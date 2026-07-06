@@ -1,0 +1,1285 @@
+/* ======================================================================
+   PROFIL (v2) — bannière TV Time, follow, listes
+   ====================================================================== */
+.pf {
+  max-width: 1000px;
+}
+
+.pf-banner {
+  margin-bottom: 1.6rem;
+}
+
+/* ---------- Cover (arrondie, contenue) ---------- */
+.pf-cover {
+  position: relative;
+  height: 230px;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background-color: var(--surface-2);
+  background-size: cover;
+  background-position: center;
+  background-image: linear-gradient(120deg, #23262e 0%, #3a3020 55%, #5a4212 100%);
+}
+
+.pf-cover-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg,
+      rgba(0, 0, 0, 0.15) 0%,
+      transparent 30%,
+      transparent 55%,
+      rgba(0, 0, 0, 0.55) 100%);
+}
+
+.pf-cover-menu {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 3;
+}
+
+.pf-cover-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(10, 10, 15, 0.55);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.82rem;
+  backdrop-filter: blur(6px);
+  transition: background 0.15s ease;
+}
+
+.pf-cover-edit:hover {
+  background: rgba(10, 10, 15, 0.8);
+}
+
+/* Chevron indiquant que « Couverture » ouvre un menu */
+.pf-cover-caret {
+  transition: transform 0.18s ease;
+  opacity: 0.85;
+}
+
+.pf-cover-menu.open .pf-cover-caret {
+  transform: rotate(180deg);
+}
+
+/* Menu déroulant du bouton « Couverture » — verre sombre, raccord avec la pastille */
+.pf-cover-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 210px;
+  padding: 6px;
+  background: rgba(12, 13, 17, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transform-origin: top right;
+  animation: pf-cover-pop-in 0.14s ease;
+}
+
+@keyframes pf-cover-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+}
+
+.pf-cover-pop button {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.6rem 0.7rem;
+  border: none;
+  background: transparent;
+  border-radius: 9px;
+  color: rgba(255, 255, 255, 0.92);
+  text-align: left;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.86rem;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.pf-cover-pop button svg {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.65);
+  transition: color 0.15s ease;
+}
+
+.pf-cover-pop button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.pf-cover-pop button:hover:not(:disabled) svg {
+  color: var(--orange);
+}
+
+.pf-cover-pop button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+/* ---------- Modale de recadrage de la couverture ---------- */
+.reframe-modal {
+  max-width: min(880px, 94vw);
+}
+
+.reframe-hint {
+  margin: 0 0 0.9rem;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
+.reframe-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1000 / 230;
+  max-height: 300px;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.reframe-stage:active {
+  cursor: grabbing;
+}
+
+.reframe-stage img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.reframe-grip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(10, 10, 15, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+/* ---------- Bandeau défilant ---------- */
+.pf-marquee {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  overflow: hidden;
+  padding: 0.5rem 0;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.35));
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+}
+
+.pf-marquee-inner {
+  display: flex;
+  width: max-content;
+  animation: pf-scroll 34s linear infinite;
+}
+
+.pf-cover:hover .pf-marquee-inner {
+  animation-play-state: paused;
+}
+
+.pf-marquee-track {
+  display: flex;
+  align-items: center;
+}
+
+.pf-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0 0.2rem;
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.pf-fact svg {
+  color: var(--amber);
+}
+
+.pf-fact-sep {
+  margin: 0 1.4rem;
+  color: var(--amber);
+  opacity: 0.7;
+  font-size: 0.6rem;
+}
+
+@keyframes pf-scroll {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* ---------- Identité ---------- */
+.pf-identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.2rem;
+  padding: 0 1.4rem;
+  position: relative;
+  z-index: 3;
+  flex-wrap: wrap;
+}
+
+/* Seul l'avatar remonte sur la couverture : le pseudo et la bio restent en
+   dessous, sur le fond de page, donc toujours lisibles (le texte ne chevauche
+   plus l'image ni le bandeau défilant, même quand une bio est présente). */
+.pf-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+  margin-top: -52px;
+}
+
+.pf-avatar {
+  width: 118px;
+  height: 118px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid var(--bg);
+  background: var(--accent-grad);
+  color: #1a1204;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 10px 26px rgba(242, 183, 11, 0.4);
+}
+
+.pf-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pf-avatar-fallback {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 3rem;
+}
+
+.pf-avatar-edit {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid var(--bg);
+  background: var(--surface);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.12s ease, color 0.15s ease;
+}
+
+.pf-avatar-edit:hover {
+  transform: scale(1.08);
+  color: var(--accent-ink);
+}
+
+.pf-idmain {
+  flex: 1;
+  min-width: 200px;
+  padding-top: 0.6rem;
+  padding-bottom: 0.3rem;
+}
+
+.pf-username {
+  font-size: clamp(1.25rem, 3vw, 1.6rem);
+  line-height: 1.1;
+}
+
+.pf-bio {
+  color: var(--text-soft);
+  margin: 0.45rem 0 0;
+  font-size: 0.94rem;
+  line-height: 1.45;
+  max-width: 60ch;
+}
+
+/* Emojis Twitter (twemoji) dans la bio et le bandeau défilant */
+.pf-bio img.emoji,
+.pf-fact img.emoji {
+  display: inline-block;
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.2em;
+  margin: 0 0.03em;
+}
+
+.pf-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.3rem;
+  margin-top: 0.7rem;
+  font-size: 0.9rem;
+  color: var(--text-soft);
+}
+
+.pf-stat {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-soft);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  transition: color 0.15s ease;
+}
+
+button.pf-stat:hover {
+  color: var(--accent-ink);
+}
+
+.pf-stat strong {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  margin-right: 0.15rem;
+}
+
+.pf-actions {
+  align-self: flex-start;
+  margin-top: 0.6rem;
+  margin-left: auto;
+}
+
+/* ---------- Bouton suivre ---------- */
+.follow-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1.15rem;
+  border-radius: 999px;
+  border: none;
+  background: var(--accent-grad);
+  color: #1a1204;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.92rem;
+  box-shadow: 0 6px 18px rgba(242, 183, 11, 0.35);
+  transition: transform 0.12s ease, filter 0.15s ease, box-shadow 0.2s ease;
+}
+
+.follow-btn:hover {
+  filter: brightness(1.05);
+}
+
+.follow-btn:active {
+  transform: translateY(1px);
+}
+
+.follow-btn.following {
+  background: var(--surface);
+  color: var(--text);
+  border: 1.5px solid var(--border-strong);
+  box-shadow: none;
+}
+
+.follow-btn.following:hover {
+  border-color: #e0483f;
+  color: #e0483f;
+}
+
+.follow-btn.small {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.82rem;
+  box-shadow: none;
+}
+
+/* ---------- Onglets (compléments) ---------- */
+.tab-count {
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  padding: 0.02rem 0.42rem;
+  border-radius: 999px;
+  margin-left: 0.1rem;
+}
+
+.pf-section-empty {
+  color: var(--text-soft);
+  align-self: center;
+  padding: 1rem;
+}
+
+.pf-inline-link {
+  color: var(--accent-ink);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+/* ---------- Modal édition : champ avec icône ---------- */
+.ep-input-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.85rem;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ep-input-icon:focus-within {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 4px var(--ring);
+}
+
+.ep-input-icon input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.98rem;
+  padding: 0.78rem 0;
+}
+
+/* Neutralise le style global `.field input` (bordure/fond/anneau) sur l'input
+   interne : sinon on voit une 2e "couche" d'input dans le wrapper au focus. */
+.field .ep-input-icon input,
+.field .ep-input-icon input:focus {
+  border: none;
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+/* Champ verrouillé (identifiant) */
+.ep-input-icon.disabled {
+  background: var(--surface-2);
+  border-color: var(--border);
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+.ep-input-icon.disabled input {
+  color: var(--text-soft);
+  cursor: not-allowed;
+}
+
+.ep-help {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+
+/* Compteur de caractères de la bio */
+.ep-counter {
+  float: right;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+/* Bio : bouton émoji + popover */
+.ep-bio-wrap {
+  position: relative;
+}
+
+.ep-bio-wrap .modal-textarea {
+  padding-right: 2.6rem;
+}
+
+.ep-emoji-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 8px;
+  color: var(--text-soft);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.ep-emoji-btn:hover,
+.ep-emoji-btn.on {
+  background: var(--surface-2);
+  color: var(--orange);
+}
+
+.ep-emoji-pop {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 12px);
+  /* à droite de la zone bio, là où il y a la place */
+  z-index: 50;
+  width: min(340px, 88vw);
+  animation: lc-pop-in 0.12s ease;
+}
+
+.ep-emoji-pop .lc-emoji-wrap {
+  max-width: none;
+}
+
+/* Sur petit écran : pas la place à droite → on repasse en dessous */
+@media (max-width: 900px) {
+  .ep-emoji-pop {
+    top: calc(100% + 6px);
+    left: auto;
+    right: 0;
+  }
+}
+
+/* La règle globale `.field input` cassait le champ de recherche interne du
+   picker (padding de l'icône, bordure…). On rend la main à la librairie. */
+.field .lc-emoji-wrap input {
+  padding: var(--epr-search-input-padding, 0 30px);
+  height: var(--epr-search-input-height, 40px);
+  border: 1px solid var(--epr-search-border-color);
+  border-radius: var(--epr-search-input-border-radius, 8px);
+  background: var(--epr-search-input-bg-color);
+  color: var(--epr-search-input-text-color);
+  box-shadow: none;
+  font-family: var(--font-body);
+  font-size: 15px;
+}
+
+.field .lc-emoji-wrap input:focus {
+  border-color: var(--epr-search-border-color-active);
+  box-shadow: none;
+}
+
+/* Alter ego : recherche + sélection d'un personnage */
+.ep-char-search {
+  position: relative;
+}
+
+.ep-char-results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  animation: lc-pop-in 0.12s ease;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.ep-char-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  background: transparent;
+  border-radius: 9px;
+  text-align: left;
+  transition: background 0.12s ease;
+}
+
+.ep-char-opt:hover {
+  background: var(--surface-2);
+}
+
+.ep-char-opt-img {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.ep-char-opt-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ep-char-opt-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ep-char-opt-txt b {
+  font-size: 0.9rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ep-char-opt-txt small {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ep-char-empty {
+  margin: 0;
+  padding: 0.6rem;
+  text-align: center;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+}
+
+.ep-char-selected {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.ep-char-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.7rem 0.35rem 0.35rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.ep-char-chip-img {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--text-soft);
+}
+
+.ep-char-chip-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ep-char-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: none;
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  transition: color 0.15s ease;
+}
+
+.ep-char-clear:hover {
+  color: var(--orange);
+}
+
+/* ---------- CoverPicker ---------- */
+.coverpick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.7rem;
+  max-height: 50vh;
+  overflow-y: auto;
+  padding: 0.2rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.coverpick-img {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid var(--border);
+  background: var(--surface-2);
+  padding: 0;
+  transition: border-color 0.15s ease, transform 0.12s ease;
+}
+
+.coverpick-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.coverpick-img:hover {
+  border-color: var(--orange);
+  transform: translateY(-2px);
+}
+
+.coverpick-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 8, 12, 0.65);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.coverpick-img:hover .coverpick-check,
+.coverpick-img.active .coverpick-check {
+  opacity: 1;
+}
+
+.coverpick-img.active {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.coverpick-img.active .coverpick-check {
+  background: var(--accent-grad);
+  color: #1a1204;
+}
+
+/* ---------- Modal follow ---------- */
+.follow-modal {
+  max-width: 460px;
+}
+
+.follow-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.follow-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem;
+  border-radius: 12px;
+  transition: background 0.15s ease;
+}
+
+.follow-row:hover {
+  background: var(--surface-2);
+}
+
+.follow-user {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.follow-avatar {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--accent-grad);
+  color: #1a1204;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.follow-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.follow-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.follow-info strong {
+  color: var(--text);
+}
+
+.follow-bio {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ld-author-link:hover strong,
+.ld-comment-head a:hover strong {
+  color: var(--orange);
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .pf-identity {
+    align-items: flex-start;
+  }
+
+  .pf-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .pf-actions .btn,
+  .pf-actions .follow-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ======================================================================
+   PROFIL — onglet "Tous les jeux" (filtres + grille)
+   ====================================================================== */
+.pg-layout {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  gap: 1.4rem;
+  align-items: start;
+}
+
+.pg-panel {
+  position: sticky;
+  top: calc(var(--topbar-h, 60px) + 12px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.05rem 1.2rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.pg-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.pg-panel-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.pg-filter-block {
+  margin-bottom: 1.15rem;
+}
+
+.pg-filter-label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  margin-bottom: 0.55rem;
+}
+
+.pg-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.pg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.36rem 0.7rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.82rem;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.pg-chip:hover {
+  border-color: var(--orange);
+  color: var(--text);
+}
+
+.pg-chip.active {
+  background: var(--accent-grad);
+  color: #1a1204;
+  border-color: transparent;
+}
+
+.pg-chip.wide {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Filtre note — segmented control */
+/* Filtre de note : opérateur ≥/≤ + valeur (ou vide = toutes) */
+.pg-rating-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pg-rating-ops {
+  display: flex;
+  flex-shrink: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.pg-rating-op {
+  width: 30px;
+  border: none;
+  background: none;
+  padding: 0.35rem 0;
+  border-radius: 7px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--text-soft);
+  transition: color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pg-rating-op:hover {
+  color: var(--text);
+}
+
+.pg-rating-op.active {
+  background: var(--accent-grad);
+  color: #1a1204;
+  box-shadow: 0 2px 8px rgba(242, 183, 11, 0.35);
+}
+
+.pg-rating-input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border-radius: 10px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pg-rating-input:focus {
+  outline: none;
+  border-color: var(--orange);
+  box-shadow: 0 0 0 4px var(--ring);
+}
+
+/* Masque les flèches natives du input number */
+.pg-rating-input::-webkit-outer-spin-button,
+.pg-rating-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.pg-rating-input {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.pg-rating-clear {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--text-soft);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.pg-rating-clear:hover {
+  color: var(--orange);
+  background: var(--surface-2);
+}
+
+.pg-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.pg-search {
+  flex: 1;
+  min-width: 180px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+}
+
+.pg-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  min-width: 0;
+}
+
+.pg-search-clear {
+  border: none;
+  background: none;
+  color: var(--text-soft);
+  display: grid;
+  place-items: center;
+}
+
+.pg-search-clear:hover {
+  color: var(--text);
+}
+
+.pg-sort {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pg-filter-toggle {
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.pg-count {
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  margin-bottom: 0.8rem;
+}
+
+.pg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1rem;
+}
+
+/* ---------- Tuile jeu ---------- */
+.pg-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+}
+
+.pg-tile-cover {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.pg-tile:hover .pg-tile-cover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow);
+  border-color: color-mix(in srgb, var(--orange) 40%, var(--border));
+}
+
+.pg-tile-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pg-tile-ph {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+
+.pg-tile-fav {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 10, 15, 0.6);
+  color: var(--amber);
+  backdrop-filter: blur(4px);
+}
+
+.pg-tile-rating {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(8, 8, 12, 0.72);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--font-display);
+  backdrop-filter: blur(4px);
+}
+
+.pg-tile-status {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-family: var(--font-display);
+  color: #fff;
+  backdrop-filter: blur(4px);
+}
+
+.pg-tile-status.s-playing {
+  background: rgba(74, 168, 255, 0.9);
+}
+
+.pg-tile-status.s-finished {
+  background: rgba(61, 214, 140, 0.92);
+  color: #06301d;
+}
+
+.pg-tile-status.s-paused {
+  background: rgba(242, 183, 11, 0.92);
+  color: #2b1e02;
+}
+
+.pg-tile-status.s-dropped {
+  background: rgba(224, 72, 63, 0.9);
+}
+
+.pg-tile-status.s-wishlist {
+  background: rgba(168, 121, 255, 0.9);
+}
+
+.pg-tile-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.86rem;
+  line-height: 1.15;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pg-tile-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+
+@media (max-width: 860px) {
+  .pg-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .pg-panel {
+    display: none;
+    position: static;
+  }
+
+  .pg-panel.open {
+    display: block;
+    margin-bottom: 1rem;
+  }
+
+  .pg-filter-toggle {
+    display: inline-flex;
+  }
+}

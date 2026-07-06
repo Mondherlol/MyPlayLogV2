@@ -1,0 +1,9 @@
+/node_modules
+./idees-app.txt
+./combined.log
+/AUTRES
+/server/.env
+/server/server.log
+/server/node_modules
+/server/.igdb-token.json
+/server/uploads

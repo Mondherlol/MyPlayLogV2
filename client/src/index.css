@@ -1,0 +1,249 @@
+/* ======================================================================
+   MyPlayLog — Design system (v2)
+   Épuré, moderne, nostalgique-sexy. Inspiré TV Time.
+   Light : blanc + grille "bloc-note" discrète.
+   Dark  : sombre profond + grille discrète, accents orange/ambre.
+   ====================================================================== */
+
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Fredoka:wght@500;600&display=swap");
+
+:root {
+  /* Accent doré (esprit TV Time).
+     --orange garde son nom (alias historique) mais vaut désormais un doré vif. */
+  --orange: #f2b70b;
+  --amber: #ffd24a;
+  --accent-grad: linear-gradient(100deg, #eaa908 0%, #ffcf3a 100%);
+  --accent-ink: #97680a; /* doré profond : lisible en TEXTE sur fond clair */
+  --brand-grad: linear-gradient(100deg, #b07d08 0%, #d29e06 100%);
+
+  /* THEME CLAIR */
+  --bg: #ffffff;
+  --grid-line: rgba(20, 20, 40, 0.045);
+  --surface: #ffffff;
+  --surface-2: #f6f6f8;
+  --border: #ececef;
+  --border-strong: #e0e0e5;
+  --text: #14151a;
+  --text-soft: #6b6c76;
+  --shadow-sm: 0 1px 2px rgba(20, 20, 40, 0.05);
+  --shadow: 0 8px 30px rgba(20, 20, 40, 0.08);
+  --ring: rgba(242, 183, 11, 0.32);
+
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-fun: "Fredoka", system-ui, sans-serif;
+
+  --radius: 14px;
+  --radius-lg: 20px;
+}
+
+:root[data-theme="dark"] {
+  /* Sur fond sombre, le doré vif ressort : l'encre d'accent redevient vive */
+  --accent-ink: #ffd24a;
+  --brand-grad: linear-gradient(100deg, #f0b012 0%, #ffd23f 100%);
+
+  --bg: #0c0d11;
+  --grid-line: rgba(255, 255, 255, 0.035);
+  --surface: #14161c;
+  --surface-2: #1b1e26;
+  --border: #23262f;
+  --border-strong: #2d313c;
+  --text: #f2f3f6;
+  --text-soft: #9a9dab;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
+  --ring: rgba(255, 210, 74, 0.4);
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg);
+  /* Motif bloc-note : grille fine */
+  background-image: linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 28px 28px;
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Halo d'accent très discret en haut */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(
+    900px 420px at 70% -15%,
+    rgba(242, 183, 11, 0.12),
+    transparent 65%
+  );
+  pointer-events: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.025em;
+  line-height: 1.06;
+  margin: 0;
+  font-weight: 700;
+}
+
+/* ---------- Curseur pixel-art ---------- */
+@media (pointer: fine) {
+  html,
+  body {
+    cursor: url("/cursor.svg") 2 2, auto;
+  }
+  a,
+  button,
+  [role="button"],
+  .clickable,
+  label {
+    cursor: url("/cursor.svg") 2 2, pointer;
+  }
+  input,
+  textarea,
+  select {
+    cursor: text;
+  }
+}
+
+/* ---------- Typo utilitaires ---------- */
+.font-fun {
+  font-family: var(--font-fun);
+}
+.grad-text {
+  background: var(--brand-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---------- Boutons ---------- */
+.btn {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.72rem 1.25rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: transform 0.12s ease, box-shadow 0.2s ease, filter 0.2s ease,
+    background 0.2s ease, border-color 0.2s ease;
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn svg {
+  width: 18px;
+  height: 18px;
+}
+.btn-primary {
+  background: var(--accent-grad);
+  color: #1a1204;
+  box-shadow: 0 6px 18px rgba(242, 183, 11, 0.35);
+}
+.btn-primary:hover {
+  filter: brightness(1.05);
+  box-shadow: 0 8px 24px rgba(242, 183, 11, 0.5);
+}
+.btn-ghost {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+}
+.btn-ghost:hover {
+  border-color: var(--orange);
+}
+.btn-block {
+  width: 100%;
+  justify-content: center;
+}
+
+/* ---------- Champs ---------- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+.field label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+.field input {
+  font-family: var(--font-body);
+  font-size: 0.98rem;
+  padding: 0.78rem 0.95rem;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.field input::placeholder {
+  color: var(--text-soft);
+  opacity: 0.6;
+}
+.field input:focus {
+  outline: none;
+  border-color: var(--orange);
+  box-shadow: 0 0 0 4px var(--ring);
+}
+
+/* ---------- Cartes ---------- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---------- Alertes ---------- */
+.alert {
+  padding: 0.7rem 0.95rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+.alert-error {
+  background: rgba(230, 60, 60, 0.1);
+  color: #e0483f;
+  border: 1px solid rgba(230, 60, 60, 0.28);
+}
+
+.center-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

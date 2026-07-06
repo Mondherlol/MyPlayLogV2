@@ -1,0 +1,37 @@
+MyPlayLog - Concept (type "TV Time" mais pour les jeux vidéo)
+=============================================================
+
+Plateformes visées
+- App mobile (Android APK, idéalement iOS aussi)
+- Site web
+
+Fonctionnalités
+- Tracker les jeux joués (en cours, terminés, à jouer, abandonnés)
+- Noter les jeux
+- Statistiques de temps de jeu
+- Voir quels jeux ont joué les amis
+- Créer des listes de jeux
+- Créer des tops / classements de jeux
+- Feed d'activité des amis
+- Import de la bibliothèque depuis PSN et Steam
+- Tracking des trophées / succès
+- Système de "ressenti" par jeu : chat solo ou en groupe autour d'un jeu (esprit Amino / communautés)
+- Profil complet : jeux favoris, OST favorite, etc.
+- Partager clips - vidéos - images -memes 
+- Récuperer auto un feed sur un jeu depuis twitter - reddit -notes JVC pour avoir un feed sympa à scroll sur chaque page de jeu
+- Recuperer time to beat 
+- Télcharger jeu - le télécharge depuis C411, ygg.gratis , fitgirl etc 
+- Is it cracked ? - scrap depuis isitcracked 
+- Jouer directement dans le navigateur (ex : jeux DS via émulateur web)
+- Ost de jeux vidéos qui se lancent sur le site - radio et les users peuvent rajouter leurs OST 
+- Api vndb pour les Visual Novels 
+- Tier Lists 
+- Récuperer personnages du jeu
+- Découper note en OSTs, etc..
+-Bibilotheque 3D jaquettes 3D consoles 3D
+- Feeed quand user rajoute un ou des persos, modifie un perso, rajoute des covers, ost...
+Note technique
+- IA pour m'aider a choisir un jeu à finir / commencer
+- Animés de jeux (persona, ace attorney, ...) & regarder épisode apparait dans le feed
+- Jouer aux jeux DS dans le navigateur : techniquement possible via émulateur WASM
+  (ex : DeSmuME/EmulatorJS). Attention aux aspects légaux (ROMs).

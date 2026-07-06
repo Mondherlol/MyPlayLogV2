@@ -1,0 +1,438 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Search,
+  Bell,
+  User,
+  Settings,
+  LogOut,
+  ChevronDown,
+  X,
+  AtSign,
+  Reply,
+  Heart,
+  MessageSquare,
+  Loader2,
+  Send,
+  Plus,
+  Gamepad2,
+  Users,
+  CornerDownLeft,
+  Music,
+  Repeat2,
+} from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { useClickOutside } from "../hooks/useClickOutside";
+import { apiFetch } from "../lib/api";
+import { timeAgo } from "../lib/lists";
+
+// Libellé + icône selon le type de notification.
+const NOTIF_META = {
+  mention: { Icon: AtSign, verb: "t'a mentionné" },
+  comment_reply: { Icon: Reply, verb: "a répondu à ton commentaire" },
+  comment_like: { Icon: Heart, verb: "a aimé ton commentaire" },
+  list_comment: { Icon: MessageSquare, verb: "a commenté ta liste" },
+  list_like: { Icon: Heart, verb: "a aimé ta liste" },
+  review_comment: { Icon: MessageSquare, verb: "a répondu à ta review" },
+  review_comment_reply: { Icon: Reply, verb: "a répondu à ton commentaire" },
+  review_comment_like: { Icon: Heart, verb: "a aimé ton commentaire" },
+  ost_comment: { Icon: Music, verb: "a commenté ton OST" },
+  repost_comment: { Icon: Repeat2, verb: "a commenté ton fan art republié" },
+  repost_like: { Icon: Heart, verb: "a aimé ton fan art republié" },
+  recommendation: { Icon: Send, verb: "t'a recommandé" },
+  recommendation_boost: { Icon: Plus, verb: "a fait +1 sur ta reco de" },
+  recommendation_comment: { Icon: MessageSquare, verb: "a commenté la reco de" },
+};
+
+export default function Topbar() {
+  const { user, token, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [searchMode, setSearchMode] = useState("games"); // 'games' | 'users'
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [menu, setMenu] = useState(null); // 'notif' | 'profile' | null
+
+  // Notifications
+  const [notifs, setNotifs] = useState([]);
+  const [unread, setUnread] = useState(0);
+  const [notifLoading, setNotifLoading] = useState(false);
+
+  const searchRef = useRef(null);
+  const searchInput = useRef(null);
+  const notifRef = useRef(null);
+  const profileRef = useRef(null);
+
+  useClickOutside(searchRef, () => closeSearch(), searchOpen);
+  useClickOutside(notifRef, () => setMenu(null), menu === "notif");
+  useClickOutside(profileRef, () => setMenu(null), menu === "profile");
+
+  useEffect(() => {
+    if (searchOpen) searchInput.current?.focus();
+  }, [searchOpen]);
+
+  // Recherche instantanée (debounce) : jeux via IGDB, joueurs via username.
+  useEffect(() => {
+    const term = query.trim();
+    if (!searchOpen || !term) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        if (searchMode === "games") {
+          const d = await apiFetch(
+            `/games?search=${encodeURIComponent(term)}&limit=6`,
+            { token }
+          );
+          setResults(d.games || []);
+        } else {
+          const d = await apiFetch(
+            `/users/search/mentions?q=${encodeURIComponent(term)}`,
+            { token }
+          );
+          setResults(d.users || []);
+        }
+      } catch {
+        setResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [query, searchMode, searchOpen, token]);
+
+  function closeSearch() {
+    setSearchOpen(false);
+    setResults([]);
+  }
+
+  // Jeux : Entrée / clic « plus de résultats » → page Explorer.
+  function goExplore() {
+    const term = query.trim();
+    navigate(term ? `/explore?q=${encodeURIComponent(term)}` : "/explore");
+    closeSearch();
+  }
+
+  function openResult(r) {
+    if (searchMode === "games") navigate(`/game/${r.id}`);
+    else navigate(`/u/${r.username}`);
+    setQuery("");
+    closeSearch();
+  }
+
+  // Compteur de non-lues : au montage + toutes les 45s.
+  useEffect(() => {
+    if (!token) return;
+    let alive = true;
+    const poll = () =>
+      apiFetch("/notifications/unread-count", { token })
+        .then((d) => alive && setUnread(d.unread || 0))
+        .catch(() => {});
+    poll();
+    const id = setInterval(poll, 45000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [token]);
+
+  // Ouverture du panneau : charge les notifs et marque comme lues.
+  const openNotifs = useCallback(async () => {
+    setNotifLoading(true);
+    try {
+      const d = await apiFetch("/notifications", { token });
+      setNotifs(d.notifications || []);
+      if ((d.unread || 0) > 0) {
+        await apiFetch("/notifications/read", { method: "POST", token });
+      }
+      setUnread(0);
+    } catch {
+      /* silencieux */
+    } finally {
+      setNotifLoading(false);
+    }
+  }, [token]);
+
+  function toggleNotif() {
+    setMenu((m) => {
+      const next = m === "notif" ? null : "notif";
+      if (next === "notif") openNotifs();
+      return next;
+    });
+  }
+
+  function openNotifTarget(n) {
+    setMenu(null);
+    // OST : ouvre l'onglet OST du profil concerné, sur la bonne piste.
+    if (n.ostOwner) {
+      navigate(`/u/${n.ostOwner}?tab=ost${n.game ? `&ost=${n.game}` : ""}`);
+    } else if (n.repostOwner) {
+      // Repost : ouvre l'onglet Feed du profil dont vient la republication.
+      navigate(`/u/${n.repostOwner}?tab=feed`);
+    } else if (n.type?.startsWith("recommendation")) {
+      if (n.type === "recommendation" && n.game) navigate(`/game/${n.game}`);
+      else navigate("/profile?tab=reco");
+    } else if (n.type?.startsWith("review") && n.game) {
+      navigate(`/game/${n.game}?tab=reviews`);
+    } else if (n.listId) navigate(`/lists/${n.listId}`);
+    // Mention dans une réponse de review : pas de liste, mais un jeu ciblé.
+    else if (n.game) navigate(`/game/${n.game}?tab=reviews`);
+  }
+
+  function onSearchSubmit(e) {
+    e.preventDefault();
+    // Pas de page « recherche de joueurs » : Entrée ne fait rien en mode users.
+    if (searchMode === "users") return;
+    goExplore();
+  }
+
+  return (
+    <header className="topbar">
+      <div className="topbar-actions">
+        {/* Recherche */}
+        <div className={`search ${searchOpen ? "open" : ""}`} ref={searchRef}>
+          <form onSubmit={onSearchSubmit} className="search-form">
+            <button
+              type="button"
+              className="icon-btn clickable"
+              onClick={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
+              aria-label="Rechercher"
+              title="Rechercher"
+            >
+              {searchOpen ? <X size={19} /> : <Search size={19} />}
+            </button>
+            <input
+              ref={searchInput}
+              className="search-input"
+              type="text"
+              placeholder={
+                searchMode === "games"
+                  ? "Rechercher un jeu…"
+                  : "Rechercher un joueur…"
+              }
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </form>
+
+          {searchOpen && query.trim() && (
+            <div className="search-panel card">
+              <div className="search-tabs">
+                <button
+                  type="button"
+                  className={`search-tab clickable ${
+                    searchMode === "games" ? "active" : ""
+                  }`}
+                  onClick={() => setSearchMode("games")}
+                >
+                  <Gamepad2 size={15} /> Jeux
+                </button>
+                <button
+                  type="button"
+                  className={`search-tab clickable ${
+                    searchMode === "users" ? "active" : ""
+                  }`}
+                  onClick={() => setSearchMode("users")}
+                >
+                  <Users size={15} /> Joueurs
+                </button>
+              </div>
+
+              <div className="search-results">
+                {searching ? (
+                  <div className="search-state">
+                    <Loader2 size={18} className="spin" />
+                  </div>
+                ) : results.length === 0 ? (
+                  <div className="search-state">Aucun résultat.</div>
+                ) : searchMode === "games" ? (
+                  results.map((g) => (
+                    <button
+                      key={g.id}
+                      className="search-res clickable"
+                      onClick={() => openResult(g)}
+                    >
+                      <span className="search-res-cover">
+                        {g.cover ? (
+                          <img src={g.cover} alt="" loading="lazy" />
+                        ) : (
+                          <Gamepad2 size={16} />
+                        )}
+                      </span>
+                      <span className="search-res-name">{g.name}</span>
+                    </button>
+                  ))
+                ) : (
+                  results.map((u) => (
+                    <button
+                      key={u.id}
+                      className="search-res clickable"
+                      onClick={() => openResult(u)}
+                    >
+                      <span className="search-res-av">
+                        {u.avatar ? (
+                          <img src={u.avatar} alt="" loading="lazy" />
+                        ) : (
+                          (u.username || "?")[0].toUpperCase()
+                        )}
+                      </span>
+                      <span className="search-res-name">{u.username}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+
+              {searchMode === "games" && !searching && results.length > 0 && (
+                <button className="search-more clickable" onClick={goExplore}>
+                  <CornerDownLeft size={13} /> Entrée pour plus de résultats
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Notifications */}
+        <div className="dd" ref={notifRef}>
+          <button
+            className="icon-btn clickable"
+            onClick={toggleNotif}
+            aria-label="Notifications"
+            title="Notifications"
+          >
+            <Bell size={19} />
+            {unread > 0 && (
+              <span className="notif-badge">{unread > 9 ? "9+" : unread}</span>
+            )}
+          </button>
+          {menu === "notif" && (
+            <div className="dd-menu card notif-menu">
+              <div className="dd-title">Notifications</div>
+              {notifLoading && notifs.length === 0 ? (
+                <div className="notif-empty">
+                  <Loader2 size={20} className="spin" />
+                </div>
+              ) : notifs.length === 0 ? (
+                <div className="notif-empty">
+                  <Bell size={22} />
+                  <p>Pas de notification pour l'instant.</p>
+                </div>
+              ) : (
+                <div className="notif-list">
+                  {notifs.map((n) => {
+                    const meta = NOTIF_META[n.type] || NOTIF_META.list_like;
+                    return (
+                      <button
+                        key={n.id}
+                        className={`notif-item clickable ${n.read ? "" : "unread"}`}
+                        onClick={() => openNotifTarget(n)}
+                      >
+                        <span className="notif-avatar">
+                          {n.actor?.avatar ? (
+                            <img src={n.actor.avatar} alt="" />
+                          ) : (
+                            (n.actor?.username || "?")[0].toUpperCase()
+                          )}
+                          <span className={`notif-type t-${n.type}`}>
+                            <meta.Icon size={11} />
+                          </span>
+                        </span>
+                        <span className="notif-body">
+                          <span className="notif-text">
+                            <strong>{n.actor?.username || "Quelqu'un"}</strong> {meta.verb}
+                            {n.listTitle && (
+                              <> «&nbsp;{n.listTitle}&nbsp;»</>
+                            )}
+                            {n.gameName && (
+                              <> «&nbsp;{n.gameName}&nbsp;»</>
+                            )}
+                          </span>
+                          {n.snippet && (
+                            <span className="notif-snippet">{n.snippet}</span>
+                          )}
+                          <span className="notif-time">{timeAgo(n.createdAt)}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Profil */}
+        <div className="dd" ref={profileRef}>
+          <button
+            className="profile-btn clickable"
+            onClick={() => setMenu((m) => (m === "profile" ? null : "profile"))}
+            aria-label="Menu du profil"
+          >
+            <span className="avatar">
+              {user?.avatar ? (
+                <img src={user.avatar} alt={user.username} />
+              ) : (
+                <User size={18} strokeWidth={2.2} />
+              )}
+            </span>
+            <span className="profile-name">{user?.username}</span>
+            <ChevronDown
+              size={16}
+              className={`profile-caret ${menu === "profile" ? "up" : ""}`}
+            />
+          </button>
+          {menu === "profile" && (
+            <div className="dd-menu card profile-menu">
+              <div className="profile-head">
+                <span className="avatar avatar-lg">
+                  {user?.avatar ? (
+                    <img src={user.avatar} alt={user.username} />
+                  ) : (
+                    <User size={20} strokeWidth={2.2} />
+                  )}
+                </span>
+                <div className="profile-head-info">
+                  <strong>{user?.username}</strong>
+                  <span>{user?.email}</span>
+                </div>
+              </div>
+              <div className="dd-sep" />
+              <button
+                className="dd-item clickable"
+                onClick={() => {
+                  setMenu(null);
+                  navigate("/profile");
+                }}
+              >
+                <User size={17} /> Mon profil
+              </button>
+              <button
+                className="dd-item clickable"
+                onClick={() => {
+                  setMenu(null);
+                  navigate("/settings");
+                }}
+              >
+                <Settings size={17} /> Paramètres
+              </button>
+              <button
+                className="dd-item danger clickable"
+                onClick={() => {
+                  setMenu(null);
+                  logout();
+                  navigate("/");
+                }}
+              >
+                <LogOut size={17} /> Déconnexion
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}

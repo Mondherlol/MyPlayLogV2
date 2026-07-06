@@ -1,0 +1,13 @@
+{
+  "name": "myplaylog",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MyPlayLog — monorepo (client React + server Express/MongoDB)",
+  "scripts": {
+    "dev": "concurrently -n SERVER,CLIENT -c yellow,magenta \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "install:all": "npm install && npm --prefix server install && npm --prefix client install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

@@ -1,0 +1,5 @@
+node_modules/
+.env
+.igdb-token.json
+server.log
+uploads/

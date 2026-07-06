@@ -1,0 +1,1527 @@
+import express from "express";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import multer from "multer";
+import { igdbQuery } from "../lib/igdb.js";
+import { getValidAccessToken, fetchUserTitles, fetchTitleTrophies } from "../lib/psn.js";
+import { isAdminEmail } from "../lib/admin.js";
+import { requireAuth } from "../middleware/auth.js";
+import { notify } from "../lib/notify.js";
+import { summarizeReactions, reviewComment } from "../lib/reviewSerialize.js";
+import User from "../models/User.js";
+import UserGame from "../models/UserGame.js";
+import CustomCover from "../models/CustomCover.js";
+import CustomCharacter from "../models/CustomCharacter.js";
+import CustomOst from "../models/CustomOst.js";
+import GameTime from "../models/GameTime.js";
+import HiddenOst from "../models/HiddenOst.js";
+import VnCache from "../models/VnCache.js";
+import { fetchHltbTimes } from "../lib/hltb.js";
+import { buildGameFeed, fetchSteamReviews } from "../lib/feed.js";
+import { findVnId, fetchVnCharacters } from "../lib/vndb.js";
+import { GENRES_FR, MODES_FR, THEMES_FR, LANGUAGES_FR, frName } from "../lib/translations.js";
+
+const YT_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+
+function youtubeId(url) {
+  const m = String(url).match(
+    /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/))([\w-]{11})/
+  );
+  return m ? m[1] : null;
+}
+function youtubePlaylistId(url) {
+  const m = String(url).match(/[?&]list=([\w-]+)/);
+  return m ? m[1] : null;
+}
+
+// Titre + auteur d'une vidéo YouTube via oembed (public, sans clé)
+async function ytOembed(videoId) {
+  try {
+    const r = await fetch(
+      `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
+    );
+    if (!r.ok) return null;
+    const j = await r.json();
+    return { title: j.title, author: j.author_name };
+  } catch {
+    return null;
+  }
+}
+
+// Extrait les pistes d'une playlist YouTube (scraping de la page)
+async function ytPlaylistTracks(playlistId) {
+  const html = await fetch(
+    `https://www.youtube.com/playlist?list=${playlistId}`,
+    { headers: { "User-Agent": YT_UA, "Accept-Language": "en" } }
+  ).then((r) => r.text());
+  const raw = html.split("ytInitialData = ")[1]?.split(";</script>")[0];
+  if (!raw) return [];
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  const out = [];
+  const seen = new Set();
+  (function walk(o) {
+    if (!o || typeof o !== "object") return;
+    if (o.lockupViewModel) {
+      const lm = o.lockupViewModel;
+      const id = lm.contentId;
+      const title = lm.metadata?.lockupMetadataViewModel?.title?.content;
+      if (id && title && !seen.has(id)) {
+        seen.add(id);
+        out.push({ videoId: id, title });
+      }
+    }
+    for (const k in o) walk(o[k]);
+  })(data);
+  return out;
+}
+
+const router = express.Router();
+
+const IMG_BASE = "https://images.igdb.com/igdb/image/upload";
+
+// --- Upload de covers custom ---
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const UPLOAD_DIR = path.join(__dirname, "../../uploads/covers");
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || ".jpg";
+    cb(null, `${req.params.id}-${Date.now()}-${Math.round(Math.random() * 1e6)}${ext}`);
+  },
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 Mo
+  fileFilter: (req, file, cb) =>
+    cb(null, /^image\/(jpe?g|png|webp|gif)$/.test(file.mimetype)),
+});
+
+const FIELDS =
+  "fields name,alternative_names.name,alternative_names.comment,cover.image_id,total_rating,total_rating_count,first_release_date,genres.name,platforms.abbreviation,platforms.name";
+
+// Champs de tri disponibles
+const SORT_FIELDS = {
+  popularity: "total_rating_count",
+  rating: "total_rating",
+  release: "first_release_date",
+  name: "name",
+};
+
+function mapGame(g) {
+  // Titre français si IGDB en a un (commentaire "French title")
+  const fr = (g.alternative_names || []).find((a) =>
+    /french/i.test(a.comment || "")
+  );
+  return {
+    id: g.id,
+    name: fr?.name || g.name,
+    cover: g.cover?.image_id
+      ? `${IMG_BASE}/t_cover_big/${g.cover.image_id}.jpg`
+      : null,
+    rating: g.total_rating ? Math.round(g.total_rating) : null,
+    year: g.first_release_date
+      ? new Date(g.first_release_date * 1000).getFullYear()
+      : null,
+    genres: (g.genres || []).map((x) => x.name),
+    platforms: (g.platforms || [])
+      .map((p) => p.abbreviation || p.name)
+      .filter(Boolean),
+  };
+}
+
+// Temps de jeu (Time to Beat) : IGDB en priorité, sinon fallback HowLongToBeat
+// mis en cache (on ne scrape qu'UNE fois par jeu, jamais de re-scrape).
+async function resolveTimeToBeat(id, name) {
+  const ttbArr = await igdbQuery(
+    "game_time_to_beats",
+    `fields hastily,normally,completely; where game_id = ${id};`
+  ).catch(() => []);
+  const toH = (s) => (s ? Math.round(s / 3600) : null);
+  const t = ttbArr[0];
+  let timeToBeat = t
+    ? { hastily: toH(t.hastily), normally: toH(t.normally), completely: toH(t.completely) }
+    : null;
+
+  if (!timeToBeat) {
+    const cached = await GameTime.findOne({ gameId: id });
+    if (cached) {
+      if (cached.hastily || cached.normally || cached.completely) {
+        timeToBeat = {
+          hastily: cached.hastily,
+          normally: cached.normally,
+          completely: cached.completely,
+        };
+      }
+    } else if (name) {
+      // Marque comme "en cours" (empêche tout re-scrape) puis fetch en
+      // arrière-plan : la réponse actuelle renvoie null, la prochaine ouverture
+      // aura les valeurs si HLTB a répondu.
+      try {
+        await GameTime.create({ gameId: id, source: "pending" });
+        fetchHltbTimes(name)
+          .then((res) =>
+            GameTime.updateOne(
+              { gameId: id },
+              { $set: res ? { ...res, source: "hltb" } : { source: "none" } }
+            )
+          )
+          .catch(() => {});
+      } catch {
+        /* course : déjà créé par une autre requête */
+      }
+    }
+  }
+  return timeToBeat;
+}
+
+// Comparaison tolérante de noms de perso (casse, ponctuation, accents) pour dédoublonner.
+function normCharName(s) {
+  return String(s || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+// Personnages VNDB d'un visual novel, avec cache DB (re-tente si vide et périmé).
+// VN_VERSION : à incrémenter dès qu'on change la logique de résolution, pour
+// invalider automatiquement les entrées mises en cache par l'ancienne version.
+const VN_VERSION = 2;
+const VN_STALE_MS = 7 * 24 * 60 * 60 * 1000;
+async function resolveVnCharacters(gameId, name) {
+  try {
+    const cached = await VnCache.findOne({ gameId });
+    const fresh =
+      cached &&
+      cached.ver === VN_VERSION &&
+      (cached.characters?.length || Date.now() - cached.updatedAt.getTime() < VN_STALE_MS);
+    if (fresh) return cached.characters || [];
+
+    const vnId = await findVnId(name);
+    const characters = vnId ? await fetchVnCharacters(vnId) : [];
+    await VnCache.updateOne(
+      { gameId },
+      { $set: { vnId: vnId || null, characters, ver: VN_VERSION } },
+      { upsert: true }
+    ).catch(() => {});
+    return characters;
+  } catch {
+    return [];
+  }
+}
+
+// Liste d'ids "1,2,3" -> [1,2,3]
+function parseIds(str) {
+  return String(str || "")
+    .split(",")
+    .map((s) => parseInt(s, 10))
+    .filter((n) => Number.isInteger(n));
+}
+
+// Construit une clause pour une catégorie multi-valeurs avec mode ET/OU
+function clause(field, ids, mode) {
+  if (!ids.length) return null;
+  if (ids.length === 1) return `${field} = (${ids[0]})`;
+  const parts = ids.map((id) => `${field} = (${id})`);
+  return mode === "and" ? parts.join(" & ") : `(${parts.join(" | ")})`;
+}
+
+function buildQuery(opts) {
+  const { search, sort, dir, limit, offset, filters, typeIds } = opts;
+  // version_parent = null : exclut les éditions/remasters "version de" (Deluxe,
+  // Collector's, Ellie Edition…) qu'IGDB classe pourtant en game_type = 0.
+  const where = ["cover != null", "version_parent = null"];
+
+  // Type de jeu (game_type) : un jeu n'a qu'un type -> toujours en OU.
+  if (typeIds && typeIds.length) {
+    const parts = typeIds.map((id) => `game_type = ${id}`);
+    where.push(parts.length === 1 ? parts[0] : `(${parts.join(" | ")})`);
+  }
+
+  // Recherche par nom + titres alternatifs (toutes langues / régions).
+  // ~ *"..."* est compatible avec sort et les filtres (pas la commande `search`).
+  if (search)
+    where.push(
+      `(name ~ *"${search}"* | alternative_names.name ~ *"${search}"*)`
+    );
+
+  for (const f of filters) {
+    const c = clause(f.field, f.ids, f.mode);
+    if (c) where.push(c);
+  }
+
+  const field = SORT_FIELDS[sort] || SORT_FIELDS.popularity;
+  const direction = dir === "asc" ? "asc" : "desc";
+  const now = Math.floor(Date.now() / 1000);
+
+  // Filtres "qualité" uniquement en navigation : en recherche on ne veut pas
+  // masquer un jeu peu noté / pas encore sorti que l'utilisateur cherche.
+  if (!search) {
+    if (sort === "rating")
+      where.push("total_rating != null", "total_rating_count > 80");
+    else if (sort === "release") {
+      where.push("first_release_date != null");
+      if (direction === "desc") where.push(`first_release_date <= ${now}`);
+    } else where.push("total_rating_count != null");
+  }
+
+  return `${FIELDS}; where ${where.join(
+    " & "
+  )}; sort ${field} ${direction}; limit ${limit}; offset ${offset};`;
+}
+
+// GET /api/games?page&limit&search&sort&dir&genre&genreMode&platform&platformMode&mode&modeMode&theme&themeMode
+router.get("/", requireAuth, async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(48, Math.max(1, parseInt(req.query.limit, 10) || 24));
+    const offset = (page - 1) * limit;
+    const search = String(req.query.search || "")
+      .trim()
+      .replace(/["\\]/g, "");
+    const sort = SORT_FIELDS[req.query.sort] ? req.query.sort : "popularity";
+    const dir = req.query.dir === "asc" ? "asc" : "desc";
+    const typeIds = parseIds(req.query.type);
+
+    const filters = [
+      { field: "genres", ids: parseIds(req.query.genre), mode: req.query.genreMode },
+      {
+        field: "platforms",
+        ids: parseIds(req.query.platform),
+        mode: req.query.platformMode,
+      },
+      {
+        field: "game_modes",
+        ids: parseIds(req.query.mode),
+        mode: req.query.modeMode,
+      },
+      { field: "themes", ids: parseIds(req.query.theme), mode: req.query.themeMode },
+      {
+        field: "language_supports.language",
+        ids: parseIds(req.query.language),
+        mode: req.query.languageMode,
+      },
+    ];
+
+    const query = buildQuery({ search, sort, dir, limit, offset, filters, typeIds });
+    const raw = await igdbQuery("games", query);
+    const games = raw.map(mapGame);
+
+    res.json({
+      page,
+      limit,
+      count: games.length,
+      hasMore: games.length === limit,
+      games,
+    });
+  } catch (err) {
+    console.error("games error:", err.message);
+    res
+      .status(err.status || 500)
+      .json({ error: err.message || "Erreur lors de la récupération des jeux." });
+  }
+});
+
+// --- Listes pour les filtres (mises en cache en mémoire) ---
+const cache = {};
+
+async function cachedList(key, endpoint, query, mapFn) {
+  if (!cache[key]) {
+    const raw = await igdbQuery(endpoint, query);
+    cache[key] = raw.map(mapFn);
+  }
+  return cache[key];
+}
+
+router.get("/genres", requireAuth, async (req, res) => {
+  try {
+    const genres = (
+      await cachedList("genres", "genres", "fields name; limit 50;", (g) => ({
+        id: g.id,
+        name: frName(GENRES_FR, g.name),
+      }))
+    )
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name, "fr"));
+    res.json({ genres });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.get("/platforms", requireAuth, async (req, res) => {
+  try {
+    // Consoles/portables/ordinateurs, triés par génération décroissante
+    // (les plus récents d'abord — pas l'Amiga en tête !)
+    const platforms = await cachedList(
+      "platforms",
+      "platforms",
+      "fields name,abbreviation,generation; where platform_type = (1,5,6); sort generation desc; limit 80;",
+      (p) => ({ id: p.id, name: p.name, abbr: p.abbreviation || p.name })
+    );
+    res.json({ platforms });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.get("/modes", requireAuth, async (req, res) => {
+  try {
+    const modes = (
+      await cachedList("modes", "game_modes", "fields name; limit 20;", (m) => ({
+        id: m.id,
+        name: frName(MODES_FR, m.name),
+      }))
+    )
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name, "fr"));
+    res.json({ modes });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.get("/themes", requireAuth, async (req, res) => {
+  try {
+    const themes = (
+      await cachedList("themes", "themes", "fields name; limit 30;", (t) => ({
+        id: t.id,
+        name: frName(THEMES_FR, t.name),
+      }))
+    )
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name, "fr"));
+    res.json({ themes });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.get("/languages", requireAuth, async (req, res) => {
+  try {
+    const languages = (
+      await cachedList(
+        "languages",
+        "languages",
+        "fields name,native_name; limit 100;",
+        (l) => ({ id: l.id, name: frName(LANGUAGES_FR, l.name) })
+      )
+    )
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name, "fr"));
+    res.json({ languages });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// Parmi une liste d'ids de jeux, ceux qui ont AU MOINS un personnage
+// (IGDB ou communauté) — pour signaler les jeux exploitables avant de cliquer.
+router.get("/characters-availability", requireAuth, async (req, res) => {
+  try {
+    const ids = parseIds(req.query.ids);
+    if (!ids.length) return res.json({ ids: [] });
+    const [igdbChars, customIds] = await Promise.all([
+      igdbQuery(
+        "characters",
+        `fields games; where games = (${ids.join(",")}); limit 500;`
+      ).catch(() => []),
+      CustomCharacter.find({ gameId: { $in: ids } }).distinct("gameId"),
+    ]);
+    const set = new Set();
+    for (const c of igdbChars) for (const g of c.games || []) set.add(g);
+    for (const g of customIds) set.add(g);
+    res.json({ ids: ids.filter((id) => set.has(id)) });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// Recherche de personnages par nom (IGDB + communauté).
+router.get("/characters-search", requireAuth, async (req, res) => {
+  try {
+    const q = String(req.query.q || "").trim().replace(/["\\]/g, "");
+    if (!q) return res.json({ characters: [] });
+
+    const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    const [raw, customs] = await Promise.all([
+      igdbQuery(
+        "characters",
+        `search "${q}"; fields name,mug_shot.image_id,games.name; limit 24;`
+      ).catch(() => []),
+      CustomCharacter.find({ name: rx }).sort({ createdAt: -1 }).limit(24),
+    ]);
+
+    // Résout le nom des jeux des persos communautaires en un seul appel.
+    const gameIds = [...new Set(customs.map((c) => c.gameId).filter(Boolean))];
+    let nameById = {};
+    if (gameIds.length) {
+      const gs = await igdbQuery(
+        "games",
+        `fields name; where id = (${gameIds.join(",")}); limit ${gameIds.length};`
+      ).catch(() => []);
+      nameById = Object.fromEntries(gs.map((g) => [g.id, g.name]));
+    }
+
+    const characters = [
+      ...customs.map((c) => ({
+        id: String(c._id),
+        name: c.name,
+        image: c.image,
+        gameId: c.gameId,
+        gameName: nameById[c.gameId] || "",
+        custom: true,
+        mine: String(c.addedBy) === String(req.userId),
+      })),
+      ...raw.map((c) => ({
+        id: `igdb-${c.id}`,
+        name: c.name,
+        image: c.mug_shot?.image_id
+          ? `${IMG_BASE}/t_cover_big/${c.mug_shot.image_id}.jpg`
+          : null,
+        gameId: c.games?.[0]?.id ?? null,
+        gameName: c.games?.[0]?.name || "",
+      })),
+    ];
+    res.json({ characters });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// Extraits 30s via l'API iTunes Search (gratuite, sans clé)
+async function fetchItunesOst(q) {
+  const term = encodeURIComponent(`${q} soundtrack`);
+  const r = await fetch(
+    `https://itunes.apple.com/search?term=${term}&media=music&entity=song&limit=40`
+  );
+  if (!r.ok) return [];
+  const data = await r.json();
+  const seen = new Set();
+  return (data.results || [])
+    .filter((t) => t.previewUrl)
+    .map((t) => ({
+      id: `it-${t.trackId}`,
+      name: t.trackName,
+      artist: t.artistName,
+      preview: t.previewUrl,
+      artwork: t.artworkUrl100
+        ? t.artworkUrl100.replace("100x100", "200x200")
+        : null,
+    }))
+    .filter((t) => {
+      const key = `${t.name}|${t.artist}`.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function ostFromCustom(c) {
+  return {
+    id: `yt-${c._id}`,
+    name: c.name,
+    artist: c.artist || "YouTube",
+    artwork: c.artwork,
+    youtube: true,
+    videoId: c.videoId,
+    url: c.url,
+  };
+}
+
+// --- OST d'un jeu : iTunes + pistes YouTube (communauté), moins les masquées ---
+router.get("/:id/ost", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const q = String(req.query.q || "").trim();
+    const [itunes, customs, hiddenDoc] = await Promise.all([
+      q ? fetchItunesOst(q).catch(() => []) : Promise.resolve([]),
+      CustomOst.find({ gameId: id }).sort({ createdAt: -1 }),
+      HiddenOst.findOne({ user: req.userId, gameId: id }),
+    ]);
+    const hidden = new Set(hiddenDoc?.hidden || []);
+    const all = [...customs.map(ostFromCustom), ...itunes];
+    // Visibles + masquées (la corbeille) : on renvoie les deux pour pouvoir
+    // proposer de restaurer une piste retirée.
+    const tracks = all.filter((t) => !hidden.has(t.id));
+    const hiddenTracks = all.filter((t) => hidden.has(t.id));
+    res.json({ tracks, hiddenTracks });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Infos d'une vidéo YouTube (titre auto) ---
+router.get("/yt-info", requireAuth, async (req, res) => {
+  const videoId = youtubeId(req.query.url || "");
+  if (!videoId) return res.json({ videoId: null });
+  const info = await ytOembed(videoId);
+  res.json({ videoId, title: info?.title || "", author: info?.author || "" });
+});
+
+// --- Ajout d'une piste d'OST via un lien YouTube (titre auto si absent) ---
+router.post("/:id/ost", requireAuth, async (req, res) => {
+  try {
+    const url = String(req.body?.url || "").trim();
+    const videoId = youtubeId(url);
+    if (!videoId) return res.status(400).json({ error: "Lien YouTube invalide." });
+    let name = String(req.body?.name || "").trim();
+    let artist = String(req.body?.artist || "").trim();
+    if (!name || !artist) {
+      const info = await ytOembed(videoId);
+      if (!name) name = info?.title || "OST";
+      if (!artist) artist = info?.author || null;
+    }
+    const co = await CustomOst.create({
+      gameId: Number(req.params.id),
+      name,
+      artist: artist || null,
+      url,
+      videoId,
+      artwork: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
+      addedBy: req.userId,
+    });
+    res.status(201).json({ track: ostFromCustom(co) });
+  } catch (err) {
+    console.error("ost add error:", err.message);
+    res.status(500).json({ error: "Échec de l'ajout." });
+  }
+});
+
+// --- Import d'une playlist YouTube entière ---
+router.post("/:id/ost/playlist", requireAuth, async (req, res) => {
+  try {
+    const playlistId = youtubePlaylistId(req.body?.url || "");
+    if (!playlistId)
+      return res.status(400).json({ error: "Lien de playlist YouTube invalide." });
+    const items = await ytPlaylistTracks(playlistId);
+    if (!items.length)
+      return res.status(404).json({ error: "Playlist vide ou introuvable." });
+
+    const gameId = Number(req.params.id);
+    const limited = items.slice(0, 200);
+    const docs = await CustomOst.insertMany(
+      limited.map((it) => ({
+        gameId,
+        name: it.title,
+        artist: null,
+        url: `https://www.youtube.com/watch?v=${it.videoId}`,
+        videoId: it.videoId,
+        artwork: `https://img.youtube.com/vi/${it.videoId}/mqdefault.jpg`,
+        addedBy: req.userId,
+      }))
+    );
+    res.status(201).json({ tracks: docs.map(ostFromCustom), count: docs.length });
+  } catch (err) {
+    console.error("ost playlist error:", err.message);
+    res.status(500).json({ error: "Échec de l'import de la playlist." });
+  }
+});
+
+// --- Masquer des OST pour cet utilisateur (retirer "pour de bon") ---
+router.post("/:id/ost/hide", requireAuth, async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : [];
+    if (!ids.length) return res.status(400).json({ error: "Aucune piste." });
+    await HiddenOst.updateOne(
+      { user: req.userId, gameId: Number(req.params.id) },
+      { $addToSet: { hidden: { $each: ids } } },
+      { upsert: true }
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: "Échec." });
+  }
+});
+
+// --- Restaurer des OST masquées (les sortir de la corbeille) ---
+router.post("/:id/ost/unhide", requireAuth, async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : [];
+    if (!ids.length) return res.status(400).json({ error: "Aucune piste." });
+    await HiddenOst.updateOne(
+      { user: req.userId, gameId: Number(req.params.id) },
+      { $pull: { hidden: { $in: ids } } }
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: "Échec." });
+  }
+});
+
+// --- Détails d'un jeu pour la modal : covers alternatives, plateformes, temps ---
+router.get("/:id/details", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+
+    const [gameArr, customCovers, charArr, customChars] = await Promise.all([
+      igdbQuery(
+        "games",
+        `fields name,cover.image_id,artworks.image_id,platforms.id,platforms.name,genres.id,genres.name; where id = ${id};`
+      ),
+      CustomCover.find({ gameId: id }).sort({ createdAt: -1 }),
+      igdbQuery(
+        "characters",
+        `fields name,mug_shot.image_id; where games = (${id}); limit 50;`
+      ).catch(() => []),
+      CustomCharacter.find({ gameId: id }).sort({ createdAt: -1 }),
+    ]);
+
+    const g = gameArr[0] || {};
+    const covers = [];
+    if (g.cover?.image_id)
+      covers.push({ id: g.cover.image_id, url: `${IMG_BASE}/t_cover_big/${g.cover.image_id}.jpg` });
+    for (const a of g.artworks || [])
+      covers.push({ id: a.image_id, url: `${IMG_BASE}/t_720p/${a.image_id}.jpg` });
+    for (const c of customCovers)
+      covers.push({ id: String(c._id), url: c.url, custom: true });
+
+    const igdbChars = (charArr || []).map((c) => ({
+      id: `igdb-${c.id}`,
+      name: c.name,
+      image: c.mug_shot?.image_id
+        ? `${IMG_BASE}/t_cover_big/${c.mug_shot.image_id}.jpg`
+        : null,
+    }));
+    const communityChars = (customChars || []).map((c) => ({
+      id: String(c._id),
+      name: c.name,
+      image: c.image,
+      custom: true,
+      mine: String(c.addedBy) === String(req.userId),
+    }));
+
+    // Pour les visual novels, on complète avec les personnages de VNDB
+    // (IGDB en manque souvent). Les deux appels externes tournent en parallèle.
+    const isVn = (g.genres || []).some(
+      (x) => x.id === 34 || /visual novel/i.test(x.name || "")
+    );
+    const [timeToBeat, vnChars] = await Promise.all([
+      resolveTimeToBeat(id, g.name),
+      isVn ? resolveVnCharacters(id, g.name) : Promise.resolve([]),
+    ]);
+
+    // Dédoublonnage : on n'ajoute un perso VNDB que si son nom n'existe pas déjà.
+    const seen = new Set([...igdbChars, ...communityChars].map((c) => normCharName(c.name)));
+    const vnAdd = vnChars.filter((c) => {
+      const k = normCharName(c.name);
+      if (!k || seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+
+    // Personnages : IGDB + VNDB + communauté, portraits d'abord (tri stable).
+    const characters = [...igdbChars, ...vnAdd, ...communityChars].sort(
+      (a, b) => (b.image ? 1 : 0) - (a.image ? 1 : 0)
+    );
+
+    res.json({
+      platforms: (g.platforms || []).map((p) => ({ id: p.id, name: p.name })),
+      covers,
+      characters,
+      timeToBeat,
+    });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// --- Upload d'une cover custom (réutilisable par les autres) ---
+router.post("/:id/cover", requireAuth, upload.single("cover"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "Image manquante ou invalide." });
+    const url = `${req.protocol}://${req.get("host")}/uploads/covers/${req.file.filename}`;
+    const cc = await CustomCover.create({
+      gameId: Number(req.params.id),
+      url,
+      uploadedBy: req.userId,
+    });
+    res.status(201).json({ cover: { id: String(cc._id), url, custom: true } });
+  } catch (err) {
+    console.error("cover upload error:", err.message);
+    res.status(500).json({ error: "Échec de l'upload." });
+  }
+});
+
+// --- Ajout d'un personnage custom (nom + image optionnelle, partagé) ---
+router.post("/:id/character", requireAuth, upload.single("image"), async (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim();
+    if (!name) return res.status(400).json({ error: "Le nom du personnage est requis." });
+    const image = req.file
+      ? `${req.protocol}://${req.get("host")}/uploads/covers/${req.file.filename}`
+      : null;
+    const cc = await CustomCharacter.create({
+      gameId: Number(req.params.id),
+      name,
+      image,
+      addedBy: req.userId,
+    });
+    res
+      .status(201)
+      .json({ character: { id: String(cc._id), name, image, custom: true, mine: true } });
+  } catch (err) {
+    console.error("character add error:", err.message);
+    res.status(500).json({ error: "Échec de l'ajout du personnage." });
+  }
+});
+
+// --- Modifier un perso custom (uniquement le sien) ---
+router.put("/:id/character/:charId", requireAuth, upload.single("image"), async (req, res) => {
+  try {
+    const cc = await CustomCharacter.findById(req.params.charId);
+    if (!cc) return res.status(404).json({ error: "Personnage introuvable." });
+    if (String(cc.addedBy) !== String(req.userId))
+      return res.status(403).json({ error: "Tu ne peux modifier que tes personnages." });
+    const name = String(req.body?.name || "").trim();
+    if (name) cc.name = name;
+    if (req.file)
+      cc.image = `${req.protocol}://${req.get("host")}/uploads/covers/${req.file.filename}`;
+    await cc.save();
+    res.json({
+      character: { id: String(cc._id), name: cc.name, image: cc.image, custom: true, mine: true },
+    });
+  } catch (err) {
+    console.error("character edit error:", err.message);
+    res.status(500).json({ error: "Échec de la modification." });
+  }
+});
+
+// --- Retirer un perso custom (uniquement le sien) ---
+router.delete("/:id/character/:charId", requireAuth, async (req, res) => {
+  try {
+    const cc = await CustomCharacter.findById(req.params.charId);
+    if (!cc) return res.json({ ok: true });
+    if (String(cc.addedBy) !== String(req.userId))
+      return res.status(403).json({ error: "Tu ne peux retirer que tes personnages." });
+    await cc.deleteOne();
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: "Échec." });
+  }
+});
+
+// --- Page complète d'un jeu : description, studios, médias, similaires… ---
+
+// IGDB website.category -> réseau/plateforme reconnaissable côté client
+const WEBSITE_KINDS = {
+  1: "official",
+  3: "wikipedia",
+  9: "youtube",
+  13: "steam",
+  16: "epic",
+  17: "gog",
+  15: "itch",
+  6: "twitch",
+  5: "twitter",
+  14: "reddit",
+  18: "discord",
+};
+
+const FULL_FIELDS = [
+  "name",
+  "summary",
+  "storyline",
+  "cover.image_id",
+  "artworks.image_id",
+  "artworks.width",
+  "artworks.height",
+  "screenshots.image_id",
+  "screenshots.width",
+  "screenshots.height",
+  "genres.name",
+  "themes.name",
+  "game_modes.name",
+  "player_perspectives.name",
+  "platforms.id",
+  "platforms.name",
+  "platforms.abbreviation",
+  "first_release_date",
+  "rating",
+  "rating_count",
+  "total_rating",
+  "total_rating_count",
+  "aggregated_rating",
+  "aggregated_rating_count",
+  "language_supports.language.name",
+  "language_supports.language.locale",
+  "involved_companies.company.name",
+  "involved_companies.developer",
+  "involved_companies.publisher",
+  "videos.video_id",
+  "videos.name",
+  "websites.url",
+  "websites.category",
+  "game_engines.name",
+  "franchises.name",
+  "collections.name",
+  "alternative_names.name",
+  "alternative_names.comment",
+  "similar_games.name",
+  "similar_games.cover.image_id",
+  "similar_games.total_rating",
+  "similar_games.first_release_date",
+].join(",");
+
+router.get("/:id/full", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+
+    const arr = await igdbQuery("games", `fields ${FULL_FIELDS}; where id = ${id};`);
+    const g = arr[0];
+    if (!g) return res.status(404).json({ error: "Jeu introuvable." });
+
+    // Titre français si IGDB en a un
+    const fr = (g.alternative_names || []).find((a) => /french/i.test(a.comment || ""));
+
+    // Médias : artworks + captures en 1080p (fond/plein écran) avec vignette,
+    // typés pour permettre le filtrage côté client. Triés par résolution
+    // décroissante (les plus nettes d'abord — pour un beau fond de page).
+    const imgFull = (imgId) => `${IMG_BASE}/t_1080p/${imgId}.jpg`;
+    const imgThumb = (imgId) => `${IMG_BASE}/t_screenshot_med/${imgId}.jpg`;
+    const byArea = (a, b) => (b.width || 0) * (b.height || 0) - (a.width || 0) * (a.height || 0);
+    const artworks = (g.artworks || []).filter((a) => a.image_id).sort(byArea);
+    const screenshots = (g.screenshots || []).filter((s) => s.image_id).sort(byArea);
+
+    const toMedia = (type) => (a) => ({
+      type,
+      id: a.image_id,
+      full: imgFull(a.image_id),
+      thumb: imgThumb(a.image_id),
+      w: a.width || null,
+      h: a.height || null,
+    });
+
+    const media = [
+      ...(g.videos || [])
+        .filter((v) => v.video_id)
+        .map((v) => ({
+          type: "video",
+          videoId: v.video_id,
+          name: v.name || "Vidéo",
+          thumb: `https://img.youtube.com/vi/${v.video_id}/hqdefault.jpg`,
+        })),
+      ...artworks.map(toMedia("artwork")),
+      ...screenshots.map(toMedia("screenshot")),
+    ];
+
+    // Fond de page : l'artwork le PLUS haute résolution (déjà trié), sinon la
+    // meilleure capture. Jamais la jaquette portrait (affreuse étirée en fond).
+    const backdrop = artworks[0]
+      ? imgFull(artworks[0].image_id)
+      : screenshots[0]
+      ? imgFull(screenshots[0].image_id)
+      : null;
+
+    const companies = g.involved_companies || [];
+    const developers = [
+      ...new Set(companies.filter((c) => c.developer).map((c) => c.company?.name).filter(Boolean)),
+    ];
+    const publishers = [
+      ...new Set(companies.filter((c) => c.publisher).map((c) => c.company?.name).filter(Boolean)),
+    ];
+
+    const websites = (g.websites || [])
+      .map((w) => ({ url: w.url, kind: WEBSITE_KINDS[w.category] }))
+      .filter((w) => w.kind);
+
+    const similar = (g.similar_games || [])
+      .filter((s) => s.cover?.image_id)
+      .map((s) => ({
+        id: s.id,
+        name: s.name,
+        cover: `${IMG_BASE}/t_cover_big/${s.cover.image_id}.jpg`,
+        rating: s.total_rating ? Math.round(s.total_rating) : null,
+        year: s.first_release_date
+          ? new Date(s.first_release_date * 1000).getFullYear()
+          : null,
+      }))
+      .slice(0, 12);
+
+    // Langues (dédupliquées) + code pays du drapeau, déduit de la locale IGDB
+    // (ex: "fr-FR" -> "fr", "pt-BR" -> "br").
+    const langByName = new Map();
+    for (const ls of g.language_supports || []) {
+      const raw = ls.language?.name;
+      if (!raw) continue;
+      const name = frName(LANGUAGES_FR, raw);
+      if (langByName.has(name)) continue;
+      const region = (ls.language?.locale || "").split("-")[1];
+      langByName.set(name, { name, cc: region ? region.toLowerCase() : null });
+    }
+    const languages = [...langByName.values()].sort((a, b) =>
+      a.name.localeCompare(b.name, "fr")
+    );
+
+    const timeToBeat = await resolveTimeToBeat(id, g.name);
+
+    res.json({
+      id: g.id,
+      name: fr?.name || g.name,
+      originalName: g.name,
+      summary: g.summary || null,
+      storyline: g.storyline || null,
+      cover: g.cover?.image_id ? `${IMG_BASE}/t_cover_big/${g.cover.image_id}.jpg` : null,
+      backdrop,
+      media,
+      genres: (g.genres || []).map((x) => frName(GENRES_FR, x.name)),
+      themes: (g.themes || []).map((x) => frName(THEMES_FR, x.name)),
+      gameModes: (g.game_modes || []).map((x) => frName(MODES_FR, x.name)),
+      perspectives: (g.player_perspectives || []).map((x) => x.name),
+      platforms: (g.platforms || []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        abbr: p.abbreviation || p.name,
+      })),
+      releaseDate: g.first_release_date || null,
+      year: g.first_release_date
+        ? new Date(g.first_release_date * 1000).getFullYear()
+        : null,
+      rating: g.total_rating ? Math.round(g.total_rating) : null,
+      ratingCount: g.total_rating_count || 0,
+      // Note des joueurs (IGDB) vs note des critiques (agrégée type Metacritic)
+      playerRating: g.rating
+        ? Math.round(g.rating)
+        : g.total_rating
+        ? Math.round(g.total_rating)
+        : null,
+      playerRatingCount: g.rating_count || g.total_rating_count || 0,
+      criticRating: g.aggregated_rating ? Math.round(g.aggregated_rating) : null,
+      criticRatingCount: g.aggregated_rating_count || 0,
+      languages,
+      developers,
+      publishers,
+      engines: (g.game_engines || []).map((e) => e.name).filter(Boolean),
+      franchise: g.franchises?.[0]?.name || g.collections?.[0]?.name || null,
+      websites,
+      similar,
+      timeToBeat,
+    });
+  } catch (err) {
+    console.error("game full error:", err.message);
+    res.status(err.status || 500).json({ error: err.message || "Erreur." });
+  }
+});
+
+// --- Succès Steam d'un jeu ---
+// L'appid Steam est déduit d'IGDB (external_games catégorie 1 = Steam, sinon
+// l'URL du site Steam). On liste ensuite les succès (schéma) + leur rareté
+// (pourcentage global de déblocage). Nécessite STEAM_API_KEY dans server/.env.
+const steamAchCache = new Map(); // appid -> { ts, data }
+const STEAM_ACH_TTL = 6 * 60 * 60 * 1000; // 6h
+
+async function resolveSteamAppId(gameId) {
+  try {
+    // external_game_source = 1 → Steam (uid = appid). IGDB a remplacé l'ancien
+    // champ `category` par `external_game_source`.
+    let rows = await igdbQuery(
+      "external_games",
+      `fields uid,url; where game = ${gameId} & external_game_source = 1;`
+    );
+    // Filet de sécurité : si l'enum évolue encore, on scanne tous les liens
+    // externes et on garde ceux qui pointent vers le store Steam.
+    if (!rows.length) {
+      const all = await igdbQuery(
+        "external_games",
+        `fields uid,url; where game = ${gameId}; limit 50;`
+      );
+      rows = all.filter((r) => /steampowered\.com\/app\//.test(String(r.url || "")));
+    }
+    for (const r of rows) {
+      const m = String(r.url || "").match(/app\/(\d+)/);
+      if (m) return m[1]; // l'appid depuis l'URL (le plus fiable)
+      if (r.uid && /^\d+$/.test(String(r.uid))) return String(r.uid);
+    }
+  } catch {
+    /* IGDB indispo / champ inconnu : pas d'appid */
+  }
+  return null;
+}
+
+router.get("/:id/achievements", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+    if (!process.env.STEAM_API_KEY) return res.json({ available: false, reason: "no_key" });
+
+    const appid = await resolveSteamAppId(id);
+    if (!appid) return res.json({ available: false, reason: "no_appid" });
+
+    const cached = steamAchCache.get(appid);
+    if (cached && Date.now() - cached.ts < STEAM_ACH_TTL) return res.json(cached.data);
+
+    const key = process.env.STEAM_API_KEY;
+    const [schemaRes, pctRes] = await Promise.all([
+      fetch(
+        `https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${key}&appid=${appid}&l=french`
+      ),
+      fetch(
+        `https://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/?gameid=${appid}`
+      ),
+    ]);
+    const schema = schemaRes.ok ? await schemaRes.json().catch(() => null) : null;
+    const pct = pctRes.ok ? await pctRes.json().catch(() => null) : null;
+
+    const list = schema?.game?.availableGameStats?.achievements || [];
+    const pctMap = new Map(
+      (pct?.achievementpercentages?.achievements || []).map((a) => [a.name, a.percent])
+    );
+    const achievements = list
+      .map((a) => ({
+        name: a.name,
+        title: a.displayName || a.name,
+        desc: a.description || "",
+        hidden: a.hidden === 1 || a.hidden === true,
+        icon: a.icon || null,
+        percent: pctMap.has(a.name)
+          ? Math.round(pctMap.get(a.name) * 10) / 10
+          : null,
+      }))
+      // Les plus communs d'abord (progression), les plus rares en bas.
+      .sort((x, y) => (y.percent ?? -1) - (x.percent ?? -1));
+
+    const data = {
+      available: true,
+      appid,
+      gameName: schema?.game?.gameName || null,
+      count: achievements.length,
+      achievements,
+    };
+    steamAchCache.set(appid, { ts: Date.now(), data });
+    res.json(data);
+  } catch (err) {
+    console.error("steam achievements error:", err.message);
+    res.json({ available: false, reason: "error" });
+  }
+});
+
+// --- Trophées PSN d'un jeu (liste générique, visible par TOUS) ---
+// Source unique : le compte PSN de l'admin (ADMIN_EMAIL). On y retrouve le jeu
+// par nom, puis on renvoie la LISTE des trophées à débloquer + leur rareté
+// globale. Aucune donnée perso (progression/obtenus) n'est exposée.
+const psnTitlesCache = { ts: 0, titles: null }; // cache global (compte admin)
+const PSN_TITLES_TTL = 30 * 60 * 1000; // 30 min
+
+function normName(s) {
+  return String(s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[®™:'’.,!?_/\\|-]/g, " ")
+    .replace(
+      /\b(the|remastered|remaster|definitive|deluxe|goty|edition|hd|complete|trophies?)\b/g,
+      " "
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function getAdminPsnUser() {
+  const email = (process.env.ADMIN_EMAIL || "").trim();
+  if (!email) return null;
+  const admin = await User.findOne({ email: email.toLowerCase() });
+  return admin && isAdminEmail(admin.email) ? admin : null;
+}
+
+router.get("/:id/psn-trophies", requireAuth, async (req, res) => {
+  try {
+    const admin = await getAdminPsnUser();
+    if (!admin?.psn?.refreshToken) return res.json({ available: false, reason: "not_connected" });
+
+    let accessToken = null;
+    try {
+      accessToken = await getValidAccessToken(admin);
+    } catch {
+      accessToken = null;
+    }
+    if (!accessToken) return res.json({ available: false, reason: "not_connected" });
+
+    // Bibliothèque de trophées du compte admin (cache global 30 min)
+    let titles = psnTitlesCache.titles;
+    if (!titles || Date.now() - psnTitlesCache.ts >= PSN_TITLES_TTL) {
+      titles = await fetchUserTitles(accessToken);
+      psnTitlesCache.titles = titles;
+      psnTitlesCache.ts = Date.now();
+    }
+
+    const wanted = [req.query.name, req.query.altName]
+      .filter(Boolean)
+      .map(normName)
+      .filter(Boolean);
+    const match =
+      titles.find((t) => wanted.includes(normName(t.trophyTitleName))) ||
+      titles.find((t) => {
+        const n = normName(t.trophyTitleName);
+        return wanted.some((w) => n.includes(w) || w.includes(n));
+      });
+
+    if (!match) return res.json({ available: false, reason: "not_found" });
+
+    const raw = await fetchTitleTrophies(
+      accessToken,
+      match.npCommunicationId,
+      match.npServiceName
+    );
+    // On enlève tout ce qui est personnel à l'admin (obtenu / date). On garde la
+    // définition du trophée + sa rareté globale (% de joueurs l'ayant débloqué).
+    const trophies = raw.map((t) => ({
+      id: t.id,
+      name: t.name,
+      detail: t.detail,
+      icon: t.icon,
+      type: t.type,
+      hidden: t.hidden,
+      percent: t.percent,
+    }));
+
+    res.json({
+      available: true,
+      title: {
+        name: match.trophyTitleName,
+        icon: match.trophyTitleIconUrl || null,
+        platform: match.trophyTitlePlatform || null,
+        defined: match.definedTrophies || {},
+      },
+      trophies,
+    });
+  } catch (err) {
+    console.error("psn trophies error:", err.message);
+    res.json({ available: false, reason: "error" });
+  }
+});
+
+// --- Reviews d'un jeu (tous les utilisateurs) ---
+// Nettoie les médias reçus du client (mêmes règles que les commentaires de liste).
+function sanitizeReviewMedia(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .map((m) =>
+      m && (m.type === "gif" || m.type === "image") && m.url
+        ? {
+            type: m.type,
+            url: String(m.url).slice(0, 1000),
+            width: m.width != null ? Number(m.width) || null : null,
+            height: m.height != null ? Number(m.height) || null : null,
+          }
+        : null
+    )
+    .filter(Boolean)
+    .slice(0, 4);
+}
+
+// Extrait les @pseudo existants d'un texte → [{ user, username }].
+const REVIEW_MENTION_RE = /@([\p{L}\p{N}_.-]{2,32})/gu;
+async function resolveReviewMentions(text) {
+  const names = [...new Set([...(text || "").matchAll(REVIEW_MENTION_RE)].map((m) => m[1]))];
+  if (!names.length) return [];
+  const escaped = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const rx = new RegExp(`^(${escaped.join("|")})$`, "i");
+  const users = await User.find({ username: rx }).select("username").limit(20).lean();
+  return users.map((u) => ({ user: u._id, username: u.username }));
+}
+
+function gameReviewCard(e, meId) {
+  const { counts, mine } = summarizeReactions(e.reactions, meId);
+  return {
+    user: e.user
+      ? { id: e.user._id, username: e.user.username, avatar: e.user.avatar || null }
+      : null,
+    isMe: String(e.user?._id || e.user) === String(meId),
+    reactions: counts,
+    myReaction: mine,
+    status: e.status,
+    rating: e.rating,
+    review: e.review || "",
+    spoiler: !!e.spoiler,
+    pros: e.pros || [],
+    cons: e.cons || [],
+    platform: e.platform,
+    playtimeHours: e.playtimeHours,
+    media: (e.reviewMedia || []).map((m) => ({
+      type: m.type,
+      url: m.url,
+      width: m.width,
+      height: m.height,
+    })),
+    favoriteCharacter: e.favoriteCharacter?.name
+      ? { name: e.favoriteCharacter.name, image: e.favoriteCharacter.image || null }
+      : null,
+    favoriteOst: e.favoriteOst?.name
+      ? {
+          name: e.favoriteOst.name,
+          artist: e.favoriteOst.artist || null,
+          artwork: e.favoriteOst.artwork || null,
+          preview: e.favoriteOst.preview || null,
+          youtube: !!e.favoriteOst.youtube,
+          url: e.favoriteOst.url || null,
+        }
+      : null,
+    comments: (e.comments || []).map((c) => reviewComment(c, e.comments, meId)),
+    updatedAt: e.updatedAt,
+  };
+}
+
+router.get("/:id/reviews", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+
+    // Avis joueurs Steam en parallèle : complètent les reviews de nos users
+    // (qui restent prioritaires). Échoue silencieusement en null.
+    const [entries, steam] = await Promise.all([
+      UserGame.find({ gameId: id })
+        .populate("user", "username avatar")
+        .populate("comments.user", "username avatar")
+        .sort({ updatedAt: -1 }),
+      fetchSteamReviews(id).catch(() => null),
+    ]);
+
+    // Une entrée compte comme review si elle a du contenu rédigé OU une note.
+    const hasContent = (e) =>
+      (e.review && e.review.trim()) ||
+      (e.pros && e.pros.length) ||
+      (e.cons && e.cons.length) ||
+      (e.reviewMedia && e.reviewMedia.length) ||
+      e.rating != null;
+
+    const reviews = entries.filter(hasContent).map((e) => gameReviewCard(e, req.userId));
+    const mine = entries.find((e) => String(e.user?._id) === String(req.userId));
+
+    res.json({
+      reviews,
+      mine: mine ? gameReviewCard(mine, req.userId) : null,
+      steam,
+    });
+  } catch (err) {
+    console.error("game reviews error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement des reviews." });
+  }
+});
+
+// --- Réagir à la review d'un joueur (toggle like / dislike / rigolo) ---
+router.post("/:id/reviews/:userId/react", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { userId } = req.params;
+    const { type } = req.body || {};
+    if (!id) return res.status(400).json({ error: "id invalide." });
+    if (!["heart", "clap", "funny"].includes(type))
+      return res.status(400).json({ error: "type invalide." });
+    // On ne réagit pas à sa propre review.
+    if (String(userId) === String(req.userId))
+      return res.status(400).json({ error: "Impossible de réagir à sa propre review." });
+
+    const entry = await UserGame.findOne({ gameId: id, user: userId });
+    if (!entry) return res.status(404).json({ error: "Review introuvable." });
+
+    const reactions = (entry.reactions || []).filter(
+      (r) => String(r.user) !== String(req.userId)
+    );
+    const prev = (entry.reactions || []).find(
+      (r) => String(r.user) === String(req.userId)
+    );
+    // Toggle : re-cliquer sur la même réaction la retire ; sinon on remplace.
+    if (!prev || prev.type !== type) reactions.push({ user: req.userId, type });
+
+    // timestamps:false → réagir ne « rajeunit » pas la review dans les tris.
+    await UserGame.updateOne(
+      { _id: entry._id },
+      { $set: { reactions } },
+      { timestamps: false }
+    );
+
+    const { counts, mine } = summarizeReactions(reactions, req.userId);
+    res.json({ reactions: counts, myReaction: mine });
+  } catch (err) {
+    console.error("review react error:", err.message);
+    res.status(500).json({ error: "Erreur lors de la réaction." });
+  }
+});
+
+// --- Répondre à la review d'un joueur (commentaire, fil à un niveau) ---
+router.post("/:id/reviews/:userId/comments", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { userId } = req.params;
+    if (!id) return res.status(400).json({ error: "id invalide." });
+
+    const text = String(req.body?.text || "").trim().slice(0, 300);
+    const media = sanitizeReviewMedia(req.body?.media);
+    if (!text && !media.length)
+      return res.status(400).json({ error: "Réponse vide." });
+
+    const entry = await UserGame.findOne({ gameId: id, user: userId });
+    if (!entry) return res.status(404).json({ error: "Review introuvable." });
+
+    // Réponse à un commentaire : on remonte toujours à la racine (fil à 1 niveau).
+    let parent = null;
+    let replyTargetUser = null; // auteur du message auquel on répond (pour la notif)
+    if (req.body?.parent) {
+      const p = (entry.comments || []).find(
+        (c) => String(c._id) === String(req.body.parent)
+      );
+      if (p) {
+        parent = p.parent ? p.parent : p._id;
+        replyTargetUser = p.user;
+      }
+    }
+
+    const mentions = await resolveReviewMentions(text);
+    entry.comments.push({ user: req.userId, text, media, mentions, parent });
+    await entry.save({ timestamps: false });
+    await entry.populate("comments.user", "username avatar");
+
+    const created = entry.comments[entry.comments.length - 1];
+
+    // Notifications (un seul message par destinataire, par priorité).
+    const recipients = new Map();
+    const actorStr = String(req.userId);
+    const add = (uid, type) => {
+      if (!uid) return;
+      const s = String(uid);
+      if (s === actorStr || recipients.has(s)) return;
+      recipients.set(s, type);
+    };
+    if (replyTargetUser) add(replyTargetUser, "review_comment_reply");
+    mentions.forEach((m) => add(m.user, "mention"));
+    add(entry.user, "review_comment"); // l'auteur de la review
+    const snippet = text || (media.length ? "a envoyé un média" : "");
+    for (const [uid, type] of recipients) {
+      notify({
+        user: uid,
+        type,
+        actor: req.userId,
+        game: id,
+        gameName: entry.name,
+        comment: created._id,
+        snippet,
+      });
+    }
+
+    res.status(201).json({ comment: reviewComment(created, entry.comments, req.userId) });
+  } catch (err) {
+    console.error("review comment error:", err.message);
+    res.status(500).json({ error: "Erreur lors de l'envoi de la réponse." });
+  }
+});
+
+// --- Liker / déliker une réponse sous une review ---
+router.post("/:id/reviews/:userId/comments/:commentId/like", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { userId, commentId } = req.params;
+    if (!id) return res.status(400).json({ error: "id invalide." });
+
+    const entry = await UserGame.findOne({ gameId: id, user: userId });
+    if (!entry) return res.status(404).json({ error: "Review introuvable." });
+    const c = (entry.comments || []).find((x) => String(x._id) === String(commentId));
+    if (!c) return res.status(404).json({ error: "Réponse introuvable." });
+
+    const uid = String(req.userId);
+    const has = (c.likes || []).some((u) => String(u) === uid);
+    c.likes = has
+      ? (c.likes || []).filter((u) => String(u) !== uid)
+      : [...(c.likes || []), req.userId];
+    await entry.save({ timestamps: false });
+
+    if (!has) {
+      notify({
+        user: c.user,
+        type: "review_comment_like",
+        actor: req.userId,
+        game: id,
+        gameName: entry.name,
+        comment: c._id,
+        snippet: c.text,
+      });
+    }
+    res.json({ liked: !has, likeCount: c.likes.length });
+  } catch (err) {
+    console.error("review comment like error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// --- Supprimer une réponse (seul son auteur) ---
+router.delete("/:id/reviews/:userId/comments/:commentId", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { userId, commentId } = req.params;
+    if (!id) return res.status(400).json({ error: "id invalide." });
+
+    const entry = await UserGame.findOne({ gameId: id, user: userId });
+    if (!entry) return res.status(404).json({ error: "Review introuvable." });
+
+    const c = (entry.comments || []).find((x) => String(x._id) === String(commentId));
+    if (!c) return res.status(404).json({ error: "Réponse introuvable." });
+
+    if (String(c.user) !== String(req.userId))
+      return res.status(403).json({ error: "Action non autorisée." });
+
+    // On retire le commentaire ET ses réponses éventuelles.
+    entry.comments = (entry.comments || []).filter(
+      (x) =>
+        String(x._id) !== String(commentId) && String(x.parent) !== String(commentId)
+    );
+    await entry.save({ timestamps: false });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("review comment delete error:", err.message);
+    res.status(500).json({ error: "Erreur lors de la suppression." });
+  }
+});
+
+// --- Feed communautaire d'un jeu : Twitch live + Reddit + YouTube ---
+router.get("/:id/feed", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+    const name = String(req.query.name || "").trim();
+    if (!name) return res.status(400).json({ error: "Nom du jeu manquant." });
+    const feed = await buildGameFeed(id, name);
+    res.json(feed);
+  } catch (err) {
+    console.error("game feed error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement du feed." });
+  }
+});
+
+// --- Amis (abonnements) qui ont ce jeu dans leur bibliothèque ---
+router.get("/:id/friends", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+
+    const me = await User.findById(req.userId).select("following");
+    const following = me?.following || [];
+    if (!following.length) return res.json({ friends: [] });
+
+    const entries = await UserGame.find({ user: { $in: following }, gameId: id })
+      .populate("user", "username avatar")
+      .lean();
+
+    const friends = entries
+      .filter((e) => e.user)
+      .map((e) => ({
+        user: { id: e.user._id, username: e.user.username, avatar: e.user.avatar || null },
+        status: e.status,
+        rating: e.rating ?? null,
+      }));
+    res.json({ friends });
+  } catch (err) {
+    console.error("game friends error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+export default router;

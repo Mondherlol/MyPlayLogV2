@@ -1,0 +1,2156 @@
+/* ======================================================================
+   Page détail de liste
+   ====================================================================== */
+.ld-page {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.ld-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.ld-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-soft);
+  font-weight: 600;
+  font-family: var(--font-display);
+}
+
+.ld-back:hover {
+  color: var(--text);
+}
+
+.ld-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+}
+
+.ld-save.save-saved {
+  color: #22a35a;
+}
+
+.ld-save.save-saving {
+  color: var(--accent-ink);
+}
+
+.ld-header {
+  display: flex;
+  gap: 1.2rem;
+  padding: 1.4rem;
+  margin-bottom: 1.4rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.ld-header-main {
+  flex: 1;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.ld-title {
+  font-size: 1.9rem;
+  line-height: 1.1;
+}
+
+.ld-title-input {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.8rem;
+  letter-spacing: -0.025em;
+  color: var(--text);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.1rem 0;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.ld-title-input:hover,
+.ld-title-input:focus {
+  border-color: var(--border-strong);
+}
+
+.ld-title-input:focus {
+  border-color: var(--orange);
+}
+
+.ld-desc {
+  color: var(--text-soft);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.ld-desc-input {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: var(--text-soft);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.15s ease;
+}
+
+.ld-desc-input:focus {
+  border-color: var(--orange);
+  color: var(--text);
+}
+
+.ld-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+
+.ld-author strong {
+  color: var(--accent-ink);
+}
+
+.ld-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.ld-like,
+.ld-vis {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.88rem;
+  transition: all 0.15s ease;
+}
+
+.ld-like:hover {
+  border-color: #ff5470;
+  color: #ff5470;
+}
+
+.ld-like.liked {
+  background: rgba(255, 84, 112, 0.12);
+  border-color: rgba(255, 84, 112, 0.4);
+  color: #ff5470;
+}
+
+.ld-vis:hover {
+  border-color: var(--orange);
+}
+
+.ld-del {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+}
+
+.ld-del:hover {
+  border-color: #e0483f;
+  color: #e0483f;
+}
+
+.ld-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.ld-addbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1.05rem;
+  border-radius: 12px;
+  border: none;
+  /* Bouton d'action à fort contraste : fond sombre en clair, clair en sombre */
+  background: var(--text);
+  color: var(--bg);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.12s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.ld-addbtn.small {
+  padding: 0.4rem 0.85rem;
+  font-size: 0.82rem;
+  /* Sur le dock sombre : bouton doré bien visible (fond var(--text) exclu). */
+  background: var(--accent-grad);
+  color: #23180a;
+  box-shadow: 0 4px 14px rgba(242, 183, 11, 0.28);
+}
+
+.ld-addbtn.small:hover {
+  opacity: 1;
+  filter: brightness(1.05);
+}
+
+.ld-addbtn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+  opacity: 0.92;
+}
+
+/* Ligne badge de type + titre */
+.ld-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.ld-title-row .ld-title,
+.ld-title-row .ld-title-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.ld-title-row .list-type-badge {
+  flex-shrink: 0;
+}
+
+/* Bouton Modifier / Terminé */
+.ld-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.95rem;
+  border-radius: 999px;
+  border: none;
+  background: var(--text);
+  color: var(--bg);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.88rem;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.12s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.ld-edit:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+  opacity: 0.92;
+}
+
+.ld-edit.done {
+  background: var(--accent-grad);
+  color: #1a1204;
+}
+
+.ld-hint {
+  color: var(--text-soft);
+  font-size: 0.88rem;
+}
+
+.ld-empty {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  color: var(--text-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+/* ---------- Grille d'items (classique / top) ---------- */
+.ld-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+/* ---------- Carte d'item ---------- */
+.ic-card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0.5rem;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.18s ease, border-color 0.15s ease, transform 0.12s ease,
+    opacity 0.15s ease;
+  touch-action: none;
+}
+
+.ic-card.grab {
+  cursor: grab;
+}
+
+.ic-card.grab:active {
+  cursor: grabbing;
+}
+
+.ic-card:hover {
+  box-shadow: var(--shadow);
+  border-color: var(--border-strong);
+}
+
+.ic-card.dragging {
+  opacity: 0.35;
+  box-shadow: 0 0 0 2px var(--orange);
+}
+
+.ic-rank {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  z-index: 3;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-grad);
+  color: #1a1204;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.82rem;
+  box-shadow: 0 4px 12px rgba(242, 183, 11, 0.4);
+}
+
+.ic-cover {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+
+.ic-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Les PNG transparents (souvent des personnages) reçoivent un fond blanc. */
+  background: #fff;
+}
+
+.ic-rating {
+  position: absolute;
+  bottom: 5px;
+  left: 5px;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(8, 8, 12, 0.72);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--font-display);
+  backdrop-filter: blur(4px);
+}
+
+.ic-kind {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(139, 92, 246, 0.9);
+  color: #fff;
+}
+
+.ic-body {
+  padding: 0.45rem 0.2rem 0.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.ic-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.86rem;
+  line-height: 1.15;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ic-sub {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+.ic-note {
+  margin: 0.25rem 0 0;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+  line-height: 1.35;
+  font-style: italic;
+  border-left: 2px solid var(--orange);
+  padding-left: 0.45rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ic-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  display: flex;
+  gap: 0.3rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.ic-card:hover .ic-actions {
+  opacity: 1;
+}
+
+.ic-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: none;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 8, 12, 0.68);
+  color: #fff;
+  backdrop-filter: blur(4px);
+}
+
+.ic-btn:hover {
+  background: var(--accent-grad);
+  color: #1a1204;
+}
+
+.ic-btn.danger:hover {
+  background: #e0483f;
+  color: #fff;
+}
+
+.ic-grip {
+  position: absolute;
+  bottom: 8px;
+  right: 6px;
+  color: var(--text-soft);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.ic-card:hover .ic-grip {
+  opacity: 0.5;
+}
+
+/* ---------- Tier list ---------- */
+.tier-board {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.tier-board.has-dock {
+  padding-bottom: 144px;
+}
+
+.tier-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.tier-label {
+  display: grid;
+  place-items: center;
+  padding: 0.6rem;
+  min-height: 96px;
+  color: #1a1204;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.35rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+}
+
+.tier-label-text {
+  word-break: break-word;
+  text-align: center;
+  line-height: 1.05;
+}
+
+.tier-label-input {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.15);
+  border: none;
+  border-radius: 8px;
+  color: #1a1204;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1rem;
+  text-align: center;
+  outline: none;
+  padding: 0.3rem;
+}
+
+.tier-drop {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 0.5rem;
+  padding: 0.55rem;
+  min-height: 96px;
+  background: var(--surface-2);
+}
+
+.tier-tools {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 0.3rem 0.5rem;
+  box-shadow: var(--shadow);
+}
+
+.tier-colors {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.tier-color-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+
+.tier-color-dot:hover {
+  transform: scale(1.15);
+}
+
+.tier-remove {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: none;
+  background: none;
+  color: #e0483f;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.tier-add {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 10px;
+  border: 1.5px dashed var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.tier-add:hover {
+  border-color: var(--orange);
+  color: var(--accent-ink);
+}
+
+.tier-pool {
+  /* Suit le thème de la page (clair en clair, sombre en sombre) au lieu de
+     détonner avec un bloc sombre en dur. */
+  margin-top: 0.6rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 0.35rem 0.7rem 0.5rem;
+  color: var(--text);
+}
+
+.tier-pool.is-docked {
+  position: fixed;
+  bottom: 0;
+  z-index: 30;
+  /* Aligné et centré sur la colonne de contenu (après la sidebar). */
+  left: calc(var(--app-sidebar-w, 208px) + var(--content-pad, 1.5rem));
+  right: var(--content-pad, 1.5rem);
+  transform: none;
+  margin-top: 0;
+  padding: 0.35rem 0.85rem 0.55rem;
+  border-radius: 16px 16px 0 0;
+  border-bottom: none;
+  /* Liseré doré discret + ombre portée douce vers le haut */
+  border-top: 2px solid color-mix(in srgb, var(--orange) 60%, var(--border));
+  box-shadow: 0 -6px 22px rgba(20, 20, 40, 0.1);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(16px);
+}
+
+/* Vivier replié : ne reste que la barre de titre. */
+.tier-pool.is-collapsed {
+  padding-bottom: 0.4rem;
+}
+
+.tier-pool.is-collapsed .tier-pool-head {
+  margin-bottom: 0;
+}
+
+/* Quand le vivier est replié, on récupère l'espace réservé sous les paliers. */
+.tier-board.dock-collapsed {
+  padding-bottom: 46px;
+}
+
+.tier-pool-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+/* Repliée : toute la barre (pas seulement le texte) rouvre le vivier. */
+.tier-pool.is-collapsed .tier-pool-head {
+  cursor: pointer;
+  padding: 0.15rem 0.1rem;
+  border-radius: 10px;
+  transition: background 0.12s ease;
+}
+
+.tier-pool.is-collapsed .tier-pool-head:hover {
+  background: color-mix(in srgb, var(--orange) 8%, transparent);
+}
+
+.tier-pool-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0.1rem;
+  border: none;
+  background: none;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.72rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--text-soft);
+  transition: color 0.12s ease;
+}
+
+.tier-pool-title:hover {
+  color: var(--text);
+}
+
+/* Quand la barre entière est cliquable (repliée), le bouton ne capte plus le
+   pointeur : le clic est géré par le head. */
+.tier-pool.is-collapsed .tier-pool-title {
+  pointer-events: none;
+}
+
+.tier-pool-title svg {
+  color: var(--orange);
+}
+
+.tier-pool-count {
+  min-width: 1.5rem;
+  padding: 0.1rem 0.42rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  color: var(--accent-ink);
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.tier-pool-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.tier-pool-search {
+  min-width: min(280px, 46vw);
+}
+
+.tier-pool-search input {
+  width: 100%;
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.82rem;
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.tier-pool-search input::placeholder {
+  color: var(--text-soft);
+}
+
+.tier-pool-search input:focus {
+  border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
+}
+
+.tier-pool-items {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 0.5rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  min-height: 96px;
+  scroll-snap-type: x proximity;
+  /* Padding vertical généreux : laisse respirer le relief au survol des cartes
+     sans qu'elles soient rognées par overflow (overflow-x force overflow-y). */
+  padding: 0.5rem 2rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.tier-pool.is-docked .tier-pool-items {
+  max-height: none;
+}
+
+.tier-pool-items::-webkit-scrollbar {
+  height: 6px;
+}
+
+.tier-pool-items::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+}
+
+.tier-pool-items::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tier-pool-scroll-wrap {
+  position: relative;
+}
+
+.tier-pool-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: none;
+  background: var(--accent-grad);
+  color: #17130a;
+  /* flèche noire sur pastille dorée */
+  display: grid;
+  place-items: center;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+  transition: filter 0.12s ease, transform 0.12s ease;
+}
+
+.tier-pool-arrow:hover {
+  filter: brightness(1.08);
+}
+
+.tier-pool-arrow-left {
+  left: 0.2rem;
+}
+
+.tier-pool-arrow-right {
+  right: 0.2rem;
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.tier-pool-empty {
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  padding: 0.5rem;
+  align-self: center;
+}
+
+/* Empty state du vivier : un vrai bouton d'ajout plutôt qu'un texte. */
+.tier-pool-cta {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.3rem auto;
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  border: 1.5px dashed color-mix(in srgb, var(--orange) 50%, var(--border));
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  color: var(--accent-ink);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.86rem;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.tier-pool-cta:hover {
+  background: color-mix(in srgb, var(--orange) 22%, transparent);
+  border-color: color-mix(in srgb, var(--orange) 70%, transparent);
+}
+
+/* Cartes compactes (identiques dans les paliers ET le vivier : couverture
+   seule, sans titre, pour un maximum de compacité). */
+.ic-card.compact {
+  width: 84px;
+  padding: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+}
+
+/* Léger relief au survol dans le vivier (contenu dans le padding pour ne pas
+   être rogné par l'overflow horizontal). */
+.tier-pool .ic-card.compact {
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.tier-pool .ic-card.compact:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(20, 20, 40, 0.18),
+    0 0 0 1.5px color-mix(in srgb, var(--orange) 60%, transparent);
+}
+
+.ic-card.compact .ic-cover {
+  aspect-ratio: 1 / 1;
+  border-radius: 0;
+}
+
+.ic-card.compact .ic-actions {
+  top: 3px;
+  right: 3px;
+}
+
+.ic-card.compact .ic-btn {
+  width: 20px;
+  height: 20px;
+}
+
+
+@media (max-width: 899px) {
+  .tier-pool.is-docked {
+    border-radius: 14px 14px 0 0;
+  }
+
+  .tier-pool-search {
+    min-width: 100%;
+  }
+
+  .tier-pool-arrow {
+    display: none;
+  }
+
+  .tier-pool-items {
+    padding-inline: 0.25rem;
+  }
+}
+
+.ic-note-dot {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--orange);
+  box-shadow: 0 0 0 2px var(--surface);
+  z-index: 2;
+}
+
+/* ---------- Fantôme de drag (DragOverlay dnd-kit) ---------- */
+/* Positionné par dnd-kit : ici on ne fait QUE du visuel (pas de position
+   ni de transform, sinon la preview est éjectée hors de l'écran). */
+.drag-overlay-card {
+  width: 92px;
+  cursor: grabbing;
+  filter: drop-shadow(0 16px 30px rgba(0, 0, 0, 0.4));
+  rotate: -3deg;
+}
+
+.drag-overlay-card .ic-cover {
+  aspect-ratio: 3 / 4;
+  border-radius: 10px;
+  border: 2px solid var(--orange);
+  overflow: hidden;
+}
+
+.drag-overlay-card .ic-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #fff;
+}
+
+/* ---------- Commentaires ---------- */
+.ld-comments {
+  margin-top: 2rem;
+  padding: 1.4rem;
+}
+
+.ld-comments-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.15rem;
+  margin-bottom: 1rem;
+}
+
+.ld-comments-count {
+  font-size: 0.8rem;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+
+.ld-comment-form {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 1.2rem;
+}
+
+.ld-comment-form input {
+  flex: 1;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ld-comment-form input:focus {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 4px var(--ring);
+}
+
+.ld-comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ld-comments-empty {
+  color: var(--text-soft);
+  text-align: center;
+  padding: 1rem;
+}
+
+.ld-comment {
+  display: flex;
+  gap: 0.7rem;
+}
+
+.ld-comment-avatar {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-grad);
+  color: #1a1204;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.ld-comment-body {
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.6rem 0.85rem;
+}
+
+.ld-comment-body p {
+  margin: 0.25rem 0 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  /* préserve les retours à la ligne */
+}
+
+/* Troncature « Voir plus » */
+.lc-textwrap {
+  margin-top: 0.25rem;
+}
+
+.lc-textwrap p {
+  margin: 0;
+}
+
+.lc-clamp {
+  display: block;
+  max-height: 8.7em;
+  /* ~6 lignes */
+  overflow: hidden;
+}
+
+.lc-more {
+  border: none;
+  background: none;
+  color: #1d9bf0;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.2rem 0;
+}
+
+.lc-more:hover {
+  text-decoration: underline;
+}
+
+/* Liens dans les messages */
+.lc-link {
+  color: #1d9bf0;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.lc-link:hover {
+  text-decoration: underline;
+}
+
+.lc-input-link {
+  color: #1d9bf0;
+}
+
+/* Lecteur YouTube inline */
+.lc-yt {
+  position: relative;
+  margin-top: 0.5rem;
+  width: min(420px, 100%);
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #000;
+  padding: 0;
+  display: block;
+}
+
+.lc-yt iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+.lc-yt-preview {
+  cursor: pointer;
+}
+
+.lc-yt-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.lc-yt-play {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 62px;
+  height: 62px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.lc-yt-preview:hover .lc-yt-play {
+  background: #ff0033;
+  transform: scale(1.06);
+}
+
+.ld-comment-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+}
+
+.ld-comment-head strong {
+  color: var(--accent-ink);
+}
+
+.ld-comment-time {
+  color: var(--text-soft);
+}
+
+/* Groupe des actions de modération (édit + supprimer), collé à droite. */
+.ld-comment-mod {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.ld-comment-del {
+  border: none;
+  background: none;
+  color: var(--text-soft);
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+}
+
+.ld-comment-del:hover {
+  color: var(--text);
+  background: var(--surface);
+}
+
+/* Bouton supprimer (le 2e du groupe) → rouge au survol. */
+.ld-comment-mod .ld-comment-del:last-child:hover {
+  color: #e0483f;
+}
+
+/* Avatar image (photo de profil) */
+.ld-comment-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+/* ---------- Composer de commentaire (rich) ---------- */
+.lc-composer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-bottom: 1.3rem;
+}
+
+.lc-composer.compact {
+  margin: 0.4rem 0 0.6rem;
+}
+
+/* Médias joints, affichés DANS la zone de saisie (sous le texte) */
+.lc-attach {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.55rem;
+}
+
+.lc-attach-item {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  line-height: 0;
+}
+
+.lc-attach-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #fff;
+}
+
+.lc-attach-loading {
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+
+.lc-attach-tag {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  padding: 0.02rem 0.3rem;
+  border-radius: 5px;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  background: rgba(10, 12, 18, 0.72);
+  color: #fff;
+}
+
+.lc-attach-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(10, 12, 18, 0.72);
+  color: #fff;
+}
+
+.lc-attach-remove:hover {
+  background: #e0483f;
+}
+
+/* Conteneur relatif : ancre le dropdown de mentions au-dessus de l'input. */
+.lc-inputwrap {
+  position: relative;
+}
+
+/* Boîte de saisie (texte seul ; les outils sont dessous) */
+.lc-inputbox {
+  border: 1.5px solid var(--border-strong);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 0.55rem 0.85rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.lc-inputbox:focus-within {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 4px var(--ring);
+}
+
+/* Champ = textarea + calque de surlignage superposés (mêmes métriques). */
+.lc-input-field {
+  position: relative;
+}
+
+.lc-input,
+.lc-input-hl {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  letter-spacing: normal;
+  min-height: 24px;
+  max-height: 160px;
+  padding: 0;
+  border: none;
+  box-sizing: border-box;
+}
+
+.lc-input {
+  display: block;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-width: 0;
+  background: none;
+  outline: none;
+  resize: none;
+  overflow-y: auto;
+  /* Texte transparent : c'est le calque dessous qui l'affiche (coloré). */
+  color: transparent;
+  caret-color: var(--text);
+}
+
+.lc-input::placeholder {
+  color: var(--text-soft);
+}
+
+.lc-input::selection {
+  background: color-mix(in srgb, #1d9bf0 30%, transparent);
+}
+
+/* Calque affiché sous le textarea : rend le texte + mentions en bleu. */
+.lc-input-hl {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  pointer-events: none;
+  user-select: none;
+}
+
+.lc-input-mention {
+  color: #1d9bf0;
+  font-weight: 600;
+}
+
+/* Emojis Twitter dans le calque de saisie (approche la largeur d'un emoji système) */
+.lc-input-hl img.emoji {
+  display: inline-block;
+  width: 1.2em;
+  height: 1.2em;
+  vertical-align: -0.25em;
+  margin: 0 0.02em;
+}
+
+/* En réponse, le champ s'ouvre un peu plus grand. */
+.lc-composer.compact .lc-input,
+.lc-composer.compact .lc-input-hl {
+  min-height: 52px;
+}
+
+/* Barre d'outils sous l'input */
+.lc-toolbar-wrap {
+  position: relative;
+}
+
+.lc-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+/* Popover flottant (émoji / gif) : ne décale pas le contenu.
+   Ouvre vers le bas par défaut, vers le haut s'il manque de place. */
+.lc-pop {
+  position: absolute;
+  left: 0;
+  z-index: 50;
+  animation: lc-pop-in 0.12s ease;
+}
+
+.lc-pop.down {
+  top: calc(100% + 8px);
+  bottom: auto;
+}
+
+.lc-pop.up {
+  bottom: calc(100% + 8px);
+  top: auto;
+}
+
+.lc-pop-emoji {
+  width: min(340px, 92vw);
+}
+
+.lc-pop-gif {
+  width: min(360px, 90vw);
+}
+
+.lc-pop-gif .lc-gif-panel {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 0.6rem;
+}
+
+@keyframes lc-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.lc-toolbar-left,
+.lc-toolbar-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.lc-tool {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: none;
+  background: none;
+  color: var(--accent-ink);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.74rem;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.lc-tool:hover {
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
+}
+
+.lc-tool.on {
+  background: color-mix(in srgb, var(--orange) 18%, transparent);
+}
+
+.lc-tool:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.lc-tool-gif {
+  letter-spacing: 0.02em;
+}
+
+.lc-media-count {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  margin-left: 0.15rem;
+}
+
+.lc-cancel {
+  border: none;
+  background: none;
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 999px;
+}
+
+.lc-cancel:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+/* Compteur de caractères (anneau qui se remplit) */
+.lc-count {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 0.15rem;
+}
+
+.lc-count-bg {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-width: 2.5;
+}
+
+.lc-count-fg {
+  fill: none;
+  stroke: var(--orange);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.15s ease, stroke 0.15s ease;
+}
+
+.lc-count.near .lc-count-fg {
+  stroke: #f0902a;
+}
+
+.lc-count.full .lc-count-fg {
+  stroke: #e0483f;
+}
+
+.lc-count-num {
+  position: absolute;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.lc-count.full .lc-count-num {
+  color: #e0483f;
+}
+
+/* Étiquette "modifié" cliquable */
+.lc-edited {
+  border: none;
+  background: none;
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  font-style: italic;
+  padding: 0;
+}
+
+.lc-edited:hover {
+  color: var(--accent-ink);
+  text-decoration: underline;
+}
+
+.lc-send {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 34px;
+  padding: 0 0.95rem;
+  border-radius: 999px;
+  border: none;
+  background: var(--accent-grad);
+  color: #23180a;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  transition: filter 0.12s ease, opacity 0.12s ease;
+}
+
+.lc-send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.lc-send:not(:disabled):hover {
+  filter: brightness(1.06);
+}
+
+.lc-error {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #e0483f;
+}
+
+/* Mention @pseudo colorée dans un message (user existant) — bleu façon Twitter */
+.lc-mention {
+  color: #1d9bf0;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.lc-mention:hover {
+  text-decoration: underline;
+}
+
+/* Dropdown d'autocomplétion : flotte AU-DESSUS de l'input */
+.lc-mention-pop {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  animation: lc-pop-in 0.12s ease;
+}
+
+/* Dropdown d'autocomplétion des mentions */
+.lc-mention-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-self: flex-start;
+  min-width: min(260px, 100%);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 0.3rem;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.lc-mention-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.35rem 0.5rem;
+  border: none;
+  background: none;
+  border-radius: 9px;
+  color: var(--text);
+  text-align: left;
+}
+
+.lc-mention-item.active {
+  background: var(--surface-2);
+}
+
+.lc-mention-av {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--accent-grad);
+  color: #23180a;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.lc-mention-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lc-mention-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* Panneaux (émoji / gif) */
+.lc-panel {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 0.6rem;
+}
+
+/* Wrapper du picker emoji-picker-react */
+.lc-emoji-wrap {
+  align-self: flex-start;
+  width: 100%;
+  max-width: 340px;
+}
+
+.lc-emoji-wrap .EmojiPickerReact {
+  --epr-emoji-size: 26px;
+  border-color: var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.lc-emoji-loading {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 340px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text-soft);
+}
+
+.lc-gif-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.lc-gif-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.lc-gif-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.lc-gif-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 0.4rem;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.lc-gif {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  padding: 0;
+  background: var(--surface-2);
+  aspect-ratio: 1;
+  transition: border-color 0.1s ease, transform 0.1s ease;
+}
+
+.lc-gif:hover {
+  border-color: var(--orange);
+  transform: translateY(-2px);
+}
+
+.lc-gif img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lc-gif-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  padding: 1rem;
+}
+
+.lc-gif-credit {
+  align-self: flex-end;
+  font-size: 0.68rem;
+  color: var(--text-soft);
+}
+
+/* Médias d'un commentaire (jusqu'à 4) */
+.lc-media-grid {
+  display: grid;
+  gap: 4px;
+  margin-top: 0.45rem;
+  max-width: 360px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.lc-media-grid.n-1 {
+  grid-template-columns: 1fr;
+  max-width: 300px;
+}
+
+.lc-media-grid.n-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.lc-media-grid.n-3 {
+  grid-template-columns: 1fr 1fr;
+}
+
+/* 3 médias : le 1er occupe toute la hauteur à gauche. */
+.lc-media-grid.n-3 .lc-media:first-child {
+  grid-row: span 2;
+}
+
+.lc-media-grid.n-4 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.lc-media {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  line-height: 0;
+  background: var(--surface-2);
+  overflow: hidden;
+  cursor: zoom-in;
+}
+
+.lc-media-grid.n-1 .lc-media {
+  border-radius: 12px;
+}
+
+.lc-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #fff;
+}
+
+/* En solo, on laisse respirer le ratio (pas de crop fort). */
+.lc-media-grid.n-1 .lc-media img {
+  max-height: 260px;
+  object-fit: contain;
+}
+
+/* En grille, cases carrées pour un montage propre. */
+.lc-media-grid:not(.n-1) .lc-media {
+  aspect-ratio: 1;
+}
+
+/* Actions like / répondre */
+.lc-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.lc-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: none;
+  background: none;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.lc-act:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.lc-act.liked {
+  color: #e0483f;
+}
+
+/* Fils : message racine + réponses imbriquées (un niveau) */
+.lc-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.lc-replies {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  margin-left: 1.1rem;
+  padding-left: 1.1rem;
+  border-left: 2px solid var(--border);
+}
+
+/* Réponses : avatar un peu plus petit. */
+.ld-comment.is-reply .ld-comment-avatar {
+  width: 30px;
+  height: 30px;
+  font-size: 0.85rem;
+}
+
+/* ---------- Modale d'historique d'édition ---------- */
+.hist-modal {
+  max-width: 520px;
+}
+
+.hist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin-top: 0.6rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.hist-item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.7rem 0.85rem;
+  background: var(--surface-2);
+}
+
+.hist-item.current {
+  border-color: color-mix(in srgb, var(--orange) 45%, var(--border));
+  background: color-mix(in srgb, var(--orange) 7%, var(--surface-2));
+}
+
+.hist-item p {
+  margin: 0.35rem 0 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.hist-meta {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.hist-media {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+}
+
+.hist-media img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+/* ---------- Lightbox média (esprit Twitter) ---------- */
+.mv-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.15s ease;
+}
+
+.mv-close {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 3;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  transition: background 0.12s ease;
+}
+
+.mv-close:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.mv-media {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem;
+}
+
+.mv-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 14px 50px rgba(0, 0, 0, 0.5);
+}
+
+.mv-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  transition: background 0.12s ease;
+}
+
+.mv-nav:hover {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.mv-prev {
+  left: 0.6rem;
+}
+
+.mv-next {
+  right: 0.6rem;
+}
+
+.mv-dots {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.4rem;
+}
+
+.mv-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.4);
+  padding: 0;
+}
+
+.mv-dot.active {
+  background: #fff;
+}
+
+.mv-side {
+  width: min(400px, 92vw);
+  flex-shrink: 0;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.mv-thread {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.mv-composer {
+  border-top: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+}
+
+@media (max-width: 900px) {
+  .mv-overlay {
+    flex-direction: column;
+  }
+
+  .mv-media {
+    flex: none;
+    height: 44vh;
+    padding: 1rem;
+  }
+
+  .mv-side {
+    width: 100%;
+    flex: 1;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    min-height: 0;
+  }
+}
+
+/* Emojis Twitter (twemoji) rendus dans les messages postés */
+.ld-comment-body img.emoji {
+  display: inline-block;
+  width: 1.28em;
+  height: 1.28em;
+  vertical-align: -0.25em;
+  margin: 0 0.03em;
+}
+
+/* ---------- Modal d'édition d'item ---------- */
+.item-edit-modal {
+  max-width: 480px;
+  /* Laisse déborder les popovers (émojis, résultats persos) hors de la modale */
+  overflow: visible;
+}
+
+.ie-head {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-bottom: 1.2rem;
+}
+
+.ie-cover {
+  width: 60px;
+  height: 78px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+  flex-shrink: 0;
+}
+
+.ie-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ie-name {
+  font-size: 1.2rem;
+}
+
+.ie-sub {
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  margin: 0.2rem 0 0;
+}
+
+.ie-rating {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.ie-rating input[type="range"] {
+  flex: 1;
+}
+
+.ie-rating-clear {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+  display: grid;
+  place-items: center;
+}
+
+.ie-rating-clear:hover {
+  border-color: var(--orange);
+  color: var(--accent-ink);
+}
+
+@media (max-width: 640px) {
+  .ld-header {
+    flex-direction: column;
+  }
+
+  .tier-row {
+    grid-template-columns: 56px 1fr;
+  }
+
+  .tier-label {
+    font-size: 1.1rem;
+  }
+}

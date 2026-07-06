@@ -1,0 +1,874 @@
+/* ======================================================================
+   LISTES — feed, détail, tier lists, drag & drop
+   ====================================================================== */
+
+.dot {
+  color: var(--text-soft);
+  opacity: 0.6;
+}
+
+/* ---------- Page feed ---------- */
+.lists-page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.lists-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.4rem;
+  flex-wrap: wrap;
+}
+
+.lists-title {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-size: 2rem;
+}
+
+.lists-title-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: var(--accent-grad);
+  color: #1a1204;
+  box-shadow: 0 6px 18px rgba(242, 183, 11, 0.35);
+}
+
+.lists-sub {
+  color: var(--text-soft);
+  margin: 0.5rem 0 0;
+  font-size: 1rem;
+}
+
+.lists-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+
+.lists-tab {
+  border: none;
+  background: none;
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 10px 10px 0 0;
+  position: relative;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.lists-tab:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.lists-tab.active {
+  color: var(--accent-ink);
+}
+
+.lists-tab.active::after {
+  content: "";
+  position: absolute;
+  left: 0.9rem;
+  right: 0.9rem;
+  bottom: -1px;
+  height: 2.5px;
+  border-radius: 2px;
+  background: var(--accent-grad);
+}
+
+.lists-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 3rem;
+  color: var(--text-soft);
+}
+
+.lists-empty {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  color: var(--text-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.lists-empty h3 {
+  color: var(--text);
+  margin-top: 0.4rem;
+}
+
+.lists-empty .btn {
+  margin-top: 0.8rem;
+}
+
+.lists-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.1rem;
+}
+
+/* ---------- Carte de liste (feed) ---------- */
+.list-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.18s cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 0.22s ease, border-color 0.2s ease;
+}
+
+.list-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow);
+  border-color: var(--border-strong);
+}
+
+.list-preview {
+  position: relative;
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, var(--surface-2), var(--surface));
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.list-preview.empty {
+  color: var(--text-soft);
+  opacity: 0.5;
+}
+
+.list-preview-cover {
+  position: absolute;
+  width: 74px;
+  aspect-ratio: 3 / 4;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid var(--surface);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+  transform: translateX(calc((var(--i) - 2) * 46px)) rotate(calc((var(--i) - 2) * 4deg));
+  transition: transform 0.28s cubic-bezier(0.2, 0.7, 0.2, 1);
+  z-index: calc(5 - var(--i));
+}
+
+.list-card:hover .list-preview-cover {
+  transform: translateX(calc((var(--i) - 2) * 58px)) rotate(calc((var(--i) - 2) * 6deg)) translateY(-2px);
+}
+
+.list-preview-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---------- Badges de type (cartes + en-tête) ----------
+   Couleur pilotée par --tc, déclinée par type. Deux variantes :
+   .list-tag        → posé sur une image (verre teinté sombre)
+   .list-type-badge → posé sur une surface (pastille teintée douce) */
+.list-tag,
+.list-type-badge {
+  --tc: #8b93a7;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.015em;
+  line-height: 1;
+  white-space: nowrap;
+  padding: 0.34rem 0.6rem;
+  border-radius: 999px;
+}
+
+.list-tag.t-classic,
+.list-type-badge.t-classic {
+  --tc: #3b8ff0;
+}
+
+.list-tag.t-ranked,
+.list-type-badge.t-ranked {
+  --tc: #e6a70a;
+}
+
+.list-tag.t-tier,
+.list-type-badge.t-tier {
+  --tc: #9a6bff;
+}
+
+/* Sur une surface : pastille teintée douce */
+.list-type-badge {
+  color: color-mix(in srgb, var(--tc) 78%, var(--text));
+  background: color-mix(in srgb, var(--tc) 13%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--tc) 30%, transparent);
+}
+
+.list-type-badge svg {
+  color: var(--tc);
+}
+
+/* Sur une image : verre teinté sombre, icône éclaircie */
+.list-tag {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 6;
+  font-size: 0.68rem;
+  padding: 0.32rem 0.58rem;
+  color: #fff;
+  background: color-mix(in srgb, var(--tc) 26%, rgba(14, 15, 20, 0.7));
+  border: 1px solid color-mix(in srgb, var(--tc) 45%, rgba(255, 255, 255, 0.16));
+  backdrop-filter: blur(8px) saturate(130%);
+  -webkit-backdrop-filter: blur(8px) saturate(130%);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.32);
+}
+
+.list-tag svg {
+  color: color-mix(in srgb, var(--tc) 55%, #ffffff);
+}
+
+.list-tag-priv {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 6;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(14, 15, 20, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.32);
+}
+
+.list-card-body {
+  padding: 0.9rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1;
+}
+
+.list-card-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.list-priv-badge {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+}
+
+.list-card-title {
+  font-size: 1.12rem;
+  line-height: 1.2;
+}
+
+.list-card-desc {
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.list-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  margin-top: auto;
+}
+
+.list-card-author {
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.list-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding-top: 0.6rem;
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.list-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  font-weight: 500;
+}
+
+.list-stat.liked {
+  color: #ff5470;
+}
+
+.list-stat.time {
+  margin-left: auto;
+  font-size: 0.76rem;
+  opacity: 0.8;
+}
+
+/* ---------- Modal de création ---------- */
+.type-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.type-card {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: left;
+  padding: 0.6rem 0.65rem;
+  border-radius: 13px;
+  border: 1.5px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+}
+
+.type-card:hover {
+  border-color: var(--orange);
+  transform: translateY(-1px);
+}
+
+.type-card.active {
+  border-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 12%, var(--surface));
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.type-card-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.type-card.active .type-card-icon {
+  background: var(--accent-grad);
+  color: #1a1204;
+  border-color: transparent;
+}
+
+.type-card-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  line-height: 1.12;
+}
+
+/* Choix jeux / personnages (tier list) */
+.kind-picker {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.kind-card {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem 0.65rem;
+  border-radius: 13px;
+  border: 1.5px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+}
+
+.kind-card:hover {
+  border-color: var(--orange);
+  transform: translateY(-1px);
+}
+
+.kind-card.active {
+  border-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 12%, var(--surface));
+  color: var(--accent-ink);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+/* Ligne titre + switch de visibilité */
+.title-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.55rem;
+}
+
+.title-row .modal-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.title-row .vis-switch {
+  flex-shrink: 0;
+}
+
+.vis-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.55rem 0.3rem 0.65rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.8rem;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.vis-switch.on {
+  color: var(--accent-ink);
+  border-color: color-mix(in srgb, var(--orange) 45%, var(--border));
+  background: color-mix(in srgb, var(--orange) 10%, var(--surface));
+}
+
+.vis-switch-track {
+  position: relative;
+  width: 30px;
+  height: 17px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  transition: background 0.15s ease;
+}
+
+.vis-switch.on .vis-switch-track {
+  background: var(--orange);
+}
+
+.vis-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.16s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.vis-switch.on .vis-switch-knob {
+  transform: translateX(13px);
+}
+
+/* ---------- Modal d'ajout d'éléments ---------- */
+.additems-modal {
+  max-width: 720px;
+}
+
+.additems-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.additems-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.additems-tab.active {
+  background: var(--accent-grad);
+  color: #1a1204;
+  border-color: transparent;
+}
+
+/* Sous-modes (par jeu / par personnage) */
+.additems-modes {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.9rem;
+  background: var(--surface-2);
+  padding: 0.25rem;
+  border-radius: 11px;
+}
+
+.additems-mode {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  border: none;
+  background: none;
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.additems-mode.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Filtre "avec personnages" */
+.additems-filterrow {
+  display: flex;
+  justify-content: flex-end;
+  margin: -0.4rem 0 0.8rem;
+}
+
+.additems-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.5rem 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.8rem;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.additems-toggle.on {
+  color: var(--accent-ink);
+  border-color: color-mix(in srgb, var(--orange) 45%, var(--border));
+  background: color-mix(in srgb, var(--orange) 10%, var(--surface));
+}
+
+.additems-toggle-track {
+  position: relative;
+  width: 30px;
+  height: 17px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  transition: background 0.15s ease;
+}
+
+.additems-toggle.on .additems-toggle-track {
+  background: var(--orange);
+}
+
+.additems-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.16s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.additems-toggle.on .additems-toggle-knob {
+  transform: translateX(13px);
+}
+
+.additems-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.4rem 0.4rem 0.85rem;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  margin-bottom: 1rem;
+  color: var(--text-soft);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.additems-search:focus-within {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 4px var(--ring);
+}
+
+.additems-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.additems-search-btn {
+  flex-shrink: 0;
+  padding: 0.5rem 1rem;
+  border-radius: 9px;
+  border: none;
+  background: var(--accent-grad);
+  color: #1a1204;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  transition: opacity 0.15s ease, transform 0.12s ease;
+}
+
+.additems-search-btn:hover {
+  transform: translateY(-1px);
+  opacity: 0.94;
+}
+
+.additems-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 0.7rem;
+  max-height: 46vh;
+  overflow-y: auto;
+  padding: 0.2rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.pick-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: center;
+}
+
+.pick-cover {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1.5px solid var(--border);
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+  transition: border-color 0.15s ease, transform 0.12s ease;
+}
+
+.pick-cover.char {
+  aspect-ratio: 1;
+  border-radius: 12px;
+}
+
+.pick-card:hover .pick-cover {
+  border-color: var(--orange);
+  transform: translateY(-2px);
+}
+
+.pick-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #fff;
+}
+
+.pick-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  /* reset : une autre règle .pick-check (cartes plateforme) fixe left/transform */
+  left: auto;
+  bottom: auto;
+  transform: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 8, 12, 0.7);
+  color: #fff;
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.pick-card:hover .pick-check,
+.pick-check.arrow {
+  opacity: 1;
+}
+
+.pick-card.added .pick-cover {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.pick-card.added .pick-check {
+  opacity: 1;
+  background: var(--accent-grad);
+  color: #1a1204;
+}
+
+.pick-name {
+  font-size: 0.76rem;
+  line-height: 1.15;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pick-sub {
+  font-size: 0.68rem;
+  line-height: 1.1;
+  color: var(--text-soft);
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Badge "ce jeu a des personnages" (coin bas-gauche) */
+.pick-flag {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--orange) 30%, rgba(8, 8, 12, 0.72));
+  color: #fff;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+/* Carte "Ajouter mon personnage" */
+.pick-cover.char.add {
+  display: grid;
+  place-items: center;
+  color: var(--accent-ink);
+  border-style: dashed;
+  border-color: var(--border-strong);
+  background: var(--surface);
+}
+
+.pick-card.char.add:hover .pick-cover.char.add {
+  border-color: var(--orange);
+  color: var(--accent-ink);
+}
+
+.additems-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.additems-count {
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+
+.additems-hint {
+  color: var(--text-soft);
+  text-align: center;
+  padding: 1.5rem 0;
+}
+
+.additems-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--text-soft);
+  padding: 2rem;
+}
+
+.additems-crumb {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.crumb-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.crumb-back:hover {
+  border-color: var(--orange);
+  color: var(--text);
+}
+
+.crumb-current {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
