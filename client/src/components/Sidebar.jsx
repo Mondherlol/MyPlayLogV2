@@ -19,6 +19,9 @@ import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { useClickOutside } from "../hooks/useClickOutside";
 
+// Version courante de l'app (affichée en bas de la sidebar).
+const APP_VERSION = "1.0";
+
 const NAV = [
   { to: "/app", label: "Accueil", Icon: Home, end: true },
   { to: "/explore", label: "Explorer", Icon: Compass },
@@ -119,6 +122,10 @@ export default function Sidebar({ collapsed, onToggle }) {
             <span className="side-label">Français</span>
             <ChevronUp size={15} className="side-label lang-caret" />
           </button>
+        </div>
+
+        <div className="side-version" title={`Version ${APP_VERSION}`}>
+          v{APP_VERSION}
         </div>
       </div>
     </aside>

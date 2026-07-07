@@ -979,6 +979,23 @@
   border-top: 1px solid var(--border);
 }
 
+/* Numéro de version discret, tout en bas */
+.side-version {
+  padding: 0.5rem 0.7rem 0.15rem;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-soft);
+  opacity: 0.65;
+}
+
+.sidebar.collapsed .side-version {
+  text-align: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
 /* Sélecteur de langue */
 .lang-wrap {
   position: relative;
