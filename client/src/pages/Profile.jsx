@@ -26,6 +26,7 @@ import {
   ChevronDown,
   ArrowRight,
   Repeat2,
+  Film,
 } from "lucide-react";
 import twemoji from "@twemoji/api";
 import { apiFetch, apiUpload } from "../lib/api";
@@ -41,6 +42,7 @@ import ProfileActivity from "../components/ProfileActivity";
 import ProfileOST from "../components/ProfileOST";
 import ProfileFeed from "../components/ProfileFeed";
 import ProfileRecommendations from "../components/ProfileRecommendations";
+import ProfileVideos from "../components/ProfileVideos";
 import EditProfileModal from "../components/EditProfileModal";
 import CoverPickerModal from "../components/CoverPickerModal";
 import ReframeCoverModal from "../components/ReframeCoverModal";
@@ -256,6 +258,7 @@ export default function Profile() {
   const [editing, setEditing] = useState(false);
   const [pickingCover, setPickingCover] = useState(false);
   const [reframing, setReframing] = useState(false);
+  const [pendingCover, setPendingCover] = useState(null);
   const [coverMenu, setCoverMenu] = useState(false);
   const [followModal, setFollowModal] = useState(null);
   const [followBusy, setFollowBusy] = useState(false);
@@ -370,11 +373,11 @@ export default function Profile() {
   // Applique une nouvelle image de couverture à MON profil (cadrage recentré).
   // Ne met à jour la bannière affichée que si on est sur son propre profil
   // (on peut définir sa couverture depuis le feed d'un autre joueur).
-  async function applyCover(url) {
+  async function applyCover(url, posStr = null) {
     const { user: u } = await apiFetch("/users/me", {
       method: "PUT",
       token,
-      body: { cover: url, coverPos: null },
+      body: { cover: url, coverPos: posStr },
     });
     updateUser({ cover: u.cover, coverPos: u.coverPos });
     if (isMe) {
@@ -388,27 +391,28 @@ export default function Profile() {
 
   async function pickCover(url) {
     setPickingCover(false);
-    try {
-      // Nouvelle image → on repart d'un cadrage centré.
-      await applyCover(url);
-    } catch (err) {
-      alert(err.message);
-    }
+    setPendingCover(url);
+    setReframing(true);
   }
 
   async function saveCoverPos(posStr) {
     try {
-      const { user: u } = await apiFetch("/users/me", {
-        method: "PUT",
-        token,
-        body: { coverPos: posStr },
-      });
-      updateUser({ coverPos: u.coverPos });
-      setData((d) => {
-        const next = { ...d, profile: { ...d.profile, coverPos: u.coverPos } };
-        profileCache.set(targetUsername, next);
-        return next;
-      });
+      if (pendingCover) {
+        await applyCover(pendingCover, posStr);
+      } else {
+        const { user: u } = await apiFetch("/users/me", {
+          method: "PUT",
+          token,
+          body: { coverPos: posStr },
+        });
+        updateUser({ coverPos: u.coverPos });
+        setData((d) => {
+          const next = { ...d, profile: { ...d.profile, coverPos: u.coverPos } };
+          profileCache.set(targetUsername, next);
+          return next;
+        });
+      }
+      setPendingCover(null);
       setReframing(false);
     } catch (err) {
       alert(err.message);
@@ -622,6 +626,13 @@ export default function Profile() {
           {ostCount > 0 && <span className="tab-count">{ostCount}</span>}
         </button>
         <button
+          className={`profile-tab ${tab === "videos" ? "active" : ""}`}
+          onClick={() => setTab("videos")}
+        >
+          <Film size={16} /> Vidéos
+          {c.videos > 0 && <span className="tab-count">{c.videos}</span>}
+        </button>
+        <button
           className={`profile-tab ${tab === "activity" ? "active" : ""}`}
           onClick={() => setTab("activity")}
         >
@@ -820,6 +831,11 @@ export default function Profile() {
         />
       )}
 
+      {/* ---------- Vidéos (documentaires) ---------- */}
+      {tab === "videos" && (
+        <ProfileVideos username={targetUsername} isMe={isMe} token={token} />
+      )}
+
       {/* ---------- Reviews & commentaires ---------- */}
       {tab === "activity" && (
         <ProfileActivity
@@ -885,10 +901,13 @@ export default function Profile() {
       )}
       {reframing && profile.cover && (
         <ReframeCoverModal
-          cover={profile.cover}
+          cover={pendingCover || profile.cover}
           pos={profile.coverPos}
           onSave={saveCoverPos}
-          onClose={() => setReframing(false)}
+          onClose={() => {
+            setPendingCover(null);
+            setReframing(false);
+          }}
         />
       )}
       {followModal && (

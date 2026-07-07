@@ -10,6 +10,7 @@ import List from "../models/List.js";
 import Recommendation from "../models/Recommendation.js";
 import OstThread from "../models/OstThread.js";
 import Repost from "../models/Repost.js";
+import Documentary from "../models/Documentary.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { connectWithNpsso } from "../lib/psn.js";
 import { isAdminEmail } from "../lib/admin.js";
@@ -740,7 +741,7 @@ router.get("/:username", requireAuth, async (req, res) => {
       (u) => String(u) === String(user._id)
     );
 
-    const [entries, followers, listQuery, recoCount] = await Promise.all([
+    const [entries, followers, listQuery, recoCount, videoCount] = await Promise.all([
       UserGame.find({ user: user._id }).sort({ updatedAt: -1 }),
       User.countDocuments({ following: user._id }),
       List.find(
@@ -752,6 +753,7 @@ router.get("/:username", requireAuth, async (req, res) => {
         .limit(50)
         .lean(),
       Recommendation.countDocuments({ to: user._id }),
+      Documentary.countDocuments({ user: user._id, recommended: true }),
     ]);
 
     const library = entries.map(entryCard);
@@ -820,6 +822,7 @@ router.get("/:username", requireAuth, async (req, res) => {
           favorites: favorites.length,
           finished,
           recommendations: recoCount,
+          videos: videoCount,
         },
       },
       favorites,

@@ -1,10 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Play, Pause, Star, Music, Search, Plus, X, Trash2, Disc3, RotateCcw } from "lucide-react";
+import {
+  Play,
+  Pause,
+  Star,
+  Music,
+  Search,
+  Plus,
+  X,
+  Trash2,
+  Disc3,
+  RotateCcw,
+  TextCursorInput,
+} from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { makeCache } from "../lib/cache";
 import { loadYT } from "../lib/youtube";
 import AddOstModal from "./AddOstModal";
+import MassRenameOstModal from "./MassRenameOstModal";
 
 // OST du jeu affichée sous forme de vinyles qui tournent pendant la lecture.
 // Même fonctionnement que l'OstPicker de la modale (extraits iTunes + pistes
@@ -30,6 +43,7 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
   const [loading, setLoading] = useState(!ostCache.get(String(gameId)));
   const [playingId, setPlayingId] = useState(null);
   const [adding, setAdding] = useState(false);
+  const [renaming, setRenaming] = useState(false);
   const [query, setQuery] = useState("");
   const [showTrash, setShowTrash] = useState(false);
   const [menu, setMenu] = useState(null); // { x, y, track }
@@ -187,6 +201,14 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
     }
   }
 
+  // Applique un renommage en masse (déjà persisté côté serveur par la modale).
+  function applyRenames(byId) {
+    commit(
+      tracks.map((t) => (byId.has(t.id) ? { ...t, name: byId.get(t.id) } : t)),
+      trash
+    );
+  }
+
   const isFav = (t) =>
     favorite && favorite.name === t.name && favorite.artist === t.artist;
 
@@ -228,6 +250,15 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
               </button>
             )}
           </div>
+          {tracks.length > 0 && (
+            <button
+              className="gp-ost-trash-btn clickable"
+              onClick={() => setRenaming(true)}
+              title="Renommer en masse"
+            >
+              <TextCursorInput size={15} />
+            </button>
+          )}
           {trash.length > 0 && (
             <button
               className={`gp-ost-trash-btn clickable ${showTrash ? "active" : ""}`}
@@ -420,6 +451,16 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
           token={token}
           onClose={() => setAdding(false)}
           onAdded={(arr) => commit([...arr, ...tracks], trash)}
+        />
+      )}
+
+      {renaming && (
+        <MassRenameOstModal
+          gameId={gameId}
+          token={token}
+          tracks={tracks}
+          onClose={() => setRenaming(false)}
+          onApply={applyRenames}
         />
       )}
     </div>

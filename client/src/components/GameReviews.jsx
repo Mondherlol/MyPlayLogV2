@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import {
@@ -398,6 +398,38 @@ function ReviewReactions({ r, readOnly, onReact }) {
 // Carte d'une review — avatar en dehors, contenu dans une bulle.
 // variant "user" (page du jeu) : avatar = auteur. variant "game" (profil) :
 // avatar = jaquette du jeu (→ page du jeu), titre = nom du jeu (→ onglet reviews).
+// Texte d'une review : on écrase les retours à la ligne successifs (un seul
+// suffit) et on tronque avec un bouton « Afficher plus » si c'est trop long.
+function ReviewText({ text }) {
+  const clean = useMemo(
+    () => text.replace(/[ \t]*\r?\n(?:[ \t]*\r?\n){2,}/g, "\n\n").trim(),
+    [text]
+  );
+  const [expanded, setExpanded] = useState(false);
+  const [clamped, setClamped] = useState(false);
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el) setClamped(el.scrollHeight > el.clientHeight + 4);
+  }, [clean]);
+  return (
+    <div className="rv-textwrap">
+      <p ref={ref} className={`rv-text ${expanded ? "" : "rv-clamp"}`}>
+        {renderMessage(clean, [])}
+      </p>
+      {clamped && (
+        <button
+          type="button"
+          className="rv-more clickable"
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? "Afficher moins" : "Afficher plus"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function ReviewItem({
   r,
   gameId,
@@ -509,7 +541,7 @@ export function ReviewItem({
           }
         >
           <div className={`rv-body ${hidden ? "is-hidden" : ""}`}>
-            {r.review.trim() && <p className="rv-text">{renderMessage(r.review, [])}</p>}
+            {r.review.trim() && <ReviewText text={r.review} />}
 
             {r.media.length > 0 && (
               <div className={`lc-media-grid n-${Math.min(r.media.length, 4)}`}>

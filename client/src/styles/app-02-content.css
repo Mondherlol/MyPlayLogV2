@@ -3350,6 +3350,72 @@
   text-decoration: underline;
 }
 
+/* Renommage en masse des OST */
+.mass-rename-modal {
+  max-width: 480px;
+}
+
+.mass-rename-case {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+  cursor: pointer;
+}
+
+.mass-rename-preview {
+  margin-top: 1rem;
+}
+
+.mass-rename-count {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent-ink);
+  margin-bottom: 0.5rem;
+}
+
+.mass-rename-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+
+.mass-rename-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 9px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.82rem;
+}
+
+.mass-rename-before {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-decoration: line-through;
+}
+
+.mass-rename-after {
+  flex: 1;
+  min-width: 0;
+  color: var(--text);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ======================================================================
    PAGE PROFIL
    ====================================================================== */

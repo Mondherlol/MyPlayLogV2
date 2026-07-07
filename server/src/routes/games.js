@@ -16,6 +16,7 @@ import CustomCharacter from "../models/CustomCharacter.js";
 import CustomOst from "../models/CustomOst.js";
 import GameTime from "../models/GameTime.js";
 import HiddenOst from "../models/HiddenOst.js";
+import OstRename from "../models/OstRename.js";
 import VnCache from "../models/VnCache.js";
 import { fetchHltbTimes } from "../lib/hltb.js";
 import { buildGameFeed, fetchSteamReviews } from "../lib/feed.js";
@@ -330,6 +331,74 @@ router.get("/", requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/games/releases?from&to&ids
+// Calendrier des sorties : jeux à venir triés par date de sortie croissante.
+// - Sans `ids` : toutes les sorties à venir dans la fenêtre [from, to].
+// - Avec `ids` (ex: bibliothèque de souhaits) : uniquement ces jeux, sans borne
+//   haute (une envie peut sortir dans longtemps).
+// La liste générale (sans ids) est la même pour tout le monde : on la met en
+// cache mémoire partagé (par jour) pour ne pas rappeler IGDB à chaque visite.
+const releasesCache = { day: 0, games: null };
+
+router.get("/releases", requireAuth, async (req, res) => {
+  try {
+    const now = Math.floor(Date.now() / 1000);
+    const startOfToday = now - (now % 86400); // minuit UTC : inclut les sorties du jour
+    const from = parseInt(req.query.from, 10) || startOfToday;
+    const ids = parseIds(req.query.ids);
+    const isGeneral = !ids.length && !req.query.from && !req.query.to;
+
+    // Cache partagé pour la liste générale du jour.
+    if (isGeneral && releasesCache.games && releasesCache.day === startOfToday) {
+      return res.json({ games: releasesCache.games });
+    }
+
+    const where = [
+      "cover != null",
+      "version_parent = null",
+      `first_release_date >= ${from}`,
+    ];
+
+    if (ids.length) {
+      where.push(`id = (${ids.join(",")})`);
+    } else {
+      const to = parseInt(req.query.to, 10) || now + 300 * 86400; // ~10 mois
+      where.push(`first_release_date <= ${to}`);
+      where.push("game_type = (0,8,9)"); // jeu principal + remake + remaster
+    }
+
+    const fields =
+      "fields name,alternative_names.name,alternative_names.comment,cover.image_id,total_rating,total_rating_count,first_release_date,hypes,genres.name,platforms.abbreviation,platforms.name,keywords.name";
+    const query = `${fields}; where ${where.join(
+      " & "
+    )}; sort first_release_date asc; limit 500;`;
+
+    const raw = await igdbQuery("games", query);
+    // Contenu généré par IA : détecté via les mots-clés IGDB (ex : "ai-generated
+    // artwork", "ai-generated translations", "generative ai"). On ne renvoie
+    // qu'un booléen (payload léger) que le client peut filtrer.
+    const AI_RE = /\bai[- ]generated\b|generative[- ]ai/i;
+    const games = raw.map((g) => ({
+      ...mapGame(g),
+      releaseDate: g.first_release_date || null,
+      hypes: g.hypes || 0,
+      ai: (g.keywords || []).some((k) => AI_RE.test(k.name || "")),
+    }));
+
+    if (isGeneral) {
+      releasesCache.games = games;
+      releasesCache.day = startOfToday;
+    }
+
+    res.json({ games });
+  } catch (err) {
+    console.error("releases error:", err.message);
+    res
+      .status(err.status || 500)
+      .json({ error: err.message || "Erreur lors de la récupération des sorties." });
+  }
+});
+
 // --- Listes pour les filtres (mises en cache en mémoire) ---
 const cache = {};
 
@@ -542,13 +611,18 @@ router.get("/:id/ost", requireAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
     const q = String(req.query.q || "").trim();
-    const [itunes, customs, hiddenDoc] = await Promise.all([
+    const [itunes, customs, hiddenDoc, renameDoc] = await Promise.all([
       q ? fetchItunesOst(q).catch(() => []) : Promise.resolve([]),
       CustomOst.find({ gameId: id }).sort({ createdAt: -1 }),
       HiddenOst.findOne({ user: req.userId, gameId: id }),
+      OstRename.findOne({ user: req.userId, gameId: id }),
     ]);
     const hidden = new Set(hiddenDoc?.hidden || []);
-    const all = [...customs.map(ostFromCustom), ...itunes];
+    const renames = renameDoc?.renames;
+    const all = [...customs.map(ostFromCustom), ...itunes].map((t) => {
+      const renamed = renames?.get(t.id);
+      return renamed ? { ...t, name: renamed } : t;
+    });
     // Visibles + masquées (la corbeille) : on renvoie les deux pour pouvoir
     // proposer de restaurer une piste retirée.
     const tracks = all.filter((t) => !hidden.has(t.id));
@@ -654,6 +728,27 @@ router.post("/:id/ost/unhide", requireAuth, async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: "Échec." });
+  }
+});
+
+// --- Renommer des OST en masse pour cet utilisateur (ex: retirer un préfixe) ---
+router.post("/:id/ost/rename", requireAuth, async (req, res) => {
+  try {
+    const list = Array.isArray(req.body?.renames) ? req.body.renames : [];
+    const entries = list
+      .map((r) => [String(r?.id || ""), String(r?.name || "").trim()])
+      .filter(([id, name]) => id && name);
+    if (!entries.length) return res.status(400).json({ error: "Aucune piste." });
+    const set = {};
+    for (const [id, name] of entries) set[`renames.${id}`] = name;
+    await OstRename.updateOne(
+      { user: req.userId, gameId: Number(req.params.id) },
+      { $set: set },
+      { upsert: true }
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: "Échec du renommage." });
   }
 });
 

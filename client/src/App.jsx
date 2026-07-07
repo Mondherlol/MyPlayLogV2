@@ -6,6 +6,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Welcome from "./pages/Welcome";
 import Explorer from "./pages/Explorer";
+import Releases from "./pages/Releases";
 import GamePage from "./pages/GamePage";
 import Profile from "./pages/Profile";
 import Lists from "./pages/Lists";
@@ -59,6 +60,7 @@ export default function App() {
       >
         <Route path="/app" element={<Welcome />} />
         <Route path="/explore" element={<Explorer />} />
+        <Route path="/releases" element={<Releases />} />
         <Route path="/game/:id" element={<GamePage />} />
         <Route path="/lists" element={<Lists />} />
         <Route path="/lists/:id" element={<ListDetail />} />

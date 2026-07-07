@@ -687,6 +687,505 @@
   }
 }
 
+/* ======================================================================
+   DOCUMENTAIRES — CTA d'accueil, réglages, mini-feed & onglet profil
+   ====================================================================== */
+
+/* --- CTA sur la home --- */
+.doc-cta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1.6rem;
+}
+
+.doc-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.8rem 1.3rem;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--orange), #ffcf4a);
+  color: #1a1408;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.98rem;
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--orange) 35%, transparent);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.doc-cta-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+  box-shadow: 0 14px 32px color-mix(in srgb, var(--orange) 45%, transparent);
+}
+
+.doc-cta-settings {
+  position: relative;
+}
+
+.doc-cta-gear {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+  transition: color 0.15s ease, border-color 0.15s ease, transform 0.3s ease;
+}
+
+.doc-cta-gear:hover {
+  color: var(--text);
+  border-color: var(--orange);
+}
+
+.doc-cta-gear.active {
+  color: var(--accent-ink);
+  border-color: var(--orange);
+  transform: rotate(60deg);
+}
+
+/* --- Popover de réglages --- */
+.doc-settings {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  left: 0;
+  z-index: 40;
+  width: 230px;
+  padding: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  animation: modalIn 0.16s ease;
+}
+
+.doc-settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.doc-settings-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+  margin-bottom: 0.15rem;
+}
+
+.doc-settings-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.45rem;
+  border-radius: 9px;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.doc-settings-opt.clickable:hover {
+  background: var(--surface-2);
+}
+
+.doc-settings-opt.disabled {
+  opacity: 0.75;
+  cursor: default;
+}
+
+.doc-check {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  border: 1.5px solid var(--border-strong);
+  display: grid;
+  place-items: center;
+  color: #1a1408;
+}
+
+.doc-check.on {
+  background: var(--orange);
+  border-color: var(--orange);
+}
+
+.doc-radio {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  position: relative;
+}
+
+.doc-radio.on {
+  border-color: var(--orange);
+}
+
+.doc-radio.on::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--orange);
+}
+
+/* --- Modal mini-feed : vidéo XL, textes & boutons à même le backdrop --- */
+.doc-overlay {
+  z-index: 1100;
+  background: rgba(4, 5, 8, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  align-items: flex-start;
+}
+
+/* Le conteneur du feed est transparent : pas de carte, la vidéo domine. */
+.doc-modal {
+  position: relative;
+  width: 100%;
+  max-width: min(1040px, 96vw);
+  margin: auto;
+  color: #fff;
+  animation: modalIn 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.doc-modal .modal-close {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.doc-modal .modal-close:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.doc-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.9rem;
+  padding-right: 2.8rem;
+}
+
+.doc-modal-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.15rem;
+  color: #fff;
+}
+
+.doc-modal-counter {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.12);
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+}
+
+.doc-modal .doc-state {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* --- Lightbox (onglet profil) : reste une carte classique --- */
+.doc-lightbox {
+  position: relative;
+  width: 100%;
+  max-width: 860px;
+  margin: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+  padding: 1.3rem;
+  animation: modalIn 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.doc-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--text-soft);
+}
+
+.doc-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+/* Grande vidéo immersive dans le feed (ombre marquée, coins nets). */
+.doc-modal .doc-stage {
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  max-height: 64vh;
+}
+
+.doc-player {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.doc-info {
+  margin-top: 0.9rem;
+}
+
+.doc-video-title {
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.doc-modal .doc-info {
+  margin-top: 1.1rem;
+}
+
+.doc-modal .doc-video-title {
+  font-size: 1.15rem;
+  color: #fff;
+}
+
+.doc-video-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.8rem;
+  margin-top: 0.5rem;
+}
+
+.doc-chan {
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+
+.doc-modal .doc-chan {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.doc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.doc-modal .doc-badge {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.doc-badge.reco {
+  background: color-mix(in srgb, var(--orange) 15%, var(--surface));
+  color: var(--accent-ink);
+}
+
+.doc-modal .doc-badge.reco {
+  background: color-mix(in srgb, var(--orange) 28%, transparent);
+  color: #ffe08a;
+}
+
+/* --- 3 boutons d'action (à même le backdrop) --- */
+.doc-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.7rem;
+  margin-top: 1.3rem;
+}
+
+.doc-act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.85rem 0.6rem;
+  border-radius: 12px;
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  transition: all 0.15s ease;
+}
+
+.doc-act:hover {
+  border-color: var(--orange);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.doc-act.active {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--orange) 32%, transparent);
+  color: #ffe08a;
+}
+
+.doc-act.next {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.doc-act:disabled {
+  opacity: 0.6;
+}
+
+/* --- Onglet Vidéos du profil : grille de cartes --- */
+.doc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.2rem;
+}
+
+.doc-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.doc-card:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+}
+
+.doc-card-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: none;
+  padding: 0;
+  background: #000;
+  overflow: hidden;
+}
+
+.doc-card-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.doc-card-play {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.doc-card-thumb:hover .doc-card-play {
+  opacity: 1;
+}
+
+.doc-card-dur {
+  position: absolute;
+  bottom: 0.5rem;
+  right: 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.78);
+  padding: 0.1rem 0.4rem;
+  border-radius: 6px;
+}
+
+.doc-card-body {
+  padding: 0.75rem 0.85rem 0.9rem;
+  flex: 1;
+}
+
+.doc-card-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.doc-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.doc-card-chan {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+.doc-card-game {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.76rem;
+  color: var(--accent-ink);
+}
+
+.doc-card-del {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: none;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.doc-card:hover .doc-card-del {
+  opacity: 1;
+}
+
+.doc-card-del:hover {
+  background: #e0483f;
+}
+
+@media (max-width: 560px) {
+  .doc-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* --- Conteneur activité --- */
 .act {
   animation: fadeIn 0.2s ease;
@@ -1084,6 +1583,35 @@
 .rv-text.muted {
   color: var(--text-soft);
   font-size: 0.9rem;
+}
+
+/* Troncature « Afficher plus » du texte des reviews */
+.rv-textwrap {
+  display: block;
+}
+
+.rv-clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  line-clamp: 6;
+  overflow: hidden;
+}
+
+.rv-more {
+  display: inline-block;
+  margin-top: 0.2rem;
+  border: none;
+  background: none;
+  color: var(--accent, #1d9bf0);
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.1rem 0;
+  cursor: pointer;
+}
+
+.rv-more:hover {
+  text-decoration: underline;
 }
 
 .rv-pc {
@@ -4261,6 +4789,9 @@
 }
 
 .rvc-av {
+  position: sticky;
+  top: calc(var(--topbar-h, 60px) + 0.5rem);
+  z-index: 3;
   width: 48px;
   height: 48px;
   flex-shrink: 0;
@@ -4347,10 +4878,25 @@
 }
 
 .rvc-top {
+  /* Reste collé en haut pendant qu'on scrolle une review longue, jusqu'à ce
+     que le bas de la bulle passe. Le fond opaque masque le texte qui défile
+     derrière ; les marges négatives couvrent tout le padding de la bulle. */
+  position: sticky;
+  top: calc(var(--topbar-h, 60px) + 0.5rem);
+  z-index: 2;
+  margin: -1rem -1.15rem 0;
+  padding: 1rem 1.15rem 0.6rem;
+  background: var(--surface);
+  border-radius: 15px 15px 0 0;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.8rem;
+}
+
+/* Ma review : le fond du header suit la teinte or de la bulle */
+.rvc.is-mine .rvc-top {
+  background: color-mix(in srgb, var(--orange) 8%, var(--surface));
 }
 
 .rvc-id {

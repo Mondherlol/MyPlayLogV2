@@ -1,6 +1,6 @@
 /node_modules
-./idees-app.txt
-./combined.log
+.idees-app.txt
+.combined.log
 /AUTRES
 /server/.env
 /server/server.log

@@ -1,0 +1,507 @@
+/* ======================================================================
+   Calendrier des sorties (/releases)
+   ====================================================================== */
+
+.releases {
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+/* ---------- En-tête ---------- */
+.rel-hero {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.rel-hero-icon {
+  flex: none;
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  color: #1a1204;
+  background: var(--accent-grad);
+  box-shadow: 0 8px 22px rgba(242, 183, 11, 0.4);
+}
+.rel-title {
+  font-size: clamp(1.7rem, 5vw, 2.3rem);
+}
+.rel-sub {
+  color: var(--text-soft);
+  margin: 0.35rem 0 0;
+  font-size: 0.98rem;
+}
+
+/* ---------- Barre d'outils : périodes + wishlist ---------- */
+.rel-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 1.8rem;
+  position: sticky;
+  top: calc(var(--topbar-h, 64px) + 0.4rem);
+  /* Au-dessus des cartes (le "+" des cards monte à z-index 15/20) */
+  z-index: 30;
+}
+
+.rel-periods {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.3rem;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+.rel-period {
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.5rem 0.95rem;
+  border-radius: 10px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.rel-period:hover {
+  color: var(--text);
+}
+.rel-period.active {
+  background: var(--accent-grad);
+  color: #1a1204;
+  box-shadow: 0 4px 12px rgba(242, 183, 11, 0.32);
+}
+
+.rel-wish {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.55rem 1rem;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.rel-wish:hover {
+  border-color: var(--orange);
+}
+.rel-wish.active {
+  border-color: transparent;
+  background: var(--accent-grad);
+  color: #1a1204;
+  box-shadow: 0 4px 14px rgba(242, 183, 11, 0.35);
+}
+
+/* ---------- Groupe d'actions à droite (wishlist + filtres) ---------- */
+.rel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.rel-dd {
+  position: relative;
+}
+.rel-dd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 11px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.rel-dd-btn:hover {
+  border-color: var(--orange);
+}
+.rel-dd-btn.active {
+  border-color: var(--orange);
+  background: var(--surface);
+  color: var(--accent-ink);
+}
+.rel-dd-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  background: var(--accent-grad);
+  color: #1a1204;
+}
+.rel-dd-caret {
+  transition: transform 0.15s ease;
+  color: var(--text-soft);
+}
+.rel-dd-caret.up {
+  transform: rotate(180deg);
+}
+
+.rel-dd-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  width: 250px;
+  max-width: 80vw;
+  padding: 0.4rem;
+  box-shadow: var(--shadow);
+}
+
+/* Barre de recherche dans le menu */
+.rel-dd-search {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.55rem;
+  margin-bottom: 0.35rem;
+  border-radius: 9px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.rel-dd-search svg {
+  flex: none;
+  color: var(--text-soft);
+}
+.rel-dd-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  outline: none;
+}
+.rel-dd-search-clear {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  border-radius: 6px;
+}
+.rel-dd-search-clear:hover {
+  color: var(--text);
+}
+
+.rel-dd-list {
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.rel-dd-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.55rem;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.9rem;
+  border-radius: 9px;
+  transition: background 0.12s ease;
+}
+.rel-dd-item:hover {
+  background: var(--surface-2);
+}
+.rel-dd-box {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  border: 1.5px solid var(--border-strong);
+  color: #1a1204;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+/* Inclus : case dorée */
+.rel-dd-item.include .rel-dd-box {
+  background: var(--accent-grad);
+  border-color: transparent;
+}
+.rel-dd-item.include {
+  color: var(--text);
+  font-weight: 600;
+}
+/* Exclu : case rouge */
+.rel-dd-item.exclude .rel-dd-box {
+  background: #e0483f;
+  border-color: transparent;
+  color: #fff;
+}
+.rel-dd-item.exclude {
+  color: var(--text-soft);
+  font-weight: 600;
+}
+.rel-dd-empty {
+  padding: 0.7rem;
+  text-align: center;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+}
+.rel-dd-clear {
+  width: 100%;
+  margin-top: 0.3rem;
+  padding: 0.45rem;
+  border: none;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--accent-ink);
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+.rel-dd-clear:hover {
+  color: var(--orange);
+}
+
+/* Bouton case à cocher « Exclure le contenu IA » */
+.rel-ai-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 11px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.rel-ai-toggle:hover {
+  border-color: var(--orange);
+}
+.rel-ai-toggle.active {
+  border-color: transparent;
+  background: var(--accent-grad);
+  color: #1a1204;
+  box-shadow: 0 4px 14px rgba(242, 183, 11, 0.35);
+}
+.rel-ai-box {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  border: 1.5px solid var(--border-strong);
+  color: #1a1204;
+}
+/* Case sombre sur fond doré (opaque et bien lisible) */
+.rel-ai-toggle.active .rel-ai-box {
+  background: #1a1204;
+  border-color: transparent;
+  color: var(--amber);
+}
+
+.rel-filter-clear {
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 9px;
+}
+.rel-filter-clear:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+/* Badge « IA » sur les cartes utilisant du contenu généré */
+.rel-ai-tag {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #fff;
+  background: rgba(20, 20, 30, 0.72);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+/* ---------- Timeline groupée par jour ---------- */
+.rel-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 2.2rem;
+}
+.rel-day {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 1.4rem;
+  align-items: start;
+}
+
+.rel-day-badge {
+  position: sticky;
+  top: calc(var(--topbar-h, 64px) + 4.5rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0.7rem 0.4rem 0.6rem;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+.rel-weekday {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+}
+.rel-daynum {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 2rem;
+  line-height: 1.05;
+  color: var(--text);
+}
+.rel-month {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-soft);
+}
+.rel-count {
+  margin-top: 0.55rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  padding: 0.22rem 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+/* Journée du jour : accent doré */
+.rel-day-badge.today {
+  border-color: transparent;
+  background: linear-gradient(160deg, rgba(242, 183, 11, 0.16), rgba(242, 183, 11, 0.05));
+  box-shadow: 0 0 0 1.5px var(--orange) inset;
+}
+.rel-day-badge.today .rel-daynum {
+  color: var(--accent-ink);
+}
+.rel-day-badge.today .rel-count {
+  background: var(--accent-grad);
+  color: #1a1204;
+}
+
+.rel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1.1rem;
+}
+
+/* Surbrillance dorée des jeux présents dans la liste de souhaits */
+.rel-card {
+  position: relative;
+  border-radius: 16px;
+}
+.rel-card.is-wish::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 18px;
+  border: 2px solid var(--orange);
+  pointer-events: none;
+  box-shadow: 0 0 16px rgba(242, 183, 11, 0.28);
+}
+
+/* ---------- États (chargement / vide / erreur) ---------- */
+.rel-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  text-align: center;
+  color: var(--text-soft);
+  padding: 4rem 1rem;
+}
+.rel-state h3 {
+  color: var(--text);
+  font-size: 1.2rem;
+}
+.rel-state svg {
+  color: var(--accent-ink);
+}
+.rel-empty p {
+  margin: 0;
+}
+.rel-error {
+  padding: 2.5rem 1.5rem;
+}
+.rel-error svg {
+  color: #e0483f;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 760px) {
+  .rel-day {
+    grid-template-columns: 1fr;
+    gap: 0.9rem;
+  }
+  .rel-day-badge {
+    position: static;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.5rem 0.85rem;
+  }
+  .rel-daynum {
+    font-size: 1.4rem;
+  }
+  .rel-count {
+    margin-top: 0;
+    margin-left: auto;
+  }
+  .rel-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 0.8rem;
+  }
+  .rel-toolbar {
+    position: static;
+  }
+  .rel-periods {
+    overflow-x: auto;
+  }
+}

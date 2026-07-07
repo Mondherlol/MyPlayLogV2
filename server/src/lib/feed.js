@@ -454,7 +454,7 @@ function pickThumb(thumbs) {
   return arr[arr.length - 1]?.url || arr[0]?.url || null;
 }
 
-async function ytSearch(query, { sp = "" } = {}) {
+export async function ytSearch(query, { sp = "" } = {}) {
   try {
     const spParam = sp ? `&sp=${sp}` : "";
     const html = await fetch(

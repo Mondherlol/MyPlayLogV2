@@ -1,0 +1,57 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    # Pas de port exposé sur l'hôte : la base n'est joignable que par les
+    # autres conteneurs via le réseau interne Docker.
+    networks:
+      - myplaylog
+
+  server:
+    build:
+      context: ./server
+    restart: unless-stopped
+    env_file:
+      - ./server/.env
+    environment:
+      # On force ces valeurs en prod (elles priment sur le .env s'il diffère).
+      MONGODB_URI: mongodb://mongo:27017/myplaylog
+      CLIENT_ORIGIN: https://myplaylog.cc
+      PORT: 4000
+    volumes:
+      # Les images uploadées (covers, avatars, reposts…) persistent hors conteneur.
+      - uploads_data:/app/uploads
+    depends_on:
+      - mongo
+    networks:
+      - myplaylog
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        VITE_API_URL: /api
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Certificats HTTPS persistés pour ne pas les regénérer à chaque rebuild.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - server
+    networks:
+      - myplaylog
+
+volumes:
+  mongo_data:
+  uploads_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  myplaylog:

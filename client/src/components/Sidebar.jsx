@@ -4,6 +4,7 @@ import {
   Gamepad2,
   Home,
   Compass,
+  CalendarDays,
   List,
   User,
   Shield,
@@ -21,6 +22,7 @@ import { useClickOutside } from "../hooks/useClickOutside";
 const NAV = [
   { to: "/app", label: "Accueil", Icon: Home, end: true },
   { to: "/explore", label: "Explorer", Icon: Compass },
+  { to: "/releases", label: "Sorties", Icon: CalendarDays },
   { to: "/lists", label: "Listes", Icon: List },
   { to: "/profile", label: "Profil", Icon: User },
   { to: "/admin", label: "Admin", Icon: Shield, adminOnly: true },

@@ -186,9 +186,22 @@ export default function Topbar() {
 
   function onSearchSubmit(e) {
     e.preventDefault();
-    // Pas de page « recherche de joueurs » : Entrée ne fait rien en mode users.
+    // Un seul résultat : Entrée l'ouvre directement.
+    if (results.length === 1) {
+      openResult(results[0]);
+      return;
+    }
+    // Pas de page « recherche de joueurs » : Entrée ne fait rien de plus en mode users.
     if (searchMode === "users") return;
     goExplore();
+  }
+
+  // Tab : bascule entre les onglets Jeux/Joueurs.
+  function onSearchKeyDown(e) {
+    if (e.key !== "Tab") return;
+    e.preventDefault();
+    if (!query.trim()) return;
+    setSearchMode((m) => (m === "games" ? "users" : "games"));
   }
 
   return (
@@ -217,6 +230,7 @@ export default function Topbar() {
               }
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={onSearchKeyDown}
             />
           </form>
 

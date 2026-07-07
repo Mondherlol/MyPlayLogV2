@@ -13,13 +13,23 @@ import notificationRoutes from "./routes/notifications.js";
 import recommendationRoutes from "./routes/recommendations.js";
 import ostRoutes from "./routes/ost.js";
 import repostRoutes from "./routes/reposts.js";
+import videoRoutes from "./routes/videos.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
+// Derrière le reverse-proxy Caddy : fait confiance à X-Forwarded-Proto/Host
+// pour que req.protocol vaille "https" et que les URLs d'uploads soient
+// construites en https://myplaylog.cc/... (et pas http://localhost).
+app.set("trust proxy", true);
+
 app.use(
   cors({
-    origin: process.env.CLIENT_ORIGIN || "http://localhost:5173",
+    // Liste d'origines autorisées, séparées par des virgules (localhost + IP
+    // du PC sur le réseau local pour tester depuis le téléphone).
+    origin: (process.env.CLIENT_ORIGIN || "http://localhost:5173")
+      .split(",")
+      .map((s) => s.trim()),
   })
 );
 app.use(express.json());
@@ -40,6 +50,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/ost", ostRoutes);
 app.use("/api/reposts", repostRoutes);
+app.use("/api/videos", videoRoutes);
 
 const PORT = process.env.PORT || 4000;
 const MONGODB_URI =

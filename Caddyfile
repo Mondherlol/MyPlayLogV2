@@ -1,0 +1,23 @@
+# Caddy s'occupe TOUT SEUL du certificat HTTPS (Let's Encrypt) dès que le
+# DNS de myplaylog.cc pointe vers l'IP du VPS. Le www redirige vers l'apex.
+
+www.myplaylog.cc {
+    redir https://myplaylog.cc{uri} permanent
+}
+
+myplaylog.cc {
+    encode gzip zstd
+
+    # L'API et les fichiers uploadés vont vers le backend Express.
+    @backend path /api/* /uploads/*
+    handle @backend {
+        reverse_proxy server:4000
+    }
+
+    # Tout le reste : les fichiers statiques du build React (SPA).
+    handle {
+        root * /srv
+        try_files {path} /index.html
+        file_server
+    }
+}
