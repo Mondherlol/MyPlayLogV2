@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import {
   Gamepad2,
   Library,
@@ -13,8 +13,12 @@ import {
   Sparkles,
   ArrowRight,
   Check,
+  Search,
+  PenLine,
+  Share2,
 } from "lucide-react";
 import Navbar from "../components/Navbar";
+import { useAuth } from "../context/AuthContext";
 
 const FEATURES = [
   {
@@ -64,25 +68,65 @@ const FEATURES = [
   },
 ];
 
+const MARQUEE = [
+  "RPG",
+  "Souls-like",
+  "Metroidvania",
+  "Rétro",
+  "Indé",
+  "Rogue-lite",
+  "JRPG",
+  "Pixel-art",
+  "Open world",
+  "Speedrun",
+  "Coop",
+  "Aventure",
+];
+
+const STEPS = [
+  {
+    Icon: Search,
+    title: "Ajoute tes jeux",
+    text: "Cherche un titre ou importe direct depuis Steam & PSN.",
+  },
+  {
+    Icon: PenLine,
+    title: "Note & log",
+    text: "Statut, heures, note, ressenti — capture chaque partie.",
+  },
+  {
+    Icon: Share2,
+    title: "Partage & compare",
+    text: "Suis tes potes, publie tes tops, grimpe au classement.",
+  },
+];
+
 export default function Landing() {
+  const { user, loading } = useAuth();
+
+  // Déjà connecté → on file direct dans l'app.
+  if (loading) return <div className="center-screen">Chargement…</div>;
+  if (user) return <Navigate to="/app" replace />;
+
   return (
-    <div className="page">
+    <div className="page landing">
       <Navbar />
 
       {/* HERO */}
       <section className="hero">
+        <div className="hero-glow" aria-hidden="true" />
+
         <div className="hero-badge font-fun">
           <Sparkles size={14} /> Le journal de tes jeux vidéo
         </div>
         <h1 className="hero-title">
           Tous tes jeux.
           <br />
-          <span className="grad-text">Une seule légende.</span>
+          <span className="grad-text">Une seule place.</span>
         </h1>
         <p className="hero-sub">
           MyPlayLog, c'est ton carnet de bord gaming : track, note, partage et
-          reviens sur tout ce que tu as joué. Comme un TV Time, mais pour les
-          manettes.
+          reviens sur tout ce que tu as joué. Que tu sois casual ou complétionniste, on s'occupe de tout.
         </p>
         <div className="hero-cta">
           <Link to="/register" className="btn btn-primary">
@@ -93,33 +137,80 @@ export default function Landing() {
           </Link>
         </div>
 
-        <div className="hero-mock card">
-          <div className="mock-head">
-            <span className="mock-dot" />
-            <span className="mock-dot" />
-            <span className="mock-dot" />
-            <span className="mock-head-label font-fun">ma bibliothèque</span>
+        <div className="hero-stage">
+          {/* Chips flottantes décoratives */}
+          <span className="float-chip chip-1">
+            <Trophy size={14} /> +1 trophée
+          </span>
+          <span className="float-chip chip-2">
+            <Star size={14} /> ★★★★★
+          </span>
+          <span className="float-chip chip-3">
+            <Timer size={14} /> 47h de jeu
+          </span>
+
+          <div className="hero-mock card">
+            <div className="mock-head">
+              <span className="mock-dot" />
+              <span className="mock-dot" />
+              <span className="mock-dot" />
+              <span className="mock-head-label font-fun">ma bibliothèque</span>
+            </div>
+            <MockRow
+              Icon={Library}
+              title="Elden Ring"
+              meta="En cours · 47h · ★★★★½"
+              tag="Bientôt fini"
+            />
+            <MockRow
+              Icon={Trophy}
+              title="Hollow Knight"
+              meta="Terminé · 32h · ★★★★★"
+              tag="100%"
+              tone="done"
+            />
+            <MockRow
+              Icon={ListOrdered}
+              title="Celeste"
+              meta="À jouer · dans ta liste"
+              tag="Backlog"
+              tone="soon"
+            />
           </div>
-          <MockRow
-            Icon={Library}
-            title="Elden Ring"
-            meta="En cours · 47h · ★★★★½"
-            tag="Bientôt fini"
-          />
-          <MockRow
-            Icon={Trophy}
-            title="Hollow Knight"
-            meta="Terminé · 32h · ★★★★★"
-            tag="100%"
-            tone="done"
-          />
-          <MockRow
-            Icon={ListOrdered}
-            title="Celeste"
-            meta="À jouer · dans ta liste"
-            tag="Backlog"
-            tone="soon"
-          />
+        </div>
+      </section>
+
+      {/* MARQUEE nostalgique */}
+      <div className="marquee" aria-hidden="true">
+        <div className="marquee-track">
+          {[...MARQUEE, ...MARQUEE].map((word, i) => (
+            <span className="marquee-item" key={i}>
+              {word}
+              <Gamepad2 size={14} className="marquee-sep" />
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* COMMENT ÇA MARCHE */}
+      <section className="steps-section">
+        <h2 className="section-title">
+          Trois étapes, <span className="grad-text">simples comme tout.</span>
+        </h2>
+        <p className="section-sub">
+          Pas de config, pas de prise de tête. Tu logges, on s'occupe du reste.
+        </p>
+        <div className="steps">
+          {STEPS.map(({ Icon, title, text }, i) => (
+            <div className="step card" key={title}>
+              <span className="step-num font-fun">{i + 1}</span>
+              <div className="step-icon">
+                <Icon size={22} strokeWidth={2} />
+              </div>
+              <h3>{title}</h3>
+              <p>{text}</p>
+            </div>
+          ))}
         </div>
       </section>
 

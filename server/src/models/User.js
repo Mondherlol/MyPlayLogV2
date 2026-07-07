@@ -21,6 +21,11 @@ const userSchema = new mongoose.Schema(
       required: true,
     },
 
+    // --- Réinitialisation de mot de passe ---
+    // On stocke le HASH du token (jamais le token en clair) + son expiration.
+    resetTokenHash: { type: String, default: null, select: false },
+    resetTokenExpires: { type: Date, default: null, select: false },
+
     // --- Profil ---
     avatar: { type: String, default: null }, // photo de profil (upload)
     cover: { type: String, default: null }, // photo de couverture (image de jeu)

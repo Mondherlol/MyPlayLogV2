@@ -4,6 +4,8 @@ import { useAuth } from "./context/AuthContext";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Welcome from "./pages/Welcome";
 import Explorer from "./pages/Explorer";
 import Releases from "./pages/Releases";
@@ -46,6 +48,22 @@ export default function App() {
         element={
           <GuestOnly>
             <Register />
+          </GuestOnly>
+        }
+      />
+      <Route
+        path="/forgot-password"
+        element={
+          <GuestOnly>
+            <ForgotPassword />
+          </GuestOnly>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          <GuestOnly>
+            <ResetPassword />
           </GuestOnly>
         }
       />

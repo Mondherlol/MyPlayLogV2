@@ -61,6 +61,17 @@ export function AuthProvider({ children }) {
     return data.user;
   }
 
+  // Réinitialisation via lien email : le backend renvoie un token → on connecte.
+  async function resetPassword(resetToken, password) {
+    const data = await apiFetch("/auth/reset-password", {
+      method: "POST",
+      body: { token: resetToken, password },
+    });
+    persistToken(data.token, false);
+    setUser(data.user);
+    return data.user;
+  }
+
   function logout() {
     setToken(null);
     setUser(null);
@@ -75,7 +86,16 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, login, register, logout, updateUser }}
+      value={{
+        user,
+        token,
+        loading,
+        login,
+        register,
+        resetPassword,
+        logout,
+        updateUser,
+      }}
     >
       {children}
     </AuthContext.Provider>

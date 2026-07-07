@@ -74,14 +74,19 @@ export default function Login() {
             />
           </div>
 
-          <label className="remember clickable">
-            <input
-              type="checkbox"
-              checked={remember}
-              onChange={(e) => setRemember(e.target.checked)}
-            />
-            <span>Se souvenir de moi</span>
-          </label>
+          <div className="auth-row">
+            <label className="remember clickable">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+              />
+              <span>Se souvenir de moi</span>
+            </label>
+            <Link to="/forgot-password" className="link-accent clickable">
+              Mot de passe oublié ?
+            </Link>
+          </div>
 
           <button
             className="btn btn-primary btn-block"
