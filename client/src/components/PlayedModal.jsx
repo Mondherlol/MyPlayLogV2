@@ -285,7 +285,7 @@ export default function PlayedModal({ game, onClose, openReview = false }) {
 
   return createPortal(
     <>
-      <div className="modal-overlay" onMouseDown={onClose}>
+      <div className="modal-overlay" onMouseDown={onClose} onClick={(e) => e.stopPropagation()}>
         <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
           <button className="modal-close clickable" onClick={onClose} aria-label="Fermer">
             <X size={20} />
@@ -524,7 +524,11 @@ export default function PlayedModal({ game, onClose, openReview = false }) {
 
       {/* Popup Review (par-dessus) */}
       {showReview && (
-        <div className="modal-overlay sub" onMouseDown={() => setShowReview(false)}>
+        <div
+          className="modal-overlay sub"
+          onMouseDown={() => setShowReview(false)}
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="modal review-modal" onMouseDown={(e) => e.stopPropagation()}>
             <button
               className="modal-close clickable"

@@ -1,5 +1,17 @@
 import mongoose from "mongoose";
 
+// Un média joint (un seul par entrée) : GIF (GIPHY) ou image. Partagé par les
+// annotations d'items et les commentaires.
+const commentMediaSchema = new mongoose.Schema(
+  {
+    type: { type: String, enum: ["gif", "image"], required: true },
+    url: { type: String, required: true },
+    width: { type: Number, default: null },
+    height: { type: Number, default: null },
+  },
+  { _id: false }
+);
+
 // Un élément d'une liste : un jeu (IGDB) ou un personnage (pour les tier lists).
 const listItemSchema = new mongoose.Schema(
   {
@@ -10,7 +22,10 @@ const listItemSchema = new mongoose.Schema(
     gameName: { type: String, default: null }, // d'où vient le personnage
     name: { type: String, required: true },
     image: { type: String, default: null }, // cover ou portrait
-    note: { type: String, default: "" }, // commentaire de l'auteur
+    note: { type: String, default: "" }, // commentaire de l'auteur (texte)
+    // Médias joints à l'annotation (GIF / images), comme les commentaires.
+    media: { type: [commentMediaSchema], default: [] },
+    // Conservé pour compat des anciennes données ; plus édité côté UI.
     rating: { type: Number, min: 0, max: 100, default: null },
     // Tier list uniquement : id du palier (null = non classé, dans le vivier).
     tier: { type: String, default: null },
@@ -24,17 +39,6 @@ const tierSchema = new mongoose.Schema(
     id: { type: String, required: true },
     label: { type: String, default: "" },
     color: { type: String, default: "#f2b70b" },
-  },
-  { _id: false }
-);
-
-// Un média joint à un commentaire (un seul par message) : GIF (GIPHY) ou image.
-const commentMediaSchema = new mongoose.Schema(
-  {
-    type: { type: String, enum: ["gif", "image"], required: true },
-    url: { type: String, required: true },
-    width: { type: Number, default: null },
-    height: { type: Number, default: null },
   },
   { _id: false }
 );
@@ -93,14 +97,16 @@ const listSchema = new mongoose.Schema(
     },
     title: { type: String, required: true, trim: true, maxlength: 120 },
     description: { type: String, default: "", maxlength: 2000 },
+    // Image de couverture (URL servie par le serveur), optionnelle.
+    cover: { type: String, default: null },
     // classic = liste simple, ranked = TOP classé, tier = tier list
     type: {
       type: String,
       enum: ["classic", "ranked", "tier"],
       default: "classic",
     },
-    // Tier list uniquement : cette liste range SOIT des jeux SOIT des
-    // personnages (pas les deux). Ignoré pour les autres types.
+    // Cette liste contient SOIT des jeux SOIT des personnages (pas les deux),
+    // quel que soit son type. Figé après création.
     itemKind: {
       type: String,
       enum: ["game", "character"],

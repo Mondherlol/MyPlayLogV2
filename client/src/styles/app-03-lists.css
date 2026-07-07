@@ -872,3 +872,652 @@
   font-family: var(--font-display);
   font-weight: 600;
 }
+
+/* ======================================================================
+   AJOUTS — filtres feed, couverture, cards riches, quick-add, annotation
+   ====================================================================== */
+
+/* ---------- Barre de filtres (page feed) ---------- */
+.lists-toolbar {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 1.4rem;
+  flex-wrap: wrap;
+}
+
+.lists-search {
+  position: relative;
+  flex: 1 1 220px;
+  min-width: 180px;
+  display: flex;
+  align-items: center;
+}
+
+.lists-search-icon {
+  position: absolute;
+  left: 0.7rem;
+  color: var(--text-soft);
+  pointer-events: none;
+}
+
+.lists-search input {
+  width: 100%;
+  padding: 0.6rem 2.2rem;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.lists-search input:focus {
+  outline: none;
+  border-color: var(--orange);
+}
+
+.lists-search-clear {
+  position: absolute;
+  right: 0.5rem;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: none;
+  color: var(--text-soft);
+  border-radius: 8px;
+}
+
+.lists-search-clear:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.lists-select {
+  padding: 0.6rem 0.8rem;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lists-select:focus {
+  outline: none;
+  border-color: var(--orange);
+}
+
+.lists-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ---------- Couverture personnalisée sur la carte du feed ---------- */
+.list-preview.has-cover {
+  padding: 0;
+}
+
+.list-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---------- Couverture dans l'en-tête du détail ----------
+   Bannière pleine largeur : premier enfant flex du header, occupe toute la
+   ligne (flex-basis 100 %) et déborde jusqu'aux bords de la carte. */
+.ld-header.has-cover {
+  overflow: hidden;
+}
+
+.ld-cover {
+  position: relative;
+  flex: 0 0 100%;
+  width: 100%;
+  margin: -1.4rem -1.4rem 0;
+  height: 168px;
+}
+
+.ld-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ld-cover-actions {
+  position: absolute;
+  bottom: 0.7rem;
+  right: 0.9rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ld-cover-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.42rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(15, 15, 20, 0.55);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.ld-cover-btn:hover {
+  border-color: var(--orange);
+}
+
+.ld-cover-btn.danger:hover {
+  border-color: #ff6b6b;
+  color: #ff6b6b;
+}
+
+/* ---------- Sélecteur de type (mode édition du détail) ---------- */
+.ld-typeswitch {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.ld-type-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.34rem 0.6rem;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.ld-type-opt:hover {
+  color: var(--text);
+}
+
+.ld-type-opt.active {
+  background: var(--accent-grad);
+  color: #1a1204;
+}
+
+/* ---------- Cards riches de jeux (lecture, listes classiques/rankées) ---------- */
+.ld-grid.rich {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.lg-card {
+  position: relative;
+  border-radius: 14px;
+}
+
+.lg-rank {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  z-index: 6;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 0.4rem;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--accent-grad);
+  color: #1a1204;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  box-shadow: 0 4px 12px rgba(242, 183, 11, 0.35);
+}
+
+.lg-cover {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 0.22s ease, border-color 0.22s ease;
+}
+
+.lg-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.lg-card:hover .lg-cover {
+  transform: translateY(-6px);
+  box-shadow: 0 18px 40px rgba(20, 20, 40, 0.28);
+  border-color: color-mix(in srgb, var(--orange) 45%, transparent);
+}
+
+.lg-card:hover .lg-cover img {
+  transform: scale(1.08);
+}
+
+.lg-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0.8rem 0.75rem;
+  background: linear-gradient(to top,
+      rgba(10, 10, 15, 0.92) 0%,
+      rgba(10, 10, 15, 0.5) 45%,
+      rgba(10, 10, 15, 0) 100%);
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+
+.lg-card:hover .lg-overlay {
+  opacity: 1;
+}
+
+.lg-title {
+  color: #fff;
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+}
+
+/* Bouton « ajouter à une liste » — masqué, révélé au survol */
+.lg-add {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 7;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  border: none;
+  background: rgba(15, 15, 20, 0.62);
+  color: #fff;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.18s ease, transform 0.18s ease, background 0.18s ease;
+}
+
+.lg-card:hover .lg-add,
+.lg-add:focus-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.lg-add:hover {
+  background: var(--accent-grad);
+  color: #1a1204;
+}
+
+/* Bulle d'annotation (toujours visible si présente).
+   z-index élevé pour passer AU-DESSUS du menu radial de GameCard (z-index 15). */
+.lg-note-wrap {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 22;
+}
+
+/* Quand le popover est ouvert, on hisse toute la carte au-dessus des voisines */
+.lg-wrap:has(.lg-note-pop),
+.lg-card:has(.lg-note-pop) {
+  z-index: 30;
+}
+
+.lg-note-btn {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent-grad);
+  color: #1a1204;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.lg-note-btn:hover,
+.lg-note-btn.on {
+  transform: scale(1.08);
+}
+
+.lg-note-pop {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: 240px;
+  max-width: 70vw;
+  padding: 0.8rem 0.85rem;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 18px 40px rgba(20, 20, 40, 0.28);
+  z-index: 31;
+}
+
+.lg-note-close {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-soft);
+}
+
+.lg-note-close:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.lg-note-text {
+  margin: 0 1.2rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.lg-note-media {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.6rem;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.lg-note-media.n-1 {
+  grid-template-columns: 1fr;
+}
+
+.lg-note-media img {
+  width: 100%;
+  border-radius: 8px;
+  max-height: 140px;
+  object-fit: cover;
+}
+
+/* ---------- Modale « Ajouter à une liste » (quick-add) ---------- */
+.addtolist-modal {
+  max-width: 460px;
+}
+
+.atl-game {
+  margin: -0.4rem 0 1rem;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
+.atl-create {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 11px;
+  border: 1.5px dashed var(--border-strong);
+  background: var(--surface);
+  color: var(--accent-ink);
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+  width: 100%;
+  justify-content: center;
+}
+
+.atl-create:hover {
+  border-color: var(--orange);
+  background: var(--surface-2);
+}
+
+.atl-loading,
+.atl-empty {
+  padding: 1.4rem 0;
+  text-align: center;
+  color: var(--text-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.atl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+
+.atl-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  text-align: left;
+}
+
+.atl-row:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+
+.atl-row.on {
+  border-color: color-mix(in srgb, var(--orange) 55%, transparent);
+}
+
+.atl-row:disabled {
+  opacity: 0.6;
+}
+
+.atl-thumb {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+
+.atl-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.atl-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.atl-title {
+  font-weight: 600;
+  font-size: 0.94rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.atl-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+}
+
+.atl-toggle {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-soft);
+}
+
+.atl-row.on .atl-toggle {
+  background: var(--accent-grad);
+  border-color: transparent;
+  color: #1a1204;
+}
+
+/* Composer plus large dans la modale d'annotation */
+.item-edit-modal {
+  max-width: 540px;
+}
+
+/* Effet au survol des tuiles de tier list (paliers + vivier). Le transform
+   n'entre pas en conflit avec le drag : dnd-kit pose un transform inline
+   (prioritaire) pendant le déplacement, la règle :hover ne s'applique donc
+   qu'au repos. */
+.tier-drop .ic-card.compact,
+.tier-pool .ic-card.compact {
+  transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
+}
+
+.tier-drop .ic-card.compact:not(.dragging):hover,
+.tier-pool .ic-card.compact:not(.dragging):hover {
+  transform: translateY(-4px) scale(1.05);
+  box-shadow: 0 12px 24px rgba(20, 20, 40, 0.3);
+  border-color: color-mix(in srgb, var(--orange) 60%, transparent);
+  z-index: 4;
+}
+
+.tier-drop .ic-card.compact .ic-cover img,
+.tier-pool .ic-card.compact .ic-cover img {
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.tier-drop .ic-card.compact:not(.dragging):hover .ic-cover img,
+.tier-pool .ic-card.compact:not(.dragging):hover .ic-cover img {
+  transform: scale(1.08);
+}
+
+/* Emojis (twemoji) à taille de glyphe dans le popover d'annotation */
+.lg-note-text img.emoji {
+  display: inline-block;
+  width: 1.2em;
+  height: 1.2em;
+  vertical-align: -0.25em;
+  margin: 0 0.03em;
+}
+
+/* Wrapper des cards de jeux riches : réutilise GameCard, superpose rang + bulle */
+.lg-wrap {
+  position: relative;
+}
+
+/* Sous-titre (jeu d'origine) sur les cards de personnages */
+.lg-sub {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.75rem;
+  margin-top: 0.15rem;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lg-card.char {
+  cursor: default;
+}
+
+.lg-card.char.clickable {
+  cursor: pointer;
+}
+
+/* Badge visibilité (public/privé) sur les cartes de « Mes listes » */
+.list-vis-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+}
+
+.list-vis-badge.private {
+  color: #c98a1a;
+  border-color: color-mix(in srgb, #f2b70b 40%, transparent);
+  background: color-mix(in srgb, #f2b70b 12%, transparent);
+}
+
+.list-card-meta {
+  flex-wrap: wrap;
+}
+
+/* Bouton supprimer sur une carte de « Mes listes » (révélé au survol) */
+.list-card {
+  position: relative;
+}
+
+.list-card-del {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 6;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 9px;
+  background: rgba(15, 15, 20, 0.6);
+  color: #fff;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.16s ease, transform 0.16s ease, background 0.16s ease;
+}
+
+.list-card:hover .list-card-del,
+.list-card-del:focus-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.list-card-del:hover {
+  background: #e0483f;
+}

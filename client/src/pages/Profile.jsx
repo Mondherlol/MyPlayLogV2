@@ -15,6 +15,8 @@ import {
   UserCheck,
   Loader2,
   Lock,
+  Globe,
+  Trash2,
   MessageCircle,
   MessageSquareText,
   LayoutGrid,
@@ -169,30 +171,59 @@ function Marquee({ facts }) {
   );
 }
 
-function ProfileListCard({ list }) {
+function ProfileListCard({ list, isMe, onDelete }) {
   const meta = typeMeta(list.type);
   return (
     <Link to={`/lists/${list.id}`} className="list-card clickable">
-      <div className={`list-preview ${list.preview?.length ? "" : "empty"}`}>
-        {list.preview?.length ? (
-          list.preview.map((src, i) => (
-            <span className="list-preview-cover" key={i} style={{ "--i": i }}>
-              <img src={src} alt="" loading="lazy" draggable="false" />
-            </span>
-          ))
-        ) : (
-          <meta.Icon size={30} />
-        )}
-      </div>
+      {isMe && (
+        <button
+          className="list-card-del clickable"
+          title="Supprimer la liste"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDelete(list);
+          }}
+        >
+          <Trash2 size={15} />
+        </button>
+      )}
+      {list.cover ? (
+        <div className="list-preview has-cover">
+          <img className="list-preview-img" src={list.cover} alt="" loading="lazy" draggable="false" />
+        </div>
+      ) : (
+        <div className={`list-preview ${list.preview?.length ? "" : "empty"}`}>
+          {list.preview?.length ? (
+            list.preview.map((src, i) => (
+              <span className="list-preview-cover" key={i} style={{ "--i": i }}>
+                <img src={src} alt="" loading="lazy" draggable="false" />
+              </span>
+            ))
+          ) : (
+            <meta.Icon size={30} />
+          )}
+        </div>
+      )}
       <div className="list-card-body">
         <div className="list-card-badges">
           <span className={`list-type-badge t-${list.type}`}>
             <meta.Icon size={13} /> {meta.label}
           </span>
-          {list.visibility === "private" && (
-            <span className="list-priv-badge" title="Privée">
-              <Lock size={12} />
+          {isMe ? (
+            <span className={`list-vis-badge ${list.visibility}`}>
+              {list.visibility === "private" ? (
+                <><Lock size={12} /> Privée</>
+              ) : (
+                <><Globe size={12} /> Publique</>
+              )}
             </span>
+          ) : (
+            list.visibility === "private" && (
+              <span className="list-priv-badge" title="Privée">
+                <Lock size={12} />
+              </span>
+            )
           )}
         </div>
         <h3 className="list-card-title">{list.title}</h3>
@@ -416,6 +447,24 @@ export default function Profile() {
       setReframing(false);
     } catch (err) {
       alert(err.message);
+    }
+  }
+
+  // Supprime une de mes listes depuis l'onglet Listes du profil.
+  async function deleteList(list) {
+    if (!confirm(`Supprimer la liste « ${list.title} » ? Cette action est définitive.`))
+      return;
+    const snapshot = data;
+    setData((d) => {
+      const next = { ...d, lists: d.lists.filter((l) => l.id !== list.id) };
+      profileCache.set(targetUsername, next);
+      return next;
+    });
+    try {
+      await apiFetch(`/lists/${list.id}`, { method: "DELETE", token });
+    } catch (e) {
+      alert(e.message);
+      setData(snapshot); // rollback
     }
   }
 
@@ -808,7 +857,12 @@ export default function Profile() {
               ) : (
                 <div className="lists-grid">
                   {shownLists.map((l) => (
-                    <ProfileListCard key={l.id} list={l} />
+                    <ProfileListCard
+                      key={l.id}
+                      list={l}
+                      isMe={isMe}
+                      onDelete={deleteList}
+                    />
                   ))}
                 </div>
               )}

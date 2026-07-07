@@ -18,6 +18,7 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  ImagePlus,
 } from "lucide-react";
 import {
   DndContext,
@@ -37,12 +38,14 @@ import {
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { apiFetch } from "../lib/api";
+import { apiFetch, apiUpload } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { typeMeta, timeAgo, DEFAULT_TIERS, localId } from "../lib/lists";
+import { typeMeta, timeAgo, DEFAULT_TIERS, localId, LIST_TYPES } from "../lib/lists";
 import AddItemsModal from "../components/AddItemsModal";
 import ItemEditModal from "../components/ItemEditModal";
 import ListComments from "../components/ListComments";
+import ListGameCard from "../components/ListGameCard";
+import ListCharacterCard from "../components/ListCharacterCard";
 
 const TIER_COLORS = [
   "#ff5470", "#ff8b3d", "#f2b70b", "#3dd68c", "#4aa8ff", "#a879ff", "#8b93a7",
@@ -118,6 +121,7 @@ export default function ListDetail() {
               description: l.description,
               visibility: l.visibility,
               tiers: trs,
+              type: l.type,
               items: its.map((i) => ({
                 kind: i.kind,
                 refId: i.refId,
@@ -126,6 +130,7 @@ export default function ListDetail() {
                 name: i.name,
                 image: i.image,
                 note: i.note,
+                media: i.media,
                 rating: i.rating,
                 tier: i.tier,
               })),
@@ -239,7 +244,7 @@ export default function ListDetail() {
       if (idx >= 0) return prev.filter((_, k) => k !== idx);
       return [
         ...prev,
-        { ...raw, note: "", rating: null, tier: null, key: localId("it") },
+        { ...raw, note: "", media: [], rating: null, tier: null, key: localId("it") },
       ];
     });
     scheduleSave();
@@ -257,6 +262,41 @@ export default function ListDetail() {
   function patchList(patch) {
     setList((prev) => ({ ...prev, ...patch }));
     scheduleSave();
+  }
+
+  // Change le type de la liste en conservant les items. Entrer en tier list
+  // pose des paliers par défaut ; en sortir déclasse tous les items.
+  function changeType(next) {
+    if (!list || next === list.type) return;
+    if (next === "tier") {
+      setTiers((prev) => (prev.length ? prev : DEFAULT_TIERS));
+    } else {
+      setTiers([]);
+      setItems((prev) => prev.map((i) => (i.tier ? { ...i, tier: null } : i)));
+    }
+    setList((prev) => ({ ...prev, type: next }));
+    scheduleSave();
+  }
+
+  // --- Couverture ---
+  const coverInputRef = useRef(null);
+  const [coverBusy, setCoverBusy] = useState(false);
+  async function uploadCover(file) {
+    if (!file) return;
+    setCoverBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("cover", file);
+      const { cover } = await apiUpload(`/lists/${id}/cover`, fd, token);
+      setList((prev) => ({ ...prev, cover }));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setCoverBusy(false);
+    }
+  }
+  function removeCover() {
+    patchList({ cover: null });
   }
 
   // --- Tiers ---
@@ -326,6 +366,7 @@ export default function ListDetail() {
   const meta = typeMeta(list.type);
   const ranked = list.type === "ranked";
   const isTier = list.type === "tier";
+  const isGameList = (list.itemKind || "game") === "game";
   const pool = isTier ? items.filter((i) => !i.tier) : items;
 
   return (
@@ -348,7 +389,47 @@ export default function ListDetail() {
         )}
       </div>
 
-      <header className="ld-header card">
+      <header className={`ld-header card ${list.cover ? "has-cover" : ""}`}>
+        {list.cover && (
+          <div className="ld-cover">
+            <img src={list.cover} alt="" draggable="false" />
+            {editable && (
+              <div className="ld-cover-actions">
+                <button
+                  type="button"
+                  className="ld-cover-btn clickable"
+                  onClick={() => coverInputRef.current?.click()}
+                  disabled={coverBusy}
+                >
+                  {coverBusy ? (
+                    <Loader2 size={15} className="spin" />
+                  ) : (
+                    <ImagePlus size={15} />
+                  )}
+                  Changer
+                </button>
+                <button
+                  type="button"
+                  className="ld-cover-btn danger clickable"
+                  onClick={removeCover}
+                >
+                  <X size={15} /> Retirer
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        {/* input fichier partagé (banner + bouton dans les actions) */}
+        <input
+          ref={coverInputRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => {
+            uploadCover(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
         <div className="ld-header-main">
           <div className="ld-title-row">
             {editable ? (
@@ -362,9 +443,25 @@ export default function ListDetail() {
             ) : (
               <h1 className="ld-title">{list.title}</h1>
             )}
-            <span className={`list-type-badge t-${list.type}`}>
-              <meta.Icon size={13} /> {meta.long}
-            </span>
+            {editable ? (
+              <div className="ld-typeswitch" role="group" aria-label="Type de liste">
+                {Object.values(LIST_TYPES).map((t) => (
+                  <button
+                    key={t.value}
+                    type="button"
+                    className={`ld-type-opt clickable ${list.type === t.value ? "active" : ""}`}
+                    onClick={() => changeType(t.value)}
+                    title={t.desc}
+                  >
+                    <t.Icon size={13} /> {t.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <span className={`list-type-badge t-${list.type}`}>
+                <meta.Icon size={13} /> {meta.long}
+              </span>
+            )}
           </div>
 
           {editable ? (
@@ -408,16 +505,40 @@ export default function ListDetail() {
             {list.likeCount}
           </button>
           {isOwner && !editing && (
-            <button
-              className="ld-edit clickable"
-              onClick={() => setEditing(true)}
-              title="Modifier la liste"
-            >
-              <Pencil size={16} /> Modifier
-            </button>
+            <>
+              <button
+                className="ld-edit clickable"
+                onClick={() => setEditing(true)}
+                title="Modifier la liste"
+              >
+                <Pencil size={16} /> Modifier
+              </button>
+              <button
+                className="ld-del clickable"
+                onClick={deleteList}
+                title="Supprimer la liste"
+              >
+                <Trash2 size={16} />
+              </button>
+            </>
           )}
           {editable && (
             <>
+              {!list.cover && (
+                <button
+                  className="ld-vis clickable"
+                  onClick={() => coverInputRef.current?.click()}
+                  disabled={coverBusy}
+                  title="Ajouter une couverture"
+                >
+                  {coverBusy ? (
+                    <Loader2 size={16} className="spin" />
+                  ) : (
+                    <ImagePlus size={16} />
+                  )}
+                  Couverture
+                </button>
+              )}
               <button
                 className="ld-vis clickable"
                 onClick={() =>
@@ -514,6 +635,26 @@ export default function ListDetail() {
                   </button>
                 )}
               </div>
+            ) : !editable ? (
+              // Lecture : cards riches (lien jeu, menu d'actions, bulle
+              // d'annotation). Pas de drag en lecture.
+              <div className={`ld-grid rich ${ranked ? "ranked" : ""}`}>
+                {items.map((it, i) =>
+                  isGameList ? (
+                    <ListGameCard
+                      key={it.key}
+                      item={it}
+                      rank={ranked ? i + 1 : null}
+                    />
+                  ) : (
+                    <ListCharacterCard
+                      key={it.key}
+                      item={it}
+                      rank={ranked ? i + 1 : null}
+                    />
+                  )
+                )}
+              </div>
             ) : (
               <SortableContext
                 items={items.map((i) => i.key)}
@@ -559,7 +700,7 @@ export default function ListDetail() {
 
       {adding && (
         <AddItemsModal
-          kind={isTier ? list.itemKind || "game" : "game"}
+          kind={list.itemKind || "game"}
           existing={existingRefIds}
           onToggle={toggleItem}
           onClose={() => setAdding(false)}
@@ -830,12 +971,17 @@ function ItemCard({
   innerRef, style, dragProps,
 }) {
   const isChar = item.kind === "character";
+  const navigate = useNavigate();
+  // En lecture, la carte est cliquable vers la page du jeu (y compris pour les
+  // personnages, qui pointent vers leur jeu d'origine).
+  const linkable = !editable && !!item.gameId;
   return (
     <div
       ref={innerRef}
       style={style}
       title={compact ? item.name : undefined}
-      className={`ic-card ${compact ? "compact" : ""} ${palette ? "palette" : ""} ${dragging ? "dragging" : ""} ${editable ? "grab" : ""}`}
+      className={`ic-card ${compact ? "compact" : ""} ${palette ? "palette" : ""} ${dragging ? "dragging" : ""} ${editable ? "grab" : ""} ${linkable ? "clickable" : ""}`}
+      onClick={linkable ? () => navigate(`/game/${item.gameId}`) : undefined}
       {...dragProps}
     >
       {rank != null && <span className="ic-rank">{rank}</span>}
@@ -856,7 +1002,15 @@ function ItemCard({
           {isChar && item.gameName && (
             <span className="ic-sub">{item.gameName}</span>
           )}
-          {item.note && <p className="ic-note">{item.note}</p>}
+          {item.note ? (
+            <p className="ic-note">{item.note}</p>
+          ) : (
+            item.media?.length > 0 && (
+              <p className="ic-note ic-note-media">
+                <ImagePlus size={12} /> Média joint
+              </p>
+            )
+          )}
         </div>
       )}
       {compact && palette && (
@@ -871,14 +1025,18 @@ function ItemCard({
 
       {editable && (
         <div className="ic-actions">
-          <button
-            className="ic-btn clickable"
-            title="Note & commentaire"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={() => onEdit(item)}
-          >
-            <Pencil size={13} />
-          </button>
+          {/* Pas d'annotation sur les tier lists (tuiles compactes) : seul le
+              retrait est proposé. L'annotation reste dispo sur les cards pleines. */}
+          {!compact && (
+            <button
+              className="ic-btn clickable"
+              title="Annotation"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => onEdit(item)}
+            >
+              <Pencil size={13} />
+            </button>
+          )}
           <button
             className="ic-btn danger clickable"
             title="Retirer"

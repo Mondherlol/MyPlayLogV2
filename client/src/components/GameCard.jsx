@@ -15,6 +15,7 @@ import { useLibrary } from "../context/LibraryContext";
 import { useClickOutside } from "../hooks/useClickOutside";
 import { apiFetch } from "../lib/api";
 import PlayedModal from "./PlayedModal";
+import AddToListModal from "./AddToListModal";
 
 const PLAYED = ["playing", "finished", "paused", "dropped"];
 
@@ -26,6 +27,7 @@ export default function GameCard({ game, variant = "grid" }) {
 
   const [fanOpen, setFanOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [showListModal, setShowListModal] = useState(false);
   const [busy, setBusy] = useState(false);
   const fanRef = useRef(null);
   useClickOutside(fanRef, () => setFanOpen(false), fanOpen);
@@ -65,6 +67,7 @@ export default function GameCard({ game, variant = "grid" }) {
   if (variant === "list") {
     const genres = game.genres || [];
     return (
+      <>
       <article
         className="game-row clickable"
         onClick={() => navigate(`/game/${game.id}`)}
@@ -123,23 +126,33 @@ export default function GameCard({ game, variant = "grid" }) {
             <Bookmark size={17} fill={isWishlist ? "currentColor" : "none"} />
           </button>
           <button
-            className="game-row-btn disabled"
-            title="Ajouter à une liste (bientôt)"
-            disabled
-            onClick={(e) => e.stopPropagation()}
+            className="game-row-btn"
+            title="Ajouter à une liste"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowListModal(true);
+            }}
           >
             <ListPlus size={17} />
           </button>
         </div>
-
-        {showModal && (
-          <PlayedModal game={game} onClose={() => setShowModal(false)} />
-        )}
       </article>
+
+      {/* Modales rendues HORS de l'article : via un portail React, leurs
+          évènements remontent l'arbre React — les laisser enfants de l'article
+          déclencherait sa navigation au moindre clic. */}
+      {showModal && (
+        <PlayedModal game={game} onClose={() => setShowModal(false)} />
+      )}
+      {showListModal && (
+        <AddToListModal game={game} onClose={() => setShowListModal(false)} />
+      )}
+      </>
     );
   }
 
   return (
+    <>
     <article
       className="game-card clickable"
       onClick={() => navigate(`/game/${game.id}`)}
@@ -182,10 +195,13 @@ export default function GameCard({ game, variant = "grid" }) {
       {/* Menu radial d'ajout (hors de la cover pour pouvoir dépasser) */}
       <div className={`add-fan ${fanOpen ? "open" : ""}`} ref={fanRef}>
         <button
-          className="fan-btn b1 disabled"
-          title="Ajouter à une liste (bientôt)"
-          disabled
-          onClick={(e) => e.stopPropagation()}
+          className="fan-btn b1"
+          title="Ajouter à une liste"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowListModal(true);
+            setFanOpen(false);
+          }}
         >
           <ListPlus size={19} />
         </button>
@@ -220,10 +236,16 @@ export default function GameCard({ game, variant = "grid" }) {
           {fanOpen ? <X size={20} /> : inLibrary ? <Check size={20} /> : <Plus size={20} />}
         </button>
       </div>
-
-      {showModal && (
-        <PlayedModal game={game} onClose={() => setShowModal(false)} />
-      )}
     </article>
+
+    {/* Modales hors de l'article (voir vue liste) pour éviter que leurs clics,
+        remontant l'arbre React via le portail, ne déclenchent la navigation. */}
+    {showModal && (
+      <PlayedModal game={game} onClose={() => setShowModal(false)} />
+    )}
+    {showListModal && (
+      <AddToListModal game={game} onClose={() => setShowListModal(false)} />
+    )}
+    </>
   );
 }

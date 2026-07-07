@@ -40,6 +40,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLibrary } from "../context/LibraryContext";
 import ScrollRow from "../components/ScrollRow";
 import PlayedModal from "../components/PlayedModal";
+import AddToListModal from "../components/AddToListModal";
 import GameReviews from "../components/GameReviews";
 import RecommendModal from "../components/RecommendModal";
 import GameCharacters from "../components/GameCharacters";
@@ -104,6 +105,48 @@ function bgKey(id) {
   return `mpl_bg_${id}`;
 }
 
+// Marge avant la sortie où l'on autorise déjà « joué » / review (accès
+// anticipés, previews, leaks). Au-delà, le jeu est considéré « à venir ».
+const UPCOMING_MARGIN_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Compteur à rebours jusqu'à la sortie (jours / heures / min / sec).
+function ReleaseCountdown({ ts, dateLabel }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const diff = Math.max(0, ts - now);
+  const s = Math.floor(diff / 1000);
+  const days = Math.floor(s / 86400);
+  const hours = Math.floor((s % 86400) / 3600);
+  const mins = Math.floor((s % 3600) / 60);
+  const secs = s % 60;
+  const pad = (n) => String(n).padStart(2, "0");
+  const units = [
+    { v: days, label: days > 1 ? "jours" : "jour" },
+    { v: pad(hours), label: "h" },
+    { v: pad(mins), label: "min" },
+    { v: pad(secs), label: "sec" },
+  ];
+  return (
+    <div className="gp-countdown">
+      <div className="gp-countdown-head">
+        <Clock size={14} /> Sortie dans
+      </div>
+      <div className="gp-countdown-grid">
+        {units.map((u, i) => (
+          <div className="gp-cd-unit" key={i}>
+            <span className="gp-cd-val">{u.v}</span>
+            <span className="gp-cd-lbl">{u.label}</span>
+          </div>
+        ))}
+      </div>
+      {dateLabel && <div className="gp-countdown-date">{dateLabel}</div>}
+    </div>
+  );
+}
+
 // Jauge circulaire (note en %)
 function Gauge({ value, label, sub }) {
   const R = 25;
@@ -150,6 +193,7 @@ export default function GamePage() {
   const [error, setError] = useState(null);
   const [tab, setTab] = useState("infos");
   const [showPlayed, setShowPlayed] = useState(false);
+  const [showList, setShowList] = useState(false);
   const [showRecommend, setShowRecommend] = useState(false);
   const [wishBusy, setWishBusy] = useState(false);
   const [viewer, setViewer] = useState(null); // { images, index }
@@ -294,13 +338,17 @@ export default function GamePage() {
   }
 
   const backdrop = bgOverride || game.backdrop || null;
-  const release = game.releaseDate
-    ? new Date(game.releaseDate * 1000).toLocaleDateString("fr-FR", {
+  const releaseTs = game.releaseDate ? game.releaseDate * 1000 : null;
+  const release = releaseTs
+    ? new Date(releaseTs).toLocaleDateString("fr-FR", {
         day: "numeric",
         month: "long",
         year: "numeric",
       })
     : null;
+  // Jeu « à venir » : sortie connue et à plus d'une semaine → on bloque
+  // « j'y ai joué » et les reviews, et on affiche un compteur à rebours.
+  const upcoming = releaseTs != null && releaseTs - Date.now() > UPCOMING_MARGIN_MS;
 
   const ttb = game.timeToBeat || {};
   const ttbChips = [
@@ -341,12 +389,16 @@ export default function GamePage() {
               )}
             </div>
 
+            {/* Compteur à rebours si le jeu n'est pas encore sorti */}
+            {upcoming && <ReleaseCountdown ts={releaseTs} dateLabel={release} />}
+
             {/* Boutons d'action côte à côte */}
             <div className="gp-actions">
               <button
-                className={`gp-action ${isPlayed ? "active" : ""}`}
-                onClick={() => setShowPlayed(true)}
-                title="J'y ai joué"
+                className={`gp-action ${isPlayed ? "active" : ""} ${upcoming ? "disabled" : ""}`}
+                onClick={() => !upcoming && setShowPlayed(true)}
+                disabled={upcoming}
+                title={upcoming ? "Pas encore sorti" : "J'y ai joué"}
               >
                 <Gamepad size={18} />
                 <span>{isPlayed ? "Joué" : "Jouer"}</span>
@@ -361,9 +413,9 @@ export default function GamePage() {
                 <span>Wishlist</span>
               </button>
               <button
-                className="gp-action disabled"
-                disabled
-                title="Ajouter à une liste (bientôt)"
+                className="gp-action"
+                onClick={() => setShowList(true)}
+                title="Ajouter à une liste"
               >
                 <ListPlus size={18} />
                 <span>Liste</span>
@@ -393,11 +445,11 @@ export default function GamePage() {
               )}
             </div>
 
-            {/* OST favori */}
+            {/* OST favori — mène à l'onglet OST */}
             <FavCard
               Icon={Music}
               title="OST favori"
-              onAdd={() => setShowPlayed(true)}
+              onAdd={() => setTab("ost")}
               filled={!!fav?.favoriteOst}
             >
               {fav?.favoriteOst && (
@@ -413,11 +465,11 @@ export default function GamePage() {
               )}
             </FavCard>
 
-            {/* Personnage favori */}
+            {/* Personnage favori — mène à l'onglet Personnages */}
             <FavCard
               Icon={Users}
               title="Personnage favori"
-              onAdd={() => setShowPlayed(true)}
+              onAdd={() => setTab("characters")}
               filled={!!fav?.favoriteCharacter}
             >
               {fav?.favoriteCharacter && (
@@ -518,6 +570,7 @@ export default function GamePage() {
               <GameReviews
                 game={{ id: Number(id), name: game.name, cover: game.cover }}
                 viewerStatus={entry?.status}
+                upcoming={upcoming}
                 onWantPlay={() => setShowPlayed(true)}
               />
             )}
@@ -559,6 +612,13 @@ export default function GamePage() {
             setShowPlayed(false);
             reloadEntry();
           }}
+        />
+      )}
+
+      {showList && (
+        <AddToListModal
+          game={{ id: Number(id), name: game.name, cover: game.cover }}
+          onClose={() => setShowList(false)}
         />
       )}
 

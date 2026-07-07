@@ -37,7 +37,7 @@ export default function CreateListModal({ onClose, onCreated }) {
           type,
           title: title.trim(),
           visibility,
-          ...(type === "tier" ? { itemKind } : {}),
+          itemKind,
         },
       });
       onCreated?.(list);
@@ -48,7 +48,11 @@ export default function CreateListModal({ onClose, onCreated }) {
   }
 
   return createPortal(
-    <div className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+      onClick={(e) => e.stopPropagation()}
+    >
       <div className="modal list-modal">
         <button className="modal-close clickable" onClick={onClose} aria-label="Fermer">
           <X size={18} />
@@ -80,27 +84,25 @@ export default function CreateListModal({ onClose, onCreated }) {
             </div>
           </div>
 
-          {type === "tier" && (
-            <div className="field">
-              <label>Contenu de la tier list</label>
-              <div className="kind-picker">
-                <button
-                  type="button"
-                  className={`kind-card clickable ${itemKind === "game" ? "active" : ""}`}
-                  onClick={() => setItemKind("game")}
-                >
-                  <Gamepad2 size={17} /> Des jeux
-                </button>
-                <button
-                  type="button"
-                  className={`kind-card clickable ${itemKind === "character" ? "active" : ""}`}
-                  onClick={() => setItemKind("character")}
-                >
-                  <User size={17} /> Des personnages
-                </button>
-              </div>
+          <div className="field">
+            <label>Contenu de la liste</label>
+            <div className="kind-picker">
+              <button
+                type="button"
+                className={`kind-card clickable ${itemKind === "game" ? "active" : ""}`}
+                onClick={() => setItemKind("game")}
+              >
+                <Gamepad2 size={17} /> Des jeux
+              </button>
+              <button
+                type="button"
+                className={`kind-card clickable ${itemKind === "character" ? "active" : ""}`}
+                onClick={() => setItemKind("character")}
+              >
+                <User size={17} /> Des personnages
+              </button>
             </div>
-          )}
+          </div>
 
           <div className="field">
             <label htmlFor="list-title">Titre</label>

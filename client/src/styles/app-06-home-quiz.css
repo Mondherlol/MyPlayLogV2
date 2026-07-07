@@ -2441,6 +2441,68 @@
   cursor: not-allowed;
 }
 
+/* Compteur à rebours (jeu à venir) */
+.gp-countdown {
+  border-radius: 16px;
+  padding: 0.9rem 1rem;
+  background: linear-gradient(150deg,
+    color-mix(in srgb, var(--orange) 18%, var(--surface)),
+    var(--surface));
+  border: 1px solid color-mix(in srgb, var(--orange) 35%, transparent);
+  box-shadow: var(--shadow-sm);
+}
+
+.gp-countdown-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--accent-ink);
+  margin-bottom: 0.6rem;
+}
+
+.gp-countdown-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
+}
+
+.gp-cd-unit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.5rem 0.2rem;
+  border-radius: 11px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.gp-cd-val {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.gp-cd-lbl {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+}
+
+.gp-countdown-date {
+  margin-top: 0.6rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
 /* Cartes de la colonne gauche */
 .gp-left-card {
   background: var(--surface);

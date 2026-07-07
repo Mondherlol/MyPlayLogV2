@@ -1,12 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Check, Gamepad2, User, Star, Trash2 } from "lucide-react";
+import { X, Check, Gamepad2, User } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { Composer } from "./ListComments";
 
-// Modal d'édition d'un élément de liste : commentaire de l'auteur + note.
+// Modal d'édition de l'annotation d'un élément de liste : un texte riche
+// (emoji + GIF/images, comme les commentaires). Plus de note chiffrée.
 export default function ItemEditModal({ item, onSave, onClose }) {
-  const [note, setNote] = useState(item.note || "");
-  const [rating, setRating] = useState(item.rating);
+  const { token } = useAuth();
   const isChar = item.kind === "character";
+  // État vivant du composer (remonté via onLiveChange).
+  const draft = useRef({ text: item.note || "", media: item.media || [] });
+  const [, force] = useState(0);
 
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && onClose();
@@ -14,8 +19,8 @@ export default function ItemEditModal({ item, onSave, onClose }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const color =
-    rating == null ? "var(--border-strong)" : rating < 40 ? "#e0483f" : rating < 70 ? "#f2b70b" : "#22a35a";
+  const empty =
+    !draft.current.text.trim() && draft.current.media.length === 0;
 
   return createPortal(
     <div className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -41,49 +46,17 @@ export default function ItemEditModal({ item, onSave, onClose }) {
         </div>
 
         <div className="field">
-          <label>
-            Note {rating != null && <strong style={{ color }}>{rating}/100</strong>}
-          </label>
-          <div className="ie-rating">
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={rating ?? 0}
-              onChange={(e) => setRating(Number(e.target.value))}
-              style={{ accentColor: color }}
-            />
-            {rating != null ? (
-              <button
-                className="ie-rating-clear clickable"
-                onClick={() => setRating(null)}
-                title="Retirer la note"
-              >
-                <Trash2 size={14} />
-              </button>
-            ) : (
-              <button
-                className="ie-rating-clear clickable"
-                onClick={() => setRating(75)}
-                title="Noter"
-              >
-                <Star size={14} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="field">
-          <label htmlFor="ie-note">Ton commentaire</label>
-          <textarea
-            id="ie-note"
-            className="modal-textarea"
-            placeholder="Pourquoi ce jeu à cette place ?"
-            value={note}
-            maxLength={500}
-            rows={4}
-            autoFocus
-            onChange={(e) => setNote(e.target.value)}
+          <label>Ton annotation</label>
+          <Composer
+            token={token}
+            big
+            initialText={item.note || ""}
+            initialMedia={item.media || []}
+            placeholder="Un mot, un GIF, une réaction…"
+            onLiveChange={({ text, media }) => {
+              draft.current = { text, media };
+              force((n) => n + 1);
+            }}
           />
         </div>
 
@@ -93,9 +66,11 @@ export default function ItemEditModal({ item, onSave, onClose }) {
           </button>
           <button
             className="btn btn-primary"
-            onClick={() => onSave({ note: note.trim(), rating })}
+            onClick={() =>
+              onSave({ note: draft.current.text.trim(), media: draft.current.media })
+            }
           >
-            <Check size={18} /> Valider
+            <Check size={18} /> {empty ? "Retirer l'annotation" : "Valider"}
           </button>
         </div>
       </div>

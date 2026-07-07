@@ -698,7 +698,7 @@ function SteamReviews({ steam }) {
   );
 }
 
-export default function GameReviews({ game, viewerStatus, onWantPlay }) {
+export default function GameReviews({ game, viewerStatus, upcoming, onWantPlay }) {
   const { token } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -829,7 +829,8 @@ export default function GameReviews({ game, viewerStatus, onWantPlay }) {
 
   return (
     <div className="grv">
-      {/* Ma review : carte si déjà écrite, sinon invite (verrouillée si jeu non joué) */}
+      {/* Ma review : carte si déjà écrite, sinon invite (verrouillée si jeu non
+          joué, ou pas encore sorti) */}
       {mineHasContent ? (
         <div className="grv-mine">
           <h3 className="grv-section-title">
@@ -845,6 +846,16 @@ export default function GameReviews({ game, viewerStatus, onWantPlay }) {
             onDelete={deleteReview}
             onReact={reactTo}
           />
+        </div>
+      ) : upcoming ? (
+        <div className="grv-locked">
+          <span className="grv-locked-ic">
+            <Clock size={20} />
+          </span>
+          <div className="grv-locked-txt">
+            <b>Pas encore sorti</b>
+            <p>Les reviews s'ouvriront à la sortie du jeu.</p>
+          </div>
         </div>
       ) : canReview ? (
         <ReviewPrompt game={game} onOpen={() => setModal(true)} />

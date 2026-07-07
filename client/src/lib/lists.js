@@ -27,6 +27,27 @@ export const LIST_TYPES = {
 
 export const typeMeta = (t) => LIST_TYPES[t] || LIST_TYPES.classic;
 
+// Options de tri de la page Listes (valeur = param `sort` du backend).
+export const LIST_SORTS = [
+  { value: "recent", label: "Dernière modif" },
+  { value: "likes", label: "Popularité" },
+];
+
+// Options de filtre par type (null = tous).
+export const LIST_TYPE_FILTERS = [
+  { value: "", label: "Tous les types" },
+  { value: "classic", label: "Classiques" },
+  { value: "ranked", label: "Classées" },
+  { value: "tier", label: "Tier lists" },
+];
+
+// Options de filtre par contenu (jeux / personnages).
+export const LIST_KIND_FILTERS = [
+  { value: "", label: "Tout contenu" },
+  { value: "game", label: "Jeux" },
+  { value: "character", label: "Personnages" },
+];
+
 // Paliers par défaut (doit rester aligné avec le serveur).
 export const DEFAULT_TIERS = [
   { id: "s", label: "S", color: "#ff5470" },

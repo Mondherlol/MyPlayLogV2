@@ -68,6 +68,7 @@ function listCard(l, viewerId) {
     id: l._id,
     title: l.title,
     description: l.description,
+    cover: l.cover || null,
     type: l.type,
     visibility: l.visibility,
     itemCount: items.length,

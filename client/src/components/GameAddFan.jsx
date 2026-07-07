@@ -5,6 +5,7 @@ import { useLibrary } from "../context/LibraryContext";
 import { useClickOutside } from "../hooks/useClickOutside";
 import { apiFetch } from "../lib/api";
 import PlayedModal from "./PlayedModal";
+import AddToListModal from "./AddToListModal";
 
 const PLAYED = ["playing", "finished", "paused", "dropped"];
 
@@ -17,6 +18,7 @@ export default function GameAddFan({ game, hoverOnly = false }) {
 
   const [fanOpen, setFanOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [showListModal, setShowListModal] = useState(false);
   const [busy, setBusy] = useState(false);
   const fanRef = useRef(null);
   useClickOutside(fanRef, () => setFanOpen(false), fanOpen);
@@ -57,10 +59,13 @@ export default function GameAddFan({ game, hoverOnly = false }) {
         onClick={(e) => e.stopPropagation()}
       >
         <button
-          className="fan-btn b1 disabled"
-          title="Ajouter à une liste (bientôt)"
-          disabled
-          onClick={(e) => e.stopPropagation()}
+          className="fan-btn b1"
+          title="Ajouter à une liste"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowListModal(true);
+            setFanOpen(false);
+          }}
         >
           <ListPlus size={19} />
         </button>
@@ -97,6 +102,9 @@ export default function GameAddFan({ game, hoverOnly = false }) {
       </div>
 
       {showModal && <PlayedModal game={game} onClose={() => setShowModal(false)} />}
+      {showListModal && (
+        <AddToListModal game={game} onClose={() => setShowListModal(false)} />
+      )}
     </>
   );
 }

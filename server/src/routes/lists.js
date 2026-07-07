@@ -33,6 +33,23 @@ const commentUpload = multer({
     cb(null, /^image\/(jpe?g|png|webp|gif)$/.test(file.mimetype)),
 });
 
+// --- Upload des couvertures de liste ---
+const COVERS_DIR = path.join(__dirname, "../../uploads/lists");
+fs.mkdirSync(COVERS_DIR, { recursive: true });
+
+const coverUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, COVERS_DIR),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase() || ".png";
+      cb(null, `l-${Date.now()}-${Math.round(Math.random() * 1e6)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 6 * 1024 * 1024 }, // 6 Mo
+  fileFilter: (req, file, cb) =>
+    cb(null, /^image\/(jpe?g|png|webp|gif)$/.test(file.mimetype)),
+});
+
 // Paliers par défaut d'une nouvelle tier list (esprit S/A/B/C/D).
 const DEFAULT_TIERS = [
   { id: "s", label: "S", color: "#ff5470" },
@@ -58,6 +75,7 @@ function sanitizeItem(raw) {
     name: String(raw.name).slice(0, 200),
     image: raw.image ? String(raw.image) : null,
     note: raw.note ? String(raw.note).slice(0, 500) : "",
+    media: sanitizeMediaList(raw.media),
     rating,
     tier: raw.tier ? String(raw.tier) : null,
   };
@@ -82,6 +100,7 @@ function toCard(l, userId) {
     id: l._id,
     title: l.title,
     description: l.description,
+    cover: l.cover || null,
     type: l.type,
     itemKind: l.itemKind || "game",
     visibility: l.visibility,
@@ -111,6 +130,7 @@ function toFull(l, userId) {
     id: l._id,
     title: l.title,
     description: l.description,
+    cover: l.cover || null,
     type: l.type,
     itemKind: l.itemKind || "game",
     visibility: l.visibility,
@@ -125,6 +145,7 @@ function toFull(l, userId) {
       name: i.name,
       image: i.image,
       note: i.note,
+      media: i.media || [],
       rating: i.rating,
       tier: i.tier,
     })),
@@ -144,11 +165,20 @@ function toFull(l, userId) {
 router.get("/", requireAuth, async (req, res) => {
   try {
     const scope = req.query.scope;
-    const q =
+    const filter =
       scope === "mine"
         ? { user: req.userId }
         : { $or: [{ visibility: "public" }, { user: req.userId }] };
-    const lists = await List.find(q)
+    // Filtres optionnels : type, itemKind (jeu/perso), recherche plein-texte.
+    if (TYPES.includes(req.query.type)) filter.type = req.query.type;
+    if (ITEM_KINDS.includes(req.query.itemKind))
+      filter.itemKind = req.query.itemKind;
+    const search = String(req.query.q || "").trim();
+    if (search) {
+      const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      filter.$and = [{ $or: [{ title: rx }, { description: rx }] }];
+    }
+    const lists = await List.find(filter)
       .populate("user", "username")
       .sort({ updatedAt: -1 })
       .limit(200)
@@ -218,6 +248,41 @@ router.post(
   }
 );
 
+// GET /api/lists/mine/for-item?refId=&kind= — mes listes compatibles avec un
+// élément, avec l'info « contient déjà ». Sert au quick-add depuis l'Explorer.
+// Déclarée AVANT /:id pour ne pas être capturée par la route paramétrée.
+router.get("/mine/for-item", requireAuth, async (req, res) => {
+  try {
+    const refId = req.query.refId != null ? String(req.query.refId) : null;
+    const kind = ITEM_KINDS.includes(req.query.kind) ? req.query.kind : "game";
+    const lists = await List.find({ user: req.userId, itemKind: kind })
+      .sort({ updatedAt: -1 })
+      .limit(200)
+      .lean();
+    res.json({
+      lists: lists.map((l) => ({
+        id: l._id,
+        title: l.title,
+        cover: l.cover || null,
+        type: l.type,
+        itemKind: l.itemKind || "game",
+        visibility: l.visibility,
+        itemCount: (l.items || []).length,
+        preview: (l.items || [])
+          .filter((i) => i.image)
+          .slice(0, 3)
+          .map((i) => i.image),
+        contains: refId
+          ? (l.items || []).some((i) => String(i.refId) === refId)
+          : false,
+      })),
+    });
+  } catch (err) {
+    console.error("lists for-item error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement des listes." });
+  }
+});
+
 // GET /api/lists/:id — détail d'une liste (respecte la confidentialité).
 router.get("/:id", requireAuth, async (req, res) => {
   try {
@@ -245,9 +310,8 @@ router.post("/", requireAuth, async (req, res) => {
     const title = String(b.title || "").trim();
     if (!title) return res.status(400).json({ error: "Un titre est requis." });
     const type = TYPES.includes(b.type) ? b.type : "classic";
-    // Le "kind" ne concerne que les tier lists (jeux OU personnages).
-    const itemKind =
-      type === "tier" && ITEM_KINDS.includes(b.itemKind) ? b.itemKind : "game";
+    // Le "kind" (jeux OU personnages) s'applique à tous les types de listes.
+    const itemKind = ITEM_KINDS.includes(b.itemKind) ? b.itemKind : "game";
     const visibility = VISIBILITIES.includes(b.visibility)
       ? b.visibility
       : "public";
@@ -263,6 +327,7 @@ router.post("/", requireAuth, async (req, res) => {
       user: req.userId,
       title,
       description: String(b.description || "").slice(0, 2000),
+      cover: b.cover ? String(b.cover) : null,
       type,
       itemKind,
       visibility,
@@ -295,14 +360,27 @@ router.put("/:id", requireAuth, async (req, res) => {
     }
     if (b.description !== undefined)
       list.description = String(b.description).slice(0, 2000);
+    if (b.cover !== undefined) list.cover = b.cover ? String(b.cover) : null;
     if (b.visibility !== undefined && VISIBILITIES.includes(b.visibility))
       list.visibility = b.visibility;
+    // Changement de type : on garde les items (itemKind figé). En quittant
+    // "tier" on déclasse tout ; en y entrant on pose des paliers par défaut.
+    if (b.type !== undefined && TYPES.includes(b.type) && b.type !== list.type) {
+      const wasTier = list.type === "tier";
+      list.type = b.type;
+      if (b.type !== "tier" && wasTier)
+        list.items.forEach((i) => (i.tier = null));
+      if (b.type === "tier" && (!list.tiers || list.tiers.length === 0))
+        list.tiers = DEFAULT_TIERS;
+    }
     if (b.items !== undefined && Array.isArray(b.items))
       list.items = b.items.map(sanitizeItem).filter(Boolean);
     if (b.tiers !== undefined && list.type === "tier") {
       const t = sanitizeTiers(b.tiers);
       if (t) list.tiers = t;
     }
+    // Invariant : hors tier list, aucun item ne conserve de palier.
+    if (list.type !== "tier") list.items.forEach((i) => (i.tier = null));
 
     await list.save({ validateModifiedOnly: true });
     const full = await List.findById(list._id)
@@ -353,6 +431,72 @@ router.post("/:id/like", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("list like error:", err.message);
     res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// POST /api/lists/:id/cover — uploader une couverture (propriétaire).
+router.post(
+  "/:id/cover",
+  requireAuth,
+  coverUpload.single("cover"),
+  async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: "Aucun fichier." });
+      const list = await List.findById(req.params.id);
+      if (!list) return res.status(404).json({ error: "Liste introuvable." });
+      if (String(list.user) !== String(req.userId))
+        return res.status(403).json({ error: "Action non autorisée." });
+      const url = `${req.protocol}://${req.get("host")}/uploads/lists/${req.file.filename}`;
+      list.cover = url;
+      await list.save({ validateModifiedOnly: true });
+      res.status(201).json({ cover: url });
+    } catch (err) {
+      console.error("list cover error:", err.message);
+      res.status(500).json({ error: "Erreur lors de l'upload." });
+    }
+  }
+);
+
+// POST /api/lists/:id/items — ajouter un élément (quick-add). Dédup sur refId.
+router.post("/:id/items", requireAuth, async (req, res) => {
+  try {
+    const list = await List.findById(req.params.id);
+    if (!list) return res.status(404).json({ error: "Liste introuvable." });
+    if (String(list.user) !== String(req.userId))
+      return res.status(403).json({ error: "Action non autorisée." });
+    const item = sanitizeItem(req.body);
+    if (!item) return res.status(400).json({ error: "Élément invalide." });
+    if (item.kind !== (list.itemKind || "game"))
+      return res
+        .status(400)
+        .json({ error: "Cette liste n'accepte pas ce type d'élément." });
+    const exists = list.items.some((i) => String(i.refId) === item.refId);
+    if (!exists) {
+      item.tier = null;
+      list.items.push(item);
+      await list.save({ validateModifiedOnly: true });
+    }
+    res.status(201).json({ added: !exists, itemCount: list.items.length });
+  } catch (err) {
+    console.error("list add item error:", err.message);
+    res.status(500).json({ error: "Erreur lors de l'ajout." });
+  }
+});
+
+// DELETE /api/lists/:id/items/:refId — retirer un élément (quick-add).
+router.delete("/:id/items/:refId", requireAuth, async (req, res) => {
+  try {
+    const list = await List.findById(req.params.id);
+    if (!list) return res.status(404).json({ error: "Liste introuvable." });
+    if (String(list.user) !== String(req.userId))
+      return res.status(403).json({ error: "Action non autorisée." });
+    const refId = String(req.params.refId);
+    list.items = list.items.filter((i) => String(i.refId) !== refId);
+    await list.save({ validateModifiedOnly: true });
+    res.json({ itemCount: list.items.length });
+  } catch (err) {
+    console.error("list remove item error:", err.message);
+    res.status(500).json({ error: "Erreur lors du retrait." });
   }
 });
 
