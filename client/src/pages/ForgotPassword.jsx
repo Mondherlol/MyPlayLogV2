@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Gamepad2, ArrowLeft, MailCheck } from "lucide-react";
+import { Gamepad2, ArrowLeft, MailCheck, AlertTriangle } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import ThemeToggle from "../components/ThemeToggle";
 
@@ -50,9 +50,15 @@ export default function ForgotPassword() {
             <h1 className="auth-title">Vérifie tes mails</h1>
             <p className="auth-sub">
               Si un compte existe avec <strong>{email}</strong>, tu vas recevoir
-              un lien pour réinitialiser ton mot de passe. Pense à regarder tes
-              spams.
+              un lien pour réinitialiser ton mot de passe.
             </p>
+            <div className="auth-hint">
+              <AlertTriangle size={18} />
+              <span>
+                Pense à vérifier tes <strong>spams</strong> / courriers
+                indésirables : l'email peut s'y glisser.
+              </span>
+            </div>
             <Link to="/login" className="btn btn-primary btn-block">
               Retour à la connexion
             </Link>
