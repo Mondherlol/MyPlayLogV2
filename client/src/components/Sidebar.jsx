@@ -20,7 +20,7 @@ import { useAuth } from "../context/AuthContext";
 import { useClickOutside } from "../hooks/useClickOutside";
 
 // Version courante de l'app (affichée en bas de la sidebar).
-const APP_VERSION = "1.0";
+const APP_VERSION = "1.1";
 
 const NAV = [
   { to: "/app", label: "Accueil", Icon: Home, end: true },
