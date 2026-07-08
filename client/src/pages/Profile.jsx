@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
-  Plus,
-  Star,
   Heart,
   Trophy,
   Gamepad2,
@@ -26,7 +24,6 @@ import {
   Move,
   Image as ImageIcon,
   ChevronDown,
-  ArrowRight,
   Repeat2,
   Film,
   BarChart3,
@@ -40,7 +37,7 @@ import { typeMeta, timeAgo } from "../lib/lists";
 import PlayedModal from "../components/PlayedModal";
 import AddGameModal from "../components/AddGameModal";
 import ProfileAllGames from "../components/ProfileAllGames";
-import GameAddFan from "../components/GameAddFan";
+import ProfileOverview from "../components/ProfileOverview";
 import ProfileActivity from "../components/ProfileActivity";
 import ProfileOST from "../components/ProfileOST";
 import ProfileFeed from "../components/ProfileFeed";
@@ -70,14 +67,6 @@ function twemojiHtml(text) {
   return { __html: twemoji.parse(escapeHtml(text), { folder: "svg", ext: ".svg" }) };
 }
 
-const SECTIONS = [
-  { key: "playing", label: "En cours" },
-  { key: "finished", label: "Terminés" },
-  { key: "paused", label: "En pause" },
-  { key: "dropped", label: "Abandonnés" },
-  { key: "wishlist", label: "À jouer" },
-];
-
 // Sous-onglets de filtrage de l'onglet « Listes » (par type).
 const LIST_FILTERS = [
   { key: "all", label: "Toutes", Icon: LayoutGrid },
@@ -90,60 +79,6 @@ const LIST_SORTS = [
   { key: "recent", label: "Plus récentes" },
   { key: "liked", label: "Plus aimées" },
 ];
-
-function CoverTile({ entry, fav }) {
-  const navigate = useNavigate();
-  return (
-    <div
-      className="cover-tile clickable"
-      onClick={() => navigate(`/game/${entry.gameId}`)}
-      title={entry.name}
-    >
-      {entry.cover ? (
-        <img src={entry.cover} alt={entry.name} loading="lazy" />
-      ) : (
-        <div className="cover-ph">{entry.name}</div>
-      )}
-      {fav && (
-        <span className="cover-fav">
-          <Star size={13} fill="currentColor" strokeWidth={0} />
-        </span>
-      )}
-      <GameAddFan
-        game={{ id: entry.gameId, name: entry.name, cover: entry.cover }}
-        hoverOnly
-      />
-    </div>
-  );
-}
-
-// Dernière tuile d'une rangée d'aperçu quand la liste dépasse 6 jeux :
-// aperçu empilé des jeux restants + « Voir le reste » → onglet Tous les jeux.
-function ShowMoreTile({ rest, onClick }) {
-  const preview = rest.slice(0, 3);
-  return (
-    <button className="cover-more clickable" onClick={onClick} title="Voir le reste des jeux">
-      <span className="cover-more-stack" aria-hidden="true">
-        {preview.map((e) => (
-          <span className="cover-more-cover" key={e.gameId}>
-            {e.cover ? (
-              <img src={e.cover} alt="" loading="lazy" draggable="false" />
-            ) : (
-              <span className="cover-more-ph" />
-            )}
-          </span>
-        ))}
-      </span>
-      <span className="cover-more-veil" aria-hidden="true" />
-      <span className="cover-more-body">
-        <span className="cover-more-count">+{rest.length}</span>
-        <span className="cover-more-text">
-          Voir le reste <ArrowRight size={13} />
-        </span>
-      </span>
-    </button>
-  );
-}
 
 // Bandeau défilant "TV Time" : les infos glissent en boucle.
 function Marquee({ facts }) {
@@ -485,6 +420,21 @@ export default function Profile() {
     }
   }
 
+  // Enregistre la personnalisation de l'aperçu (ordre des sections / détails des
+  // jaquettes). MAJ optimiste du profil local + cache, puis persistance serveur.
+  async function saveOverviewPrefs(prefs) {
+    setData((d) => {
+      const next = { ...d, profile: { ...d.profile, ...prefs } };
+      profileCache.set(targetUsername, next);
+      return next;
+    });
+    try {
+      await apiFetch("/users/me/overview", { method: "PUT", token, body: prefs });
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
   if (loading)
     return (
       <div className="lists-loading">
@@ -706,86 +656,24 @@ export default function Profile() {
 
       {/* ---------- Aperçu ---------- */}
       {tab === "overview" && (
-        <>
-          <section className="profile-section">
-            <h2 className="profile-section-title">
-              <Heart size={18} /> Jeux favoris
-              {favorites.length > 0 && <span className="section-count">{favorites.length}</span>}
-            </h2>
-            <div className="cover-row">
-              {favorites.slice(0, 6).map((e) => (
-                <CoverTile key={e.gameId} entry={e} fav />
-              ))}
-              {favorites.length > 6 && (
-                <ShowMoreTile
-                  rest={favorites.slice(6)}
-                  onClick={() => goAllGames({ fav: "1" })}
-                />
-              )}
-              {isMe &&
-                favorites.length <= 6 &&
-                Array.from({ length: Math.max(1, 6 - favorites.length) }).map((_, i) => (
-                  <button
-                    key={`add-${i}`}
-                    className="cover-add clickable"
-                    onClick={() =>
-                      setAddModal({ mode: "favorite", title: "Ajouter aux favoris" })
-                    }
-                    title="Ajouter un favori"
-                  >
-                    <Plus size={26} />
-                  </button>
-                ))}
-              {!favorites.length && !isMe && (
-                <p className="pf-section-empty font-fun">Aucun favori pour l'instant.</p>
-              )}
-            </div>
-          </section>
-
-          {SECTIONS.map(({ key, label }) => {
-            const list = library.filter((e) => e.status === key);
-            // Chez soi : on montre toutes les sections (même vides) pour pouvoir
-            // ajouter. Chez les autres : on masque les sections vides.
-            if (!list.length && !isMe) return null;
-            return (
-              <section className="profile-section" key={key}>
-                <h2 className="profile-section-title">
-                  {label}
-                  {list.length > 0 && <span className="section-count">{list.length}</span>}
-                </h2>
-                <div className="cover-row">
-                  {list.slice(0, 6).map((e) => (
-                    <CoverTile key={e.gameId} entry={e} />
-                  ))}
-                  {list.length > 6 && (
-                    <ShowMoreTile
-                      rest={list.slice(6)}
-                      onClick={() => goAllGames({ st: key })}
-                    />
-                  )}
-                  {isMe &&
-                    list.length <= 6 &&
-                    Array.from({ length: Math.max(1, 6 - list.length) }).map((_, i) => (
-                      <button
-                        key={`add-${i}`}
-                        className="cover-add clickable"
-                        onClick={() =>
-                          setAddModal({ mode: "status", status: key, title: `Ajouter à « ${label} »` })
-                        }
-                        title={`Ajouter à ${label}`}
-                      >
-                        <Plus size={26} />
-                      </button>
-                    ))}
-                </div>
-              </section>
-            );
-          })}
-
-          {library.length === 0 && !isMe && (
-            <div className="profile-empty font-fun">Ce joueur n'a pas encore de jeux.</div>
-          )}
-        </>
+        <ProfileOverview
+          favorites={favorites}
+          library={library}
+          lists={lists}
+          profile={profile}
+          isMe={isMe}
+          username={targetUsername}
+          token={token}
+          onAddFavorite={() =>
+            setAddModal({ mode: "favorite", title: "Ajouter aux favoris" })
+          }
+          onAddStatus={(key, label) =>
+            setAddModal({ mode: "status", status: key, title: `Ajouter à « ${label} »` })
+          }
+          goAllGames={goAllGames}
+          onSavePrefs={saveOverviewPrefs}
+          onOpenTab={setTab}
+        />
       )}
 
       {/* ---------- Feed (fan arts republiés) ---------- */}

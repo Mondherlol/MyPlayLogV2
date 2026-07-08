@@ -42,6 +42,13 @@ const userSchema = new mongoose.Schema(
     // absents de la liste sont considérés comme « pas encore classés ».
     ostOrder: { type: [Number], default: [] },
 
+    // --- Personnalisation de l'onglet « Aperçu » du profil ---
+    // Ordre des sections (favoris + statuts) glissées-déposées par le
+    // propriétaire ; ex. ["favorites","playing","finished",…]. Vide = ordre par
+    // défaut. `overviewCards` : détails affichés sur les jaquettes (note, heures…).
+    overviewOrder: { type: [String], default: [] },
+    overviewCards: { type: [String], default: [] },
+
     // --- Connexion PSN (tokens de l'API non officielle, jamais renvoyés au client) ---
     psn: {
       accessToken: { type: String, default: null },
@@ -77,6 +84,8 @@ userSchema.methods.toPublic = function () {
     tagline: this.tagline,
     taglineImage: this.taglineImage,
     ostOrder: this.ostOrder || [],
+    overviewOrder: this.overviewOrder || [],
+    overviewCards: this.overviewCards || [],
     psnConnected: !!(this.psn && this.psn.refreshToken),
     isAdmin: isAdminEmail(this.email),
     followingCount: (this.following || []).length,

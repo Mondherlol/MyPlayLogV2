@@ -40,6 +40,17 @@ const upload = multer({
     cb(null, /^image\/(jpe?g|png|webp|gif)$/.test(file.mimetype)),
 });
 
+// Clés autorisées pour la personnalisation de l'onglet « Aperçu » (voir PUT /me).
+const OVERVIEW_SECTIONS = new Set([
+  "favorites",
+  "playing",
+  "finished",
+  "wishlist",
+  "paused",
+  "dropped",
+]);
+const OVERVIEW_CARD_FIELDS = new Set(["rating", "hours", "platform", "title"]);
+
 function entryCard(e) {
   return {
     gameId: e.gameId,
@@ -115,11 +126,37 @@ router.put("/me", requireAuth, async (req, res) => {
         .filter((n) => Number.isFinite(n) && !seen.has(n) && seen.add(n))
         .slice(0, 500);
     }
-
     await user.save();
     res.json({ user: user.toPublic() });
   } catch (err) {
     console.error("profile update error:", err.message);
+    res.status(500).json({ error: "Erreur lors de l'enregistrement." });
+  }
+});
+
+// --- Personnalisation de l'onglet « Aperçu » (ordre des sections + détails des
+//     jaquettes). Écriture ATOMIQUE via $set : ces réglages sont enregistrés à
+//     chaque toggle / glisser-déposer, donc en rafale — un load-modify-save
+//     classique provoquerait des VersionError sur les requêtes concurrentes. ---
+function cleanKeys(arr, allowed) {
+  const seen = new Set();
+  return (Array.isArray(arr) ? arr : [])
+    .map((s) => String(s))
+    .filter((s) => allowed.has(s) && !seen.has(s) && seen.add(s));
+}
+
+router.put("/me/overview", requireAuth, async (req, res) => {
+  try {
+    const b = req.body || {};
+    const set = {};
+    if (b.overviewOrder !== undefined)
+      set.overviewOrder = cleanKeys(b.overviewOrder, OVERVIEW_SECTIONS);
+    if (b.overviewCards !== undefined)
+      set.overviewCards = cleanKeys(b.overviewCards, OVERVIEW_CARD_FIELDS);
+    if (Object.keys(set).length) await User.updateOne({ _id: req.userId }, { $set: set });
+    res.json({ ok: true, ...set });
+  } catch (err) {
+    console.error("overview prefs error:", err.message);
     res.status(500).json({ error: "Erreur lors de l'enregistrement." });
   }
 });
@@ -1121,6 +1158,8 @@ router.get("/:username", requireAuth, async (req, res) => {
         tagline: user.tagline,
         taglineImage: user.taglineImage,
         ostOrder: user.ostOrder || [],
+        overviewOrder: user.overviewOrder || [],
+        overviewCards: user.overviewCards || [],
         createdAt: user.createdAt,
         isMe,
         isFollowing,
