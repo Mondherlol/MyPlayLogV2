@@ -1,6 +1,7 @@
 import express from "express";
 import UserGame from "../models/UserGame.js";
 import { requireAuth } from "../middleware/auth.js";
+import { warmGameMeta } from "../lib/gameMeta.js";
 
 const router = express.Router();
 
@@ -99,6 +100,9 @@ router.put("/:gameId", requireAuth, async (req, res) => {
       { $set: update },
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
+    // Pré-chauffe le cache de métadonnées (genres/studios…) pour l'onglet
+    // Stats, sans bloquer la réponse.
+    warmGameMeta(gameId);
     res.json({ entry: toPublic(entry) });
   } catch (err) {
     console.error("library put error:", err.message);

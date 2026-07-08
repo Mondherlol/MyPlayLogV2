@@ -12,6 +12,7 @@ import OstThread from "../models/OstThread.js";
 import Repost from "../models/Repost.js";
 import Documentary from "../models/Documentary.js";
 import { igdbQuery } from "../lib/igdb.js";
+import { ensureGameMeta } from "../lib/gameMeta.js";
 import { connectWithNpsso } from "../lib/psn.js";
 import { isAdminEmail } from "../lib/admin.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -727,6 +728,207 @@ router.get("/:username/recommendations", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("reco fetch error:", err.message);
     res.status(500).json({ error: "Erreur lors du chargement des recommandations." });
+  }
+});
+
+// --- Statistiques du profil (onglet Stats) ---
+// Tout est calculé à la volée depuis Mongo. IGDB n'est sollicité que pour les
+// jeux absents du cache GameMeta (1 requête batchée max, puis plus jamais).
+router.get("/:username/stats", requireAuth, async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.params.username }).select(
+      "_id following"
+    );
+    if (!user) return res.status(404).json({ error: "Profil introuvable." });
+
+    const entries = await UserGame.find({ user: user._id })
+      .select("gameId name cover status platform playtimeHours favorite rating review")
+      .lean();
+
+    const meta = await ensureGameMeta(entries.map((e) => e.gameId));
+    const played = entries.filter((e) => e.status !== "wishlist");
+    // Base des stats de goûts (genres, studios…) : les jeux joués ; si le
+    // profil n'a que de la wishlist, on se rabat sur toute la bibliothèque.
+    const base = played.length ? played : entries;
+
+    // -- Compteur générique : liste de labels -> top trié avec proportions --
+    const tally = (items) => {
+      const m = new Map();
+      for (const it of items) if (it) m.set(it, (m.get(it) || 0) + 1);
+      return [...m.entries()].sort((a, b) => b[1] - a[1]);
+    };
+    const withPct = ([name, count]) => ({
+      name,
+      count,
+      pct: Math.round((count / base.length) * 100),
+    });
+
+    // -- Totaux / KPI --
+    const hours = played.reduce((s, e) => s + (e.playtimeHours || 0), 0);
+    const rated = entries.filter((e) => e.rating != null);
+    const finished = entries.filter((e) => e.status === "finished").length;
+    const droppedCount = entries.filter((e) => e.status === "dropped").length;
+    const avgRating = rated.length
+      ? Math.round(rated.reduce((s, e) => s + e.rating, 0) / rated.length)
+      : null;
+
+    const statuses = ["playing", "finished", "paused", "dropped", "wishlist"].map(
+      (key) => ({ key, count: entries.filter((e) => e.status === key).length })
+    );
+
+    // -- Consoles (plateforme déclarée sur l'entrée) --
+    const platMap = new Map();
+    for (const e of played) {
+      if (!e.platform) continue;
+      const p = platMap.get(e.platform) || { name: e.platform, count: 0, hours: 0 };
+      p.count += 1;
+      p.hours += e.playtimeHours || 0;
+      platMap.set(e.platform, p);
+    }
+    const platforms = [...platMap.values()]
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+
+    // -- Marathon : jeux avec le plus d'heures --
+    const topByHours = played
+      .filter((e) => (e.playtimeHours || 0) > 0)
+      .sort((a, b) => b.playtimeHours - a.playtimeHours)
+      .slice(0, 8)
+      .map((e) => ({ gameId: e.gameId, name: e.name, cover: e.cover, hours: e.playtimeHours }));
+
+    // -- Goûts : genres / studios / franchises (via le cache GameMeta) --
+    const metaOf = (e) => meta.get(e.gameId) || {};
+    const genres = tally(base.flatMap((e) => metaOf(e).genres || []))
+      .slice(0, 8)
+      .map(withPct);
+    const developers = tally(base.flatMap((e) => metaOf(e).developers || []))
+      .slice(0, 8)
+      .map(withPct);
+    const franchises = tally(base.map((e) => metaOf(e).franchise))
+      .filter(([, count]) => count >= 2)
+      .slice(0, 6)
+      .map(([name, count]) => ({
+        name,
+        count,
+        covers: base
+          .filter((e) => metaOf(e).franchise === name && e.cover)
+          .slice(0, 3)
+          .map((e) => e.cover),
+      }));
+
+    // -- Machine à remonter le temps : décennies de sortie --
+    const decades = tally(
+      base.map((e) => {
+        const y = metaOf(e).year;
+        return y ? Math.floor(y / 10) * 10 : null;
+      })
+    )
+      .map(([decade, count]) => ({ decade, count }))
+      .sort((a, b) => a.decade - b.decade);
+
+    // -- Notes : distribution (10 paliers) + podium --
+    const dist = Array.from({ length: 10 }, () => 0);
+    for (const e of rated) dist[Math.min(9, Math.floor(e.rating / 10))] += 1;
+    const topRated = rated
+      .slice()
+      .sort((a, b) => b.rating - a.rating || (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0))
+      .slice(0, 5)
+      .map((e) => ({ gameId: e.gameId, name: e.name, cover: e.cover, rating: e.rating }));
+
+    // -- Âme sœur gaming : l'abonnement avec le plus de goûts en commun --
+    // Zéro IGDB : simple croisement des bibliothèques des gens que ce profil
+    // suit (jeux en commun pondérés + proximité des notes sur ces jeux).
+    const following = (user.following || []).slice(0, 150);
+    const mine = new Map(entries.map((e) => [e.gameId, e]));
+    let soulmates = [];
+    if (following.length && entries.length) {
+      const friendGames = await UserGame.find({ user: { $in: following } })
+        .select("user gameId rating")
+        .lean();
+      const byFriend = new Map();
+      for (const g of friendGames) {
+        const k = String(g.user);
+        if (!byFriend.has(k)) byFriend.set(k, []);
+        byFriend.get(k).push(g);
+      }
+      const scored = [];
+      for (const [fid, list] of byFriend) {
+        const common = list.filter((g) => mine.has(g.gameId));
+        if (common.length < 3) continue;
+        const overlap = common.length / Math.min(entries.length, list.length);
+        const ratedPairs = common
+          .map((g) => [g.rating, mine.get(g.gameId).rating])
+          .filter(([a, b]) => a != null && b != null);
+        const agreement = ratedPairs.length
+          ? ratedPairs.reduce((s, [a, b]) => s + (1 - Math.abs(a - b) / 100), 0) /
+            ratedPairs.length
+          : null;
+        const match = Math.round(
+          100 * (agreement == null ? overlap : 0.55 * overlap + 0.45 * agreement)
+        );
+        const topCommon = common
+          .map((g) => mine.get(g.gameId))
+          .sort(
+            (a, b) =>
+              (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0) ||
+              (b.rating || 0) - (a.rating || 0)
+          )
+          .slice(0, 4)
+          .map((e) => ({ gameId: e.gameId, name: e.name, cover: e.cover }));
+        scored.push({ fid, match: Math.min(match, 99), common: common.length, topCommon });
+      }
+      scored.sort((a, b) => b.match - a.match || b.common - a.common);
+      const top = scored.slice(0, 3);
+      if (top.length) {
+        const friends = await User.find({ _id: { $in: top.map((s) => s.fid) } })
+          .select("username avatar")
+          .lean();
+        const fMap = new Map(friends.map((f) => [String(f._id), f]));
+        soulmates = top
+          .filter((s) => fMap.has(s.fid))
+          .map((s) => ({
+            id: s.fid,
+            username: fMap.get(s.fid).username,
+            avatar: fMap.get(s.fid).avatar || null,
+            match: s.match,
+            common: s.common,
+            topCommon: s.topCommon,
+          }));
+      }
+    }
+
+    res.json({
+      totals: {
+        games: entries.length,
+        played: played.length,
+        finished,
+        hours,
+        favorites: entries.filter((e) => e.favorite).length,
+        reviews: entries.filter((e) => (e.review || "").trim()).length,
+        rated: rated.length,
+        avgRating,
+        completionRate: played.length ? Math.round((finished / played.length) * 100) : null,
+        droppedRate: played.length ? Math.round((droppedCount / played.length) * 100) : null,
+      },
+      statuses,
+      platforms,
+      topByHours,
+      genres,
+      developers,
+      franchises,
+      decades,
+      ratings: { avg: avgRating, dist, top: topRated },
+      soulmates,
+      // Part des jeux dont on a les métadonnées (honnêteté des % affichés)
+      metaCoverage: entries.length
+        ? Math.round(
+            (entries.filter((e) => meta.has(e.gameId)).length / entries.length) * 100
+          )
+        : 0,
+    });
+  } catch (err) {
+    console.error("profile stats error:", err.message);
+    res.status(500).json({ error: "Erreur lors du calcul des statistiques." });
   }
 });
 

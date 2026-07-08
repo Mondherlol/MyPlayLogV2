@@ -215,24 +215,20 @@ export default function GameFeed({ gameId, gameName, token }) {
         </Rail>
       )}
 
-      {/* Fan arts — la pièce maîtresse : masonry vertical, clic = visionneuse */}
+      {/* Fan arts — la pièce maîtresse : fil vertical façon Twitter, une œuvre
+          sous l'autre, révélées par lots au scroll. Clic = visionneuse. */}
       {fanart.length > 0 && (
         <section className="gp-fanart-sec">
           <h3 className="gp-feed-h3">
             <Palette size={16} /> Fan arts
             <span className="gp-feed-count">{fanart.length}</span>
           </h3>
-          <div className="gp-feed-masonry">
-            {fanart.map((a, i) => (
-              <FanartCard
-                key={a.id}
-                c={a}
-                onOpen={() => setArtIndex(i)}
-                reposted={reposted.has(a.id)}
-                onRepost={toggleRepost}
-              />
-            ))}
-          </div>
+          <FanartFeed
+            items={fanart}
+            reposted={reposted}
+            onRepost={toggleRepost}
+            onOpen={setArtIndex}
+          />
         </section>
       )}
 
@@ -395,38 +391,115 @@ function PostCard({ c }) {
   );
 }
 
-function FanartCard({ c, onOpen, reposted, onRepost }) {
-  // <div> et non <button> : la carte contient elle-même le bouton republier
-  // (les boutons imbriqués sont interdits en HTML).
+// Fil vertical des fan arts : les œuvres sont déjà chargées côté données,
+// mais on ne MONTE que `ART_BATCH` cartes à la fois — les images suivantes ne
+// se chargent qu'en approchant de la sentinelle (fini le mur qui rame).
+const ART_BATCH = 5;
+
+function FanartFeed({ items, reposted, onRepost, onOpen }) {
+  const [shown, setShown] = useState(ART_BATCH);
+  const sentinelRef = useRef(null);
+
+  // Changement de jeu / de données : on repart du premier lot.
+  useEffect(() => setShown(ART_BATCH), [items]);
+
+  // Recréé à chaque lot : si la sentinelle est encore visible après la
+  // révélation, l'observer neuf redéclenche aussitôt le lot suivant.
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || shown >= items.length) return;
+    const io = new IntersectionObserver(
+      (entries) =>
+        entries[0].isIntersecting &&
+        setShown((n) => Math.min(n + ART_BATCH, items.length)),
+      { rootMargin: "900px 0px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [items.length, shown]);
+
   return (
-    <div
-      className="gp-feed-card gp-feed-art clickable"
-      role="button"
-      tabIndex={0}
-      onClick={onOpen}
-      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onOpen()}
-    >
-      <div className="gp-feed-media">
-        <img src={c.image} alt="" loading="lazy" draggable="false" />
-        <span className="gp-art-hover">
-          <Maximize2 size={18} />
+    <div className="gp-art-feed">
+      {items.slice(0, shown).map((a, i) => (
+        <FanartPost
+          key={a.id}
+          c={a}
+          onOpen={() => onOpen(i)}
+          reposted={reposted.has(a.id)}
+          onRepost={onRepost}
+        />
+      ))}
+      <div ref={sentinelRef} className="gp-art-sentinel" aria-hidden="true" />
+      {shown < items.length && (
+        <div className="gp-art-feed-more">
+          <Loader2 size={18} className="spin" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Une œuvre du fil, façon tweet : en-tête artiste/source, image au ratio
+// réservé (zéro saut de mise en page), actions en pied de carte.
+function FanartPost({ c, onOpen, reposted, onRepost }) {
+  const src = c.source.toLowerCase();
+  return (
+    <article className="gp-artp">
+      <header className="gp-artp-head">
+        <span className={`gp-artp-avatar src-${src}`}>{initial(c.author || c.source)}</span>
+        <div className="gp-artp-who">
+          <span className="gp-artp-author" title={c.author}>
+            {c.author || "Artiste mystère"}
+          </span>
+          <span className="gp-artp-sub">
+            <Palette size={11} /> Fan art · {c.source}
+          </span>
+        </div>
+        {c.url && (
+          <a
+            className="gp-artp-orig clickable"
+            href={c.url}
+            target="_blank"
+            rel="noreferrer"
+            title="Voir le post original"
+            aria-label="Voir le post original"
+          >
+            <ExternalLink size={15} />
+          </a>
+        )}
+      </header>
+
+      <button
+        className={`gp-artp-media clickable ${c.w && c.h ? "ratio" : ""}`}
+        onClick={onOpen}
+        style={c.w && c.h ? { aspectRatio: `${c.w} / ${c.h}` } : undefined}
+        aria-label="Agrandir le fan art"
+      >
+        <img
+          src={c.image}
+          alt={c.author ? `Fan art par ${c.author}` : "Fan art"}
+          loading="lazy"
+          decoding="async"
+          draggable="false"
+        />
+        <span className="gp-artp-zoom">
+          <Maximize2 size={17} />
         </span>
-        <span className={`gp-feed-src-badge src-${c.source.toLowerCase()}`}>{c.source}</span>
-        {c.author && <span className="gp-art-author-badge">par {c.author}</span>}
+      </button>
+
+      <footer className="gp-artp-actions">
         <button
-          className={`gp-art-repost clickable ${reposted ? "on" : ""}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            onRepost(c);
-          }}
+          className={`gp-artp-act repost clickable ${reposted ? "on" : ""}`}
+          onClick={() => onRepost(c)}
           title={reposted ? "Retirer de mon feed" : "Republier sur mon feed"}
-          aria-label={reposted ? "Retirer de mon feed" : "Republier sur mon feed"}
         >
-          <Repeat2 size={14} />
+          <Repeat2 size={16} />
           {reposted ? "Republié" : "Republier"}
         </button>
-      </div>
-    </div>
+        <span className="gp-artp-spacer" />
+        <span className={`gp-artp-src src-${src}`}>{c.source}</span>
+      </footer>
+    </article>
   );
 }
 
@@ -636,12 +709,19 @@ function FeedSkeleton() {
           </div>
         ))}
       </div>
-      <div className="gp-feed-masonry" style={{ marginTop: "1.5rem" }}>
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="gp-feed-card">
+      <div className="gp-art-feed" style={{ marginTop: "1.5rem" }}>
+        {Array.from({ length: 2 }).map((_, i) => (
+          <div key={i} className="gp-artp">
+            <div className="gp-artp-head">
+              <span className="gp-skel" style={{ width: 40, height: 40, borderRadius: "50%" }} />
+              <div className="gp-artp-who">
+                <span className="gp-skel gp-skel-bar" style={{ width: "45%" }} />
+                <span className="gp-skel gp-skel-bar sm" style={{ width: "28%" }} />
+              </div>
+            </div>
             <span
               className="gp-skel"
-              style={{ display: "block", height: 150 + (i % 3) * 40, borderRadius: 16 }}
+              style={{ display: "block", height: 320 + (i % 2) * 90, borderRadius: 14 }}
             />
           </div>
         ))}

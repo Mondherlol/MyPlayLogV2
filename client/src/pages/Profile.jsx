@@ -29,6 +29,7 @@ import {
   ArrowRight,
   Repeat2,
   Film,
+  BarChart3,
 } from "lucide-react";
 import twemoji from "@twemoji/api";
 import { apiFetch, apiUpload } from "../lib/api";
@@ -45,6 +46,7 @@ import ProfileOST from "../components/ProfileOST";
 import ProfileFeed from "../components/ProfileFeed";
 import ProfileRecommendations from "../components/ProfileRecommendations";
 import ProfileVideos from "../components/ProfileVideos";
+import ProfileStats from "../components/ProfileStats";
 import EditProfileModal from "../components/EditProfileModal";
 import CoverPickerModal from "../components/CoverPickerModal";
 import ReframeCoverModal from "../components/ReframeCoverModal";
@@ -661,6 +663,12 @@ export default function Profile() {
           <span className="tab-count">{c.games}</span>
         </button>
         <button
+          className={`profile-tab ${tab === "stats" ? "active" : ""}`}
+          onClick={() => setTab("stats")}
+        >
+          <BarChart3 size={16} /> Stats
+        </button>
+        <button
           className={`profile-tab ${tab === "lists" ? "active" : ""}`}
           onClick={() => setTab("lists")}
         >
@@ -802,6 +810,9 @@ export default function Profile() {
         ) : (
           <ProfileAllGames library={library} onOpen={openGame} />
         ))}
+
+      {/* ---------- Stats ---------- */}
+      {tab === "stats" && <ProfileStats username={targetUsername} token={token} />}
 
       {/* ---------- Listes ---------- */}
       {tab === "lists" && (

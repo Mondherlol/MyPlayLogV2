@@ -14,6 +14,7 @@ import recommendationRoutes from "./routes/recommendations.js";
 import ostRoutes from "./routes/ost.js";
 import repostRoutes from "./routes/reposts.js";
 import videoRoutes from "./routes/videos.js";
+import feedRoutes from "./routes/feed.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -51,6 +52,7 @@ app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/ost", ostRoutes);
 app.use("/api/reposts", repostRoutes);
 app.use("/api/videos", videoRoutes);
+app.use("/api/feed", feedRoutes);
 
 const PORT = process.env.PORT || 4000;
 const MONGODB_URI =
