@@ -20,8 +20,11 @@ import {
   CornerDownLeft,
   Music,
   Repeat2,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { useClickOutside } from "../hooks/useClickOutside";
 import { apiFetch } from "../lib/api";
 import { timeAgo } from "../lib/lists";
@@ -46,6 +49,7 @@ const NOTIF_META = {
 
 export default function Topbar() {
   const { user, token, logout } = useAuth();
+  const { theme, toggle: toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const [searchOpen, setSearchOpen] = useState(false);
@@ -207,6 +211,16 @@ export default function Topbar() {
   return (
     <header className="topbar">
       <div className="topbar-actions">
+        {/* Thème (mobile uniquement : sur desktop il vit dans la sidebar) */}
+        <button
+          className="icon-btn theme-btn-mobile clickable"
+          onClick={toggleTheme}
+          aria-label={theme === "light" ? "Thème sombre" : "Thème clair"}
+          title={theme === "light" ? "Thème sombre" : "Thème clair"}
+        >
+          {theme === "light" ? <Moon size={19} /> : <Sun size={19} />}
+        </button>
+
         {/* Recherche */}
         <div className={`search ${searchOpen ? "open" : ""}`} ref={searchRef}>
           <form onSubmit={onSearchSubmit} className="search-form">

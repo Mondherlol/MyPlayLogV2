@@ -56,6 +56,10 @@ const userSchema = new mongoose.Schema(
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
       default: [],
     },
+
+    // Dernière version de patch note vue par l'utilisateur : sert à n'afficher
+    // la pop-up des nouveautés qu'UNE SEULE fois, à sa prochaine ouverture.
+    seenPatchnote: { type: String, default: null },
   },
   { timestamps: true }
 );

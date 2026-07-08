@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
+import PatchnotePopup from "./PatchnotePopup";
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(
@@ -25,6 +26,7 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
+      <PatchnotePopup />
     </div>
   );
 }

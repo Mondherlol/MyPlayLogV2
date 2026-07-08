@@ -823,6 +823,9 @@
   /* Largeur courante de la sidebar (héritée par les éléments fixed enfants,
      ex. le dock de la tier list qui doit se centrer sur le contenu). */
   --app-sidebar-w: 208px;
+  /* Hauteur de la bottom bar mobile (0 sur desktop) — utilisée par les
+     éléments flottants qui doivent se poser au-dessus (ex. FAB filtres). */
+  --bottom-bar-h: 0px;
 }
 
 .app-shell.is-collapsed {
@@ -1126,6 +1129,12 @@
 .icon-btn:hover {
   background: var(--surface-2);
   color: var(--text);
+}
+
+/* Toggle de thème dans la topbar : mobile uniquement (sur desktop il est
+   dans la sidebar). Affiché par la media query bottom bar. */
+.theme-btn-mobile {
+  display: none;
 }
 
 /* Recherche déployable */
@@ -1694,4 +1703,99 @@
 .placeholder-sub {
   color: var(--text-soft);
   font-size: 1.02rem;
+}
+
+/* ======================================================================
+   MOBILE — la sidebar devient une bottom bar (style Android)
+   ====================================================================== */
+@media (max-width: 760px) {
+  .app-shell,
+  .app-shell.is-collapsed {
+    --app-sidebar-w: 0px;
+    --bottom-bar-h: 60px;
+  }
+
+  .sidebar,
+  .sidebar.collapsed {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: auto;
+    flex-direction: row;
+    padding: 0.35rem 0.4rem calc(0.35rem + env(safe-area-inset-bottom));
+    border-right: none;
+    border-top: 1px solid rgba(0, 0, 0, 0.28);
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.28);
+    z-index: 120;
+    transition: none;
+  }
+
+  /* Éléments desktop inutiles en bottom bar */
+  .side-toggle,
+  .sidebar-head,
+  .side-bottom,
+  .side-row-admin {
+    display: none;
+  }
+
+  .side-nav {
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: space-around;
+    width: 100%;
+    margin-top: 0;
+    gap: 0.1rem;
+  }
+
+  .sidebar .side-row {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.24rem;
+    flex: 1;
+    min-width: 0;
+    padding: 0.34rem 0.15rem 0.3rem;
+    font-size: 0.64rem;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .sidebar .side-label,
+  .sidebar.collapsed .side-label {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Indicateur actif façon Material : pilule dorée derrière l'icône */
+  .sidebar .side-icon {
+    width: auto;
+    padding: 0.2rem 0.85rem;
+    border-radius: 999px;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+
+  .sidebar .side-row:hover,
+  .sidebar .side-row.active {
+    background: transparent;
+  }
+
+  .sidebar .side-row.active .side-icon {
+    background: color-mix(in srgb, var(--orange) 18%, transparent);
+  }
+
+  /* Le contenu ne doit pas finir caché derrière la bottom bar */
+  .app-content {
+    padding-bottom: calc(var(--bottom-bar-h) + env(safe-area-inset-bottom) + 1.6rem);
+  }
+
+  /* Le thème se règle depuis la topbar en mobile */
+  .theme-btn-mobile {
+    display: grid;
+  }
 }

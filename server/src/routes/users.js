@@ -13,6 +13,7 @@ import Repost from "../models/Repost.js";
 import Documentary from "../models/Documentary.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { ensureGameMeta } from "../lib/gameMeta.js";
+import { ensureEntityLogos } from "../lib/entityLogos.js";
 import { connectWithNpsso } from "../lib/psn.js";
 import { isAdminEmail } from "../lib/admin.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -804,6 +805,21 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
     const developers = tally(base.flatMap((e) => metaOf(e).developers || []))
       .slice(0, 8)
       .map(withPct);
+    const publishers = tally(base.flatMap((e) => metaOf(e).publishers || []))
+      .slice(0, 8)
+      .map(withPct);
+
+    // -- Logos studios/éditeurs/consoles (cache Mongo, IGDB au premier appel) --
+    const [companyLogos, platformLogos] = await Promise.all([
+      ensureEntityLogos("company", [
+        ...developers.map((d) => d.name),
+        ...publishers.map((p) => p.name),
+      ]),
+      ensureEntityLogos("platform", platforms.map((p) => p.name)),
+    ]);
+    for (const d of developers) d.logo = companyLogos.get(d.name) || null;
+    for (const p of publishers) p.logo = companyLogos.get(p.name) || null;
+    for (const p of platforms) p.logo = platformLogos.get(p.name) || null;
     const franchises = tally(base.map((e) => metaOf(e).franchise))
       .filter(([, count]) => count >= 2)
       .slice(0, 6)
@@ -835,6 +851,24 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
       .slice(0, 5)
       .map((e) => ({ gameId: e.gameId, name: e.name, cover: e.cover, rating: e.rating }));
 
+    // -- Les mal-aimés : pires notes (sans recouper le panthéon) --
+    const topIds = new Set(topRated.map((g) => g.gameId));
+    const flopRated = rated
+      .filter((e) => !topIds.has(e.gameId) && e.rating < 60)
+      .sort(
+        (a, b) =>
+          a.rating - b.rating ||
+          (b.status === "dropped" ? 1 : 0) - (a.status === "dropped" ? 1 : 0)
+      )
+      .slice(0, 5)
+      .map((e) => ({
+        gameId: e.gameId,
+        name: e.name,
+        cover: e.cover,
+        rating: e.rating,
+        dropped: e.status === "dropped",
+      }));
+
     // -- Âme sœur gaming : l'abonnement avec le plus de goûts en commun --
     // Zéro IGDB : simple croisement des bibliothèques des gens que ce profil
     // suit (jeux en commun pondérés + proximité des notes sur ces jeux).
@@ -843,7 +877,7 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
     let soulmates = [];
     if (following.length && entries.length) {
       const friendGames = await UserGame.find({ user: { $in: following } })
-        .select("user gameId rating")
+        .select("user gameId rating favorite")
         .lean();
       const byFriend = new Map();
       for (const g of friendGames) {
@@ -863,8 +897,22 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
           ? ratedPairs.reduce((s, [a, b]) => s + (1 - Math.abs(a - b) / 100), 0) /
             ratedPairs.length
           : null;
+        // Coups de cœur partagés : le signal de goût le plus fort — un jeu que
+        // les DEUX ont mis en favori pèse bien plus qu'un simple jeu en commun.
+        const sharedFavs = common.filter(
+          (g) => g.favorite && mine.get(g.gameId).favorite
+        ).length;
+        const favScore = sharedFavs ? Math.min(1, sharedFavs / 4) : null;
+        // Moyenne pondérée des composantes disponibles (les poids des
+        // composantes absentes sont redistribués).
+        const parts = [
+          [0.45, overlap],
+          [0.3, agreement],
+          [0.25, favScore],
+        ].filter(([, v]) => v != null);
+        const wTotal = parts.reduce((s, [w]) => s + w, 0);
         const match = Math.round(
-          100 * (agreement == null ? overlap : 0.55 * overlap + 0.45 * agreement)
+          (100 * parts.reduce((s, [w, v]) => s + w * v, 0)) / wTotal
         );
         const topCommon = common
           .map((g) => mine.get(g.gameId))
@@ -875,7 +923,13 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
           )
           .slice(0, 4)
           .map((e) => ({ gameId: e.gameId, name: e.name, cover: e.cover }));
-        scored.push({ fid, match: Math.min(match, 99), common: common.length, topCommon });
+        scored.push({
+          fid,
+          match: Math.min(match, 99),
+          common: common.length,
+          sharedFavs,
+          topCommon,
+        });
       }
       scored.sort((a, b) => b.match - a.match || b.common - a.common);
       const top = scored.slice(0, 3);
@@ -892,6 +946,7 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
             avatar: fMap.get(s.fid).avatar || null,
             match: s.match,
             common: s.common,
+            sharedFavs: s.sharedFavs,
             topCommon: s.topCommon,
           }));
       }
@@ -915,9 +970,10 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
       topByHours,
       genres,
       developers,
+      publishers,
       franchises,
       decades,
-      ratings: { avg: avgRating, dist, top: topRated },
+      ratings: { avg: avgRating, dist, top: topRated, flop: flopRated },
       soulmates,
       // Part des jeux dont on a les métadonnées (honnêteté des % affichés)
       metaCoverage: entries.length
@@ -929,6 +985,56 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("profile stats error:", err.message);
     res.status(500).json({ error: "Erreur lors du calcul des statistiques." });
+  }
+});
+
+// --- Jeux en commun entre deux profils (détail de l'âme sœur gaming) ---
+// Renvoie l'intersection complète des deux bibliothèques, coups de cœur
+// partagés en tête puis meilleures notes, avec la note de chacun.
+router.get("/:username/common/:other", requireAuth, async (req, res) => {
+  try {
+    const [user, other] = await Promise.all([
+      User.findOne({ username: req.params.username }).select("_id"),
+      User.findOne({ username: req.params.other }).select("_id"),
+    ]);
+    if (!user || !other)
+      return res.status(404).json({ error: "Profil introuvable." });
+
+    const [mine, theirs] = await Promise.all([
+      UserGame.find({ user: user._id })
+        .select("gameId name cover rating favorite status")
+        .lean(),
+      UserGame.find({ user: other._id })
+        .select("gameId rating favorite")
+        .lean(),
+    ]);
+    const theirMap = new Map(theirs.map((g) => [g.gameId, g]));
+    const games = mine
+      .filter((g) => theirMap.has(g.gameId))
+      .map((g) => {
+        const t = theirMap.get(g.gameId);
+        return {
+          gameId: g.gameId,
+          name: g.name,
+          cover: g.cover,
+          myRating: g.rating ?? null,
+          theirRating: t.rating ?? null,
+          myFav: Boolean(g.favorite),
+          theirFav: Boolean(t.favorite),
+        };
+      })
+      .sort(
+        (a, b) =>
+          (b.myFav && b.theirFav ? 1 : 0) - (a.myFav && a.theirFav ? 1 : 0) ||
+          (b.myFav || b.theirFav ? 1 : 0) - (a.myFav || a.theirFav ? 1 : 0) ||
+          ((b.myRating || 0) + (b.theirRating || 0)) -
+            ((a.myRating || 0) + (a.theirRating || 0))
+      );
+
+    res.json({ games });
+  } catch (err) {
+    console.error("common games error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement des jeux en commun." });
   }
 });
 

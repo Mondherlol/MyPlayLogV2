@@ -1087,19 +1087,13 @@
   color: #1a1204;
 }
 
-/* Bouton filtres (mobile uniquement) */
-.filter-toggle-mobile {
+/* Éléments mobile des filtres (FAB, backdrop, fermeture, valider) :
+   cachés par défaut, activés par la media query ≤ 900px. */
+.filter-fab,
+.filter-backdrop,
+.filter-close-mobile,
+.filter-apply-mobile {
   display: none;
-  align-items: center;
-  gap: 0.4rem;
-  border: 1.5px solid var(--border-strong);
-  background: var(--surface);
-  color: var(--text);
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 0.9rem;
-  padding: 0.55rem 0.9rem;
-  border-radius: 12px;
 }
 
 @media (max-width: 900px) {
@@ -1107,27 +1101,156 @@
     grid-template-columns: 1fr;
   }
 
+  /* Voile sombre derrière le bottom sheet — un tap dessus ferme */
+  .filter-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 290;
+    background: rgba(8, 8, 12, 0.55);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    animation: fadeIn 0.15s ease;
+  }
+
+  /* Le panneau devient un bottom sheet */
   .filter-panel {
     display: none;
-    position: static;
-    max-height: none;
-    margin-bottom: 1.2rem;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    z-index: 300;
+    max-height: min(80dvh, 640px);
+    margin: 0;
+    border-radius: 20px 20px 0 0;
+    border-bottom: none;
+    padding-bottom: calc(0.7rem + env(safe-area-inset-bottom));
+    box-shadow: 0 -18px 50px rgba(0, 0, 0, 0.45);
   }
 
   .filter-panel.open {
     display: block;
+    animation: sheetUp 0.24s cubic-bezier(0.2, 0.8, 0.3, 1);
   }
 
-  .filter-toggle-mobile {
+  /* Poignée type Android en haut du sheet */
+  .filter-panel-head {
+    padding-top: 1.15rem;
+  }
+
+  .filter-panel-head::before {
+    content: "";
+    position: absolute;
+    top: 7px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 42px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--border-strong);
+  }
+
+  .filter-close-mobile {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 9px;
+    background: var(--surface-2);
+    color: var(--text-soft);
+    flex-shrink: 0;
+  }
+
+  .filter-close-mobile:hover {
+    color: var(--text);
+  }
+
+  /* Bouton "Voir les résultats" collé en bas du sheet */
+  .filter-apply-mobile {
+    display: block;
+    position: sticky;
+    bottom: 0;
+    width: 100%;
+    margin-top: 0.65rem;
+    padding: 0.8rem;
+    border: none;
+    border-radius: 12px;
+    background: var(--accent-grad);
+    color: #1a1204;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 0.95rem;
+    box-shadow: 0 -10px 18px color-mix(in srgb, var(--surface) 80%, transparent);
+  }
+
+  /* Bouton flottant d'ouverture (au-dessus de la bottom bar mobile) */
+  .filter-fab {
+    position: fixed;
+    right: 1rem;
+    bottom: calc(var(--bottom-bar-h, 0px) + env(safe-area-inset-bottom) + 1rem);
+    z-index: 280;
     display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.78rem 1.15rem;
+    border: none;
+    border-radius: 999px;
+    background: var(--accent-grad);
+    color: #1a1204;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 0.92rem;
+    box-shadow: 0 10px 26px rgba(242, 183, 11, 0.42);
+    transition: transform 0.12s ease;
+  }
+
+  .filter-fab:active {
+    transform: scale(0.95);
+  }
+
+  .filter-fab .filter-count {
+    background: #1a1204;
+    color: var(--amber);
+  }
+}
+
+@keyframes sheetUp {
+  from {
+    transform: translateY(70px);
+    opacity: 0.4;
   }
 }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 560px) {
+  /* Deux jeux par rangée, bien calibrés */
   .game-grid {
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
     gap: 0.8rem;
+  }
+
+  /* Toolbar : recherche pleine largeur, tri + vue sur la 2e ligne */
+  .explorer-toolbar {
+    gap: 0.5rem;
+  }
+
+  .explorer-search {
+    flex: 1 1 100%;
+    max-width: none;
+    order: -1;
+  }
+
+  .explorer-sort {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .explorer-select {
+    flex: 1;
+    min-width: 0;
   }
 
   .brand-name {
@@ -1152,30 +1275,6 @@
   .profile-btn {
     padding: 0.25rem;
     border-radius: 50%;
-  }
-}
-
-@media (max-width: 760px) {
-  .app-shell {
-    --app-sidebar-w: 76px;
-  }
-
-  .sidebar {
-    width: 76px;
-  }
-
-  .sidebar .side-label {
-    display: none;
-  }
-
-  .sidebar .sidebar-head {
-    flex-direction: column;
-    gap: 0.6rem;
-  }
-
-  .sidebar .side-row,
-  .sidebar .side-brand {
-    justify-content: center;
   }
 }
 
@@ -3946,14 +4045,122 @@
 }
 
 @media (max-width: 620px) {
+  /* Toutes les modales deviennent des bottom sheets (glissent du bas) */
+  .modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .modal {
+    max-width: none;
+    max-height: 94dvh;
+    border-radius: 20px 20px 0 0;
+    padding: 1.15rem 1.05rem calc(1.05rem + env(safe-area-inset-bottom));
+    animation: sheetUp 0.26s cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+
+  /* Poignée d'attrape en haut du sheet */
+  .modal::before {
+    content: "";
+    display: block;
+    width: 42px;
+    height: 4px;
+    margin: -0.25rem auto 0.7rem;
+    border-radius: 999px;
+    background: var(--border-strong);
+  }
+
+  .modal-close {
+    top: 0.7rem;
+    right: 0.7rem;
+  }
+
+  .modal-title {
+    font-size: 1.22rem;
+  }
+
+  /* --- PlayedModal : en-tête compact (jaquette + actions côte à côte) --- */
   .modal-body {
     grid-template-columns: 1fr;
+    gap: 1rem;
   }
 
   .modal-cover-col {
-    max-width: 260px;
-    margin: 0 auto;
-    width: 100%;
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    gap: 0.55rem 0.8rem;
+    align-items: start;
+    max-width: none;
+    width: auto;
+    margin: 0;
+  }
+
+  .modal-cover {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    border-radius: 12px;
+  }
+
+  /* L'infobulle "Modifier" au survol est inutile au tactile → toujours visible */
+  .modal-cover-edit {
+    opacity: 1;
+    font-size: 0.72rem;
+    padding: 0.35rem;
+  }
+
+  .fav-btn {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: stretch;
+    padding: 0.6rem;
+    font-size: 0.85rem;
+  }
+
+  .review-btn {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: stretch;
+  }
+
+  /* Bouton "Ajouter à une liste" (bientôt) : masqué en mobile pour gagner de la place */
+  .modal-cover-col .list-btn {
+    display: none;
+  }
+
+  .rating-block {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    flex-direction: row;
+    justify-content: center;
+    gap: 1rem;
+  }
+
+  .btn-remove {
+    grid-column: 1 / -1;
+    grid-row: 4;
+  }
+
+  /* Champs : segments et temps sur toute la largeur */
+  .seg-opt {
+    min-width: calc(50% - 0.35rem);
+  }
+
+  .time-col {
+    flex: 1 1 100%;
+  }
+
+  /* Footer collé en bas du sheet, boutons pleine largeur */
+  .modal-footer {
+    position: sticky;
+    bottom: calc(-1.05rem - env(safe-area-inset-bottom));
+    margin-top: 1.2rem;
+    padding: 0.9rem 0 calc(0.4rem + env(safe-area-inset-bottom));
+    background: var(--surface);
+  }
+
+  .modal-footer .btn {
+    flex: 1;
+    justify-content: center;
   }
 
   .proscons {

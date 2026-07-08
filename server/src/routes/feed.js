@@ -4,6 +4,7 @@ import UserGame from "../models/UserGame.js";
 import List from "../models/List.js";
 import Repost from "../models/Repost.js";
 import Documentary from "../models/Documentary.js";
+import Notification from "../models/Notification.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { requireAuth } from "../middleware/auth.js";
 
@@ -15,6 +16,26 @@ const router = express.Router();
 
 const person = (u) =>
   u ? { id: String(u._id), username: u.username, avatar: u.avatar || null } : null;
+
+// Interactions sociales remontées dans le fil (commentaires, réponses, likes
+// sur les listes et les avis). Seule trace horodatée des likes : les
+// notifications. On repère celles émises PAR les joueurs suivis.
+const INTERACTION_TYPES = [
+  "list_comment",
+  "comment_reply",
+  "list_like",
+  "comment_like",
+  "review_comment",
+  "review_comment_reply",
+  "review_comment_like",
+];
+const isReplyType = (t) =>
+  t === "comment_reply" || t === "review_comment_reply";
+const isCommentAddType = (t) =>
+  t === "list_comment" ||
+  t === "comment_reply" ||
+  t === "review_comment" ||
+  t === "review_comment_reply";
 
 // ============================================================
 //  GET /api/feed/home?limit&before — timeline de l'accueil
@@ -39,7 +60,13 @@ router.get("/home", requireAuth, async (req, res) => {
       ? { user: { $ne: req.userId } }
       : { user: { $in: followed } };
 
-    const [entries, lists, reposts, docs] = await Promise.all([
+    // Filtre « acteur » pour les interactions (le champ scope cible le
+    // propriétaire du contenu ; ici on veut l'auteur de l'action).
+    const actorScope = community
+      ? { $ne: req.userId }
+      : { $in: followed };
+
+    const [entries, lists, reposts, docs, notifs] = await Promise.all([
       UserGame.find({ ...scope, ...lt("updatedAt") })
         .sort({ updatedAt: -1 })
         .limit(limit)
@@ -63,6 +90,19 @@ router.get("/home", requireAuth, async (req, res) => {
         .sort({ recommendedAt: -1 })
         .limit(limit)
         .populate("user", "username avatar")
+        .lean(),
+      Notification.find({
+        actor: actorScope,
+        type: { $in: INTERACTION_TYPES },
+        ...lt("createdAt"),
+      })
+        .sort({ createdAt: -1 })
+        // On surdimensionne : une action génère plusieurs notifs (réponse =
+        // parent + propriétaire) qu'on dédoublonne ensuite.
+        .limit(limit * 3)
+        .populate("actor", "username avatar")
+        .populate("user", "username")
+        .populate("list", "title type visibility items")
         .lean(),
     ]);
 

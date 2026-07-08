@@ -1,7 +1,23 @@
-import { useEffect, useState } from "react";
-import { Shield, Trophy, Check, Loader2, ExternalLink, Link2Off } from "lucide-react";
-import { apiFetch } from "../lib/api";
+import { useEffect, useRef, useState } from "react";
+import {
+  Shield,
+  Trophy,
+  Check,
+  Loader2,
+  ExternalLink,
+  Link2Off,
+  Sparkles,
+  Plus,
+  Trash2,
+  Pencil,
+  EyeOff,
+  ImagePlus,
+  X,
+  Send,
+} from "lucide-react";
+import { apiFetch, apiUpload } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { PN_ICONS } from "../components/PatchnotePopup";
 
 export default function Admin() {
   const { token, updateUser } = useAuth();
@@ -18,6 +34,7 @@ export default function Admin() {
       </header>
 
       <PsnManager token={token} updateUser={updateUser} />
+      <PatchnoteManager token={token} />
     </div>
   );
 }
@@ -164,5 +181,357 @@ function PsnManager({ token, updateUser }) {
         </>
       )}
     </section>
+  );
+}
+
+// ======================================================================
+//  Gestionnaire de patch notes (nouveautés affichées aux utilisateurs)
+// ======================================================================
+const ICON_NAMES = Object.keys(PN_ICONS);
+const blankItem = () => ({ icon: "Sparkles", title: "", description: "", images: [] });
+const blankNote = () => ({
+  version: "",
+  title: "",
+  intro: "",
+  items: [blankItem()],
+});
+
+function PatchnoteManager({ token }) {
+  const [notes, setNotes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [allowed, setAllowed] = useState(true);
+  const [editing, setEditing] = useState(null); // note en cours d'édition/création
+  const [err, setErr] = useState(null);
+
+  function load() {
+    setLoading(true);
+    apiFetch("/patchnotes", { token })
+      .then((d) => {
+        setNotes(d.patchnotes || []);
+        setAllowed(true);
+      })
+      .catch((e) => {
+        if (/administrateur/i.test(e.message)) setAllowed(false);
+        else setErr(e.message);
+      })
+      .finally(() => setLoading(false));
+  }
+  useEffect(load, [token]);
+
+  async function togglePublish(note) {
+    try {
+      await apiFetch(`/patchnotes/${note.id}/publish`, {
+        method: "POST",
+        token,
+        body: { published: !note.published },
+      });
+      load();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  async function remove(note) {
+    if (!confirm(`Supprimer le patch note v${note.version} ?`)) return;
+    try {
+      await apiFetch(`/patchnotes/${note.id}`, { method: "DELETE", token });
+      load();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  if (!allowed) return null;
+
+  return (
+    <section className="admin-card">
+      <div className="admin-card-head">
+        <span className="admin-card-icon">
+          <Sparkles size={18} />
+        </span>
+        <div className="admin-card-titles">
+          <h2>Patch notes</h2>
+          <p>
+            Rédige les nouveautés de l'app : le dernier patch note{" "}
+            <strong>publié</strong> s'affiche en pop-up à chaque utilisateur,{" "}
+            <strong>une seule fois</strong>, à sa prochaine visite.
+          </p>
+        </div>
+        {!editing && (
+          <button className="btn btn-primary" onClick={() => setEditing(blankNote())}>
+            <Plus size={16} /> Nouveau
+          </button>
+        )}
+      </div>
+
+      {err && <p className="psn-err">{err}</p>}
+
+      {editing ? (
+        <PatchnoteEditor
+          token={token}
+          initial={editing}
+          onCancel={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            load();
+          }}
+        />
+      ) : loading ? (
+        <div className="gp-troph-state">
+          <Loader2 size={18} className="spin" /> Chargement…
+        </div>
+      ) : notes.length === 0 ? (
+        <p className="pn-admin-empty">Aucun patch note pour l'instant.</p>
+      ) : (
+        <div className="pn-admin-list">
+          {notes.map((n) => (
+            <div className="pn-admin-row" key={n.id}>
+              <span className={`pn-admin-ver ${n.published ? "live" : ""}`}>
+                v{n.version}
+              </span>
+              <div className="pn-admin-info">
+                <strong>{n.title}</strong>
+                <span>
+                  {n.items.length} nouveauté{n.items.length > 1 ? "s" : ""} ·{" "}
+                  {n.published ? "En ligne" : "Brouillon"}
+                </span>
+              </div>
+              <div className="pn-admin-actions">
+                <button
+                  className="icon-btn clickable"
+                  onClick={() => togglePublish(n)}
+                  title={n.published ? "Dépublier" : "Publier"}
+                >
+                  {n.published ? <EyeOff size={17} /> : <Send size={17} />}
+                </button>
+                <button
+                  className="icon-btn clickable"
+                  onClick={() => setEditing(n)}
+                  title="Modifier"
+                >
+                  <Pencil size={17} />
+                </button>
+                <button
+                  className="icon-btn clickable danger"
+                  onClick={() => remove(n)}
+                  title="Supprimer"
+                >
+                  <Trash2 size={17} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PatchnoteEditor({ token, initial, onCancel, onSaved }) {
+  const [note, setNote] = useState(() => ({
+    ...blankNote(),
+    ...initial,
+    items: initial.items?.length ? initial.items.map((it) => ({ ...it })) : [blankItem()],
+  }));
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const isEdit = !!initial.id;
+
+  function setField(k, v) {
+    setNote((n) => ({ ...n, [k]: v }));
+  }
+  function setItem(i, patch) {
+    setNote((n) => ({
+      ...n,
+      items: n.items.map((it, j) => (j === i ? { ...it, ...patch } : it)),
+    }));
+  }
+  function addItem() {
+    setNote((n) => ({ ...n, items: [...n.items, blankItem()] }));
+  }
+  function removeItem(i) {
+    setNote((n) => ({ ...n, items: n.items.filter((_, j) => j !== i) }));
+  }
+
+  async function save() {
+    setErr(null);
+    if (!note.version.trim() || !note.title.trim()) {
+      setErr("La version et le titre sont obligatoires.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const body = {
+        version: note.version.trim(),
+        title: note.title.trim(),
+        intro: note.intro.trim(),
+        items: note.items.filter((it) => it.title.trim()),
+      };
+      if (isEdit) {
+        await apiFetch(`/patchnotes/${initial.id}`, { method: "PUT", token, body });
+      } else {
+        await apiFetch("/patchnotes", { method: "POST", token, body });
+      }
+      onSaved();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="pn-editor">
+      <div className="pn-editor-grid">
+        <label className="pn-field">
+          <span>Version</span>
+          <input
+            value={note.version}
+            onChange={(e) => setField("version", e.target.value)}
+            placeholder="1.1"
+          />
+        </label>
+        <label className="pn-field grow">
+          <span>Titre</span>
+          <input
+            value={note.title}
+            onChange={(e) => setField("title", e.target.value)}
+            placeholder="Ce qui change dans cette version"
+          />
+        </label>
+      </div>
+
+      <label className="pn-field">
+        <span>Intro (optionnel)</span>
+        <textarea
+          rows={2}
+          value={note.intro}
+          onChange={(e) => setField("intro", e.target.value)}
+          placeholder="Petit mot d'accroche affiché sous le titre…"
+        />
+      </label>
+
+      <div className="pn-editor-items">
+        {note.items.map((it, i) => (
+          <PatchnoteItemEditor
+            key={i}
+            token={token}
+            item={it}
+            index={i}
+            onChange={(patch) => setItem(i, patch)}
+            onRemove={() => removeItem(i)}
+            canRemove={note.items.length > 1}
+          />
+        ))}
+      </div>
+
+      <button className="pn-add-item clickable" onClick={addItem}>
+        <Plus size={15} /> Ajouter une nouveauté
+      </button>
+
+      {err && <p className="psn-err">{err}</p>}
+
+      <div className="pn-editor-foot">
+        <button className="btn btn-ghost" onClick={onCancel} disabled={saving}>
+          Annuler
+        </button>
+        <button className="btn btn-primary" onClick={save} disabled={saving}>
+          {saving ? <Loader2 size={16} className="spin" /> : <Check size={16} />}
+          {isEdit ? "Enregistrer" : "Créer le brouillon"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PatchnoteItemEditor({ token, item, index, onChange, onRemove, canRemove }) {
+  const fileRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const Icon = PN_ICONS[item.icon] || Sparkles;
+
+  async function onUpload(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || item.images.length >= 2) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const d = await apiUpload("/patchnotes/upload", fd, token);
+      onChange({ images: [...item.images, d.url] });
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="pn-item-editor">
+      <div className="pn-item-editor-head">
+        <span className="pn-item-num">#{index + 1}</span>
+        <div className="pn-icon-picker">
+          <span className="pn-icon-current">
+            <Icon size={17} />
+          </span>
+          <select
+            value={item.icon}
+            onChange={(e) => onChange({ icon: e.target.value })}
+            aria-label="Icône"
+          >
+            {ICON_NAMES.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
+        {canRemove && (
+          <button className="icon-btn clickable danger" onClick={onRemove} title="Retirer">
+            <X size={16} />
+          </button>
+        )}
+      </div>
+
+      <input
+        className="pn-item-title-input"
+        value={item.title}
+        onChange={(e) => onChange({ title: e.target.value })}
+        placeholder="Titre de la nouveauté"
+      />
+      <textarea
+        rows={2}
+        value={item.description}
+        onChange={(e) => onChange({ description: e.target.value })}
+        placeholder="Décris ce qui a changé…"
+      />
+
+      <div className="pn-item-shots">
+        {item.images.map((src, j) => (
+          <div className="pn-shot" key={j}>
+            <img src={src} alt="" />
+            <button
+              className="pn-shot-del clickable"
+              onClick={() => onChange({ images: item.images.filter((_, k) => k !== j) })}
+              aria-label="Retirer l'image"
+            >
+              <X size={13} />
+            </button>
+          </div>
+        ))}
+        {item.images.length < 2 && (
+          <button
+            className="pn-shot-add clickable"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+          >
+            {uploading ? <Loader2 size={18} className="spin" /> : <ImagePlus size={18} />}
+            <span>{item.images.length ? "Après" : "Image"}</span>
+          </button>
+        )}
+        <input ref={fileRef} type="file" accept="image/*" hidden onChange={onUpload} />
+      </div>
+    </div>
   );
 }

@@ -67,13 +67,15 @@ export default function Sidebar({ collapsed, onToggle }) {
       </div>
 
       <nav className="side-nav">
-        {NAV.filter((n) => !n.adminOnly || user?.isAdmin).map(({ to, label, Icon, end }) => (
+        {NAV.filter((n) => !n.adminOnly || user?.isAdmin).map(({ to, label, Icon, end, adminOnly }) => (
           <NavLink
             key={to}
             to={to}
             end={end}
             className={({ isActive }) =>
-              `side-row clickable ${isActive ? "active" : ""}`
+              `side-row clickable ${isActive ? "active" : ""} ${
+                adminOnly ? "side-row-admin" : ""
+              }`
             }
             title={label}
           >

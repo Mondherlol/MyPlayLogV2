@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import {
   Loader2,
   Hourglass,
@@ -16,6 +18,9 @@ import {
   CalendarRange,
   MessageSquareText,
   Info,
+  ThumbsDown,
+  X,
+  Skull,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { makeCache } from "../lib/cache";
@@ -36,8 +41,12 @@ const STATUS_META = [
 
 const nf = new Intl.NumberFormat("fr-FR");
 
+const REDUCED_MOTION =
+  typeof window !== "undefined" &&
+  window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
 function fmtHours(h) {
-  if (h >= 1000) return `${nf.format(Math.round(h / 100) / 10).replace(",", ",")} k h`;
+  if (h >= 1000) return `${nf.format(Math.round(h / 100) / 10)} k h`;
   return `${nf.format(Math.round(h))} h`;
 }
 
@@ -50,27 +59,58 @@ function heroSub(h) {
   return `soit ${nf.format(Math.round((days / 30.44) * 10) / 10)} mois de jeu non-stop`;
 }
 
+// Compteur animé : le chiffre grimpe jusqu'à sa valeur au montage (ease-out).
+function useCountUp(target, duration = 1100) {
+  const [val, setVal] = useState(REDUCED_MOTION ? target : 0);
+  useEffect(() => {
+    if (REDUCED_MOTION) {
+      setVal(target);
+      return;
+    }
+    let raf;
+    const t0 = performance.now();
+    const tick = (now) => {
+      const p = Math.min((now - t0) / duration, 1);
+      setVal(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, duration]);
+  return val;
+}
+
+function CountUp({ value, duration }) {
+  const v = useCountUp(value, duration);
+  return nf.format(Math.round(v));
+}
+
 function StatTile({ Icon, label, value, sub }) {
   return (
     <div className="ps-tile">
       <span className="ps-tile-icon">
-        <Icon size={17} />
+        <Icon size={16} />
       </span>
-      <span className="ps-tile-value">{value}</span>
+      <span className="ps-tile-value">
+        {typeof value === "number" ? <CountUp value={value} /> : value}
+      </span>
       <span className="ps-tile-label">{label}</span>
       {sub && <span className="ps-tile-sub">{sub}</span>}
     </div>
   );
 }
 
-function Card({ Icon, title, sub, wide, children }) {
+function Card({ Icon, title, sub, wide, actions, children }) {
   return (
     <section className={`ps-card ${wide ? "wide" : ""}`}>
       <header className="ps-card-head">
         <h3 className="ps-card-title">
-          <Icon size={17} /> {title}
+          <span className="ps-card-icon">
+            <Icon size={15} />
+          </span>
+          {title}
         </h3>
-        {sub && <span className="ps-card-sub">{sub}</span>}
+        {actions || (sub && <span className="ps-card-sub">{sub}</span>)}
       </header>
       {children}
     </section>
@@ -79,14 +119,17 @@ function Card({ Icon, title, sub, wide, children }) {
 
 // Liste de barres horizontales mono-série (doré) : rangée = libellé + piste +
 // valeur directe en bout — chaque valeur est lisible sans tooltip.
-function BarList({ items, onRowClick }) {
+// `logo` affiche une pastille logo (studios, consoles), `FallbackIcon` prend
+// le relais quand IGDB n'a pas de logo.
+function BarList({ items, onRowClick, FallbackIcon }) {
   const max = Math.max(...items.map((i) => i.value), 1);
   return (
     <ul className="ps-barlist">
-      {items.map((it) => (
+      {items.map((it, idx) => (
         <li
           key={it.key}
           className={`ps-barrow ${onRowClick ? "clickable" : ""}`}
+          style={{ "--d": `${idx * 55}ms` }}
           onClick={onRowClick ? () => onRowClick(it) : undefined}
           title={it.title || it.label}
         >
@@ -95,6 +138,16 @@ function BarList({ items, onRowClick }) {
               <img className="ps-barrow-cover" src={it.cover} alt="" loading="lazy" />
             ) : (
               <span className="ps-barrow-cover ph" />
+            ))}
+          {it.logo !== undefined &&
+            (it.logo ? (
+              <span className="ps-barrow-logo">
+                <img src={it.logo} alt="" loading="lazy" />
+              </span>
+            ) : (
+              <span className="ps-barrow-logo ph">
+                {FallbackIcon && <FallbackIcon size={15} />}
+              </span>
             ))}
           <span className="ps-barrow-label">{it.label}</span>
           <span className="ps-barrow-track">
@@ -115,7 +168,7 @@ function Columns({ data, tipOf }) {
   const max = Math.max(...data.map((d) => d.value), 1);
   return (
     <div className="ps-cols" role="img">
-      {data.map((d) => (
+      {data.map((d, idx) => (
         <div className="ps-col" key={d.key} tabIndex={0} aria-label={tipOf(d)}>
           <span className="ps-col-tip">{tipOf(d)}</span>
           {d.value === max && d.value > 0 && (
@@ -123,7 +176,7 @@ function Columns({ data, tipOf }) {
           )}
           <span
             className={`ps-col-fill ${d.value === 0 ? "zero" : ""}`}
-            style={{ height: `${(d.value / max) * 100}%` }}
+            style={{ height: `${(d.value / max) * 100}%`, "--d": `${idx * 40}ms` }}
           />
           <span className="ps-col-label">{d.label}</span>
         </div>
@@ -132,11 +185,181 @@ function Columns({ data, tipOf }) {
   );
 }
 
+// Tooltip custom du donut (mêmes codes que les tooltips des colonnes)
+function DonutTip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0];
+  return (
+    <div className="ps-donut-tip">
+      <span className="ps-dot" style={{ background: d.payload.fill }} />
+      {d.name} : <strong>{nf.format(d.value)}</strong>
+    </div>
+  );
+}
+
+// « Fromage » du backlog : donut animé + total au centre, légende à côté.
+function StatusDonut({ statuses, total }) {
+  const data = useMemo(
+    () =>
+      STATUS_META.map((m) => {
+        const s = statuses.find((x) => x.key === m.key);
+        return s?.count
+          ? { key: m.key, name: m.label, value: s.count, fill: `var(--ps-c-${m.key})` }
+          : null;
+      }).filter(Boolean),
+    [statuses]
+  );
+  return (
+    <div className="ps-donut-wrap">
+      <div className="ps-donut">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Tooltip content={<DonutTip />} cursor={false} />
+            <Pie
+              data={data}
+              dataKey="value"
+              nameKey="name"
+              innerRadius="66%"
+              outerRadius="98%"
+              paddingAngle={2}
+              cornerRadius={4}
+              stroke="none"
+              isAnimationActive={!REDUCED_MOTION}
+              animationDuration={900}
+              animationBegin={150}
+            >
+              {data.map((d) => (
+                <Cell key={d.key} fill={d.fill} />
+              ))}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="ps-donut-center">
+          <span className="ps-donut-total">
+            <CountUp value={total} />
+          </span>
+          <span className="ps-donut-caption">jeux</span>
+        </div>
+      </div>
+      <ul className="ps-legend ps-legend-col">
+        {data.map((d) => (
+          <li key={d.key}>
+            <span className="ps-dot" style={{ background: d.fill }} />
+            {d.name}
+            <strong>{nf.format(d.value)}</strong>
+            <span className="ps-legend-pct">{Math.round((d.value / total) * 100)} %</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// Modal « jeux en commun » : l'intersection complète des deux bibliothèques,
+// coups de cœur partagés en tête (endpoint /users/:me/common/:other).
+function CommonGamesModal({ me, soulmate, token, onClose }) {
+  const [games, setGames] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  useEffect(() => {
+    let alive = true;
+    apiFetch(`/users/${me}/common/${soulmate.username}`, { token })
+      .then((d) => alive && setGames(d.games))
+      .catch((e) => alive && setError(e.message));
+    return () => {
+      alive = false;
+    };
+  }, [me, soulmate.username, token]);
+
+  return createPortal(
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="modal ps-common-modal">
+        <button className="modal-close clickable" onClick={onClose} aria-label="Fermer">
+          <X size={18} />
+        </button>
+        <h2 className="modal-title">
+          <HeartHandshake size={20} /> Jeux en commun avec {soulmate.username}
+        </h2>
+        {games && (
+          <p className="ps-common-modal-sub">
+            {nf.format(games.length)} jeux partagés
+            {games.some((g) => g.myFav && g.theirFav) &&
+              ` — dont ${nf.format(
+                games.filter((g) => g.myFav && g.theirFav).length
+              )} coups de cœur mutuels`}
+          </p>
+        )}
+        {error && <div className="alert alert-error">{error}</div>}
+        {!games && !error && (
+          <div className="lists-loading">
+            <Loader2 size={18} className="spin" /> Chargement…
+          </div>
+        )}
+        {games && (
+          <div className="ps-common-grid">
+            {games.map((g) => (
+              <Link
+                key={g.gameId}
+                to={`/game/${g.gameId}`}
+                className="ps-common-item"
+                title={g.name}
+                onClick={onClose}
+              >
+                {(g.myFav || g.theirFav) && (
+                  <span
+                    className={`ps-common-heart ${g.myFav && g.theirFav ? "both" : ""}`}
+                    title={
+                      g.myFav && g.theirFav
+                        ? "Coup de cœur mutuel"
+                        : g.myFav
+                          ? "Ton coup de cœur"
+                          : `Coup de cœur de ${soulmate.username}`
+                    }
+                  >
+                    <Heart size={11} fill="currentColor" />
+                  </span>
+                )}
+                {g.cover ? (
+                  <img src={g.cover} alt={g.name} loading="lazy" />
+                ) : (
+                  <span className="ps-common-ph">{g.name}</span>
+                )}
+                <span className="ps-common-name">{g.name}</span>
+                {(g.myRating != null || g.theirRating != null) && (
+                  <span className="ps-common-ratings">
+                    <span title="Ta note">{g.myRating ?? "—"}</span>
+                    <span className="ps-common-vs">·</span>
+                    <span title={`Note de ${soulmate.username}`}>
+                      {g.theirRating ?? "—"}
+                    </span>
+                  </span>
+                )}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export default function ProfileStats({ username, token }) {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [companyTab, setCompanyTab] = useState("developers");
+  const [commonOpen, setCommonOpen] = useState(false);
 
   useEffect(() => {
     if (!username) return;
@@ -168,8 +391,7 @@ export default function ProfileStats({ username, token }) {
         <Loader2 size={20} className="spin" /> Calcul des statistiques…
       </div>
     );
-  if (error)
-    return <div className="profile-empty font-fun">{error}</div>;
+  if (error) return <div className="profile-empty font-fun">{error}</div>;
   if (!stats) return null;
 
   const t = stats.totals;
@@ -185,6 +407,9 @@ export default function ProfileStats({ username, token }) {
   const soulmate = stats.soulmates[0];
   const others = stats.soulmates.slice(1);
   const topRated = stats.ratings.top;
+  const flops = stats.ratings.flop || [];
+  const companies =
+    companyTab === "developers" ? stats.developers : stats.publishers || [];
 
   return (
     <div className="ps">
@@ -195,61 +420,34 @@ export default function ProfileStats({ username, token }) {
             <Hourglass size={15} /> Temps de jeu total
           </span>
           <span className="ps-hero-value">
-            {nf.format(Math.round(t.hours))}
+            <CountUp value={Math.round(t.hours)} duration={1500} />
             <span className="ps-hero-unit">h</span>
           </span>
           <span className="ps-hero-sub font-fun">{heroSub(t.hours)}</span>
         </div>
         <div className="ps-tiles">
-          <StatTile Icon={Gamepad2} label="Jeux" value={nf.format(t.games)} />
+          <StatTile Icon={Gamepad2} label="Jeux" value={t.games} />
           <StatTile
             Icon={Trophy}
             label="Terminés"
-            value={nf.format(t.finished)}
+            value={t.finished}
             sub={t.completionRate != null ? `${t.completionRate} % des jeux lancés` : null}
           />
           <StatTile
             Icon={Star}
             label="Note moyenne"
-            value={t.avgRating != null ? `${t.avgRating}` : "—"}
+            value={t.avgRating != null ? t.avgRating : "—"}
             sub={t.rated ? `sur ${nf.format(t.rated)} jeux notés` : "aucun jeu noté"}
           />
-          <StatTile Icon={Heart} label="Coups de cœur" value={nf.format(t.favorites)} />
-          <StatTile Icon={MessageSquareText} label="Reviews" value={nf.format(t.reviews)} />
+          {/* <StatTile Icon={Heart} label="Coups de cœur" value={t.favorites} /> */}
+          <StatTile Icon={MessageSquareText} label="Reviews" value={t.reviews} />
         </div>
       </section>
 
       <div className="ps-grid">
-        {/* ---------- Backlog : répartition des statuts ---------- */}
+        {/* ---------- Backlog : donut des statuts ---------- */}
         <Card Icon={Layers} title="État du backlog" sub={`${nf.format(t.games)} jeux`}>
-          <div className="ps-stack" role="img" aria-label="Répartition des statuts">
-            {stats.statuses
-              .filter((s) => s.count > 0)
-              .map((s) => (
-                <span
-                  key={s.key}
-                  className={`ps-stack-seg c-${s.key}`}
-                  style={{ width: `${(s.count / statusTotal) * 100}%` }}
-                  title={`${STATUS_META.find((m) => m.key === s.key)?.label} : ${s.count}`}
-                />
-              ))}
-          </div>
-          <ul className="ps-legend">
-            {STATUS_META.map((m) => {
-              const s = stats.statuses.find((x) => x.key === m.key);
-              if (!s?.count) return null;
-              return (
-                <li key={m.key}>
-                  <span className={`ps-dot c-${m.key}`} />
-                  {m.label}
-                  <strong>{nf.format(s.count)}</strong>
-                  <span className="ps-legend-pct">
-                    {Math.round((s.count / statusTotal) * 100)} %
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
+          <StatusDonut statuses={stats.statuses} total={statusTotal} />
           {t.completionRate != null && (
             <div className="ps-meter-block">
               <div className="ps-meter-line">
@@ -270,17 +468,43 @@ export default function ProfileStats({ username, token }) {
         {/* ---------- Marathon : jeux avec le plus d'heures ---------- */}
         {stats.topByHours.length > 0 && (
           <Card Icon={Flame} title="Les marathons" sub="jeux les plus joués">
-            <BarList
-              onRowClick={goGame}
-              items={stats.topByHours.map((g) => ({
-                key: g.gameId,
-                label: g.name,
-                cover: g.cover,
-                value: g.hours,
-                right: fmtHours(g.hours),
-                title: g.name,
-              }))}
-            />
+            {stats.topByHours[0] && (
+              <Link
+                to={`/game/${stats.topByHours[0].gameId}`}
+                className="ps-marathon-hero"
+                title={stats.topByHours[0].name}
+              >
+                {stats.topByHours[0].cover ? (
+                  <img src={stats.topByHours[0].cover} alt="" loading="lazy" />
+                ) : (
+                  <span className="ps-barrow-cover ph" />
+                )}
+                <span className="ps-marathon-hero-body">
+                  <span className="ps-marathon-hero-badge">
+                    <Flame size={11} /> N°1
+                  </span>
+                  <span className="ps-marathon-hero-name">
+                    {stats.topByHours[0].name}
+                  </span>
+                </span>
+                <span className="ps-marathon-hero-hours">
+                  {fmtHours(stats.topByHours[0].hours)}
+                </span>
+              </Link>
+            )}
+            {stats.topByHours.length > 1 && (
+              <BarList
+                onRowClick={goGame}
+                items={stats.topByHours.slice(1).map((g) => ({
+                  key: g.gameId,
+                  label: g.name,
+                  cover: g.cover,
+                  value: g.hours,
+                  right: fmtHours(g.hours),
+                  title: g.name,
+                }))}
+              />
+            )}
           </Card>
         )}
 
@@ -299,28 +523,55 @@ export default function ProfileStats({ username, token }) {
           </Card>
         )}
 
-        {/* ---------- Studios préférés ---------- */}
-        {stats.developers.length > 0 && (
-          <Card Icon={Building2} title="Studios de cœur" sub="part des jeux joués">
-            <BarList
-              items={stats.developers.map((d) => ({
-                key: d.name,
-                label: d.name,
-                value: d.count,
-                right: `${d.pct} %`,
-                title: `${d.name} : ${d.count} jeux`,
-              }))}
-            />
+        {/* ---------- Studios / éditeurs (avec logos) ---------- */}
+        {(stats.developers.length > 0 || (stats.publishers || []).length > 0) && (
+          <Card
+            Icon={Building2}
+            title="Studios & éditeurs"
+            actions={
+              <span className="ps-seg">
+                <button
+                  className={`clickable ${companyTab === "developers" ? "active" : ""}`}
+                  onClick={() => setCompanyTab("developers")}
+                >
+                  Studios
+                </button>
+                <button
+                  className={`clickable ${companyTab === "publishers" ? "active" : ""}`}
+                  onClick={() => setCompanyTab("publishers")}
+                >
+                  Éditeurs
+                </button>
+              </span>
+            }
+          >
+            {companies.length ? (
+              <BarList
+                FallbackIcon={Building2}
+                items={companies.map((d) => ({
+                  key: d.name,
+                  label: d.name,
+                  logo: d.logo ?? null,
+                  value: d.count,
+                  right: `${d.pct} %`,
+                  title: `${d.name} : ${d.count} jeux`,
+                }))}
+              />
+            ) : (
+              <p className="ps-meter-note">Pas encore de données de ce côté-là.</p>
+            )}
           </Card>
         )}
 
-        {/* ---------- Consoles ---------- */}
+        {/* ---------- Consoles (avec logos) ---------- */}
         {stats.platforms.length > 0 && (
           <Card Icon={Joystick} title="Consoles & supports" sub="jeux joués par support">
             <BarList
+              FallbackIcon={Joystick}
               items={stats.platforms.map((p) => ({
                 key: p.name,
                 label: p.name,
+                logo: p.logo ?? null,
                 value: p.count,
                 right: p.hours
                   ? `${nf.format(p.count)} · ${fmtHours(p.hours)}`
@@ -371,6 +622,38 @@ export default function ProfileStats({ username, token }) {
                 </div>
               </>
             )}
+          </Card>
+        )}
+
+        {/* ---------- Les mal-aimés : pires notes ---------- */}
+        {flops.length > 0 && (
+          <Card
+            Icon={ThumbsDown}
+            title="Les mal-aimés"
+            sub="ils ne t'ont pas convaincu"
+          >
+            <ul className="ps-flops">
+              {flops.map((g) => (
+                <li key={g.gameId}>
+                  <Link to={`/game/${g.gameId}`} className="ps-flop clickable" title={g.name}>
+                    {g.cover ? (
+                      <img className="ps-flop-cover" src={g.cover} alt="" loading="lazy" />
+                    ) : (
+                      <span className="ps-flop-cover ph" />
+                    )}
+                    <span className="ps-flop-body">
+                      <span className="ps-flop-name">{g.name}</span>
+                      {g.dropped && (
+                        <span className="ps-flop-dropped">
+                          <Skull size={11} /> Abandonné
+                        </span>
+                      )}
+                    </span>
+                    <span className="ps-flop-note">{g.rating}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </Card>
         )}
 
@@ -428,11 +711,14 @@ export default function ProfileStats({ username, token }) {
                 <span className="ps-soulmate-name">{soulmate.username}</span>
                 <span className="ps-soulmate-common">
                   {nf.format(soulmate.common)} jeux en commun
+                  {soulmate.sharedFavs
+                    ? ` · ${nf.format(soulmate.sharedFavs)} coup${soulmate.sharedFavs > 1 ? "s" : ""} de cœur mutuel${soulmate.sharedFavs > 1 ? "s" : ""}`
+                    : ""}
                 </span>
               </span>
               <span className="ps-soulmate-match">
                 <span className="ps-soulmate-num">
-                  {soulmate.match}
+                  <CountUp value={soulmate.match} duration={1400} />
                   <span className="ps-soulmate-pct">%</span>
                 </span>
                 <span className="ps-soulmate-affin">d'affinité</span>
@@ -451,6 +737,13 @@ export default function ProfileStats({ username, token }) {
                 ))}
               </div>
             )}
+            <button
+              className="ps-common-all clickable"
+              onClick={() => setCommonOpen(true)}
+            >
+              <Gamepad2 size={14} /> Voir les {nf.format(soulmate.common)} jeux en
+              commun
+            </button>
             {others.length > 0 && (
               <ul className="ps-runnerups">
                 {others.map((s) => (
@@ -480,6 +773,15 @@ export default function ProfileStats({ username, token }) {
           {stats.metaCoverage} % de la bibliothèque (métadonnées en cours de
           récupération).
         </p>
+      )}
+
+      {commonOpen && soulmate && (
+        <CommonGamesModal
+          me={username}
+          soulmate={soulmate}
+          token={token}
+          onClose={() => setCommonOpen(false)}
+        />
       )}
     </div>
   );

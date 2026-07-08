@@ -128,6 +128,20 @@ export default function Explorer() {
 
   useEffect(() => setSearchInput(q), [q]);
 
+  // Panneau de filtres mobile (bottom sheet) : bloque le scroll de la page
+  // derrière et se ferme avec Échap.
+  useEffect(() => {
+    if (!filtersOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => e.key === "Escape" && setFiltersOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [filtersOpen]);
+
   // clé qui déclenche un rechargement complet
   const filtersKey = useMemo(
     () => JSON.stringify({ q, sort, dir, filters }),
@@ -285,7 +299,16 @@ export default function Explorer() {
     <div className="explorer">
 
       <div className="explorer-layout">
-        {/* PANNEAU DE FILTRES (gauche, sticky) */}
+        {/* Voile derrière le bottom sheet des filtres (mobile) */}
+        {filtersOpen && (
+          <div
+            className="filter-backdrop"
+            onClick={() => setFiltersOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* PANNEAU DE FILTRES (desktop : colonne sticky / mobile : bottom sheet) */}
         <aside className={`filter-panel ${filtersOpen ? "open" : ""}`}>
           <div className="filter-panel-head">
             <span className="filter-panel-title">
@@ -318,6 +341,13 @@ export default function Explorer() {
                   Effacer
                 </button>
               )}
+              <button
+                className="filter-close-mobile clickable"
+                onClick={() => setFiltersOpen(false)}
+                aria-label="Fermer les filtres"
+              >
+                <X size={17} />
+              </button>
             </div>
           </div>
 
@@ -385,6 +415,13 @@ export default function Explorer() {
             defaultOpen={false}
             search={filterSearch}
           />
+
+          <button
+            className="filter-apply-mobile clickable"
+            onClick={() => setFiltersOpen(false)}
+          >
+            Voir les résultats
+          </button>
         </aside>
 
         {/* CONTENU (droite) */}
@@ -461,15 +498,6 @@ export default function Explorer() {
               </button>
             </div>
 
-            <button
-              className="filter-toggle-mobile clickable"
-              onClick={() => setFiltersOpen((v) => !v)}
-            >
-              <SlidersHorizontal size={16} /> Filtres
-              {activeCount > 0 && (
-                <span className="filter-count">{activeCount}</span>
-              )}
-            </button>
           </div>
 
           {error ? (
@@ -524,6 +552,16 @@ export default function Explorer() {
           )}
         </div>
       </div>
+
+      {/* Bouton flottant d'ouverture des filtres (mobile uniquement) */}
+      <button
+        className="filter-fab clickable"
+        onClick={() => setFiltersOpen(true)}
+        aria-label="Ouvrir les filtres"
+      >
+        <SlidersHorizontal size={18} /> Filtres
+        {activeCount > 0 && <span className="filter-count">{activeCount}</span>}
+      </button>
     </div>
   );
 }

@@ -417,7 +417,10 @@ router.post("/:id/like", requireAuth, async (req, res) => {
     const has = list.likes.some((u) => String(u) === uid);
     if (has) list.likes = list.likes.filter((u) => String(u) !== uid);
     else list.likes.push(req.userId);
-    await list.save({ validateModifiedOnly: true });
+    // timestamps:false → un like ne doit pas « bumper » la liste (sinon elle
+    // remonte dans le fil comme « a mis à jour sa liste »). L'activité sociale
+    // est portée par les notifications (cf. feed.js).
+    await list.save({ validateModifiedOnly: true, timestamps: false });
     if (!has) {
       notify({
         user: list.user,
@@ -532,8 +535,11 @@ router.post("/:id/comments", requireAuth, async (req, res) => {
       media,
       mentions,
       parent,
+      // createdAt explicite : on sauvegarde avec timestamps:false (pour ne pas
+      // « bumper » la liste), il faut donc horodater le commentaire nous-mêmes.
+      createdAt: new Date(),
     });
-    await list.save({ validateModifiedOnly: true });
+    await list.save({ validateModifiedOnly: true, timestamps: false });
     await list.populate("comments.user", "username avatar");
     const c = list.comments[list.comments.length - 1];
 
@@ -593,7 +599,7 @@ router.put("/:id/comments/:commentId", requireAuth, async (req, res) => {
     c.editCount = (c.editCount || 0) + 1;
     c.editedAt = new Date();
 
-    await list.save({ validateModifiedOnly: true });
+    await list.save({ validateModifiedOnly: true, timestamps: false });
     await list.populate("comments.user", "username avatar");
     const updated = list.comments.id(req.params.commentId);
     res.json({ comment: toComment(updated, list.comments, req.userId) });
@@ -614,7 +620,7 @@ router.post("/:id/comments/:commentId/like", requireAuth, async (req, res) => {
     const has = c.likes.some((u) => String(u) === uid);
     if (has) c.likes = c.likes.filter((u) => String(u) !== uid);
     else c.likes.push(req.userId);
-    await list.save({ validateModifiedOnly: true });
+    await list.save({ validateModifiedOnly: true, timestamps: false });
     if (!has) {
       notify({
         user: c.user,
@@ -645,7 +651,7 @@ router.delete("/:id/comments/:commentId", requireAuth, async (req, res) => {
     if (!isCommentAuthor && !isListOwner)
       return res.status(403).json({ error: "Action non autorisée." });
     c.deleteOne();
-    await list.save({ validateModifiedOnly: true });
+    await list.save({ validateModifiedOnly: true, timestamps: false });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: "Erreur." });
