@@ -1665,6 +1665,11 @@
   --topbar-h: 60px;
   flex: 1;
   padding: var(--content-pad);
+  /* Filet de sécurité : un enfant récalcitrant (carte trop large, texte non
+     coupable…) ne doit jamais faire défiler la page entière horizontalement.
+     N'affecte pas le scroll horizontal interne (carrousels) ni le sticky
+     vertical des enfants, seul l'axe X est concerné. */
+  overflow-x: hidden;
 }
 
 .welcome {

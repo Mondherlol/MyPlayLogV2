@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Hourglass,
@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { typeMeta, timeAgo } from "../lib/lists";
+import { extractVideoId } from "../lib/youtube";
+import { usePlayer } from "../context/PlayerContext";
 
 const nf = new Intl.NumberFormat("fr-FR");
 
@@ -87,39 +89,24 @@ export default function ProfileOverviewAside({ username, token, library, lists, 
     };
   }, [username, token]);
 
-  // --- Lecture de l'extrait de la dernière OST (iTunes) ---
-  const audioRef = useRef(null);
-  const [playing, setPlaying] = useState(false);
+  // --- Lecture de la dernière OST : déléguée au mini-lecteur global. ---
+  const player = usePlayer();
   const ost = lastOst?.favoriteOst;
-  const canPlayOst = !!(ost && (ost.preview || (ost.youtube && ost.url)));
-
-  useEffect(() => {
-    const a = audioRef.current;
-    return () => a?.pause();
-  }, []);
+  const ytVideoId = ost?.url ? extractVideoId(ost.url) : ost?.videoId || null;
+  const canPlayOst = !!(ost && ytVideoId);
+  const playing = ost ? player.isPlaying(ost) : false;
 
   function toggleOst() {
-    if (!ost) return;
-    if (ost.preview) {
-      const a = audioRef.current;
-      if (!a) return;
-      if (playing) {
-        a.pause();
-        setPlaying(false);
-      } else {
-        a.src = ost.preview;
-        a.play().catch(() => {});
-        setPlaying(true);
-      }
-    } else if (ost.youtube && ost.url) {
-      window.open(ost.url, "_blank", "noopener");
-    }
+    if (!ost || !canPlayOst) return;
+    player.toggleTrack(
+      { ...ost, gameId: lastOst.gameId, gameName: lastOst.name },
+      [{ ...ost, gameId: lastOst.gameId, gameName: lastOst.name }],
+      {}
+    );
   }
 
   return (
     <aside className="pf-overview-aside">
-      <audio ref={audioRef} onEnded={() => setPlaying(false)} hidden />
-
       {/* ---------- Temps de jeu + console fétiche ---------- */}
       <AsideCard Icon={Hourglass} title="Temps de jeu">
         <div className="pfa-stat">

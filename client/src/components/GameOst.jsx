@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Play,
@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { makeCache } from "../lib/cache";
-import { loadYT } from "../lib/youtube";
+import { usePlayer } from "../context/PlayerContext";
 import AddOstModal from "./AddOstModal";
 import MassRenameOstModal from "./MassRenameOstModal";
 
@@ -41,16 +41,14 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
   const [tracks, setTracks] = useState(cached.tracks);
   const [trash, setTrash] = useState(cached.trash); // pistes retirées (corbeille)
   const [loading, setLoading] = useState(!ostCache.get(String(gameId)));
-  const [playingId, setPlayingId] = useState(null);
   const [adding, setAdding] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [query, setQuery] = useState("");
   const [showTrash, setShowTrash] = useState(false);
   const [menu, setMenu] = useState(null); // { x, y, track }
 
-  const audioRef = useRef(null);
-  const ytRef = useRef(null); // player YouTube caché
-  const ytDivRef = useRef(null);
+  // Lecture déléguée au mini-lecteur global.
+  const player = usePlayer();
 
   // Garde le cache à jour à chaque changement de liste (ajout/masquage/restauration).
   function commit(nextTracks, nextTrash) {
@@ -86,72 +84,9 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
     };
   }, [gameId, gameName, token]);
 
-  // Player YouTube caché (lecture audio inline)
-  useEffect(() => {
-    let destroyed = false;
-    loadYT().then((YT) => {
-      if (destroyed || !ytDivRef.current) return;
-      ytRef.current = new YT.Player(ytDivRef.current, {
-        height: "0",
-        width: "0",
-        playerVars: { autoplay: 0, playsinline: 1 },
-        events: {
-          onStateChange: (e) => {
-            if (e.data === YT.PlayerState.ENDED) setPlayingId(null);
-          },
-        },
-      });
-    });
-    return () => {
-      destroyed = true;
-      try {
-        ytRef.current?.destroy();
-      } catch {
-        /* ignore */
-      }
-    };
-  }, []);
-
-  // Coupe tout au démontage (changement d'onglet / de page)
-  useEffect(() => {
-    const audio = audioRef.current;
-    return () => {
-      if (audio) audio.pause();
-      try {
-        ytRef.current?.stopVideo?.();
-      } catch {
-        /* ignore */
-      }
-    };
-  }, []);
-
+  // Lance/bascule une piste dans le mini-lecteur global (file = pistes visibles).
   function toggle(t) {
-    if (t.youtube) {
-      audioRef.current?.pause();
-      if (playingId === t.id) {
-        ytRef.current?.pauseVideo?.();
-        setPlayingId(null);
-        return;
-      }
-      ytRef.current?.loadVideoById?.(t.videoId); // autoplay
-      setPlayingId(t.id);
-      return;
-    }
-    try {
-      ytRef.current?.pauseVideo?.();
-    } catch {
-      /* ignore */
-    }
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (playingId === t.id) {
-      audio.pause();
-      setPlayingId(null);
-      return;
-    }
-    audio.src = t.preview;
-    audio.play().catch(() => {});
-    setPlayingId(t.id);
+    player.toggleTrack(t, filtered, { gameId, gameName });
   }
 
   async function hide(ids) {
@@ -163,15 +98,8 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
       tracks.filter((t) => !idset.has(t.id)),
       [...removed, ...trash]
     );
-    if (idset.has(playingId)) {
-      audioRef.current?.pause();
-      try {
-        ytRef.current?.stopVideo?.();
-      } catch {
-        /* ignore */
-      }
-      setPlayingId(null);
-    }
+    // Si on retire la piste en cours de lecture, on ferme le mini-lecteur.
+    if (removed.some((t) => player.isCurrent(t))) player.close();
     try {
       await apiFetch(`/games/${gameId}/ost/hide`, {
         method: "POST",
@@ -220,9 +148,6 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
 
   return (
     <div className="gp-ost">
-      <div ref={ytDivRef} style={{ display: "none" }} />
-      <audio ref={audioRef} onEnded={() => setPlayingId(null)} hidden />
-
       <div className="gp-ost-head">
         <div className="gp-ost-title">
           <Disc3 size={18} />
@@ -335,7 +260,7 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
           <div className="gp-ost-grid">
             {filtered.map((t) => {
               const fav = isFav(t);
-              const playing = playingId === t.id;
+              const playing = player.isPlaying(t);
               return (
                 <div className="gp-ost-item" key={t.id}>
                   <div

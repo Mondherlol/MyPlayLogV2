@@ -917,14 +917,11 @@ button.pf-stat:hover {
   min-width: 0;
 }
 
-/* ---------- Barre + panneau de personnalisation ---------- */
-.pf-edit-bar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 0.4rem;
-}
-
+/* ---------- Bouton « Personnaliser » + panneau ---------- */
+/* Vit désormais dans le titre de la 1re section (plus de barre dédiée qui
+   mangeait une ligne pleine hauteur). */
 .pf-edit-btn {
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -936,6 +933,8 @@ button.pf-stat:hover {
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 0.82rem;
+  /* Le bloc parent passe en cursor:grab en édition ; le bouton reste cliquable normalement. */
+  cursor: pointer;
   transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 

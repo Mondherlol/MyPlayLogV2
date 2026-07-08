@@ -3670,9 +3670,19 @@
 .profile-section-title {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
   font-size: 1.15rem;
   margin-bottom: 0.8rem;
+}
+
+/* Portion texte (icône + libellé + compteur) : garde le style d'origine
+   maintenant que le titre peut aussi contenir le bouton « Personnaliser ». */
+.pf-section-title-txt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 .profile-section-title svg {

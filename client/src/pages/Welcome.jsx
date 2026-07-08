@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import {
   Clapperboard,
@@ -11,6 +12,7 @@ import {
   ChevronRight,
   ChevronLeft,
   Gamepad2,
+  X,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useClickOutside } from "../hooks/useClickOutside";
@@ -24,6 +26,25 @@ import GameCard from "../components/GameCard";
 const PREFS_KEY = "mpl_doc_prefs";
 const DEFAULT_PREFS = { lang: ["fr"], scope: "played" };
 const QUIZ_KEY = "mpl_home_quiz_open";
+// Même seuil que la bottom bar de l'app-shell (voir app-01-landing-shell.css).
+const MOBILE_BP = 760;
+
+// Sur mobile le rail latéral passe sous le feed (potentiellement long) : on
+// ouvre le quiz dans une modale plutôt que de compter sur le scroll pour le
+// révéler, sinon le bouton "Quiz" paraît ne rien faire.
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.innerWidth <= MOBILE_BP
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${MOBILE_BP}px)`);
+    const onChange = () => setIsMobile(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return isMobile;
+}
 
 function loadPrefs() {
   try {
@@ -52,7 +73,9 @@ export default function Welcome() {
   const [showQuiz, setShowQuiz] = useState(
     () => localStorage.getItem(QUIZ_KEY) === "1"
   );
+  const [quizModalOpen, setQuizModalOpen] = useState(false);
   const [discover, setDiscover] = useState(null);
+  const isMobile = useIsMobile();
   const settingsRef = useRef(null);
   useClickOutside(settingsRef, () => setShowSettings(false), showSettings);
 
@@ -77,6 +100,12 @@ export default function Welcome() {
   }
 
   function toggleQuiz() {
+    // Mobile : le rail latéral est sous le feed (potentiellement long), donc
+    // on ouvre directement une modale au lieu de compter sur le scroll.
+    if (isMobile) {
+      setQuizModalOpen(true);
+      return;
+    }
     setShowQuiz((v) => {
       localStorage.setItem(QUIZ_KEY, v ? "0" : "1");
       return !v;
@@ -151,9 +180,17 @@ export default function Welcome() {
             </div>
 
             <button
-              className={`hf-quiz-btn clickable ${showQuiz ? "on" : ""}`}
+              className={`hf-quiz-btn clickable ${
+                (isMobile ? quizModalOpen : showQuiz) ? "on" : ""
+              }`}
               onClick={toggleQuiz}
-              title={showQuiz ? "Masquer le quiz" : "Afficher le quiz"}
+              title={
+                isMobile
+                  ? "Ouvrir le quiz"
+                  : showQuiz
+                    ? "Masquer le quiz"
+                    : "Afficher le quiz"
+              }
             >
               <Brain size={18} /> Quiz
             </button>
@@ -200,7 +237,9 @@ export default function Welcome() {
 
       {/* --- Rail latéral : quiz (sur demande), sorties, suggestions --- */}
       <div className="home-aside hf-aside">
-        {showQuiz && <QuizCard />}
+        {/* Sur mobile, le quiz ne vit que dans la modale (voir toggleQuiz) —
+            évite d'avoir deux instances qui se disputent le même localStorage. */}
+        {showQuiz && !isMobile && <QuizCard />}
 
         <UpcomingWidget games={discover?.upcoming} loading={discover === null} />
         <ForYouWidget games={discover?.forYou} loading={discover === null} />
@@ -209,7 +248,37 @@ export default function Welcome() {
       {showDoc && (
         <DocumentaryModal prefs={prefs} token={token} onClose={() => setShowDoc(false)} />
       )}
+      {quizModalOpen && <QuizModal onClose={() => setQuizModalOpen(false)} />}
     </div>
+  );
+}
+
+// Modale mobile du quiz (voir toggleQuiz) : même carte que le rail latéral,
+// juste encapsulée dans un overlay pour un accès immédiat.
+function QuizModal({ onClose }) {
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="quiz-modal">
+        <button className="modal-close clickable" onClick={onClose} aria-label="Fermer">
+          <X size={18} />
+        </button>
+        <QuizCard />
+      </div>
+    </div>,
+    document.body
   );
 }
 

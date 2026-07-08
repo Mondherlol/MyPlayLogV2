@@ -25,7 +25,8 @@ import {
   MessageCircle,
   ExternalLink,
 } from "lucide-react";
-import { loadYT, extractVideoId } from "../lib/youtube";
+import { extractVideoId } from "../lib/youtube";
+import { usePlayer } from "../context/PlayerContext";
 import OstCommentsModal from "./OstCommentsModal";
 
 // Onglet OST du profil : toutes les OST favorites de l'utilisateur (une par jeu)
@@ -110,84 +111,18 @@ export default function ProfileOST({
       ? byRecent(items)
       : order.map((id) => byId.get(id)).filter(Boolean);
 
-  // --- Lecture audio (extraits iTunes) + YouTube caché, comme l'onglet OST du jeu ---
-  const [playingId, setPlayingId] = useState(null);
-  const audioRef = useRef(null);
-  const ytRef = useRef(null);
-  const ytDivRef = useRef(null);
-
-  useEffect(() => {
-    let destroyed = false;
-    loadYT().then((YT) => {
-      if (destroyed || !ytDivRef.current) return;
-      ytRef.current = new YT.Player(ytDivRef.current, {
-        height: "0",
-        width: "0",
-        playerVars: { autoplay: 0, playsinline: 1 },
-        events: {
-          onStateChange: (e) => {
-            if (e.data === YT.PlayerState.ENDED) setPlayingId(null);
-          },
-        },
-      });
-    });
-    return () => {
-      destroyed = true;
-      try {
-        ytRef.current?.destroy();
-      } catch {
-        /* ignore */
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    return () => {
-      if (audio) audio.pause();
-      try {
-        ytRef.current?.stopVideo?.();
-      } catch {
-        /* ignore */
-      }
-    };
-  }, []);
+  // --- Lecture déléguée au mini-lecteur global ---
+  const player = usePlayer();
 
   function playable(t) {
-    return !!t.preview || (t.youtube && extractVideoId(t.url));
+    return !!(t.videoId || extractVideoId(t.url || ""));
   }
 
+  // Lance/bascule la piste dans le lecteur global. La file = toutes les OST
+  // affichées, chacune enrichie de son jeu (pour le lien du mini-lecteur).
   function toggle(item) {
-    const t = item.ost;
-    const id = item.gameId;
-    const vid = t.youtube ? extractVideoId(t.url) : null;
-    if (vid) {
-      audioRef.current?.pause();
-      if (playingId === id) {
-        ytRef.current?.pauseVideo?.();
-        setPlayingId(null);
-        return;
-      }
-      ytRef.current?.loadVideoById?.(vid);
-      setPlayingId(id);
-      return;
-    }
-    if (!t.preview) return;
-    try {
-      ytRef.current?.pauseVideo?.();
-    } catch {
-      /* ignore */
-    }
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (playingId === id) {
-      audio.pause();
-      setPlayingId(null);
-      return;
-    }
-    audio.src = t.preview;
-    audio.play().catch(() => {});
-    setPlayingId(id);
+    const withGame = (i) => ({ ...i.ost, gameId: i.gameId, gameName: i.gameName });
+    player.toggleTrack(withGame(item), ordered.map(withGame), {});
   }
 
   const sensors = useSensors(
@@ -221,9 +156,6 @@ export default function ProfileOST({
 
   return (
     <section className="profile-section pfo">
-      <div ref={ytDivRef} style={{ display: "none" }} />
-      <audio ref={audioRef} onEnded={() => setPlayingId(null)} hidden />
-
       <div className="pfo-head">
         <div className="pfo-title">
           <Music size={18} />
@@ -259,7 +191,7 @@ export default function ProfileOST({
                 rank={i + 1}
                 showRank={sort === "preference"}
                 draggable={draggable}
-                playing={playingId === item.gameId}
+                playing={player.isPlaying(item.ost)}
                 canPlay={playable(item.ost)}
                 commentCount={countOverride[item.gameId] ?? item.commentCount}
                 onToggle={() => toggle(item)}

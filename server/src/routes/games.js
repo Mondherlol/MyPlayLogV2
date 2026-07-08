@@ -23,9 +23,7 @@ import { fetchHltbTimes } from "../lib/hltb.js";
 import { buildGameFeed, fetchSteamReviews } from "../lib/feed.js";
 import { findVnId, fetchVnCharacters } from "../lib/vndb.js";
 import { GENRES_FR, MODES_FR, THEMES_FR, LANGUAGES_FR, frName } from "../lib/translations.js";
-
-const YT_UA =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+import { ensureScraped, ytPlaylistTracks } from "../lib/ostScrape.js";
 
 function youtubeId(url) {
   const m = String(url).match(
@@ -50,38 +48,6 @@ async function ytOembed(videoId) {
   } catch {
     return null;
   }
-}
-
-// Extrait les pistes d'une playlist YouTube (scraping de la page)
-async function ytPlaylistTracks(playlistId) {
-  const html = await fetch(
-    `https://www.youtube.com/playlist?list=${playlistId}`,
-    { headers: { "User-Agent": YT_UA, "Accept-Language": "en" } }
-  ).then((r) => r.text());
-  const raw = html.split("ytInitialData = ")[1]?.split(";</script>")[0];
-  if (!raw) return [];
-  let data;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    return [];
-  }
-  const out = [];
-  const seen = new Set();
-  (function walk(o) {
-    if (!o || typeof o !== "object") return;
-    if (o.lockupViewModel) {
-      const lm = o.lockupViewModel;
-      const id = lm.contentId;
-      const title = lm.metadata?.lockupMetadataViewModel?.title?.content;
-      if (id && title && !seen.has(id)) {
-        seen.add(id);
-        out.push({ videoId: id, title });
-      }
-    }
-    for (const k in o) walk(o[k]);
-  })(data);
-  return out;
 }
 
 const router = express.Router();
@@ -567,34 +533,6 @@ router.get("/characters-search", requireAuth, async (req, res) => {
   }
 });
 
-// Extraits 30s via l'API iTunes Search (gratuite, sans clé)
-async function fetchItunesOst(q) {
-  const term = encodeURIComponent(`${q} soundtrack`);
-  const r = await fetch(
-    `https://itunes.apple.com/search?term=${term}&media=music&entity=song&limit=40`
-  );
-  if (!r.ok) return [];
-  const data = await r.json();
-  const seen = new Set();
-  return (data.results || [])
-    .filter((t) => t.previewUrl)
-    .map((t) => ({
-      id: `it-${t.trackId}`,
-      name: t.trackName,
-      artist: t.artistName,
-      preview: t.previewUrl,
-      artwork: t.artworkUrl100
-        ? t.artworkUrl100.replace("100x100", "200x200")
-        : null,
-    }))
-    .filter((t) => {
-      const key = `${t.name}|${t.artist}`.toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-}
-
 function ostFromCustom(c) {
   return {
     id: `yt-${c._id}`,
@@ -607,20 +545,24 @@ function ostFromCustom(c) {
   };
 }
 
-// --- OST d'un jeu : iTunes + pistes YouTube (communauté), moins les masquées ---
+// --- OST d'un jeu : pistes YouTube (scrapées auto + communauté), moins les masquées ---
 router.get("/:id/ost", requireAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
     const q = String(req.query.q || "").trim();
-    const [itunes, customs, hiddenDoc, renameDoc] = await Promise.all([
-      q ? fetchItunesOst(q).catch(() => []) : Promise.resolve([]),
-      CustomOst.find({ gameId: id }).sort({ createdAt: -1 }),
+    // Pistes déjà en base (auto par ordre de playlist, puis ajouts manuels).
+    let customs = await CustomOst.find({ gameId: id }).sort({ order: 1, createdAt: 1 });
+    // Première ouverture (aucune piste) : scraping auto d'une playlist YouTube.
+    if (!customs.length) {
+      customs = await ensureScraped(id, q);
+    }
+    const [hiddenDoc, renameDoc] = await Promise.all([
       HiddenOst.findOne({ user: req.userId, gameId: id }),
       OstRename.findOne({ user: req.userId, gameId: id }),
     ]);
     const hidden = new Set(hiddenDoc?.hidden || []);
     const renames = renameDoc?.renames;
-    const all = [...customs.map(ostFromCustom), ...itunes].map((t) => {
+    const all = customs.map(ostFromCustom).map((t) => {
       const renamed = renames?.get(t.id);
       return renamed ? { ...t, name: renamed } : t;
     });
@@ -662,6 +604,8 @@ router.post("/:id/ost", requireAuth, async (req, res) => {
       url,
       videoId,
       artwork: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
+      source: "user",
+      order: Date.now(), // après les pistes auto (ordres 0..199)
       addedBy: req.userId,
     });
     res.status(201).json({ track: ostFromCustom(co) });
@@ -683,14 +627,17 @@ router.post("/:id/ost/playlist", requireAuth, async (req, res) => {
 
     const gameId = Number(req.params.id);
     const limited = items.slice(0, 200);
+    const base = Date.now();
     const docs = await CustomOst.insertMany(
-      limited.map((it) => ({
+      limited.map((it, i) => ({
         gameId,
         name: it.title,
         artist: null,
         url: `https://www.youtube.com/watch?v=${it.videoId}`,
         videoId: it.videoId,
         artwork: `https://img.youtube.com/vi/${it.videoId}/mqdefault.jpg`,
+        source: "user",
+        order: base + i, // après les pistes auto, dans l'ordre de la playlist
         addedBy: req.userId,
       }))
     );

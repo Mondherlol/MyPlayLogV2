@@ -3,6 +3,8 @@ import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import PatchnotePopup from "./PatchnotePopup";
+import MiniPlayer from "./MiniPlayer";
+import { PlayerProvider } from "../context/PlayerContext";
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(
@@ -18,15 +20,18 @@ export default function AppLayout() {
   }
 
   return (
-    <div className={`app-shell ${collapsed ? "is-collapsed" : ""}`}>
-      <Sidebar collapsed={collapsed} onToggle={toggle} />
-      <div className="app-main">
-        <Topbar />
-        <main className="app-content">
-          <Outlet />
-        </main>
+    <PlayerProvider>
+      <div className={`app-shell ${collapsed ? "is-collapsed" : ""}`}>
+        <Sidebar collapsed={collapsed} onToggle={toggle} />
+        <div className="app-main">
+          <Topbar />
+          <main className="app-content">
+            <Outlet />
+          </main>
+        </div>
+        <PatchnotePopup />
+        <MiniPlayer />
       </div>
-      <PatchnotePopup />
-    </div>
+    </PlayerProvider>
   );
 }

@@ -250,7 +250,7 @@ export default function ProfileOverview({
     });
   }
 
-  function renderBlockInner(key) {
+  function renderBlockInner(key, isFirst) {
     const meta = BLOCK_META[key];
     const isFav = key === "favorites";
     const list = isFav ? favorites : library.filter((e) => e.status === key);
@@ -259,8 +259,26 @@ export default function ProfileOverview({
     return (
       <>
         <h2 className="profile-section-title">
-          <meta.Icon size={18} /> {meta.label}
-          {list.length > 0 && <span className="section-count">{list.length}</span>}
+          <span className="pf-section-title-txt">
+            <meta.Icon size={18} /> {meta.label}
+            {list.length > 0 && <span className="section-count">{list.length}</span>}
+          </span>
+          {isFirst && isMe && (
+            <button
+              className={`pf-edit-btn clickable ${editing ? "on" : ""}`}
+              onClick={() => setEditing((v) => !v)}
+            >
+              {editing ? (
+                <>
+                  <Check size={15} /> Terminé
+                </>
+              ) : (
+                <>
+                  <SlidersHorizontal size={15} /> Personnaliser
+                </>
+              )}
+            </button>
+          )}
         </h2>
         <div className="cover-row">
           {preview.map((e) => (
@@ -295,25 +313,6 @@ export default function ProfileOverview({
   return (
     <div className={`pf-overview ${showAside ? "has-aside" : ""}`}>
       <div className="pf-overview-main">
-        {isMe && (
-          <div className="pf-edit-bar">
-            <button
-              className={`pf-edit-btn clickable ${editing ? "on" : ""}`}
-              onClick={() => setEditing((v) => !v)}
-            >
-              {editing ? (
-                <>
-                  <Check size={15} /> Terminé
-                </>
-              ) : (
-                <>
-                  <SlidersHorizontal size={15} /> Personnaliser
-                </>
-              )}
-            </button>
-          </div>
-        )}
-
         {editing && (
           <div className="pf-edit-panel">
             <p className="pf-edit-hint">
@@ -337,17 +336,17 @@ export default function ProfileOverview({
         {editing ? (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
             <SortableContext items={visibleOrder} strategy={verticalListSortingStrategy}>
-              {visibleOrder.map((key) => (
+              {visibleOrder.map((key, i) => (
                 <SortableBlock key={key} id={key} editing>
-                  {renderBlockInner(key)}
+                  {renderBlockInner(key, i === 0)}
                 </SortableBlock>
               ))}
             </SortableContext>
           </DndContext>
         ) : (
-          visibleOrder.map((key) => (
+          visibleOrder.map((key, i) => (
             <section className="profile-section pf-block" key={key}>
-              {renderBlockInner(key)}
+              {renderBlockInner(key, i === 0)}
             </section>
           ))
         )}

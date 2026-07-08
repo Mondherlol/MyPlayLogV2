@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Play, Pause, Star, Music, Loader2, Search, Plus, X, Trash2 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { loadYT } from "../lib/youtube";
+import { usePlayer } from "../context/PlayerContext";
 import ScrollRow from "./ScrollRow";
 import AddOstModal from "./AddOstModal";
 
@@ -20,6 +21,7 @@ export default function OstPicker({ gameId, gameName, token, favorite, onSelect 
   const audioRef = useRef(null);
   const ytRef = useRef(null); // player YouTube
   const ytDivRef = useRef(null);
+  const globalPlayer = usePlayer(); // barre audio globale (à mettre en pause)
 
   useEffect(() => {
     let alive = true;
@@ -79,6 +81,7 @@ export default function OstPicker({ gameId, gameName, token, favorite, onSelect 
         setPlayingId(null);
         return;
       }
+      globalPlayer?.pause?.(); // coupe la barre audio globale, on relance à la main
       ytRef.current?.loadVideoById?.(t.videoId); // autoplay
       setPlayingId(t.id);
       return;
@@ -95,6 +98,7 @@ export default function OstPicker({ gameId, gameName, token, favorite, onSelect 
       setPlayingId(null);
       return;
     }
+    globalPlayer?.pause?.(); // coupe la barre audio globale
     audio.src = t.preview;
     audio.play().catch(() => {});
     setPlayingId(t.id);

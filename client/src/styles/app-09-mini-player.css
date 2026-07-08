@@ -1,0 +1,298 @@
+/* ======================================================================
+   MINI-LECTEUR FLOTTANT — barre de lecture globale (OST YouTube)
+   Sombre (comme la sidebar), accent doré, disque vinyle qui tourne.
+   ====================================================================== */
+
+.mini-player {
+  position: fixed;
+  bottom: calc(var(--bottom-bar-h, 0px) + 0px);
+  left: var(--app-sidebar-w, 0px);
+  right: 0;
+  z-index: 110;
+
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(140px, 1.4fr) auto;
+  align-items: center;
+  gap: clamp(0.6rem, 2vw, 1.4rem);
+
+  padding: 0.6rem clamp(0.8rem, 3vw, 1.6rem);
+  margin: 0 0.7rem 0.7rem;
+  border-radius: 16px;
+
+  /* Verre sombre + liseré doré discret */
+  background: linear-gradient(180deg, #262a33 0%, #1e2129 100%);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow:
+    0 -2px 0 rgba(242, 183, 11, 0.12) inset,
+    0 18px 44px rgba(0, 0, 0, 0.5);
+  color: #f3f4f7;
+  backdrop-filter: saturate(140%) blur(10px);
+  animation: mp-rise 0.28s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+@keyframes mp-rise {
+  from {
+    transform: translateY(18px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ---------- Disque vinyle ---------- */
+.mp-disc {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 50%, #14161c 0%, #05060a 78%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 4px 12px rgba(0, 0, 0, 0.5);
+  color: #6b7180;
+  flex: none;
+}
+
+.mp-disc img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.mp-disc.spin img {
+  animation: mp-spin 1000s linear infinite;
+}
+
+@keyframes mp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.mp-disc-hole {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #1e2129;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- Métadonnées ---------- */
+.mp-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.mp-name {
+  font-weight: 700;
+  font-size: 0.92rem;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mp-sub {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  font-size: 0.76rem;
+  color: #a6acba;
+}
+
+.mp-artist {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mp-game {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  color: #ffd24a;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.mp-game:hover {
+  text-decoration: underline;
+}
+
+.mp-game span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Contrôles ---------- */
+.mp-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.mp-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #e6e8ee;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.mp-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.mp-btn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.mp-btn:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
+.mp-play {
+  width: 42px;
+  height: 42px;
+  background: linear-gradient(135deg, #ffd24a, #f2b70b);
+  color: #1a1204;
+  box-shadow: 0 4px 14px rgba(242, 183, 11, 0.35);
+}
+
+.mp-play:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ffdd6b, #ffc21f);
+}
+
+/* ---------- Barre de progression ---------- */
+.mp-seek {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.mp-time {
+  font-size: 0.72rem;
+  color: #8c92a0;
+  font-variant-numeric: tabular-nums;
+  flex: none;
+  min-width: 34px;
+  text-align: center;
+}
+
+.mp-bar {
+  position: relative;
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+}
+
+.mp-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f2b70b, #ffd24a);
+}
+
+.mp-bar-knob {
+  position: absolute;
+  right: -5px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  transform: translateY(-50%) scale(0);
+  transition: transform 0.12s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.mp-bar:hover .mp-bar-knob {
+  transform: translateY(-50%) scale(1);
+}
+
+/* ---------- Fermer ---------- */
+.mp-close {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #8c92a0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.mp-close:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: #f3f4f7;
+}
+
+/* Le contenu ne doit pas rester caché derrière la barre. */
+body.mpl-open .app-content {
+  padding-bottom: calc(var(--content-pad, 1.6rem) + 80px);
+}
+
+/* ---------- Mobile : version compacte au-dessus de la bottom bar ---------- */
+@media (max-width: 760px) {
+  .mini-player {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "disc meta controls"
+      "seek seek seek";
+    gap: 0.5rem 0.7rem;
+    margin: 0 0.45rem calc(0.45rem + env(safe-area-inset-bottom));
+    padding: 0.55rem 0.7rem;
+  }
+
+  .mp-disc {
+    grid-area: disc;
+  }
+
+  .mp-meta {
+    grid-area: meta;
+  }
+
+  .mp-controls {
+    grid-area: controls;
+  }
+
+  .mp-seek {
+    grid-area: seek;
+  }
+
+  .mp-close {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.35rem;
+    width: 26px;
+    height: 26px;
+  }
+
+  body.mpl-open .app-content {
+    padding-bottom: calc(var(--bottom-bar-h) + env(safe-area-inset-bottom) + 128px);
+  }
+}

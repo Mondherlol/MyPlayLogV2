@@ -449,6 +449,9 @@
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  /* Un mot ou lien collé trop long (sans espace) ne doit pas pousser la carte
+     plus large que son conteneur, surtout sur petit écran. */
+  overflow-wrap: anywhere;
 }
 
 .hf-review.spoiler > *:not(.hf-spoiler-veil) {
@@ -722,7 +725,10 @@
 .hf-repost-foot {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
+  /* Un long crédit d'auteur (« par … ») ne doit pas forcer la ligne à
+     déborder : elle passe à la ligne plutôt que de pousser la carte. */
+  flex-wrap: wrap;
+  gap: 0.4rem 0.55rem;
   margin-top: 0.7rem;
   min-width: 0;
 }
@@ -895,6 +901,7 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
 .hf-video-meta {
@@ -1771,6 +1778,45 @@
     position: static;
     max-width: 460px;
   }
+}
+
+/* --- Mobile (même seuil que la bottom bar de l'app-shell) --- */
+@media (max-width: 760px) {
+  /* Les flèches du carrousel débordent volontairement de 14px de chaque
+     côté (esthétique desktop) — sur mobile ça dépasse le viewport et fait
+     apparaître un scroll horizontal parasite. Inutiles au toucher (le swipe
+     natif marche déjà), donc on les masque plutôt que de les recadrer. */
+  .hf-car-arrow {
+    display: none;
+  }
+
+  .home-aside {
+    max-width: none;
+  }
+
+  /* Le popover de réglages docs peut dépasser à droite si le bouton est
+     proche du bord sur mobile : on le borne à la largeur du viewport. */
+  .doc-settings {
+    max-width: calc(100vw - 2.4rem);
+  }
+}
+
+/* ---------- Modale Quiz (mobile) ---------- */
+/* Sur téléphone, l'aside (donc le quiz) passe sous le feed : on ouvre plutôt
+   une modale pour un accès immédiat sans avoir à scroller. */
+.quiz-modal {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  margin: auto;
+}
+
+.quiz-modal .modal-close {
+  top: -14px;
+  right: -14px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow);
 }
 
 /* ======================================================================
