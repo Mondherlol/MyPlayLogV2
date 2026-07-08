@@ -4,7 +4,7 @@ import UserGame from "../models/UserGame.js";
 import List from "../models/List.js";
 import Repost from "../models/Repost.js";
 import Documentary from "../models/Documentary.js";
-import Notification from "../models/Notification.js";
+import Activity from "../models/Activity.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { requireAuth } from "../middleware/auth.js";
 
@@ -16,26 +16,6 @@ const router = express.Router();
 
 const person = (u) =>
   u ? { id: String(u._id), username: u.username, avatar: u.avatar || null } : null;
-
-// Interactions sociales remontées dans le fil (commentaires, réponses, likes
-// sur les listes et les avis). Seule trace horodatée des likes : les
-// notifications. On repère celles émises PAR les joueurs suivis.
-const INTERACTION_TYPES = [
-  "list_comment",
-  "comment_reply",
-  "list_like",
-  "comment_like",
-  "review_comment",
-  "review_comment_reply",
-  "review_comment_like",
-];
-const isReplyType = (t) =>
-  t === "comment_reply" || t === "review_comment_reply";
-const isCommentAddType = (t) =>
-  t === "list_comment" ||
-  t === "comment_reply" ||
-  t === "review_comment" ||
-  t === "review_comment_reply";
 
 // ============================================================
 //  GET /api/feed/home?limit&before — timeline de l'accueil
@@ -66,7 +46,7 @@ router.get("/home", requireAuth, async (req, res) => {
       ? { $ne: req.userId }
       : { $in: followed };
 
-    const [entries, lists, reposts, docs, notifs] = await Promise.all([
+    const [entries, lists, reposts, docs, acts] = await Promise.all([
       UserGame.find({ ...scope, ...lt("updatedAt") })
         .sort({ updatedAt: -1 })
         .limit(limit)
@@ -91,17 +71,11 @@ router.get("/home", requireAuth, async (req, res) => {
         .limit(limit)
         .populate("user", "username avatar")
         .lean(),
-      Notification.find({
-        actor: actorScope,
-        type: { $in: INTERACTION_TYPES },
-        ...lt("createdAt"),
-      })
+      Activity.find({ actor: actorScope, ...lt("createdAt") })
         .sort({ createdAt: -1 })
-        // On surdimensionne : une action génère plusieurs notifs (réponse =
-        // parent + propriétaire) qu'on dédoublonne ensuite.
-        .limit(limit * 3)
+        .limit(limit)
         .populate("actor", "username avatar")
-        .populate("user", "username")
+        .populate("target", "username")
         .populate("list", "title type visibility items")
         .lean(),
     ]);
@@ -218,6 +192,50 @@ router.get("/home", requireAuth, async (req, res) => {
           duration: d.duration || null,
         },
         game: d.gameId ? { id: d.gameId, name: d.gameName } : null,
+      });
+    }
+
+    // --- Interactions sociales (commentaires, réponses, likes, réactions) ---
+    // Une action = une entrée d'Activity (pas de dédup à faire).
+    for (const a of acts) {
+      if (!a.actor) continue;
+      const onList = !!a.list;
+      // Liste supprimée ou passée en privé → lien cassé pour l'abonné : on masque.
+      if (onList && a.list.visibility === "private") continue;
+      // Activité « liste » dont la liste n'existe plus (populate → null).
+      const listMissing =
+        (a.type.startsWith("list_") || a.type === "comment_reply" ||
+          a.type === "comment_like") && !onList;
+      if (listMissing) continue;
+
+      let list = null;
+      if (onList) {
+        const items = a.list.items || [];
+        const chars = items.filter((i) => i.kind === "character").length;
+        list = {
+          id: String(a.list._id),
+          title: a.list.title,
+          type: a.list.type,
+          itemKind:
+            items.length > 0 && chars === items.length ? "character" : "game",
+          itemCount: items.length,
+          preview: items
+            .filter((i) => i.image)
+            .slice(0, 5)
+            .map((i) => i.image),
+        };
+      }
+
+      events.push({
+        type: "interaction",
+        id: `a-${a._id}`,
+        date: a.createdAt,
+        user: person(a.actor),
+        action: a.type,
+        target: a.target ? { username: a.target.username } : null,
+        snippet: a.snippet || "",
+        list,
+        game: a.game ? { id: a.game, name: a.gameName || "" } : null,
       });
     }
 

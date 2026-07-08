@@ -7,6 +7,7 @@ import multer from "multer";
 import List from "../models/List.js";
 import { requireAuth } from "../middleware/auth.js";
 import { notify } from "../lib/notify.js";
+import { recordActivity, removeActivity } from "../lib/activity.js";
 import { sanitizeMediaList, resolveMentions, toComment } from "../lib/commentThread.js";
 
 const router = express.Router();
@@ -429,6 +430,15 @@ router.post("/:id/like", requireAuth, async (req, res) => {
         list: list._id,
         snippet: list.title,
       });
+      recordActivity({
+        actor: req.userId,
+        type: "list_like",
+        target: list.user,
+        list: list._id,
+        snippet: list.title,
+      });
+    } else {
+      removeActivity({ actor: req.userId, type: "list_like", list: list._id });
     }
     res.json({ liked: !has, likeCount: list.likes.length });
   } catch (err) {
@@ -567,6 +577,17 @@ router.post("/:id/comments", requireAuth, async (req, res) => {
       });
     }
 
+    // Fil d'accueil : un commentaire racine ou une réponse (cible = auteur du
+    // commentaire parent pour une réponse, sinon propriétaire de la liste).
+    recordActivity({
+      actor: req.userId,
+      type: parent ? "comment_reply" : "list_comment",
+      target: replyTargetUser || list.user,
+      list: list._id,
+      comment: c._id,
+      snippet,
+    });
+
     res.status(201).json({ comment: toComment(c, list.comments, req.userId) });
   } catch (err) {
     console.error("list comment error:", err.message);
@@ -630,6 +651,20 @@ router.post("/:id/comments/:commentId/like", requireAuth, async (req, res) => {
         comment: c._id,
         snippet: c.text,
       });
+      recordActivity({
+        actor: req.userId,
+        type: "comment_like",
+        target: c.user,
+        list: list._id,
+        comment: c._id,
+        snippet: c.text,
+      });
+    } else {
+      removeActivity({
+        actor: req.userId,
+        type: "comment_like",
+        comment: c._id,
+      });
     }
     res.json({ liked: !has, likeCount: c.likes.length });
   } catch (err) {
@@ -652,6 +687,9 @@ router.delete("/:id/comments/:commentId", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "Action non autorisée." });
     c.deleteOne();
     await list.save({ validateModifiedOnly: true, timestamps: false });
+    // On retire du fil les activités liées à ce commentaire (le commentaire
+    // lui-même + les likes qu'il a reçus).
+    removeActivity({ comment: c._id });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: "Erreur." });

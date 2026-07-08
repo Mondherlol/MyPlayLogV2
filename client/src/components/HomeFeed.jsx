@@ -26,6 +26,7 @@ import {
   CircleX,
   ThumbsUp,
   ThumbsDown,
+  CornerDownRight,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { timeAgo } from "../lib/lists";
@@ -49,6 +50,20 @@ const LIST_TYPE_META = {
   classic: { label: "Liste", Icon: Rows3 },
   ranked: { label: "Top classé", Icon: ListOrdered },
   tier: { label: "Tier list", Icon: Layers },
+};
+
+// Interactions sociales : verbe + icône + contexte (liste ou avis) + faut-il
+// afficher l'extrait (le texte commenté / liké). `target` = à qui appartient
+// le contenu visé (propriétaire de la liste, auteur du commentaire répondu…).
+const ACTION_META = {
+  list_comment: { Icon: MessageCircle, verb: "a commenté la liste de", ctx: "list", quote: true },
+  comment_reply: { Icon: CornerDownRight, verb: "a répondu à", ctx: "list", quote: true },
+  list_like: { Icon: Heart, verb: "a aimé la liste de", ctx: "list", quote: false },
+  comment_like: { Icon: Heart, verb: "a aimé un commentaire de", ctx: "list", quote: true },
+  review_comment: { Icon: MessageCircle, verb: "a commenté l'avis de", ctx: "review", quote: true },
+  review_comment_reply: { Icon: CornerDownRight, verb: "a répondu à", ctx: "review", quote: true },
+  review_comment_like: { Icon: Heart, verb: "a aimé une réponse de", ctx: "review", quote: true },
+  review_react: { Icon: Heart, verb: "a réagi à l'avis de", ctx: "review", quote: false },
 };
 
 export default function HomeFeed({ token, me }) {
@@ -225,6 +240,7 @@ function FeedCard(props) {
   const { item } = props;
   if (item.type === "game") return <GameEvent {...props} />;
   if (item.type === "list") return <ListEvent {...props} />;
+  if (item.type === "interaction") return <InteractionEvent {...props} />;
   if (item.type === "repost") return <RepostEvent {...props} />;
   if (item.type === "video") return <VideoEvent {...props} />;
   return null;
@@ -436,6 +452,94 @@ function ListEvent({ item }) {
           </span>
         </div>
       </div>
+    </article>
+  );
+}
+
+// --- Petite carte « liste » réutilisée dans les interactions ---
+function ListMini({ list }) {
+  const navigate = useNavigate();
+  const meta = LIST_TYPE_META[list.type] || LIST_TYPE_META.classic;
+  const kind = list.itemKind === "character" ? "personnage" : "jeu";
+  return (
+    <div
+      className="hf-list-body clickable"
+      onClick={() => navigate(`/lists/${list.id}`)}
+    >
+      <div className="hf-list-mosaic">
+        {list.preview.length ? (
+          list.preview.slice(0, 5).map((src, i) => (
+            <img
+              key={i}
+              src={src}
+              alt=""
+              loading="lazy"
+              draggable="false"
+              style={{ zIndex: 5 - i }}
+            />
+          ))
+        ) : (
+          <span className="hf-list-mosaic-ph">
+            <meta.Icon size={20} />
+          </span>
+        )}
+      </div>
+      <div className="hf-list-info">
+        <span className="hf-list-type">
+          <meta.Icon size={12} /> {meta.label}
+        </span>
+        <h4 className="hf-list-title">{list.title}</h4>
+        <span className="hf-list-meta">
+          {list.itemCount} {kind}
+          {list.itemCount > 1 ? "s" : ""}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// --- Évènement interaction : commentaire / réponse / like sur liste ou avis ---
+function InteractionEvent({ item }) {
+  const meta = ACTION_META[item.action];
+  if (!meta) return null;
+  const target = item.target?.username;
+  const reviewUrl = item.game ? `/game/${item.game.id}?tab=reviews` : null;
+
+  return (
+    <article className="hf-card hf-interaction">
+      <EventHead
+        user={item.user}
+        date={item.date}
+        badge={
+          <span className={`hf-int-badge act-${item.action}`}>
+            <meta.Icon size={13} />
+          </span>
+        }
+      >
+        {meta.verb}
+        {target && (
+          <>
+            {" "}
+            <Link to={`/u/${target}`} className="hf-int-target clickable">
+              {target}
+            </Link>
+          </>
+        )}
+      </EventHead>
+
+      {meta.quote && item.snippet && (
+        <p className="hf-int-quote">{item.snippet}</p>
+      )}
+
+      {item.list && <ListMini list={item.list} />}
+
+      {meta.ctx === "review" && item.game && reviewUrl && (
+        <Link to={reviewUrl} className="hf-int-gamechip clickable">
+          <Star size={13} fill="currentColor" strokeWidth={0} />
+          <span>Avis sur {item.game.name}</span>
+          <ExternalLink size={13} />
+        </Link>
+      )}
     </article>
   );
 }

@@ -8,6 +8,7 @@ import { getValidAccessToken, fetchUserTitles, fetchTitleTrophies } from "../lib
 import { isAdminEmail } from "../lib/admin.js";
 import { requireAuth } from "../middleware/auth.js";
 import { notify } from "../lib/notify.js";
+import { recordActivity, removeActivity } from "../lib/activity.js";
 import { summarizeReactions, reviewComment } from "../lib/reviewSerialize.js";
 import User from "../models/User.js";
 import UserGame from "../models/UserGame.js";
@@ -1426,7 +1427,8 @@ router.post("/:id/reviews/:userId/react", requireAuth, async (req, res) => {
       (r) => String(r.user) === String(req.userId)
     );
     // Toggle : re-cliquer sur la même réaction la retire ; sinon on remplace.
-    if (!prev || prev.type !== type) reactions.push({ user: req.userId, type });
+    const removed = prev && prev.type === type;
+    if (!removed) reactions.push({ user: req.userId, type });
 
     // timestamps:false → réagir ne « rajeunit » pas la review dans les tris.
     await UserGame.updateOne(
@@ -1434,6 +1436,25 @@ router.post("/:id/reviews/:userId/react", requireAuth, async (req, res) => {
       { $set: { reactions } },
       { timestamps: false }
     );
+
+    // Fil d'accueil : une seule activité « réaction » par (acteur, avis) — on
+    // remplace la précédente (changement de type) ou on la retire (toggle-off).
+    await removeActivity({
+      actor: req.userId,
+      type: "review_react",
+      game: id,
+      target: entry.user,
+    });
+    if (!removed) {
+      recordActivity({
+        actor: req.userId,
+        type: "review_react",
+        target: entry.user,
+        game: id,
+        gameName: entry.name,
+        snippet: type,
+      });
+    }
 
     const { counts, mine } = summarizeReactions(reactions, req.userId);
     res.json({ reactions: counts, myReaction: mine });
@@ -1503,6 +1524,18 @@ router.post("/:id/reviews/:userId/comments", requireAuth, async (req, res) => {
       });
     }
 
+    // Fil d'accueil : commentaire racine ou réponse sous un avis (cible =
+    // auteur du commentaire parent pour une réponse, sinon auteur de l'avis).
+    recordActivity({
+      actor: req.userId,
+      type: parent ? "review_comment_reply" : "review_comment",
+      target: replyTargetUser || entry.user,
+      game: id,
+      gameName: entry.name,
+      comment: created._id,
+      snippet,
+    });
+
     res.status(201).json({ comment: reviewComment(created, entry.comments, req.userId) });
   } catch (err) {
     console.error("review comment error:", err.message);
@@ -1539,6 +1572,21 @@ router.post("/:id/reviews/:userId/comments/:commentId/like", requireAuth, async 
         comment: c._id,
         snippet: c.text,
       });
+      recordActivity({
+        actor: req.userId,
+        type: "review_comment_like",
+        target: c.user,
+        game: id,
+        gameName: entry.name,
+        comment: c._id,
+        snippet: c.text,
+      });
+    } else {
+      removeActivity({
+        actor: req.userId,
+        type: "review_comment_like",
+        comment: c._id,
+      });
     }
     res.json({ liked: !has, likeCount: c.likes.length });
   } catch (err) {
@@ -1564,11 +1612,20 @@ router.delete("/:id/reviews/:userId/comments/:commentId", requireAuth, async (re
       return res.status(403).json({ error: "Action non autorisée." });
 
     // On retire le commentaire ET ses réponses éventuelles.
+    const removedIds = (entry.comments || [])
+      .filter(
+        (x) =>
+          String(x._id) === String(commentId) ||
+          String(x.parent) === String(commentId)
+      )
+      .map((x) => x._id);
     entry.comments = (entry.comments || []).filter(
       (x) =>
         String(x._id) !== String(commentId) && String(x.parent) !== String(commentId)
     );
     await entry.save({ timestamps: false });
+    // Nettoie le fil d'accueil (commentaires supprimés + likes reçus).
+    if (removedIds.length) removeActivity({ comment: { $in: removedIds } });
     res.json({ ok: true });
   } catch (err) {
     console.error("review comment delete error:", err.message);

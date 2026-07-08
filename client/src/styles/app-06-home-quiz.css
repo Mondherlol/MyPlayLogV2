@@ -630,6 +630,72 @@
   vertical-align: -1px;
 }
 
+/* Évènement interaction : commentaire / réponse / like sur liste ou avis */
+.hf-int-badge {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--orange) 15%, transparent);
+  color: var(--accent-ink);
+}
+
+.hf-int-badge.act-list_like,
+.hf-int-badge.act-comment_like,
+.hf-int-badge.act-review_comment_like,
+.hf-int-badge.act-review_react {
+  background: rgba(230, 74, 74, 0.12);
+  color: #d65454;
+}
+
+.hf-int-target {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.hf-int-target:hover {
+  color: var(--accent-ink);
+}
+
+/* Extrait du message commenté / liké */
+.hf-int-quote {
+  margin: 0.1rem 0 0.2rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--border);
+  border-radius: 0 10px 10px 0;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Renvoi vers l'avis (contexte review) */
+.hf-int-gamechip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.1rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--accent-ink);
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: background 0.15s ease;
+}
+
+.hf-int-gamechip:hover {
+  background: color-mix(in srgb, var(--orange) 10%, var(--surface-2));
+}
+
+.hf-int-gamechip svg:last-child {
+  color: var(--text-soft);
+}
+
 /* Évènement repost : image + pied + actions */
 .hf-media {
   display: block;
