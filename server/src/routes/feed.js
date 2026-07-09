@@ -5,7 +5,10 @@ import List from "../models/List.js";
 import Repost from "../models/Repost.js";
 import Documentary from "../models/Documentary.js";
 import Activity from "../models/Activity.js";
+import GemDiscovery from "../models/GemDiscovery.js";
+import GemSkip from "../models/GemSkip.js";
 import { igdbQuery } from "../lib/igdb.js";
+import { geminiJson, isGeminiConfigured } from "../lib/gemini.js";
 import { requireAuth } from "../middleware/auth.js";
 
 // Flux de la page d'accueil : activité des joueurs suivis (jeux, reviews,
@@ -46,7 +49,7 @@ router.get("/home", requireAuth, async (req, res) => {
       ? { $ne: req.userId }
       : { $in: followed };
 
-    const [entries, lists, reposts, docs, acts] = await Promise.all([
+    const [entries, lists, reposts, docs, acts, gems] = await Promise.all([
       UserGame.find({ ...scope, ...lt("updatedAt") })
         .sort({ updatedAt: -1 })
         .limit(limit)
@@ -77,6 +80,11 @@ router.get("/home", requireAuth, async (req, res) => {
         .populate("actor", "username avatar")
         .populate("target", "username")
         .populate("list", "title type visibility items")
+        .lean(),
+      GemDiscovery.find({ ...scope, ...lt("updatedAt") })
+        .sort({ updatedAt: -1 })
+        .limit(limit)
+        .populate("user", "username avatar")
         .lean(),
     ]);
 
@@ -239,6 +247,25 @@ router.get("/home", requireAuth, async (req, res) => {
       });
     }
 
+    // --- Découvertes de pépites indés (une carte par jour et par joueur) ---
+    for (const g of gems) {
+      if (!g.user || !(g.seeds || []).length) continue;
+      events.push({
+        type: "gems",
+        id: `gd-${g._id}`,
+        gemsId: String(g._id), // pour GET /feed/gems/:id (modale « ses pépites »)
+        date: g.updatedAt,
+        user: person(g.user),
+        seeds: g.seeds.map((s) => ({
+          id: s.gameId,
+          name: s.name,
+          cover: s.cover || null,
+        })),
+        gameCount: (g.games || []).length,
+        count: g.count || 1,
+      });
+    }
+
     events.sort((a, b) => new Date(b.date) - new Date(a.date));
     const page = events.slice(0, limit);
     const nextCursor =
@@ -370,6 +397,451 @@ router.get("/discover", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("discover error:", err.message);
     res.status(500).json({ error: "Erreur lors du chargement des découvertes." });
+  }
+});
+
+// ============================================================
+//  POST /api/feed/recommend — « Trouve-moi des pépites »
+//  À partir de 3 jeux choisis (+ plateformes), on sort une petite liste
+//  sur mesure. Deux moteurs :
+//   1. Gemini (principal) : le LLM propose des titres « au feeling »
+//      (ambiance, narration, style visuel — pas juste les genres IGDB),
+//      chaque titre étant ensuite résolu et validé sur IGDB (jaquette, note,
+//      exclusions) — un nom halluciné est simplement jeté.
+//   2. IGDB pur (repli / complément) : similar_games + genres/thèmes scorés.
+//      D'abord en mode strict (pépites indés récentes), puis assoupli si
+//      trop peu de résultats — le filtre « indé récent » vidait par
+//      construction les requêtes sur plateformes rétro (ex. DS).
+// ============================================================
+
+const RECO_FIELDS = `${DISCOVER_FIELDS},themes`;
+const SIX_YEARS = 6 * 365 * 86400;
+// Genre IGDB « Indie » : exigé dans les pools stricts — on veut des pépites
+// indés, pas des AAA qui traînent dans les similar_games.
+const INDIE_GENRE = 32;
+
+// Score d'un candidat : plus il recoupe les 3 jeux de départ (et plus il est
+// confidentiel/bien noté), plus il remonte.
+function scoreCandidate(g, ctx) {
+  let s = 0;
+  if (ctx.similar.has(g.id)) s += 6; // IGDB le juge déjà proche : gros signal
+  for (const ge of g.genres || []) s += 2 * (ctx.genres.get(ge.id) || 0);
+  for (const th of g.themes || []) s += 1.5 * (ctx.themes.get(th) || 0);
+  // Bonus « pépite » : moins il a de votes, plus il est méconnu (borné à 0).
+  s += Math.max(0, 2 - (g.total_rating_count || 0) / 400);
+  // Léger bonus qualité (les candidats sont déjà filtrés côté note).
+  if (g.total_rating) s += (g.total_rating - 70) / 30;
+  return s;
+}
+
+// --- Moteur IGDB pur (repli) ---------------------------------------------
+// strict : pépites indés récentes (comportement historique).
+// assoupli : plus de filtre indé ni de fenêtre de récence, plafonds élargis —
+// indispensable pour les plateformes rétro où « indé récent » = ensemble vide.
+async function igdbGemPools(ctx, { strict }) {
+  const { similar, genres, themes, platClause, excludeClause } = ctx;
+  const now = Math.floor(Date.now() / 1000);
+  const topGenres = [...genres.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([id]) => id);
+
+  // `genres = [32]` (crochets) : le tableau doit CONTENIR Indie ; les
+  // parenthèses (`= (a,b)`) signifient « au moins un de ».
+  const indieClause = strict ? ` & genres = [${INDIE_GENRE}]` : "";
+  const recencyClause = strict ? ` & first_release_date >= ${now - SIX_YEARS}` : "";
+
+  // Pool A : jeux similaires selon IGDB (signal fort).
+  const capA = strict ? " & total_rating_count <= 2500" : "";
+  const qA = similar.size
+    ? `${RECO_FIELDS}; where id = (${[...similar].slice(0, 300).join(
+        ","
+      )}) & cover != null & version_parent = null & total_rating >= 65${capA}${indieClause}${platClause}${excludeClause}; limit 80;`
+    : null;
+  // Pool B : découverte de jeux confidentiels bien notés dans les mêmes genres.
+  const qB = topGenres.length
+    ? `${RECO_FIELDS}; where cover != null & version_parent = null & game_type = (0,8,9)${indieClause} & genres = (${topGenres.join(
+        ","
+      )}) & total_rating >= ${strict ? 72 : 70} & total_rating_count >= ${
+        strict ? 8 : 4
+      } & total_rating_count <= ${strict ? 700 : 2500}${recencyClause}${platClause}${excludeClause}; sort total_rating_count desc; limit 80;`
+    : null;
+
+  const [poolA, poolB] = await Promise.all([
+    qA ? igdbQuery("games", qA).catch(() => []) : Promise.resolve([]),
+    qB ? igdbQuery("games", qB).catch(() => []) : Promise.resolve([]),
+  ]);
+
+  // Fusion + dédoublonnage, puis score.
+  const byId = new Map();
+  for (const g of [...poolA, ...poolB]) if (!byId.has(g.id)) byId.set(g.id, g);
+  return [...byId.values()]
+    .map((g) => ({ g, score: scoreCandidate(g, { genres, themes, similar }) }))
+    .sort((a, b) => b.score - a.score)
+    .map((x) => discoverGame(x.g));
+}
+
+// --- Moteur Gemini ---------------------------------------------------------
+
+// Titres déjà proposés par le LLM, par utilisateur + jeux de départ : à la
+// fournée suivante on lui demande explicitement d'autres jeux, sinon il
+// redonnerait à peu près la même liste. Mémoire process, TTL 24 h.
+const llmSeenCache = new Map();
+const LLM_SEEN_TTL = 24 * 60 * 60 * 1000;
+
+function llmSeen(key) {
+  const now = Date.now();
+  for (const [k, v] of llmSeenCache)
+    if (now - v.at > LLM_SEEN_TTL) llmSeenCache.delete(k);
+  let entry = llmSeenCache.get(key);
+  if (!entry) {
+    entry = { at: now, names: [] };
+    llmSeenCache.set(key, entry);
+  }
+  entry.at = now;
+  return entry;
+}
+
+// Demande au LLM ~20 jeux « du même esprit » que les seeds.
+// Renvoie [{ name, year, reason }] — noms à valider ensuite sur IGDB.
+async function llmSuggest(seeds, platNames, avoidNames) {
+  const seedLines = seeds.map((s) => {
+    const year = s.first_release_date
+      ? new Date(s.first_release_date * 1000).getFullYear()
+      : "?";
+    const genres = (s.genres || []).map((g) => g.name).join(", ");
+    const sum = (s.summary || "").replace(/\s+/g, " ").slice(0, 280);
+    return `- ${s.name} (${year})${genres ? ` — ${genres}` : ""}${sum ? ` — ${sum}` : ""}`;
+  });
+
+  const prompt = [
+    "Tu es un expert en jeux vidéo à la culture encyclopédique, y compris les jeux confidentiels, rétro et les perles oubliées.",
+    "Un joueur adore ces jeux :",
+    ...seedLines,
+    "",
+    "Recommande-lui 20 jeux du même ESPRIT : ambiance, narration, rythme, style visuel, sensations — pas simplement le même genre. Pense « les joueurs qui ont adoré ces jeux ont aussi adoré… ».",
+    "Mélange pépites méconnues et classiques moins évidents ; évite les blockbusters que tout le monde connaît déjà.",
+    platNames.length
+      ? `IMPORTANT : uniquement des jeux réellement disponibles sur ${platNames.join(", ")} (version d'origine ou portage).`
+      : "Toutes plateformes confondues.",
+    avoidNames.length
+      ? `Ne propose AUCUN de ces jeux (déjà vus/possédés) : ${avoidNames.join(" ; ")}.`
+      : "",
+    'Réponds UNIQUEMENT avec un tableau JSON de cette forme : [{"name": "titre international exact du jeu, tel qu\'écrit dans les bases comme IGDB", "year": 2008, "reason": "une phrase courte en français, qui donne envie, expliquant le lien avec ses jeux"}]',
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const out = await geminiJson(prompt);
+  const arr = Array.isArray(out) ? out : out?.games;
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .map((x) => ({
+      name: String(x?.name || "").trim(),
+      year: Number(x?.year) || null,
+      reason: String(x?.reason || "").trim().slice(0, 220),
+    }))
+    .filter((x) => x.name)
+    .slice(0, 24);
+}
+
+const igdbEscape = (s) => s.replace(/\\/g, " ").replace(/"/g, '\\"');
+// Normalisation pour comparer un titre LLM à un titre IGDB (casse, accents,
+// ponctuation) : "Ghost Trick: Phantom Detective" ≈ "ghost trick phantom detective".
+// NFKD décompose les lettres accentuées ; le filtre [^a-z0-9] jette ensuite
+// les diacritiques comme la ponctuation.
+const normName = (s) =>
+  s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+// Tous les noms d'un candidat IGDB (titre principal + noms alternatifs,
+// ex. « Trace Memory » = nom US d'Another Code), normalisés.
+const candNames = (c) => [
+  normName(c.name),
+  ...(c.alternative_names || []).map((a) => normName(a.name || "")),
+];
+
+// Meilleur candidat IGDB pour un titre proposé par le LLM : nom identique
+// (titre ou nom alternatif) + année cohérente d'abord, puis nom identique,
+// puis inclusion large. Renvoie null si rien de crédible.
+function pickCandidate(sugg, pool) {
+  const target = normName(sugg.name);
+  if (!target) return null;
+  const exact = pool.filter((c) => candNames(c).includes(target));
+  const loose = pool.filter(
+    (c) =>
+      !exact.includes(c) &&
+      candNames(c).some((n) => n.includes(target) || (n && target.includes(n)))
+  );
+  const yearOk = (c) => {
+    const y = c.first_release_date
+      ? new Date(c.first_release_date * 1000).getFullYear()
+      : null;
+    return !sugg.year || !y || Math.abs(y - sugg.year) <= 1;
+  };
+  return exact.find(yearOk) || exact[0] || loose.find(yearOk) || loose[0] || null;
+}
+
+// Résout les titres proposés par le LLM sur IGDB. Le endpoint /multiquery ne
+// supporte pas `search`, et 20 requêtes search séparées exploseraient le
+// rate-limit IGDB (4 req/s) : on fait donc UNE requête « le nom contient un
+// des titres » (insensible à la casse), puis un rattrapage `search` individuel
+// (fuzzy), séquentiel et plafonné, pour les seuls titres non trouvés.
+// Un titre halluciné par le LLM ne matche rien et est silencieusement jeté.
+async function resolveOnIgdb(suggestions, { platClause, excludeSet }) {
+  const withNames = suggestions.filter((s) => s.name.length >= 2);
+  if (!withNames.length) return [];
+
+  const or = withNames.map((s) => `name ~ *"${igdbEscape(s.name)}"*`).join(" | ");
+  let pool = [];
+  try {
+    pool = await igdbQuery(
+      "games",
+      `${RECO_FIELDS}; where (${or}) & cover != null & version_parent = null & game_type = (0,4,8,9)${platClause}; limit 250;`
+    );
+  } catch {
+    /* on tentera le rattrapage individuel */
+  }
+
+  const resolved = [];
+  const seen = new Set();
+  const unmatched = [];
+
+  const keep = (sugg, pick) => {
+    if (!pick || excludeSet.has(pick.id) || seen.has(pick.id)) return;
+    seen.add(pick.id);
+    resolved.push({ ...discoverGame(pick), reason: sugg.reason || null });
+  };
+
+  for (const sugg of withNames) {
+    const pick = pickCandidate(sugg, pool);
+    if (pick) keep(sugg, pick);
+    else unmatched.push(sugg);
+  }
+
+  for (const sugg of unmatched.slice(0, 8)) {
+    let found = [];
+    try {
+      found = await igdbQuery(
+        "games",
+        `search "${igdbEscape(sugg.name)}"; ${RECO_FIELDS}; where cover != null & version_parent = null & game_type = (0,4,8,9)${platClause}; limit 4;`
+      );
+    } catch {
+      continue;
+    }
+    keep(sugg, pickCandidate(sugg, found));
+    // Petite pause : reste sous les 4 requêtes/seconde d'IGDB.
+    await new Promise((r) => setTimeout(r, 150));
+  }
+
+  return resolved;
+}
+
+router.post("/recommend", requireAuth, async (req, res) => {
+  try {
+    const seedIds = [
+      ...new Set((req.body.gameIds || []).map(Number).filter(Number.isInteger)),
+    ].slice(0, 3);
+    if (!seedIds.length) {
+      return res.status(400).json({ error: "Choisis au moins un jeu." });
+    }
+    const platIds = [
+      ...new Set((req.body.platforms || []).map(Number).filter(Number.isInteger)),
+    ].slice(0, 20);
+
+    // 1. Contexte des jeux de départ (genres nommés + résumé pour le LLM,
+    //    similar_games/thèmes pour le repli IGDB) + noms des plateformes.
+    const [seeds, plats] = await Promise.all([
+      igdbQuery(
+        "games",
+        `fields name,cover.image_id,summary,first_release_date,genres.name,themes,similar_games; where id = (${seedIds.join(",")});`
+      ),
+      platIds.length
+        ? igdbQuery(
+            "platforms",
+            `fields name,abbreviation; where id = (${platIds.join(",")});`
+          ).catch(() => [])
+        : Promise.resolve([]),
+    ]);
+    if (!seeds.length) {
+      return res.status(404).json({ error: "Jeux introuvables sur IGDB." });
+    }
+
+    const genres = new Map();
+    const themes = new Map();
+    const similar = new Set();
+    for (const s of seeds) {
+      for (const g of s.genres || []) genres.set(g.id, (genres.get(g.id) || 0) + 1);
+      for (const id of s.themes || []) themes.set(id, (themes.get(id) || 0) + 1);
+      for (const id of s.similar_games || []) similar.add(id);
+    }
+
+    // On écarte les jeux de départ, la bibliothèque (découverte) et les jeux
+    // déjà passés d'un swipe gauche (« je ne veux plus jamais le revoir »).
+    const [owned, skips] = await Promise.all([
+      UserGame.find({ user: req.userId }).select("gameId name").lean(),
+      GemSkip.find({ user: req.userId }).select("gameId").lean(),
+    ]);
+    const excludeSet = new Set([
+      ...seedIds,
+      ...skips.map((s) => s.gameId),
+      ...owned.map((o) => o.gameId),
+    ]);
+    const exclude = [...excludeSet].slice(0, 450);
+
+    const platClause = platIds.length ? ` & platforms = (${platIds.join(",")})` : "";
+    const excludeClause = ` & id != (${exclude.join(",")})`;
+
+    // 2. Moteur principal : Gemini. Toute erreur (pas de clé, quota, réseau,
+    //    JSON invalide) fait retomber en silence sur le moteur IGDB.
+    let results = [];
+    if (isGeminiConfigured()) {
+      try {
+        const seen = llmSeen(
+          `${req.userId}:${[...seedIds].sort().join("-")}:${[...platIds].sort().join("-")}`
+        );
+        const ownedNames = owned.map((o) => o.name).filter(Boolean).slice(-60);
+        const avoid = [...new Set([...seen.names, ...ownedNames])].slice(0, 120);
+        const suggestions = await llmSuggest(
+          seeds,
+          plats.map((p) => p.name),
+          avoid
+        );
+        seen.names.push(...suggestions.map((s) => s.name));
+        if (seen.names.length > 200)
+          seen.names.splice(0, seen.names.length - 200);
+        results = await resolveOnIgdb(suggestions, { platClause, excludeSet });
+        console.log(
+          `gems: ${results.length}/${suggestions.length} propositions Gemini résolues sur IGDB`
+        );
+      } catch (err) {
+        console.error("gemini recommend error:", err.message);
+      }
+    }
+    const llmCount = results.length;
+
+    // 3. Repli / complément IGDB : si le LLM est indisponible ou n'a pas
+    //    donné assez de jeux valides, on complète (strict puis assoupli).
+    if (results.length < 5) {
+      const ctx = { similar, genres, themes, platClause, excludeClause };
+      let pool = await igdbGemPools(ctx, { strict: true }).catch(() => []);
+      if (pool.length < 5) {
+        const relaxed = await igdbGemPools(ctx, { strict: false }).catch(() => []);
+        pool = [...pool, ...relaxed];
+      }
+      const have = new Set(results.map((g) => g.id));
+      for (const g of pool) {
+        if (have.has(g.id) || excludeSet.has(g.id)) continue;
+        have.add(g.id);
+        results.push(g);
+      }
+    }
+
+    results = results.slice(0, 15);
+
+    // Journal pour le fil des abonnés : une carte par jour, mise à jour à
+    // chaque nouvelle fournée (best-effort, ne bloque pas la réponse). On garde
+    // aussi les pépites obtenues : les abonnés peuvent les parcourir.
+    const day = new Date().toISOString().slice(0, 10);
+    GemDiscovery.findOneAndUpdate(
+      { user: req.userId, day },
+      {
+        $set: {
+          seeds: seeds.map((s) => ({
+            gameId: s.id,
+            name: s.name,
+            cover: s.cover?.image_id ? `${IMG}/t_cover_big/${s.cover.image_id}.jpg` : null,
+          })),
+          games: results.map((g) => ({
+            gameId: g.id,
+            name: g.name,
+            cover: g.cover,
+            rating: g.rating,
+            year: g.year,
+            genres: (g.genres || []).slice(0, 2),
+          })),
+        },
+        $inc: { count: 1 },
+      },
+      { upsert: true }
+    ).catch(() => {});
+
+    res.json({
+      games: results,
+      seeds: seeds.map((s) => ({ id: s.id, name: s.name })),
+      // « gemini » dès que le LLM a fourni au moins une pépite (le reste peut
+      // être complété par le moteur IGDB), « igdb » pour le repli pur.
+      engine: llmCount > 0 ? "gemini" : "igdb",
+    });
+  } catch (err) {
+    console.error("recommend error:", err.message);
+    res
+      .status(err.status || 500)
+      .json({ error: err.message || "Erreur lors de la génération des recommandations." });
+  }
+});
+
+// POST /api/feed/gems/skip — swipe gauche : ne plus JAMAIS proposer ce jeu.
+router.post("/gems/skip", requireAuth, async (req, res) => {
+  const gameId = Number(req.body.gameId);
+  if (!Number.isInteger(gameId)) {
+    return res.status(400).json({ error: "gameId invalide." });
+  }
+  try {
+    await GemSkip.updateOne(
+      { user: req.userId, gameId },
+      { $setOnInsert: { user: req.userId, gameId } },
+      { upsert: true }
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("gems skip error:", err.message);
+    res.status(500).json({ error: "Impossible d'écarter ce jeu." });
+  }
+});
+
+// GET /api/feed/gems/:id — détail d'une découverte du fil : les pépites
+// obtenues + le statut actuel de CE joueur sur chacune (wishlist, en cours…).
+router.get("/gems/:id", requireAuth, async (req, res) => {
+  try {
+    const disco = await GemDiscovery.findById(req.params.id)
+      .populate("user", "username avatar")
+      .lean();
+    if (!disco) return res.status(404).json({ error: "Découverte introuvable." });
+
+    const ids = (disco.games || []).map((g) => g.gameId);
+    const entries = ids.length
+      ? await UserGame.find({ user: disco.user._id, gameId: { $in: ids } })
+          .select("gameId status")
+          .lean()
+      : [];
+    const statusById = new Map(entries.map((e) => [e.gameId, e.status]));
+
+    res.json({
+      user: person(disco.user),
+      date: disco.updatedAt,
+      count: disco.count || 1,
+      seeds: (disco.seeds || []).map((s) => ({
+        id: s.gameId,
+        name: s.name,
+        cover: s.cover || null,
+      })),
+      games: (disco.games || []).map((g) => ({
+        id: g.gameId,
+        name: g.name,
+        cover: g.cover || null,
+        rating: g.rating ?? null,
+        year: g.year ?? null,
+        genres: g.genres || [],
+        ownerStatus: statusById.get(g.gameId) || null,
+      })),
+    });
+  } catch (err) {
+    console.error("gems detail error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement des pépites." });
   }
 });
 

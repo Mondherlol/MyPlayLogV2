@@ -19,6 +19,7 @@ import { useClickOutside } from "../hooks/useClickOutside";
 import { apiFetch } from "../lib/api";
 import QuizCard from "../components/QuizCard";
 import DocumentaryModal from "../components/DocumentaryModal";
+import DiscoverGemsModal, { GEMS_RESUME_KEY } from "../components/DiscoverGemsModal";
 import HomeFeed from "../components/HomeFeed";
 import GameCard from "../components/GameCard";
 
@@ -69,6 +70,11 @@ export default function Welcome() {
   const { user, token } = useAuth();
   const [prefs, setPrefs] = useState(loadPrefs);
   const [showDoc, setShowDoc] = useState(false);
+  // Rouvre le deck de pépites là où on l'avait laissé si on revient d'une
+  // fiche de jeu ouverte depuis le deck (état sauvé en sessionStorage).
+  const [showGems, setShowGems] = useState(
+    () => !!sessionStorage.getItem(GEMS_RESUME_KEY)
+  );
   const [showSettings, setShowSettings] = useState(false);
   const [showQuiz, setShowQuiz] = useState(
     () => localStorage.getItem(QUIZ_KEY) === "1"
@@ -78,6 +84,13 @@ export default function Welcome() {
   const isMobile = useIsMobile();
   const settingsRef = useRef(null);
   useClickOutside(settingsRef, () => setShowSettings(false), showSettings);
+
+  // Le CTA « Chercher mes pépites aussi » des cartes du fil ouvre la modale.
+  useEffect(() => {
+    const open = () => setShowGems(true);
+    window.addEventListener("mpl:open-gems", open);
+    return () => window.removeEventListener("mpl:open-gems", open);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -194,6 +207,14 @@ export default function Welcome() {
             >
               <Brain size={18} /> Quiz
             </button>
+
+            <button
+              className="hf-gems-btn clickable"
+              onClick={() => setShowGems(true)}
+              title="3 jeux que tu aimes → des pépites indés sur mesure"
+            >
+              Découvrir une pépite indé
+            </button>
           </div>
         </header>
 
@@ -249,6 +270,9 @@ export default function Welcome() {
         <DocumentaryModal prefs={prefs} token={token} onClose={() => setShowDoc(false)} />
       )}
       {quizModalOpen && <QuizModal onClose={() => setQuizModalOpen(false)} />}
+      {showGems && (
+        <DiscoverGemsModal token={token} onClose={() => setShowGems(false)} />
+      )}
     </div>
   );
 }

@@ -127,7 +127,9 @@ function RatingGauge({ value, active, onEnable, onChange, onClear }) {
   );
 }
 
-export default function PlayedModal({ game, onClose, openReview = false }) {
+// `onSaved` (optionnel) : appelé après un enregistrement réussi uniquement
+// (pas à l'annulation) — ex. le deck de pépites passe au jeu suivant.
+export default function PlayedModal({ game, onClose, onSaved, openReview = false }) {
   const { token } = useAuth();
   const { upsertLocal, removeLocal } = useLibrary();
 
@@ -232,6 +234,7 @@ export default function PlayedModal({ game, onClose, openReview = false }) {
       };
       const data = await apiFetch(`/library/${game.id}`, { method: "PUT", token, body });
       upsertLocal(game.id, { status: data.entry.status, favorite: data.entry.favorite });
+      onSaved?.();
       onClose();
     } catch (err) {
       alert(err.message);

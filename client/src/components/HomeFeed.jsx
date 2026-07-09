@@ -27,10 +27,12 @@ import {
   ThumbsUp,
   ThumbsDown,
   CornerDownRight,
+  Gem,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { timeAgo } from "../lib/lists";
 import RepostCommentsModal from "./RepostCommentsModal";
+import GemsFeedModal from "./GemsFeedModal";
 
 // Fil d'actualité de la page d'accueil : timeline fusionnée (jeux joués,
 // reviews, listes, fan arts republiés, documentaires recommandés) des joueurs
@@ -75,6 +77,7 @@ export default function HomeFeed({ token, me }) {
   const [lightbox, setLightbox] = useState(null); // repost affiché en grand
   const [playing, setPlaying] = useState(null); // documentaire en lecture
   const [commentsFor, setCommentsFor] = useState(null); // repost → modale commentaires
+  const [gemsFor, setGemsFor] = useState(null); // découverte de pépites → modale liste
   const sentinelRef = useRef(null);
   // Refs miroirs pour que l'observer (créé une fois) lise l'état courant.
   const stateRef = useRef({ cursor: null, busy: false });
@@ -205,6 +208,7 @@ export default function HomeFeed({ token, me }) {
           onRepost={() => toggleRepost(item)}
           onOpenImage={() => setLightbox(item)}
           onPlay={() => setPlaying(item)}
+          onOpenGems={() => setGemsFor(item)}
         />
       ))}
 
@@ -232,6 +236,7 @@ export default function HomeFeed({ token, me }) {
           onClose={() => setCommentsFor(null)}
         />
       )}
+      {gemsFor && <GemsFeedModal item={gemsFor} onClose={() => setGemsFor(null)} />}
     </div>
   );
 }
@@ -243,6 +248,7 @@ function FeedCard(props) {
   if (item.type === "interaction") return <InteractionEvent {...props} />;
   if (item.type === "repost") return <RepostEvent {...props} />;
   if (item.type === "video") return <VideoEvent {...props} />;
+  if (item.type === "gems") return <GemsEvent {...props} />;
   return null;
 }
 
@@ -605,6 +611,66 @@ function RepostEvent({ item, me, onLike, onComments, onRepost, onOpenImage }) {
           </button>
         )}
       </div>
+    </article>
+  );
+}
+
+// --- Évènement pépites : un joueur a utilisé la découverte de pépites indés.
+// Cliquer la carte ouvre la liste de ses trouvailles (GemsFeedModal). ---
+function GemsEvent({ item, onOpenGems }) {
+  const names = item.seeds.map((s) => s.name);
+  return (
+    <article className="hf-card hf-gems">
+      <EventHead user={item.user} date={item.date}>
+        <Gem size={13} className="hf-inline-ic" /> est parti à la chasse aux
+        pépites indés
+      </EventHead>
+
+      <div
+        className="hf-gems-body clickable"
+        onClick={onOpenGems}
+        title="Voir ses pépites"
+      >
+        <div className="hf-gems-covers">
+          {item.seeds.map((s) => (
+            <span key={s.id} className="hf-gems-cover" title={s.name}>
+              {s.cover ? (
+                <img src={s.cover} alt={s.name} loading="lazy" draggable="false" />
+              ) : (
+                <span className="hf-gems-cover-ph">
+                  <Gamepad2 size={16} />
+                </span>
+              )}
+            </span>
+          ))}
+        </div>
+        <div className="hf-gems-info">
+          <p className="hf-gems-txt">
+            À partir de <b>{names.slice(0, -1).join(", ") || names[0]}</b>
+            {names.length > 1 && (
+              <>
+                {" "}
+                et <b>{names[names.length - 1]}</b>
+              </>
+            )}
+            {item.count > 1 && (
+              <span className="hf-gems-count"> · {item.count} fournées</span>
+            )}
+          </p>
+          {item.gameCount > 0 && (
+            <span className="hf-gems-open">
+              <Gem size={13} /> Voir ses {item.gameCount} pépites
+            </span>
+          )}
+        </div>
+      </div>
+
+      <button
+        className="hf-gems-cta clickable"
+        onClick={() => window.dispatchEvent(new CustomEvent("mpl:open-gems"))}
+      >
+        <Gem size={14} /> Chercher mes pépites aussi
+      </button>
     </article>
   );
 }

@@ -10872,3 +10872,1641 @@
     justify-content: center;
   }
 }
+
+/* ======================================================================
+   PÉPITES — bouton hero + modale « Découvrir une pépite indé »
+   (3 jeux + plateformes → deck de pépites à swiper ; voir DiscoverGemsModal)
+   ====================================================================== */
+
+/* Bouton hero : même style que le bouton Quiz (pill neutre, hover doré). */
+.hf-gems-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 44px;
+  padding: 0 1.1rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.92rem;
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.hf-gems-btn:hover {
+  border-color: var(--orange);
+  transform: translateY(-2px);
+}
+
+/* --- Modale : colonne, footer collant, pas de padding global --- */
+.dg-modal {
+  max-width: 620px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: 92vh;
+}
+
+.dg-modal.deck {
+  max-width: 480px;
+  background: var(--surface-2);
+  /* Hauteur fixe : la carte remplit le deck (sinon flex se replie sur le contenu). */
+  height: min(92vh, 760px);
+}
+
+.dg-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1.5rem 1.6rem 1rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.dg-intro {
+  margin: 0.15rem 0 1rem;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+}
+
+/* --- Les 3 jeux épinglés : grille, jaquettes bien visibles --- */
+.dg-seeds {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.dg-seed {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.dg-seed.empty {
+  border: 1.5px dashed var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.dg-seed.filled {
+  border: none;
+  padding: 0;
+  background: var(--surface-2);
+  box-shadow: 0 0 0 2px var(--orange);
+}
+
+.dg-seed.filled img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dg-seed-ph {
+  color: var(--text-soft);
+}
+
+.dg-seed-x {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(8, 8, 12, 0.72);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.dg-seed.filled:hover .dg-seed-x {
+  opacity: 1;
+}
+
+.dg-seed-name {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 1.3rem 0.5rem 0.4rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(to top, rgba(8, 8, 12, 0.85), transparent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+/* --- Recherche : pill sobre, loupe intégrée, pas de bouton --- */
+.dg-search {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  height: 42px;
+  padding: 0 0.95rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+  margin-bottom: 0.7rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dg-search:focus-within {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.dg-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+}
+
+.dg-row-label {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+}
+
+/* --- Résultats de recherche : UNE ligne horizontale de jaquettes --- */
+.dg-picks {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 3px 3px 8px;
+  margin-bottom: 1rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.dg-pick {
+  position: relative;
+  flex: none;
+  width: 62px;
+  height: 83px;
+  border: none;
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--surface-2);
+  padding: 0;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.dg-pick:hover {
+  transform: translateY(-2px);
+}
+
+.dg-pick.picked {
+  box-shadow: 0 0 0 2px var(--orange);
+}
+
+.dg-pick img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.dg-pick-ph {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+
+.dg-pick-check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--brand-grad);
+  color: #1a1205;
+  display: grid;
+  place-items: center;
+}
+
+.dg-picks-empty {
+  align-self: center;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  padding: 0.6rem 0.2rem;
+}
+
+/* Skeletons pendant la recherche (mêmes dimensions que les jaquettes) */
+.dg-pick-skel {
+  flex: none;
+  width: 62px;
+  height: 83px;
+  border-radius: 9px;
+}
+
+/* --- Plateformes : chips, jouées en premier, « voir plus » --- */
+.dg-plats-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.45rem;
+}
+
+.dg-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+}
+
+.dg-hint {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+.dg-plats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.dg-plat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  height: 30px;
+  padding: 0 0.65rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.76rem;
+  transition: all 0.12s ease;
+}
+
+.dg-plat:hover {
+  border-color: var(--orange);
+  color: var(--text);
+}
+
+.dg-plat.on {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--orange) 18%, var(--surface));
+  color: var(--accent-ink);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--orange) 45%, transparent);
+}
+
+.dg-plat.more {
+  border-style: dashed;
+  color: var(--accent-ink);
+}
+
+.dg-error {
+  margin: 0.8rem 0 0;
+  color: #e5484d;
+  font-size: 0.85rem;
+}
+
+/* --- Footer collant : compteur + CTA (grisé tant que < 3 jeux) --- */
+.dg-footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.85rem 1.6rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.dg-foot-count {
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+
+.dg-foot-count b {
+  color: var(--accent-ink);
+  font-size: 1rem;
+}
+
+.dg-go {
+  min-width: 210px;
+  justify-content: center;
+}
+
+.dg-go:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  filter: grayscale(0.4);
+}
+
+/* ============================================================
+   Deck de résultats — une pépite à la fois, façon Tinder
+   ============================================================ */
+
+.dg-deck-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.8rem 3.2rem 0.55rem 1.1rem; /* espace à droite pour la croix */
+}
+
+.dg-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 32px;
+  padding: 0 0.8rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.8rem;
+  transition: all 0.15s ease;
+}
+
+.dg-back:hover {
+  border-color: var(--orange);
+  color: var(--text);
+}
+
+.dg-progress {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+
+.dg-progress-bar {
+  flex: none;
+  height: 3px;
+  margin: 0 1.1rem 0.7rem;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.dg-progress-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent-grad);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+/* Enveloppe du deck : colonne carte (+ panneau médias sur desktop) */
+.dg-deck-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dg-deck-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Panneau médias : masqué par défaut (mobile), visible sur grand écran */
+.dg-aside {
+  display: none;
+}
+
+.dg-deck {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 1.1rem 1.1rem;
+}
+
+/* --- La carte --- */
+.dg-card {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  touch-action: pan-y;
+  user-select: none;
+  cursor: grab;
+}
+
+.dg-card:active {
+  cursor: grabbing;
+}
+
+/* Tampons de swipe */
+.dg-stamp {
+  position: absolute;
+  top: 14px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.82rem;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dg-stamp.like {
+  left: 14px;
+  background: var(--brand-grad);
+  color: #1a1205;
+  transform: rotate(-8deg);
+}
+
+.dg-stamp.nope {
+  right: 14px;
+  background: rgba(229, 72, 77, 0.92);
+  color: #fff;
+  transform: rotate(8deg);
+}
+
+/* --- Visuel de tête --- */
+.dg-card-hero {
+  position: relative;
+  flex: none;
+  aspect-ratio: 16 / 8.5;
+  background: #101218;
+  overflow: hidden;
+}
+
+.dg-card-hero iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.dg-hero-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dg-hero-fallback {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(140deg, #1c1f28, #0e1015);
+}
+
+.dg-hero-veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(8, 9, 13, 0.88) 0%, rgba(8, 9, 13, 0.1) 55%, rgba(8, 9, 13, 0.25) 100%);
+}
+
+.dg-trailer-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 30px;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+  border: none;
+  background: rgba(8, 8, 12, 0.6);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.76rem;
+  transition: background 0.15s ease;
+}
+
+.dg-trailer-btn:hover {
+  background: rgba(8, 8, 12, 0.85);
+}
+
+.dg-hero-id {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 10px;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.65rem;
+}
+
+.dg-hero-cover {
+  width: 54px;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  flex: none;
+}
+
+.dg-hero-txt {
+  min-width: 0;
+}
+
+.dg-hero-name {
+  margin: 0 0 0.2rem;
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+  line-height: 1.15;
+  color: #fff;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+}
+
+.dg-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.dg-hero-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.dg-hero-rating {
+  color: var(--amber);
+}
+
+/* --- Corps de la carte --- */
+.dg-card-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden; /* seul le résumé scrolle (dg-summary-scroll) */
+  padding: 0.8rem 0.95rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+/* Zone scrollable du résumé : l'OST et les amis restent toujours visibles. */
+.dg-summary-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.dg-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.dg-tag {
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.6rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.dg-langs {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+}
+
+.dg-langs img {
+  width: 18px;
+  height: 13.5px;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.dg-langs i {
+  font-style: normal;
+  font-size: 0.7rem;
+  color: var(--text-soft);
+}
+
+/* « Pourquoi ce jeu » : la phrase de liaison du moteur de reco, en doré. */
+.dg-why {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 10px;
+  background: rgba(242, 183, 11, 0.09);
+  border: 1px solid rgba(242, 183, 11, 0.25);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  font-style: italic;
+  color: var(--accent-ink);
+}
+
+.dg-why svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* Résumé complet (les médias sont dans le panneau de droite) */
+.dg-summary {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--text-soft);
+}
+
+.dg-summary-skel {
+  display: grid;
+  gap: 6px;
+}
+
+/* OST + amis */
+.dg-extras {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: auto;
+}
+
+/* Bouton OST façon vinyle : le disque (pochette au centre) tourne à la lecture,
+   même esprit que les cards de l'onglet OST du profil (.pfo-disc). */
+.dg-ost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  height: 54px;
+  padding: 0 0.5rem 0 0.4rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  text-align: left;
+  max-width: 100%;
+  transition: border-color 0.15s ease;
+}
+
+.dg-ost:hover {
+  border-color: var(--orange);
+}
+
+.dg-ost.playing {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--orange) 14%, var(--surface));
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--orange) 45%, transparent);
+}
+
+.dg-ost-disc {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.18), transparent 42%),
+    repeating-radial-gradient(circle at center,
+      #17171b 0,
+      #17171b 1px,
+      #26262c 1px,
+      #26262c 3px),
+    #0e0e12;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  animation: vinyl-spin 4s linear infinite;
+  animation-play-state: paused;
+}
+
+.dg-ost.playing .dg-ost-disc {
+  animation-play-state: running;
+}
+
+.dg-ost-disc-label {
+  position: relative;
+  width: 60%;
+  height: 60%;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.5);
+}
+
+.dg-ost-disc-label img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dg-ost-hole {
+  position: absolute;
+  width: 20%;
+  height: 20%;
+  border-radius: 50%;
+  background: #0e0e12;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+
+.dg-ost-action {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--brand-grad);
+  color: #1a1205;
+  display: grid;
+  place-items: center;
+}
+
+.dg-ost-txt {
+  min-width: 0;
+  display: grid;
+  line-height: 1.2;
+}
+
+.dg-ost-txt b {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-family: var(--font-display);
+  font-size: 0.76rem;
+  color: var(--text);
+}
+
+.dg-ost-txt small {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dg-friends {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.dg-friends-avs {
+  display: inline-flex;
+}
+
+.dg-friend-av {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 2px solid var(--surface);
+  display: grid;
+  place-items: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  margin-left: -8px;
+}
+
+.dg-friend-av:first-child {
+  margin-left: 0;
+}
+
+.dg-friend-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dg-friends small {
+  font-size: 0.75rem;
+  color: var(--text-soft);
+}
+
+/* --- Actions de la carte --- */
+.dg-card-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.1rem;
+  padding: 0.7rem 0 0.9rem;
+  border-top: 1px solid var(--border);
+}
+
+.dg-act {
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease,
+    color 0.12s ease;
+}
+
+.dg-act:hover {
+  transform: scale(1.08);
+}
+
+.dg-act.nope {
+  width: 52px;
+  height: 52px;
+  color: #e5484d;
+}
+
+.dg-act.nope:hover {
+  border-color: #e5484d;
+  background: color-mix(in srgb, #e5484d 10%, var(--surface));
+}
+
+.dg-act.mid {
+  width: 42px;
+  height: 42px;
+  color: var(--text-soft);
+}
+
+.dg-act.mid:hover {
+  border-color: var(--orange);
+  color: var(--text);
+}
+
+.dg-act.like {
+  width: 52px;
+  height: 52px;
+  border-color: transparent;
+  background: var(--brand-grad);
+  color: #1a1205;
+}
+
+/* --- Fin du deck --- */
+.dg-deck-end {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-align: center;
+  padding: 2.2rem 1.4rem;
+  color: var(--text-soft);
+}
+
+.dg-deck-end svg {
+  color: var(--accent-ink);
+}
+
+.dg-deck-end h3 {
+  margin: 0.2rem 0 0;
+  font-family: var(--font-display);
+  color: var(--text);
+}
+
+.dg-deck-end p {
+  margin: 0 0 0.9rem;
+  font-size: 0.9rem;
+}
+
+.dg-deck-end-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* --- Panneau médias (desktop) : trailer + autres vidéos + images --- */
+.dg-aside-video {
+  position: relative;
+  flex: none;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #101218;
+}
+
+.dg-aside-video iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
+/* --- Lecteur de trailer « propre » (TrailerPlayer) --- */
+/* L'iframe est plus haut que son cadre : la vidéo 16:9 reste entière mais le
+   titre YouTube (haut) et ses contrôles (bas) tombent dans la zone croppée.
+   pointer-events: none → YouTube ne voit jamais la souris, son UI ne sort pas. */
+.trp {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.trp-crop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.trp-crop iframe {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  top: calc(-1 * var(--trp-crop, 60px));
+  height: calc(100% + 2 * var(--trp-crop, 60px));
+  border: none;
+  pointer-events: none;
+}
+
+/* Nos contrôles : bandeau bas, visibles au survol */
+.trp-ui {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.2rem 0.7rem 0.5rem;
+  background: linear-gradient(to top, rgba(8, 8, 12, 0.8), transparent);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.trp:hover .trp-ui {
+  opacity: 1;
+}
+
+.trp-btn {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  transition: background 0.15s ease;
+}
+
+.trp-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.trp-time {
+  flex: none;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  font-variant-numeric: tabular-nums;
+}
+
+.trp-track {
+  position: relative;
+  flex: 1;
+  height: 14px; /* zone de clic confortable */
+  display: flex;
+  align-items: center;
+}
+
+.trp-track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.trp-fill {
+  position: relative;
+  z-index: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  pointer-events: none;
+}
+
+.dg-aside-vids {
+  flex: none;
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  padding-bottom: 3px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.dg-aside-vid {
+  position: relative;
+  flex: none;
+  width: 104px;
+  aspect-ratio: 16 / 9;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #101218;
+  padding: 0;
+  transition: border-color 0.12s ease, transform 0.12s ease;
+}
+
+.dg-aside-vid:hover {
+  transform: translateY(-1px);
+}
+
+.dg-aside-vid.active {
+  border-color: var(--orange);
+}
+
+.dg-aside-vid img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.dg-aside-vid-play {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(8, 8, 12, 0.65);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+/* Images qui défilent toutes seules (fondu enchaîné + points) */
+.dg-aside-imgs {
+  position: relative;
+  flex: 1;
+  min-height: 120px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #101218;
+  cursor: grab;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.dg-aside-imgs:active {
+  cursor: grabbing;
+}
+
+.dg-aside-imgs img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+.dg-aside-imgs img.on {
+  opacity: 1;
+}
+
+/* Flèches de navigation des images (visibles au survol) */
+.dg-aside-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(8, 8, 12, 0.55);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.dg-aside-arrow.left {
+  left: 8px;
+}
+
+.dg-aside-arrow.right {
+  right: 8px;
+}
+
+.dg-aside-imgs:hover .dg-aside-arrow {
+  opacity: 1;
+}
+
+.dg-aside-arrow:hover {
+  background: rgba(8, 8, 12, 0.85);
+}
+
+.dg-aside-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  z-index: 2;
+}
+
+.dg-aside-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  transition: background 0.2s ease;
+}
+
+.dg-aside-dots i.on {
+  background: #fff;
+}
+
+.dg-aside-empty {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--text-soft);
+}
+
+/* --- Carte du fil : « X est parti à la chasse aux pépites indés » --- */
+.hf-gems-body {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.hf-gems-covers {
+  display: flex;
+  flex: none;
+}
+
+.hf-gems-cover {
+  width: 52px;
+  height: 69px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 2px solid var(--surface);
+  box-shadow: var(--shadow-sm);
+  margin-left: -14px;
+  transition: transform 0.15s ease;
+}
+
+.hf-gems-cover:first-child {
+  margin-left: 0;
+}
+
+.hf-gems-cover:hover {
+  transform: translateY(-3px);
+  z-index: 2;
+  position: relative;
+}
+
+.hf-gems-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.hf-gems-cover-ph {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+
+.hf-gems-info {
+  min-width: 0;
+  display: grid;
+  gap: 0.45rem;
+  justify-items: start;
+}
+
+.hf-gems-txt {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--text-soft);
+}
+
+.hf-gems-txt b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.hf-gems-count {
+  color: var(--text-soft);
+}
+
+.hf-gems-body.clickable {
+  border-radius: var(--radius);
+  padding: 0.5rem;
+  margin: -0.5rem;
+  transition: background 0.15s ease;
+}
+
+.hf-gems-body.clickable:hover {
+  background: var(--surface-2);
+}
+
+.hf-gems-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--accent-ink);
+}
+
+.hf-gems-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  align-self: flex-start;
+  height: 32px;
+  margin-top: 0.75rem;
+  padding: 0 0.85rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--accent-ink);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.hf-gems-cta:hover {
+  border-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 10%, var(--surface));
+}
+
+/* --- Modale « les pépites de X » (GemsFeedModal) --- */
+.gfm-modal {
+  max-width: 560px;
+}
+
+.gfm-head {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding-right: 2.4rem; /* place pour la croix */
+  margin-bottom: 1.1rem;
+}
+
+.gfm-avatar {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.gfm-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gfm-head-txt {
+  min-width: 0;
+  flex: 1;
+}
+
+.gfm-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.gfm-title svg {
+  color: var(--accent-ink);
+}
+
+.gfm-sub {
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gfm-seeds {
+  display: flex;
+  flex: none;
+}
+
+.gfm-seed {
+  width: 30px;
+  height: 40px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 2px solid var(--surface);
+  margin-left: -8px;
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+
+.gfm-seed:first-child {
+  margin-left: 0;
+}
+
+.gfm-seed img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gfm-loading {
+  display: grid;
+  place-items: center;
+  padding: 3rem 0;
+  color: var(--text-soft);
+}
+
+.gfm-empty {
+  text-align: center;
+  color: var(--text-soft);
+  padding: 2.2rem 1rem;
+}
+
+.gfm-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.gfm-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.gfm-row:hover {
+  border-color: var(--orange);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.gfm-cover {
+  width: 46px;
+  height: 61px;
+  flex: none;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.gfm-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.gfm-cover-ph {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+
+.gfm-info {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 3px;
+}
+
+.gfm-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gfm-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  font-size: 0.75rem;
+  color: var(--text-soft);
+}
+
+.gfm-meta i {
+  font-style: normal;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.gfm-rating {
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+/* Statut du découvreur — mêmes teintes que les pastilles du fil */
+.gfm-owner {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 22px;
+  padding: 0 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.gfm-owner.st-finished {
+  background: rgba(61, 214, 140, 0.14);
+  color: #26a96a;
+}
+
+.gfm-owner.st-playing {
+  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  color: var(--accent-ink);
+}
+
+.gfm-owner.st-wishlist {
+  background: rgba(74, 168, 255, 0.14);
+  color: #3d8fd6;
+}
+
+.gfm-owner.st-paused {
+  background: rgba(255, 176, 46, 0.15);
+  color: #cf8a13;
+}
+
+.gfm-owner.st-dropped {
+  background: rgba(230, 74, 74, 0.12);
+  color: #d65454;
+}
+
+.gfm-owner.none {
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.gfm-wish {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+  display: grid;
+  place-items: center;
+  transition: all 0.15s ease;
+}
+
+.gfm-wish:hover {
+  border-color: var(--orange);
+  color: var(--text);
+}
+
+.gfm-wish.on {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--orange) 16%, var(--surface));
+  color: var(--accent-ink);
+}
+
+/* --- Desktop large : la carte se cale à gauche, les médias à droite --- */
+@media (min-width: 1024px) {
+  .dg-modal.deck {
+    max-width: 1040px;
+  }
+
+  .dg-deck-wrap {
+    flex-direction: row;
+  }
+
+  .dg-deck-main {
+    flex: none;
+    width: 460px;
+  }
+
+  .dg-aside {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.7rem;
+    padding: 1.1rem 1.1rem 1.1rem 0;
+  }
+
+  /* Deck terminé : plus de panneau médias → l'écran de fin prend toute la
+     largeur (sinon il reste coincé dans la colonne de gauche). */
+  .dg-deck-wrap.done .dg-deck-main {
+    width: 100%;
+    flex: 1;
+  }
+
+  /* Le trailer joue déjà à droite : inutile de le proposer dans la carte. */
+  .dg-trailer-btn {
+    display: none;
+  }
+}
+
+/* --- Mobile --- */
+@media (max-width: 560px) {
+  .dg-modal {
+    max-height: 96vh;
+  }
+
+  .dg-body {
+    padding: 1.2rem 1.1rem 0.8rem;
+  }
+
+  .dg-footer {
+    padding: 0.75rem 1.1rem;
+  }
+
+  .dg-go {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .dg-seeds-hint {
+    display: none;
+  }
+
+  .dg-card-hero {
+    aspect-ratio: 16 / 10;
+  }
+}
