@@ -20,6 +20,7 @@ import {
   ListPlus,
   PenLine,
   EyeOff,
+  Infinity as InfinityIcon,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { makeCache } from "../lib/cache";
@@ -37,15 +38,26 @@ const STATUSES = [
   { value: "dropped", label: "Abandonné", Icon: Ban },
 ];
 
+// Statut spécial des jeux sans fin (multi/service : Rocket League, Overwatch…).
+// Proposé automatiquement quand IGDB signale du multi/MMO/battle royale, et
+// activable à la main sur n'importe quel jeu via le lien sous les statuts.
+const ENDLESS = { value: "endless", label: "Sans fin", Icon: InfinityIcon };
+
 const LETSPLAY = "Vu en let's play";
-const PLAYED = ["playing", "finished", "paused", "dropped"];
+const PLAYED = ["playing", "finished", "paused", "dropped", "endless"];
 
 // Infos statiques du jeu (plateformes, jaquettes, persos, temps de jeu) : elles
 // ne changent pas d'une ouverture à l'autre → cache mémoire + localStorage 24h,
-// pour afficher la modale instantanément la 2e fois.
-const detailsCache = makeCache("mpl_gamedetails_", 24 * 60 * 60 * 1000);
+// pour afficher la modale instantanément la 2e fois. (v2 : + endlessHint)
+const detailsCache = makeCache("mpl_gamedetails2_", 24 * 60 * 60 * 1000);
 
-const EMPTY_DETAILS = { platforms: [], covers: [], characters: [], timeToBeat: null };
+const EMPTY_DETAILS = {
+  platforms: [],
+  covers: [],
+  characters: [],
+  timeToBeat: null,
+  endlessHint: false,
+};
 
 // Jauge de note semi-circulaire — centre éditable (sans zéro parasite)
 function RatingGauge({ value, active, onEnable, onChange, onClear }) {
@@ -131,7 +143,7 @@ function RatingGauge({ value, active, onEnable, onChange, onClear }) {
 // (pas à l'annulation) — ex. le deck de pépites passe au jeu suivant.
 export default function PlayedModal({ game, onClose, onSaved, openReview = false }) {
   const { token } = useAuth();
-  const { upsertLocal, removeLocal } = useLibrary();
+  const { map, upsertLocal, removeLocal } = useLibrary();
 
   const [saving, setSaving] = useState(false);
   // Infos statiques (plateformes, temps de jeu…) : préremplies depuis le cache
@@ -149,10 +161,16 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
 
-  const [status, setStatus] = useState("finished");
+  // Statut/favori initialisés depuis la map locale de la bibliothèque : le bon
+  // bouton est coché dès l'ouverture, sans flash « Terminé » le temps que
+  // l'entrée complète arrive de l'API (qui reste la source de vérité).
+  const [status, setStatus] = useState(() => {
+    const s = map[game.id]?.status;
+    return PLAYED.includes(s) ? s : "finished";
+  });
   const [platform, setPlatform] = useState("");
   const [playtime, setPlaytime] = useState("");
-  const [favorite, setFavorite] = useState(false);
+  const [favorite, setFavorite] = useState(() => !!map[game.id]?.favorite);
   const [hasRating, setHasRating] = useState(false);
   const [rating, setRating] = useState(75);
   const [review, setReview] = useState("");
@@ -163,6 +181,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   const [favoriteOst, setFavoriteOst] = useState(null);
   const [cover, setCover] = useState(game.cover);
   const [existing, setExisting] = useState(false);
+  const [manualEndless, setManualEndless] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -285,6 +304,10 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
 
   const platformOptions = [...details.platforms.map((p) => p.name), LETSPLAY];
   const hasReview = review.trim() || reviewMedia.length || pros.length || cons.length;
+  // « Sans fin » visible si le jeu est multi/service (IGDB), déjà dans ce
+  // statut, ou activé à la main via le lien sous les statuts.
+  const showEndless = details.endlessHint || status === "endless" || manualEndless;
+  const statusOptions = showEndless ? [...STATUSES, ENDLESS] : STATUSES;
 
   return createPortal(
     <>
@@ -395,10 +418,12 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
 
                   <label className="field-label">Avancement</label>
                   <div className="seg">
-                    {STATUSES.map((s) => (
+                    {statusOptions.map((s) => (
                       <button
                         key={s.value}
-                        className={`seg-opt ${status === s.value ? "active" : ""}`}
+                        className={`seg-opt ${s.value === "endless" ? "endless" : ""} ${
+                          status === s.value ? "active" : ""
+                        }`}
                         onClick={() => setStatus(s.value)}
                       >
                         <s.Icon size={16} />
@@ -406,6 +431,17 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                       </button>
                     ))}
                   </div>
+                  {!showEndless && !detailsLoading && (
+                    <button
+                      className="endless-link clickable"
+                      onClick={() => {
+                        setManualEndless(true);
+                        setStatus("endless");
+                      }}
+                    >
+                      <InfinityIcon size={13} /> Ce jeu n'a pas de fin ?
+                    </button>
+                  )}
 
                   <label className="field-label">Plateforme</label>
                   {detailsLoading ? (

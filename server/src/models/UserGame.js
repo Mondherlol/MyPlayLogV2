@@ -58,10 +58,12 @@ const userGameSchema = new mongoose.Schema(
     name: { type: String, required: true },
     cover: { type: String, default: null }, // url (peut être une cover custom)
 
-    // "wishlist" = je veux y jouer ; les autres = j'y ai joué
+    // "wishlist" = je veux y jouer ; les autres = j'y ai joué.
+    // "endless" = jeu sans fin (multi/service : Rocket League, Overwatch…) —
+    // il ne compte ni comme terminé ni comme abandonné dans le backlog.
     status: {
       type: String,
-      enum: ["wishlist", "playing", "finished", "paused", "dropped"],
+      enum: ["wishlist", "playing", "finished", "paused", "dropped", "endless"],
       default: "wishlist",
     },
     platform: { type: String, default: null },

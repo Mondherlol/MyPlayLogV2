@@ -66,7 +66,13 @@ export function PlayerProvider({ children }) {
     let destroyed = false;
     loadYT().then((YT) => {
       if (destroyed || !ytDivRef.current) return;
-      ytRef.current = new YT.Player(ytDivRef.current, {
+      // YT.Player REMPLACE le nœud fourni par une iframe. On lui donne donc un
+      // div créé à la main (jamais un nœud rendu par React) : sinon, au
+      // démontage (ex. déconnexion), React tente de retirer son div disparu →
+      // NotFoundError removeChild → tout l'arbre React tombe (page blanche).
+      const host = document.createElement("div");
+      ytDivRef.current.appendChild(host);
+      ytRef.current = new YT.Player(host, {
         height: "0",
         width: "0",
         playerVars: { autoplay: 0, playsinline: 1 },
@@ -98,6 +104,8 @@ export function PlayerProvider({ children }) {
       }
       ytRef.current = null;
       readyRef.current = false;
+      // Vide ce que YT a laissé (iframe ou div restauré) dans le wrapper.
+      if (ytDivRef.current) ytDivRef.current.innerHTML = "";
     };
   }, []);
 

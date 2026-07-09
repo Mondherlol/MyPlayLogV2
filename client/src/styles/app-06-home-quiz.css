@@ -347,6 +347,11 @@
   color: #d65454;
 }
 
+.hf-status-badge.st-endless {
+  background: rgba(23, 179, 196, 0.14);
+  color: #0e8a99;
+}
+
 /* Corps d'un évènement jeu : cover + infos */
 .hf-game-body {
   display: flex;
@@ -2646,6 +2651,10 @@
   --sc: #9a6bff;
 }
 
+.rv-status.s-endless {
+  --sc: #14a3b4;
+}
+
 .rv-spoiler-tag {
   display: inline-flex;
   align-items: center;
@@ -3459,12 +3468,14 @@
       var(--bg) 100%);
 }
 
-/* --- Bouton retour flottant --- */
+/* --- Bouton retour flottant : fixed pour rester visible pendant tout le
+   scroll (au-dessus du contenu, juste sous la topbar). Décalé de la largeur
+   de la sidebar (variable héritée de .app-shell, 0 en mobile). --- */
 .gp-back {
-  position: absolute;
-  top: 1rem;
-  left: clamp(1rem, 4vw, 2rem);
-  z-index: 6;
+  position: fixed;
+  top: calc(var(--topbar-h, 60px) + 0.9rem);
+  left: calc(var(--app-sidebar-w, 0px) + clamp(1rem, 4vw, 2rem));
+  z-index: 70;
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -3478,7 +3489,8 @@
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 0.9rem;
-  transition: background 0.15s ease, transform 0.15s ease;
+  /* left animé : suit le repli/dépli de la sidebar */
+  transition: background 0.15s ease, transform 0.15s ease, left 0.2s ease;
 }
 
 .gp-back:hover {
@@ -12417,6 +12429,11 @@
   color: #d65454;
 }
 
+.gfm-owner.st-endless {
+  background: rgba(23, 179, 196, 0.14);
+  color: #0e8a99;
+}
+
 .gfm-owner.none {
   background: var(--surface-2);
   color: var(--text-soft);
@@ -12508,5 +12525,430 @@
 
   .dg-card-hero {
     aspect-ratio: 16 / 10;
+  }
+}
+
+/* ============================================================
+   Onglet « Univers » (contenus liés) + bannière de relation
+   ============================================================ */
+
+/* --- Bannière « Ce jeu est un … de … » (header page jeu) --- */
+.gp-relation {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+  padding: 0.35rem 0.75rem 0.35rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--orange) 35%, var(--border));
+  background: color-mix(in srgb, var(--orange) 9%, var(--surface));
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.gp-relation:not(:disabled):hover {
+  border-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 16%, var(--surface));
+  transform: translateY(-1px);
+}
+
+.gp-relation:disabled {
+  cursor: default;
+}
+
+.gp-relation-cover {
+  width: 26px;
+  height: 34px;
+  border-radius: 6px;
+  object-fit: cover;
+  box-shadow: var(--shadow-sm);
+}
+
+.gp-relation-ico {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--orange) 18%, transparent);
+  color: var(--accent-ink);
+}
+
+.gp-relation-txt b {
+  font-weight: 700;
+}
+
+.gp-relation-txt .gp-relation-parent {
+  color: var(--accent-ink);
+}
+
+.gp-relation-go {
+  color: var(--accent-ink);
+  flex-shrink: 0;
+}
+
+/* --- Onglet Univers --- */
+.gpr {
+  padding-top: 1.4rem;
+}
+
+.gpr-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.3rem;
+}
+
+.gpr-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.98rem;
+  color: var(--text);
+}
+
+.gpr-count svg {
+  color: var(--accent-ink);
+}
+
+.gpr-franchise-chip {
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--orange) 40%, var(--border));
+  background: color-mix(in srgb, var(--orange) 10%, transparent);
+  color: var(--accent-ink);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.gpr-h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.gpr-h2 svg {
+  color: var(--accent-ink);
+}
+
+.gpr-h2-count {
+  padding: 0.08rem 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+/* Cards jaquette des groupes (DLC, remakes…) */
+.gpr-row {
+  gap: 0.9rem;
+}
+
+.gpr-card {
+  flex: 0 0 auto;
+  width: 128px;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+}
+
+.gpr-cover {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: 13px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.gpr-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.25s ease;
+}
+
+.gpr-card:hover .gpr-cover {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
+  box-shadow: 0 14px 30px rgba(10, 10, 20, 0.3),
+    0 0 0 3px color-mix(in srgb, var(--orange) 16%, transparent);
+}
+
+.gpr-card:hover .gpr-cover img {
+  transform: scale(1.05);
+}
+
+.gpr-cover-empty {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.gpr-year {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 0.12rem 0.42rem;
+  border-radius: 999px;
+  background: rgba(10, 10, 16, 0.7);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 700;
+  backdrop-filter: blur(4px);
+}
+
+.gpr-rating {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.18rem;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(10, 10, 16, 0.7);
+  color: var(--amber);
+  font-size: 0.68rem;
+  font-weight: 700;
+  backdrop-filter: blur(4px);
+}
+
+.gpr-badge {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 7px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: color-mix(in srgb, var(--orange) 14%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--orange) 35%, var(--border));
+  color: var(--accent-ink);
+}
+
+.gpr-badge.on-cover {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  background: rgba(10, 10, 16, 0.72);
+  border: none;
+  color: #ffd77a;
+  backdrop-filter: blur(4px);
+}
+
+.gpr-name {
+  display: -webkit-box;
+  margin-top: 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--text);
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* --- Timeline de la saga --- */
+.gpr-timeline {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding-left: 0.2rem;
+}
+
+.gpr-tl-item {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.gpr-tl-rail {
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  width: 14px;
+  flex-shrink: 0;
+}
+
+/* Ligne continue derrière les points */
+.gpr-tl-rail::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -0.55rem;
+  bottom: -0.55rem;
+  width: 2px;
+  transform: translateX(-50%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--orange) 45%, var(--border)),
+    var(--border)
+  );
+}
+
+.gpr-tl-item:first-child .gpr-tl-rail::before {
+  top: 50%;
+}
+
+.gpr-tl-item:last-child .gpr-tl-rail::before {
+  bottom: 50%;
+}
+
+.gpr-tl-dot {
+  position: relative;
+  z-index: 1;
+  width: 9px;
+  height: 9px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid color-mix(in srgb, var(--orange) 60%, var(--border));
+}
+
+.gpr-tl-item.is-current .gpr-tl-dot {
+  width: 13px;
+  height: 13px;
+  background: var(--accent-grad);
+  border-color: transparent;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--orange) 22%, transparent);
+}
+
+.gpr-tl-year {
+  width: 42px;
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  text-align: right;
+}
+
+.gpr-tl-item.is-current .gpr-tl-year {
+  color: var(--accent-ink);
+}
+
+.gpr-tl-card {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex: 1;
+  min-width: 0;
+  padding: 0.45rem 0.7rem 0.45rem 0.45rem;
+  border-radius: 13px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  text-align: left;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.gpr-tl-card:not(:disabled):hover {
+  transform: translateX(3px);
+  border-color: color-mix(in srgb, var(--orange) 50%, var(--border));
+  box-shadow: var(--shadow-sm);
+}
+
+.gpr-tl-item.is-current .gpr-tl-card {
+  cursor: default;
+  border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
+  background: color-mix(in srgb, var(--orange) 7%, var(--surface));
+}
+
+.gpr-tl-cover {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 54px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  box-shadow: var(--shadow-sm);
+}
+
+.gpr-tl-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gpr-tl-txt {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.gpr-tl-name {
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gpr-here {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #1c1206;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+/* Skeleton de chargement de l'onglet */
+.gpr-skel-row {
+  display: flex;
+  gap: 0.9rem;
+  margin-top: 0.9rem;
+}
+
+.gpr-skel-cover {
+  width: 128px;
+  aspect-ratio: 3 / 4;
+  border-radius: 13px;
+}
+
+@media (max-width: 640px) {
+  .gpr-card {
+    width: 106px;
+  }
+
+  .gpr-tl-year {
+    width: 34px;
+    font-size: 0.74rem;
+  }
+
+  .gpr-here {
+    display: none;
   }
 }

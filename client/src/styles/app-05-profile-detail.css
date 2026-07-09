@@ -1968,6 +1968,11 @@ button.pf-stat:hover {
   background: rgba(168, 121, 255, 0.9);
 }
 
+.pg-tile-status.s-endless {
+  background: rgba(23, 179, 196, 0.92);
+  color: #04262b;
+}
+
 .pg-tile-name {
   font-family: var(--font-display);
   font-weight: 600;

@@ -18,6 +18,7 @@ import {
   Pause,
   Trophy,
   Ban,
+  Infinity as InfinityIcon,
   Clock,
   Gamepad,
   Check,
@@ -33,13 +34,14 @@ import { timeAgo } from "../lib/lists";
 import { Composer, renderMessage } from "./ListComments";
 import ReviewComments from "./ReviewComments";
 
-const PLAYED = ["playing", "finished", "paused", "dropped"];
+const PLAYED = ["playing", "finished", "paused", "dropped", "endless"];
 
 const STATUS_META = {
   playing: { label: "En cours", Icon: Play },
   finished: { label: "Terminé", Icon: Trophy },
   paused: { label: "En pause", Icon: Pause },
   dropped: { label: "Abandonné", Icon: Ban },
+  endless: { label: "Sans fin", Icon: InfinityIcon },
   wishlist: { label: "À jouer", Icon: Clock },
 };
 

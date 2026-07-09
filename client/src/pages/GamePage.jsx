@@ -33,6 +33,8 @@ import {
   Check,
   Send,
   Lock,
+  Orbit,
+  CornerLeftUp,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { makeCache } from "../lib/cache";
@@ -46,13 +48,14 @@ import RecommendModal from "../components/RecommendModal";
 import GameCharacters from "../components/GameCharacters";
 import GameOst from "../components/GameOst";
 import GameFeed from "../components/GameFeed";
+import GameRelated from "../components/GameRelated";
 
 const FRIEND_GROUPS = [
   { key: "played", label: "Y ont joué", match: (s) => s !== "wishlist" },
   { key: "wishlist", label: "Veulent y jouer", match: (s) => s === "wishlist" },
 ];
 
-const PLAYED = ["playing", "finished", "paused", "dropped"];
+const PLAYED = ["playing", "finished", "paused", "dropped", "endless"];
 
 // Détails complets du jeu (infos IGDB, médias, similaires…) : statiques → cache
 // mémoire + localStorage 24h pour rouvrir la page instantanément.
@@ -65,6 +68,7 @@ const psnCache = makeCache("mpl_psn_", 30 * 60 * 1000);
 
 const TABS = [
   { id: "infos", label: "Infos", Icon: Info, ready: true },
+  { id: "related", label: "Univers", Icon: Orbit, ready: true },
   { id: "feed", label: "Feed", Icon: Flame, ready: true },
   { id: "reviews", label: "Reviews", Icon: MessageSquareText, ready: true },
   { id: "trophies", label: "Trophées", Icon: Trophy, ready: true },
@@ -191,7 +195,6 @@ export default function GamePage() {
   const [friends, setFriends] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [tab, setTab] = useState("infos");
   const [showPlayed, setShowPlayed] = useState(false);
   const [showList, setShowList] = useState(false);
   const [showRecommend, setShowRecommend] = useState(false);
@@ -203,6 +206,14 @@ export default function GamePage() {
   const isWishlist = entry?.status === "wishlist";
   const isPlayed = entry && PLAYED.includes(entry.status);
 
+  // Onglet actif : vit dans l'URL (?tab=…) pour survivre au refresh et au
+  // retour arrière (replace : changer d'onglet n'empile pas d'historique).
+  const wantTab = searchParams.get("tab");
+  const tab = TABS.some((t) => t.id === wantTab && t.ready) ? wantTab : "infos";
+  function setTab(next) {
+    setSearchParams(next === "infos" ? {} : { tab: next }, { replace: true });
+  }
+
   function reloadEntry() {
     apiFetch(`/library/${id}`, { token })
       .then((e) => setFav(e.entry || null))
@@ -212,10 +223,6 @@ export default function GamePage() {
   useEffect(() => {
     let alive = true;
     setError(null);
-    // Onglet initial : « reviews » si demandé via l'URL (ex. depuis une notif), sinon « infos ».
-    const wantTab = searchParams.get("tab");
-    setTab(TABS.some((t) => t.id === wantTab && t.ready) ? wantTab : "infos");
-    if (wantTab) setSearchParams({}, { replace: true });
     setFav(null);
     setFriends([]);
     setBgOverride(localStorage.getItem(bgKey(id)) || null);
@@ -507,6 +514,34 @@ export default function GamePage() {
                     </span>
                   )}
                 </p>
+                {/* « Ce jeu est un remake / DLC / … de … » (relation IGDB) */}
+                {game.relation && (
+                  <button
+                    className={`gp-relation ${game.relation.of ? "clickable" : ""}`}
+                    onClick={() =>
+                      game.relation.of && navigate(`/game/${game.relation.of.id}`)
+                    }
+                    disabled={!game.relation.of}
+                  >
+                    {game.relation.of?.cover ? (
+                      <img src={game.relation.of.cover} alt="" className="gp-relation-cover" />
+                    ) : (
+                      <span className="gp-relation-ico">
+                        <CornerLeftUp size={14} />
+                      </span>
+                    )}
+                    <span className="gp-relation-txt">
+                      Ce jeu est <b>{game.relation.phrase}</b>
+                      {game.relation.of && (
+                        <>
+                          {" "}
+                          de <b className="gp-relation-parent">{game.relation.of.name}</b>
+                        </>
+                      )}
+                    </span>
+                    {game.relation.of && <ChevronRight size={15} className="gp-relation-go" />}
+                  </button>
+                )}
                 <FriendsPlayed friends={friends} />
               </div>
 
@@ -548,6 +583,10 @@ export default function GamePage() {
                 </button>
               ))}
             </nav>
+
+            {tab === "related" && (
+              <GameRelated key={id} gameId={id} token={token} game={game} />
+            )}
 
             {tab === "infos" && (
               <InfosTab

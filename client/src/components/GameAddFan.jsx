@@ -7,7 +7,7 @@ import { apiFetch } from "../lib/api";
 import PlayedModal from "./PlayedModal";
 import AddToListModal from "./AddToListModal";
 
-const PLAYED = ["playing", "finished", "paused", "dropped"];
+const PLAYED = ["playing", "finished", "paused", "dropped", "endless"];
 
 // Bouton radial « + » d'ajout rapide (repris de GameCard), réutilisable sur les
 // vignettes. `hoverOnly` : le « + » n'apparaît qu'au survol de la vignette.

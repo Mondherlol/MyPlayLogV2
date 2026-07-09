@@ -709,7 +709,7 @@ router.get("/:id/details", requireAuth, async (req, res) => {
     const [gameArr, customCovers, charArr, customChars] = await Promise.all([
       igdbQuery(
         "games",
-        `fields name,cover.image_id,artworks.image_id,platforms.id,platforms.name,genres.id,genres.name; where id = ${id};`
+        `fields name,cover.image_id,artworks.image_id,platforms.id,platforms.name,genres.id,genres.name,game_modes; where id = ${id};`
       ),
       CustomCover.find({ gameId: id }).sort({ createdAt: -1 }),
       igdbQuery(
@@ -767,11 +767,16 @@ router.get("/:id/details", requireAuth, async (req, res) => {
       (a, b) => (b.image ? 1 : 0) - (a.image ? 1 : 0)
     );
 
+    // Jeux « sans fin » potentiels : multijoueur (2), MMO (5) ou battle
+    // royale (6) selon IGDB → la modale propose alors le statut « Sans fin ».
+    const endlessHint = (g.game_modes || []).some((m) => [2, 5, 6].includes(m));
+
     res.json({
       platforms: (g.platforms || []).map((p) => ({ id: p.id, name: p.name })),
       covers,
       characters,
       timeToBeat,
+      endlessHint,
     });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
@@ -870,10 +875,34 @@ const WEBSITE_KINDS = {
   18: "discord",
 };
 
+// Types de jeu IGDB (game_type) : libellé + tournure française pour la
+// mention « Ce jeu est un remake de … » et les badges de l'onglet Univers.
+const GAME_TYPES_FR = {
+  1: { label: "DLC", phrase: "un DLC" },
+  2: { label: "Extension", phrase: "une extension" },
+  3: { label: "Bundle", phrase: "un bundle" },
+  4: { label: "Extension autonome", phrase: "une extension autonome" },
+  5: { label: "Mod", phrase: "un mod" },
+  6: { label: "Épisode", phrase: "un épisode" },
+  7: { label: "Saison", phrase: "une saison" },
+  8: { label: "Remake", phrase: "un remake" },
+  9: { label: "Remaster", phrase: "un remaster" },
+  10: { label: "Version enrichie", phrase: "une version enrichie" },
+  11: { label: "Portage", phrase: "un portage" },
+  12: { label: "Fork", phrase: "un fork" },
+  13: { label: "Pack", phrase: "un pack" },
+  14: { label: "Mise à jour", phrase: "une mise à jour" },
+};
+
 const FULL_FIELDS = [
   "name",
   "summary",
   "storyline",
+  "game_type",
+  "parent_game.name",
+  "parent_game.cover.image_id",
+  "version_parent.name",
+  "version_parent.cover.image_id",
   "cover.image_id",
   "artworks.image_id",
   "artworks.width",
@@ -1008,6 +1037,26 @@ router.get("/:id/full", requireAuth, async (req, res) => {
 
     const timeToBeat = await resolveTimeToBeat(id, g.name);
 
+    // « Ce jeu est un remake / DLC / … de … » : type IGDB + jeu parent.
+    const typeFr = GAME_TYPES_FR[g.game_type];
+    const relParent = g.parent_game || g.version_parent || null;
+    const relation = typeFr
+      ? {
+          type: g.game_type,
+          label: typeFr.label,
+          phrase: typeFr.phrase,
+          of: relParent
+            ? {
+                id: relParent.id,
+                name: relParent.name,
+                cover: relParent.cover?.image_id
+                  ? `${IMG_BASE}/t_cover_small/${relParent.cover.image_id}.jpg`
+                  : null,
+              }
+            : null,
+        }
+      : null;
+
     res.json({
       id: g.id,
       name: fr?.name || g.name,
@@ -1046,12 +1095,130 @@ router.get("/:id/full", requireAuth, async (req, res) => {
       publishers,
       engines: (g.game_engines || []).map((e) => e.name).filter(Boolean),
       franchise: g.franchises?.[0]?.name || g.collections?.[0]?.name || null,
+      relation,
       websites,
       similar,
       timeToBeat,
     });
   } catch (err) {
     console.error("game full error:", err.message);
+    res.status(err.status || 500).json({ error: err.message || "Erreur." });
+  }
+});
+
+// --- Contenus liés (onglet Univers) : DLC, remakes, remasters, éditions,
+// portages… + tous les jeux de la même licence en chronologie. ---
+const REL_SUBFIELDS = ["name", "cover.image_id", "total_rating", "first_release_date", "game_type"];
+const relFields = (f) => REL_SUBFIELDS.map((s) => `${f}.${s}`).join(",");
+
+function mapRelGame(g) {
+  return {
+    id: g.id,
+    name: g.name,
+    cover: g.cover?.image_id ? `${IMG_BASE}/t_cover_big/${g.cover.image_id}.jpg` : null,
+    rating: g.total_rating ? Math.round(g.total_rating) : null,
+    year: g.first_release_date
+      ? new Date(g.first_release_date * 1000).getFullYear()
+      : null,
+    releaseDate: g.first_release_date || null,
+    typeLabel: GAME_TYPES_FR[g.game_type]?.label || null,
+  };
+}
+
+router.get("/:id/related", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+
+    const fields = [
+      "name",
+      "game_type",
+      "first_release_date",
+      "franchises.name",
+      "collections.name",
+      relFields("parent_game"),
+      relFields("version_parent"),
+      relFields("dlcs"),
+      relFields("expansions"),
+      relFields("standalone_expansions"),
+      relFields("remakes"),
+      relFields("remasters"),
+      relFields("expanded_games"),
+      relFields("ports"),
+      relFields("bundles"),
+      relFields("forks"),
+    ].join(",");
+
+    const arr = await igdbQuery("games", `fields ${fields}; where id = ${id};`);
+    const g = arr[0];
+    if (!g) return res.status(404).json({ error: "Jeu introuvable." });
+
+    const parent = g.parent_game || g.version_parent || null;
+
+    // Groupes directs (l'ordre définit l'affichage côté client)
+    const rawGroups = [
+      { id: "parent", items: parent ? [parent] : [] },
+      {
+        id: "dlc",
+        items: [
+          ...(g.dlcs || []),
+          ...(g.expansions || []),
+          ...(g.standalone_expansions || []),
+        ],
+      },
+      { id: "remakes", items: g.remakes || [] },
+      { id: "remasters", items: g.remasters || [] },
+      { id: "expanded", items: [...(g.expanded_games || []), ...(g.forks || [])] },
+      { id: "ports", items: g.ports || [] },
+      { id: "bundles", items: g.bundles || [] },
+    ];
+
+    // Éditions de CE jeu (Deluxe, GOTY…) : jeux dont il est le version_parent.
+    const editions = await igdbQuery(
+      "games",
+      `fields ${REL_SUBFIELDS.join(",")}; where version_parent = ${id}; limit 50;`
+    ).catch(() => []);
+    rawGroups.push({ id: "editions", items: editions });
+
+    // Dédup + mapping ; on garde la trace des ids déjà casés pour la saga.
+    const seen = new Set([id]);
+    const groups = [];
+    for (const grp of rawGroups) {
+      const items = [];
+      for (const it of grp.items) {
+        if (!it?.id || seen.has(it.id)) continue;
+        seen.add(it.id);
+        items.push(mapRelGame(it));
+      }
+      if (items.length) {
+        items.sort((a, b) => (a.releaseDate || Infinity) - (b.releaseDate || Infinity));
+        groups.push({ id: grp.id, items });
+      }
+    }
+
+    // Saga : tous les jeux principaux de la même franchise (ou collection),
+    // hors éditions/remasters « version de », en ordre chronologique.
+    const fid = g.franchises?.[0]?.id;
+    const cid = g.collections?.[0]?.id;
+    let series = [];
+    if (fid || cid) {
+      const whereRel = fid ? `franchises = (${fid})` : `collections = (${cid})`;
+      // limit 500 = maximum autorisé par IGDB ; tri desc pour garder les jeux
+      // les plus récents si la licence dépasse quand même la limite.
+      const list = await igdbQuery(
+        "games",
+        `fields ${REL_SUBFIELDS.join(",")}; where ${whereRel} & id != ${id} & version_parent = null & cover != null; sort first_release_date desc; limit 500;`
+      ).catch(() => []);
+      series = list.filter((s) => !seen.has(s.id)).map(mapRelGame);
+    }
+
+    res.json({
+      franchise: g.franchises?.[0]?.name || g.collections?.[0]?.name || null,
+      groups,
+      series,
+    });
+  } catch (err) {
+    console.error("game related error:", err.message);
     res.status(err.status || 500).json({ error: err.message || "Erreur." });
   }
 });

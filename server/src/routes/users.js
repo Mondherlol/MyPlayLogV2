@@ -44,6 +44,7 @@ const upload = multer({
 const OVERVIEW_SECTIONS = new Set([
   "favorites",
   "playing",
+  "endless",
   "finished",
   "wishlist",
   "paused",
@@ -785,6 +786,7 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
 
     const meta = await ensureGameMeta(entries.map((e) => e.gameId));
     const played = entries.filter((e) => e.status !== "wishlist");
+    const finishable = played.filter((e) => e.status !== "endless");
     // Base des stats de goûts (genres, studios…) : les jeux joués ; si le
     // profil n'a que de la wishlist, on se rabat sur toute la bibliothèque.
     const base = played.length ? played : entries;
@@ -810,7 +812,7 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
       ? Math.round(rated.reduce((s, e) => s + e.rating, 0) / rated.length)
       : null;
 
-    const statuses = ["playing", "finished", "paused", "dropped", "wishlist"].map(
+    const statuses = ["playing", "endless", "finished", "paused", "dropped", "wishlist"].map(
       (key) => ({ key, count: entries.filter((e) => e.status === key).length })
     );
 
@@ -999,8 +1001,10 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
         reviews: entries.filter((e) => (e.review || "").trim()).length,
         rated: rated.length,
         avgRating,
-        completionRate: played.length ? Math.round((finished / played.length) * 100) : null,
-        droppedRate: played.length ? Math.round((droppedCount / played.length) * 100) : null,
+        // Base « finissable » : les jeux sans fin (multi/service) sont exclus
+        // du taux de complétion — on ne peut ni les terminer ni les abandonner.
+        completionRate: finishable.length ? Math.round((finished / finishable.length) * 100) : null,
+        droppedRate: finishable.length ? Math.round((droppedCount / finishable.length) * 100) : null,
       },
       statuses,
       platforms,

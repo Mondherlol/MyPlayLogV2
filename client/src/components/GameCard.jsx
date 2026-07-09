@@ -17,7 +17,7 @@ import { apiFetch } from "../lib/api";
 import PlayedModal from "./PlayedModal";
 import AddToListModal from "./AddToListModal";
 
-const PLAYED = ["playing", "finished", "paused", "dropped"];
+const PLAYED = ["playing", "finished", "paused", "dropped", "endless"];
 
 export default function GameCard({ game, variant = "grid" }) {
   const navigate = useNavigate();

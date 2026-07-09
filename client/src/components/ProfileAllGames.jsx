@@ -18,6 +18,7 @@ import GameAddFan from "./GameAddFan";
 
 const STATUSES = [
   { key: "playing", label: "En cours" },
+  { key: "endless", label: "Sans fin" },
   { key: "finished", label: "Terminés" },
   { key: "paused", label: "En pause" },
   { key: "dropped", label: "Abandonnés" },

@@ -33,6 +33,7 @@ const statsCache = makeCache("mpl_stats_", 10 * 60 * 1000);
 // design system) — les valeurs light/dark vivent dans le CSS (--ps-c-*).
 const STATUS_META = [
   { key: "playing", label: "En cours" },
+  { key: "endless", label: "Sans fin" },
   { key: "finished", label: "Terminés" },
   { key: "paused", label: "En pause" },
   { key: "dropped", label: "Abandonnés" },

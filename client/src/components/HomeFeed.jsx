@@ -28,6 +28,7 @@ import {
   ThumbsDown,
   CornerDownRight,
   Gem,
+  Infinity as InfinityIcon,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { timeAgo } from "../lib/lists";
@@ -46,6 +47,7 @@ const STATUS_META = {
   finished: { verb: "a terminé", Icon: CircleCheck, cls: "finished" },
   paused: { verb: "a mis en pause", Icon: CirclePause, cls: "paused" },
   dropped: { verb: "a abandonné", Icon: CircleX, cls: "dropped" },
+  endless: { verb: "enchaîne les parties sur", Icon: InfinityIcon, cls: "endless" },
 };
 
 const LIST_TYPE_META = {

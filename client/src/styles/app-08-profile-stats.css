@@ -10,6 +10,7 @@
   --ps-bar-track: rgba(176, 125, 8, 0.13);
   /* Statuts du backlog (ordre d'empilement = ordre CVD validé) */
   --ps-c-playing: #2a78d6;
+  --ps-c-endless: #0f9fae;
   --ps-c-finished: #1baf7a;
   --ps-c-paused: #eda100;
   --ps-c-dropped: #e34948;
@@ -33,6 +34,7 @@
   --ps-bar: #f2b70b;
   --ps-bar-track: rgba(242, 183, 11, 0.14);
   --ps-c-playing: #3987e5;
+  --ps-c-endless: #2cb8c7;
   --ps-c-finished: #199e70;
   --ps-c-paused: #c98500;
   --ps-c-dropped: #e66767;
@@ -45,6 +47,7 @@
 }
 
 .c-playing { --ps-c: var(--ps-c-playing); }
+.c-endless { --ps-c: var(--ps-c-endless); }
 .c-finished { --ps-c: var(--ps-c-finished); }
 .c-paused { --ps-c: var(--ps-c-paused); }
 .c-dropped { --ps-c: var(--ps-c-dropped); }

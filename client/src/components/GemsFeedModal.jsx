@@ -14,6 +14,7 @@ import {
   CirclePause,
   CircleX,
   Check,
+  Infinity as InfinityIcon,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -26,9 +27,10 @@ const OWNER_STATUS = {
   finished: { label: "terminé", Icon: CircleCheck, cls: "finished" },
   paused: { label: "en pause", Icon: CirclePause, cls: "paused" },
   dropped: { label: "abandonné", Icon: CircleX, cls: "dropped" },
+  endless: { label: "il y joue sans fin", Icon: InfinityIcon, cls: "endless" },
 };
 
-const PLAYED = ["playing", "finished", "paused", "dropped"];
+const PLAYED = ["playing", "finished", "paused", "dropped", "endless"];
 
 // Modale « les pépites de X » : ouverte depuis la carte du fil, elle liste la
 // dernière fournée du joueur (liste verticale) avec son statut sur chaque jeu,

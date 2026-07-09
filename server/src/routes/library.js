@@ -5,7 +5,7 @@ import { warmGameMeta } from "../lib/gameMeta.js";
 
 const router = express.Router();
 
-const STATUSES = ["wishlist", "playing", "finished", "paused", "dropped"];
+const STATUSES = ["wishlist", "playing", "finished", "paused", "dropped", "endless"];
 
 function toPublic(e) {
   return {

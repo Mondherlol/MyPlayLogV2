@@ -26,6 +26,7 @@ import {
   Gamepad2,
   Pencil,
   Repeat2,
+  Infinity as InfinityIcon,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { timeAgo, typeMeta } from "../lib/lists";
@@ -39,6 +40,7 @@ const STATUS_META = {
   finished: { label: "Terminé", Icon: Trophy },
   paused: { label: "En pause", Icon: Pause },
   dropped: { label: "Abandonné", Icon: Ban },
+  endless: { label: "Sans fin", Icon: InfinityIcon },
   wishlist: { label: "À jouer", Icon: Clock },
 };
 

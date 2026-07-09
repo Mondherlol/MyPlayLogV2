@@ -1716,6 +1716,48 @@
   box-shadow: 0 4px 12px rgba(242, 183, 11, 0.3);
 }
 
+/* Statut spécial « Sans fin » (jeux multi/service) : pointillés + cyan actif
+   pour le distinguer des statuts d'avancement classiques. */
+.seg-opt.endless {
+  border-style: dashed;
+}
+
+.seg-opt.endless:hover {
+  border-color: #17b3c4;
+  background: color-mix(in srgb, #17b3c4 10%, var(--surface));
+}
+
+.seg-opt.endless:hover svg {
+  color: #0e8a99;
+}
+
+.seg-opt.endless.active {
+  background: linear-gradient(135deg, #2cc5d6, #0e8a99);
+  border-color: transparent;
+  border-style: solid;
+  color: #03262b;
+  box-shadow: 0 4px 12px rgba(23, 179, 196, 0.3);
+}
+
+/* Lien discret sous les statuts : révèle « Sans fin » sur n'importe quel jeu */
+.endless-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.endless-link:hover {
+  color: #0e8a99;
+  text-decoration: underline;
+}
+
 .field-row {
   display: flex;
   gap: 0.8rem;

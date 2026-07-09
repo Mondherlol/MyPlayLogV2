@@ -30,6 +30,7 @@ import {
   Check,
   SlidersHorizontal,
   ArrowRight,
+  Infinity as InfinityIcon,
 } from "lucide-react";
 import GameAddFan from "./GameAddFan";
 import ProfileOverviewAside from "./ProfileOverviewAside";
@@ -40,12 +41,13 @@ import ProfileOverviewAside from "./ProfileOverviewAside";
 const BLOCK_META = {
   favorites: { label: "Jeux favoris", Icon: Heart },
   playing: { label: "En cours", Icon: Gamepad2 },
+  endless: { label: "Sans fin", Icon: InfinityIcon },
   finished: { label: "Terminés", Icon: Trophy },
   wishlist: { label: "À jouer", Icon: ListChecks },
   paused: { label: "En pause", Icon: PauseCircle },
   dropped: { label: "Abandonnés", Icon: Ban },
 };
-const DEFAULT_ORDER = ["favorites", "playing", "finished", "wishlist", "paused", "dropped"];
+const DEFAULT_ORDER = ["favorites", "playing", "endless", "finished", "wishlist", "paused", "dropped"];
 
 // Détails optionnels affichés en surimpression des jaquettes.
 const CARD_FIELDS = [
