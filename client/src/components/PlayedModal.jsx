@@ -15,8 +15,10 @@ import {
   ThumbsDown,
   Play,
   Pause,
-  Ban,
+  Skull,
   Trophy,
+  Cloud,
+  Disc,
   ListPlus,
   PenLine,
   EyeOff,
@@ -35,7 +37,7 @@ const STATUSES = [
   { value: "playing", label: "En cours", Icon: Play },
   { value: "finished", label: "Terminé", Icon: Trophy },
   { value: "paused", label: "En pause", Icon: Pause },
-  { value: "dropped", label: "Abandonné", Icon: Ban },
+  { value: "dropped", label: "Abandonné", Icon: Skull },
 ];
 
 // Statut spécial des jeux sans fin (multi/service : Rocket League, Overwatch…).
@@ -45,6 +47,10 @@ const ENDLESS = { value: "endless", label: "Sans fin", Icon: InfinityIcon };
 
 const LETSPLAY = "Vu en let's play";
 const PLAYED = ["playing", "finished", "paused", "dropped", "endless"];
+
+// Plateformes 100 % dématérialisées : pas de choix digital/physique pour
+// elles (PC, mobile, cloud…). Pour les consoles, on propose le format.
+const DIGITAL_ONLY = /windows|\bpc\b|android|ios|linux|\bmac\b|browser|stadia|luna/i;
 
 // Infos statiques du jeu (plateformes, jaquettes, persos, temps de jeu) : elles
 // ne changent pas d'une ouverture à l'autre → cache mémoire + localStorage 24h,
@@ -160,6 +166,15 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   const [favChar, setFavChar] = useState(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
+  // Instantané de la review au chargement, pour détecter une modif non
+  // enregistrée et prévenir avant de fermer la modale.
+  const initialReview = useRef({
+    review: "",
+    reviewMedia: [],
+    pros: [],
+    cons: [],
+    spoiler: false,
+  });
 
   // Statut/favori initialisés depuis la map locale de la bibliothèque : le bon
   // bouton est coché dès l'ouverture, sans flash « Terminé » le temps que
@@ -169,6 +184,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
     return PLAYED.includes(s) ? s : "finished";
   });
   const [platform, setPlatform] = useState("");
+  const [format, setFormat] = useState("digital"); // digital | physical
   const [playtime, setPlaytime] = useState("");
   const [favorite, setFavorite] = useState(() => !!map[game.id]?.favorite);
   const [hasRating, setHasRating] = useState(false);
@@ -198,6 +214,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
         setExisting(true);
         setStatus(PLAYED.includes(en.status) ? en.status : "finished");
         setPlatform(en.platform || "");
+        setFormat(en.format || "digital");
         setPlaytime(en.playtimeHours ?? "");
         setFavorite(!!en.favorite);
         if (en.rating != null) {
@@ -212,6 +229,13 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
         setFavChar(en.favoriteCharacter || null);
         setFavoriteOst(en.favoriteOst || null);
         if (en.cover) setCover(en.cover);
+        initialReview.current = {
+          review: en.review || "",
+          reviewMedia: en.reviewMedia || [],
+          pros: en.pros || [],
+          cons: en.cons || [],
+          spoiler: !!en.spoiler,
+        };
       }
       setEntryLoading(false);
       // Ouverture directe sur l'éditeur de review (depuis « Modifier ma review »).
@@ -224,13 +248,44 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
-    const onKey = (e) => e.key === "Escape" && (showReview ? setShowReview(false) : onClose());
+    const onKey = (e) => e.key === "Escape" && (showReview ? setShowReview(false) : attemptClose());
     document.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = "";
       document.removeEventListener("keydown", onKey);
     };
   }, [onClose, showReview]);
+
+  // Reflet « live » des champs de review, pour un contrôle fiable du non
+  // enregistré même depuis un handler capturé par un effet (touche Échap).
+  const liveReview = useRef(null);
+  liveReview.current = { review, reviewMedia, pros, cons, spoiler };
+
+  function reviewDirty() {
+    const i = initialReview.current;
+    const c = liveReview.current;
+    return (
+      c.review.trim() !== i.review.trim() ||
+      JSON.stringify(c.reviewMedia) !== JSON.stringify(i.reviewMedia) ||
+      JSON.stringify(c.pros) !== JSON.stringify(i.pros) ||
+      JSON.stringify(c.cons) !== JSON.stringify(i.cons) ||
+      c.spoiler !== i.spoiler
+    );
+  }
+
+  // Fermeture de la modale : prévient si une review a été écrite/modifiée
+  // sans être enregistrée (le clic « Enregistrer » appelle onClose directement).
+  function attemptClose() {
+    if (
+      reviewDirty() &&
+      !confirm(
+        "Ta review n'est pas encore enregistrée et sera perdue si tu fermes. Fermer quand même ?"
+      )
+    ) {
+      return;
+    }
+    onClose();
+  }
 
   async function save() {
     setSaving(true);
@@ -240,6 +295,8 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
         cover,
         status,
         platform: platform || null,
+        // Le format n'a de sens que sur console : on retombe sur digital sinon.
+        format: showFormat ? format : "digital",
         playtimeHours: playtime === "" ? null : Number(playtime),
         favorite,
         rating: hasRating ? Number(rating) : null,
@@ -303,6 +360,10 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   ];
 
   const platformOptions = [...details.platforms.map((p) => p.name), LETSPLAY];
+  // Choix digital/physique : uniquement pour une console « physique-capable »
+  // (ni PC/mobile/cloud, ni let's play).
+  const showFormat =
+    !!platform && platform !== LETSPLAY && !DIGITAL_ONLY.test(platform);
   const hasReview = review.trim() || reviewMedia.length || pros.length || cons.length;
   // « Sans fin » visible si le jeu est multi/service (IGDB), déjà dans ce
   // statut, ou activé à la main via le lien sous les statuts.
@@ -311,9 +372,9 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
 
   return createPortal(
     <>
-      <div className="modal-overlay" onMouseDown={onClose} onClick={(e) => e.stopPropagation()}>
-        <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
-          <button className="modal-close clickable" onClick={onClose} aria-label="Fermer">
+      <div className="modal-overlay" onMouseDown={attemptClose} onClick={(e) => e.stopPropagation()}>
+        <div className="modal played-modal" onMouseDown={(e) => e.stopPropagation()}>
+          <button className="modal-close clickable" onClick={attemptClose} aria-label="Fermer">
             <X size={20} />
           </button>
 
@@ -468,6 +529,31 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                     </ScrollRow>
                   )}
 
+                  {/* Format d'achat (console uniquement) : démat ou boîte */}
+                  {showFormat && (
+                    <div className="format-row">
+                      <label className="field-label">Format</label>
+                      <div className="format-seg">
+                        <button
+                          type="button"
+                          className={`format-opt clickable ${format === "digital" ? "active" : ""}`}
+                          onClick={() => setFormat("digital")}
+                        >
+                          <Cloud size={16} />
+                          <span>Digital</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={`format-opt clickable ${format === "physical" ? "active" : ""}`}
+                          onClick={() => setFormat("physical")}
+                        >
+                          <Disc size={16} />
+                          <span>Physique</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="time-ttb-row">
                     <div className="time-col">
                       <label className="field-label">Temps de jeu</label>
@@ -540,7 +626,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
 
               {/* Footer : actions tout en bas, à droite */}
               <div className="modal-footer">
-                <button className="btn btn-ghost" onClick={onClose} disabled={saving}>
+                <button className="btn btn-ghost" onClick={attemptClose} disabled={saving}>
                   Annuler
                 </button>
                 <button

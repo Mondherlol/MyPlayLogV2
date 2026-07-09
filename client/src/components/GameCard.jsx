@@ -9,6 +9,10 @@ import {
   Bookmark,
   ListPlus,
   Gamepad,
+  Play,
+  Pause,
+  Skull,
+  Infinity as InfinityIcon,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useLibrary } from "../context/LibraryContext";
@@ -18,6 +22,17 @@ import PlayedModal from "./PlayedModal";
 import AddToListModal from "./AddToListModal";
 
 const PLAYED = ["playing", "finished", "paused", "dropped", "endless"];
+
+// Icône + libellé du bouton principal selon le statut du jeu dans la
+// bibliothèque : on voit d'un coup d'œil où on en est, comme sur la page jeu.
+const STATUS_META = {
+  wishlist: { label: "Dans ma wishlist", Icon: Bookmark },
+  playing: { label: "En cours", Icon: Play },
+  finished: { label: "Terminé", Icon: Check },
+  paused: { label: "En pause", Icon: Pause },
+  dropped: { label: "Abandonné", Icon: Skull },
+  endless: { label: "Sans fin", Icon: InfinityIcon },
+};
 
 export default function GameCard({ game, variant = "grid" }) {
   const navigate = useNavigate();
@@ -35,6 +50,7 @@ export default function GameCard({ game, variant = "grid" }) {
   const inLibrary = !!entry;
   const isWishlist = entry?.status === "wishlist";
   const isPlayed = entry && PLAYED.includes(entry.status);
+  const statusMeta = entry ? STATUS_META[entry.status] : null;
 
   async function toggleWishlist(e) {
     e.stopPropagation();
@@ -109,13 +125,13 @@ export default function GameCard({ game, variant = "grid" }) {
         <div className="game-row-actions">
           <button
             className={`game-row-btn ${isPlayed ? "active" : ""}`}
-            title="J'y ai joué"
+            title={isPlayed ? statusMeta.label : "J'y ai joué"}
             onClick={(e) => {
               e.stopPropagation();
               setShowModal(true);
             }}
           >
-            <Gamepad size={17} />
+            {isPlayed ? <statusMeta.Icon size={17} /> : <Gamepad size={17} />}
           </button>
           <button
             className={`game-row-btn ${isWishlist ? "active" : ""}`}
@@ -230,10 +246,16 @@ export default function GameCard({ game, variant = "grid" }) {
             e.stopPropagation();
             setFanOpen((v) => !v);
           }}
-          title="Ajouter"
-          aria-label="Ajouter le jeu"
+          title={statusMeta ? statusMeta.label : "Ajouter"}
+          aria-label={statusMeta ? statusMeta.label : "Ajouter le jeu"}
         >
-          {fanOpen ? <X size={20} /> : inLibrary ? <Check size={20} /> : <Plus size={20} />}
+          {fanOpen ? (
+            <X size={20} />
+          ) : statusMeta ? (
+            <statusMeta.Icon size={20} />
+          ) : (
+            <Plus size={20} />
+          )}
         </button>
       </div>
     </article>

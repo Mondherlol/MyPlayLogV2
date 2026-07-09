@@ -14,7 +14,7 @@ import {
   Play,
   Pause,
   Trophy,
-  Ban,
+  Skull,
   EyeOff,
   Eye,
   User,
@@ -39,7 +39,7 @@ const STATUS_META = {
   playing: { label: "En cours", Icon: Play },
   finished: { label: "Terminé", Icon: Trophy },
   paused: { label: "En pause", Icon: Pause },
-  dropped: { label: "Abandonné", Icon: Ban },
+  dropped: { label: "Abandonné", Icon: Skull },
   endless: { label: "Sans fin", Icon: InfinityIcon },
   wishlist: { label: "À jouer", Icon: Clock },
 };

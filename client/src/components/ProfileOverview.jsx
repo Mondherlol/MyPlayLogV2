@@ -22,7 +22,7 @@ import {
   Gamepad2,
   ListChecks,
   PauseCircle,
-  Ban,
+  Skull,
   Clock,
   Joystick,
   Type,
@@ -45,7 +45,7 @@ const BLOCK_META = {
   finished: { label: "Terminés", Icon: Trophy },
   wishlist: { label: "À jouer", Icon: ListChecks },
   paused: { label: "En pause", Icon: PauseCircle },
-  dropped: { label: "Abandonnés", Icon: Ban },
+  dropped: { label: "Abandonnés", Icon: Skull },
 };
 const DEFAULT_ORDER = ["favorites", "playing", "endless", "finished", "wishlist", "paused", "dropped"];
 

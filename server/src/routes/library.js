@@ -14,6 +14,7 @@ function toPublic(e) {
     cover: e.cover,
     status: e.status,
     platform: e.platform,
+    format: e.format || "digital",
     playtimeHours: e.playtimeHours,
     note: e.note,
     review: e.review,
@@ -69,6 +70,9 @@ router.put("/:gameId", requireAuth, async (req, res) => {
     if (b.status && !STATUSES.includes(b.status)) {
       return res.status(400).json({ error: "Statut invalide." });
     }
+    if (b.format && !["digital", "physical"].includes(b.format)) {
+      return res.status(400).json({ error: "Format invalide." });
+    }
 
     const update = { user: req.userId, gameId };
     // n'écrase que les champs fournis
@@ -77,6 +81,7 @@ router.put("/:gameId", requireAuth, async (req, res) => {
       "cover",
       "status",
       "platform",
+      "format",
       "playtimeHours",
       "note",
       "review",

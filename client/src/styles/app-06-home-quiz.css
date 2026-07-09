@@ -3551,6 +3551,11 @@
 }
 
 .gp-cover {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  cursor: pointer;
   margin-top: -104px;
   /* remonte sur le backdrop */
   aspect-ratio: 3 / 4;
@@ -3559,6 +3564,29 @@
   background: var(--surface-2);
   border: 4px solid var(--bg);
   box-shadow: 0 22px 46px rgba(10, 10, 20, 0.45);
+}
+
+/* Overlay « Modifier » au survol de la jaquette (ouvre le sélecteur) */
+.gp-cover-edit {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.55rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(to top, rgba(10, 10, 15, 0.85), transparent);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.gp-cover:hover .gp-cover-edit {
+  opacity: 1;
 }
 
 .gp-cover img {
@@ -3688,6 +3716,48 @@
   color: var(--text-soft);
 }
 
+/* Jeu sans date de sortie (TBD) */
+.gp-tbd {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 16px;
+  padding: 0.75rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.gp-tbd-ic {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--orange) 15%, var(--surface));
+}
+
+.gp-tbd-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.gp-tbd-txt b {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.gp-tbd-txt span {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+
 /* Cartes de la colonne gauche */
 .gp-left-card {
   background: var(--surface);
@@ -3750,6 +3820,22 @@
   font-weight: 700;
   font-size: 0.92rem;
   color: var(--text);
+}
+
+/* « Mon temps » de jeu (saisie directe, au-dessus des temps moyens) */
+.gp-myplaytime {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.gp-myplaytime-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-soft);
 }
 
 /* Favoris (OST / perso) */
@@ -5588,6 +5674,13 @@
   .gp-cover {
     max-width: 190px;
     margin-top: -84px;
+  }
+
+  /* Au tactile, l'infobulle « Modifier » est toujours visible */
+  .gp-cover-edit {
+    opacity: 1;
+    font-size: 0.74rem;
+    padding: 0.4rem;
   }
 
   .gp-rhead {

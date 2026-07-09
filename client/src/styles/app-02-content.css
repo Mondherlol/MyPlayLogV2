@@ -1739,6 +1739,64 @@
   box-shadow: 0 4px 12px rgba(23, 179, 196, 0.3);
 }
 
+/* Format d'achat (digital / physique) — apparaît quand une console est cochée */
+.format-row {
+  animation: formatIn 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+@keyframes formatIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.format-seg {
+  display: inline-flex;
+  gap: 0.35rem;
+  padding: 0.3rem;
+  border-radius: 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.format-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.84rem;
+  transition: all 0.15s ease;
+}
+
+.format-opt svg {
+  opacity: 0.7;
+}
+
+.format-opt:hover {
+  color: var(--text);
+}
+
+.format-opt:hover svg {
+  opacity: 1;
+}
+
+.format-opt.active {
+  background: var(--accent-grad);
+  color: #1a1204;
+  box-shadow: 0 3px 10px rgba(242, 183, 11, 0.28);
+}
+
+.format-opt.active svg {
+  opacity: 1;
+}
+
 /* Lien discret sous les statuts : révèle « Sans fin » sur n'importe quel jeu */
 .endless-link {
   display: inline-flex;
@@ -2187,6 +2245,35 @@
   margin-top: 1.4rem;
   padding-top: 1.2rem;
   border-top: 1px solid var(--border);
+}
+
+/* PlayedModal (desktop) : le footer d'actions (Enregistrer / Annuler) reste
+   collé en bas, TOUJOURS visible. On passe la modale en colonne flex : seul le
+   contenu défile, le footer est une vraie rangée figée (pas de « fantôme »
+   derrière les boutons comme avec un sticky au-dessus du padding). */
+@media (min-width: 621px) {
+  .modal.played-modal {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  /* Zone défilante : le corps normal OU le sélecteur de jaquette. */
+  .modal.played-modal > .modal-body,
+  .modal.played-modal > .cover-picker {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1.7rem 1.7rem 1rem;
+  }
+
+  .modal.played-modal > .modal-footer {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 1rem 1.7rem 1.3rem;
+    background: var(--surface);
+  }
 }
 
 /* Bouton "Écrire une review" (colonne gauche) */

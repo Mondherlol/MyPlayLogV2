@@ -21,6 +21,8 @@ import {
   ThumbsDown,
   X,
   Skull,
+  Cloud,
+  Disc,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { makeCache } from "../lib/cache";
@@ -182,6 +184,34 @@ function Columns({ data, tipOf }) {
           <span className="ps-col-label">{d.label}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+// Démat vs physique : barre bicolore + légende (dans la card Consoles).
+function FormatSplit({ formats }) {
+  const digital = formats?.digital || 0;
+  const physical = formats?.physical || 0;
+  const total = digital + physical;
+  if (!total) return null;
+  const pctD = Math.round((digital / total) * 100);
+  const pctP = 100 - pctD;
+  return (
+    <div className="ps-formats">
+      <div className="ps-formats-legend">
+        <span className="ps-format-item digital" title={`${nf.format(digital)} jeux en dématérialisé`}>
+          <Cloud size={14} /> Démat
+          <strong>{pctD} %</strong>
+        </span>
+        <span className="ps-format-item physical" title={`${nf.format(physical)} jeux en physique`}>
+          <Disc size={14} /> Physique
+          <strong>{pctP} %</strong>
+        </span>
+      </div>
+      <div className="ps-formats-bar" role="img" aria-label={`${pctD} % dématérialisé, ${pctP} % physique`}>
+        <span className="ps-formats-digital" style={{ width: `${pctD}%` }} />
+        <span className="ps-formats-physical" style={{ width: `${pctP}%` }} />
+      </div>
     </div>
   );
 }
@@ -580,6 +610,7 @@ export default function ProfileStats({ username, token }) {
                 title: `${p.name} : ${p.count} jeux${p.hours ? `, ${fmtHours(p.hours)}` : ""}`,
               }))}
             />
+            <FormatSplit formats={stats.formats} />
           </Card>
         )}
 

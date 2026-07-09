@@ -67,6 +67,8 @@ const userGameSchema = new mongoose.Schema(
       default: "wishlist",
     },
     platform: { type: String, default: null },
+    // Format d'achat sur console : dématérialisé ou boîte physique.
+    format: { type: String, enum: ["digital", "physical"], default: "digital" },
     playtimeHours: { type: Number, default: null },
     note: { type: String, default: "" }, // (déprécié) où je me suis arrêté
     review: { type: String, default: "" }, // texte de review

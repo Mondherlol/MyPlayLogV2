@@ -20,9 +20,16 @@ import {
   Cpu,
   Layers,
   Clock,
+  CalendarClock,
   Play,
+  Pause,
+  Skull,
+  Heart,
+  Infinity as InfinityIcon,
   Plus,
   X,
+  Upload,
+  ImagePlus,
   ImageOff,
   ExternalLink,
   Languages,
@@ -36,7 +43,7 @@ import {
   Orbit,
   CornerLeftUp,
 } from "lucide-react";
-import { apiFetch } from "../lib/api";
+import { apiFetch, apiUpload } from "../lib/api";
 import { makeCache } from "../lib/cache";
 import { useAuth } from "../context/AuthContext";
 import { useLibrary } from "../context/LibraryContext";
@@ -56,6 +63,16 @@ const FRIEND_GROUPS = [
 ];
 
 const PLAYED = ["playing", "finished", "paused", "dropped", "endless"];
+
+// Libellé + icône par statut « joué » — pour que le bouton d'action reflète
+// l'avancement réel (et non un « Joué » générique). Aligné sur PlayedModal.
+const STATUS_META = {
+  playing: { label: "En cours", Icon: Play },
+  finished: { label: "Terminé", Icon: Trophy },
+  paused: { label: "En pause", Icon: Pause },
+  dropped: { label: "Abandonné", Icon: Skull },
+  endless: { label: "Sans fin", Icon: InfinityIcon },
+};
 
 // Détails complets du jeu (infos IGDB, médias, similaires…) : statiques → cache
 // mémoire + localStorage 24h pour rouvrir la page instantanément.
@@ -109,9 +126,11 @@ function bgKey(id) {
   return `mpl_bg_${id}`;
 }
 
-// Marge avant la sortie où l'on autorise déjà « joué » / review (accès
-// anticipés, previews, leaks). Au-delà, le jeu est considéré « à venir ».
-const UPCOMING_MARGIN_MS = 7 * 24 * 60 * 60 * 1000;
+// Jaquette choisie pour ce jeu (persistée localement pour survivre au refresh
+// même si le jeu n'est pas dans la bibliothèque).
+function coverKey(id) {
+  return `mpl_cover_${id}`;
+}
 
 // Compteur à rebours jusqu'à la sortie (jours / heures / min / sec).
 function ReleaseCountdown({ ts, dateLabel }) {
@@ -201,6 +220,8 @@ export default function GamePage() {
   const [wishBusy, setWishBusy] = useState(false);
   const [viewer, setViewer] = useState(null); // { images, index }
   const [bgOverride, setBgOverride] = useState(null);
+  const [coverOverride, setCoverOverride] = useState(null);
+  const [showCover, setShowCover] = useState(false);
 
   const entry = map[id];
   const isWishlist = entry?.status === "wishlist";
@@ -226,6 +247,7 @@ export default function GamePage() {
     setFav(null);
     setFriends([]);
     setBgOverride(localStorage.getItem(bgKey(id)) || null);
+    setCoverOverride(localStorage.getItem(coverKey(id)) || null);
     window.scrollTo({ top: 0 });
     // Affichage immédiat depuis le cache (jaquette, titre, infos), puis revalidation.
     const cached = gameCache.get(String(id));
@@ -280,6 +302,30 @@ export default function GamePage() {
     }
   }
 
+  // Mise à jour partielle de l'entrée de bibliothèque (note, temps de jeu,
+  // coup de cœur) sans ouvrir la modale. Le PUT ne touche qu'aux champs
+  // fournis (merge côté serveur), donc le statut est préservé.
+  async function patchEntry(patch, mapPatch) {
+    setFav((f) => ({ ...(f || {}), ...patch })); // MAJ optimiste
+    try {
+      const data = await apiFetch(`/library/${id}`, {
+        method: "PUT",
+        token,
+        body: { ...patch, name: game.name, cover: game.cover },
+      });
+      setFav(data.entry);
+      if (mapPatch) upsertLocal(id, mapPatch);
+    } catch (err) {
+      alert(err.message);
+      reloadEntry();
+    }
+  }
+
+  function toggleFavorite() {
+    const next = !fav?.favorite;
+    patchEntry({ favorite: next }, { favorite: next });
+  }
+
   // Choix (ou retrait) de l'OST favorite depuis l'onglet OST : persiste
   // directement dans la bibliothèque et rafraîchit la card « OST favori ».
   async function selectFavoriteOst(t) {
@@ -306,6 +352,15 @@ export default function GamePage() {
       alert(err.message);
       reloadEntry();
     }
+  }
+
+  // Change la jaquette affichée pour ce jeu (choisie/uploadée depuis la page).
+  // Mémorisée localement pour survivre au refresh, et persistée sur l'entrée de
+  // bibliothèque si le jeu y est déjà (pour rester cohérent ailleurs).
+  function pickCover(url) {
+    localStorage.setItem(coverKey(id), url);
+    setCoverOverride(url);
+    if (fav) patchEntry({ cover: url });
   }
 
   // Définit l'image affichée comme fond de la page (mémorisé localement)
@@ -345,6 +400,7 @@ export default function GamePage() {
   }
 
   const backdrop = bgOverride || game.backdrop || null;
+  const cover = coverOverride || fav?.cover || game.cover || null;
   const releaseTs = game.releaseDate ? game.releaseDate * 1000 : null;
   const release = releaseTs
     ? new Date(releaseTs).toLocaleDateString("fr-FR", {
@@ -353,9 +409,13 @@ export default function GamePage() {
         year: "numeric",
       })
     : null;
-  // Jeu « à venir » : sortie connue et à plus d'une semaine → on bloque
-  // « j'y ai joué » et les reviews, et on affiche un compteur à rebours.
-  const upcoming = releaseTs != null && releaseTs - Date.now() > UPCOMING_MARGIN_MS;
+  // Jeu « à venir » : date de sortie connue mais future → compteur à rebours
+  // (tant que le jeu n'est pas sorti, sans marge) et « j'y ai joué » bloqué.
+  const upcoming = releaseTs != null && releaseTs > Date.now();
+  // Jeu « TBD » : pas de date de sortie et jamais noté par la communauté → il
+  // n'est pas encore sorti. On masque « déjà joué » (impossible d'y avoir joué)
+  // et on l'indique. (Un jeu déjà noté est forcément sorti, même sans date IGDB.)
+  const tbd = releaseTs == null && !game.ratingCount;
 
   const ttb = game.timeToBeat || {};
   const ttbChips = [
@@ -386,39 +446,79 @@ export default function GamePage() {
         <div className="gp-grid">
           {/* ---------------- Colonne gauche (fixe) ---------------- */}
           <aside className="gp-left">
-            <div className="gp-cover">
-              {game.cover ? (
-                <img src={game.cover} alt={game.name} draggable="false" />
+            <button
+              className="gp-cover clickable"
+              onClick={() => setShowCover(true)}
+              title="Changer la jaquette"
+            >
+              {cover ? (
+                <img src={cover} alt={game.name} draggable="false" />
               ) : (
                 <div className="gp-cover-empty">
                   <ImageOff size={34} />
                 </div>
               )}
-            </div>
+              <span className="gp-cover-edit">
+                <ImagePlus size={15} /> Modifier
+              </span>
+            </button>
 
             {/* Compteur à rebours si le jeu n'est pas encore sorti */}
             {upcoming && <ReleaseCountdown ts={releaseTs} dateLabel={release} />}
 
+            {/* Date de sortie indéterminée (TBD) */}
+            {tbd && (
+              <div className="gp-tbd">
+                <span className="gp-tbd-ic">
+                  <CalendarClock size={18} />
+                </span>
+                <div className="gp-tbd-txt">
+                  <b>Date de sortie à venir</b>
+                  <span>Ce jeu n'a pas encore de date (TBD)</span>
+                </div>
+              </div>
+            )}
+
             {/* Boutons d'action côte à côte */}
             <div className="gp-actions">
-              <button
-                className={`gp-action ${isPlayed ? "active" : ""} ${upcoming ? "disabled" : ""}`}
-                onClick={() => !upcoming && setShowPlayed(true)}
-                disabled={upcoming}
-                title={upcoming ? "Pas encore sorti" : "J'y ai joué"}
-              >
-                <Gamepad size={18} />
-                <span>{isPlayed ? "Joué" : "Jouer"}</span>
-              </button>
-              <button
-                className={`gp-action ${isWishlist ? "active" : ""}`}
-                onClick={toggleWishlist}
-                disabled={wishBusy}
-                title="Je veux y jouer"
-              >
-                <Bookmark size={18} fill={isWishlist ? "currentColor" : "none"} />
-                <span>Wishlist</span>
-              </button>
+              {/* « déjà joué » masqué tant que le jeu n'est pas sorti (TBD) */}
+              {!tbd &&
+                (() => {
+                  const st = isPlayed ? STATUS_META[entry.status] : null;
+                  const StatusIcon = st?.Icon || Gamepad;
+                  return (
+                    <button
+                      className={`gp-action ${isPlayed ? "active" : ""} ${upcoming ? "disabled" : ""}`}
+                      onClick={() => !upcoming && setShowPlayed(true)}
+                      disabled={upcoming}
+                      title={upcoming ? "Pas encore sorti" : "J'y ai joué"}
+                    >
+                      <StatusIcon size={18} />
+                      <span>{st ? st.label : "Jouer"}</span>
+                    </button>
+                  );
+                })()}
+              {/* Jeu joué → « Coup de cœur » ; sinon → « Wishlist ». */}
+              {isPlayed ? (
+                <button
+                  className={`gp-action ${fav?.favorite ? "active" : ""}`}
+                  onClick={toggleFavorite}
+                  title="Coup de cœur"
+                >
+                  <Heart size={18} fill={fav?.favorite ? "currentColor" : "none"} />
+                  <span>Coup de cœur</span>
+                </button>
+              ) : (
+                <button
+                  className={`gp-action ${isWishlist ? "active" : ""}`}
+                  onClick={toggleWishlist}
+                  disabled={wishBusy}
+                  title="Je veux y jouer"
+                >
+                  <Bookmark size={18} fill={isWishlist ? "currentColor" : "none"} />
+                  <span>Wishlist</span>
+                </button>
+              )}
               <button
                 className="gp-action"
                 onClick={() => setShowList(true)}
@@ -433,11 +533,27 @@ export default function GamePage() {
               <Send size={16} /> Recommander à un ami
             </button>
 
+            {/* Ma note — notation rapide sans ouvrir la modale (jeu joué) */}
+            {isPlayed && (
+              <div className="gp-left-card">
+                <InlineRating
+                  value={fav?.rating}
+                  onSave={(r) => patchEntry({ rating: r })}
+                />
+              </div>
+            )}
+
             {/* Temps moyen pour finir */}
             <div className="gp-left-card">
               <h3 className="gp-h3">
                 <Clock size={14} /> Temps de jeu
               </h3>
+              {isPlayed && (
+                <InlinePlaytime
+                  value={fav?.playtimeHours}
+                  onSave={(n) => patchEntry({ playtimeHours: n })}
+                />
+              )}
               {hasTtb ? (
                 <div className="gp-ttb">
                   {ttbChips.map((c) => (
@@ -506,6 +622,11 @@ export default function GamePage() {
                   {release && (
                     <span>
                       <Calendar size={14} /> {release}
+                    </span>
+                  )}
+                  {tbd && (
+                    <span>
+                      <CalendarClock size={14} /> À venir · TBD
                     </span>
                   )}
                   {game.developers?.[0] && (
@@ -609,7 +730,7 @@ export default function GamePage() {
               <GameReviews
                 game={{ id: Number(id), name: game.name, cover: game.cover }}
                 viewerStatus={entry?.status}
-                upcoming={upcoming}
+                upcoming={upcoming || tbd}
                 onWantPlay={() => setShowPlayed(true)}
               />
             )}
@@ -646,7 +767,7 @@ export default function GamePage() {
 
       {showPlayed && (
         <PlayedModal
-          game={{ id: Number(id), name: game.name, cover: game.cover }}
+          game={{ id: Number(id), name: game.name, cover }}
           onClose={() => {
             setShowPlayed(false);
             reloadEntry();
@@ -656,15 +777,25 @@ export default function GamePage() {
 
       {showList && (
         <AddToListModal
-          game={{ id: Number(id), name: game.name, cover: game.cover }}
+          game={{ id: Number(id), name: game.name, cover }}
           onClose={() => setShowList(false)}
         />
       )}
 
       {showRecommend && (
         <RecommendModal
-          game={{ id: Number(id), name: game.name, cover: game.cover }}
+          game={{ id: Number(id), name: game.name, cover }}
           onClose={() => setShowRecommend(false)}
+        />
+      )}
+
+      {showCover && (
+        <CoverPickerModal
+          gameId={id}
+          token={token}
+          currentCover={cover}
+          onPick={pickCover}
+          onClose={() => setShowCover(false)}
         />
       )}
 
@@ -975,6 +1106,262 @@ function FriendsPlayed({ friends }) {
         );
       })}
     </div>
+  );
+}
+
+// Jauge de note semi-circulaire, éditable au centre (identique à PlayedModal).
+function RatingGauge({ value, active, onEnable, onChange, onClear }) {
+  const R = 56;
+  const CX = 70;
+  const CY = 66;
+  const SW = 12;
+  const L = Math.PI * R;
+  const arc = `M ${CX - R} ${CY} A ${R} ${R} 0 0 1 ${CX + R} ${CY}`;
+  const offset = L * (1 - (active ? value : 0) / 100);
+  const color = !active
+    ? "var(--border-strong)"
+    : value < 40
+    ? "#e0483f"
+    : value < 70
+    ? "#f2b70b"
+    : "#22a35a";
+  const inputRef = useRef(null);
+  const [txt, setTxt] = useState(String(value));
+
+  useEffect(() => {
+    setTxt(String(value));
+  }, [value]);
+  useEffect(() => {
+    if (active) inputRef.current?.focus();
+  }, [active]);
+
+  function onInput(e) {
+    let v = e.target.value.replace(/[^0-9]/g, "").replace(/^0+(?=\d)/, "");
+    if (v === "") {
+      setTxt("");
+      return;
+    }
+    const n = Math.max(0, Math.min(100, parseInt(v, 10)));
+    setTxt(String(n));
+    onChange(n);
+  }
+
+  return (
+    <div className="rating-gauge">
+      <div className="gauge-vis">
+        <svg viewBox="0 0 140 78" className="gauge-svg">
+          <path d={arc} fill="none" stroke="var(--border-strong)" strokeWidth={SW} strokeLinecap="round" />
+          {active && (
+            <path
+              d={arc}
+              fill="none"
+              stroke={color}
+              strokeWidth={SW}
+              strokeLinecap="round"
+              strokeDasharray={L}
+              strokeDashoffset={offset}
+              style={{ transition: "stroke-dashoffset 0.3s ease, stroke 0.3s ease" }}
+            />
+          )}
+        </svg>
+        <div className="gauge-center">
+          {active ? (
+            <input
+              ref={inputRef}
+              type="number"
+              min="0"
+              max="100"
+              value={txt}
+              onChange={onInput}
+              onFocus={(e) => e.target.select()}
+              onBlur={() => txt === "" && setTxt(String(value))}
+              className="gauge-input"
+              style={{ color }}
+            />
+          ) : (
+            <button className="gauge-noter clickable" onClick={onEnable}>
+              Noter
+            </button>
+          )}
+        </div>
+      </div>
+      {active && (
+        <button className="gauge-clear clickable" onClick={onClear}>
+          <X size={12} /> retirer la note
+        </button>
+      )}
+    </div>
+  );
+}
+
+// « Ma note » de la colonne gauche : note éditable directement, persistée en
+// base sans ouvrir la modale (petit délai pour ne pas spammer l'API en tapant).
+function InlineRating({ value, onSave }) {
+  const [hasRating, setHasRating] = useState(value != null);
+  const [rating, setRating] = useState(value ?? 75);
+  const timer = useRef(null);
+
+  useEffect(() => {
+    setHasRating(value != null);
+    if (value != null) setRating(value);
+  }, [value]);
+
+  function pushSave(next) {
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => onSave(next), 500);
+  }
+
+  return (
+    <div className="rating-block">
+      <span className="rating-block-label">Ma note</span>
+      <RatingGauge
+        value={rating}
+        active={hasRating}
+        onEnable={() => {
+          setHasRating(true);
+          onSave(rating);
+        }}
+        onChange={(n) => {
+          setRating(n);
+          pushSave(n);
+        }}
+        onClear={() => {
+          setHasRating(false);
+          clearTimeout(timer.current);
+          onSave(null);
+        }}
+      />
+    </div>
+  );
+}
+
+// « Mon temps » de jeu : saisie directe (validée à la sortie du champ / Entrée).
+function InlinePlaytime({ value, onSave }) {
+  const [txt, setTxt] = useState(value != null ? String(value) : "");
+
+  useEffect(() => {
+    setTxt(value != null ? String(value) : "");
+  }, [value]);
+
+  function commit() {
+    const n = txt === "" ? null : Number(txt);
+    if (n === (value ?? null)) return; // rien n'a changé
+    onSave(n);
+  }
+
+  return (
+    <div className="gp-myplaytime">
+      <span className="gp-myplaytime-label">Mon temps</span>
+      <div className="input-group">
+        <Clock size={16} className="input-icon" />
+        <input
+          className="modal-input"
+          type="number"
+          min="0"
+          placeholder="0"
+          value={txt}
+          onChange={(e) => setTxt(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+        />
+        <span className="input-suffix">h</span>
+      </div>
+    </div>
+  );
+}
+
+// Sélecteur de jaquette (ouvert en cliquant la cover sur la page) : mêmes
+// jaquettes que la modale (IGDB + covers custom) + upload d'une image perso.
+function CoverPickerModal({ gameId, token, currentCover, onPick, onClose }) {
+  const [covers, setCovers] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef(null);
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    let alive = true;
+    apiFetch(`/games/${gameId}/details`, { token })
+      .then((d) => alive && setCovers(d.covers || []))
+      .catch(() => alive && setCovers([]));
+    return () => {
+      alive = false;
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [gameId, token, onClose]);
+
+  async function onUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("cover", file);
+      const data = await apiUpload(`/games/${gameId}/cover`, fd, token);
+      onPick(data.cover.url);
+      onClose();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return createPortal(
+    <div className="modal-overlay" onMouseDown={onClose} onClick={(e) => e.stopPropagation()}>
+      <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+        <button className="modal-close clickable" onClick={onClose} aria-label="Fermer">
+          <X size={20} />
+        </button>
+        <div className="cover-picker">
+          <h3 className="picker-title">Choisir une jaquette</h3>
+          {covers === null ? (
+            <div style={{ display: "grid", placeItems: "center", padding: "2.5rem" }}>
+              <Loader2 size={24} className="spin" />
+            </div>
+          ) : (
+            <div className="picker-grid">
+              <button
+                className="picker-upload clickable"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? (
+                  <Loader2 size={22} className="spin" />
+                ) : (
+                  <>
+                    <Upload size={22} />
+                    <span>Uploader</span>
+                  </>
+                )}
+              </button>
+              {covers.map((c) => (
+                <button
+                  key={c.id}
+                  className={`picker-item clickable ${currentCover === c.url ? "active" : ""}`}
+                  onClick={() => {
+                    onPick(c.url);
+                    onClose();
+                  }}
+                >
+                  <img src={c.url} alt="" loading="lazy" />
+                  {c.custom && <span className="picker-badge">custom</span>}
+                  {currentCover === c.url && (
+                    <span className="picker-check">
+                      <Check size={16} />
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+          <input ref={fileRef} type="file" accept="image/*" hidden onChange={onUpload} />
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 

@@ -412,6 +412,63 @@
   color: var(--text-soft);
 }
 
+/* ---------- Démat vs physique (card Consoles) ---------- */
+.ps-formats {
+  margin-top: 1.1rem;
+  padding-top: 0.95rem;
+  border-top: 1px solid var(--border);
+}
+
+.ps-formats-legend {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.45rem;
+}
+
+.ps-format-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+
+.ps-format-item strong {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.ps-format-item.digital svg {
+  color: var(--ps-bar);
+}
+
+.ps-format-item.physical svg {
+  color: var(--ps-c-playing);
+}
+
+.ps-formats-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--ps-bar-track);
+}
+
+.ps-formats-digital {
+  height: 100%;
+  background: var(--ps-bar);
+  transform-origin: left;
+  animation: ps-grow-x 0.9s cubic-bezier(0.22, 0.8, 0.3, 1) both;
+}
+
+.ps-formats-physical {
+  height: 100%;
+  background: var(--ps-c-playing);
+  transform-origin: right;
+  animation: ps-grow-x 0.9s cubic-bezier(0.22, 0.8, 0.3, 1) both;
+}
+
 /* ---------- Listes de barres (marathons, genres, studios, consoles) ------ */
 .ps-barlist {
   list-style: none;

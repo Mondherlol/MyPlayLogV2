@@ -781,7 +781,7 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
     if (!user) return res.status(404).json({ error: "Profil introuvable." });
 
     const entries = await UserGame.find({ user: user._id })
-      .select("gameId name cover status platform playtimeHours favorite rating review")
+      .select("gameId name cover status platform format playtimeHours favorite rating review")
       .lean();
 
     const meta = await ensureGameMeta(entries.map((e) => e.gameId));
@@ -828,6 +828,10 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
     const platforms = [...platMap.values()]
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
+
+    // -- Démat vs physique (jeux joués ; défaut : digital) --
+    const physical = played.filter((e) => e.format === "physical").length;
+    const formats = { digital: played.length - physical, physical };
 
     // -- Marathon : jeux avec le plus d'heures --
     const topByHours = played
@@ -1008,6 +1012,7 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
       },
       statuses,
       platforms,
+      formats,
       topByHours,
       genres,
       developers,
