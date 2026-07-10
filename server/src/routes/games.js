@@ -306,7 +306,12 @@ router.get("/", requireAuth, async (req, res) => {
 //   haute (une envie peut sortir dans longtemps).
 // La liste générale (sans ids) est la même pour tout le monde : on la met en
 // cache mémoire partagé (par jour) pour ne pas rappeler IGDB à chaque visite.
+// Les fenêtres passées (feed « jours précédents » de la page Sorties) sont
+// aussi partagées : cache par fenêtre from-to, TTL 6 h, plafonné.
 const releasesCache = { day: 0, games: null };
+const windowCache = new Map(); // "from-to" -> { at, games }
+const WINDOW_TTL = 6 * 60 * 60 * 1000;
+const WINDOW_MAX = 60;
 
 router.get("/releases", requireAuth, async (req, res) => {
   try {
@@ -315,10 +320,20 @@ router.get("/releases", requireAuth, async (req, res) => {
     const from = parseInt(req.query.from, 10) || startOfToday;
     const ids = parseIds(req.query.ids);
     const isGeneral = !ids.length && !req.query.from && !req.query.to;
+    const isWindow = !ids.length && !isGeneral;
 
     // Cache partagé pour la liste générale du jour.
     if (isGeneral && releasesCache.games && releasesCache.day === startOfToday) {
       return res.json({ games: releasesCache.games });
+    }
+
+    const to = parseInt(req.query.to, 10) || now + 300 * 86400; // ~10 mois
+    const windowKey = `${from}-${to}`;
+    if (isWindow) {
+      const hit = windowCache.get(windowKey);
+      if (hit && Date.now() - hit.at < WINDOW_TTL) {
+        return res.json({ games: hit.games });
+      }
     }
 
     const where = [
@@ -330,7 +345,6 @@ router.get("/releases", requireAuth, async (req, res) => {
     if (ids.length) {
       where.push(`id = (${ids.join(",")})`);
     } else {
-      const to = parseInt(req.query.to, 10) || now + 300 * 86400; // ~10 mois
       where.push(`first_release_date <= ${to}`);
       where.push("game_type = (0,8,9)"); // jeu principal + remake + remaster
     }
@@ -350,12 +364,20 @@ router.get("/releases", requireAuth, async (req, res) => {
       ...mapGame(g),
       releaseDate: g.first_release_date || null,
       hypes: g.hypes || 0,
+      ratingCount: g.total_rating_count || 0,
       ai: (g.keywords || []).some((k) => AI_RE.test(k.name || "")),
     }));
 
     if (isGeneral) {
       releasesCache.games = games;
       releasesCache.day = startOfToday;
+    } else if (isWindow) {
+      if (windowCache.size >= WINDOW_MAX) {
+        // Purge simple : on jette l'entrée la plus ancienne.
+        const oldest = [...windowCache.entries()].sort((a, b) => a[1].at - b[1].at)[0];
+        if (oldest) windowCache.delete(oldest[0]);
+      }
+      windowCache.set(windowKey, { at: Date.now(), games });
     }
 
     res.json({ games });

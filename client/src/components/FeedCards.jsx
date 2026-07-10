@@ -35,6 +35,9 @@ import {
   Laugh,
   ListPlus,
   Trash2,
+  Gift,
+  Plus,
+  Flame,
   Infinity as InfinityIcon,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
@@ -77,6 +80,10 @@ const ACTION_META = {
   review_comment_reply: { Icon: CornerDownRight, verb: "a répondu à", ctx: "review", quote: true },
   review_comment_like: { Icon: Heart, verb: "a aimé une réponse de", ctx: "review", quote: true },
   review_react: { Icon: Heart, verb: "a réagi à l'avis de", ctx: "review", quote: false },
+  // Recommandations de jeux (target = destinataire) — cf. routes/recommendations.js
+  recommendation: { Icon: Gift, verb: "a recommandé un jeu à", ctx: "reco", quote: true },
+  recommendation_boost: { Icon: ThumbsUp, verb: "a soutenu une recommandation faite à", ctx: "reco", quote: false },
+  recommendation_comment: { Icon: MessageCircle, verb: "a commenté une recommandation faite à", ctx: "reco", quote: true },
 };
 
 // Réactions possibles sur un avis (mêmes clés que l'onglet Reviews).
@@ -754,11 +761,13 @@ const REACT_BADGES = {
   funny: { Icon: Laugh, color: "#f2b70b" },
 };
 
-function InteractionEvent({ item }) {
+function InteractionEvent({ item, token }) {
   const meta = ACTION_META[item.action];
   if (!meta) return null;
   const target = item.target?.username;
   const reviewUrl = item.game ? `/game/${item.game.id}?tab=reviews` : null;
+  // Contexte recommandation : le lien du destinataire mène à son onglet Reco.
+  const targetUrl = meta.ctx === "reco" ? `/u/${target}?tab=reco` : `/u/${target}`;
   // Réaction à un avis : la pastille montre LA réaction posée (cœur/bravo/rigolo).
   const reactBadge =
     item.action === "review_react" ? REACT_BADGES[item.snippet] : null;
@@ -787,7 +796,7 @@ function InteractionEvent({ item }) {
         {target && (
           <>
             {" "}
-            <Link to={`/u/${target}`} className="hf-int-target clickable">
+            <Link to={targetUrl} className="hf-int-target clickable">
               {target}
             </Link>
           </>
@@ -797,6 +806,11 @@ function InteractionEvent({ item }) {
       {meta.quote && item.snippet && <p className="hf-int-quote">{item.snippet}</p>}
 
       {item.list && <ListMini list={item.list} />}
+
+      {/* Contexte recommandation : mini-carte du jeu recommandé + bouton +1 */}
+      {meta.ctx === "reco" && item.game && (
+        <RecoPreview item={item} token={token} />
+      )}
 
       {meta.ctx === "review" &&
         item.game &&
@@ -811,6 +825,86 @@ function InteractionEvent({ item }) {
           </Link>
         ))}
     </article>
+  );
+}
+
+// Mini-carte du jeu recommandé : jaquette + infos (année, genre, note) +
+// bouton +1 — mêmes règles que l'onglet Recommandations du profil : un
+// recommandeur ne peut pas +1 (flamme), sinon toggle optimiste sur l'endpoint
+// /recommendations/:id/boost. `item.reco` est absent si la reco a été retirée
+// depuis : la carte reste mais sans bouton.
+function RecoPreview({ item, token }) {
+  const navigate = useNavigate();
+  const g = item.game;
+  const [reco, setReco] = useState(item.reco || null);
+  const [busy, setBusy] = useState(false);
+
+  async function boost(e) {
+    e.stopPropagation();
+    if (!reco || busy || reco.iRecommended || !token) return;
+    setBusy(true);
+    try {
+      const d = await apiFetch(`/recommendations/${reco.id}/boost`, {
+        method: "POST",
+        token,
+      });
+      setReco((r) => ({ ...r, iBoosted: !!d.boosted, count: d.count }));
+    } catch {
+      /* le +1 retentera au prochain clic */
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const metaLine = [g.year, ...(g.genres || []).slice(0, 1)].filter(Boolean);
+
+  return (
+    <div
+      className="hf-reco clickable"
+      onClick={() => navigate(`/game/${g.id}`)}
+      title={g.name}
+    >
+      <span className="hf-reco-cover">
+        {g.cover ? (
+          <img src={g.cover} alt="" loading="lazy" draggable="false" />
+        ) : (
+          <span className="hf-reco-ph">
+            <Gamepad2 size={18} />
+          </span>
+        )}
+      </span>
+      <span className="hf-reco-info">
+        <span className="hf-reco-name">{g.name}</span>
+        <span className="hf-reco-meta">
+          {metaLine.length > 0 && <span>{metaLine.join(" · ")}</span>}
+          {g.rating != null && (
+            <span className="hf-rating sm">
+              <Star size={11} fill="currentColor" strokeWidth={0} />
+              {g.rating}%
+            </span>
+          )}
+        </span>
+      </span>
+      {reco && (
+        <button
+          className={`reco-plus clickable ${reco.iBoosted ? "on" : ""} ${
+            reco.iRecommended ? "mine" : ""
+          }`}
+          onClick={boost}
+          disabled={busy || reco.iRecommended}
+          title={
+            reco.iRecommended
+              ? "Tu as recommandé ce jeu"
+              : reco.iBoosted
+                ? "Retirer ton +1"
+                : "Faire +1"
+          }
+        >
+          {reco.iRecommended ? <Flame size={14} /> : <Plus size={14} />}
+          <b>{reco.count}</b>
+        </button>
+      )}
+    </div>
   );
 }
 

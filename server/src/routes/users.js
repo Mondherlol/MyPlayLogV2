@@ -48,6 +48,7 @@ const OVERVIEW_SECTIONS = new Set([
   "endless",
   "finished",
   "wishlist",
+  "upcoming",
   "paused",
   "dropped",
 ]);

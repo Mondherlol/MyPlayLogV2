@@ -31,23 +31,48 @@ import {
   SlidersHorizontal,
   ArrowRight,
   Infinity as InfinityIcon,
+  CalendarClock,
 } from "lucide-react";
+import { apiFetch } from "../lib/api";
 import GameAddFan from "./GameAddFan";
 import ProfileOverviewAside from "./ProfileOverviewAside";
 
-// Les 6 « sections » de l'aperçu (favoris + 5 statuts) que l'utilisateur peut
+// Les « sections » de l'aperçu (favoris + statuts) que l'utilisateur peut
 // réordonner par glisser-déposer. L'ordre par défaut place les favoris et les
 // jeux en cours en tête, puis à jouer / en pause / abandonnés.
+// « upcoming » est une section dérivée : les jeux « à jouer » pas encore
+// sortis (date IGDB future) y sont déplacés automatiquement.
 const BLOCK_META = {
   favorites: { label: "Jeux favoris", Icon: Heart },
   playing: { label: "En cours", Icon: Gamepad2 },
   endless: { label: "Sans fin", Icon: InfinityIcon },
   finished: { label: "Terminés", Icon: Trophy },
   wishlist: { label: "À jouer", Icon: ListChecks },
+  upcoming: { label: "Jeux attendus", Icon: CalendarClock },
   paused: { label: "En pause", Icon: PauseCircle },
   dropped: { label: "Abandonnés", Icon: Skull },
 };
-const DEFAULT_ORDER = ["favorites", "playing", "endless", "finished", "wishlist", "paused", "dropped"];
+const DEFAULT_ORDER = [
+  "favorites",
+  "playing",
+  "endless",
+  "finished",
+  "wishlist",
+  "upcoming",
+  "paused",
+  "dropped",
+];
+
+// « Aujourd'hui », « Demain », « J-12 », « 3 mois », « 2027 » — délai avant la
+// sortie d'un jeu attendu, volontairement compact pour tenir sur la jaquette.
+function releaseCountdown(ts) {
+  const days = Math.ceil((ts * 1000 - Date.now()) / 86400000);
+  if (days <= 0) return "Aujourd'hui";
+  if (days === 1) return "Demain";
+  if (days <= 30) return `J-${days}`;
+  if (days < 365) return `${Math.round(days / 30)} mois`;
+  return String(new Date(ts * 1000).getFullYear());
+}
 
 // Détails optionnels affichés en surimpression des jaquettes.
 const CARD_FIELDS = [
@@ -70,7 +95,7 @@ function resolveCards(saved) {
 }
 
 // Jaquette d'un jeu avec surimpression optionnelle (note, heures, plateforme…).
-function CoverTile({ entry, fav, fields, editing }) {
+function CoverTile({ entry, fav, fields, editing, releaseTs }) {
   const navigate = useNavigate();
   const showRating = fields.includes("rating") && entry.rating != null;
   const showHours = fields.includes("hours") && entry.playtimeHours != null;
@@ -92,6 +117,11 @@ function CoverTile({ entry, fav, fields, editing }) {
         {fav && (
           <span className="cover-fav">
             <Star size={13} fill="currentColor" strokeWidth={0} />
+          </span>
+        )}
+        {releaseTs != null && (
+          <span className="cover-release" title="Date de sortie prévue">
+            <CalendarClock size={11} /> {releaseCountdown(releaseTs)}
           </span>
         )}
         {hasMeta && (
@@ -221,14 +251,61 @@ export default function ProfileOverview({
   const showAside = library.length > 0;
   const PREVIEW = 6;
 
-  const countOf = (key) =>
-    key === "favorites" ? favorites.length : library.filter((e) => e.status === key).length;
+  // Dates de sortie des jeux « à jouer » : non stockées en base, on interroge
+  // /games/releases avec les ids de la wishlist (l'endpoint ne renvoie que les
+  // sorties futures → la map ne contient que les jeux pas encore sortis).
+  const wishIdsKey = useMemo(
+    () =>
+      library
+        .filter((e) => e.status === "wishlist")
+        .map((e) => e.gameId)
+        .sort((a, b) => a - b)
+        .join(","),
+    [library]
+  );
+  const [releaseMap, setReleaseMap] = useState({});
+  useEffect(() => {
+    if (!wishIdsKey || !token) {
+      setReleaseMap({});
+      return;
+    }
+    let alive = true;
+    apiFetch(`/games/releases?ids=${wishIdsKey}`, { token })
+      .then((d) => {
+        if (!alive) return;
+        const map = {};
+        for (const g of d.games || []) if (g.releaseDate) map[g.id] = g.releaseDate;
+        setReleaseMap(map);
+      })
+      .catch(() => alive && setReleaseMap({}));
+    return () => {
+      alive = false;
+    };
+  }, [wishIdsKey, token]);
+
+  // Les jeux « à jouer » pas encore sortis migrent dans « Jeux attendus »
+  // (triés par date de sortie), le reste de la wishlist n'en garde que les
+  // jeux déjà disponibles.
+  const listOf = (key) => {
+    if (key === "favorites") return favorites;
+    if (key === "upcoming")
+      return library
+        .filter((e) => e.status === "wishlist" && releaseMap[e.gameId])
+        .sort((a, b) => releaseMap[a.gameId] - releaseMap[b.gameId]);
+    if (key === "wishlist")
+      return library.filter((e) => e.status === "wishlist" && !releaseMap[e.gameId]);
+    return library.filter((e) => e.status === key);
+  };
   // Chez soi : toutes les sections (même vides, pour pouvoir ajouter). Chez les
-  // autres : on masque les sections sans jeu.
+  // autres : on masque les sections sans jeu. « Jeux attendus » est dérivée
+  // (pas d'ajout manuel possible) : masquée dès qu'elle est vide.
   const visibleOrder = useMemo(
-    () => order.filter((key) => isMe || countOf(key) > 0),
+    () =>
+      order.filter((key) =>
+        key === "upcoming" ? listOf(key).length > 0 : isMe || listOf(key).length > 0
+      ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [order, isMe, favorites, library]
+    [order, isMe, favorites, library, releaseMap]
   );
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -255,7 +332,8 @@ export default function ProfileOverview({
   function renderBlockInner(key, isFirst) {
     const meta = BLOCK_META[key];
     const isFav = key === "favorites";
-    const list = isFav ? favorites : library.filter((e) => e.status === key);
+    const isUpcoming = key === "upcoming";
+    const list = listOf(key);
     const preview = list.slice(0, PREVIEW);
     const rest = list.slice(PREVIEW);
     return (
@@ -284,15 +362,23 @@ export default function ProfileOverview({
         </h2>
         <div className="cover-row">
           {preview.map((e) => (
-            <CoverTile key={e.gameId} entry={e} fav={isFav} fields={cards} editing={editing} />
+            <CoverTile
+              key={e.gameId}
+              entry={e}
+              fav={isFav}
+              fields={cards}
+              editing={editing}
+              releaseTs={isUpcoming ? releaseMap[e.gameId] : null}
+            />
           ))}
           {rest.length > 0 && (
             <ShowMoreTile
               rest={rest}
-              onClick={() => goAllGames(isFav ? { fav: "1" } : { st: key })}
+              onClick={() => goAllGames(isFav ? { fav: "1" } : { st: isUpcoming ? "wishlist" : key })}
             />
           )}
           {isMe &&
+            !isUpcoming &&
             list.length <= PREVIEW &&
             Array.from({ length: Math.max(1, PREVIEW - list.length) }).map((_, i) => (
               <button

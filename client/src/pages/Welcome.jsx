@@ -7,6 +7,9 @@ import {
   Check,
   Flame,
   CalendarDays,
+  CalendarClock,
+  Gift,
+  Radar,
   Sparkles,
   Brain,
   ChevronRight,
@@ -271,6 +274,8 @@ export default function Welcome() {
             évite d'avoir deux instances qui se disputent le même localStorage. */}
         {showQuiz && !isMobile && <QuizCard />}
 
+        {/* Radar wishlist : jeux voulus déjà sortis / sorties imminentes */}
+        <WishlistRadar token={token} />
         <UpcomingWidget games={discover?.upcoming} loading={discover === null} />
         <ForYouWidget games={discover?.forYou} loading={discover === null} />
       </div>
@@ -282,6 +287,160 @@ export default function Welcome() {
       {showGems && (
         <DiscoverGemsModal token={token} onClose={() => setShowGems(false)} />
       )}
+    </div>
+  );
+}
+
+// --- Radar wishlist ---
+// Croise la liste « à jouer » avec les dates de sortie IGDB : les jeux voulus
+// sortis ces 30 derniers jours (toujours pas lancés) et ceux qui sortent dans
+// les 30 jours, affichés en cards directement — avec un compte à rebours en
+// direct pour la sortie la plus proche. Masqué si rien à signaler.
+const RADAR_WINDOW = 30 * 86400; // fenêtre (secondes) avant/après aujourd'hui
+
+// « il y a 5 j » — recul depuis la sortie d'un jeu déjà dispo.
+function agoDays(ts) {
+  const d = Math.max(0, Math.floor((Date.now() - ts * 1000) / 86400000));
+  if (d === 0) return "aujourd'hui";
+  if (d === 1) return "hier";
+  return `il y a ${d} j`;
+}
+
+// Compte à rebours en direct (décrémente chaque seconde) jusqu'à un timestamp
+// unix : « J-13 · 07:42:19 », puis « 07:42:19 » le jour J.
+function LiveCountdown({ ts }) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  let left = Math.max(0, Math.floor(ts - Date.now() / 1000));
+  const days = Math.floor(left / 86400);
+  left -= days * 86400;
+  const two = (n) => String(n).padStart(2, "0");
+  const clock = `${two(Math.floor(left / 3600))}:${two(Math.floor((left % 3600) / 60))}:${two(left % 60)}`;
+  return (
+    <span className="hf-up-date hf-cd" title="Temps restant avant la sortie">
+      {days > 0 ? `J-${days} · ${clock}` : clock}
+    </span>
+  );
+}
+
+function WishlistRadar({ token }) {
+  const [radar, setRadar] = useState(null);
+
+  useEffect(() => {
+    if (!token) return;
+    let alive = true;
+    // 1) ids de la wishlist → 2) dates de sortie (fenêtre : -30 j → futur).
+    apiFetch("/library?status=wishlist", { token })
+      .then((d) => {
+        const ids = (d.entries || []).map((e) => e.gameId);
+        if (!ids.length) return null;
+        const from = Math.floor(Date.now() / 1000) - RADAR_WINDOW;
+        return apiFetch(`/games/releases?ids=${ids.join(",")}&from=${from}`, { token });
+      })
+      .then((d) => {
+        if (!alive || !d) return;
+        const now = Math.floor(Date.now() / 1000);
+        const soon = [];
+        const out = [];
+        for (const g of d.games || []) {
+          if (!g.releaseDate) continue;
+          if (g.releaseDate <= now) out.push(g);
+          else if (g.releaseDate <= now + RADAR_WINDOW) soon.push(g);
+        }
+        soon.sort((a, b) => a.releaseDate - b.releaseDate);
+        out.sort((a, b) => b.releaseDate - a.releaseDate);
+        setRadar({ soon, out });
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [token]);
+
+  if (!radar || (!radar.soon.length && !radar.out.length)) return null;
+  const { soon, out } = radar;
+
+  return (
+    <div className="hf-widget card hf-radar">
+      <h3 className="hf-w-title">
+        <Radar size={15} /> Sur ton radar
+      </h3>
+
+      {out.length > 0 && (
+        <>
+          <p className="hf-radar-sec gold">
+            <Gift size={12} /> Déjà dispo — toujours pas lancé…
+          </p>
+          <ul className="hf-up-list">
+            {out.slice(0, 3).map((g) => (
+              <li key={g.id}>
+                <Link to={`/game/${g.id}`} className="hf-up-row clickable" title={g.name}>
+                  {g.cover ? (
+                    <img src={g.cover} alt="" loading="lazy" draggable="false" />
+                  ) : (
+                    <span className="hf-up-ph">
+                      <Gamepad2 size={14} />
+                    </span>
+                  )}
+                  <span className="hf-up-info">
+                    <span className="hf-up-name">{g.name}</span>
+                    <span className="hf-radar-ago">sorti {agoDays(g.releaseDate)}</span>
+                  </span>
+                  <span className="hf-up-date hf-radar-out">Dispo !</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          {out.length > 3 && (
+            <Link to="/profile?tab=allgames&st=wishlist" className="hf-radar-more clickable">
+              +{out.length - 3} autre{out.length - 3 > 1 ? "s" : ""} dans ta wishlist
+            </Link>
+          )}
+        </>
+      )}
+
+      {soon.length > 0 && (
+        <>
+          <p className="hf-radar-sec">
+            <CalendarClock size={12} /> Sorties imminentes
+          </p>
+          <ul className="hf-up-list">
+            {soon.slice(0, 4).map((g, i) => (
+              <li key={g.id}>
+                <Link to={`/game/${g.id}`} className="hf-up-row clickable" title={g.name}>
+                  {g.cover ? (
+                    <img src={g.cover} alt="" loading="lazy" draggable="false" />
+                  ) : (
+                    <span className="hf-up-ph">
+                      <Gamepad2 size={14} />
+                    </span>
+                  )}
+                  <span className="hf-up-info">
+                    <span className="hf-up-name">{g.name}</span>
+                    <span className="hf-radar-ago">{shortDate(g.releaseDate)}</span>
+                  </span>
+                  {/* La plus proche : compte à rebours en direct ; les autres : J-x */}
+                  {i === 0 ? (
+                    <LiveCountdown ts={g.releaseDate} />
+                  ) : (
+                    <span className="hf-up-date">
+                      J-{Math.ceil((g.releaseDate * 1000 - Date.now()) / 86400000)}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      <Link to="/releases?wish=1" className="hf-w-more clickable">
+        Calendrier des sorties <ChevronRight size={14} />
+      </Link>
     </div>
   );
 }

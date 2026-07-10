@@ -69,6 +69,9 @@ const userGameSchema = new mongoose.Schema(
     platform: { type: String, default: null },
     // Format d'achat sur console : dématérialisé ou boîte physique.
     format: { type: String, enum: ["digital", "physical"], default: "digital" },
+    // Planning perso : mois où je compte jouer à ce jeu ("2026-08"), ou null.
+    // Alimenté par le mode Planning de la page Sorties.
+    plannedMonth: { type: String, default: null },
     playtimeHours: { type: Number, default: null },
     note: { type: String, default: "" }, // (déprécié) où je me suis arrêté
     review: { type: String, default: "" }, // texte de review

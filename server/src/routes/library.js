@@ -16,6 +16,7 @@ function toPublic(e) {
     status: e.status,
     platform: e.platform,
     format: e.format || "digital",
+    plannedMonth: e.plannedMonth || null,
     playtimeHours: e.playtimeHours,
     note: e.note,
     review: e.review,
@@ -151,6 +152,14 @@ router.put("/:gameId", requireAuth, async (req, res) => {
     if (b.format && !["digital", "physical"].includes(b.format)) {
       return res.status(400).json({ error: "Format invalide." });
     }
+    // Mois de planning : "YYYY-MM" ou null (retirer du planning).
+    if (
+      b.plannedMonth !== undefined &&
+      b.plannedMonth !== null &&
+      !/^\d{4}-(0[1-9]|1[0-2])$/.test(String(b.plannedMonth))
+    ) {
+      return res.status(400).json({ error: "Mois de planning invalide." });
+    }
 
     const update = { user: req.userId, gameId };
     // n'écrase que les champs fournis
@@ -171,6 +180,7 @@ router.put("/:gameId", requireAuth, async (req, res) => {
       "cons",
       "favoriteCharacter",
       "favoriteOst",
+      "plannedMonth",
     ]) {
       if (b[key] !== undefined) update[key] = b[key];
     }

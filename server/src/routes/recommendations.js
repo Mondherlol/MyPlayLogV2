@@ -4,6 +4,7 @@ import Recommendation from "../models/Recommendation.js";
 import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { notify } from "../lib/notify.js";
+import { recordActivity, removeActivity } from "../lib/activity.js";
 
 const router = express.Router();
 
@@ -27,6 +28,9 @@ router.post("/", requireAuth, async (req, res) => {
 
     const msg = message ? String(message).slice(0, 280) : "";
     let rec = await Recommendation.findOne({ to: toUserId, gameId: gid });
+    // On ne journalise dans le fil que la PREMIÈRE fois qu'on recommande ce
+    // jeu à cette personne (mettre à jour son mot n'est pas une nouvelle action).
+    let isNewRecommender = false;
 
     if (!rec) {
       rec = await Recommendation.create({
@@ -36,6 +40,7 @@ router.post("/", requireAuth, async (req, res) => {
         cover: cover || null,
         recommenders: [{ user: req.userId, message: msg }],
       });
+      isNewRecommender = true;
     } else {
       const mine = rec.recommenders.find((r) => String(r.user) === String(req.userId));
       if (mine) {
@@ -43,9 +48,23 @@ router.post("/", requireAuth, async (req, res) => {
       } else {
         rec.recommenders.push({ user: req.userId, message: msg });
         rec.boosters = rec.boosters.filter((u) => String(u) !== String(req.userId));
+        isNewRecommender = true;
       }
       if (!rec.cover && cover) rec.cover = cover;
       await rec.save();
+    }
+
+    // Journal du fil social (cf. models/Activity.js, routes/feed.js).
+    if (isNewRecommender) {
+      recordActivity({
+        actor: req.userId,
+        type: "recommendation",
+        target: toUserId,
+        game: gid,
+        gameName: String(name),
+        gameCover: rec.cover || null,
+        snippet: msg,
+      });
     }
 
     // Notifie le destinataire (auto +1 = nouvelle recommandation pour lui).
@@ -78,9 +97,25 @@ router.post("/:id/boost", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Tu as déjà recommandé ce jeu (déjà +1)." });
 
     const has = rec.boosters.some((u) => String(u) === String(req.userId));
-    if (has) rec.boosters = rec.boosters.filter((u) => String(u) !== String(req.userId));
-    else {
+    if (has) {
+      rec.boosters = rec.boosters.filter((u) => String(u) !== String(req.userId));
+      // +1 annulé → on retire l'activité du fil.
+      removeActivity({
+        actor: req.userId,
+        type: "recommendation_boost",
+        game: rec.gameId,
+        target: rec.to,
+      });
+    } else {
       rec.boosters.push(req.userId);
+      recordActivity({
+        actor: req.userId,
+        type: "recommendation_boost",
+        target: rec.to,
+        game: rec.gameId,
+        gameName: rec.name,
+        gameCover: rec.cover || null,
+      });
       // Notifie le(s) recommandeur(s) qu'on a soutenu leur reco.
       for (const r of rec.recommenders) {
         notify({
@@ -112,6 +147,16 @@ router.post("/:id/comments", requireAuth, async (req, res) => {
     await rec.save();
     const c = rec.comments[rec.comments.length - 1];
     const me = await User.findById(req.userId).select("username avatar");
+
+    recordActivity({
+      actor: req.userId,
+      type: "recommendation_comment",
+      target: rec.to,
+      game: rec.gameId,
+      gameName: rec.name,
+      gameCover: rec.cover || null,
+      snippet: text,
+    });
 
     // Notifie le destinataire + les recommandeurs (sauf l'auteur du commentaire).
     const recipients = new Set([String(rec.to), ...rec.recommenders.map((r) => String(r.user))]);
@@ -148,6 +193,13 @@ router.delete("/:id", requireAuth, async (req, res) => {
     rec.recommenders = rec.recommenders.filter((r) => String(r.user) !== String(req.userId));
     if (rec.recommenders.length === 0) await rec.deleteOne();
     else await rec.save();
+    // Reco retirée → la carte du fil n'a plus lieu d'être.
+    removeActivity({
+      actor: req.userId,
+      type: "recommendation",
+      game: rec.gameId,
+      target: rec.to,
+    });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: "Erreur." });

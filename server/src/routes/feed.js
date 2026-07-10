@@ -7,6 +7,8 @@ import Documentary from "../models/Documentary.js";
 import Activity from "../models/Activity.js";
 import GemDiscovery from "../models/GemDiscovery.js";
 import GemSkip from "../models/GemSkip.js";
+import Recommendation from "../models/Recommendation.js";
+import { ensureGameMeta } from "../lib/gameMeta.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { geminiJson, isGeminiConfigured } from "../lib/gemini.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -32,7 +34,11 @@ const INTERACTIONS = [
   "review_comment_reply",
   "review_comment_like",
   "review_react",
+  "recommendation",
+  "recommendation_boost",
+  "recommendation_comment",
 ];
+const RECO_TYPES = ["recommendation", "recommendation_boost", "recommendation_comment"];
 
 // Mini-carte de liste embarquée dans les évènements.
 function listMini(l) {
@@ -127,6 +133,25 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
   ];
   const entries = pairs.length ? await UserGame.find({ $or: pairs }).lean() : [];
   const entryByKey = new Map(entries.map((e) => [`${e.user}-${e.gameId}`, e]));
+
+  // Recommandations : la carte embarque l'état ACTUEL de la reco (score,
+  // ai-je déjà +1 ?) pour proposer le bouton +1 directement dans le fil, et
+  // quelques métadonnées du jeu (année, genre, note — cache GameMeta).
+  const recoActs = acts.filter(
+    (a) => RECO_TYPES.includes(a.type) && a.actor && a.game && a.target
+  );
+  let recByKey = new Map();
+  let recoMeta = new Map();
+  if (recoActs.length) {
+    const [recs, meta] = await Promise.all([
+      Recommendation.find({
+        $or: recoActs.map((a) => ({ to: a.target._id, gameId: a.game })),
+      }).lean(),
+      ensureGameMeta(recoActs.map((a) => a.game)).catch(() => new Map()),
+    ]);
+    recByKey = new Map(recs.map((r) => [`${r.to}-${r.gameId}`, r]));
+    recoMeta = meta;
+  }
 
   const gameEvents = [];
   for (const a of gameActs) {
@@ -323,6 +348,24 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
       }
     }
 
+    // État de la reco visée (score + mon +1) et méta du jeu pour la mini-carte.
+    let reco = null;
+    let gm = null;
+    if (RECO_TYPES.includes(a.type) && a.game && a.target) {
+      const r = recByKey.get(`${a.target._id}-${a.game}`);
+      if (r) {
+        reco = {
+          id: String(r._id),
+          count: (r.recommenders || []).length + (r.boosters || []).length,
+          iBoosted: (r.boosters || []).some((u) => String(u) === String(req.userId)),
+          iRecommended: (r.recommenders || []).some(
+            (x) => String(x.user) === String(req.userId)
+          ),
+        };
+      }
+      gm = recoMeta.get(a.game) || null;
+    }
+
     events.push({
       type: "interaction",
       id: `a-${a._id}`,
@@ -332,8 +375,22 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
       target: person(a.target),
       snippet: a.snippet || "",
       list: onList ? listMini(a.list) : null,
-      game: a.game ? { id: a.game, name: a.gameName || "" } : null,
+      game: a.game
+        ? {
+            id: a.game,
+            name: a.gameName || "",
+            cover: a.gameCover || null,
+            ...(gm
+              ? {
+                  year: gm.year ?? null,
+                  rating: gm.rating ?? null,
+                  genres: (gm.genres || []).slice(0, 2),
+                }
+              : {}),
+          }
+        : null,
       review,
+      reco,
     });
   }
 

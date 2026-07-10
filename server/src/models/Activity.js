@@ -31,6 +31,9 @@ const activitySchema = new mongoose.Schema(
         "review_comment_reply", // réponse à un commentaire d'avis
         "review_comment_like", // like d'un commentaire d'avis
         "review_react", // réaction (cœur/bravo/rigolo) sur un avis
+        "recommendation", // a recommandé un jeu à un joueur (target = destinataire)
+        "recommendation_boost", // +1 sur une recommandation faite à target
+        "recommendation_comment", // commentaire sous une recommandation faite à target
         // Actions « premières » (pas des interactions) :
         "game_update", // action(s) sur une entrée de bibliothèque — les
         // changements réels (statut, note, review, OST…) sont dans

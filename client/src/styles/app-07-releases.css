@@ -48,7 +48,8 @@
   z-index: 30;
 }
 
-.rel-periods {
+/* Switch de vue : feed des sorties / mon planning */
+.rel-views {
   display: inline-flex;
   gap: 0.25rem;
   padding: 0.3rem;
@@ -57,7 +58,10 @@
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
 }
-.rel-period {
+.rel-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
   border: none;
   background: transparent;
   color: var(--text-soft);
@@ -68,13 +72,38 @@
   border-radius: 10px;
   transition: background 0.15s ease, color 0.15s ease;
 }
-.rel-period:hover {
+.rel-view:hover {
   color: var(--text);
 }
-.rel-period.active {
+.rel-view.active {
   background: var(--accent-grad);
   color: #1a1204;
   box-shadow: 0 4px 12px rgba(242, 183, 11, 0.32);
+}
+
+/* Toggle « Gros jeux » (grosses sorties uniquement) */
+.rel-big {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 11px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.rel-big:hover {
+  border-color: var(--orange);
+}
+.rel-big.active {
+  border-color: transparent;
+  background: linear-gradient(135deg, #ff7a3c, #e0483f);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(224, 92, 63, 0.4);
 }
 
 .rel-wish {
@@ -431,19 +460,167 @@
   gap: 1.1rem;
 }
 
-/* Surbrillance dorée des jeux présents dans la liste de souhaits */
-.rel-card {
-  position: relative;
-  border-radius: 16px;
+/* Jour passé : badge atténué */
+.rel-day-badge.past {
+  opacity: 0.72;
 }
-.rel-card.is-wish::after {
-  content: "";
+.rel-day-badge.past .rel-daynum {
+  color: var(--text-soft);
+}
+
+/* Haut du feed : sentinelle + indications de remontée dans le passé */
+.rel-past-top {
+  height: 1px;
+}
+.rel-past-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+.rel-past-end {
+  text-align: center;
+  padding: 0.4rem;
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
+/* Jour hors focus du scroll : grisé pour bien marquer les transitions de
+   jours — le jour sous la ligne de lecture reste net (cf. activeDay). */
+.rel-day.dim .relc-cover {
+  filter: grayscale(0.8) brightness(0.9);
+  opacity: 0.55;
+}
+.rel-day.dim .relc-name,
+.rel-day.dim .relc-plats {
+  opacity: 0.5;
+}
+.rel-day.dim .rel-day-badge {
+  opacity: 0.5;
+}
+/* Survoler un jour grisé le réveille (on peut cliquer sans scroller) */
+.rel-day.dim:hover .relc-cover,
+.rel-day.dim:hover .relc-name,
+.rel-day.dim:hover .relc-plats,
+.rel-day.dim:hover .rel-day-badge {
+  filter: none;
+  opacity: 1;
+}
+.rel-day-badge,
+.relc-name,
+.relc-plats {
+  transition: opacity 0.25s ease;
+}
+
+/* ---------- Carte de jeu du feed (ouvre la modale de découverte) ---------- */
+.relc {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  min-width: 0;
+}
+.relc-cover {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.25s ease,
+    opacity 0.25s ease;
+}
+.relc:hover .relc-cover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow);
+}
+/* Le « + » radial (GameAddFan) n'apparaît qu'au survol de la carte */
+.relc:hover .add-fan.hover-only {
+  opacity: 1;
+  pointer-events: auto;
+}
+/* Le coin haut droit est réservé au « + » : le badge IA descend en bas */
+.relc .rel-ai-tag {
+  top: auto;
+  bottom: 6px;
+  right: 6px;
+}
+.relc-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.relc-ph {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+/* Jeu de la wishlist : liseré doré + marque-page */
+.relc.is-wish .relc-cover {
+  border-color: var(--orange);
+  box-shadow: 0 0 14px rgba(242, 183, 11, 0.25);
+}
+.relc-wishtag {
   position: absolute;
-  inset: -5px;
-  border-radius: 18px;
-  border: 2px solid var(--orange);
-  pointer-events: none;
-  box-shadow: 0 0 16px rgba(242, 183, 11, 0.28);
+  top: 6px;
+  left: 6px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--accent-grad);
+  color: #1a1204;
+}
+/* Flamme de hype (gros jeux) */
+.relc-hype {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #ffd9a8;
+  background: rgba(20, 14, 8, 0.78);
+  backdrop-filter: blur(4px);
+}
+.relc-hype svg {
+  color: #ff8a3c;
+}
+.relc-name {
+  font-weight: 700;
+  font-size: 0.86rem;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.relc-plats {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---------- États (chargement / vide / erreur) ---------- */
@@ -474,6 +651,819 @@
   color: #e0483f;
 }
 
+/* ======================================================================
+   Modale de découverte d'un jeu (clic sur une carte du feed)
+   ====================================================================== */
+.relm-overlay {
+  z-index: 200;
+}
+.relm {
+  position: relative;
+  width: min(600px, 94vw);
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 0;
+  border-radius: 20px;
+}
+
+/* --- Bandeau : backdrop plein cadre + jaquette + titre --- */
+.relm-hero {
+  position: relative;
+  min-height: 190px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  border-radius: 20px 20px 0 0;
+}
+.relm-hero.plain {
+  min-height: 0;
+  background: linear-gradient(160deg, rgba(242, 183, 11, 0.14), transparent 65%);
+}
+.relm-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.relm-hero-veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(12, 10, 16, 0.15) 0%,
+    rgba(12, 10, 16, 0.55) 55%,
+    var(--surface) 100%
+  );
+}
+.relm-hero-row {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  width: 100%;
+  padding: 2.4rem 1.4rem 1rem;
+}
+.relm-cover {
+  flex-shrink: 0;
+  width: 96px;
+  aspect-ratio: 3 / 4;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 2px solid var(--surface);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+}
+.relm-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.relm-cover-ph {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+.relm-headings {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding-bottom: 0.2rem;
+}
+.relm-title {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.15;
+  /* Toujours lisible sur backdrop sombre comme sur fond clair (veil → surface) */
+  color: var(--text);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.25);
+}
+.relm-datebits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.relm-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.26rem 0.6rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 75%, transparent);
+  backdrop-filter: blur(4px);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.relm-hypechip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.26rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(224, 92, 63, 0.18);
+  color: #ff9a5c;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+/* Compte à rebours en segments (J / h / min / s) */
+.relm-cd {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+.relm-cd-seg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 44px;
+  padding: 0.32rem 0.45rem 0.28rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--orange) 35%, var(--border));
+  backdrop-filter: blur(4px);
+}
+.relm-cd-seg b {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  line-height: 1;
+  color: var(--accent-ink);
+  font-variant-numeric: tabular-nums;
+}
+.relm-cd-seg i {
+  font-style: normal;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+}
+
+/* --- Corps --- */
+.relm-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem 1.4rem 1.3rem;
+}
+.relm-skel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.relm-err {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+.relm-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.relm-chip {
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  color: var(--accent-ink);
+}
+.relm-chip.soft {
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+.relm-ratings {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+.relm-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--accent-ink);
+}
+.relm-rating.critic {
+  color: #7ec4ff;
+}
+.relm-rating i {
+  font-style: normal;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+.relm-dev {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+.relm-summary {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--text-soft);
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* --- Bandeau d'images (captures & artworks), scrollbar dorée --- */
+.relm-shots {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.45rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--orange) var(--surface-2);
+}
+.relm-shots::-webkit-scrollbar {
+  height: 7px;
+}
+.relm-shots::-webkit-scrollbar-track {
+  background: var(--surface-2);
+  border-radius: 999px;
+}
+.relm-shots::-webkit-scrollbar-thumb {
+  background: var(--accent-grad);
+  border-radius: 999px;
+}
+.relm-shot {
+  flex: 0 0 auto;
+  width: 148px;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-2);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.relm-shot:hover {
+  transform: translateY(-2px);
+  border-color: var(--orange);
+}
+.relm-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Capture plein écran par-dessus la modale */
+.relm-shot-lb {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 6, 12, 0.92);
+  border-radius: 20px;
+  cursor: zoom-out;
+}
+.relm-shot-lb img {
+  max-width: 96%;
+  max-height: 92%;
+  border-radius: 12px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+}
+
+/* --- Langues disponibles --- */
+.relm-langs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+.relm-langs-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-right: 0.2rem;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-soft);
+}
+.relm-langs-label svg {
+  color: var(--accent-ink);
+}
+.relm-lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.24rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  background: var(--surface-2);
+  color: var(--text);
+}
+.relm-lang img {
+  border-radius: 2px;
+}
+.relm-lang.more {
+  color: var(--text-soft);
+}
+
+/* --- Actions --- */
+.relm-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border);
+}
+.relm-wish {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.95rem;
+  border-radius: 11px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.88rem;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.relm-wish:hover:not(:disabled) {
+  border-color: var(--orange);
+}
+.relm-wish.on {
+  border-color: transparent;
+  background: var(--accent-grad);
+  color: #1a1204;
+}
+.relm-wish:disabled {
+  opacity: 0.75;
+}
+.relm-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  padding: 0.55rem 0.9rem;
+  border-radius: 11px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--accent-ink);
+  transition: background 0.15s ease;
+}
+.relm-go:hover {
+  background: color-mix(in srgb, var(--orange) 10%, transparent);
+}
+
+/* ======================================================================
+   Menu « Planifier » (modale + vue planning)
+   ====================================================================== */
+.plan-menu {
+  position: relative;
+}
+.plan-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: 11px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.84rem;
+  white-space: nowrap;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.plan-menu-btn:hover {
+  border-color: var(--orange);
+}
+.plan-menu-btn.on {
+  border-color: color-mix(in srgb, var(--orange) 55%, var(--border-strong));
+  color: var(--accent-ink);
+}
+.plan-menu-btn.compact {
+  padding: 0.32rem 0.55rem;
+  font-size: 0.74rem;
+  border-radius: 9px;
+}
+.plan-menu-btn svg:last-child {
+  transition: transform 0.15s ease;
+  color: var(--text-soft);
+}
+.plan-menu-btn svg:last-child.up {
+  transform: rotate(180deg);
+}
+.plan-menu-pop {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  min-width: 185px;
+  padding: 0.3rem;
+  box-shadow: var(--shadow);
+}
+.plan-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.48rem 0.6rem;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.86rem;
+  border-radius: 8px;
+}
+.plan-menu-item:hover {
+  background: var(--surface-2);
+}
+.plan-menu-item.active {
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+.plan-menu-item.clear {
+  color: #d65454;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 8px 8px;
+  justify-content: flex-start;
+}
+
+/* ======================================================================
+   Vue Planning : tiroir « à planifier » + colonnes par mois
+   ====================================================================== */
+.plan {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+.plan-tray {
+  padding: 1rem 1.1rem;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.plan-tray-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.plan-tray-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  font-size: 1rem;
+}
+.plan-tray-title svg {
+  color: var(--accent-ink);
+}
+
+/* Outils du tiroir : switch de statut + recherche (en haut à droite) */
+.plan-tray-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.plan-tray-switch {
+  display: inline-flex;
+  gap: 0.2rem;
+  padding: 0.22rem;
+  border-radius: 11px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.plan-tray-st {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.76rem;
+  padding: 0.32rem 0.6rem;
+  border-radius: 8px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.plan-tray-st:hover {
+  color: var(--text);
+}
+.plan-tray-st.active {
+  background: var(--accent-grad);
+  color: #1a1204;
+}
+.plan-tray-search {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.34rem 0.6rem;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  transition: border-color 0.15s ease;
+}
+.plan-tray-search:focus-within {
+  border-color: var(--orange);
+}
+.plan-tray-search svg {
+  flex: none;
+  color: var(--text-soft);
+}
+.plan-tray-search input {
+  width: 150px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  outline: none;
+}
+.plan-tray-search-clear {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  border-radius: 5px;
+}
+.plan-tray-search-clear:hover {
+  color: var(--text);
+}
+.plan-tray-count {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  background: var(--accent-grad);
+  color: #1a1204;
+}
+.plan-tray-sub {
+  margin: 0.25rem 0 0.75rem;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+/* Rangée horizontale du tiroir : scrollbar dorée, fine et arrondie */
+.plan-tray-row {
+  display: flex;
+  gap: 0.9rem;
+  overflow-x: auto;
+  padding-bottom: 0.55rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--orange) var(--surface-2);
+}
+.plan-tray-row::-webkit-scrollbar {
+  height: 8px;
+}
+.plan-tray-row::-webkit-scrollbar-track {
+  background: var(--surface-2);
+  border-radius: 999px;
+}
+.plan-tray-row::-webkit-scrollbar-thumb {
+  background: var(--accent-grad);
+  border-radius: 999px;
+  border: 1px solid var(--surface);
+}
+.plan-tray-row::-webkit-scrollbar-thumb:hover {
+  background: var(--orange);
+}
+.plan-tray-item {
+  flex: 0 0 auto;
+  width: 108px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.plan-tray-cover {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  transition: transform 0.15s ease;
+}
+.plan-tray-cover:hover {
+  transform: translateY(-3px);
+}
+.plan-tray-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.plan-cover-ph {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+.plan-tray-name {
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plan-months {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+.plan-month {
+  padding: 0.95rem 1rem;
+}
+.plan-month.now {
+  border-color: transparent;
+  box-shadow: 0 0 0 1.5px var(--orange) inset;
+  background: linear-gradient(165deg, rgba(242, 183, 11, 0.09), var(--surface) 55%);
+}
+.plan-month-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin: 0 0 0.6rem;
+  font-size: 0.98rem;
+}
+.plan-month-count {
+  margin-left: auto;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+.plan-month-now,
+.plan-month-late {
+  padding: 0.14rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.64rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.plan-month-now {
+  background: var(--accent-grad);
+  color: #1a1204;
+}
+.plan-month-late {
+  background: rgba(224, 72, 63, 0.14);
+  color: #d65454;
+}
+.plan-month-empty {
+  margin: 0;
+  padding: 0.4rem 0;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+.plan-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.plan-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.plan-item-cover {
+  flex-shrink: 0;
+  width: 40px;
+  height: 53px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.plan-item-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.plan-item-info {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.plan-item-name {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.plan-item-name:hover {
+  color: var(--accent-ink);
+}
+
+/* Jeu « en cours » injecté automatiquement dans le mois courant */
+.plan-item-auto {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  padding: 0.24rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  background: color-mix(in srgb, var(--orange) 15%, transparent);
+  color: var(--accent-ink);
+  white-space: nowrap;
+}
+
+/* ---------- Drag & drop (dnd-kit) ---------- */
+/* L'original s'estompe pendant le glissé (le fantôme suit le curseur) */
+.plan-item.dragging,
+.plan-tray-item.dragging {
+  opacity: 0.3;
+}
+/* `manipulation` : garde le scroll tactile (tiroir horizontal) — sur mobile le
+   drag & drop cède la place aux menus « Planifier », c'est voulu. */
+.plan-item,
+.plan-tray-item {
+  touch-action: manipulation;
+}
+
+/* Zone de dépôt survolée : liseré doré en pointillés */
+.plan-month.drop-over,
+.plan-tray.drop-over {
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--orange) inset, 0 0 18px rgba(242, 183, 11, 0.25);
+}
+.plan-month.drop-over .plan-month-empty {
+  color: var(--accent-ink);
+}
+
+/* Fantôme suivi par le curseur */
+.plan-ghost {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.75rem 0.4rem 0.4rem;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1.5px solid var(--orange);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.35);
+  font-size: 0.84rem;
+  font-weight: 700;
+  max-width: 240px;
+  cursor: grabbing;
+}
+.plan-ghost img {
+  width: 34px;
+  height: 45px;
+  object-fit: cover;
+  border-radius: 7px;
+  flex-shrink: 0;
+}
+.plan-ghost span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 760px) {
   .rel-day {
@@ -501,7 +1491,22 @@
   .rel-toolbar {
     position: static;
   }
-  .rel-periods {
+  .rel-views {
     overflow-x: auto;
+  }
+  .relm-hero-row {
+    padding: 2rem 1rem 0.9rem;
+  }
+  .relm-body {
+    padding: 0.9rem 1rem 1.1rem;
+  }
+  .relm-cover {
+    width: 78px;
+  }
+  .relm-go {
+    margin-left: 0;
+  }
+  .plan-months {
+    grid-template-columns: 1fr;
   }
 }

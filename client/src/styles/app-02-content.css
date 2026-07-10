@@ -3905,6 +3905,27 @@
   backdrop-filter: blur(4px);
 }
 
+/* Compte à rebours des « Jeux attendus » (en haut à gauche : le coin droit est
+   pris par le favori et le « + » d'ajout au survol) */
+.cover-release {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.24rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(10, 10, 15, 0.72);
+  color: var(--amber);
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  font-weight: 700;
+  white-space: nowrap;
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
 .cover-add {
   display: grid;
   place-items: center;
