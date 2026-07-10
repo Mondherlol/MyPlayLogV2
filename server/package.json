@@ -8,7 +8,8 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "seed:patch11": "node src/scripts/seedPatchnoteV11.js",
-    "migrate:ost-youtube": "node src/scripts/migrateItunesOst.js"
+    "migrate:ost-youtube": "node src/scripts/migrateItunesOst.js",
+    "backfill:feed": "node src/scripts/backfillFeedActivities.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -1,8 +1,9 @@
 import mongoose from "mongoose";
 
 // Journal d'activité sociale : une entrée par action (commentaire, réponse,
-// like, réaction) sur une liste ou un avis. Alimente le fil d'accueil
-// (cf. routes/feed.js).
+// like, réaction, mais aussi action de bibliothèque, abonnement, liste créée…).
+// Alimente le fil d'accueil ET l'onglet Feed du profil (cf. routes/feed.js).
+// C'est la source de vérité du fil : on n'infère plus rien des updatedAt.
 //
 // Différences volontaires avec les Notification :
 //  - on enregistre AUSSI les actions sur son propre contenu (un abonné qui
@@ -30,6 +31,13 @@ const activitySchema = new mongoose.Schema(
         "review_comment_reply", // réponse à un commentaire d'avis
         "review_comment_like", // like d'un commentaire d'avis
         "review_react", // réaction (cœur/bravo/rigolo) sur un avis
+        // Actions « premières » (pas des interactions) :
+        "game_update", // action(s) sur une entrée de bibliothèque — les
+        // changements réels (statut, note, review, OST…) sont dans
+        // meta.changes, fusionnés si rapprochés dans le temps
+        "list_create", // création d'une liste publique
+        "list_items", // ajout d'éléments à une liste (meta.added, fusionné)
+        "follow", // abonnement à un joueur (target)
       ],
       required: true,
     },
@@ -43,15 +51,23 @@ const activitySchema = new mongoose.Schema(
     // Contexte « liste » ou « avis (jeu) ».
     list: { type: mongoose.Schema.Types.ObjectId, ref: "List", default: null },
     comment: { type: mongoose.Schema.Types.ObjectId, default: null },
-    game: { type: Number, default: null }, // id IGDB (avis)
+    game: { type: Number, default: null }, // id IGDB (avis ou entrée de bibliothèque)
     gameName: { type: String, default: "" },
+    gameCover: { type: String, default: null }, // jaquette (cards game_update)
     // Extrait affiché (texte commenté / liké, ou type de réaction).
     snippet: { type: String, default: "" },
+    // Détails structurés selon le type :
+    //  game_update → { changes: [{ kind: "added"|"status"|"rating"|"review"|
+    //                  "favorite"|"ost"|"character"|"time", ... }] }
+    //  list_items  → { added: n }
+    meta: { type: mongoose.Schema.Types.Mixed, default: null },
   },
   { timestamps: true }
 );
 
 // Fil d'accueil : activité émise par les joueurs suivis, du plus récent au plus ancien.
 activitySchema.index({ actor: 1, createdAt: -1 });
+// Fusion des actions rapprochées sur un même jeu / une même liste.
+activitySchema.index({ actor: 1, type: 1, game: 1, createdAt: -1 });
 
 export default mongoose.model("Activity", activitySchema);

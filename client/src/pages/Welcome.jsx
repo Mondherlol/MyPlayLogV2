@@ -20,7 +20,7 @@ import { apiFetch } from "../lib/api";
 import QuizCard from "../components/QuizCard";
 import DocumentaryModal from "../components/DocumentaryModal";
 import DiscoverGemsModal, { GEMS_RESUME_KEY } from "../components/DiscoverGemsModal";
-import HomeFeed from "../components/HomeFeed";
+import HomeFeed, { FeedUserFilter } from "../components/HomeFeed";
 import GameCard from "../components/GameCard";
 
 // Réglages par défaut du feed documentaire, persistés en localStorage.
@@ -81,6 +81,8 @@ export default function Welcome() {
   );
   const [quizModalOpen, setQuizModalOpen] = useState(false);
   const [discover, setDiscover] = useState(null);
+  // Filtre du fil : id du joueur suivi dont on veut voir l'activité (null = tous).
+  const [feedUser, setFeedUser] = useState(null);
   const isMobile = useIsMobile();
   const settingsRef = useRef(null);
   useClickOutside(settingsRef, () => setShowSettings(false), showSettings);
@@ -251,8 +253,15 @@ export default function Welcome() {
             <h2 className="hf-sec-title">
               <Sparkles size={17} /> Fil d'actualité
             </h2>
+            {/* Avatars des joueurs suivis : filtre le fil sur un seul joueur */}
+            <FeedUserFilter
+              token={token}
+              myId={user?.id}
+              value={feedUser}
+              onChange={setFeedUser}
+            />
           </div>
-          <HomeFeed token={token} me={user?.username} />
+          <HomeFeed token={token} me={user?.username} filterUser={feedUser} />
         </section>
       </div>
 

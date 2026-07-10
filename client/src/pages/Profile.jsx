@@ -108,6 +108,22 @@ function Marquee({ facts }) {
   );
 }
 
+// Présence façon réseau social : point vert pulsant si vu il y a < 10 min,
+// sinon « Dernière activité il y a … » (alimenté par User.lastSeenAt).
+function Presence({ lastSeenAt }) {
+  if (!lastSeenAt) return null;
+  const online = Date.now() - new Date(lastSeenAt).getTime() < 10 * 60 * 1000;
+  return (
+    <span
+      className={`pf-presence ${online ? "online" : ""}`}
+      title={new Date(lastSeenAt).toLocaleString()}
+    >
+      <span className="pf-presence-dot" />
+      {online ? "En ligne" : `Dernière activité ${timeAgo(lastSeenAt)}`}
+    </span>
+  );
+}
+
 function ProfileListCard({ list, isMe, onDelete }) {
   const meta = typeMeta(list.type);
   return (
@@ -549,7 +565,10 @@ export default function Profile() {
           </div>
 
           <div className="pf-idmain">
-            <h1 className="pf-username">{profile.username}</h1>
+            <div className="pf-namerow">
+              <h1 className="pf-username">{profile.username}</h1>
+              {!isMe && <Presence lastSeenAt={profile.lastSeenAt} />}
+            </div>
             {profile.bio && (
               <p className="pf-bio" dangerouslySetInnerHTML={twemojiHtml(profile.bio)} />
             )}

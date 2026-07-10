@@ -2,6 +2,7 @@ import express from "express";
 import UserGame from "../models/UserGame.js";
 import { requireAuth } from "../middleware/auth.js";
 import { warmGameMeta } from "../lib/gameMeta.js";
+import { recordGameActivity, removeActivity } from "../lib/activity.js";
 
 const router = express.Router();
 
@@ -28,6 +29,83 @@ function toPublic(e) {
     favoriteOst: e.favoriteOst || null,
     updatedAt: e.updatedAt,
   };
+}
+
+// Une review « existe » dès qu'il y a du contenu rédigé.
+const hasReviewContent = (e) =>
+  !!(
+    (e.review || "").trim() ||
+    (e.pros || []).length ||
+    (e.cons || []).length ||
+    (e.reviewMedia || []).length
+  );
+
+// Compare l'entrée avant/après et le body reçu → liste des changements réels
+// à journaliser dans le fil. Un champ non fourni (undefined) n'est jamais un
+// changement ; un champ fourni identique non plus.
+function diffChanges(prev, entry, b) {
+  const changes = [];
+
+  if (!prev) {
+    changes.push({ kind: "added", status: entry.status });
+  } else if (b.status !== undefined && b.status !== prev.status) {
+    changes.push({ kind: "status", from: prev.status, to: entry.status });
+  }
+
+  if (
+    b.rating !== undefined &&
+    entry.rating != null &&
+    entry.rating !== (prev?.rating ?? null)
+  ) {
+    changes.push({ kind: "rating", value: entry.rating });
+  }
+
+  if (["review", "pros", "cons", "reviewMedia"].some((k) => b[k] !== undefined)) {
+    const reviewChanged =
+      !prev ||
+      (prev.review || "") !== (entry.review || "") ||
+      JSON.stringify(prev.pros || []) !== JSON.stringify(entry.pros || []) ||
+      JSON.stringify(prev.cons || []) !== JSON.stringify(entry.cons || []) ||
+      (prev.reviewMedia || []).length !== (entry.reviewMedia || []).length;
+    if (reviewChanged && hasReviewContent(entry)) changes.push({ kind: "review" });
+  }
+
+  if (b.favorite !== undefined && entry.favorite && !prev?.favorite) {
+    changes.push({ kind: "favorite" });
+  }
+
+  if (b.favoriteOst !== undefined) {
+    const name = entry.favoriteOst?.name || "";
+    if (name && name !== (prev?.favoriteOst?.name || "")) {
+      changes.push({
+        kind: "ost",
+        name,
+        artist: entry.favoriteOst.artist || "",
+        artwork: entry.favoriteOst.artwork || null,
+      });
+    }
+  }
+
+  if (b.favoriteCharacter !== undefined) {
+    const name = entry.favoriteCharacter?.name || "";
+    if (name && name !== (prev?.favoriteCharacter?.name || "")) {
+      changes.push({
+        kind: "character",
+        name,
+        image: entry.favoriteCharacter.image || null,
+      });
+    }
+  }
+
+  if (
+    b.playtimeHours !== undefined &&
+    entry.playtimeHours != null &&
+    entry.playtimeHours !== (prev?.playtimeHours ?? null)
+  ) {
+    changes.push({ kind: "time", hours: entry.playtimeHours });
+  }
+
+  return changes;
 }
 
 // Toutes les entrées de l'utilisateur (option ?status=)
@@ -96,7 +174,11 @@ router.put("/:gameId", requireAuth, async (req, res) => {
     ]) {
       if (b[key] !== undefined) update[key] = b[key];
     }
-    if (b.name === undefined && !(await UserGame.exists({ user: req.userId, gameId }))) {
+    // L'état AVANT modification : sert à ne journaliser dans le fil que les
+    // VRAIS changements (le fil ne doit plus réafficher « a terminé » quand on
+    // change juste une note ou une OST — cf. routes/feed.js).
+    const prev = await UserGame.findOne({ user: req.userId, gameId }).lean();
+    if (b.name === undefined && !prev) {
       return res.status(400).json({ error: "Le nom du jeu est requis." });
     }
 
@@ -108,6 +190,14 @@ router.put("/:gameId", requireAuth, async (req, res) => {
     // Pré-chauffe le cache de métadonnées (genres/studios…) pour l'onglet
     // Stats, sans bloquer la réponse.
     warmGameMeta(gameId);
+    // Journal du fil (best-effort, ne bloque pas la réponse).
+    recordGameActivity({
+      actor: req.userId,
+      gameId,
+      gameName: entry.name,
+      gameCover: entry.cover || null,
+      changes: diffChanges(prev, entry, b),
+    });
     res.json({ entry: toPublic(entry) });
   } catch (err) {
     console.error("library put error:", err.message);
@@ -117,10 +207,10 @@ router.put("/:gameId", requireAuth, async (req, res) => {
 
 // Tout retirer pour ce jeu
 router.delete("/:gameId", requireAuth, async (req, res) => {
-  await UserGame.deleteOne({
-    user: req.userId,
-    gameId: Number(req.params.gameId),
-  });
+  const gameId = Number(req.params.gameId);
+  await UserGame.deleteOne({ user: req.userId, gameId });
+  // Le jeu n'est plus dans la bibliothèque : ses cartes du fil n'ont plus de sens.
+  removeActivity({ actor: req.userId, type: "game_update", game: gameId });
   res.json({ ok: true });
 });
 

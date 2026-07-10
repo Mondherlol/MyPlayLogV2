@@ -2,6 +2,22 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import { isAdminEmail } from "../lib/admin.js";
 
+// Présence : on note le dernier passage de chaque utilisateur (affiché sur son
+// profil). Throttlé en mémoire pour ne pas écrire en base à chaque requête.
+const SEEN_THROTTLE = 3 * 60 * 1000; // 3 min
+const lastSeenWrites = new Map(); // userId -> timestamp de la dernière écriture
+
+function touchLastSeen(userId) {
+  const now = Date.now();
+  const prev = lastSeenWrites.get(userId) || 0;
+  if (now - prev < SEEN_THROTTLE) return;
+  lastSeenWrites.set(userId, now);
+  // Fire-and-forget : la présence ne doit jamais ralentir ni casser une requête.
+  User.updateOne({ _id: userId }, { $set: { lastSeenAt: new Date() } }, { timestamps: false }).catch(
+    () => lastSeenWrites.delete(userId)
+  );
+}
+
 // Vérifie le token JWT présent dans l'en-tête Authorization: Bearer <token>
 export function requireAuth(req, res, next) {
   const header = req.headers.authorization || "";
@@ -14,6 +30,7 @@ export function requireAuth(req, res, next) {
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
     req.userId = payload.sub;
+    touchLastSeen(payload.sub);
     next();
   } catch {
     return res.status(401).json({ error: "Session invalide ou expirée." });

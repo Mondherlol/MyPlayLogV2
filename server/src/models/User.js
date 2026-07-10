@@ -67,6 +67,10 @@ const userSchema = new mongoose.Schema(
     // Dernière version de patch note vue par l'utilisateur : sert à n'afficher
     // la pop-up des nouveautés qu'UNE SEULE fois, à sa prochaine ouverture.
     seenPatchnote: { type: String, default: null },
+
+    // Dernier passage sur le site (mis à jour par requireAuth, throttlé) :
+    // alimente le « En ligne / Dernière activité il y a … » du profil.
+    lastSeenAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

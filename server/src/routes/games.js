@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import multer from "multer";
+import mongoose from "mongoose";
 import { igdbQuery } from "../lib/igdb.js";
 import { getValidAccessToken, fetchUserTitles, fetchTitleTrophies } from "../lib/psn.js";
 import { isAdminEmail } from "../lib/admin.js";
@@ -1515,6 +1516,24 @@ router.get("/:id/reviews", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("game reviews error:", err.message);
     res.status(500).json({ error: "Erreur lors du chargement des reviews." });
+  }
+});
+
+// --- Une review précise (chargée à la volée depuis les cartes du fil :
+// réactions à jour + fil de réponses complet) ---
+router.get("/:id/reviews/:userId", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id || !mongoose.isValidObjectId(req.params.userId))
+      return res.status(400).json({ error: "id invalide." });
+    const entry = await UserGame.findOne({ gameId: id, user: req.params.userId })
+      .populate("user", "username avatar")
+      .populate("comments.user", "username avatar");
+    if (!entry) return res.status(404).json({ error: "Review introuvable." });
+    res.json({ review: gameReviewCard(entry, req.userId) });
+  } catch (err) {
+    console.error("single review error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement de la review." });
   }
 });
 

@@ -7,7 +7,11 @@ import multer from "multer";
 import List from "../models/List.js";
 import { requireAuth } from "../middleware/auth.js";
 import { notify } from "../lib/notify.js";
-import { recordActivity, removeActivity } from "../lib/activity.js";
+import {
+  recordActivity,
+  removeActivity,
+  recordListItemsActivity,
+} from "../lib/activity.js";
 import { sanitizeMediaList, resolveMentions, toComment } from "../lib/commentThread.js";
 
 const router = express.Router();
@@ -335,6 +339,10 @@ router.post("/", requireAuth, async (req, res) => {
       items,
       tiers,
     });
+    // Fil : « X a créé une liste » (les listes privées n'y apparaissent pas —
+    // le feed refiltre de toute façon sur la visibilité actuelle).
+    recordActivity({ actor: req.userId, type: "list_create", list: list._id });
+
     const full = await List.findById(list._id)
       .populate("user", "username")
       .lean();
@@ -374,8 +382,12 @@ router.put("/:id", requireAuth, async (req, res) => {
       if (b.type === "tier" && (!list.tiers || list.tiers.length === 0))
         list.tiers = DEFAULT_TIERS;
     }
-    if (b.items !== undefined && Array.isArray(b.items))
+    let addedCount = 0;
+    if (b.items !== undefined && Array.isArray(b.items)) {
+      const before = new Set(list.items.map((i) => String(i.refId)));
       list.items = b.items.map(sanitizeItem).filter(Boolean);
+      addedCount = list.items.filter((i) => !before.has(String(i.refId))).length;
+    }
     if (b.tiers !== undefined && list.type === "tier") {
       const t = sanitizeTiers(b.tiers);
       if (t) list.tiers = t;
@@ -384,6 +396,9 @@ router.put("/:id", requireAuth, async (req, res) => {
     if (list.type !== "tier") list.items.forEach((i) => (i.tier = null));
 
     await list.save({ validateModifiedOnly: true });
+    // Fil : « X a ajouté n jeux à sa liste » (fusionné si ajouts rapprochés).
+    if (addedCount > 0)
+      recordListItemsActivity({ actor: req.userId, list: list._id, added: addedCount });
     const full = await List.findById(list._id)
       .populate("user", "username")
       .populate("comments.user", "username avatar")
@@ -403,6 +418,8 @@ router.delete("/:id", requireAuth, async (req, res) => {
     if (String(list.user) !== String(req.userId))
       return res.status(403).json({ error: "Action non autorisée." });
     await list.deleteOne();
+    // Plus de liste → plus de cartes du fil qui pointent dessus.
+    removeActivity({ list: list._id });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: "Erreur lors de la suppression." });
@@ -488,6 +505,8 @@ router.post("/:id/items", requireAuth, async (req, res) => {
       item.tier = null;
       list.items.push(item);
       await list.save({ validateModifiedOnly: true });
+      // Fil : ajouts quick-add cumulés dans une seule carte.
+      recordListItemsActivity({ actor: req.userId, list: list._id, added: 1 });
     }
     res.status(201).json({ added: !exists, itemCount: list.items.length });
   } catch (err) {

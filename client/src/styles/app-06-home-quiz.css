@@ -13045,3 +13045,634 @@
     display: none;
   }
 }
+
+/* ============================================================
+   Feed social v2 — cartes d'actions réelles (FeedCards.jsx)
+   ============================================================ */
+
+/* Pastilles des nouveaux types d'action */
+.hf-status-badge.st-review {
+  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  color: var(--accent-ink);
+}
+
+.hf-status-badge.st-ost {
+  background: rgba(154, 107, 255, 0.14);
+  color: #7d54e0;
+}
+
+.hf-status-badge.st-character {
+  background: rgba(74, 168, 255, 0.14);
+  color: #3d8fd6;
+}
+
+.hf-status-badge.st-favorite {
+  background: rgba(230, 74, 110, 0.12);
+  color: #d64a72;
+}
+
+.hf-status-badge.st-time {
+  background: rgba(255, 176, 46, 0.15);
+  color: #cf8a13;
+}
+
+.hf-status-badge.st-listadd,
+.hf-status-badge.st-follow {
+  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  color: var(--accent-ink);
+}
+
+/* Chip de statut contextuel (quand le verbe principal est autre chose) */
+.hf-chip.st-chip.st-finished { color: #26a96a; border-color: rgba(61, 214, 140, 0.4); }
+.hf-chip.st-chip.st-playing { color: var(--accent-ink); border-color: color-mix(in srgb, var(--orange) 45%, transparent); }
+.hf-chip.st-chip.st-wishlist { color: #3d8fd6; border-color: rgba(74, 168, 255, 0.4); }
+.hf-chip.st-chip.st-paused { color: #cf8a13; border-color: rgba(255, 176, 46, 0.45); }
+.hf-chip.st-chip.st-dropped { color: #d65454; border-color: rgba(230, 74, 74, 0.4); }
+.hf-chip.st-chip.st-endless { color: #0e8a99; border-color: rgba(23, 179, 196, 0.4); }
+
+/* Chip « fraîchement modifié » (heures ajoutées, note posée…) */
+.hf-chip.new {
+  border-color: color-mix(in srgb, var(--orange) 55%, transparent);
+  background: color-mix(in srgb, var(--orange) 9%, transparent);
+  color: var(--accent-ink);
+}
+
+/* --- Chip OST favorite jouable (mini-lecteur global) --- */
+.hf-ost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  max-width: 100%;
+  padding: 0.45rem 0.8rem 0.45rem 0.45rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+  align-self: flex-start;
+}
+
+.hf-ost:hover {
+  border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
+  background: color-mix(in srgb, var(--orange) 7%, var(--surface-2));
+  transform: translateY(-1px);
+}
+
+.hf-ost.playing {
+  border-color: color-mix(in srgb, var(--orange) 65%, var(--border));
+  background: color-mix(in srgb, var(--orange) 10%, var(--surface-2));
+}
+
+.hf-ost-art {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  color: var(--text-soft);
+  box-shadow: var(--shadow-sm);
+}
+
+.hf-ost-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.hf-ost-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.38);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.hf-ost:hover .hf-ost-play,
+.hf-ost.playing .hf-ost-play {
+  opacity: 1;
+}
+
+.hf-ost-txt {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.hf-ost-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #7d54e0;
+}
+
+.hf-ost-name {
+  font-weight: 700;
+  font-size: 0.86rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hf-ost-artist {
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Égaliseur animé pendant la lecture */
+.hf-ost-eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+  margin-left: 0.25rem;
+  flex-shrink: 0;
+}
+
+.hf-ost-eq i {
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent-ink);
+  animation: hf-eq 0.9s ease-in-out infinite;
+}
+
+.hf-ost-eq i:nth-child(1) { height: 60%; animation-delay: 0s; }
+.hf-ost-eq i:nth-child(2) { height: 100%; animation-delay: 0.2s; }
+.hf-ost-eq i:nth-child(3) { height: 45%; animation-delay: 0.4s; }
+
+@keyframes hf-eq {
+  0%, 100% { transform: scaleY(0.5); }
+  50% { transform: scaleY(1); }
+}
+
+/* --- Chip personnage favori --- */
+.hf-chara {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.8rem 0.4rem 0.45rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+.hf-chara-av {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  color: var(--text-soft);
+  box-shadow: var(--shadow-sm);
+}
+
+.hf-chara-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.hf-chara-txt {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.hf-chara-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #3d8fd6;
+}
+
+.hf-chara-name {
+  font-weight: 700;
+  font-size: 0.86rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- Pied de carte jeu : réactions + répondre --- */
+.hf-game-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--border);
+}
+
+.hf-reacts {
+  display: inline-flex;
+  gap: 0.3rem;
+}
+
+.hf-reply-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  padding: 0.32rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.hf-reply-btn:hover,
+.hf-reply-btn.on {
+  color: var(--accent-ink);
+  border-color: color-mix(in srgb, var(--orange) 55%, transparent);
+  background: color-mix(in srgb, var(--orange) 8%, transparent);
+}
+
+/* Fil de réponses inline (réutilise les styles rvcm de l'onglet Reviews) */
+.hf-thread {
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px dashed var(--border);
+}
+
+.hf-thread-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+}
+
+/* --- Carte abonnement --- */
+.hf-follow-target {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.hf-follow-target:hover {
+  border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
+  transform: translateY(-1px);
+}
+
+.hf-follow-av {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--border);
+}
+
+.hf-follow-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.hf-follow-av .hf-avatar-fb {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: var(--accent-grad);
+  color: #1a1204;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.hf-follow-name {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.hf-follow-cta {
+  margin-left: auto;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+/* Corbeille dans l'en-tête (retirer un de mes reposts, feed du profil) */
+.hf-del {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.hf-del:hover {
+  color: #d65454;
+  background: rgba(230, 74, 74, 0.1);
+}
+
+/* Le feed du profil réutilise la colonne hf-feed dans la layout pff */
+.pff-layout .hf-feed {
+  width: 100%;
+}
+
+/* Sous-onglets du feed de profil (Tout / Médias) */
+.pff-subhead {
+  margin-bottom: 1rem;
+}
+
+/* --- Carte groupée : rafale d'ajouts au même statut --- */
+.hf-group-covers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.hf-group-cover {
+  width: 72px;
+  aspect-ratio: 3 / 4;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  flex-shrink: 0;
+}
+
+.hf-group-cover:hover {
+  transform: translateY(-3px) scale(1.04);
+  box-shadow: var(--shadow);
+}
+
+.hf-group-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.hf-group-cover-ph {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.hf-group-names {
+  margin: 0.6rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+/* --- Aperçu d'avis dans une carte interaction --- */
+.hf-rvprev {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.8rem 0.6rem 0.6rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.hf-rvprev:hover {
+  border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
+  background: color-mix(in srgb, var(--orange) 6%, var(--surface-2));
+  transform: translateY(-1px);
+}
+
+.hf-rvprev-cover {
+  width: 46px;
+  aspect-ratio: 3 / 4;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.hf-rvprev-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.hf-rvprev-cover-ph {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  color: var(--text-soft);
+}
+
+.hf-rvprev-main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.hf-rvprev-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.hf-rvprev-title {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.hf-rating.sm {
+  padding: 0.14rem 0.45rem;
+  font-size: 0.7rem;
+}
+
+.hf-rvprev-text {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-soft);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.hf-rvprev-text.blur {
+  filter: blur(5px);
+  user-select: none;
+}
+
+.hf-rvprev-spoiler {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.hf-rvprev-go {
+  flex-shrink: 0;
+  color: var(--text-soft);
+}
+
+.hf-rvprev:hover .hf-rvprev-go {
+  color: var(--accent-ink);
+}
+
+.hf-rvprev .hf-proscons {
+  margin: 0;
+}
+
+/* Citation de l'avis : avatar de l'auteur + son texte */
+.hf-rvprev-quote {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.hf-rvprev-av {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  margin-top: 1px;
+}
+
+.hf-rvprev-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.hf-rvprev-av-fb {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: var(--accent-grad);
+  color: #1a1204;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.6rem;
+}
+
+/* --- Filtre du fil par joueur : avatars des abonnements --- */
+.hf-flt {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 60%;
+  overflow-x: auto;
+  padding: 3px 2px;
+  scrollbar-width: none;
+}
+
+.hf-flt::-webkit-scrollbar {
+  display: none;
+}
+
+.hf-flt-av {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--border);
+  background: var(--surface-2);
+  padding: 0;
+  transition: border-color 0.15s ease, transform 0.15s ease, opacity 0.15s ease,
+    filter 0.15s ease, box-shadow 0.15s ease;
+}
+
+.hf-flt-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.hf-flt-fb {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: var(--accent-grad);
+  color: #1a1204;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.hf-flt-av:hover {
+  border-color: color-mix(in srgb, var(--orange) 60%, var(--border));
+  transform: translateY(-2px) scale(1.06);
+}
+
+/* Un joueur sélectionné : lui en doré, les autres éteints */
+.hf-flt-av.on {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--orange) 35%, transparent);
+  transform: scale(1.08);
+}
+
+.hf-flt-av.off {
+  opacity: 0.4;
+  filter: grayscale(0.9);
+}
+
+.hf-flt-av.off:hover {
+  opacity: 0.8;
+  filter: grayscale(0.3);
+}

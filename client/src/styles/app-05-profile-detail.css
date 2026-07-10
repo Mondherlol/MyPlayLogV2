@@ -2012,3 +2012,57 @@ button.pf-stat:hover {
     display: inline-flex;
   }
 }
+
+/* --- Présence : « En ligne » / « Dernière activité il y a … » --- */
+.pf-namerow {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.pf-presence {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.24rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pf-presence-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  flex-shrink: 0;
+}
+
+.pf-presence.online {
+  border-color: rgba(61, 214, 140, 0.45);
+  background: rgba(61, 214, 140, 0.09);
+  color: #26a96a;
+}
+
+.pf-presence.online .pf-presence-dot {
+  background: #2ecc7d;
+  box-shadow: 0 0 0 0 rgba(46, 204, 125, 0.5);
+  animation: pf-presence-pulse 2s ease-out infinite;
+}
+
+@keyframes pf-presence-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(46, 204, 125, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(46, 204, 125, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(46, 204, 125, 0);
+  }
+}

@@ -18,6 +18,7 @@ import { connectWithNpsso } from "../lib/psn.js";
 import { isAdminEmail } from "../lib/admin.js";
 import { requireAuth } from "../middleware/auth.js";
 import { summarizeReactions, reviewComment } from "../lib/reviewSerialize.js";
+import { recordActivity, removeActivity } from "../lib/activity.js";
 
 const router = express.Router();
 
@@ -272,6 +273,10 @@ router.post("/:id/follow", requireAuth, async (req, res) => {
     if (has) me.following = me.following.filter((u) => String(u) !== String(target._id));
     else me.following.push(target._id);
     await me.save();
+
+    // Fil : « X s'est abonné à Y » (retiré si on se désabonne).
+    if (has) removeActivity({ actor: req.userId, type: "follow", target: target._id });
+    else recordActivity({ actor: req.userId, type: "follow", target: target._id });
 
     const followers = await User.countDocuments({ following: target._id });
     res.json({ following: !has, followersCount: followers });
@@ -1170,6 +1175,7 @@ router.get("/:username", requireAuth, async (req, res) => {
         overviewOrder: user.overviewOrder || [],
         overviewCards: user.overviewCards || [],
         createdAt: user.createdAt,
+        lastSeenAt: user.lastSeenAt || null,
         isMe,
         isFollowing,
         counts: {

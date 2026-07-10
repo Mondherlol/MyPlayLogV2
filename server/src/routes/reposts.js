@@ -108,6 +108,10 @@ function repostCard(r, req, opts = {}) {
 }
 
 // Stats du feed d'un utilisateur (pour le rail latéral de l'onglet).
+// Exportée : le feed du profil (routes/feed.js) les renvoie aussi.
+export async function buildRepostStats(userId) {
+  return buildStats(userId);
+}
 async function buildStats(userId) {
   const [bySource, topGames, total] = await Promise.all([
     Repost.aggregate([

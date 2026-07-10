@@ -1,7 +1,7 @@
 import express from "express";
+import mongoose from "mongoose";
 import User from "../models/User.js";
 import UserGame from "../models/UserGame.js";
-import List from "../models/List.js";
 import Repost from "../models/Repost.js";
 import Documentary from "../models/Documentary.js";
 import Activity from "../models/Activity.js";
@@ -10,6 +10,8 @@ import GemSkip from "../models/GemSkip.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { geminiJson, isGeminiConfigured } from "../lib/gemini.js";
 import { requireAuth } from "../middleware/auth.js";
+import { summarizeReactions } from "../lib/reviewSerialize.js";
+import { buildRepostStats } from "./reposts.js";
 
 // Flux de la page d'accueil : activité des joueurs suivis (jeux, reviews,
 // listes, fan arts republiés, documentaires recommandés) fusionnée en une
@@ -20,253 +22,432 @@ const router = express.Router();
 const person = (u) =>
   u ? { id: String(u._id), username: u.username, avatar: u.avatar || null } : null;
 
+// Interactions sociales « secondaires » (l'acteur agit sur le contenu d'un autre).
+const INTERACTIONS = [
+  "list_comment",
+  "comment_reply",
+  "list_like",
+  "comment_like",
+  "review_comment",
+  "review_comment_reply",
+  "review_comment_like",
+  "review_react",
+];
+
+// Mini-carte de liste embarquée dans les évènements.
+function listMini(l) {
+  const items = l.items || [];
+  const chars = items.filter((i) => i.kind === "character").length;
+  return {
+    id: String(l._id),
+    title: l.title,
+    type: l.type,
+    itemKind: items.length > 0 && chars === items.length ? "character" : "game",
+    itemCount: items.length,
+    preview: items.filter((i) => i.image).slice(0, 5).map((i) => i.image),
+    likeCount: (l.likes || []).length,
+    commentCount: (l.comments || []).length,
+  };
+}
+
+// ============================================================
+//  Construction de la timeline (partagée accueil / feed de profil)
+// ============================================================
+// La timeline est bâtie sur le journal Activity (les VRAIES actions : passage
+// en « terminé », note posée, OST choisie…), plus les reposts, documentaires
+// recommandés et découvertes de pépites. On n'infère plus rien des updatedAt :
+// modifier une entrée ne la fait plus remonter comme « nouvellement terminée ».
+// Chaque source est bornée à `limit` : on est donc sûr d'avoir les `limit`
+// évènements les plus récents toutes sources confondues.
+// `only: "media"` restreint la timeline aux fan arts republiés (onglet
+// « Médias » du feed de profil, et bento indépendant du fil).
+async function buildTimeline(req, { userScope, actorScope, before, limit, only = null }) {
+  const hasBefore = before && !Number.isNaN(before.getTime());
+  const lt = (field) => (hasBefore ? { [field]: { $lt: before } } : {});
+  const wantAll = only !== "media";
+  // limit + 1 : s'il reste au moins un évènement au-delà de la page, le total
+  // dépasse `limit` et le curseur de pagination est renvoyé — indispensable
+  // quand une seule source remplit exactement la page (ex. onglet Médias).
+  const cap = limit + 1;
+
+  const [reposts, docs, acts, gems] = await Promise.all([
+    Repost.find({ user: userScope, ...lt("createdAt") })
+      .sort({ createdAt: -1 })
+      .limit(cap)
+      .populate("user", "username avatar")
+      .lean(),
+    !wantAll
+      ? Promise.resolve([])
+      : Documentary.find({
+          user: userScope,
+          recommended: true,
+          ...(hasBefore ? { recommendedAt: { $lt: before } } : {}),
+        })
+          .sort({ recommendedAt: -1 })
+          .limit(cap)
+          .populate("user", "username avatar")
+          .lean(),
+    !wantAll
+      ? Promise.resolve([])
+      : Activity.find({ actor: actorScope, ...lt("createdAt") })
+          .sort({ createdAt: -1 })
+          .limit(limit * 2) // les activités portent plusieurs types d'évènements
+          .populate("actor", "username avatar")
+          .populate("target", "username avatar")
+          .populate("list", "title type visibility items likes comments")
+          .lean(),
+    !wantAll
+      ? Promise.resolve([])
+      : GemDiscovery.find({ user: userScope, ...lt("updatedAt") })
+          .sort({ updatedAt: -1 })
+          .limit(cap)
+          .populate("user", "username avatar")
+          .lean(),
+  ]);
+
+  const events = [];
+
+  // --- Actions de bibliothèque (game_update) : on complète la carte avec
+  // l'état ACTUEL de l'entrée (review, note, réactions…) pour pouvoir y
+  // réagir/répondre directement depuis le fil. ---
+  const gameActs = acts.filter((a) => a.type === "game_update" && a.actor && a.game);
+  // Aperçu de l'avis visé par une interaction (réaction / commentaire) : on
+  // charge aussi l'entrée du PROPRIÉTAIRE de l'avis (a.target) pour embarquer
+  // jaquette + note + extrait dans la carte.
+  const rvActs = acts.filter(
+    (a) =>
+      (a.type === "review_react" || a.type === "review_comment") &&
+      a.actor &&
+      a.game &&
+      a.target
+  );
+  const pairs = [
+    ...gameActs.map((a) => ({ user: a.actor._id, gameId: a.game })),
+    ...rvActs.map((a) => ({ user: a.target._id, gameId: a.game })),
+  ];
+  const entries = pairs.length ? await UserGame.find({ $or: pairs }).lean() : [];
+  const entryByKey = new Map(entries.map((e) => [`${e.user}-${e.gameId}`, e]));
+
+  const gameEvents = [];
+  for (const a of gameActs) {
+    const changes = a.meta?.changes || [];
+    if (!changes.length) continue;
+    const e = entryByKey.get(`${a.actor._id}-${a.game}`);
+    const hasReview = !!(
+      e &&
+      ((e.review && e.review.trim()) ||
+        (e.pros || []).length ||
+        (e.cons || []).length ||
+        (e.reviewMedia || []).length)
+    );
+    // Le corps de la review n'est montré que si la review fait partie des
+    // actions de la carte (sinon on n'affiche que ce qui a réellement changé).
+    const showReview =
+      hasReview && changes.some((c) => c.kind === "review" || c.kind === "added");
+    const { counts, mine } = summarizeReactions(e?.reactions || [], req.userId);
+    const kinds = new Set(changes.map((c) => c.kind));
+    gameEvents.push({
+      type: "game",
+      id: `a-${a._id}`,
+      date: a.createdAt,
+      user: person(a.actor),
+      game: {
+        id: a.game,
+        name: a.gameName || e?.name || "",
+        cover: a.gameCover || e?.cover || null,
+      },
+      changes,
+      status:
+        e?.status ||
+        changes.find((c) => c.kind === "status")?.to ||
+        changes.find((c) => c.kind === "added")?.status ||
+        null,
+      rating: e?.rating ?? null,
+      favorite: !!e?.favorite,
+      platform: e?.platform || null,
+      playtimeHours: e?.playtimeHours ?? null,
+      hasReview: showReview,
+      review: showReview ? String(e.review || "").slice(0, 420) : "",
+      spoiler: !!e?.spoiler,
+      pros: showReview ? (e.pros || []).slice(0, 3) : [],
+      cons: showReview ? (e.cons || []).slice(0, 3) : [],
+      reviewImage: showReview ? e.reviewMedia?.[0]?.url || null : null,
+      // OST / personnage : seulement si c'est une des actions de la carte.
+      ost: kinds.has("ost") && e?.favoriteOst?.name
+        ? {
+            name: e.favoriteOst.name,
+            artist: e.favoriteOst.artist || "",
+            artwork: e.favoriteOst.artwork || null,
+            preview: e.favoriteOst.preview || null,
+            youtube: !!e.favoriteOst.youtube,
+            url: e.favoriteOst.url || null,
+          }
+        : changes.find((c) => c.kind === "ost") || null,
+      character: kinds.has("character")
+        ? e?.favoriteCharacter?.name
+          ? { name: e.favoriteCharacter.name, image: e.favoriteCharacter.image || null }
+          : changes.find((c) => c.kind === "character") || null
+        : null,
+      // Barre de réactions : dès que la carte porte un avis ou une note.
+      canReact:
+        (hasReview || e?.rating != null) &&
+        changes.some((c) => ["review", "rating", "added", "status"].includes(c.kind)),
+      reactions: counts,
+      myReaction: mine,
+      commentCount: (e?.comments || []).length,
+    });
+  }
+
+  // Regroupement anti-rafale : plusieurs cartes « simples » (juste un statut,
+  // sans note/review/OST) d'un même joueur, même statut, rapprochées dans le
+  // temps → UNE carte « a ajouté N jeux à sa liste de souhaits » avec les
+  // jaquettes. Les cartes riches restent individuelles.
+  const GROUP_GAP = 2 * 60 * 60 * 1000; // 2 h entre deux évènements consécutifs
+  const isSimple = (ev) =>
+    !!ev.status &&
+    !ev.hasReview &&
+    (ev.changes || []).every((c) => c.kind === "added" || c.kind === "status");
+  gameEvents.sort((x, y) => new Date(y.date) - new Date(x.date));
+  const clusters = [];
+  for (const ev of gameEvents) {
+    const last = clusters[clusters.length - 1];
+    if (
+      last &&
+      last.simple &&
+      isSimple(ev) &&
+      last.user.id === ev.user.id &&
+      last.status === ev.status &&
+      new Date(last.lastDate) - new Date(ev.date) <= GROUP_GAP
+    ) {
+      last.members.push(ev);
+      last.lastDate = ev.date;
+    } else {
+      clusters.push({
+        simple: isSimple(ev),
+        user: ev.user,
+        status: ev.status,
+        date: ev.date,
+        lastDate: ev.date,
+        members: [ev],
+      });
+    }
+  }
+  for (const c of clusters) {
+    if (c.simple && c.members.length >= 2) {
+      events.push({
+        type: "gamegroup",
+        id: `gg-${c.members[0].id}`,
+        date: c.date, // le plus récent du groupe
+        user: c.user,
+        status: c.status,
+        games: c.members.map((m) => m.game),
+      });
+    } else {
+      events.push(...c.members);
+    }
+  }
+
+  // --- Autres activités : listes, abonnements, interactions ---
+  for (const a of acts) {
+    if (!a.actor || a.type === "game_update") continue;
+
+    if (a.type === "list_create" || a.type === "list_items") {
+      // Liste supprimée ou passée en privé : on masque.
+      if (!a.list || a.list.visibility === "private") continue;
+      if (a.type === "list_create") {
+        events.push({
+          type: "list",
+          id: `a-${a._id}`,
+          date: a.createdAt,
+          user: person(a.actor),
+          created: true,
+          list: listMini(a.list),
+        });
+      } else {
+        events.push({
+          type: "listadd",
+          id: `a-${a._id}`,
+          date: a.createdAt,
+          user: person(a.actor),
+          count: a.meta?.added || 1,
+          list: listMini(a.list),
+        });
+      }
+      continue;
+    }
+
+    if (a.type === "follow") {
+      if (!a.target) continue;
+      events.push({
+        type: "follow",
+        id: `a-${a._id}`,
+        date: a.createdAt,
+        user: person(a.actor),
+        target: person(a.target),
+      });
+      continue;
+    }
+
+    if (!INTERACTIONS.includes(a.type)) continue;
+
+    const onList = !!a.list;
+    // Liste supprimée ou passée en privé → lien cassé pour l'abonné : on masque.
+    if (onList && a.list.visibility === "private") continue;
+    // Activité « liste » dont la liste n'existe plus (populate → null).
+    const listMissing =
+      (a.type === "list_comment" ||
+        a.type === "list_like" ||
+        a.type === "comment_reply" ||
+        a.type === "comment_like") &&
+      !onList;
+    if (listMissing) continue;
+
+    // Aperçu de l'avis visé (réaction ou commentaire racine) : jaquette,
+    // note, extrait — pour une carte parlante au lieu d'un simple lien.
+    let review = null;
+    if (
+      (a.type === "review_react" || a.type === "review_comment") &&
+      a.game &&
+      a.target
+    ) {
+      const e = entryByKey.get(`${a.target._id}-${a.game}`);
+      if (e) {
+        review = {
+          gameCover: e.cover || null,
+          rating: e.rating ?? null,
+          text: String(e.review || "").slice(0, 220),
+          spoiler: !!e.spoiler,
+          pros: (e.pros || []).slice(0, 2),
+          cons: (e.cons || []).slice(0, 2),
+        };
+      }
+    }
+
+    events.push({
+      type: "interaction",
+      id: `a-${a._id}`,
+      date: a.createdAt,
+      user: person(a.actor),
+      action: a.type,
+      target: person(a.target),
+      snippet: a.snippet || "",
+      list: onList ? listMini(a.list) : null,
+      game: a.game ? { id: a.game, name: a.gameName || "" } : null,
+      review,
+    });
+  }
+
+  // --- Fan arts republiés (images locales, cf. routes/reposts.js) ---
+  // Le lecteur a-t-il déjà ces fan arts sur SON feed ? (état du bouton)
+  const myReposts = reposts.length
+    ? await Repost.find({
+        user: req.userId,
+        itemId: { $in: reposts.map((r) => r.itemId) },
+      })
+        .select("itemId")
+        .lean()
+    : [];
+  const myItemIds = new Set(myReposts.map((r) => r.itemId));
+  const base = `${req.protocol}://${req.get("host")}`;
+  for (const r of reposts) {
+    if (!r.user) continue;
+    events.push({
+      type: "repost",
+      id: `r-${r._id}`,
+      date: r.createdAt,
+      user: person(r.user),
+      repost: {
+        id: String(r._id),
+        image: `${base}/uploads/reposts/${r.image}`,
+        w: r.w || null,
+        h: r.h || null,
+        source: r.source,
+        author: r.author || "",
+        url: r.url || "",
+        likeCount: (r.likes || []).length,
+        liked: (r.likes || []).some((u) => String(u) === String(req.userId)),
+        commentCount: (r.comments || []).length,
+        repostedByMe:
+          String(r.user._id) === String(req.userId) || myItemIds.has(r.itemId),
+      },
+      game: { id: r.gameId, name: r.gameName, cover: r.gameCover || null },
+    });
+  }
+
+  // --- Documentaires recommandés ---
+  for (const d of docs) {
+    if (!d.user) continue;
+    events.push({
+      type: "video",
+      id: `v-${d._id}`,
+      date: d.recommendedAt || d.createdAt,
+      user: person(d.user),
+      video: {
+        videoId: d.videoId,
+        title: d.title,
+        author: d.author || "",
+        thumb: d.thumb || `https://i.ytimg.com/vi/${d.videoId}/hqdefault.jpg`,
+        duration: d.duration || null,
+      },
+      game: d.gameId ? { id: d.gameId, name: d.gameName } : null,
+    });
+  }
+
+  // --- Découvertes de pépites indés (une carte par jour et par joueur) ---
+  for (const g of gems) {
+    if (!g.user || !(g.seeds || []).length) continue;
+    events.push({
+      type: "gems",
+      id: `gd-${g._id}`,
+      gemsId: String(g._id), // pour GET /feed/gems/:id (modale « ses pépites »)
+      date: g.updatedAt,
+      user: person(g.user),
+      seeds: g.seeds.map((s) => ({
+        id: s.gameId,
+        name: s.name,
+        cover: s.cover || null,
+      })),
+      gameCount: (g.games || []).length,
+      count: g.count || 1,
+    });
+  }
+
+  events.sort((a, b) => new Date(b.date) - new Date(a.date));
+  return events;
+}
+
 // ============================================================
 //  GET /api/feed/home?limit&before — timeline de l'accueil
 // ============================================================
-// Fusionne 4 sources triées par date décroissante. Chaque source est bornée
-// à `limit` : on est donc sûr d'avoir les `limit` évènements les plus récents
-// toutes sources confondues. Curseur = date du dernier évènement affiché.
+// Curseur = date du dernier évènement affiché.
 router.get("/home", requireAuth, async (req, res) => {
   try {
     const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 25);
     const before = req.query.before ? new Date(req.query.before) : null;
-    const hasBefore = before && !Number.isNaN(before.getTime());
-    const lt = (field) => (hasBefore ? { [field]: { $lt: before } } : {});
+    // Filtre « un seul joueur » (avatars au-dessus du fil) : on ne montre que
+    // l'activité de cet utilisateur.
+    const onlyUser =
+      req.query.u && mongoose.isValidObjectId(req.query.u) ? req.query.u : null;
 
     const me = await User.findById(req.userId).select("following");
     const followed = (me?.following || []).map(String);
     // Personne à suivre encore : on ouvre le feed à toute la communauté pour
     // que la page ne soit jamais vide (petite appli entre amis). Dans tous
     // les cas, on n'affiche jamais ses PROPRES activités dans son fil.
-    const community = followed.length === 0;
-    const scope = community
-      ? { user: { $ne: req.userId } }
-      : { user: { $in: followed } };
+    const community = !onlyUser && followed.length === 0;
+    const userScope = onlyUser
+      ? onlyUser
+      : community
+        ? { $ne: req.userId }
+        : { $in: followed };
 
-    // Filtre « acteur » pour les interactions (le champ scope cible le
-    // propriétaire du contenu ; ici on veut l'auteur de l'action).
-    const actorScope = community
-      ? { $ne: req.userId }
-      : { $in: followed };
+    const events = await buildTimeline(req, {
+      userScope,
+      actorScope: userScope,
+      before,
+      limit,
+    });
 
-    const [entries, lists, reposts, docs, acts, gems] = await Promise.all([
-      UserGame.find({ ...scope, ...lt("updatedAt") })
-        .sort({ updatedAt: -1 })
-        .limit(limit)
-        .populate("user", "username avatar")
-        .lean(),
-      List.find({ ...scope, visibility: "public", ...lt("updatedAt") })
-        .sort({ updatedAt: -1 })
-        .limit(limit)
-        .populate("user", "username avatar")
-        .lean(),
-      Repost.find({ ...scope, ...lt("createdAt") })
-        .sort({ createdAt: -1 })
-        .limit(limit)
-        .populate("user", "username avatar")
-        .lean(),
-      Documentary.find({
-        ...scope,
-        recommended: true,
-        ...(hasBefore ? { recommendedAt: { $lt: before } } : {}),
-      })
-        .sort({ recommendedAt: -1 })
-        .limit(limit)
-        .populate("user", "username avatar")
-        .lean(),
-      Activity.find({ actor: actorScope, ...lt("createdAt") })
-        .sort({ createdAt: -1 })
-        .limit(limit)
-        .populate("actor", "username avatar")
-        .populate("target", "username")
-        .populate("list", "title type visibility items")
-        .lean(),
-      GemDiscovery.find({ ...scope, ...lt("updatedAt") })
-        .sort({ updatedAt: -1 })
-        .limit(limit)
-        .populate("user", "username avatar")
-        .lean(),
-    ]);
-
-    const events = [];
-
-    // --- Entrées de bibliothèque : ajout / statut / note / review ---
-    for (const e of entries) {
-      if (!e.user) continue;
-      const hasReview = !!(
-        (e.review && e.review.trim()) ||
-        (e.pros || []).length ||
-        (e.cons || []).length ||
-        (e.reviewMedia || []).length
-      );
-      events.push({
-        type: "game",
-        id: `g-${e._id}`,
-        date: e.updatedAt,
-        user: person(e.user),
-        game: { id: e.gameId, name: e.name, cover: e.cover || null },
-        status: e.status,
-        rating: e.rating ?? null,
-        favorite: !!e.favorite,
-        platform: e.platform || null,
-        playtimeHours: e.playtimeHours ?? null,
-        hasReview,
-        review: hasReview ? String(e.review || "").slice(0, 420) : "",
-        spoiler: !!e.spoiler,
-        pros: hasReview ? (e.pros || []).slice(0, 3) : [],
-        cons: hasReview ? (e.cons || []).slice(0, 3) : [],
-        reviewImage: hasReview ? e.reviewMedia?.[0]?.url || null : null,
-        reactionCount: (e.reactions || []).length,
-        commentCount: (e.comments || []).length,
-      });
-    }
-
-    // --- Listes créées ou mises à jour ---
-    for (const l of lists) {
-      if (!l.user) continue;
-      const items = l.items || [];
-      const created =
-        new Date(l.updatedAt) - new Date(l.createdAt) < 5 * 60 * 1000;
-      const chars = items.filter((i) => i.kind === "character").length;
-      events.push({
-        type: "list",
-        id: `l-${l._id}`,
-        date: l.updatedAt,
-        user: person(l.user),
-        created,
-        list: {
-          id: String(l._id),
-          title: l.title,
-          type: l.type,
-          itemKind: items.length > 0 && chars === items.length ? "character" : "game",
-          itemCount: items.length,
-          preview: items.filter((i) => i.image).slice(0, 5).map((i) => i.image),
-          likeCount: (l.likes || []).length,
-          commentCount: (l.comments || []).length,
-        },
-      });
-    }
-
-    // --- Fan arts republiés (images locales, cf. routes/reposts.js) ---
-    // Le lecteur a-t-il déjà ces fan arts sur SON feed ? (état du bouton)
-    const myReposts = reposts.length
-      ? await Repost.find({
-          user: req.userId,
-          itemId: { $in: reposts.map((r) => r.itemId) },
-        })
-          .select("itemId")
-          .lean()
-      : [];
-    const myItemIds = new Set(myReposts.map((r) => r.itemId));
-    const base = `${req.protocol}://${req.get("host")}`;
-    for (const r of reposts) {
-      if (!r.user) continue;
-      events.push({
-        type: "repost",
-        id: `r-${r._id}`,
-        date: r.createdAt,
-        user: person(r.user),
-        repost: {
-          id: String(r._id),
-          image: `${base}/uploads/reposts/${r.image}`,
-          w: r.w || null,
-          h: r.h || null,
-          source: r.source,
-          author: r.author || "",
-          url: r.url || "",
-          likeCount: (r.likes || []).length,
-          liked: (r.likes || []).some((u) => String(u) === String(req.userId)),
-          commentCount: (r.comments || []).length,
-          repostedByMe:
-            String(r.user._id) === String(req.userId) || myItemIds.has(r.itemId),
-        },
-        game: { id: r.gameId, name: r.gameName, cover: r.gameCover || null },
-      });
-    }
-
-    // --- Documentaires recommandés ---
-    for (const d of docs) {
-      if (!d.user) continue;
-      events.push({
-        type: "video",
-        id: `v-${d._id}`,
-        date: d.recommendedAt || d.createdAt,
-        user: person(d.user),
-        video: {
-          videoId: d.videoId,
-          title: d.title,
-          author: d.author || "",
-          thumb: d.thumb || `https://i.ytimg.com/vi/${d.videoId}/hqdefault.jpg`,
-          duration: d.duration || null,
-        },
-        game: d.gameId ? { id: d.gameId, name: d.gameName } : null,
-      });
-    }
-
-    // --- Interactions sociales (commentaires, réponses, likes, réactions) ---
-    // Une action = une entrée d'Activity (pas de dédup à faire).
-    for (const a of acts) {
-      if (!a.actor) continue;
-      const onList = !!a.list;
-      // Liste supprimée ou passée en privé → lien cassé pour l'abonné : on masque.
-      if (onList && a.list.visibility === "private") continue;
-      // Activité « liste » dont la liste n'existe plus (populate → null).
-      const listMissing =
-        (a.type.startsWith("list_") || a.type === "comment_reply" ||
-          a.type === "comment_like") && !onList;
-      if (listMissing) continue;
-
-      let list = null;
-      if (onList) {
-        const items = a.list.items || [];
-        const chars = items.filter((i) => i.kind === "character").length;
-        list = {
-          id: String(a.list._id),
-          title: a.list.title,
-          type: a.list.type,
-          itemKind:
-            items.length > 0 && chars === items.length ? "character" : "game",
-          itemCount: items.length,
-          preview: items
-            .filter((i) => i.image)
-            .slice(0, 5)
-            .map((i) => i.image),
-        };
-      }
-
-      events.push({
-        type: "interaction",
-        id: `a-${a._id}`,
-        date: a.createdAt,
-        user: person(a.actor),
-        action: a.type,
-        target: a.target ? { username: a.target.username } : null,
-        snippet: a.snippet || "",
-        list,
-        game: a.game ? { id: a.game, name: a.gameName || "" } : null,
-      });
-    }
-
-    // --- Découvertes de pépites indés (une carte par jour et par joueur) ---
-    for (const g of gems) {
-      if (!g.user || !(g.seeds || []).length) continue;
-      events.push({
-        type: "gems",
-        id: `gd-${g._id}`,
-        gemsId: String(g._id), // pour GET /feed/gems/:id (modale « ses pépites »)
-        date: g.updatedAt,
-        user: person(g.user),
-        seeds: g.seeds.map((s) => ({
-          id: s.gameId,
-          name: s.name,
-          cover: s.cover || null,
-        })),
-        gameCount: (g.games || []).length,
-        count: g.count || 1,
-      });
-    }
-
-    events.sort((a, b) => new Date(b.date) - new Date(a.date));
     const page = events.slice(0, limit);
     const nextCursor =
       events.length > page.length && page.length
@@ -277,6 +458,45 @@ router.get("/home", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("home feed error:", err.message);
     res.status(500).json({ error: "Erreur lors du chargement du flux." });
+  }
+});
+
+// ============================================================
+//  GET /api/feed/user/:username?limit&before — feed d'un profil
+// ============================================================
+// Toute l'activité d'UN joueur (actions de bibliothèque, listes, abonnements,
+// interactions, fan arts, documentaires, pépites), même format que /home.
+// Première page : stats des reposts en plus (rail latéral de l'onglet Feed).
+router.get("/user/:username", requireAuth, async (req, res) => {
+  try {
+    const u = await User.findOne({ username: req.params.username }).select("_id");
+    if (!u) return res.status(404).json({ error: "Profil introuvable." });
+
+    const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 25);
+    const before = req.query.before ? new Date(req.query.before) : null;
+    const only = req.query.only === "media" ? "media" : null;
+
+    const [events, stats] = await Promise.all([
+      buildTimeline(req, {
+        userScope: u._id,
+        actorScope: u._id,
+        before,
+        limit,
+        only,
+      }),
+      before ? Promise.resolve(null) : buildRepostStats(u._id),
+    ]);
+
+    const page = events.slice(0, limit);
+    const nextCursor =
+      events.length > page.length && page.length
+        ? new Date(page[page.length - 1].date).toISOString()
+        : null;
+
+    res.json({ items: page, nextCursor, ...(stats ? { stats } : {}) });
+  } catch (err) {
+    console.error("user feed error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement du feed." });
   }
 });
 
