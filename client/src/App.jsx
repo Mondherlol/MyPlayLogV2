@@ -17,6 +17,7 @@ import Admin from "./pages/Admin";
 import Placeholder from "./pages/Placeholder";
 import AppLayout from "./components/AppLayout";
 import InstallPrompt from "./components/InstallPrompt";
+import ScrollManager from "./components/ScrollManager";
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -35,6 +36,7 @@ function GuestOnly({ children }) {
 export default function App() {
   return (
     <>
+      <ScrollManager />
       <Routes>
       <Route path="/" element={<Landing />} />
       <Route

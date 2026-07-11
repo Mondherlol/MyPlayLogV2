@@ -1046,6 +1046,36 @@
   max-width: 40ch;
 }
 
+/* --- Feed sur petit écran : le contenu ne doit jamais être coupé à droite ---
+   On resserre les cartes et on autorise le retour à la ligne des rangées
+   d'infos (méta vidéo/liste/reco/playlist, barre d'actions) plutôt que de les
+   laisser déborder hors de la carte. */
+@media (max-width: 560px) {
+  .hf-card {
+    padding: 0.85rem 0.9rem;
+  }
+
+  .hf-game-body {
+    gap: 0.7rem;
+  }
+
+  .hf-cover {
+    width: 64px;
+  }
+
+  .hf-video-meta,
+  .hf-pl-meta,
+  .hf-list-meta,
+  .hf-reco-meta,
+  .hf-actions {
+    flex-wrap: wrap;
+  }
+
+  .hf-video-meta {
+    gap: 0.25rem 0.7rem;
+  }
+}
+
 /* --- Rail latéral --- */
 .home-aside {
   position: sticky;
@@ -4307,6 +4337,18 @@
 .gp-back:hover {
   background: rgba(15, 15, 20, 0.7);
   transform: translateX(-2px);
+}
+
+/* Sur mobile, le bouton retour se loge dans la barre du haut (topbar) plutôt
+   que de flotter plus bas et de chevaucher les onglets sticky de la fiche. */
+@media (max-width: 760px) {
+  .gp-back {
+    top: 0.7rem;
+    left: 0.7rem;
+    z-index: 90;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.85rem;
+  }
 }
 
 /* --- Feuille de contenu qui remonte (animation) --- */
