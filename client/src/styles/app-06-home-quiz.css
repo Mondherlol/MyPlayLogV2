@@ -7537,6 +7537,39 @@
     gap: 0.6rem;
   }
 
+  /* Jaquette un peu plus compacte pour laisser de la place à la bulle */
+  .rvc-av-game {
+    width: 44px;
+    height: 59px;
+  }
+
+  /* En-tête : on empile le titre puis les étiquettes (au lieu de tout tasser sur
+     une ligne où le titre — non rétrécissable — écrase les tags à droite). */
+  .rvc-top {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.45rem;
+  }
+
+  .rvc-id {
+    flex-shrink: 1;
+  }
+
+  .rvc-top-right {
+    flex: none;
+    justify-content: flex-start;
+    gap: 0.4rem 0.5rem;
+  }
+
+  .rvc-tags {
+    justify-content: flex-start;
+  }
+
+  /* La barre pied (réactions + répondre) peut passer à la ligne si besoin */
+  .rvc-foot {
+    flex-wrap: wrap;
+  }
+
   .rvcm-replies {
     margin-left: 0.6rem;
   }

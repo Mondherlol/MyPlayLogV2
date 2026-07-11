@@ -630,6 +630,11 @@ export default function Profile() {
         </button>
       </nav>
 
+      {/* Enveloppe des onglets : une hauteur minimale garantit que la page ne se
+          « ratatine » pas pendant qu'un onglet asynchrone charge (spinner court).
+          Sans ça, le document rétrécit d'un coup et le navigateur ramène le scroll
+          tout en haut (on repasse au-dessus des onglets collés → on revoit la pp). */}
+      <div className="pf-tabpanel">
       {/* ---------- Aperçu ---------- */}
       {tab === "overview" && (
         <ProfileOverview
@@ -717,6 +722,7 @@ export default function Profile() {
       {tab === "reco" && (
         <ProfileRecommendations username={targetUsername} token={token} isMe={isMe} />
       )}
+      </div>
 
       {/* ---------- Modals ---------- */}
       {modalGame && (
