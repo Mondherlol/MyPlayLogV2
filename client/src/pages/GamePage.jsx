@@ -222,6 +222,7 @@ export default function GamePage() {
   const [bgOverride, setBgOverride] = useState(null);
   const [coverOverride, setCoverOverride] = useState(null);
   const [showCover, setShowCover] = useState(false);
+  const tabsTopRef = useRef(null);
 
   const entry = map[id];
   const isWishlist = entry?.status === "wishlist";
@@ -233,6 +234,18 @@ export default function GamePage() {
   const tab = TABS.some((t) => t.id === wantTab && t.ready) ? wantTab : "infos";
   function setTab(next) {
     setSearchParams(next === "infos" ? {} : { tab: next }, { replace: true });
+    scrollTabsToTop();
+  }
+
+  // Au changement d'onglet, ramène le contenu au début : on remonte juste sous
+  // les onglets (collés en haut) si on était plus bas — sinon on ne bouge pas.
+  function scrollTabsToTop() {
+    requestAnimationFrame(() => {
+      const el = tabsTopRef.current;
+      if (!el) return;
+      const y = window.scrollY + el.getBoundingClientRect().top - 60;
+      window.scrollTo({ top: Math.min(window.scrollY, y) });
+    });
   }
 
   function reloadEntry() {
@@ -687,6 +700,8 @@ export default function GamePage() {
             </header>
 
             {/* Onglets */}
+            {/* Ancre (hors flux sticky) pour recaler le scroll au changement d'onglet. */}
+            <div ref={tabsTopRef} aria-hidden="true" />
             <nav className="gp-tabs">
               {TABS.map((t) => (
                 <button

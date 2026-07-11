@@ -101,14 +101,24 @@ export default function MiniPlayer() {
   return (
     <>
       <div className="mini-player" role="region" aria-label="Lecteur de musique">
-        <div className={`mp-disc ${playing ? "spin" : ""}`}>
+        {/* Le disque qui tourne ouvre la file de lecture (surtout sur mobile,
+            où les boutons de la file sont masqués pour rester compact). */}
+        <button
+          type="button"
+          className={`mp-disc ${playing ? "spin" : ""} ${
+            queue.length > 1 ? "mp-disc-btn clickable" : ""
+          }`}
+          onClick={() => queue.length > 1 && setShowQueue(true)}
+          title={queue.length > 1 ? "Voir la file de lecture" : current.name}
+          aria-label={queue.length > 1 ? "Voir la file de lecture" : "Pochette"}
+        >
           {current.artwork ? (
             <img src={current.artwork} alt="" draggable="false" />
           ) : (
             <Music size={20} />
           )}
           <span className="mp-disc-hole" />
-        </div>
+        </button>
 
         <div className="mp-meta">
           <span className="mp-name" title={current.name}>
@@ -175,7 +185,7 @@ export default function MiniPlayer() {
               (au lieu de quitter la page). Icône seule pour rester compact. */}
           {queue.length > 1 && (
             <button
-              className="mp-icon-btn clickable"
+              className="mp-icon-btn mp-queue-btn clickable"
               onClick={() => setShowQueue(true)}
               title="Voir la file de lecture"
               aria-label="Voir la file de lecture"

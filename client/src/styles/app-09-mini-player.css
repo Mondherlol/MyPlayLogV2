@@ -59,6 +59,28 @@
   flex: none;
 }
 
+/* Le disque est un bouton (ouvre la file) : on neutralise le style natif. */
+button.mp-disc {
+  border: none;
+  padding: 0;
+  font: inherit;
+}
+
+.mp-disc.mp-disc-btn {
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.1s ease;
+}
+
+.mp-disc.mp-disc-btn:hover {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--orange, #f2b70b) 60%, transparent),
+    0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.mp-disc.mp-disc-btn:active {
+  transform: scale(0.94);
+}
+
 .mp-disc img {
   width: 100%;
   height: 100%;
@@ -268,19 +290,22 @@ body.mpl-open .app-content {
 
 /* ---------- Mobile : version compacte au-dessus de la bottom bar ---------- */
 @media (max-width: 760px) {
+  /* Version compacte façon PC mais sur une seule ligne : disque · titre/jeu ·
+     contrôles · (réduire/fermer). La barre de progression et le bouton « file »
+     sont masqués — on ouvre la file en tapant le disque. */
   .mini-player {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas:
-      "disc meta actions"
-      "controls seek seek";
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas: "disc meta controls actions";
     align-items: center;
-    gap: 0.5rem 0.7rem;
+    gap: 0.5rem;
     margin: 0 0.45rem calc(0.45rem + env(safe-area-inset-bottom));
-    padding: 0.55rem 0.7rem;
+    padding: 0.45rem 0.55rem;
   }
 
   .mp-disc {
     grid-area: disc;
+    width: 42px;
+    height: 42px;
   }
 
   .mp-meta {
@@ -290,19 +315,37 @@ body.mpl-open .app-content {
 
   .mp-controls {
     grid-area: controls;
-  }
-
-  .mp-seek {
-    grid-area: seek;
+    gap: 0.1rem;
   }
 
   .mp-actions {
     grid-area: actions;
-    justify-self: end;
+  }
+
+  /* Masqués sur mobile pour rester compact. */
+  .mp-seek,
+  .mp-queue-btn {
+    display: none;
+  }
+
+  /* Contrôles resserrés. */
+  .mp-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .mp-play {
+    width: 36px;
+    height: 36px;
+  }
+
+  .mp-icon-btn {
+    width: 28px;
+    height: 28px;
   }
 
   body.mpl-open .app-content {
-    padding-bottom: calc(var(--bottom-bar-h) + env(safe-area-inset-bottom) + 128px);
+    padding-bottom: calc(var(--bottom-bar-h) + env(safe-area-inset-bottom) + 84px);
   }
 }
 

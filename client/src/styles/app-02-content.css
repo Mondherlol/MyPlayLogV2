@@ -1219,7 +1219,7 @@
   /* Quand le mini-lecteur est ouvert, on remonte le FAB pour qu'il reste
      au-dessus de la barre de lecture (au lieu de se superposer dessus). */
   body.mpl-open .filter-fab {
-    bottom: calc(var(--bottom-bar-h, 0px) + env(safe-area-inset-bottom) + 128px + 0.8rem);
+    bottom: calc(var(--bottom-bar-h, 0px) + env(safe-area-inset-bottom) + 96px);
   }
 }
 

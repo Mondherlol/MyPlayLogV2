@@ -131,7 +131,10 @@ export default function Profile() {
       },
       { replace: true }
     );
-  const setTab = (t) => setParam("tab", t, "overview");
+  const setTab = (t) => {
+    setParam("tab", t, "overview");
+    scrollTabsToTop();
+  };
   // Bascule vers l'onglet « Tous les jeux » avec des filtres pré-appliqués
   // (depuis les cartes « Voir le reste » de l'aperçu). On repart d'un jeu de
   // filtres propre pour ne pas mélanger avec une recherche précédente.
@@ -158,7 +161,20 @@ export default function Profile() {
   const [followBusy, setFollowBusy] = useState(false);
   const avatarInput = useRef(null);
   const coverMenuRef = useRef(null);
+  const tabsTopRef = useRef(null);
   useClickOutside(coverMenuRef, () => setCoverMenu(false), coverMenu);
+
+  // Au changement d'onglet, ramène le contenu au début : on remonte juste sous
+  // les onglets (collés en haut) si on était plus bas — sinon on ne bouge pas
+  // (on ne veut pas redescendre quand on est déjà en haut).
+  function scrollTabsToTop() {
+    requestAnimationFrame(() => {
+      const el = tabsTopRef.current;
+      if (!el) return;
+      const y = window.scrollY + el.getBoundingClientRect().top - 60;
+      window.scrollTo({ top: Math.min(window.scrollY, y) });
+    });
+  }
 
   const profile = data?.profile;
   const isMe = profile?.isMe;
@@ -514,6 +530,8 @@ export default function Profile() {
       </header>
 
       {/* ---------- Onglets ---------- */}
+      {/* Ancre (hors flux sticky) pour recaler le scroll au changement d'onglet. */}
+      <div ref={tabsTopRef} aria-hidden="true" />
       <nav className="profile-tabs">
         <button
           className={`profile-tab ${tab === "overview" ? "active" : ""}`}

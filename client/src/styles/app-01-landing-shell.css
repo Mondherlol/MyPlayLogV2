@@ -1454,6 +1454,19 @@
   overflow-y: auto;
 }
 
+/* Sur mobile : le panneau prend toute la largeur (ancré au viewport) au lieu de
+   partir vers la gauche depuis la cloche et de déborder de l'écran. */
+@media (max-width: 760px) {
+  .notif-menu {
+    position: fixed;
+    top: 66px;
+    left: 0.6rem;
+    right: 0.6rem;
+    width: auto;
+    max-width: none;
+  }
+}
+
 .notif-list {
   display: flex;
   flex-direction: column;
