@@ -66,6 +66,39 @@ export function reportClientError(kind, error, extra = {}) {
   }
 }
 
+// Ping de diagnostic « environnement » : envoyé UNE fois par session, et
+// seulement quand l'app tourne en mode installé (PWA/APK), pour identifier si
+// l'APK est un vrai TWA (moteur Chrome, rapide) ou un wrapper WebView (souvent
+// lent/saccadé). Ce qui tranche : referrer `android-app://…` (TWA) et l'absence
+// de `wv` dans le User-Agent (présent = WebView). Se lit dans les logs serveur :
+// `docker compose logs server | grep "client-error] env"`.
+export function reportEnvPing() {
+  try {
+    const installed =
+      window.matchMedia?.("(display-mode: standalone)").matches ||
+      window.matchMedia?.("(display-mode: fullscreen)").matches ||
+      window.matchMedia?.("(display-mode: minimal-ui)").matches ||
+      navigator.standalone === true ||
+      (document.referrer || "").startsWith("android-app://");
+    if (!installed) return; // en onglet navigateur classique : on ne ping pas
+    if (sessionStorage.getItem("mpl_env_pinged")) return;
+    sessionStorage.setItem("mpl_env_pinged", "1");
+
+    const dm =
+      ["standalone", "fullscreen", "minimal-ui", "browser"].find((m) =>
+        window.matchMedia?.(`(display-mode: ${m})`).matches
+      ) || "unknown";
+    const isWebView = /[;\s]wv[;)]/.test(navigator.userAgent);
+    reportClientError("env", {
+      message: `webview=${isWebView} display-mode=${dm} referrer=${
+        document.referrer || "-"
+      }`,
+    });
+  } catch {
+    /* diagnostic best-effort */
+  }
+}
+
 // Handlers globaux : erreurs JS non-rattrapées + promesses rejetées.
 // À appeler une fois au démarrage (main.jsx).
 let installed = false;

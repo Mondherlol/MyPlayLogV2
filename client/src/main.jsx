@@ -5,7 +5,7 @@ import "./index.css";
 import "./App.css";
 import App from "./App.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
-import { installGlobalErrorReporting } from "./lib/reportError.js";
+import { installGlobalErrorReporting, reportEnvPing } from "./lib/reportError.js";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { LibraryProvider } from "./context/LibraryContext.jsx";
@@ -14,6 +14,9 @@ import { LibraryProvider } from "./context/LibraryContext.jsx";
 // backend, pour diagnostiquer les crashs qui n'arrivent que sur certains
 // appareils. À installer avant le premier rendu.
 installGlobalErrorReporting();
+// Diagnostic ponctuel : identifie si l'app installée (APK) tourne en TWA (Chrome)
+// ou en WebView. Ne fait rien dans un onglet de navigateur classique.
+reportEnvPing();
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
