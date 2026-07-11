@@ -233,22 +233,32 @@
   transform: translateY(-50%) scale(1);
 }
 
-/* ---------- Fermer ---------- */
-.mp-close {
+/* ---------- Actions (file de lecture / réduire / fermer) ---------- */
+.mp-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.mp-icon-btn {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border: none;
   border-radius: 50%;
   background: transparent;
   color: #8c92a0;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
 }
 
-.mp-close:hover {
+.mp-icon-btn:hover {
   background: rgba(255, 255, 255, 0.09);
   color: #f3f4f7;
+}
+
+.mp-icon-btn:active {
+  transform: scale(0.92);
 }
 
 /* Le contenu ne doit pas rester caché derrière la barre. */
@@ -261,8 +271,9 @@ body.mpl-open .app-content {
   .mini-player {
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
-      "disc meta controls"
-      "seek seek seek";
+      "disc meta actions"
+      "controls seek seek";
+    align-items: center;
     gap: 0.5rem 0.7rem;
     margin: 0 0.45rem calc(0.45rem + env(safe-area-inset-bottom));
     padding: 0.55rem 0.7rem;
@@ -274,6 +285,7 @@ body.mpl-open .app-content {
 
   .mp-meta {
     grid-area: meta;
+    align-self: center;
   }
 
   .mp-controls {
@@ -284,15 +296,311 @@ body.mpl-open .app-content {
     grid-area: seek;
   }
 
-  .mp-close {
-    position: absolute;
-    top: 0.35rem;
-    right: 0.35rem;
-    width: 26px;
-    height: 26px;
+  .mp-actions {
+    grid-area: actions;
+    justify-self: end;
   }
 
   body.mpl-open .app-content {
     padding-bottom: calc(var(--bottom-bar-h) + env(safe-area-inset-bottom) + 128px);
+  }
+}
+
+/* ======================================================================
+   BULLE RÉDUITE — façon Messenger : le son continue, on rouvre au clic
+   ====================================================================== */
+.mp-bubble {
+  position: fixed;
+  bottom: calc(var(--bottom-bar-h, 0px) + 0.9rem + env(safe-area-inset-bottom));
+  left: calc(var(--app-sidebar-w, 0px) + 0.9rem);
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.28rem;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #262a33 0%, #1e2129 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 -2px 0 rgba(242, 183, 11, 0.14) inset,
+    0 10px 30px rgba(0, 0, 0, 0.5);
+  animation: mp-rise 0.28s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.mp-bubble-main {
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 50%;
+  transition: transform 0.12s ease;
+}
+
+.mp-bubble-main:hover {
+  transform: scale(1.05);
+}
+
+.mp-bubble-disc {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 50%, #14161c 0%, #05060a 78%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 4px 12px rgba(0, 0, 0, 0.5);
+  color: #6b7180;
+}
+
+.mp-bubble-disc img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.mp-bubble-disc.spin img {
+  animation: mp-spin 1000s linear infinite;
+}
+
+.mp-bubble-hole {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #1e2129;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5);
+}
+
+.mp-bubble-play {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ffd24a, #f2b70b);
+  color: #1a1204;
+  box-shadow: 0 4px 12px rgba(242, 183, 11, 0.35);
+  transition: transform 0.1s ease, filter 0.15s ease;
+}
+
+.mp-bubble-play:hover {
+  filter: brightness(1.05);
+}
+
+.mp-bubble-play:active {
+  transform: scale(0.92);
+}
+
+/* ======================================================================
+   MODALE « FILE DE LECTURE » — pistes de la playlist en cours
+   ====================================================================== */
+.mpq-modal {
+  max-width: 460px;
+  width: 100%;
+}
+
+.mpq-head {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin: 0 0 1.1rem;
+  padding-right: 2rem;
+  flex-wrap: wrap;
+}
+
+.mpq-head-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: var(--accent-grad);
+  color: #1a1204;
+  box-shadow: 0 6px 18px rgba(242, 183, 11, 0.3);
+}
+
+.mpq-head-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  min-width: 0;
+  flex: 1 1 12rem;
+}
+
+.mpq-head-kicker {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.mpq-head-title {
+  font-size: 1.15rem;
+  line-height: 1.2;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mpq-head-count {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+.mpq-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: none;
+  padding: 0.42rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--accent-ink);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.8rem;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.mpq-open:hover {
+  border-color: var(--orange);
+  background: var(--surface-2);
+}
+
+.mpq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-height: 56vh;
+  overflow-y: auto;
+  margin: 0 -0.4rem;
+  padding: 0 0.4rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.mpq-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  transition: background 0.14s ease;
+}
+
+.mpq-row:hover {
+  background: var(--surface-2);
+}
+
+.mpq-row.active {
+  background: color-mix(in srgb, var(--orange) 12%, var(--surface-2));
+}
+
+.mpq-index {
+  flex: none;
+  width: 22px;
+  display: grid;
+  place-items: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.mpq-row.active .mpq-index {
+  color: var(--accent-ink);
+}
+
+.mpq-thumb {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 9px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.mpq-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mpq-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.mpq-name {
+  font-weight: 600;
+  font-size: 0.92rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mpq-row.active .mpq-name {
+  color: var(--accent-ink);
+}
+
+.mpq-artist {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Égaliseur animé sur la piste en cours de lecture. */
+.mpq-eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+}
+
+.mpq-eq i {
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent-ink);
+  transform-origin: bottom;
+  animation: mpq-eq 0.9s ease-in-out infinite;
+}
+
+.mpq-eq i:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.mpq-eq i:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes mpq-eq {
+  0%, 100% {
+    transform: scaleY(0.35);
+  }
+
+  50% {
+    transform: scaleY(1);
   }
 }

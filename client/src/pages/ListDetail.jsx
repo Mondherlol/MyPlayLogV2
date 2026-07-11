@@ -23,7 +23,8 @@ import {
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   pointerWithin,
@@ -149,8 +150,12 @@ export default function ListDetail() {
   );
 
   // --- Drag & drop (dnd-kit) ---
+  // Souris : le drag démarre dès 6 px de déplacement. Tactile : appui long
+  // (180 ms) avant de saisir, sinon un simple glissé du doigt fait défiler la
+  // page / le vivier au lieu de déclencher un drag (indispensable sur mobile).
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } })
   );
 
   // Détection de collision : `pointerWithin` d'abord (le conteneur RÉELLEMENT

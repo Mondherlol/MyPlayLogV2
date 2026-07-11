@@ -16,6 +16,7 @@ import ListDetail from "./pages/ListDetail";
 import Admin from "./pages/Admin";
 import Placeholder from "./pages/Placeholder";
 import AppLayout from "./components/AppLayout";
+import InstallPrompt from "./components/InstallPrompt";
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -33,7 +34,8 @@ function GuestOnly({ children }) {
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <Routes>
       <Route path="/" element={<Landing />} />
       <Route
         path="/login"
@@ -92,6 +94,10 @@ export default function App() {
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+
+      {/* Pop-up d'installation PWA (Android/iOS), globale à toute l'app. */}
+      <InstallPrompt />
+    </>
   );
 }

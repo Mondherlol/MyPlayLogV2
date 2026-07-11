@@ -3733,6 +3733,11 @@
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
+  /* Reste accroché sous la topbar : on change d'onglet sans remonter. */
+  position: sticky;
+  top: var(--topbar-h, 60px);
+  z-index: 40;
+  background: var(--bg);
 }
 
 .profile-tabs::-webkit-scrollbar {

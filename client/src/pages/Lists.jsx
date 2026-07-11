@@ -27,7 +27,6 @@ import { Preview, Author } from "../components/ListPreview";
 
 const SCOPES = [
   { value: "feed", label: "Découvrir" },
-  { value: "popular", label: "Populaires" },
   { value: "playlists", label: "PlayLists" },
   { value: "mine", label: "Mes listes" },
 ];
@@ -145,8 +144,7 @@ export default function Lists() {
     setError(null);
     const params = new URLSearchParams();
     if (scope === "mine") params.set("scope", "mine");
-    // L'onglet « Populaires » force le tri par likes ; sinon on suit le select.
-    params.set("sort", scope === "popular" ? "likes" : sort);
+    params.set("sort", sort);
     // L'onglet « PlayLists » ne montre que les playlists (filtres type/contenu ignorés).
     if (scope === "playlists") params.set("type", "playlist");
     else {
@@ -243,11 +241,10 @@ export default function Lists() {
         </select>
         <select
           className="lists-select"
-          value={scope === "popular" ? "likes" : sort}
+          value={sort}
           onChange={(e) => setSort(e.target.value)}
-          disabled={scope === "popular"}
           aria-label="Trier"
-          title={scope === "popular" ? "L'onglet Populaires trie par likes" : "Trier"}
+          title="Trier"
         >
           {LIST_SORTS.map((o) => (
             <option key={o.value} value={o.value}>

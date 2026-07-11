@@ -52,6 +52,19 @@
   margin-bottom: 1.4rem;
   border-bottom: 1px solid var(--border);
   padding-bottom: 0;
+  /* Reste accroché sous la topbar quand on fait défiler le feed de listes. */
+  position: sticky;
+  top: var(--topbar-h, 60px);
+  z-index: 40;
+  background: var(--bg);
+  /* Défilement horizontal des onglets si l'écran est très étroit. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.lists-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .lists-tab {

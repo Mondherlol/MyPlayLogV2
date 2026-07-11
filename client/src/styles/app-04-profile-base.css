@@ -2153,4 +2153,45 @@
   .tier-label {
     font-size: 1.1rem;
   }
+
+  /* --- Mode édition : rien ne doit déborder de l'écran --- */
+  /* On enlève le plancher de 260px pour laisser l'en-tête rétrécir et les
+     enfants passer à la ligne au lieu d'être rognés par overflow-x: clip. */
+  .ld-header-main {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .ld-title,
+  .ld-title-input {
+    font-size: 1.5rem;
+  }
+
+  /* Sélecteur de type : segmenté pleine largeur, chaque type se répartit. */
+  .ld-typeswitch {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .ld-type-opt {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  /* Description : la textarea reste dans les clous (bordures comprises). */
+  .ld-desc-input {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .ld-desc {
+    overflow-wrap: anywhere;
+  }
+
+  /* Barre d'actions : les boutons passent à la ligne, jamais coupés. */
+  .ld-header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
 }
