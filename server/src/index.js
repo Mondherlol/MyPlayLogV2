@@ -19,6 +19,7 @@ import patchnoteRoutes from "./routes/patchnotes.js";
 import adminRoutes from "./routes/admin.js";
 import companyRoutes from "./routes/companies.js";
 import platformRoutes from "./routes/platforms.js";
+import shareRoutes from "./routes/share.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -61,6 +62,10 @@ app.use("/api/patchnotes", patchnoteRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/companies", companyRoutes);
 app.use("/api/platforms", platformRoutes);
+
+// Aperçus de partage (Open Graph). Caddy ne route ici que les robots sociaux
+// (WhatsApp, Facebook, X, Discord…) ; les vraies personnes reçoivent la SPA.
+app.use("/", shareRoutes);
 
 const PORT = process.env.PORT || 4000;
 const MONGODB_URI =

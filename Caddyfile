@@ -14,6 +14,19 @@ myplaylog.cc {
         reverse_proxy server:4000
     }
 
+    # Robots sociaux (aperçus de partage) sur les pages partageables : le
+    # backend renvoie des balises Open Graph dynamiques (titre, image, infos).
+    # Ces robots ne lisent que le <head> et n'exécutent pas de JS -> sans ça,
+    # ils ne voient que les méta génériques de la SPA. Les vraies personnes
+    # (autres User-Agent) tombent dans le `handle` suivant et reçoivent la SPA.
+    @crawler {
+        path /lists/*
+        header_regexp User-Agent (?i)(facebookexternalhit|facebot|WhatsApp|Twitterbot|Discordbot|TelegramBot|Slackbot|LinkedInBot|redditbot|Pinterest|SkypeUriPreview|vkShare|Embedly|Iframely|Googlebot|bingbot|Applebot|ia_archiver|Google-InspectionTool)
+    }
+    handle @crawler {
+        reverse_proxy server:4000
+    }
+
     # Tout le reste : les fichiers statiques du build React (SPA).
     handle {
         root * /srv
