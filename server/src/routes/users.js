@@ -895,16 +895,27 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
     const platforms = [...platMap.values()]
       .sort((a, b) => b.count - a.count)
       .slice(0, 8)
-      .map((p) => ({ ...p, games: platGames.get(p.name) || [] }));
+      .map((p) => ({
+        ...p,
+        pct: Math.round((p.count / played.length) * 100),
+        games: platGames.get(p.name) || [],
+      }));
 
-    // -- Démat vs physique (jeux joués ; défaut : digital) --
-    const physicalEntries = played.filter((e) => e.format === "physical");
-    const digitalEntries = played.filter((e) => e.format !== "physical");
+    // -- Démat vs physique vs let's play (jeux joués ; défaut : digital) --
+    // Les jeux « vus en let's play » n'ont pas de format d'achat : on les sort
+    // du décompte démat/physique pour en faire une catégorie à part.
+    const LETSPLAY_PLATFORM = "Vu en let's play";
+    const letsplayEntries = played.filter((e) => e.platform === LETSPLAY_PLATFORM);
+    const ownedEntries = played.filter((e) => e.platform !== LETSPLAY_PLATFORM);
+    const physicalEntries = ownedEntries.filter((e) => e.format === "physical");
+    const digitalEntries = ownedEntries.filter((e) => e.format !== "physical");
     const formats = {
       digital: digitalEntries.length,
       physical: physicalEntries.length,
+      letsplay: letsplayEntries.length,
       digitalGames: digitalEntries.slice(0, FACET_CAP).map(slim),
       physicalGames: physicalEntries.slice(0, FACET_CAP).map(slim),
+      letsplayGames: letsplayEntries.slice(0, FACET_CAP).map(slim),
     };
 
     // -- Marathon : jeux avec le plus d'heures --

@@ -447,6 +447,10 @@
   color: var(--ps-c-playing);
 }
 
+.ps-format-item.letsplay svg {
+  color: var(--ps-c-wishlist);
+}
+
 .ps-formats-bar {
   display: flex;
   height: 10px;
@@ -465,6 +469,13 @@
 .ps-formats-physical {
   height: 100%;
   background: var(--ps-c-playing);
+  transform-origin: right;
+  animation: ps-grow-x 0.9s cubic-bezier(0.22, 0.8, 0.3, 1) both;
+}
+
+.ps-formats-letsplay {
+  height: 100%;
+  background: var(--ps-c-wishlist);
   transform-origin: right;
   animation: ps-grow-x 0.9s cubic-bezier(0.22, 0.8, 0.3, 1) both;
 }

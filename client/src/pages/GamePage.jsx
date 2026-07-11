@@ -1489,7 +1489,6 @@ function InfosTab({ game, onOpenImage, navigate }) {
     { label: "Genres", items: game.genres },
     { label: "Thèmes", items: game.themes },
     { label: "Modes de jeu", items: game.gameModes },
-    { label: "Plateformes", items: game.platforms.map((p) => p.name) },
   ].filter((g) => g.items?.length);
 
   const facts = [
@@ -1607,6 +1606,27 @@ function InfosTab({ game, onOpenImage, navigate }) {
           </div>
         </section>
       ))}
+
+      {game.platforms?.length > 0 && (
+        <section className="gp-block">
+          <h3 className="gp-h3">
+            <Cpu size={14} /> Plateformes
+          </h3>
+          <div className="gp-chips">
+            {game.platforms.map((p) => (
+              <button
+                key={p.id}
+                className="gp-chip gp-chip-plat clickable"
+                onClick={() => navigate(`/platform/${p.id}`)}
+                title={`Voir la console ${p.name}`}
+              >
+                {p.name}
+                <ChevronRight size={13} />
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {game.languages?.length > 0 && (
         <section className="gp-block">

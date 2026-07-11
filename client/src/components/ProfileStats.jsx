@@ -23,6 +23,7 @@ import {
   Skull,
   Cloud,
   Disc,
+  Tv,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { makeCache } from "../lib/cache";
@@ -204,15 +205,18 @@ function Columns({ data, tipOf, onColClick }) {
   );
 }
 
-// Démat vs physique : barre bicolore + légende (dans la card Consoles).
+// Démat vs physique vs let's play : barre multicolore + légende (dans la card
+// Consoles). La part « let's play » n'apparaît que s'il y a des jeux vus ainsi.
 // `onPick` rend chaque part cliquable (ouvre la liste des jeux concernés).
 function FormatSplit({ formats, onPick }) {
   const digital = formats?.digital || 0;
   const physical = formats?.physical || 0;
-  const total = digital + physical;
+  const letsplay = formats?.letsplay || 0;
+  const total = digital + physical + letsplay;
   if (!total) return null;
   const pctD = Math.round((digital / total) * 100);
-  const pctP = 100 - pctD;
+  const pctL = Math.round((letsplay / total) * 100);
+  const pctP = 100 - pctD - pctL;
   return (
     <div className="ps-formats">
       <div className="ps-formats-legend">
@@ -234,10 +238,30 @@ function FormatSplit({ formats, onPick }) {
           <Disc size={14} /> Physique
           <strong>{pctP} %</strong>
         </button>
+        {letsplay > 0 && (
+          <button
+            type="button"
+            className="ps-format-item letsplay clickable"
+            title={`${nf.format(letsplay)} jeux vus en let's play`}
+            onClick={() => onPick?.("letsplay")}
+          >
+            <Tv size={14} /> Let's play
+            <strong>{pctL} %</strong>
+          </button>
+        )}
       </div>
-      <div className="ps-formats-bar" role="img" aria-label={`${pctD} % dématérialisé, ${pctP} % physique`}>
+      <div
+        className="ps-formats-bar"
+        role="img"
+        aria-label={`${pctD} % dématérialisé, ${pctP} % physique${
+          letsplay > 0 ? `, ${pctL} % vus en let's play` : ""
+        }`}
+      >
         <span className="ps-formats-digital" style={{ width: `${pctD}%` }} />
         <span className="ps-formats-physical" style={{ width: `${pctP}%` }} />
+        {letsplay > 0 && (
+          <span className="ps-formats-letsplay" style={{ width: `${pctL}%` }} />
+        )}
       </div>
     </div>
   );
@@ -724,8 +748,8 @@ export default function ProfileStats({ username, token }) {
                 value: p.count,
                 games: p.games,
                 right: p.hours
-                  ? `${nf.format(p.count)} · ${fmtHours(p.hours)}`
-                  : nf.format(p.count),
+                  ? `${p.pct} % · ${fmtHours(p.hours)}`
+                  : `${p.pct} %`,
                 title: `${p.name} : ${p.count} jeux${p.hours ? `, ${fmtHours(p.hours)}` : ""} — voir la liste`,
               }))}
             />
@@ -734,7 +758,9 @@ export default function ProfileStats({ username, token }) {
               onPick={(kind) =>
                 kind === "physical"
                   ? openFacet("Jeux physiques", Disc, stats.formats.physicalGames, stats.formats.physical)
-                  : openFacet("Jeux dématérialisés", Cloud, stats.formats.digitalGames, stats.formats.digital)
+                  : kind === "letsplay"
+                    ? openFacet("Jeux vus en let's play", Tv, stats.formats.letsplayGames, stats.formats.letsplay)
+                    : openFacet("Jeux dématérialisés", Cloud, stats.formats.digitalGames, stats.formats.digital)
               }
             />
           </Card>

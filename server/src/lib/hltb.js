@@ -1,57 +1,51 @@
 // Récupération best-effort des temps "how long to beat" depuis HowLongToBeat.
-// ⚠️ HLTB n'a pas d'API publique : on extrait dynamiquement l'endpoint de
-// recherche depuis leur bundle JS. C'est fragile (peut casser à tout moment).
-// En cas d'échec, on renvoie null (l'appelant met alors le cache en "none").
+// ⚠️ HLTB n'a pas d'API publique. Depuis 2024 leur recherche est protégée : il
+// faut d'abord récupérer un jeton de sécurité via /api/bleed/init, puis POSTer
+// la recherche sur /api/bleed avec ce jeton (headers x-auth-token/x-hp-key/
+// x-hp-val + un champ "honeypot" body[hpKey]=hpVal). C'est fragile (peut casser
+// à tout moment) : en cas d'échec on renvoie null (l'appelant met alors le cache
+// en "none").
 
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
-let endpointCache = null;
-let endpointCheckedAt = 0;
+const BASE = "https://howlongtobeat.com";
+const COMMON_HEADERS = {
+  "User-Agent": UA,
+  Origin: BASE,
+  Referer: BASE + "/",
+};
 
-async function findEndpoint() {
-  // re-tente au plus une fois par heure
-  if (endpointCache && Date.now() - endpointCheckedAt < 3_600_000) {
-    return endpointCache;
-  }
-  endpointCheckedAt = Date.now();
-  try {
-    const home = await fetch("https://howlongtobeat.com/", {
-      headers: { "User-Agent": UA },
-    }).then((r) => r.text());
+// Jeton de sécurité anti-bot (valable un court instant, 403 à expiration).
+async function fetchSecurityToken() {
+  const r = await fetch(`${BASE}/api/bleed/init?t=${Date.now()}`, {
+    headers: COMMON_HEADERS,
+  });
+  if (!r.ok) return null;
+  const j = await r.json().catch(() => null);
+  if (!j || !j.token) return null;
+  return { token: j.token, hpKey: j.hpKey, hpVal: j.hpVal };
+}
 
-    const srcs = [...home.matchAll(/src="([^"]*_next[^"]+\.js)"/g)].map((m) => m[1]);
-    for (const s of srcs) {
-      const url = s.startsWith("http") ? s : "https://howlongtobeat.com" + s;
-      const js = await fetch(url, { headers: { "User-Agent": UA } })
-        .then((r) => r.text())
-        .catch(() => "");
-      // Motif classique : "/api/xxx/".concat("a").concat("b")...
-      const m = js.match(/"(\/api\/[a-z_]+\/?)"((?:\.concat\("[a-zA-Z0-9]+"\))+)/i);
-      if (m) {
-        const tokens = [...m[2].matchAll(/concat\("([a-zA-Z0-9]+)"\)/g)]
-          .map((x) => x[1])
-          .join("");
-        endpointCache = "https://howlongtobeat.com" + m[1] + tokens;
-        return endpointCache;
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return null;
+// Nom réduit à ses lettres/chiffres pour comparer sans se soucier de la casse,
+// de la ponctuation ni des accents (choix du bon résultat parmi la liste).
+function normName(s) {
+  return String(s || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9]+/g, "");
 }
 
 export async function fetchHltbTimes(name) {
   try {
-    const endpoint = await findEndpoint();
-    if (!endpoint) return null;
+    const sec = await fetchSecurityToken();
+    if (!sec) return null;
 
-    const body = JSON.stringify({
+    const body = {
       searchType: "games",
       searchTerms: name.split(" ").filter(Boolean),
       searchPage: 1,
-      size: 5,
+      size: 10,
       searchOptions: {
         games: {
           userId: 0,
@@ -59,7 +53,7 @@ export async function fetchHltbTimes(name) {
           sortCategory: "popular",
           rangeCategory: "main",
           rangeTime: { min: null, max: null },
-          gameplay: { perspective: "", flow: "", genre: "" },
+          gameplay: { perspective: "", flow: "", genre: "", difficulty: "" },
           rangeYear: { min: "", max: "" },
           modifier: "",
         },
@@ -69,30 +63,42 @@ export async function fetchHltbTimes(name) {
         sort: 0,
         randomizer: 0,
       },
-    });
+      useCache: true,
+    };
+    // Champ "honeypot" attendu dans le corps (nom de clé dynamique).
+    if (sec.hpKey) body[sec.hpKey] = sec.hpVal;
 
-    const r = await fetch(endpoint, {
+    const r = await fetch(`${BASE}/api/bleed`, {
       method: "POST",
       headers: {
-        "User-Agent": UA,
+        ...COMMON_HEADERS,
         "Content-Type": "application/json",
-        Origin: "https://howlongtobeat.com",
-        Referer: "https://howlongtobeat.com/",
+        "x-auth-token": sec.token,
+        "x-hp-key": sec.hpKey,
+        "x-hp-val": sec.hpVal,
       },
-      body,
+      body: JSON.stringify(body),
     });
     if (!r.ok) return null;
     const j = await r.json();
-    const g = (j.data || [])[0];
-    if (!g) return null;
+    const data = j.data || [];
+    if (!data.length) return null;
+
+    // Le meilleur résultat est en général le 1er (tri "popular"), mais on
+    // privilégie une correspondance exacte de nom pour éviter un mauvais jeu.
+    const target = normName(name);
+    const g = data.find((x) => normName(x.game_name) === target) || data[0];
 
     const toH = (s) => (s ? Math.round(s / 3600) : null);
-    // Mapping HLTB -> nos 3 valeurs
-    return {
+    // Mapping HLTB -> nos 3 valeurs (main / main+extra / complétionniste).
+    const res = {
       hastily: toH(g.comp_main),
       normally: toH(g.comp_plus),
       completely: toH(g.comp_100),
     };
+    // Si HLTB n'a aucune donnée chiffrée pour ce jeu, on considère l'échec.
+    if (!res.hastily && !res.normally && !res.completely) return null;
+    return res;
   } catch {
     return null;
   }

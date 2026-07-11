@@ -1,0 +1,1081 @@
+/* ======================================================================
+   Page Console / Plateforme (.pv-*)
+   Langage propre : hero cinématique image-first, bandeau de stats, sections
+   épurées, scroll infini. Sobre, moderne, doré en accent. Theme-aware.
+   ====================================================================== */
+
+.pv {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 1rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+.pv-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 4rem 1rem;
+  color: var(--text-soft);
+}
+
+.pv-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.pv-back:hover {
+  color: var(--text);
+  border-color: var(--border-strong, var(--border));
+}
+
+/* -------------------- Hero cinématique -------------------- */
+.pv-hero {
+  position: relative;
+  border-radius: 26px;
+  overflow: hidden;
+  min-height: 320px;
+  display: flex;
+  isolation: isolate;
+  box-shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.6);
+}
+.pv-hero-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+.pv-hero-bg > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.25);
+  filter: blur(28px) saturate(1.15) brightness(0.8);
+}
+.pv-hero-mosaic {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  filter: blur(6px) brightness(0.6) saturate(1.1);
+  transform: scale(1.06);
+}
+.pv-hero-mosaic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pv-hero-veil {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 100% at 12% 30%, rgba(10, 10, 14, 0.35), transparent 60%),
+    linear-gradient(90deg, rgba(8, 8, 12, 0.92) 0%, rgba(8, 8, 12, 0.7) 42%, rgba(8, 8, 12, 0.35) 100%);
+}
+
+.pv-hero-inner {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 2.4rem 2.6rem;
+}
+.pv-hero-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+  max-width: 480px;
+  flex: 1;
+}
+.pv-badge {
+  font-size: 0.74rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--orange);
+  background: rgba(200, 146, 11, 0.14);
+  border: 1px solid rgba(200, 146, 11, 0.35);
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+}
+/* Plaque blanche SANS padding ni bordure : un logo noir-sur-transparent laisse
+   voir le blanc, tandis qu'un logo avec fond intégré (blanc-sur-noir…) couvre
+   toute la plaque bord à bord → aucun liseré blanc parasite autour. */
+.pv-hero-logo-plate {
+  display: inline-flex;
+  max-width: min(340px, 72vw);
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.55);
+}
+.pv-hero-logo {
+  max-width: 100%;
+  max-height: 84px;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+}
+.pv-hero-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 4vw, 2.9rem);
+  line-height: 1.02;
+  color: #fff;
+  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
+}
+.pv-hero-name.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+.pv-hero-maker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.92rem;
+  color: rgba(255, 255, 255, 0.82);
+}
+.pv-hero-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+.pv-follow,
+.pv-wiki {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.95rem;
+  border-radius: 999px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  backdrop-filter: blur(6px);
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.pv-follow:hover,
+.pv-wiki:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.18);
+}
+.pv-follow.on {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #241a02;
+}
+
+.pv-hero-shot {
+  position: relative;
+  flex: 0 0 clamp(220px, 32%, 360px);
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+}
+.pv-hero-glow {
+  position: absolute;
+  width: 78%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(242, 183, 11, 0.32), transparent 68%);
+  filter: blur(10px);
+}
+.pv-hero-shot img {
+  position: relative;
+  max-width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+  filter: drop-shadow(0 22px 38px rgba(0, 0, 0, 0.6));
+}
+
+/* Anneau d'affinité (doré) — vit dans le bandeau de stats + la modale */
+.pv-ring {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: conic-gradient(var(--orange) calc(var(--pct) * 1%), var(--border) 0);
+  display: grid;
+  place-items: center;
+}
+.pv-ring.clickable {
+  cursor: pointer;
+}
+.pv-ring-hole {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  color: var(--text);
+}
+.pv-ring-val {
+  display: inline-flex;
+  align-items: baseline;
+  line-height: 1;
+  font-family: var(--font-display);
+}
+.pv-ring-num {
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+.pv-ring-pct {
+  font-size: 0.68rem;
+  margin-left: 0.05em;
+  opacity: 0.7;
+}
+.pv-ring-empty {
+  font-size: 1.15rem;
+  color: var(--text-soft);
+}
+.pv-ring.lg {
+  width: 120px;
+  height: 120px;
+}
+.pv-ring.lg .pv-ring-hole {
+  width: 94px;
+  height: 94px;
+}
+.pv-ring.lg .pv-ring-num {
+  font-size: 2.2rem;
+}
+.pv-ring.lg .pv-ring-pct {
+  font-size: 0.85rem;
+}
+
+/* -------------------- Bandeau de stats -------------------- */
+.pv-statband {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.7rem;
+}
+.pv-stat {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 1rem 1.1rem;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  text-align: left;
+}
+/* Tuile affinité (anneau + libellé) */
+.pv-stat-aff {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: default;
+}
+.pv-stat-aff.clickable {
+  cursor: pointer;
+}
+.pv-stat-aff.clickable:hover {
+  border-color: var(--orange);
+}
+.pv-stat-aff-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.pv-stat-aff .pv-stat-lbl {
+  font-weight: 700;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+.pv-stat-sub2 {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+.pv-stat-ic {
+  color: var(--orange);
+  margin-bottom: 0.2rem;
+}
+.pv-stat-val {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  line-height: 1.05;
+  color: var(--text);
+}
+.pv-stat-lbl {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+.pv-stat-sub {
+  position: absolute;
+  top: 0.9rem;
+  right: 1rem;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  opacity: 0.7;
+}
+
+/* -------------------- Onglets -------------------- */
+.pv-tabs {
+  display: flex;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+.pv-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.7rem 0.4rem;
+  margin-right: 0.8rem;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s ease;
+}
+.pv-tab:hover {
+  color: var(--text);
+}
+.pv-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--orange);
+}
+.pv-tab-count {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  background: var(--surface-2);
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+}
+
+/* -------------------- Aperçu -------------------- */
+.pv-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 1.8rem;
+}
+.pv-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.pv-sec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.pv-sec-head h2,
+.pv-panel-h {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  font-weight: 700;
+}
+.pv-sec-head h2 svg,
+.pv-panel-h svg {
+  color: var(--orange);
+}
+.pv-sec-hint {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  padding-left: 0.5rem;
+  margin-left: 0.1rem;
+  border-left: 1px solid var(--border);
+}
+.pv-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--orange);
+  font-weight: 600;
+}
+
+/* Rangée horizontale de vignettes (jeux phares) */
+.pv-strip {
+  display: flex;
+  gap: 0.9rem;
+  overflow-x: auto;
+  /* overflow-x:auto rogne aussi le haut → padding vertical pour laisser respirer
+     le translateY + l'ombre au survol des cartes (sinon le haut est coupé). */
+  padding: 12px 2px 16px;
+  scroll-snap-type: x proximity;
+  /* Barre de défilement dorée, discrète, adaptée au thème (Firefox) */
+  scrollbar-width: thin;
+  scrollbar-color: var(--orange) transparent;
+}
+.pv-strip > * {
+  scroll-snap-align: start;
+  flex: 0 0 120px;
+}
+.pv-strip::-webkit-scrollbar {
+  height: 8px;
+}
+.pv-strip::-webkit-scrollbar-track {
+  background: transparent;
+}
+.pv-strip::-webkit-scrollbar-thumb {
+  background: var(--orange);
+  border-radius: 999px;
+}
+.pv-strip::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-ink, var(--orange));
+}
+
+/* Deux panneaux côte à côte : genres + éditeurs */
+.pv-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.1rem;
+}
+.pv-panel {
+  padding: 1.2rem;
+  border-radius: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+/* Donut genres */
+.pv-genre {
+  display: flex;
+  align-items: center;
+  gap: 1.4rem;
+  flex-wrap: wrap;
+}
+.pv-genre-donut {
+  position: relative;
+  width: 168px;
+  height: 168px;
+  flex-shrink: 0;
+}
+.pv-genre-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  text-align: center;
+  padding: 0 1.4rem;
+}
+.pv-genre-cap {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-soft);
+}
+.pv-genre-top {
+  font-family: var(--font-display);
+  font-size: 0.98rem;
+  color: var(--text);
+  line-height: 1.1;
+}
+.pv-genre-legend {
+  flex: 1;
+  min-width: 150px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.pv-genre-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+.pv-genre-name {
+  flex: 1;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pv-genre-legend strong {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.pv-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.pv-genre-tip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 0.82rem;
+  color: var(--text);
+  box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.4);
+}
+
+/* Top éditeurs (cartes-logos, sans texte) */
+.pv-pub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 0.6rem;
+}
+.pv-pub-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 74px;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  /* Tuile claire constante : les logos éditeurs IGDB sont souvent sombres,
+     donc une plaque claire garantit leur lisibilité en thème clair ET sombre. */
+  background: #f7f7f9;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.pv-pub-card:hover {
+  border-color: var(--orange);
+  transform: translateY(-2px);
+}
+.pv-pub-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  max-height: 100%;
+}
+.pv-pub-logo img {
+  max-width: 100%;
+  max-height: 42px; /* borne dure : ne déborde jamais de la tuile (74px - padding) */
+  object-fit: contain;
+  display: block;
+}
+.pv-pub-initial {
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: #2a2a2e; /* toujours foncé : la tuile est claire */
+  text-align: center;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Modèles & révisions — visuel + specs révélées au survol */
+.pv-ver-strip > * {
+  flex: 0 0 210px;
+}
+.pv-ver {
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+.pv-ver.has-specs {
+  cursor: pointer;
+}
+.pv-ver:hover {
+  border-color: var(--orange);
+  transform: translateY(-3px);
+  box-shadow: 0 18px 34px -22px rgba(0, 0, 0, 0.5);
+}
+.pv-ver-vis {
+  position: relative;
+  height: 150px;
+  display: grid;
+  place-items: center;
+  padding: 1.1rem;
+  background:
+    radial-gradient(130% 90% at 50% 0%, rgba(242, 183, 11, 0.14), transparent 72%),
+    var(--surface-2);
+  overflow: hidden;
+}
+/* Photo de la console (modèle) */
+.pv-ver-photo {
+  max-width: 90%;
+  max-height: 108px;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.35));
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+/* Repli : logo en grand sur plaque claire quand pas de photo (logos souvent noirs) */
+.pv-ver-logo-plate {
+  display: grid;
+  place-items: center;
+  max-width: 78%;
+  max-height: 78px;
+  padding: 0.8rem 1rem;
+  background: #f7f7f9;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.pv-ver-logo-big {
+  max-width: 100%;
+  max-height: 46px;
+  object-fit: contain;
+  display: block;
+}
+.pv-ver-fallback {
+  color: var(--text-soft);
+  transition: opacity 0.25s ease;
+}
+.pv-ver.has-specs:hover .pv-ver-photo,
+.pv-ver.has-specs:hover .pv-ver-logo-plate,
+.pv-ver.has-specs:hover .pv-ver-fallback {
+  opacity: 0.1;
+  transform: scale(0.94);
+}
+/* Badge logo du modèle, en médaillon (plaque claire → logos noirs lisibles) */
+.pv-ver-badge {
+  position: absolute;
+  top: 0.55rem;
+  left: 0.55rem;
+  height: 24px;
+  max-width: 82px;
+  padding: 0.2rem 0.42rem;
+  display: grid;
+  place-items: center;
+  background: #f7f7f9;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 10px -6px rgba(0, 0, 0, 0.5);
+  transition: opacity 0.2s ease;
+}
+.pv-ver-badge img {
+  max-height: 16px;
+  max-width: 100%;
+  object-fit: contain;
+  display: block;
+}
+.pv-ver.has-specs:hover .pv-ver-badge {
+  opacity: 0;
+}
+/* Pastille « Par défaut » */
+.pv-ver-def {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #241a02;
+  background: var(--orange);
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  transition: opacity 0.2s ease;
+}
+.pv-ver.has-specs:hover .pv-ver-def {
+  opacity: 0;
+}
+/* Overlay de specs, masqué puis révélé au survol (scrim pour lisibilité) */
+.pv-ver-specs {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.9rem 1rem;
+  background: var(--surface-2);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.pv-ver:hover .pv-ver-specs {
+  opacity: 1;
+  transform: none;
+}
+.pv-ver-specs span {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.76rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pv-ver-specs em {
+  font-style: normal;
+  color: var(--text-soft);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  min-width: 3.2rem;
+}
+.pv-ver-specs svg {
+  color: var(--orange);
+  flex-shrink: 0;
+}
+.pv-ver-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.7rem 0.9rem 0.8rem;
+}
+.pv-ver-foot b {
+  font-size: 0.9rem;
+  color: var(--text);
+  line-height: 1.2;
+}
+.pv-ver-foot span {
+  font-size: 0.78rem;
+  color: var(--orange);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Palmarès — leaderboard élégant (2 colonnes sur large) */
+.pv-lead {
+  list-style: none;
+  margin: 0;
+  padding: 0.4rem 0.3rem;
+  border-radius: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 0.1rem 0.6rem;
+}
+.pv-lead-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.pv-lead-row:hover {
+  background: var(--surface-2);
+}
+.pv-lead-rank {
+  width: 1.7rem;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  color: var(--text-soft);
+  flex-shrink: 0;
+}
+.pv-lead-row.top3 .pv-lead-rank {
+  color: var(--orange);
+}
+.pv-lead-cover {
+  width: 40px;
+  height: 54px;
+  border-radius: 7px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+  box-shadow: 0 4px 10px -5px rgba(0, 0, 0, 0.5);
+}
+.pv-lead-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pv-lead-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.pv-lead-name {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pv-lead-year {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+/* Note en anneau coloré */
+.pv-lead-note {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+}
+.pv-lead-ring {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+.pv-lead-track {
+  fill: none;
+  stroke: var(--surface-2);
+  stroke-width: 4;
+}
+.pv-lead-arc {
+  fill: none;
+  stroke: var(--c);
+  stroke-width: 4;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.4s ease;
+}
+.pv-lead-note b {
+  font-family: var(--font-display);
+  font-size: 0.86rem;
+  color: var(--c);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Consoles de la même famille */
+.pv-fam {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.pv-fam-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.9rem 0.55rem 0.6rem;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.pv-fam-item:hover {
+  border-color: var(--orange);
+  transform: translateY(-2px);
+}
+.pv-fam-logo {
+  width: 52px;
+  height: 34px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  padding: 4px 6px;
+  border-radius: 7px;
+  /* Plaque claire : les logos plateforme IGDB sont souvent noirs détourés */
+  background: #f7f7f9;
+  border: 1px solid var(--border);
+  color: #2a2a2e;
+  overflow: hidden;
+}
+.pv-fam-logo img {
+  max-width: 100%;
+  max-height: 26px;
+  object-fit: contain;
+  display: block;
+}
+.pv-fam-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* -------------------- Onglet Jeux -------------------- */
+.pv-games {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.pv-filters {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.pv-search {
+  flex: 1;
+  min-width: 180px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+}
+.pv-search input {
+  flex: 1;
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+.pv-toggle,
+.pv-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 0.86rem;
+  cursor: pointer;
+}
+.pv-toggle.active {
+  color: #241a02;
+  background: var(--orange);
+  border-color: var(--orange);
+}
+.pv-games-note {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+.pv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(122px, 1fr));
+  gap: 1rem 0.85rem;
+}
+.pv-sentinel {
+  display: flex;
+  justify-content: center;
+  padding: 1.4rem;
+  color: var(--text-soft);
+}
+.pv-empty {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: center;
+  padding: 2.5rem 1rem;
+  color: var(--text-soft);
+}
+
+/* Modale d'affinité */
+.pv-aff-modal {
+  max-width: 440px;
+}
+.pv-aff-hero {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  margin: 0.6rem 0 1.2rem;
+}
+.pv-aff-intro {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--text-soft);
+}
+.pv-aff-parts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.pv-aff-part-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.9rem;
+  color: var(--text);
+  margin-bottom: 0.3rem;
+}
+.pv-aff-part-pts {
+  font-family: var(--font-display);
+  color: var(--orange);
+}
+.pv-aff-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.pv-aff-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--orange), var(--accent-ink, #a5780a));
+}
+.pv-aff-part-detail {
+  margin-top: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+/* -------------------- Responsive -------------------- */
+@media (max-width: 720px) {
+  .pv-hero {
+    min-height: 0;
+  }
+  .pv-hero-inner {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: 1.1rem;
+    padding: 1.5rem 1.3rem 1.6rem;
+  }
+  .pv-hero-shot {
+    flex-basis: auto;
+    align-self: center;
+    min-height: 0;
+    height: 150px;
+  }
+  .pv-hero-shot img {
+    max-height: 150px;
+  }
+  .pv-hero-text {
+    max-width: none;
+    width: 100%;
+  }
+  .pv-stat-val {
+    font-size: 1.35rem;
+  }
+}

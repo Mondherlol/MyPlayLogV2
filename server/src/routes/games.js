@@ -107,49 +107,100 @@ function mapGame(g) {
   };
 }
 
+// On re-scrape HowLongToBeat au plus une fois tous les 3 mois par jeu (pour
+// tenir compte des maj de HLTB), y compris quand un précédent scrape avait
+// échoué (source "none") : HLTB a peut-être la donnée depuis.
+const HLTB_REFRESH_MS = 90 * 24 * 60 * 60 * 1000;
+// Au-delà, un "pending" est considéré bloqué (ex: crash serveur pendant le
+// scrape) et peut être repris, plutôt que de rester coincé indéfiniment.
+const HLTB_PENDING_TIMEOUT_MS = 60 * 60 * 1000;
+
+// Version de la logique de scrape HLTB. À incrémenter quand on corrige le
+// scraper : toutes les entrées d'une version antérieure sont re-scrapées à la
+// prochaine ouverture (ex: v1 = passage au protocole /api/bleed de HLTB).
+const HLTB_VERSION = 1;
+
+// Lance (en arrière-plan) le scrape HLTB d'un jeu, avec garde anti-course : la
+// première requête pose l'état "pending" atomiquement, les autres s'abstiennent.
+// `cached` = entrée GameTime existante (null si premier scrape).
+async function scheduleHltbScrape(id, name, cached) {
+  try {
+    if (!cached) {
+      // Création atomique (index unique sur gameId) : une seule requête gagne.
+      await GameTime.create({ gameId: id, source: "pending" });
+    } else {
+      // Re-scrape périmé : passe en "pending" seulement si personne d'actif ne
+      // le fait déjà (garde anti-course). On peut reprendre un "pending" bloqué
+      // depuis > timeout. Les valeurs existantes sont conservées.
+      const stalePending = new Date(Date.now() - HLTB_PENDING_TIMEOUT_MS);
+      const upd = await GameTime.updateOne(
+        {
+          gameId: id,
+          $or: [{ source: { $ne: "pending" } }, { updatedAt: { $lt: stalePending } }],
+        },
+        { $set: { source: "pending" } }
+      );
+      if (upd.modifiedCount === 0) return; // déjà en cours ailleurs
+    }
+    // On garde les anciennes valeurs si le scrape échoue (pas de perte de data).
+    fetchHltbTimes(name)
+      .then((res) =>
+        GameTime.updateOne(
+          { gameId: id },
+          {
+            $set: res
+              ? { ...res, source: "hltb", ver: HLTB_VERSION }
+              : { source: "none", ver: HLTB_VERSION },
+          }
+        )
+      )
+      .catch(() => {});
+  } catch {
+    /* course : déjà créé par une autre requête */
+  }
+}
+
 // Temps de jeu (Time to Beat) : IGDB en priorité, sinon fallback HowLongToBeat
-// mis en cache (on ne scrape qu'UNE fois par jeu, jamais de re-scrape).
-async function resolveTimeToBeat(id, name) {
+// mis en cache (scrape en arrière-plan, re-scrape au plus tous les 3 mois). On
+// ne scrape que les jeux SORTIS : `released` doit être vrai pour tenter HLTB.
+async function resolveTimeToBeat(id, name, released = true) {
   const ttbArr = await igdbQuery(
     "game_time_to_beats",
     `fields hastily,normally,completely; where game_id = ${id};`
   ).catch(() => []);
   const toH = (s) => (s ? Math.round(s / 3600) : null);
   const t = ttbArr[0];
-  let timeToBeat = t
-    ? { hastily: toH(t.hastily), normally: toH(t.normally), completely: toH(t.completely) }
-    : null;
-
-  if (!timeToBeat) {
-    const cached = await GameTime.findOne({ gameId: id });
-    if (cached) {
-      if (cached.hastily || cached.normally || cached.completely) {
-        timeToBeat = {
-          hastily: cached.hastily,
-          normally: cached.normally,
-          completely: cached.completely,
-        };
-      }
-    } else if (name) {
-      // Marque comme "en cours" (empêche tout re-scrape) puis fetch en
-      // arrière-plan : la réponse actuelle renvoie null, la prochaine ouverture
-      // aura les valeurs si HLTB a répondu.
-      try {
-        await GameTime.create({ gameId: id, source: "pending" });
-        fetchHltbTimes(name)
-          .then((res) =>
-            GameTime.updateOne(
-              { gameId: id },
-              { $set: res ? { ...res, source: "hltb" } : { source: "none" } }
-            )
-          )
-          .catch(() => {});
-      } catch {
-        /* course : déjà créé par une autre requête */
-      }
-    }
+  if (t) {
+    return { hastily: toH(t.hastily), normally: toH(t.normally), completely: toH(t.completely) };
   }
-  return timeToBeat;
+
+  // Pas de temps IGDB → fallback HLTB, mais uniquement pour les jeux sortis.
+  if (!name || !released) return null;
+
+  const cached = await GameTime.findOne({ gameId: id });
+  const age = cached ? Date.now() - cached.updatedAt.getTime() : 0;
+  // Un "pending" récent = scrape en cours ailleurs, on le laisse tranquille.
+  const inProgress = cached?.source === "pending" && age < HLTB_PENDING_TIMEOUT_MS;
+  // Périmé si : produit par une version antérieure du scraper, plus vieux que
+  // 3 mois, ou "pending" bloqué depuis trop longtemps (crash serveur).
+  const stale =
+    cached && !inProgress &&
+    (cached.ver !== HLTB_VERSION || age > HLTB_REFRESH_MS || cached.source === "pending");
+
+  // Premier scrape (aucune entrée) ou entrée périmée → en arrière-plan.
+  // La réponse courante renvoie les valeurs déjà connues (ou null la 1re fois).
+  if (!cached || stale) {
+    scheduleHltbScrape(id, name, cached);
+  }
+
+  if (cached && (cached.hastily || cached.normally || cached.completely)) {
+    return {
+      hastily: cached.hastily,
+      normally: cached.normally,
+      completely: cached.completely,
+    };
+  }
+  return null;
 }
 
 // Comparaison tolérante de noms de perso (casse, ponctuation, accents) pour dédoublonner.
@@ -732,7 +783,7 @@ router.get("/:id/details", requireAuth, async (req, res) => {
     const [gameArr, customCovers, charArr, customChars] = await Promise.all([
       igdbQuery(
         "games",
-        `fields name,cover.image_id,artworks.image_id,platforms.id,platforms.name,genres.id,genres.name,game_modes; where id = ${id};`
+        `fields name,cover.image_id,artworks.image_id,platforms.id,platforms.name,genres.id,genres.name,game_modes,first_release_date,total_rating_count; where id = ${id};`
       ),
       CustomCover.find({ gameId: id }).sort({ createdAt: -1 }),
       igdbQuery(
@@ -771,8 +822,14 @@ router.get("/:id/details", requireAuth, async (req, res) => {
     const isVn = (g.genres || []).some(
       (x) => x.id === 34 || /visual novel/i.test(x.name || "")
     );
+    // Jeu « sorti » : date passée, ou (à défaut de date) déjà noté par la
+    // communauté → on ne scrape HLTB que dans ce cas.
+    const nowSec = Math.floor(Date.now() / 1000);
+    const released =
+      (g.first_release_date && g.first_release_date <= nowSec) ||
+      (!g.first_release_date && (g.total_rating_count || 0) > 0);
     const [timeToBeat, vnChars] = await Promise.all([
-      resolveTimeToBeat(id, g.name),
+      resolveTimeToBeat(id, g.name, released),
       isVn ? resolveVnCharacters(id, g.name) : Promise.resolve([]),
     ]);
 
@@ -1058,7 +1115,14 @@ router.get("/:id/full", requireAuth, async (req, res) => {
       a.name.localeCompare(b.name, "fr")
     );
 
-    const timeToBeat = await resolveTimeToBeat(id, g.name);
+    // Jeu « sorti » : date passée, ou (à défaut de date) déjà noté par la
+    // communauté. On ne scrape HLTB que dans ce cas (pas de temps pour un jeu
+    // pas encore sorti). Aligné sur la logique upcoming/tbd du front.
+    const nowSec = Math.floor(Date.now() / 1000);
+    const released =
+      (g.first_release_date && g.first_release_date <= nowSec) ||
+      (!g.first_release_date && (g.total_rating_count || 0) > 0);
+    const timeToBeat = await resolveTimeToBeat(id, g.name, released);
 
     // « Ce jeu est un remake / DLC / … de … » : type IGDB + jeu parent.
     const typeFr = GAME_TYPES_FR[g.game_type];

@@ -74,6 +74,23 @@ const userSchema = new mongoose.Schema(
       default: [],
     },
 
+    // --- Consoles / plateformes favorites ---
+    // Épinglées depuis leur page /platform/:id. On garde nom + logo + abréviation
+    // pour un rendu direct (pas de refetch IGDB).
+    favoritePlatforms: {
+      type: [
+        {
+          platformId: { type: Number, required: true },
+          name: { type: String, required: true },
+          logo: { type: String, default: null },
+          abbr: { type: String, default: null },
+          addedAt: { type: Date, default: Date.now },
+          _id: false,
+        },
+      ],
+      default: [],
+    },
+
     // --- Abonnements (qui JE suis) ---
     following: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],

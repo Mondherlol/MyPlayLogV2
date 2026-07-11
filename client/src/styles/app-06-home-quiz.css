@@ -6034,6 +6034,28 @@
   font-weight: 500;
 }
 
+/* Plateformes cliquables → page console */
+.gp-chip-plat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.gp-chip-plat svg {
+  opacity: 0.5;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.gp-chip-plat:hover {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  background: var(--accent-soft, var(--surface-2));
+}
+.gp-chip-plat:hover svg {
+  opacity: 1;
+  transform: translateX(2px);
+}
+
 /* Liens */
 .gp-links {
   display: flex;

@@ -9,6 +9,9 @@ const gameTimeSchema = new mongoose.Schema(
     normally: { type: Number, default: null },
     completely: { type: Number, default: null },
     source: { type: String, default: "pending" },
+    // Version de la logique de scrape ayant produit cette entrée : permet de
+    // forcer un re-scrape quand on corrige/améliore le scraper (voir HLTB_VERSION).
+    ver: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

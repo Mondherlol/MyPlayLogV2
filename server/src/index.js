@@ -18,6 +18,7 @@ import feedRoutes from "./routes/feed.js";
 import patchnoteRoutes from "./routes/patchnotes.js";
 import adminRoutes from "./routes/admin.js";
 import companyRoutes from "./routes/companies.js";
+import platformRoutes from "./routes/platforms.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -59,6 +60,7 @@ app.use("/api/feed", feedRoutes);
 app.use("/api/patchnotes", patchnoteRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/companies", companyRoutes);
+app.use("/api/platforms", platformRoutes);
 
 const PORT = process.env.PORT || 4000;
 const MONGODB_URI =
