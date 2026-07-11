@@ -21,3 +21,11 @@ createRoot(document.getElementById("root")).render(
     </BrowserRouter>
   </StrictMode>
 );
+
+// PWA : enregistre le service worker (installation + repli hors-ligne).
+// Uniquement en prod : en dev, un SW en cache masquerait les mises à jour de Vite.
+if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
+}

@@ -1,0 +1,28 @@
+{
+  "name": "MyPlayLog — Ton journal de jeux vidéo",
+  "short_name": "MyPlayLog",
+  "description": "Track, note et partage tes jeux vidéo. Le journal de tes parties.",
+  "lang": "fr",
+  "dir": "ltr",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0c0d11",
+  "theme_color": "#0c0d11",
+  "categories": ["games", "entertainment", "social"],
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "192x192 512x512 any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-icon-maskable.svg",
+      "sizes": "192x192 512x512 any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

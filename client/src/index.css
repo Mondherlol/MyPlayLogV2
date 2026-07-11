@@ -247,3 +247,21 @@ h3 {
     transition: none !important;
   }
 }
+
+/* ===== PWA / mode installé (standalone) =====
+   Quand l'app est lancée depuis l'icône de l'écran d'accueil (pas dans un
+   onglet de navigateur), on retire le header marketing (Navbar) et le footer
+   pour un rendu « comme une appli ». La Topbar interne (recherche / notifs /
+   profil) reste, c'est la navigation principale sur mobile. */
+@media (display-mode: standalone) {
+  .navbar,
+  .footer {
+    display: none !important;
+  }
+
+  /* Respecte l'encoche / la barre d'état des mobiles (viewport-fit=cover). */
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
