@@ -450,6 +450,7 @@ export default function ProfileOverview({
           token={token}
           library={library}
           lists={lists}
+          favoriteCompanies={profile.favoriteCompanies || []}
           onOpenTab={onOpenTab}
         />
       )}

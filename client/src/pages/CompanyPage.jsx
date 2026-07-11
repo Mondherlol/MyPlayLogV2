@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { createPortal } from "react-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import {
   Loader2,
   ArrowLeft,
   Building2,
   Globe,
   CalendarDays,
-  Heart,
-  Star,
   Search,
   Gamepad2,
   Users,
@@ -15,87 +15,231 @@ import {
   Trophy,
   Sparkles,
   ExternalLink,
-  Library,
   Clapperboard,
+  Layers,
+  Library,
+  ChevronDown,
+  ChevronUp,
+  ChevronRight,
+  Star as StarIcon,
+  X,
+  TrendingUp,
+  Cpu,
+  CircleDot,
+  Bookmark,
+  PieChart as PieIcon,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useLibrary } from "../context/LibraryContext";
 import { apiFetch } from "../lib/api";
 import { makeCache } from "../lib/cache";
+import GameAddFan from "../components/GameAddFan";
 
 // Cache stale-while-revalidate du profil studio (par nom), comme les stats.
 const companyCache = makeCache("mpl_company_", 30 * 60 * 1000);
 
 const nf = new Intl.NumberFormat("fr-FR");
 
-const STATUS_LABEL = {
-  playing: "En cours",
-  finished: "Terminé",
-  paused: "En pause",
-  dropped: "Abandonné",
-  endless: "Sans fin",
-  wishlist: "À jouer",
-};
-
-// Anneau d'affinité : conic-gradient doré rempli à `value` %.
-function AffinityRing({ value }) {
-  const pct = value == null ? 0 : value;
+// Carte de jeu du catalogue studio — reprise des vignettes de la page Sorties
+// (.relc) : jaquette épurée, « + » d'ajout rapide qui n'apparaît qu'au survol,
+// liseré doré + marque-page si le jeu est en wishlist. Un clic ouvre la fiche.
+function CompanyGameCard({ g }) {
+  const navigate = useNavigate();
+  const { map } = useLibrary();
+  const inWish = map[g.gameId]?.status === "wishlist";
+  const sub = [g.franchise, g.year].filter(Boolean).join(" · ");
   return (
     <div
-      className="cp-ring"
-      style={{ "--pct": `${pct}` }}
-      role="img"
-      aria-label={value == null ? "Affinité indisponible" : `${pct} % d'affinité`}
+      className={`relc clickable ${inWish ? "is-wish" : ""}`}
+      onClick={() => navigate(`/game/${g.gameId}`)}
+      title={g.name}
     >
-      <div className="cp-ring-hole">
-        {value == null ? (
-          <span className="cp-ring-empty">—</span>
+      <span className="relc-cover">
+        {g.cover ? (
+          <img src={g.cover} alt="" loading="lazy" draggable="false" />
         ) : (
-          <>
-            <span className="cp-ring-num">{pct}</span>
-            <span className="cp-ring-pct">%</span>
-          </>
+          <span className="relc-ph">
+            <Gamepad2 size={22} />
+          </span>
         )}
-      </div>
+        {g.rating != null && (
+          <span className="relc-hype" title="Note critique">
+            <StarIcon size={11} fill="currentColor" strokeWidth={0} /> {g.rating}
+          </span>
+        )}
+        {inWish && (
+          <span className="relc-wishtag" title="Dans ta liste de souhaits">
+            <Bookmark size={11} fill="currentColor" strokeWidth={0} />
+          </span>
+        )}
+        <GameAddFan game={{ id: g.gameId, name: g.name, cover: g.cover }} hoverOnly />
+      </span>
+      <span className="relc-name">{g.name}</span>
+      {sub && <span className="relc-plats">{sub}</span>}
     </div>
   );
 }
 
-// Carte de jeu (onglet Jeux + jeux phares) : jaquette + badges biblio.
-function GameCard({ g }) {
+// Anneau d'affinité : conic-gradient doré rempli à `value` %. Cliquable pour
+// ouvrir le détail du calcul.
+function AffinityRing({ value, onClick, size }) {
+  const pct = value == null ? 0 : value;
+  const Tag = onClick ? "button" : "div";
   return (
-    <Link to={`/game/${g.gameId}`} className="cp-game" title={g.name}>
-      <div className="cp-game-cover">
-        {g.cover ? (
-          <img src={g.cover} alt={g.name} loading="lazy" />
+    <Tag
+      className={`cp-ring ${onClick ? "clickable" : ""} ${size === "lg" ? "lg" : ""}`}
+      style={{ "--pct": pct }}
+      onClick={onClick}
+      title={onClick ? "Voir le détail du calcul" : undefined}
+      aria-label={value == null ? "Affinité indisponible" : `${pct} % d'affinité`}
+    >
+      <span className="cp-ring-hole">
+        {value == null ? (
+          <span className="cp-ring-empty">—</span>
         ) : (
-          <span className="cp-game-ph">{g.name}</span>
-        )}
-        {g.rating != null && (
-          <span className="cp-game-rating" title="Note critique">
-            <Star size={10} fill="currentColor" /> {g.rating}
-          </span>
-        )}
-        {g.mine?.favorite && (
-          <span className="cp-game-fav" title="Coup de cœur">
-            <Heart size={11} fill="currentColor" />
-          </span>
-        )}
-        {g.mine && !g.mine.favorite && (
-          <span className="cp-game-owned" title={STATUS_LABEL[g.mine.status]}>
-            <Library size={11} />
-          </span>
-        )}
-      </div>
-      <span className="cp-game-name">{g.name}</span>
-      <span className="cp-game-meta">
-        {g.year || "—"}
-        {g.mine?.rating != null && (
-          <span className="cp-game-mynote" title="Ta note">
-            · {g.mine.rating}
+          <span className="cp-ring-val">
+            <span className="cp-ring-num">{pct}</span>
+            <span className="cp-ring-pct">%</span>
           </span>
         )}
       </span>
-    </Link>
+    </Tag>
+  );
+}
+
+// Modale « nerd stats » : décompose le score d'affinité en ses trois
+// ingrédients (couverture du catalogue, licences explorées, coups de cœur).
+function AffinityModal({ detail, name, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="modal cp-aff-modal">
+        <button className="modal-close clickable" onClick={onClose} aria-label="Fermer">
+          <X size={18} />
+        </button>
+        <h2 className="modal-title">
+          <TrendingUp size={20} /> Ton affinité avec {name}
+        </h2>
+        <div className="cp-aff-hero">
+          <AffinityRing value={detail.score} size="lg" />
+          <p className="cp-aff-intro">
+            Ton score mélange trois signaux : la part de leur catalogue que tu
+            possèdes, le nombre de leurs sagas que tu as touchées, et tes coups de
+            cœur. Explorer plusieurs licences compte plus que finir l'une d'elles.
+          </p>
+        </div>
+        <ul className="cp-aff-parts">
+          {detail.parts.map((p) => (
+            <li key={p.key}>
+              <div className="cp-aff-part-head">
+                <span className="cp-aff-part-label">{p.label}</span>
+                <span className="cp-aff-part-pts">+{p.points}</span>
+              </div>
+              <div className="cp-aff-bar">
+                <span style={{ width: `${Math.round(p.ratio * 100)}%` }} />
+              </div>
+              <div className="cp-aff-part-detail">
+                {p.detail} · {Math.round(p.ratio * 100)} % × poids{" "}
+                {Math.round(p.weight * 100)} %
+              </div>
+            </li>
+          ))}
+        </ul>
+        <p className="cp-aff-total">
+          <strong>{detail.score ?? "—"} %</strong> = somme des contributions
+          ci-dessus (plafonnée à 100).
+        </p>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// Palette catégorielle (doré en tête, puis teintes distinctes lisibles clair/sombre)
+const GENRE_COLORS = [
+  "#c8920b",
+  "#4e79a7",
+  "#e15759",
+  "#59a14f",
+  "#b07aa1",
+  "#ef8e3b",
+  "#4ba6a2",
+  "#9c755f",
+];
+
+const fmtDate = (d) =>
+  new Date(d).toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+// Tooltip du donut des genres
+function GenreTip({ active, payload, total }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0];
+  return (
+    <div className="cp-genre-tip">
+      <span className="cp-dot" style={{ background: d.payload.fill }} />
+      {d.name} : <strong>{d.value}</strong> ·{" "}
+      {Math.round((d.value / total) * 100)} %
+    </div>
+  );
+}
+
+// Donut « genres développés par le studio » (recharts) + légende.
+function GenreDonut({ genres }) {
+  const total = genres.reduce((s, g) => s + g.count, 0) || 1;
+  const data = genres.map((g, i) => ({
+    name: g.name,
+    value: g.count,
+    fill: GENRE_COLORS[i % GENRE_COLORS.length],
+  }));
+  return (
+    <div className="cp-genre-wrap">
+      <div className="cp-genre-donut">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Tooltip content={<GenreTip total={total} />} cursor={false} />
+            <Pie
+              data={data}
+              dataKey="value"
+              nameKey="name"
+              innerRadius="60%"
+              outerRadius="98%"
+              paddingAngle={2}
+              cornerRadius={3}
+              stroke="none"
+            >
+              {data.map((d) => (
+                <Cell key={d.name} fill={d.fill} />
+              ))}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="cp-genre-center">
+          <span className="cp-genre-total">{nf.format(total)}</span>
+          <span className="cp-genre-cap">jeux</span>
+        </div>
+      </div>
+      <ul className="cp-genre-legend">
+        {data.map((d) => (
+          <li key={d.name}>
+            <span className="cp-dot" style={{ background: d.fill }} />
+            {d.name}
+            <strong>{Math.round((d.value / total) * 100)} %</strong>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -110,6 +254,11 @@ export default function CompanyPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState("overview");
+  // Favori studio + bio dépliable + modale d'affinité
+  const [fav, setFav] = useState(false);
+  const [favBusy, setFavBusy] = useState(false);
+  const [bioOpen, setBioOpen] = useState(false);
+  const [affOpen, setAffOpen] = useState(false);
 
   // Filtres de l'onglet Jeux
   const [q, setQ] = useState("");
@@ -117,7 +266,7 @@ export default function CompanyPage() {
   const [roleF, setRoleF] = useState(
     params.get("role") === "pub" ? "publisher" : "all"
   );
-  const [sort, setSort] = useState("rating");
+  const [sort, setSort] = useState("popularity");
 
   useEffect(() => {
     let alive = true;
@@ -146,24 +295,45 @@ export default function CompanyPage() {
     document.title = data?.profile?.name
       ? `${data.profile.name} — MyPlayLog`
       : "Studio — MyPlayLog";
+    if (data?.profile) setFav(!!data.profile.isFavorite);
   }, [data]);
+
+  async function toggleFavorite() {
+    if (favBusy) return;
+    setFavBusy(true);
+    setFav((v) => !v); // optimiste
+    try {
+      const r = await apiFetch(
+        `/companies/${encodeURIComponent(decoded)}/favorite`,
+        { method: "POST", token }
+      );
+      setFav(r.favorited);
+      // Met à jour le cache local du profil studio
+      if (data) {
+        const next = { ...data, profile: { ...data.profile, isFavorite: r.favorited } };
+        setData(next);
+        companyCache.set(decoded, next);
+      }
+    } catch {
+      setFav((v) => !v); // rollback
+    } finally {
+      setFavBusy(false);
+    }
+  }
 
   const games = data?.games || [];
 
+  // Jeux phares = les plus populaires (nb d'avis) qu'ils ont DÉVELOPPÉS —
+  // un jeu seulement édité au Japon ne fait pas l'identité du studio.
   const flagship = useMemo(
     () =>
       [...games]
-        .filter((g) => g.rating != null)
-        .sort((a, b) => b.rating - a.rating)
-        .slice(0, 6),
+        .filter((g) => g.role !== "publisher")
+        .sort((a, b) => (b.ratingCount ?? 0) - (a.ratingCount ?? 0)),
     [games]
   );
   const latest = useMemo(
-    () =>
-      [...games]
-        .filter((g) => g.year)
-        .sort((a, b) => b.year - a.year)
-        .slice(0, 6),
+    () => [...games].filter((g) => g.year).sort((a, b) => b.year - a.year),
     [games]
   );
 
@@ -177,7 +347,9 @@ export default function CompanyPage() {
     if (roleF !== "all")
       list = list.filter((g) => g.role === roleF || g.role === "both");
     const arr = [...list];
-    if (sort === "rating")
+    if (sort === "popularity")
+      arr.sort((a, b) => (b.ratingCount ?? 0) - (a.ratingCount ?? 0));
+    else if (sort === "rating")
       arr.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
     else if (sort === "year") arr.sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
     else arr.sort((a, b) => a.name.localeCompare(b.name, "fr"));
@@ -255,14 +427,37 @@ export default function CompanyPage() {
             </div>
           </div>
           <div className="cp-hero-affinity">
-            <AffinityRing value={stats.affinity} />
+            <AffinityRing
+              value={stats.affinity}
+              onClick={stats.affinityDetail ? () => setAffOpen(true) : undefined}
+            />
             <div className="cp-affinity-legend">
-              <span className="cp-affinity-title">Ton affinité</span>
+              <span className="cp-affinity-title">
+                Ton affinité
+                {stats.affinityDetail && (
+                  <button
+                    className="cp-affinity-info clickable"
+                    onClick={() => setAffOpen(true)}
+                    title="Détail du calcul"
+                  >
+                    <TrendingUp size={12} />
+                  </button>
+                )}
+              </span>
               <span className="cp-affinity-sub">
                 {stats.inLibrary
-                  ? `${nf.format(stats.liked)} aimé${stats.liked > 1 ? "s" : ""} sur ${nf.format(stats.played)} joué${stats.played > 1 ? "s" : ""}`
+                  ? `${nf.format(stats.inLibrary)} jeu${stats.inLibrary > 1 ? "x" : ""} · ${nf.format(stats.affinityDetail?.franchisesTouched || 0)} licence${(stats.affinityDetail?.franchisesTouched || 0) > 1 ? "s" : ""}${stats.liked ? ` · ${nf.format(stats.liked)} favori${stats.liked > 1 ? "s" : ""}` : ""}`
                   : "Aucun de leurs jeux dans ta biblio"}
               </span>
+              <button
+                className={`cp-fav-btn clickable ${fav ? "on" : ""}`}
+                onClick={toggleFavorite}
+                disabled={favBusy}
+                title={fav ? "Retirer des studios favoris" : "Ajouter aux studios favoris"}
+              >
+                <StarIcon size={15} fill={fav ? "currentColor" : "none"} />
+                {fav ? "Favori" : "Suivre ce studio"}
+              </button>
             </div>
           </div>
         </div>
@@ -302,54 +497,157 @@ export default function CompanyPage() {
               <h2 className="cp-panel-title">
                 <BookOpen size={16} /> L'histoire
               </h2>
-              <p className="cp-bio-text">{profile.description}</p>
-              {profile.wikiUrl && (
-                <a
-                  className="cp-bio-more"
-                  href={profile.wikiUrl}
-                  target="_blank"
-                  rel="noreferrer"
+              <p className={`cp-bio-text ${bioOpen ? "open" : ""}`}>
+                {profile.description}
+              </p>
+              {profile.description.length > 240 && (
+                <button
+                  className="cp-see-more clickable"
+                  onClick={() => setBioOpen((v) => !v)}
                 >
-                  Lire la suite sur Wikipédia <ExternalLink size={12} />
-                </a>
+                  {bioOpen ? (
+                    <>
+                      Voir moins <ChevronUp size={14} />
+                    </>
+                  ) : (
+                    <>
+                      Voir plus <ChevronDown size={14} />
+                    </>
+                  )}
+                </button>
               )}
             </section>
           )}
 
           <div className="cp-overview-side">
-            <section className="cp-panel cp-mini-stats">
-              <div className="cp-mini">
-                <span className="cp-mini-ico">
-                  <Gamepad2 size={16} />
-                </span>
-                <span className="cp-mini-num">{nf.format(stats.total)}</span>
-                <span className="cp-mini-lbl">jeux au catalogue</span>
-              </div>
-              <div className="cp-mini">
-                <span className="cp-mini-ico">
-                  <Library size={16} />
-                </span>
-                <span className="cp-mini-num">{nf.format(stats.inLibrary)}</span>
-                <span className="cp-mini-lbl">dans ta biblio</span>
-              </div>
-              <div className="cp-mini">
-                <span className="cp-mini-ico">
-                  <Heart size={16} />
-                </span>
-                <span className="cp-mini-num">{nf.format(stats.liked)}</span>
-                <span className="cp-mini-lbl">que tu aimes</span>
-              </div>
+            <section className="cp-panel cp-facts">
+              <h2 className="cp-panel-title">
+                <Building2 size={16} /> Fiche
+              </h2>
+              <ul className="cp-fact-list">
+                {profile.statusActive != null && (
+                  <li>
+                    <span className="cp-fact-key">
+                      <CircleDot size={13} /> Statut
+                    </span>
+                    <span
+                      className={`cp-fact-val cp-status ${profile.statusActive ? "on" : "off"}`}
+                    >
+                      <span className="cp-status-dot" />
+                      {profile.statusActive ? "En activité" : "Plus en activité"}
+                    </span>
+                  </li>
+                )}
+                {(profile.startDate || profile.startYear) && (
+                  <li>
+                    <span className="cp-fact-key">
+                      <CalendarDays size={13} /> Création
+                    </span>
+                    <span className="cp-fact-val">
+                      {profile.startDate ? fmtDate(profile.startDate) : profile.startYear}
+                    </span>
+                  </li>
+                )}
+                {profile.country && (
+                  <li>
+                    <span className="cp-fact-key">
+                      <Globe size={13} /> Pays
+                    </span>
+                    <span className="cp-fact-val">{profile.country}</span>
+                  </li>
+                )}
+                {profile.employees && (
+                  <li>
+                    <span className="cp-fact-key">
+                      <Users size={13} /> Effectif
+                    </span>
+                    <span className="cp-fact-val">
+                      ≈ {nf.format(profile.employees)} employés
+                      {profile.employeesYear ? ` (${profile.employeesYear})` : ""}
+                    </span>
+                  </li>
+                )}
+                {profile.engines?.length > 0 && (
+                  <li className="cp-fact-engines">
+                    <span className="cp-fact-key">
+                      <Cpu size={13} /> Moteurs
+                    </span>
+                    <span className="cp-engine-chips">
+                      {profile.engines.map((e) => (
+                        <span className="cp-engine" key={e}>
+                          {e}
+                        </span>
+                      ))}
+                    </span>
+                  </li>
+                )}
+              </ul>
             </section>
           </div>
+
+          {profile.genres?.length > 1 && (
+            <section className="cp-panel cp-wide">
+              <h2 className="cp-panel-title">
+                <PieIcon size={16} /> Genres de prédilection
+              </h2>
+              <GenreDonut genres={profile.genres} />
+            </section>
+          )}
+
+          {profile.franchises?.length > 0 && (
+            <section className="cp-panel cp-wide">
+              <h2 className="cp-panel-title">
+                <Layers size={16} /> Licences phares
+              </h2>
+              <div className="cp-lic-grid">
+                {profile.franchises.map((f) => (
+                  <button
+                    key={f.name}
+                    className="cp-lic clickable"
+                    title={`${f.name} — ${f.count} jeux · filtrer`}
+                    onClick={() => {
+                      setQ(f.name);
+                      setRoleF("all");
+                      setTab("games");
+                    }}
+                  >
+                    <span className="cp-lic-cover">
+                      {f.cover ? (
+                        <img src={f.cover} alt={f.name} loading="lazy" />
+                      ) : (
+                        <Layers size={22} />
+                      )}
+                    </span>
+                    <span className="cp-lic-name">{f.name}</span>
+                    <span className="cp-lic-count">
+                      {nf.format(f.count)} jeu{f.count > 1 ? "x" : ""}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
 
           {flagship.length > 0 && (
             <section className="cp-panel cp-wide">
               <h2 className="cp-panel-title">
                 <Trophy size={16} /> Jeux phares
+                {flagship.length > 6 && (
+                  <button
+                    className="cp-panel-more clickable"
+                    onClick={() => {
+                      setRoleF("developer");
+                      setSort("popularity");
+                      setTab("games");
+                    }}
+                  >
+                    Tout voir <ChevronRight size={14} />
+                  </button>
+                )}
               </h2>
-              <div className="cp-game-grid">
-                {flagship.map((g) => (
-                  <GameCard key={g.gameId} g={g} />
+              <div className="cp-cards">
+                {flagship.slice(0, 6).map((g) => (
+                  <CompanyGameCard key={g.gameId} g={g} />
                 ))}
               </div>
             </section>
@@ -359,10 +657,22 @@ export default function CompanyPage() {
             <section className="cp-panel cp-wide">
               <h2 className="cp-panel-title">
                 <Clapperboard size={16} /> Dernières sorties
+                {latest.length > 6 && (
+                  <button
+                    className="cp-panel-more clickable"
+                    onClick={() => {
+                      setRoleF("all");
+                      setSort("year");
+                      setTab("games");
+                    }}
+                  >
+                    Tout voir <ChevronRight size={14} />
+                  </button>
+                )}
               </h2>
-              <div className="cp-game-grid">
-                {latest.map((g) => (
-                  <GameCard key={g.gameId} g={g} />
+              <div className="cp-cards">
+                {latest.slice(0, 6).map((g) => (
+                  <CompanyGameCard key={g.gameId} g={g} />
                 ))}
               </div>
             </section>
@@ -413,6 +723,7 @@ export default function CompanyPage() {
               value={sort}
               onChange={(e) => setSort(e.target.value)}
             >
+              <option value="popularity">Populaires</option>
               <option value="rating">Mieux notés</option>
               <option value="year">Plus récents</option>
               <option value="name">A → Z</option>
@@ -420,9 +731,9 @@ export default function CompanyPage() {
           </div>
 
           {filtered.length ? (
-            <div className="cp-game-grid">
+            <div className="cp-cards">
               {filtered.map((g) => (
-                <GameCard key={g.gameId} g={g} />
+                <CompanyGameCard key={g.gameId} g={g} />
               ))}
             </div>
           ) : (
@@ -467,6 +778,14 @@ export default function CompanyPage() {
             );
           })}
         </div>
+      )}
+
+      {affOpen && stats.affinityDetail && (
+        <AffinityModal
+          detail={stats.affinityDetail}
+          name={profile.name}
+          onClose={() => setAffOpen(false)}
+        />
       )}
     </div>
   );

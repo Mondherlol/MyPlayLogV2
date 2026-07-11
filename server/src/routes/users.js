@@ -1260,6 +1260,7 @@ router.get("/:username", requireAuth, async (req, res) => {
         ostOrder: user.ostOrder || [],
         overviewOrder: user.overviewOrder || [],
         overviewCards: user.overviewCards || [],
+        favoriteCompanies: user.favoriteCompanies || [],
         createdAt: user.createdAt,
         lastSeenAt: user.lastSeenAt || null,
         isMe,

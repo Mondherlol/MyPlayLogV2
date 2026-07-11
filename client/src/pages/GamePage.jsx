@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
@@ -200,6 +200,37 @@ function Gauge({ value, label, sub }) {
       <span className="gp-gauge-label">{label}</span>
       {sub != null && <span className="gp-gauge-sub">{sub}</span>}
     </div>
+  );
+}
+
+// Nom de studio / éditeur cliquable → sa page /company/:name. `role` (dev|pub)
+// ne sert qu'à pré-sélectionner l'onglet de filtre sur la fiche du studio.
+function CompanyLink({ name, role, navigate }) {
+  return (
+    <button
+      className="gp-company-link clickable"
+      onClick={(e) => {
+        e.stopPropagation();
+        navigate(`/company/${encodeURIComponent(name)}${role ? `?role=${role}` : ""}`);
+      }}
+      title={`Voir ${name}`}
+    >
+      {name}
+    </button>
+  );
+}
+
+// Liste de studios/éditeurs cliquables séparés par des virgules.
+function CompanyList({ names, role, navigate }) {
+  return (
+    <>
+      {names.map((n, i) => (
+        <Fragment key={n}>
+          {i > 0 && ", "}
+          <CompanyLink name={n} role={role} navigate={navigate} />
+        </Fragment>
+      ))}
+    </>
   );
 }
 
@@ -667,7 +698,12 @@ export default function GamePage() {
                   )}
                   {game.developers?.[0] && (
                     <span>
-                      <Building2 size={14} /> {game.developers[0]}
+                      <Building2 size={14} />{" "}
+                      <CompanyLink
+                        name={game.developers[0]}
+                        role="dev"
+                        navigate={navigate}
+                      />
                     </span>
                   )}
                 </p>
@@ -1457,10 +1493,17 @@ function InfosTab({ game, onOpenImage, navigate }) {
   ].filter((g) => g.items?.length);
 
   const facts = [
+    game.developers?.length && {
+      Icon: Building2,
+      label: game.developers.length > 1 ? "Développeurs" : "Développeur",
+      companies: game.developers,
+      role: "dev",
+    },
     game.publishers?.length && {
       Icon: Building2,
-      label: "Éditeur",
-      value: game.publishers.join(", "),
+      label: game.publishers.length > 1 ? "Éditeurs" : "Éditeur",
+      companies: game.publishers,
+      role: "pub",
     },
     game.engines?.length && { Icon: Cpu, label: "Moteur", value: game.engines.join(", ") },
     game.perspectives?.length && {
@@ -1539,7 +1582,13 @@ function InfosTab({ game, onOpenImage, navigate }) {
                 <span className="gp-fact-label">
                   <f.Icon size={13} /> {f.label}
                 </span>
-                <span className="gp-fact-value">{f.value}</span>
+                <span className="gp-fact-value">
+                  {f.companies ? (
+                    <CompanyList names={f.companies} role={f.role} navigate={navigate} />
+                  ) : (
+                    f.value
+                  )}
+                </span>
               </div>
             ))}
           </div>

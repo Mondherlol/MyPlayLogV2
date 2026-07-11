@@ -12,6 +12,7 @@ import {
   MessageSquareText,
   Star,
   ArrowRight,
+  Building2,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { typeMeta, timeAgo } from "../lib/lists";
@@ -43,7 +44,14 @@ function AsideCard({ Icon, title, more, children }) {
 
 // Colonne latérale de l'onglet « Aperçu » (PC) : condensé de stats + derniers
 // contenus du joueur (vidéo reco, listes publiques, OST likée, review).
-export default function ProfileOverviewAside({ username, token, library, lists, onOpenTab }) {
+export default function ProfileOverviewAside({
+  username,
+  token,
+  library,
+  lists,
+  favoriteCompanies = [],
+  onOpenTab,
+}) {
   // --- Dérivé de la bibliothèque déjà chargée (aucune requête) ---
   const totalHours = useMemo(
     () => library.reduce((s, e) => s + (e.playtimeHours || 0), 0),
@@ -128,6 +136,34 @@ export default function ProfileOverviewAside({ username, token, library, lists, 
           </div>
         )}
       </AsideCard>
+
+      {/* ---------- Studios favoris ---------- */}
+      {favoriteCompanies.length > 0 && (
+        <AsideCard Icon={Building2} title="Studios favoris">
+          <div className="pfa-studios">
+            {favoriteCompanies.slice(0, 6).map((c) => (
+              <Link
+                key={c.name}
+                to={`/company/${encodeURIComponent(c.name)}`}
+                className="pfa-studio clickable"
+                title={c.name}
+              >
+                <span className="pfa-studio-logo">
+                  {c.logo ? (
+                    <img src={c.logo} alt="" loading="lazy" />
+                  ) : (
+                    <Building2 size={16} />
+                  )}
+                </span>
+                <span className="pfa-studio-body">
+                  <span className="pfa-studio-name">{c.name}</span>
+                  {c.country && <span className="pfa-studio-sub">{c.country}</span>}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </AsideCard>
+      )}
 
       {/* ---------- Dernière vidéo recommandée ---------- */}
       {video && (

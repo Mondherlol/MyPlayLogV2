@@ -58,6 +58,22 @@ const userSchema = new mongoose.Schema(
       connectedAt: { type: Date, default: null },
     },
 
+    // --- Studios / éditeurs favoris ---
+    // Épinglés depuis leur page /company/:name, affichés dans l'aperçu du profil.
+    // On garde nom + logo + pays pour un rendu direct (pas de refetch IGDB).
+    favoriteCompanies: {
+      type: [
+        {
+          name: { type: String, required: true },
+          logo: { type: String, default: null },
+          country: { type: String, default: null },
+          addedAt: { type: Date, default: Date.now },
+          _id: false,
+        },
+      ],
+      default: [],
+    },
+
     // --- Abonnements (qui JE suis) ---
     following: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
