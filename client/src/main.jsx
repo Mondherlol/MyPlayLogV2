@@ -4,21 +4,30 @@ import { BrowserRouter } from "react-router-dom";
 import "./index.css";
 import "./App.css";
 import App from "./App.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
+import { installGlobalErrorReporting } from "./lib/reportError.js";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { LibraryProvider } from "./context/LibraryContext.jsx";
 
+// Capture les erreurs non-rattrapées (hors rendu React) et les remonte au
+// backend, pour diagnostiquer les crashs qui n'arrivent que sur certains
+// appareils. À installer avant le premier rendu.
+installGlobalErrorReporting();
+
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <BrowserRouter>
-      <ThemeProvider>
-        <AuthProvider>
-          <LibraryProvider>
-            <App />
-          </LibraryProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <ThemeProvider>
+          <AuthProvider>
+            <LibraryProvider>
+              <App />
+            </LibraryProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>
 );
 

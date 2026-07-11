@@ -2,7 +2,10 @@
    But : rendre l'app installable (PWA) et offrir un repli hors-ligne léger.
    On NE met jamais en cache les appels API (/api) ni les requêtes non-GET. */
 
-const VERSION = "mpl-v1";
+// ⚠️ Bump ce numéro à chaque déploiement où l'on veut forcer la purge du cache
+// (sinon les anciens assets restent servis « cache-first » indéfiniment, ce qui
+// peut désynchroniser un vieux bundle et faire crasher l'app sur un appareil).
+const VERSION = "mpl-v2";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
