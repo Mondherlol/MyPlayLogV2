@@ -11,6 +11,7 @@ import {
   Search,
   X,
   Trash2,
+  Disc3,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -22,10 +23,12 @@ import {
   LIST_KIND_FILTERS,
 } from "../lib/lists";
 import CreateListModal from "../components/CreateListModal";
+import PlaylistCard from "../components/PlaylistCard";
 
 const SCOPES = [
   { value: "feed", label: "Découvrir" },
   { value: "popular", label: "Populaires" },
+  { value: "playlists", label: "PlayLists" },
   { value: "mine", label: "Mes listes" },
 ];
 
@@ -192,8 +195,12 @@ export default function Lists() {
     if (scope === "mine") params.set("scope", "mine");
     // L'onglet « Populaires » force le tri par likes ; sinon on suit le select.
     params.set("sort", scope === "popular" ? "likes" : sort);
-    if (typeFilter) params.set("type", typeFilter);
-    if (kindFilter) params.set("itemKind", kindFilter);
+    // L'onglet « PlayLists » ne montre que les playlists (filtres type/contenu ignorés).
+    if (scope === "playlists") params.set("type", "playlist");
+    else {
+      if (typeFilter) params.set("type", typeFilter);
+      if (kindFilter) params.set("itemKind", kindFilter);
+    }
     if (query) params.set("q", query);
     apiFetch(`/lists?${params}`, { token })
       .then((d) => alive && setLists(d.lists || []))
@@ -215,7 +222,7 @@ export default function Lists() {
             Listes
           </h1>
           <p className="lists-sub font-fun">
-            Crée tes tops, tier lists et collections — et découvre celles des autres.
+            Crée tes tops, tier lists et playlists d'OST — et découvre celles des autres.
           </p>
         </div>
         <button className="btn btn-primary" onClick={() => setCreating(true)}>
@@ -257,9 +264,11 @@ export default function Lists() {
         </div>
         <select
           className="lists-select"
-          value={typeFilter}
+          value={scope === "playlists" ? "playlist" : typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
+          disabled={scope === "playlists"}
           aria-label="Filtrer par type"
+          title={scope === "playlists" ? "L'onglet PlayLists ne montre que les playlists" : "Filtrer par type"}
         >
           {LIST_TYPE_FILTERS.map((o) => (
             <option key={o.value} value={o.value}>
@@ -269,8 +278,9 @@ export default function Lists() {
         </select>
         <select
           className="lists-select"
-          value={kindFilter}
+          value={scope === "playlists" ? "" : kindFilter}
           onChange={(e) => setKindFilter(e.target.value)}
+          disabled={scope === "playlists"}
           aria-label="Filtrer par contenu"
         >
           {LIST_KIND_FILTERS.map((o) => (
@@ -306,18 +316,32 @@ export default function Lists() {
         </div>
       ) : lists.length === 0 ? (
         <div className="lists-empty card">
-          <Layers size={34} />
-          <h3>{scope === "mine" ? "Tu n'as pas encore de liste" : "Rien par ici pour l'instant"}</h3>
-          <p className="font-fun">Lance-toi et crée ta première liste !</p>
+          {scope === "playlists" ? <Disc3 size={34} /> : <Layers size={34} />}
+          <h3>
+            {scope === "mine"
+              ? "Tu n'as pas encore de liste"
+              : scope === "playlists"
+                ? "Aucune playlist pour l'instant"
+                : "Rien par ici pour l'instant"}
+          </h3>
+          <p className="font-fun">
+            {scope === "playlists"
+              ? "Crée la première playlist d'OST !"
+              : "Lance-toi et crée ta première liste !"}
+          </p>
           <button className="btn btn-primary" onClick={() => setCreating(true)}>
             <Plus size={18} /> Créer une liste
           </button>
         </div>
       ) : (
-        <div className="lists-grid">
-          {lists.map((l) => (
-            <ListCard key={l.id} list={l} onDelete={handleDelete} />
-          ))}
+        <div className={scope === "playlists" ? "plc-grid" : "lists-grid"}>
+          {lists.map((l) =>
+            l.type === "playlist" ? (
+              <PlaylistCard key={l.id} list={l} onDelete={handleDelete} />
+            ) : (
+              <ListCard key={l.id} list={l} onDelete={handleDelete} />
+            )
+          )}
         </div>
       )}
 

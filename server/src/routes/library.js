@@ -28,8 +28,26 @@ function toPublic(e) {
     cons: e.cons,
     favoriteCharacter: e.favoriteCharacter || null,
     favoriteOst: e.favoriteOst || null,
+    reviewedAt: e.reviewedAt || null,
     updatedAt: e.updatedAt,
   };
+}
+
+// Le contenu « review » (ce qui définit la date d'une review affichée) : texte,
+// médias, points forts/faibles, spoiler. La note, la jaquette, le temps de jeu
+// ou le statut n'en font PAS partie — les modifier ne doit pas dater à neuf la
+// review. Renvoie true si l'un de ces champs change vraiment entre prev et body.
+function reviewBodyChanged(prev, b) {
+  const next = (key, fallback) =>
+    b[key] !== undefined ? b[key] : prev ? prev[key] : fallback;
+  return (
+    (next("review", "") || "").trim() !== (prev?.review || "").trim() ||
+    JSON.stringify(next("reviewMedia", []) || []) !==
+      JSON.stringify(prev?.reviewMedia || []) ||
+    JSON.stringify(next("pros", []) || []) !== JSON.stringify(prev?.pros || []) ||
+    JSON.stringify(next("cons", []) || []) !== JSON.stringify(prev?.cons || []) ||
+    !!next("spoiler", false) !== !!prev?.spoiler
+  );
 }
 
 // Une review « existe » dès qu'il y a du contenu rédigé.
@@ -190,6 +208,12 @@ router.put("/:gameId", requireAuth, async (req, res) => {
     const prev = await UserGame.findOne({ user: req.userId, gameId }).lean();
     if (b.name === undefined && !prev) {
       return res.status(400).json({ error: "Le nom du jeu est requis." });
+    }
+
+    // On (re)date la review uniquement quand son contenu change réellement :
+    // ainsi éditer la note/jaquette/temps de jeu conserve la date d'origine.
+    if (reviewBodyChanged(prev, b)) {
+      update.reviewedAt = new Date();
     }
 
     const entry = await UserGame.findOneAndUpdate(

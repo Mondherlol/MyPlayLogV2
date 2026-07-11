@@ -302,7 +302,7 @@ function ReviewEditor({ game, token, initial, isNew, onSaved }) {
       <Composer
         token={token}
         big
-        maxChars={2000}
+        maxChars={4000}
         placeholder="Qu'as-tu pensé du jeu ?…"
         initialText={initial?.review || ""}
         initialMedia={initial?.media || []}
@@ -491,7 +491,7 @@ export function ReviewItem({
                 {r.user?.username || "?"}
               </Link>
             )}
-            <span className="rvc-time">{timeAgo(r.updatedAt)}</span>
+            <span className="rvc-time">{timeAgo(r.reviewedAt || r.updatedAt)}</span>
           </div>
           <div className="rvc-top-right">
             <div className="rvc-tags">

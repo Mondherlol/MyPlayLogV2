@@ -12,16 +12,24 @@ const commentMediaSchema = new mongoose.Schema(
   { _id: false }
 );
 
-// Un élément d'une liste : un jeu (IGDB) ou un personnage (pour les tier lists).
+// Un élément d'une liste : un jeu (IGDB), un personnage (tier lists) ou une
+// piste d'OST (playlists).
 const listItemSchema = new mongoose.Schema(
   {
-    kind: { type: String, enum: ["game", "character"], default: "game" },
-    // Identifiant : gameId IGDB (jeu) ou id de personnage (igdb-xx / custom).
+    kind: { type: String, enum: ["game", "character", "track"], default: "game" },
+    // Identifiant : gameId IGDB (jeu), id de personnage (igdb-xx / custom) ou
+    // id de piste (yt-xx, cf. CustomOst).
     refId: { type: String, required: true },
-    gameId: { type: Number, default: null }, // jeu parent (pour un personnage)
-    gameName: { type: String, default: null }, // d'où vient le personnage
+    gameId: { type: Number, default: null }, // jeu parent (perso / piste)
+    gameName: { type: String, default: null }, // d'où vient le perso / la piste
     name: { type: String, required: true },
-    image: { type: String, default: null }, // cover ou portrait
+    image: { type: String, default: null }, // cover, portrait ou artwork
+    // Piste d'OST uniquement : lecture YouTube + infos enrichies (iTunes).
+    videoId: { type: String, default: null },
+    url: { type: String, default: null },
+    artist: { type: String, default: null }, // compositeur / artiste
+    releaseYear: { type: Number, default: null },
+    durationSec: { type: Number, default: null }, // durée (iTunes, best-effort)
     note: { type: String, default: "" }, // commentaire de l'auteur (texte)
     // Médias joints à l'annotation (GIF / images), comme les commentaires.
     media: { type: [commentMediaSchema], default: [] },
@@ -31,6 +39,42 @@ const listItemSchema = new mongoose.Schema(
     tier: { type: String, default: null },
   },
   { _id: true, timestamps: false }
+);
+
+// Élément posé sur une pochette personnalisée (image : avatar, artwork, jaquette).
+// Coordonnées et taille normalisées (0→1) par rapport à la pochette carrée.
+const coverElementSchema = new mongoose.Schema(
+  {
+    kind: { type: String, enum: ["avatar", "image"], default: "image" },
+    src: { type: String, required: true, maxlength: 600 },
+    x: { type: Number, default: 0.5 },
+    y: { type: Number, default: 0.5 },
+    size: { type: Number, default: 0.3 },
+    rot: { type: Number, default: 0 },
+    shape: { type: String, enum: ["circle", "rounded", "square"], default: "rounded" },
+  },
+  { _id: false }
+);
+
+// Design d'une pochette générée & personnalisée (alternative à `cover` image).
+const coverDesignSchema = new mongoose.Schema(
+  {
+    bg1: { type: String, default: "#f2b70b", maxlength: 32 },
+    bg2: { type: String, default: "#b26a00", maxlength: 32 },
+    angle: { type: Number, default: 150 },
+    motif: {
+      type: String,
+      enum: ["none", "rings", "dots", "stripes", "grid"],
+      default: "rings",
+    },
+    motifOpacity: { type: Number, default: 1 },
+    titleShow: { type: Boolean, default: true },
+    titlePos: { type: String, enum: ["top", "center", "bottom"], default: "center" },
+    titleColor: { type: String, default: "#ffffff", maxlength: 32 },
+    mark: { type: Boolean, default: true },
+    elements: { type: [coverElementSchema], default: [] },
+  },
+  { _id: false }
 );
 
 // Définition d'un palier de tier list.
@@ -99,17 +143,21 @@ const listSchema = new mongoose.Schema(
     description: { type: String, default: "", maxlength: 2000 },
     // Image de couverture (URL servie par le serveur), optionnelle.
     cover: { type: String, default: null },
-    // classic = liste simple, ranked = TOP classé, tier = tier list
+    // Pochette générée & personnalisée (playlists), utilisée quand `cover` est
+    // vide. null = pochette générée par défaut (dérivée du titre).
+    coverDesign: { type: coverDesignSchema, default: null },
+    // classic = liste simple, ranked = TOP classé, tier = tier list,
+    // playlist = playlist d'OST (écoutable dans le mini-lecteur)
     type: {
       type: String,
-      enum: ["classic", "ranked", "tier"],
+      enum: ["classic", "ranked", "tier", "playlist"],
       default: "classic",
     },
-    // Cette liste contient SOIT des jeux SOIT des personnages (pas les deux),
-    // quel que soit son type. Figé après création.
+    // Cette liste contient SOIT des jeux SOIT des personnages SOIT des OST
+    // (pas de mélange), quel que soit son type. Figé après création.
     itemKind: {
       type: String,
-      enum: ["game", "character"],
+      enum: ["game", "character", "ost"],
       default: "game",
     },
     visibility: {

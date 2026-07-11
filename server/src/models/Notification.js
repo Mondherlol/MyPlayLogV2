@@ -17,6 +17,7 @@ const notificationSchema = new mongoose.Schema(
         "comment_like", // like sur ton commentaire
         "list_comment", // commentaire sur ta liste
         "list_like", // like sur ta liste
+        "playlist_listen", // quelqu'un a écouté ta playlist d'OST
         "review_comment", // réponse à ta review
         "review_comment_reply", // réponse à ton commentaire sous une review
         "review_comment_like", // like sur ton commentaire sous une review

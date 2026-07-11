@@ -1500,6 +1500,7 @@ function gameReviewCard(e, meId) {
         }
       : null,
     comments: (e.comments || []).map((c) => reviewComment(c, e.comments, meId)),
+    reviewedAt: e.reviewedAt || e.updatedAt,
     updatedAt: e.updatedAt,
   };
 }

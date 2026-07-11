@@ -5,6 +5,7 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import multer from "multer";
 import List from "../models/List.js";
+import Activity from "../models/Activity.js";
 import { requireAuth } from "../middleware/auth.js";
 import { notify } from "../lib/notify.js";
 import {
@@ -16,9 +17,13 @@ import { sanitizeMediaList, resolveMentions, toComment } from "../lib/commentThr
 
 const router = express.Router();
 
-const TYPES = ["classic", "ranked", "tier"];
+const TYPES = ["classic", "ranked", "tier", "playlist"];
 const VISIBILITIES = ["public", "private"];
-const ITEM_KINDS = ["game", "character"];
+const ITEM_KINDS = ["game", "character", "ost"];
+
+// Kind d'item attendu pour une liste (itemKind "ost" ⇔ items "track").
+const expectedKind = (list) =>
+  (list.itemKind || "game") === "ost" ? "track" : list.itemKind || "game";
 
 // --- Upload d'images de réaction (commentaires) ---
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -67,7 +72,8 @@ const DEFAULT_TIERS = [
 // Normalise un élément reçu du client (on ne fait pas confiance au brut).
 function sanitizeItem(raw) {
   if (!raw || raw.refId == null || !raw.name) return null;
-  const kind = raw.kind === "character" ? "character" : "game";
+  const kind =
+    raw.kind === "character" ? "character" : raw.kind === "track" ? "track" : "game";
   const rating =
     raw.rating == null || raw.rating === ""
       ? null
@@ -79,6 +85,14 @@ function sanitizeItem(raw) {
     gameName: raw.gameName ? String(raw.gameName).slice(0, 200) : null,
     name: String(raw.name).slice(0, 200),
     image: raw.image ? String(raw.image) : null,
+    // Piste d'OST : de quoi la rejouer (YouTube) + infos affichées.
+    videoId: kind === "track" && raw.videoId ? String(raw.videoId).slice(0, 20) : null,
+    url: kind === "track" && raw.url ? String(raw.url).slice(0, 500) : null,
+    artist: kind === "track" && raw.artist ? String(raw.artist).slice(0, 200) : null,
+    releaseYear:
+      kind === "track" && raw.releaseYear ? Number(raw.releaseYear) || null : null,
+    durationSec:
+      kind === "track" && raw.durationSec ? Number(raw.durationSec) || null : null,
     note: raw.note ? String(raw.note).slice(0, 500) : "",
     media: sanitizeMediaList(raw.media),
     rating,
@@ -98,14 +112,29 @@ function sanitizeTiers(raw) {
     }));
 }
 
+// Durée totale d'écoute d'une playlist : durées iTunes connues + 4 min par
+// défaut pour les pistes sans info. `durationEstimated` dès qu'il en manque.
+export function playlistDuration(items) {
+  if (!items.length) return { durationSec: 0, durationEstimated: false };
+  const known = items.filter((i) => i.durationSec > 0);
+  return {
+    durationSec:
+      known.reduce((s, i) => s + i.durationSec, 0) +
+      (items.length - known.length) * 240,
+    durationEstimated: known.length < items.length,
+  };
+}
+
 // Vue "carte" (feed) : légère, sans les items complets.
 function toCard(l, userId) {
   const items = l.items || [];
   return {
+    ...(l.type === "playlist" ? playlistDuration(items) : {}),
     id: l._id,
     title: l.title,
     description: l.description,
     cover: l.cover || null,
+    coverDesign: l.coverDesign || null,
     type: l.type,
     itemKind: l.itemKind || "game",
     visibility: l.visibility,
@@ -136,6 +165,7 @@ function toFull(l, userId) {
     title: l.title,
     description: l.description,
     cover: l.cover || null,
+    coverDesign: l.coverDesign || null,
     type: l.type,
     itemKind: l.itemKind || "game",
     visibility: l.visibility,
@@ -149,6 +179,11 @@ function toFull(l, userId) {
       gameName: i.gameName,
       name: i.name,
       image: i.image,
+      videoId: i.videoId || null,
+      url: i.url || null,
+      artist: i.artist || null,
+      releaseYear: i.releaseYear || null,
+      durationSec: i.durationSec || null,
       note: i.note,
       media: i.media || [],
       rating: i.rating,
@@ -166,12 +201,23 @@ function toFull(l, userId) {
 }
 
 // GET /api/lists — feed : toutes les listes publiques + mes listes.
-// ?scope=mine pour n'avoir que les miennes, ?sort=likes|recent
+// ?scope=mine pour n'avoir que les miennes, ?sort=likes|recent,
+// ?author=<userId> pour les listes d'UN joueur (publiques sauf si c'est moi).
 router.get("/", requireAuth, async (req, res) => {
   try {
     const scope = req.query.scope;
-    const filter =
-      scope === "mine"
+    const author =
+      req.query.author && mongoose.isValidObjectId(req.query.author)
+        ? req.query.author
+        : null;
+    const filter = author
+      ? {
+          user: author,
+          ...(String(author) === String(req.userId)
+            ? {}
+            : { visibility: "public" }),
+        }
+      : scope === "mine"
         ? { user: req.userId }
         : { $or: [{ visibility: "public" }, { user: req.userId }] };
     // Filtres optionnels : type, itemKind (jeu/perso), recherche plein-texte.
@@ -269,6 +315,7 @@ router.get("/mine/for-item", requireAuth, async (req, res) => {
         id: l._id,
         title: l.title,
         cover: l.cover || null,
+        coverDesign: l.coverDesign || null,
         type: l.type,
         itemKind: l.itemKind || "game",
         visibility: l.visibility,
@@ -316,7 +363,13 @@ router.post("/", requireAuth, async (req, res) => {
     if (!title) return res.status(400).json({ error: "Un titre est requis." });
     const type = TYPES.includes(b.type) ? b.type : "classic";
     // Le "kind" (jeux OU personnages) s'applique à tous les types de listes.
-    const itemKind = ITEM_KINDS.includes(b.itemKind) ? b.itemKind : "game";
+    // Une playlist contient toujours des OST ; l'inverse est vrai aussi.
+    const itemKind =
+      type === "playlist"
+        ? "ost"
+        : ITEM_KINDS.includes(b.itemKind) && b.itemKind !== "ost"
+          ? b.itemKind
+          : "game";
     const visibility = VISIBILITIES.includes(b.visibility)
       ? b.visibility
       : "public";
@@ -370,11 +423,29 @@ router.put("/:id", requireAuth, async (req, res) => {
     if (b.description !== undefined)
       list.description = String(b.description).slice(0, 2000);
     if (b.cover !== undefined) list.cover = b.cover ? String(b.cover) : null;
+    if (b.coverDesign !== undefined) {
+      const cd = b.coverDesign;
+      if (cd && typeof cd === "object") {
+        // On borne la liste d'éléments ; le sous-schéma nettoie/caste le reste.
+        if (Array.isArray(cd.elements)) cd.elements = cd.elements.slice(0, 24);
+        list.coverDesign = cd;
+      } else {
+        list.coverDesign = null;
+      }
+    }
     if (b.visibility !== undefined && VISIBILITIES.includes(b.visibility))
       list.visibility = b.visibility;
     // Changement de type : on garde les items (itemKind figé). En quittant
     // "tier" on déclasse tout ; en y entrant on pose des paliers par défaut.
-    if (b.type !== undefined && TYPES.includes(b.type) && b.type !== list.type) {
+    // Une playlist ne change pas de type (et rien ne devient playlist) : le
+    // contenu (pistes vs jeux/persos) n'est pas compatible.
+    if (
+      b.type !== undefined &&
+      TYPES.includes(b.type) &&
+      b.type !== list.type &&
+      b.type !== "playlist" &&
+      list.type !== "playlist"
+    ) {
       const wasTier = list.type === "tier";
       list.type = b.type;
       if (b.type !== "tier" && wasTier)
@@ -496,7 +567,7 @@ router.post("/:id/items", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "Action non autorisée." });
     const item = sanitizeItem(req.body);
     if (!item) return res.status(400).json({ error: "Élément invalide." });
-    if (item.kind !== (list.itemKind || "game"))
+    if (item.kind !== expectedKind(list))
       return res
         .status(400)
         .json({ error: "Cette liste n'accepte pas ce type d'élément." });
@@ -529,6 +600,115 @@ router.delete("/:id/items/:refId", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("list remove item error:", err.message);
     res.status(500).json({ error: "Erreur lors du retrait." });
+  }
+});
+
+// POST /api/lists/:id/listen — signale l'écoute d'une playlist par quelqu'un
+// d'autre que son propriétaire. Anti-spam : la carte du fil est UNIQUE par
+// (auditeur, playlist) et simplement re-datée (max 1×/6 h) ; le propriétaire
+// n'est notifié qu'une seule fois par auditeur.
+router.post("/:id/listen", requireAuth, async (req, res) => {
+  try {
+    const list = await List.findById(req.params.id).select(
+      "user title type visibility"
+    );
+    if (!list || list.type !== "playlist")
+      return res.status(404).json({ error: "Playlist introuvable." });
+    // Écouter sa propre playlist n'est pas un évènement social.
+    if (String(list.user) === String(req.userId)) return res.json({ ok: true });
+    if (list.visibility === "private")
+      return res.status(403).json({ error: "Playlist privée." });
+
+    const existing = await Activity.findOne({
+      actor: req.userId,
+      type: "playlist_listen",
+      list: list._id,
+    }).lean();
+    if (!existing) {
+      recordActivity({
+        actor: req.userId,
+        type: "playlist_listen",
+        target: list.user,
+        list: list._id,
+        snippet: list.title,
+      });
+      // Première écoute de cet auditeur : on prévient le propriétaire.
+      notify({
+        user: list.user,
+        type: "playlist_listen",
+        actor: req.userId,
+        list: list._id,
+        snippet: list.title,
+      });
+    } else if (Date.now() - new Date(existing.createdAt).getTime() > 6 * 60 * 60 * 1000) {
+      // Ré-écoute plus tard : on re-date la carte pour qu'elle remonte.
+      const now = new Date();
+      await Activity.collection.updateOne(
+        { _id: existing._id },
+        { $set: { createdAt: now, updatedAt: now } }
+      );
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("playlist listen error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// POST /api/lists/:id/enrich — enrichit les pistes d'une playlist (compositeur
+// + année de sortie) via l'API de recherche iTunes. Best-effort : on ne touche
+// que les pistes auxquelles il manque une info, 12 max par appel (le client
+// rappelle tant que `remaining` > 0).
+router.post("/:id/enrich", requireAuth, async (req, res) => {
+  try {
+    const list = await List.findById(req.params.id);
+    if (!list) return res.status(404).json({ error: "Liste introuvable." });
+    if (String(list.user) !== String(req.userId))
+      return res.status(403).json({ error: "Action non autorisée." });
+
+    const missing = list.items.filter(
+      (i) => i.kind === "track" && (!i.artist || !i.releaseYear || !i.durationSec)
+    );
+    const batch = missing.slice(0, 12);
+    await Promise.allSettled(
+      batch.map(async (it) => {
+        const term = `${it.gameName || ""} ${it.name}`.trim();
+        const params = new URLSearchParams({
+          term,
+          media: "music",
+          entity: "song",
+          limit: "1",
+        });
+        const r = await fetch(`https://itunes.apple.com/search?${params}`);
+        if (!r.ok) return;
+        const s = (await r.json())?.results?.[0];
+        if (!s) return;
+        if (!it.artist && s.artistName)
+          it.artist = String(s.artistName).slice(0, 200);
+        if (!it.releaseYear && s.releaseDate) {
+          const y = new Date(s.releaseDate).getFullYear();
+          if (y > 1950 && y < 2100) it.releaseYear = y;
+        }
+        if (!it.durationSec && s.trackTimeMillis) {
+          const d = Math.round(s.trackTimeMillis / 1000);
+          if (d > 10 && d < 3600) it.durationSec = d;
+        }
+      })
+    );
+    // Un enrichissement ne « bumpe » pas la liste dans le feed.
+    await list.save({ validateModifiedOnly: true, timestamps: false });
+    res.json({
+      items: list.items.map((i) => ({
+        refId: i.refId,
+        artist: i.artist || null,
+        releaseYear: i.releaseYear || null,
+        durationSec: i.durationSec || null,
+      })),
+      remaining: Math.max(0, missing.length - batch.length),
+    });
+  } catch (err) {
+    console.error("playlist enrich error:", err.message);
+    res.status(500).json({ error: "Enrichissement indisponible." });
   }
 });
 

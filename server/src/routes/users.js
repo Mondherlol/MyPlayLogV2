@@ -61,6 +61,7 @@ function entryCard(e) {
     cover: e.cover,
     status: e.status,
     platform: e.platform,
+    format: e.format || "digital",
     playtimeHours: e.playtimeHours,
     favorite: e.favorite,
     rating: e.rating,
@@ -392,6 +393,7 @@ function reviewCard(e, meId, author) {
         }
       : null,
     createdAt: e.createdAt,
+    reviewedAt: e.reviewedAt || e.updatedAt,
     updatedAt: e.updatedAt,
   };
 }

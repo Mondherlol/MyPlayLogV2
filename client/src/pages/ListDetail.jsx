@@ -40,7 +40,8 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { apiFetch, apiUpload } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { typeMeta, timeAgo, DEFAULT_TIERS, localId, LIST_TYPES } from "../lib/lists";
+import { typeMeta, timeAgo, DEFAULT_TIERS, localId, GAME_LIST_TYPES } from "../lib/lists";
+import PlaylistDetail from "./PlaylistDetail";
 import AddItemsModal from "../components/AddItemsModal";
 import ItemEditModal from "../components/ItemEditModal";
 import ListComments from "../components/ListComments";
@@ -363,6 +364,11 @@ export default function ListDetail() {
     );
   if (!list) return null;
 
+  // Les PlayLists d'OST ont leur propre page (CD + pistes en arc). On garde la
+  // même route /lists/:id : la donnée chargée décide du rendu.
+  if (list.type === "playlist")
+    return <PlaylistDetail key={list.id} id={id} initial={list} />;
+
   const meta = typeMeta(list.type);
   const ranked = list.type === "ranked";
   const isTier = list.type === "tier";
@@ -445,7 +451,7 @@ export default function ListDetail() {
             )}
             {editable ? (
               <div className="ld-typeswitch" role="group" aria-label="Type de liste">
-                {Object.values(LIST_TYPES).map((t) => (
+                {GAME_LIST_TYPES.map((t) => (
                   <button
                     key={t.value}
                     type="button"

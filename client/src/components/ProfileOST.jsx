@@ -24,10 +24,16 @@ import {
   Trophy,
   MessageCircle,
   ExternalLink,
+  Loader2,
+  Plus,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { extractVideoId } from "../lib/youtube";
+import { apiFetch } from "../lib/api";
 import { usePlayer } from "../context/PlayerContext";
 import OstCommentsModal from "./OstCommentsModal";
+import PlaylistCard from "./PlaylistCard";
+import CreateListModal from "./CreateListModal";
 
 // Onglet OST du profil : toutes les OST favorites de l'utilisateur (une par jeu)
 // sous forme de cards « pochette + CD » (la pochette = le jeu, le CD = l'OST).
@@ -89,6 +95,40 @@ export default function ProfileOST({
   // Compteurs de commentaires rafraîchis après ouverture d'une modale (par gameId).
   const [countOverride, setCountOverride] = useState({});
 
+  // Sous-onglet : OST favorites (une par jeu) ou playlists du joueur.
+  const [view, setView] = useState("ost"); // "ost" | "playlists"
+  const [playlists, setPlaylists] = useState(null); // null = pas encore chargées
+  const [plLoading, setPlLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const navigate = useNavigate();
+
+  // Playlists du profil : chargées à la première ouverture de l'onglet.
+  useEffect(() => {
+    if (view !== "playlists" || playlists !== null || !ownerId) return;
+    let alive = true;
+    setPlLoading(true);
+    apiFetch(`/lists?author=${ownerId}&type=playlist`, { token })
+      .then((d) => alive && setPlaylists(d.lists || []))
+      .catch(() => alive && setPlaylists([]))
+      .finally(() => alive && setPlLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [view, playlists, ownerId, token]);
+
+  async function deletePlaylist(list) {
+    if (!confirm(`Supprimer la playlist « ${list.title} » ? Cette action est définitive.`))
+      return;
+    const prev = playlists;
+    setPlaylists((ls) => (ls || []).filter((l) => l.id !== list.id));
+    try {
+      await apiFetch(`/lists/${list.id}`, { method: "DELETE", token });
+    } catch (e) {
+      alert(e.message);
+      setPlaylists(prev); // rollback
+    }
+  }
+
   useEffect(() => {
     setOrder(byPreference(items, ostOrder || []).map((i) => i.gameId));
   }, [items, ostOrder]);
@@ -141,66 +181,112 @@ export default function ProfileOST({
     onOrderChange?.(next);
   }
 
-  if (!items.length) {
-    return (
-      <div className="pfo-empty font-fun">
-        <Disc3 size={34} />
-        <p>
-          {isMe
-            ? "Aucune OST favorite pour l'instant — choisis-en depuis l'onglet OST d'un jeu."
-            : "Ce joueur n'a pas encore d'OST favorite."}
-        </p>
-      </div>
-    );
-  }
-
   return (
     <section className="profile-section pfo">
       <div className="pfo-head">
-        <div className="pfo-title">
-          <Music size={18} />
-          <span>OST favorites</span>
-          <span className="pfo-count">{items.length}</span>
+        {/* Sous-onglets : OST favorites / Playlists */}
+        <div className="pfo-views" role="group" aria-label="Contenu OST">
+          <button
+            className={`pfo-view clickable ${view === "ost" ? "active" : ""}`}
+            onClick={() => setView("ost")}
+          >
+            <Music size={16} /> OST favorites
+            {items.length > 0 && <span className="pfo-count">{items.length}</span>}
+          </button>
+          <button
+            className={`pfo-view clickable ${view === "playlists" ? "active" : ""}`}
+            onClick={() => setView("playlists")}
+          >
+            <Disc3 size={16} /> Playlists
+            {(playlists?.length || 0) > 0 && (
+              <span className="pfo-count">{playlists.length}</span>
+            )}
+          </button>
         </div>
-        <div className="pfo-sorts">
-          {SORTS.map((s) => (
-            <button
-              key={s.key}
-              className={`pfo-sort clickable ${sort === s.key ? "active" : ""}`}
-              onClick={() => setSort(s.key)}
-            >
-              <s.Icon size={15} /> {s.label}
-            </button>
-          ))}
-        </div>
+        {view === "ost" && items.length > 0 && (
+          <div className="pfo-sorts">
+            {SORTS.map((s) => (
+              <button
+                key={s.key}
+                className={`pfo-sort clickable ${sort === s.key ? "active" : ""}`}
+                onClick={() => setSort(s.key)}
+              >
+                <s.Icon size={15} /> {s.label}
+              </button>
+            ))}
+          </div>
+        )}
+        {view === "playlists" && isMe && (
+          <button className="ld-addbtn small clickable" onClick={() => setCreating(true)}>
+            <Plus size={15} /> Créer une playlist
+          </button>
+        )}
       </div>
 
-      {draggable && (
-        <p className="pfo-hint font-fun">
-          <GripVertical size={14} /> Glisse les cards pour les classer par ordre de préférence.
-        </p>
-      )}
-
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-        <SortableContext items={ordered.map((i) => i.gameId)} strategy={rectSortingStrategy}>
-          <div className="pfo-grid">
-            {ordered.map((item, i) => (
-              <OstCard
-                key={item.gameId}
-                item={item}
-                rank={i + 1}
-                showRank={sort === "preference"}
-                draggable={draggable}
-                playing={player.isPlaying(item.ost)}
-                canPlay={playable(item.ost)}
-                commentCount={countOverride[item.gameId] ?? item.commentCount}
-                onToggle={() => toggle(item)}
-                onComment={() => setCommentFor(item)}
+      {view === "playlists" ? (
+        plLoading || playlists === null ? (
+          <div className="pfo-empty font-fun">
+            <Loader2 size={22} className="spin" />
+          </div>
+        ) : playlists.length === 0 ? (
+          <div className="pfo-empty font-fun">
+            <Disc3 size={34} />
+            <p>
+              {isMe
+                ? "Aucune playlist pour l'instant — crée-en une et remplis-la d'OST !"
+                : "Ce joueur n'a pas encore de playlist."}
+            </p>
+          </div>
+        ) : (
+          <div className="plc-grid">
+            {playlists.map((l) => (
+              <PlaylistCard
+                key={l.id}
+                list={l}
+                onDelete={isMe ? deletePlaylist : undefined}
               />
             ))}
           </div>
-        </SortableContext>
-      </DndContext>
+        )
+      ) : !items.length ? (
+        <div className="pfo-empty font-fun">
+          <Disc3 size={34} />
+          <p>
+            {isMe
+              ? "Aucune OST favorite pour l'instant — choisis-en depuis l'onglet OST d'un jeu."
+              : "Ce joueur n'a pas encore d'OST favorite."}
+          </p>
+        </div>
+      ) : (
+        <>
+          {draggable && (
+            <p className="pfo-hint font-fun">
+              <GripVertical size={14} /> Glisse les cards pour les classer par ordre de préférence.
+            </p>
+          )}
+
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+            <SortableContext items={ordered.map((i) => i.gameId)} strategy={rectSortingStrategy}>
+              <div className="pfo-grid">
+                {ordered.map((item, i) => (
+                  <OstCard
+                    key={item.gameId}
+                    item={item}
+                    rank={i + 1}
+                    showRank={sort === "preference"}
+                    draggable={draggable}
+                    playing={player.isPlaying(item.ost)}
+                    canPlay={playable(item.ost)}
+                    commentCount={countOverride[item.gameId] ?? item.commentCount}
+                    onToggle={() => toggle(item)}
+                    onComment={() => setCommentFor(item)}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        </>
+      )}
 
       {commentFor && (
         <OstCommentsModal
@@ -213,6 +299,17 @@ export default function ProfileOST({
             setCountOverride((m) => ({ ...m, [commentFor.gameId]: n }))
           }
           onClose={() => setCommentFor(null)}
+        />
+      )}
+
+      {creating && (
+        <CreateListModal
+          fixedType="playlist"
+          onClose={() => setCreating(false)}
+          onCreated={(list) => {
+            setCreating(false);
+            navigate(`/lists/${list.id}`, { state: { edit: true } });
+          }}
         />
       )}
     </section>

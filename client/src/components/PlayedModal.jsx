@@ -678,7 +678,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
               token={token}
               big
               autoFocus
-              maxChars={2000}
+              maxChars={4000}
               placeholder="Partage ton avis sur le jeu…"
               initialText={review}
               initialMedia={reviewMedia}

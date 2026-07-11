@@ -13,6 +13,8 @@ function serialize(n) {
       : null,
     listId: n.list?._id || n.list || null,
     listTitle: n.list?.title || null,
+    // Type de la liste visée : les notifs adaptent leur wording (playlist).
+    listType: n.list?.type || null,
     commentId: n.comment ? String(n.comment) : null,
     game: n.game || null,
     gameName: n.gameName || "",
@@ -34,7 +36,7 @@ router.get("/", requireAuth, async (req, res) => {
         .sort({ createdAt: -1 })
         .limit(30)
         .populate("actor", "username avatar")
-        .populate("list", "title")
+        .populate("list", "title type")
         .populate("ostOwner", "username")
         .populate("repostOwner", "username")
         .lean(),

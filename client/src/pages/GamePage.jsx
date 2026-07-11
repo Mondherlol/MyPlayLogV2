@@ -506,7 +506,7 @@ export default function GamePage() {
                   title="Coup de cœur"
                 >
                   <Heart size={18} fill={fav?.favorite ? "currentColor" : "none"} />
-                  <span>Coup de cœur</span>
+                  <span>Favoris</span>
                 </button>
               ) : (
                 <button

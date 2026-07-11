@@ -39,9 +39,12 @@ import {
   Plus,
   Flame,
   Infinity as InfinityIcon,
+  Disc3,
+  Headphones,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
-import { timeAgo } from "../lib/lists";
+import { timeAgo, fmtDuration } from "../lib/lists";
+import { usePlayPlaylist } from "../lib/usePlayPlaylist";
 import { extractVideoId } from "../lib/youtube";
 import { usePlayer } from "../context/PlayerContext";
 import ReviewComments from "./ReviewComments";
@@ -66,7 +69,20 @@ const LIST_TYPE_META = {
   classic: { label: "Liste", Icon: Rows3 },
   ranked: { label: "Top classé", Icon: ListOrdered },
   tier: { label: "Tier list", Icon: Layers },
+  playlist: { label: "PlayList", Icon: Disc3 },
 };
+
+// Mot (au bon pluriel) pour le contenu d'une liste : jeux, personnages ou OST.
+const kindWord = (itemKind, n) =>
+  itemKind === "character"
+    ? n > 1
+      ? "personnages"
+      : "personnage"
+    : itemKind === "ost"
+      ? "OST"
+      : n > 1
+        ? "jeux"
+        : "jeu";
 
 // Interactions sociales : verbe + icône + contexte (liste ou avis) + faut-il
 // afficher l'extrait (le texte commenté / liké). `target` = à qui appartient
@@ -76,6 +92,7 @@ const ACTION_META = {
   comment_reply: { Icon: CornerDownRight, verb: "a répondu à", ctx: "list", quote: true },
   list_like: { Icon: Heart, verb: "a aimé la liste de", ctx: "list", quote: false },
   comment_like: { Icon: Heart, verb: "a aimé un commentaire de", ctx: "list", quote: true },
+  playlist_listen: { Icon: Headphones, verb: "écoute la playlist de", ctx: "list", quote: false },
   review_comment: { Icon: MessageCircle, verb: "a commenté l'avis de", ctx: "review", quote: true },
   review_comment_reply: { Icon: CornerDownRight, verb: "a répondu à", ctx: "review", quote: true },
   review_comment_like: { Icon: Heart, verb: "a aimé une réponse de", ctx: "review", quote: true },
@@ -550,10 +567,12 @@ function GameGroupEvent({ item }) {
 // ============================================================
 //  Listes
 // ============================================================
-export function ListMini({ list }) {
+export function ListMini({ list, showTracks = false }) {
   const navigate = useNavigate();
+  // Les playlists d'OST ont leur propre mini-carte (CD écoutable).
+  if (list.type === "playlist")
+    return <PlaylistMini list={list} showTracks={showTracks} />;
   const meta = LIST_TYPE_META[list.type] || LIST_TYPE_META.classic;
-  const kind = list.itemKind === "character" ? "personnage" : "jeu";
   return (
     <div className="hf-list-body clickable" onClick={() => navigate(`/lists/${list.id}`)}>
       <div className="hf-list-mosaic">
@@ -580,8 +599,7 @@ export function ListMini({ list }) {
         </span>
         <h4 className="hf-list-title">{list.title}</h4>
         <span className="hf-list-meta">
-          {list.itemCount} {kind}
-          {list.itemCount > 1 ? "s" : ""}
+          {list.itemCount} {kindWord(list.itemKind, list.itemCount)}
           {list.likeCount > 0 && (
             <>
               {" · "}
@@ -600,35 +618,195 @@ export function ListMini({ list }) {
   );
 }
 
-// --- Liste créée ---
-function ListEvent({ item }) {
+// Mini-carte PlayList du fil : un CD (la pochette, ou la première piste) qui
+// tourne si c'est la playlist en cours d'écoute, écoutable directement.
+// `showTracks` : affiche en plus les miniatures des premières OST, chacune
+// écoutable d'un clic (cartes « a créé / a ajouté des OST »).
+function PlaylistMini({ list, showTracks = false }) {
+  const navigate = useNavigate();
+  const player = usePlayer();
+  const { launching, playPlaylist } = usePlayPlaylist(list);
+  const isActive = player.source?.href === `/lists/${list.id}`;
+  const spinning = isActive && player.playing;
+  const discArt = list.cover || list.preview?.[0] || null;
+  const tracks = list.tracks || [];
+
+  // Écoute express d'une miniature : file = les pistes embarquées dans la carte.
+  function playTrack(e, t) {
+    e.stopPropagation();
+    const toTrack = (x) => ({
+      id: x.refId,
+      videoId: x.videoId,
+      url: x.url,
+      name: x.name,
+      artist: x.artist,
+      artwork: x.image,
+      gameId: x.gameId,
+      gameName: x.gameName,
+    });
+    player.toggleTrack(toTrack(t), tracks.map(toTrack), {
+      source: { href: `/lists/${list.id}`, label: list.title },
+    });
+  }
+
   return (
-    <article className="hf-card hf-list">
-      <EventHead user={item.user} date={item.date}>
-        a créé une liste
-      </EventHead>
-      <ListMini list={item.list} />
-    </article>
+    <div
+      className="hf-pl clickable"
+      onClick={() => navigate(`/lists/${list.id}`)}
+      title={list.title}
+    >
+      <div className="hf-pl-row">
+        <span className={`hf-pl-cd ${spinning ? "spinning" : ""}`}>
+          <span className="hf-pl-cd-face">
+            {discArt ? (
+              <img src={discArt} alt="" loading="lazy" draggable="false" />
+            ) : (
+              <Music size={18} />
+            )}
+            <span className="hf-pl-cd-grooves" />
+            <span className="hf-pl-cd-hole" />
+          </span>
+        </span>
+
+        <div className="hf-pl-info">
+          <span className="hf-pl-type">
+            <Disc3 size={12} /> PlayList
+          </span>
+          <h4 className="hf-pl-title">
+            {isActive && (
+              <span className={`pld-eq ${player.playing ? "" : "paused"}`} aria-hidden="true">
+                <i /><i /><i />
+              </span>
+            )}
+            {list.title}
+          </h4>
+          <span className="hf-pl-meta">
+            {list.itemCount} piste{list.itemCount > 1 ? "s" : ""}
+            {list.durationSec > 0 && (
+              <>
+                {" · "}
+                {list.durationEstimated ? "≈ " : ""}
+                {fmtDuration(list.durationSec)}
+              </>
+            )}
+            {list.likeCount > 0 && (
+              <>
+                {" · "}
+                <Heart size={11} /> {list.likeCount}
+              </>
+            )}
+            {list.commentCount > 0 && (
+              <>
+                {" · "}
+                <MessageCircle size={11} /> {list.commentCount}
+              </>
+            )}
+          </span>
+        </div>
+
+        {list.itemCount > 0 && (
+          <button
+            className="hf-pl-play clickable"
+            title={spinning ? "Pause" : "Écouter la playlist"}
+            aria-label="Écouter la playlist"
+            onClick={(e) => {
+              if (isActive) {
+                e.stopPropagation();
+                player.toggle();
+              } else {
+                playPlaylist(e);
+              }
+            }}
+          >
+            {launching ? (
+              <Loader2 size={16} className="spin" />
+            ) : spinning ? (
+              <Pause size={16} fill="currentColor" strokeWidth={0} />
+            ) : (
+              <Play size={16} fill="currentColor" strokeWidth={0} />
+            )}
+          </button>
+        )}
+      </div>
+
+      {/* Miniatures des OST, écoutables en un clic */}
+      {showTracks && tracks.length > 0 && (
+        <div className="hf-pl-tracks">
+          {tracks.map((t) => {
+            const cur = player.isCurrent(t);
+            const isPlaying = player.isPlaying(t);
+            return (
+              <button
+                key={t.refId}
+                className={`hf-pl-track clickable ${cur ? "current" : ""}`}
+                onClick={(e) => playTrack(e, t)}
+                title={`${t.name}${t.gameName ? ` — ${t.gameName}` : ""}`}
+              >
+                <span className="hf-pl-track-art">
+                  {t.image ? (
+                    <img src={t.image} alt="" loading="lazy" draggable="false" />
+                  ) : (
+                    <Music size={14} />
+                  )}
+                  <span className={`hf-pl-track-play ${isPlaying ? "on" : ""}`}>
+                    {isPlaying ? <Pause size={13} /> : <Play size={13} />}
+                  </span>
+                </span>
+                <span className="hf-pl-track-name">{t.name}</span>
+              </button>
+            );
+          })}
+          {list.itemCount > tracks.length && (
+            <span className="hf-pl-track-more">+{list.itemCount - tracks.length}</span>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
-// --- Jeux ajoutés à une liste ---
-function ListAddEvent({ item }) {
-  const kind = item.list.itemKind === "character" ? "personnage" : "jeu";
+// --- Liste / playlist créée ---
+function ListEvent({ item }) {
+  const isPlaylist = item.list.type === "playlist";
   return (
     <article className="hf-card hf-list">
       <EventHead
         user={item.user}
         date={item.date}
         badge={
-          <span className="hf-status-badge st-listadd">
-            <ListPlus size={13} />
+          isPlaylist ? (
+            <span className="hf-status-badge st-playlist">
+              <Disc3 size={13} />
+            </span>
+          ) : undefined
+        }
+      >
+        {isPlaylist ? "a créé une playlist" : "a créé une liste"}
+      </EventHead>
+      <ListMini list={item.list} showTracks />
+    </article>
+  );
+}
+
+// --- Éléments ajoutés à une liste / des OST ajoutées à une playlist ---
+function ListAddEvent({ item }) {
+  const isPlaylist = item.list.type === "playlist";
+  const kind = kindWord(item.list.itemKind, item.count);
+  const what = item.count > 1 ? `${item.count} ${kind}` : `${item.list.itemKind === "ost" ? "une" : "un"} ${kind}`;
+  return (
+    <article className="hf-card hf-list">
+      <EventHead
+        user={item.user}
+        date={item.date}
+        badge={
+          <span className={`hf-status-badge ${isPlaylist ? "st-playlist" : "st-listadd"}`}>
+            {isPlaylist ? <Disc3 size={13} /> : <ListPlus size={13} />}
           </span>
         }
       >
-        a ajouté {item.count > 1 ? `${item.count} ${kind}s` : `un ${kind}`} à sa liste
+        a ajouté {what} à sa {isPlaylist ? "playlist" : "liste"}
       </EventHead>
-      <ListMini list={item.list} />
+      <ListMini list={item.list} showTracks />
     </article>
   );
 }
@@ -773,10 +951,12 @@ function InteractionEvent({ item, token }) {
     item.action === "review_react" ? REACT_BADGES[item.snippet] : null;
   const BadgeIcon = reactBadge?.Icon || meta.Icon;
   // « l'avis de » devient « la note de » quand l'avis visé n'a ni texte ni +/−.
-  const verb =
+  let verb =
     meta.ctx === "review" && reviewIsJustARating(item.review)
       ? meta.verb.replace("l'avis de", "la note de")
       : meta.verb;
+  // Contexte playlist : le vocabulaire suit (« a aimé la playlist de… »).
+  if (item.list?.type === "playlist") verb = verb.replace("la liste de", "la playlist de");
 
   return (
     <article className="hf-card hf-interaction">

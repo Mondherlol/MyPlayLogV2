@@ -37,7 +37,13 @@ export function PlayerProvider({ children }) {
   const [queue, setQueue] = useState([]);
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
+  // Piste en cours de chargement/buffering (le mini-lecteur affiche un loader
+  // au lieu du bouton play, pour ne pas croire que rien n'a été lancé).
+  const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, duration: 0 });
+  // D'où vient la file en cours (ex. { href: "/lists/xx", label: "Ma playlist" }) :
+  // permet au mini-lecteur de proposer un retour vers la playlist écoutée.
+  const [source, setSource] = useState(null);
 
   const ytRef = useRef(null);
   const ytDivRef = useRef(null);
@@ -83,14 +89,20 @@ export function PlayerProvider({ children }) {
             const cur = queueRef.current[indexRef.current];
             if (cur && loadedRef.current !== cur.videoId) {
               loadedRef.current = cur.videoId;
+              setLoading(true);
               ytRef.current.loadVideoById(cur.videoId);
             }
           },
           onStateChange: (e) => {
             const S = window.YT.PlayerState;
             if (e.data === S.ENDED) advanceRef.current();
-            else if (e.data === S.PLAYING) setPlaying(true);
-            else if (e.data === S.PAUSED) setPlaying(false);
+            else if (e.data === S.PLAYING) {
+              setPlaying(true);
+              setLoading(false);
+            } else if (e.data === S.PAUSED) {
+              setPlaying(false);
+              setLoading(false);
+            } else if (e.data === S.BUFFERING) setLoading(true);
           },
         },
       });
@@ -114,6 +126,7 @@ export function PlayerProvider({ children }) {
     if (!readyRef.current || !current) return;
     if (loadedRef.current === current.videoId) return;
     loadedRef.current = current.videoId;
+    setLoading(true);
     try {
       ytRef.current?.loadVideoById(current.videoId); // autoplay
     } catch {
@@ -155,6 +168,7 @@ export function PlayerProvider({ children }) {
 
   // Lance une piste en construisant une file à partir d'une liste (les pistes
   // injouables sont filtrées). L'index pointe sur la piste cliquée.
+  // meta.source (optionnel) : origine de la file, affichée par le mini-lecteur.
   const playFromList = useCallback((track, list, meta = {}) => {
     const items = (Array.isArray(list) && list.length ? list : [track])
       .map((t) => toPlayable(t, meta))
@@ -165,6 +179,7 @@ export function PlayerProvider({ children }) {
     if (start < 0) start = 0;
     setQueue(items);
     setIndex(start);
+    setSource(meta.source || null);
     setProgress({ current: 0, duration: 0 });
   }, []);
 
@@ -245,6 +260,8 @@ export function PlayerProvider({ children }) {
     setQueue([]);
     setIndex(0);
     setPlaying(false);
+    setLoading(false);
+    setSource(null);
     setProgress({ current: 0, duration: 0 });
   }, []);
 
@@ -254,7 +271,9 @@ export function PlayerProvider({ children }) {
       queue,
       index,
       playing,
+      loading,
       progress,
+      source,
       hasNext: index < queue.length - 1,
       hasPrev: index > 0,
       isCurrent,
@@ -273,7 +292,9 @@ export function PlayerProvider({ children }) {
       queue,
       index,
       playing,
+      loading,
       progress,
+      source,
       isCurrent,
       isPlaying,
       playFromList,

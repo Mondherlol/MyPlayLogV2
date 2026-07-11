@@ -1,6 +1,6 @@
-import { List, ListOrdered, LayoutGrid } from "lucide-react";
+import { List, ListOrdered, LayoutGrid, Disc3 } from "lucide-react";
 
-// Métadonnées des 3 types de listes (icône, libellés, description).
+// Métadonnées des 4 types de listes (icône, libellés, description).
 export const LIST_TYPES = {
   classic: {
     value: "classic",
@@ -23,9 +23,22 @@ export const LIST_TYPES = {
     Icon: LayoutGrid,
     desc: "Range jeux et personnages par paliers (S, A, B…).",
   },
+  playlist: {
+    value: "playlist",
+    label: "PlayList",
+    long: "PlayList",
+    Icon: Disc3,
+    desc: "Une playlist d'OST à écouter, trier et partager.",
+  },
 };
 
 export const typeMeta = (t) => LIST_TYPES[t] || LIST_TYPES.classic;
+
+// Types proposés dans le sélecteur de type d'une liste EXISTANTE : une liste
+// de jeux/persos ne peut pas devenir une playlist (contenus incompatibles).
+export const GAME_LIST_TYPES = ["classic", "ranked", "tier"].map(
+  (t) => LIST_TYPES[t]
+);
 
 // Options de tri de la page Listes (valeur = param `sort` du backend).
 export const LIST_SORTS = [
@@ -39,13 +52,15 @@ export const LIST_TYPE_FILTERS = [
   { value: "classic", label: "Classiques" },
   { value: "ranked", label: "Classées" },
   { value: "tier", label: "Tier lists" },
+  { value: "playlist", label: "PlayLists" },
 ];
 
-// Options de filtre par contenu (jeux / personnages).
+// Options de filtre par contenu (jeux / personnages / OST).
 export const LIST_KIND_FILTERS = [
   { value: "", label: "Tout contenu" },
   { value: "game", label: "Jeux" },
   { value: "character", label: "Personnages" },
+  { value: "ost", label: "OST" },
 ];
 
 // Paliers par défaut (doit rester aligné avec le serveur).
@@ -79,3 +94,39 @@ export function timeAgo(date) {
 let seq = 0;
 // Id local unique pour un nouveau palier / élément côté client.
 export const localId = (p = "id") => `${p}-${Date.now().toString(36)}-${seq++}`;
+
+// "1 h 12 min" / "24 min" — durée d'écoute totale d'une playlist.
+export function fmtDuration(sec) {
+  if (!sec || sec <= 0) return "";
+  const m = Math.round(sec / 60);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  const rest = m % 60;
+  return rest ? `${h} h ${String(rest).padStart(2, "0")}` : `${h} h`;
+}
+
+// Durée totale d'une playlist côté client (mêmes règles que le serveur :
+// durées iTunes connues + 4 min par piste inconnue, estimée dès qu'il en manque).
+export function playlistDuration(items) {
+  if (!items.length) return { durationSec: 0, durationEstimated: false };
+  const known = items.filter((i) => i.durationSec > 0);
+  return {
+    durationSec:
+      known.reduce((s, i) => s + i.durationSec, 0) +
+      (items.length - known.length) * 240,
+    durationEstimated: known.length < items.length,
+  };
+}
+
+// Item de playlist (List.items, kind "track") → piste jouable par le
+// PlayerContext (mini-lecteur global).
+export const playlistItemToTrack = (it) => ({
+  id: it.refId,
+  videoId: it.videoId,
+  url: it.url,
+  name: it.name,
+  artist: it.artist,
+  artwork: it.image,
+  gameId: it.gameId,
+  gameName: it.gameName,
+});

@@ -7,9 +7,11 @@ import { LIST_TYPES } from "../lib/lists";
 
 // Modal de création d'une liste : type, titre, visibilité.
 // (La description se saisit ensuite directement dans la liste.)
-export default function CreateListModal({ onClose, onCreated }) {
+// `fixedType` : impose un type (ex. "playlist" depuis l'onglet OST d'un jeu)
+// et masque le sélecteur.
+export default function CreateListModal({ onClose, onCreated, fixedType = null }) {
   const { token } = useAuth();
-  const [type, setType] = useState("classic");
+  const [type, setType] = useState(fixedType || "classic");
   const [itemKind, setItemKind] = useState("game"); // tier list : jeux OU persos
   const [title, setTitle] = useState("");
   const [visibility, setVisibility] = useState("public");
@@ -37,7 +39,8 @@ export default function CreateListModal({ onClose, onCreated }) {
           type,
           title: title.trim(),
           visibility,
-          itemKind,
+          // Une playlist contient des OST ; les autres types, jeux ou persos.
+          itemKind: type === "playlist" ? "ost" : itemKind,
         },
       });
       onCreated?.(list);
@@ -60,30 +63,34 @@ export default function CreateListModal({ onClose, onCreated }) {
 
         <form className="modal-form" onSubmit={submit}>
           <h2 className="modal-title">
-            <Sparkles size={20} /> Nouvelle liste
+            <Sparkles size={20} />{" "}
+            {fixedType === "playlist" ? "Nouvelle playlist" : "Nouvelle liste"}
           </h2>
 
           {error && <div className="alert alert-error">{error}</div>}
 
-          <div className="field">
-            <label>Type de liste</label>
-            <div className="type-picker">
-              {Object.values(LIST_TYPES).map((t) => (
-                <button
-                  type="button"
-                  key={t.value}
-                  className={`type-card clickable ${type === t.value ? "active" : ""}`}
-                  onClick={() => setType(t.value)}
-                >
-                  <span className="type-card-icon">
-                    <t.Icon size={18} />
-                  </span>
-                  <span className="type-card-label">{t.long}</span>
-                </button>
-              ))}
+          {!fixedType && (
+            <div className="field">
+              <label>Type de liste</label>
+              <div className="type-picker">
+                {Object.values(LIST_TYPES).map((t) => (
+                  <button
+                    type="button"
+                    key={t.value}
+                    className={`type-card clickable ${type === t.value ? "active" : ""}`}
+                    onClick={() => setType(t.value)}
+                  >
+                    <span className="type-card-icon">
+                      <t.Icon size={18} />
+                    </span>
+                    <span className="type-card-label">{t.long}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
+          {type !== "playlist" && (
           <div className="field">
             <label>Contenu de la liste</label>
             <div className="kind-picker">
@@ -103,6 +110,7 @@ export default function CreateListModal({ onClose, onCreated }) {
               </button>
             </div>
           </div>
+          )}
 
           <div className="field">
             <label htmlFor="list-title">Titre</label>
@@ -110,7 +118,9 @@ export default function CreateListModal({ onClose, onCreated }) {
               <input
                 id="list-title"
                 className="modal-input"
-                placeholder="Ex : Mes RPG cultes"
+                placeholder={
+                  type === "playlist" ? "Ex : OST qui donnent des frissons" : "Ex : Mes RPG cultes"
+                }
                 value={title}
                 maxLength={120}
                 autoFocus
@@ -141,7 +151,7 @@ export default function CreateListModal({ onClose, onCreated }) {
             </button>
             <button type="submit" className="btn btn-primary" disabled={busy}>
               {busy ? <Loader2 size={18} className="spin" /> : <Sparkles size={18} />}
-              Créer la liste
+              {type === "playlist" ? "Créer la playlist" : "Créer la liste"}
             </button>
           </div>
         </form>

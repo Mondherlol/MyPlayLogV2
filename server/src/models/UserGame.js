@@ -77,6 +77,10 @@ const userGameSchema = new mongoose.Schema(
     review: { type: String, default: "" }, // texte de review
     reviewMedia: { type: [reviewMediaSchema], default: [] }, // GIF / images joints
     spoiler: { type: Boolean, default: false }, // la review dévoile l'intrigue
+    // Date de publication/dernière édition du CONTENU de la review (texte,
+    // médias, points forts/faibles). Distincte de `updatedAt` : changer une
+    // note, une jaquette ou un temps de jeu ne doit pas rajeunir la review.
+    reviewedAt: { type: Date, default: null },
     favorite: { type: Boolean, default: false },
     rating: { type: Number, min: 0, max: 100, default: null }, // note en %
     pros: { type: [String], default: [] },

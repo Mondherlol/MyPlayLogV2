@@ -14,6 +14,7 @@ import { geminiJson, isGeminiConfigured } from "../lib/gemini.js";
 import { requireAuth } from "../middleware/auth.js";
 import { summarizeReactions } from "../lib/reviewSerialize.js";
 import { buildRepostStats } from "./reposts.js";
+import { playlistDuration } from "./lists.js";
 
 // Flux de la page d'accueil : activité des joueurs suivis (jeux, reviews,
 // listes, fan arts republiés, documentaires recommandés) fusionnée en une
@@ -30,6 +31,7 @@ const INTERACTIONS = [
   "comment_reply",
   "list_like",
   "comment_like",
+  "playlist_listen",
   "review_comment",
   "review_comment_reply",
   "review_comment_like",
@@ -44,15 +46,43 @@ const RECO_TYPES = ["recommendation", "recommendation_boost", "recommendation_co
 function listMini(l) {
   const items = l.items || [];
   const chars = items.filter((i) => i.kind === "character").length;
+  const tracks = items.filter((i) => i.kind === "track").length;
+  const itemKind =
+    items.length > 0 && tracks === items.length
+      ? "ost"
+      : items.length > 0 && chars === items.length
+        ? "character"
+        : "game";
   return {
     id: String(l._id),
     title: l.title,
     type: l.type,
-    itemKind: items.length > 0 && chars === items.length ? "character" : "game",
+    cover: l.cover || null, // pochette (CD des mini-cartes playlist)
+    itemKind: l.type === "playlist" ? "ost" : itemKind,
     itemCount: items.length,
     preview: items.filter((i) => i.image).slice(0, 5).map((i) => i.image),
     likeCount: (l.likes || []).length,
     commentCount: (l.comments || []).length,
+    // Playlist : durée totale + premières pistes jouables (miniatures
+    // écoutables directement depuis la carte du fil).
+    ...(l.type === "playlist"
+      ? {
+          ...playlistDuration(items),
+          tracks: items
+            .filter((i) => i.kind === "track" && (i.videoId || i.url))
+            .slice(0, 6)
+            .map((i) => ({
+              refId: i.refId,
+              name: i.name,
+              artist: i.artist || null,
+              image: i.image || null,
+              videoId: i.videoId || null,
+              url: i.url || null,
+              gameId: i.gameId || null,
+              gameName: i.gameName || null,
+            })),
+        }
+      : {}),
   };
 }
 
@@ -100,7 +130,7 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
           .limit(limit * 2) // les activités portent plusieurs types d'évènements
           .populate("actor", "username avatar")
           .populate("target", "username avatar")
-          .populate("list", "title type visibility items likes comments")
+          .populate("list", "title type cover visibility items likes comments")
           .lean(),
     !wantAll
       ? Promise.resolve([])
@@ -323,7 +353,8 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
       (a.type === "list_comment" ||
         a.type === "list_like" ||
         a.type === "comment_reply" ||
-        a.type === "comment_like") &&
+        a.type === "comment_like" ||
+        a.type === "playlist_listen") &&
       !onList;
     if (listMissing) continue;
 

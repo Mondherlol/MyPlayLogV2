@@ -8,6 +8,7 @@ import {
   X,
   Music,
   Disc3,
+  Loader2,
 } from "lucide-react";
 import { usePlayer } from "../context/PlayerContext";
 
@@ -22,7 +23,7 @@ function fmt(sec) {
 // que lorsqu'une OST est lancée (depuis la page jeu, le profil ou l'aperçu).
 export default function MiniPlayer() {
   const player = usePlayer();
-  const { current, playing, progress, hasNext, hasPrev } = player;
+  const { current, playing, loading, progress, hasNext, hasPrev, source } = player;
   const barRef = useRef(null);
 
   // Décale le contenu pour ne pas le masquer derrière la barre.
@@ -83,11 +84,13 @@ export default function MiniPlayer() {
         <button
           className="mp-btn mp-play clickable"
           onClick={player.toggle}
-          title={playing ? "Pause" : "Lecture"}
-          aria-label={playing ? "Pause" : "Lecture"}
+          title={playing ? "Pause" : loading ? "Chargement…" : "Lecture"}
+          aria-label={playing ? "Pause" : loading ? "Chargement" : "Lecture"}
         >
           {playing ? (
             <Pause size={20} fill="currentColor" strokeWidth={0} />
+          ) : loading ? (
+            <Loader2 size={20} className="spin" />
           ) : (
             <Play size={20} fill="currentColor" strokeWidth={0} />
           )}
@@ -112,6 +115,18 @@ export default function MiniPlayer() {
         </div>
         <span className="mp-time">{fmt(progress.duration)}</span>
       </div>
+
+      {/* Retour vers la playlist en cours d'écoute */}
+      {source?.href && (
+        <Link
+          to={source.href}
+          className="mp-source clickable"
+          title={source.label ? `Ouvrir « ${source.label} »` : "Ouvrir la playlist"}
+        >
+          <Disc3 size={15} />
+          <span className="mp-source-label">{source.label || "Playlist"}</span>
+        </Link>
+      )}
 
       <button
         className="mp-close clickable"

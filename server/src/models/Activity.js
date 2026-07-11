@@ -27,6 +27,7 @@ const activitySchema = new mongoose.Schema(
         "comment_reply", // réponse à un commentaire de liste
         "list_like", // like d'une liste
         "comment_like", // like d'un commentaire de liste
+        "playlist_listen", // écoute d'une playlist d'OST (une entrée par auditeur)
         "review_comment", // commentaire (racine) sous un avis
         "review_comment_reply", // réponse à un commentaire d'avis
         "review_comment_like", // like d'un commentaire d'avis

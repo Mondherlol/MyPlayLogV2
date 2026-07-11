@@ -12,12 +12,14 @@ import {
   Disc3,
   RotateCcw,
   TextCursorInput,
+  ListPlus,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { makeCache } from "../lib/cache";
 import { usePlayer } from "../context/PlayerContext";
 import AddOstModal from "./AddOstModal";
 import MassRenameOstModal from "./MassRenameOstModal";
+import AddToPlaylistModal from "./AddToPlaylistModal";
 
 // OST du jeu affichée sous forme de vinyles qui tournent pendant la lecture.
 // Même fonctionnement que l'OstPicker de la modale (extraits iTunes + pistes
@@ -26,15 +28,18 @@ import MassRenameOstModal from "./MassRenameOstModal";
 
 // Cache mémoire + localStorage : évite de relancer la recherche d'OST quand on
 // quitte l'onglet puis qu'on y revient (TTL 30 min). Mis à jour après ajout/masquage.
-const ostCache = makeCache("mpl_ost_", 30 * 60 * 1000);
+// Exporté : la modale d'ajout de pistes aux playlists (AddOstTracksModal) fait
+// les mêmes opérations (ajout/masquage/renommage) et doit garder ce cache à jour.
+export const ostCache = makeCache("mpl_ost_", 30 * 60 * 1000);
 
 // Normalise la donnée en cache : ancien format (tableau de pistes) ou nouveau
 // format { tracks, trash }. Garantit toujours les deux listes.
-function normalize(d) {
+export function normalizeOstCache(d) {
   if (!d) return { tracks: [], trash: [] };
   if (Array.isArray(d)) return { tracks: d, trash: [] };
   return { tracks: d.tracks || [], trash: d.trash || [] };
 }
+const normalize = normalizeOstCache;
 
 export default function GameOst({ gameId, gameName, token, favorite, onFavorite }) {
   const cached = normalize(ostCache.get(String(gameId))?.data);
@@ -46,6 +51,7 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
   const [query, setQuery] = useState("");
   const [showTrash, setShowTrash] = useState(false);
   const [menu, setMenu] = useState(null); // { x, y, track }
+  const [playlistFor, setPlaylistFor] = useState(null); // piste à ajouter à une playlist
 
   // Lecture déléguée au mini-lecteur global.
   const player = usePlayer();
@@ -300,6 +306,14 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
                     >
                       <Star size={14} fill={fav ? "currentColor" : "none"} />
                     </button>
+
+                    <button
+                      className="gp-vinyl-playlist clickable"
+                      onClick={() => setPlaylistFor(t)}
+                      title="Ajouter à une playlist"
+                    >
+                      <ListPlus size={14} />
+                    </button>
                   </div>
 
                   <div className="gp-ost-meta">
@@ -356,6 +370,15 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
               }}
             />
             <div className="ctx-menu" style={{ top: menu.y, left: menu.x }}>
+              <button
+                className="ctx-item clickable"
+                onClick={() => {
+                  setPlaylistFor(menu.track);
+                  setMenu(null);
+                }}
+              >
+                <ListPlus size={15} /> Ajouter à une playlist
+              </button>
               <button className="ctx-item clickable" onClick={() => hide([menu.track.id])}>
                 <Trash2 size={15} /> Retirer cette OST
               </button>
@@ -376,6 +399,15 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
           token={token}
           onClose={() => setAdding(false)}
           onAdded={(arr) => commit([...arr, ...tracks], trash)}
+        />
+      )}
+
+      {playlistFor && (
+        <AddToPlaylistModal
+          track={playlistFor}
+          gameId={gameId}
+          gameName={gameName}
+          onClose={() => setPlaylistFor(null)}
         />
       )}
 

@@ -1623,6 +1623,11 @@ button.pf-stat:hover {
 .pg-panel {
   position: sticky;
   top: calc(var(--topbar-h, 60px) + 12px);
+  /* Le panneau reste collé ET défile de lui-même s'il dépasse l'écran :
+     on accède aux filtres du bas sans avoir à atteindre la fin de la grille. */
+  max-height: calc(100vh - var(--topbar-h, 60px) - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -1692,6 +1697,26 @@ button.pf-stat:hover {
 
 .pg-chip.wide {
   width: 100%;
+  justify-content: center;
+}
+
+/* Liste de chips potentiellement longue (consoles jouées) : hauteur bornée
+   + défilement interne pour ne pas manger tout le panneau. */
+.pg-chips-scroll {
+  max-height: 148px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+
+/* Format : les deux options côte à côte, largeur égale, pour gagner de la place. */
+.pg-format-row {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.pg-format-row .pg-chip {
+  flex: 1;
   justify-content: center;
 }
 
@@ -1991,6 +2016,119 @@ button.pf-stat:hover {
   gap: 0.3rem;
   font-size: 0.76rem;
   color: var(--text-soft);
+}
+
+/* Ligne d'infos sous le titre : temps de jeu, console jouée, format */
+.pg-tile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.4rem;
+  margin-top: -0.1rem;
+}
+
+.pg-tile-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: 100%;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pg-tile-chip svg {
+  flex-shrink: 0;
+}
+
+/* Bouton « Affichage » (choix des infos sur les cartes) */
+.pg-fields-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.pg-fields-btn:hover {
+  border-color: color-mix(in srgb, var(--orange) 45%, var(--border-strong));
+}
+
+/* Modale de choix des infos affichées */
+.pg-fields-modal {
+  max-width: 380px;
+  padding: 1.6rem 1.5rem 1.4rem;
+}
+
+.pg-fields-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.pg-fields-sub {
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  margin: 0.3rem 0 1rem;
+}
+
+.pg-fields-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.pg-field-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: 11px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-align: left;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.pg-field-row.on {
+  border-color: color-mix(in srgb, var(--orange) 55%, var(--border-strong));
+  background: color-mix(in srgb, var(--orange) 8%, var(--surface));
+  color: var(--text);
+}
+
+.pg-field-check {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border-strong);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.pg-field-row.on .pg-field-check {
+  background: var(--orange);
+  border-color: var(--orange);
 }
 
 @media (max-width: 860px) {

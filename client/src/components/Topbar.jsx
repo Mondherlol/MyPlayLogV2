@@ -20,6 +20,7 @@ import {
   CornerDownLeft,
   Music,
   Repeat2,
+  Headphones,
   Sun,
   Moon,
 } from "lucide-react";
@@ -36,6 +37,7 @@ const NOTIF_META = {
   comment_like: { Icon: Heart, verb: "a aimé ton commentaire" },
   list_comment: { Icon: MessageSquare, verb: "a commenté ta liste" },
   list_like: { Icon: Heart, verb: "a aimé ta liste" },
+  playlist_listen: { Icon: Headphones, verb: "a écouté ta playlist" },
   review_comment: { Icon: MessageSquare, verb: "a répondu à ta review" },
   review_comment_reply: { Icon: Reply, verb: "a répondu à ton commentaire" },
   review_comment_like: { Icon: Heart, verb: "a aimé ton commentaire" },
@@ -353,6 +355,11 @@ export default function Topbar() {
                 <div className="notif-list">
                   {notifs.map((n) => {
                     const meta = NOTIF_META[n.type] || NOTIF_META.list_like;
+                    // Une action sur une playlist se dit « playlist », pas « liste ».
+                    const verb =
+                      n.listType === "playlist"
+                        ? meta.verb.replace("ta liste", "ta playlist")
+                        : meta.verb;
                     return (
                       <button
                         key={n.id}
@@ -371,7 +378,7 @@ export default function Topbar() {
                         </span>
                         <span className="notif-body">
                           <span className="notif-text">
-                            <strong>{n.actor?.username || "Quelqu'un"}</strong> {meta.verb}
+                            <strong>{n.actor?.username || "Quelqu'un"}</strong> {verb}
                             {n.listTitle && (
                               <> «&nbsp;{n.listTitle}&nbsp;»</>
                             )}

@@ -1,0 +1,2010 @@
+/* ======================================================================
+   PlayLists d'OST — page de consultation (CD + pistes en arc), édition,
+   modales (ajout de pistes, ajout à une playlist) et déclinaisons de cards.
+   ====================================================================== */
+
+/* ---------- Tag / badge du type playlist ---------- */
+.list-tag.t-playlist,
+.list-type-badge.t-playlist {
+  --tc: #e0559c;
+}
+
+/* ---------- Cards PlayList (page Listes) : un CD qui sort de sa pochette --- */
+.plc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 1.1rem;
+}
+
+/* Dans la grille mixte (Découvrir / Mes listes), la card garde son gabarit. */
+.lists-grid .plc-card {
+  min-width: 0;
+}
+
+.plc-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.plc-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow);
+}
+
+.plc-visual {
+  position: relative;
+  /* de la place à droite pour l'éventail de CD qui dépasse */
+  padding: 1.15rem 1.1rem 1.1rem;
+  min-height: 158px;
+  display: flex;
+  align-items: center;
+  background:
+    radial-gradient(120% 90% at 20% 0%, rgba(242, 183, 11, 0.10), transparent 60%),
+    var(--surface-2);
+}
+
+.plc-sleeve {
+  position: relative;
+  z-index: 5;
+  width: 54%;
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  box-shadow: 5px 6px 16px rgba(20, 20, 40, 0.2);
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+
+/* ======================================================================
+   Pochette générée & personnalisée (composant CoverArt) — rendu partagé
+   par la card, le disque de la page et l'aperçu de l'éditeur.
+   ====================================================================== */
+.cvr {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  display: block;
+  container-type: size;
+  background: var(--surface-2);
+}
+
+.cvr-motif {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.cvr-motif.m-rings {
+  background:
+    repeating-radial-gradient(
+      circle at 84% 16%,
+      rgba(255, 255, 255, 0.16) 0 2px,
+      transparent 2px 13px
+    ),
+    linear-gradient(125deg, rgba(255, 255, 255, 0.16), transparent 48%);
+}
+
+.cvr-motif.m-dots {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.2) 22%, transparent 24%);
+  background-size: 7cqw 7cqw;
+}
+
+.cvr-motif.m-stripes {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.14) 0 4cqw,
+    transparent 4cqw 9cqw
+  );
+}
+
+.cvr-motif.m-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.16) 1px, transparent 1px);
+  background-size: 10cqw 10cqw;
+}
+
+.cvr-mark {
+  position: absolute;
+  top: 7%;
+  left: 8%;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.cvr-mark svg {
+  width: 8cqw;
+  height: 8cqw;
+}
+
+.cvr-el {
+  position: absolute;
+  z-index: 2;
+  aspect-ratio: 1 / 1;
+}
+
+.cvr-el img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+.cvr-title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  padding: 0 10%;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 13cqw;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  text-align: center;
+  color: #fff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.cvr-title.pos-top {
+  top: 8%;
+}
+
+.cvr-title.pos-center {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.cvr-title.pos-bottom {
+  bottom: 8%;
+}
+
+/* Le disque de la page peut aussi porter une pochette personnalisée. */
+.pld-disc-cover {
+  z-index: 0;
+}
+
+/* ======================================================================
+   Éditeur de pochette (modale)
+   ====================================================================== */
+.cvr-ed-modal {
+  max-width: 860px;
+  width: 100%;
+}
+
+.cvr-ed {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+  gap: 1.3rem;
+  align-items: start;
+}
+
+.cvr-ed-stage {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cvr-ed-canvas {
+  position: relative;
+  width: 100%;
+  max-width: 300px;
+  aspect-ratio: 1 / 1;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow);
+  touch-action: none;
+  user-select: none;
+}
+
+.cvr-ed-tip {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+/* Élément déplaçable dans l'éditeur : liseré au survol, cadre doré si choisi */
+.cvr-el.editor {
+  cursor: grab;
+}
+
+.cvr-el.editor:active {
+  cursor: grabbing;
+}
+
+.cvr-el.editor img {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  transition: outline-color 0.12s ease;
+}
+
+.cvr-el.editor:hover img {
+  outline-color: rgba(255, 255, 255, 0.55);
+}
+
+.cvr-el.editor.sel img {
+  outline-color: var(--orange);
+}
+
+.cvr-ed-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  max-height: 62vh;
+  overflow-y: auto;
+  padding-right: 0.3rem;
+  scrollbar-width: thin;
+}
+
+.cvr-ed-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.cvr-ed-sec:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.cvr-ed-h {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+}
+
+.cvr-ed-row,
+.cvr-ed-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.cvr-ed-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.cvr-ed-swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  padding: 0;
+}
+
+.cvr-ed-swatch:hover {
+  transform: scale(1.08);
+}
+
+.cvr-ed-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+.cvr-ed-color input[type="color"] {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  padding: 2px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.cvr-ed-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.32rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+.cvr-ed-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.cvr-ed-chip.on {
+  color: var(--accent-ink);
+  border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
+  background: color-mix(in srgb, var(--orange) 12%, var(--surface));
+}
+
+.cvr-ed-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.cvr-ed-icon:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.cvr-ed-icon.danger:hover {
+  color: #e0483f;
+  border-color: color-mix(in srgb, #e0483f 55%, var(--border));
+}
+
+.cvr-ed-slider {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+.cvr-ed-slider span {
+  flex: none;
+  width: 66px;
+}
+
+.cvr-ed-slider input[type="range"] {
+  flex: 1;
+  accent-color: var(--orange);
+}
+
+.cvr-ed-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.cvr-ed-tile {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  padding: 0;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.cvr-ed-tile:hover {
+  transform: translateY(-2px);
+  border-color: var(--orange);
+}
+
+.cvr-ed-tile.av {
+  border-radius: 50%;
+}
+
+.cvr-ed-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cvr-ed-tile-tag {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  display: grid;
+  place-items: center;
+  padding: 2px;
+  border-radius: 5px;
+  background: rgba(10, 10, 15, 0.6);
+  color: #fff;
+}
+
+.cvr-ed-empty {
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+
+.cvr-ed-elpanel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.3rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--orange) 40%, var(--border));
+  background: color-mix(in srgb, var(--orange) 6%, var(--surface));
+}
+
+.cvr-ed-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1.1rem;
+}
+
+.cvr-ed-foot-sp {
+  flex: 1;
+}
+
+@media (max-width: 720px) {
+  .cvr-ed {
+    grid-template-columns: 1fr;
+  }
+
+  .cvr-ed-stage {
+    position: static;
+  }
+
+  .cvr-ed-controls {
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+.plc-sleeve img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Tranche de la pochette (petit pli à gauche) */
+.plc-sleeve-spine {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 7px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.28), transparent);
+  pointer-events: none;
+}
+
+.plc-sleeve-empty {
+  display: grid;
+  place-items: center;
+}
+
+/* L'éventail de CD (un par artwork, max 3), à moitié caché derrière la
+   pochette ; il s'écarte légèrement au survol. --i = profondeur (0 devant). */
+.plc-cds {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.plc-cd {
+  position: absolute;
+  z-index: calc(4 - var(--i, 0));
+  top: 50%;
+  left: 34%;
+  width: 46%;
+  aspect-ratio: 1 / 1;
+  /* Les CD restent glissés dans la pochette : ils ne dépassent qu'un peu. */
+  transform: translate(calc(6% + var(--i, 0) * 15%), -50%)
+    scale(calc(1 - var(--i, 0) * 0.07));
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  border-radius: 50%;
+  padding: 3px;
+  background: conic-gradient(
+    from 40deg,
+    #b9bcc6,
+    #f2f3f7 14%,
+    #9a9daf 30%,
+    #e8e9ef 48%,
+    #a7aab8 64%,
+    #f0f1f5 82%,
+    #b9bcc6
+  );
+  box-shadow: 6px 3px 14px rgba(20, 20, 40, 0.28);
+}
+
+.plc-card:hover .plc-cd {
+  transform: translate(calc(15% + var(--i, 0) * 18%), -50%)
+    scale(calc(1 - var(--i, 0) * 0.07))
+    rotate(calc(9deg + var(--i, 0) * 5deg));
+}
+
+.plc-cd-face {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  display: grid;
+  place-items: center;
+}
+
+.plc-cd.spinning .plc-cd-face {
+  animation: pld-spin 4.5s linear infinite;
+}
+
+.plc-cd-face img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.plc-cd-grooves {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-radial-gradient(
+    circle at 50% 50%,
+    rgba(255, 255, 255, 0.06) 0 1px,
+    rgba(0, 0, 0, 0.14) 1px 2.5px
+  );
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+.plc-cd-hole {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18%;
+  aspect-ratio: 1 / 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--surface-2);
+  box-shadow:
+    inset 0 0 0 2px rgba(0, 0, 0, 0.22),
+    0 0 0 2px rgba(255, 255, 255, 0.28);
+  pointer-events: none;
+}
+
+.plc-play {
+  position: absolute;
+  z-index: 3;
+  right: 12px;
+  bottom: 12px;
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent-grad);
+  color: #1a1204;
+  box-shadow: 0 8px 20px rgba(242, 183, 11, 0.4);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.plc-card:hover .plc-play,
+.plc-play:focus-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.plc-play:hover {
+  transform: scale(1.08);
+}
+
+.plc-body {
+  padding: 0.85rem 1rem 0.95rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.plc-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 1.02rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plc-title .pld-eq {
+  color: var(--accent-ink);
+}
+
+.plc-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+/* ---------- Page jeu : bouton « + playlist » sur un vinyle ---------- */
+.gp-vinyl-playlist {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 10, 15, 0.6);
+  color: #fff;
+  z-index: 3;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.15s ease;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.gp-vinyl:hover .gp-vinyl-playlist {
+  opacity: 1;
+}
+
+.gp-vinyl-playlist:hover {
+  transform: scale(1.12);
+  background: var(--accent-grad);
+  color: #1a1204;
+}
+
+/* ======================================================================
+   Page PlayList
+   ====================================================================== */
+
+.pld-page {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.pld-main {
+  display: grid;
+  /* Colonnes bornées + centrées : les pistes restent proches du CD. */
+  grid-template-columns: 370px minmax(0, 620px);
+  justify-content: center;
+  gap: 1.3rem;
+  align-items: start;
+  margin-top: 0.4rem;
+}
+
+/* ---------- Colonne gauche : le CD ---------- */
+.pld-left {
+  position: sticky;
+  top: 84px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.pld-disc-zone {
+  position: relative;
+  width: min(340px, 82vw);
+}
+
+/* Le disque : la face (pochette plein format + sillons) tourne, le reflet
+   reste fixe par-dessus. */
+.pld-disc {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  /* tranche métallique du CD */
+  padding: 8px;
+  background: conic-gradient(
+    from 40deg,
+    #b9bcc6,
+    #f2f3f7 12%,
+    #9a9daf 26%,
+    #e8e9ef 44%,
+    #a7aab8 60%,
+    #f0f1f5 78%,
+    #b9bcc6
+  );
+  box-shadow:
+    0 22px 60px rgba(10, 10, 25, 0.35),
+    0 4px 14px rgba(10, 10, 25, 0.22);
+}
+
+:root[data-theme="dark"] .pld-disc {
+  box-shadow:
+    0 22px 60px rgba(0, 0, 0, 0.65),
+    0 4px 14px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.pld-disc-face {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #14161c;
+  animation: pld-spin 5.2s linear infinite;
+  animation-play-state: paused;
+}
+
+.pld-disc.spinning .pld-disc-face {
+  animation-play-state: running;
+}
+
+@keyframes pld-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pld-disc-face > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pld-disc-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(242, 183, 11, 0.16), transparent 65%),
+    var(--surface-2);
+}
+
+/* Sillons concentriques par-dessus la pochette */
+.pld-disc-grooves {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-radial-gradient(
+    circle at 50% 50%,
+    rgba(255, 255, 255, 0.055) 0 1.5px,
+    rgba(0, 0, 0, 0.14) 1.5px 3.5px
+  );
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+/* Trou central + anneau translucide */
+.pld-disc-hole {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 17%;
+  aspect-ratio: 1 / 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    var(--bg) 0 38%,
+    rgba(255, 255, 255, 0.34) 40% 62%,
+    rgba(255, 255, 255, 0.1) 64% 100%
+  );
+  box-shadow:
+    inset 0 0 0 2px rgba(0, 0, 0, 0.25),
+    0 0 0 2px rgba(255, 255, 255, 0.22);
+  pointer-events: none;
+}
+
+/* Reflet irisé fixe (ne tourne pas) */
+.pld-disc-sheen {
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    conic-gradient(
+      from 210deg,
+      transparent 0 8%,
+      rgba(255, 255, 255, 0.22) 12%,
+      rgba(160, 220, 255, 0.12) 18%,
+      transparent 26% 55%,
+      rgba(255, 190, 240, 0.1) 62%,
+      rgba(255, 255, 255, 0.16) 68%,
+      transparent 76%
+    ),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.16), transparent 42%);
+}
+
+/* Gros bouton lecture posé sur le CD */
+.pld-bigplay {
+  position: absolute;
+  right: 4%;
+  bottom: 4%;
+  width: 64px;
+  height: 64px;
+  border: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent-grad);
+  color: #1a1204;
+  box-shadow:
+    0 10px 26px rgba(242, 183, 11, 0.45),
+    0 2px 8px rgba(20, 20, 40, 0.25);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  z-index: 4;
+}
+
+.pld-bigplay:hover:not(:disabled) {
+  transform: scale(1.07);
+  box-shadow:
+    0 14px 34px rgba(242, 183, 11, 0.55),
+    0 3px 10px rgba(20, 20, 40, 0.3);
+}
+
+.pld-bigplay:disabled {
+  opacity: 0.5;
+}
+
+/* « En écoute » sous le disque */
+.pld-nowplaying {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  max-width: min(340px, 82vw);
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--orange) 45%, var(--border));
+  background: color-mix(in srgb, var(--orange) 10%, var(--surface));
+  color: var(--accent-ink);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.pld-nowplaying-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Égaliseur (3 barres animées) */
+.pld-eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+  flex: none;
+}
+
+.pld-eq i {
+  width: 3px;
+  border-radius: 2px;
+  background: currentColor;
+  animation: pld-eq 0.9s ease-in-out infinite;
+}
+
+.pld-eq i:nth-child(1) {
+  height: 60%;
+  animation-delay: -0.3s;
+}
+.pld-eq i:nth-child(2) {
+  height: 100%;
+  animation-delay: -0.65s;
+}
+.pld-eq i:nth-child(3) {
+  height: 45%;
+}
+
+@keyframes pld-eq {
+  0%,
+  100% {
+    transform: scaleY(0.45);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+/* Bloc infos sous le CD */
+.pld-info {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  text-align: center;
+}
+
+.pld-title {
+  font-size: 1.7rem;
+  line-height: 1.1;
+}
+
+.pld-title-input {
+  text-align: center;
+  width: 100%;
+}
+
+.pld-desc {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.92rem;
+  line-height: 1.45;
+  max-width: 46ch;
+}
+
+.pld-meta {
+  justify-content: center;
+}
+
+.pld-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.2rem;
+}
+
+.pld-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  padding: 0 0.35rem;
+}
+
+/* ---------- Colonne droite : les pistes ---------- */
+.pld-right {
+  min-width: 0;
+}
+
+.pld-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-bottom: 0.9rem;
+}
+
+.pld-tracks {
+  position: relative;
+}
+
+/* En lecture : liste scrollable, l'arc est calculé en JS (translateX). */
+.pld-tracks.arc {
+  max-height: min(72vh, 720px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Marge haute/basse = ARC_PAD_Y (JS) : la 1re et la dernière piste tombent
+     sous le fondu → elles restent nettes. À droite, place pour l'arc. */
+  padding: 44px 140px 44px 4px;
+  scrollbar-width: thin;
+}
+
+/* Playlists assez longues pour scroller : fondu haut/bas, les pistes
+   « sortent » de la scène. */
+.pld-tracks.arc.deep {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 44px,
+    #000 calc(100% - 44px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 44px,
+    #000 calc(100% - 44px),
+    transparent 100%
+  );
+}
+
+/* Une rangée = 64px + 10px d'espace → ROW_H = 74 dans PlaylistDetail.jsx */
+.pld-row {
+  height: 64px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0 0.9rem 0 0.7rem;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  will-change: transform;
+  user-select: none;
+}
+
+.pld-tracks.arc .pld-row {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.pld-row:hover {
+  border-color: var(--border-strong);
+}
+
+/* Piste en cours : ressort vers la droite, cerclée d'or. */
+.pld-row.current {
+  border-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 9%, var(--surface));
+  box-shadow:
+    0 0 0 1px var(--orange),
+    0 10px 28px rgba(242, 183, 11, 0.28);
+}
+
+.pld-row-num {
+  flex: none;
+  width: 30px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+
+.pld-row.current .pld-row-num {
+  color: var(--accent-ink);
+}
+
+.pld-row-art {
+  position: relative;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  border: none;
+  padding: 0;
+}
+
+.pld-row-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Play au survol, posé sur la vignette */
+.pld-row-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 10, 15, 0.5);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.pld-row:hover .pld-row-play {
+  opacity: 1;
+}
+
+.pld-row-txt {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.06rem;
+}
+
+.pld-row-name {
+  font-weight: 600;
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pld-row-sub {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+  min-width: 0;
+}
+
+.pld-row-artist,
+.pld-row-game {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pld-row-game:hover {
+  color: var(--accent-ink);
+  text-decoration: underline;
+}
+
+.pld-row-note {
+  font-size: 0.74rem;
+  color: var(--accent-ink);
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pld-row-year {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.16rem 0.5rem;
+  background: var(--surface-2);
+}
+
+.pld-row.current .pld-row-year {
+  color: var(--accent-ink);
+  border-color: color-mix(in srgb, var(--orange) 50%, var(--border));
+}
+
+/* --- Mode édition : liste droite, drag & drop depuis toute la carte --- */
+.pld-tracks.editing .pld-row {
+  height: auto;
+  min-height: 64px;
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+}
+
+.pld-row.grab {
+  touch-action: none;
+  cursor: grab;
+}
+
+.pld-row.grab:active {
+  cursor: grabbing;
+}
+
+.pld-row.edit.dragging {
+  opacity: 0.55;
+}
+
+/* Poignée décorative (toute la carte se drague, elle sert d'indice). */
+.pld-row-grip {
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+  opacity: 0.7;
+  margin-right: -0.3rem;
+}
+
+.pld-row-tools {
+  flex: none;
+  display: inline-flex;
+  gap: 0.3rem;
+}
+
+/* Titre + description, toujours au-dessus du CD (lecture ET édition) */
+.pld-edit-head {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  text-align: center;
+}
+
+.pld-edit-head .ld-desc-input {
+  width: 100%;
+}
+
+/* Bouton « Terminé » flottant (au-dessus du mini-lecteur s'il est ouvert) */
+.pld-done {
+  position: fixed;
+  right: 26px;
+  bottom: 26px;
+  z-index: 60;
+  box-shadow: 0 12px 30px rgba(242, 183, 11, 0.45), var(--shadow);
+}
+
+body.mpl-open .pld-done {
+  bottom: 96px;
+}
+
+/* Égaliseur figé (piste courante en pause) */
+.pld-eq.paused i {
+  animation-play-state: paused;
+}
+
+/* ======================================================================
+   Modale « Ajouter des OST » (playlist)
+   ====================================================================== */
+
+/* Barre d'outils à droite du fil d'Ariane : filtre + actions OST */
+.aost-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.aost-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 30px;
+  padding: 0 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.74rem;
+  font-weight: 600;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.aost-tool:hover,
+.aost-tool.active {
+  color: var(--accent-ink);
+  border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
+  background: color-mix(in srgb, var(--orange) 10%, var(--surface));
+}
+
+.aost-tool.danger:hover {
+  color: #e0483f;
+  border-color: color-mix(in srgb, #e0483f 55%, var(--border));
+  background: color-mix(in srgb, #e0483f 8%, var(--surface));
+}
+
+.aost-tool-count {
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.aost-filter {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 0.3rem 0.8rem;
+  min-width: 0;
+  width: 150px;
+}
+
+.aost-filter:focus {
+  outline: none;
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.aost-tracks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  max-height: 46vh;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 0.15rem 0.15rem 0.4rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.aost-track {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 13px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: border-color 0.15s ease, background 0.15s ease;
+  user-select: none;
+}
+
+.aost-track:hover {
+  border-color: var(--border-strong);
+}
+
+.aost-track.added {
+  border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
+  background: color-mix(in srgb, var(--orange) 8%, var(--surface));
+}
+
+/* Piste en cours de pré-écoute : bien identifiable */
+.aost-track.current {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 1px var(--orange);
+}
+
+.aost-track.current .aost-track-name {
+  color: var(--accent-ink);
+}
+
+.aost-track-name .pld-eq {
+  color: var(--accent-ink);
+  margin-right: 0.4rem;
+  vertical-align: -2px;
+}
+
+/* Actions par piste (renommer / retirer), visibles au survol */
+.aost-track-actions {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.aost-track-actions .aost-tool {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.aost-track:hover .aost-track-actions .aost-tool {
+  opacity: 1;
+}
+
+/* Renommage inline */
+.aost-rename-input {
+  width: 100%;
+  border: 1px solid var(--orange);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+/* Corbeille compacte (pistes retirées, restaurables) */
+.aost-trash {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.7rem;
+  margin-bottom: 0.6rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: 13px;
+  background: var(--surface-2);
+}
+
+.aost-trash-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.aost-trash-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.aost-trash-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: 220px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  padding: 0.2rem 0.6rem;
+}
+
+.aost-trash-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aost-trash-item:hover {
+  color: var(--accent-ink);
+  border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
+}
+
+.aost-trash-all {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: none;
+  background: none;
+  color: var(--accent-ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.aost-track-art {
+  position: relative;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  border: none;
+  padding: 0;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.aost-track-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.aost-track-art .aost-track-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 10, 15, 0.5);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.aost-track-art:hover .aost-track-play {
+  opacity: 1;
+}
+
+.aost-track-txt {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.aost-track-name {
+  font-weight: 600;
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aost-track-artist {
+  font-size: 0.74rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aost-track-toggle {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--text);
+  transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease;
+}
+
+.aost-track-toggle:hover {
+  transform: scale(1.08);
+}
+
+.aost-track-toggle.on {
+  background: var(--accent-grad);
+  border-color: transparent;
+  color: #1a1204;
+}
+
+/* Pré-écoute en cours : l'overlay play/pause reste visible */
+.aost-track-play.on {
+  opacity: 1;
+}
+
+/* ======================================================================
+   Modale « Vignette de la piste » (cover par OST)
+   ====================================================================== */
+
+.pld-cover-modal {
+  max-width: 640px;
+}
+
+.pld-cover-sub {
+  margin: -0.4rem 0 0.9rem;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+}
+
+.pld-cover-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.7rem;
+  max-height: 52vh;
+  overflow-y: auto;
+  padding: 0.2rem;
+  scrollbar-width: thin;
+}
+
+.pld-cover-opt {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid var(--border);
+  background: var(--surface-2);
+  padding: 0;
+  transition: border-color 0.15s ease, transform 0.12s ease;
+}
+
+.pld-cover-opt:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+}
+
+.pld-cover-opt.active {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.pld-cover-opt img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pld-cover-tag {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(10, 10, 15, 0.62);
+  border-radius: 999px;
+  padding: 0.16rem 0.5rem;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.pld-cover-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-grad);
+  color: #1a1204;
+}
+
+/* ======================================================================
+   Feed : mini-carte PlayList (CD écoutable) + badge d'évènement
+   ====================================================================== */
+
+.hf-status-badge.st-playlist {
+  color: #e0559c;
+}
+
+.hf-pl {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.65rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(120% 160% at 0% 50%, rgba(224, 85, 156, 0.08), transparent 55%),
+    var(--surface-2);
+  transition: border-color 0.15s ease, transform 0.12s ease;
+}
+
+.hf-pl:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.hf-pl-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-width: 0;
+}
+
+/* Miniatures des OST de la carte, écoutables d'un clic */
+.hf-pl-tracks {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.hf-pl-tracks::-webkit-scrollbar {
+  display: none;
+}
+
+.hf-pl-track {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  width: 76px;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--text-soft);
+}
+
+.hf-pl-track-art {
+  position: relative;
+  width: 76px;
+  height: 48px;
+  border-radius: 9px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition: border-color 0.15s ease, transform 0.12s ease;
+}
+
+.hf-pl-track:hover .hf-pl-track-art {
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+}
+
+.hf-pl-track.current .hf-pl-track-art {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 1px var(--orange);
+}
+
+.hf-pl-track.current {
+  color: var(--accent-ink);
+}
+
+.hf-pl-track-art img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hf-pl-track-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 10, 15, 0.45);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.hf-pl-track:hover .hf-pl-track-play,
+.hf-pl-track-play.on {
+  opacity: 1;
+}
+
+.hf-pl-track-name {
+  width: 100%;
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.hf-pl-track-more {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  padding: 0 0.4rem;
+}
+
+.hf-pl-cd {
+  flex: none;
+  position: relative;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  padding: 3px;
+  background: conic-gradient(
+    from 40deg,
+    #b9bcc6,
+    #f2f3f7 14%,
+    #9a9daf 30%,
+    #e8e9ef 48%,
+    #a7aab8 64%,
+    #f0f1f5 82%,
+    #b9bcc6
+  );
+  box-shadow: 0 6px 14px rgba(20, 20, 40, 0.22);
+}
+
+.hf-pl-cd-face {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--text-soft);
+}
+
+.hf-pl-cd.spinning .hf-pl-cd-face {
+  animation: pld-spin 4.5s linear infinite;
+}
+
+.hf-pl-cd-face img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hf-pl-cd-grooves {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-radial-gradient(
+    circle at 50% 50%,
+    rgba(255, 255, 255, 0.06) 0 1px,
+    rgba(0, 0, 0, 0.14) 1px 2.5px
+  );
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+.hf-pl-cd-hole {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20%;
+  aspect-ratio: 1 / 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--surface-2);
+  box-shadow:
+    inset 0 0 0 2px rgba(0, 0, 0, 0.22),
+    0 0 0 2px rgba(255, 255, 255, 0.28);
+  pointer-events: none;
+}
+
+.hf-pl-info {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.hf-pl-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #e0559c;
+}
+
+.hf-pl-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  font-size: 0.98rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hf-pl-title .pld-eq {
+  color: var(--accent-ink);
+  flex: none;
+}
+
+.hf-pl-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+
+.hf-pl-play {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent-grad);
+  color: #1a1204;
+  box-shadow: 0 6px 16px rgba(242, 183, 11, 0.38);
+  transition: transform 0.12s ease;
+}
+
+.hf-pl-play:hover {
+  transform: scale(1.08);
+}
+
+/* ======================================================================
+   Profil — onglet OST : sous-onglets « OST favorites / Playlists »
+   ====================================================================== */
+
+.pfo-views {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.pfo-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  font-weight: 700;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.pfo-view:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.pfo-view.active {
+  color: var(--accent-ink);
+  border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
+  background: color-mix(in srgb, var(--orange) 10%, var(--surface));
+}
+
+/* ======================================================================
+   Mini-lecteur : lien de retour vers la playlist en cours
+   ====================================================================== */
+
+/* La barre est une grid (disque | méta | contrôles | seek | fermer) : on
+   intercale le lien source avant le bouton fermer. */
+.mini-player:has(.mp-source) {
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(140px, 1.4fr) auto auto;
+}
+
+.mp-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 180px;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--orange) 45%, var(--border));
+  background: color-mix(in srgb, var(--orange) 9%, var(--surface));
+  color: var(--accent-ink);
+  font-size: 0.76rem;
+  font-weight: 700;
+  flex: none;
+  transition: background 0.15s ease;
+}
+
+.mp-source:hover {
+  background: color-mix(in srgb, var(--orange) 16%, var(--surface));
+}
+
+.mp-source-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .mp-source-label {
+    display: none;
+  }
+
+  .mp-source {
+    padding: 0.3rem 0.45rem;
+  }
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 980px) {
+  .pld-main {
+    grid-template-columns: 1fr;
+    gap: 1.4rem;
+  }
+
+  .pld-left {
+    position: static;
+  }
+
+  .pld-tracks.arc,
+  .pld-tracks.arc.deep {
+    max-height: none;
+    overflow: visible;
+    padding-right: 4px;
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+
+  /* Sans scène scrollable, pas d'arc : les rangées restent alignées. */
+  .pld-tracks.arc .pld-row {
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}

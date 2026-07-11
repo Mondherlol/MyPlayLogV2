@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Search,
@@ -10,6 +11,11 @@ import {
   ArrowDownWideNarrow,
   ArrowUpWideNarrow,
   Gamepad2,
+  Joystick,
+  Cloud,
+  Disc,
+  Eye,
+  Check,
 } from "lucide-react";
 import { loadFilters } from "../lib/filters";
 import { useAuth } from "../context/AuthContext";
@@ -33,6 +39,42 @@ const SORTS = [
   { value: "name", label: "Nom" },
 ];
 
+// Format d'achat sur console (démat / boîte) — libellé + icône sur les cartes.
+const FORMAT_META = {
+  digital: { label: "Démat", Icon: Cloud },
+  physical: { label: "Physique", Icon: Disc },
+};
+
+// Infos affichables sur les cartes de jeu — cochables via la modale « Affichage ».
+// La préférence est mémorisée localement (elle n'a pas à vivre dans l'URL).
+const CARD_FIELDS = [
+  { key: "status", label: "Statut", Icon: Gamepad2 },
+  { key: "rating", label: "Note", Icon: Star },
+  { key: "favorite", label: "Favori", Icon: Heart },
+  { key: "platform", label: "Console jouée", Icon: Joystick },
+  { key: "format", label: "Digital / Physique", Icon: Disc },
+  { key: "playtime", label: "Temps de jeu", Icon: Clock },
+];
+const DEFAULT_FIELDS = {
+  status: true,
+  rating: true,
+  favorite: true,
+  platform: false,
+  format: false,
+  playtime: true,
+};
+const FIELDS_KEY = "mpl_pg_cardfields";
+
+function loadCardFields() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(FIELDS_KEY));
+    if (raw && typeof raw === "object") return { ...DEFAULT_FIELDS, ...raw };
+  } catch {
+    /* ignore */
+  }
+  return { ...DEFAULT_FIELDS };
+}
+
 const EMPTY = { ids: [], mode: "or" };
 
 function matchCat(entryIds, sel) {
@@ -43,8 +85,14 @@ function matchCat(entryIds, sel) {
     : sel.ids.some((id) => arr.includes(id));
 }
 
-function GameTile({ entry }) {
+function GameTile({ entry, fields }) {
   const navigate = useNavigate();
+  const fmt = FORMAT_META[entry.format] || FORMAT_META.digital;
+  // Le format (démat/boîte) n'a de sens qu'avec une console renseignée.
+  const showFormat = fields.format && !!entry.platform;
+  const showPlatform = fields.platform && !!entry.platform;
+  const showPlaytime = fields.playtime && entry.playtimeHours != null;
+  const hasMeta = showPlaytime || showPlatform || showFormat;
   return (
     <div
       className="pg-tile clickable"
@@ -59,27 +107,86 @@ function GameTile({ entry }) {
             <Gamepad2 size={26} />
           </div>
         )}
-        {entry.favorite && (
+        {fields.favorite && entry.favorite && (
           <span className="pg-tile-fav">
             <Star size={12} fill="currentColor" strokeWidth={0} />
           </span>
         )}
-        {entry.rating != null && <span className="pg-tile-rating">{entry.rating}</span>}
-        <span className={`pg-tile-status s-${entry.status}`}>
-          {STATUS_LABEL[entry.status]}
-        </span>
+        {fields.rating && entry.rating != null && (
+          <span className="pg-tile-rating">{entry.rating}</span>
+        )}
+        {fields.status && (
+          <span className={`pg-tile-status s-${entry.status}`}>
+            {STATUS_LABEL[entry.status]}
+          </span>
+        )}
         <GameAddFan
           game={{ id: entry.gameId, name: entry.name, cover: entry.cover }}
           hoverOnly
         />
       </div>
       <span className="pg-tile-name">{entry.name}</span>
-      {entry.playtimeHours != null && (
-        <span className="pg-tile-time">
-          <Clock size={12} /> {entry.playtimeHours} h
-        </span>
+      {hasMeta && (
+        <div className="pg-tile-meta">
+          {showPlaytime && (
+            <span className="pg-tile-chip">
+              <Clock size={12} /> {entry.playtimeHours} h
+            </span>
+          )}
+          {showPlatform && (
+            <span className="pg-tile-chip">
+              <Joystick size={12} /> {entry.platform}
+            </span>
+          )}
+          {showFormat && (
+            <span className="pg-tile-chip">
+              <fmt.Icon size={12} /> {fmt.label}
+            </span>
+          )}
+        </div>
       )}
     </div>
+  );
+}
+
+// Modale « Affichage » : coche les infos visibles sur les cartes.
+function CardFieldsModal({ fields, onToggle, onClose }) {
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  return createPortal(
+    <div className="modal-overlay" onMouseDown={onClose}>
+      <div className="modal pg-fields-modal" onMouseDown={(e) => e.stopPropagation()}>
+        <button className="modal-close clickable" onClick={onClose} aria-label="Fermer">
+          <X size={20} />
+        </button>
+        <h3 className="pg-fields-title">
+          <Eye size={17} /> Infos sur les cartes
+        </h3>
+        <p className="pg-fields-sub">Choisis ce qui s'affiche sur chaque jeu.</p>
+        <div className="pg-fields-list">
+          {CARD_FIELDS.map((f) => (
+            <button
+              key={f.key}
+              className={`pg-field-row clickable ${fields[f.key] ? "on" : ""}`}
+              onClick={() => onToggle(f.key)}
+            >
+              <span className="pg-field-check">{fields[f.key] && <Check size={14} />}</span>
+              <f.Icon size={15} />
+              <span>{f.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -90,6 +197,8 @@ const catFromParam = (sp, idsKey, modeKey) => ({
   ids: csvNums(sp.get(idsKey)),
   mode: sp.get(modeKey) === "and" ? "and" : "or",
 });
+// Listes de chaînes (consoles jouées) : séparateur « | » (absent des noms).
+const pipeList = (s) => (s ? s.split("|").filter(Boolean) : []);
 
 export default function ProfileAllGames({ library, onOpen }) {
   const { token } = useAuth();
@@ -105,9 +214,27 @@ export default function ProfileAllGames({ library, onOpen }) {
     () => (searchParams.get("rop") === "lte" ? "lte" : "gte")
   ); // "gte" (≥) | "lte" (≤)
   const [ratingVal, setRatingVal] = useState(() => searchParams.get("rv") || ""); // "" = toutes les notes
+  // Console réellement jouée (entry.platform), format d'achat et temps de jeu.
+  const [playedPlats, setPlayedPlats] = useState(
+    () => new Set(pipeList(searchParams.get("pf")))
+  );
+  // Format : un seul à la fois (démat OU boîte OU aucun).
+  const [format, setFormat] = useState(() => {
+    const f = searchParams.get("fmt");
+    return f === "digital" || f === "physical" ? f : "";
+  });
+  const [ptOp, setPtOp] = useState(() => (searchParams.get("ptop") === "lte" ? "lte" : "gte"));
+  const [ptVal, setPtVal] = useState(() => searchParams.get("ptv") || "");
   const [sort, setSort] = useState(() => searchParams.get("sort") || "recent");
   const [dir, setDir] = useState(() => searchParams.get("dir") || "desc");
   const [panelOpen, setPanelOpen] = useState(false);
+
+  // Infos affichées sur les cartes (préférence locale) + modale de réglage.
+  const [fields, setFields] = useState(loadCardFields);
+  const [fieldsOpen, setFieldsOpen] = useState(false);
+  useEffect(() => {
+    localStorage.setItem(FIELDS_KEY, JSON.stringify(fields));
+  }, [fields]);
 
   const [opts, setOpts] = useState({ platforms: [], genres: [], modes: [], themes: [] });
   const [filters, setFilters] = useState(() => ({
@@ -121,6 +248,15 @@ export default function ProfileAllGames({ library, onOpen }) {
     loadFilters(token).then(setOpts).catch(() => {});
   }, [token]);
 
+  // Consoles réellement jouées présentes dans la bibliothèque (pour les chips).
+  const playedPlatformOptions = useMemo(
+    () =>
+      [...new Set(library.map((e) => e.platform).filter(Boolean))].sort((a, b) =>
+        a.localeCompare(b, "fr")
+      ),
+    [library]
+  );
+
   // Réécrit l'état des filtres dans l'URL (replace : pas d'entrée d'historique
   // par frappe). On ne touche qu'à nos clés, les autres (tab, lf…) sont conservées.
   useEffect(() => {
@@ -133,6 +269,10 @@ export default function ProfileAllGames({ library, onOpen }) {
         set("fav", favOnly ? "1" : "");
         set("rv", ratingVal);
         set("rop", ratingVal !== "" && ratingOp === "lte" ? "lte" : "");
+        set("pf", [...playedPlats].join("|"));
+        set("fmt", format);
+        set("ptv", ptVal);
+        set("ptop", ptVal !== "" && ptOp === "lte" ? "lte" : "");
         set("sort", sort !== "recent" ? sort : "");
         set("dir", dir !== "desc" ? dir : "");
         set("plat", filters.platform.ids.join(","));
@@ -147,7 +287,21 @@ export default function ProfileAllGames({ library, onOpen }) {
       },
       { replace: true }
     );
-  }, [search, statuses, favOnly, ratingOp, ratingVal, sort, dir, filters, setSearchParams]);
+  }, [
+    search,
+    statuses,
+    favOnly,
+    ratingOp,
+    ratingVal,
+    playedPlats,
+    format,
+    ptOp,
+    ptVal,
+    sort,
+    dir,
+    filters,
+    setSearchParams,
+  ]);
 
   function toggleStatus(key) {
     setStatuses((prev) => {
@@ -156,6 +310,18 @@ export default function ProfileAllGames({ library, onOpen }) {
       else next.add(key);
       return next;
     });
+  }
+  // Bascule d'une valeur dans un Set de filtre (console jouée, format).
+  function toggleInSet(setter, key) {
+    setter((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+  function toggleField(key) {
+    setFields((prev) => ({ ...prev, [key]: !prev[key] }));
   }
   function toggleOption(key, id) {
     setFilters((prev) => {
@@ -181,6 +347,14 @@ export default function ProfileAllGames({ library, onOpen }) {
         if (e.rating == null) return false;
         if (ratingOp === "gte" ? e.rating < n : e.rating > n) return false;
       }
+      if (playedPlats.size && !playedPlats.has(e.platform)) return false;
+      // Le format ne concerne que les jeux joués sur une console renseignée.
+      if (format && (!e.platform || (e.format || "digital") !== format)) return false;
+      if (ptVal !== "") {
+        const n = Number(ptVal);
+        if (e.playtimeHours == null) return false;
+        if (ptOp === "gte" ? e.playtimeHours < n : e.playtimeHours > n) return false;
+      }
       if (!matchCat(e.platforms, filters.platform)) return false;
       if (!matchCat(e.genres, filters.genre)) return false;
       if (!matchCat(e.modes, filters.gameMode)) return false;
@@ -204,7 +378,21 @@ export default function ProfileAllGames({ library, onOpen }) {
       return (av - bv) * mul;
     });
     return list;
-  }, [library, search, statuses, favOnly, ratingOp, ratingVal, filters, sort, dir]);
+  }, [
+    library,
+    search,
+    statuses,
+    favOnly,
+    ratingOp,
+    ratingVal,
+    playedPlats,
+    format,
+    ptOp,
+    ptVal,
+    filters,
+    sort,
+    dir,
+  ]);
 
   const catCount =
     filters.platform.ids.length +
@@ -212,7 +400,13 @@ export default function ProfileAllGames({ library, onOpen }) {
     filters.gameMode.ids.length +
     filters.theme.ids.length;
   const activeCount =
-    statuses.size + (favOnly ? 1 : 0) + (ratingVal !== "" ? 1 : 0) + catCount;
+    statuses.size +
+    (favOnly ? 1 : 0) +
+    (ratingVal !== "" ? 1 : 0) +
+    playedPlats.size +
+    (format ? 1 : 0) +
+    (ptVal !== "" ? 1 : 0) +
+    catCount;
 
   function resetAll() {
     setSearch("");
@@ -220,6 +414,10 @@ export default function ProfileAllGames({ library, onOpen }) {
     setFavOnly(false);
     setRatingOp("gte");
     setRatingVal("");
+    setPlayedPlats(new Set());
+    setFormat("");
+    setPtOp("gte");
+    setPtVal("");
     setSort("recent");
     setDir("desc");
     setFilters({
@@ -329,6 +527,94 @@ export default function ProfileAllGames({ library, onOpen }) {
           </div>
         </div>
 
+        {/* Console réellement jouée (renseignée sur l'entrée) */}
+        {playedPlatformOptions.length > 0 && (
+          <div className="pg-filter-block">
+            <label className="pg-filter-label">
+              <Joystick size={13} style={{ verticalAlign: "-2px" }} /> Console jouée
+            </label>
+            <div className="pg-chips pg-chips-scroll">
+              {playedPlatformOptions.map((p) => (
+                <button
+                  key={p}
+                  className={`pg-chip clickable ${playedPlats.has(p) ? "active" : ""}`}
+                  onClick={() => toggleInSet(setPlayedPlats, p)}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Format d'achat (démat / boîte) — un seul à la fois, ou aucun */}
+        <div className="pg-filter-block">
+          <label className="pg-filter-label">
+            <Disc size={13} style={{ verticalAlign: "-2px" }} /> Format
+          </label>
+          <div className="pg-format-row">
+            <button
+              className={`pg-chip clickable ${format === "digital" ? "active" : ""}`}
+              onClick={() => setFormat((f) => (f === "digital" ? "" : "digital"))}
+            >
+              <Cloud size={13} />
+              Digital
+            </button>
+            <button
+              className={`pg-chip clickable ${format === "physical" ? "active" : ""}`}
+              onClick={() => setFormat((f) => (f === "physical" ? "" : "physical"))}
+            >
+              <Disc size={13} />
+              Physique
+            </button>
+          </div>
+        </div>
+
+        {/* Temps de jeu (en heures) */}
+        <div className="pg-filter-block">
+          <label className="pg-filter-label">
+            <Clock size={13} style={{ verticalAlign: "-2px" }} /> Temps de jeu
+          </label>
+          <div className="pg-rating-filter">
+            <div className="pg-rating-ops">
+              <button
+                type="button"
+                className={`pg-rating-op clickable ${ptOp === "gte" ? "active" : ""}`}
+                onClick={() => setPtOp("gte")}
+                title="Au moins"
+              >
+                ≥
+              </button>
+              <button
+                type="button"
+                className={`pg-rating-op clickable ${ptOp === "lte" ? "active" : ""}`}
+                onClick={() => setPtOp("lte")}
+                title="Au plus"
+              >
+                ≤
+              </button>
+            </div>
+            <input
+              type="number"
+              className="pg-rating-input"
+              min="0"
+              placeholder="Heures"
+              value={ptVal}
+              onChange={(e) => setPtVal(e.target.value.replace(/[^0-9]/g, ""))}
+            />
+            {ptVal !== "" && (
+              <button
+                type="button"
+                className="pg-rating-clear clickable"
+                onClick={() => setPtVal("")}
+                title="Tous les temps de jeu"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
+
         <FilterSection
           title="Console"
           options={opts.platforms}
@@ -398,6 +684,13 @@ export default function ProfileAllGames({ library, onOpen }) {
               {dir === "desc" ? <ArrowDownWideNarrow size={18} /> : <ArrowUpWideNarrow size={18} />}
             </button>
           </div>
+          <button
+            className="pg-fields-btn clickable"
+            onClick={() => setFieldsOpen(true)}
+            title="Choisir les infos affichées sur les cartes"
+          >
+            <Eye size={16} /> Affichage
+          </button>
           <button className="pg-filter-toggle clickable" onClick={() => setPanelOpen((v) => !v)}>
             <SlidersHorizontal size={16} /> Filtres
             {activeCount > 0 && <span className="filter-count">{activeCount}</span>}
@@ -413,11 +706,19 @@ export default function ProfileAllGames({ library, onOpen }) {
         ) : (
           <div className="pg-grid">
             {filtered.map((e) => (
-              <GameTile key={e.gameId} entry={e} />
+              <GameTile key={e.gameId} entry={e} fields={fields} />
             ))}
           </div>
         )}
       </div>
+
+      {fieldsOpen && (
+        <CardFieldsModal
+          fields={fields}
+          onToggle={toggleField}
+          onClose={() => setFieldsOpen(false)}
+        />
+      )}
     </div>
   );
 }
