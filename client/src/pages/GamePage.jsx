@@ -779,6 +779,11 @@ export default function GamePage() {
               ))}
             </nav>
 
+            {/* Enveloppe des onglets : une hauteur minimale évite que la page se
+                « ratatine » pendant qu'un onglet asynchrone charge (spinner court).
+                Sinon le document rétrécit d'un coup et le navigateur ramène le
+                scroll tout en haut (on repasse au-dessus des onglets collés). */}
+            <div className="gp-tabpanel">
             {tab === "related" && (
               <GameRelated key={id} gameId={id} token={token} game={game} />
             )}
@@ -835,6 +840,7 @@ export default function GamePage() {
                 favoriteName={fav?.favoriteCharacter?.name}
               />
             )}
+            </div>
           </div>
         </div>
       </div>

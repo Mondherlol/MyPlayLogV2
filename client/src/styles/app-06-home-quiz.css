@@ -4900,6 +4900,14 @@
   display: none;
 }
 
+/* Contenu des onglets : hauteur plancher = ce qui reste sous les onglets collés.
+   Ainsi, quand on bascule vers un onglet qui charge (spinner court), la page ne
+   rétrécit pas d'un coup — le scroll reste calé sous les onglets au lieu de
+   remonter tout en haut de la fiche. */
+.gp-tabpanel {
+  min-height: calc(100dvh - var(--topbar-h, 60px) - 4rem);
+}
+
 .gp-tab {
   position: relative;
   display: inline-flex;
