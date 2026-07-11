@@ -67,6 +67,15 @@
   display: none;
 }
 
+/* Mobile : la barre d'onglets collée prend toute la largeur de l'écran plutôt
+   que de laisser le fond de page dépasser sur les côtés. */
+@media (max-width: 760px) {
+  .lists-tabs {
+    margin-inline: calc(-1 * var(--content-pad, 1.2rem));
+    padding-inline: var(--content-pad, 1.2rem);
+  }
+}
+
 .lists-tab {
   border: none;
   background: none;

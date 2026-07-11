@@ -194,6 +194,11 @@
 /* --- Fil d'actualité --- */
 .hf-feed {
   display: grid;
+  /* minmax(0, 1fr) : la colonne est bornée à la largeur du conteneur. Sans ça,
+     la colonne implicite est en `auto` et se cale sur le max-content de la
+     carte la PLUS large ; dès qu'une carte chargée au scroll a un contenu large,
+     TOUTES les cartes s'élargissent et débordent à droite. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
   min-width: 0;
 }
@@ -6543,6 +6548,13 @@
 
   .gp-gauges {
     justify-content: flex-start;
+  }
+
+  /* La barre d'onglets collée prend toute la largeur de l'écran (compense le
+     padding de .gp-sheet) plutôt que de laisser voir le fond sur les côtés. */
+  .gp-tabs {
+    margin-inline: calc(-1 * clamp(1.1rem, 3vw, 2.2rem));
+    padding-inline: clamp(1.1rem, 3vw, 2.2rem);
   }
 }
 

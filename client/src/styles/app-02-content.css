@@ -3802,6 +3802,16 @@
   cursor: not-allowed;
 }
 
+/* Mobile : la barre d'onglets collée prend toute la largeur de l'écran (le fond
+   déborde jusqu'aux bords) au lieu de laisser voir la page sur les côtés. Les
+   boutons restent alignés au contenu grâce au padding compensatoire. */
+@media (max-width: 760px) {
+  .profile-tabs {
+    margin-inline: calc(-1 * var(--content-pad, 1.2rem));
+    padding-inline: var(--content-pad, 1.2rem);
+  }
+}
+
 /* Sections */
 .profile-section {
   margin-bottom: 1.8rem;
