@@ -12,10 +12,6 @@ import {
   UserPlus,
   UserCheck,
   Loader2,
-  Lock,
-  Globe,
-  Trash2,
-  MessageCircle,
   MessageSquareText,
   LayoutGrid,
   List,
@@ -33,7 +29,7 @@ import { apiFetch, apiUpload } from "../lib/api";
 import { makeCache } from "../lib/cache";
 import { useAuth } from "../context/AuthContext";
 import { useLibrary } from "../context/LibraryContext";
-import { typeMeta, timeAgo } from "../lib/lists";
+import { timeAgo } from "../lib/lists";
 import PlayedModal from "../components/PlayedModal";
 import AddGameModal from "../components/AddGameModal";
 import ProfileAllGames from "../components/ProfileAllGames";
@@ -44,6 +40,7 @@ import ProfileFeed from "../components/ProfileFeed";
 import ProfileRecommendations from "../components/ProfileRecommendations";
 import ProfileVideos from "../components/ProfileVideos";
 import ProfileStats from "../components/ProfileStats";
+import ProfileLists from "../components/ProfileLists";
 import EditProfileModal from "../components/EditProfileModal";
 import CoverPickerModal from "../components/CoverPickerModal";
 import ReframeCoverModal from "../components/ReframeCoverModal";
@@ -66,19 +63,6 @@ function escapeHtml(s) {
 function twemojiHtml(text) {
   return { __html: twemoji.parse(escapeHtml(text), { folder: "svg", ext: ".svg" }) };
 }
-
-// Sous-onglets de filtrage de l'onglet « Listes » (par type).
-const LIST_FILTERS = [
-  { key: "all", label: "Toutes", Icon: LayoutGrid },
-  { key: "classic", label: "Listes", Icon: typeMeta("classic").Icon },
-  { key: "ranked", label: "Classées", Icon: typeMeta("ranked").Icon },
-  { key: "tier", label: "Tier lists", Icon: typeMeta("tier").Icon },
-];
-
-const LIST_SORTS = [
-  { key: "recent", label: "Plus récentes" },
-  { key: "liked", label: "Plus aimées" },
-];
 
 // Bandeau défilant "TV Time" : les infos glissent en boucle.
 function Marquee({ facts }) {
@@ -124,76 +108,6 @@ function Presence({ lastSeenAt }) {
   );
 }
 
-function ProfileListCard({ list, isMe, onDelete }) {
-  const meta = typeMeta(list.type);
-  return (
-    <Link to={`/lists/${list.id}`} className="list-card clickable">
-      {isMe && (
-        <button
-          className="list-card-del clickable"
-          title="Supprimer la liste"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onDelete(list);
-          }}
-        >
-          <Trash2 size={15} />
-        </button>
-      )}
-      {list.cover ? (
-        <div className="list-preview has-cover">
-          <img className="list-preview-img" src={list.cover} alt="" loading="lazy" draggable="false" />
-        </div>
-      ) : (
-        <div className={`list-preview ${list.preview?.length ? "" : "empty"}`}>
-          {list.preview?.length ? (
-            list.preview.map((src, i) => (
-              <span className="list-preview-cover" key={i} style={{ "--i": i }}>
-                <img src={src} alt="" loading="lazy" draggable="false" />
-              </span>
-            ))
-          ) : (
-            <meta.Icon size={30} />
-          )}
-        </div>
-      )}
-      <div className="list-card-body">
-        <div className="list-card-badges">
-          <span className={`list-type-badge t-${list.type}`}>
-            <meta.Icon size={13} /> {meta.label}
-          </span>
-          {isMe ? (
-            <span className={`list-vis-badge ${list.visibility}`}>
-              {list.visibility === "private" ? (
-                <><Lock size={12} /> Privée</>
-              ) : (
-                <><Globe size={12} /> Publique</>
-              )}
-            </span>
-          ) : (
-            list.visibility === "private" && (
-              <span className="list-priv-badge" title="Privée">
-                <Lock size={12} />
-              </span>
-            )
-          )}
-        </div>
-        <h3 className="list-card-title">{list.title}</h3>
-        <div className="list-card-foot">
-          <span className={`list-stat ${list.liked ? "liked" : ""}`}>
-            <Heart size={14} fill={list.liked ? "currentColor" : "none"} /> {list.likeCount}
-          </span>
-          <span className="list-stat">
-            <MessageCircle size={14} /> {list.commentCount}
-          </span>
-          <span className="list-stat time">màj {timeAgo(list.updatedAt)}</span>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
 export default function Profile() {
   const { username: routeUsername } = useParams();
   const { user, token, updateUser } = useAuth();
@@ -207,8 +121,6 @@ export default function Profile() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get("tab") || "overview";
   const openOst = searchParams.get("ost"); // deep-link : ouvre le fil d'une OST
-  const listFilter = searchParams.get("lf") || "all";
-  const listSort = searchParams.get("ls") || "recent";
   const setParam = (key, value, def) =>
     setSearchParams(
       (prev) => {
@@ -220,8 +132,6 @@ export default function Profile() {
       { replace: true }
     );
   const setTab = (t) => setParam("tab", t, "overview");
-  const setListFilter = (v) => setParam("lf", v, "all");
-  const setListSort = (v) => setParam("ls", v, "recent");
   // Bascule vers l'onglet « Tous les jeux » avec des filtres pré-appliqués
   // (depuis les cartes « Voir le reste » de l'aperçu). On repart d'un jeu de
   // filtres propre pour ne pas mélanger avec une recherche précédente.
@@ -470,13 +380,6 @@ export default function Profile() {
   const { favorites, library, lists } = data;
   const c = profile.counts;
   const ostCount = library.filter((e) => e.favoriteOst?.name).length;
-  const shownLists = (listFilter === "all" ? lists : lists.filter((l) => l.type === listFilter))
-    .slice()
-    .sort((a, b) =>
-      listSort === "liked"
-        ? b.likeCount - a.likeCount
-        : new Date(b.updatedAt) - new Date(a.updatedAt)
-    );
   const openGame = (e, opts) =>
     setModalGame({ id: e.gameId, name: e.name, cover: e.cover, openReview: !!opts?.review });
 
@@ -723,70 +626,7 @@ export default function Profile() {
 
       {/* ---------- Listes ---------- */}
       {tab === "lists" && (
-        <section className="profile-section">
-          {lists.length === 0 ? (
-            <div className="profile-empty font-fun">
-              {isMe ? (
-                <>
-                  Aucune liste pour l'instant.{" "}
-                  <Link to="/lists" className="pf-inline-link">En créer une</Link>
-                </>
-              ) : (
-                "Aucune liste publique."
-              )}
-            </div>
-          ) : (
-            <>
-              <div className="act-head">
-                <div className="act-subtabs">
-                  {LIST_FILTERS.map((f) => {
-                    const n =
-                      f.key === "all"
-                        ? lists.length
-                        : lists.filter((l) => l.type === f.key).length;
-                    return (
-                      <button
-                        key={f.key}
-                        className={`act-subtab clickable ${listFilter === f.key ? "active" : ""}`}
-                        onClick={() => setListFilter(f.key)}
-                      >
-                        <f.Icon size={16} /> {f.label}
-                        <span className="act-subtab-count">{n}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="act-head-tools">
-                  <label className="act-sort">
-                    <span className="act-sort-label">Trier</span>
-                    <select value={listSort} onChange={(e) => setListSort(e.target.value)}>
-                      {LIST_SORTS.map((o) => (
-                        <option key={o.key} value={o.key}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              </div>
-
-              {shownLists.length === 0 ? (
-                <div className="profile-empty font-fun">Aucune liste de ce type.</div>
-              ) : (
-                <div className="lists-grid">
-                  {shownLists.map((l) => (
-                    <ProfileListCard
-                      key={l.id}
-                      list={l}
-                      isMe={isMe}
-                      onDelete={deleteList}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </section>
+        <ProfileLists lists={lists} isMe={isMe} onDelete={deleteList} />
       )}
 
       {/* ---------- OST favorites ---------- */}

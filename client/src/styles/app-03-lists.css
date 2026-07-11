@@ -314,8 +314,247 @@
 }
 
 .list-card-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
   color: var(--accent-ink);
   font-weight: 600;
+}
+
+/* Photo de profil de l'auteur (pastille ronde, initiale en repli). */
+.list-author-pp {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.62rem;
+  line-height: 1;
+}
+
+.list-author-pp img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---------- Aperçu « liste classée » : éventail à podium masqué ----------
+   Les 3 premiers sont des médailles (le gagnant reste secret), les suivants
+   des jaquettes qui s'étalent derrière. Positions pilotées en JS via --x /
+   --rot / --y / --sc, pour un éventail symétrique quel que soit le nombre. */
+.list-preview.ranked {
+  padding: 0;
+  background:
+    radial-gradient(120% 80% at 50% 116%, rgba(242, 183, 11, 0.16), transparent 60%),
+    linear-gradient(180deg, var(--surface-2), var(--surface));
+}
+
+.rk-fan {
+  position: absolute;
+  inset: 0;
+}
+
+.rk-card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 66px;
+  aspect-ratio: 3 / 4;
+  border-radius: 10px;
+  /* --spread (écartement) / --lift (soulèvement) / --pop (grossissement) sont
+     hérités de .rk-fan et animés au survol de la carte. */
+  transform: translate(-50%, -50%)
+    translate(calc(var(--x, 0) * var(--spread, 1)), calc(var(--y, 0) - var(--lift, 0px)))
+    rotate(var(--rot, 0)) scale(calc(var(--sc, 1) * var(--pop, 1)));
+  transform-origin: center bottom;
+  transition: transform 0.3s cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+/* Épanouissement au survol : l'éventail s'ouvre et se soulève. */
+.list-card:hover .rk-fan {
+  --spread: 1.14;
+  --lift: 8px;
+}
+
+/* La carte du 1er ressort un peu plus. */
+.list-card:hover .rk-card.first {
+  --pop: 1.1;
+}
+
+/* Toutes les cartes : la jaquette du jeu */
+.rk-card {
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1.5px solid var(--surface);
+  box-shadow: 0 8px 18px rgba(20, 20, 40, 0.3);
+}
+
+.rk-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Podium masqué (top 3) : jaquette floutée + « ? » pour garder le suspense. */
+.rk-card.hidden img {
+  filter: blur(7px) brightness(0.72) saturate(1.15);
+  transform: scale(1.18);
+}
+
+.rk-q {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 1.9rem;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+  z-index: 1;
+}
+
+/* Badge de rang, posé du côté non recouvert de la carte. */
+.rk-no {
+  position: absolute;
+  top: 5px;
+  z-index: 2;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 0.28rem;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: rgba(10, 10, 15, 0.72);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.74rem;
+  line-height: 1;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.32);
+}
+
+.rk-no-left {
+  left: 5px;
+}
+.rk-no-right {
+  right: 5px;
+}
+.rk-no-center {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Couleurs podium (or / argent / bronze) sur les trois premiers rangs. */
+.rk-no.p-1 {
+  background: linear-gradient(135deg, #ffe491, #e6a70a);
+  color: #2a1e02;
+}
+.rk-no.p-2 {
+  background: linear-gradient(135deg, #eef1f6, #b6bcc9);
+  color: #23262e;
+}
+.rk-no.p-3 {
+  background: linear-gradient(135deg, #efb488, #c47a3d);
+  color: #2a1602;
+}
+
+/* Pastille « + N » (jeux au-delà de l'aperçu). */
+.rk-more {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  z-index: 25;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(14, 15, 20, 0.62);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.72rem;
+  line-height: 1;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+/* ---------- Aperçu « tier list » : mini-grille de paliers ---------- */
+.list-preview.tier {
+  padding: 0;
+}
+
+.ltp-grid {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.ltp-row {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  flex: 1;
+  min-height: 0;
+}
+
+.ltp-label {
+  flex: none;
+  width: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--tier, #888) 88%, #000 4%);
+  color: #1a1204;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.86rem;
+  line-height: 1;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.25);
+}
+
+.ltp-cells {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 3px;
+  overflow: hidden;
+  padding: 1px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--tier, #888) 12%, var(--surface));
+}
+
+.ltp-cell {
+  flex: none;
+  height: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface-2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.list-card:hover .ltp-cell {
+  transform: translateY(-2px);
+}
+
+.ltp-cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .list-card-foot {

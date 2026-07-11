@@ -2,13 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, Users, Sparkles } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import RepostCommentsModal from "./RepostCommentsModal";
+import VideoCommentsModal from "./VideoCommentsModal";
+import VideoPlayerModal from "./VideoPlayerModal";
 import GemsFeedModal from "./GemsFeedModal";
-import {
-  FeedCard,
-  FanartLightbox,
-  VideoLightbox,
-  FeedCardsSkeleton,
-} from "./FeedCards";
+import { FeedCard, FanartLightbox, FeedCardsSkeleton } from "./FeedCards";
 
 // Rangée d'avatars des joueurs suivis : filtre le fil sur UN joueur (clic),
 // re-clic sur l'actif → retour à tout le monde. Affichée à droite du titre
@@ -66,8 +63,9 @@ export default function HomeFeed({ token, me, filterUser = null }) {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [lightbox, setLightbox] = useState(null); // repost affiché en grand
-  const [playing, setPlaying] = useState(null); // documentaire en lecture
+  const [playing, setPlaying] = useState(null); // vidéo en lecture (objet video)
   const [commentsFor, setCommentsFor] = useState(null); // repost → modale commentaires
+  const [commentsForVideo, setCommentsForVideo] = useState(null); // vidéo → modale
   const [gemsFor, setGemsFor] = useState(null); // découverte de pépites → modale liste
   const sentinelRef = useRef(null);
   // Refs miroirs pour que l'observer (créé une fois) lise l'état courant.
@@ -135,6 +133,51 @@ export default function HomeFeed({ token, me, filterUser = null }) {
       )
     );
 
+  const patchVideo = (id, patch) =>
+    setItems((list) =>
+      list.map((i) => (i.id === id ? { ...i, video: { ...i.video, ...patch } } : i))
+    );
+
+  // Like optimiste d'une vidéo recommandée.
+  async function toggleVideoLike(item) {
+    const v = item.video;
+    const was = { liked: v.liked, likeCount: v.likeCount };
+    patchVideo(item.id, { liked: !v.liked, likeCount: (v.likeCount || 0) + (v.liked ? -1 : 1) });
+    try {
+      const d = await apiFetch(`/videos/${v.id}/like`, { method: "POST", token });
+      patchVideo(item.id, { liked: d.liked, likeCount: d.likeCount });
+    } catch {
+      patchVideo(item.id, was);
+    }
+  }
+
+  // « Regarder plus tard » : bascule la vidéo dans MA liste privée.
+  async function toggleVideoLater(item) {
+    const v = item.video;
+    const was = v.later;
+    patchVideo(item.id, { later: !was });
+    try {
+      const d = await apiFetch("/videos/later", {
+        method: "POST",
+        token,
+        body: {
+          video: {
+            videoId: v.videoId,
+            title: v.title,
+            author: v.author,
+            thumb: v.thumb,
+            duration: v.duration,
+            gameId: item.game?.id || null,
+            gameName: item.game?.name || null,
+          },
+        },
+      });
+      patchVideo(item.id, { later: d.later });
+    } catch {
+      patchVideo(item.id, { later: was });
+    }
+  }
+
   // Like optimiste d'une republication.
   async function toggleLike(item) {
     const r = item.repost;
@@ -200,11 +243,16 @@ export default function HomeFeed({ token, me, filterUser = null }) {
           item={item}
           me={me}
           token={token}
-          onLike={() => toggleLike(item)}
-          onComments={() => setCommentsFor(item)}
+          onLike={() =>
+            item.type === "video" ? toggleVideoLike(item) : toggleLike(item)
+          }
+          onComments={() =>
+            item.type === "video" ? setCommentsForVideo(item) : setCommentsFor(item)
+          }
+          onLater={() => toggleVideoLater(item)}
           onRepost={() => toggleRepost(item)}
           onOpenImage={() => setLightbox(item)}
-          onPlay={() => setPlaying(item)}
+          onPlay={(v) => setPlaying(v)}
           onOpenGems={() => setGemsFor(item)}
         />
       ))}
@@ -223,7 +271,12 @@ export default function HomeFeed({ token, me, filterUser = null }) {
         <FanartLightbox item={lightbox} onClose={() => setLightbox(null)} />
       )}
       {playing && (
-        <VideoLightbox item={playing} onClose={() => setPlaying(null)} />
+        <VideoPlayerModal
+          video={playing}
+          resumeAt={playing.positionSeconds || 0}
+          token={token}
+          onClose={() => setPlaying(null)}
+        />
       )}
       {commentsFor && (
         <RepostCommentsModal
@@ -231,6 +284,14 @@ export default function HomeFeed({ token, me, filterUser = null }) {
           token={token}
           onCountChange={(n) => patchRepost(commentsFor.id, { commentCount: n })}
           onClose={() => setCommentsFor(null)}
+        />
+      )}
+      {commentsForVideo && (
+        <VideoCommentsModal
+          video={commentsForVideo.video}
+          token={token}
+          onCountChange={(n) => patchVideo(commentsForVideo.id, { commentCount: n })}
+          onClose={() => setCommentsForVideo(null)}
         />
       )}
       {gemsFor && <GemsFeedModal item={gemsFor} onClose={() => setGemsFor(null)} />}

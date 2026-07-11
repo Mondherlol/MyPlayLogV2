@@ -46,6 +46,9 @@ export default function DocumentaryModal({ prefs, token, onClose }) {
   const autoplayTimer = useRef(null);
   const seenSent = useRef(new Set()); // videoIds déjà marqués « vus » cette session
   const fetching = useRef(false);
+  const watchedSent = useRef(new Set()); // videoIds déjà marqués « regardés » (seuil)
+  const progressRef = useRef({ videoId: null, position: 0, duration: 0 });
+  const currentRef = useRef(null); // vidéo courante, lisible depuis les timers
 
   // Affiche la miniature puis lance la lecture après un court instant.
   const AUTOPLAY_DELAY = 1100;
@@ -66,6 +69,7 @@ export default function DocumentaryModal({ prefs, token, onClose }) {
   }
 
   const current = queue[index] || null;
+  currentRef.current = current;
 
   const query = `lang=${encodeURIComponent(prefs.lang.join(","))}&scope=${prefs.scope}`;
 
@@ -120,6 +124,53 @@ export default function DocumentaryModal({ prefs, token, onClose }) {
     [token]
   );
 
+  // Sauvegarde de la position de lecture + « regardée » au seuil (~30 s / 10 %),
+  // qui alimente l'onglet Historique et l'évènement « a regardé » du fil.
+  const saveProgress = useCallback(
+    (v, position, duration, watched) => {
+      if (!v) return;
+      apiFetch("/videos/progress", {
+        method: "POST",
+        token,
+        body: {
+          video: toPayload(v),
+          position: Math.floor(position || 0),
+          duration: Math.floor(duration || 0),
+          watched: !!watched,
+        },
+      }).catch(() => {});
+    },
+    [token]
+  );
+
+  // Sondage de la position de lecture chaque seconde → seuil « regardée » +
+  // mémorisation de la position courante (reprise / sauvegarde à la sortie).
+  useEffect(() => {
+    const poll = setInterval(() => {
+      const p = ytRef.current;
+      const v = currentRef.current;
+      if (!p?.getCurrentTime || !v) return;
+      let position = 0;
+      let duration = 0;
+      try {
+        position = p.getCurrentTime() || 0;
+        duration = p.getDuration() || 0;
+      } catch {
+        return;
+      }
+      if (position <= 0) return;
+      progressRef.current = { videoId: v.videoId, position, duration };
+      if (
+        !watchedSent.current.has(v.videoId) &&
+        (position >= 30 || (duration > 0 && position / duration >= 0.1))
+      ) {
+        watchedSent.current.add(v.videoId);
+        saveProgress(v, position, duration, true);
+      }
+    }, 1000);
+    return () => clearInterval(poll);
+  }, [saveProgress]);
+
   // Player YouTube intégré (créé une fois la 1re vidéo connue).
   useEffect(() => {
     if (!current || ytRef.current) return;
@@ -159,19 +210,36 @@ export default function DocumentaryModal({ prefs, token, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, current?.videoId]);
 
-  // Coupe la lecture au démontage.
+  // Coupe la lecture au démontage + sauvegarde la position de la vidéo courante.
   useEffect(() => {
     return () => {
       clearTimeout(autoplayTimer.current);
+      const v = currentRef.current;
+      const pr = progressRef.current;
+      if (v && pr.videoId === v.videoId) {
+        saveProgress(v, pr.position, pr.duration, watchedSent.current.has(v.videoId));
+      }
       try {
         ytRef.current?.destroy?.();
       } catch {
         /* ignore */
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function goNext() {
+    const v = queue[index];
+    if (v) {
+      const pr = progressRef.current;
+      const same = pr.videoId === v.videoId;
+      saveProgress(
+        v,
+        same ? pr.position : 0,
+        same ? pr.duration : 0,
+        watchedSent.current.has(v.videoId)
+      );
+    }
     markSeen(queue[index]);
     setIndex((i) => i + 1);
   }

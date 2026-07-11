@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Shield,
   Trophy,
@@ -14,6 +15,10 @@ import {
   ImagePlus,
   X,
   Send,
+  Users,
+  Search,
+  Crown,
+  Gamepad2,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -34,8 +39,193 @@ export default function Admin() {
       </header>
 
       <PsnManager token={token} updateUser={updateUser} />
+      <UsersManager token={token} />
       <PatchnoteManager token={token} />
     </div>
+  );
+}
+
+// ======================================================================
+//  Gestion des utilisateurs du site (liste + suppression) — admin only
+// ======================================================================
+function timeAgo(date) {
+  if (!date) return null;
+  const diff = Date.now() - new Date(date).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 2) return "à l'instant";
+  if (min < 60) return `il y a ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `il y a ${h} h`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `il y a ${d} j`;
+  return new Date(date).toLocaleDateString("fr-FR");
+}
+
+function UsersManager({ token }) {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [allowed, setAllowed] = useState(true);
+  const [err, setErr] = useState(null);
+  const [q, setQ] = useState("");
+  const [deleting, setDeleting] = useState(null); // id en cours de suppression
+
+  function load(search = "") {
+    setLoading(true);
+    apiFetch(`/admin/users${search ? `?q=${encodeURIComponent(search)}` : ""}`, { token })
+      .then((d) => {
+        setUsers(d.users || []);
+        setAllowed(true);
+      })
+      .catch((e) => {
+        if (/administrateur/i.test(e.message)) setAllowed(false);
+        else setErr(e.message);
+      })
+      .finally(() => setLoading(false));
+  }
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  // Recherche débattue (300 ms) côté serveur.
+  useEffect(() => {
+    const t = setTimeout(() => load(q.trim()), 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q]);
+
+  async function remove(u) {
+    if (
+      !confirm(
+        `Supprimer définitivement « ${u.username} » ?\n\nToutes ses données (jeux, listes, avis, republications, notifications, abonnements…) seront effacées. Cette action est irréversible.`
+      )
+    )
+      return;
+    setDeleting(u.id);
+    setErr(null);
+    try {
+      await apiFetch(`/admin/users/${u.id}`, { method: "DELETE", token });
+      setUsers((list) => list.filter((x) => x.id !== u.id));
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  if (!allowed) return null;
+
+  return (
+    <section className="admin-card">
+      <div className="admin-card-head">
+        <span className="admin-card-icon">
+          <Users size={18} />
+        </span>
+        <div className="admin-card-titles">
+          <h2>Utilisateurs</h2>
+          <p>
+            Tous les comptes inscrits sur le site. Recherche par pseudo ou email,
+            consulte un profil ou supprime un compte.
+          </p>
+        </div>
+        {!loading && (
+          <span className="psn-status on">
+            {users.length} compte{users.length > 1 ? "s" : ""}
+          </span>
+        )}
+      </div>
+
+      <div className="au-search">
+        <Search size={16} />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Rechercher un pseudo ou un email…"
+        />
+        {q && (
+          <button className="au-search-clear clickable" onClick={() => setQ("")}>
+            <X size={15} />
+          </button>
+        )}
+      </div>
+
+      {err && <p className="psn-err">{err}</p>}
+
+      {loading ? (
+        <div className="gp-troph-state">
+          <Loader2 size={18} className="spin" /> Chargement…
+        </div>
+      ) : users.length === 0 ? (
+        <p className="pn-admin-empty">Aucun utilisateur trouvé.</p>
+      ) : (
+        <div className="au-list">
+          {users.map((u) => (
+            <div className="au-row" key={u.id}>
+              <Link to={`/u/${u.username}`} className="au-avatar clickable" title="Voir le profil">
+                {u.avatar ? (
+                  <img src={u.avatar} alt="" />
+                ) : (
+                  <span className="au-avatar-fallback">
+                    {u.username?.[0]?.toUpperCase() || "?"}
+                  </span>
+                )}
+              </Link>
+              <div className="au-info">
+                <div className="au-name-row">
+                  <Link to={`/u/${u.username}`} className="au-name clickable">
+                    {u.username}
+                  </Link>
+                  {u.isAdmin && (
+                    <span className="au-admin-badge" title="Administrateur">
+                      <Crown size={12} /> Admin
+                    </span>
+                  )}
+                </div>
+                <span className="au-email">{u.email}</span>
+                <span className="au-meta">
+                  <Gamepad2 size={12} /> {u.gameCount} jeu{u.gameCount > 1 ? "x" : ""}
+                  {" · "}
+                  {u.followersCount} abonné{u.followersCount > 1 ? "s" : ""}
+                  {" · inscrit le "}
+                  {new Date(u.createdAt).toLocaleDateString("fr-FR")}
+                  {u.lastSeenAt ? ` · vu ${timeAgo(u.lastSeenAt)}` : ""}
+                </span>
+              </div>
+              <div className="au-actions">
+                <Link
+                  to={`/u/${u.username}`}
+                  className="icon-btn clickable"
+                  title="Voir le profil"
+                >
+                  <ExternalLink size={16} />
+                </Link>
+                {u.isAdmin ? (
+                  <span
+                    className="icon-btn au-locked"
+                    title="Un administrateur ne peut pas être supprimé"
+                  >
+                    <Shield size={16} />
+                  </span>
+                ) : (
+                  <button
+                    className="icon-btn clickable danger"
+                    onClick={() => remove(u)}
+                    disabled={deleting === u.id}
+                    title="Supprimer ce compte"
+                  >
+                    {deleting === u.id ? (
+                      <Loader2 size={16} className="spin" />
+                    ) : (
+                      <Trash2 size={16} />
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

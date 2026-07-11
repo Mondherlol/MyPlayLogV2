@@ -11,6 +11,7 @@ export async function notify({
   gameName = "",
   ostOwner = null,
   repostOwner = null,
+  videoOwner = null,
   snippet = "",
 }) {
   if (!user || !actor || String(user) === String(actor)) return;
@@ -25,6 +26,7 @@ export async function notify({
       gameName: String(gameName || "").slice(0, 160),
       ostOwner,
       repostOwner,
+      videoOwner,
       snippet: String(snippet || "").slice(0, 120),
     });
   } catch (err) {

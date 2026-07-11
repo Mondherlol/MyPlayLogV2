@@ -23,11 +23,42 @@ export default function PlaylistCard({ list, onDelete }) {
   // Pochette : l'image choisie par l'auteur si elle existe, sinon une pochette
   // générée (jamais un artwork de piste).
   const sleeveArt = list.cover || null;
-  // Un disque par artwork distinct (max 3) — plusieurs sons, plusieurs CD.
-  const discs = [...new Set(list.preview || [])].slice(0, 3);
   // La playlist est-elle celle en cours d'écoute ? (via la source du lecteur)
   const isActive = player.source?.href === `/lists/${list.id}`;
   const spinning = isActive && player.playing;
+
+  // Les disques affichés.
+  //  · En écoute : on suit la file du lecteur — le disque de tête est la piste
+  //    en cours. À chaque changement de piste, le disque de tête glisse dans la
+  //    pochette, les suivants avancent d'un cran et un nouveau apparaît au fond
+  //    (toujours 3 disques visibles). Chaque disque est clé par son rang dans la
+  //    file → React réutilise le nœud et les positions s'animent en CSS.
+  //  · Sinon : aperçu statique des pochettes distinctes (max 3).
+  const playingStack = isActive && player.queue.length > 0;
+  let discs;
+  if (playingStack) {
+    const idx = player.index;
+    discs = [];
+    for (let qi = idx - 1; qi <= idx + 3; qi++) {
+      if (qi < 0 || qi >= player.queue.length) continue;
+      const off = qi - idx;
+      const slot = off <= -1 ? "tuck" : off >= 3 ? "wait" : String(off);
+      discs.push({
+        key: `q${qi}`,
+        art: player.queue[qi]?.artwork || null,
+        slot,
+        front: off === 0,
+      });
+    }
+  } else {
+    const imgs = [...new Set(list.preview || [])].slice(0, 3);
+    discs = (imgs.length ? imgs : [null]).map((art, i) => ({
+      key: `p${i}`,
+      art,
+      i,
+      front: i === 0,
+    }));
+  }
 
   return (
     <Link to={`/lists/${list.id}`} className="plc-card clickable">
@@ -47,16 +78,18 @@ export default function PlaylistCard({ list, onDelete }) {
 
       <div className="plc-visual">
         {/* L'éventail de CD (rendu de l'arrière vers l'avant) */}
-        <span className="plc-cds">
-          {(discs.length ? discs : [null]).map((art, i) => (
+        <span className={`plc-cds ${playingStack ? "playing" : ""}`}>
+          {discs.map((d) => (
             <span
-              key={i}
-              className={`plc-cd ${i === 0 && spinning ? "spinning" : ""}`}
-              style={{ "--i": i }}
+              key={d.key}
+              className={`plc-cd ${d.front && spinning ? "spinning" : ""} ${
+                d.slot ? `s-${d.slot}` : ""
+              }`}
+              style={d.slot ? undefined : { "--i": d.i }}
             >
               <span className="plc-cd-face">
-                {art ? (
-                  <img src={art} alt="" loading="lazy" draggable="false" />
+                {d.art ? (
+                  <img src={d.art} alt="" loading="lazy" draggable="false" />
                 ) : (
                   <Music size={16} />
                 )}
@@ -117,9 +150,20 @@ export default function PlaylistCard({ list, onDelete }) {
           {list.title}
         </h3>
         <div className="plc-meta">
-          <span className="list-card-author">
-            {list.author ? `@${list.author.username}` : "—"}
-          </span>
+          {list.author ? (
+            <span className="list-card-author">
+              <span className="list-author-pp" aria-hidden="true">
+                {list.author.avatar ? (
+                  <img src={list.author.avatar} alt="" loading="lazy" draggable="false" />
+                ) : (
+                  list.author.username?.[0]?.toUpperCase() || "?"
+                )}
+              </span>
+              {list.author.username}
+            </span>
+          ) : (
+            <span className="list-card-author">—</span>
+          )}
           <span className="dot">·</span>
           <span>{list.itemCount} piste{list.itemCount > 1 ? "s" : ""}</span>
           {list.durationSec > 0 && (

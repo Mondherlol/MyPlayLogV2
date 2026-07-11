@@ -139,15 +139,33 @@ function toCard(l, userId) {
     itemKind: l.itemKind || "game",
     visibility: l.visibility,
     author: l.user
-      ? { id: l.user._id, username: l.user.username }
+      ? { id: l.user._id, username: l.user.username, avatar: l.user.avatar || null }
       : null,
     mine: userId ? String(l.user?._id || l.user) === String(userId) : false,
     itemCount: items.length,
-    // Aperçu : les 5 premières images pour un montage visuel.
+    // Aperçu : les premières images pour un montage visuel (jusqu'à 8 pour
+    // laisser respirer l'éventail des listes classées).
     preview: items
       .filter((i) => i.image)
-      .slice(0, 5)
+      .slice(0, 8)
       .map((i) => i.image),
+    // Aperçu de tier list : quelques images regroupées par palier (dans
+    // l'ordre des paliers), pour un mini-rendu de la grille sur la carte.
+    ...(l.type === "tier"
+      ? {
+          tierPreview: (l.tiers || [])
+            .map((t) => ({
+              label: t.label,
+              color: t.color,
+              images: items
+                .filter((i) => i.tier === t.id && i.image)
+                .map((i) => i.image)
+                .slice(0, 6),
+            }))
+            .filter((t) => t.images.length > 0)
+            .slice(0, 4),
+        }
+      : {}),
     likeCount: (l.likes || []).length,
     liked: userId
       ? (l.likes || []).some((u) => String(u) === String(userId))
@@ -230,7 +248,7 @@ router.get("/", requireAuth, async (req, res) => {
       filter.$and = [{ $or: [{ title: rx }, { description: rx }] }];
     }
     const lists = await List.find(filter)
-      .populate("user", "username")
+      .populate("user", "username avatar")
       .sort({ updatedAt: -1 })
       .limit(200)
       .lean();

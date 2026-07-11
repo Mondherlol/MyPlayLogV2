@@ -22,6 +22,8 @@ function serialize(n) {
     ostOwner: n.ostOwner?.username || null,
     // Repost : pseudo du propriétaire du feed (pour le lien /u/…?tab=feed).
     repostOwner: n.repostOwner?.username || null,
+    // Vidéo : pseudo du propriétaire de la reco (pour le lien /u/…?tab=videos).
+    videoOwner: n.videoOwner?.username || null,
     snippet: n.snippet || "",
     read: n.read,
     createdAt: n.createdAt,
@@ -39,6 +41,7 @@ router.get("/", requireAuth, async (req, res) => {
         .populate("list", "title type")
         .populate("ostOwner", "username")
         .populate("repostOwner", "username")
+        .populate("videoOwner", "username")
         .lean(),
       Notification.countDocuments({ user: req.userId, read: false }),
     ]);

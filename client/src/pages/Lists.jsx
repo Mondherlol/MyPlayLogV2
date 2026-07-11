@@ -16,7 +16,6 @@ import {
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import {
-  typeMeta,
   timeAgo,
   LIST_SORTS,
   LIST_TYPE_FILTERS,
@@ -24,6 +23,7 @@ import {
 } from "../lib/lists";
 import CreateListModal from "../components/CreateListModal";
 import PlaylistCard from "../components/PlaylistCard";
+import { Preview, Author } from "../components/ListPreview";
 
 const SCOPES = [
   { value: "feed", label: "Découvrir" },
@@ -31,52 +31,6 @@ const SCOPES = [
   { value: "playlists", label: "PlayLists" },
   { value: "mine", label: "Mes listes" },
 ];
-
-// Montage d'aperçu : quelques covers empilées en éventail, avec le type de
-// liste en tag posé sur l'image.
-function Preview({ list }) {
-  const meta = typeMeta(list.type);
-  const images = list.preview;
-  const overlay = (
-    <>
-      <span className={`list-tag t-${list.type}`}>
-        <meta.Icon size={12} /> {meta.label}
-      </span>
-      {list.visibility === "private" && (
-        <span className="list-tag-priv" title="Privée">
-          <Lock size={12} />
-        </span>
-      )}
-    </>
-  );
-  // Couverture personnalisée : prioritaire sur le montage d'items.
-  if (list.cover) {
-    return (
-      <div className="list-preview has-cover">
-        {overlay}
-        <img className="list-preview-img" src={list.cover} alt="" loading="lazy" draggable="false" />
-      </div>
-    );
-  }
-  if (!images || images.length === 0) {
-    return (
-      <div className="list-preview empty">
-        {overlay}
-        <meta.Icon size={30} />
-      </div>
-    );
-  }
-  return (
-    <div className="list-preview">
-      {overlay}
-      {images.slice(0, 5).map((src, i) => (
-        <span className="list-preview-cover" key={i} style={{ "--i": i }}>
-          <img src={src} alt="" loading="lazy" draggable="false" />
-        </span>
-      ))}
-    </div>
-  );
-}
 
 function ListCard({ list, onDelete }) {
   return (
@@ -101,9 +55,7 @@ function ListCard({ list, onDelete }) {
           <p className="list-card-desc">{list.description}</p>
         )}
         <div className="list-card-meta">
-          <span className="list-card-author">
-            {list.author ? `@${list.author.username}` : "—"}
-          </span>
+          <Author author={list.author} />
           <span className="dot">·</span>
           <span>{list.itemCount} élément{list.itemCount > 1 ? "s" : ""}</span>
           {list.mine && (

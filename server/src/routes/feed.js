@@ -15,6 +15,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { summarizeReactions } from "../lib/reviewSerialize.js";
 import { buildRepostStats } from "./reposts.js";
 import { playlistDuration } from "./lists.js";
+import { loadSocialCounts } from "../lib/videoSocial.js";
 
 // Flux de la page d'accueil : activité des joueurs suivis (jeux, reviews,
 // listes, fan arts republiés, documentaires recommandés) fusionnée en une
@@ -106,7 +107,7 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
   // quand une seule source remplit exactement la page (ex. onglet Médias).
   const cap = limit + 1;
 
-  const [reposts, docs, acts, gems] = await Promise.all([
+  const [reposts, docs, watched, liked, commented, later, acts, gems] = await Promise.all([
     Repost.find({ user: userScope, ...lt("createdAt") })
       .sort({ createdAt: -1 })
       .limit(cap)
@@ -120,6 +121,54 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
           ...(hasBefore ? { recommendedAt: { $lt: before } } : {}),
         })
           .sort({ recommendedAt: -1 })
+          .limit(cap)
+          .populate("user", "username avatar")
+          .lean(),
+    // Vidéos réellement regardées (seuil franchi) → évènement « a regardé ».
+    !wantAll
+      ? Promise.resolve([])
+      : Documentary.find({
+          user: userScope,
+          watched: true,
+          ...(hasBefore ? { watchedAt: { $lt: before } } : {}),
+        })
+          .sort({ watchedAt: -1 })
+          .limit(cap)
+          .populate("user", "username avatar")
+          .lean(),
+    // Vidéos aimées → évènement « a aimé une vidéo ».
+    !wantAll
+      ? Promise.resolve([])
+      : Documentary.find({
+          user: userScope,
+          liked: true,
+          ...(hasBefore ? { likedAt: { $lt: before } } : {}),
+        })
+          .sort({ likedAt: -1 })
+          .limit(cap)
+          .populate("user", "username avatar")
+          .lean(),
+    // Vidéos commentées → évènement « a commenté une vidéo ».
+    !wantAll
+      ? Promise.resolve([])
+      : Documentary.find({
+          user: userScope,
+          commented: true,
+          ...(hasBefore ? { commentedAt: { $lt: before } } : {}),
+        })
+          .sort({ commentedAt: -1 })
+          .limit(cap)
+          .populate("user", "username avatar")
+          .lean(),
+    // Vidéos mises en « à regarder plus tard » → évènement « a ajouté… ».
+    !wantAll
+      ? Promise.resolve([])
+      : Documentary.find({
+          user: userScope,
+          later: true,
+          ...(hasBefore ? { laterAt: { $lt: before } } : {}),
+        })
+          .sort({ laterAt: -1 })
           .limit(cap)
           .populate("user", "username avatar")
           .lean(),
@@ -471,15 +520,82 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
       date: d.recommendedAt || d.createdAt,
       user: person(d.user),
       video: {
+        id: String(d._id), // doc de la reco : cible des likes / commentaires
         videoId: d.videoId,
         title: d.title,
         author: d.author || "",
         thumb: d.thumb || `https://i.ytimg.com/vi/${d.videoId}/hqdefault.jpg`,
         duration: d.duration || null,
+        positionSeconds: d.positionSeconds || 0,
+        durationSeconds: d.durationSeconds || 0,
+        // Défauts : remplacés par les compteurs GLOBAUX (loadSocialCounts).
+        likeCount: 0,
+        liked: false,
+        commentCount: 0,
       },
       game: d.gameId ? { id: d.gameId, name: d.gameName } : null,
     });
   }
+
+  // --- Activités vidéo : regardée / aimée / commentée / « plus tard ». Chaque
+  //     type est regroupé en rafale (« a aimé N vidéos ») comme les visionnages,
+  //     via une carte générique { type: videoact(group), kind }. ---
+  const actVideo = (d) => ({
+    id: String(d._id),
+    videoId: d.videoId,
+    title: d.title,
+    author: d.author || "",
+    thumb: d.thumb || `https://i.ytimg.com/vi/${d.videoId}/hqdefault.jpg`,
+    duration: d.duration || null,
+    positionSeconds: d.positionSeconds || 0,
+    durationSeconds: d.durationSeconds || 0,
+    game: d.gameId ? { id: d.gameId, name: d.gameName } : null,
+  });
+  const pushVideoActivity = (kind, list, dateField) => {
+    const items = list
+      .filter((d) => d.user)
+      .map((d) => ({ user: d.user, date: d[dateField] || d.createdAt, video: actVideo(d) }))
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+    const clusters = [];
+    for (const w of items) {
+      const last = clusters[clusters.length - 1];
+      if (
+        last &&
+        String(last.user._id) === String(w.user._id) &&
+        new Date(last.lastDate) - new Date(w.date) <= GROUP_GAP
+      ) {
+        last.videos.push(w.video);
+        last.lastDate = w.date;
+      } else {
+        clusters.push({ user: w.user, date: w.date, lastDate: w.date, videos: [w.video] });
+      }
+    }
+    for (const c of clusters) {
+      if (c.videos.length >= 2) {
+        events.push({
+          type: "videoactgroup",
+          kind,
+          id: `va-${kind}-g-${c.videos[0].id}`,
+          date: c.date,
+          user: person(c.user),
+          videos: c.videos,
+        });
+      } else {
+        events.push({
+          type: "videoact",
+          kind,
+          id: `va-${kind}-${c.videos[0].id}`,
+          date: c.date,
+          user: person(c.user),
+          video: c.videos[0],
+        });
+      }
+    }
+  };
+  pushVideoActivity("watch", watched, "watchedAt");
+  pushVideoActivity("like", liked, "likedAt");
+  pushVideoActivity("comment", commented, "commentedAt");
+  pushVideoActivity("later", later, "laterAt");
 
   // --- Découvertes de pépites indés (une carte par jour et par joueur) ---
   for (const g of gems) {
@@ -498,6 +614,20 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
       gameCount: (g.games || []).length,
       count: g.count || 1,
     });
+  }
+
+  // Compteurs sociaux GLOBAUX (par videoId) sur les cards vidéo recommandées :
+  // liker/commenter depuis le fil agit sur la même vidéo que dans les profils.
+  const videoEvents = events.filter((e) => e.type === "video" && e.video?.videoId);
+  if (videoEvents.length) {
+    const counts = await loadSocialCounts(
+      videoEvents.map((e) => e.video.videoId),
+      req.userId
+    );
+    for (const e of videoEvents) {
+      const s = counts.get(e.video.videoId);
+      if (s) Object.assign(e.video, s);
+    }
   }
 
   events.sort((a, b) => new Date(b.date) - new Date(a.date));

@@ -9,6 +9,7 @@
     "dev": "nodemon src/index.js",
     "seed:patch11": "node src/scripts/seedPatchnoteV11.js",
     "migrate:ost-youtube": "node src/scripts/migrateItunesOst.js",
+    "migrate:video-social": "node src/scripts/migrateVideoSocial.js",
     "backfill:feed": "node src/scripts/backfillFeedActivities.js"
   },
   "dependencies": {

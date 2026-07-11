@@ -79,17 +79,52 @@ function entryCard(e) {
   };
 }
 
+// Durée d'écoute d'une playlist : durées connues + 4 min par piste sans info
+// (aligné avec le serveur des listes et le client).
+function listDuration(items) {
+  if (!items.length) return { durationSec: 0, durationEstimated: false };
+  const known = items.filter((i) => i.durationSec > 0);
+  return {
+    durationSec:
+      known.reduce((s, i) => s + i.durationSec, 0) +
+      (items.length - known.length) * 240,
+    durationEstimated: known.length < items.length,
+  };
+}
+
 function listCard(l, viewerId) {
   const items = l.items || [];
   return {
+    ...(l.type === "playlist" ? listDuration(items) : {}),
     id: l._id,
     title: l.title,
     description: l.description,
     cover: l.cover || null,
+    coverDesign: l.coverDesign || null,
     type: l.type,
+    itemKind: l.itemKind || "game",
     visibility: l.visibility,
+    author: l.user
+      ? { id: l.user._id || l.user, username: l.user.username, avatar: l.user.avatar || null }
+      : null,
     itemCount: items.length,
-    preview: items.filter((i) => i.image).slice(0, 5).map((i) => i.image),
+    preview: items.filter((i) => i.image).slice(0, 8).map((i) => i.image),
+    // Aperçu de tier list : images regroupées par palier (ordre des paliers).
+    ...(l.type === "tier"
+      ? {
+          tierPreview: (l.tiers || [])
+            .map((t) => ({
+              label: t.label,
+              color: t.color,
+              images: items
+                .filter((i) => i.tier === t.id && i.image)
+                .map((i) => i.image)
+                .slice(0, 6),
+            }))
+            .filter((t) => t.images.length > 0)
+            .slice(0, 4),
+        }
+      : {}),
     likeCount: (l.likes || []).length,
     liked: viewerId ? (l.likes || []).some((u) => String(u) === String(viewerId)) : false,
     commentCount: (l.comments || []).length,
@@ -1112,6 +1147,7 @@ router.get("/:username", requireAuth, async (req, res) => {
           ? { user: user._id }
           : { user: user._id, visibility: "public" }
       )
+        .populate("user", "username avatar")
         .sort({ updatedAt: -1 })
         .limit(50)
         .lean(),

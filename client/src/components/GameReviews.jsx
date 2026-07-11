@@ -302,7 +302,7 @@ function ReviewEditor({ game, token, initial, isNew, onSaved }) {
       <Composer
         token={token}
         big
-        maxChars={4000}
+        maxChars={10000}
         placeholder="Qu'as-tu pensé du jeu ?…"
         initialText={initial?.review || ""}
         initialMedia={initial?.media || []}

@@ -127,6 +127,13 @@ export function FeedCard(props) {
   if (item.type === "interaction") return <InteractionEvent {...props} />;
   if (item.type === "repost") return <RepostEvent {...props} />;
   if (item.type === "video") return <VideoEvent {...props} />;
+  if (item.type === "videoact") return <VideoActivityEvent {...props} />;
+  if (item.type === "videoactgroup") return <VideoActivityGroupEvent {...props} />;
+  // Rétro-compat : anciens noms d'évènements « vidéo regardée ».
+  if (item.type === "videowatch")
+    return <VideoActivityEvent {...props} item={{ ...item, kind: "watch" }} />;
+  if (item.type === "videowatchgroup")
+    return <VideoActivityGroupEvent {...props} item={{ ...item, kind: "watch" }} />;
   if (item.type === "gems") return <GemsEvent {...props} />;
   return null;
 }
@@ -1228,18 +1235,17 @@ function GemsEvent({ item, onOpenGems }) {
 }
 
 // ============================================================
-//  Documentaire recommandé
+//  Vidéo recommandée (like / regarder plus tard / commenter / lire)
 // ============================================================
-function VideoEvent({ item, onPlay }) {
+function VideoEvent({ item, onPlay, onLike, onLater, onComments }) {
   const v = item.video;
   return (
     <article className="hf-card hf-video">
       <EventHead user={item.user} date={item.date}>
-        <Clapperboard size={13} className="hf-inline-ic" /> recommande un
-        documentaire
+        <Clapperboard size={13} className="hf-inline-ic" /> recommande une vidéo
       </EventHead>
 
-      <button className="hf-video-thumb clickable" onClick={onPlay} title={v.title}>
+      <button className="hf-video-thumb clickable" onClick={() => onPlay(v)} title={v.title}>
         <img src={v.thumb} alt="" loading="lazy" draggable="false" />
         <span className="hf-video-play">
           <Play size={22} fill="currentColor" />
@@ -1257,6 +1263,143 @@ function VideoEvent({ item, onPlay }) {
             </Link>
           )}
         </span>
+      </div>
+
+      <div className="hf-actions">
+        <button
+          className={`hf-act like clickable ${v.liked ? "on" : ""}`}
+          onClick={onLike}
+          title="J'aime"
+        >
+          <Heart size={16} fill={v.liked ? "currentColor" : "none"} />
+          <span>{v.likeCount > 0 ? v.likeCount : ""}</span>
+        </button>
+        <button className="hf-act clickable" onClick={onComments} title="Commentaires">
+          <MessageCircle size={16} />
+          <span>{v.commentCount > 0 ? v.commentCount : ""}</span>
+        </button>
+        <button
+          className={`hf-act clickable ${v.later ? "on" : ""}`}
+          onClick={onLater}
+          title={v.later ? "Retirer de « à regarder plus tard »" : "Regarder plus tard"}
+        >
+          <Clock size={16} />
+          <span>{v.later ? "Ajouté" : "Plus tard"}</span>
+        </button>
+      </div>
+    </article>
+  );
+}
+
+// ============================================================
+//  Activité vidéo : regardée / aimée / commentée / « plus tard »
+//  (cartes génériques pilotées par item.kind, groupées côté serveur)
+// ============================================================
+const VIDEO_ACT_META = {
+  watch: {
+    Icon: Play,
+    filled: true,
+    one: "a regardé une vidéo",
+    many: (n) => `a regardé ${n} vidéos`,
+  },
+  like: {
+    Icon: Heart,
+    filled: true,
+    one: "a aimé une vidéo",
+    many: (n) => `a aimé ${n} vidéos`,
+  },
+  comment: {
+    Icon: MessageCircle,
+    filled: false,
+    one: "a commenté une vidéo",
+    many: (n) => `a commenté ${n} vidéos`,
+  },
+  later: {
+    Icon: Clock,
+    filled: false,
+    one: "a mis une vidéo à regarder plus tard",
+    many: (n) => `a mis ${n} vidéos à regarder plus tard`,
+  },
+};
+
+// Barre de reprise (visionnage) : proportion vue si on a la durée.
+function resumePct(v) {
+  if (v.durationSeconds > 0)
+    return Math.min(100, Math.round((v.positionSeconds / v.durationSeconds) * 100));
+  return v.positionSeconds > 0 ? 6 : 0;
+}
+
+function VideoActivityEvent({ item, onPlay }) {
+  const v = item.video;
+  const meta = VIDEO_ACT_META[item.kind] || VIDEO_ACT_META.watch;
+  const pct = item.kind === "watch" ? resumePct(v) : 0;
+  return (
+    <article className={`hf-card hf-video hf-vact k-${item.kind}`}>
+      <EventHead user={item.user} date={item.date}>
+        <span className={`hf-vact-ic k-${item.kind}`}>
+          <meta.Icon size={13} fill={meta.filled ? "currentColor" : "none"} />
+        </span>{" "}
+        {meta.one}
+      </EventHead>
+
+      <button className="hf-video-thumb clickable" onClick={() => onPlay(v)} title={v.title}>
+        <img src={v.thumb} alt="" loading="lazy" draggable="false" />
+        <span className="hf-video-play">
+          <Play size={22} fill="currentColor" />
+        </span>
+        {v.duration && <span className="hf-video-dur">{v.duration}</span>}
+        {pct > 0 && pct < 100 && (
+          <span className="hf-video-bar" aria-hidden="true">
+            <span style={{ width: `${pct}%` }} />
+          </span>
+        )}
+      </button>
+
+      <div className="hf-video-info">
+        <h4 className="hf-video-title">{v.title}</h4>
+        <span className="hf-video-meta">
+          {v.author && <span>{v.author}</span>}
+          {v.game && (
+            <Link to={`/game/${v.game.id}`} className="hf-video-game clickable">
+              <Gamepad2 size={12} /> {v.game.name}
+            </Link>
+          )}
+        </span>
+      </div>
+    </article>
+  );
+}
+
+function VideoActivityGroupEvent({ item, onPlay }) {
+  const videos = item.videos || [];
+  const meta = VIDEO_ACT_META[item.kind] || VIDEO_ACT_META.watch;
+  return (
+    <article className={`hf-card hf-video hf-vact-group k-${item.kind}`}>
+      <EventHead user={item.user} date={item.date}>
+        <span className={`hf-vact-ic k-${item.kind}`}>
+          <meta.Icon size={13} fill={meta.filled ? "currentColor" : "none"} />
+        </span>{" "}
+        {meta.many(videos.length)}
+      </EventHead>
+
+      <div className="hf-vact-grid">
+        {videos.map((v) => (
+          <button
+            key={v.id}
+            className="hf-vact-item clickable"
+            onClick={() => onPlay(v)}
+            title={v.title}
+          >
+            <span className="hf-vact-thumb">
+              <img src={v.thumb} alt="" loading="lazy" draggable="false" />
+              <span className="hf-vact-play">
+                <Play size={16} fill="currentColor" />
+              </span>
+              {v.duration && <span className="hf-video-dur">{v.duration}</span>}
+            </span>
+            <span className="hf-vact-cap">{v.title}</span>
+          </button>
+        ))}
       </div>
     </article>
   );
@@ -1301,33 +1444,6 @@ export function FanartLightbox({ item, onClose }) {
           )}
         </figcaption>
       </figure>
-    </div>,
-    document.body
-  );
-}
-
-export function VideoLightbox({ item, onClose }) {
-  const v = item.video;
-  return createPortal(
-    <div className="modal-overlay doc-overlay" onMouseDown={onClose}>
-      <div className="doc-lightbox" onMouseDown={(e) => e.stopPropagation()}>
-        <button className="modal-close clickable" onClick={onClose} aria-label="Fermer">
-          <X size={20} />
-        </button>
-        <div className="doc-stage">
-          <iframe
-            className="doc-player"
-            src={`https://www.youtube.com/embed/${v.videoId}?autoplay=1&rel=0&modestbranding=1`}
-            title={v.title}
-            allow="autoplay; encrypted-media; picture-in-picture"
-            allowFullScreen
-          />
-        </div>
-        <div className="doc-info">
-          <h3 className="doc-video-title">{v.title}</h3>
-          {v.author && <span className="doc-chan">{v.author}</span>}
-        </div>
-      </div>
     </div>,
     document.body
   );

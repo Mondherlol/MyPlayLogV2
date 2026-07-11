@@ -16,12 +16,10 @@ import {
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import RepostCommentsModal from "./RepostCommentsModal";
+import VideoCommentsModal from "./VideoCommentsModal";
+import VideoPlayerModal from "./VideoPlayerModal";
 import GemsFeedModal from "./GemsFeedModal";
-import {
-  FeedCard,
-  VideoLightbox,
-  FeedCardsSkeleton,
-} from "./FeedCards";
+import { FeedCard, FeedCardsSkeleton } from "./FeedCards";
 
 // Onglet « Feed » du profil : TOUTE l'activité du joueur, façon Twitter —
 // actions de bibliothèque (terminé, noté, OST choisie…), listes créées,
@@ -62,8 +60,9 @@ export default function ProfileFeed({ username, isMe, token, onSetCover }) {
   const [stats, setStats] = useState(null);
   const [bento, setBento] = useState([]);
   const [lightbox, setLightbox] = useState(null); // repost affiché en grand
-  const [playing, setPlaying] = useState(null); // documentaire en lecture
+  const [playing, setPlaying] = useState(null); // vidéo en lecture (objet video)
   const [commentsFor, setCommentsFor] = useState(null); // repost → modale commentaires
+  const [commentsForVideo, setCommentsForVideo] = useState(null); // vidéo → modale
   const [gemsFor, setGemsFor] = useState(null); // découverte de pépites → modale
   const sentinelRef = useRef(null);
   // Refs miroirs pour que l'observer (créé une fois) lise l'état courant.
@@ -152,6 +151,51 @@ export default function ProfileFeed({ username, isMe, token, onSetCover }) {
     setItems(apply);
     setBento(apply);
   };
+
+  const patchVideo = (id, patch) =>
+    setItems((list) =>
+      list.map((i) => (i.id === id ? { ...i, video: { ...i.video, ...patch } } : i))
+    );
+
+  // Like optimiste d'une vidéo recommandée.
+  async function toggleVideoLike(item) {
+    const v = item.video;
+    const was = { liked: v.liked, likeCount: v.likeCount };
+    patchVideo(item.id, { liked: !v.liked, likeCount: (v.likeCount || 0) + (v.liked ? -1 : 1) });
+    try {
+      const d = await apiFetch(`/videos/${v.id}/like`, { method: "POST", token });
+      patchVideo(item.id, { liked: d.liked, likeCount: d.likeCount });
+    } catch {
+      patchVideo(item.id, was);
+    }
+  }
+
+  // « Regarder plus tard » : bascule la vidéo dans MA liste privée.
+  async function toggleVideoLater(item) {
+    const v = item.video;
+    const was = v.later;
+    patchVideo(item.id, { later: !was });
+    try {
+      const d = await apiFetch("/videos/later", {
+        method: "POST",
+        token,
+        body: {
+          video: {
+            videoId: v.videoId,
+            title: v.title,
+            author: v.author,
+            thumb: v.thumb,
+            duration: v.duration,
+            gameId: item.game?.id || null,
+            gameName: item.game?.name || null,
+          },
+        },
+      });
+      patchVideo(item.id, { later: d.later });
+    } catch {
+      patchVideo(item.id, { later: was });
+    }
+  }
 
   // Like optimiste d'une republication.
   async function toggleLike(item) {
@@ -264,11 +308,18 @@ export default function ProfileFeed({ username, isMe, token, onSetCover }) {
                   item={item}
                   me={me}
                   token={token}
-                  onLike={() => toggleLike(item)}
-                  onComments={() => setCommentsFor(item)}
+                  onLike={() =>
+                    item.type === "video" ? toggleVideoLike(item) : toggleLike(item)
+                  }
+                  onComments={() =>
+                    item.type === "video"
+                      ? setCommentsForVideo(item)
+                      : setCommentsFor(item)
+                  }
+                  onLater={() => toggleVideoLater(item)}
                   onRepost={() => toggleRepost(item)}
                   onOpenImage={() => setLightbox(item)}
-                  onPlay={() => setPlaying(item)}
+                  onPlay={(v) => setPlaying(v)}
                   onOpenGems={() => setGemsFor(item)}
                   onRemove={isMe ? () => removeRepost(item) : undefined}
                 />
@@ -307,13 +358,28 @@ export default function ProfileFeed({ username, isMe, token, onSetCover }) {
           onClose={() => setLightbox(null)}
         />
       )}
-      {playing && <VideoLightbox item={playing} onClose={() => setPlaying(null)} />}
+      {playing && (
+        <VideoPlayerModal
+          video={playing}
+          resumeAt={playing.positionSeconds || 0}
+          token={token}
+          onClose={() => setPlaying(null)}
+        />
+      )}
       {commentsFor && (
         <RepostCommentsModal
           repost={{ ...commentsFor.repost, game: commentsFor.game }}
           token={token}
           onCountChange={(n) => patchRepost(commentsFor.id, { commentCount: n })}
           onClose={() => setCommentsFor(null)}
+        />
+      )}
+      {commentsForVideo && (
+        <VideoCommentsModal
+          video={commentsForVideo.video}
+          token={token}
+          onCountChange={(n) => patchVideo(commentsForVideo.id, { commentCount: n })}
+          onClose={() => setCommentsForVideo(null)}
         />
       )}
       {gemsFor && <GemsFeedModal item={gemsFor} onClose={() => setGemsFor(null)} />}

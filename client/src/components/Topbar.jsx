@@ -44,6 +44,7 @@ const NOTIF_META = {
   ost_comment: { Icon: Music, verb: "a commenté ton OST" },
   repost_comment: { Icon: Repeat2, verb: "a commenté ton fan art republié" },
   repost_like: { Icon: Heart, verb: "a aimé ton fan art republié" },
+  video_comment: { Icon: MessageSquare, verb: "a commenté une vidéo que tu as recommandée" },
   recommendation: { Icon: Send, verb: "t'a recommandé" },
   recommendation_boost: { Icon: Plus, verb: "a fait +1 sur ta reco de" },
   recommendation_comment: { Icon: MessageSquare, verb: "a commenté la reco de" },
@@ -180,6 +181,9 @@ export default function Topbar() {
     } else if (n.repostOwner) {
       // Repost : ouvre l'onglet Feed du profil dont vient la republication.
       navigate(`/u/${n.repostOwner}?tab=feed`);
+    } else if (n.videoOwner) {
+      // Vidéo : ouvre l'onglet Vidéos du profil dont vient la recommandation.
+      navigate(`/u/${n.videoOwner}?tab=videos`);
     } else if (n.type?.startsWith("recommendation")) {
       if (n.type === "recommendation" && n.game) navigate(`/game/${n.game}`);
       else navigate("/profile?tab=reco");
