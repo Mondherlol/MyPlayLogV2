@@ -46,6 +46,20 @@ import CoverPickerModal from "../components/CoverPickerModal";
 import ReframeCoverModal from "../components/ReframeCoverModal";
 import FollowListModal from "../components/FollowListModal";
 import { useClickOutside } from "../hooks/useClickOutside";
+import { useTabSwipe } from "../hooks/useTabSwipe";
+
+// Ordre des onglets (pour le swipe gauche/droite et le recentrage de la nav).
+const TAB_ORDER = [
+  "overview",
+  "feed",
+  "allgames",
+  "stats",
+  "lists",
+  "ost",
+  "videos",
+  "activity",
+  "reco",
+];
 
 // Cache du dernier profil chargé (par pseudo) : on réaffiche instantanément la
 // dernière version connue, puis on rafraîchit en fond (stale-while-revalidate).
@@ -162,6 +176,7 @@ export default function Profile() {
   const avatarInput = useRef(null);
   const coverMenuRef = useRef(null);
   const tabsTopRef = useRef(null);
+  const tabsNavRef = useRef(null);
   useClickOutside(coverMenuRef, () => setCoverMenu(false), coverMenu);
 
   // Au changement d'onglet, ramène le contenu au début : on remonte juste sous
@@ -175,6 +190,27 @@ export default function Profile() {
       window.scrollTo({ top: Math.min(window.scrollY, y) });
     });
   }
+
+  // Recentre horizontalement la barre d'onglets sur l'onglet actif (le met en
+  // tête), pour qu'il ne reste pas coupé sur le bord. Le navigateur borne le
+  // scroll : le dernier onglet ne force pas de défilement inutile.
+  useEffect(() => {
+    const nav = tabsNavRef.current;
+    const active = nav?.querySelector(".profile-tab.active");
+    if (active) nav.scrollTo({ left: active.offsetLeft - 12, behavior: "smooth" });
+  }, [tab]);
+
+  // Swipe gauche/droite (mobile) → onglet précédent / suivant.
+  const swipeTab = (dir) => {
+    const i = TAB_ORDER.indexOf(tab);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= TAB_ORDER.length) return;
+    setTab(TAB_ORDER[j]);
+  };
+  const swipe = useTabSwipe({
+    onPrev: () => swipeTab(-1),
+    onNext: () => swipeTab(1),
+  });
 
   const profile = data?.profile;
   const isMe = profile?.isMe;
@@ -400,7 +436,7 @@ export default function Profile() {
     setModalGame({ id: e.gameId, name: e.name, cover: e.cover, openReview: !!opts?.review });
 
   return (
-    <div className="profile pf">
+    <div className="profile pf" {...swipe}>
       {/* ---------- Bannière ---------- */}
       <header className="pf-banner">
         <div
@@ -532,7 +568,7 @@ export default function Profile() {
       {/* ---------- Onglets ---------- */}
       {/* Ancre (hors flux sticky) pour recaler le scroll au changement d'onglet. */}
       <div ref={tabsTopRef} aria-hidden="true" />
-      <nav className="profile-tabs">
+      <nav className="profile-tabs" ref={tabsNavRef}>
         <button
           className={`profile-tab ${tab === "overview" ? "active" : ""}`}
           onClick={() => setTab("overview")}

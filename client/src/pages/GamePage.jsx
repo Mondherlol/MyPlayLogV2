@@ -56,6 +56,7 @@ import GameCharacters from "../components/GameCharacters";
 import GameOst from "../components/GameOst";
 import GameFeed from "../components/GameFeed";
 import GameRelated from "../components/GameRelated";
+import { useTabSwipe } from "../hooks/useTabSwipe";
 
 const FRIEND_GROUPS = [
   { key: "played", label: "Y ont joué", match: (s) => s !== "wishlist" },
@@ -223,6 +224,7 @@ export default function GamePage() {
   const [coverOverride, setCoverOverride] = useState(null);
   const [showCover, setShowCover] = useState(false);
   const tabsTopRef = useRef(null);
+  const tabsNavRef = useRef(null);
 
   const entry = map[id];
   const isWishlist = entry?.status === "wishlist";
@@ -247,6 +249,27 @@ export default function GamePage() {
       window.scrollTo({ top: Math.min(window.scrollY, y) });
     });
   }
+
+  // Recentre la barre d'onglets sur l'onglet actif (le met en tête), pour qu'il
+  // ne reste pas coupé sur le bord. Le navigateur borne le scroll.
+  useEffect(() => {
+    const nav = tabsNavRef.current;
+    const active = nav?.querySelector(".gp-tab.active");
+    if (active) nav.scrollTo({ left: active.offsetLeft - 12, behavior: "smooth" });
+  }, [tab]);
+
+  // Swipe gauche/droite (mobile) → onglet précédent / suivant.
+  const swipeTab = (dir) => {
+    const order = TABS.filter((t) => t.ready).map((t) => t.id);
+    const i = order.indexOf(tab);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= order.length) return;
+    setTab(order[j]);
+  };
+  const swipe = useTabSwipe({
+    onPrev: () => swipeTab(-1),
+    onNext: () => swipeTab(1),
+  });
 
   function reloadEntry() {
     apiFetch(`/library/${id}`, { token })
@@ -439,7 +462,7 @@ export default function GamePage() {
   const hasTtb = ttb.hastily || ttb.normally || ttb.completely;
 
   return (
-    <div className="gamepage">
+    <div className="gamepage" {...swipe}>
       {/* Fond flouté */}
       <div className="gp-backdrop">
         {backdrop ? (
@@ -702,7 +725,7 @@ export default function GamePage() {
             {/* Onglets */}
             {/* Ancre (hors flux sticky) pour recaler le scroll au changement d'onglet. */}
             <div ref={tabsTopRef} aria-hidden="true" />
-            <nav className="gp-tabs">
+            <nav className="gp-tabs" ref={tabsNavRef}>
               {TABS.map((t) => (
                 <button
                   key={t.id}
