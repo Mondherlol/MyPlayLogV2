@@ -1141,13 +1141,20 @@ function RatingGauge({ value, active, onEnable, onChange, onClear }) {
     ? "#f2b70b"
     : "#22a35a";
   const inputRef = useRef(null);
+  // Ne focus le champ (→ ouvre le clavier mobile) QUE si l'utilisateur clique
+  // « Noter ». Sinon, ouvrir la page sur un jeu déjà noté ouvrirait le clavier
+  // tout seul (frustrant). Le flag est posé par le bouton « Noter ».
+  const wantFocus = useRef(false);
   const [txt, setTxt] = useState(String(value));
 
   useEffect(() => {
     setTxt(String(value));
   }, [value]);
   useEffect(() => {
-    if (active) inputRef.current?.focus();
+    if (active && wantFocus.current) {
+      inputRef.current?.focus();
+      wantFocus.current = false;
+    }
   }, [active]);
 
   function onInput(e) {
@@ -1194,7 +1201,13 @@ function RatingGauge({ value, active, onEnable, onChange, onClear }) {
               style={{ color }}
             />
           ) : (
-            <button className="gauge-noter clickable" onClick={onEnable}>
+            <button
+              className="gauge-noter clickable"
+              onClick={() => {
+                wantFocus.current = true;
+                onEnable();
+              }}
+            >
               Noter
             </button>
           )}
