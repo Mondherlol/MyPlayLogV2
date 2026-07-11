@@ -1,7 +1,12 @@
 <!doctype html>
-<html lang="fr">
+<html lang="fr" translate="no">
   <head>
     <meta charset="UTF-8" />
+    <!-- Désactive la traduction automatique du navigateur (Google Translate /
+         « Traduire cette page » sur Chrome Android). Elle remplace les nœuds de
+         texte par des <font>, ce qui casse le rendu React (NotFoundError sur
+         insertBefore/removeChild) et fait planter toute l'app. -->
+    <meta name="google" content="notranslate" />
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%AE%3C/text%3E%3C/svg%3E"
