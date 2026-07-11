@@ -10,6 +10,7 @@ import Welcome from "./pages/Welcome";
 import Explorer from "./pages/Explorer";
 import Releases from "./pages/Releases";
 import GamePage from "./pages/GamePage";
+import CompanyPage from "./pages/CompanyPage";
 import Profile from "./pages/Profile";
 import Lists from "./pages/Lists";
 import ListDetail from "./pages/ListDetail";
@@ -84,6 +85,7 @@ export default function App() {
         <Route path="/explore" element={<Explorer />} />
         <Route path="/releases" element={<Releases />} />
         <Route path="/game/:id" element={<GamePage />} />
+        <Route path="/company/:name" element={<CompanyPage />} />
         <Route path="/lists" element={<Lists />} />
         <Route path="/lists/:id" element={<ListDetail />} />
         <Route path="/profile" element={<Profile />} />

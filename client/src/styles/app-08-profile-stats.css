@@ -1165,6 +1165,62 @@
   color: var(--text-soft);
 }
 
+/* ---------- Facettes cliquables (pop-up « voir les jeux ») ---------- */
+.ps-barrow.clickable {
+  cursor: pointer;
+}
+.ps-col.clickable {
+  cursor: pointer;
+}
+.ps-col.clickable:hover .ps-col-fill,
+.ps-col.clickable:focus-visible .ps-col-fill {
+  filter: brightness(1.18);
+}
+.ps-col.clickable:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+.ps-legend-col li.clickable {
+  cursor: pointer;
+  border-radius: 8px;
+  transition: color 0.15s ease;
+}
+.ps-legend-col li.clickable:hover {
+  color: var(--text);
+}
+.ps-legend-col li.clickable:hover strong {
+  color: var(--accent-ink);
+}
+.ps-franchise.clickable {
+  cursor: pointer;
+  padding: 0.3rem 0.4rem;
+  margin: -0.3rem -0.4rem;
+  border-radius: 10px;
+  transition: background 0.15s ease;
+}
+.ps-franchise.clickable:hover {
+  background: var(--surface-2);
+}
+.ps-franchise.clickable:hover .ps-franchise-name {
+  color: var(--accent-ink);
+}
+/* .ps-format-item est désormais un <button> : reset + curseur */
+.ps-format-item {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  padding: 0;
+}
+.ps-format-item.clickable {
+  cursor: pointer;
+  border-radius: 8px;
+  transition: opacity 0.15s ease;
+}
+.ps-format-item.clickable:hover {
+  opacity: 0.7;
+}
+
 /* ---------- Reduced motion : tout s'affiche direct ---------- */
 @media (prefers-reduced-motion: reduce) {
   .ps-hero,

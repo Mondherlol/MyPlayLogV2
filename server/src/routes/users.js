@@ -846,6 +846,24 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
       pct: Math.round((count / base.length) * 100),
     });
 
+    // -- Listes de jeux par facette (pour les pop-ups « voir les jeux ») --
+    // Version allégée d'une entrée : juste de quoi afficher une jaquette.
+    const FACET_CAP = 60; // on plafonne chaque liste (payload + lisibilité)
+    const slim = (e) => ({ gameId: e.gameId, name: e.name, cover: e.cover });
+    // Regroupe des entrées par clé(s) -> liste de jeux allégée (plafonnée).
+    const groupGames = (list, keyFn) => {
+      const m = new Map();
+      for (const e of list) {
+        for (const k of keyFn(e)) {
+          if (k == null || k === "") continue;
+          if (!m.has(k)) m.set(k, []);
+          const arr = m.get(k);
+          if (arr.length < FACET_CAP) arr.push(slim(e));
+        }
+      }
+      return m;
+    };
+
     // -- Totaux / KPI --
     const hours = played.reduce((s, e) => s + (e.playtimeHours || 0), 0);
     const rated = entries.filter((e) => e.rating != null);
@@ -855,8 +873,13 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
       ? Math.round(rated.reduce((s, e) => s + e.rating, 0) / rated.length)
       : null;
 
+    const statusGames = groupGames(entries, (e) => [e.status]);
     const statuses = ["playing", "endless", "finished", "paused", "dropped", "wishlist"].map(
-      (key) => ({ key, count: entries.filter((e) => e.status === key).length })
+      (key) => ({
+        key,
+        count: entries.filter((e) => e.status === key).length,
+        games: statusGames.get(key) || [],
+      })
     );
 
     // -- Consoles (plateforme déclarée sur l'entrée) --
@@ -868,13 +891,21 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
       p.hours += e.playtimeHours || 0;
       platMap.set(e.platform, p);
     }
+    const platGames = groupGames(played, (e) => (e.platform ? [e.platform] : []));
     const platforms = [...platMap.values()]
       .sort((a, b) => b.count - a.count)
-      .slice(0, 8);
+      .slice(0, 8)
+      .map((p) => ({ ...p, games: platGames.get(p.name) || [] }));
 
     // -- Démat vs physique (jeux joués ; défaut : digital) --
-    const physical = played.filter((e) => e.format === "physical").length;
-    const formats = { digital: played.length - physical, physical };
+    const physicalEntries = played.filter((e) => e.format === "physical");
+    const digitalEntries = played.filter((e) => e.format !== "physical");
+    const formats = {
+      digital: digitalEntries.length,
+      physical: physicalEntries.length,
+      digitalGames: digitalEntries.slice(0, FACET_CAP).map(slim),
+      physicalGames: physicalEntries.slice(0, FACET_CAP).map(slim),
+    };
 
     // -- Marathon : jeux avec le plus d'heures --
     const topByHours = played
@@ -885,9 +916,11 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
 
     // -- Goûts : genres / studios / franchises (via le cache GameMeta) --
     const metaOf = (e) => meta.get(e.gameId) || {};
+    const genreGames = groupGames(base, (e) => metaOf(e).genres || []);
     const genres = tally(base.flatMap((e) => metaOf(e).genres || []))
       .slice(0, 8)
-      .map(withPct);
+      .map(withPct)
+      .map((g) => ({ ...g, games: genreGames.get(g.name) || [] }));
     const developers = tally(base.flatMap((e) => metaOf(e).developers || []))
       .slice(0, 8)
       .map(withPct);
@@ -906,6 +939,9 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
     for (const d of developers) d.logo = companyLogos.get(d.name) || null;
     for (const p of publishers) p.logo = companyLogos.get(p.name) || null;
     for (const p of platforms) p.logo = platformLogos.get(p.name) || null;
+    const franchiseGames = groupGames(base, (e) =>
+      metaOf(e).franchise ? [metaOf(e).franchise] : []
+    );
     const franchises = tally(base.map((e) => metaOf(e).franchise))
       .filter(([, count]) => count >= 2)
       .slice(0, 6)
@@ -916,21 +952,32 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
           .filter((e) => metaOf(e).franchise === name && e.cover)
           .slice(0, 3)
           .map((e) => e.cover),
+        games: franchiseGames.get(name) || [],
       }));
 
     // -- Machine à remonter le temps : décennies de sortie --
+    const decadeGames = groupGames(base, (e) => {
+      const y = metaOf(e).year;
+      return y ? [Math.floor(y / 10) * 10] : [];
+    });
     const decades = tally(
       base.map((e) => {
         const y = metaOf(e).year;
         return y ? Math.floor(y / 10) * 10 : null;
       })
     )
-      .map(([decade, count]) => ({ decade, count }))
+      .map(([decade, count]) => ({
+        decade,
+        count,
+        games: decadeGames.get(decade) || [],
+      }))
       .sort((a, b) => a.decade - b.decade);
 
     // -- Notes : distribution (10 paliers) + podium --
     const dist = Array.from({ length: 10 }, () => 0);
     for (const e of rated) dist[Math.min(9, Math.floor(e.rating / 10))] += 1;
+    const ratingGames = groupGames(rated, (e) => [Math.min(9, Math.floor(e.rating / 10))]);
+    const distGames = Array.from({ length: 10 }, (_, i) => ratingGames.get(i) || []);
     const topRated = rated
       .slice()
       .sort((a, b) => b.rating - a.rating || (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0))
@@ -1062,7 +1109,7 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
       publishers,
       franchises,
       decades,
-      ratings: { avg: avgRating, dist, top: topRated, flop: flopRated },
+      ratings: { avg: avgRating, dist, distGames, top: topRated, flop: flopRated },
       soulmates,
       // Part des jeux dont on a les métadonnées (honnêteté des % affichés)
       metaCoverage: entries.length

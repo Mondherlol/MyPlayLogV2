@@ -167,29 +167,46 @@ function BarList({ items, onRowClick, FallbackIcon }) {
 }
 
 // Histogramme en colonnes (mono-série doré) : pic étiqueté, le reste au survol.
-function Columns({ data, tipOf }) {
+// `onColClick` rend chaque colonne cliquable (ouvre la liste des jeux du palier).
+function Columns({ data, tipOf, onColClick }) {
   const max = Math.max(...data.map((d) => d.value), 1);
   return (
     <div className="ps-cols" role="img">
-      {data.map((d, idx) => (
-        <div className="ps-col" key={d.key} tabIndex={0} aria-label={tipOf(d)}>
-          <span className="ps-col-tip">{tipOf(d)}</span>
-          {d.value === max && d.value > 0 && (
-            <span className="ps-col-peak">{nf.format(d.value)}</span>
-          )}
-          <span
-            className={`ps-col-fill ${d.value === 0 ? "zero" : ""}`}
-            style={{ height: `${(d.value / max) * 100}%`, "--d": `${idx * 40}ms` }}
-          />
-          <span className="ps-col-label">{d.label}</span>
-        </div>
-      ))}
+      {data.map((d, idx) => {
+        const clickable = onColClick && d.value > 0;
+        return (
+          <div
+            className={`ps-col ${clickable ? "clickable" : ""}`}
+            key={d.key}
+            tabIndex={0}
+            aria-label={tipOf(d)}
+            role={clickable ? "button" : undefined}
+            onClick={clickable ? () => onColClick(d) : undefined}
+            onKeyDown={
+              clickable
+                ? (e) => (e.key === "Enter" || e.key === " ") && onColClick(d)
+                : undefined
+            }
+          >
+            <span className="ps-col-tip">{tipOf(d)}</span>
+            {d.value === max && d.value > 0 && (
+              <span className="ps-col-peak">{nf.format(d.value)}</span>
+            )}
+            <span
+              className={`ps-col-fill ${d.value === 0 ? "zero" : ""}`}
+              style={{ height: `${(d.value / max) * 100}%`, "--d": `${idx * 40}ms` }}
+            />
+            <span className="ps-col-label">{d.label}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 // Démat vs physique : barre bicolore + légende (dans la card Consoles).
-function FormatSplit({ formats }) {
+// `onPick` rend chaque part cliquable (ouvre la liste des jeux concernés).
+function FormatSplit({ formats, onPick }) {
   const digital = formats?.digital || 0;
   const physical = formats?.physical || 0;
   const total = digital + physical;
@@ -199,14 +216,24 @@ function FormatSplit({ formats }) {
   return (
     <div className="ps-formats">
       <div className="ps-formats-legend">
-        <span className="ps-format-item digital" title={`${nf.format(digital)} jeux en dématérialisé`}>
+        <button
+          type="button"
+          className="ps-format-item digital clickable"
+          title={`${nf.format(digital)} jeux en dématérialisé`}
+          onClick={() => onPick?.("digital")}
+        >
           <Cloud size={14} /> Démat
           <strong>{pctD} %</strong>
-        </span>
-        <span className="ps-format-item physical" title={`${nf.format(physical)} jeux en physique`}>
+        </button>
+        <button
+          type="button"
+          className="ps-format-item physical clickable"
+          title={`${nf.format(physical)} jeux en physique`}
+          onClick={() => onPick?.("physical")}
+        >
           <Disc size={14} /> Physique
           <strong>{pctP} %</strong>
-        </span>
+        </button>
       </div>
       <div className="ps-formats-bar" role="img" aria-label={`${pctD} % dématérialisé, ${pctP} % physique`}>
         <span className="ps-formats-digital" style={{ width: `${pctD}%` }} />
@@ -229,13 +256,19 @@ function DonutTip({ active, payload }) {
 }
 
 // « Fromage » du backlog : donut animé + total au centre, légende à côté.
-function StatusDonut({ statuses, total }) {
+function StatusDonut({ statuses, total, onSlice }) {
   const data = useMemo(
     () =>
       STATUS_META.map((m) => {
         const s = statuses.find((x) => x.key === m.key);
         return s?.count
-          ? { key: m.key, name: m.label, value: s.count, fill: `var(--ps-c-${m.key})` }
+          ? {
+              key: m.key,
+              name: m.label,
+              value: s.count,
+              games: s.games || [],
+              fill: `var(--ps-c-${m.key})`,
+            }
           : null;
       }).filter(Boolean),
     [statuses]
@@ -274,7 +307,18 @@ function StatusDonut({ statuses, total }) {
       </div>
       <ul className="ps-legend ps-legend-col">
         {data.map((d) => (
-          <li key={d.key}>
+          <li
+            key={d.key}
+            className={onSlice ? "clickable" : ""}
+            onClick={onSlice ? () => onSlice(d) : undefined}
+            role={onSlice ? "button" : undefined}
+            tabIndex={onSlice ? 0 : undefined}
+            onKeyDown={
+              onSlice
+                ? (e) => (e.key === "Enter" || e.key === " ") && onSlice(d)
+                : undefined
+            }
+          >
             <span className="ps-dot" style={{ background: d.fill }} />
             {d.name}
             <strong>{nf.format(d.value)}</strong>
@@ -384,6 +428,64 @@ function CommonGamesModal({ me, soulmate, token, onClose }) {
   );
 }
 
+// Pop-up générique « les jeux de cette stat » : ouverte au clic sur une barre,
+// une colonne, une part du donut… Liste de jaquettes qui défile (scroll), chaque
+// jaquette mène à la page du jeu. `total` = effectif réel de la facette (la liste
+// peut être plafonnée côté serveur → on l'indique).
+function FacetGamesModal({ title, Icon, games, total, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const capped = total != null && total > games.length;
+
+  return createPortal(
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="modal ps-common-modal ps-facet-modal">
+        <button className="modal-close clickable" onClick={onClose} aria-label="Fermer">
+          <X size={18} />
+        </button>
+        <h2 className="modal-title">
+          {Icon && <Icon size={20} />} {title}
+        </h2>
+        <p className="ps-common-modal-sub">
+          {nf.format(total != null ? total : games.length)} jeu
+          {(total != null ? total : games.length) > 1 ? "x" : ""}
+          {capped && ` — aperçu des ${nf.format(games.length)} premiers`}
+        </p>
+        {games.length ? (
+          <div className="ps-common-grid ps-facet-grid">
+            {games.map((g) => (
+              <Link
+                key={g.gameId}
+                to={`/game/${g.gameId}`}
+                className="ps-common-item"
+                title={g.name}
+                onClick={onClose}
+              >
+                {g.cover ? (
+                  <img src={g.cover} alt={g.name} loading="lazy" />
+                ) : (
+                  <span className="ps-common-ph">{g.name}</span>
+                )}
+                <span className="ps-common-name">{g.name}</span>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="ps-meter-note">Aucun jeu à afficher ici.</p>
+        )}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export default function ProfileStats({ username, token }) {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
@@ -391,6 +493,10 @@ export default function ProfileStats({ username, token }) {
   const [error, setError] = useState(null);
   const [companyTab, setCompanyTab] = useState("developers");
   const [commonOpen, setCommonOpen] = useState(false);
+  // Pop-up « les jeux de cette stat » : { title, Icon, games, total } | null
+  const [facet, setFacet] = useState(null);
+  const openFacet = (title, Icon, games, total) =>
+    setFacet({ title, Icon, games: games || [], total });
 
   useEffect(() => {
     if (!username) return;
@@ -435,6 +541,8 @@ export default function ProfileStats({ username, token }) {
 
   const statusTotal = stats.statuses.reduce((s, x) => s + x.count, 0) || 1;
   const goGame = (it) => navigate(`/game/${it.key}`);
+  const goCompany = (name, role) =>
+    navigate(`/company/${encodeURIComponent(name)}?role=${role}`);
   const soulmate = stats.soulmates[0];
   const others = stats.soulmates.slice(1);
   const topRated = stats.ratings.top;
@@ -478,7 +586,11 @@ export default function ProfileStats({ username, token }) {
       <div className="ps-grid">
         {/* ---------- Backlog : donut des statuts ---------- */}
         <Card Icon={Layers} title="État du backlog" sub={`${nf.format(t.games)} jeux`}>
-          <StatusDonut statuses={stats.statuses} total={statusTotal} />
+          <StatusDonut
+            statuses={stats.statuses}
+            total={statusTotal}
+            onSlice={(d) => openFacet(d.name, Layers, d.games, d.value)}
+          />
           {t.completionRate != null && (
             <div className="ps-meter-block">
               <div className="ps-meter-line">
@@ -543,12 +655,14 @@ export default function ProfileStats({ username, token }) {
         {stats.genres.length > 0 && (
           <Card Icon={Gamepad2} title="Genres de prédilection" sub="part des jeux joués">
             <BarList
+              onRowClick={(it) => openFacet(it.label, Gamepad2, it.games, it.value)}
               items={stats.genres.map((g) => ({
                 key: g.name,
                 label: g.name,
                 value: g.count,
+                games: g.games,
                 right: `${g.pct} %`,
-                title: `${g.name} : ${g.count} jeux`,
+                title: `${g.name} : ${g.count} jeux — voir la liste`,
               }))}
             />
           </Card>
@@ -579,13 +693,16 @@ export default function ProfileStats({ username, token }) {
             {companies.length ? (
               <BarList
                 FallbackIcon={Building2}
+                onRowClick={(it) =>
+                  goCompany(it.key, companyTab === "developers" ? "dev" : "pub")
+                }
                 items={companies.map((d) => ({
                   key: d.name,
                   label: d.name,
                   logo: d.logo ?? null,
                   value: d.count,
                   right: `${d.pct} %`,
-                  title: `${d.name} : ${d.count} jeux`,
+                  title: `${d.name} : ${d.count} jeux — ouvrir la fiche`,
                 }))}
               />
             ) : (
@@ -599,18 +716,27 @@ export default function ProfileStats({ username, token }) {
           <Card Icon={Joystick} title="Consoles & supports" sub="jeux joués par support">
             <BarList
               FallbackIcon={Joystick}
+              onRowClick={(it) => openFacet(it.label, Joystick, it.games, it.value)}
               items={stats.platforms.map((p) => ({
                 key: p.name,
                 label: p.name,
                 logo: p.logo ?? null,
                 value: p.count,
+                games: p.games,
                 right: p.hours
                   ? `${nf.format(p.count)} · ${fmtHours(p.hours)}`
                   : nf.format(p.count),
-                title: `${p.name} : ${p.count} jeux${p.hours ? `, ${fmtHours(p.hours)}` : ""}`,
+                title: `${p.name} : ${p.count} jeux${p.hours ? `, ${fmtHours(p.hours)}` : ""} — voir la liste`,
               }))}
             />
-            <FormatSplit formats={stats.formats} />
+            <FormatSplit
+              formats={stats.formats}
+              onPick={(kind) =>
+                kind === "physical"
+                  ? openFacet("Jeux physiques", Disc, stats.formats.physicalGames, stats.formats.physical)
+                  : openFacet("Jeux dématérialisés", Cloud, stats.formats.digitalGames, stats.formats.digital)
+              }
+            />
           </Card>
         )}
 
@@ -622,9 +748,18 @@ export default function ProfileStats({ username, token }) {
                 key: i,
                 label: i === 0 ? "0" : `${i * 10}`,
                 value: v,
+                games: stats.ratings.distGames?.[i] || [],
               }))}
               tipOf={(d) =>
                 `${d.label}–${Number(d.label) + 10} : ${nf.format(d.value)} jeu${d.value > 1 ? "x" : ""}`
+              }
+              onColClick={(d) =>
+                openFacet(
+                  `Notes de ${d.label} à ${Number(d.label) + 10}`,
+                  Star,
+                  d.games,
+                  d.value
+                )
               }
             />
             {topRated.length > 0 && (
@@ -694,7 +829,18 @@ export default function ProfileStats({ username, token }) {
           <Card Icon={Crown} title="Franchises fétiches" sub="sagas les plus présentes">
             <ul className="ps-franchises">
               {stats.franchises.map((f) => (
-                <li className="ps-franchise" key={f.name}>
+                <li
+                  className="ps-franchise clickable"
+                  key={f.name}
+                  role="button"
+                  tabIndex={0}
+                  title={`${f.name} — voir les ${f.count} jeux`}
+                  onClick={() => openFacet(f.name, Crown, f.games, f.count)}
+                  onKeyDown={(e) =>
+                    (e.key === "Enter" || e.key === " ") &&
+                    openFacet(f.name, Crown, f.games, f.count)
+                  }
+                >
                   <span className="ps-franchise-covers">
                     {f.covers.map((c, i) => (
                       <img key={i} src={c} alt="" loading="lazy" style={{ "--i": i }} />
@@ -720,8 +866,12 @@ export default function ProfileStats({ username, token }) {
                 key: d.decade,
                 label: `${String(d.decade).slice(2)}s`,
                 value: d.count,
+                games: d.games,
               }))}
               tipOf={(d) => `Années ${d.key} : ${nf.format(d.value)} jeu${d.value > 1 ? "x" : ""}`}
+              onColClick={(d) =>
+                openFacet(`Jeux des années ${d.key}`, CalendarRange, d.games, d.value)
+              }
             />
           </Card>
         )}
@@ -813,6 +963,16 @@ export default function ProfileStats({ username, token }) {
           soulmate={soulmate}
           token={token}
           onClose={() => setCommonOpen(false)}
+        />
+      )}
+
+      {facet && (
+        <FacetGamesModal
+          title={facet.title}
+          Icon={facet.Icon}
+          games={facet.games}
+          total={facet.total}
+          onClose={() => setFacet(null)}
         />
       )}
     </div>

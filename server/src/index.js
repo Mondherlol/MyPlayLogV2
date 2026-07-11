@@ -17,6 +17,7 @@ import videoRoutes from "./routes/videos.js";
 import feedRoutes from "./routes/feed.js";
 import patchnoteRoutes from "./routes/patchnotes.js";
 import adminRoutes from "./routes/admin.js";
+import companyRoutes from "./routes/companies.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -57,6 +58,7 @@ app.use("/api/videos", videoRoutes);
 app.use("/api/feed", feedRoutes);
 app.use("/api/patchnotes", patchnoteRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/companies", companyRoutes);
 
 const PORT = process.env.PORT || 4000;
 const MONGODB_URI =
