@@ -935,12 +935,19 @@ function TierRow({
                 key={c}
                 className="tier-color-dot clickable"
                 style={{ background: c }}
+                // Empêche le blur de l'input du label (qui refermerait tier-tools
+                // avant que le onClick ne se déclenche).
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => onUpdateTier(tier.id, { color: c })}
                 aria-label="Couleur"
               />
             ))}
           </div>
-          <button className="tier-remove clickable" onClick={() => onRemoveTier(tier.id)}>
+          <button
+            className="tier-remove clickable"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => onRemoveTier(tier.id)}
+          >
             <Trash2 size={14} /> Supprimer
           </button>
         </div>
