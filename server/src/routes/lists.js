@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 import multer from "multer";
 import List from "../models/List.js";
 import Activity from "../models/Activity.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { notify } from "../lib/notify.js";
 import {
   recordActivity,
@@ -221,7 +221,7 @@ function toFull(l, userId) {
 // GET /api/lists — feed : toutes les listes publiques + mes listes.
 // ?scope=mine pour n'avoir que les miennes, ?sort=likes|recent,
 // ?author=<userId> pour les listes d'UN joueur (publiques sauf si c'est moi).
-router.get("/", requireAuth, async (req, res) => {
+router.get("/", optionalAuth, async (req, res) => {
   try {
     const scope = req.query.scope;
     const author =
@@ -354,7 +354,7 @@ router.get("/mine/for-item", requireAuth, async (req, res) => {
 });
 
 // GET /api/lists/:id — détail d'une liste (respecte la confidentialité).
-router.get("/:id", requireAuth, async (req, res) => {
+router.get("/:id", optionalAuth, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id))
       return res.status(404).json({ error: "Liste introuvable." });

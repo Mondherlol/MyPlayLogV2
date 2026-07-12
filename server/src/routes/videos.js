@@ -2,7 +2,7 @@ import express from "express";
 import Documentary from "../models/Documentary.js";
 import UserGame from "../models/UserGame.js";
 import User from "../models/User.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { searchDocs, searchEvergreen } from "../lib/videos.js";
 import { sanitizeMediaList, resolveMentions, toComment } from "../lib/commentThread.js";
 import { notify } from "../lib/notify.js";
@@ -392,7 +392,7 @@ router.post("/progress", requireAuth, async (req, res) => {
 
 // --- Liste pour l'onglet Vidéos du profil (recommandations/historique publics,
 //     « regarder plus tard » privé) ---
-router.get("/user/:username", requireAuth, async (req, res) => {
+router.get("/user/:username", optionalAuth, async (req, res) => {
   try {
     const user = await User.findOne({ username: req.params.username }).select("_id");
     if (!user) return res.status(404).json({ error: "Profil introuvable." });

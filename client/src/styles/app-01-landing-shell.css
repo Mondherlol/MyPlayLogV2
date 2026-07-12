@@ -1686,6 +1686,86 @@
   overflow-x: clip;
 }
 
+/* ===== Coquille publique : profil partagé consulté sans être connecté =====
+   Pas de sidebar/topbar de l'app — juste le bandeau public (Navbar) et un
+   appel à l'inscription en pied. On reprend les repères de mise en page de
+   .app-content (padding, --topbar-h pour les onglets sticky, overflow clip). */
+.public-shell {
+  --content-pad: clamp(1.2rem, 4vw, 2.2rem);
+  --topbar-h: 58px;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.public-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: var(--content-pad);
+  /* clip (pas hidden) : ne pas casser le position:sticky des onglets du profil. */
+  overflow-x: clip;
+}
+
+.public-cta {
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--orange) 7%, var(--surface));
+  padding: clamp(1.2rem, 4vw, 2rem) var(--content-pad);
+}
+
+.public-cta-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.public-cta-logo {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: var(--accent-grad);
+  color: #1a0d02;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(242, 183, 11, 0.4);
+}
+
+.public-cta-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+  min-width: 200px;
+}
+
+.public-cta-text strong {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+
+.public-cta-text span {
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
+.public-cta-btn {
+  flex-shrink: 0;
+}
+
+@media (max-width: 560px) {
+  .public-cta-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .welcome {
   min-height: 62vh;
   display: flex;

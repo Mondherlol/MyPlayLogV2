@@ -430,6 +430,14 @@ export default function ProfileAllGames({ library, onOpen }) {
 
   return (
     <div className="pg-layout">
+      {/* Fond sombre derrière le panneau en mode mobile (bottom-sheet) */}
+      {panelOpen && (
+        <div
+          className="pg-panel-backdrop"
+          onClick={() => setPanelOpen(false)}
+          aria-hidden
+        />
+      )}
       {/* Panneau de filtres */}
       <aside className={`pg-panel ${panelOpen ? "open" : ""}`}>
         <div className="pg-panel-head">
@@ -442,6 +450,14 @@ export default function ProfileAllGames({ library, onOpen }) {
               Effacer
             </button>
           )}
+          {/* Fermeture — visible uniquement en mobile (bottom-sheet) */}
+          <button
+            className="pg-panel-close clickable"
+            onClick={() => setPanelOpen(false)}
+            aria-label="Fermer les filtres"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         <div className="pg-filter-block">
@@ -652,6 +668,21 @@ export default function ProfileAllGames({ library, onOpen }) {
           onSetMode={(m) => setMode("theme", m)}
           defaultOpen={false}
         />
+
+        {/* Barre de validation — visible uniquement en mobile (bottom-sheet) */}
+        <div className="pg-panel-foot">
+          {(activeCount > 0 || search) && (
+            <button className="pg-panel-reset clickable" onClick={resetAll}>
+              Effacer
+            </button>
+          )}
+          <button
+            className="pg-panel-apply clickable"
+            onClick={() => setPanelOpen(false)}
+          >
+            Voir {filtered.length} jeu{filtered.length > 1 ? "x" : ""}
+          </button>
+        </div>
       </aside>
 
       {/* Contenu */}

@@ -1642,6 +1642,14 @@ button.pf-stat:hover {
   margin-bottom: 1rem;
 }
 
+/* Fermeture / validation / fond : réservés au bottom-sheet mobile,
+   masqués sur desktop où le panneau est une colonne fixe. */
+.pg-panel-close,
+.pg-panel-foot,
+.pg-panel-backdrop {
+  display: none;
+}
+
 .pg-panel-title {
   display: inline-flex;
   align-items: center;
@@ -2136,18 +2144,135 @@ button.pf-stat:hover {
     grid-template-columns: 1fr;
   }
 
+  /* Panneau caché par défaut, ouvert en bottom-sheet plein écran. */
   .pg-panel {
     display: none;
-    position: static;
+  }
+
+  .pg-panel-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(1px);
   }
 
   .pg-panel.open {
-    display: block;
-    margin-bottom: 1rem;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    z-index: 1201;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    /* Occupe au plus 88% de l'écran, le reste laisse voir la grille derrière. */
+    max-height: 88vh;
+    margin: 0;
+    padding: 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.35);
+    /* L'aside défile ; en-tête et pied restent collés (sticky). */
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    animation: pg-sheet-in 0.22s ease;
+  }
+
+  /* En-tête collé en haut du sheet. */
+  .pg-panel.open .pg-panel-head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    margin: 0;
+    padding: 0.9rem 1.05rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    /* Poignée visuelle du bottom-sheet. */
+  }
+
+  .pg-panel.open .pg-panel-head::before {
+    content: "";
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--border-strong);
+  }
+
+  .pg-panel.open .pg-panel-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.15rem;
+    color: var(--text-soft);
+    margin-left: 0.2rem;
+  }
+
+  /* Blocs de filtres : ne pas se comprimer, marges latérales (le head/foot
+     portent leur propre padding pleine largeur). */
+  .pg-panel.open > .pg-filter-block,
+  .pg-panel.open > .filter-section {
+    flex-shrink: 0;
+    margin-left: 1.05rem;
+    margin-right: 1.05rem;
+  }
+
+  .pg-panel.open .pg-filter-block:first-of-type {
+    padding-top: 0.4rem;
+  }
+
+  /* Pied collé en bas avec le bouton de validation. */
+  .pg-panel-foot {
+    display: flex;
+    gap: 0.6rem;
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin: 0.6rem 0 0;
+    padding: 0.8rem 1.05rem calc(0.8rem + env(safe-area-inset-bottom, 0px));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+
+  .pg-panel-reset {
+    flex-shrink: 0;
+    padding: 0.7rem 1.1rem;
+    border-radius: var(--radius-md, 10px);
+    border: 1.5px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text-soft);
+    font-family: var(--font-display);
+    font-weight: 600;
+  }
+
+  .pg-panel-apply {
+    flex: 1;
+    padding: 0.7rem 1.1rem;
+    border-radius: var(--radius-md, 10px);
+    border: none;
+    background: var(--accent-grad);
+    color: #1a1204;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 0.95rem;
   }
 
   .pg-filter-toggle {
     display: inline-flex;
+  }
+}
+
+@keyframes pg-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
   }
 }
 

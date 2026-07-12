@@ -11,7 +11,7 @@ import Recommendation from "../models/Recommendation.js";
 import { ensureGameMeta } from "../lib/gameMeta.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { geminiJson, isGeminiConfigured } from "../lib/gemini.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { summarizeReactions } from "../lib/reviewSerialize.js";
 import { buildRepostStats } from "./reposts.js";
 import { playlistDuration } from "./lists.js";
@@ -474,9 +474,10 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
     });
   }
 
-  // --- Fan arts republiés (images locales, cf. routes/reposts.js) ---
+  // --- Fan arts républiés (images locales, cf. routes/reposts.js) ---
   // Le lecteur a-t-il déjà ces fan arts sur SON feed ? (état du bouton)
-  const myReposts = reposts.length
+  // Invité (pas de req.userId) : aucune republication « à moi ».
+  const myReposts = reposts.length && req.userId
     ? await Repost.find({
         user: req.userId,
         itemId: { $in: reposts.map((r) => r.itemId) },
@@ -685,7 +686,7 @@ router.get("/home", requireAuth, async (req, res) => {
 // Toute l'activité d'UN joueur (actions de bibliothèque, listes, abonnements,
 // interactions, fan arts, documentaires, pépites), même format que /home.
 // Première page : stats des reposts en plus (rail latéral de l'onglet Feed).
-router.get("/user/:username", requireAuth, async (req, res) => {
+router.get("/user/:username", optionalAuth, async (req, res) => {
   try {
     const u = await User.findOne({ username: req.params.username }).select("_id");
     if (!u) return res.status(404).json({ error: "Profil introuvable." });

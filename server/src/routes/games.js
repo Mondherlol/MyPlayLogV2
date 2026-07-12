@@ -7,7 +7,7 @@ import mongoose from "mongoose";
 import { igdbQuery } from "../lib/igdb.js";
 import { getValidAccessToken, fetchUserTitles, fetchTitleTrophies } from "../lib/psn.js";
 import { isAdminEmail } from "../lib/admin.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { notify } from "../lib/notify.js";
 import { recordActivity, removeActivity } from "../lib/activity.js";
 import { summarizeReactions, reviewComment } from "../lib/reviewSerialize.js";
@@ -364,7 +364,7 @@ const windowCache = new Map(); // "from-to" -> { at, games }
 const WINDOW_TTL = 6 * 60 * 60 * 1000;
 const WINDOW_MAX = 60;
 
-router.get("/releases", requireAuth, async (req, res) => {
+router.get("/releases", optionalAuth, async (req, res) => {
   try {
     const now = Math.floor(Date.now() / 1000);
     const startOfToday = now - (now % 86400); // minuit UTC : inclut les sorties du jour

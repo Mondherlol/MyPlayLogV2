@@ -18,6 +18,7 @@ import ListDetail from "./pages/ListDetail";
 import Admin from "./pages/Admin";
 import Placeholder from "./pages/Placeholder";
 import AppLayout from "./components/AppLayout";
+import PublicProfileShell from "./components/PublicProfileShell";
 import InstallPrompt from "./components/InstallPrompt";
 import ScrollManager from "./components/ScrollManager";
 
@@ -26,6 +27,23 @@ function ProtectedRoute({ children }) {
   if (loading) return <div className="center-screen">Chargement…</div>;
   if (!user) return <Navigate to="/login" replace />;
   return children;
+}
+
+// Profil partageable : consultable connecté (dans l'app, avec sidebar) OU en
+// invité (coquille publique + appel à l'inscription). On choisit la coquille
+// selon l'état d'authentification, sans jamais rediriger vers /login.
+function PublicProfileRoute() {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="center-screen">Chargement…</div>;
+  return user ? (
+    <AppLayout>
+      <Profile />
+    </AppLayout>
+  ) : (
+    <PublicProfileShell>
+      <Profile />
+    </PublicProfileShell>
+  );
 }
 
 function GuestOnly({ children }) {
@@ -74,6 +92,9 @@ export default function App() {
         }
       />
 
+      {/* Profil public partageable : accessible connecté OU en invité. */}
+      <Route path="/u/:username" element={<PublicProfileRoute />} />
+
       {/* Espace connecté : sidebar + topbar */}
       <Route
         element={
@@ -91,7 +112,6 @@ export default function App() {
         <Route path="/lists" element={<Lists />} />
         <Route path="/lists/:id" element={<ListDetail />} />
         <Route path="/profile" element={<Profile />} />
-        <Route path="/u/:username" element={<Profile />} />
         <Route path="/admin" element={<Admin />} />
         <Route
           path="/settings"

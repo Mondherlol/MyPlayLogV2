@@ -6,7 +6,7 @@ import PatchnotePopup from "./PatchnotePopup";
 import MiniPlayer from "./MiniPlayer";
 import { PlayerProvider } from "../context/PlayerContext";
 
-export default function AppLayout() {
+export default function AppLayout({ children }) {
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem("mpl_sidebar") === "collapsed"
   );
@@ -26,7 +26,7 @@ export default function AppLayout() {
         <div className="app-main">
           <Topbar />
           <main className="app-content">
-            <Outlet />
+            {children || <Outlet />}
           </main>
         </div>
         <PatchnotePopup />

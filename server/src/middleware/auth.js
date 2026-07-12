@@ -37,6 +37,26 @@ export function requireAuth(req, res, next) {
   }
 }
 
+// Variante « douce » : si un token valide est présent, on renseigne req.userId
+// (le viewer est alors reconnu — isMe, likes, abonnements…). Sinon on laisse
+// passer en invité (req.userId reste undefined). Sert aux pages publiques
+// partageables (profils en lecture seule) où l'on ne veut PAS bloquer les
+// visiteurs déconnectés.
+export function optionalAuth(req, _res, next) {
+  const header = req.headers.authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+  if (token) {
+    try {
+      const payload = jwt.verify(token, process.env.JWT_SECRET);
+      req.userId = payload.sub;
+      touchLastSeen(payload.sub);
+    } catch {
+      /* token invalide/expiré : on continue en invité, sans 401. */
+    }
+  }
+  next();
+}
+
 // À chaîner APRÈS requireAuth : réserve la route à l'admin (ADMIN_EMAIL).
 export async function requireAdmin(req, res, next) {
   try {

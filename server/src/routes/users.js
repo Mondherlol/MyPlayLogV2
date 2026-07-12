@@ -16,7 +16,7 @@ import { ensureGameMeta } from "../lib/gameMeta.js";
 import { ensureEntityLogos } from "../lib/entityLogos.js";
 import { connectWithNpsso } from "../lib/psn.js";
 import { isAdminEmail } from "../lib/admin.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { summarizeReactions, reviewComment } from "../lib/reviewSerialize.js";
 import { recordActivity, removeActivity } from "../lib/activity.js";
 
@@ -324,7 +324,7 @@ router.post("/:id/follow", requireAuth, async (req, res) => {
 });
 
 // --- Liste des abonnements d'un utilisateur ---
-router.get("/:id/following", requireAuth, async (req, res) => {
+router.get("/:id/following", optionalAuth, async (req, res) => {
   try {
     const u = await User.findById(req.params.id).populate("following", "username avatar bio");
     if (!u) return res.status(404).json({ error: "Utilisateur introuvable." });
@@ -342,7 +342,7 @@ router.get("/:id/following", requireAuth, async (req, res) => {
 });
 
 // --- Liste des abonnés d'un utilisateur ---
-router.get("/:id/followers", requireAuth, async (req, res) => {
+router.get("/:id/followers", optionalAuth, async (req, res) => {
   try {
     const followers = await User.find({ following: req.params.id }).select(
       "username avatar bio"
@@ -433,7 +433,7 @@ function reviewCard(e, meId, author) {
   };
 }
 
-router.get("/:username/activity", requireAuth, async (req, res) => {
+router.get("/:username/activity", optionalAuth, async (req, res) => {
   try {
     const user = await User.findOne({ username: req.params.username }).select(
       "_id username avatar"
@@ -729,7 +729,7 @@ async function gameMetaMap(gameIds) {
   return map;
 }
 
-router.get("/:username/recommendations", requireAuth, async (req, res) => {
+router.get("/:username/recommendations", optionalAuth, async (req, res) => {
   try {
     const user = await User.findOne({ username: req.params.username }).select("_id");
     if (!user) return res.status(404).json({ error: "Profil introuvable." });
@@ -816,7 +816,7 @@ router.get("/:username/recommendations", requireAuth, async (req, res) => {
 // --- Statistiques du profil (onglet Stats) ---
 // Tout est calculé à la volée depuis Mongo. IGDB n'est sollicité que pour les
 // jeux absents du cache GameMeta (1 requête batchée max, puis plus jamais).
-router.get("/:username/stats", requireAuth, async (req, res) => {
+router.get("/:username/stats", optionalAuth, async (req, res) => {
   try {
     const user = await User.findOne({ username: req.params.username }).select(
       "_id following"
@@ -1138,7 +1138,7 @@ router.get("/:username/stats", requireAuth, async (req, res) => {
 // --- Jeux en commun entre deux profils (détail de l'âme sœur gaming) ---
 // Renvoie l'intersection complète des deux bibliothèques, coups de cœur
 // partagés en tête puis meilleures notes, avec la note de chacun.
-router.get("/:username/common/:other", requireAuth, async (req, res) => {
+router.get("/:username/common/:other", optionalAuth, async (req, res) => {
   try {
     const [user, other] = await Promise.all([
       User.findOne({ username: req.params.username }).select("_id"),
@@ -1186,13 +1186,20 @@ router.get("/:username/common/:other", requireAuth, async (req, res) => {
 });
 
 // --- Profil public complet par identifiant (username) ---
-router.get("/:username", requireAuth, async (req, res) => {
+// optionalAuth : consultable sans être connecté (profil partageable). Un
+// visiteur connecté est reconnu (isMe / abonnements) ; un invité voit la
+// version publique (isMe=false, lists publiques uniquement).
+router.get("/:username", optionalAuth, async (req, res) => {
   try {
     const user = await User.findOne({ username: req.params.username });
     if (!user) return res.status(404).json({ error: "Profil introuvable." });
 
     const isMe = String(user._id) === String(req.userId);
-    const me = isMe ? user : await User.findById(req.userId).select("following");
+    const me = isMe
+      ? user
+      : req.userId
+        ? await User.findById(req.userId).select("following")
+        : null;
     const isFollowing = (me?.following || []).some(
       (u) => String(u) === String(user._id)
     );

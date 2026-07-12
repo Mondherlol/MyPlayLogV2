@@ -548,6 +548,11 @@ export default function Profile() {
               <button className="btn btn-ghost" onClick={() => setEditing(true)}>
                 <Pencil size={16} /> Modifier le profil
               </button>
+            ) : !user ? (
+              // Visiteur non connecté : suivre nécessite un compte.
+              <Link to="/login" className="follow-btn clickable">
+                <UserPlus size={17} /> Suivre
+              </Link>
             ) : (
               <button
                 className={`follow-btn clickable ${profile.isFollowing ? "following" : ""}`}
