@@ -55,6 +55,22 @@ function shuffle(a) {
 }
 const sample = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
+// Tirage sans remise PONDÉRÉ (Efraimidis–Spirakis : clé = rand^(1/poids)) : les
+// jeux sur lesquels le joueur a le plus d'heures (ou qu'il a le mieux notés)
+// remontent plus souvent en tête — sans être systématiques, le hasard garde sa
+// part pour la diversité. Retourne les jeux réordonnés.
+function weightedOrder(games) {
+  const weight = (g) => {
+    const h = Math.min(g.playtimeHours || 0, 120);
+    const r = g.rating != null ? Math.max(0, g.rating - 60) / 40 : 0;
+    return 1 + h / 8 + r * 3; // base 1 → tout jeu reste tirable
+  };
+  return games
+    .map((g) => ({ g, k: Math.random() ** (1 / weight(g)) }))
+    .sort((a, b) => b.k - a.k)
+    .map((x) => x.g);
+}
+
 // --- Pool de « gros jeux » pour les manches piège (jeux non joués) + décors de
 // recherche. Mis en cache par jour (comme /feed/discover). ---
 let famousCache = { day: 0, games: [] };
@@ -144,6 +160,42 @@ async function hintsForGames(gameIds) {
   }
 }
 
+// Noms alternatifs (dont FR) des jeux, pour rendre la recherche du joueur
+// tolérante : « Another Code » retrouve « Trace Memory », « Biohazard » →
+// « Resident Evil », etc. Un ou deux appels IGDB bornés, best-effort.
+// Retourne Map(gameId → [noms]).
+async function altNamesForGames(ids) {
+  const list = [...new Set(ids)].filter(Boolean);
+  const map = new Map();
+  if (!list.length) return map;
+  try {
+    for (let i = 0; i < list.length; i += 300) {
+      const chunk = list.slice(i, i + 300);
+      const raw = await igdbQuery(
+        "games",
+        `fields alternative_names.name; where id = (${chunk.join(",")}); limit ${chunk.length};`
+      );
+      for (const g of raw) {
+        const names = (g.alternative_names || []).map((a) => a.name).filter(Boolean);
+        if (names.length) map.set(g.id, names);
+      }
+    }
+  } catch (err) {
+    console.error("blindtest altnames error:", err.message);
+  }
+  return map;
+}
+
+// Attache les noms alternatifs à une liste de candidats (recherche tolérante).
+async function attachAltNames(candidates) {
+  const altMap = await altNamesForGames(candidates.map((c) => c.id));
+  for (const c of candidates) {
+    const a = altMap.get(c.id);
+    if (a && a.length) c.alt = a;
+  }
+  return candidates;
+}
+
 function mkRound(g, track, owned) {
   return {
     gameId: g.gameId,
@@ -195,15 +247,19 @@ async function buildRounds(userId, count) {
   }));
   const ownedIds = playedGames.map((g) => g.gameId);
 
-  const foreignTarget = ownedIds.length ? Math.max(1, Math.round(count * 0.35)) : count;
+  // Moins de manches « jamais joué » qu'avant (elles étaient trop nombreuses et
+  // répétitives) : ~20 %, le reste vient de la biblio du joueur.
+  const foreignTarget = ownedIds.length ? Math.max(1, Math.round(count * 0.2)) : count;
   const ownedTarget = count - foreignTarget;
 
   const usedVideo = new Set();
 
   // 1. Manches « mes jeux » : d'abord ceux qui ont déjà une OST en base (rapide).
+  //    Ordre pondéré par le temps de jeu → un peu plus souvent les jeux que le
+  //    joueur a le plus pratiqués, tout en gardant de la variété.
   const ownedTrackMap = await tracksForGames(ownedIds);
   const ownedRounds = [];
-  for (const g of shuffle([...playedGames])) {
+  for (const g of weightedOrder(playedGames)) {
     if (ownedRounds.length >= ownedTarget) break;
     const tracks = (ownedTrackMap.get(g.gameId) || []).filter(
       (t) => !usedVideo.has(t.videoId)
@@ -213,9 +269,9 @@ async function buildRounds(userId, count) {
     usedVideo.add(t.videoId);
     ownedRounds.push(mkRound(g, t, true));
   }
-  // Complément : scrape quelques jeux joués sans OST encore.
+  // Complément : scrape quelques jeux joués sans OST encore (même pondération).
   if (ownedRounds.length < ownedTarget) {
-    const missing = shuffle(
+    const missing = weightedOrder(
       playedGames.filter((g) => !(ownedTrackMap.get(g.gameId) || []).length)
     );
     ownedRounds.push(
@@ -273,7 +329,7 @@ async function buildRounds(userId, count) {
   for (const g of playedGames) addCand(g.gameId, g.name, g.cover);
   for (const g of foreignPool) addCand(g.gameId, g.name, g.cover);
   for (const r of rounds) addCand(r.gameId, r.gameName, r.cover); // filet de sécurité
-  const candidates = [...candMap.values()];
+  const candidates = await attachAltNames([...candMap.values()]);
 
   return { rounds, candidates };
 }
@@ -426,7 +482,7 @@ router.get("/challenge/:id", requireAuth, async (req, res) => {
     for (const r of rounds) addCand(r.gameId, r.gameName, r.cover);
     for (const g of played) addCand(g.gameId, g.name, g.cover || null);
     for (const g of famous) addCand(g.id, g.name, g.cover);
-    const candidates = [...candMap.values()];
+    const candidates = await attachAltNames([...candMap.values()]);
 
     const hintMap = await hintsForGames(rounds.map((r) => r.gameId));
     const sessionId = crypto.randomUUID();

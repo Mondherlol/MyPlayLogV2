@@ -861,12 +861,55 @@
   transition: color 0.15s ease;
 }
 .bt-vol-btn:hover { color: var(--bts-gold-2); }
+/* Slider de volume : piste fine, portion remplie en doré (suit --bt-vol-pct
+   posé par le JSX), pastille dorée nette. Cohérent avec l'accent de la page. */
 .bt-vol-slider {
-  width: 92px;
-  height: 4px;
-  accent-color: var(--bts-gold);
+  -webkit-appearance: none;
+  appearance: none;
+  width: 96px;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--bts-gold) 0 var(--bt-vol-pct, 100%),
+    var(--bts-btn-line) var(--bt-vol-pct, 100%) 100%
+  );
+  cursor: pointer;
+  outline: none;
+}
+.bt-vol-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bts-gold-2);
+  border: 2px solid var(--bts-btn-bg);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+.bt-vol-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.bt-vol-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bts-btn-line);
+}
+.bt-vol-slider::-moz-range-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bts-gold);
+}
+.bt-vol-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bts-gold-2);
+  border: 2px solid var(--bts-btn-bg);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
   cursor: pointer;
 }
+.bt-vol-slider:focus-visible { outline: 2px solid var(--bts-gold); outline-offset: 3px; }
 @media (max-width: 520px) {
   .bt-vol-slider { width: 58px; }
   .bt-back span { display: none; }

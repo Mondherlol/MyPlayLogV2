@@ -48,6 +48,11 @@ const norm = (s) =>
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 
+// Version « collée » (sans espaces) : rend la recherche tolérante à la
+// ponctuation et aux espaces mal placés — « assassins creed » et
+// « assassin's creed » donnent tous deux « assassinscreed ».
+const squish = (s) => norm(s).replace(/\s+/g, "");
+
 // Suffixes d'édition / portage / remaster à ignorer : deviner « BOTW » quand
 // la réponse est « BOTW - Switch 2 Edition », c'est le même jeu → bonne
 // réponse. Miroir EXACT de canonName()/sameGame() côté serveur.
@@ -131,7 +136,7 @@ const AUTO_NEXT_MS = 5000;
 
 // Temps supplémentaire APRÈS la fin de l'extrait pour finir de taper sa
 // réponse (le son est coupé, le chrono devient rouge).
-const GRACE_MS = 5000;
+const GRACE_MS = 10000;
 
 // --- Bruitages synthétisés (WebAudio, zéro asset externe) ---
 function useSfx() {
@@ -229,8 +234,12 @@ export default function BlindTest() {
   const [roundCount, setRoundCount] = useState(10);
   const [muted, setMutedState] = useState(false);
   const [volume, setVolume] = useState(() => {
-    const v = Number(localStorage.getItem("bt_volume"));
-    return Number.isFinite(v) && v >= 0 && v <= 100 ? v : 85;
+    // getItem() renvoie null quand rien n'est stocké → Number(null) vaut 0 (et
+    // passe le test >= 0), d'où un volume à 0 au tout premier lancement. On
+    // teste donc l'ABSENCE de valeur explicitement, et on démarre à fond.
+    const raw = localStorage.getItem("bt_volume");
+    const v = raw == null ? NaN : Number(raw);
+    return Number.isFinite(v) && v >= 0 && v <= 100 ? v : 100;
   });
   const [paused, setPaused] = useState(false);
 
@@ -255,6 +264,7 @@ export default function BlindTest() {
   const [input, setInput] = useState("");
   const [highlight, setHighlight] = useState(0);
   const inputRef = useRef(null);
+  const suggestRef = useRef(null);
 
   // Refs de contrôle (timers / closures fraîches)
   const guessesRef = useRef([]);
@@ -750,32 +760,68 @@ export default function BlindTest() {
       if (!prev) {
         byCanon.set(key, c);
       } else {
+        // On fusionne : on garde le nom le plus court comme libellé, mais on
+        // cumule les noms alternatifs (FR, etc.) des deux entrées.
         const better = c.name.length < prev.name.length ? c : prev;
-        byCanon.set(key, { ...better, cover: better.cover || prev.cover || c.cover });
+        byCanon.set(key, {
+          ...better,
+          cover: better.cover || prev.cover || c.cover,
+          alt: [...(prev.alt || []), ...(c.alt || [])],
+        });
       }
     }
-    // Acronymes précalculés une fois pour la recherche.
-    return [...byCanon.values()].map((c) => ({ ...c, acr: acronymsOf(c.name) }));
+    // Précalcule, une fois, tout ce qui sert à la recherche : acronymes, et le
+    // corpus de noms cherchables (nom principal + noms alternatifs / FR),
+    // chacun en version normalisée ET « collée » (sans espaces).
+    return [...byCanon.values()].map((c) => {
+      const raw = [c.name, ...(c.alt || [])].filter(Boolean);
+      const names = [...new Set(raw.map(norm))].filter(Boolean);
+      const sq = [...new Set(raw.map(squish))].filter(Boolean);
+      return { ...c, acr: acronymsOf(c.name), _names: names, _sq: sq };
+    });
   }, [candidates]);
 
-  // Suggestions de recherche : préfixe du nom > acronyme (« gta », « botw »,
-  // « ff7 »…) > sous-chaîne.
+  // Suggestions de recherche : préfixe > acronyme (« gta », « botw », « ff7 »…)
+  // > sous-chaîne. On teste le nom principal ET les noms alternatifs (FR…), en
+  // version normale et « collée » — donc « another code » trouve « Trace
+  // Memory », et « assassins creed » trouve « Assassin's Creed ».
   const suggestions = useMemo(() => {
     const q = norm(input);
     if (!q) return [];
-    const qc = q.replace(/\s+/g, ""); // « gta 5 » → « gta5 »
+    const qc = squish(input); // « gta 5 » / « assassin's » → « gta5 » / « assassins »
     const starts = [];
     const acro = [];
     const incl = [];
     for (const c of uniqueCandidates) {
-      const n = norm(c.name);
-      if (n.startsWith(q)) starts.push(c);
+      if (c._names.some((n) => n.startsWith(q)) || c._sq.some((n) => n.startsWith(qc)))
+        starts.push(c);
       else if (qc.length >= 2 && c.acr.some((a) => a.startsWith(qc))) acro.push(c);
-      else if (n.includes(q)) incl.push(c);
+      else if (
+        c._names.some((n) => n.includes(q)) ||
+        (qc.length >= 2 && c._sq.some((n) => n.includes(qc)))
+      )
+        incl.push(c);
       if (starts.length >= 8) break;
     }
     return [...starts, ...acro, ...incl].slice(0, 8);
   }, [input, uniqueCandidates]);
+
+  // La liste de suggestions est en position absolue sous le champ : quand le
+  // champ est bas dans la page (contenu centré verticalement), elle débordait
+  // sous l'écran sans qu'on puisse l'atteindre. On plafonne sa hauteur à
+  // l'espace réellement dispo jusqu'au bas du viewport → elle scrolle dedans.
+  useEffect(() => {
+    const el = suggestRef.current;
+    if (!el) return;
+    const fit = () => {
+      const top = el.getBoundingClientRect().top;
+      const avail = window.innerHeight - top - 12;
+      el.style.maxHeight = `${Math.max(140, avail)}px`;
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [suggestions]);
 
   function onKeyDown(e) {
     if (reveal || paused) return;
@@ -889,6 +935,7 @@ export default function BlindTest() {
             min="0"
             max="100"
             value={muted ? 0 : volume}
+            style={{ "--bt-vol-pct": `${muted ? 0 : volume}%` }}
             aria-label="Volume"
             onChange={(e) => {
               const v = Number(e.target.value);
@@ -1089,7 +1136,7 @@ export default function BlindTest() {
                 />
               </div>
               {!reveal && !paused && suggestions.length > 0 && (
-                <ul className="bt-suggest">
+                <ul className="bt-suggest" ref={suggestRef}>
                   {suggestions.map((c, i) => (
                     <li key={c.id}>
                       <button
