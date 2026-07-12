@@ -129,6 +129,10 @@ const HINT_FRACS = [0.35, 0.55, 0.75];
 // révélation (la barre CSS .bt-reveal-progress dure aussi 5 s — garder synchro).
 const AUTO_NEXT_MS = 5000;
 
+// Temps supplémentaire APRÈS la fin de l'extrait pour finir de taper sa
+// réponse (le son est coupé, le chrono devient rouge).
+const GRACE_MS = 5000;
+
 // --- Bruitages synthétisés (WebAudio, zéro asset externe) ---
 function useSfx() {
   const ctxRef = useRef(null);
@@ -268,6 +272,7 @@ export default function BlindTest() {
   const clipStartRef = useRef(0); // position (s) du début de l'extrait dans la vidéo
   const revealAtRef = useRef(0); // instant de la révélation (anti Entrée « en retard »)
   const loadingRef = useRef(false); // miroir de clipLoading pour le timer de manche
+  const graceRef = useRef(false); // l'extrait est fini, on est dans le temps bonus
 
   // --- Player YouTube caché, propre à la page (indépendant du mini-lecteur) ---
   const ytHostRef = useRef(null);
@@ -447,42 +452,15 @@ export default function BlindTest() {
       }
     } else {
       roundStartRef.current += Date.now() - pauseStartRef.current;
-      try {
-        ytRef.current?.playVideo?.();
-      } catch {
-        /* ignore */
+      // Pas de reprise du son si l'extrait était déjà terminé (temps bonus).
+      if (!graceRef.current) {
+        try {
+          ytRef.current?.playVideo?.();
+        } catch {
+          /* ignore */
+        }
       }
       setTimeout(() => inputRef.current?.focus(), 30);
-    }
-  }, []);
-
-  // --- Lecture d'une OST depuis le scoreboard final (toggle par piste) ---
-  const [boardPlaying, setBoardPlaying] = useState(null); // videoId en cours
-  const boardPlayingRef = useRef(null);
-  const playBoardTrack = useCallback((r) => {
-    const p = ytRef.current;
-    if (!p || !r.videoId) return;
-    if (boardPlayingRef.current === r.videoId) {
-      try {
-        p.pauseVideo?.();
-      } catch {
-        /* ignore */
-      }
-      boardPlayingRef.current = null;
-      setBoardPlaying(null);
-      return;
-    }
-    boardPlayingRef.current = r.videoId;
-    setBoardPlaying(r.videoId);
-    try {
-      p.loadVideoById(r.videoId);
-      if (!mutedRef.current) {
-        p.unMute?.();
-        p.setVolume?.(volumeRef.current);
-      }
-      p.playVideo?.();
-    } catch {
-      /* ignore */
     }
   }, []);
 
@@ -512,6 +490,7 @@ export default function BlindTest() {
   // --- Démarrage d'une partie ---
   async function startGame() {
     sfx.resume(); // crée/réveille l'AudioContext dans le geste utilisateur
+    player?.pause?.(); // coupe le mini-lecteur global (ex. OST des résultats)
     setError("");
     setPhase("loading");
     setFinal(null);
@@ -585,9 +564,11 @@ export default function BlindTest() {
     pausedRef.current = false;
     setPaused(false);
     prevUnlockRef.current = 0;
+    graceRef.current = false;
     roundStartRef.current = Date.now();
-    const dur = round.durationSec * 1000;
-    setTimeLeftMs(dur);
+    // La manche dure : extrait (durationSec) + temps bonus pour taper (GRACE_MS).
+    const total = round.durationSec * 1000 + GRACE_MS;
+    setTimeLeftMs(total);
     playClip(round);
     sfx.play("start");
     // Focus le champ de recherche pour taper tout de suite.
@@ -604,12 +585,19 @@ export default function BlindTest() {
       // Chrono gelé tant que le son charge (playClip réarme roundStartRef au
       // vrai départ) — évite le compteur qui descend puis remonte.
       if (loadingRef.current) return;
-      const left = Math.max(0, dur - (Date.now() - roundStartRef.current));
+      const left = Math.max(0, total - (Date.now() - roundStartRef.current));
       setTimeLeftMs(left);
-      const sec = Math.ceil(left / 1000);
-      if (left <= 5000 && left > 0 && sec !== lastTickRef.current) {
-        lastTickRef.current = sec;
-        sfx.play(sec <= 3 ? "tick-hot" : "tick");
+      // Fin de l'extrait → on coupe le son, place au temps bonus (une fois).
+      if (left <= GRACE_MS && !graceRef.current) {
+        graceRef.current = true;
+        stopClip();
+      }
+      if (left <= GRACE_MS && left > 0) {
+        const sec = Math.ceil(left / 1000);
+        if (sec !== lastTickRef.current) {
+          lastTickRef.current = sec;
+          sfx.play(sec <= 3 ? "tick-hot" : "tick");
+        }
       }
       if (left <= 0) {
         clearInterval(iv);
@@ -830,9 +818,18 @@ export default function BlindTest() {
   }
 
   const round = rounds[idx];
-  const clipFrac = round ? timeLeftMs / (round.durationSec * 1000) : 0;
-  const secondsLeft = Math.ceil(timeLeftMs / 1000);
-  const elapsedMs = round ? round.durationSec * 1000 - timeLeftMs : 0;
+  // La manche = écoute (durationSec) puis temps bonus (GRACE_MS, son coupé).
+  // L'anneau montre le temps d'écoute restant, puis se remplit en rouge et
+  // égrène les 5 dernières secondes.
+  const listenLeftMs = Math.max(0, timeLeftMs - GRACE_MS);
+  const inGrace = phase === "playing" && !!round && timeLeftMs > 0 && listenLeftMs <= 0;
+  const clipFrac = round
+    ? inGrace
+      ? timeLeftMs / GRACE_MS
+      : listenLeftMs / (round.durationSec * 1000)
+    : 0;
+  const secondsLeft = Math.ceil((inGrace ? timeLeftMs : listenLeftMs) / 1000);
+  const elapsedMs = round ? round.durationSec * 1000 - listenLeftMs : 0;
 
   // --- Indices progressifs : année → plateformes → studio (ou genre) ---
   const hintDefs = useMemo(() => {
@@ -993,9 +990,9 @@ export default function BlindTest() {
             </div>
 
             <div
-              className={`bt-stage ${secondsLeft <= 3 && !paused ? "hot" : ""} ${
-                paused ? "paused" : ""
-              }`}
+              className={`bt-stage ${(inGrace || secondsLeft <= 3) && !paused ? "hot" : ""} ${
+                inGrace ? "grace" : ""
+              } ${paused ? "paused" : ""}`}
             >
               <button
                 className="bt-vinyl clickable"
@@ -1040,6 +1037,10 @@ export default function BlindTest() {
                 </button>
               )}
             </div>
+
+            {inGrace && !reveal && !paused && (
+              <p className="bt-grace-hint">Extrait terminé — valide ta réponse !</p>
+            )}
 
             {/* ---- Indices progressifs ---- */}
             {hintDefs.length > 0 && !reveal && (
@@ -1134,6 +1135,7 @@ export default function BlindTest() {
             {/* ---- Révélation : overlay centré plein écran ---- */}
             {reveal && (
               <div className="bt-overlay" role="dialog" aria-modal="true">
+                <div className="bt-reveal-wrap">
                 <div
                   className={`bt-reveal ${reveal.correct ? "good" : "bad"} ${
                     replayOn ? "replaying" : ""
@@ -1169,17 +1171,6 @@ export default function BlindTest() {
                     {replayOn ? <Pause size={13} /> : <Play size={13} />}
                     <span>{reveal.round.ostName || "Réécouter l'extrait"}</span>
                   </button>
-                  {!reveal.correct && (
-                    <span className="bt-reveal-your">
-                      {reveal.guessName ? (
-                        <>
-                          Ta réponse : <s>{reveal.guessName}</s>
-                        </>
-                      ) : (
-                        "Temps écoulé, aucune réponse"
-                      )}
-                    </span>
-                  )}
                   <button className="bt-next clickable" onClick={goNext}>
                     {idx + 1 < rounds.length ? "Manche suivante" : "Voir mon score"}
                     <span className="bt-next-count">{nextIn}</span>
@@ -1188,6 +1179,19 @@ export default function BlindTest() {
                     <kbd className="bt-kbd">↵</kbd> ou{" "}
                     <kbd className="bt-kbd">Espace</kbd> pour continuer
                   </span>
+                </div>
+                {/* Ta réponse : sous la card, en pill sur le voile */}
+                {!reveal.correct && (
+                  <span className="bt-reveal-your">
+                    {reveal.guessName ? (
+                      <>
+                        Ta réponse : <s>{reveal.guessName}</s>
+                      </>
+                    ) : (
+                      "Temps écoulé, aucune réponse"
+                    )}
+                  </span>
+                )}
                 </div>
               </div>
             )}
@@ -1202,14 +1206,9 @@ export default function BlindTest() {
             copied={copied}
             onCopy={copyChallenge}
             onReplay={() => {
-              stopClip();
-              boardPlayingRef.current = null;
-              setBoardPlaying(null);
               if (challengeId) navigate("/blindtest");
               setPhase("intro");
             }}
-            onPlayTrack={playBoardTrack}
-            playingId={boardPlaying}
             token={token}
           />
         )}
@@ -1221,19 +1220,30 @@ export default function BlindTest() {
 // ============================================================
 //  Tableau des scores + classement
 // ============================================================
-function Scoreboard({
-  final,
-  challengeId,
-  copied,
-  onCopy,
-  onReplay,
-  onPlayTrack,
-  playingId,
-  token,
-}) {
+function Scoreboard({ final, challengeId, copied, onCopy, onReplay, token }) {
   const [board, setBoard] = useState(null);
+  const player = usePlayer();
   const pct = final.roundCount ? Math.round((final.correctCount / final.roundCount) * 100) : 0;
   const ch = final.challenge;
+
+  // Les OST de la partie, jouables dans le mini-lecteur global (file complète :
+  // lancer une piste permet d'enchaîner les autres avec suivant/précédent).
+  const tracks = useMemo(
+    () =>
+      final.rounds
+        .filter((r) => r.videoId)
+        .map((r) => ({
+          id: `bt-${r.gameId}-${r.videoId}`,
+          videoId: r.videoId,
+          name: r.ostName || r.gameName,
+          artist: r.gameName,
+          artwork: r.cover || null,
+          gameId: r.gameId,
+          gameName: r.gameName,
+        })),
+    [final.rounds]
+  );
+  const trackFor = (r) => tracks.find((t) => t.videoId === r.videoId) || null;
 
   useEffect(() => {
     let alive = true;
@@ -1338,12 +1348,24 @@ function Scoreboard({
                 {r.videoId && (
                   <button
                     className={`bt-recap-play clickable ${
-                      playingId === r.videoId ? "on" : ""
+                      player?.isPlaying?.(trackFor(r)) ? "on" : ""
                     }`}
-                    onClick={() => onPlayTrack(r)}
-                    title={playingId === r.videoId ? "Mettre en pause" : "Écouter l'OST"}
+                    onClick={() =>
+                      player?.toggleTrack?.(trackFor(r), tracks, {
+                        source: { label: "Blind test — le détail" },
+                      })
+                    }
+                    title={
+                      player?.isPlaying?.(trackFor(r))
+                        ? "Mettre en pause"
+                        : "Écouter l'OST"
+                    }
                   >
-                    {playingId === r.videoId ? <Pause size={13} /> : <Play size={13} />}
+                    {player?.isPlaying?.(trackFor(r)) ? (
+                      <Pause size={13} />
+                    ) : (
+                      <Play size={13} />
+                    )}
                   </button>
                 )}
                 <span className={`bt-recap-pts ${r.points >= 0 ? "up" : "down"}`}>
