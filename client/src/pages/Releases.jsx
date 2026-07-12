@@ -24,7 +24,6 @@ import {
   Check,
   Minus,
   Search,
-  X,
   Flame,
   Gamepad2,
   Gamepad,
@@ -33,7 +32,7 @@ import {
   ArrowUp,
   Languages,
   PauseCircle,
-  Skull,
+  X,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { makeCache } from "../lib/cache";
@@ -648,7 +647,7 @@ function RelGameModal({ game, token, onClose }) {
 const TRAY_STATUSES = [
   { key: "wishlist", label: "À jouer", Icon: Bookmark },
   { key: "paused", label: "En pause", Icon: PauseCircle },
-  { key: "dropped", label: "Abandonnés", Icon: Skull },
+  { key: "dropped", label: "Abandonnés", Icon: X },
 ];
 
 // Enveloppe déplaçable (dnd-kit) : la contrainte de distance du capteur

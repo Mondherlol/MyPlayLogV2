@@ -15,13 +15,13 @@ import {
   ThumbsDown,
   Play,
   Pause,
-  Skull,
   Trophy,
   Cloud,
   Disc,
   ListPlus,
   PenLine,
   EyeOff,
+  AlertTriangle,
   Infinity as InfinityIcon,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
@@ -31,13 +31,14 @@ import { useLibrary } from "../context/LibraryContext";
 import ScrollRow from "./ScrollRow";
 import CharacterPicker from "./CharacterPicker";
 import OstPicker from "./OstPicker";
+import RatingGauge from "./RatingGauge";
 import { Composer } from "./ListComments";
 
 const STATUSES = [
   { value: "playing", label: "En cours", Icon: Play },
   { value: "finished", label: "Terminé", Icon: Trophy },
   { value: "paused", label: "En pause", Icon: Pause },
-  { value: "dropped", label: "Abandonné", Icon: Skull },
+  { value: "dropped", label: "Abandonné", Icon: X },
 ];
 
 // Statut spécial des jeux sans fin (multi/service : Rocket League, Overwatch…).
@@ -65,97 +66,27 @@ const EMPTY_DETAILS = {
   endlessHint: false,
 };
 
-// Jauge de note semi-circulaire — centre éditable (sans zéro parasite)
-function RatingGauge({ value, active, onEnable, onChange, onClear }) {
-  const R = 56;
-  const CX = 70;
-  const CY = 66;
-  const SW = 12;
-  const L = Math.PI * R;
-  const arc = `M ${CX - R} ${CY} A ${R} ${R} 0 0 1 ${CX + R} ${CY}`;
-  const offset = L * (1 - (active ? value : 0) / 100);
-  const color =
-    !active ? "var(--border-strong)" : value < 40 ? "#e0483f" : value < 70 ? "#f2b70b" : "#22a35a";
-  const inputRef = useRef(null);
-  // Ne focus le champ (→ ouvre le clavier mobile) QUE si l'utilisateur clique
-  // « Noter ». Sinon, ouvrir la modale sur un jeu déjà noté ouvrirait le clavier
-  // tout seul (frustrant). Le flag est posé par le bouton « Noter ».
-  const wantFocus = useRef(false);
-  const [txt, setTxt] = useState(String(value));
-
-  useEffect(() => {
-    setTxt(String(value));
-  }, [value]);
-  useEffect(() => {
-    if (active && wantFocus.current) {
-      inputRef.current?.focus();
-      wantFocus.current = false;
-    }
-  }, [active]);
-
-  function onInput(e) {
-    let v = e.target.value.replace(/[^0-9]/g, "").replace(/^0+(?=\d)/, "");
-    if (v === "") {
-      setTxt("");
-      return;
-    }
-    const n = Math.max(0, Math.min(100, parseInt(v, 10)));
-    setTxt(String(n));
-    onChange(n);
-  }
-
-  return (
-    <div className="rating-gauge">
-      <div className="gauge-vis">
-        <svg viewBox="0 0 140 78" className="gauge-svg">
-          <path d={arc} fill="none" stroke="var(--border-strong)" strokeWidth={SW} strokeLinecap="round" />
-          {active && (
-            <path
-              d={arc}
-              fill="none"
-              stroke={color}
-              strokeWidth={SW}
-              strokeLinecap="round"
-              strokeDasharray={L}
-              strokeDashoffset={offset}
-              style={{ transition: "stroke-dashoffset 0.3s ease, stroke 0.3s ease" }}
-            />
-          )}
-        </svg>
-        <div className="gauge-center">
-          {active ? (
-            <input
-              ref={inputRef}
-              type="number"
-              min="0"
-              max="100"
-              value={txt}
-              onChange={onInput}
-              onFocus={(e) => e.target.select()}
-              onBlur={() => txt === "" && setTxt(String(value))}
-              className="gauge-input"
-              style={{ color }}
-            />
-          ) : (
-            <button
-              className="gauge-noter clickable"
-              onClick={() => {
-                wantFocus.current = true;
-                onEnable();
-              }}
-            >
-              Noter
-            </button>
-          )}
-        </div>
-      </div>
-      {active && (
-        <button className="gauge-clear clickable" onClick={onClear}>
-          <X size={12} /> retirer la note
-        </button>
-      )}
-    </div>
-  );
+// Forme canonique des champs éditables, comparée par valeur (JSON) pour savoir
+// si l'utilisateur a des modifications non enregistrées. On plie `hasRating`
+// dans `rating` (null = pas de note) et on stringifie le temps de jeu pour que
+// "" et 0 ne soient pas confondus à tort.
+function normalizeState(s) {
+  return {
+    status: s.status || "",
+    platform: s.platform || "",
+    format: s.format || "digital",
+    playtime: String(s.playtime ?? ""),
+    favorite: !!s.favorite,
+    rating: s.hasRating ? Number(s.rating) : null,
+    review: (s.review || "").trim(),
+    reviewMedia: s.reviewMedia || [],
+    spoiler: !!s.spoiler,
+    pros: s.pros || [],
+    cons: s.cons || [],
+    favChar: s.favChar || null,
+    favoriteOst: s.favoriteOst || null,
+    cover: s.cover || null,
+  };
 }
 
 // `onSaved` (optionnel) : appelé après un enregistrement réussi uniquement
@@ -179,29 +110,25 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   const [favChar, setFavChar] = useState(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
-  // Instantané de la review au chargement, pour détecter une modif non
-  // enregistrée et prévenir avant de fermer la modale.
-  const initialReview = useRef({
-    review: "",
-    reviewMedia: [],
-    pros: [],
-    cons: [],
-    spoiler: false,
-  });
+  const [confirmClose, setConfirmClose] = useState(false);
+  // Instantané de TOUS les champs éditables au chargement, pour détecter une
+  // modification non enregistrée et prévenir avant de fermer la modale.
+  const initialSnapshot = useRef(null);
 
   // Statut/favori initialisés depuis la map locale de la bibliothèque : le bon
-  // bouton est coché dès l'ouverture, sans flash « Terminé » le temps que
-  // l'entrée complète arrive de l'API (qui reste la source de vérité).
+  // bouton est coché dès l'ouverture. Pour un jeu pas encore dans la
+  // bibliothèque on ne présélectionne AUCUN statut — c'est à l'utilisateur de
+  // choisir son avancement (pas de « Terminé » imposé par défaut).
   const [status, setStatus] = useState(() => {
     const s = map[game.id]?.status;
-    return PLAYED.includes(s) ? s : "finished";
+    return PLAYED.includes(s) ? s : "";
   });
   const [platform, setPlatform] = useState("");
   const [format, setFormat] = useState("digital"); // digital | physical
   const [playtime, setPlaytime] = useState("");
   const [favorite, setFavorite] = useState(() => !!map[game.id]?.favorite);
   const [hasRating, setHasRating] = useState(false);
-  const [rating, setRating] = useState(75);
+  const [rating, setRating] = useState(50);
   const [review, setReview] = useState("");
   const [reviewMedia, setReviewMedia] = useState([]);
   const [spoiler, setSpoiler] = useState(false);
@@ -225,7 +152,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
       if (e.entry) {
         const en = e.entry;
         setExisting(true);
-        setStatus(PLAYED.includes(en.status) ? en.status : "finished");
+        setStatus(PLAYED.includes(en.status) ? en.status : "");
         setPlatform(en.platform || "");
         setFormat(en.format || "digital");
         setPlaytime(en.playtimeHours ?? "");
@@ -242,13 +169,42 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
         setFavChar(en.favoriteCharacter || null);
         setFavoriteOst(en.favoriteOst || null);
         if (en.cover) setCover(en.cover);
-        initialReview.current = {
+        initialSnapshot.current = normalizeState({
+          status: PLAYED.includes(en.status) ? en.status : "",
+          platform: en.platform || "",
+          format: en.format || "digital",
+          playtime: en.playtimeHours ?? "",
+          favorite: !!en.favorite,
+          hasRating: en.rating != null,
+          rating: en.rating != null ? en.rating : 50,
           review: en.review || "",
           reviewMedia: en.reviewMedia || [],
+          spoiler: !!en.spoiler,
           pros: en.pros || [],
           cons: en.cons || [],
-          spoiler: !!en.spoiler,
-        };
+          favChar: en.favoriteCharacter || null,
+          favoriteOst: en.favoriteOst || null,
+          cover: en.cover || game.cover,
+        });
+      } else {
+        // Jeu pas encore dans la bibliothèque : l'état de référence est vierge.
+        initialSnapshot.current = normalizeState({
+          status: "",
+          platform: "",
+          format: "digital",
+          playtime: "",
+          favorite: false,
+          hasRating: false,
+          rating: 50,
+          review: "",
+          reviewMedia: [],
+          spoiler: false,
+          pros: [],
+          cons: [],
+          favChar: null,
+          favoriteOst: null,
+          cover: game.cover,
+        });
       }
       setEntryLoading(false);
       // Ouverture directe sur l'éditeur de review (depuis « Modifier ma review »).
@@ -261,46 +217,49 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
-    const onKey = (e) => e.key === "Escape" && (showReview ? setShowReview(false) : attemptClose());
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      if (confirmClose) setConfirmClose(false);
+      else if (showReview) setShowReview(false);
+      else attemptClose();
+    };
     document.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = "";
       document.removeEventListener("keydown", onKey);
     };
-  }, [onClose, showReview]);
+  }, [onClose, showReview, confirmClose]);
 
-  // Reflet « live » des champs de review, pour un contrôle fiable du non
+  // Reflet « live » de tous les champs éditables, pour un contrôle fiable du non
   // enregistré même depuis un handler capturé par un effet (touche Échap).
-  const liveReview = useRef(null);
-  liveReview.current = { review, reviewMedia, pros, cons, spoiler };
+  const live = useRef(null);
+  live.current = {
+    status, platform, format, playtime, favorite, hasRating, rating,
+    review, reviewMedia, spoiler, pros, cons, favChar, favoriteOst, cover,
+  };
 
-  function reviewDirty() {
-    const i = initialReview.current;
-    const c = liveReview.current;
+  // Une modif est « non enregistrée » si l'état courant diffère de l'instantané
+  // pris au chargement (ou de l'état vierge pour un jeu pas encore ajouté).
+  function isDirty() {
+    if (!initialSnapshot.current) return false;
     return (
-      c.review.trim() !== i.review.trim() ||
-      JSON.stringify(c.reviewMedia) !== JSON.stringify(i.reviewMedia) ||
-      JSON.stringify(c.pros) !== JSON.stringify(i.pros) ||
-      JSON.stringify(c.cons) !== JSON.stringify(i.cons) ||
-      c.spoiler !== i.spoiler
+      JSON.stringify(normalizeState(live.current)) !==
+      JSON.stringify(initialSnapshot.current)
     );
   }
 
-  // Fermeture de la modale : prévient si une review a été écrite/modifiée
-  // sans être enregistrée (le clic « Enregistrer » appelle onClose directement).
+  // Fermeture de la modale : si des changements ne sont pas enregistrés, on
+  // affiche un avertissement (le clic « Enregistrer » appelle onClose direct).
   function attemptClose() {
-    if (
-      reviewDirty() &&
-      !confirm(
-        "Ta review n'est pas encore enregistrée et sera perdue si tu fermes. Fermer quand même ?"
-      )
-    ) {
+    if (isDirty()) {
+      setConfirmClose(true);
       return;
     }
     onClose();
   }
 
   async function save() {
+    if (!status) return; // avancement obligatoire (bouton déjà désactivé)
     setSaving(true);
     try {
       const body = {
@@ -466,7 +425,10 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                     <RatingGauge
                       value={rating}
                       active={hasRating}
-                      onEnable={() => setHasRating(true)}
+                      onEnable={() => {
+                        setRating(50); // pastille au milieu au départ
+                        setHasRating(true);
+                      }}
                       onChange={setRating}
                       onClear={() => setHasRating(false)}
                     />
@@ -490,8 +452,10 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                 <div className="modal-form">
                   <h2 className="modal-title">{game.name}</h2>
 
-                  <label className="field-label">Avancement</label>
-                  <div className="seg">
+                  <label className="field-label">
+                    Avancement <span className="field-req">*</span>
+                  </label>
+                  <div className={`seg ${!status ? "unset" : ""}`}>
                     {statusOptions.map((s) => (
                       <button
                         key={s.value}
@@ -505,6 +469,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                       </button>
                     ))}
                   </div>
+
                   {!showEndless && !detailsLoading && (
                     <button
                       className="endless-link clickable"
@@ -645,7 +610,8 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                 <button
                   className="btn btn-primary"
                   onClick={save}
-                  disabled={saving || entryLoading}
+                  disabled={saving || entryLoading || !status}
+                  title={!status ? "Choisis d'abord ton avancement" : undefined}
                 >
                   {saving || entryLoading ? (
                     <Loader2 size={16} className="spin" />
@@ -720,6 +686,43 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
             <div className="modal-footer">
               <button className="btn btn-primary" onClick={() => setShowReview(false)}>
                 <Check size={16} /> Terminé
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Avertissement de fermeture avec des modifications non enregistrées */}
+      {confirmClose && (
+        <div
+          className="modal-overlay sub confirm-overlay"
+          onMouseDown={() => setConfirmClose(false)}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="confirm-card" onMouseDown={(e) => e.stopPropagation()}>
+            <span className="confirm-icon">
+              <AlertTriangle size={24} />
+            </span>
+            <h3 className="confirm-title">Modifications non enregistrées</h3>
+            <p className="confirm-text">
+              Tes changements ne sont pas encore enregistrés. Si tu fermes
+              maintenant, ils seront perdus.
+            </p>
+            <div className="confirm-actions">
+              <button
+                className="btn btn-ghost"
+                onClick={() => setConfirmClose(false)}
+              >
+                Continuer l'édition
+              </button>
+              <button
+                className="btn-discard clickable"
+                onClick={() => {
+                  setConfirmClose(false);
+                  onClose();
+                }}
+              >
+                Fermer sans enregistrer
               </button>
             </div>
           </div>

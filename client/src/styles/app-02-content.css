@@ -1561,7 +1561,7 @@
 .gauge-vis {
   position: relative;
   width: 100%;
-  max-width: 150px;
+  max-width: 180px;
 }
 
 .gauge-svg {
@@ -1576,6 +1576,15 @@
   top: 52%;
   display: flex;
   justify-content: center;
+  /* La rangée est pleine largeur : sans ça, ses zones vides (à gauche/droite du
+     chiffre) intercepteraient les clics destinés aux extrémités de l'arc. */
+  pointer-events: none;
+}
+
+/* Seuls le champ et le bouton « Noter » restent cliquables au centre. */
+.gauge-input,
+.gauge-noter {
+  pointer-events: auto;
 }
 
 .gauge-input {
@@ -1593,10 +1602,27 @@
   outline: none;
 }
 
-/* garde les petites flèches natives visibles */
+/* input texte (inputMode numérique) : aucune flèche parasite, réglage au slider */
 .gauge-input::-webkit-inner-spin-button,
 .gauge-input::-webkit-outer-spin-button {
-  opacity: 1;
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Arc draggable : on attrape la jauge et on glisse le long du demi-cercle.
+   `touch-action: none` évite que la page scrolle pendant le drag sur mobile. */
+.gauge-svg.grabbable {
+  touch-action: none;
+  cursor: pointer;
+}
+
+.gauge-svg.grabbable:active {
+  cursor: grabbing;
+}
+
+.gauge-thumb {
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.3));
+  pointer-events: none;
 }
 
 .gauge-noter {
@@ -1675,6 +1701,23 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
+}
+
+/* Astérisque « champ requis » sur le label Avancement */
+.field-req {
+  color: #e0483f;
+  font-weight: 700;
+}
+
+/* Aucun statut choisi : on souligne discrètement qu'un choix est attendu */
+.seg.unset .seg-opt {
+  border-style: dashed;
+}
+
+.seg-hint {
+  margin: 0.4rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-soft);
 }
 
 .seg-opt {
@@ -2315,6 +2358,93 @@
 .modal-overlay.sub {
   z-index: 1100;
   background: rgba(8, 8, 12, 0.55);
+}
+
+/* Avertissement « modifications non enregistrées » — au-dessus de tout */
+.confirm-overlay {
+  z-index: 1300;
+  display: grid;
+  place-items: center;
+  padding: 1.2rem;
+}
+
+.confirm-card {
+  width: 100%;
+  max-width: 380px;
+  padding: 1.6rem 1.4rem 1.2rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  text-align: center;
+  animation: confirm-pop 0.16s ease;
+}
+
+@keyframes confirm-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.confirm-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 0.9rem;
+  border-radius: 50%;
+  color: #e0483f;
+  background: rgba(224, 72, 63, 0.13);
+}
+
+.confirm-title {
+  margin: 0 0 0.4rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.08rem;
+}
+
+.confirm-text {
+  margin: 0 0 1.3rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text-soft);
+}
+
+.confirm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.confirm-actions .btn-ghost {
+  width: 100%;
+  justify-content: center;
+}
+
+.btn-discard {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.7rem 1rem;
+  border-radius: 12px;
+  border: none;
+  background: #e0483f;
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: filter 0.15s ease;
+}
+
+.btn-discard:hover {
+  filter: brightness(1.08);
 }
 
 .review-modal {

@@ -10,14 +10,13 @@ import {
   PartyPopper,
   Laugh,
   Plus,
-  X,
   Trash2,
   EyeOff,
   Eye,
   Play,
   Pause,
   Trophy,
-  Skull,
+  X,
   Infinity as InfinityIcon,
   Clock,
   Gamepad,
@@ -33,6 +32,7 @@ import { useAuth } from "../context/AuthContext";
 import { timeAgo } from "../lib/lists";
 import { Composer, renderMessage } from "./ListComments";
 import ReviewComments from "./ReviewComments";
+import RatingGauge from "./RatingGauge";
 
 const PLAYED = ["playing", "finished", "paused", "dropped", "endless"];
 
@@ -40,7 +40,7 @@ const STATUS_META = {
   playing: { label: "En cours", Icon: Play },
   finished: { label: "Terminé", Icon: Trophy },
   paused: { label: "En pause", Icon: Pause },
-  dropped: { label: "Abandonné", Icon: Skull },
+  dropped: { label: "Abandonné", Icon: X },
   endless: { label: "Sans fin", Icon: InfinityIcon },
   wishlist: { label: "À jouer", Icon: Clock },
 };
@@ -87,86 +87,6 @@ function ScoreRing({ value }) {
         />
       </svg>
       <span className="rv-ring-num">{value}</span>
-    </div>
-  );
-}
-
-// Jauge de note semi-circulaire — reprise à l'identique de PlayedModal.
-function RatingGauge({ value, active, onEnable, onChange, onClear }) {
-  const R = 56;
-  const CX = 70;
-  const CY = 66;
-  const SW = 12;
-  const L = Math.PI * R;
-  const arc = `M ${CX - R} ${CY} A ${R} ${R} 0 0 1 ${CX + R} ${CY}`;
-  const offset = L * (1 - (active ? value : 0) / 100);
-  const color =
-    !active ? "var(--border-strong)" : value < 40 ? "#e0483f" : value < 70 ? "#f2b70b" : "#22a35a";
-  const inputRef = useRef(null);
-  const [txt, setTxt] = useState(String(value));
-
-  useEffect(() => {
-    setTxt(String(value));
-  }, [value]);
-  useEffect(() => {
-    if (active) inputRef.current?.focus();
-  }, [active]);
-
-  function onInput(e) {
-    let v = e.target.value.replace(/[^0-9]/g, "").replace(/^0+(?=\d)/, "");
-    if (v === "") {
-      setTxt("");
-      return;
-    }
-    const n = Math.max(0, Math.min(100, parseInt(v, 10)));
-    setTxt(String(n));
-    onChange(n);
-  }
-
-  return (
-    <div className="rating-gauge">
-      <div className="gauge-vis">
-        <svg viewBox="0 0 140 78" className="gauge-svg">
-          <path d={arc} fill="none" stroke="var(--border-strong)" strokeWidth={SW} strokeLinecap="round" />
-          {active && (
-            <path
-              d={arc}
-              fill="none"
-              stroke={color}
-              strokeWidth={SW}
-              strokeLinecap="round"
-              strokeDasharray={L}
-              strokeDashoffset={offset}
-              style={{ transition: "stroke-dashoffset 0.3s ease, stroke 0.3s ease" }}
-            />
-          )}
-        </svg>
-        <div className="gauge-center">
-          {active ? (
-            <input
-              ref={inputRef}
-              type="number"
-              min="0"
-              max="100"
-              value={txt}
-              onChange={onInput}
-              onFocus={(e) => e.target.select()}
-              onBlur={() => txt === "" && setTxt(String(value))}
-              className="gauge-input"
-              style={{ color }}
-            />
-          ) : (
-            <button className="gauge-noter clickable" onClick={onEnable}>
-              Noter
-            </button>
-          )}
-        </div>
-      </div>
-      {active && (
-        <button className="gauge-clear clickable" onClick={onClear}>
-          <X size={12} /> retirer la note
-        </button>
-      )}
     </div>
   );
 }
@@ -290,9 +210,9 @@ function ReviewEditor({ game, token, initial, isNew, onSaved }) {
         <div className="rating-block grv-rating-block">
           <span className="rating-block-label">Ma note</span>
           <RatingGauge
-            value={rating ?? 75}
+            value={rating ?? 50}
             active={rating != null}
-            onEnable={() => setRating(75)}
+            onEnable={() => setRating(50)}
             onChange={setRating}
             onClear={() => setRating(null)}
           />

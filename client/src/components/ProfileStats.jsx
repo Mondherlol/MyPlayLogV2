@@ -20,7 +20,6 @@ import {
   Info,
   ThumbsDown,
   X,
-  Skull,
   Cloud,
   Disc,
   Tv,
@@ -838,7 +837,7 @@ export default function ProfileStats({ username, token }) {
                       <span className="ps-flop-name">{g.name}</span>
                       {g.dropped && (
                         <span className="ps-flop-dropped">
-                          <Skull size={11} /> Abandonné
+                          <X size={11} /> Abandonné
                         </span>
                       )}
                     </span>

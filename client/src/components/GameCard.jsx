@@ -11,7 +11,6 @@ import {
   Gamepad,
   Play,
   Pause,
-  Skull,
   Infinity as InfinityIcon,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -30,7 +29,7 @@ const STATUS_META = {
   playing: { label: "En cours", Icon: Play },
   finished: { label: "Terminé", Icon: Check },
   paused: { label: "En pause", Icon: Pause },
-  dropped: { label: "Abandonné", Icon: Skull },
+  dropped: { label: "Abandonné", Icon: X },
   endless: { label: "Sans fin", Icon: InfinityIcon },
 };
 

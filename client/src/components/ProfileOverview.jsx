@@ -22,7 +22,7 @@ import {
   Gamepad2,
   ListChecks,
   PauseCircle,
-  Skull,
+  X,
   Clock,
   Joystick,
   Type,
@@ -50,7 +50,7 @@ const BLOCK_META = {
   wishlist: { label: "À jouer", Icon: ListChecks },
   upcoming: { label: "Jeux attendus", Icon: CalendarClock },
   paused: { label: "En pause", Icon: PauseCircle },
-  dropped: { label: "Abandonnés", Icon: Skull },
+  dropped: { label: "Abandonnés", Icon: X },
 };
 const DEFAULT_ORDER = [
   "favorites",

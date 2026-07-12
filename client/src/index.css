@@ -154,6 +154,17 @@ h3 {
 .btn:active {
   transform: translateY(1px);
 }
+.btn:disabled {
+  opacity: 0.45;
+  filter: grayscale(0.4);
+  box-shadow: none;
+  transform: none;
+  cursor: not-allowed;
+}
+.btn:disabled:hover {
+  filter: grayscale(0.4);
+  box-shadow: none;
+}
 .btn svg {
   width: 18px;
   height: 18px;

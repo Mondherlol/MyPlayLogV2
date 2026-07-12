@@ -23,11 +23,10 @@ import {
   CalendarClock,
   Play,
   Pause,
-  Skull,
+  X,
   Heart,
   Infinity as InfinityIcon,
   Plus,
-  X,
   Upload,
   ImagePlus,
   ImageOff,
@@ -52,6 +51,7 @@ import { makeCache } from "../lib/cache";
 import { useAuth } from "../context/AuthContext";
 import { useLibrary } from "../context/LibraryContext";
 import ScrollRow from "../components/ScrollRow";
+import RatingGauge from "../components/RatingGauge";
 import PlayedModal from "../components/PlayedModal";
 import AddToListModal from "../components/AddToListModal";
 import GameReviews from "../components/GameReviews";
@@ -75,7 +75,7 @@ const STATUS_META = {
   playing: { label: "En cours", Icon: Play },
   finished: { label: "Terminé", Icon: Trophy },
   paused: { label: "En pause", Icon: Pause },
-  dropped: { label: "Abandonné", Icon: Skull },
+  dropped: { label: "Abandonné", Icon: X },
   endless: { label: "Sans fin", Icon: InfinityIcon },
 };
 
@@ -1441,109 +1441,11 @@ function FriendsPlayed({ friends }) {
   );
 }
 
-// Jauge de note semi-circulaire, éditable au centre (identique à PlayedModal).
-function RatingGauge({ value, active, onEnable, onChange, onClear }) {
-  const R = 56;
-  const CX = 70;
-  const CY = 66;
-  const SW = 12;
-  const L = Math.PI * R;
-  const arc = `M ${CX - R} ${CY} A ${R} ${R} 0 0 1 ${CX + R} ${CY}`;
-  const offset = L * (1 - (active ? value : 0) / 100);
-  const color = !active
-    ? "var(--border-strong)"
-    : value < 40
-    ? "#e0483f"
-    : value < 70
-    ? "#f2b70b"
-    : "#22a35a";
-  const inputRef = useRef(null);
-  // Ne focus le champ (→ ouvre le clavier mobile) QUE si l'utilisateur clique
-  // « Noter ». Sinon, ouvrir la page sur un jeu déjà noté ouvrirait le clavier
-  // tout seul (frustrant). Le flag est posé par le bouton « Noter ».
-  const wantFocus = useRef(false);
-  const [txt, setTxt] = useState(String(value));
-
-  useEffect(() => {
-    setTxt(String(value));
-  }, [value]);
-  useEffect(() => {
-    if (active && wantFocus.current) {
-      inputRef.current?.focus();
-      wantFocus.current = false;
-    }
-  }, [active]);
-
-  function onInput(e) {
-    let v = e.target.value.replace(/[^0-9]/g, "").replace(/^0+(?=\d)/, "");
-    if (v === "") {
-      setTxt("");
-      return;
-    }
-    const n = Math.max(0, Math.min(100, parseInt(v, 10)));
-    setTxt(String(n));
-    onChange(n);
-  }
-
-  return (
-    <div className="rating-gauge">
-      <div className="gauge-vis">
-        <svg viewBox="0 0 140 78" className="gauge-svg">
-          <path d={arc} fill="none" stroke="var(--border-strong)" strokeWidth={SW} strokeLinecap="round" />
-          {active && (
-            <path
-              d={arc}
-              fill="none"
-              stroke={color}
-              strokeWidth={SW}
-              strokeLinecap="round"
-              strokeDasharray={L}
-              strokeDashoffset={offset}
-              style={{ transition: "stroke-dashoffset 0.3s ease, stroke 0.3s ease" }}
-            />
-          )}
-        </svg>
-        <div className="gauge-center">
-          {active ? (
-            <input
-              ref={inputRef}
-              type="number"
-              min="0"
-              max="100"
-              value={txt}
-              onChange={onInput}
-              onFocus={(e) => e.target.select()}
-              onBlur={() => txt === "" && setTxt(String(value))}
-              className="gauge-input"
-              style={{ color }}
-            />
-          ) : (
-            <button
-              className="gauge-noter clickable"
-              onClick={() => {
-                wantFocus.current = true;
-                onEnable();
-              }}
-            >
-              Noter
-            </button>
-          )}
-        </div>
-      </div>
-      {active && (
-        <button className="gauge-clear clickable" onClick={onClear}>
-          <X size={12} /> retirer la note
-        </button>
-      )}
-    </div>
-  );
-}
-
 // « Ma note » de la colonne gauche : note éditable directement, persistée en
 // base sans ouvrir la modale (petit délai pour ne pas spammer l'API en tapant).
 function InlineRating({ value, onSave }) {
   const [hasRating, setHasRating] = useState(value != null);
-  const [rating, setRating] = useState(value ?? 75);
+  const [rating, setRating] = useState(value ?? 50);
   const timer = useRef(null);
 
   useEffect(() => {
@@ -1563,8 +1465,10 @@ function InlineRating({ value, onSave }) {
         value={rating}
         active={hasRating}
         onEnable={() => {
+          // « Noter » ouvre la jauge au milieu (50) et persiste cette note.
+          setRating(50);
           setHasRating(true);
-          onSave(rating);
+          onSave(50);
         }}
         onChange={(n) => {
           setRating(n);
