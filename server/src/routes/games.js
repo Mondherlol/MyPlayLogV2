@@ -1573,6 +1573,14 @@ async function getAdminPsnUser() {
   return admin && isAdminEmail(admin.email) ? admin : null;
 }
 
+// Le viewer (par son id) est-il l'administrateur ? Sert à la modération des
+// reviews et des réponses (suppression de n'importe quel contenu).
+async function isUserAdmin(userId) {
+  if (!userId) return false;
+  const u = await User.findById(userId).select("email").lean();
+  return isAdminEmail(u?.email);
+}
+
 router.get("/:id/psn-trophies", optionalAuth, async (req, res) => {
   try {
     const admin = await getAdminPsnUser();
@@ -1670,13 +1678,16 @@ async function resolveReviewMentions(text) {
   return users.map((u) => ({ user: u._id, username: u.username }));
 }
 
-function gameReviewCard(e, meId) {
+function gameReviewCard(e, meId, isAdmin = false) {
   const { counts, mine } = summarizeReactions(e.reactions, meId);
+  const isMe = String(e.user?._id || e.user) === String(meId);
   return {
     user: e.user
       ? { id: e.user._id, username: e.user.username, avatar: e.user.avatar || null }
       : null,
-    isMe: String(e.user?._id || e.user) === String(meId),
+    isMe,
+    // L'auteur peut supprimer sa review — l'admin, celle de n'importe qui.
+    canDelete: isMe || isAdmin,
     reactions: counts,
     myReaction: mine,
     status: e.status,
@@ -1706,7 +1717,7 @@ function gameReviewCard(e, meId) {
           url: e.favoriteOst.url || null,
         }
       : null,
-    comments: (e.comments || []).map((c) => reviewComment(c, e.comments, meId)),
+    comments: (e.comments || []).map((c) => reviewComment(c, e.comments, meId, isAdmin)),
     reviewedAt: e.reviewedAt || e.updatedAt,
     updatedAt: e.updatedAt,
   };
@@ -1719,12 +1730,13 @@ router.get("/:id/reviews", optionalAuth, async (req, res) => {
 
     // Avis joueurs Steam en parallèle : complètent les reviews de nos users
     // (qui restent prioritaires). Échoue silencieusement en null.
-    const [entries, steam] = await Promise.all([
+    const [entries, steam, viewerIsAdmin] = await Promise.all([
       UserGame.find({ gameId: id })
         .populate("user", "username avatar")
         .populate("comments.user", "username avatar")
         .sort({ updatedAt: -1 }),
       fetchSteamReviews(id).catch(() => null),
+      isUserAdmin(req.userId),
     ]);
 
     // Une entrée compte comme review si elle a du contenu rédigé OU une note.
@@ -1735,7 +1747,9 @@ router.get("/:id/reviews", optionalAuth, async (req, res) => {
       (e.reviewMedia && e.reviewMedia.length) ||
       e.rating != null;
 
-    const reviews = entries.filter(hasContent).map((e) => gameReviewCard(e, req.userId));
+    const reviews = entries
+      .filter(hasContent)
+      .map((e) => gameReviewCard(e, req.userId, viewerIsAdmin));
     // Visiteur non connecté : pas de review « à moi ». (Le garde évite aussi
     // qu'une entrée orpheline — user supprimé, e.user null — matche req.userId
     // undefined et soit renvoyée à tort comme la review du lecteur.)
@@ -1745,7 +1759,7 @@ router.get("/:id/reviews", optionalAuth, async (req, res) => {
 
     res.json({
       reviews,
-      mine: mine ? gameReviewCard(mine, req.userId) : null,
+      mine: mine ? gameReviewCard(mine, req.userId, viewerIsAdmin) : null,
       steam,
     });
   } catch (err) {
@@ -1761,14 +1775,49 @@ router.get("/:id/reviews/:userId", optionalAuth, async (req, res) => {
     const id = Number(req.params.id);
     if (!id || !mongoose.isValidObjectId(req.params.userId))
       return res.status(400).json({ error: "id invalide." });
-    const entry = await UserGame.findOne({ gameId: id, user: req.params.userId })
-      .populate("user", "username avatar")
-      .populate("comments.user", "username avatar");
+    const [entry, viewerIsAdmin] = await Promise.all([
+      UserGame.findOne({ gameId: id, user: req.params.userId })
+        .populate("user", "username avatar")
+        .populate("comments.user", "username avatar"),
+      isUserAdmin(req.userId),
+    ]);
     if (!entry) return res.status(404).json({ error: "Review introuvable." });
-    res.json({ review: gameReviewCard(entry, req.userId) });
+    res.json({ review: gameReviewCard(entry, req.userId, viewerIsAdmin) });
   } catch (err) {
     console.error("single review error:", err.message);
     res.status(500).json({ error: "Erreur lors du chargement de la review." });
+  }
+});
+
+// --- Supprimer une review (son auteur, ou l'administrateur pour modération) ---
+// On vide le contenu rédigé sans retirer le jeu de la bibliothèque du joueur
+// (même logique que la suppression « par soi-même » côté client).
+router.delete("/:id/reviews/:userId", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { userId } = req.params;
+    if (!id || !mongoose.isValidObjectId(userId))
+      return res.status(400).json({ error: "id invalide." });
+
+    if (String(userId) !== String(req.userId) && !(await isUserAdmin(req.userId)))
+      return res.status(403).json({ error: "Action non autorisée." });
+
+    const entry = await UserGame.findOne({ gameId: id, user: userId });
+    if (!entry) return res.status(404).json({ error: "Review introuvable." });
+
+    Object.assign(entry, {
+      review: "",
+      reviewMedia: [],
+      spoiler: false,
+      pros: [],
+      cons: [],
+      rating: null,
+    });
+    await entry.save();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("review delete error:", err.message);
+    res.status(500).json({ error: "Erreur lors de la suppression." });
   }
 });
 
@@ -1963,7 +2012,7 @@ router.post("/:id/reviews/:userId/comments/:commentId/like", requireAuth, async 
   }
 });
 
-// --- Supprimer une réponse (seul son auteur) ---
+// --- Supprimer une réponse (son auteur, ou l'administrateur) ---
 router.delete("/:id/reviews/:userId/comments/:commentId", requireAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -1976,7 +2025,7 @@ router.delete("/:id/reviews/:userId/comments/:commentId", requireAuth, async (re
     const c = (entry.comments || []).find((x) => String(x._id) === String(commentId));
     if (!c) return res.status(404).json({ error: "Réponse introuvable." });
 
-    if (String(c.user) !== String(req.userId))
+    if (String(c.user) !== String(req.userId) && !(await isUserAdmin(req.userId)))
       return res.status(403).json({ error: "Action non autorisée." });
 
     // On retire le commentaire ET ses réponses éventuelles.

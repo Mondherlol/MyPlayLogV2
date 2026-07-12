@@ -150,7 +150,7 @@ function RvComment({ c, onReply, onDelete, onLike }) {
             <button
               className="rvcm-del clickable"
               onClick={() => onDelete(c.id)}
-              title="Supprimer ma réponse"
+              title="Supprimer la réponse"
             >
               <Trash2 size={13} />
             </button>

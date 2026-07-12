@@ -439,6 +439,7 @@ export function ReviewItem({
   viewerFinished,
   forceReveal,
   isMine,
+  canModerate,
   variant = "user",
   onEdit,
   onDelete,
@@ -515,7 +516,7 @@ export function ReviewItem({
               )}
             </div>
             {r.rating != null && <ScoreRing value={r.rating} />}
-            {isMine && (
+            {isMine ? (
               <div className="rvc-mine-actions">
                 <button className="rvc-edit clickable" onClick={onEdit} title="Modifier ma review">
                   <PenLine size={15} />
@@ -528,7 +529,17 @@ export function ReviewItem({
                   <Trash2 size={15} />
                 </button>
               </div>
-            )}
+            ) : canModerate ? (
+              <div className="rvc-mine-actions">
+                <button
+                  className="rvc-edit rvc-del clickable"
+                  onClick={onDelete}
+                  title="Supprimer cette review (modération admin)"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ) : null}
           </div>
         </header>
 
@@ -701,7 +712,7 @@ function SteamReviews({ steam }) {
 }
 
 export default function GameReviews({ game, viewerStatus, upcoming, onWantPlay }) {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -768,6 +779,20 @@ export default function GameReviews({ game, viewerStatus, upcoming, onWantPlay }
       }));
     } catch {
       load(); // en cas d'échec, on resynchronise
+    }
+  }
+
+  // Modération admin : supprime la review d'un autre joueur (contenu vidé côté
+  // serveur, le jeu reste dans SA bibliothèque). Réservé à l'admin par l'API.
+  async function moderateDeleteReview(userId, username) {
+    if (!userId) return;
+    if (!confirm(`Supprimer la review de ${username || "ce joueur"} ? (modération admin)`)) return;
+    try {
+      await apiFetch(`/games/${game.id}/reviews/${userId}`, { method: "DELETE", token });
+      setLoading(true);
+      load();
+    } catch (err) {
+      alert(err.message);
     }
   }
 
@@ -943,6 +968,8 @@ export default function GameReviews({ game, viewerStatus, upcoming, onWantPlay }
                 gameId={game.id}
                 token={token}
                 viewerFinished={viewerFinished}
+                canModerate={!!user?.isAdmin}
+                onDelete={() => moderateDeleteReview(r.user?.id, r.user?.username)}
                 onReact={reactTo}
               />
             ))}

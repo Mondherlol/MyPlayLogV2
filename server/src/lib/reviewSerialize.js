@@ -13,7 +13,8 @@ export function summarizeReactions(reactions, meId) {
 }
 
 // Sérialise un commentaire (réponse) sous une review — résout l'aperçu du parent.
-export function reviewComment(c, all, meId) {
+// isAdmin : le lecteur est l'administrateur → il peut modérer (supprimer) toute réponse.
+export function reviewComment(c, all, meId, isAdmin = false) {
   const parent = c.parent ? all.find((x) => String(x._id) === String(c.parent)) : null;
   const mine = String(c.user?._id || c.user) === String(meId);
   return {
@@ -29,8 +30,8 @@ export function reviewComment(c, all, meId) {
       ? { id: c.user._id, username: c.user.username, avatar: c.user.avatar || null }
       : null,
     mine,
-    // Seul l'auteur de la réponse peut la supprimer.
-    canDelete: mine,
+    // L'auteur de la réponse peut la supprimer — l'admin, n'importe laquelle.
+    canDelete: mine || isAdmin,
     likeCount: (c.likes || []).length,
     liked: meId ? (c.likes || []).some((u) => String(u) === String(meId)) : false,
     parent: c.parent ? String(c.parent) : null,

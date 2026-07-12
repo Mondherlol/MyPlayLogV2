@@ -161,13 +161,18 @@ router.get("/feed", requireAuth, async (req, res) => {
       searchEvergreen({ en }).catch(() => []),
     ]);
 
-    // 4) Pool communautaire : vidéos recommandées par n'importe qui (curé humain,
-    //    on lui donne un gros bonus de score pour qu'il ressorte en priorité).
-    const pool = await Documentary.find({ recommended: true })
-      .populate("user", "username avatar")
-      .sort({ recommendedAt: -1 })
-      .limit(40)
-      .lean();
+    // 4) Pool communautaire : vidéos recommandées par les joueurs que JE suis
+    //    (curé humain, gros bonus de score pour qu'il ressorte en priorité).
+    //    Restreint aux abonnements : pas de recos d'inconnus dans le feed.
+    const me = await User.findById(req.userId).select("following").lean();
+    const following = me?.following || [];
+    const pool = following.length
+      ? await Documentary.find({ recommended: true, user: { $in: following } })
+          .populate("user", "username avatar")
+          .sort({ recommendedAt: -1 })
+          .limit(40)
+          .lean()
+      : [];
     const poolVideos = pool.map((d) => ({
       videoId: d.videoId,
       title: d.title,
