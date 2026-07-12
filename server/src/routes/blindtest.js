@@ -567,6 +567,90 @@ router.post("/finish", requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/blindtest/:id/results — le détail d'une partie terminée, pour la
+// modale « Voir les résultats » du fil : chaque manche avec la bonne réponse
+// (écoutable) et la réponse donnée. Pour les manches ratées, on joint la
+// jaquette du jeu répondu (IGDB, best-effort).
+router.get("/:id/results", requireAuth, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id))
+      return res.status(404).json({ error: "Partie introuvable." });
+    const doc = await BlindTest.findById(req.params.id)
+      .populate("user", "username avatar")
+      .populate("challengedUser", "username avatar")
+      .lean();
+    if (!doc) return res.status(404).json({ error: "Partie introuvable." });
+
+    const wrongIds = [
+      ...new Set(
+        (doc.rounds || [])
+          .filter((r) => !r.correct && r.guessedGameId != null && r.guessedGameId !== r.gameId)
+          .map((r) => r.guessedGameId)
+      ),
+    ];
+    let guessCovers = new Map();
+    if (wrongIds.length) {
+      try {
+        const raw = await igdbQuery(
+          "games",
+          `fields name,cover.image_id; where id = (${wrongIds.join(",")}); limit ${wrongIds.length};`
+        );
+        guessCovers = new Map(
+          raw.map((g) => [
+            g.id,
+            g.cover?.image_id ? `${IMG}/t_cover_big/${g.cover.image_id}.jpg` : null,
+          ])
+        );
+      } catch {
+        /* pas de jaquette, tant pis */
+      }
+    }
+
+    res.json({
+      id: String(doc._id),
+      user: person(doc.user),
+      score: doc.score,
+      correctCount: doc.correctCount,
+      roundCount: doc.roundCount,
+      durationSec: doc.durationSec,
+      date: doc.createdAt,
+      challenge: doc.challengedUser
+        ? {
+            user: person(doc.challengedUser),
+            score: doc.challengedScore ?? null,
+            beaten: doc.score > (doc.challengedScore ?? 0),
+          }
+        : null,
+      rounds: (doc.rounds || []).map((r) => {
+        const wrongGuess =
+          !r.correct && r.guessedGameId != null && r.guessedGameId !== r.gameId;
+        return {
+          gameId: r.gameId,
+          gameName: r.gameName,
+          cover: r.cover || null,
+          videoId: r.videoId,
+          ostName: r.ostName || "",
+          owned: !!r.owned,
+          correct: !!r.correct,
+          guessedName: r.guessedName || "",
+          points: r.points || 0,
+          timeMs: r.timeMs ?? null,
+          guessed: wrongGuess
+            ? {
+                gameId: r.guessedGameId,
+                name: r.guessedName || "",
+                cover: guessCovers.get(r.guessedGameId) || null,
+              }
+            : null,
+        };
+      }),
+    });
+  } catch (err) {
+    console.error("blindtest results error:", err.message);
+    res.status(500).json({ error: "Impossible de charger les résultats." });
+  }
+});
+
 // GET /api/blindtest/leaderboard — meilleur score par joueur (moi + mes suivis).
 router.get("/leaderboard", requireAuth, async (req, res) => {
   try {

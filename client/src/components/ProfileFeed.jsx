@@ -19,6 +19,7 @@ import RepostCommentsModal from "./RepostCommentsModal";
 import VideoCommentsModal from "./VideoCommentsModal";
 import VideoPlayerModal from "./VideoPlayerModal";
 import GemsFeedModal from "./GemsFeedModal";
+import BlindTestResultsModal from "./BlindTestResultsModal";
 import { FeedCard, FeedCardsSkeleton } from "./FeedCards";
 
 // Onglet « Feed » du profil : TOUTE l'activité du joueur, façon Twitter —
@@ -64,6 +65,7 @@ export default function ProfileFeed({ username, isMe, token, onSetCover }) {
   const [commentsFor, setCommentsFor] = useState(null); // repost → modale commentaires
   const [commentsForVideo, setCommentsForVideo] = useState(null); // vidéo → modale
   const [gemsFor, setGemsFor] = useState(null); // découverte de pépites → modale
+  const [blindTestFor, setBlindTestFor] = useState(null); // blind test → modale résultats
   const sentinelRef = useRef(null);
   // Refs miroirs pour que l'observer (créé une fois) lise l'état courant.
   const stateRef = useRef({ cursor: null, busy: false });
@@ -321,6 +323,7 @@ export default function ProfileFeed({ username, isMe, token, onSetCover }) {
                   onOpenImage={() => setLightbox(item)}
                   onPlay={(v) => setPlaying(v)}
                   onOpenGems={() => setGemsFor(item)}
+                  onOpenBlindTest={() => setBlindTestFor(item)}
                   onRemove={isMe ? () => removeRepost(item) : undefined}
                 />
               ))}
@@ -383,6 +386,13 @@ export default function ProfileFeed({ username, isMe, token, onSetCover }) {
         />
       )}
       {gemsFor && <GemsFeedModal item={gemsFor} onClose={() => setGemsFor(null)} />}
+      {blindTestFor && (
+        <BlindTestResultsModal
+          item={blindTestFor}
+          token={token}
+          onClose={() => setBlindTestFor(null)}
+        />
+      )}
     </section>
   );
 }

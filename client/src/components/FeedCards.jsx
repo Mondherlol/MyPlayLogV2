@@ -1239,9 +1239,10 @@ function GemsEvent({ item, onOpenGems }) {
 }
 
 // ============================================================
-//  Blind test terminé — cliquer « Défier » rejoue le même set d'extraits
+//  Blind test terminé — « Voir les résultats » ouvre la modale de détail
+//  (manches, réponses, écoute), d'où on peut aussi tenter le même défi
 // ============================================================
-function BlindTestEvent({ item }) {
+function BlindTestEvent({ item, onOpenBlindTest }) {
   const pct = item.total ? Math.round((item.correct / item.total) * 100) : 0;
   const ch = item.challenge;
   return (
@@ -1277,12 +1278,12 @@ function BlindTestEvent({ item }) {
         </div>
       </div>
 
-      <Link
-        to={`/blindtest?challenge=${item.blindTestId}`}
+      <button
         className="hf-bt-challenge-cta clickable"
+        onClick={onOpenBlindTest}
       >
-        <Swords size={15} /> Tenter le même défi
-      </Link>
+        <Disc3 size={15} /> Voir les résultats
+      </button>
     </article>
   );
 }

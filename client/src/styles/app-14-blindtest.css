@@ -225,6 +225,7 @@
 .hf-bt-versus.win { color: #1f9d55; }
 .hf-bt-versus.lose { color: var(--text-soft); }
 
+/* C'est désormais un <button> (ouvre la modale de résultats) : reset du fond. */
 .hf-bt-challenge-cta {
   display: inline-flex;
   align-items: center;
@@ -235,6 +236,7 @@
   padding: 0.55rem;
   border-radius: 12px;
   border: 1.5px solid var(--border-strong);
+  background: transparent;
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 0.87rem;
@@ -247,6 +249,421 @@
   background: color-mix(in srgb, var(--orange) 8%, transparent);
 }
 :root[data-theme="dark"] .hf-bt-versus.win { color: #3ddc84; }
+
+/* ---------------------------------------------------------------------
+   Modale « Voir les résultats » d'un blind test (BlindTestResultsModal)
+   --------------------------------------------------------------------- */
+.btr-modal {
+  max-width: 620px;
+  display: flex;
+  flex-direction: column;
+}
+
+.btr-head {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding-right: 2.4rem; /* place pour la croix */
+  margin-bottom: 1rem;
+}
+.btr-avatar {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  border: 2px solid var(--border-strong);
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--text-soft);
+  text-decoration: none;
+}
+.btr-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.btr-head-txt {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+}
+.btr-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.btr-title svg { color: var(--accent-ink); }
+.btr-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+.btr-sub svg { color: var(--accent-ink); }
+.btr-sub i { font-style: normal; opacity: 0.8; }
+.btr-versus {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.btr-versus.win { color: #1f9d55; }
+.btr-versus.lose { color: var(--text-soft); }
+:root[data-theme="dark"] .btr-versus.win { color: #3ddc84; }
+
+.btr-scorebox {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 76px;
+  padding: 0.55rem 0;
+  border-radius: 14px;
+  background: var(--accent-grad);
+  color: #3a2600;
+  line-height: 1;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--orange) 35%, transparent);
+}
+.btr-score-num {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.45rem;
+}
+.btr-score-lbl {
+  font-size: 0.66rem;
+  font-weight: 600;
+  opacity: 0.8;
+  margin-top: 0.15rem;
+}
+
+.btr-loading {
+  display: grid;
+  place-items: center;
+  padding: 3rem 0;
+  color: var(--text-soft);
+}
+.btr-empty {
+  padding: 2.2rem 1rem;
+  text-align: center;
+  color: var(--text-soft);
+}
+
+/* --- Liste des manches --- */
+.btr-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.btr-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 13px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  position: relative;
+  overflow: hidden;
+}
+/* Liseré de verdict à gauche */
+.btr-row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+}
+.btr-row.good::before { background: #2fbf71; }
+.btr-row.bad::before { background: #e0483f; }
+
+.btr-num {
+  flex: 0 0 auto;
+  width: 1.1rem;
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+/* --- Mini pochette + CD (même esprit que .pfo-card, en tout petit).
+   Le bouton entier lance la lecture ; le CD dépasse à droite, sort un peu
+   au survol et tourne pendant la lecture. --- */
+.btr-sleeve {
+  position: relative;
+  flex: 0 0 auto;
+  width: 88px;
+  height: 58px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  overflow: visible;
+}
+.btr-sleeve:disabled { opacity: 0.7; }
+
+.btr-cd {
+  position: absolute;
+  top: 6%;
+  left: 34%;
+  height: 88%;
+  aspect-ratio: 1;
+  transform: translateX(0);
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  filter: drop-shadow(-3px 4px 8px rgba(0, 0, 0, 0.45));
+}
+.btr-sleeve:not(:disabled):hover .btr-cd { transform: translateX(12%); }
+.btr-row.playing .btr-cd { transform: translateX(18%); }
+
+.btr-disc {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.18), transparent 42%),
+    repeating-radial-gradient(circle at center,
+      #17171b 0,
+      #17171b 1px,
+      #26262c 1px,
+      #26262c 3px),
+    #0e0e12;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  animation: vinyl-spin 4s linear infinite;
+  animation-play-state: paused;
+}
+.btr-row.playing .btr-disc { animation-play-state: running; }
+
+.btr-disc-label {
+  position: relative;
+  width: 46%;
+  height: 46%;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.5);
+}
+.btr-disc-label img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.btr-disc-hole {
+  position: absolute;
+  width: 16%;
+  height: 16%;
+  border-radius: 50%;
+  background: #0e0e12;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+
+/* La pochette = la jaquette du jeu, au-dessus du CD */
+.btr-album {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 46px;
+  z-index: 2;
+  overflow: hidden;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.btr-album img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.btr-album-ph {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-soft);
+}
+.btr-album-mouth {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 10px;
+  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.3));
+  pointer-events: none;
+}
+
+/* Play/pause en overlay sur la pochette (au survol ou en lecture) */
+.btr-sleeve-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.38);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.btr-sleeve:not(:disabled):hover .btr-sleeve-play,
+.btr-row.playing .btr-sleeve-play {
+  opacity: 1;
+}
+
+.btr-verdict {
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+.btr-row.good .btr-verdict { background: #2fbf71; }
+.btr-row.bad .btr-verdict { background: #e0483f; }
+
+.btr-info {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.btr-game {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.btr-game:hover { color: var(--accent-ink); }
+.btr-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.btr-meta:empty { display: none; }
+.btr-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+.btr-tag {
+  font-size: 0.66rem;
+  font-weight: 700;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  color: var(--accent-ink);
+  white-space: nowrap;
+}
+
+/* Réponse donnée sur une manche ratée (jaquette mini + écoute) */
+.btr-guess {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.15rem;
+  min-width: 0;
+}
+.btr-guess.none {
+  font-size: 0.76rem;
+  font-style: italic;
+  color: var(--text-soft);
+}
+.btr-guess-cover {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 26px;
+  border-radius: 4px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+}
+.btr-guess-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.btr-guess-txt {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.btr-guess-txt b {
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Colonne de droite : pastille de points + tag « Jamais joué » en dessous */
+.btr-side {
+  flex: 0 0 auto;
+  margin-left: 0.45rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+/* Points de la manche : pastille teintée */
+.btr-pts {
+  min-width: 3.2rem;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+.btr-pts.up {
+  color: #1f9d55;
+  background: color-mix(in srgb, #2fbf71 13%, transparent);
+}
+.btr-pts.down {
+  color: #e0483f;
+  background: color-mix(in srgb, #e0483f 11%, transparent);
+}
+:root[data-theme="dark"] .btr-pts.up { color: #3ddc84; }
+:root[data-theme="dark"] .btr-pts.down { color: #ff7b72; }
+
+@media (max-width: 560px) {
+  .btr-num { display: none; }
+  .btr-sleeve { width: 78px; }
+  .btr-scorebox { width: 64px; }
+  .btr-score-num { font-size: 1.25rem; }
+}
 
 /* ======================================================================
    Page /blindtest — scène de jeu immersive, tout centré, pleine largeur
