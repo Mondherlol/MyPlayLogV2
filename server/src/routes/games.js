@@ -20,9 +20,11 @@ import GameTime from "../models/GameTime.js";
 import HiddenOst from "../models/HiddenOst.js";
 import OstRename from "../models/OstRename.js";
 import VnCache from "../models/VnCache.js";
+import SwitchPatchCache from "../models/SwitchPatchCache.js";
 import { fetchHltbTimes } from "../lib/hltb.js";
 import { buildGameFeed, fetchSteamReviews } from "../lib/feed.js";
-import { findVnId, fetchVnCharacters } from "../lib/vndb.js";
+import { findVnId, fetchVnCharacters, fetchVnFrPatches } from "../lib/vndb.js";
+import { fetchSwitchFrPatch } from "../lib/nxbrew.js";
 import { GENRES_FR, MODES_FR, THEMES_FR, LANGUAGES_FR, frName } from "../lib/translations.js";
 import { ensureScraped, ytPlaylistTracks } from "../lib/ostScrape.js";
 
@@ -236,6 +238,95 @@ async function resolveVnCharacters(gameId, name) {
   } catch {
     return [];
   }
+}
+
+// Patchs de traduction FR (VNDB) d'un visual novel, avec cache DB séparé de
+// celui des personnages (mêmes staleness, versionné indépendamment). On réutilise
+// l'id VNDB déjà résolu par l'onglet Personnages quand il est disponible.
+const PATCH_VERSION = 1;
+async function resolveVnFrPatches(gameId, name) {
+  try {
+    const cached = await VnCache.findOne({ gameId });
+    if (
+      cached &&
+      cached.frPatchesVer === PATCH_VERSION &&
+      (cached.frPatches?.length ||
+        (cached.frPatchesAt && Date.now() - cached.frPatchesAt.getTime() < VN_STALE_MS))
+    ) {
+      return cached.frPatches || [];
+    }
+
+    // Réutilise l'id VNDB déjà résolu (par les personnages) si présent, sinon
+    // on le cherche. `vnId` vaut null quand une résolution précédente n'a rien
+    // trouvé — on ne re-cherche que si aucune résolution n'a jamais eu lieu.
+    const alreadyResolved = cached && cached.ver > 0;
+    const vnId = alreadyResolved ? cached.vnId : await findVnId(name);
+    const frPatches = vnId ? await fetchVnFrPatches(vnId) : [];
+    await VnCache.updateOne(
+      { gameId },
+      {
+        $set: {
+          vnId: vnId || null,
+          frPatches,
+          frPatchesVer: PATCH_VERSION,
+          frPatchesAt: new Date(),
+        },
+      },
+      { upsert: true }
+    ).catch(() => {});
+    return frPatches;
+  } catch {
+    return [];
+  }
+}
+
+// Patch FR Switch (nxbrew.net) d'un jeu, avec cache DB. On met en cache les
+// succès (7 j) ET les « rien trouvé » (3 h, pour ne pas marteler le site), mais
+// jamais un site injoignable (fetchSwitchFrPatch renvoie undefined → on réessaie
+// au prochain appel, ce qui fait « revivre » l'onglet dès le retour du site).
+const SWITCH_PATCH_VERSION = 1;
+const SWITCH_PATCH_OK_MS = 7 * 24 * 60 * 60 * 1000; // patch trouvé : 7 jours
+const SWITCH_PATCH_MISS_MS = 3 * 60 * 60 * 1000; // rien trouvé : 3 heures
+async function resolveSwitchFrPatch(gameId, name) {
+  try {
+    const cached = await SwitchPatchCache.findOne({ gameId });
+    if (cached && cached.ver === SWITCH_PATCH_VERSION && cached.at) {
+      const age = Date.now() - cached.at.getTime();
+      const ttl = cached.data ? SWITCH_PATCH_OK_MS : SWITCH_PATCH_MISS_MS;
+      if (age < ttl) return cached.data || null;
+    }
+    const data = await fetchSwitchFrPatch(name);
+    if (data === undefined) return null; // site injoignable → pas de mise en cache
+    await SwitchPatchCache.updateOne(
+      { gameId },
+      { $set: { data: data || null, ver: SWITCH_PATCH_VERSION, at: new Date() } },
+      { upsert: true }
+    ).catch(() => {});
+    return data || null;
+  } catch {
+    return null;
+  }
+}
+
+// Liens de recherche vers les grandes plateformes de mods, pré-remplis avec le
+// nom du jeu (aucune API gratuite fiable pour lister les mods → on renvoie vers
+// la recherche de chaque site).
+function buildModLinks(name) {
+  const q = encodeURIComponent(name);
+  return [
+    { key: "nexus", label: "Nexus Mods", url: `https://www.nexusmods.com/games?keyword=${q}` },
+    { key: "moddb", label: "ModDB", url: `https://www.moddb.com/search?q=${q}` },
+    {
+      key: "workshop",
+      label: "Steam Workshop",
+      url: `https://steamcommunity.com/workshop/browse/?searchtext=${q}`,
+    },
+    {
+      key: "google",
+      label: "Rechercher sur le web",
+      url: `https://www.google.com/search?q=${encodeURIComponent(name + " mods")}`,
+    },
+  ];
 }
 
 // Liste d'ids "1,2,3" -> [1,2,3]
@@ -1193,6 +1284,54 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
     });
   } catch (err) {
     console.error("game full error:", err.message);
+    res.status(err.status || 500).json({ error: err.message || "Erreur." });
+  }
+});
+
+// --- Onglet Patchs : mods + patchs de traduction. Cas spécifique traité : les
+// visual novels non disponibles en français → on cherche sur VNDB s'il existe
+// un patch de fan-traduction FR (avec son lien de téléchargement). ---
+router.get("/:id/patches", optionalAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+
+    const arr = await igdbQuery(
+      "games",
+      `fields name,genres.id,genres.name,platforms.id,platforms.name,language_supports.language.name; where id = ${id};`
+    );
+    const g = arr[0];
+    if (!g) return res.status(404).json({ error: "Jeu introuvable." });
+
+    const isVn = (g.genres || []).some(
+      (x) => x.id === 34 || /visual novel/i.test(x.name || "")
+    );
+    const hasFr = (g.language_supports || []).some((ls) =>
+      /french|français/i.test(ls.language?.name || "")
+    );
+    // Nintendo Switch (id IGDB 130) et Switch 2 (id 508) → patch FR nxbrew.
+    const isSwitch = (g.platforms || []).some(
+      (p) => p.id === 130 || p.id === 508 || /switch/i.test(p.name || "")
+    );
+
+    // On n'interroge VNDB que pour un VN pas déjà en FR ; nxbrew pour tout
+    // jeu Switch (même déjà traduit : la version Switch est parfois censurée).
+    const [vnPatches, switchPatch] = await Promise.all([
+      isVn && !hasFr ? resolveVnFrPatches(id, g.name) : Promise.resolve(null),
+      isSwitch ? resolveSwitchFrPatch(id, g.name) : Promise.resolve(null),
+    ]);
+
+    res.json({
+      name: g.name,
+      isVn,
+      hasFr,
+      isSwitch,
+      vnPatches, // null si non pertinent (pas un VN, ou déjà dispo en FR)
+      switchPatch, // null si non pertinent, aucun patch, ou site down
+      modLinks: buildModLinks(g.name),
+    });
+  } catch (err) {
+    console.error("game patches error:", err.message);
     res.status(err.status || 500).json({ error: err.message || "Erreur." });
   }
 });

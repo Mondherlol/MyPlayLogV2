@@ -42,6 +42,10 @@ import {
   Lock,
   Orbit,
   CornerLeftUp,
+  Wrench,
+  Download,
+  Package,
+  Gamepad2,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { makeCache } from "../lib/cache";
@@ -83,6 +87,8 @@ const gameCache = makeCache("mpl_gamefull_", 24 * 60 * 60 * 1000);
 // quand on quitte l'onglet Trophées puis qu'on y revient (TTL 30 min).
 const achCache = makeCache("mpl_ach_", 30 * 60 * 1000);
 const psnCache = makeCache("mpl_psn_", 30 * 60 * 1000);
+// Patchs/mods : cache mémoire + localStorage (appels VNDB coûteux). TTL 30 min.
+const patchCache = makeCache("mpl_patch_", 30 * 60 * 1000);
 
 const TABS = [
   { id: "infos", label: "Infos", Icon: Info, ready: true },
@@ -92,6 +98,7 @@ const TABS = [
   { id: "trophies", label: "Trophées", Icon: Trophy, ready: true },
   { id: "ost", label: "OST", Icon: Music, ready: true },
   { id: "characters", label: "Personnages", Icon: Users, ready: true },
+  { id: "patches", label: "Patchs", Icon: Wrench, ready: true },
 ];
 
 const TROPHY_TABS = [
@@ -270,10 +277,20 @@ export default function GamePage() {
   const isWishlist = entry?.status === "wishlist";
   const isPlayed = entry && PLAYED.includes(entry.status);
 
+  // Onglet « Patchs » : pertinent seulement pour les jeux Switch (patch FR
+  // nxbrew) et les visual novels (fan-trad VNDB) — on le masque ailleurs pour
+  // l'instant. Détection sur les mêmes critères que l'endpoint /patches.
+  const isSwitchGame = (game?.platforms || []).some(
+    (p) => p.id === 130 || p.id === 508 || /switch/i.test(p.name || "")
+  );
+  const isVnGame = (game?.genres || []).some((g) => /visual novel/i.test(g));
+  const tabs =
+    isSwitchGame || isVnGame ? TABS : TABS.filter((t) => t.id !== "patches");
+
   // Onglet actif : vit dans l'URL (?tab=…) pour survivre au refresh et au
   // retour arrière (replace : changer d'onglet n'empile pas d'historique).
   const wantTab = searchParams.get("tab");
-  const tab = TABS.some((t) => t.id === wantTab && t.ready) ? wantTab : "infos";
+  const tab = tabs.some((t) => t.id === wantTab && t.ready) ? wantTab : "infos";
   function setTab(next) {
     setSearchParams(next === "infos" ? {} : { tab: next }, { replace: true });
     scrollTabsToTop();
@@ -300,7 +317,7 @@ export default function GamePage() {
 
   // Swipe gauche/droite (mobile) → onglet précédent / suivant.
   const swipeTab = (dir) => {
-    const order = TABS.filter((t) => t.ready).map((t) => t.id);
+    const order = tabs.filter((t) => t.ready).map((t) => t.id);
     const i = order.indexOf(tab);
     const j = i + dir;
     if (i < 0 || j < 0 || j >= order.length) return;
@@ -773,7 +790,7 @@ export default function GamePage() {
             {/* Ancre (hors flux sticky) pour recaler le scroll au changement d'onglet. */}
             <div ref={tabsTopRef} aria-hidden="true" />
             <nav className="gp-tabs" ref={tabsNavRef}>
-              {TABS.map((t) => (
+              {tabs.map((t) => (
                 <button
                   key={t.id}
                   className={`gp-tab ${tab === t.id ? "active" : ""} ${
@@ -850,6 +867,10 @@ export default function GamePage() {
                 token={token}
                 favoriteName={fav?.favoriteCharacter?.name}
               />
+            )}
+
+            {tab === "patches" && (
+              <PatchesTab key={id} gameId={id} token={token} />
             )}
             </div>
           </div>
@@ -1160,6 +1181,226 @@ function PsnTrophies({ gameId, token, gameName, altName }) {
         })}
       </div>
     </>
+  );
+}
+
+// Détail d'un patch FR Switch (nxbrew) : sections Base / Update / DLC, chaque
+// hébergeur donnant un ou plusieurs liens (via le raccourcisseur ouo.io).
+function SwitchPatch({ patch }) {
+  return (
+    <div className="gp-swpatch">
+      <div className="gp-swpatch-head">
+        <span className="gp-patch-name">{patch.title}</span>
+        <div className="gp-patch-badges">
+          {patch.size && <span className="gp-patch-badge">{patch.size}</span>}
+          {patch.updateVersion && (
+            <span className="gp-patch-badge">v{patch.updateVersion}</span>
+          )}
+          <a
+            href={patch.pageUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="gp-patch-vndb clickable"
+            title="Voir sur nxbrew.net"
+          >
+            nxbrew <ExternalLink size={12} />
+          </a>
+        </div>
+      </div>
+      {patch.sections.map((sec, si) => (
+        <div className="gp-swsec" key={si}>
+          <span className={`gp-swsec-label ${sec.kind}`}>{sec.label}</span>
+          <div className="gp-patch-links">
+            {sec.hosts.map((h) =>
+              h.links.map((url, i) => (
+                <a
+                  key={`${h.host}-${i}`}
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="gp-patch-dl clickable"
+                  title={`${h.host} — ${sec.label}`}
+                >
+                  <Download size={14} /> {h.host}
+                  {h.links.length > 1 ? ` #${i + 1}` : ""}
+                </a>
+              ))
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// --- Onglet Patchs : patch FR Switch (nxbrew) + fan-traduction FR des visual
+// novels non traduits (VNDB) + liens de recherche de mods. ---
+function PatchesTab({ gameId, token }) {
+  const cached = patchCache.get(String(gameId));
+  const [loading, setLoading] = useState(!cached);
+  const [data, setData] = useState(cached?.data || null);
+
+  useEffect(() => {
+    const c = patchCache.get(String(gameId));
+    if (c?.fresh) {
+      setData(c.data);
+      setLoading(false);
+      return;
+    }
+    let alive = true;
+    if (c) setData(c.data); // périmé : on garde l'affichage pendant la revalidation
+    else setLoading(true);
+    apiFetch(`/games/${gameId}/patches`, { token })
+      .then((d) => {
+        if (!alive) return;
+        setData(d);
+        patchCache.set(String(gameId), d);
+      })
+      .catch(() => alive && !c && setData({ error: true }))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [gameId, token]);
+
+  if (loading) return <TrophySkeleton rows={4} />;
+
+  if (!data || data.error) {
+    return (
+      <div className="gp-troph-empty">
+        <Wrench size={26} />
+        <p className="font-fun">Impossible de charger les patchs pour l'instant.</p>
+      </div>
+    );
+  }
+
+  const vn = data.vnPatches; // null si non pertinent
+  const dateLabel = (r) =>
+    !r || r === "TBA" || /^0+/.test(r)
+      ? null
+      : new Date(`${r}`.length === 4 ? `${r}-01-01` : r).toLocaleDateString("fr-FR", {
+          year: "numeric",
+          month: "long",
+          day: /^\d{4}-\d{2}-\d{2}$/.test(r) ? "numeric" : undefined,
+        });
+
+  return (
+    <div className="gp-patches">
+      {/* Patch FR Switch (nxbrew.net) — pour tout jeu Switch */}
+      {data.isSwitch && (
+        <section className="gp-block">
+          <h2 className="gp-h2">
+            <Gamepad2 size={16} /> Patch FR Switch
+          </h2>
+          <p className="gp-patch-intro">
+            Certains jeux traduits en français sur PC ne le sont pas sur Switch (ou
+            avec une version censurée). Voici le patch FR d'origine, hébergé sur
+            nxbrew.net.
+          </p>
+          {data.switchPatch ? (
+            <SwitchPatch patch={data.switchPatch} />
+          ) : (
+            <div className="gp-troph-empty">
+              <Gamepad2 size={26} />
+              <p className="font-fun">
+                Aucun patch FR Switch trouvé pour ce jeu (ou site momentanément
+                indisponible).
+              </p>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Traduction FR (visual novels sans version française) */}
+      {vn !== null && (
+        <section className="gp-block">
+          <h2 className="gp-h2">
+            <Languages size={16} /> Traduction française
+          </h2>
+          <p className="gp-patch-intro">
+            Ce visual novel n'est pas disponible en français. Voici les patchs de
+            traduction trouvés sur VNDB (souvent des fan-traductions).
+          </p>
+          {vn.length === 0 ? (
+            <div className="gp-troph-empty">
+              <Languages size={26} />
+              <p className="font-fun">
+                Aucun patch de traduction française trouvé sur VNDB pour ce jeu.
+              </p>
+            </div>
+          ) : (
+            <div className="gp-patch-list">
+              {vn.map((r) => (
+                <div className="gp-patch" key={r.id}>
+                  <div className="gp-patch-body">
+                    <span className="gp-patch-name">{r.title}</span>
+                    <div className="gp-patch-badges">
+                      <span className={`gp-patch-badge ${r.official ? "official" : "fan"}`}>
+                        {r.official ? "Officiel" : "Fan-trad"}
+                      </span>
+                      {r.patch && <span className="gp-patch-badge">Patch</span>}
+                      {r.mtl && <span className="gp-patch-badge warn">Auto-trad</span>}
+                      {dateLabel(r.released) && (
+                        <span className="gp-patch-date">
+                          <Calendar size={12} /> {dateLabel(r.released)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="gp-patch-links">
+                    {r.links.slice(0, 4).map((l) => (
+                      <a
+                        key={l.url}
+                        href={l.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="gp-patch-dl clickable"
+                        title={l.label}
+                      >
+                        <Download size={14} /> {l.label}
+                      </a>
+                    ))}
+                    <a
+                      href={r.vndbUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="gp-patch-vndb clickable"
+                      title="Voir sur VNDB"
+                    >
+                      VNDB <ExternalLink size={12} />
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Mods : liens de recherche vers les grandes plateformes */}
+      <section className="gp-block">
+        <h2 className="gp-h2">
+          <Package size={16} /> Mods
+        </h2>
+        <p className="gp-patch-intro">
+          Retrouvez les mods de ce jeu sur les principales plateformes.
+        </p>
+        <div className="gp-links">
+          {(data.modLinks || []).map((m) => (
+            <a
+              key={m.key}
+              href={m.url}
+              target="_blank"
+              rel="noreferrer"
+              className="gp-link clickable"
+            >
+              {m.label}
+              <ExternalLink size={13} />
+            </a>
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }
 

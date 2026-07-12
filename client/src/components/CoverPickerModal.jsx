@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, ArrowLeft, Loader2, Gamepad2, Search, Check } from "lucide-react";
-import { apiFetch } from "../lib/api";
+import { X, ArrowLeft, Loader2, Gamepad2, Search, Check, Upload } from "lucide-react";
+import { apiFetch, apiUpload } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 
 // Choisir une photo de couverture : on cherche un jeu dans TOUT le catalogue
@@ -16,7 +16,28 @@ export default function CoverPickerModal({ entries, current, onPick, onClose }) 
   const [q, setQ] = useState("");
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef(null);
   const reqRef = useRef(0);
+
+  // Upload d'une image perso : on l'envoie au serveur, puis on la traite comme
+  // n'importe quelle couverture choisie (onPick → recadrage).
+  async function onFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("cover", file);
+      const { url } = await apiUpload("/users/me/cover", fd, token);
+      onPick(url);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setUploading(false);
+    }
+  }
 
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && onClose();
@@ -120,6 +141,25 @@ export default function CoverPickerModal({ entries, current, onPick, onClose }) 
               />
               {searching && <Loader2 size={16} className="spin" />}
             </div>
+            <button
+              className="btn btn-ghost coverpick-upload clickable"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              style={{ width: "100%", justifyContent: "center", marginBottom: "0.6rem" }}
+            >
+              {uploading ? (
+                <><Loader2 size={16} className="spin" /> Envoi…</>
+              ) : (
+                <><Upload size={16} /> Importer ma propre image</>
+              )}
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={onFile}
+            />
             <p className="additems-hint font-fun" style={{ marginTop: 0, marginBottom: "0.6rem" }}>
               {showMine ? "Tes jeux — ou cherche n'importe quel titre ci-dessus." : "Choisis un jeu, puis une de ses images."}
             </p>

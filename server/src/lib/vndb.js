@@ -70,6 +70,41 @@ export async function findVnId(title) {
   return loose?.id || null;
 }
 
+// Récupère les "releases" en français d'un VN depuis VNDB : c'est là que les
+// fans déposent leurs patchs de traduction (souvent absents d'IGDB/Steam). On
+// remonte patchs non-officiels ET versions FR officielles, du plus récent au
+// plus ancien, avec leurs liens externes (page de téléchargement du patch).
+export async function fetchVnFrPatches(vnId, max = 25) {
+  if (!vnId) return [];
+  const j = await post("/release", {
+    filters: ["and", ["vn", "=", ["id", "=", vnId]], ["lang", "=", "fr"]],
+    fields:
+      "id, title, alttitle, patch, official, released, languages.lang, languages.mtl, extlinks.url, extlinks.label, extlinks.name",
+    results: max,
+    sort: "released",
+    reverse: true,
+  });
+  const results = j?.results || [];
+  return results.map((r) => {
+    const frLang = (r.languages || []).find((l) => l.lang === "fr");
+    // Dédoublonne les liens (une même URL peut apparaître via plusieurs labels).
+    const seen = new Set();
+    const links = (r.extlinks || [])
+      .filter((e) => e.url && !seen.has(e.url) && seen.add(e.url))
+      .map((e) => ({ url: e.url, label: e.label || e.name || "Lien" }));
+    return {
+      id: r.id,
+      title: r.title || r.alttitle || "Version française",
+      patch: !!r.patch, // patch à appliquer sur le jeu de base
+      official: !!r.official, // traduction officielle (vs fan-trad)
+      mtl: !!frLang?.mtl, // traduction automatique (machine translation)
+      released: r.released || null, // "YYYY-MM-DD", "TBA" ou null
+      links,
+      vndbUrl: `https://vndb.org/${r.id}`,
+    };
+  });
+}
+
 // Priorité d'affichage selon le rôle du personnage dans le VN.
 const ROLE_ORDER = { main: 0, primary: 1, side: 2, appears: 3 };
 

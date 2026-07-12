@@ -41,6 +41,23 @@ const upload = multer({
     cb(null, /^image\/(jpe?g|png|webp|gif)$/.test(file.mimetype)),
 });
 
+// --- Upload de couvertures (bannière du profil) : dossier + limite dédiés ---
+const COVER_DIR = path.join(__dirname, "../../uploads/covers");
+fs.mkdirSync(COVER_DIR, { recursive: true });
+const coverStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, COVER_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || ".jpg";
+    cb(null, `${req.userId}-${Date.now()}-${Math.round(Math.random() * 1e6)}${ext}`);
+  },
+});
+const coverUpload = multer({
+  storage: coverStorage,
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: (req, file, cb) =>
+    cb(null, /^image\/(jpe?g|png|webp|gif)$/.test(file.mimetype)),
+});
+
 // Clés autorisées pour la personnalisation de l'onglet « Aperçu » (voir PUT /me).
 const OVERVIEW_SECTIONS = new Set([
   "favorites",
@@ -291,6 +308,20 @@ router.post("/me/avatar", requireAuth, upload.single("avatar"), async (req, res)
     res.json({ avatar: url, user: user.toPublic() });
   } catch (err) {
     console.error("avatar upload error:", err.message);
+    res.status(500).json({ error: "Échec de l'upload." });
+  }
+});
+
+// --- Upload d'une image de couverture personnalisée ---
+// Renvoie juste l'URL : le cadrage et l'enregistrement se font ensuite via
+// PUT /me (cover + coverPos) comme pour une couverture piochée dans un jeu.
+router.post("/me/cover", requireAuth, coverUpload.single("cover"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "Image manquante ou invalide." });
+    const url = `${req.protocol}://${req.get("host")}/uploads/covers/${req.file.filename}`;
+    res.json({ url });
+  } catch (err) {
+    console.error("cover upload error:", err.message);
     res.status(500).json({ error: "Échec de l'upload." });
   }
 });
