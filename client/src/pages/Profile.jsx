@@ -776,7 +776,7 @@ export default function Profile() {
           onClose={() => setPickingCover(false)}
         />
       )}
-      {reframing && profile.cover && (
+      {reframing && (pendingCover || profile.cover) && (
         <ReframeCoverModal
           cover={pendingCover || profile.cover}
           pos={profile.coverPos}
