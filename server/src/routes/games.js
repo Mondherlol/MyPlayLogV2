@@ -620,7 +620,7 @@ function ostFromCustom(c) {
 }
 
 // --- OST d'un jeu : pistes YouTube (scrapées auto + communauté), moins les masquées ---
-router.get("/:id/ost", requireAuth, async (req, res) => {
+router.get("/:id/ost", optionalAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
     const q = String(req.query.q || "").trim();
@@ -630,10 +630,14 @@ router.get("/:id/ost", requireAuth, async (req, res) => {
     if (!customs.length) {
       customs = await ensureScraped(id, q);
     }
-    const [hiddenDoc, renameDoc] = await Promise.all([
-      HiddenOst.findOne({ user: req.userId, gameId: id }),
-      OstRename.findOne({ user: req.userId, gameId: id }),
-    ]);
+    // Masquages / renommages sont propres à chaque utilisateur : rien pour un
+    // visiteur non connecté (il voit toutes les pistes, sans corbeille perso).
+    const [hiddenDoc, renameDoc] = req.userId
+      ? await Promise.all([
+          HiddenOst.findOne({ user: req.userId, gameId: id }),
+          OstRename.findOne({ user: req.userId, gameId: id }),
+        ])
+      : [null, null];
     const hidden = new Set(hiddenDoc?.hidden || []);
     const renames = renameDoc?.renames;
     const all = customs.map(ostFromCustom).map((t) => {
@@ -775,7 +779,7 @@ router.post("/:id/ost/rename", requireAuth, async (req, res) => {
 });
 
 // --- Détails d'un jeu pour la modal : covers alternatives, plateformes, temps ---
-router.get("/:id/details", requireAuth, async (req, res) => {
+router.get("/:id/details", optionalAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
@@ -1024,7 +1028,7 @@ const FULL_FIELDS = [
   "similar_games.first_release_date",
 ].join(",");
 
-router.get("/:id/full", requireAuth, async (req, res) => {
+router.get("/:id/full", optionalAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
@@ -1212,7 +1216,7 @@ function mapRelGame(g) {
   };
 }
 
-router.get("/:id/related", requireAuth, async (req, res) => {
+router.get("/:id/related", optionalAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
@@ -1345,7 +1349,7 @@ async function resolveSteamAppId(gameId) {
   return null;
 }
 
-router.get("/:id/achievements", requireAuth, async (req, res) => {
+router.get("/:id/achievements", optionalAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
@@ -1430,7 +1434,7 @@ async function getAdminPsnUser() {
   return admin && isAdminEmail(admin.email) ? admin : null;
 }
 
-router.get("/:id/psn-trophies", requireAuth, async (req, res) => {
+router.get("/:id/psn-trophies", optionalAuth, async (req, res) => {
   try {
     const admin = await getAdminPsnUser();
     if (!admin?.psn?.refreshToken) return res.json({ available: false, reason: "not_connected" });
@@ -1569,7 +1573,7 @@ function gameReviewCard(e, meId) {
   };
 }
 
-router.get("/:id/reviews", requireAuth, async (req, res) => {
+router.get("/:id/reviews", optionalAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
@@ -1593,7 +1597,12 @@ router.get("/:id/reviews", requireAuth, async (req, res) => {
       e.rating != null;
 
     const reviews = entries.filter(hasContent).map((e) => gameReviewCard(e, req.userId));
-    const mine = entries.find((e) => String(e.user?._id) === String(req.userId));
+    // Visiteur non connecté : pas de review « à moi ». (Le garde évite aussi
+    // qu'une entrée orpheline — user supprimé, e.user null — matche req.userId
+    // undefined et soit renvoyée à tort comme la review du lecteur.)
+    const mine = req.userId
+      ? entries.find((e) => String(e.user?._id) === String(req.userId))
+      : null;
 
     res.json({
       reviews,
@@ -1608,7 +1617,7 @@ router.get("/:id/reviews", requireAuth, async (req, res) => {
 
 // --- Une review précise (chargée à la volée depuis les cartes du fil :
 // réactions à jour + fil de réponses complet) ---
-router.get("/:id/reviews/:userId", requireAuth, async (req, res) => {
+router.get("/:id/reviews/:userId", optionalAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!id || !mongoose.isValidObjectId(req.params.userId))
@@ -1854,7 +1863,7 @@ router.delete("/:id/reviews/:userId/comments/:commentId", requireAuth, async (re
 });
 
 // --- Feed communautaire d'un jeu : Twitch live + Reddit + YouTube ---
-router.get("/:id/feed", requireAuth, async (req, res) => {
+router.get("/:id/feed", optionalAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
@@ -1869,10 +1878,13 @@ router.get("/:id/feed", requireAuth, async (req, res) => {
 });
 
 // --- Amis (abonnements) qui ont ce jeu dans leur bibliothèque ---
-router.get("/:id/friends", requireAuth, async (req, res) => {
+router.get("/:id/friends", optionalAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
+
+    // Visiteur non connecté : pas d'abonnements → aucun « ami » à afficher.
+    if (!req.userId) return res.json({ friends: [] });
 
     const me = await User.findById(req.userId).select("following");
     const following = me?.following || [];

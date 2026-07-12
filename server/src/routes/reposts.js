@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import Repost from "../models/Repost.js";
 import User from "../models/User.js";
 import { igdbQuery } from "../lib/igdb.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { notify } from "../lib/notify.js";
 import { sanitizeMediaList, resolveMentions, toComment } from "../lib/commentThread.js";
 
@@ -147,10 +147,12 @@ async function buildStats(userId) {
 }
 
 // --- Fan arts déjà republiés par moi pour un jeu (état des boutons du feed) ---
-router.get("/ids", requireAuth, async (req, res) => {
+router.get("/ids", optionalAuth, async (req, res) => {
   try {
     const gameId = Number(req.query.gameId);
     if (!gameId) return res.status(400).json({ error: "gameId invalide." });
+    // Visiteur non connecté : aucune republication « à moi ».
+    if (!req.userId) return res.json({ ids: [] });
     const rows = await Repost.find({ user: req.userId, gameId }).select("itemId").lean();
     res.json({ ids: rows.map((r) => r.itemId) });
   } catch (err) {

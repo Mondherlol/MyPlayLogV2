@@ -4,11 +4,11 @@ import Navbar from "./Navbar";
 import MiniPlayer from "./MiniPlayer";
 import { PlayerProvider } from "../context/PlayerContext";
 
-// Coquille publique pour un profil partagé consulté SANS être connecté.
-// Pas de sidebar/topbar de l'app (réservés aux membres) : un simple bandeau
-// avec le logo + les boutons Connexion / Inscription, et un appel à l'action
-// discret en bas pour inviter le visiteur à créer son propre journal.
-export default function PublicProfileShell({ children }) {
+// Coquille publique pour une page partagée consultée SANS être connecté
+// (profil, fiche de jeu…). Pas de sidebar/topbar de l'app (réservés aux
+// membres) : un simple bandeau avec le logo + Connexion / Inscription, et un
+// appel à l'action en bas pour inviter le visiteur à créer son propre journal.
+export default function PublicShell({ children }) {
   return (
     <PlayerProvider>
       <div className="public-shell">

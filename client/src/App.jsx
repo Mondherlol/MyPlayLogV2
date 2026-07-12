@@ -18,7 +18,7 @@ import ListDetail from "./pages/ListDetail";
 import Admin from "./pages/Admin";
 import Placeholder from "./pages/Placeholder";
 import AppLayout from "./components/AppLayout";
-import PublicProfileShell from "./components/PublicProfileShell";
+import PublicShell from "./components/PublicShell";
 import InstallPrompt from "./components/InstallPrompt";
 import ScrollManager from "./components/ScrollManager";
 
@@ -29,20 +29,16 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
-// Profil partageable : consultable connecté (dans l'app, avec sidebar) OU en
-// invité (coquille publique + appel à l'inscription). On choisit la coquille
-// selon l'état d'authentification, sans jamais rediriger vers /login.
-function PublicProfileRoute() {
+// Page partageable (profil, fiche de jeu) : consultable connecté (dans l'app,
+// avec sidebar) OU en invité (coquille publique + appel à l'inscription). On
+// choisit la coquille selon l'auth, sans jamais rediriger vers /login.
+function PublicOrApp({ children }) {
   const { user, loading } = useAuth();
   if (loading) return <div className="center-screen">Chargement…</div>;
   return user ? (
-    <AppLayout>
-      <Profile />
-    </AppLayout>
+    <AppLayout>{children}</AppLayout>
   ) : (
-    <PublicProfileShell>
-      <Profile />
-    </PublicProfileShell>
+    <PublicShell>{children}</PublicShell>
   );
 }
 
@@ -92,8 +88,23 @@ export default function App() {
         }
       />
 
-      {/* Profil public partageable : accessible connecté OU en invité. */}
-      <Route path="/u/:username" element={<PublicProfileRoute />} />
+      {/* Pages publiques partageables : accessibles connecté OU en invité. */}
+      <Route
+        path="/u/:username"
+        element={
+          <PublicOrApp>
+            <Profile />
+          </PublicOrApp>
+        }
+      />
+      <Route
+        path="/game/:id"
+        element={
+          <PublicOrApp>
+            <GamePage />
+          </PublicOrApp>
+        }
+      />
 
       {/* Espace connecté : sidebar + topbar */}
       <Route
@@ -106,7 +117,6 @@ export default function App() {
         <Route path="/app" element={<Welcome />} />
         <Route path="/explore" element={<Explorer />} />
         <Route path="/releases" element={<Releases />} />
-        <Route path="/game/:id" element={<GamePage />} />
         <Route path="/company/:name" element={<CompanyPage />} />
         <Route path="/platform/:id" element={<PlatformPage />} />
         <Route path="/lists" element={<Lists />} />

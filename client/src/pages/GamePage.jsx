@@ -238,8 +238,17 @@ export default function GamePage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { token, updateUser } = useAuth();
+  const { user, token, updateUser } = useAuth();
   const { map, upsertLocal, removeLocal } = useLibrary();
+
+  // Visiteur non connecté (fiche partagée) : les actions qui écrivent
+  // (wishlist, « j'y ai joué », listes, reco…) nécessitent un compte → on
+  // renvoie vers la connexion au lieu de tenter un appel voué à un 401.
+  const requireLogin = () => {
+    if (user) return true;
+    navigate("/login");
+    return false;
+  };
 
   const [game, setGame] = useState(null);
   const [fav, setFav] = useState(null); // entrée bibliothèque (OST/perso favoris…)
@@ -346,6 +355,7 @@ export default function GamePage() {
   }, [id, token]);
 
   async function toggleWishlist() {
+    if (!requireLogin()) return;
     if (wishBusy || !game) return;
     setWishBusy(true);
     try {
@@ -396,6 +406,7 @@ export default function GamePage() {
   // Choix (ou retrait) de l'OST favorite depuis l'onglet OST : persiste
   // directement dans la bibliothèque et rafraîchit la card « OST favori ».
   async function selectFavoriteOst(t) {
+    if (!requireLogin()) return;
     const favoriteOst = t
       ? {
           name: t.name,
@@ -556,7 +567,7 @@ export default function GamePage() {
                   return (
                     <button
                       className={`gp-action ${isPlayed ? "active" : ""} ${upcoming ? "disabled" : ""}`}
-                      onClick={() => !upcoming && setShowPlayed(true)}
+                      onClick={() => requireLogin() && !upcoming && setShowPlayed(true)}
                       disabled={upcoming}
                       title={upcoming ? "Pas encore sorti" : "J'y ai joué"}
                     >
@@ -588,7 +599,7 @@ export default function GamePage() {
               )}
               <button
                 className="gp-action"
-                onClick={() => setShowList(true)}
+                onClick={() => requireLogin() && setShowList(true)}
                 title="Ajouter à une liste"
               >
                 <ListPlus size={18} />
@@ -596,7 +607,7 @@ export default function GamePage() {
               </button>
             </div>
 
-            <button className="gp-recommend clickable" onClick={() => setShowRecommend(true)}>
+            <button className="gp-recommend clickable" onClick={() => requireLogin() && setShowRecommend(true)}>
               <Send size={16} /> Recommander à un ami
             </button>
 
@@ -810,7 +821,7 @@ export default function GamePage() {
                 game={{ id: Number(id), name: game.name, cover: game.cover }}
                 viewerStatus={entry?.status}
                 upcoming={upcoming || tbd}
-                onWantPlay={() => setShowPlayed(true)}
+                onWantPlay={() => requireLogin() && setShowPlayed(true)}
               />
             )}
 
