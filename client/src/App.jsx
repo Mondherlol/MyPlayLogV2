@@ -1,5 +1,4 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import { Settings } from "lucide-react";
 import { useAuth } from "./context/AuthContext";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -17,6 +16,7 @@ import Profile from "./pages/Profile";
 import Lists from "./pages/Lists";
 import ListDetail from "./pages/ListDetail";
 import Admin from "./pages/Admin";
+import Settings from "./pages/Settings";
 import Placeholder from "./pages/Placeholder";
 import AppLayout from "./components/AppLayout";
 import PublicShell from "./components/PublicShell";
@@ -125,10 +125,7 @@ export default function App() {
         <Route path="/lists/:id" element={<ListDetail />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/admin" element={<Admin />} />
-        <Route
-          path="/settings"
-          element={<Placeholder title="Paramètres" Icon={Settings} />}
-        />
+        <Route path="/settings" element={<Settings />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

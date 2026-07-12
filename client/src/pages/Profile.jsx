@@ -20,6 +20,7 @@ import {
   Move,
   Image as ImageIcon,
   ChevronDown,
+  Trash2,
   Repeat2,
   Film,
   BarChart3,
@@ -40,6 +41,7 @@ import ProfileFeed from "../components/ProfileFeed";
 import ProfileRecommendations from "../components/ProfileRecommendations";
 import ProfileVideos from "../components/ProfileVideos";
 import ProfileStats from "../components/ProfileStats";
+import ProfileAchievements from "../components/ProfileAchievements";
 import ProfileLists from "../components/ProfileLists";
 import EditProfileModal from "../components/EditProfileModal";
 import CoverPickerModal from "../components/CoverPickerModal";
@@ -54,6 +56,7 @@ const TAB_ORDER = [
   "feed",
   "allgames",
   "stats",
+  "achievements",
   "lists",
   "ost",
   "videos",
@@ -215,6 +218,78 @@ export default function Profile() {
   const profile = data?.profile;
   const isMe = profile?.isMe;
 
+  // ---------- Carrousel de couvertures (max 6 photos) ----------
+  // Couvertures affichées : le tableau `covers`, sinon l'ancienne couverture
+  // unique (profils d'avant le carrousel).
+  const covers = useMemo(() => {
+    if (profile?.covers?.length) return profile.covers.slice(0, 6);
+    return profile?.cover
+      ? [{ url: profile.cover, pos: profile.coverPos || null }]
+      : [];
+  }, [profile]);
+  const [coverIdx, setCoverIdx] = useState(0);
+  const [coverDragging, setCoverDragging] = useState(false);
+  const [coverDx, setCoverDx] = useState(0);
+  const [coverHover, setCoverHover] = useState(false);
+  const coverRef = useRef(null);
+  const coverDrag = useRef(null); // { startX, width, dx, active }
+
+  // Si une image est supprimée, on ne reste pas sur un index hors limites.
+  useEffect(() => {
+    if (coverIdx >= covers.length) setCoverIdx(Math.max(0, covers.length - 1));
+  }, [covers.length, coverIdx]);
+
+  // Défilement automatique : slide suivante toutes les 6 s. En pause pendant un
+  // drag, au survol (comme le bandeau) ou quand le menu Couverture est ouvert.
+  useEffect(() => {
+    if (covers.length < 2 || coverDragging || coverHover || coverMenu) return;
+    const t = setInterval(
+      () => setCoverIdx((i) => (i + 1) % covers.length),
+      6000
+    );
+    return () => clearInterval(t);
+  }, [covers.length, coverDragging, coverHover, coverMenu, coverIdx]);
+
+  // Glisser au doigt / à la souris : on suit le pointeur, puis on passe à la
+  // slide voisine si le geste dépasse ~15 % de la largeur (sinon on recolle).
+  function coverPointerDown(e) {
+    if (covers.length < 2) return;
+    if (e.target.closest("button, a, input")) return;
+    coverDrag.current = {
+      startX: e.clientX,
+      width: coverRef.current?.offsetWidth || 1,
+      dx: 0,
+      active: false,
+    };
+  }
+  function coverPointerMove(e) {
+    const d = coverDrag.current;
+    if (!d) return;
+    let dx = e.clientX - d.startX;
+    if (!d.active) {
+      if (Math.abs(dx) < 8) return; // clic simple : on ne bouge pas
+      d.active = true;
+      setCoverDragging(true);
+      coverRef.current?.setPointerCapture?.(e.pointerId);
+    }
+    // Résistance élastique aux extrémités (pas de boucle en glissant).
+    if ((coverIdx === 0 && dx > 0) || (coverIdx === covers.length - 1 && dx < 0))
+      dx *= 0.35;
+    d.dx = dx;
+    setCoverDx(dx);
+  }
+  function coverPointerUp() {
+    const d = coverDrag.current;
+    coverDrag.current = null;
+    if (!d?.active) return;
+    setCoverDragging(false);
+    setCoverDx(0);
+    if (Math.abs(d.dx) > d.width * 0.15)
+      setCoverIdx((i) =>
+        Math.min(covers.length - 1, Math.max(0, i + (d.dx < 0 ? 1 : -1)))
+      );
+  }
+
   // Chargement principal (changement de profil).
   // On affiche d'abord la dernière version en cache (nom, avatar, sections…)
   // pour un rendu immédiat, puis on revalide en fond.
@@ -316,26 +391,65 @@ export default function Profile() {
     e.target.value = "";
   }
 
-  // Applique une nouvelle image de couverture à MON profil (cadrage recentré).
-  // Ne met à jour la bannière affichée que si on est sur son propre profil
-  // (on peut définir sa couverture depuis le feed d'un autre joueur).
-  async function applyCover(url, posStr = null) {
+  // Couvertures de MON profil (celui affiché peut être celui d'un autre joueur :
+  // on peut définir sa couverture depuis le feed de quelqu'un d'autre).
+  const myCovers = () => {
+    if (isMe) return covers;
+    if (user?.covers?.length) return user.covers.slice(0, 6);
+    return user?.cover ? [{ url: user.cover, pos: user.coverPos || null }] : [];
+  };
+
+  // Persiste le tableau complet des couvertures de MON profil, puis synchronise
+  // le contexte auth + le profil affiché (si c'est le mien).
+  async function saveCovers(nextCovers) {
     const { user: u } = await apiFetch("/users/me", {
       method: "PUT",
       token,
-      body: { cover: url, coverPos: posStr },
+      body: { covers: nextCovers },
     });
-    updateUser({ cover: u.cover, coverPos: u.coverPos });
+    updateUser({ cover: u.cover, coverPos: u.coverPos, covers: u.covers });
     if (isMe) {
       setData((d) => {
-        const next = { ...d, profile: { ...d.profile, cover: u.cover, coverPos: u.coverPos } };
+        const next = {
+          ...d,
+          profile: { ...d.profile, cover: u.cover, coverPos: u.coverPos, covers: u.covers },
+        };
         profileCache.set(targetUsername, next);
         return next;
       });
     }
+    return u;
+  }
+
+  // Ajoute une image au carrousel (ou met à jour son cadrage si déjà présente).
+  async function applyCover(url, posStr = null) {
+    const base = myCovers();
+    if (base.some((c) => c.url === url)) {
+      await saveCovers(base.map((c) => (c.url === url ? { ...c, pos: posStr } : c)));
+      return;
+    }
+    if (base.length >= 6) {
+      alert("Maximum 6 photos de couverture — supprime-en une d'abord.");
+      return;
+    }
+    await saveCovers([...base, { url, pos: posStr }]);
   }
 
   async function pickCover(url) {
+    // « Tout retirer » depuis la modale : on vide le carrousel.
+    if (!url) {
+      setPickingCover(false);
+      try {
+        await saveCovers([]);
+      } catch (err) {
+        alert(err.message);
+      }
+      return;
+    }
+    if (myCovers().length >= 6 && !myCovers().some((c) => c.url === url)) {
+      alert("Maximum 6 photos de couverture — supprime-en une d'abord.");
+      return;
+    }
     setPickingCover(false);
     setPendingCover(url);
     setReframing(true);
@@ -344,22 +458,30 @@ export default function Profile() {
   async function saveCoverPos(posStr) {
     try {
       if (pendingCover) {
+        // Nouvelle image : on l'ajoute puis on affiche sa slide.
         await applyCover(pendingCover, posStr);
+        const i = covers.findIndex((c) => c.url === pendingCover);
+        setCoverIdx(i >= 0 ? i : Math.min(covers.length, 5));
       } else {
-        const { user: u } = await apiFetch("/users/me", {
-          method: "PUT",
-          token,
-          body: { coverPos: posStr },
-        });
-        updateUser({ coverPos: u.coverPos });
-        setData((d) => {
-          const next = { ...d, profile: { ...d.profile, coverPos: u.coverPos } };
-          profileCache.set(targetUsername, next);
-          return next;
-        });
+        // Recadrage de la slide actuellement affichée.
+        await saveCovers(
+          covers.map((c, i) => (i === coverIdx ? { ...c, pos: posStr } : c))
+        );
       }
       setPendingCover(null);
       setReframing(false);
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  // Supprime la photo actuellement affichée dans le carrousel.
+  async function removeCover() {
+    if (!covers.length) return;
+    if (!confirm("Supprimer cette photo de couverture ?")) return;
+    try {
+      await saveCovers(covers.filter((_, i) => i !== coverIdx));
+      setCoverIdx((i) => Math.max(0, i - 1));
     } catch (err) {
       alert(err.message);
     }
@@ -440,17 +562,51 @@ export default function Profile() {
       {/* ---------- Bannière ---------- */}
       <header className="pf-banner">
         <div
-          className="pf-cover"
-          style={
-            profile.cover
-              ? {
-                  backgroundImage: `url(${profile.cover})`,
-                  backgroundPosition: profile.coverPos || "center",
-                }
-              : undefined
-          }
+          className={`pf-cover ${covers.length > 1 ? "multi" : ""} ${coverDragging ? "dragging" : ""}`}
+          ref={coverRef}
+          onPointerDown={coverPointerDown}
+          onPointerMove={coverPointerMove}
+          onPointerUp={coverPointerUp}
+          onPointerCancel={coverPointerUp}
+          onMouseEnter={() => setCoverHover(true)}
+          onMouseLeave={() => setCoverHover(false)}
+          // Un swipe sur le carrousel ne doit pas changer d'onglet (useTabSwipe
+          // écoute sur la racine de la page).
+          onTouchStart={(e) => covers.length > 1 && e.stopPropagation()}
         >
+          {covers.length > 0 && (
+            <div
+              className="pf-cover-track"
+              style={{
+                transform: `translateX(calc(${-coverIdx * 100}% + ${coverDx}px))`,
+                transition: coverDragging ? "none" : undefined,
+              }}
+            >
+              {covers.map((cv, i) => (
+                <div
+                  key={`${cv.url}-${i}`}
+                  className="pf-cover-slide"
+                  style={{
+                    backgroundImage: `url(${cv.url})`,
+                    backgroundPosition: cv.pos || "center",
+                  }}
+                />
+              ))}
+            </div>
+          )}
           <div className="pf-cover-scrim" />
+          {covers.length > 1 && (
+            <div className="pf-cover-dots">
+              {covers.map((_, i) => (
+                <button
+                  key={i}
+                  className={`pf-cover-dot clickable ${i === coverIdx ? "active" : ""}`}
+                  onClick={() => setCoverIdx(i)}
+                  aria-label={`Photo ${i + 1}`}
+                />
+              ))}
+            </div>
+          )}
           {isMe && (
             <div className={`pf-cover-menu ${coverMenu ? "open" : ""}`} ref={coverMenuRef}>
               <button
@@ -458,6 +614,9 @@ export default function Profile() {
                 onClick={() => setCoverMenu((v) => !v)}
               >
                 <Camera size={15} /> Couverture
+                {covers.length > 1 && (
+                  <span className="pf-cover-count">{covers.length}/6</span>
+                )}
                 <ChevronDown size={14} className="pf-cover-caret" />
               </button>
               {coverMenu && (
@@ -468,8 +627,10 @@ export default function Profile() {
                       setCoverMenu(false);
                       setPickingCover(true);
                     }}
+                    disabled={covers.length >= 6}
                   >
-                    <ImageIcon size={15} /> Changer l'image
+                    <ImageIcon size={15} />
+                    {covers.length ? `Ajouter une photo (${covers.length}/6)` : "Choisir une photo"}
                   </button>
                   <button
                     className="clickable"
@@ -477,9 +638,19 @@ export default function Profile() {
                       setCoverMenu(false);
                       setReframing(true);
                     }}
-                    disabled={!profile.cover}
+                    disabled={!covers.length}
                   >
-                    <Move size={15} /> Recadrer
+                    <Move size={15} /> Recadrer celle-ci
+                  </button>
+                  <button
+                    className="clickable"
+                    onClick={() => {
+                      setCoverMenu(false);
+                      removeCover();
+                    }}
+                    disabled={!covers.length}
+                  >
+                    <Trash2 size={15} /> Supprimer celle-ci
                   </button>
                 </div>
               )}
@@ -600,6 +771,13 @@ export default function Profile() {
           <BarChart3 size={16} /> Stats
         </button>
         <button
+          className={`profile-tab ${tab === "achievements" ? "active" : ""}`}
+          onClick={() => setTab("achievements")}
+        >
+          <Trophy size={16} /> Succès
+          {c.achievements > 0 && <span className="tab-count">{c.achievements}</span>}
+        </button>
+        <button
           className={`profile-tab ${tab === "lists" ? "active" : ""}`}
           onClick={() => setTab("lists")}
         >
@@ -688,6 +866,11 @@ export default function Profile() {
       {/* ---------- Stats ---------- */}
       {tab === "stats" && <ProfileStats username={targetUsername} token={token} />}
 
+      {/* ---------- Succès ---------- */}
+      {tab === "achievements" && (
+        <ProfileAchievements username={targetUsername} token={token} isMe={isMe} />
+      )}
+
       {/* ---------- Listes ---------- */}
       {tab === "lists" && (
         <ProfileLists lists={lists} isMe={isMe} onDelete={deleteList} />
@@ -771,15 +954,16 @@ export default function Profile() {
       {pickingCover && (
         <CoverPickerModal
           entries={library}
-          current={profile.cover}
+          current={covers[coverIdx]?.url || null}
+          count={covers.length}
           onPick={pickCover}
           onClose={() => setPickingCover(false)}
         />
       )}
-      {reframing && (pendingCover || profile.cover) && (
+      {reframing && (pendingCover || covers[coverIdx]) && (
         <ReframeCoverModal
-          cover={pendingCover || profile.cover}
-          pos={profile.coverPos}
+          cover={pendingCover || covers[coverIdx].url}
+          pos={pendingCover ? null : covers[coverIdx].pos}
           onSave={saveCoverPos}
           onClose={() => {
             setPendingCover(null);

@@ -1,0 +1,373 @@
+/* ============================================================
+   Onglet « Succès » du profil
+   ============================================================ */
+
+.ach-tab {
+  padding: 0.5rem 0 2rem;
+}
+
+/* Bandeau de stats */
+.ach-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.8rem;
+  margin-bottom: 1.6rem;
+}
+.ach-stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-soft);
+}
+.ach-stat-tile.accent {
+  background: linear-gradient(150deg, color-mix(in srgb, var(--orange) 14%, var(--surface)), var(--surface));
+  border-color: color-mix(in srgb, var(--orange) 30%, var(--border));
+  color: var(--accent-ink);
+}
+.ach-stat-tile strong {
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  color: var(--text);
+  line-height: 1.1;
+}
+.ach-stat-tile.accent strong {
+  color: var(--accent-ink);
+}
+.ach-stat-tile span {
+  font-size: 0.8rem;
+}
+
+/* Rails (rares / récents) */
+.ach-rail {
+  margin-bottom: 1.6rem;
+}
+.ach-rail-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  margin: 0 0 0.7rem;
+}
+.ach-rail-row {
+  display: flex;
+  gap: 0.7rem;
+  overflow-x: auto;
+  padding-bottom: 0.4rem;
+  scrollbar-width: thin;
+}
+.ach-rare-card,
+.ach-recent-card {
+  flex: 0 0 auto;
+  width: 240px;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.ach-rare-card {
+  border-left: 3px solid var(--border-strong);
+}
+.ach-rare-card.r-legendary { border-left-color: #ffcf3a; }
+.ach-rare-card.r-epic { border-left-color: #b06fff; }
+.ach-rare-card.r-rare { border-left-color: #66c0f4; }
+.ach-rare-card.r-common { border-left-color: var(--border-strong); }
+
+.ach-rare-icon,
+.ach-recent-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 9px;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+.ach-rare-icon img,
+.ach-recent-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ach-rare-info {
+  flex: 1;
+  min-width: 0;
+}
+.ach-rare-info strong {
+  display: block;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ach-rare-info span {
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+.ach-rare-pct {
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: var(--accent-ink);
+  flex-shrink: 0;
+}
+
+/* Grille par jeu */
+.ach-games {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.9rem;
+}
+.ach-game-card {
+  display: flex;
+  gap: 0.7rem;
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  text-align: left;
+  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+}
+.ach-game-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+  border-color: var(--border-strong);
+}
+.ach-game-cover {
+  position: relative;
+  width: 58px;
+  flex-shrink: 0;
+  aspect-ratio: 3 / 4;
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--border);
+}
+.ach-game-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ach-plat-badge {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: rgba(12, 13, 17, 0.82);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+.ach-perfect-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: #1a1204;
+  background: var(--accent-grad);
+  padding: 1px 5px;
+  border-radius: 999px;
+}
+.ach-game-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.3rem;
+}
+.ach-game-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ach-game-count {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  font-weight: 600;
+}
+.ach-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.ach-progress.big {
+  height: 9px;
+  margin-top: 0.5rem;
+  width: 100%;
+  max-width: 320px;
+}
+.ach-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  transition: width 0.5s ease;
+}
+
+/* État vide */
+.ach-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.4rem;
+  padding: 3rem 1rem;
+  color: var(--text-soft);
+}
+.ach-empty svg { color: var(--border-strong); }
+.ach-empty h3 {
+  font-family: var(--font-display);
+  color: var(--text);
+  margin: 0.4rem 0 0;
+}
+.ach-empty p { max-width: 40ch; margin: 0 0 0.8rem; }
+
+/* Modale détail d'un jeu */
+.ach-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(6, 8, 14, 0.72);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: steam-fade 0.2s ease;
+}
+.ach-modal {
+  position: relative;
+  width: min(640px, 100%);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  animation: steam-pop 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+.ach-modal-head {
+  display: flex;
+  gap: 0.9rem;
+  padding: 1.2rem;
+  border-bottom: 1px solid var(--border);
+}
+.ach-modal-cover {
+  width: 70px;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.ach-modal-head h3 {
+  font-family: var(--font-display);
+  margin: 0 0 0.2rem;
+  font-size: 1.2rem;
+}
+.ach-modal-sub {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+.ach-modal-list {
+  overflow-y: auto;
+  padding: 0.6rem;
+}
+.ach-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem;
+  border-radius: 12px;
+}
+.ach-row + .ach-row {
+  border-top: 1px solid var(--border);
+}
+.ach-row.locked {
+  opacity: 0.55;
+}
+.ach-row-icon {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  border-radius: 9px;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+.ach-row-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ach-row.locked .ach-row-icon img {
+  filter: grayscale(1);
+}
+.ach-row-lock {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(12, 13, 17, 0.5);
+  color: #fff;
+}
+.ach-row-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ach-row-body strong {
+  font-size: 0.9rem;
+}
+.ach-row-body span {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+.ach-row-date {
+  color: var(--accent-ink) !important;
+  font-weight: 600;
+  margin-top: 1px;
+}
+.ach-row-rarity {
+  flex-shrink: 0;
+  font-weight: 800;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+.ach-row.r-legendary .ach-row-rarity { color: #d9a406; }
+.ach-row.r-epic .ach-row-rarity { color: #b06fff; }
+.ach-row.r-rare .ach-row-rarity { color: #3d9bd6; }
+
+@media (max-width: 640px) {
+  .ach-stats { grid-template-columns: repeat(2, 1fr); }
+}

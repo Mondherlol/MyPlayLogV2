@@ -69,6 +69,11 @@ const userGameSchema = new mongoose.Schema(
     platform: { type: String, default: null },
     // Format d'achat sur console : dématérialisé ou boîte physique.
     format: { type: String, enum: ["digital", "physical"], default: "digital" },
+    // Origine « import Steam » : appid Steam rattaché, et vrai UNIQUEMENT si
+    // l'entrée a été CRÉÉE par un import Steam (pas juste mise à jour). Sert à
+    // proposer de retirer les jeux ajoutés lors d'une déliaison du compte Steam.
+    steamAppId: { type: Number, default: null },
+    steamImported: { type: Boolean, default: false },
     // Planning perso : mois où je compte jouer à ce jeu ("2026-08"), ou null.
     // Alimenté par le mode Planning de la page Sorties.
     plannedMonth: { type: String, default: null },

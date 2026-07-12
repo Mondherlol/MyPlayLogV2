@@ -465,14 +465,24 @@ export default function GamePage() {
     setBgOverride(url);
   }
 
-  // Applique l'image comme couverture de profil (comme dans le profil)
+  // Ajoute l'image au carrousel de couvertures du profil (max 6 photos).
   async function setProfileCover(url) {
+    const base = user?.covers?.length
+      ? user.covers
+      : user?.cover
+        ? [{ url: user.cover, pos: user.coverPos || null }]
+        : [];
+    if (base.some((c) => c.url === url)) return; // déjà dans le carrousel
+    if (base.length >= 6) {
+      alert("Maximum 6 photos de couverture — supprime-en une depuis ton profil.");
+      return;
+    }
     const { user: u } = await apiFetch("/users/me", {
       method: "PUT",
       token,
-      body: { cover: url },
+      body: { covers: [...base, { url, pos: null }] },
     });
-    updateUser({ cover: u.cover });
+    updateUser({ cover: u.cover, coverPos: u.coverPos, covers: u.covers });
   }
 
   if (loading) {

@@ -7,7 +7,7 @@ import { useAuth } from "../context/AuthContext";
 // Choisir une photo de couverture : on cherche un jeu dans TOUT le catalogue
 // (ou parmi ses jeux quand la recherche est vide), puis on pioche une de ses
 // images (jaquette ou artwork).
-export default function CoverPickerModal({ entries, current, onPick, onClose }) {
+export default function CoverPickerModal({ entries, current, count = 0, onPick, onClose }) {
   const { token } = useAuth();
   const [game, setGame] = useState(null);
   const [images, setImages] = useState([]);
@@ -188,11 +188,15 @@ export default function CoverPickerModal({ entries, current, onPick, onClose }) 
           </>
         )}
 
-        {current && !game && (
+        {count > 0 && !game && (
           <div className="additems-foot">
-            <span className="additems-count">Une couverture est déjà définie</span>
+            <span className="additems-count">
+              {count > 1
+                ? `${count} photos de couverture définies`
+                : "Une couverture est déjà définie"}
+            </span>
             <button className="btn btn-ghost" onClick={() => onPick(null)}>
-              Retirer la couverture
+              {count > 1 ? "Tout retirer" : "Retirer la couverture"}
             </button>
           </div>
         )}

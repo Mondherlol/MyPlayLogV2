@@ -9,14 +9,23 @@ export function LibraryProvider({ children }) {
   const { token } = useAuth();
   const [map, setMap] = useState({});
 
+  // Recharge la carte complète depuis le serveur (après un import Steam massif,
+  // par ex.) : la nouvelle référence de `map` déclenche le rafraîchissement des
+  // écrans qui en dépendent (profil…).
+  function refresh() {
+    if (!token) return Promise.resolve();
+    return apiFetch("/library/map", { token })
+      .then((d) => setMap(d.map || {}))
+      .catch(() => {});
+  }
+
   useEffect(() => {
     if (!token) {
       setMap({});
       return;
     }
-    apiFetch("/library/map", { token })
-      .then((d) => setMap(d.map || {}))
-      .catch(() => {});
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   function upsertLocal(gameId, partial) {
@@ -31,7 +40,7 @@ export function LibraryProvider({ children }) {
   }
 
   return (
-    <LibraryContext.Provider value={{ map, upsertLocal, removeLocal }}>
+    <LibraryContext.Provider value={{ map, upsertLocal, removeLocal, refresh }}>
       {children}
     </LibraryContext.Provider>
   );

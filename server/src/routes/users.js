@@ -11,6 +11,7 @@ import Recommendation from "../models/Recommendation.js";
 import OstThread from "../models/OstThread.js";
 import Repost from "../models/Repost.js";
 import Documentary from "../models/Documentary.js";
+import GameAchievements from "../models/GameAchievements.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { ensureGameMeta } from "../lib/gameMeta.js";
 import { ensureEntityLogos } from "../lib/entityLogos.js";
@@ -173,6 +174,20 @@ router.put("/me", requireAuth, async (req, res) => {
     if (b.cover !== undefined) user.cover = b.cover ? String(b.cover) : null;
     if (b.coverPos !== undefined)
       user.coverPos = b.coverPos ? String(b.coverPos).slice(0, 32) : null;
+    // Photos de couverture multiples (carrousel) : max 6, dédoublonnées par URL.
+    // cover/coverPos restent alignés sur la 1re image (partage, rétrocompat).
+    if (b.covers !== undefined) {
+      const seen = new Set();
+      user.covers = (Array.isArray(b.covers) ? b.covers : [])
+        .map((c) => ({
+          url: c && c.url ? String(c.url).slice(0, 600) : null,
+          pos: c && c.pos ? String(c.pos).slice(0, 32) : null,
+        }))
+        .filter((c) => c.url && !seen.has(c.url) && seen.add(c.url))
+        .slice(0, 6);
+      user.cover = user.covers[0]?.url || null;
+      user.coverPos = user.covers[0]?.pos || null;
+    }
     if (b.avatar !== undefined) user.avatar = b.avatar ? String(b.avatar) : null;
     // Ordre de préférence des OST favorites (ids de jeux, dédoublonnés).
     if (b.ostOrder !== undefined) {
@@ -1216,6 +1231,126 @@ router.get("/:username/common/:other", optionalAuth, async (req, res) => {
   }
 });
 
+// --- Onglet « Succès » du profil : synthèse des succès (Steam pour l'instant,
+//     PSN prévu) agrégés par jeu + statistiques globales. ---
+router.get("/:username/achievements", optionalAuth, async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.params.username }).select(
+      "_id steam"
+    );
+    if (!user) return res.status(404).json({ error: "Profil introuvable." });
+    const isMe = String(user._id) === String(req.userId);
+
+    const docs = await GameAchievements.find({ user: user._id }).lean();
+
+    const games = docs
+      .map((d) => {
+        const percent = d.total ? Math.round((d.unlocked / d.total) * 100) : 0;
+        // Succès débloqué le plus rare de ce jeu (rareté = % de joueurs).
+        const rarest = (d.achievements || [])
+          .filter((a) => a.unlocked && a.rarity != null)
+          .sort((a, b) => a.rarity - b.rarity)[0];
+        return {
+          gameId: d.gameId,
+          name: d.gameName,
+          cover: d.gameCover,
+          platform: d.platform,
+          total: d.total,
+          unlocked: d.unlocked,
+          percent,
+          perfect: d.total > 0 && d.unlocked === d.total,
+          updatedAt: d.updatedAt,
+          rarest: rarest
+            ? { name: rarest.name, rarity: rarest.rarity, icon: rarest.icon }
+            : null,
+        };
+      })
+      .sort((a, b) => b.unlocked - a.unlocked || b.percent - a.percent);
+
+    // Flux transverses : succès récemment débloqués + plus rares, tous jeux.
+    const flat = [];
+    for (const d of docs) {
+      for (const a of d.achievements || []) {
+        if (!a.unlocked) continue;
+        flat.push({
+          name: a.name,
+          icon: a.icon,
+          rarity: a.rarity,
+          unlockedAt: a.unlockedAt,
+          gameId: d.gameId,
+          gameName: d.gameName,
+          cover: d.gameCover,
+          platform: d.platform,
+        });
+      }
+    }
+    const recent = flat
+      .filter((a) => a.unlockedAt)
+      .sort((a, b) => new Date(b.unlockedAt) - new Date(a.unlockedAt))
+      .slice(0, 12);
+    const rarest = flat
+      .filter((a) => a.rarity != null)
+      .sort((a, b) => a.rarity - b.rarity)
+      .slice(0, 12);
+
+    const withAch = games.filter((g) => g.total > 0);
+    const totalUnlocked = games.reduce((s, g) => s + g.unlocked, 0);
+    const totalAchievements = games.reduce((s, g) => s + g.total, 0);
+    const avgCompletion = withAch.length
+      ? Math.round(withAch.reduce((s, g) => s + g.percent, 0) / withAch.length)
+      : 0;
+
+    res.json({
+      isMe,
+      connected: !!user.steam?.steamId,
+      stats: {
+        games: games.length,
+        totalUnlocked,
+        totalAchievements,
+        avgCompletion,
+        perfectGames: games.filter((g) => g.perfect).length,
+      },
+      games,
+      recent,
+      rarest,
+    });
+  } catch (err) {
+    console.error("achievements summary error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement des succès." });
+  }
+});
+
+// --- Liste complète des succès d'UN jeu (chargée à l'ouverture d'une carte). ---
+router.get("/:username/achievements/:gameId", optionalAuth, async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.params.username }).select("_id");
+    if (!user) return res.status(404).json({ error: "Profil introuvable." });
+    const doc = await GameAchievements.findOne({
+      user: user._id,
+      gameId: Number(req.params.gameId),
+    }).lean();
+    if (!doc) return res.json({ achievements: [] });
+    // Débloqués d'abord (par date récente), puis verrouillés (par rareté).
+    const achievements = (doc.achievements || []).slice().sort((a, b) => {
+      if (a.unlocked !== b.unlocked) return a.unlocked ? -1 : 1;
+      if (a.unlocked) return new Date(b.unlockedAt || 0) - new Date(a.unlockedAt || 0);
+      return (b.rarity ?? -1) - (a.rarity ?? -1);
+    });
+    res.json({
+      gameId: doc.gameId,
+      name: doc.gameName,
+      cover: doc.gameCover,
+      platform: doc.platform,
+      total: doc.total,
+      unlocked: doc.unlocked,
+      achievements,
+    });
+  } catch (err) {
+    console.error("achievements detail error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
 // --- Profil public complet par identifiant (username) ---
 // optionalAuth : consultable sans être connecté (profil partageable). Un
 // visiteur connecté est reconnu (isMe / abonnements) ; un invité voit la
@@ -1235,21 +1370,23 @@ router.get("/:username", optionalAuth, async (req, res) => {
       (u) => String(u) === String(user._id)
     );
 
-    const [entries, followers, listQuery, recoCount, videoCount] = await Promise.all([
-      UserGame.find({ user: user._id }).sort({ updatedAt: -1 }),
-      User.countDocuments({ following: user._id }),
-      List.find(
-        isMe
-          ? { user: user._id }
-          : { user: user._id, visibility: "public" }
-      )
-        .populate("user", "username avatar")
-        .sort({ updatedAt: -1 })
-        .limit(50)
-        .lean(),
-      Recommendation.countDocuments({ to: user._id }),
-      Documentary.countDocuments({ user: user._id, recommended: true }),
-    ]);
+    const [entries, followers, listQuery, recoCount, videoCount, achievementsCount] =
+      await Promise.all([
+        UserGame.find({ user: user._id }).sort({ updatedAt: -1 }),
+        User.countDocuments({ following: user._id }),
+        List.find(
+          isMe
+            ? { user: user._id }
+            : { user: user._id, visibility: "public" }
+        )
+          .populate("user", "username avatar")
+          .sort({ updatedAt: -1 })
+          .limit(50)
+          .lean(),
+        Recommendation.countDocuments({ to: user._id }),
+        Documentary.countDocuments({ user: user._id, recommended: true }),
+        GameAchievements.countDocuments({ user: user._id }),
+      ]);
 
     const library = entries.map(entryCard);
 
@@ -1303,6 +1440,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
         avatar: user.avatar,
         cover: user.cover,
         coverPos: user.coverPos,
+        covers: user.effectiveCovers(),
         bio: user.bio,
         tagline: user.tagline,
         taglineImage: user.taglineImage,
@@ -1322,6 +1460,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
           finished,
           recommendations: recoCount,
           videos: videoCount,
+          achievements: achievementsCount,
         },
       },
       favorites,

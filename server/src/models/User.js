@@ -31,6 +31,19 @@ const userSchema = new mongoose.Schema(
     cover: { type: String, default: null }, // photo de couverture (image de jeu)
     // Cadrage de la couverture : position CSS façon "50% 30%" (défaut = centré).
     coverPos: { type: String, default: null },
+    // Photos de couverture multiples (carrousel de la bannière, max 6).
+    // Chaque entrée garde son propre cadrage. `cover`/`coverPos` restent
+    // synchronisés sur la 1re entrée (rétrocompat : partage, anciens clients).
+    covers: {
+      type: [
+        {
+          url: { type: String, required: true },
+          pos: { type: String, default: null },
+          _id: false,
+        },
+      ],
+      default: [],
+    },
     bio: { type: String, default: "", maxlength: 300 },
     // "Si j'étais un perso de jeu vidéo, je serais…" : nom d'un personnage
     // existant + son image (pour l'afficher dans le profil).
@@ -48,6 +61,17 @@ const userSchema = new mongoose.Schema(
     // défaut. `overviewCards` : détails affichés sur les jaquettes (note, heures…).
     overviewOrder: { type: [String], default: [] },
     overviewCards: { type: [String], default: [] },
+
+    // --- Connexion Steam (liaison OpenID « Sign in through Steam ») ---
+    // On garde le SteamID64 + un instantané du profil public (pseudo, avatar).
+    // La clé Steam Web API vit côté serveur ; aucun secret n'est stocké ici.
+    steam: {
+      steamId: { type: String, default: null },
+      personaName: { type: String, default: null },
+      avatar: { type: String, default: null },
+      profileUrl: { type: String, default: null },
+      connectedAt: { type: Date, default: null },
+    },
 
     // --- Connexion PSN (tokens de l'API non officielle, jamais renvoyés au client) ---
     psn: {
@@ -108,6 +132,14 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Couvertures effectives : le tableau s'il existe, sinon l'ancienne couverture
+// unique (profils créés avant le carrousel — pas de migration nécessaire).
+userSchema.methods.effectiveCovers = function () {
+  if (this.covers?.length)
+    return this.covers.map((c) => ({ url: c.url, pos: c.pos || null }));
+  return this.cover ? [{ url: this.cover, pos: this.coverPos || null }] : [];
+};
+
 // Version "self" : renvoyée à l'utilisateur connecté (inclut l'email).
 userSchema.methods.toPublic = function () {
   return {
@@ -117,6 +149,7 @@ userSchema.methods.toPublic = function () {
     avatar: this.avatar,
     cover: this.cover,
     coverPos: this.coverPos,
+    covers: this.effectiveCovers(),
     bio: this.bio,
     tagline: this.tagline,
     taglineImage: this.taglineImage,
@@ -124,6 +157,15 @@ userSchema.methods.toPublic = function () {
     overviewOrder: this.overviewOrder || [],
     overviewCards: this.overviewCards || [],
     psnConnected: !!(this.psn && this.psn.refreshToken),
+    steamConnected: !!(this.steam && this.steam.steamId),
+    steam: this.steam?.steamId
+      ? {
+          personaName: this.steam.personaName || null,
+          avatar: this.steam.avatar || null,
+          profileUrl: this.steam.profileUrl || null,
+          connectedAt: this.steam.connectedAt || null,
+        }
+      : null,
     isAdmin: isAdminEmail(this.email),
     followingCount: (this.following || []).length,
     createdAt: this.createdAt,
