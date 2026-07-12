@@ -386,6 +386,13 @@ export default function BlindTest() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Mode immersif : sur mobile, masque la bottom bar de navigation le temps de
+  // la partie (sinon elle chevauche le champ quand le clavier virtuel s'ouvre).
+  useEffect(() => {
+    document.body.classList.add("bt-immersive");
+    return () => document.body.classList.remove("bt-immersive");
+  }, []);
+
   // --- Pause / reprise : fige le chrono (décale l'origine de la manche du
   //     temps passé en pause) et suspend l'extrait. ---
   const togglePause = useCallback(() => {
@@ -997,6 +1004,16 @@ export default function BlindTest() {
                     setHighlight(0);
                   }}
                   onKeyDown={onKeyDown}
+                  onFocus={(e) => {
+                    // Mobile : remonte le champ au-dessus du clavier virtuel.
+                    if (window.innerWidth <= 760) {
+                      const el = e.target;
+                      setTimeout(
+                        () => el.scrollIntoView({ block: "center", behavior: "smooth" }),
+                        250
+                      );
+                    }
+                  }}
                   autoComplete="off"
                   spellCheck="false"
                 />
