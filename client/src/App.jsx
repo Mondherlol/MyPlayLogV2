@@ -7,6 +7,7 @@ import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Welcome from "./pages/Welcome";
+import BlindTest from "./pages/BlindTest";
 import Explorer from "./pages/Explorer";
 import Releases from "./pages/Releases";
 import GamePage from "./pages/GamePage";
@@ -115,6 +116,7 @@ export default function App() {
         }
       >
         <Route path="/app" element={<Welcome />} />
+        <Route path="/blindtest" element={<BlindTest />} />
         <Route path="/explore" element={<Explorer />} />
         <Route path="/releases" element={<Releases />} />
         <Route path="/company/:name" element={<CompanyPage />} />

@@ -1,3 +1,5 @@
+import { safeSetItem } from "./storage";
+
 // Petit cache "stale-while-revalidate" : mémoire + localStorage avec TTL.
 // On garde la donnée en mémoire pour la session (instantané pendant la nav SPA)
 // et en localStorage pour survivre à un refresh complet.
@@ -28,11 +30,9 @@ export function makeCache(keyPrefix, ttl) {
     set(key, data) {
       const entry = { ts: Date.now(), data };
       mem.set(key, entry);
-      try {
-        localStorage.setItem(keyPrefix + key, JSON.stringify(entry));
-      } catch {
-        /* quota dépassé / mode privé : tant pis, le cache mémoire suffit */
-      }
+      // Résilient : si le quota est saturé, safeSetItem purge les vieux caches
+      // puis retente — sinon le cache disque se fige définitivement une fois plein.
+      safeSetItem(keyPrefix + key, JSON.stringify(entry));
     },
   };
 }

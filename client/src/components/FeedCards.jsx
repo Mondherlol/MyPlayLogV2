@@ -41,6 +41,9 @@ import {
   Infinity as InfinityIcon,
   Disc3,
   Headphones,
+  Trophy,
+  Swords,
+  Music2,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { timeAgo, fmtDuration } from "../lib/lists";
@@ -135,6 +138,7 @@ export function FeedCard(props) {
   if (item.type === "videowatchgroup")
     return <VideoActivityGroupEvent {...props} item={{ ...item, kind: "watch" }} />;
   if (item.type === "gems") return <GemsEvent {...props} />;
+  if (item.type === "blindtest") return <BlindTestEvent {...props} />;
   return null;
 }
 
@@ -1230,6 +1234,55 @@ function GemsEvent({ item, onOpenGems }) {
       >
         <Gem size={14} /> Chercher mes pépites aussi
       </button>
+    </article>
+  );
+}
+
+// ============================================================
+//  Blind test terminé — cliquer « Défier » rejoue le même set d'extraits
+// ============================================================
+function BlindTestEvent({ item }) {
+  const pct = item.total ? Math.round((item.correct / item.total) * 100) : 0;
+  const ch = item.challenge;
+  return (
+    <article className="hf-card hf-blindtest">
+      <EventHead user={item.user} date={item.date}>
+        <Music2 size={13} className="hf-inline-ic" />{" "}
+        {ch ? (
+          <>
+            a défié <b>{ch.username}</b> au blind test
+          </>
+        ) : (
+          "a fait un blind test musical"
+        )}
+      </EventHead>
+
+      <div className="hf-bt-body">
+        <div className="hf-bt-scorebox">
+          <span className="hf-bt-score-num">{item.score}</span>
+          <span className="hf-bt-score-lbl">points</span>
+        </div>
+        <div className="hf-bt-meta">
+          <span className="hf-bt-stat">
+            <Trophy size={13} /> {item.correct}/{item.total} trouvés · {pct}%
+          </span>
+          {ch && (
+            <span className={`hf-bt-versus ${ch.beaten ? "win" : "lose"}`}>
+              <Swords size={12} />
+              {ch.beaten
+                ? `bat ${ch.username} (${ch.score})`
+                : `${ch.username} garde la tête (${ch.score})`}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <Link
+        to={`/blindtest?challenge=${item.blindTestId}`}
+        className="hf-bt-challenge-cta clickable"
+      >
+        <Swords size={15} /> Tenter le même défi
+      </Link>
     </article>
   );
 }

@@ -15,6 +15,10 @@ import {
   ChevronRight,
   ChevronLeft,
   Gamepad2,
+  Music2,
+  Trophy,
+  Crown,
+  Swords,
   X,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -197,6 +201,14 @@ export default function Welcome() {
               </div>
             </div>
 
+            <Link
+              to="/blindtest"
+              className="hf-blindtest-btn clickable"
+              title="Devine le jeu à partir d'un extrait d'OST"
+            >
+              <Music2 size={18} /> Blind test
+            </Link>
+
             <button
               className={`hf-quiz-btn clickable ${
                 (isMobile ? quizModalOpen : showQuiz) ? "on" : ""
@@ -273,6 +285,9 @@ export default function Welcome() {
         {/* Sur mobile, le quiz ne vit que dans la modale (voir toggleQuiz) —
             évite d'avoir deux instances qui se disputent le même localStorage. */}
         {showQuiz && !isMobile && <QuizCard />}
+
+        {/* Classement du blind test (moi + les joueurs que je suis) */}
+        <BlindTestLeaderboard token={token} myId={user?.id} />
 
         {/* Radar wishlist : jeux voulus déjà sortis / sorties imminentes */}
         <WishlistRadar token={token} />
@@ -471,6 +486,80 @@ function QuizModal({ onClose }) {
       </div>
     </div>,
     document.body
+  );
+}
+
+// Classement du blind test : meilleur score par joueur parmi moi + mes suivis.
+// Chaque ligne (sauf la mienne) est défiable → rejoue le même set d'extraits.
+function BlindTestLeaderboard({ token, myId }) {
+  const [entries, setEntries] = useState(null);
+
+  useEffect(() => {
+    if (!token) return;
+    let alive = true;
+    apiFetch("/blindtest/leaderboard", { token })
+      .then((d) => alive && setEntries(d.entries || []))
+      .catch(() => alive && setEntries([]));
+    return () => {
+      alive = false;
+    };
+  }, [token]);
+
+  // Rien tant qu'aucune partie n'a été jouée (garde le rail épuré).
+  if (!entries || entries.length === 0) {
+    if (entries === null) return null;
+    return (
+      <div className="hf-widget card hf-bt-widget">
+        <h3 className="hf-w-title">
+          <Crown size={15} /> Blind test
+        </h3>
+        <p className="hf-bt-empty">
+          Personne n'a encore joué. Lance-toi et deviens numéro 1&nbsp;!
+        </p>
+        <Link to="/blindtest" className="hf-bt-cta clickable">
+          <Music2 size={15} /> Jouer au blind test
+        </Link>
+      </div>
+    );
+  }
+
+  const top = entries.slice(0, 6);
+  return (
+    <div className="hf-widget card hf-bt-widget">
+      <h3 className="hf-w-title">
+        <Crown size={15} /> Classement blind test
+      </h3>
+      <ol className="hf-bt-list">
+        {top.map((e, i) => (
+          <li key={e.blindTestId} className={`hf-bt-row ${e.isMe ? "me" : ""}`}>
+            <span className={`hf-bt-rank r${i + 1}`}>{i + 1}</span>
+            <Link to={`/u/${e.user.username}`} className="hf-bt-user clickable">
+              {e.user.avatar ? (
+                <img src={e.user.avatar} alt="" loading="lazy" draggable="false" />
+              ) : (
+                <span className="hf-bt-av-fb">{e.user.username[0].toUpperCase()}</span>
+              )}
+              <span className="hf-bt-name">{e.user.username}</span>
+            </Link>
+            {!e.isMe && String(e.user.id) !== String(myId) && (
+              <Link
+                to={`/blindtest?challenge=${e.blindTestId}`}
+                className="hf-bt-fight clickable"
+                title={`Défier ${e.user.username}`}
+              >
+                <Swords size={13} />
+              </Link>
+            )}
+            <span className="hf-bt-score">
+              <Trophy size={12} /> {e.score}
+            </span>
+          </li>
+        ))}
+      </ol>
+      <Link to="/blindtest" className="hf-bt-cta clickable">
+        <Music2 size={15} /> Jouer au blind test
+      </Link>
+    </div>
   );
 }
 

@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { makeCache } from "../lib/cache";
+import { safeSetItem } from "../lib/storage";
 import { useAuth } from "../context/AuthContext";
 import { useLibrary } from "../context/LibraryContext";
 import ScrollRow from "../components/ScrollRow";
@@ -453,14 +454,14 @@ export default function GamePage() {
   // Mémorisée localement pour survivre au refresh, et persistée sur l'entrée de
   // bibliothèque si le jeu y est déjà (pour rester cohérent ailleurs).
   function pickCover(url) {
-    localStorage.setItem(coverKey(id), url);
+    safeSetItem(coverKey(id), url);
     setCoverOverride(url);
     if (fav) patchEntry({ cover: url });
   }
 
   // Définit l'image affichée comme fond de la page (mémorisé localement)
   function setGameCover(url) {
-    localStorage.setItem(bgKey(id), url);
+    safeSetItem(bgKey(id), url);
     setBgOverride(url);
   }
 

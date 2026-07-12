@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { apiFetch } from "../lib/api";
+import { safeSetItem } from "../lib/storage";
 
 const AuthContext = createContext();
 
@@ -32,12 +33,33 @@ export function AuthProvider({ children }) {
 
   function persistToken(newToken, remember) {
     setToken(newToken);
+    // Écritures résilientes : si le localStorage est saturé par les caches, on
+    // purge et on retente — la connexion ne doit jamais échouer pour un quota.
     if (remember) {
-      localStorage.setItem("mpl_token", newToken);
-      sessionStorage.removeItem("mpl_token");
+      safeSetItem("mpl_token", newToken);
+      try {
+        sessionStorage.removeItem("mpl_token");
+      } catch {
+        /* ignore */
+      }
     } else {
-      sessionStorage.setItem("mpl_token", newToken);
-      localStorage.removeItem("mpl_token");
+      let inSession = false;
+      try {
+        sessionStorage.setItem("mpl_token", newToken);
+        inSession = true;
+      } catch {
+        /* sessionStorage plein : repli sur localStorage juste en dessous */
+      }
+      if (inSession) {
+        try {
+          localStorage.removeItem("mpl_token");
+        } catch {
+          /* ignore */
+        }
+      } else {
+        // Repli résilient : le token vit dans localStorage (purge + retry).
+        safeSetItem("mpl_token", newToken);
+      }
     }
   }
 

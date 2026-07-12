@@ -392,6 +392,22 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
       continue;
     }
 
+    if (a.type === "blindtest") {
+      if (!a.meta?.blindTestId) continue;
+      events.push({
+        type: "blindtest",
+        id: `a-${a._id}`,
+        date: a.createdAt,
+        user: person(a.actor),
+        blindTestId: a.meta.blindTestId,
+        score: a.meta.score || 0,
+        correct: a.meta.correct || 0,
+        total: a.meta.total || 0,
+        challenge: a.meta.challenge || null,
+      });
+      continue;
+    }
+
     if (!INTERACTIONS.includes(a.type)) continue;
 
     const onList = !!a.list;

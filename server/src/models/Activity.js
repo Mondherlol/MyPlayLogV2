@@ -42,6 +42,7 @@ const activitySchema = new mongoose.Schema(
         "list_create", // création d'une liste publique
         "list_items", // ajout d'éléments à une liste (meta.added, fusionné)
         "follow", // abonnement à un joueur (target)
+        "blindtest", // a terminé un blind test musical (meta = score/manches/défi)
       ],
       required: true,
     },
