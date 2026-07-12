@@ -734,9 +734,12 @@
   background: radial-gradient(closest-side, var(--bts-stage-glow), transparent);
   pointer-events: none;
 }
+/* Le vinyle est un bouton : cliquer dessus met en pause / reprend. */
 .bt-vinyl {
   position: absolute;
   inset: 12%; /* proportionnel → la scène peut rétrécir sur mobile */
+  border: none;
+  padding: 0;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -745,7 +748,25 @@
     repeating-radial-gradient(circle at center, #14141a 0 2px, #24242c 2px 4px);
   box-shadow: inset 0 0 34px rgba(0, 0, 0, 0.65);
   overflow: hidden;
+  cursor: pointer;
 }
+/* Icône pause qui se dévoile au survol du vinyle */
+.bt-vinyl-pause {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(6, 7, 11, 0.45);
+  color: var(--bts-gold-2);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+.bt-vinyl:hover .bt-vinyl-pause,
+.bt-vinyl:focus-visible .bt-vinyl-pause { opacity: 1; }
+.bt-stage.paused .bt-vinyl-pause { opacity: 0; } /* l'overlay Reprendre prend le relais */
 .bt-vinyl-disc { position: absolute; inset: 0; border-radius: 50%; animation: bt-spin 4s linear infinite; }
 .bt-eq {
   position: relative;

@@ -61,6 +61,44 @@ function sameGame(r, guessGameId, guessName) {
   return !!a && a === canonName(r.gameName);
 }
 
+// Acronymes d'un titre pour la recherche (« gta » → Grand Theft Auto,
+// « botw » → Breath of the Wild, « ff7 » → Final Fantasy VII…). On génère les
+// initiales du titre complet ET de chaque segment (avant/après « : » ou « - »),
+// les nombres et chiffres romains étant gardés entiers (+ variante en chiffres).
+const ROMAN = {
+  i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8,
+  ix: 9, x: 10, xi: 11, xii: 12, xiii: 13, xiv: 14, xv: 15, xvi: 16,
+};
+function acronymsOf(rawName) {
+  const out = new Set();
+  const addFor = (words) => {
+    if (words.length < 2) return;
+    let a = ""; // « gtav », « ffvii »
+    let b = ""; // variante chiffres : « gta5 », « ff7 »
+    for (const w of words) {
+      if (/^\d+$/.test(w)) {
+        a += w;
+        b += w;
+      } else if (ROMAN[w]) {
+        a += w;
+        b += String(ROMAN[w]);
+      } else {
+        a += w[0];
+        b += w[0];
+      }
+    }
+    out.add(a);
+    if (b !== a) out.add(b);
+  };
+  const allWords = norm(rawName).split(" ").filter(Boolean);
+  addFor(allWords);
+  for (const seg of String(rawName || "").split(/[:\-–—]/)) {
+    const ws = norm(seg).split(" ").filter(Boolean);
+    if (ws.length && ws.length !== allWords.length) addFor(ws);
+  }
+  return [...out];
+}
+
 // Miroir EXACT de scoreRound() côté serveur (routes/blindtest.js) : le client
 // affiche des points « en direct », le serveur recalcule la vérité au /finish.
 function estimatePoints(r, guessGameId, guessName, timeMs, durationSec) {
@@ -713,20 +751,43 @@ export default function BlindTest() {
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  // Suggestions de recherche.
+  // Une seule entrée par jeu « canonique » dans la recherche : pas de doublons
+  // éditions / versions / remasters (le nom le plus court = le jeu de base, et
+  // deviner l'un vaut l'autre grâce à sameGame).
+  const uniqueCandidates = useMemo(() => {
+    const byCanon = new Map();
+    for (const c of candidates) {
+      const key = canonName(c.name) || norm(c.name);
+      const prev = byCanon.get(key);
+      if (!prev) {
+        byCanon.set(key, c);
+      } else {
+        const better = c.name.length < prev.name.length ? c : prev;
+        byCanon.set(key, { ...better, cover: better.cover || prev.cover || c.cover });
+      }
+    }
+    // Acronymes précalculés une fois pour la recherche.
+    return [...byCanon.values()].map((c) => ({ ...c, acr: acronymsOf(c.name) }));
+  }, [candidates]);
+
+  // Suggestions de recherche : préfixe du nom > acronyme (« gta », « botw »,
+  // « ff7 »…) > sous-chaîne.
   const suggestions = useMemo(() => {
     const q = norm(input);
     if (!q) return [];
+    const qc = q.replace(/\s+/g, ""); // « gta 5 » → « gta5 »
     const starts = [];
+    const acro = [];
     const incl = [];
-    for (const c of candidates) {
+    for (const c of uniqueCandidates) {
       const n = norm(c.name);
       if (n.startsWith(q)) starts.push(c);
+      else if (qc.length >= 2 && c.acr.some((a) => a.startsWith(qc))) acro.push(c);
       else if (n.includes(q)) incl.push(c);
       if (starts.length >= 8) break;
     }
-    return [...starts, ...incl].slice(0, 8);
-  }, [input, candidates]);
+    return [...starts, ...acro, ...incl].slice(0, 8);
+  }, [input, uniqueCandidates]);
 
   function onKeyDown(e) {
     if (reveal || paused) return;
@@ -936,14 +997,22 @@ export default function BlindTest() {
                 paused ? "paused" : ""
               }`}
             >
-              <div className="bt-vinyl" aria-hidden="true">
+              <button
+                className="bt-vinyl clickable"
+                onClick={togglePause}
+                title={paused ? "Reprendre" : "Mettre en pause"}
+                aria-label={paused ? "Reprendre" : "Mettre en pause"}
+              >
                 <span className="bt-vinyl-disc" />
                 <span className="bt-eq">
                   {Array.from({ length: 7 }).map((_, i) => (
                     <i key={i} style={{ animationDelay: `${i * 0.09}s` }} />
                   ))}
                 </span>
-              </div>
+                <span className="bt-vinyl-pause" aria-hidden="true">
+                  <Pause size={28} />
+                </span>
+              </button>
               <svg className="bt-ring" viewBox="0 0 120 120" aria-hidden="true">
                 <circle className="bt-ring-bg" cx="60" cy="60" r="54" />
                 <circle
