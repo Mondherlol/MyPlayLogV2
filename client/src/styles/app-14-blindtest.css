@@ -720,12 +720,13 @@
   place-items: center;
   margin: 0.7rem 0 0.3rem;
 }
+/* Halo derrière le vinyle : closest-side → le dégradé s'éteint AVANT les
+   bords de la boîte, donc jamais de coupe carrée visible. */
 .bt-stage::before {
   content: "";
   position: absolute;
-  inset: -34px;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--bts-stage-glow), transparent 68%);
+  inset: -46px;
+  background: radial-gradient(closest-side, var(--bts-stage-glow), transparent);
   pointer-events: none;
 }
 .bt-vinyl {
@@ -1410,6 +1411,25 @@
   font-weight: 700;
   color: var(--bts-gold-ink);
   background: var(--bts-gold-soft);
+}
+/* Écouter l'OST d'une manche depuis le recap */
+.bt-recap-play {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--bts-line-2);
+  background: var(--bts-card);
+  color: var(--bts-soft);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.bt-recap-play:hover { border-color: var(--bts-gold); color: var(--bts-text); }
+.bt-recap-play.on {
+  border-color: transparent;
+  background: var(--bts-grad);
+  color: #3a2600;
 }
 .bt-recap-pts {
   flex: 0 0 auto;

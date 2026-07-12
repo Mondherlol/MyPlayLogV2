@@ -24,6 +24,28 @@ const DEFAULT_ROUNDS = 10;
 const person = (u) =>
   u ? { id: String(u._id), username: u.username, avatar: u.avatar || null } : null;
 
+// Même normalisation que le client (pages/BlindTest.jsx).
+const norm = (s) =>
+  String(s || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+// Suffixes d'édition / portage / remaster à ignorer dans la comparaison :
+// deviner « BOTW » quand la réponse est « BOTW - Switch 2 Edition » (ou
+// l'inverse), c'est le même jeu → bonne réponse. Miroir EXACT côté client.
+const EDITION_RE =
+  /\b(nintendo switch 2 edition|nintendo switch edition|definitive edition|deluxe edition|complete edition|game of the year edition|goty edition|goty|enhanced edition|special edition|anniversary edition|legacy edition|collector s edition|ultimate edition|royal edition|directors cut|director s cut|remastered|remaster|remake|intergrade|redux|vr edition|hd)\b/g;
+const canonName = (s) => norm(s).replace(EDITION_RE, " ").replace(/\s+/g, " ").trim();
+
+// Même jeu ? Par id IGDB, sinon par nom canonique.
+function sameGame(r, guessGameId, guessName) {
+  if (guessGameId != null && Number(guessGameId) === Number(r.gameId)) return true;
+  const a = canonName(guessName);
+  return !!a && a === canonName(r.gameName);
+}
+
 function shuffle(a) {
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -259,8 +281,8 @@ async function buildRounds(userId, count) {
 // Score d'une manche (serveur). Rapide = plus de points ; un jeu piège deviné
 // rapporte gros ; ne PAS trouver un jeu qu'on adore (bcp d'heures / grosse note)
 // coûte davantage.
-function scoreRound(r, guessGameId, timeMs, durationSec) {
-  const correct = guessGameId != null && Number(guessGameId) === Number(r.gameId);
+function scoreRound(r, guessGameId, guessName, timeMs, durationSec) {
+  const correct = sameGame(r, guessGameId, guessName);
   const dur = durationSec * 1000;
   const t = timeMs == null ? dur : Math.min(Math.max(timeMs, 0), dur);
   const frac = dur > 0 ? (dur - t) / dur : 0; // 1 = instantané, 0 = à la fin
@@ -456,9 +478,10 @@ router.post("/finish", requireAuth, async (req, res) => {
     const rounds = session.rounds.map((r, i) => {
       const g = byId.get(i) || {};
       const guessId = g.gameId != null ? Number(g.gameId) : null;
+      const guessName = String(g.name || "").slice(0, 160);
       const timeMs = g.timeMs != null ? Number(g.timeMs) : null;
-      const correct = guessId != null && guessId === Number(r.gameId);
-      const points = scoreRound(r, guessId, timeMs, dur);
+      const correct = sameGame(r, guessId, guessName);
+      const points = scoreRound(r, guessId, guessName, timeMs, dur);
       score += points;
       if (correct) correctCount += 1;
       return {

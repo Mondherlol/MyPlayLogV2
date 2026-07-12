@@ -30,6 +30,7 @@ import {
   Building2,
   Tag,
   Timer,
+  Home,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { usePlayer } from "../context/PlayerContext";
@@ -47,10 +48,23 @@ const norm = (s) =>
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 
+// Suffixes d'édition / portage / remaster à ignorer : deviner « BOTW » quand
+// la réponse est « BOTW - Switch 2 Edition », c'est le même jeu → bonne
+// réponse. Miroir EXACT de canonName()/sameGame() côté serveur.
+const EDITION_RE =
+  /\b(nintendo switch 2 edition|nintendo switch edition|definitive edition|deluxe edition|complete edition|game of the year edition|goty edition|goty|enhanced edition|special edition|anniversary edition|legacy edition|collector s edition|ultimate edition|royal edition|directors cut|director s cut|remastered|remaster|remake|intergrade|redux|vr edition|hd)\b/g;
+const canonName = (s) => norm(s).replace(EDITION_RE, " ").replace(/\s+/g, " ").trim();
+
+function sameGame(r, guessGameId, guessName) {
+  if (guessGameId != null && Number(guessGameId) === Number(r.gameId)) return true;
+  const a = canonName(guessName);
+  return !!a && a === canonName(r.gameName);
+}
+
 // Miroir EXACT de scoreRound() côté serveur (routes/blindtest.js) : le client
 // affiche des points « en direct », le serveur recalcule la vérité au /finish.
-function estimatePoints(r, guessGameId, timeMs, durationSec) {
-  const correct = guessGameId != null && Number(guessGameId) === Number(r.gameId);
+function estimatePoints(r, guessGameId, guessName, timeMs, durationSec) {
+  const correct = sameGame(r, guessGameId, guessName);
   const dur = durationSec * 1000;
   const t = timeMs == null ? dur : Math.min(Math.max(timeMs, 0), dur);
   const frac = dur > 0 ? (dur - t) / dur : 0;
@@ -215,6 +229,7 @@ export default function BlindTest() {
   const replayRef = useRef(false); // miroir de replayOn pour les timers
   const clipStartRef = useRef(0); // position (s) du début de l'extrait dans la vidéo
   const revealAtRef = useRef(0); // instant de la révélation (anti Entrée « en retard »)
+  const loadingRef = useRef(false); // miroir de clipLoading pour le timer de manche
 
   // --- Player YouTube caché, propre à la page (indépendant du mini-lecteur) ---
   const ytHostRef = useRef(null);
@@ -283,6 +298,7 @@ export default function BlindTest() {
       const p = ytRef.current;
       if (!p) return;
       seekDoneRef.current = false;
+      loadingRef.current = true;
       setClipLoading(true);
       try {
         p.loadVideoById(round.videoId);
@@ -319,11 +335,14 @@ export default function BlindTest() {
           }
           // Le vrai départ de la manche : le chrono repart quand le son joue.
           if (!lockedRef.current && !pausedRef.current) roundStartRef.current = Date.now();
+          loadingRef.current = false;
           setClipLoading(false);
           clearInterval(pollRef.current);
           pollRef.current = null;
         } else if (Date.now() - pollStart > 8000) {
           // Vidéo qui ne répond pas : on retire le spinner, la manche continue.
+          if (!lockedRef.current && !pausedRef.current) roundStartRef.current = Date.now();
+          loadingRef.current = false;
           setClipLoading(false);
           clearInterval(pollRef.current);
           pollRef.current = null;
@@ -392,6 +411,36 @@ export default function BlindTest() {
     }
   }, []);
 
+  // --- Lecture d'une OST depuis le scoreboard final (toggle par piste) ---
+  const [boardPlaying, setBoardPlaying] = useState(null); // videoId en cours
+  const boardPlayingRef = useRef(null);
+  const playBoardTrack = useCallback((r) => {
+    const p = ytRef.current;
+    if (!p || !r.videoId) return;
+    if (boardPlayingRef.current === r.videoId) {
+      try {
+        p.pauseVideo?.();
+      } catch {
+        /* ignore */
+      }
+      boardPlayingRef.current = null;
+      setBoardPlaying(null);
+      return;
+    }
+    boardPlayingRef.current = r.videoId;
+    setBoardPlaying(r.videoId);
+    try {
+      p.loadVideoById(r.videoId);
+      if (!mutedRef.current) {
+        p.unMute?.();
+        p.setVolume?.(volumeRef.current);
+      }
+      p.playVideo?.();
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   // --- Réécoute de l'extrait depuis la card de résultat (toggle) ---
   const toggleReplay = useCallback(() => {
     const p = ytRef.current;
@@ -453,13 +502,15 @@ export default function BlindTest() {
       if (lockedRef.current) return;
       lockedRef.current = true;
       stopClip();
+      loadingRef.current = false;
       setClipLoading(false);
       const round = rounds[idx];
       if (!round) return;
       const timeMs = cand ? Date.now() - roundStartRef.current : null;
       const guessId = cand ? cand.id : null;
-      const points = estimatePoints(round, guessId, timeMs, round.durationSec);
-      const correct = guessId != null && Number(guessId) === Number(round.gameId);
+      const guessName = cand ? cand.name : "";
+      const points = estimatePoints(round, guessId, guessName, timeMs, round.durationSec);
+      const correct = sameGame(round, guessId, guessName);
       guessesRef.current[idx] = {
         id: round.id,
         gameId: guessId,
@@ -505,6 +556,9 @@ export default function BlindTest() {
         return;
       }
       if (pausedRef.current) return; // chrono gelé pendant la pause
+      // Chrono gelé tant que le son charge (playClip réarme roundStartRef au
+      // vrai départ) — évite le compteur qui descend puis remonte.
+      if (loadingRef.current) return;
       const left = Math.max(0, dur - (Date.now() - roundStartRef.current));
       setTimeLeftMs(left);
       const sec = Math.ceil(left / 1000);
@@ -540,16 +594,23 @@ export default function BlindTest() {
       // Repli : on montre quand même le tableau reconstruit côté client.
       const localRounds = rounds.map((r, i) => {
         const g = guessesRef.current[i];
-        const correct = g?.gameId != null && Number(g.gameId) === Number(r.gameId);
+        const correct = g ? sameGame(r, g.gameId, g.name) : false;
         return {
           gameId: r.gameId,
           gameName: r.gameName,
           cover: r.cover,
           ostName: r.ostName,
+          videoId: r.videoId,
           owned: r.owned,
           correct,
           guessedName: g?.name || "",
-          points: estimatePoints(r, g?.gameId ?? null, g?.timeMs ?? null, r.durationSec),
+          points: estimatePoints(
+            r,
+            g?.gameId ?? null,
+            g?.name || "",
+            g?.timeMs ?? null,
+            r.durationSec
+          ),
           timeMs: g?.timeMs ?? null,
         };
       });
@@ -1055,9 +1116,14 @@ export default function BlindTest() {
             copied={copied}
             onCopy={copyChallenge}
             onReplay={() => {
+              stopClip();
+              boardPlayingRef.current = null;
+              setBoardPlaying(null);
               if (challengeId) navigate("/blindtest");
               setPhase("intro");
             }}
+            onPlayTrack={playBoardTrack}
+            playingId={boardPlaying}
             token={token}
           />
         )}
@@ -1069,7 +1135,16 @@ export default function BlindTest() {
 // ============================================================
 //  Tableau des scores + classement
 // ============================================================
-function Scoreboard({ final, challengeId, copied, onCopy, onReplay, token }) {
+function Scoreboard({
+  final,
+  challengeId,
+  copied,
+  onCopy,
+  onReplay,
+  onPlayTrack,
+  playingId,
+  token,
+}) {
   const [board, setBoard] = useState(null);
   const pct = final.roundCount ? Math.round((final.correctCount / final.roundCount) * 100) : 0;
   const ch = final.challenge;
@@ -1121,6 +1196,9 @@ function Scoreboard({ final, challengeId, copied, onCopy, onReplay, token }) {
               {copied ? "Lien copié !" : "Défier un ami"}
             </button>
           )}
+          <Link to="/app" className="bt-ghost clickable">
+            <Home size={16} /> Accueil
+          </Link>
         </div>
         {final._offline && (
           <p className="bt-offline-note">Score affiché en local (enregistrement indisponible).</p>
@@ -1171,6 +1249,17 @@ function Scoreboard({ final, challengeId, copied, onCopy, onReplay, token }) {
                     {!r.owned && <span className="bt-recap-tag">Jamais joué</span>}
                   </span>
                 </span>
+                {r.videoId && (
+                  <button
+                    className={`bt-recap-play clickable ${
+                      playingId === r.videoId ? "on" : ""
+                    }`}
+                    onClick={() => onPlayTrack(r)}
+                    title={playingId === r.videoId ? "Mettre en pause" : "Écouter l'OST"}
+                  >
+                    {playingId === r.videoId ? <Pause size={13} /> : <Play size={13} />}
+                  </button>
+                )}
                 <span className={`bt-recap-pts ${r.points >= 0 ? "up" : "down"}`}>
                   {r.points >= 0 ? `+${r.points}` : r.points}
                 </span>
