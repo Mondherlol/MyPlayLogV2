@@ -27,7 +27,6 @@ const NAV = [
   { to: "/app", label: "Accueil", Icon: Home, end: true },
   { to: "/explore", label: "Explorer", Icon: Compass },
   { to: "/releases", label: "Sorties", Icon: CalendarDays },
-  { to: "/playtopia", label: "Playtopia", Icon: Palmtree },
   { to: "/lists", label: "Listes", Icon: List },
   { to: "/profile", label: "Profil", Icon: User },
   { to: "/admin", label: "Admin", Icon: Shield, adminOnly: true },
