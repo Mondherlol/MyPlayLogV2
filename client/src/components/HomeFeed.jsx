@@ -256,7 +256,7 @@ export default function HomeFeed({ token, me, filterUser = null }) {
           onOpenImage={() => setLightbox(item)}
           onPlay={(v) => setPlaying(v)}
           onOpenGems={() => setGemsFor(item)}
-          onOpenBlindTest={() => setBlindTestFor(item)}
+          onOpenBlindTest={(payload) => setBlindTestFor(payload || item)}
         />
       ))}
 

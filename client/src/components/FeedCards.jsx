@@ -139,6 +139,7 @@ export function FeedCard(props) {
     return <VideoActivityGroupEvent {...props} item={{ ...item, kind: "watch" }} />;
   if (item.type === "gems") return <GemsEvent {...props} />;
   if (item.type === "blindtest") return <BlindTestEvent {...props} />;
+  if (item.type === "blindtestgroup") return <BlindTestGroupEvent {...props} />;
   return null;
 }
 
@@ -1280,10 +1281,63 @@ function BlindTestEvent({ item, onOpenBlindTest }) {
 
       <button
         className="hf-bt-challenge-cta clickable"
-        onClick={onOpenBlindTest}
+        onClick={() => onOpenBlindTest()}
       >
         <Disc3 size={15} /> Voir les résultats
       </button>
+    </article>
+  );
+}
+
+// Plusieurs blind tests d'affilée du même joueur → une seule carte avec la
+// liste des parties (chacune ouvrant ses résultats). Le score le mieux réussi
+// est mis en avant.
+function BlindTestGroupEvent({ item, onOpenBlindTest }) {
+  return (
+    <article className="hf-card hf-blindtest hf-btg">
+      <EventHead user={item.user} date={item.date}>
+        <Music2 size={13} className="hf-inline-ic" /> a fait {item.count} blind
+        tests musicaux
+      </EventHead>
+
+      <div className="hf-btg-summary">
+        <div className="hf-bt-scorebox">
+          <span className="hf-bt-score-num">{item.bestScore}</span>
+          <span className="hf-bt-score-lbl">meilleur</span>
+        </div>
+        <span className="hf-btg-summary-txt">
+          {item.count} parties · {item.best.correct}/{item.best.total} au top
+        </span>
+      </div>
+
+      <ul className="hf-btg-list">
+        {item.games.map((g) => {
+          const pct = g.total ? Math.round((g.correct / g.total) * 100) : 0;
+          const best = g.score === item.bestScore;
+          return (
+            <li key={g.id} className={`hf-btg-row ${best ? "best" : ""}`}>
+              <span className="hf-btg-pts">
+                <b>{g.score}</b> pts
+              </span>
+              <span className="hf-btg-stat">
+                <Trophy size={12} /> {g.correct}/{g.total} · {pct}%
+              </span>
+              {g.challenge && (
+                <span className={`hf-btg-vs ${g.challenge.beaten ? "win" : "lose"}`}>
+                  <Swords size={11} /> {g.challenge.username}
+                </span>
+              )}
+              <span className="hf-btg-time">{timeAgo(g.date)}</span>
+              <button
+                className="hf-btg-see clickable"
+                onClick={() => onOpenBlindTest({ ...g, user: item.user })}
+              >
+                <Disc3 size={14} /> Voir
+              </button>
+            </li>
+          );
+        })}
+      </ul>
     </article>
   );
 }

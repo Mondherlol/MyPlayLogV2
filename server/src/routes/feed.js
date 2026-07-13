@@ -191,6 +191,7 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
   ]);
 
   const events = [];
+  const blindtests = []; // regroupés en rafale après la boucle des activités
 
   // --- Actions de bibliothèque (game_update) : on complète la carte avec
   // l'état ACTUEL de l'entrée (review, note, réactions…) pour pouvoir y
@@ -394,7 +395,7 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
 
     if (a.type === "blindtest") {
       if (!a.meta?.blindTestId) continue;
-      events.push({
+      blindtests.push({
         type: "blindtest",
         id: `a-${a._id}`,
         date: a.createdAt,
@@ -613,6 +614,58 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
   pushVideoActivity("like", liked, "likedAt");
   pushVideoActivity("comment", commented, "commentedAt");
   pushVideoActivity("later", later, "laterAt");
+
+  // --- Blind tests : plusieurs parties d'un même joueur rapprochées dans le
+  //     temps → UNE carte « a fait N blind tests » (jouer plusieurs fois de
+  //     suite est courant et noyait le fil). Une seule partie = carte normale. ---
+  blindtests.sort((a, b) => new Date(b.date) - new Date(a.date));
+  {
+    const clusters = [];
+    for (const bt of blindtests) {
+      const last = clusters[clusters.length - 1];
+      if (
+        last &&
+        last.user.id === bt.user.id &&
+        new Date(last.lastDate) - new Date(bt.date) <= GROUP_GAP
+      ) {
+        last.members.push(bt);
+        last.lastDate = bt.date;
+      } else {
+        clusters.push({ user: bt.user, date: bt.date, lastDate: bt.date, members: [bt] });
+      }
+    }
+    for (const c of clusters) {
+      if (c.members.length >= 2) {
+        const best = c.members.reduce((a, b) => (b.score > a.score ? b : a));
+        events.push({
+          type: "blindtestgroup",
+          id: `bt-g-${c.members[0].id}`,
+          date: c.date, // le plus récent du groupe
+          user: c.user,
+          count: c.members.length,
+          bestScore: best.score,
+          best: {
+            blindTestId: best.blindTestId,
+            score: best.score,
+            correct: best.correct,
+            total: best.total,
+            challenge: best.challenge,
+          },
+          games: c.members.map((m) => ({
+            id: m.id,
+            blindTestId: m.blindTestId,
+            date: m.date,
+            score: m.score,
+            correct: m.correct,
+            total: m.total,
+            challenge: m.challenge,
+          })),
+        });
+      } else {
+        events.push(c.members[0]);
+      }
+    }
+  }
 
   // --- Découvertes de pépites indés (une carte par jour et par joueur) ---
   for (const g of gems) {

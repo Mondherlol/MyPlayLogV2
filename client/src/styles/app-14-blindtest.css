@@ -251,6 +251,119 @@
 :root[data-theme="dark"] .hf-bt-versus.win { color: #3ddc84; }
 
 /* ---------------------------------------------------------------------
+   Card « a fait N blind tests » (rafale regroupée) — BlindTestGroupEvent
+   --------------------------------------------------------------------- */
+.hf-btg-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-top: 0.15rem;
+}
+.hf-btg-summary-txt {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+.hf-btg-list {
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.hf-btg-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid transparent;
+}
+.hf-btg-row.best {
+  background: color-mix(in srgb, var(--orange) 10%, transparent);
+  border-color: color-mix(in srgb, var(--orange) 30%, transparent);
+}
+.hf-btg-pts {
+  flex: 0 0 auto;
+  min-width: 4.4rem;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+.hf-btg-pts b {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.98rem;
+  color: var(--accent-ink);
+}
+.hf-btg-stat {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hf-btg-stat svg { flex: 0 0 auto; color: var(--accent-ink); }
+.hf-btg-vs {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hf-btg-vs.win { color: #1f9d55; }
+.hf-btg-vs.lose { color: var(--text-soft); }
+:root[data-theme="dark"] .hf-btg-vs.win { color: #3ddc84; }
+.hf-btg-time {
+  flex: 0 0 auto;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+  opacity: 0.8;
+  white-space: nowrap;
+}
+.hf-btg-see {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.32rem 0.6rem;
+  border-radius: 9px;
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--text);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.hf-btg-see:hover {
+  border-color: var(--orange);
+  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--orange) 8%, transparent);
+}
+.hf-btg-see svg { color: var(--accent-ink); }
+
+/* Mobile : la ligne devient plus compacte, on cache le défi et l'heure. */
+@media (max-width: 560px) {
+  .hf-btg-row { gap: 0.4rem; padding: 0.4rem 0.45rem; }
+  .hf-btg-pts { min-width: 3.6rem; }
+  .hf-btg-vs,
+  .hf-btg-time { display: none; }
+}
+
+/* ---------------------------------------------------------------------
    Modale « Voir les résultats » d'un blind test (BlindTestResultsModal)
    --------------------------------------------------------------------- */
 .btr-modal {
