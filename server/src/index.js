@@ -23,6 +23,7 @@ import companyRoutes from "./routes/companies.js";
 import platformRoutes from "./routes/platforms.js";
 import shareRoutes from "./routes/share.js";
 import clientErrorRoutes from "./routes/clientErrors.js";
+import patchesRoutes from "./routes/patches.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -67,6 +68,7 @@ app.use("/api/patchnotes", patchnoteRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/companies", companyRoutes);
 app.use("/api/platforms", platformRoutes);
+app.use("/api/patches", patchesRoutes);
 // Remontée des crashs du front (voir routes/clientErrors.js).
 app.use("/api/client-errors", clientErrorRoutes);
 

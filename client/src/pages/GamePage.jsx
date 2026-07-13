@@ -1244,6 +1244,69 @@ function SwitchPatch({ patch }) {
   );
 }
 
+// Bloc « Patch FR Switch » : affiche le patch poussé par l'app locale, ou un
+// bouton « Demander » (le scraping se fait hors serveur, sur une machine à IP
+// résidentielle). Une demande sur un jeu déjà pourvu vaut demande de MAJ.
+function SwitchPatchBlock({ data, gameId, token }) {
+  const [requested, setRequested] = useState(!!data.switchPatchRequested);
+  const [busy, setBusy] = useState(false);
+
+  async function ask() {
+    if (busy || !token) return;
+    setBusy(true);
+    try {
+      await apiFetch(`/patches/switch/${gameId}/request`, {
+        method: "POST",
+        token,
+        body: { name: data.name },
+      });
+      setRequested(true);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const askBtn = (label) =>
+    requested ? (
+      <span className="gp-patch-asked">
+        <Check size={14} /> Demande envoyée — en attente de scraping
+      </span>
+    ) : token ? (
+      <button className="gp-patch-ask clickable" onClick={ask} disabled={busy}>
+        {busy ? <Loader2 size={14} className="spin" /> : <Send size={14} />} {label}
+      </button>
+    ) : (
+      <span className="gp-patch-asked">Connecte-toi pour demander ce patch.</span>
+    );
+
+  return (
+    <section className="gp-block">
+      <h2 className="gp-h2">
+        <Gamepad2 size={16} /> Patch FR Switch
+      </h2>
+      <p className="gp-patch-intro">
+        Certains jeux traduits en français sur PC ne le sont pas sur Switch (ou
+        avec une version censurée). Voici le patch FR d'origine, hébergé sur
+        nxbrew.net.
+      </p>
+      {data.switchPatch ? (
+        <>
+          <SwitchPatch patch={data.switchPatch} />
+          <div className="gp-patch-askrow">{askBtn("Demander une mise à jour")}</div>
+        </>
+      ) : (
+        <div className="gp-troph-empty">
+          <Gamepad2 size={26} />
+          <p className="font-fun">Aucun patch FR Switch enregistré pour ce jeu.</p>
+          {askBtn("Demander le patch")}
+        </div>
+      )}
+    </section>
+  );
+}
+
 // --- Onglet Patchs : patch FR Switch (nxbrew) + fan-traduction FR des visual
 // novels non traduits (VNDB) + liens de recherche de mods. ---
 function PatchesTab({ gameId, token }) {
@@ -1298,29 +1361,7 @@ function PatchesTab({ gameId, token }) {
   return (
     <div className="gp-patches">
       {/* Patch FR Switch (nxbrew.net) — pour tout jeu Switch */}
-      {data.isSwitch && (
-        <section className="gp-block">
-          <h2 className="gp-h2">
-            <Gamepad2 size={16} /> Patch FR Switch
-          </h2>
-          <p className="gp-patch-intro">
-            Certains jeux traduits en français sur PC ne le sont pas sur Switch (ou
-            avec une version censurée). Voici le patch FR d'origine, hébergé sur
-            nxbrew.net.
-          </p>
-          {data.switchPatch ? (
-            <SwitchPatch patch={data.switchPatch} />
-          ) : (
-            <div className="gp-troph-empty">
-              <Gamepad2 size={26} />
-              <p className="font-fun">
-                Aucun patch FR Switch trouvé pour ce jeu (ou site momentanément
-                indisponible).
-              </p>
-            </div>
-          )}
-        </section>
-      )}
+      {data.isSwitch && <SwitchPatchBlock data={data} gameId={gameId} token={token} />}
 
       {/* Traduction FR (visual novels sans version française) */}
       {vn !== null && (

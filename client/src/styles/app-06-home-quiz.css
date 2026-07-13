@@ -5491,6 +5491,42 @@
   color: var(--accent-ink);
 }
 
+/* Bouton « Demander » (déclenche un scrape via l'app locale) */
+.gp-patch-askrow {
+  margin-top: 0.8rem;
+}
+
+.gp-patch-ask {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 10px;
+  background: var(--accent-grad);
+  color: #1a1204;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+  transition: filter 0.15s ease, opacity 0.15s ease;
+}
+
+.gp-patch-ask:hover {
+  filter: brightness(1.06);
+}
+
+.gp-patch-ask:disabled {
+  opacity: 0.6;
+}
+
+.gp-patch-asked {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 /* Patch FR Switch (nxbrew) : carte avec sections Base / Update / DLC */
 .gp-swpatch {
   border: 1px solid var(--border);

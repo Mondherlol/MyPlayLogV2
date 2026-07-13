@@ -24,7 +24,6 @@ import SwitchPatchCache from "../models/SwitchPatchCache.js";
 import { fetchHltbTimes } from "../lib/hltb.js";
 import { buildGameFeed, fetchSteamReviews } from "../lib/feed.js";
 import { findVnId, fetchVnCharacters, fetchVnFrPatches } from "../lib/vndb.js";
-import { fetchSwitchFrPatch } from "../lib/nxbrew.js";
 import { GENRES_FR, MODES_FR, THEMES_FR, LANGUAGES_FR, frName } from "../lib/translations.js";
 import { ensureScraped, ytPlaylistTracks } from "../lib/ostScrape.js";
 
@@ -291,33 +290,16 @@ async function resolveVnFrPatches(gameId, name) {
   }
 }
 
-// Patch FR Switch (nxbrew.net) d'un jeu, avec cache DB. Le scraping passe par
-// ScraperAPI (bypass Cloudflare) dont le quota gratuit est petit (~1000
-// crédits/mois, ~30 crédits/requête) → on met le cache TRÈS long pour appeler
-// l'API le moins possible : un patch/une absence de patch ne change quasiment
-// jamais. On cache les succès (30 j) ET les « rien trouvé » (14 j), mais jamais
-// un échec réseau/API (undefined → on réessaie au prochain appel).
-const SWITCH_PATCH_VERSION = 1;
-const SWITCH_PATCH_OK_MS = 30 * 24 * 60 * 60 * 1000; // patch trouvé : 30 jours
-const SWITCH_PATCH_MISS_MS = 14 * 24 * 60 * 60 * 1000; // rien trouvé : 14 jours
-async function resolveSwitchFrPatch(gameId, name) {
+// Patch FR Switch (nxbrew.net) d'un jeu. Le serveur ne scrape PLUS (IP datacenter
+// bloquée par Cloudflare) : il lit simplement ce que l'app locale a poussé. On
+// renvoie { patch, requested } pour que le client sache s'il doit proposer le
+// bouton « Demander ».
+async function resolveSwitchFrPatch(gameId) {
   try {
-    const cached = await SwitchPatchCache.findOne({ gameId });
-    if (cached && cached.ver === SWITCH_PATCH_VERSION && cached.at) {
-      const age = Date.now() - cached.at.getTime();
-      const ttl = cached.data ? SWITCH_PATCH_OK_MS : SWITCH_PATCH_MISS_MS;
-      if (age < ttl) return cached.data || null;
-    }
-    const data = await fetchSwitchFrPatch(name);
-    if (data === undefined) return null; // site injoignable → pas de mise en cache
-    await SwitchPatchCache.updateOne(
-      { gameId },
-      { $set: { data: data || null, ver: SWITCH_PATCH_VERSION, at: new Date() } },
-      { upsert: true }
-    ).catch(() => {});
-    return data || null;
+    const doc = await SwitchPatchCache.findOne({ gameId });
+    return { patch: doc?.data || null, requested: !!doc?.requested };
   } catch {
-    return null;
+    return { patch: null, requested: false };
   }
 }
 
@@ -1329,11 +1311,12 @@ router.get("/:id/patches", optionalAuth, async (req, res) => {
       (p) => p.id === 130 || p.id === 508 || /switch/i.test(p.name || "")
     );
 
-    // On n'interroge VNDB que pour un VN pas déjà en FR ; nxbrew pour tout
-    // jeu Switch (même déjà traduit : la version Switch est parfois censurée).
-    const [vnPatches, switchPatch] = await Promise.all([
+    // On n'interroge VNDB que pour un VN pas déjà en FR ; pour tout jeu Switch
+    // on lit le patch poussé par l'app locale (même déjà traduit : la version
+    // Switch est parfois censurée).
+    const [vnPatches, sw] = await Promise.all([
       isVn && !hasFr ? resolveVnFrPatches(id, g.name) : Promise.resolve(null),
-      isSwitch ? resolveSwitchFrPatch(id, g.name) : Promise.resolve(null),
+      isSwitch ? resolveSwitchFrPatch(id) : Promise.resolve(null),
     ]);
 
     res.json({
@@ -1342,7 +1325,8 @@ router.get("/:id/patches", optionalAuth, async (req, res) => {
       hasFr,
       isSwitch,
       vnPatches, // null si non pertinent (pas un VN, ou déjà dispo en FR)
-      switchPatch, // null si non pertinent, aucun patch, ou site down
+      switchPatch: sw?.patch || null, // patch poussé par l'app locale, ou null
+      switchPatchRequested: !!sw?.requested, // une demande de scrape est en attente
       modLinks: buildModLinks(g.name),
     });
   } catch (err) {
