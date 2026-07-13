@@ -467,6 +467,21 @@ button.pf-stat:hover {
   margin-left: auto;
 }
 
+/* Avis de recherche dans la colonne latérale de l'aperçu : bouton transparent
+   qui laisse l'affiche remplir la carte et l'ouvre en grand au clic. */
+.pfa-wanted {
+  display: block;
+  width: 100%;
+  padding: 0.15rem 0;
+  border: none;
+  background: none;
+  transition: transform 0.14s ease;
+}
+
+.pfa-wanted:hover {
+  transform: translateY(-2px);
+}
+
 /* ---------- Bouton suivre ---------- */
 .follow-btn {
   display: inline-flex;

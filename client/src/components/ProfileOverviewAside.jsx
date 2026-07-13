@@ -13,11 +13,13 @@ import {
   Star,
   ArrowRight,
   Building2,
+  ScrollText,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { typeMeta, timeAgo } from "../lib/lists";
 import { extractVideoId } from "../lib/youtube";
 import { usePlayer } from "../context/PlayerContext";
+import { WantedPosterCard, WantedModal } from "./WantedPoster";
 
 const nf = new Intl.NumberFormat("fr-FR");
 
@@ -83,6 +85,8 @@ export default function ProfileOverviewAside({
   // --- Contenus qui nécessitent une requête (best-effort) ---
   const [video, setVideo] = useState(undefined);
   const [review, setReview] = useState(undefined);
+  const [wanted, setWanted] = useState(null); // avis de recherche (délits de DL)
+  const [wantedOpen, setWantedOpen] = useState(false); // modale agrandie
 
   useEffect(() => {
     let alive = true;
@@ -92,6 +96,9 @@ export default function ProfileOverviewAside({
     apiFetch(`/users/${username}/activity`, { token })
       .then((d) => alive && setReview(d.reviews?.[0] || null))
       .catch(() => alive && setReview(null));
+    apiFetch(`/feed/wanted/${encodeURIComponent(username)}`, { token })
+      .then((d) => alive && setWanted(d))
+      .catch(() => alive && setWanted(null));
     return () => {
       alive = false;
     };
@@ -317,6 +324,27 @@ export default function ProfileOverviewAside({
             </span>
           </div>
         </AsideCard>
+      )}
+
+      {/* ---------- Avis de recherche (rançon = délits de téléchargement) ---------- */}
+      {wanted && (
+        <AsideCard Icon={ScrollText} title="Avis de recherche">
+          <button
+            className="pfa-wanted clickable"
+            onClick={() => setWantedOpen(true)}
+            title="Voir l'avis de recherche en grand"
+          >
+            <WantedPosterCard username={username} wanted={wanted} />
+          </button>
+        </AsideCard>
+      )}
+      {wantedOpen && (
+        <WantedModal
+          username={username}
+          wanted={wanted}
+          token={token}
+          onClose={() => setWantedOpen(false)}
+        />
       )}
     </aside>
   );

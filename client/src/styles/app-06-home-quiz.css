@@ -11497,6 +11497,13 @@
   }
 }
 
+/* Sur mobile, on masque tout le rail latéral (stats + bento) : place au fil. */
+@media (max-width: 700px) {
+  .pff-rail {
+    display: none;
+  }
+}
+
 .pff-col {
   display: flex;
   flex-direction: column;
@@ -15117,6 +15124,62 @@ b.hf-dl-src {
   padding-left: 0.1rem;
 }
 
+/* Corps du délit : jeu (à gauche) + prime cliquable (à droite) */
+.hf-dl-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.hf-dl-row .hf-dl-body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Prime « MORT OU VIF » : +60 $ en rouge + lien vers l'avis de recherche */
+.hf-dl-bounty {
+  position: relative;
+  z-index: 5;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  padding: 0.35rem 0.55rem;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  text-align: right;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+
+.hf-dl-bounty:hover {
+  background: rgba(214, 84, 84, 0.1);
+  transform: translateY(-1px);
+}
+
+.hf-dl-bounty-amount {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 800;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: #d63a3a;
+  letter-spacing: 0.01em;
+}
+
+.hf-dl-bounty-link {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  border-bottom: 1px dashed color-mix(in srgb, var(--text-soft) 45%, transparent);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.hf-dl-bounty:hover .hf-dl-bounty-link {
+  color: #a35a25;
+  border-color: #a35a25;
+}
+
 /* Pluie de tomates pourries (une par réaction « tomate ») */
 .hf-dl-splats {
   position: absolute;
@@ -15504,6 +15567,113 @@ b.hf-dl-src {
 .wp-demon .pff-wanted-photo::after {
   right: 15%;
   transform: rotate(22deg);
+}
+
+/* ============================================================
+   Modale « avis de recherche » agrandi (profil + fil de piratage)
+   ============================================================ */
+.wanted-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: radial-gradient(
+    120% 120% at 50% 0%,
+    rgba(40, 24, 8, 0.62),
+    rgba(0, 0, 0, 0.84)
+  );
+  backdrop-filter: blur(6px);
+  animation: wm-fade 0.2s ease both;
+}
+
+@keyframes wm-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.wanted-modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+
+.wanted-modal-close:hover {
+  background: rgba(255, 255, 255, 0.26);
+  transform: scale(1.06);
+}
+
+.wanted-modal-stage {
+  position: relative;
+  width: min(360px, 92vw);
+  animation: wm-drop 0.42s cubic-bezier(0.2, 1.3, 0.35, 1) both;
+}
+
+/* Punaise dorée qui « fixe » l'avis en haut, pour l'effet placardé. */
+.wanted-modal-stage::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffe9a8, #c9992a 60%, #8a6410);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
+  z-index: 2;
+}
+
+@keyframes wm-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-26px) rotate(-3deg) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.wanted-modal-loading {
+  display: grid;
+  place-items: center;
+  height: 220px;
+  color: #fff;
+}
+
+/* Poster / médaille agrandis dans la modale (focal point). */
+.wanted-modal-stage .pff-wanted {
+  padding: 1.1rem 1.1rem 1.3rem;
+}
+.wanted-modal-stage .pff-wanted-top {
+  font-size: 1.08rem;
+}
+.wanted-modal-stage .pff-wanted-name {
+  font-size: 1.4rem;
+}
+.wanted-modal-stage .pff-wanted-bounty {
+  font-size: 1.85rem;
+}
+.wanted-modal-stage .pff-wanted-foot {
+  font-size: 0.74rem;
+}
+.wanted-modal-stage .pff-citizen {
+  padding: 1.1rem 1.15rem;
 }
 
 /* Chip de statut contextuel (quand le verbe principal est autre chose) */

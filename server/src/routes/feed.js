@@ -789,6 +789,27 @@ router.get("/home", requireAuth, async (req, res) => {
 // Toute l'activité d'UN joueur (actions de bibliothèque, listes, abonnements,
 // interactions, fan arts, documentaires, pépites), même format que /home.
 // Première page : stats des reposts en plus (rail latéral de l'onglet Feed).
+// Avis de recherche seul (rançon = délits de téléchargement × 60 $). Léger :
+// utilisé par la mini-pastille du profil et la modale du fil de piratage.
+router.get("/wanted/:username", optionalAuth, async (req, res) => {
+  try {
+    const u = await User.findOne({ username: req.params.username }).select(
+      "_id username avatar"
+    );
+    if (!u) return res.status(404).json({ error: "Profil introuvable." });
+    const count = await Download.countDocuments({ user: u._id });
+    res.json({
+      username: u.username,
+      count,
+      value: count * 60,
+      avatar: u.avatar || null,
+    });
+  } catch (err) {
+    console.error("wanted error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement de l'avis de recherche." });
+  }
+});
+
 router.get("/user/:username", optionalAuth, async (req, res) => {
   try {
     const u = await User.findOne({ username: req.params.username }).select("_id avatar");

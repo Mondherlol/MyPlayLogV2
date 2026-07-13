@@ -4,7 +4,6 @@ import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import PatchnotePopup from "./PatchnotePopup";
 import MiniPlayer from "./MiniPlayer";
-import { PlayerProvider } from "../context/PlayerContext";
 
 export default function AppLayout({ children }) {
   const [collapsed, setCollapsed] = useState(
@@ -20,18 +19,16 @@ export default function AppLayout({ children }) {
   }
 
   return (
-    <PlayerProvider>
-      <div className={`app-shell ${collapsed ? "is-collapsed" : ""}`}>
-        <Sidebar collapsed={collapsed} onToggle={toggle} />
-        <div className="app-main">
-          <Topbar />
-          <main className="app-content">
-            {children || <Outlet />}
-          </main>
-        </div>
-        <PatchnotePopup />
-        <MiniPlayer />
+    <div className={`app-shell ${collapsed ? "is-collapsed" : ""}`}>
+      <Sidebar collapsed={collapsed} onToggle={toggle} />
+      <div className="app-main">
+        <Topbar />
+        <main className="app-content">
+          {children || <Outlet />}
+        </main>
       </div>
-    </PlayerProvider>
+      <PatchnotePopup />
+      <MiniPlayer />
+    </div>
   );
 }

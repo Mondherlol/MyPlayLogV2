@@ -55,6 +55,7 @@ import { usePlayPlaylist } from "../lib/usePlayPlaylist";
 import { extractVideoId } from "../lib/youtube";
 import { usePlayer } from "../context/PlayerContext";
 import ReviewComments from "./ReviewComments";
+import { WantedModal } from "./WantedPoster";
 
 // Cards du fil social — partagées entre le fil d'accueil (HomeFeed) et
 // l'onglet Feed du profil (ProfileFeed). Chaque évènement reflète une VRAIE
@@ -1300,6 +1301,7 @@ function DownloadEvent({ item, token }) {
   );
   const [mine, setMine] = useState(item.myReactions || []);
   const [busy, setBusy] = useState(false);
+  const [wantedOpen, setWantedOpen] = useState(false); // avis de recherche agrandi
 
   async function react(type) {
     if (!token || busy) return;
@@ -1354,23 +1356,35 @@ function DownloadEvent({ item, token }) {
         sur <b className="hf-dl-src">{item.source}</b>
       </EventHead>
 
-      <Link to={gameUrl} className="hf-dl-body clickable">
-        <div className="hf-cover">
-          {g.cover ? (
-            <img src={g.cover} alt={g.name} loading="lazy" draggable="false" />
-          ) : (
-            <span className="hf-cover-ph">
-              <Gamepad2 size={20} />
+      <div className="hf-dl-row">
+        <Link to={gameUrl} className="hf-dl-body clickable">
+          <div className="hf-cover">
+            {g.cover ? (
+              <img src={g.cover} alt={g.name} loading="lazy" draggable="false" />
+            ) : (
+              <span className="hf-cover-ph">
+                <Gamepad2 size={20} />
+              </span>
+            )}
+          </div>
+          <div className="hf-dl-info">
+            <span className="hf-dl-name">{g.name}</span>
+            <span className="hf-dl-caught">
+              <Download size={12} /> Butin récupéré sur {item.source}
             </span>
-          )}
-        </div>
-        <div className="hf-dl-info">
-          <span className="hf-dl-name">{g.name}</span>
-          <span className="hf-dl-caught">
-            <Download size={12} /> Butin récupéré sur {item.source}
-          </span>
-        </div>
-      </Link>
+          </div>
+        </Link>
+
+        {/* Prime : chaque jeu piraté ajoute 60 $ à la rançon. Clic → avis. */}
+        <button
+          className="hf-dl-bounty clickable"
+          onClick={() => setWantedOpen(true)}
+          title={`Voir l'avis de recherche de ${item.user?.username || "ce joueur"}`}
+        >
+          <span className="hf-dl-bounty-amount">+60&nbsp;$</span>
+          <span className="hf-dl-bounty-link">Voir l'avis de recherche</span>
+        </button>
+      </div>
 
       <div className="hf-dl-reacts" role="group" aria-label="Réagir au délit">
         {DL_REACTIONS.map((rc) => {
@@ -1391,6 +1405,14 @@ function DownloadEvent({ item, token }) {
           );
         })}
       </div>
+
+      {wantedOpen && (
+        <WantedModal
+          username={item.user?.username}
+          token={token}
+          onClose={() => setWantedOpen(false)}
+        />
+      )}
 
       {/* Décorations jetées sur le post, une par réaction. Chaque type démarre à
           un offset différent dans les emplacements pour ne pas se superposer. */}
