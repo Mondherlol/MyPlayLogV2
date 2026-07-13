@@ -17,12 +17,24 @@ const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
 // Récupère le HTML d'une page. Renvoie null si injoignable (réseau / statut ≠ 200).
+// Logs de diagnostic : sur le VPS, nxbrew.net (derrière Cloudflare) répond
+// probablement 403/503 aux IP de datacenter alors qu'il renvoie 200 en local
+// (IP résidentielle). Ces logs confirment le status exact côté serveur.
 async function getHtml(url) {
+  const t0 = Date.now();
   try {
     const r = await fetch(url, { headers: { "User-Agent": UA } });
-    if (!r.ok) return null;
+    if (!r.ok) {
+      console.warn(
+        `[nxbrew] HTTP ${r.status} (${r.statusText || "?"}) en ${Date.now() - t0}ms · cf-ray=${
+          r.headers.get("cf-ray") || "-"
+        } server=${r.headers.get("server") || "-"} → ${url}`
+      );
+      return null;
+    }
     return await r.text();
-  } catch {
+  } catch (e) {
+    console.warn(`[nxbrew] fetch échoué en ${Date.now() - t0}ms: ${e.message} → ${url}`);
     return null;
   }
 }
