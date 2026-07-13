@@ -4974,13 +4974,18 @@
 }
 
 /* --- Onglets (dans la colonne droite) --- */
-.gp-tabs {
+/* Le wrapper porte le sticky et sert d'ancre aux flèches ; la <nav> à
+   l'intérieur scrolle horizontalement (drag souris + tactile natif). */
+.gp-tabs-wrap {
   position: sticky;
   top: var(--topbar-h);
   z-index: 5;
+  margin: 1.4rem 0 0;
+}
+
+.gp-tabs {
   display: flex;
   gap: 0.3rem;
-  margin: 1.4rem 0 0;
   padding: 0.5rem 0;
   border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--bg) 90%, transparent);
@@ -4992,6 +4997,47 @@
 
 .gp-tabs::-webkit-scrollbar {
   display: none;
+}
+
+/* Flèches de défilement (desktop uniquement — au tactile le scroll est natif).
+   Masquées par défaut, révélées via .show quand il reste des onglets à découvrir
+   de ce côté. Un dégradé de fond laisse deviner la coupe. */
+.gp-tabs-arrow {
+  position: absolute;
+  top: 0;
+  bottom: 1px;
+  width: 44px;
+  display: none;
+  align-items: center;
+  border: none;
+  padding: 0;
+  color: var(--text);
+  z-index: 2;
+}
+
+.gp-tabs-arrow.left {
+  left: 0;
+  justify-content: flex-start;
+  background: linear-gradient(to right, var(--bg) 45%, transparent);
+}
+
+.gp-tabs-arrow.right {
+  right: 0;
+  justify-content: flex-end;
+  background: linear-gradient(to left, var(--bg) 45%, transparent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .gp-tabs {
+    cursor: grab;
+  }
+  .gp-tabs.dragging {
+    cursor: grabbing;
+    user-select: none;
+  }
+  .gp-tabs-arrow.show {
+    display: inline-flex;
+  }
 }
 
 /* Contenu des onglets : hauteur plancher = ce qui reste sous les onglets collés.
@@ -7368,8 +7414,10 @@
 
   /* La barre d'onglets collée prend toute la largeur de l'écran (compense le
      padding de .gp-sheet) plutôt que de laisser voir le fond sur les côtés. */
-  .gp-tabs {
+  .gp-tabs-wrap {
     margin-inline: calc(-1 * clamp(1.1rem, 3vw, 2.2rem));
+  }
+  .gp-tabs {
     padding-inline: clamp(1.1rem, 3vw, 2.2rem);
   }
 }

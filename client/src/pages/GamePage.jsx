@@ -270,6 +270,10 @@ export default function GamePage() {
   const [showCover, setShowCover] = useState(false);
   const tabsTopRef = useRef(null);
   const tabsNavRef = useRef(null);
+  // Drag-to-scroll (souris) + flèches (desktop) de la barre d'onglets, qui
+  // déborde depuis qu'il y a beaucoup d'onglets.
+  const tabDrag = useRef({ down: false, moved: false, startX: 0, startScroll: 0 });
+  const [tabScroll, setTabScroll] = useState({ left: false, right: false });
 
   const entry = map[id];
   const isWishlist = entry?.status === "wishlist";
@@ -306,7 +310,76 @@ export default function GamePage() {
     const nav = tabsNavRef.current;
     const active = nav?.querySelector(".gp-tab.active");
     if (active) nav.scrollTo({ left: active.offsetLeft - 12, behavior: "smooth" });
+    updateTabArrows();
   }, [tab]);
+
+  // Visibilité des flèches selon la position de scroll (masquées aux extrémités).
+  const updateTabArrows = () => {
+    const el = tabsNavRef.current;
+    if (!el) return;
+    const left = el.scrollLeft > 4;
+    const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
+    setTabScroll((s) => (s.left === left && s.right === right ? s : { left, right }));
+  };
+
+  // Écoute le scroll (natif ou par flèches) + le resize, et gère le drag-to-scroll
+  // à la souris. Le scroll tactile reste natif (overflow-x) → on ne touche qu'à
+  // la souris ici pour ne pas casser le défilement au doigt.
+  useEffect(() => {
+    const el = tabsNavRef.current;
+    if (!el) return;
+    updateTabArrows();
+    const onScroll = () => updateTabArrows();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", updateTabArrows);
+    const onMove = (e) => {
+      if (!tabDrag.current.down) return;
+      const dx = e.pageX - tabDrag.current.startX;
+      if (Math.abs(dx) > 4) tabDrag.current.moved = true;
+      el.scrollLeft = tabDrag.current.startScroll - dx;
+      e.preventDefault();
+    };
+    const onUp = () => {
+      if (!tabDrag.current.down) return;
+      tabDrag.current.down = false;
+      el.classList.remove("dragging");
+      // Laisse le clic suivant s'annuler s'il y a eu un drag.
+      setTimeout(() => (tabDrag.current.moved = false), 0);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", updateTabArrows);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
+  function onTabsDown(e) {
+    if (e.button !== 0) return; // clic gauche uniquement
+    const el = tabsNavRef.current;
+    if (!el) return;
+    tabDrag.current = {
+      down: true,
+      moved: false,
+      startX: e.pageX,
+      startScroll: el.scrollLeft,
+    };
+    el.classList.add("dragging");
+  }
+  // Après un drag, on annule le clic pour ne pas changer d'onglet par erreur.
+  function onTabsClickCapture(e) {
+    if (tabDrag.current.moved) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }
+  function scrollTabs(dir) {
+    const el = tabsNavRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * el.clientWidth * 0.6, behavior: "smooth" });
+  }
 
   // Swipe gauche/droite (mobile) → onglet précédent / suivant.
   const swipeTab = (dir) => {
@@ -792,23 +865,46 @@ export default function GamePage() {
             {/* Onglets */}
             {/* Ancre (hors flux sticky) pour recaler le scroll au changement d'onglet. */}
             <div ref={tabsTopRef} aria-hidden="true" />
-            <nav className="gp-tabs" ref={tabsNavRef}>
-              {tabs.map((t) => (
-                <button
-                  key={t.id}
-                  className={`gp-tab ${tab === t.id ? "active" : ""} ${
-                    t.ready ? "clickable" : "soon"
-                  }`}
-                  onClick={() => t.ready && setTab(t.id)}
-                  disabled={!t.ready}
-                  title={t.ready ? "" : "Bientôt"}
-                >
-                  <t.Icon size={16} />
-                  {t.label}
-                  {!t.ready && <span className="gp-soon">bientôt</span>}
-                </button>
-              ))}
-            </nav>
+            <div className="gp-tabs-wrap">
+              <button
+                className={`gp-tabs-arrow left clickable ${tabScroll.left ? "show" : ""}`}
+                onClick={() => scrollTabs(-1)}
+                aria-label="Onglets précédents"
+                tabIndex={-1}
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <nav
+                className="gp-tabs"
+                ref={tabsNavRef}
+                onMouseDown={onTabsDown}
+                onClickCapture={onTabsClickCapture}
+              >
+                {tabs.map((t) => (
+                  <button
+                    key={t.id}
+                    className={`gp-tab ${tab === t.id ? "active" : ""} ${
+                      t.ready ? "clickable" : "soon"
+                    }`}
+                    onClick={() => t.ready && setTab(t.id)}
+                    disabled={!t.ready}
+                    title={t.ready ? "" : "Bientôt"}
+                  >
+                    <t.Icon size={16} />
+                    {t.label}
+                    {!t.ready && <span className="gp-soon">bientôt</span>}
+                  </button>
+                ))}
+              </nav>
+              <button
+                className={`gp-tabs-arrow right clickable ${tabScroll.right ? "show" : ""}`}
+                onClick={() => scrollTabs(1)}
+                aria-label="Onglets suivants"
+                tabIndex={-1}
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
 
             {/* Enveloppe des onglets : une hauteur minimale évite que la page se
                 « ratatine » pendant qu'un onglet asynchrone charge (spinner court).
