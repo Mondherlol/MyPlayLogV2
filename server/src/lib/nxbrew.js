@@ -23,25 +23,31 @@ const UA =
 // Cloudflare pour nous. En local (IP résidentielle), SCRAPER_API_KEY n'est pas
 // défini → on garde le fetch direct.
 const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY;
-// ultra_premium franchit Cloudflare mais coûte ~30 crédits/requête (vs ~10 pour
-// render seul). Activé par défaut car nxbrew en a besoin ; mettre
-// SCRAPER_API_ULTRA=false pour tester à moindre coût si le quota gratuit fond.
-const SCRAPER_API_ULTRA = process.env.SCRAPER_API_ULTRA !== "false";
 
-// Passe par ScraperAPI : rendu JS + proxy résidentiel (ultra_premium) pour
-// franchir Cloudflare. Renvoie le HTML, ou null en cas d'échec.
+// Passe par ScraperAPI avec `premium=true` : proxy résidentiel qui franchit
+// Cloudflare. Testé gagnant vs les alternatives (ultra_premium = hors plan
+// gratuit → 403 ; render seul = insuffisant sur ce domaine protégé ; premium =
+// fiable, ~5-8s, ~10-25 crédits, pas de rendu JS car les résultats sont dans le
+// HTML brut). Renvoie le HTML, ou null en cas d'échec.
+// ⚠️ ScraperAPI répond parfois HTTP 200 avec un corps « Request failed… » quand
+// le proxy n'a pas pu charger la page → on le détecte comme un échec.
 async function getHtmlViaScraperApi(url) {
   const t0 = Date.now();
-  const params = { api_key: SCRAPER_API_KEY, url, render: "true" };
-  if (SCRAPER_API_ULTRA) params.ultra_premium = "true";
-  const endpoint = "https://api.scraperapi.com/?" + new URLSearchParams(params);
+  const endpoint =
+    "https://api.scraperapi.com/?" +
+    new URLSearchParams({ api_key: SCRAPER_API_KEY, url, premium: "true" });
   try {
     const r = await fetch(endpoint);
     if (!r.ok) {
       console.warn(`[nxbrew] scraperapi HTTP ${r.status} en ${Date.now() - t0}ms → ${url}`);
       return null;
     }
-    return await r.text();
+    const html = await r.text();
+    if (html.length < 500 && /request failed/i.test(html)) {
+      console.warn(`[nxbrew] scraperapi corps d'échec en ${Date.now() - t0}ms → ${url}`);
+      return null;
+    }
+    return html;
   } catch (e) {
     console.warn(`[nxbrew] scraperapi échec en ${Date.now() - t0}ms: ${e.message} → ${url}`);
     return null;

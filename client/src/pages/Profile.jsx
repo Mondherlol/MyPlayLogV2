@@ -607,57 +607,60 @@ export default function Profile() {
               ))}
             </div>
           )}
-          {isMe && (
-            <div className={`pf-cover-menu ${coverMenu ? "open" : ""}`} ref={coverMenuRef}>
-              <button
-                className="pf-cover-edit clickable"
-                onClick={() => setCoverMenu((v) => !v)}
-              >
-                <Camera size={15} /> Couverture
-                {covers.length > 1 && (
-                  <span className="pf-cover-count">{covers.length}/6</span>
-                )}
-                <ChevronDown size={14} className="pf-cover-caret" />
-              </button>
-              {coverMenu && (
-                <div className="pf-cover-pop">
-                  <button
-                    className="clickable"
-                    onClick={() => {
-                      setCoverMenu(false);
-                      setPickingCover(true);
-                    }}
-                    disabled={covers.length >= 6}
-                  >
-                    <ImageIcon size={15} />
-                    {covers.length ? `Ajouter une photo (${covers.length}/6)` : "Choisir une photo"}
-                  </button>
-                  <button
-                    className="clickable"
-                    onClick={() => {
-                      setCoverMenu(false);
-                      setReframing(true);
-                    }}
-                    disabled={!covers.length}
-                  >
-                    <Move size={15} /> Recadrer celle-ci
-                  </button>
-                  <button
-                    className="clickable"
-                    onClick={() => {
-                      setCoverMenu(false);
-                      removeCover();
-                    }}
-                    disabled={!covers.length}
-                  >
-                    <Trash2 size={15} /> Supprimer celle-ci
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
           <Marquee facts={facts} />
         </div>
+
+        {/* Menu Couverture : hors de .pf-cover (qui a overflow:hidden) pour que
+            la pop-up ne soit pas coupée par les bords de la couverture. */}
+        {isMe && (
+          <div className={`pf-cover-menu ${coverMenu ? "open" : ""}`} ref={coverMenuRef}>
+            <button
+              className="pf-cover-edit clickable"
+              onClick={() => setCoverMenu((v) => !v)}
+            >
+              <Camera size={15} /> Couverture
+              {covers.length > 1 && (
+                <span className="pf-cover-count">{covers.length}/6</span>
+              )}
+              <ChevronDown size={14} className="pf-cover-caret" />
+            </button>
+            {coverMenu && (
+              <div className="pf-cover-pop">
+                <button
+                  className="clickable"
+                  onClick={() => {
+                    setCoverMenu(false);
+                    setPickingCover(true);
+                  }}
+                  disabled={covers.length >= 6}
+                >
+                  <ImageIcon size={15} />
+                  {covers.length ? `Ajouter une photo (${covers.length}/6)` : "Choisir une photo"}
+                </button>
+                <button
+                  className="clickable"
+                  onClick={() => {
+                    setCoverMenu(false);
+                    setReframing(true);
+                  }}
+                  disabled={!covers.length}
+                >
+                  <Move size={15} /> Recadrer celle-ci
+                </button>
+                <button
+                  className="clickable"
+                  onClick={() => {
+                    setCoverMenu(false);
+                    removeCover();
+                  }}
+                  disabled={!covers.length}
+                >
+                  <Trash2 size={15} /> Supprimer celle-ci
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="pf-identity">
           <div className="pf-avatar-wrap">
@@ -693,7 +696,18 @@ export default function Profile() {
           <div className="pf-idmain">
             <div className="pf-namerow">
               <h1 className="pf-username">{profile.username}</h1>
-              {!isMe && <Presence lastSeenAt={profile.lastSeenAt} />}
+              {isMe ? (
+                <button
+                  className="pf-edit-icon clickable"
+                  onClick={() => setEditing(true)}
+                  title="Modifier le profil"
+                  aria-label="Modifier le profil"
+                >
+                  <Pencil size={15} />
+                </button>
+              ) : (
+                <Presence lastSeenAt={profile.lastSeenAt} />
+              )}
             </div>
             {profile.bio && (
               <p className="pf-bio" dangerouslySetInnerHTML={twemojiHtml(profile.bio)} />
@@ -714,30 +728,28 @@ export default function Profile() {
             </div>
           </div>
 
-          <div className="pf-actions">
-            {isMe ? (
-              <button className="btn btn-ghost" onClick={() => setEditing(true)}>
-                <Pencil size={16} /> Modifier le profil
-              </button>
-            ) : !user ? (
-              // Visiteur non connecté : suivre nécessite un compte.
-              <Link to="/login" className="follow-btn clickable">
-                <UserPlus size={17} /> Suivre
-              </Link>
-            ) : (
-              <button
-                className={`follow-btn clickable ${profile.isFollowing ? "following" : ""}`}
-                onClick={toggleFollow}
-                disabled={followBusy}
-              >
-                {profile.isFollowing ? (
-                  <><UserCheck size={17} /> Suivi(e)</>
-                ) : (
-                  <><UserPlus size={17} /> Suivre</>
-                )}
-              </button>
-            )}
-          </div>
+          {!isMe && (
+            <div className="pf-actions">
+              {!user ? (
+                // Visiteur non connecté : suivre nécessite un compte.
+                <Link to="/login" className="follow-btn clickable">
+                  <UserPlus size={17} /> Suivre
+                </Link>
+              ) : (
+                <button
+                  className={`follow-btn clickable ${profile.isFollowing ? "following" : ""}`}
+                  onClick={toggleFollow}
+                  disabled={followBusy}
+                >
+                  {profile.isFollowing ? (
+                    <><UserCheck size={17} /> Suivi(e)</>
+                  ) : (
+                    <><UserPlus size={17} /> Suivre</>
+                  )}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </header>
 

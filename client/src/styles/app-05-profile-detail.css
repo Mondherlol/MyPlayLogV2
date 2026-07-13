@@ -6,6 +6,7 @@
 }
 
 .pf-banner {
+  position: relative;
   margin-bottom: 1.6rem;
 }
 
@@ -390,6 +391,26 @@
 .pf-username {
   font-size: clamp(1.25rem, 3vw, 1.6rem);
   line-height: 1.1;
+}
+
+/* Édition du profil : discrète pastille icône à côté du pseudo (profil perso). */
+.pf-edit-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.pf-edit-icon:hover {
+  color: var(--accent-ink);
+  border-color: var(--border-strong);
+  background: var(--surface);
 }
 
 .pf-bio {
@@ -1010,16 +1031,6 @@ button.pf-stat:hover {
     justify-content: flex-end;
     margin: 0.1rem 0 0;
     align-self: auto;
-  }
-
-  /* « Modifier le profil » : petite pastille discrète (profil perso). */
-  .pf-actions .btn-ghost {
-    width: auto;
-    padding: 0.38rem 0.85rem;
-    font-size: 0.8rem;
-    border-radius: 999px;
-    color: var(--text-soft);
-    background: transparent;
   }
 
   /* « Suivre » (profil d'un autre) reste un CTA pleine largeur bien visible. */
