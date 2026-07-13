@@ -9,13 +9,21 @@ const C411_API = "https://c411.org/api";
 const C411_KEY =
   process.env.C411_API_KEY ||
   "076a2466932ddb16946ec28f920b19f3a0cd560d32cea0af738aced9f2167d56";
-const CAT_GAMES = "4050"; // Jeux Vidéo
+
+// On NE filtre PAS par catégorie côté API : `cat=4050` ne renvoie que les jeux
+// PC et exclut toutes les consoles (Switch, WiiU…), et l'API n'accepte pas une
+// liste de catégories. On récupère donc tout et on garde les catégories jeux
+// dans le code : Console (1000-1999) + PC (4000-4099). Exclut PDF/audio/vidéo.
+function isGameCategory(cat) {
+  const c = Number(cat);
+  return (c >= 1000 && c < 2000) || (c >= 4000 && c < 4100);
+}
 
 // Cache mémoire (les recherches C411 sont lentes et le catalogue bouge peu).
 const cache = new Map(); // name -> { at, packs }
 const TTL = 60 * 60 * 1000; // 1 h
 
-export async function fetchC411Packs(name, limit = 25) {
+export async function fetchC411Packs(name, limit = 40) {
   const q = String(name || "").trim();
   if (!q) return [];
 
@@ -25,7 +33,7 @@ export async function fetchC411Packs(name, limit = 25) {
 
   const url =
     `${C411_API}?t=search&q=${encodeURIComponent(q)}` +
-    `&apikey=${C411_KEY}&cat=${CAT_GAMES}&limit=${limit}`;
+    `&apikey=${C411_KEY}&limit=${limit}`;
 
   let packs = [];
   try {
@@ -52,6 +60,9 @@ function parseTorznab(xml) {
     const item = $(el);
     const attr = (n) =>
       item.find(`torznab\\:attr[name="${n}"], attr[name="${n}"]`).attr("value");
+
+    // On ignore tout ce qui n'est pas un jeu (PDF, OST, films…).
+    if (!isGameCategory(attr("category"))) return;
 
     const title = item.find("title").first().text().trim() || "Sans titre";
     // `link` = page torrent (lisible) ; `enclosure` = .torrent direct (API get).
