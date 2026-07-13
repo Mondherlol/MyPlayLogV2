@@ -823,6 +823,14 @@ export default function BlindTest() {
     return () => window.removeEventListener("resize", fit);
   }, [suggestions]);
 
+  // Navigation clavier : garde la suggestion surlignée visible dans la liste
+  // (sinon on descend « dans le vide » sans que ça scrolle jusqu'à elle).
+  useEffect(() => {
+    const el = suggestRef.current;
+    if (!el) return;
+    el.children[highlight]?.scrollIntoView({ block: "nearest" });
+  }, [highlight, suggestions]);
+
   function onKeyDown(e) {
     if (reveal || paused) return;
     if (e.key === "Tab") {
