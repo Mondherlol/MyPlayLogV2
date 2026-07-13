@@ -16,11 +16,47 @@ const HOSTS = ["DataNodes", "1Fichier", "MultiUp"];
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
+// nxbrew.net est derrière Cloudflare : les IP de datacenter (VPS OVH) reçoivent
+// un challenge 403 immédiat, alors qu'une IP résidentielle (dev local) passe.
+// En prod on route donc via FlareSolverr (Chrome headless qui résout le
+// challenge). Si FLARESOLVERR_URL n'est pas défini (local), on garde le fetch
+// direct. Ex. valeur : http://flaresolverr:8191/v1
+const FLARESOLVERR_URL = process.env.FLARESOLVERR_URL;
+const FLARESOLVERR_TIMEOUT = 60000; // ms — laissé à FlareSolverr pour résoudre le challenge
+
+// Passe par FlareSolverr : renvoie le HTML rendu, ou null si échec/challenge non résolu.
+async function getHtmlViaFlaresolverr(url) {
+  const t0 = Date.now();
+  try {
+    const r = await fetch(FLARESOLVERR_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cmd: "request.get", url, maxTimeout: FLARESOLVERR_TIMEOUT }),
+    });
+    const data = await r.json().catch(() => null);
+    const sol = data?.solution;
+    if (data?.status !== "ok" || !sol) {
+      console.warn(
+        `[nxbrew] flaresolverr KO en ${Date.now() - t0}ms: status=${data?.status} ${
+          data?.message || ""
+        } → ${url}`
+      );
+      return null;
+    }
+    if (sol.status && sol.status >= 400) {
+      console.warn(`[nxbrew] flaresolverr HTTP ${sol.status} en ${Date.now() - t0}ms → ${url}`);
+      return null;
+    }
+    return sol.response || null;
+  } catch (e) {
+    console.warn(`[nxbrew] flaresolverr échec en ${Date.now() - t0}ms: ${e.message} → ${url}`);
+    return null;
+  }
+}
+
 // Récupère le HTML d'une page. Renvoie null si injoignable (réseau / statut ≠ 200).
-// Logs de diagnostic : sur le VPS, nxbrew.net (derrière Cloudflare) répond
-// probablement 403/503 aux IP de datacenter alors qu'il renvoie 200 en local
-// (IP résidentielle). Ces logs confirment le status exact côté serveur.
 async function getHtml(url) {
+  if (FLARESOLVERR_URL) return getHtmlViaFlaresolverr(url);
   const t0 = Date.now();
   try {
     const r = await fetch(url, { headers: { "User-Agent": UA } });
