@@ -34,6 +34,8 @@ import {
   Languages,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Image as ImageIcon,
   UserRound,
   Check,
@@ -48,6 +50,8 @@ import {
   HardDrive,
   Magnet,
   Users2,
+  KeyRound,
+  Trash2,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { makeCache } from "../lib/cache";
@@ -281,15 +285,10 @@ export default function GamePage() {
   const isWishlist = entry?.status === "wishlist";
   const isPlayed = entry && PLAYED.includes(entry.status);
 
-  // Onglet « Patchs » : pertinent seulement pour les jeux Switch (patch FR
-  // nxbrew) et les visual novels (fan-trad VNDB) — on le masque ailleurs pour
-  // l'instant. Détection sur les mêmes critères que l'endpoint /patches.
-  const isSwitchGame = (game?.platforms || []).some(
-    (p) => p.id === 130 || p.id === 508 || /switch/i.test(p.name || "")
-  );
-  const isVnGame = (game?.genres || []).some((g) => /visual novel/i.test(g));
-  const tabs =
-    isSwitchGame || isVnGame ? TABS : TABS.filter((t) => t.id !== "patches");
+  // Onglet « Patchs » : toujours présent (le bloc Pack HD concerne tout jeu).
+  // Les sous-sections (patch FR Switch, fan-trad VN) se masquent d'elles-mêmes
+  // côté serveur si non pertinentes.
+  const tabs = TABS;
 
   // Onglet actif : vit dans l'URL (?tab=…) pour survivre au refresh et au
   // retour arrière (replace : changer d'onglet n'empile pas d'historique).
@@ -1318,21 +1317,102 @@ function formatSize(bytes) {
   return `${Math.round(bytes / 1024 ** 2)} Mo`;
 }
 
+// Date RFC (pubDate C411) -> « mars 2026 ». null si invalide.
+function shortMonth(s) {
+  const d = new Date(s);
+  return isNaN(d.getTime())
+    ? null
+    : d.toLocaleDateString("fr-FR", { month: "short", year: "numeric" });
+}
+
 // --- Bloc « Pack HD » : torrents C411 correspondant au jeu (chargé à la
-// demande). Chaque résultat = titre, poids, seeders, lien page + .torrent. ---
+// demande), regroupés par plateforme, triables par seeders ou par poids.
+// Chaque résultat = jaquette + titre + poids + seeders + lien page/.torrent. ---
+const C411_KEY_LS = "mpl_c411_key";
+
 function HdPacksBlock({ gameId, token }) {
-  const [state, setState] = useState({ loading: true, packs: null, error: false });
+  const [state, setState] = useState({ loading: true, data: null, error: false });
+  // Tri : critère (seeders | size) + sens (desc | asc). Défaut : + seedés.
+  const [sort, setSort] = useState({ by: "seeders", dir: "desc" });
+  // Clé API C411 PERSONNELLE de l'utilisateur (localStorage, jamais envoyée au
+  // serveur). Sans elle, on ne propose QUE le lien vers la page C411 : le
+  // téléchargement direct .torrent embarquerait un passkey → ratio de ce compte.
+  const [c411Key, setC411Key] = useState(
+    () => (typeof localStorage !== "undefined" && localStorage.getItem(C411_KEY_LS)) || ""
+  );
+  const [keyOpen, setKeyOpen] = useState(false);
+  const [keyDraft, setKeyDraft] = useState("");
+
+  const saveKey = () => {
+    const k = keyDraft.trim();
+    if (!k) return;
+    safeSetItem(C411_KEY_LS, k);
+    setC411Key(k);
+    setKeyOpen(false);
+    setKeyDraft("");
+  };
+  const clearKey = () => {
+    try {
+      localStorage.removeItem(C411_KEY_LS);
+    } catch {
+      /* ignore */
+    }
+    setC411Key("");
+    setKeyOpen(false);
+  };
+  // URL .torrent construite avec la clé PERSO — seulement si elle est saisie.
+  const dlUrl = (p) =>
+    c411Key && p.id
+      ? `https://c411.org/api?t=get&id=${p.id}&apikey=${encodeURIComponent(c411Key)}`
+      : null;
 
   useEffect(() => {
     let alive = true;
-    setState({ loading: true, packs: null, error: false });
+    setState({ loading: true, data: null, error: false });
     apiFetch(`/games/${gameId}/hd-packs`, { token })
-      .then((d) => alive && setState({ loading: false, packs: d.packs || [], error: false }))
-      .catch(() => alive && setState({ loading: false, packs: null, error: true }));
+      .then((d) => alive && setState({ loading: false, data: d, error: false }))
+      .catch(() => alive && setState({ loading: false, data: null, error: true }));
     return () => {
       alive = false;
     };
   }, [gameId, token]);
+
+  const toggleSort = (by) =>
+    setSort((s) =>
+      s.by === by ? { by, dir: s.dir === "desc" ? "asc" : "desc" } : { by, dir: "desc" }
+    );
+
+  const packs = state.data?.packs || [];
+  const cover = state.data?.cover || null;
+
+  // Comparateur selon le tri courant.
+  const cmp = (a, b) => {
+    const va = sort.by === "size" ? a.size || 0 : a.seeders || 0;
+    const vb = sort.by === "size" ? b.size || 0 : b.seeders || 0;
+    return sort.dir === "asc" ? va - vb : vb - va;
+  };
+  // Regroupe par plateforme ; groupes ordonnés par seeders cumulés (le plus
+  // « vivant » d'abord), chaque liste triée selon le critère choisi.
+  const groups = {};
+  for (const p of packs) (groups[p.platform] ||= []).push(p);
+  const groupList = Object.entries(groups)
+    .map(([plat, list]) => ({
+      plat,
+      list: [...list].sort(cmp),
+      seed: list.reduce((n, p) => n + (p.seeders || 0), 0),
+    }))
+    .sort((a, b) => b.seed - a.seed);
+
+  const SortBtn = ({ by, label }) => (
+    <button
+      className={`gp-hd-sortbtn clickable ${sort.by === by ? "active" : ""}`}
+      onClick={() => toggleSort(by)}
+    >
+      {label}
+      {sort.by === by &&
+        (sort.dir === "desc" ? <ChevronDown size={13} /> : <ChevronUp size={13} />)}
+    </button>
+  );
 
   return (
     <section className="gp-block">
@@ -1340,8 +1420,9 @@ function HdPacksBlock({ gameId, token }) {
         <HardDrive size={16} /> Pack HD
       </h2>
       <p className="gp-patch-intro">
-        Packs et versions complètes de ce jeu trouvés sur C411 (tracker FR). Ouvre
-        la page du torrent ou télécharge directement le fichier .torrent.
+        Packs et versions complètes de ce jeu trouvés sur C411 (tracker FR),
+        regroupés par plateforme. Ouvre la page du torrent sur C411 pour le
+        télécharger avec ton compte.
       </p>
 
       {state.loading ? (
@@ -1351,55 +1432,141 @@ function HdPacksBlock({ gameId, token }) {
           <HardDrive size={26} />
           <p className="font-fun">Impossible de charger les packs pour l'instant.</p>
         </div>
-      ) : !state.packs.length ? (
+      ) : !packs.length ? (
         <div className="gp-troph-empty">
           <HardDrive size={26} />
           <p className="font-fun">Aucun pack trouvé sur C411 pour ce jeu.</p>
         </div>
       ) : (
-        <div className="gp-patch-list">
-          {state.packs.map((p, i) => (
-            <div className="gp-patch" key={p.page || p.download || i}>
-              <div className="gp-patch-body">
-                <span className="gp-patch-name">{p.title}</span>
-                <div className="gp-patch-badges">
-                  {formatSize(p.size) && (
-                    <span className="gp-patch-badge">{formatSize(p.size)}</span>
-                  )}
-                  {p.seeders != null && (
-                    <span className={`gp-patch-badge ${p.seeders > 0 ? "official" : "warn"}`}>
-                      <Users2 size={12} /> {p.seeders}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="gp-patch-links">
-                {p.download && (
-                  <a
-                    href={p.download}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="gp-patch-dl clickable"
-                    title="Télécharger le .torrent"
+        <>
+          <div className="gp-hd-toolbar">
+            <div className="gp-hd-toolleft">
+              <span className="gp-hd-total">
+                {packs.length} pack{packs.length > 1 ? "s" : ""}
+              </span>
+              <button
+                className={`gp-hd-keybtn clickable ${c411Key ? "set" : ""}`}
+                onClick={() => {
+                  setKeyDraft(c411Key);
+                  setKeyOpen((v) => !v);
+                }}
+                title="Configurer ta clé API C411 pour le téléchargement direct"
+              >
+                <KeyRound size={13} />
+                {c411Key ? "Clé C411 active" : "Ma clé C411"}
+              </button>
+            </div>
+            <div className="gp-hd-sort">
+              <span className="gp-hd-sortlabel">Trier</span>
+              <SortBtn by="seeders" label="Seeders" />
+              <SortBtn by="size" label="Poids" />
+            </div>
+          </div>
+
+          {keyOpen && (
+            <div className="gp-hd-keypanel">
+              <p className="gp-hd-keyinfo">
+                Colle ta clé API C411 (Profil → API sur c411.org) pour activer le
+                téléchargement direct du .torrent avec <strong>ton</strong> compte.
+                Elle reste sur cet appareil et n'est jamais envoyée à MyPlayLog.
+              </p>
+              <div className="gp-hd-keyrow">
+                <input
+                  type="password"
+                  className="gp-hd-keyinput"
+                  placeholder="Clé API C411…"
+                  value={keyDraft}
+                  onChange={(e) => setKeyDraft(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && saveKey()}
+                  autoFocus
+                />
+                <button className="gp-hd-keysave clickable" onClick={saveKey}>
+                  Enregistrer
+                </button>
+                {c411Key && (
+                  <button
+                    className="gp-hd-keyclear clickable"
+                    onClick={clearKey}
+                    title="Supprimer la clé"
                   >
-                    <Magnet size={14} /> .torrent
-                  </a>
-                )}
-                {p.page && (
-                  <a
-                    href={p.page}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="gp-patch-vndb clickable"
-                    title="Voir sur C411"
-                  >
-                    C411 <ExternalLink size={12} />
-                  </a>
+                    <Trash2 size={14} />
+                  </button>
                 )}
               </div>
             </div>
+          )}
+
+          {groupList.map(({ plat, list }) => (
+            <div className="gp-hd-group" key={plat}>
+              <div className="gp-hd-grouphead">
+                <Gamepad2 size={14} />
+                <span className="gp-hd-platname">{plat}</span>
+                <span className="gp-hd-groupcount">{list.length}</span>
+              </div>
+              <div className="gp-hd-list">
+                {list.map((p, i) => (
+                  <div className="gp-hd-row" key={p.page || p.id || i}>
+                    <div className="gp-hd-cover">
+                      {cover ? (
+                        <img src={cover} alt="" loading="lazy" />
+                      ) : (
+                        <HardDrive size={18} />
+                      )}
+                    </div>
+                    <div className="gp-hd-main">
+                      <span className="gp-hd-title" title={p.title}>
+                        {p.title}
+                      </span>
+                      <div className="gp-hd-meta">
+                        {formatSize(p.size) && (
+                          <span className="gp-hd-badge">
+                            <HardDrive size={11} /> {formatSize(p.size)}
+                          </span>
+                        )}
+                        {p.seeders != null && (
+                          <span
+                            className={`gp-hd-badge seed ${p.seeders === 0 ? "dead" : ""}`}
+                          >
+                            <Users2 size={11} /> {p.seeders}
+                          </span>
+                        )}
+                        {shortMonth(p.pubDate) && (
+                          <span className="gp-hd-age">{shortMonth(p.pubDate)}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="gp-hd-actions">
+                      {dlUrl(p) && (
+                        <a
+                          href={dlUrl(p)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="gp-hd-dl clickable"
+                          title="Télécharger le .torrent avec ta clé C411"
+                        >
+                          <Magnet size={14} />
+                          <span>.torrent</span>
+                        </a>
+                      )}
+                      {p.page && (
+                        <a
+                          href={p.page}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="gp-hd-page clickable"
+                          title="Voir sur C411"
+                        >
+                          <ExternalLink size={13} />
+                          <span>C411</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           ))}
-        </div>
+        </>
       )}
     </section>
   );
@@ -1457,11 +1624,11 @@ function PatchesTab({ gameId, token }) {
 
   return (
     <div className="gp-patches">
-      {/* Patch FR Switch (nxbrew.net) — pour tout jeu Switch */}
-      {data.isSwitch && <SwitchPatchBlock data={data} gameId={gameId} token={token} />}
-
-      {/* Pack HD (torrents C411) — pour tout jeu */}
+      {/* Pack HD (torrents C411) — pour tout jeu, toujours en premier */}
       <HdPacksBlock gameId={gameId} token={token} />
+
+      {/* Patch FR Switch (nxbrew.net) — seulement si jeu Switch */}
+      {data.isSwitch && <SwitchPatchBlock data={data} gameId={gameId} token={token} />}
 
       {/* Traduction FR (visual novels sans version française) */}
       {vn !== null && (

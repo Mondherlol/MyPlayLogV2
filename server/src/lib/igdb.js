@@ -75,10 +75,21 @@ async function getToken() {
   return cachedToken;
 }
 
-// Exécute une requête Apicalypse sur un endpoint IGDB (ex: "games").
-export async function igdbQuery(endpoint, body) {
-  const token = await getToken();
-  const res = await fetch(`https://api.igdb.com/v4/${endpoint}`, {
+// Invalide le token en cache (mémoire + disque) : appelé quand IGDB le rejette
+// (401) alors que sa date d'expiration n'est pas encore atteinte — cas d'un
+// token révoqué côté Twitch (ex: un nouveau token généré ailleurs).
+function invalidateToken() {
+  cachedToken = null;
+  tokenExpiry = 0;
+  try {
+    fs.rmSync(CACHE_FILE, { force: true });
+  } catch {
+    /* best-effort */
+  }
+}
+
+async function igdbFetch(endpoint, body, token) {
+  return fetch(`https://api.igdb.com/v4/${endpoint}`, {
     method: "POST",
     headers: {
       "Client-ID": process.env.TWITCH_CLIENT_ID,
@@ -88,6 +99,19 @@ export async function igdbQuery(endpoint, body) {
     },
     body,
   });
+}
+
+// Exécute une requête Apicalypse sur un endpoint IGDB (ex: "games").
+export async function igdbQuery(endpoint, body) {
+  let token = await getToken();
+  let res = await igdbFetch(endpoint, body, token);
+
+  // Token rejeté (révoqué) : on l'invalide et on réessaie une fois avec un neuf.
+  if (res.status === 401) {
+    invalidateToken();
+    token = await getToken();
+    res = await igdbFetch(endpoint, body, token);
+  }
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");

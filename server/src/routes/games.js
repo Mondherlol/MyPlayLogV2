@@ -1343,12 +1343,18 @@ router.get("/:id/hd-packs", optionalAuth, async (req, res) => {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
 
-    const arr = await igdbQuery("games", `fields name; where id = ${id};`);
+    const arr = await igdbQuery(
+      "games",
+      `fields name,cover.image_id; where id = ${id};`
+    );
     const g = arr[0];
     if (!g) return res.status(404).json({ error: "Jeu introuvable." });
 
+    const cover = g.cover?.image_id
+      ? `${IMG_BASE}/t_cover_small/${g.cover.image_id}.jpg`
+      : null;
     const packs = await fetchC411Packs(g.name);
-    res.json({ name: g.name, packs });
+    res.json({ name: g.name, cover, packs });
   } catch (err) {
     console.error("game hd-packs error:", err.message);
     res.status(err.status || 500).json({ error: err.message || "Erreur." });
