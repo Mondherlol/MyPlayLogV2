@@ -5363,6 +5363,32 @@
   gap: 2rem;
 }
 
+/* En-tête compact de bloc : titre + indice court sur une seule ligne, action
+   optionnelle (passkey) poussée à droite. Remplace les longs paragraphes. */
+.gp-pblock-head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.gp-pblock-head .gp-h2 {
+  margin-bottom: 0;
+}
+
+.gp-pblock-hint {
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  padding-left: 0.65rem;
+  border-left: 1px solid var(--border);
+  line-height: 1.2;
+}
+
+.gp-pblock-head .gp-hd-keybtn {
+  margin-left: auto;
+}
+
 .gp-patch-intro {
   margin: -0.4rem 0 1rem;
   color: var(--text-soft);
@@ -5582,6 +5608,16 @@
   color: var(--accent-ink);
 }
 
+/* Barre : mini-onglets plateforme à gauche, tri à droite, sur une seule ligne */
+.gp-hd-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem 1.2rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
 /* Mini-onglets par plateforme */
 .gp-hd-tabs {
   display: flex;
@@ -5589,6 +5625,10 @@
   gap: 0.5rem;
   flex-wrap: wrap;
   margin-bottom: 1rem;
+}
+
+.gp-hd-bar .gp-hd-tabs {
+  margin-bottom: 0;
 }
 
 .gp-hd-tab {

@@ -2170,6 +2170,9 @@ button.pf-stat:hover {
   line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  /* Toujours réserver 2 lignes : les titres courts n'écrasent pas la tuile,
+     toutes gardent la même hauteur (cf. VirtuosoGrid, items uniformes). */
+  min-height: 2.3em;
 }
 
 .pg-tile-time {
@@ -2183,7 +2186,11 @@ button.pf-stat:hover {
 /* Ligne d'infos sous le titre : temps de jeu, console jouée, format */
 .pg-tile-meta {
   display: flex;
-  flex-wrap: wrap;
+  /* Une seule ligne, hauteur fixe : garantit des tuiles de hauteur identique
+     (VirtuosoGrid saute sinon). Le surplus de chips est masqué proprement. */
+  flex-wrap: nowrap;
+  overflow: hidden;
+  min-height: 1.35rem;
   gap: 0.3rem 0.4rem;
   margin-top: -0.1rem;
 }

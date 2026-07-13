@@ -93,7 +93,11 @@ function GameTile({ entry, fields }) {
   const showFormat = fields.format && !!entry.platform;
   const showPlatform = fields.platform && !!entry.platform;
   const showPlaytime = fields.playtime && entry.playtimeHours != null;
-  const hasMeta = showPlaytime || showPlatform || showFormat;
+  // La zone méta est réservée dès qu'un champ méta est activé (choix global),
+  // même si CETTE entrée n'a pas la donnée : toutes les tuiles gardent ainsi la
+  // même hauteur — condition indispensable pour que VirtuosoGrid ne « saute »
+  // pas (grille virtualisée = items de taille identique obligatoire).
+  const showMetaArea = fields.playtime || fields.platform || fields.format;
   return (
     <div
       className="pg-tile clickable"
@@ -127,7 +131,7 @@ function GameTile({ entry, fields }) {
         />
       </div>
       <span className="pg-tile-name">{entry.name}</span>
-      {hasMeta && (
+      {showMetaArea && (
         <div className="pg-tile-meta">
           {showPlaytime && (
             <span className="pg-tile-chip">
