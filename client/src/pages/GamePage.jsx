@@ -45,6 +45,9 @@ import {
   Download,
   Package,
   Gamepad2,
+  HardDrive,
+  Magnet,
+  Users2,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { makeCache } from "../lib/cache";
@@ -1307,6 +1310,101 @@ function SwitchPatchBlock({ data, gameId, token }) {
   );
 }
 
+// Octets -> « 1.2 Go » / « 340 Mo ». null si taille inconnue.
+function formatSize(bytes) {
+  if (!bytes || bytes <= 0) return null;
+  const gb = bytes / 1024 ** 3;
+  if (gb >= 1) return `${gb.toFixed(gb >= 10 ? 0 : 1)} Go`;
+  return `${Math.round(bytes / 1024 ** 2)} Mo`;
+}
+
+// --- Bloc « Pack HD » : torrents C411 correspondant au jeu (chargé à la
+// demande). Chaque résultat = titre, poids, seeders, lien page + .torrent. ---
+function HdPacksBlock({ gameId, token }) {
+  const [state, setState] = useState({ loading: true, packs: null, error: false });
+
+  useEffect(() => {
+    let alive = true;
+    setState({ loading: true, packs: null, error: false });
+    apiFetch(`/games/${gameId}/hd-packs`, { token })
+      .then((d) => alive && setState({ loading: false, packs: d.packs || [], error: false }))
+      .catch(() => alive && setState({ loading: false, packs: null, error: true }));
+    return () => {
+      alive = false;
+    };
+  }, [gameId, token]);
+
+  return (
+    <section className="gp-block">
+      <h2 className="gp-h2">
+        <HardDrive size={16} /> Pack HD
+      </h2>
+      <p className="gp-patch-intro">
+        Packs et versions complètes de ce jeu trouvés sur C411 (tracker FR). Ouvre
+        la page du torrent ou télécharge directement le fichier .torrent.
+      </p>
+
+      {state.loading ? (
+        <TrophySkeleton rows={3} />
+      ) : state.error ? (
+        <div className="gp-troph-empty">
+          <HardDrive size={26} />
+          <p className="font-fun">Impossible de charger les packs pour l'instant.</p>
+        </div>
+      ) : !state.packs.length ? (
+        <div className="gp-troph-empty">
+          <HardDrive size={26} />
+          <p className="font-fun">Aucun pack trouvé sur C411 pour ce jeu.</p>
+        </div>
+      ) : (
+        <div className="gp-patch-list">
+          {state.packs.map((p, i) => (
+            <div className="gp-patch" key={p.page || p.download || i}>
+              <div className="gp-patch-body">
+                <span className="gp-patch-name">{p.title}</span>
+                <div className="gp-patch-badges">
+                  {formatSize(p.size) && (
+                    <span className="gp-patch-badge">{formatSize(p.size)}</span>
+                  )}
+                  {p.seeders != null && (
+                    <span className={`gp-patch-badge ${p.seeders > 0 ? "official" : "warn"}`}>
+                      <Users2 size={12} /> {p.seeders}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="gp-patch-links">
+                {p.download && (
+                  <a
+                    href={p.download}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="gp-patch-dl clickable"
+                    title="Télécharger le .torrent"
+                  >
+                    <Magnet size={14} /> .torrent
+                  </a>
+                )}
+                {p.page && (
+                  <a
+                    href={p.page}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="gp-patch-vndb clickable"
+                    title="Voir sur C411"
+                  >
+                    C411 <ExternalLink size={12} />
+                  </a>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 // --- Onglet Patchs : patch FR Switch (nxbrew) + fan-traduction FR des visual
 // novels non traduits (VNDB) + liens de recherche de mods. ---
 function PatchesTab({ gameId, token }) {
@@ -1361,6 +1459,9 @@ function PatchesTab({ gameId, token }) {
     <div className="gp-patches">
       {/* Patch FR Switch (nxbrew.net) — pour tout jeu Switch */}
       {data.isSwitch && <SwitchPatchBlock data={data} gameId={gameId} token={token} />}
+
+      {/* Pack HD (torrents C411) — pour tout jeu */}
+      <HdPacksBlock gameId={gameId} token={token} />
 
       {/* Traduction FR (visual novels sans version française) */}
       {vn !== null && (

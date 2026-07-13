@@ -26,6 +26,7 @@ import { buildGameFeed, fetchSteamReviews } from "../lib/feed.js";
 import { findVnId, fetchVnCharacters, fetchVnFrPatches } from "../lib/vndb.js";
 import { GENRES_FR, MODES_FR, THEMES_FR, LANGUAGES_FR, frName } from "../lib/translations.js";
 import { ensureScraped, ytPlaylistTracks } from "../lib/ostScrape.js";
+import { fetchC411Packs } from "../lib/c411.js";
 
 function youtubeId(url) {
   const m = String(url).match(
@@ -1331,6 +1332,25 @@ router.get("/:id/patches", optionalAuth, async (req, res) => {
     });
   } catch (err) {
     console.error("game patches error:", err.message);
+    res.status(err.status || 500).json({ error: err.message || "Erreur." });
+  }
+});
+
+// --- Packs HD / torrents C411 pour un jeu (chargé à la demande depuis l'onglet
+// Patchs, car l'appel externe est lent et ne concerne pas tous les jeux). ---
+router.get("/:id/hd-packs", optionalAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+
+    const arr = await igdbQuery("games", `fields name; where id = ${id};`);
+    const g = arr[0];
+    if (!g) return res.status(404).json({ error: "Jeu introuvable." });
+
+    const packs = await fetchC411Packs(g.name);
+    res.json({ name: g.name, packs });
+  } catch (err) {
+    console.error("game hd-packs error:", err.message);
     res.status(err.status || 500).json({ error: err.message || "Erreur." });
   }
 });

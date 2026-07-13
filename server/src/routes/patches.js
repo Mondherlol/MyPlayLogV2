@@ -56,6 +56,30 @@ router.get("/switch/requests", requireAuth, requireAdmin, async (_req, res) => {
   }
 });
 
+// --- Liste complète (demandés + déjà scrapés) pour l'app locale (admin) ---
+router.get("/switch/list", requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const docs = await SwitchPatchCache.find({}).sort({ updatedAt: -1 }).lean();
+    res.json({
+      items: docs.map((d) => ({
+        gameId: d.gameId,
+        name: d.name || "",
+        requested: !!d.requested,
+        requestedAt: d.requestedAt,
+        hasData: !!d.data,
+        sections: d.data?.sections?.length || 0,
+        size: d.data?.size || null,
+        updateVersion: d.data?.updateVersion || null,
+        pageUrl: d.data?.pageUrl || null,
+        at: d.at,
+      })),
+    });
+  } catch (err) {
+    console.error("switch patch list error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
 // --- L'app locale pousse les données scrapées (admin) ---
 // body: { name, data } — data = patch normalisé, ou null si « rien trouvé ».
 router.post("/switch/:gameId", requireAuth, requireAdmin, async (req, res) => {
