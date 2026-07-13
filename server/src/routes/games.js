@@ -1307,9 +1307,12 @@ router.get("/:id/patches", optionalAuth, async (req, res) => {
     const hasFr = (g.language_supports || []).some((ls) =>
       /french|français/i.test(ls.language?.name || "")
     );
-    // Nintendo Switch (id IGDB 130) et Switch 2 (id 508) → patch FR nxbrew.
+    // Nintendo Switch (id IGDB 130) → téléchargement nxbrew. On EXCLUT la
+    // Switch 2 (id 508, nom « Nintendo Switch 2 ») : nxbrew ne la couvre pas.
     const isSwitch = (g.platforms || []).some(
-      (p) => p.id === 130 || p.id === 508 || /switch/i.test(p.name || "")
+      (p) =>
+        p.id === 130 ||
+        (p.id !== 508 && /switch/i.test(p.name || "") && !/switch\s*2/i.test(p.name || ""))
     );
 
     // On n'interroge VNDB que pour un VN pas déjà en FR ; pour tout jeu Switch

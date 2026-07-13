@@ -163,7 +163,7 @@ function SwitchPatchBlock({ data, gameId, token }) {
 
   return (
     <section className="gp-block">
-      <BlockHead Icon={Gamepad2} title="Patch FR Switch" hint="Patch FR d'origine · nxbrew" />
+      <BlockHead Icon={Gamepad2} title="Téléchargement NxBrew" hint= "Liens directs · Jeux Switch " />
       {data.switchPatch ? (
         <>
           <SwitchPatch patch={data.switchPatch} />
@@ -172,8 +172,8 @@ function SwitchPatchBlock({ data, gameId, token }) {
       ) : (
         <div className="gp-troph-empty">
           <Gamepad2 size={26} />
-          <p className="font-fun">Aucun patch FR Switch pour ce jeu.</p>
-          {askBtn("Demander le patch")}
+          <p className="font-fun">Aucun lien trouvé pour le moment.</p>
+          {askBtn("Demander le jeu")}
         </div>
       )}
     </section>
@@ -326,7 +326,7 @@ function HdPacksBlock({ gameId, token }) {
 
   return (
     <section className="gp-block">
-      <BlockHead Icon={HardDrive} title="Pack HD" hint="Torrents C411 · par plateforme">
+      <BlockHead Icon={HardDrive} title="Téléchargement C411" hint="Torrents · par plateforme">
         {token && (
           <button
             className={`gp-hd-keybtn clickable ${passkey ? "set" : ""}`}

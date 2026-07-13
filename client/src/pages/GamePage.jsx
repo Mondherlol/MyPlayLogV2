@@ -42,6 +42,7 @@ import {
   Orbit,
   CornerLeftUp,
   Wrench,
+  Download,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { makeCache } from "../lib/cache";
@@ -95,7 +96,7 @@ const TABS = [
   { id: "trophies", label: "Trophées", Icon: Trophy, ready: true },
   { id: "ost", label: "OST", Icon: Music, ready: true },
   { id: "characters", label: "Personnages", Icon: Users, ready: true },
-  { id: "patches", label: "Patchs", Icon: Wrench, ready: true },
+  { id: "patches", label: "Téléchargements", Icon: Download, ready: true },
 ];
 
 const TROPHY_TABS = [
