@@ -291,13 +291,15 @@ async function resolveVnFrPatches(gameId, name) {
   }
 }
 
-// Patch FR Switch (nxbrew.net) d'un jeu, avec cache DB. On met en cache les
-// succès (7 j) ET les « rien trouvé » (3 h, pour ne pas marteler le site), mais
-// jamais un site injoignable (fetchSwitchFrPatch renvoie undefined → on réessaie
-// au prochain appel, ce qui fait « revivre » l'onglet dès le retour du site).
+// Patch FR Switch (nxbrew.net) d'un jeu, avec cache DB. Le scraping passe par
+// ScraperAPI (bypass Cloudflare) dont le quota gratuit est petit (~1000
+// crédits/mois, ~30 crédits/requête) → on met le cache TRÈS long pour appeler
+// l'API le moins possible : un patch/une absence de patch ne change quasiment
+// jamais. On cache les succès (30 j) ET les « rien trouvé » (14 j), mais jamais
+// un échec réseau/API (undefined → on réessaie au prochain appel).
 const SWITCH_PATCH_VERSION = 1;
-const SWITCH_PATCH_OK_MS = 7 * 24 * 60 * 60 * 1000; // patch trouvé : 7 jours
-const SWITCH_PATCH_MISS_MS = 3 * 60 * 60 * 1000; // rien trouvé : 3 heures
+const SWITCH_PATCH_OK_MS = 30 * 24 * 60 * 60 * 1000; // patch trouvé : 30 jours
+const SWITCH_PATCH_MISS_MS = 14 * 24 * 60 * 60 * 1000; // rien trouvé : 14 jours
 async function resolveSwitchFrPatch(gameId, name) {
   try {
     const cached = await SwitchPatchCache.findOne({ gameId });

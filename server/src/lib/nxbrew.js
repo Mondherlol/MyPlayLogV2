@@ -17,46 +17,40 @@ const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
 // nxbrew.net est derrière Cloudflare : les IP de datacenter (VPS OVH) reçoivent
-// un challenge 403 immédiat, alors qu'une IP résidentielle (dev local) passe.
-// En prod on route donc via FlareSolverr (Chrome headless qui résout le
-// challenge). Si FLARESOLVERR_URL n'est pas défini (local), on garde le fetch
-// direct. Ex. valeur : http://flaresolverr:8191/v1
-const FLARESOLVERR_URL = process.env.FLARESOLVERR_URL;
-const FLARESOLVERR_TIMEOUT = 60000; // ms — laissé à FlareSolverr pour résoudre le challenge
+// un challenge insoluble (même un vrai navigateur headless boucle, car c'est
+// l'IP qui est re-challengée). En prod on route donc via une API de scraping
+// (ScraperAPI) qui requête depuis une IP résidentielle rotative et résout
+// Cloudflare pour nous. En local (IP résidentielle), SCRAPER_API_KEY n'est pas
+// défini → on garde le fetch direct.
+const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY;
+// ultra_premium franchit Cloudflare mais coûte ~30 crédits/requête (vs ~10 pour
+// render seul). Activé par défaut car nxbrew en a besoin ; mettre
+// SCRAPER_API_ULTRA=false pour tester à moindre coût si le quota gratuit fond.
+const SCRAPER_API_ULTRA = process.env.SCRAPER_API_ULTRA !== "false";
 
-// Passe par FlareSolverr : renvoie le HTML rendu, ou null si échec/challenge non résolu.
-async function getHtmlViaFlaresolverr(url) {
+// Passe par ScraperAPI : rendu JS + proxy résidentiel (ultra_premium) pour
+// franchir Cloudflare. Renvoie le HTML, ou null en cas d'échec.
+async function getHtmlViaScraperApi(url) {
   const t0 = Date.now();
+  const params = { api_key: SCRAPER_API_KEY, url, render: "true" };
+  if (SCRAPER_API_ULTRA) params.ultra_premium = "true";
+  const endpoint = "https://api.scraperapi.com/?" + new URLSearchParams(params);
   try {
-    const r = await fetch(FLARESOLVERR_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cmd: "request.get", url, maxTimeout: FLARESOLVERR_TIMEOUT }),
-    });
-    const data = await r.json().catch(() => null);
-    const sol = data?.solution;
-    if (data?.status !== "ok" || !sol) {
-      console.warn(
-        `[nxbrew] flaresolverr KO en ${Date.now() - t0}ms: status=${data?.status} ${
-          data?.message || ""
-        } → ${url}`
-      );
+    const r = await fetch(endpoint);
+    if (!r.ok) {
+      console.warn(`[nxbrew] scraperapi HTTP ${r.status} en ${Date.now() - t0}ms → ${url}`);
       return null;
     }
-    if (sol.status && sol.status >= 400) {
-      console.warn(`[nxbrew] flaresolverr HTTP ${sol.status} en ${Date.now() - t0}ms → ${url}`);
-      return null;
-    }
-    return sol.response || null;
+    return await r.text();
   } catch (e) {
-    console.warn(`[nxbrew] flaresolverr échec en ${Date.now() - t0}ms: ${e.message} → ${url}`);
+    console.warn(`[nxbrew] scraperapi échec en ${Date.now() - t0}ms: ${e.message} → ${url}`);
     return null;
   }
 }
 
 // Récupère le HTML d'une page. Renvoie null si injoignable (réseau / statut ≠ 200).
 async function getHtml(url) {
-  if (FLARESOLVERR_URL) return getHtmlViaFlaresolverr(url);
+  if (SCRAPER_API_KEY) return getHtmlViaScraperApi(url);
   const t0 = Date.now();
   try {
     const r = await fetch(url, { headers: { "User-Agent": UA } });

@@ -9,18 +9,6 @@ services:
     networks:
       - myplaylog
 
-  # Chrome headless qui résout les challenges Cloudflare : nxbrew.net (patchs FR
-  # Switch) bloque les IP de datacenter du VPS par un 403. Non exposé sur l'hôte,
-  # joignable seulement par le serveur via le réseau interne.
-  flaresolverr:
-    image: ghcr.io/flaresolverr/flaresolverr:latest
-    restart: unless-stopped
-    environment:
-      LOG_LEVEL: info
-      TZ: Europe/Paris
-    networks:
-      - myplaylog
-
   server:
     build:
       context: ./server
@@ -32,14 +20,11 @@ services:
       MONGODB_URI: mongodb://mongo:27017/myplaylog
       CLIENT_ORIGIN: https://myplaylog.cc
       PORT: 4000
-      # Scraper nxbrew via FlareSolverr (cf. server/src/lib/nxbrew.js).
-      FLARESOLVERR_URL: http://flaresolverr:8191/v1
     volumes:
       # Les images uploadées (covers, avatars, reposts…) persistent hors conteneur.
       - uploads_data:/app/uploads
     depends_on:
       - mongo
-      - flaresolverr
     networks:
       - myplaylog
 
