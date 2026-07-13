@@ -23,6 +23,7 @@ import {
   Shuffle,
   Image,
   Sparkles,
+  Headphones,
 } from "lucide-react";
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter } from "@dnd-kit/core";
 import {
@@ -196,7 +197,13 @@ export default function PlaylistDetail({ id, initial }) {
   function pingListen() {
     if (listenSent.current) return;
     listenSent.current = true;
-    apiFetch(`/lists/${id}/listen`, { method: "POST", token }).catch(() => {});
+    apiFetch(`/lists/${id}/listen`, { method: "POST", token })
+      .then((d) => {
+        // Le serveur ne compte que les écoutes d'un tiers → maj en direct.
+        if (d?.listenCount != null)
+          setList((prev) => ({ ...prev, listenCount: d.listenCount }));
+      })
+      .catch(() => {});
   }
 
   function playAll() {
@@ -451,6 +458,15 @@ export default function PlaylistDetail({ id, initial }) {
                       <span>
                         {totalDuration.durationEstimated ? "≈ " : ""}
                         {fmtDuration(totalDuration.durationSec)}
+                      </span>
+                    </>
+                  )}
+                  {list.listenCount > 0 && (
+                    <>
+                      <span className="dot">·</span>
+                      <span title={`${list.listenCount} écoute${list.listenCount > 1 ? "s" : ""}`}>
+                        <Headphones size={13} /> {list.listenCount} écoute
+                        {list.listenCount > 1 ? "s" : ""}
                       </span>
                     </>
                   )}

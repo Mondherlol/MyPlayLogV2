@@ -13,6 +13,8 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.1",
     "@twemoji/api": "^17.0.3",
     "emoji-picker-react": "^4.19.1",
     "lucide-react": "^1.23.0",
@@ -20,7 +22,8 @@
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1",
     "react-virtuoso": "^4.18.10",
-    "recharts": "^3.9.2"
+    "recharts": "^3.9.2",
+    "three": "^0.180.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.17",

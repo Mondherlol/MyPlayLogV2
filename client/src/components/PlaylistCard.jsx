@@ -8,6 +8,7 @@ import {
   Play,
   Pause,
   Music,
+  Headphones,
 } from "lucide-react";
 import { usePlayer } from "../context/PlayerContext";
 import { usePlayPlaylist } from "../lib/usePlayPlaylist";
@@ -184,6 +185,11 @@ export default function PlaylistCard({ list, onDelete }) {
           <span className="list-stat">
             <MessageCircle size={14} /> {list.commentCount}
           </span>
+          {list.listenCount > 0 && (
+            <span className="list-stat" title={`${list.listenCount} écoute${list.listenCount > 1 ? "s" : ""}`}>
+              <Headphones size={14} /> {list.listenCount}
+            </span>
+          )}
           <span className="list-stat time">màj {timeAgo(list.updatedAt)}</span>
         </div>
       </div>

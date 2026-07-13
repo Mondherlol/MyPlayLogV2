@@ -707,7 +707,11 @@ router.get("/:id/results", requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/blindtest/leaderboard — meilleur score par joueur (moi + mes suivis).
+// GET /api/blindtest/leaderboard — score CUMULÉ par joueur (moi + mes suivis) :
+// on additionne toutes les parties, donc le classement monte à chaque partie
+// jouée (et pas seulement quand on bat son record). Le blindTestId retenu est
+// celui de la partie la plus récente → le bouton « Défier » pointe sur un set
+// à jour.
 router.get("/leaderboard", requireAuth, async (req, res) => {
   try {
     const me = await User.findById(req.userId).select("following").lean();
@@ -717,15 +721,17 @@ router.get("/leaderboard", requireAuth, async (req, res) => {
     ];
     const rows = await BlindTest.aggregate([
       { $match: { user: { $in: ids } } },
-      { $sort: { score: -1, createdAt: -1 } },
+      { $sort: { createdAt: -1 } }, // récent d'abord → $first = dernière partie
       {
         $group: {
           _id: "$user",
-          score: { $first: "$score" },
-          blindTestId: { $first: "$_id" },
-          correctCount: { $first: "$correctCount" },
-          roundCount: { $first: "$roundCount" },
-          date: { $first: "$createdAt" },
+          score: { $sum: "$score" }, // total cumulé de toutes les parties
+          games: { $sum: 1 },
+          blindTestId: { $first: "$_id" }, // la partie la plus récente
+          bestScore: { $max: "$score" },
+          correctCount: { $sum: "$correctCount" },
+          roundCount: { $sum: "$roundCount" },
+          date: { $max: "$createdAt" },
         },
       },
       { $sort: { score: -1, date: -1 } },
@@ -742,6 +748,8 @@ router.get("/leaderboard", requireAuth, async (req, res) => {
         return {
           user: person(u),
           score: r.score,
+          games: r.games,
+          bestScore: r.bestScore,
           blindTestId: String(r.blindTestId),
           correct: r.correctCount,
           total: r.roundCount,

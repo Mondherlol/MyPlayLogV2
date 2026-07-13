@@ -550,7 +550,15 @@ function BlindTestLeaderboard({ token, myId }) {
                 <Swords size={13} />
               </Link>
             )}
-            <span className="hf-bt-score">
+            <span
+              className="hf-bt-score"
+              title={
+                e.games != null
+                  ? `Total cumulé · ${e.games} partie${e.games > 1 ? "s" : ""}` +
+                    (e.bestScore != null ? ` · record ${e.bestScore}` : "")
+                  : undefined
+              }
+            >
               <Trophy size={12} /> {e.score}
             </span>
           </li>

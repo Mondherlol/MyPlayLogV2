@@ -35,3 +35,102 @@ Note technique
 - Animés de jeux (persona, ace attorney, ...) & regarder épisode apparait dans le feed
 - Jouer aux jeux DS dans le navigateur : techniquement possible via émulateur WASM
   (ex : DeSmuME/EmulatorJS). Attention aux aspects légaux (ROMs).
+-Blind Test
+-Quiz sur les jeux ajoutés
+-Bouton lancer documentaire
+( Documentaire : Cards videos moches dans profil, Historique de visionnage, 
+                 barre pour reprendre ou on s'est arreté, photos du youtubeur ,
+                chaines youtubes de docu favorites - top 5 ?   ,
+                stats des docus regardés / partagés     , feed,
+                commenter une vidéo )
+- calendrier des sorties
+- Ou un calendrier GitHub.
+
+■ ■ □ □ □
+■ ■ ■ □ □
+□ □ ■ ■ □
+
+Tu vois immédiatement les périodes où tu jouais énormément.
+-3. Les "Moments"
+
+Comme Spotify Wrapped.
+
+Quand tu finis un jeu :
+
+🎉 Félicitations
+
+120 heures
+
+7 mois
+
+173 captures
+
+42 trophées
+
+OST préférée :
+Beneath the Mask
+
+Personnage préféré :
+Makoto
+
+Boss préféré :
+Shido
+
+Puis partageable.
+- <button
+  class="btn btn-primary position-relative"
+>
+  Inbox
+  <span
+    class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary"
+  >
+    99+
+    <span class="visually-hidden">unread messages</span>
+  </span>
+</button>
+
+
+
+-
+15. Relation entre jeux
+
+Quand tu regardes
+
+Persona 5
+
+tu vois
+
+Même compositeur
+
+Même réalisateur
+
+Même studio
+
+Même univers
+
+Spin-off
+
+Préquelle
+
+Suite
+
+Remake
+
+Remaster
+
+Très agréable à explorer.
+
+
+17. Speedrun
+
+Si quelqu'un veut.
+
+Temps casual
+
+Temps 100 %
+
+Temps speedrun
+
+PB personnel
+
+- Patch FR

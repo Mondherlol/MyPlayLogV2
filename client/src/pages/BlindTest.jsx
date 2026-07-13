@@ -1471,7 +1471,17 @@ function Scoreboard({ final, challengeId, copied, onCopy, onReplay, token }) {
                       <Swords size={14} />
                     </Link>
                   )}
-                  <span className="bt-board-score">{e.score}</span>
+                  <span
+                    className="bt-board-score"
+                    title={
+                      e.games != null
+                        ? `Total cumulé · ${e.games} partie${e.games > 1 ? "s" : ""}` +
+                          (e.bestScore != null ? ` · record ${e.bestScore}` : "")
+                        : undefined
+                    }
+                  >
+                    {e.score}
+                  </span>
                 </li>
               ))}
             </ol>

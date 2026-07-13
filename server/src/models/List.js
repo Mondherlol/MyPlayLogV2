@@ -172,6 +172,9 @@ const listSchema = new mongoose.Schema(
       default: [],
     },
     comments: { type: [commentSchema], default: [] },
+    // Playlists : nombre d'écoutes (incrémenté à chaque lecture par un tiers,
+    // 1× par visite — cf. POST /lists/:id/listen). Le propriétaire ne compte pas.
+    listenCount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

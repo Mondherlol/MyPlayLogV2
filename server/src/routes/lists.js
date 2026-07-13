@@ -171,6 +171,7 @@ function toCard(l, userId) {
       ? (l.likes || []).some((u) => String(u) === String(userId))
       : false,
     commentCount: (l.comments || []).length,
+    listenCount: l.listenCount || 0,
     updatedAt: l.updatedAt,
     createdAt: l.createdAt,
   };
@@ -213,6 +214,7 @@ function toFull(l, userId) {
       ? (l.likes || []).some((u) => String(u) === String(userId))
       : false,
     comments: (l.comments || []).map((c) => toComment(c, l.comments || [], userId)),
+    listenCount: l.listenCount || 0,
     updatedAt: l.updatedAt,
     createdAt: l.createdAt,
   };
@@ -637,6 +639,14 @@ router.post("/:id/listen", requireAuth, async (req, res) => {
     if (list.visibility === "private")
       return res.status(403).json({ error: "Playlist privée." });
 
+    // Compteur d'écoutes : +1 à chaque lecture par un tiers (le client ne ping
+    // qu'une fois par visite, cf. listenSent). Atomique, best-effort.
+    const updated = await List.findByIdAndUpdate(
+      list._id,
+      { $inc: { listenCount: 1 } },
+      { new: true, select: "listenCount" }
+    ).lean();
+
     const existing = await Activity.findOne({
       actor: req.userId,
       type: "playlist_listen",
@@ -666,7 +676,7 @@ router.post("/:id/listen", requireAuth, async (req, res) => {
         { $set: { createdAt: now, updatedAt: now } }
       );
     }
-    res.json({ ok: true });
+    res.json({ ok: true, listenCount: updated?.listenCount ?? null });
   } catch (err) {
     console.error("playlist listen error:", err.message);
     res.status(500).json({ error: "Erreur." });
