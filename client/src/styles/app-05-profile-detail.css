@@ -939,16 +939,90 @@ button.pf-stat:hover {
 }
 
 @media (max-width: 640px) {
+  .pf-banner {
+    margin-bottom: 1.1rem;
+  }
+
+  /* Cover : on garde un ratio de bannière constant plutôt qu'un bloc figé à
+     230px qui paraît écrasé/zoomé sur un écran étroit (même cadrage qu'ailleurs). */
+  .pf-cover {
+    height: auto;
+    aspect-ratio: 5 / 2;
+    border-radius: 16px;
+  }
+
+  /* Avatar + pseudo sur la même ligne (façon réseau social). */
   .pf-identity {
     align-items: flex-start;
+    gap: 0.85rem;
+    padding: 0 1rem;
+    row-gap: 0.55rem;
   }
 
+  .pf-avatar-wrap {
+    margin-top: -34px;
+  }
+
+  .pf-avatar {
+    width: 82px;
+    height: 82px;
+    border-width: 3px;
+    box-shadow: 0 8px 20px rgba(242, 183, 11, 0.35);
+  }
+
+  .pf-avatar-fallback {
+    font-size: 2.1rem;
+  }
+
+  .pf-avatar-edit {
+    width: 28px;
+    height: 28px;
+    border-width: 2px;
+  }
+
+  /* idmain peut rétrécir pour rester COLLÉ à l'avatar : sans ça, sur les petits
+     écrans le min-width le faisait passer sous la photo. */
+  .pf-idmain {
+    min-width: 0;
+    flex: 1 1 auto;
+    padding-top: 0.35rem;
+    padding-bottom: 0;
+  }
+
+  .pf-username {
+    font-size: 1.3rem;
+  }
+
+  .pf-bio {
+    font-size: 0.9rem;
+    margin-top: 0.4rem;
+  }
+
+  .pf-stats {
+    gap: 1rem;
+    margin-top: 0.55rem;
+  }
+
+  /* Actions sur leur propre ligne, alignées à droite. */
   .pf-actions {
-    margin-left: 0;
     width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    margin: 0.1rem 0 0;
+    align-self: auto;
   }
 
-  .pf-actions .btn,
+  /* « Modifier le profil » : petite pastille discrète (profil perso). */
+  .pf-actions .btn-ghost {
+    width: auto;
+    padding: 0.38rem 0.85rem;
+    font-size: 0.8rem;
+    border-radius: 999px;
+    color: var(--text-soft);
+    background: transparent;
+  }
+
+  /* « Suivre » (profil d'un autre) reste un CTA pleine largeur bien visible. */
   .pf-actions .follow-btn {
     width: 100%;
     justify-content: center;
