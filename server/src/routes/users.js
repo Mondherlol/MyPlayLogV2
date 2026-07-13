@@ -310,6 +310,36 @@ router.delete("/me/psn", requireAuth, async (req, res) => {
   }
 });
 
+// --- Clé API C411 personnelle (onglet Pack HD) ---
+// Renvoyée uniquement à son propriétaire (jamais dans un profil public), sert
+// au client à construire le lien .torrent avec le passkey de l'utilisateur.
+router.get("/me/c411", requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select("+c411Key");
+    if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
+    res.json({ key: user.c411Key || "" });
+  } catch (err) {
+    console.error("c411 key get error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// Enregistre / remplace / efface (clé vide) la clé API C411.
+router.put("/me/c411", requireAuth, async (req, res) => {
+  try {
+    const raw = String(req.body?.key ?? "").trim().slice(0, 128);
+    // Une clé C411 est un jeton hexadécimal ; on refuse tout ce qui n'y
+    // ressemble pas (mais on autorise la chaîne vide = suppression).
+    if (raw && !/^[a-f0-9]{16,128}$/i.test(raw))
+      return res.status(400).json({ error: "Clé API C411 invalide." });
+    await User.updateOne({ _id: req.userId }, { $set: { c411Key: raw || null } });
+    res.json({ key: raw, hasKey: !!raw });
+  } catch (err) {
+    console.error("c411 key set error:", err.message);
+    res.status(500).json({ error: "Erreur lors de l'enregistrement." });
+  }
+});
+
 // --- Upload de la photo de profil ---
 router.post("/me/avatar", requireAuth, upload.single("avatar"), async (req, res) => {
   try {

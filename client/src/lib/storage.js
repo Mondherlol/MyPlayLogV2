@@ -5,7 +5,7 @@
 // régénérables puis on retente une fois.
 
 // Clés préservées lors d'une purge d'urgence : petites et importantes.
-const KEEP = new Set(["mpl_token", "mpl_theme", "mpl_sidebar", "mpl_c411_key"]);
+const KEEP = new Set(["mpl_token", "mpl_theme", "mpl_sidebar"]);
 
 // Supprime les entrées régénérables du localStorage. `extraKeep` protège en
 // plus la clé qu'on est justement en train d'écrire. Renvoie le nb de clés ôtées.

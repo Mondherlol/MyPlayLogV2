@@ -1328,38 +1328,56 @@ function shortMonth(s) {
 // --- Bloc « Pack HD » : torrents C411 correspondant au jeu (chargé à la
 // demande), regroupés par plateforme, triables par seeders ou par poids.
 // Chaque résultat = jaquette + titre + poids + seeders + lien page/.torrent. ---
-const C411_KEY_LS = "mpl_c411_key";
-
 function HdPacksBlock({ gameId, token }) {
   const [state, setState] = useState({ loading: true, data: null, error: false });
   // Tri : critère (seeders | size) + sens (desc | asc). Défaut : + seedés.
   const [sort, setSort] = useState({ by: "seeders", dir: "desc" });
-  // Clé API C411 PERSONNELLE de l'utilisateur (localStorage, jamais envoyée au
-  // serveur). Sans elle, on ne propose QUE le lien vers la page C411 : le
-  // téléchargement direct .torrent embarquerait un passkey → ratio de ce compte.
-  const [c411Key, setC411Key] = useState(
-    () => (typeof localStorage !== "undefined" && localStorage.getItem(C411_KEY_LS)) || ""
-  );
+  // Clé API C411 PERSONNELLE, enregistrée sur le COMPTE de l'utilisateur (jamais
+  // sur un profil public). Sans elle, on ne propose QUE le lien vers la page
+  // C411 : le .torrent direct embarquerait un passkey → ratio de ce compte.
+  const [c411Key, setC411Key] = useState("");
   const [keyOpen, setKeyOpen] = useState(false);
   const [keyDraft, setKeyDraft] = useState("");
+  const [keyBusy, setKeyBusy] = useState(false);
+  const [keyErr, setKeyErr] = useState("");
+  // Plateforme active (mini-onglets). null = auto (1re plateforme la + seedée).
+  const [activePlat, setActivePlat] = useState(null);
 
+  // Charge la clé du compte (seulement si connecté).
+  useEffect(() => {
+    if (!token) return;
+    let alive = true;
+    apiFetch(`/users/me/c411`, { token })
+      .then((d) => alive && setC411Key(d.key || ""))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [token]);
+
+  const persistKey = async (k) => {
+    setKeyBusy(true);
+    setKeyErr("");
+    try {
+      const d = await apiFetch(`/users/me/c411`, {
+        method: "PUT",
+        token,
+        body: { key: k },
+      });
+      setC411Key(d.key || "");
+      setKeyOpen(false);
+      setKeyDraft("");
+    } catch (e) {
+      setKeyErr(e?.message || "Clé invalide.");
+    } finally {
+      setKeyBusy(false);
+    }
+  };
   const saveKey = () => {
     const k = keyDraft.trim();
-    if (!k) return;
-    safeSetItem(C411_KEY_LS, k);
-    setC411Key(k);
-    setKeyOpen(false);
-    setKeyDraft("");
+    if (k) persistKey(k);
   };
-  const clearKey = () => {
-    try {
-      localStorage.removeItem(C411_KEY_LS);
-    } catch {
-      /* ignore */
-    }
-    setC411Key("");
-    setKeyOpen(false);
-  };
+  const clearKey = () => persistKey("");
   // URL .torrent construite avec la clé PERSO — seulement si elle est saisie.
   const dlUrl = (p) =>
     c411Key && p.id
@@ -1403,6 +1421,10 @@ function HdPacksBlock({ gameId, token }) {
     }))
     .sort((a, b) => b.seed - a.seed);
 
+  // Onglet actif : celui choisi s'il existe encore, sinon le plus seedé.
+  const activeGroup =
+    groupList.find((g) => g.plat === activePlat) || groupList[0] || null;
+
   const SortBtn = ({ by, label }) => (
     <button
       className={`gp-hd-sortbtn clickable ${sort.by === by ? "active" : ""}`}
@@ -1444,17 +1466,20 @@ function HdPacksBlock({ gameId, token }) {
               <span className="gp-hd-total">
                 {packs.length} pack{packs.length > 1 ? "s" : ""}
               </span>
-              <button
-                className={`gp-hd-keybtn clickable ${c411Key ? "set" : ""}`}
-                onClick={() => {
-                  setKeyDraft(c411Key);
-                  setKeyOpen((v) => !v);
-                }}
-                title="Configurer ta clé API C411 pour le téléchargement direct"
-              >
-                <KeyRound size={13} />
-                {c411Key ? "Clé C411 active" : "Ma clé C411"}
-              </button>
+              {token && (
+                <button
+                  className={`gp-hd-keybtn clickable ${c411Key ? "set" : ""}`}
+                  onClick={() => {
+                    setKeyDraft(c411Key);
+                    setKeyErr("");
+                    setKeyOpen((v) => !v);
+                  }}
+                  title="Configurer ta clé API C411 pour le téléchargement direct"
+                >
+                  <KeyRound size={13} />
+                  {c411Key ? "Clé C411 active" : "Ma clé C411"}
+                </button>
+              )}
             </div>
             <div className="gp-hd-sort">
               <span className="gp-hd-sortlabel">Trier</span>
@@ -1467,8 +1492,9 @@ function HdPacksBlock({ gameId, token }) {
             <div className="gp-hd-keypanel">
               <p className="gp-hd-keyinfo">
                 Colle ta clé API C411 (Profil → API sur c411.org) pour activer le
-                téléchargement direct du .torrent avec <strong>ton</strong> compte.
-                Elle reste sur cet appareil et n'est jamais envoyée à MyPlayLog.
+                téléchargement direct du .torrent avec <strong>ton</strong> compte
+                (ton ratio). Elle est enregistrée sur ton compte MyPlayLog et
+                jamais visible par les autres — tu peux la remplacer quand tu veux.
               </p>
               <div className="gp-hd-keyrow">
                 <input
@@ -1478,94 +1504,111 @@ function HdPacksBlock({ gameId, token }) {
                   value={keyDraft}
                   onChange={(e) => setKeyDraft(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && saveKey()}
+                  disabled={keyBusy}
                   autoFocus
                 />
-                <button className="gp-hd-keysave clickable" onClick={saveKey}>
-                  Enregistrer
+                <button
+                  className="gp-hd-keysave clickable"
+                  onClick={saveKey}
+                  disabled={keyBusy}
+                >
+                  {keyBusy ? "…" : "Enregistrer"}
                 </button>
                 {c411Key && (
                   <button
                     className="gp-hd-keyclear clickable"
                     onClick={clearKey}
+                    disabled={keyBusy}
                     title="Supprimer la clé"
                   >
                     <Trash2 size={14} />
                   </button>
                 )}
               </div>
+              {keyErr && <p className="gp-hd-keyerr">{keyErr}</p>}
             </div>
           )}
 
-          {groupList.map(({ plat, list }) => (
-            <div className="gp-hd-group" key={plat}>
-              <div className="gp-hd-grouphead">
+          {/* Mini-onglets par plateforme */}
+          <div className="gp-hd-tabs" role="tablist">
+            {groupList.map(({ plat, list }) => (
+              <button
+                key={plat}
+                role="tab"
+                aria-selected={activeGroup?.plat === plat}
+                className={`gp-hd-tab clickable ${activeGroup?.plat === plat ? "active" : ""}`}
+                onClick={() => setActivePlat(plat)}
+              >
                 <Gamepad2 size={14} />
                 <span className="gp-hd-platname">{plat}</span>
                 <span className="gp-hd-groupcount">{list.length}</span>
-              </div>
-              <div className="gp-hd-list">
-                {list.map((p, i) => (
-                  <div className="gp-hd-row" key={p.page || p.id || i}>
-                    <div className="gp-hd-cover">
-                      {cover ? (
-                        <img src={cover} alt="" loading="lazy" />
-                      ) : (
-                        <HardDrive size={18} />
+              </button>
+            ))}
+          </div>
+
+          {activeGroup && (
+            <div className="gp-hd-list">
+              {activeGroup.list.map((p, i) => (
+                <div className="gp-hd-row" key={p.page || p.id || i}>
+                  <div className="gp-hd-cover">
+                    {cover ? (
+                      <img src={cover} alt="" loading="lazy" />
+                    ) : (
+                      <HardDrive size={18} />
+                    )}
+                  </div>
+                  <div className="gp-hd-main">
+                    <span className="gp-hd-title" title={p.title}>
+                      {p.title}
+                    </span>
+                    <div className="gp-hd-meta">
+                      {formatSize(p.size) && (
+                        <span className="gp-hd-badge">
+                          <HardDrive size={11} /> {formatSize(p.size)}
+                        </span>
                       )}
-                    </div>
-                    <div className="gp-hd-main">
-                      <span className="gp-hd-title" title={p.title}>
-                        {p.title}
-                      </span>
-                      <div className="gp-hd-meta">
-                        {formatSize(p.size) && (
-                          <span className="gp-hd-badge">
-                            <HardDrive size={11} /> {formatSize(p.size)}
-                          </span>
-                        )}
-                        {p.seeders != null && (
-                          <span
-                            className={`gp-hd-badge seed ${p.seeders === 0 ? "dead" : ""}`}
-                          >
-                            <Users2 size={11} /> {p.seeders}
-                          </span>
-                        )}
-                        {shortMonth(p.pubDate) && (
-                          <span className="gp-hd-age">{shortMonth(p.pubDate)}</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="gp-hd-actions">
-                      {dlUrl(p) && (
-                        <a
-                          href={dlUrl(p)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="gp-hd-dl clickable"
-                          title="Télécharger le .torrent avec ta clé C411"
+                      {p.seeders != null && (
+                        <span
+                          className={`gp-hd-badge seed ${p.seeders === 0 ? "dead" : ""}`}
                         >
-                          <Magnet size={14} />
-                          <span>.torrent</span>
-                        </a>
+                          <Users2 size={11} /> {p.seeders}
+                        </span>
                       )}
-                      {p.page && (
-                        <a
-                          href={p.page}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="gp-hd-page clickable"
-                          title="Voir sur C411"
-                        >
-                          <ExternalLink size={13} />
-                          <span>C411</span>
-                        </a>
+                      {shortMonth(p.pubDate) && (
+                        <span className="gp-hd-age">{shortMonth(p.pubDate)}</span>
                       )}
                     </div>
                   </div>
-                ))}
-              </div>
+                  <div className="gp-hd-actions">
+                    {dlUrl(p) && (
+                      <a
+                        href={dlUrl(p)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="gp-hd-dl clickable"
+                        title="Télécharger le .torrent avec ta clé C411"
+                      >
+                        <Magnet size={14} />
+                        <span>.torrent</span>
+                      </a>
+                    )}
+                    {p.page && (
+                      <a
+                        href={p.page}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="gp-hd-page clickable"
+                        title="Voir sur C411"
+                      >
+                        <ExternalLink size={13} />
+                        <span>C411</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </>
       )}
     </section>

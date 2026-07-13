@@ -5582,27 +5582,47 @@
   color: var(--accent-ink);
 }
 
-.gp-hd-group {
-  margin-bottom: 1.4rem;
+/* Mini-onglets par plateforme */
+.gp-hd-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
 }
 
-.gp-hd-grouphead {
+.gp-hd-tab {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.3rem 0.7rem 0.3rem 0.6rem;
-  margin-bottom: 0.7rem;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
   border-radius: 999px;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  color: var(--text);
+  color: var(--text-soft);
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 0.86rem;
+  font-size: 0.84rem;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
-.gp-hd-grouphead svg {
+.gp-hd-tab:hover {
+  border-color: var(--orange);
+  color: var(--text);
+}
+
+.gp-hd-tab.active {
+  background: var(--accent-grad);
+  border-color: transparent;
+  color: #1a1204;
+}
+
+.gp-hd-tab svg {
   color: var(--accent-ink);
+}
+
+.gp-hd-tab.active svg {
+  color: #1a1204;
 }
 
 .gp-hd-groupcount {
@@ -5613,10 +5633,17 @@
   height: 1.3rem;
   padding: 0 0.35rem;
   border-radius: 999px;
-  background: var(--accent-grad);
-  color: #1a1204;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
   font-size: 0.72rem;
   font-weight: 800;
+}
+
+.gp-hd-tab.active .gp-hd-groupcount {
+  background: rgba(26, 18, 4, 0.18);
+  border-color: transparent;
+  color: #1a1204;
 }
 
 .gp-hd-list {
@@ -5866,6 +5893,18 @@
 
 .gp-hd-keyclear:hover {
   border-color: rgba(224, 72, 63, 0.5);
+}
+
+.gp-hd-keyclear:disabled,
+.gp-hd-keysave:disabled {
+  opacity: 0.55;
+}
+
+.gp-hd-keyerr {
+  margin: 0.6rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #c0392b;
 }
 
 @media (max-width: 560px) {
