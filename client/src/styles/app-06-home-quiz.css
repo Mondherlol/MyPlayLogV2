@@ -4993,6 +4993,9 @@
   -webkit-backdrop-filter: saturate(140%) blur(10px);
   overflow-x: auto;
   scrollbar-width: none;
+  /* Empêche la sélection de texte qui rendait le drag saccadé sur les onglets. */
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .gp-tabs::-webkit-scrollbar {
@@ -5031,9 +5034,11 @@
   .gp-tabs {
     cursor: grab;
   }
-  .gp-tabs.dragging {
+  /* Pendant le drag, le curseur « poing fermé » l'emporte partout (y compris
+     au-dessus des onglets, qui ont normalement un curseur pointer). */
+  .gp-tabs.dragging,
+  .gp-tabs.dragging .gp-tab {
     cursor: grabbing;
-    user-select: none;
   }
   .gp-tabs-arrow.show {
     display: inline-flex;
@@ -15009,6 +15014,102 @@
 .hf-status-badge.st-follow {
   background: color-mix(in srgb, var(--orange) 14%, transparent);
   color: var(--accent-ink);
+}
+
+/* ============================================================
+   Délit de téléchargement — card moqueuse du fil
+   ============================================================ */
+.hf-status-badge.st-download {
+  background: rgba(230, 74, 74, 0.12);
+  color: #d65454;
+}
+
+/* La source (« C411 », « FitGirl »…) mise en évidence dans la phrase */
+b.hf-dl-src {
+  font-weight: 800;
+  color: var(--accent-ink);
+}
+
+.hf-dl-body {
+  display: flex;
+  gap: 0.9rem;
+  align-items: center;
+  text-decoration: none;
+}
+
+.hf-download .hf-cover {
+  width: 58px;
+}
+
+.hf-dl-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  min-width: 0;
+}
+
+.hf-dl-name {
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.hf-dl-body:hover .hf-dl-name {
+  color: var(--accent-ink);
+}
+
+.hf-dl-caught {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+/* Rangée des réactions moqueuses */
+.hf-dl-reacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+
+.hf-dl-react {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.42rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: transform 0.12s ease, background 0.15s ease, color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.hf-dl-react:hover {
+  color: var(--dl-c);
+  border-color: color-mix(in srgb, var(--dl-c) 45%, transparent);
+  background: color-mix(in srgb, var(--dl-c) 8%, var(--surface-2));
+  transform: translateY(-1px);
+}
+
+.hf-dl-react:active {
+  transform: scale(0.94) rotate(-3deg);
+}
+
+.hf-dl-react.on {
+  color: #fff;
+  background: var(--dl-c);
+  border-color: var(--dl-c);
+}
+
+.hf-dl-react-n {
+  font-weight: 800;
+  font-size: 0.76rem;
+  padding-left: 0.1rem;
 }
 
 /* Chip de statut contextuel (quand le verbe principal est autre chose) */

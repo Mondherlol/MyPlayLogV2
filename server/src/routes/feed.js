@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import User from "../models/User.js";
 import UserGame from "../models/UserGame.js";
 import Repost from "../models/Repost.js";
+import Download from "../models/Download.js";
 import Documentary from "../models/Documentary.js";
 import Activity from "../models/Activity.js";
 import GemDiscovery from "../models/GemDiscovery.js";
@@ -107,7 +108,8 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
   // quand une seule source remplit exactement la page (ex. onglet Médias).
   const cap = limit + 1;
 
-  const [reposts, docs, watched, liked, commented, later, acts, gems] = await Promise.all([
+  const [reposts, docs, watched, liked, commented, later, acts, gems, downloads] =
+    await Promise.all([
     Repost.find({ user: userScope, ...lt("createdAt") })
       .sort({ createdAt: -1 })
       .limit(cap)
@@ -185,6 +187,14 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
       ? Promise.resolve([])
       : GemDiscovery.find({ user: userScope, ...lt("updatedAt") })
           .sort({ updatedAt: -1 })
+          .limit(cap)
+          .populate("user", "username avatar")
+          .lean(),
+    // Délits de téléchargement (cf. models/Download.js) — card moqueuse du fil.
+    !wantAll
+      ? Promise.resolve([])
+      : Download.find({ user: userScope, ...lt("createdAt") })
+          .sort({ createdAt: -1 })
           .limit(cap)
           .populate("user", "username avatar")
           .lean(),
@@ -683,6 +693,30 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
       })),
       gameCount: (g.games || []).length,
       count: g.count || 1,
+    });
+  }
+
+  // --- Délits de téléchargement : « X a téléchargé Y depuis Z » + réactions
+  //     moqueuses (huer / jeter une tomate / traiter de monstre). ---
+  for (const d of downloads) {
+    if (!d.user) continue;
+    const counts = { boo: 0, tomato: 0, monster: 0 };
+    const mine = [];
+    for (const r of d.reactions || []) {
+      if (counts[r.type] != null) counts[r.type]++;
+      if (String(r.user) === String(req.userId)) mine.push(r.type);
+    }
+    events.push({
+      type: "download",
+      id: `dl-${d._id}`,
+      date: d.createdAt,
+      user: person(d.user),
+      source: d.source,
+      variant: d.variant || 0,
+      game: { id: d.gameId, name: d.gameName, cover: d.gameCover || null },
+      downloadId: String(d._id),
+      reactions: counts,
+      myReactions: mine,
     });
   }
 

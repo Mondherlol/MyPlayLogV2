@@ -44,6 +44,10 @@ import {
   Trophy,
   Swords,
   Music2,
+  Download,
+  Megaphone,
+  Cherry,
+  Skull,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { timeAgo, fmtDuration } from "../lib/lists";
@@ -137,6 +141,7 @@ export function FeedCard(props) {
     return <VideoActivityEvent {...props} item={{ ...item, kind: "watch" }} />;
   if (item.type === "videowatchgroup")
     return <VideoActivityGroupEvent {...props} item={{ ...item, kind: "watch" }} />;
+  if (item.type === "download") return <DownloadEvent {...props} />;
   if (item.type === "gems") return <GemsEvent {...props} />;
   if (item.type === "blindtest") return <BlindTestEvent {...props} />;
   if (item.type === "blindtestgroup") return <BlindTestGroupEvent {...props} />;
@@ -1177,6 +1182,130 @@ function RepostEvent({ item, me, onLike, onComments, onRepost, onOpenImage, onRe
             <span>{r.repostedByMe ? "Republié" : "Republier"}</span>
           </button>
         )}
+      </div>
+    </article>
+  );
+}
+
+// ============================================================
+//  Délit de téléchargement — « X a téléchargé Y depuis Z » (card moqueuse)
+// ============================================================
+
+// Textes rigolos (partie APRÈS le pseudo — cf. EventHead). Le serveur fige une
+// variante par délit (Download.variant) pour que la phrase reste stable.
+const DOWNLOAD_TEXTS = [
+  (g, src) => <>a téléchargé {g} depuis {src} comme un malpropre</>,
+  (g, src) => <>a « acquis gratuitement » {g} sur {src}</>,
+  (g, src) => <>vient de pirater {g} depuis {src}, le fourbe</>,
+  (g, src) => <>a discrètement récupéré {g} sur {src}</>,
+  (g, src) => <>n'a pas payé {g}… merci {src} !</>,
+  (g, src) => <>a fait chauffer le torrent de {g} sur {src}</>,
+  (g, src) => <>a « sauvegardé pour plus tard » {g} depuis {src}</>,
+  (g, src) => <>a ajouté {g} à sa collection… gracieusement, via {src}</>,
+];
+
+// Réactions moqueuses (toggles indépendants) — endpoint /downloads/:id/react.
+const DL_REACTIONS = [
+  { key: "boo", label: "Huez le", Icon: Megaphone, color: "#e0483f" },
+  { key: "tomato", label: "Lui jeter une tomate", Icon: Cherry, color: "#d63a3a" },
+  { key: "monster", label: "T'es un monstre !", Icon: Skull, color: "#7b61ff" },
+];
+
+function DownloadEvent({ item, token }) {
+  const g = item.game;
+  const gameUrl = `/game/${g.id}?tab=patches`;
+  const [counts, setCounts] = useState(
+    item.reactions || { boo: 0, tomato: 0, monster: 0 }
+  );
+  const [mine, setMine] = useState(item.myReactions || []);
+  const [busy, setBusy] = useState(false);
+
+  const template = DOWNLOAD_TEXTS[(item.variant || 0) % DOWNLOAD_TEXTS.length];
+  const gameLink = (
+    <Link to={gameUrl} className="hf-game-link clickable">
+      {g.name}
+    </Link>
+  );
+
+  async function react(type) {
+    if (!token || busy) return;
+    const had = mine.includes(type);
+    setMine((m) => (had ? m.filter((t) => t !== type) : [...m, type]));
+    setCounts((c) => ({
+      ...c,
+      [type]: Math.max(0, (c[type] || 0) + (had ? -1 : 1)),
+    }));
+    setBusy(true);
+    try {
+      const d = await apiFetch(`/downloads/${item.downloadId}/react`, {
+        method: "POST",
+        token,
+        body: { type },
+      });
+      setCounts(d.counts);
+      setMine(d.mine);
+    } catch {
+      // Rollback en cas d'échec réseau.
+      setMine((m) => (had ? [...m, type] : m.filter((t) => t !== type)));
+      setCounts((c) => ({
+        ...c,
+        [type]: Math.max(0, (c[type] || 0) + (had ? 1 : -1)),
+      }));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <article className="hf-card hf-download">
+      <EventHead
+        user={item.user}
+        date={item.date}
+        badge={
+          <span className="hf-status-badge st-download">
+            <Download size={13} />
+          </span>
+        }
+      >
+        {template(gameLink, <b className="hf-dl-src">{item.source}</b>)}
+      </EventHead>
+
+      <Link to={gameUrl} className="hf-dl-body clickable">
+        <div className="hf-cover">
+          {g.cover ? (
+            <img src={g.cover} alt={g.name} loading="lazy" draggable="false" />
+          ) : (
+            <span className="hf-cover-ph">
+              <Gamepad2 size={20} />
+            </span>
+          )}
+        </div>
+        <div className="hf-dl-info">
+          <span className="hf-dl-name">{g.name}</span>
+          <span className="hf-dl-caught">
+            <Download size={12} /> Butin récupéré depuis {item.source}
+          </span>
+        </div>
+      </Link>
+
+      <div className="hf-dl-reacts" role="group" aria-label="Réagir au délit">
+        {DL_REACTIONS.map((rc) => {
+          const on = mine.includes(rc.key);
+          const n = counts[rc.key] || 0;
+          return (
+            <button
+              key={rc.key}
+              className={`hf-dl-react clickable ${on ? "on" : ""}`}
+              style={{ "--dl-c": rc.color }}
+              onClick={() => react(rc.key)}
+              title={rc.label}
+            >
+              <rc.Icon size={15} fill={on ? "currentColor" : "none"} />
+              <span>{rc.label}</span>
+              {n > 0 && <b className="hf-dl-react-n">{n}</b>}
+            </button>
+          );
+        })}
       </div>
     </article>
   );

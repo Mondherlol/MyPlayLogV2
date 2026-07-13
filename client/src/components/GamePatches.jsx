@@ -26,6 +26,17 @@ import { makeCache } from "../lib/cache";
 // Patchs/mods : cache mémoire + localStorage (appels VNDB coûteux). TTL 30 min.
 const patchCache = makeCache("mpl_patch_", 30 * 60 * 1000);
 
+// Journalise un « délit de téléchargement » (fil d'actualité, card moqueuse).
+// Best-effort : silencieux, ne bloque jamais le vrai téléchargement.
+function logDownload(gameId, token, game, source) {
+  if (!token || !game?.name) return;
+  apiFetch("/downloads", {
+    method: "POST",
+    token,
+    body: { gameId, gameName: game.name, gameCover: game.cover || null, source },
+  }).catch(() => {});
+}
+
 // En-tête compact d'un bloc : icône + titre + court indice (remplace les longs
 // paragraphes d'intro par une seule ligne discrète alignée à droite).
 function BlockHead({ Icon, title, hint, children }) {
@@ -78,7 +89,7 @@ function shortMonth(s) {
 
 // Détail d'un patch FR Switch (nxbrew) : sections Base / Update / DLC, chaque
 // hébergeur donnant un ou plusieurs liens (via le raccourcisseur ouo.io).
-function SwitchPatch({ patch }) {
+function SwitchPatch({ patch, onDownload }) {
   return (
     <div className="gp-swpatch">
       <div className="gp-swpatch-head">
@@ -112,6 +123,7 @@ function SwitchPatch({ patch }) {
                   rel="noreferrer"
                   className="gp-patch-dl clickable"
                   title={`${h.host} — ${sec.label}`}
+                  onClick={onDownload}
                 >
                   <Download size={14} /> {h.host}
                   {h.links.length > 1 ? ` #${i + 1}` : ""}
@@ -128,7 +140,7 @@ function SwitchPatch({ patch }) {
 // Bloc « Patch FR Switch » : affiche le patch poussé par l'app locale, ou un
 // bouton « Demander » (le scraping se fait hors serveur, sur une machine à IP
 // résidentielle). Une demande sur un jeu déjà pourvu vaut demande de MAJ.
-function SwitchPatchBlock({ data, gameId, token }) {
+function SwitchPatchBlock({ data, gameId, token, game }) {
   const [requested, setRequested] = useState(!!data.switchPatchRequested);
   const [busy, setBusy] = useState(false);
 
@@ -167,7 +179,10 @@ function SwitchPatchBlock({ data, gameId, token }) {
       <BlockHead Icon={Gamepad2} title="Téléchargement NxBrew" hint= "Liens directs · Jeux Switch " />
       {data.switchPatch ? (
         <>
-          <SwitchPatch patch={data.switchPatch} />
+          <SwitchPatch
+            patch={data.switchPatch}
+            onDownload={() => logDownload(gameId, token, game, "NxBrew")}
+          />
           <div className="gp-patch-askrow">{askBtn("Demander une mise à jour")}</div>
         </>
       ) : (
@@ -184,7 +199,7 @@ function SwitchPatchBlock({ data, gameId, token }) {
 // --- Bloc « Pack HD » : torrents C411 correspondant au jeu (chargé à la
 // demande), regroupés par plateforme, triables par seeders ou par poids.
 // Chaque résultat = jaquette + titre + poids + seeders + lien page/.torrent. ---
-function HdPacksBlock({ gameId, token }) {
+function HdPacksBlock({ gameId, token, game }) {
   const [state, setState] = useState({ loading: true, data: null, error: false });
   // Tri : critère (seeders | size) + sens (desc | asc). Défaut : + seedés.
   const [sort, setSort] = useState({ by: "seeders", dir: "desc" });
@@ -242,6 +257,7 @@ function HdPacksBlock({ gameId, token }) {
   const downloadTorrent = async (p) => {
     if (!p.id || dling) return;
     setDling(p.id);
+    logDownload(gameId, token, game, "C411");
     try {
       const res = await fetch(`${API_BASE}/games/${gameId}/hd-packs/${p.id}/torrent`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -484,6 +500,7 @@ function HdPacksBlock({ gameId, token }) {
                         rel="noreferrer"
                         className="gp-hd-page clickable"
                         title="Voir sur C411"
+                        onClick={() => logDownload(gameId, token, game, "C411")}
                       >
                         <ExternalLink size={13} />
                         <span>C411</span>
@@ -503,7 +520,7 @@ function HdPacksBlock({ gameId, token }) {
 // --- Bloc « Téléchargement FitGirl » : repacks FitGirl du jeu (jeux PC), chargés
 // à la demande. Chaque repack = titre + poids repack/original + lien magnet +
 // lien vers la page FitGirl. Rendu uniquement pour les jeux PC (data.isPc). ---
-function FitGirlBlock({ gameId, token }) {
+function FitGirlBlock({ gameId, token, game }) {
   const [state, setState] = useState({ loading: true, data: null, error: false });
 
   useEffect(() => {
@@ -565,6 +582,7 @@ function FitGirlBlock({ gameId, token }) {
                     href={r.magnet}
                     className="gp-hd-dl clickable"
                     title="Ouvrir le lien magnet dans ton client torrent"
+                    onClick={() => logDownload(gameId, token, game, "FitGirl")}
                   >
                     <Magnet size={14} />
                     <span>Magnet</span>
@@ -577,6 +595,7 @@ function FitGirlBlock({ gameId, token }) {
                     rel="noreferrer"
                     className="gp-hd-page clickable"
                     title="Voir sur FitGirl Repacks"
+                    onClick={() => logDownload(gameId, token, game, "FitGirl")}
                   >
                     <ExternalLink size={13} />
                     <span>FitGirl</span>
@@ -594,7 +613,7 @@ function FitGirlBlock({ gameId, token }) {
 // --- Onglet Patchs : Pack HD (C411) + patch FR Switch (nxbrew) + repacks FitGirl
 // (PC) + fan-traduction FR des visual novels non traduits (VNDB) + liens de
 // recherche de mods. ---
-export default function GamePatches({ gameId, token }) {
+export default function GamePatches({ gameId, token, game = null }) {
   const cached = patchCache.get(String(gameId));
   const [loading, setLoading] = useState(!cached);
   const [data, setData] = useState(cached?.data || null);
@@ -645,13 +664,15 @@ export default function GamePatches({ gameId, token }) {
   return (
     <div className="gp-patches">
       {/* Pack HD (torrents C411) — pour tout jeu, toujours en premier */}
-      <HdPacksBlock gameId={gameId} token={token} />
+      <HdPacksBlock gameId={gameId} token={token} game={game} />
 
       {/* Patch FR Switch (nxbrew.net) — seulement si jeu Switch */}
-      {data.isSwitch && <SwitchPatchBlock data={data} gameId={gameId} token={token} />}
+      {data.isSwitch && (
+        <SwitchPatchBlock data={data} gameId={gameId} token={token} game={game} />
+      )}
 
       {/* Repacks FitGirl — seulement si jeu PC */}
-      {data.isPc && <FitGirlBlock gameId={gameId} token={token} />}
+      {data.isPc && <FitGirlBlock gameId={gameId} token={token} game={game} />}
 
       {/* Traduction FR (visual novels sans version française) */}
       {vn !== null && (
@@ -694,6 +715,7 @@ export default function GamePatches({ gameId, token }) {
                         rel="noreferrer"
                         className="gp-patch-dl clickable"
                         title={l.label}
+                        onClick={() => logDownload(gameId, token, game, "une traduction FR")}
                       >
                         <Download size={14} /> {l.label}
                       </a>

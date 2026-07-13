@@ -322,22 +322,39 @@ export default function GamePage() {
     setTabScroll((s) => (s.left === left && s.right === right ? s : { left, right }));
   };
 
-  // Écoute le scroll (natif ou par flèches) + le resize, et gère le drag-to-scroll
-  // à la souris. Le scroll tactile reste natif (overflow-x) → on ne touche qu'à
-  // la souris ici pour ne pas casser le défilement au doigt.
+  // Recalcule les flèches à chaque changement de taille (contenu, polices, resize
+  // fenêtre) ET au scroll. Un ResizeObserver garantit une 1re mesure une fois la
+  // barre réellement mise en page (sinon les flèches manquent au chargement).
   useEffect(() => {
     const el = tabsNavRef.current;
     if (!el) return;
-    updateTabArrows();
-    const onScroll = () => updateTabArrows();
-    el.addEventListener("scroll", onScroll, { passive: true });
+    const ro = new ResizeObserver(() => updateTabArrows());
+    ro.observe(el);
+    const raf = requestAnimationFrame(updateTabArrows);
+    el.addEventListener("scroll", updateTabArrows, { passive: true });
     window.addEventListener("resize", updateTabArrows);
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(raf);
+      el.removeEventListener("scroll", updateTabArrows);
+      window.removeEventListener("resize", updateTabArrows);
+    };
+  }, []);
+
+  // Drag-to-scroll de la barre d'onglets (SOURIS uniquement — le tactile garde le
+  // scroll natif via overflow-x). On écoute pointermove/up sur window pour suivre
+  // le drag même quand le curseur passe sur un onglet ou sort de la barre. Pas de
+  // pointer capture : elle retargette le `click` vers la <nav> et casserait le
+  // clic natif des onglets. Le vrai souci du drag « qui ne marchait qu'entre les
+  // noms » était la sélection de texte, désormais coupée en CSS (user-select).
+  useEffect(() => {
+    const el = tabsNavRef.current;
+    if (!el) return;
     const onMove = (e) => {
       if (!tabDrag.current.down) return;
-      const dx = e.pageX - tabDrag.current.startX;
+      const dx = e.clientX - tabDrag.current.startX;
       if (Math.abs(dx) > 4) tabDrag.current.moved = true;
       el.scrollLeft = tabDrag.current.startScroll - dx;
-      e.preventDefault();
     };
     const onUp = () => {
       if (!tabDrag.current.down) return;
@@ -346,24 +363,22 @@ export default function GamePage() {
       // Laisse le clic suivant s'annuler s'il y a eu un drag.
       setTimeout(() => (tabDrag.current.moved = false), 0);
     };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
     return () => {
-      el.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", updateTabArrows);
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
     };
   }, []);
 
-  function onTabsDown(e) {
-    if (e.button !== 0) return; // clic gauche uniquement
+  function onTabsPointerDown(e) {
+    if (e.pointerType !== "mouse" || e.button !== 0) return;
     const el = tabsNavRef.current;
     if (!el) return;
     tabDrag.current = {
       down: true,
       moved: false,
-      startX: e.pageX,
+      startX: e.clientX,
       startScroll: el.scrollLeft,
     };
     el.classList.add("dragging");
@@ -877,8 +892,9 @@ export default function GamePage() {
               <nav
                 className="gp-tabs"
                 ref={tabsNavRef}
-                onMouseDown={onTabsDown}
+                onPointerDown={onTabsPointerDown}
                 onClickCapture={onTabsClickCapture}
+                onDragStart={(e) => e.preventDefault()}
               >
                 {tabs.map((t) => (
                   <button
@@ -969,7 +985,12 @@ export default function GamePage() {
             )}
 
             {tab === "patches" && (
-              <GamePatches key={id} gameId={id} token={token} />
+              <GamePatches
+                key={id}
+                gameId={id}
+                token={token}
+                game={{ name: game.name, cover }}
+              />
             )}
             </div>
           </div>
