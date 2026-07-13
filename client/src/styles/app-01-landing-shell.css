@@ -1561,6 +1561,10 @@
   background: #a879ff;
 }
 
+.notif-type.t-download_react {
+  background: #d65454;
+}
+
 .notif-body {
   display: flex;
   flex-direction: column;

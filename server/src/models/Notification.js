@@ -28,6 +28,7 @@ const notificationSchema = new mongoose.Schema(
         "recommendation", // on t'a recommandé un jeu
         "recommendation_boost", // on a fait +1 sur une reco que tu as faite
         "recommendation_comment", // on a commenté une reco (reçue/faite)
+        "download_react", // on s'est moqué de ton délit de téléchargement
       ],
       required: true,
     },

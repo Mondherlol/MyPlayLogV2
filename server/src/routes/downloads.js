@@ -1,12 +1,19 @@
 import { Router } from "express";
 import Download from "../models/Download.js";
 import { requireAuth } from "../middleware/auth.js";
+import { notify } from "../lib/notify.js";
 
 // Journal humoristique des « délits de téléchargement » (cf. models/Download.js) :
 // alimente la card moqueuse du fil d'actualité.
 const router = Router();
 
 const REACTION_TYPES = ["boo", "tomato", "monster"];
+// Message (2e ligne de la notif) selon la moquerie reçue.
+const REACT_SNIPPET = {
+  boo: "Hou ! Hou ! Tu t'es fait huer.",
+  tomato: "Splatch ! Une tomate pourrie en pleine tête.",
+  monster: "Tu es officiellement déclaré monstre.",
+};
 // Nombre de textes rigolos côté client (client/src/components/FeedCards.jsx) :
 // on tire une variante à la création pour que la phrase reste stable.
 const VARIANTS = 8;
@@ -70,8 +77,21 @@ router.post("/:id/react", requireAuth, async (req, res) => {
     const idx = doc.reactions.findIndex(
       (r) => String(r.user) === me && r.type === type
     );
-    if (idx >= 0) doc.reactions.splice(idx, 1);
-    else doc.reactions.push({ user: req.userId, type });
+    if (idx >= 0) {
+      doc.reactions.splice(idx, 1);
+    } else {
+      doc.reactions.push({ user: req.userId, type });
+      // Notifie le coupable qu'on se moque de son téléchargement (best-effort,
+      // jamais d'auto-notif — géré dans notify()).
+      notify({
+        user: doc.user,
+        type: "download_react",
+        actor: req.userId,
+        game: doc.gameId,
+        gameName: doc.gameName,
+        snippet: REACT_SNIPPET[type] || "",
+      });
+    }
     await doc.save();
 
     const counts = { boo: 0, tomato: 0, monster: 0 };

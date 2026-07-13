@@ -23,6 +23,7 @@ import {
   Headphones,
   Sun,
   Moon,
+  Megaphone,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
@@ -48,6 +49,7 @@ const NOTIF_META = {
   recommendation: { Icon: Send, verb: "t'a recommandé" },
   recommendation_boost: { Icon: Plus, verb: "a fait +1 sur ta reco de" },
   recommendation_comment: { Icon: MessageSquare, verb: "a commenté la reco de" },
+  download_react: { Icon: Megaphone, verb: "se moque de ton téléchargement de" },
 };
 
 export default function Topbar() {
@@ -187,6 +189,9 @@ export default function Topbar() {
     } else if (n.type?.startsWith("recommendation")) {
       if (n.type === "recommendation" && n.game) navigate(`/game/${n.game}`);
       else navigate("/profile?tab=reco");
+    } else if (n.type === "download_react") {
+      // On se moque de mon délit : mon propre feed (card + avis de recherche).
+      navigate("/profile?tab=feed");
     } else if (n.type?.startsWith("review") && n.game) {
       navigate(`/game/${n.game}?tab=reviews`);
     } else if (n.listId) navigate(`/lists/${n.listId}`);
