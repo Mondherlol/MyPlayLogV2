@@ -1315,14 +1315,13 @@ function PatchesTab({ gameId, token }) {
   const [data, setData] = useState(cached?.data || null);
 
   useEffect(() => {
+    // Vraie logique stale-while-revalidate : on affiche le cache instantanément
+    // s'il existe, MAIS on revalide toujours en arrière-plan. Le patch Switch est
+    // modifiable de l'extérieur (poussé par l'app locale nxbrew-manager) → il ne
+    // faut jamais rester bloqué sur une vieille réponse « aucun patch ».
     const c = patchCache.get(String(gameId));
-    if (c?.fresh) {
-      setData(c.data);
-      setLoading(false);
-      return;
-    }
     let alive = true;
-    if (c) setData(c.data); // périmé : on garde l'affichage pendant la revalidation
+    if (c) setData(c.data); // affiche le cache (frais ou périmé) sans flash
     else setLoading(true);
     apiFetch(`/games/${gameId}/patches`, { token })
       .then((d) => {
