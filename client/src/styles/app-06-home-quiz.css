@@ -5771,6 +5771,11 @@
   box-shadow: 0 4px 14px rgba(242, 183, 11, 0.35);
 }
 
+.gp-hd-dl:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
 .gp-hd-page {
   display: inline-flex;
   align-items: center;
@@ -5905,6 +5910,16 @@
   font-size: 0.8rem;
   font-weight: 600;
   color: #c0392b;
+}
+
+.gp-hd-keylink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--accent-ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 @media (max-width: 560px) {

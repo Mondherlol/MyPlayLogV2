@@ -82,11 +82,12 @@ const userSchema = new mongoose.Schema(
       connectedAt: { type: Date, default: null },
     },
 
-    // --- Clé API C411 personnelle (onglet Pack HD) ---
-    // Permet le téléchargement direct du .torrent avec le compte de
-    // l'utilisateur (son propre passkey/ratio). select:false → jamais renvoyée
-    // par les requêtes par défaut, uniquement via l'endpoint dédié /me/c411.
-    c411Key: { type: String, default: null, select: false },
+    // --- Passkey C411 personnel (onglet Pack HD) ---
+    // Le serveur récupère le .torrent avec sa clé partagée puis réécrit l'URL
+    // d'annonce vers ce passkey → le téléchargement compte sur le ratio de
+    // l'utilisateur. select:false → jamais renvoyé par les requêtes par défaut,
+    // uniquement via l'endpoint dédié /me/c411.
+    c411Passkey: { type: String, default: null, select: false },
 
     // --- Studios / éditeurs favoris ---
     // Épinglés depuis leur page /company/:name, affichés dans l'aperçu du profil.

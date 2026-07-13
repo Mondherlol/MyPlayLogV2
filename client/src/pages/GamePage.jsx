@@ -53,7 +53,7 @@ import {
   KeyRound,
   Trash2,
 } from "lucide-react";
-import { apiFetch, apiUpload } from "../lib/api";
+import { apiFetch, apiUpload, API_BASE } from "../lib/api";
 import { makeCache } from "../lib/cache";
 import { safeSetItem } from "../lib/storage";
 import { useAuth } from "../context/AuthContext";
@@ -1332,43 +1332,44 @@ function HdPacksBlock({ gameId, token }) {
   const [state, setState] = useState({ loading: true, data: null, error: false });
   // Tri : critère (seeders | size) + sens (desc | asc). Défaut : + seedés.
   const [sort, setSort] = useState({ by: "seeders", dir: "desc" });
-  // Clé API C411 PERSONNELLE, enregistrée sur le COMPTE de l'utilisateur (jamais
-  // sur un profil public). Sans elle, on ne propose QUE le lien vers la page
-  // C411 : le .torrent direct embarquerait un passkey → ratio de ce compte.
-  const [c411Key, setC411Key] = useState("");
+  // Passkey C411 PERSONNEL, enregistré sur le COMPTE de l'utilisateur (jamais
+  // sur un profil public). Sans lui, on ne propose QUE le lien vers la page
+  // C411 ; avec lui, le serveur réécrit le .torrent → son ratio.
+  const [passkey, setPasskey] = useState("");
   const [keyOpen, setKeyOpen] = useState(false);
   const [keyDraft, setKeyDraft] = useState("");
   const [keyBusy, setKeyBusy] = useState(false);
   const [keyErr, setKeyErr] = useState("");
+  const [dling, setDling] = useState(null); // id du torrent en cours de DL
   // Plateforme active (mini-onglets). null = auto (1re plateforme la + seedée).
   const [activePlat, setActivePlat] = useState(null);
 
-  // Charge la clé du compte (seulement si connecté).
+  // Charge le passkey du compte (seulement si connecté).
   useEffect(() => {
     if (!token) return;
     let alive = true;
     apiFetch(`/users/me/c411`, { token })
-      .then((d) => alive && setC411Key(d.key || ""))
+      .then((d) => alive && setPasskey(d.passkey || ""))
       .catch(() => {});
     return () => {
       alive = false;
     };
   }, [token]);
 
-  const persistKey = async (k) => {
+  const persistKey = async (pk) => {
     setKeyBusy(true);
     setKeyErr("");
     try {
       const d = await apiFetch(`/users/me/c411`, {
         method: "PUT",
         token,
-        body: { key: k },
+        body: { passkey: pk },
       });
-      setC411Key(d.key || "");
+      setPasskey(d.passkey || "");
       setKeyOpen(false);
       setKeyDraft("");
     } catch (e) {
-      setKeyErr(e?.message || "Clé invalide.");
+      setKeyErr(e?.message || "Passkey invalide.");
     } finally {
       setKeyBusy(false);
     }
@@ -1378,11 +1379,43 @@ function HdPacksBlock({ gameId, token }) {
     if (k) persistKey(k);
   };
   const clearKey = () => persistKey("");
-  // URL .torrent construite avec la clé PERSO — seulement si elle est saisie.
-  const dlUrl = (p) =>
-    c411Key && p.id
-      ? `https://c411.org/api?t=get&id=${p.id}&apikey=${encodeURIComponent(c411Key)}`
-      : null;
+
+  // Télécharge le .torrent réécrit (serveur) → passe par une requête authentifiée
+  // (le header ne peut pas voyager dans un simple <a href>), puis déclenche le
+  // téléchargement du blob côté navigateur.
+  const downloadTorrent = async (p) => {
+    if (!p.id || dling) return;
+    setDling(p.id);
+    try {
+      const res = await fetch(`${API_BASE}/games/${gameId}/hd-packs/${p.id}/torrent`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        let msg = "Téléchargement impossible.";
+        try {
+          msg = (await res.json())?.error || msg;
+        } catch {
+          /* pas de JSON */
+        }
+        throw new Error(msg);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${p.title.slice(0, 120).replace(/[\\/:*?"<>|]+/g, "_")}.torrent`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setKeyErr(e?.message || "Téléchargement impossible.");
+      setKeyOpen(true);
+    } finally {
+      setDling(null);
+    }
+  };
+  const canDl = (p) => passkey && p.id;
 
   useEffect(() => {
     let alive = true;
@@ -1468,16 +1501,16 @@ function HdPacksBlock({ gameId, token }) {
               </span>
               {token && (
                 <button
-                  className={`gp-hd-keybtn clickable ${c411Key ? "set" : ""}`}
+                  className={`gp-hd-keybtn clickable ${passkey ? "set" : ""}`}
                   onClick={() => {
-                    setKeyDraft(c411Key);
+                    setKeyDraft(passkey);
                     setKeyErr("");
                     setKeyOpen((v) => !v);
                   }}
-                  title="Configurer ta clé API C411 pour le téléchargement direct"
+                  title="Configurer ton passkey C411 pour le téléchargement direct"
                 >
                   <KeyRound size={13} />
-                  {c411Key ? "Clé C411 active" : "Ma clé C411"}
+                  {passkey ? "Passkey C411 actif" : "Mon passkey C411"}
                 </button>
               )}
             </div>
@@ -1491,16 +1524,25 @@ function HdPacksBlock({ gameId, token }) {
           {keyOpen && (
             <div className="gp-hd-keypanel">
               <p className="gp-hd-keyinfo">
-                Colle ta clé API C411 (Profil → API sur c411.org) pour activer le
-                téléchargement direct du .torrent avec <strong>ton</strong> compte
-                (ton ratio). Elle est enregistrée sur ton compte MyPlayLog et
-                jamais visible par les autres — tu peux la remplacer quand tu veux.
+                Colle ton passkey C411 pour activer le téléchargement direct du
+                .torrent avec <strong>ton</strong> compte (ton ratio). Récupère-le
+                dans la section « Votre Passkey » sur{" "}
+                <a
+                  href="https://c411.org/user/integrations"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="gp-hd-keylink"
+                >
+                  c411.org/user/integrations <ExternalLink size={11} />
+                </a>
+                . Il est enregistré sur ton compte MyPlayLog, jamais visible par
+                les autres — tu peux le remplacer quand tu veux.
               </p>
               <div className="gp-hd-keyrow">
                 <input
                   type="password"
                   className="gp-hd-keyinput"
-                  placeholder="Clé API C411…"
+                  placeholder="Passkey C411…"
                   value={keyDraft}
                   onChange={(e) => setKeyDraft(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && saveKey()}
@@ -1514,12 +1556,12 @@ function HdPacksBlock({ gameId, token }) {
                 >
                   {keyBusy ? "…" : "Enregistrer"}
                 </button>
-                {c411Key && (
+                {passkey && (
                   <button
                     className="gp-hd-keyclear clickable"
                     onClick={clearKey}
                     disabled={keyBusy}
-                    title="Supprimer la clé"
+                    title="Supprimer le passkey"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -1580,17 +1622,20 @@ function HdPacksBlock({ gameId, token }) {
                     </div>
                   </div>
                   <div className="gp-hd-actions">
-                    {dlUrl(p) && (
-                      <a
-                        href={dlUrl(p)}
-                        target="_blank"
-                        rel="noreferrer"
+                    {canDl(p) && (
+                      <button
                         className="gp-hd-dl clickable"
-                        title="Télécharger le .torrent avec ta clé C411"
+                        onClick={() => downloadTorrent(p)}
+                        disabled={dling === p.id}
+                        title="Télécharger le .torrent avec ton passkey C411"
                       >
-                        <Magnet size={14} />
+                        {dling === p.id ? (
+                          <Loader2 size={14} className="spin" />
+                        ) : (
+                          <Magnet size={14} />
+                        )}
                         <span>.torrent</span>
-                      </a>
+                      </button>
                     )}
                     {p.page && (
                       <a

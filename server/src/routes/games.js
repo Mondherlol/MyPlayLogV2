@@ -26,7 +26,7 @@ import { buildGameFeed, fetchSteamReviews } from "../lib/feed.js";
 import { findVnId, fetchVnCharacters, fetchVnFrPatches } from "../lib/vndb.js";
 import { GENRES_FR, MODES_FR, THEMES_FR, LANGUAGES_FR, frName } from "../lib/translations.js";
 import { ensureScraped, ytPlaylistTracks } from "../lib/ostScrape.js";
-import { fetchC411Packs } from "../lib/c411.js";
+import { fetchC411Packs, fetchC411Torrent, rewriteAnnounce } from "../lib/c411.js";
 
 function youtubeId(url) {
   const m = String(url).match(
@@ -1358,6 +1358,39 @@ router.get("/:id/hd-packs", optionalAuth, async (req, res) => {
   } catch (err) {
     console.error("game hd-packs error:", err.message);
     res.status(err.status || 500).json({ error: err.message || "Erreur." });
+  }
+});
+
+// --- Proxy de téléchargement d'un .torrent C411 réécrit pour le compte de
+// l'utilisateur : on récupère le fichier via notre clé partagée (aucun ratio
+// consommé) puis on remplace l'URL d'annonce par le passkey de l'utilisateur
+// → le leech des données comptera sur SON ratio. Nécessite d'être connecté et
+// d'avoir renseigné son passkey. ---
+router.get("/:id/hd-packs/:torrentId/torrent", requireAuth, async (req, res) => {
+  try {
+    const torrentId = String(req.params.torrentId || "").toLowerCase();
+    if (!/^[a-f0-9]{20,64}$/.test(torrentId))
+      return res.status(400).json({ error: "Torrent invalide." });
+
+    const user = await User.findById(req.userId).select("+c411Passkey");
+    const passkey = user?.c411Passkey;
+    if (!passkey)
+      return res
+        .status(400)
+        .json({ error: "Renseigne d'abord ton passkey C411 dans l'onglet Pack HD." });
+
+    const buf = await fetchC411Torrent(torrentId);
+    const out = rewriteAnnounce(buf, passkey);
+
+    res.setHeader("Content-Type", "application/x-bittorrent");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${torrentId}.torrent"`
+    );
+    res.send(out);
+  } catch (err) {
+    console.error("hd-pack torrent proxy error:", err.message);
+    res.status(err.status || 502).json({ error: err.message || "Erreur." });
   }
 });
 
