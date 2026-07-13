@@ -27,6 +27,7 @@ import { findVnId, fetchVnCharacters, fetchVnFrPatches } from "../lib/vndb.js";
 import { GENRES_FR, MODES_FR, THEMES_FR, LANGUAGES_FR, frName } from "../lib/translations.js";
 import { ensureScraped, ytPlaylistTracks } from "../lib/ostScrape.js";
 import { fetchC411Packs, fetchC411Torrent, rewriteAnnounce } from "../lib/c411.js";
+import { fetchFitgirlRepacks } from "../lib/fitgirl.js";
 
 function youtubeId(url) {
   const m = String(url).match(
@@ -1314,6 +1315,10 @@ router.get("/:id/patches", optionalAuth, async (req, res) => {
         p.id === 130 ||
         (p.id !== 508 && /switch/i.test(p.name || "") && !/switch\s*2/i.test(p.name || ""))
     );
+    // PC Windows (id IGDB 6) → repacks FitGirl (jeux PC uniquement).
+    const isPc = (g.platforms || []).some(
+      (p) => p.id === 6 || /\b(pc|windows)\b/i.test(p.name || "")
+    );
 
     // On n'interroge VNDB que pour un VN pas déjà en FR ; pour tout jeu Switch
     // on lit le patch poussé par l'app locale (même déjà traduit : la version
@@ -1328,6 +1333,7 @@ router.get("/:id/patches", optionalAuth, async (req, res) => {
       isVn,
       hasFr,
       isSwitch,
+      isPc,
       vnPatches, // null si non pertinent (pas un VN, ou déjà dispo en FR)
       switchPatch: sw?.patch || null, // patch poussé par l'app locale, ou null
       switchPatchRequested: !!sw?.requested, // une demande de scrape est en attente
@@ -1360,6 +1366,26 @@ router.get("/:id/hd-packs", optionalAuth, async (req, res) => {
     res.json({ name: g.name, cover, packs });
   } catch (err) {
     console.error("game hd-packs error:", err.message);
+    res.status(err.status || 500).json({ error: err.message || "Erreur." });
+  }
+});
+
+// --- Repacks FitGirl (jeux PC) pour un jeu, chargés à la demande depuis l'onglet
+// Patchs (l'appel externe est lent). Renvoie une liste de repacks avec poids et
+// lien magnet. Le client ne monte ce bloc que pour les jeux PC (data.isPc). ---
+router.get("/:id/fitgirl", optionalAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+
+    const arr = await igdbQuery("games", `fields name; where id = ${id};`);
+    const g = arr[0];
+    if (!g) return res.status(404).json({ error: "Jeu introuvable." });
+
+    const repacks = await fetchFitgirlRepacks(g.name);
+    res.json({ name: g.name, repacks });
+  } catch (err) {
+    console.error("game fitgirl error:", err.message);
     res.status(err.status || 500).json({ error: err.message || "Erreur." });
   }
 });

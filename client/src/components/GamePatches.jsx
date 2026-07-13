@@ -18,6 +18,7 @@ import {
   Send,
   Loader2,
   ShieldCheck,
+  Boxes,
 } from "lucide-react";
 import { apiFetch, API_BASE } from "../lib/api";
 import { makeCache } from "../lib/cache";
@@ -499,8 +500,100 @@ function HdPacksBlock({ gameId, token }) {
   );
 }
 
-// --- Onglet Patchs : Pack HD (C411) + patch FR Switch (nxbrew) + fan-traduction
-// FR des visual novels non traduits (VNDB) + liens de recherche de mods. ---
+// --- Bloc « Téléchargement FitGirl » : repacks FitGirl du jeu (jeux PC), chargés
+// à la demande. Chaque repack = titre + poids repack/original + lien magnet +
+// lien vers la page FitGirl. Rendu uniquement pour les jeux PC (data.isPc). ---
+function FitGirlBlock({ gameId, token }) {
+  const [state, setState] = useState({ loading: true, data: null, error: false });
+
+  useEffect(() => {
+    let alive = true;
+    setState({ loading: true, data: null, error: false });
+    apiFetch(`/games/${gameId}/fitgirl`, { token })
+      .then((d) => alive && setState({ loading: false, data: d, error: false }))
+      .catch(() => alive && setState({ loading: false, data: null, error: true }));
+    return () => {
+      alive = false;
+    };
+  }, [gameId, token]);
+
+  const repacks = state.data?.repacks || [];
+
+  return (
+    <section className="gp-block">
+      <BlockHead Icon={Boxes} title="Téléchargement FitGirl" hint="Repacks · Jeux PC" />
+      {state.loading ? (
+        <PatchSkeleton rows={2} />
+      ) : state.error ? (
+        <div className="gp-troph-empty">
+          <Boxes size={26} />
+          <p className="font-fun">Impossible de charger les repacks pour l'instant.</p>
+        </div>
+      ) : !repacks.length ? (
+        <div className="gp-troph-empty">
+          <Boxes size={26} />
+          <p className="font-fun">Aucun repack FitGirl trouvé pour ce jeu.</p>
+        </div>
+      ) : (
+        <div className="gp-hd-list">
+          {repacks.map((r, i) => (
+            <div className="gp-hd-row" key={r.slug || r.page || i}>
+              <div className="gp-hd-cover">
+                <Boxes size={18} />
+              </div>
+              <div className="gp-hd-main">
+                <span className="gp-hd-title" title={r.title}>
+                  {r.title}
+                </span>
+                <div className="gp-hd-meta">
+                  {r.repackSize && (
+                    <span className="gp-hd-badge">
+                      <HardDrive size={11} /> {r.repackSize}
+                    </span>
+                  )}
+                  {r.originalSize && (
+                    <span className="gp-hd-age">Original {r.originalSize}</span>
+                  )}
+                  {shortMonth(r.date) && (
+                    <span className="gp-hd-age">{shortMonth(r.date)}</span>
+                  )}
+                </div>
+              </div>
+              <div className="gp-hd-actions">
+                {r.magnet && (
+                  <a
+                    href={r.magnet}
+                    className="gp-hd-dl clickable"
+                    title="Ouvrir le lien magnet dans ton client torrent"
+                  >
+                    <Magnet size={14} />
+                    <span>Magnet</span>
+                  </a>
+                )}
+                {r.page && (
+                  <a
+                    href={r.page}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="gp-hd-page clickable"
+                    title="Voir sur FitGirl Repacks"
+                  >
+                    <ExternalLink size={13} />
+                    <span>FitGirl</span>
+                  </a>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// --- Onglet Patchs : Pack HD (C411) + patch FR Switch (nxbrew) + repacks FitGirl
+// (PC) + fan-traduction FR des visual novels non traduits (VNDB) + liens de
+// recherche de mods. ---
 export default function GamePatches({ gameId, token }) {
   const cached = patchCache.get(String(gameId));
   const [loading, setLoading] = useState(!cached);
@@ -556,6 +649,9 @@ export default function GamePatches({ gameId, token }) {
 
       {/* Patch FR Switch (nxbrew.net) — seulement si jeu Switch */}
       {data.isSwitch && <SwitchPatchBlock data={data} gameId={gameId} token={token} />}
+
+      {/* Repacks FitGirl — seulement si jeu PC */}
+      {data.isPc && <FitGirlBlock gameId={gameId} token={token} />}
 
       {/* Traduction FR (visual novels sans version française) */}
       {vn !== null && (
