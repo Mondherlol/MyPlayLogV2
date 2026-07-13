@@ -791,14 +791,16 @@ router.get("/home", requireAuth, async (req, res) => {
 // Première page : stats des reposts en plus (rail latéral de l'onglet Feed).
 router.get("/user/:username", optionalAuth, async (req, res) => {
   try {
-    const u = await User.findOne({ username: req.params.username }).select("_id");
+    const u = await User.findOne({ username: req.params.username }).select("_id avatar");
     if (!u) return res.status(404).json({ error: "Profil introuvable." });
 
     const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 25);
     const before = req.query.before ? new Date(req.query.before) : null;
     const only = req.query.only === "media" ? "media" : null;
 
-    const [events, stats] = await Promise.all([
+    // Rançon (avis de recherche) : nombre de délits de téléchargement × 60 $.
+    // Uniquement sur la première page (rail latéral du profil).
+    const [events, stats, dlCount] = await Promise.all([
       buildTimeline(req, {
         userScope: u._id,
         actorScope: u._id,
@@ -807,6 +809,7 @@ router.get("/user/:username", optionalAuth, async (req, res) => {
         only,
       }),
       before ? Promise.resolve(null) : buildRepostStats(u._id),
+      before ? Promise.resolve(null) : Download.countDocuments({ user: u._id }),
     ]);
 
     const page = events.slice(0, limit);
@@ -815,7 +818,20 @@ router.get("/user/:username", optionalAuth, async (req, res) => {
         ? new Date(page[page.length - 1].date).toISOString()
         : null;
 
-    res.json({ items: page, nextCursor, ...(stats ? { stats } : {}) });
+    res.json({
+      items: page,
+      nextCursor,
+      ...(stats ? { stats } : {}),
+      ...(dlCount === null
+        ? {}
+        : {
+            wanted: {
+              count: dlCount,
+              value: dlCount * 60,
+              avatar: u.avatar || null,
+            },
+          }),
+    });
   } catch (err) {
     console.error("user feed error:", err.message);
     res.status(500).json({ error: "Erreur lors du chargement du feed." });

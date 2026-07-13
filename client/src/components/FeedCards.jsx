@@ -1191,25 +1191,106 @@ function RepostEvent({ item, me, onLike, onComments, onRepost, onOpenImage, onRe
 //  Délit de téléchargement — « X a téléchargé Y depuis Z » (card moqueuse)
 // ============================================================
 
-// Textes rigolos (partie APRÈS le pseudo — cf. EventHead). Le serveur fige une
-// variante par délit (Download.variant) pour que la phrase reste stable.
-const DOWNLOAD_TEXTS = [
-  (g, src) => <>a téléchargé {g} depuis {src} comme un malpropre</>,
-  (g, src) => <>a « acquis gratuitement » {g} sur {src}</>,
-  (g, src) => <>vient de pirater {g} depuis {src}, le fourbe</>,
-  (g, src) => <>a discrètement récupéré {g} sur {src}</>,
-  (g, src) => <>n'a pas payé {g}… merci {src} !</>,
-  (g, src) => <>a fait chauffer le torrent de {g} sur {src}</>,
-  (g, src) => <>a « sauvegardé pour plus tard » {g} depuis {src}</>,
-  (g, src) => <>a ajouté {g} à sa collection… gracieusement, via {src}</>,
-];
-
 // Réactions moqueuses (toggles indépendants) — endpoint /downloads/:id/react.
 const DL_REACTIONS = [
   { key: "boo", label: "Huez le", Icon: Megaphone, color: "#e0483f" },
   { key: "tomato", label: "Lui jeter une tomate", Icon: Cherry, color: "#d63a3a" },
   { key: "monster", label: "T'es un monstre !", Icon: Skull, color: "#7b61ff" },
 ];
+
+// Emplacements pseudo-aléatoires (stables, indexés) où éclaboussent les tomates
+// pourries lancées sur le post — autant de tomates que de réactions « tomate ».
+const SPLAT_SPOTS = [
+  { top: "14%", left: "16%", r: -18, s: 1 },
+  { top: "60%", left: "9%", r: 12, s: 0.82 },
+  { top: "26%", left: "74%", r: 24, s: 1.12 },
+  { top: "72%", left: "63%", r: -9, s: 0.9 },
+  { top: "43%", left: "38%", r: 30, s: 1.06 },
+  { top: "13%", left: "52%", r: -26, s: 0.78 },
+  { top: "80%", left: "30%", r: 16, s: 0.96 },
+  { top: "36%", left: "88%", r: -14, s: 0.88 },
+  { top: "55%", left: "82%", r: 20, s: 0.84 },
+  { top: "84%", left: "48%", r: -20, s: 1.04 },
+  { top: "22%", left: "33%", r: 8, s: 0.9 },
+  { top: "48%", left: "58%", r: -30, s: 1 },
+];
+
+// Enveloppe positionnée d'une décoration jetée sur le post (position + rotation
+// figées ici ; l'élément interne gère sa propre animation d'apparition).
+function SplatWrap({ spot, wrap, extraRotate = 0, children }) {
+  return (
+    <span
+      className="hf-dl-splat"
+      style={{
+        top: spot.top,
+        left: spot.left,
+        transform: `translate(-50%, -50%) rotate(${spot.r + wrap * 15 + extraRotate}deg) scale(${spot.s})`,
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+// Une tomate pourrie écrasée (SVG maison — pas d'emoji). Éclaboussure + pépins.
+function TomatoSplat({ spot, wrap, delay }) {
+  return (
+    <SplatWrap spot={spot} wrap={wrap}>
+      <svg
+        className="hf-dl-tomato"
+        viewBox="0 0 100 100"
+        style={{ animationDelay: delay }}
+        aria-hidden="true"
+      >
+      <g fill="#7c1414">
+        <circle cx="14" cy="30" r="6" />
+        <circle cx="86" cy="42" r="7" />
+        <circle cx="72" cy="82" r="5" />
+        <circle cx="24" cy="80" r="6.5" />
+        <circle cx="50" cy="12" r="5" />
+      </g>
+      <path
+        fill="#a51d1d"
+        d="M50 20c16 0 30 12 30 29 0 19-15 31-30 31S20 68 20 49c0-17 14-29 30-29z"
+      />
+      <path
+        fill="#c62d2d"
+        d="M50 27c13 0 24 10 24 23 0 15-12 24-24 24s-24-9-24-24c0-13 11-23 24-23z"
+      />
+      <g fill="#e9b7b7" opacity="0.85">
+        <ellipse cx="42" cy="44" rx="3.4" ry="2.4" transform="rotate(-25 42 44)" />
+        <ellipse cx="57" cy="41" rx="3.2" ry="2.2" transform="rotate(20 57 41)" />
+        <ellipse cx="52" cy="56" rx="3.2" ry="2.2" transform="rotate(-8 52 56)" />
+      </g>
+      <path
+        fill="#4c7a2e"
+        d="M50 22l-6-8 6 3 6-3-6 8z"
+        transform="translate(0 4)"
+      />
+      </svg>
+    </SplatWrap>
+  );
+}
+
+// Bulle de BD « HOU ! » qui jaillit (effet du bouton « Huez le »).
+function BooBubble({ spot, wrap, delay }) {
+  return (
+    <SplatWrap spot={spot} wrap={wrap} extraRotate={-spot.r - wrap * 15}>
+      <span className="hf-dl-boo" style={{ animationDelay: delay }}>
+        HOU&nbsp;!
+      </span>
+    </SplatWrap>
+  );
+}
+
+// Petit crâne qui rôde (effet du bouton « T'es un monstre ! »).
+function SkullMark({ spot, wrap, delay }) {
+  return (
+    <SplatWrap spot={spot} wrap={wrap}>
+      <Skull className="hf-dl-skull" size={30} style={{ animationDelay: delay }} />
+    </SplatWrap>
+  );
+}
 
 function DownloadEvent({ item, token }) {
   const g = item.game;
@@ -1219,13 +1300,6 @@ function DownloadEvent({ item, token }) {
   );
   const [mine, setMine] = useState(item.myReactions || []);
   const [busy, setBusy] = useState(false);
-
-  const template = DOWNLOAD_TEXTS[(item.variant || 0) % DOWNLOAD_TEXTS.length];
-  const gameLink = (
-    <Link to={gameUrl} className="hf-game-link clickable">
-      {g.name}
-    </Link>
-  );
 
   async function react(type) {
     if (!token || busy) return;
@@ -1256,6 +1330,12 @@ function DownloadEvent({ item, token }) {
     }
   }
 
+  // Une décoration par réaction (plafonnée pour ne pas tout recouvrir) : des
+  // tomates pourries, des « HOU ! » et des crânes jetés sur le post.
+  const tomatoes = Math.min(counts.tomato || 0, 30);
+  const boos = Math.min(counts.boo || 0, 24);
+  const skulls = Math.min(counts.monster || 0, 24);
+
   return (
     <article className="hf-card hf-download">
       <EventHead
@@ -1267,7 +1347,11 @@ function DownloadEvent({ item, token }) {
           </span>
         }
       >
-        {template(gameLink, <b className="hf-dl-src">{item.source}</b>)}
+        a téléchargé{" "}
+        <Link to={gameUrl} className="hf-game-link clickable">
+          {g.name}
+        </Link>{" "}
+        sur <b className="hf-dl-src">{item.source}</b>
       </EventHead>
 
       <Link to={gameUrl} className="hf-dl-body clickable">
@@ -1283,7 +1367,7 @@ function DownloadEvent({ item, token }) {
         <div className="hf-dl-info">
           <span className="hf-dl-name">{g.name}</span>
           <span className="hf-dl-caught">
-            <Download size={12} /> Butin récupéré depuis {item.source}
+            <Download size={12} /> Butin récupéré sur {item.source}
           </span>
         </div>
       </Link>
@@ -1300,13 +1384,50 @@ function DownloadEvent({ item, token }) {
               onClick={() => react(rc.key)}
               title={rc.label}
             >
-              <rc.Icon size={15} fill={on ? "currentColor" : "none"} />
+              <rc.Icon size={15} />
               <span>{rc.label}</span>
               {n > 0 && <b className="hf-dl-react-n">{n}</b>}
             </button>
           );
         })}
       </div>
+
+      {/* Décorations jetées sur le post, une par réaction. Chaque type démarre à
+          un offset différent dans les emplacements pour ne pas se superposer. */}
+      {(tomatoes > 0 || boos > 0 || skulls > 0) && (
+        <div className="hf-dl-splats" aria-hidden="true">
+          {Array.from({ length: tomatoes }).map((_, i) => (
+            <TomatoSplat
+              key={`t${i}`}
+              spot={SPLAT_SPOTS[i % SPLAT_SPOTS.length]}
+              wrap={Math.floor(i / SPLAT_SPOTS.length)}
+              delay={`${(i % SPLAT_SPOTS.length) * 40}ms`}
+            />
+          ))}
+          {Array.from({ length: boos }).map((_, i) => {
+            const j = i + 4; // offset : évite de recouvrir les tomates
+            return (
+              <BooBubble
+                key={`b${i}`}
+                spot={SPLAT_SPOTS[j % SPLAT_SPOTS.length]}
+                wrap={Math.floor(j / SPLAT_SPOTS.length)}
+                delay={`${(i % SPLAT_SPOTS.length) * 45}ms`}
+              />
+            );
+          })}
+          {Array.from({ length: skulls }).map((_, i) => {
+            const j = i + 8; // offset différent des deux autres
+            return (
+              <SkullMark
+                key={`s${i}`}
+                spot={SPLAT_SPOTS[j % SPLAT_SPOTS.length]}
+                wrap={Math.floor(j / SPLAT_SPOTS.length)}
+                delay={`${(i % SPLAT_SPOTS.length) * 45}ms`}
+              />
+            );
+          })}
+        </div>
+      )}
     </article>
   );
 }

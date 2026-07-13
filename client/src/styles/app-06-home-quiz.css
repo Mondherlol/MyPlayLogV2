@@ -15019,6 +15019,11 @@
 /* ============================================================
    Délit de téléchargement — card moqueuse du fil
    ============================================================ */
+.hf-download {
+  position: relative;
+  overflow: hidden;
+}
+
 .hf-status-badge.st-download {
   background: rgba(230, 74, 74, 0.12);
   color: #d65454;
@@ -15110,6 +15115,395 @@ b.hf-dl-src {
   font-weight: 800;
   font-size: 0.76rem;
   padding-left: 0.1rem;
+}
+
+/* Pluie de tomates pourries (une par réaction « tomate ») */
+.hf-dl-splats {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  overflow: hidden;
+}
+
+.hf-dl-splat {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  transform-origin: center;
+}
+
+.hf-dl-tomato {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: center;
+  filter: drop-shadow(0 2px 2px rgba(60, 8, 8, 0.35));
+  animation: dl-splat 0.32s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+
+@keyframes dl-splat {
+  0% {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Bulle « HOU ! » (effet du bouton « Huez le ») */
+.hf-dl-boo {
+  display: inline-block;
+  position: relative;
+  padding: 0.14rem 0.44rem;
+  background: #fff;
+  color: #29293a;
+  font-weight: 800;
+  font-size: 0.82rem;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  border: 2px solid #29293a;
+  border-radius: 999px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25);
+  transform-origin: center;
+  animation: dl-splat 0.34s cubic-bezier(0.2, 1.5, 0.4, 1) both,
+    dl-boo-wiggle 2.4s ease-in-out infinite;
+}
+
+/* Petite queue de la bulle de BD */
+.hf-dl-boo::after {
+  content: "";
+  position: absolute;
+  bottom: -5px;
+  left: 24%;
+  width: 8px;
+  height: 8px;
+  background: #fff;
+  border-right: 2px solid #29293a;
+  border-bottom: 2px solid #29293a;
+  transform: rotate(45deg);
+}
+
+@keyframes dl-boo-wiggle {
+  0%,
+  100% {
+    rotate: -6deg;
+  }
+  50% {
+    rotate: 6deg;
+  }
+}
+
+/* Crâne qui rôde (effet du bouton « T'es un monstre ! ») */
+.hf-dl-skull {
+  display: block;
+  color: #6b4cc4;
+  transform-origin: center;
+  animation: dl-splat 0.34s cubic-bezier(0.2, 1.5, 0.4, 1) both,
+    dl-skull-glow 1.9s ease-in-out infinite;
+}
+
+@keyframes dl-skull-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 1px rgba(123, 76, 196, 0.5));
+    color: #6b4cc4;
+  }
+  50% {
+    filter: drop-shadow(0 0 6px rgba(160, 90, 255, 0.95));
+    color: #8b5cf6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hf-dl-tomato,
+  .hf-dl-boo,
+  .hf-dl-skull {
+    animation: none;
+  }
+}
+
+/* ============================================================
+   Médaille « Citoyen modèle » (profil au casier vierge, 0 délit)
+   ============================================================ */
+.pff-citizen {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, #3dd68c 40%, var(--border));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #3dd68c 8%, var(--surface)),
+    var(--surface)
+  );
+  box-shadow: var(--shadow-sm);
+}
+
+.pff-citizen-medal {
+  position: relative;
+  flex-shrink: 0;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  padding: 3px;
+  background: conic-gradient(
+    from 0deg,
+    #f6d879,
+    #b8860b,
+    #f6d879,
+    #b8860b,
+    #f6d879
+  );
+  box-shadow: 0 3px 8px rgba(150, 110, 20, 0.35);
+}
+
+/* Rubans de la médaille */
+.pff-citizen-medal::before,
+.pff-citizen-medal::after {
+  content: "";
+  position: absolute;
+  top: 46px;
+  width: 12px;
+  height: 20px;
+  z-index: -1;
+}
+.pff-citizen-medal::before {
+  left: 12px;
+  background: #d0433f;
+  transform: rotate(8deg);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
+}
+.pff-citizen-medal::after {
+  right: 12px;
+  background: #2f7ad0;
+  transform: rotate(-8deg);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
+}
+
+.pff-citizen-medal img,
+.pff-citizen-fb {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+.pff-citizen-fb {
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-weight: 800;
+  font-size: 1.4rem;
+}
+
+.pff-citizen-seal {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #26a96a;
+  color: #fff;
+  border: 2px solid var(--surface);
+}
+
+.pff-citizen-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.pff-citizen-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 800;
+  color: #1f8f57;
+}
+
+.pff-citizen-sub {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  line-height: 1.25;
+}
+
+/* ============================================================
+   Avis de recherche « One Piece » du profil (rail latéral)
+   ============================================================ */
+.pff-wanted {
+  --wp-paper: #efe2c4;
+  --wp-ink: #4a3212;
+  --wp-edge: #c9a86a;
+  position: relative;
+  padding: 0.85rem 0.85rem 0.95rem;
+  border-radius: 5px;
+  text-align: center;
+  color: var(--wp-ink);
+  background:
+    radial-gradient(120% 55% at 50% 0%, rgba(0, 0, 0, 0.06), transparent 62%),
+    repeating-linear-gradient(0deg, rgba(120, 80, 20, 0.035) 0 3px, transparent 3px 6px),
+    linear-gradient(180deg, #f4e9ce, var(--wp-paper));
+  border: 2px solid var(--wp-edge);
+  box-shadow: 0 10px 24px rgba(60, 40, 10, 0.28),
+    inset 0 0 38px rgba(150, 110, 50, 0.28);
+  transform: rotate(var(--wp-tilt, 0deg));
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.pff-wanted-top {
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  font-size: 0.9rem;
+  border-bottom: 2px solid var(--wp-edge);
+  padding-bottom: 0.32rem;
+  margin-bottom: 0.55rem;
+}
+
+.pff-wanted-photo {
+  position: relative;
+  width: 76%;
+  aspect-ratio: 1 / 1;
+  margin: 0.4rem auto 0.5rem;
+  border: 3px solid var(--wp-edge);
+  background: #d8c49a;
+  box-shadow: inset 0 0 18px rgba(80, 50, 10, 0.4);
+}
+
+.pff-wanted-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: sepia(0.5) contrast(1.05);
+}
+
+.pff-wanted-photo-fb {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 2.6rem;
+  font-weight: 800;
+  color: #7a5a28;
+}
+
+.pff-wanted-dead {
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  font-size: 0.78rem;
+  margin-top: 0.15rem;
+}
+
+.pff-wanted-name {
+  font-size: 1.12rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  line-height: 1.1;
+  margin-top: 0.12rem;
+  word-break: break-word;
+}
+
+.pff-wanted-epithet {
+  font-style: italic;
+  font-size: 0.8rem;
+  opacity: 0.78;
+  margin-top: 0.05rem;
+}
+
+.pff-wanted-bounty {
+  margin-top: 0.5rem;
+  padding-top: 0.42rem;
+  border-top: 2px solid var(--wp-edge);
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.pff-wanted-berry {
+  margin-right: 2px;
+  opacity: 0.85;
+}
+
+.pff-wanted-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.85;
+}
+
+.pff-wanted-crimes {
+  white-space: nowrap;
+}
+
+/* --- Paliers de dangerosité (plus il DL, plus c'est diabolique) --- */
+.wp-hors {
+  --wp-edge: #b98a3f;
+}
+
+.wp-pirate {
+  --wp-paper: #e7d3a6;
+  --wp-ink: #5a2a10;
+  --wp-edge: #a35a25;
+}
+
+.wp-demon {
+  --wp-paper: #e4bfa2;
+  --wp-ink: #5a1010;
+  --wp-edge: #8f2b1b;
+  box-shadow: 0 10px 26px rgba(80, 10, 10, 0.42),
+    inset 0 0 46px rgba(150, 30, 20, 0.4);
+}
+.wp-demon .pff-wanted-photo img {
+  filter: sepia(0.4) saturate(1.45) hue-rotate(-10deg) contrast(1.18);
+}
+.wp-demon .pff-wanted-name,
+.wp-demon .pff-wanted-bounty {
+  color: #7a1414;
+}
+
+/* Cornes de démon aux paliers élevés (pirate / seigneur du crime) */
+.wp-pirate .pff-wanted-photo::before,
+.wp-demon .pff-wanted-photo::before,
+.wp-pirate .pff-wanted-photo::after,
+.wp-demon .pff-wanted-photo::after {
+  content: "";
+  position: absolute;
+  top: -13px;
+  width: 0;
+  height: 0;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-bottom: 17px solid var(--wp-edge);
+  z-index: 2;
+}
+.wp-pirate .pff-wanted-photo::before,
+.wp-demon .pff-wanted-photo::before {
+  left: 15%;
+  transform: rotate(-22deg);
+}
+.wp-pirate .pff-wanted-photo::after,
+.wp-demon .pff-wanted-photo::after {
+  right: 15%;
+  transform: rotate(22deg);
 }
 
 /* Chip de statut contextuel (quand le verbe principal est autre chose) */
