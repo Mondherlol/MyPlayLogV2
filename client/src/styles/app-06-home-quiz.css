@@ -203,7 +203,17 @@
   min-width: 0;
 }
 
+/* Espacement des cartes dans le fil virtualisé : Virtuoso rend son propre
+   conteneur, donc le `gap` de .hf-feed ne s'applique plus entre les items —
+   on le restitue via un padding en bas de chaque carte. min-width:0 garde la
+   protection anti-débordement horizontal qu'assurait la grille. */
+.hf-item {
+  padding-bottom: 1rem;
+  min-width: 0;
+}
+
 .hf-community {
+  margin-bottom: 1rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;

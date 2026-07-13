@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { VirtuosoGrid } from "react-virtuoso";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Search,
@@ -735,11 +736,18 @@ export default function ProfileAllGames({ library, onOpen }) {
         {filtered.length === 0 ? (
           <div className="profile-empty font-fun">Aucun jeu ne correspond à ces filtres.</div>
         ) : (
-          <div className="pg-grid">
-            {filtered.map((e) => (
-              <GameTile key={e.gameId} entry={e} fields={fields} />
-            ))}
-          </div>
+          /* Grille virtualisée : la bibliothèque entière (parfois des centaines
+             de jeux) n'est plus montée d'un coup — seules les tuiles visibles
+             (± une marge) existent dans le DOM. `useWindowScroll` car la page
+             défile sur le body. La classe .pg-grid porte toujours la grille. */
+          <VirtuosoGrid
+            useWindowScroll
+            data={filtered}
+            computeItemKey={(_, e) => e.gameId}
+            listClassName="pg-grid"
+            increaseViewportBy={{ top: 400, bottom: 800 }}
+            itemContent={(_, e) => <GameTile entry={e} fields={fields} />}
+          />
         )}
       </div>
 

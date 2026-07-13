@@ -34,6 +34,12 @@
   gap: 0.6rem;
 }
 
+/* En vue liste virtualisée (Virtuoso), le `gap` du conteneur ne s'applique plus
+   entre les lignes : on le restitue via un padding en bas de chaque item. */
+.game-list-item {
+  padding-bottom: 0.6rem;
+}
+
 .game-row {
   display: flex;
   align-items: center;

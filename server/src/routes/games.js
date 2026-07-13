@@ -165,6 +165,9 @@ async function scheduleHltbScrape(id, name, cached) {
 // Temps de jeu (Time to Beat) : IGDB en priorité, sinon fallback HowLongToBeat
 // mis en cache (scrape en arrière-plan, re-scrape au plus tous les 3 mois). On
 // ne scrape que les jeux SORTIS : `released` doit être vrai pour tenter HLTB.
+// Renvoie `{ times, pending }` : `pending` est vrai quand un scrape HLTB tourne
+// en arrière-plan et qu'on n'a pas encore de valeurs → le client peut re-poller
+// pour afficher les temps dès qu'ils arrivent (sans avoir à rouvrir la modale).
 async function resolveTimeToBeat(id, name, released = true) {
   const ttbArr = await igdbQuery(
     "game_time_to_beats",
@@ -173,11 +176,14 @@ async function resolveTimeToBeat(id, name, released = true) {
   const toH = (s) => (s ? Math.round(s / 3600) : null);
   const t = ttbArr[0];
   if (t) {
-    return { hastily: toH(t.hastily), normally: toH(t.normally), completely: toH(t.completely) };
+    return {
+      times: { hastily: toH(t.hastily), normally: toH(t.normally), completely: toH(t.completely) },
+      pending: false,
+    };
   }
 
   // Pas de temps IGDB → fallback HLTB, mais uniquement pour les jeux sortis.
-  if (!name || !released) return null;
+  if (!name || !released) return { times: null, pending: false };
 
   const cached = await GameTime.findOne({ gameId: id });
   const age = cached ? Date.now() - cached.updatedAt.getTime() : 0;
@@ -197,12 +203,17 @@ async function resolveTimeToBeat(id, name, released = true) {
 
   if (cached && (cached.hastily || cached.normally || cached.completely)) {
     return {
-      hastily: cached.hastily,
-      normally: cached.normally,
-      completely: cached.completely,
+      times: {
+        hastily: cached.hastily,
+        normally: cached.normally,
+        completely: cached.completely,
+      },
+      pending: false,
     };
   }
-  return null;
+  // Pas (encore) de valeurs : un scrape tourne si on vient d'en programmer un
+  // (nouveau/périmé) ou si un autre est déjà en cours.
+  return { times: null, pending: !cached || stale || inProgress };
 }
 
 // Comparaison tolérante de noms de perso (casse, ponctuation, accents) pour dédoublonner.
@@ -923,7 +934,7 @@ router.get("/:id/details", optionalAuth, async (req, res) => {
     const released =
       (g.first_release_date && g.first_release_date <= nowSec) ||
       (!g.first_release_date && (g.total_rating_count || 0) > 0);
-    const [timeToBeat, vnChars] = await Promise.all([
+    const [ttb, vnChars] = await Promise.all([
       resolveTimeToBeat(id, g.name, released),
       isVn ? resolveVnCharacters(id, g.name) : Promise.resolve([]),
     ]);
@@ -950,7 +961,9 @@ router.get("/:id/details", optionalAuth, async (req, res) => {
       platforms: (g.platforms || []).map((p) => ({ id: p.id, name: p.name })),
       covers,
       characters,
-      timeToBeat,
+      timeToBeat: ttb.times,
+      // Scrape HLTB en cours : le client re-poll pour récupérer les temps.
+      timeToBeatPending: ttb.pending,
       endlessHint,
     });
   } catch (err) {
@@ -1217,7 +1230,7 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
     const released =
       (g.first_release_date && g.first_release_date <= nowSec) ||
       (!g.first_release_date && (g.total_rating_count || 0) > 0);
-    const timeToBeat = await resolveTimeToBeat(id, g.name, released);
+    const timeToBeat = (await resolveTimeToBeat(id, g.name, released)).times;
 
     // « Ce jeu est un remake / DLC / … de … » : type IGDB + jeu parent.
     const typeFr = GAME_TYPES_FR[g.game_type];

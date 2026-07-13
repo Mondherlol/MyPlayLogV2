@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Virtuoso } from "react-virtuoso";
 import { Loader2, Users, Sparkles } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import RepostCommentsModal from "./RepostCommentsModal";
@@ -52,6 +53,35 @@ export function FeedUserFilter({ token, myId, value, onChange }) {
   );
 }
 
+// En-tête et pied du fil virtualisé (définis hors composant → références
+// stables, sinon Virtuoso remonte la liste à chaque render). L'état vivant
+// (bannière communauté, chargement, fin) est lu via le `context` de Virtuoso.
+function FeedHeader({ context }) {
+  if (!context.community) return null;
+  return (
+    <div className="hf-community">
+      <Sparkles size={14} />
+      Tu ne suis personne pour l'instant : voici l'activité de toute la
+      communauté.
+    </div>
+  );
+}
+
+function FeedFooter({ context }) {
+  return (
+    <>
+      {context.loadingMore && (
+        <div className="hf-more">
+          <Loader2 size={18} className="spin" /> Chargement…
+        </div>
+      )}
+      {context.atEnd && <p className="hf-end font-fun">Tu es à jour ✦</p>}
+    </>
+  );
+}
+
+const feedComponents = { Header: FeedHeader, Footer: FeedFooter };
+
 // Fil d'actualité de la page d'accueil : timeline des VRAIES actions des
 // joueurs suivis (statuts, notes, reviews, OST choisies, listes, abonnements,
 // fan arts republiés, documentaires, pépites) — voir routes/feed.js et
@@ -69,8 +99,7 @@ export default function HomeFeed({ token, me, filterUser = null }) {
   const [commentsForVideo, setCommentsForVideo] = useState(null); // vidéo → modale
   const [gemsFor, setGemsFor] = useState(null); // découverte de pépites → modale liste
   const [blindTestFor, setBlindTestFor] = useState(null); // blind test → modale résultats
-  const sentinelRef = useRef(null);
-  // Refs miroirs pour que l'observer (créé une fois) lise l'état courant.
+  // Refs miroirs pour que le chargement (déclenché par Virtuoso) lise l'état courant.
   const stateRef = useRef({ cursor: null, busy: false });
   stateRef.current = { cursor, busy: loading || loadingMore };
 
@@ -114,19 +143,6 @@ export default function HomeFeed({ token, me, filterUser = null }) {
       setLoadingMore(false);
     }
   }
-
-  // Sentinelle de scroll infini (comme ProfileFeed).
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      (entries) => entries[0].isIntersecting && loadMore(),
-      { rootMargin: "700px 0px" }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, filterUser]);
 
   const patchRepost = (id, patch) =>
     setItems((list) =>
@@ -231,44 +247,42 @@ export default function HomeFeed({ token, me, filterUser = null }) {
 
   return (
     <div className="hf-feed">
-      {community && (
-        <div className="hf-community">
-          <Sparkles size={14} />
-          Tu ne suis personne pour l'instant : voici l'activité de toute la
-          communauté.
-        </div>
-      )}
-
-      {items.map((item) => (
-        <FeedCard
-          key={item.id}
-          item={item}
-          me={me}
-          token={token}
-          onLike={() =>
-            item.type === "video" ? toggleVideoLike(item) : toggleLike(item)
-          }
-          onComments={() =>
-            item.type === "video" ? setCommentsForVideo(item) : setCommentsFor(item)
-          }
-          onLater={() => toggleVideoLater(item)}
-          onRepost={() => toggleRepost(item)}
-          onOpenImage={() => setLightbox(item)}
-          onPlay={(v) => setPlaying(v)}
-          onOpenGems={() => setGemsFor(item)}
-          onOpenBlindTest={(payload) => setBlindTestFor(payload || item)}
-        />
-      ))}
-
-      <div ref={sentinelRef} className="hf-sentinel" aria-hidden="true" />
-      {loadingMore && (
-        <div className="hf-more">
-          <Loader2 size={18} className="spin" /> Chargement…
-        </div>
-      )}
-      {!cursor && items.length > 6 && (
-        <p className="hf-end font-fun">Tu es à jour ✦</p>
-      )}
+      {/* Fil virtualisé (react-virtuoso) : seules les cartes visibles (± une
+          marge) sont montées dans le DOM → scroll fluide même sur un très long
+          fil. `useWindowScroll` : la page scrolle sur le body, pas dans un
+          conteneur interne (indispensable pour garder les barres sticky). */}
+      <Virtuoso
+        useWindowScroll
+        data={items}
+        computeItemKey={(_, item) => item.id}
+        endReached={loadMore}
+        increaseViewportBy={{ top: 400, bottom: 900 }}
+        context={{ community, loadingMore, atEnd: !cursor && items.length > 6 }}
+        components={feedComponents}
+        itemContent={(_, item) => (
+          <div className="hf-item">
+            <FeedCard
+              item={item}
+              me={me}
+              token={token}
+              onLike={() =>
+                item.type === "video" ? toggleVideoLike(item) : toggleLike(item)
+              }
+              onComments={() =>
+                item.type === "video"
+                  ? setCommentsForVideo(item)
+                  : setCommentsFor(item)
+              }
+              onLater={() => toggleVideoLater(item)}
+              onRepost={() => toggleRepost(item)}
+              onOpenImage={() => setLightbox(item)}
+              onPlay={(v) => setPlaying(v)}
+              onOpenGems={() => setGemsFor(item)}
+              onOpenBlindTest={(payload) => setBlindTestFor(payload || item)}
+            />
+          </div>
+        )}
+      />
 
       {lightbox && (
         <FanartLightbox item={lightbox} onClose={() => setLightbox(null)} />

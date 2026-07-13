@@ -141,6 +141,21 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
 
   useEffect(() => {
     let alive = true;
+    let pollTimer;
+    // Le temps de jeu HLTB est scrapé en arrière-plan côté serveur : la 1re
+    // réponse peut arriver sans valeurs (`timeToBeatPending`). On re-poll alors
+    // l'endpoint jusqu'à récupérer les temps, pour les afficher sans avoir à
+    // rouvrir la modale.
+    async function pollTimeToBeat(attempt = 0) {
+      if (attempt >= 8) return;
+      await new Promise((r) => (pollTimer = setTimeout(r, 2500)));
+      if (!alive) return;
+      const d = await apiFetch(`/games/${game.id}/details`, { token }).catch(() => null);
+      if (!alive || !d) return;
+      setDetails((prev) => ({ ...prev, timeToBeat: d.timeToBeat }));
+      if (d.timeToBeatPending) pollTimeToBeat(attempt + 1);
+      else detailsCache.set(String(game.id), d);
+    }
     Promise.all([
       apiFetch(`/games/${game.id}/details`, { token }).catch(() => EMPTY_DETAILS),
       apiFetch(`/library/${game.id}`, { token }).catch(() => ({ entry: null })),
@@ -148,7 +163,11 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
       if (!alive) return;
       setDetails(d);
       setDetailsLoading(false);
-      detailsCache.set(String(game.id), d);
+      // On ne met en cache que des détails « stables » : si un scrape HLTB est
+      // en cours, on attend qu'il finisse (via le poll) pour ne pas figer un
+      // temps de jeu vide pendant 24h.
+      if (d.timeToBeatPending) pollTimeToBeat();
+      else detailsCache.set(String(game.id), d);
       if (e.entry) {
         const en = e.entry;
         setExisting(true);
@@ -212,6 +231,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
     });
     return () => {
       alive = false;
+      clearTimeout(pollTimer);
     };
   }, [game.id, token, openReview]);
 

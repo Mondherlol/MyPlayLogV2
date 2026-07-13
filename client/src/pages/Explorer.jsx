@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Virtuoso, VirtuosoGrid } from "react-virtuoso";
 import { useSearchParams } from "react-router-dom";
 import {
   Compass,
@@ -29,6 +30,27 @@ const SORT_OPTIONS = [
 ];
 
 const EMPTY = { ids: [], mode: "or" };
+
+// Pied des listes virtualisées : spinner de chargement « append » et message de
+// fin. Défini hors composant → référence stable (sinon Virtuoso remonte la
+// liste). L'état vivant est lu via le `context` de Virtuoso.
+function ExplorerFooter({ context }) {
+  return (
+    <>
+      {context.loading && context.count > 0 && (
+        <div className="explorer-loading">
+          <Loader2 size={18} className="spin" /> Chargement…
+        </div>
+      )}
+      {!context.hasMore && context.count > 0 && (
+        <div className="explorer-end font-fun">
+          Tu as tout exploré pour l'instant.
+        </div>
+      )}
+    </>
+  );
+}
+const explorerComponents = { Footer: ExplorerFooter };
 
 // Cache des résultats de l'Explorer (mémoire + localStorage, 24h) : les jeux
 // populaires ne bougent pas d'un jour à l'autre, inutile de relancer IGDB à
@@ -98,7 +120,6 @@ export default function Explorer() {
     localStorage.setItem("mpl_explorer_view", v);
   }
 
-  const sentinelRef = useRef(null);
   const loadingRef = useRef(false);
   const reqIdRef = useRef(0);
   const gamesRef = useRef([]); // miroir de `games` pour construire le cache
@@ -227,20 +248,10 @@ export default function Explorer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtersKey]);
 
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el || !hasMore) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingRef.current) {
-          fetchGames(page + 1, false);
-        }
-      },
-      { rootMargin: "600px" }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [page, hasMore, fetchGames]);
+  // Scroll infini : Virtuoso appelle `loadNext` quand on approche du bas.
+  const loadNext = useCallback(() => {
+    if (hasMore && !loadingRef.current) fetchGames(page + 1, false);
+  }, [hasMore, page, fetchGames]);
 
   // Helpers de mutation des filtres
   function toggleOption(key, id) {
@@ -520,32 +531,53 @@ export default function Explorer() {
                 </div>
               )}
 
-              <div
-                className={view === "list" ? "game-list" : "game-grid"}
-                ref={gridRef}
-              >
-                {games.map((g) => (
-                  <GameCard key={g.id} game={g} variant={view} />
+              {/* Résultats virtualisés : seules les cartes visibles (± une marge)
+                  sont montées. VirtuosoGrid pour la vue grille (classe .game-grid),
+                  Virtuoso pour la vue liste. `useWindowScroll` car la page défile
+                  sur le body ; `endReached` remplace la sentinelle de scroll. */}
+              {games.length > 0 &&
+                (view === "list" ? (
+                  <Virtuoso
+                    useWindowScroll
+                    data={games}
+                    computeItemKey={(_, g) => g.id}
+                    endReached={loadNext}
+                    increaseViewportBy={{ top: 400, bottom: 800 }}
+                    context={{ loading, hasMore, count: games.length }}
+                    components={explorerComponents}
+                    itemContent={(_, g) => (
+                      <div className="game-list-item">
+                        <GameCard game={g} variant="list" />
+                      </div>
+                    )}
+                  />
+                ) : (
+                  <VirtuosoGrid
+                    useWindowScroll
+                    data={games}
+                    computeItemKey={(_, g) => g.id}
+                    endReached={loadNext}
+                    listClassName="game-grid"
+                    increaseViewportBy={{ top: 400, bottom: 800 }}
+                    context={{ loading, hasMore, count: games.length }}
+                    components={explorerComponents}
+                    itemContent={(_, g) => <GameCard game={g} variant="grid" />}
+                  />
                 ))}
-                {loading &&
-                  Array.from({ length: view === "list" ? 6 : cols * 2 }).map((_, i) => (
+
+              {/* Skeletons du tout premier chargement (aucun jeu encore affiché) :
+                  une grille simple, non virtualisée, le temps de la 1re page. */}
+              {loading && games.length === 0 && (
+                <div
+                  className={view === "list" ? "game-list" : "game-grid"}
+                  ref={gridRef}
+                >
+                  {Array.from({ length: view === "list" ? 6 : cols * 2 }).map((_, i) => (
                     <div
                       className={view === "list" ? "game-row-skeleton" : "game-skeleton"}
                       key={`sk-${i}`}
                     />
                   ))}
-              </div>
-
-              {hasMore && <div ref={sentinelRef} className="scroll-sentinel" />}
-
-              {loading && (
-                <div className="explorer-loading">
-                  <Loader2 size={18} className="spin" /> Chargement…
-                </div>
-              )}
-              {!hasMore && games.length > 0 && (
-                <div className="explorer-end font-fun">
-                  Tu as tout exploré pour l'instant.
                 </div>
               )}
             </>
