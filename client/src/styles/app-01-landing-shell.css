@@ -1465,6 +1465,17 @@
     width: auto;
     max-width: none;
   }
+
+  /* Le panneau de résultats est ancré sur la barre de recherche, qui n'est pas
+     au bord droit de la topbar : sur mobile on le colle aux bords du viewport
+     (comme les notifs) pour éviter qu'il soit décalé/coupé. */
+  .search-panel {
+    position: fixed;
+    top: 66px;
+    left: 0.6rem;
+    right: 0.6rem;
+    width: auto;
+  }
 }
 
 .notif-list {
