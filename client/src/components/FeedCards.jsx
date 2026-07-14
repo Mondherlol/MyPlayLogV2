@@ -55,6 +55,8 @@ import { usePlayPlaylist } from "../lib/usePlayPlaylist";
 import { extractVideoId } from "../lib/youtube";
 import { usePlayer } from "../context/PlayerContext";
 import ReviewComments from "./ReviewComments";
+import ReviewThreadModal from "./ReviewThreadModal";
+import { CommentThreadModal } from "./ListComments";
 import { WantedModal } from "./WantedPoster";
 
 // Cards du fil social — partagées entre le fil d'accueil (HomeFeed) et
@@ -146,6 +148,8 @@ export function FeedCard(props) {
   if (item.type === "gems") return <GemsEvent {...props} />;
   if (item.type === "blindtest") return <BlindTestEvent {...props} />;
   if (item.type === "blindtestgroup") return <BlindTestGroupEvent {...props} />;
+  if (item.type === "trackermatch") return <TrackerMatchEvent {...props} />;
+  if (item.type === "trackermatchgroup") return <TrackerMatchGroupEvent {...props} />;
   return null;
 }
 
@@ -153,7 +157,11 @@ export function FeedCard(props) {
 export function EventHead({ user, date, children, badge }) {
   return (
     <header className="hf-head">
-      <Link to={`/u/${user.username}`} className="hf-avatar clickable">
+      <Link
+        to={`/u/${user.username}`}
+        className="hf-avatar clickable"
+        onClick={(e) => e.stopPropagation()}
+      >
         {user.avatar ? (
           <img src={user.avatar} alt="" loading="lazy" draggable="false" />
         ) : (
@@ -162,7 +170,11 @@ export function EventHead({ user, date, children, badge }) {
       </Link>
       <div className="hf-who">
         <span className="hf-line">
-          <Link to={`/u/${user.username}`} className="hf-user clickable">
+          <Link
+            to={`/u/${user.username}`}
+            className="hf-user clickable"
+            onClick={(e) => e.stopPropagation()}
+          >
             {user.username}
           </Link>{" "}
           <span className="hf-action">{children}</span>
@@ -280,7 +292,7 @@ function FeedReactions({ reactions, myReaction, readOnly, onReact }) {
             disabled={readOnly}
             title={rc.label}
           >
-            <rc.Icon size={15} fill={on ? "currentColor" : "none"} />
+            <rc.Icon size={15} fill={on && rc.key === "heart" ? "currentColor" : "none"} />
             {n > 0 && <span className="rvc-react-n">{n}</span>}
           </button>
         );
@@ -311,6 +323,19 @@ function GameEvent({ item, me, token }) {
   // Sous-actions affichées en plus du verbe principal (regroupement).
   const timeChange = changes.find((c) => c.kind === "time");
   const ratingChange = changes.find((c) => c.kind === "rating");
+
+  // Carte « nue » : rien à montrer d'autre que la jaquette (aucune note, avis,
+  // OST, personnage, plateforme, temps, chip…) — typiquement « a envie de jouer
+  // à X ». On passe alors sur une seule ligne (petite jaquette + nom) plutôt que
+  // de gaspiller deux lignes juste pour l'image.
+  const hasChip =
+    item.rating != null ||
+    (statusMeta && primary.kind !== "status" && primary.kind !== "added") ||
+    !!item.platform ||
+    item.playtimeHours != null ||
+    item.favorite ||
+    kinds.has("favorite");
+  const bare = !item.hasReview && !item.ost && !item.character && !hasChip;
 
   async function react(type) {
     if (!token || isMine) return;
@@ -380,7 +405,10 @@ function GameEvent({ item, me, token }) {
         </Link>
       </EventHead>
 
-      <div className="hf-game-body clickable" onClick={() => navigate(gameUrl)}>
+      <div
+        className={`hf-game-body clickable ${bare ? "bare" : ""}`}
+        onClick={() => navigate(gameUrl)}
+      >
         <div className="hf-cover">
           {g.cover ? (
             <img src={g.cover} alt={g.name} loading="lazy" draggable="false" />
@@ -390,6 +418,9 @@ function GameEvent({ item, me, token }) {
             </span>
           )}
         </div>
+        {bare ? (
+          <span className="hf-game-bare-name">{g.name}</span>
+        ) : (
         <div className="hf-game-info">
           <div className="hf-game-tags">
             {item.rating != null && (
@@ -480,6 +511,7 @@ function GameEvent({ item, me, token }) {
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* Réagir / répondre à l'avis directement depuis le fil */}
@@ -959,6 +991,7 @@ const REACT_BADGES = {
 
 function InteractionEvent({ item, token }) {
   const meta = ACTION_META[item.action];
+  const [thread, setThread] = useState(null); // "list" | "review" | null
   if (!meta) return null;
   const target = item.target?.username;
   const reviewUrl = item.game ? `/game/${item.game.id}?tab=reviews` : null;
@@ -976,53 +1009,111 @@ function InteractionEvent({ item, token }) {
   // Contexte playlist : le vocabulaire suit (« a aimé la playlist de… »).
   if (item.list?.type === "playlist") verb = verb.replace("la liste de", "la playlist de");
 
+  // Clic sur la carte → ouvre le fil focalisé sur le commentaire/réponse visé
+  // (modale liste réutilisée pour les listes, modale d'avis pour les reviews).
+  // Sur du contenu ancien sans commentId/propriétaire, on garde la navigation.
+  const commentId = item.commentId || null;
+  const listThread = meta.ctx === "list" && item.list && commentId;
+  const reviewThread = meta.ctx === "review" && item.game && item.reviewOwnerId;
+  const openable = listThread || reviewThread;
+  const open = () => setThread(reviewThread ? "review" : "list");
+  // Intercepte AVANT la navigation propre du contenu (Link / ListMini).
+  const intercept = openable
+    ? (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        open();
+      }
+    : undefined;
+  // Nom du propriétaire de l'avis à afficher : seulement s'il coïncide avec la
+  // cible (commentaire racine / réaction) — pour une réponse, la cible n'est
+  // pas le propriétaire.
+  const reviewOwnerName =
+    item.reviewOwnerId && item.target?.id === item.reviewOwnerId
+      ? item.target.username
+      : null;
+
   return (
-    <article className="hf-card hf-interaction">
-      <EventHead
-        user={item.user}
-        date={item.date}
-        badge={
-          <span
-            className={`hf-int-badge act-${item.action}`}
-            style={reactBadge ? { color: reactBadge.color } : undefined}
-          >
-            <BadgeIcon size={13} fill={reactBadge ? "currentColor" : "none"} />
-          </span>
-        }
+    <>
+      <article
+        className={`hf-card hf-interaction ${openable ? "clickable" : ""}`}
+        onClick={openable ? open : undefined}
       >
-        {verb}
-        {target && (
-          <>
-            {" "}
-            <Link to={targetUrl} className="hf-int-target clickable">
-              {target}
-            </Link>
-          </>
+        <EventHead
+          user={item.user}
+          date={item.date}
+          badge={
+            <span
+              className={`hf-int-badge act-${item.action}`}
+              style={reactBadge ? { color: reactBadge.color } : undefined}
+            >
+              <BadgeIcon size={13} fill={reactBadge ? "currentColor" : "none"} />
+            </span>
+          }
+        >
+          {verb}
+          {target && (
+            <>
+              {" "}
+              <Link
+                to={targetUrl}
+                className="hf-int-target clickable"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {target}
+              </Link>
+            </>
+          )}
+        </EventHead>
+
+        {meta.quote && item.snippet && <p className="hf-int-quote">{item.snippet}</p>}
+
+        {item.list && (
+          <div onClickCapture={intercept}>
+            <ListMini list={item.list} />
+          </div>
         )}
-      </EventHead>
 
-      {meta.quote && item.snippet && <p className="hf-int-quote">{item.snippet}</p>}
+        {/* Contexte recommandation : mini-carte du jeu recommandé + bouton +1 */}
+        {meta.ctx === "reco" && item.game && (
+          <RecoPreview item={item} token={token} />
+        )}
 
-      {item.list && <ListMini list={item.list} />}
+        {meta.ctx === "review" && item.game && reviewUrl && (
+          <div onClickCapture={intercept}>
+            {item.review ? (
+              <ReviewPreview review={item.review} game={item.game} owner={item.target} />
+            ) : (
+              <Link to={reviewUrl} className="hf-int-gamechip clickable">
+                <Star size={13} fill="currentColor" strokeWidth={0} />
+                <span>Avis sur {item.game.name}</span>
+                <ExternalLink size={13} />
+              </Link>
+            )}
+          </div>
+        )}
+      </article>
 
-      {/* Contexte recommandation : mini-carte du jeu recommandé + bouton +1 */}
-      {meta.ctx === "reco" && item.game && (
-        <RecoPreview item={item} token={token} />
+      {thread === "list" && (
+        <CommentThreadModal
+          listId={item.list.id}
+          commentId={commentId}
+          token={token}
+          onClose={() => setThread(null)}
+        />
       )}
-
-      {meta.ctx === "review" &&
-        item.game &&
-        reviewUrl &&
-        (item.review ? (
-          <ReviewPreview review={item.review} game={item.game} owner={item.target} />
-        ) : (
-          <Link to={reviewUrl} className="hf-int-gamechip clickable">
-            <Star size={13} fill="currentColor" strokeWidth={0} />
-            <span>Avis sur {item.game.name}</span>
-            <ExternalLink size={13} />
-          </Link>
-        ))}
-    </article>
+      {thread === "review" && (
+        <ReviewThreadModal
+          gameId={item.game.id}
+          reviewUserId={item.reviewOwnerId}
+          gameName={item.game.name}
+          ownerName={reviewOwnerName}
+          commentId={commentId}
+          token={token}
+          onClose={() => setThread(null)}
+        />
+      )}
+    </>
   );
 }
 
@@ -1615,6 +1706,102 @@ function BlindTestGroupEvent({ item, onOpenBlindTest }) {
 }
 
 // ============================================================
+//  Parties de jeux trackés (Marvel Rivals…)
+// ============================================================
+// Une seule partie : héros joué + K/D/A + issue.
+function TrackerMatchEvent({ item }) {
+  const m = item.match;
+  return (
+    <article className={`hf-card hf-trk ${m.win ? "win" : "loss"}`}>
+      <EventHead user={item.user} date={item.date}>
+        <Swords size={13} className="hf-inline-ic" /> a joué une partie de{" "}
+        <b>{item.game}</b>
+      </EventHead>
+
+      <div className="hf-trk-single">
+        <div className="hf-trk-hero">
+          {m.hero?.thumb ? (
+            <img src={m.hero.thumb} alt="" loading="lazy" draggable="false" />
+          ) : (
+            <span className="hf-trk-hero-fb">{(m.hero?.name || "?")[0]}</span>
+          )}
+        </div>
+        <div className="hf-trk-single-info">
+          <span className="hf-trk-hero-name">{m.hero?.name || "Héros"}</span>
+          <span className="hf-trk-kda">
+            {m.k} / {m.d} / {m.a} <b>· {m.kda} KDA</b>
+          </span>
+        </div>
+        <span className={`hf-trk-res ${m.win ? "win" : "loss"}`}>
+          {m.win ? "Victoire" : "Défaite"}
+        </span>
+      </div>
+    </article>
+  );
+}
+
+// Plusieurs parties d'affilée → « a enchaîné N parties » : héros le plus joué en
+// grand, bilan V/D + KDA moyen, puis la liste des parties.
+function TrackerMatchGroupEvent({ item }) {
+  const total = item.count;
+  const wr = total ? Math.round((item.wins / total) * 100) : 0;
+  return (
+    <article className="hf-card hf-trk hf-trkg">
+      <EventHead user={item.user} date={item.date}>
+        <Swords size={13} className="hf-inline-ic" /> a enchaîné{" "}
+        <b>{item.count} parties</b> sur <b>{item.game}</b>
+      </EventHead>
+
+      <div className="hf-trkg-summary">
+        <div className="hf-trk-hero big">
+          {item.topHero?.thumb ? (
+            <img src={item.topHero.thumb} alt="" loading="lazy" draggable="false" />
+          ) : (
+            <span className="hf-trk-hero-fb">{(item.topHero?.name || "?")[0]}</span>
+          )}
+        </div>
+        <div className="hf-trkg-stats">
+          {item.topHero?.name && (
+            <span className="hf-trkg-hero">{item.topHero.name}</span>
+          )}
+          <div className="hf-trkg-nums">
+            <span className="hf-trkg-wl">
+              <b className="win">{item.wins}V</b> · <b className="loss">{item.losses}D</b>
+            </span>
+            <span className="hf-trkg-dot">·</span>
+            <span>{wr}% WR</span>
+            <span className="hf-trkg-dot">·</span>
+            <span>
+              <b>{item.avgKda}</b> KDA moy.
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <ul className="hf-trkg-list">
+        {item.matches.slice(0, 6).map((m) => (
+          <li key={m.matchUid} className={`hf-trkg-row ${m.win ? "win" : "loss"}`}>
+            <span className={`hf-trk-res mini ${m.win ? "win" : "loss"}`}>
+              {m.win ? "V" : "D"}
+            </span>
+            <span className="hf-trkg-row-hero">
+              {m.hero?.thumb && (
+                <img src={m.hero.thumb} alt="" loading="lazy" draggable="false" />
+              )}
+              {m.hero?.name || "Héros"}
+            </span>
+            <span className="hf-trkg-row-kda">
+              {m.k}/{m.d}/{m.a}
+            </span>
+            <span className="hf-trkg-row-time">{timeAgo(m.date)}</span>
+          </li>
+        ))}
+      </ul>
+    </article>
+  );
+}
+
+// ============================================================
 //  Vidéo recommandée (like / regarder plus tard / commenter / lire)
 // ============================================================
 function VideoEvent({ item, onPlay, onLike, onLater, onComments }) {
@@ -1713,6 +1900,66 @@ function VideoActivityEvent({ item, onPlay }) {
   const v = item.video;
   const meta = VIDEO_ACT_META[item.kind] || VIDEO_ACT_META.watch;
   const pct = item.kind === "watch" ? resumePct(v) : 0;
+
+  // « A aimé une vidéo » = a aimé la recommandation d'un autre joueur. Carte
+  // compacte : verbe adapté (« a aimé une recommandation de X »), avatar du
+  // recommandeur sur la miniature réduite, le tout cliquable pour lire.
+  if (item.kind === "like") {
+    const rec =
+      v.recommender && v.recommender.id !== item.user.id ? v.recommender : null;
+    return (
+      <article className="hf-card hf-video hf-vact hf-vmini k-like">
+        <EventHead user={item.user} date={item.date}>
+          <span className="hf-vact-ic k-like">
+            <Heart size={13} fill="currentColor" />
+          </span>{" "}
+          {rec ? (
+            <>
+              a aimé une recommandation de{" "}
+              <Link to={`/u/${rec.username}`} className="hf-user clickable">
+                {rec.username}
+              </Link>
+            </>
+          ) : (
+            "a aimé une vidéo"
+          )}
+        </EventHead>
+
+        <button
+          className="hf-vmini-row clickable"
+          onClick={() => onPlay(v)}
+          title={v.title}
+        >
+          <span className="hf-vmini-thumb">
+            <img src={v.thumb} alt="" loading="lazy" draggable="false" />
+            <span className="hf-vmini-play">
+              <Play size={15} fill="currentColor" />
+            </span>
+            {v.duration && <span className="hf-video-dur">{v.duration}</span>}
+            {rec && (
+              <span
+                className="hf-vmini-rec"
+                title={`Recommandé par ${rec.username}`}
+              >
+                {rec.avatar ? (
+                  <img src={rec.avatar} alt="" loading="lazy" draggable="false" />
+                ) : (
+                  <span className="hf-vmini-rec-fb">
+                    {rec.username[0].toUpperCase()}
+                  </span>
+                )}
+              </span>
+            )}
+          </span>
+          <span className="hf-vmini-info">
+            <span className="hf-vmini-title">{v.title}</span>
+            {v.author && <span className="hf-vmini-by">{v.author}</span>}
+          </span>
+        </button>
+      </article>
+    );
+  }
+
   return (
     <article className={`hf-card hf-video hf-vact k-${item.kind}`}>
       <EventHead user={item.user} date={item.date}>

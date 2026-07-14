@@ -2060,6 +2060,9 @@ router.post("/:id/reviews/:userId/comments", requireAuth, async (req, res) => {
       gameName: entry.name,
       comment: created._id,
       snippet,
+      // Propriétaire de l'avis (≠ cible quand c'est une réponse) : permet au fil
+      // d'ouvrir le bon thread de réponses focalisé sur ce commentaire.
+      meta: { reviewUser: String(entry.user) },
     });
 
     res.status(201).json({ comment: reviewComment(created, entry.comments, req.userId) });

@@ -32,6 +32,11 @@ function signToken(userId, remember) {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Échappe les caractères spéciaux regex pour une recherche exacte sûre.
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 // --- Inscription : email + identifiant + mot de passe ---
 router.post("/register", async (req, res) => {
   try {
@@ -82,7 +87,7 @@ router.post("/login", async (req, res) => {
 
     const query = identifier.includes("@")
       ? { email: identifier.toLowerCase() }
-      : { username: identifier };
+      : { username: new RegExp(`^${escapeRegex(identifier)}$`, "i") };
     const user = await User.findOne(query);
 
     if (!user) {

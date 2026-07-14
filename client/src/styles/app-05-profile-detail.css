@@ -1232,6 +1232,60 @@ button.pf-stat:hover {
   color: var(--accent-ink);
 }
 
+/* Les icônes du bouton Personnaliser/Terminé doivent suivre la couleur du bouton
+   — sinon la règle globale `.profile-section-title svg { color: var(--accent-ink) }`
+   les force au doré clair, illisible sur le fond doré de l'état actif (« Terminé »),
+   surtout en mode sombre. */
+.profile-section-title .pf-edit-btn svg {
+  color: currentColor;
+}
+
+/* ---------- Ordre manuel des favoris (glisser-déposer) ---------- */
+.pf-order-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.15rem 0 0.7rem;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+.pf-order-hint svg {
+  color: var(--accent-ink);
+}
+
+/* Jaquette glissable en tri manuel : c'est elle l'élément flex de la rangée
+   (elle porte la transform du drag), donc elle reprend le gabarit de la tuile. */
+.pf-game-sortable {
+  flex: 0 0 auto;
+  width: 108px;
+  cursor: grab;
+}
+
+.pf-game-sortable:active {
+  cursor: grabbing;
+}
+
+.pf-game-sortable.dragging {
+  opacity: 0.65;
+  z-index: 3;
+}
+
+/* Indicateur « +N à la suite » quand il y a trop de favoris pour tout ranger. */
+.pf-order-more {
+  align-self: center;
+  flex: 0 0 auto;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  border: 1px dashed var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
 /* ---------- Jaquette customisable (surimpression) ---------- */
 .cover-row {
   align-items: flex-start;

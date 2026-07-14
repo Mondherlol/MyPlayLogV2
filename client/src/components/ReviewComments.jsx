@@ -1,4 +1,4 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Reply, Trash2, Heart } from "lucide-react";
 import { apiFetch } from "../lib/api";
@@ -7,12 +7,15 @@ import { Composer, renderMessage } from "./ListComments";
 
 // Fil de réponses sous une review — un seul niveau d'imbrication, façon
 // section commentaires des listes (texte, mentions, emoji, GIF, images).
+// `highlightId` : id d'un commentaire/réponse à mettre en avant et vers lequel
+// défiler (ouverture depuis le fil d'accueil sur une réponse précise).
 export default function ReviewComments({
   gameId,
   reviewUserId,
   token,
   comments,
   setComments,
+  highlightId = null,
 }) {
   const [replyFor, setReplyFor] = useState(null); // id de la racine dont l'input est ouvert
 
@@ -97,6 +100,7 @@ export default function ReviewComments({
               <div className="rvcm-thread" key={root.id}>
                 <RvComment
                   c={root}
+                  highlight={root.id === highlightId}
                   onReply={() => setReplyFor((v) => (v === root.id ? null : root.id))}
                   onDelete={remove}
                   onLike={toggleLike}
@@ -108,6 +112,7 @@ export default function ReviewComments({
                       <Fragment key={r.id}>
                         <RvComment
                           c={r}
+                          highlight={r.id === highlightId}
                           onReply={() => setReplyFor((v) => (v === r.id ? null : r.id))}
                           onDelete={remove}
                           onLike={toggleLike}
@@ -126,9 +131,14 @@ export default function ReviewComments({
   );
 }
 
-function RvComment({ c, onReply, onDelete, onLike }) {
+function RvComment({ c, onReply, onDelete, onLike, highlight = false }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (highlight && ref.current)
+      ref.current.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [highlight]);
   return (
-    <div className="rvcm-item">
+    <div ref={ref} className={`rvcm-item ${highlight ? "is-focused" : ""}`}>
       <Link to={c.author ? `/u/${c.author.username}` : "#"} className="rvcm-av clickable">
         {c.author?.avatar ? (
           <img src={c.author.avatar} alt="" loading="lazy" />

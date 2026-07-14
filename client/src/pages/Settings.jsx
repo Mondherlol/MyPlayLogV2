@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Gamepad2,
   Trophy,
+  Swords,
 } from "lucide-react";
 import { apiFetch, API_BASE } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -85,6 +86,165 @@ function ImportsPanel() {
         n'est ajouté sans ta validation.
       </p>
       <SteamCard />
+
+      <h2 className="settings-section-title" style={{ marginTop: "2rem" }}>
+        <Swords size={20} /> Tracking in-game
+      </h2>
+      <p className="settings-section-sub">
+        Relie tes comptes de jeux compétitifs pour suivre ton rang, tes héros et
+        tes dernières parties — et les partager sur ton profil et dans le fil.
+      </p>
+      <MarvelRivalsCard />
+    </div>
+  );
+}
+
+// Liaison Marvel Rivals (par pseudo in-game). Plus simple que Steam : pas
+// d'OpenID, on résout le pseudo côté serveur via l'API de tracking.
+function MarvelRivalsCard() {
+  const { token } = useAuth();
+  const [status, setStatus] = useState(null); // { configured, trackers }
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [input, setInput] = useState("");
+
+  async function load() {
+    try {
+      const s = await apiFetch("/trackers/status", { token });
+      setStatus(s);
+    } catch {
+      setStatus({ configured: false, trackers: [] });
+    }
+  }
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const tracker = status?.trackers?.find((t) => t.provider === "marvel-rivals");
+
+  async function link() {
+    if (!input.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await apiFetch("/trackers/marvel-rivals/link", {
+        method: "POST",
+        token,
+        body: { username: input.trim() },
+      });
+      setInput("");
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function unlink() {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiFetch("/trackers/marvel-rivals", { method: "DELETE", token });
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!status) {
+    return (
+      <div className="import-card">
+        <Loader2 className="spin" size={20} /> Chargement…
+      </div>
+    );
+  }
+
+  const connected = !!tracker;
+
+  return (
+    <div className={`import-card rivals ${connected ? "connected" : ""}`}>
+      <div className="import-card-glow" />
+      <div className="import-card-main">
+        <div className="import-logo rivals-logo">
+          <Swords size={28} />
+        </div>
+        <div className="import-card-info">
+          <div className="import-card-title">
+            Marvel Rivals
+            {connected && (
+              <span className="import-badge">
+                <CheckCircle2 size={13} /> Lié
+              </span>
+            )}
+          </div>
+          {connected ? (
+            <div className="import-steam-user">
+              <div>
+                <strong>{tracker.externalName || "Compte lié"}</strong>
+                <span>{tracker.rank ? `Rang : ${tracker.rank}` : "Stats en cours de synchro…"}</span>
+              </div>
+            </div>
+          ) : (
+            <p className="import-card-desc">
+              Colle ton <strong>identifiant</strong> ou l'<strong>URL de ton
+              profil</strong> rivalsmeta (ex. rivalsmeta.com/player/249729944)
+              pour suivre ton rang, tes héros et tes parties.
+              {status.configured && " Le pseudo exact fonctionne aussi."}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {error && (
+        <div className="import-error">
+          <AlertTriangle size={15} /> {error}
+        </div>
+      )}
+
+      <div className="import-actions">
+        {connected ? (
+          <button
+            className="btn-ghost-danger clickable"
+            onClick={unlink}
+            disabled={busy}
+          >
+            {busy ? <Loader2 className="spin" size={16} /> : <Link2Off size={16} />}
+            Délier
+          </button>
+        ) : (
+          <div className="import-manual" style={{ marginTop: 0 }}>
+            <input
+              type="text"
+              placeholder={
+                status.configured
+                  ? "Pseudo, identifiant, ou URL rivalsmeta"
+                  : "Ton identifiant ou l'URL de ton profil rivalsmeta"
+              }
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && link()}
+              disabled={busy}
+            />
+            <button
+              className="btn-steam-primary clickable"
+              onClick={link}
+              disabled={busy}
+            >
+              {busy ? <Loader2 className="spin" size={16} /> : <Link2 size={16} />}
+              Lier
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="import-soon-row">
+        <div className="import-soon-chip">League of Legends — bientôt</div>
+        <div className="import-soon-chip">Valorant — bientôt</div>
+      </div>
     </div>
   );
 }

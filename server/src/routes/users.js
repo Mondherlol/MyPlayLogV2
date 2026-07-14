@@ -12,6 +12,7 @@ import OstThread from "../models/OstThread.js";
 import Repost from "../models/Repost.js";
 import Documentary from "../models/Documentary.js";
 import GameAchievements from "../models/GameAchievements.js";
+import GameTracker from "../models/GameTracker.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { ensureGameMeta } from "../lib/gameMeta.js";
 import { ensureEntityLogos } from "../lib/entityLogos.js";
@@ -224,6 +225,24 @@ router.put("/me/overview", requireAuth, async (req, res) => {
       set.overviewOrder = cleanKeys(b.overviewOrder, OVERVIEW_SECTIONS);
     if (b.overviewCards !== undefined)
       set.overviewCards = cleanKeys(b.overviewCards, OVERVIEW_CARD_FIELDS);
+    // Ordre manuel des jeux par section : { sectionKey: [gameId,…] }. On ne
+    // garde que les sections connues et des ids numériques dédoublonnés.
+    if (b.overviewGameOrder !== undefined) {
+      const src =
+        b.overviewGameOrder && typeof b.overviewGameOrder === "object"
+          ? b.overviewGameOrder
+          : {};
+      const clean = {};
+      for (const key of Object.keys(src)) {
+        if (!OVERVIEW_SECTIONS.has(key)) continue;
+        const seen = new Set();
+        clean[key] = (Array.isArray(src[key]) ? src[key] : [])
+          .map((n) => Number(n))
+          .filter((n) => Number.isFinite(n) && !seen.has(n) && seen.add(n))
+          .slice(0, 500);
+      }
+      set.overviewGameOrder = clean;
+    }
     if (Object.keys(set).length) await User.updateOne({ _id: req.userId }, { $set: set });
     res.json({ ok: true, ...set });
   } catch (err) {
@@ -1400,7 +1419,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
       (u) => String(u) === String(user._id)
     );
 
-    const [entries, followers, listQuery, recoCount, videoCount, achievementsCount] =
+    const [entries, followers, listQuery, recoCount, videoCount, achievementsCount, trackerDocs] =
       await Promise.all([
         UserGame.find({ user: user._id }).sort({ updatedAt: -1 }),
         User.countDocuments({ following: user._id }),
@@ -1416,7 +1435,16 @@ router.get("/:username", optionalAuth, async (req, res) => {
         Recommendation.countDocuments({ to: user._id }),
         Documentary.countDocuments({ user: user._id, recommended: true }),
         GameAchievements.countDocuments({ user: user._id }),
+        GameTracker.find({ user: user._id }).lean(),
       ]);
+
+    // Résumé léger des comptes de tracking liés (badge + visibilité de l'onglet
+    // Tracking). On expose juste provider + pseudo + rang courant.
+    const trackers = (trackerDocs || []).map((t) => ({
+      provider: t.provider,
+      externalName: t.externalName || null,
+      rank: t.snapshot?.rank?.tier || null,
+    }));
 
     const library = entries.map(entryCard);
 
@@ -1477,11 +1505,13 @@ router.get("/:username", optionalAuth, async (req, res) => {
         ostOrder: user.ostOrder || [],
         overviewOrder: user.overviewOrder || [],
         overviewCards: user.overviewCards || [],
+        overviewGameOrder: user.overviewGameOrder || {},
         favoriteCompanies: user.favoriteCompanies || [],
         createdAt: user.createdAt,
         lastSeenAt: user.lastSeenAt || null,
         isMe,
         isFollowing,
+        trackers,
         counts: {
           followers,
           following: (user.following || []).length,
@@ -1491,6 +1521,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
           recommendations: recoCount,
           videos: videoCount,
           achievements: achievementsCount,
+          trackers: trackers.length,
         },
       },
       favorites,

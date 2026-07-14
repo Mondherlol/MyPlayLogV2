@@ -26,6 +26,7 @@ import {
   Repeat2,
   Film,
   BarChart3,
+  Swords,
 } from "lucide-react";
 import twemoji from "@twemoji/api";
 import { apiFetch, apiUpload } from "../lib/api";
@@ -43,6 +44,7 @@ import ProfileFeed from "../components/ProfileFeed";
 import ProfileRecommendations from "../components/ProfileRecommendations";
 import ProfileVideos from "../components/ProfileVideos";
 import ProfileStats from "../components/ProfileStats";
+import ProfileTrackers from "../components/ProfileTrackers";
 import ProfileAchievements from "../components/ProfileAchievements";
 import ProfileLists from "../components/ProfileLists";
 import EditProfileModal from "../components/EditProfileModal";
@@ -58,6 +60,7 @@ const TAB_ORDER = [
   "feed",
   "allgames",
   "stats",
+  "tracking",
   "achievements",
   "lists",
   "ost",
@@ -889,6 +892,15 @@ export default function Profile() {
         >
           <BarChart3 size={16} /> Stats
         </button>
+        {(isMe || c.trackers > 0) && (
+          <button
+            className={`profile-tab ${tab === "tracking" ? "active" : ""}`}
+            onClick={() => setTab("tracking")}
+          >
+            <Swords size={16} /> Tracking
+            {c.trackers > 0 && <span className="tab-count">{c.trackers}</span>}
+          </button>
+        )}
         <button
           className={`profile-tab ${tab === "achievements" ? "active" : ""}`}
           onClick={() => setTab("achievements")}
@@ -993,6 +1005,11 @@ export default function Profile() {
 
       {/* ---------- Stats ---------- */}
       {tab === "stats" && <ProfileStats username={targetUsername} token={token} />}
+
+      {/* ---------- Tracking in-game (Marvel Rivals…) ---------- */}
+      {tab === "tracking" && (
+        <ProfileTrackers username={targetUsername} token={token} isMe={isMe} />
+      )}
 
       {/* ---------- Succès ---------- */}
       {tab === "achievements" && (

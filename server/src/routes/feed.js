@@ -4,6 +4,8 @@ import User from "../models/User.js";
 import UserGame from "../models/UserGame.js";
 import Repost from "../models/Repost.js";
 import Download from "../models/Download.js";
+import TrackerMatch from "../models/TrackerMatch.js";
+import { PROVIDER_LABEL } from "./trackers.js";
 import Documentary from "../models/Documentary.js";
 import Activity from "../models/Activity.js";
 import GemDiscovery from "../models/GemDiscovery.js";
@@ -108,7 +110,7 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
   // quand une seule source remplit exactement la page (ex. onglet Médias).
   const cap = limit + 1;
 
-  const [reposts, docs, watched, liked, commented, later, acts, gems, downloads] =
+  const [reposts, docs, watched, liked, commented, later, acts, gems, downloads, trackerMatches] =
     await Promise.all([
     Repost.find({ user: userScope, ...lt("createdAt") })
       .sort({ createdAt: -1 })
@@ -196,6 +198,18 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
       : Download.find({ user: userScope, ...lt("createdAt") })
           .sort({ createdAt: -1 })
           .limit(cap)
+          .populate("user", "username avatar")
+          .lean(),
+    // Parties de jeux trackés (Marvel Rivals…) — datées par `playedAt` (heure
+    // réelle de la partie), regroupées en « a enchaîné N parties sur … ».
+    !wantAll
+      ? Promise.resolve([])
+      : TrackerMatch.find({
+          user: userScope,
+          ...(hasBefore ? { playedAt: { $lt: before } } : {}),
+        })
+          .sort({ playedAt: -1 })
+          .limit(limit * 3) // plusieurs parties fusionnent en une carte
           .populate("user", "username avatar")
           .lean(),
   ]);
@@ -481,6 +495,18 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
       action: a.type,
       target: person(a.target),
       snippet: a.snippet || "",
+      // Commentaire/réponse visé → permet d'ouvrir le fil focalisé au clic.
+      commentId: a.comment ? String(a.comment) : null,
+      // Propriétaire de l'avis commenté (pour ouvrir le bon fil de réponses).
+      // Pour un commentaire racine / une réaction, la cible EST le propriétaire ;
+      // pour une réponse, on l'a stocké dans meta.reviewUser.
+      reviewOwnerId:
+        a.meta?.reviewUser ||
+        (a.type === "review_comment" || a.type === "review_react"
+          ? a.target
+            ? String(a.target._id)
+            : null
+          : null),
       list: onList ? listMini(a.list) : null,
       game: a.game
         ? {
@@ -568,6 +594,28 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
   // --- Activités vidéo : regardée / aimée / commentée / « plus tard ». Chaque
   //     type est regroupé en rafale (« a aimé N vidéos ») comme les visionnages,
   //     via une carte générique { type: videoact(group), kind }. ---
+  // Qui a recommandé chaque vidéo aimée ? Une vidéo « aimée » l'a été depuis une
+  // recommandation d'un autre joueur (pool du feed) → carte « a aimé une
+  // recommandation de X » avec l'avatar du recommandeur. On prend le premier
+  // à l'avoir recommandée.
+  const likedVideoIds = [
+    ...new Set(liked.filter((d) => d.user).map((d) => d.videoId)),
+  ];
+  const recommenderByVideo = new Map();
+  if (likedVideoIds.length) {
+    const recs = await Documentary.find({
+      videoId: { $in: likedVideoIds },
+      recommended: true,
+    })
+      .sort({ recommendedAt: 1 })
+      .populate("user", "username avatar")
+      .lean();
+    for (const r of recs) {
+      if (r.user && !recommenderByVideo.has(r.videoId))
+        recommenderByVideo.set(r.videoId, person(r.user));
+    }
+  }
+
   const actVideo = (d) => ({
     id: String(d._id),
     videoId: d.videoId,
@@ -578,6 +626,7 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
     positionSeconds: d.positionSeconds || 0,
     durationSeconds: d.durationSeconds || 0,
     game: d.gameId ? { id: d.gameId, name: d.gameName } : null,
+    recommender: recommenderByVideo.get(d.videoId) || null,
   });
   const pushVideoActivity = (kind, list, dateField) => {
     const items = list
@@ -673,6 +722,89 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
         });
       } else {
         events.push(c.members[0]);
+      }
+    }
+  }
+
+  // --- Parties de jeux trackés (Marvel Rivals…) : plusieurs parties d'affilée
+  //     du même joueur (même provider) rapprochées dans le temps → UNE carte
+  //     « a enchaîné N parties sur … » avec le héros le plus joué + bilan W/L
+  //     et KDA moyen. Une seule partie = carte simple. ---
+  {
+    const byUser = new Map();
+    for (const m of trackerMatches) {
+      if (!m.user) continue;
+      const k = `${m.user._id}-${m.provider}`;
+      (byUser.get(k) || byUser.set(k, []).get(k)).push(m);
+    }
+    for (const list of byUser.values()) {
+      list.sort((a, b) => new Date(b.playedAt) - new Date(a.playedAt));
+      const clusters = [];
+      for (const m of list) {
+        const last = clusters[clusters.length - 1];
+        if (last && new Date(last.lastDate) - new Date(m.playedAt) <= GROUP_GAP) {
+          last.members.push(m);
+          last.lastDate = m.playedAt;
+        } else {
+          clusters.push({ members: [m], date: m.playedAt, lastDate: m.playedAt });
+        }
+      }
+      for (const c of clusters) {
+        const m0 = c.members[0];
+        const provider = m0.provider;
+        const gameName = PROVIDER_LABEL[provider] || provider;
+        const matchOut = (m) => ({
+          matchUid: m.matchUid,
+          hero: m.hero || null,
+          k: m.k,
+          d: m.d,
+          a: m.a,
+          kda: m.kda,
+          win: m.win,
+          mode: m.mode,
+          date: m.playedAt,
+        });
+        if (c.members.length >= 2) {
+          const wins = c.members.filter((m) => m.win).length;
+          // Héros le plus joué du cluster (pour la vignette de la carte).
+          const heroCount = new Map();
+          for (const m of c.members) {
+            const key = m.hero?.name || "?";
+            const e = heroCount.get(key) || { count: 0, hero: m.hero };
+            e.count++;
+            heroCount.set(key, e);
+          }
+          const topHero =
+            [...heroCount.values()].sort((a, b) => b.count - a.count)[0]?.hero || null;
+          const avgKda =
+            Math.round(
+              (c.members.reduce((s, m) => s + (m.kda || 0), 0) / c.members.length) * 10
+            ) / 10;
+          events.push({
+            type: "trackermatchgroup",
+            id: `tm-g-${m0._id}`,
+            date: c.date,
+            user: person(m0.user),
+            provider,
+            game: gameName,
+            count: c.members.length,
+            wins,
+            losses: c.members.length - wins,
+            avgKda,
+            topHero,
+            matches: c.members.map(matchOut),
+          });
+        } else {
+          events.push({
+            type: "trackermatch",
+            id: `tm-${m0._id}`,
+            date: c.date,
+            user: person(m0.user),
+            provider,
+            game: gameName,
+            match: matchOut(m0),
+          });
+        }
       }
     }
   }

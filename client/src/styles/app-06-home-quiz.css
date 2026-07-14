@@ -374,6 +374,29 @@
   align-items: flex-start;
 }
 
+/* Carte « nue » (ex. « a envie de jouer à X ») : une seule ligne, petite
+   jaquette à gauche + nom, au lieu de gaspiller deux lignes pour l'image. */
+.hf-game-body.bare {
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.hf-game-body.bare .hf-cover {
+  width: 40px;
+  border-radius: 8px;
+}
+
+.hf-game-bare-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .hf-cover {
   width: 74px;
   flex-shrink: 0;
@@ -696,6 +719,15 @@
   overflow-wrap: anywhere;
 }
 
+/* Carte d'interaction cliquable (ouvre le fil focalisé sur la réponse). */
+.hf-interaction.clickable {
+  cursor: pointer;
+}
+
+.hf-interaction.clickable:hover .hf-int-quote {
+  border-left-color: var(--accent-ink);
+}
+
 /* Renvoi vers l'avis (contexte review) */
 .hf-int-gamechip {
   display: inline-flex;
@@ -938,6 +970,14 @@
   object-fit: cover;
   display: block;
   transition: transform 0.3s ease, opacity 0.2s ease;
+}
+
+/* Vidéo recommandée : sur desktop, borner la largeur de la miniature — sinon
+   elle mange toute la carte. (Ne concerne pas les cards d'activité .hf-vact.) */
+@media (min-width: 700px) {
+  .hf-video:not(.hf-vact):not(.hf-vact-group) .hf-video-thumb {
+    max-width: 440px;
+  }
 }
 
 .hf-video-thumb:hover img {
@@ -3279,6 +3319,116 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   overflow-wrap: anywhere;
+}
+
+/* Mini-carte « a aimé une recommandation de X » : miniature réduite à gauche,
+   infos à droite, avatar du recommandeur en pastille sur la miniature. */
+.hf-vmini-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+}
+
+.hf-vmini-thumb {
+  position: relative;
+  flex-shrink: 0;
+  width: 148px;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #000;
+}
+
+.hf-vmini-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.94;
+  transition: opacity 0.15s ease, transform 0.25s ease;
+}
+
+.hf-vmini-row:hover .hf-vmini-thumb img {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+.hf-vmini-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 10, 14, 0.6);
+  color: #ffd24a;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.hf-vmini-row:hover .hf-vmini-play {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.hf-vmini-rec {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  background: var(--surface-2);
+}
+
+.hf-vmini-rec img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hf-vmini-rec-fb {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.hf-vmini-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.hf-vmini-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.hf-vmini-by {
+  font-size: 0.78rem;
+  color: var(--text-soft);
 }
 
 /* État actif générique d'un bouton d'action du fil (ex. « Plus tard » vidéo). */
@@ -8246,6 +8396,15 @@
 .rvcm-item {
   display: flex;
   gap: 0.6rem;
+}
+
+/* Réponse mise en avant à l'ouverture du fil depuis le feed d'accueil. */
+.rvcm-item.is-focused {
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--orange) 9%, transparent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--orange) 40%, transparent);
+  padding: 0.5rem;
+  margin: -0.2rem 0;
 }
 
 .rvcm-av {

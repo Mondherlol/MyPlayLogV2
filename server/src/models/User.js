@@ -61,6 +61,11 @@ const userSchema = new mongoose.Schema(
     // défaut. `overviewCards` : détails affichés sur les jaquettes (note, heures…).
     overviewOrder: { type: [String], default: [] },
     overviewCards: { type: [String], default: [] },
+    // Ordre manuel des jeux À L'INTÉRIEUR d'une section (favoris, en cours…) :
+    // objet { sectionKey: [gameId,…] }. Une section présente ici est en tri
+    // « manuel » (les jeux suivent cet ordre, les nouveaux tombent à la fin) ;
+    // une section absente reste en tri « récemment modifié » (par défaut).
+    overviewGameOrder: { type: mongoose.Schema.Types.Mixed, default: {} },
 
     // --- Connexion Steam (liaison OpenID « Sign in through Steam ») ---
     // On garde le SteamID64 + un instantané du profil public (pseudo, avatar).
@@ -163,6 +168,7 @@ userSchema.methods.toPublic = function () {
     ostOrder: this.ostOrder || [],
     overviewOrder: this.overviewOrder || [],
     overviewCards: this.overviewCards || [],
+    overviewGameOrder: this.overviewGameOrder || {},
     psnConnected: !!(this.psn && this.psn.refreshToken),
     steamConnected: !!(this.steam && this.steam.steamId),
     steam: this.steam?.steamId

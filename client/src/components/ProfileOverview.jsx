@@ -12,6 +12,7 @@ import {
   useSortable,
   arrayMove,
   verticalListSortingStrategy,
+  rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
@@ -218,6 +219,40 @@ function SortableBlock({ id, editing, children }) {
   );
 }
 
+// Jaquette réordonnable À L'INTÉRIEUR d'une section (tri manuel des jeux). On
+// arrête la propagation du pointerdown pour que saisir un jeu ne déclenche PAS
+// aussi le glissé de la section entière (qui est elle-même une poignée). Le
+// clic (< 6px) passe quand même vers la navigation grâce à la contrainte de
+// distance du capteur.
+function SortableGameTile({ id, children }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition: isDragging ? "none" : transition,
+    touchAction: "none",
+  };
+  const composed = {
+    ...listeners,
+    onPointerDown: (e) => {
+      listeners?.onPointerDown?.(e);
+      e.stopPropagation();
+    },
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`pf-game-sortable ${isDragging ? "dragging" : ""}`}
+      {...attributes}
+      {...composed}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function ProfileOverview({
   favorites,
   library,
@@ -235,10 +270,14 @@ export default function ProfileOverview({
   const [editing, setEditing] = useState(false);
   const [order, setOrder] = useState(() => resolveOrder(profile.overviewOrder));
   const [cards, setCards] = useState(() => resolveCards(profile.overviewCards));
+  // Ordre manuel des jeux par section : { sectionKey: [gameId,…] }. Une section
+  // présente ⇒ tri manuel (drag & drop) ; absente ⇒ tri « récemment modifié ».
+  const [gameOrder, setGameOrder] = useState(() => profile.overviewGameOrder || {});
 
   // Resynchronise avec le serveur quand on n'édite pas (revalidation en fond).
   const savedOrderKey = (profile.overviewOrder || []).join("|");
   const savedCardsKey = (profile.overviewCards || []).join("|");
+  const savedGameOrderKey = JSON.stringify(profile.overviewGameOrder || {});
   useEffect(() => {
     if (!editing) setOrder(resolveOrder(profile.overviewOrder));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -247,9 +286,17 @@ export default function ProfileOverview({
     if (!editing) setCards(resolveCards(profile.overviewCards));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedCardsKey]);
+  useEffect(() => {
+    if (!editing) setGameOrder(profile.overviewGameOrder || {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedGameOrderKey]);
 
   const showAside = library.length > 0;
   const PREVIEW = 6;
+  // Nombre max de jaquettes rendues glissables d'un coup (mode édition des
+  // favoris) : au-delà, réordonner à la main n'a plus de sens et rendre des
+  // centaines de tuiles plomberait les perfs — le surplus suit en « récent ».
+  const MANUAL_MAX = 60;
 
   // Dates de sortie des jeux « à jouer » : non stockées en base, on interroge
   // /games/releases avec les ids de la wishlist (l'endpoint ne renvoie que les
@@ -296,6 +343,23 @@ export default function ProfileOverview({
       return library.filter((e) => e.status === "wishlist" && !releaseMap[e.gameId]);
     return library.filter((e) => e.status === key);
   };
+
+  // Seule la section « favoris » est ordonnée manuellement (glisser-déposer) ;
+  // les autres restent toujours en tri « récemment modifié ».
+  // Applique l'ordre manuel enregistré des favoris : les jeux absents de l'ordre
+  // (fraîchement ajoutés en favori) retombent à la fin, du plus récent au plus
+  // ancien — comme le tri par défaut.
+  const sortedFavorites = () => {
+    const ord = gameOrder.favorites;
+    if (!Array.isArray(ord)) return favorites;
+    const rank = new Map(ord.map((id, i) => [id, i]));
+    return favorites.slice().sort((a, b) => {
+      const ra = rank.has(a.gameId) ? rank.get(a.gameId) : Infinity;
+      const rb = rank.has(b.gameId) ? rank.get(b.gameId) : Infinity;
+      if (ra !== rb) return ra - rb;
+      return new Date(b.updatedAt) - new Date(a.updatedAt);
+    });
+  };
   // Chez soi : toutes les sections (même vides, pour pouvoir ajouter). Chez les
   // autres : on masque les sections sans jeu. « Jeux attendus » est dérivée
   // (pas d'ajout manuel possible) : masquée dès qu'elle est vide.
@@ -329,13 +393,90 @@ export default function ProfileOverview({
     });
   }
 
+  // Réordonne les favoris (drag & drop). On repart de l'ordre AFFICHÉ (complet,
+  // via sortedFavorites) et non du seul tableau enregistré : ainsi les jeux mis
+  // en favori après coup (rangés à la fin) restent déplaçables et l'ordre complet
+  // est réenregistré.
+  function onGameDragEnd(e) {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const cur = sortedFavorites().map((x) => x.gameId);
+    const from = cur.indexOf(active.id);
+    const to = cur.indexOf(over.id);
+    if (from < 0 || to < 0) return;
+    const next = { ...gameOrder, favorites: arrayMove(cur, from, to) };
+    setGameOrder(next);
+    onSavePrefs?.({ overviewGameOrder: next });
+  }
+
   function renderBlockInner(key, isFirst) {
     const meta = BLOCK_META[key];
     const isFav = key === "favorites";
     const isUpcoming = key === "upcoming";
-    const list = listOf(key);
-    const preview = list.slice(0, PREVIEW);
-    const rest = list.slice(PREVIEW);
+    // Favoris : toujours rangés manuellement (glissables en édition). Les autres
+    // sections restent en tri « récemment modifié ».
+    const list = isFav ? sortedFavorites() : listOf(key);
+    // En édition, les favoris sont glissables : on montre jusqu'à MANUAL_MAX
+    // jaquettes (pour pouvoir en remonter n'importe laquelle) ; le surplus suit
+    // en récent. Hors favoris (ou hors édition), simple aperçu de 6.
+    const draggable = isFav && editing;
+    const preview = draggable ? list.slice(0, MANUAL_MAX) : list.slice(0, PREVIEW);
+    const rest = draggable ? [] : list.slice(PREVIEW);
+    const overflow = draggable ? list.length - preview.length : 0;
+
+    const tiles = preview.map((e) => {
+      const tile = (
+        <CoverTile
+          key={e.gameId}
+          entry={e}
+          fav={isFav}
+          fields={cards}
+          editing={editing}
+          releaseTs={isUpcoming ? releaseMap[e.gameId] : null}
+        />
+      );
+      return draggable ? (
+        <SortableGameTile key={e.gameId} id={e.gameId}>
+          {tile}
+        </SortableGameTile>
+      ) : (
+        tile
+      );
+    });
+    const rowExtras = (
+      <>
+        {rest.length > 0 && (
+          <ShowMoreTile
+            rest={rest}
+            onClick={() => goAllGames(isFav ? { fav: "1" } : { st: isUpcoming ? "wishlist" : key })}
+          />
+        )}
+        {/* Trop de favoris pour tout ranger à la main : le reste suit en récent. */}
+        {overflow > 0 && (
+          <span className="pf-order-more" title="Ces jeux suivent l'ordre récent, après ceux que tu ranges">
+            +{overflow} à la suite
+          </span>
+        )}
+        {!draggable &&
+          isMe &&
+          !isUpcoming &&
+          list.length <= PREVIEW &&
+          Array.from({ length: Math.max(1, PREVIEW - list.length) }).map((_, i) => (
+            <button
+              key={`add-${i}`}
+              className="cover-add clickable"
+              onClick={() => (isFav ? onAddFavorite() : onAddStatus(key, meta.label))}
+              title={isFav ? "Ajouter un favori" : `Ajouter à ${meta.label}`}
+            >
+              <Plus size={26} />
+            </button>
+          ))}
+        {isFav && !favorites.length && !isMe && (
+          <p className="pf-section-empty font-fun">Aucun favori pour l'instant.</p>
+        )}
+      </>
+    );
+
     return (
       <>
         <h2 className="profile-section-title">
@@ -360,40 +501,26 @@ export default function ProfileOverview({
             </button>
           )}
         </h2>
-        <div className="cover-row">
-          {preview.map((e) => (
-            <CoverTile
-              key={e.gameId}
-              entry={e}
-              fav={isFav}
-              fields={cards}
-              editing={editing}
-              releaseTs={isUpcoming ? releaseMap[e.gameId] : null}
-            />
-          ))}
-          {rest.length > 0 && (
-            <ShowMoreTile
-              rest={rest}
-              onClick={() => goAllGames(isFav ? { fav: "1" } : { st: isUpcoming ? "wishlist" : key })}
-            />
-          )}
-          {isMe &&
-            !isUpcoming &&
-            list.length <= PREVIEW &&
-            Array.from({ length: Math.max(1, PREVIEW - list.length) }).map((_, i) => (
-              <button
-                key={`add-${i}`}
-                className="cover-add clickable"
-                onClick={() => (isFav ? onAddFavorite() : onAddStatus(key, meta.label))}
-                title={isFav ? "Ajouter un favori" : `Ajouter à ${meta.label}`}
-              >
-                <Plus size={26} />
-              </button>
-            ))}
-          {isFav && !favorites.length && !isMe && (
-            <p className="pf-section-empty font-fun">Aucun favori pour l'instant.</p>
-          )}
-        </div>
+        {draggable && (
+          <p className="pf-order-hint font-fun">
+            <GripVertical size={13} /> Glisse les jaquettes pour choisir l'ordre de tes favoris.
+          </p>
+        )}
+        {draggable ? (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onGameDragEnd}>
+            <SortableContext items={preview.map((e) => e.gameId)} strategy={rectSortingStrategy}>
+              <div className="cover-row">
+                {tiles}
+                {rowExtras}
+              </div>
+            </SortableContext>
+          </DndContext>
+        ) : (
+          <div className="cover-row">
+            {tiles}
+            {rowExtras}
+          </div>
+        )}
       </>
     );
   }
