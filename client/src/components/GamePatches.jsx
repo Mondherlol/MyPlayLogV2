@@ -19,6 +19,7 @@ import {
   Loader2,
   ShieldCheck,
   Boxes,
+  Disc3,
 } from "lucide-react";
 import { apiFetch, API_BASE } from "../lib/api";
 import { makeCache } from "../lib/cache";
@@ -610,6 +611,88 @@ function FitGirlBlock({ gameId, token, game }) {
   );
 }
 
+// --- Bloc « Téléchargement Ziperto » : résultats Ziperto (ROMs/NSP/XCI Switch &
+// 3DS, jeux PC, VPK PS Vita…), chargés à la demande. Chaque résultat = jaquette +
+// titre + plateforme + lien vers la page du jeu (le lien de téléchargement s'y
+// trouve). Rendu pour tout jeu (le site couvre de nombreuses plateformes). ---
+function ZipertoBlock({ gameId, token, game }) {
+  const [state, setState] = useState({ loading: true, data: null, error: false });
+
+  useEffect(() => {
+    let alive = true;
+    setState({ loading: true, data: null, error: false });
+    apiFetch(`/games/${gameId}/ziperto`, { token })
+      .then((d) => alive && setState({ loading: false, data: d, error: false }))
+      .catch(() => alive && setState({ loading: false, data: null, error: true }));
+    return () => {
+      alive = false;
+    };
+  }, [gameId, token]);
+
+  const results = state.data?.results || [];
+
+  return (
+    <section className="gp-block">
+      <BlockHead Icon={Disc3} title="Téléchargement Ziperto" hint="NSP/XCI · Jeux Switch" />
+      {state.loading ? (
+        <PatchSkeleton rows={2} />
+      ) : state.error ? (
+        <div className="gp-troph-empty">
+          <Disc3 size={26} />
+          <p className="font-fun">Impossible de charger les résultats pour l'instant.</p>
+        </div>
+      ) : !results.length ? (
+        <div className="gp-troph-empty">
+          <Disc3 size={26} />
+          <p className="font-fun">Aucun résultat trouvé sur Ziperto pour ce jeu.</p>
+        </div>
+      ) : (
+        <div className="gp-hd-list">
+          {results.map((r, i) => (
+            <div className="gp-hd-row" key={r.page || i}>
+              <div className="gp-hd-cover">
+                {r.cover ? (
+                  <img src={r.cover} alt="" loading="lazy" />
+                ) : (
+                  <Disc3 size={18} />
+                )}
+              </div>
+              <div className="gp-hd-main">
+                <span className="gp-hd-title" title={r.title}>
+                  {r.title}
+                </span>
+                <div className="gp-hd-meta">
+                  {r.platform && (
+                    <span className="gp-hd-badge">
+                      <Gamepad2 size={11} /> {r.platform}
+                    </span>
+                  )}
+                  {r.date && <span className="gp-hd-age">{r.date}</span>}
+                </div>
+              </div>
+              <div className="gp-hd-actions">
+                {r.page && (
+                  <a
+                    href={r.page}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="gp-hd-page clickable"
+                    title="Voir sur Ziperto"
+                    onClick={() => logDownload(gameId, token, game, "Ziperto")}
+                  >
+                    <ExternalLink size={13} />
+                    <span>Ziperto</span>
+                  </a>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 // --- Onglet Patchs : Pack HD (C411) + patch FR Switch (nxbrew) + repacks FitGirl
 // (PC) + fan-traduction FR des visual novels non traduits (VNDB) + liens de
 // recherche de mods. ---
@@ -673,6 +756,11 @@ export default function GamePatches({ gameId, token, game = null }) {
 
       {/* Repacks FitGirl — seulement si jeu PC */}
       {data.isPc && <FitGirlBlock gameId={gameId} token={token} game={game} />}
+
+      {/* Ziperto (NSP/XCI) — seulement si jeu Switch, comme nxbrew */}
+      {data.isSwitch && (
+        <ZipertoBlock gameId={gameId} token={token} game={game} />
+      )}
 
       {/* Traduction FR (visual novels sans version française) */}
       {vn !== null && (

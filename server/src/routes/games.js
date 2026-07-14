@@ -28,6 +28,7 @@ import { GENRES_FR, MODES_FR, THEMES_FR, LANGUAGES_FR, frName } from "../lib/tra
 import { ensureScraped, ytPlaylistTracks } from "../lib/ostScrape.js";
 import { fetchC411Packs, fetchC411Torrent, rewriteAnnounce } from "../lib/c411.js";
 import { fetchFitgirlRepacks } from "../lib/fitgirl.js";
+import { fetchZipertoGames } from "../lib/ziperto.js";
 
 function youtubeId(url) {
   const m = String(url).match(
@@ -1386,6 +1387,27 @@ router.get("/:id/fitgirl", optionalAuth, async (req, res) => {
     res.json({ name: g.name, repacks });
   } catch (err) {
     console.error("game fitgirl error:", err.message);
+    res.status(err.status || 500).json({ error: err.message || "Erreur." });
+  }
+});
+
+// --- Résultats Ziperto (ROMs/NSP/XCI Switch & 3DS, jeux PC, VPK PS Vita…) pour un
+// jeu, chargés à la demande depuis l'onglet Patchs (le scraping externe est lent).
+// Renvoie une liste de posts avec titre, plateforme, jaquette et lien vers la page
+// du jeu sur Ziperto (le lien de téléchargement se trouve sur cette page). ---
+router.get("/:id/ziperto", optionalAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+
+    const arr = await igdbQuery("games", `fields name; where id = ${id};`);
+    const g = arr[0];
+    if (!g) return res.status(404).json({ error: "Jeu introuvable." });
+
+    const results = await fetchZipertoGames(g.name);
+    res.json({ name: g.name, results });
+  } catch (err) {
+    console.error("game ziperto error:", err.message);
     res.status(err.status || 500).json({ error: err.message || "Erreur." });
   }
 });
