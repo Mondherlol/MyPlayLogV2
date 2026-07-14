@@ -1804,6 +1804,45 @@ button.pf-stat:hover {
   box-shadow: var(--shadow-sm);
 }
 
+/* Scrollbars dorées, fines et sobres pour toutes les zones défilantes des
+   filtres (panneau, liste de consoles, options des sections). Le défaut du
+   navigateur ressort trop sur fond sombre ; ici on colle au thème doré. */
+.pg-panel,
+.pg-chips-scroll,
+.pg-panel .filter-options {
+  scrollbar-width: thin;
+  scrollbar-color: var(--orange) transparent;
+}
+
+.pg-panel::-webkit-scrollbar,
+.pg-chips-scroll::-webkit-scrollbar,
+.pg-panel .filter-options::-webkit-scrollbar {
+  width: 8px;
+}
+
+.pg-panel::-webkit-scrollbar-track,
+.pg-chips-scroll::-webkit-scrollbar-track,
+.pg-panel .filter-options::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pg-panel::-webkit-scrollbar-thumb,
+.pg-chips-scroll::-webkit-scrollbar-thumb,
+.pg-panel .filter-options::-webkit-scrollbar-thumb {
+  background: var(--accent-grad);
+  border-radius: 999px;
+  /* Bordure transparente = coussin autour du pouce, plus fin et discret. */
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.pg-panel::-webkit-scrollbar-thumb:hover,
+.pg-chips-scroll::-webkit-scrollbar-thumb:hover,
+.pg-panel .filter-options::-webkit-scrollbar-thumb:hover {
+  background: var(--orange);
+  background-clip: padding-box;
+}
+
 .pg-panel-head {
   display: flex;
   align-items: center;
