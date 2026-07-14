@@ -20,6 +20,8 @@ import {
   Move,
   Image as ImageIcon,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Trash2,
   Repeat2,
   Film,
@@ -180,6 +182,10 @@ export default function Profile() {
   const coverMenuRef = useRef(null);
   const tabsTopRef = useRef(null);
   const tabsNavRef = useRef(null);
+  // Drag-to-scroll (souris) + flèches (desktop) de la barre d'onglets, qui
+  // déborde dès qu'il y a beaucoup d'onglets.
+  const tabDrag = useRef({ down: false, moved: false, startX: 0, startScroll: 0 });
+  const [tabScroll, setTabScroll] = useState({ left: false, right: false });
   useClickOutside(coverMenuRef, () => setCoverMenu(false), coverMenu);
 
   // Au changement d'onglet, ramène le contenu au début : on remonte juste sous
@@ -196,12 +202,98 @@ export default function Profile() {
 
   // Recentre horizontalement la barre d'onglets sur l'onglet actif (le met en
   // tête), pour qu'il ne reste pas coupé sur le bord. Le navigateur borne le
-  // scroll : le dernier onglet ne force pas de défilement inutile.
+  // scroll : le dernier onglet ne force pas de défilement inutile. `loading` en
+  // dépendance : la <nav> n'existe pas tant que le profil charge (early return),
+  // donc l'effet doit se rejouer quand elle apparaît.
   useEffect(() => {
     const nav = tabsNavRef.current;
     const active = nav?.querySelector(".profile-tab.active");
     if (active) nav.scrollTo({ left: active.offsetLeft - 12, behavior: "smooth" });
-  }, [tab]);
+    updateTabArrows();
+  }, [tab, loading]);
+
+  // Visibilité des flèches selon la position de scroll (masquées aux extrémités).
+  const updateTabArrows = () => {
+    const el = tabsNavRef.current;
+    if (!el) return;
+    const left = el.scrollLeft > 4;
+    const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
+    setTabScroll((s) => (s.left === left && s.right === right ? s : { left, right }));
+  };
+
+  // Recalcule les flèches à chaque changement de taille (contenu, polices, resize
+  // fenêtre) ET au scroll. Un ResizeObserver garantit une 1re mesure une fois la
+  // barre réellement mise en page. `loading` en dépendance : la <nav> apparaît
+  // seulement après le chargement du profil (early return).
+  useEffect(() => {
+    const el = tabsNavRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => updateTabArrows());
+    ro.observe(el);
+    const raf = requestAnimationFrame(updateTabArrows);
+    el.addEventListener("scroll", updateTabArrows, { passive: true });
+    window.addEventListener("resize", updateTabArrows);
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(raf);
+      el.removeEventListener("scroll", updateTabArrows);
+      window.removeEventListener("resize", updateTabArrows);
+    };
+  }, [loading]);
+
+  // Drag-to-scroll de la barre d'onglets (SOURIS uniquement — le tactile garde le
+  // scroll natif via overflow-x). On écoute pointermove/up sur window pour suivre
+  // le drag même quand le curseur passe sur un onglet ou sort de la barre. Pas de
+  // pointer capture (elle retargette le `click` et casse le clic des onglets).
+  // `el` est capturé au montage → `loading` en dépendance pour rejouer l'effet
+  // quand la <nav> apparaît.
+  useEffect(() => {
+    const el = tabsNavRef.current;
+    if (!el) return;
+    const onMove = (e) => {
+      if (!tabDrag.current.down) return;
+      const dx = e.clientX - tabDrag.current.startX;
+      if (Math.abs(dx) > 4) tabDrag.current.moved = true;
+      el.scrollLeft = tabDrag.current.startScroll - dx;
+    };
+    const onUp = () => {
+      if (!tabDrag.current.down) return;
+      tabDrag.current.down = false;
+      el.classList.remove("dragging");
+      setTimeout(() => (tabDrag.current.moved = false), 0);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [loading]);
+
+  function onTabsPointerDown(e) {
+    if (e.pointerType !== "mouse" || e.button !== 0) return;
+    const el = tabsNavRef.current;
+    if (!el) return;
+    tabDrag.current = {
+      down: true,
+      moved: false,
+      startX: e.clientX,
+      startScroll: el.scrollLeft,
+    };
+    el.classList.add("dragging");
+  }
+  // Après un drag, on annule le clic pour ne pas changer d'onglet par erreur.
+  function onTabsClickCapture(e) {
+    if (tabDrag.current.moved) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }
+  function scrollTabs(dir) {
+    const el = tabsNavRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * el.clientWidth * 0.6, behavior: "smooth" });
+  }
 
   // Swipe gauche/droite (mobile) → onglet précédent / suivant.
   const swipeTab = (dir) => {
@@ -756,7 +848,22 @@ export default function Profile() {
       {/* ---------- Onglets ---------- */}
       {/* Ancre (hors flux sticky) pour recaler le scroll au changement d'onglet. */}
       <div ref={tabsTopRef} aria-hidden="true" />
-      <nav className="profile-tabs" ref={tabsNavRef}>
+      <div className="profile-tabs-wrap">
+        <button
+          className={`profile-tabs-arrow left clickable ${tabScroll.left ? "show" : ""}`}
+          onClick={() => scrollTabs(-1)}
+          aria-label="Onglets précédents"
+          tabIndex={-1}
+        >
+          <ChevronLeft size={20} />
+        </button>
+        <nav
+          className="profile-tabs"
+          ref={tabsNavRef}
+          onPointerDown={onTabsPointerDown}
+          onClickCapture={onTabsClickCapture}
+          onDragStart={(e) => e.preventDefault()}
+        >
         <button
           className={`profile-tab ${tab === "overview" ? "active" : ""}`}
           onClick={() => setTab("overview")}
@@ -823,7 +930,16 @@ export default function Profile() {
           <Send size={16} /> Recommandations
           {c.recommendations > 0 && <span className="tab-count">{c.recommendations}</span>}
         </button>
-      </nav>
+        </nav>
+        <button
+          className={`profile-tabs-arrow right clickable ${tabScroll.right ? "show" : ""}`}
+          onClick={() => scrollTabs(1)}
+          aria-label="Onglets suivants"
+          tabIndex={-1}
+        >
+          <ChevronRight size={20} />
+        </button>
+      </div>
 
       {/* Enveloppe des onglets : une hauteur minimale garantit que la page ne se
           « ratatine » pas pendant qu'un onglet asynchrone charge (spinner court).

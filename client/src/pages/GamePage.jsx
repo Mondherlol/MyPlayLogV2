@@ -311,7 +311,7 @@ export default function GamePage() {
     const active = nav?.querySelector(".gp-tab.active");
     if (active) nav.scrollTo({ left: active.offsetLeft - 12, behavior: "smooth" });
     updateTabArrows();
-  }, [tab]);
+  }, [tab, loading]);
 
   // Visibilité des flèches selon la position de scroll (masquées aux extrémités).
   const updateTabArrows = () => {
@@ -339,7 +339,10 @@ export default function GamePage() {
       el.removeEventListener("scroll", updateTabArrows);
       window.removeEventListener("resize", updateTabArrows);
     };
-  }, []);
+    // `loading` en dépendance : la <nav> n'existe pas tant que le jeu charge
+    // (early return), donc l'effet doit se rejouer quand elle apparaît, sinon
+    // le ResizeObserver n'est jamais branché et les flèches ne se calculent pas.
+  }, [loading]);
 
   // Drag-to-scroll de la barre d'onglets (SOURIS uniquement — le tactile garde le
   // scroll natif via overflow-x). On écoute pointermove/up sur window pour suivre
@@ -369,7 +372,10 @@ export default function GamePage() {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
     };
-  }, []);
+    // `loading` en dépendance : `el` est capturé au montage de l'effet ; comme la
+    // <nav> n'existe pas pendant le chargement du jeu (early return), il faut
+    // rejouer l'effet à son apparition pour capter la vraie référence.
+  }, [loading]);
 
   function onTabsPointerDown(e) {
     if (e.pointerType !== "mouse" || e.button !== 0) return;
@@ -887,7 +893,7 @@ export default function GamePage() {
                 aria-label="Onglets précédents"
                 tabIndex={-1}
               >
-                <ChevronLeft size={18} />
+                <ChevronLeft size={20} />
               </button>
               <nav
                 className="gp-tabs"
@@ -918,7 +924,7 @@ export default function GamePage() {
                 aria-label="Onglets suivants"
                 tabIndex={-1}
               >
-                <ChevronRight size={18} />
+                <ChevronRight size={20} />
               </button>
             </div>
 

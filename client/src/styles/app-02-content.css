@@ -3866,24 +3866,74 @@
 }
 
 /* Onglets */
+/* Enveloppe collée sous la topbar : elle porte le sticky pour que les flèches
+   (positionnées en absolu à l'intérieur) restent collées avec la barre. */
+.profile-tabs-wrap {
+  position: sticky;
+  top: var(--topbar-h, 60px);
+  z-index: 40;
+  margin-bottom: 1.6rem;
+}
+
 .profile-tabs {
   display: flex;
   align-items: stretch;
   gap: 0.3rem;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 1.6rem;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
-  /* Reste accroché sous la topbar : on change d'onglet sans remonter. */
-  position: sticky;
-  top: var(--topbar-h, 60px);
-  z-index: 40;
   background: var(--bg);
+  /* Empêche la sélection de texte qui rendait le drag saccadé sur les onglets. */
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .profile-tabs::-webkit-scrollbar {
   display: none;
+}
+
+/* Flèches de défilement (desktop uniquement — au tactile le scroll est natif).
+   Masquées par défaut, révélées via .show quand il reste des onglets à découvrir
+   de ce côté. Un dégradé de fond laisse deviner la coupe. */
+.profile-tabs-arrow {
+  position: absolute;
+  top: 0;
+  bottom: 1px;
+  width: 64px;
+  display: none;
+  align-items: center;
+  border: none;
+  padding: 0;
+  color: var(--text);
+  z-index: 2;
+}
+
+.profile-tabs-arrow.left {
+  left: 0;
+  justify-content: flex-start;
+  background: linear-gradient(to right, var(--bg) 55%, transparent);
+}
+
+.profile-tabs-arrow.right {
+  right: 0;
+  justify-content: flex-end;
+  background: linear-gradient(to left, var(--bg) 55%, transparent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .profile-tabs {
+    cursor: grab;
+  }
+  /* Pendant le drag, le curseur « poing fermé » l'emporte partout (y compris
+     au-dessus des onglets, qui ont normalement un curseur pointer). */
+  .profile-tabs.dragging,
+  .profile-tabs.dragging .profile-tab {
+    cursor: grabbing;
+  }
+  .profile-tabs-arrow.show {
+    display: inline-flex;
+  }
 }
 
 /* Contenu des onglets : hauteur plancher = ce qui reste sous les onglets collés.
