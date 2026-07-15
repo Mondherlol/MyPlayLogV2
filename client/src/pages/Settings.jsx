@@ -25,7 +25,7 @@ import { useLibrary } from "../context/LibraryContext";
 import SteamIcon from "../components/SteamIcon";
 import SteamImportModal from "../components/SteamImportModal";
 import PsnIcon from "../components/PsnIcon";
-import {
+import PsnImportModal, {
   ConsolePicker,
   GameSearchPicker,
   psConsolesFromPlatforms,
@@ -562,7 +562,7 @@ function PsnCard() {
   const [unlinkOpen, setUnlinkOpen] = useState(false);
   const [removeGames, setRemoveGames] = useState(false);
   const [sent, setSent] = useState(false);
-  const [pendingReload, setPendingReload] = useState(0);
+  const [importing, setImporting] = useState(false);
 
   async function load() {
     try {
@@ -633,6 +633,7 @@ function PsnCard() {
   const connected = status.connected;
   const psn = status.psn;
   const req = status.request; // { status } en cours, ou null
+  const scan = status.scan; // { games, unmatched, total } prêt à importer, ou null
 
   return (
     <div className={`import-card psn ${connected ? "connected" : ""}`}>
@@ -695,14 +696,23 @@ function PsnCard() {
       <div className="import-actions">
         {connected ? (
           <>
-            {!req && (
+            {scan && scan.total > 0 && !req && (
               <button
                 className="btn-psn-primary clickable"
+                onClick={() => setImporting(true)}
+              >
+                <Gamepad2 size={17} /> Importer mes jeux ({scan.total})
+              </button>
+            )}
+            {!req && (
+              <button
+                className="btn-ghost clickable"
                 onClick={() => requestSync(false)}
                 disabled={busy}
+                title="Relancer un scan de ta bibliothèque PlayStation"
               >
-                {busy ? <Loader2 className="spin" size={16} /> : <RefreshCw size={16} />} Demander
-                une synchro
+                {busy ? <Loader2 className="spin" size={16} /> : <RefreshCw size={16} />}{" "}
+                Actualiser
               </button>
             )}
             <button
@@ -740,13 +750,17 @@ function PsnCard() {
         </div>
       )}
 
-      {connected && (
-        <PsnPendingManager
-          token={token}
-          reloadKey={pendingReload}
-          onChanged={() => {
+      {/* Modale d'import : l'utilisateur valide jeu par jeu (statut, console,
+          trophées). Alimentée par le scan mis en cache par le worker maison. */}
+      {importing && (
+        <PsnImportModal
+          onClose={() => {
+            setImporting(false);
             load();
-            refresh();
+          }}
+          onDone={async () => {
+            await refresh();
+            await load();
           }}
         />
       )}

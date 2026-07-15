@@ -613,6 +613,9 @@ function GameAchievementsModal({ username, token, game, onClose }) {
   }, [username, token, game.gameId]);
 
   const all = data?.achievements || [];
+  // Fond illustré (artwork paysage) façon page jeu ; repli sur la jaquette
+  // tant que le détail n'est pas chargé ou si le jeu n'a pas d'artwork.
+  const backdrop = data?.backdrop || game.cover;
   const shown =
     tab === "unlocked"
       ? all.filter((a) => a.unlocked)
@@ -628,7 +631,7 @@ function GameAchievementsModal({ username, token, game, onClose }) {
         </button>
         <div
           className="ach-modal-head"
-          style={game.cover ? { "--ach-modal-bg": `url(${game.cover})` } : undefined}
+          style={backdrop ? { "--ach-modal-bg": `url(${backdrop})` } : undefined}
         >
           {game.cover && <img src={game.cover} alt="" className="ach-modal-cover" />}
           <div className="ach-modal-head-info">

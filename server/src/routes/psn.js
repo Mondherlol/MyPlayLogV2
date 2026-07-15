@@ -5,6 +5,7 @@ import GameAchievements from "../models/GameAchievements.js";
 import PendingImport from "../models/PendingImport.js";
 import Notification from "../models/Notification.js";
 import PsnSyncRequest from "../models/PsnSyncRequest.js";
+import PsnScan from "../models/PsnScan.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { warmGameMeta } from "../lib/gameMeta.js";
 import {
@@ -205,11 +206,23 @@ router.get("/status", requireAuth, async (req, res) => {
       user: req.userId,
       status: { $in: ["pending", "processing"] },
     }).select("status createdAt");
+    // Scan prêt (récupéré par le worker) → alimente « Importer mes jeux (N) ».
+    const scan = linked
+      ? await PsnScan.findOne({ user: req.userId }).select("gamesCount unmatchedCount scannedAt")
+      : null;
     res.json({
       configured: isConfigured(),
       connected: linked,
       pending,
       request: activeReq ? { status: activeReq.status, createdAt: activeReq.createdAt } : null,
+      scan: scan
+        ? {
+            games: scan.gamesCount || 0,
+            unmatched: scan.unmatchedCount || 0,
+            total: (scan.gamesCount || 0) + (scan.unmatchedCount || 0),
+            scannedAt: scan.scannedAt,
+          }
+        : null,
       psn: linked
         ? {
             onlineId: psn.onlineId || null,
@@ -313,6 +326,17 @@ router.delete("/", requireAuth, async (req, res) => {
     }
     // Les trophées PSN n'ont plus de source : on les retire toujours.
     await GameAchievements.deleteMany({ user: req.userId, platform: "psn" });
+    // Nettoyage complet : cache de scan, jeux « à valider »/ignorés, demandes en
+    // cours et notifs d'import — pour repartir de zéro.
+    await Promise.all([
+      PsnScan.deleteOne({ user: req.userId }),
+      PendingImport.deleteMany({ user: req.userId, platform: "psn" }),
+      PsnSyncRequest.deleteMany({
+        user: req.userId,
+        status: { $in: ["pending", "processing"] },
+      }),
+      Notification.deleteMany({ user: req.userId, type: "psn_ready" }),
+    ]);
 
     user.psn = { accountId: null, onlineId: null, avatar: null, connectedAt: null };
     await user.save();
@@ -541,11 +565,66 @@ router.post("/preview", requireAuth, async (req, res) => {
     if (!isLinked(user?.psn))
       return res.status(400).json({ error: "Aucun compte PSN lié." });
 
-    const accessToken = await getServiceAccessToken();
-    const { games, unmatched } = await scanPsn(req.userId, user.psn.accountId, accessToken);
+    const scan = await PsnScan.findOne({ user: req.userId }).lean();
+
+    // Pas encore de scan (le worker maison ne l'a pas encore traité) : on tente
+    // un scan en direct (marche en local ; bloqué depuis le VPS).
+    if (!scan) {
+      try {
+        const accessToken = await getServiceAccessToken();
+        const { games, unmatched } = await scanPsn(req.userId, user.psn.accountId, accessToken);
+        const counts = emptyCounts();
+        for (const g of games) counts[g.category] = (counts[g.category] || 0) + 1;
+        counts.unmatched = unmatched.length;
+        return res.json({ games, unmatched, counts });
+      } catch {
+        return res.json({ games: [], unmatched: [], counts: emptyCounts() });
+      }
+    }
+
+    // Scan en cache (worker) : on recalcule l'état « déjà en biblio » au moment
+    // présent + on retire les titres ignorés, puis on renvoie la forme attendue
+    // par la modale (id, category, currentStatus/currentHours).
+    const libRows = await UserGame.find({ user: req.userId }).select(
+      "gameId status playtimeHours"
+    );
+    const libMap = new Map(libRows.map((e) => [e.gameId, e]));
+    const ignoredRows = await PendingImport.find({
+      user: req.userId,
+      platform: "psn",
+      state: "ignored",
+    }).select("titleKey");
+    const ignoredSet = new Set(ignoredRows.map((r) => r.titleKey));
+
+    // Les trophées complets restent en base (utilisés à l'import) : on ne les
+    // renvoie PAS au navigateur (ce serait plusieurs Mo inutiles).
+    const light = ({ trophies, ...rest }) => rest;
 
     const counts = emptyCounts();
-    for (const g of games) counts[g.category] = (counts[g.category] || 0) + 1;
+    const games = [];
+    let idx = 0;
+    for (const g of scan.games || []) {
+      if (ignoredSet.has(g.titleKey)) continue;
+      const existing = libMap.get(Number(g.gameId));
+      const inLibrary = !!existing;
+      const category = inLibrary ? "update" : "played";
+      counts[category] = (counts[category] || 0) + 1;
+      games.push({
+        ...light(g),
+        id: String(idx++),
+        inLibrary,
+        category,
+        currentStatus: existing?.status || null,
+        currentHours: existing?.playtimeHours ?? null,
+        suggestedStatus: inLibrary ? existing.status : g.suggestedStatus,
+      });
+    }
+    const unmatched = [];
+    let uIdx = 0;
+    for (const g of scan.unmatched || []) {
+      if (ignoredSet.has(g.titleKey)) continue;
+      unmatched.push({ ...light(g), id: `u${uIdx++}` });
+    }
     counts.unmatched = unmatched.length;
 
     res.json({ games, unmatched, counts });
@@ -567,8 +646,6 @@ router.post("/import", requireAuth, async (req, res) => {
     const ignored = Array.isArray(req.body?.ignored) ? req.body.ignored : [];
     if (!items.length && !ignored.length)
       return res.json({ added: 0, updated: 0, achievements: 0 });
-
-    const accessToken = await getServiceAccessToken();
 
     let added = 0;
     let updated = 0;
@@ -595,14 +672,46 @@ router.post("/import", requireAuth, async (req, res) => {
         state: "pending",
       });
 
-    // Trophées : uniquement les jeux cochés « importer les trophées ».
+    // Trophées : uniquement les jeux cochés « importer les trophées ». On utilise
+    // les trophées PRÉ-RÉCUPÉRÉS par le worker (cache PsnScan) → aucun appel PSN
+    // depuis le VPS. Repli live (dev) si le cache est absent.
     const trophyItems = items.filter(
       (it) => it.importTrophies && it.npCommunicationId && Number(it.gameId)
     );
     let achievements = 0;
-    await pool(trophyItems, 3, async (it) => {
-      if (await syncTitleTrophies(req.userId, accountId, accessToken, it)) achievements++;
-    });
+    if (trophyItems.length) {
+      const scan = await PsnScan.findOne({ user: req.userId }).lean();
+      const trophyByNp = new Map();
+      for (const g of [...(scan?.games || []), ...(scan?.unmatched || [])]) {
+        if (g.npCommunicationId && Array.isArray(g.trophies) && g.trophies.length) {
+          trophyByNp.set(String(g.npCommunicationId), g);
+        }
+      }
+      let liveToken = null;
+      for (const it of trophyItems) {
+        const stored = trophyByNp.get(String(it.npCommunicationId));
+        if (stored) {
+          await writeStoredAchievements(req.userId, {
+            gameId: it.gameId,
+            name: it.name,
+            cover: it.cover,
+            npCommunicationId: it.npCommunicationId,
+            trophies: stored.trophies,
+            trophyTotal: stored.trophyTotal,
+            trophyUnlocked: stored.trophyUnlocked,
+          });
+          achievements++;
+        } else {
+          // Repli dev/localhost : récupération en direct depuis PSN.
+          try {
+            if (!liveToken) liveToken = await getServiceAccessToken();
+            if (await syncTitleTrophies(req.userId, accountId, liveToken, it)) achievements++;
+          } catch {
+            /* best-effort */
+          }
+        }
+      }
+    }
 
     res.json({ added, updated, achievements });
   } catch (err) {
@@ -881,38 +990,7 @@ async function notifyAdmin(type, snippet) {
     await Notification.create({ user: admin._id, type, actor: null, snippet }).catch(() => {});
 }
 
-// Écrit/rafraîchit un jeu « à valider » à partir d'un item renvoyé par le worker.
-async function upsertPendingFromWorker(userId, g) {
-  const titleKey = g.titleKey || simplifyName(g.psnName || g.name);
-  if (!titleKey) return;
-  const doc = {
-    psnName: g.psnName || g.name || null,
-    icon: g.icon || null,
-    playtimeHours: g.playtimeHours ?? null,
-    npCommunicationId: g.npCommunicationId || null,
-    npServiceName: g.npServiceName || null,
-    definedTrophies: g.definedTrophies || 0,
-    trophyProgress: g.trophyProgress ?? null,
-    hasPlatinum: !!g.hasPlatinum,
-    canImportTrophies: !!g.canImportTrophies,
-    gameId: g.gameId || null,
-    name: g.name || null,
-    cover: g.cover || null,
-    consoles: g.consoles || [],
-    suggestedConsole: g.suggestedConsole || null,
-    suggestedStatus: g.suggestedStatus || "paused",
-    trophies: Array.isArray(g.trophies) ? g.trophies : null,
-    trophyTotal: g.trophyTotal || 0,
-    trophyUnlocked: g.trophyUnlocked || 0,
-  };
-  await PendingImport.updateOne(
-    { user: userId, platform: "psn", titleKey },
-    { $set: doc, $setOnInsert: { state: "pending" } },
-    { upsert: true }
-  );
-}
-
-// Écrit directement les trophées d'un jeu DÉJÀ en bibliothèque (aucun appel PSN).
+// Écrit les trophées d'un jeu (depuis des trophées PRÉ-RÉCUPÉRÉS, aucun appel PSN).
 async function writeStoredAchievements(userId, g) {
   if (!Array.isArray(g.trophies) || !g.trophies.length || !g.gameId) return false;
   await GameAchievements.updateOne(
@@ -1049,62 +1127,43 @@ router.post("/worker/jobs/:id/result", requireWorker, async (req, res) => {
     const games = Array.isArray(body.games) ? body.games : [];
     const unmatched = Array.isArray(body.unmatched) ? body.unmatched : [];
 
-    const libRows = await UserGame.find({ user: user._id }).select(
-      "gameId playtimeHours psnPlaytimeHours"
+    // On NE touche PAS à la bibliothèque : on met le scan en cache. L'utilisateur
+    // choisira quoi importer via la modale « Importer mes jeux ».
+    await PsnScan.updateOne(
+      { user: user._id },
+      {
+        $set: {
+          games,
+          unmatched,
+          gamesCount: games.length,
+          unmatchedCount: unmatched.length,
+          scannedAt: new Date(),
+        },
+      },
+      { upsert: true }
     );
-    const libMap = new Map(libRows.map((r) => [r.gameId, r]));
-    const ignoredRows = await PendingImport.find({
-      user: user._id,
-      platform: "psn",
-      state: "ignored",
-    }).select("titleKey");
-    const ignoredSet = new Set(ignoredRows.map((r) => r.titleKey));
 
-    let trophiesWritten = 0;
+    await user.save();
 
-    for (const g of games) {
-      if (ignoredSet.has(g.titleKey)) continue;
-      const existing = libMap.get(Number(g.gameId));
-      if (existing) {
-        // Déjà en biblio : maj heures (respect saisie manuelle) + trophées.
-        const patch = nextPlaytime(existing, g.playtimeHours);
-        if (patch) await UserGame.updateOne({ _id: existing._id }, { $set: patch });
-        if (await writeStoredAchievements(user._id, g)) trophiesWritten++;
-      } else {
-        await upsertPendingFromWorker(user._id, g);
-      }
-    }
-    for (const g of unmatched) {
-      if (ignoredSet.has(g.titleKey)) continue;
-      await upsertPendingFromWorker(user._id, g);
-    }
-
-    const pendingCount = await PendingImport.countDocuments({
-      user: user._id,
-      platform: "psn",
-      state: "pending",
-    });
-
+    // Notif user : son import est prêt (à valider dans les Paramètres).
+    const detected = games.length + unmatched.length;
     await Notification.deleteMany({ user: user._id, type: "psn_ready", read: false });
     await Notification.create({
       user: user._id,
       type: "psn_ready",
       actor: null,
-      snippet: `Ton import PlayStation est prêt : ${pendingCount} jeu${
-        pendingCount > 1 ? "x" : ""
-      } à valider`,
+      snippet: `Ton import PlayStation est prêt : ${detected} jeu${
+        detected > 1 ? "x" : ""
+      } détecté${detected > 1 ? "s" : ""} — à valider`,
     }).catch(() => {});
-
-    user.psn.lastSyncAt = new Date();
-    await user.save();
 
     job.status = "done";
     job.error = null;
     job.processedAt = new Date();
-    job.summary = { games: games.length, trophies: trophiesWritten, pending: pendingCount };
+    job.summary = { games: games.length, trophies: 0, pending: unmatched.length };
     await job.save();
 
-    res.json({ ok: true, pending: pendingCount, trophies: trophiesWritten });
+    res.json({ ok: true, games: games.length, unmatched: unmatched.length });
   } catch (err) {
     console.error("psn worker result error:", err.message);
     res.status(500).json({ error: err.message || "Erreur d'ingestion." });

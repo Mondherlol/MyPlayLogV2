@@ -1455,10 +1455,33 @@ router.get("/:username/achievements/:gameId", optionalAuth, async (req, res) => 
       if (a.unlocked) return new Date(b.unlockedAt || 0) - new Date(a.unlockedAt || 0);
       return (b.rarity ?? -1) - (a.rarity ?? -1);
     });
+
+    // Fond illustré (artwork large, jamais la jaquette portrait) façon page jeu,
+    // pour l'en-tête de la modale. Best-effort : si IGDB échoue, le client
+    // retombe sur la jaquette.
+    let backdrop = null;
+    try {
+      const IMG_BASE = "https://images.igdb.com/igdb/image/upload";
+      const arr = await igdbQuery(
+        "games",
+        `fields artworks.image_id,artworks.width,artworks.height,screenshots.image_id,screenshots.width,screenshots.height; where id = ${doc.gameId};`
+      );
+      const g = arr[0] || {};
+      const byArea = (a, b) =>
+        (b.width || 0) * (b.height || 0) - (a.width || 0) * (a.height || 0);
+      const art = (g.artworks || []).filter((a) => a.image_id).sort(byArea)[0];
+      const shot = (g.screenshots || []).filter((s) => s.image_id).sort(byArea)[0];
+      const pick = art || shot;
+      if (pick) backdrop = `${IMG_BASE}/t_1080p/${pick.image_id}.jpg`;
+    } catch (e) {
+      /* pas de backdrop → repli jaquette côté client */
+    }
+
     res.json({
       gameId: doc.gameId,
       name: doc.gameName,
       cover: doc.gameCover,
+      backdrop,
       platform: doc.platform,
       total: doc.total,
       unlocked: doc.unlocked,

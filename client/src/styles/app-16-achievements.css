@@ -793,6 +793,25 @@
 .ach-modal-list {
   overflow-y: auto;
   padding: 0.6rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.ach-modal-list::-webkit-scrollbar {
+  width: 8px;
+}
+.ach-modal-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ach-modal-list::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+}
+/* Scrollbar dorée en thème sombre, pour coller à l'accent doré. */
+:root[data-theme="dark"] .ach-modal-list {
+  scrollbar-color: var(--orange) transparent;
+}
+:root[data-theme="dark"] .ach-modal-list::-webkit-scrollbar-thumb {
+  background: var(--accent-grad);
 }
 .ach-row {
   display: flex;

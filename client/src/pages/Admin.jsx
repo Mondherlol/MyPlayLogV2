@@ -459,7 +459,7 @@ function PsnRequestsManager({ token }) {
                 </span>
                 {r.status === "done" && r.summary && (
                   <span className="psn-req-detail">
-                    {r.summary.pending} à valider · {r.summary.trophies} jeux de trophées
+                    {r.summary.games} jeux détectés · {r.summary.pending} à reconnaître
                   </span>
                 )}
                 {r.status === "error" && r.error && (
