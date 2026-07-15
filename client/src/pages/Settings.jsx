@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   DownloadCloud,
   UserCog,
@@ -19,11 +20,21 @@ import { useAuth } from "../context/AuthContext";
 import { useLibrary } from "../context/LibraryContext";
 import SteamIcon from "../components/SteamIcon";
 import SteamImportModal from "../components/SteamImportModal";
+import {
+  CoverLogo,
+  Emblem,
+  TrackerAvatar,
+  MarvelLinkForm,
+  LeagueLinkForm,
+} from "../components/TrackerLink";
+
+const TAB_KEYS = ["imports", "tracking", "account", "appearance", "notifications", "privacy"];
 
 // Onglets de la page Paramètres (façon Discord / Steam). Seul « Imports » est
 // actif pour l'instant ; les autres sont là pour montrer la structure.
 const TABS = [
   { key: "imports", label: "Imports", Icon: DownloadCloud },
+  { key: "tracking", label: "Tracking", Icon: Swords },
   { key: "account", label: "Compte", Icon: UserCog, soon: true },
   { key: "appearance", label: "Apparence", Icon: Palette, soon: true },
   { key: "notifications", label: "Notifications", Icon: Bell, soon: true },
@@ -42,7 +53,11 @@ function openCentered(url, w = 720, h = 720) {
 }
 
 export default function Settings() {
-  const [tab, setTab] = useState("imports");
+  // L'onglet actif se lit dans l'URL (?tab=…) → liens profonds vers « Tracking ».
+  const [params, setParams] = useSearchParams();
+  const urlTab = params.get("tab");
+  const tab = TAB_KEYS.includes(urlTab) ? urlTab : "imports";
+  const setTab = (key) => setParams({ tab: key }, { replace: true });
 
   return (
     <div className="settings-page">
@@ -69,6 +84,7 @@ export default function Settings() {
 
         <section className="settings-panel">
           {tab === "imports" && <ImportsPanel />}
+          {tab === "tracking" && <TrackingPanel />}
         </section>
       </div>
     </div>
@@ -86,34 +102,22 @@ function ImportsPanel() {
         n'est ajouté sans ta validation.
       </p>
       <SteamCard />
-
-      <h2 className="settings-section-title" style={{ marginTop: "2rem" }}>
-        <Swords size={20} /> Tracking in-game
-      </h2>
-      <p className="settings-section-sub">
-        Relie tes comptes de jeux compétitifs pour suivre ton rang, tes héros et
-        tes dernières parties — et les partager sur ton profil et dans le fil.
-      </p>
-      <MarvelRivalsCard />
     </div>
   );
 }
 
-// Liaison Marvel Rivals (par pseudo in-game). Plus simple que Steam : pas
-// d'OpenID, on résout le pseudo côté serveur via l'API de tracking.
-function MarvelRivalsCard() {
+// Onglet « Tracking » : liaison des comptes de jeux compétitifs. Un seul appel
+// /trackers/status partagé (état + config serveur) évite de charger deux fois.
+function TrackingPanel() {
   const { token } = useAuth();
-  const [status, setStatus] = useState(null); // { configured, trackers }
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-  const [input, setInput] = useState("");
+  const [status, setStatus] = useState(null);
 
   async function load() {
     try {
       const s = await apiFetch("/trackers/status", { token });
       setStatus(s);
     } catch {
-      setStatus({ configured: false, trackers: [] });
+      setStatus({ configured: false, lolConfigured: false, trackers: [] });
     }
   }
   useEffect(() => {
@@ -121,35 +125,48 @@ function MarvelRivalsCard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const tracker = status?.trackers?.find((t) => t.provider === "marvel-rivals");
+  return (
+    <div className="settings-section">
+      <h2 className="settings-section-title">
+        <Swords size={20} /> Tracking in-game
+      </h2>
+      <p className="settings-section-sub">
+       Ton rang, champions et parties jouées sont synchronisés automatiquement.
+      </p>
+      <div className="trk-cards">
+        <MarvelRivalsCard
+          status={status}
+          reload={load}
+          cover={status?.games?.["marvel-rivals"]}
+        />
+        <LeagueCard
+          status={status}
+          reload={load}
+          cover={status?.games?.["league-of-legends"]}
+        />
+      </div>
+    </div>
+  );
+}
 
-  async function link() {
-    if (!input.trim()) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await apiFetch("/trackers/marvel-rivals/link", {
-        method: "POST",
-        token,
-        body: { username: input.trim() },
-      });
-      setInput("");
-      await load();
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setBusy(false);
-    }
-  }
+// Carte de liaison générique (Marvel Rivals / LoL) : logo (jaquette du jeu) +
+// titre, état connecté (avatar + rang, bouton Délier à droite) ou formulaire de
+// recherche/liaison en dessous. `Form` = MarvelLinkForm | LeagueLinkForm.
+function TrackerCard({ status, reload, cover, provider, name, desc, Form }) {
+  const { token } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const tracker = status?.trackers?.find((t) => t.provider === provider);
+  const connected = !!tracker;
+  const snap = tracker?.snapshot;
+  const avatar = snap?.icon || snap?.heroes?.[0]?.thumb;
 
   async function unlink() {
     setBusy(true);
-    setError(null);
     try {
-      await apiFetch("/trackers/marvel-rivals", { method: "DELETE", token });
-      await load();
-    } catch (e) {
-      setError(e.message);
+      await apiFetch(`/trackers/${provider}`, { method: "DELETE", token });
+      await reload();
+    } catch {
+      /* best-effort */
     } finally {
       setBusy(false);
     }
@@ -163,89 +180,83 @@ function MarvelRivalsCard() {
     );
   }
 
-  const connected = !!tracker;
-
   return (
-    <div className={`import-card rivals ${connected ? "connected" : ""}`}>
+    <div className={`import-card trk-card ${provider} ${connected ? "connected" : ""}`}>
       <div className="import-card-glow" />
-      <div className="import-card-main">
-        <div className="import-logo rivals-logo">
-          <Swords size={28} />
-        </div>
-        <div className="import-card-info">
-          <div className="import-card-title">
-            Marvel Rivals
-            {connected && (
-              <span className="import-badge">
-                <CheckCircle2 size={13} /> Lié
-              </span>
+      <div className="import-card-head">
+        <div className="import-card-main">
+          <CoverLogo cover={cover} className={`${provider}-logo`}>
+            <Swords size={26} />
+          </CoverLogo>
+          <div className="import-card-info">
+            <div className="import-card-title">
+              {name}
+              {connected && (
+                <span className="import-badge">
+                  <CheckCircle2 size={13} /> Lié
+                </span>
+              )}
+            </div>
+            {connected ? (
+              <div className="trk-connected">
+                <TrackerAvatar src={avatar} name={tracker.externalName} size={36} />
+                <div className="trk-connected-txt">
+                  <strong>{tracker.externalName || "Compte lié"}</strong>
+                  {snap?.rank?.tier && (
+                    <span className="trk-connected-rank">
+                      {snap.rank.image && <Emblem src={snap.rank.image} size={18} />}
+                      {snap.rank.tier}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="import-card-desc">{desc}</p>
             )}
           </div>
-          {connected ? (
-            <div className="import-steam-user">
-              <div>
-                <strong>{tracker.externalName || "Compte lié"}</strong>
-                <span>{tracker.rank ? `Rang : ${tracker.rank}` : "Stats en cours de synchro…"}</span>
-              </div>
-            </div>
-          ) : (
-            <p className="import-card-desc">
-              Colle ton <strong>identifiant</strong> ou l'<strong>URL de ton
-              profil</strong> rivalsmeta (ex. rivalsmeta.com/player/249729944)
-              pour suivre ton rang, tes héros et tes parties.
-              {status.configured && " Le pseudo exact fonctionne aussi."}
-            </p>
-          )}
         </div>
-      </div>
-
-      {error && (
-        <div className="import-error">
-          <AlertTriangle size={15} /> {error}
-        </div>
-      )}
-
-      <div className="import-actions">
-        {connected ? (
+        {connected && (
           <button
-            className="btn-ghost-danger clickable"
+            className="btn-ghost-danger clickable trk-unlink"
             onClick={unlink}
             disabled={busy}
           >
             {busy ? <Loader2 className="spin" size={16} /> : <Link2Off size={16} />}
-            Délier
+            <span>Délier</span>
           </button>
-        ) : (
-          <div className="import-manual" style={{ marginTop: 0 }}>
-            <input
-              type="text"
-              placeholder={
-                status.configured
-                  ? "Pseudo, identifiant, ou URL rivalsmeta"
-                  : "Ton identifiant ou l'URL de ton profil rivalsmeta"
-              }
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && link()}
-              disabled={busy}
-            />
-            <button
-              className="btn-steam-primary clickable"
-              onClick={link}
-              disabled={busy}
-            >
-              {busy ? <Loader2 className="spin" size={16} /> : <Link2 size={16} />}
-              Lier
-            </button>
-          </div>
         )}
       </div>
 
-      <div className="import-soon-row">
-        <div className="import-soon-chip">League of Legends — bientôt</div>
-        <div className="import-soon-chip">Valorant — bientôt</div>
-      </div>
+      {!connected && <Form status={status} onLinked={reload} />}
     </div>
+  );
+}
+
+function MarvelRivalsCard({ status, reload, cover }) {
+  return (
+    <TrackerCard
+      status={status}
+      reload={reload}
+      cover={cover}
+      provider="marvel-rivals"
+      name="Marvel Rivals"
+      desc="Ton identifiant ou l'URL de ton profil rivalsmeta."
+      Form={MarvelLinkForm}
+    />
+  );
+}
+
+function LeagueCard({ status, reload, cover }) {
+  return (
+    <TrackerCard
+      status={status}
+      reload={reload}
+      cover={cover}
+      provider="league-of-legends"
+      name="League of Legends"
+      desc="Ton Riot ID (Pseudo#TAG) + ta région. Synchro automatique."
+      Form={LeagueLinkForm}
+    />
   );
 }
 

@@ -14,11 +14,15 @@ import {
   Gamepad2,
   Medal,
   MapPin,
+  Plus,
+  Lock,
   X,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { timeAgo } from "../lib/lists";
 import MatchScoreboard from "./MatchScoreboard";
+import ProfileTrackerLoL from "./ProfileTrackerLoL";
+import { TrackerLinkModal } from "./TrackerLink";
 
 // Onglet « Tracking » du profil : stats in-game d'un compte lié (Marvel Rivals
 // pour l'instant). Consultable publiquement (profils partageables). Le
@@ -248,12 +252,20 @@ function Metric({ Icon, label, value, color }) {
   );
 }
 
-export default function ProfileTrackers({ username, token, isMe }) {
+// Taille d'une page d'historique côté rivalsmeta (le profil sert les 20 récents,
+// chaque « Charger plus » en récupère jusqu'à 20 de plus).
+const MATCH_PAGE = 20;
+
+function MarvelRivalsTracker({ username, token, isMe }) {
   const [state, setState] = useState({ loading: true });
   const [season, setSeason] = useState(null); // null = saison courante (défaut serveur)
   const [seasonLoading, setSeasonLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [note, setNote] = useState(null);
+  // Parties chargées EN PLUS des 20 du snapshot (pagination « Charger plus »).
+  const [moreMatches, setMoreMatches] = useState([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [exhausted, setExhausted] = useState(false); // plus rien à charger
 
   async function load(seasonValue) {
     const q = seasonValue != null ? `?season=${seasonValue}` : "";
@@ -268,6 +280,8 @@ export default function ProfileTrackers({ username, token, isMe }) {
   useEffect(() => {
     setState({ loading: true });
     setSeason(null);
+    setMoreMatches([]);
+    setExhausted(false);
     load(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username, token]);
@@ -275,8 +289,38 @@ export default function ProfileTrackers({ username, token, isMe }) {
   async function changeSeason(value) {
     setSeason(value);
     setSeasonLoading(true);
+    setMoreMatches([]);
+    setExhausted(false);
     await load(value);
     setSeasonLoading(false);
+  }
+
+  // Charge la page suivante de l'historique et l'ajoute (dédoublonnage par uid).
+  async function loadMore() {
+    if (loadingMore || exhausted) return;
+    setLoadingMore(true);
+    try {
+      const base = state.data?.matches?.length || 0;
+      const skip = base + moreMatches.length;
+      const q = new URLSearchParams({ skip: String(skip) });
+      if (season != null) q.set("season", String(season));
+      const d = await apiFetch(
+        `/trackers/marvel-rivals/${username}/matches?${q}`,
+        { token }
+      );
+      const fresh = d.matches || [];
+      if (fresh.length) {
+        setMoreMatches((prev) => {
+          const seen = new Set(prev.map((m) => m.matchUid));
+          return [...prev, ...fresh.filter((m) => !seen.has(m.matchUid))];
+        });
+      }
+      if (fresh.length < MATCH_PAGE) setExhausted(true);
+    } catch {
+      setExhausted(true);
+    } finally {
+      setLoadingMore(false);
+    }
   }
 
   async function refresh() {
@@ -291,6 +335,8 @@ export default function ProfileTrackers({ username, token, isMe }) {
         loading: false,
         data: { ...s.data, tracker: d.tracker, matches: d.matches || s.data?.matches },
       }));
+      setMoreMatches([]);
+      setExhausted(false);
       if (d.processing)
         setNote("Profil en cours de traitement chez Marvel Rivals — réactualise dans 2-5 min.");
       else if (d.cooldown) setNote("Patiente un instant avant de réactualiser.");
@@ -322,7 +368,7 @@ export default function ProfileTrackers({ username, token, isMe }) {
               Relie ton compte Marvel Rivals pour suivre ton rang, tes héros et
               tes parties — et les partager ici.
             </p>
-            <Link to="/settings" className="trk-cta clickable">
+            <Link to="/settings?tab=tracking" className="trk-cta clickable">
               <Swords size={16} /> Relier un compte
             </Link>
           </>
@@ -334,6 +380,11 @@ export default function ProfileTrackers({ username, token, isMe }) {
   }
 
   const { tracker, matches = [], stale, seasons = [], game } = state.data;
+  // Base (20 du snapshot) + pages « Charger plus », dédoublonnées par uid.
+  const allMatches = (() => {
+    const seen = new Set(matches.map((m) => m.matchUid));
+    return [...matches, ...moreMatches.filter((m) => !seen.has(m.matchUid))];
+  })();
   const snap = tracker?.snapshot;
   const rank = snap?.rank;
   const overall = snap?.overall;
@@ -518,17 +569,210 @@ export default function ProfileTrackers({ username, token, isMe }) {
             <h4 className="trk-section-title">
               <Swords size={15} /> Dernières parties
             </h4>
-            {matches.length > 0 ? (
-              <ul className="trk-matches">
-                {matches.map((m) => (
-                  <MatchCard key={m.matchUid} m={m} meUid={tracker.uid} token={token} />
-                ))}
-              </ul>
+            {allMatches.length > 0 ? (
+              <>
+                <ul className="trk-matches">
+                  {allMatches.map((m) => (
+                    <MatchCard key={m.matchUid} m={m} meUid={tracker.uid} token={token} />
+                  ))}
+                </ul>
+                {!exhausted && allMatches.length >= MATCH_PAGE && (
+                  <button
+                    className="trk-loadmore clickable"
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? (
+                      <>
+                        <Loader2 size={15} className="spin" /> Chargement…
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown size={16} /> Charger plus de parties
+                      </>
+                    )}
+                  </button>
+                )}
+              </>
             ) : (
               <div className="trk-note subtle">Aucune partie récente à afficher.</div>
             )}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// Ordre d'affichage des jeux trackés dans le sélecteur.
+const PROVIDER_ORDER = ["marvel-rivals", "league-of-legends"];
+const PROVIDER_META = {
+  "marvel-rivals": { label: "Marvel Rivals", Icon: Swords },
+  "league-of-legends": { label: "League of Legends", Icon: Swords },
+};
+
+// Catalogue des jeux proposés dans l'écran « aucun compte lié ». `soon` = pas
+// encore disponible (grisé). `grad` = dégradé de repli quand pas de jaquette.
+const GAME_CATALOG = [
+  { provider: "marvel-rivals", name: "Marvel Rivals", grad: "linear-gradient(150deg,#7a1620,#d94f2f)" },
+  { provider: "league-of-legends", name: "League of Legends", grad: "linear-gradient(150deg,#091428,#0a323c 60%,#c8aa6e)" },
+  { provider: "valorant", name: "Valorant", soon: true, grad: "linear-gradient(150deg,#ff4655,#0f1923)" },
+  { provider: "tft", name: "Teamfight Tactics", soon: true, grad: "linear-gradient(150deg,#3a1c71,#5b247a)" },
+];
+
+// Écran « aucun compte lié » (le mien) : grille de jeux. Cliquer un jeu dispo
+// ouvre la modale de liaison ; les jeux à venir sont grisés. Récupère les
+// jaquettes + l'état de config serveur via /trackers/status.
+function TrackingEmpty({ token, onLinked }) {
+  const [status, setStatus] = useState(null);
+  const [modal, setModal] = useState(null); // { provider, cover }
+
+  useEffect(() => {
+    let alive = true;
+    apiFetch("/trackers/status", { token })
+      .then((d) => alive && setStatus(d))
+      .catch(() => alive && setStatus({ games: {}, lolConfigured: false }));
+    return () => {
+      alive = false;
+    };
+  }, [token]);
+
+  const isAvailable = (g) => {
+    if (g.soon) return false;
+    if (g.provider === "league-of-legends") return !!status?.lolConfigured;
+    return true; // Marvel Rivals : toujours dispo (sans clé)
+  };
+
+  return (
+    <div className="trk-empty2 card">
+      <div className="trk-empty2-head">
+        <span className="trk-empty2-ic">
+          <Gamepad2 size={22} />
+        </span>
+        <h3>Suis tes jeux compétitifs</h3>
+        <p>Choisis un jeu pour lier ton compte.</p>
+      </div>
+
+      <div className="trk-games">
+        {GAME_CATALOG.map((g) => {
+          const cover = status?.games?.[g.provider] || null;
+          const backdrop = status?.backdrops?.[g.provider] || null;
+          const avail = isAvailable(g);
+          return (
+            <button
+              key={g.provider}
+              type="button"
+              className={`trk-game clickable ${avail ? "" : "off"}`}
+              disabled={!avail}
+              onClick={() => avail && setModal({ provider: g.provider, cover, backdrop })}
+              title={avail ? `Lier ${g.name}` : `${g.name} — bientôt`}
+            >
+              <span
+                className="trk-game-cover"
+                style={
+                  cover
+                    ? { backgroundImage: `url(${cover})` }
+                    : { backgroundImage: g.grad }
+                }
+              >
+                <span className="trk-game-overlay">
+                  {avail ? (
+                    <span className="trk-game-cta">
+                      <Plus size={16} /> Lier
+                    </span>
+                  ) : (
+                    <span className="trk-game-soon">
+                      <Lock size={13} /> Bientôt
+                    </span>
+                  )}
+                </span>
+              </span>
+              <span className="trk-game-name">{g.name}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {modal && (
+        <TrackerLinkModal
+          provider={modal.provider}
+          cover={modal.cover}
+          banner={modal.backdrop}
+          status={status}
+          onClose={() => setModal(null)}
+          onLinked={(p) => {
+            setModal(null);
+            onLinked(p);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Onglet « Tracking » du profil : aiguille vers la vue du bon jeu (Marvel Rivals
+// ou League of Legends). `providers` (profile.trackers) dit quels comptes sont
+// liés → un sélecteur de jeu apparaît quand il y en a plusieurs.
+export default function ProfileTrackers({ username, token, isMe, providers }) {
+  const [active, setActive] = useState(null);
+  const [justLinked, setJustLinked] = useState([]);
+
+  const linked = PROVIDER_ORDER.filter(
+    (p) =>
+      (providers || []).some((t) => t.provider === p) || justLinked.includes(p)
+  );
+  const current = active && linked.includes(active) ? active : linked[0];
+
+  // Pas de compte lié : grille de jeux (le mien) ou message neutre (autrui).
+  if (!linked.length) {
+    if (!isMe) {
+      return (
+        <div className="trk-empty card">
+          <span className="trk-empty-ic">
+            <Swords size={26} />
+          </span>
+          <p className="font-fun">Ce joueur ne partage pas encore de tracking.</p>
+        </div>
+      );
+    }
+    return (
+      <TrackingEmpty
+        token={token}
+        onLinked={(p) => {
+          setJustLinked((prev) => [...new Set([...prev, p])]);
+          setActive(p);
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className="trk-wrap">
+      {linked.length > 1 && (
+        <div className="trk-switch" role="tablist" aria-label="Jeu suivi">
+          {linked.map((p) => {
+            const { label, Icon } = PROVIDER_META[p];
+            return (
+              <button
+                key={p}
+                role="tab"
+                aria-selected={current === p}
+                className={`trk-switch-btn clickable ${current === p ? "on" : ""}`}
+                onClick={() => setActive(p)}
+              >
+                <Icon size={15} />
+                <span>{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {current === "marvel-rivals" && (
+        <MarvelRivalsTracker username={username} token={token} isMe={isMe} />
+      )}
+      {current === "league-of-legends" && (
+        <ProfileTrackerLoL username={username} token={token} isMe={isMe} />
       )}
     </div>
   );

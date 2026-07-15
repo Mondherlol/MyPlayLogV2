@@ -351,14 +351,21 @@ export function normalizeMatches(raw) {
 //  Backend rivalsmeta.com (public, sans clé)
 // ===========================================================================
 
-// GET rivalsmeta interne (UA navigateur + timeout). Lève une erreur typée.
-async function rmGet(path) {
+// Appel rivalsmeta interne (UA navigateur + timeout). Lève une erreur typée.
+// `body` fourni -> POST JSON, sinon GET.
+async function rmGet(path, { method, body } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12000);
   let res;
   try {
     res = await fetch(`${RIVALSMETA_API}${path}`, {
-      headers: { "user-agent": BROWSER_UA, accept: "application/json" },
+      method: method || (body ? "POST" : "GET"),
+      headers: {
+        "user-agent": BROWSER_UA,
+        accept: "application/json",
+        ...(body ? { "content-type": "application/json" } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });
   } catch (e) {
@@ -388,6 +395,32 @@ export async function rivalsmetaPlayer(uid, season) {
     throw err;
   }
   return data;
+}
+
+// Recherche de joueurs par pseudo via rivalsmeta (public, SANS clé).
+// POST /api/find-player { name } -> [{ aid, name, cur_head_icon_id }].
+// Les pseudos ne sont pas uniques : on renvoie une liste de candidats à départager.
+const RIVALSMETA_SITE = "https://rivalsmeta.com";
+export async function searchPlayersByName(name) {
+  const q = String(name || "").trim();
+  if (q.length < 2) return [];
+  let data;
+  try {
+    data = await rmGet("/find-player", { body: { name: q } });
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(data)) return [];
+  return data
+    .filter((p) => p?.aid)
+    .slice(0, 12)
+    .map((p) => ({
+      uid: String(p.aid),
+      name: p.name || String(p.aid),
+      icon: p.cur_head_icon_id
+        ? `${RIVALSMETA_SITE}/images/Playerhead/img_playerhead_${p.cur_head_icon_id}.png`
+        : null,
+    }));
 }
 
 // Rangs par saison depuis player.info (valeurs tantôt objet, tantôt string JSON).
@@ -423,6 +456,10 @@ export function normalizeFromRivalsmeta(raw) {
   //     faux pour une saison passée). Repli sur rank_game si aucun match classé.
   const hist = Array.isArray(raw.match_history) ? raw.match_history : [];
   const rankedMatches = hist
+    // Uniquement les parties CLASSÉES (game_mode_id 2). En rapide/arcade/perso,
+    // `new_level` existe aussi mais code la progression de COMPTE, pas le rang —
+    // sinon la dernière partie rapide fait afficher un faux « Bronze 3 ».
+    .filter((m) => num(m.game_mode_id) === 2)
     .map((m) => m.match_player?.dynamic_fields)
     .filter((df) => df && df.new_level != null)
     .map((df) => ({ level: num(df.new_level), score: num(df.new_score) }));
@@ -554,6 +591,15 @@ export function normalizeMatchesFromRivalsmeta(raw) {
       const opR = si[1 - camp];
       const score =
         myR != null && opR != null ? { me: num(myR), opp: num(opR) } : null;
+      // Rang APRÈS la partie + points gagnés/perdus (uniquement en CLASSÉE) —
+      // permet d'afficher « +34 » par partie et de détecter les montées de rang.
+      const df = mp.dynamic_fields || {};
+      const rankedGame = num(m.game_mode_id) === 2;
+      const rankLevel = rankedGame && df.new_level != null ? num(df.new_level) : null;
+      const rankScore =
+        rankedGame && df.new_score != null ? Math.round(num(df.new_score)) : null;
+      const scoreDelta =
+        rankedGame && df.add_score != null ? Math.round(num(df.add_score)) : null;
       return {
         matchUid: String(uid),
         playedAt: new Date(ts > 1e12 ? ts : ts * 1000),
@@ -568,6 +614,9 @@ export function normalizeMatchesFromRivalsmeta(raw) {
         map: mapName(mid),
         mapImage: mapImage(mid),
         queue: matchQueue(m.game_mode_id, m.play_mode_id, mid),
+        rankLevel,
+        rankScore,
+        scoreDelta,
         score,
         isMvp: m.mvp_uid != null && String(mp.player_uid) === String(m.mvp_uid),
         isSvp: m.svp_uid != null && String(mp.player_uid) === String(m.svp_uid),
@@ -664,6 +713,22 @@ export async function fetchPlayerData(uid, { season } = {}) {
     source: "rivalsmeta",
     processing: false,
   };
+}
+
+// Page suivante de l'historique de matchs (bouton « Charger plus »). rivalsmeta
+// pagine via /player-match-history/:uid?skip=N — le profil renvoie les 20 plus
+// récents, cet endpoint sert la suite (anté-chrono). `game_mode_id`/`hero_id` à
+// 0 = pas de filtre (les laisser VIDES renvoie une 500). `season` = valeur
+// rivalsmeta (18 = courante). Renvoie des matchs normalisés (même shape que
+// normalizeMatchesFromRivalsmeta).
+export async function fetchMatchHistoryPage(uid, { skip = 0, season } = {}) {
+  const s = season != null ? season : "";
+  const raw = await rmGet(
+    `/player-match-history/${encodeURIComponent(uid)}` +
+      `?skip=${skip}&game_mode_id=0&hero_id=0&season=${encodeURIComponent(s)}`
+  );
+  const list = Array.isArray(raw) ? raw : [];
+  return normalizeMatchesFromRivalsmeta({ match_history: list });
 }
 
 // ===========================================================================

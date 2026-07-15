@@ -12,7 +12,11 @@ const trackerMatchSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    provider: { type: String, required: true, enum: ["marvel-rivals"] },
+    provider: {
+      type: String,
+      required: true,
+      enum: ["marvel-rivals", "league-of-legends"],
+    },
     matchUid: { type: String, required: true }, // id de la partie chez le provider
     playedAt: { type: Date, required: true },
 
@@ -27,6 +31,11 @@ const trackerMatchSchema = new mongoose.Schema(
     win: { type: Boolean, default: false },
     mode: { type: String, default: null },
     map: { type: String, default: null },
+    // Classée uniquement : rang atteint APRÈS la partie (niveau absolu rivalsmeta)
+    // + points de classement obtenus/perdus (« +34 » / « -25 »). null hors classée.
+    rankLevel: { type: Number, default: null },
+    rankScore: { type: Number, default: null },
+    scoreDelta: { type: Number, default: null },
   },
   { timestamps: true }
 );

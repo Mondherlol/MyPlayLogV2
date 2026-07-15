@@ -536,6 +536,35 @@
   gap: 0.5rem;
 }
 
+/* Bouton « Charger plus de parties » sous l'historique. */
+.trk-loadmore {
+  width: 100%;
+  margin-top: 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.trk-loadmore:hover:not(:disabled) {
+  border-color: var(--orange);
+  background: var(--surface-2);
+}
+
+.trk-loadmore:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
 .trk-match {
   position: relative;
   border-radius: var(--radius);
@@ -560,7 +589,7 @@
   padding: 0.55rem 0.7rem;
   text-align: left;
   cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  /* border: 1px solid rgba(255, 255, 255, 0.08); */
   border-left: 3px solid var(--border-strong);
   border-radius: var(--radius);
   background-color: #12151d;
@@ -578,12 +607,7 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background:
-    linear-gradient(90deg,
-      rgba(6, 8, 12, 0.97) 0%,
-      rgba(6, 8, 12, 0.93) 45%,
-      rgba(6, 8, 12, 0.86) 100%),
-    linear-gradient(0deg, rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.25));
+  background: #131313b3;
 }
 
 .trk-match-btn>* {
@@ -1245,7 +1269,21 @@
    Cartes de fil : parties trackées
    ====================================================================== */
 .hf-trk {
+  /* Fond de carte explicite (identique aux autres cards du fil). */
+  background: var(--surface);
   border-left: 3px solid var(--border-strong);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.hf-trk:hover {
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.hf-trk:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
 }
 
 .hf-trk.win {
@@ -1256,8 +1294,57 @@
   border-left-color: #d8524a;
 }
 
+/* Enchaînement de parties (issues mixtes) : liseré neutre, pas de jaune. */
 .hf-trkg {
-  border-left-color: var(--orange);
+  border-left-color: var(--border-strong);
+}
+
+/* Pastille de saison dans le coin de l'en-tête. */
+.hf-trk-season {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.5rem 0.2rem 0.25rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  white-space: nowrap;
+  flex: none;
+}
+
+.hf-trk-season img {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.hf-trk-season-lbl {
+  line-height: 1;
+}
+
+/* Badge « Classé » (parties compétitives). */
+.hf-trk-tag.ranked {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.4rem;
+  padding: 0.08rem 0.4rem;
+  border-radius: 6px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--orange) 18%, transparent);
+}
+
+.hf-trk-tag.ranked.sm {
+  font-size: 0.6rem;
+  padding: 0.05rem 0.32rem;
+  margin-left: 0.35rem;
 }
 
 .hf-trk-single {
@@ -1308,20 +1395,33 @@
 }
 
 .hf-trk-kda {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
   font-size: 0.85rem;
-  color: var(--text-soft);
 }
 
 .hf-trk-kda b {
-  color: var(--text);
+  font-weight: 800;
+}
+
+.hf-trk-kda em {
+  font-style: normal;
+  font-weight: 700;
+  font-size: 0.78rem;
+  opacity: 0.9;
 }
 
 .hf-trk-res {
-  padding: 0.3rem 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.32rem 0.7rem;
   border-radius: 999px;
   font-weight: 700;
   font-size: 0.8rem;
   color: #fff;
+  flex: none;
 }
 
 .hf-trk-res.win {
@@ -1330,15 +1430,6 @@
 
 .hf-trk-res.loss {
   background: #d8524a;
-}
-
-.hf-trk-res.mini {
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  display: grid;
-  place-items: center;
-  border-radius: 7px;
 }
 
 .hf-trkg-summary {
@@ -1375,8 +1466,8 @@
   color: #d8524a;
 }
 
-.hf-trkg-dot {
-  opacity: 0.5;
+.hf-trkg-sep {
+  opacity: 0.4;
 }
 
 .hf-trkg-list {
@@ -1385,15 +1476,40 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.15rem;
 }
 
 .hf-trkg-row {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto 1fr auto auto auto;
   align-items: center;
   gap: 0.6rem;
   font-size: 0.85rem;
+  padding: 0.28rem 0.4rem;
+  border-radius: 8px;
+  transition: background 0.12s ease;
+}
+
+.hf-trkg-row:hover {
+  background: var(--surface-2);
+}
+
+/* Pastille d'issue : point coloré discret (remplace les carrés V/D). */
+.hf-trkg-res {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.hf-trkg-res.win {
+  background: #1b9d55;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #1b9d55 22%, transparent);
+}
+
+.hf-trkg-res.loss {
+  background: #d8524a;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #d8524a 22%, transparent);
 }
 
 .hf-trkg-row-hero {
@@ -1402,6 +1518,9 @@
   gap: 0.4rem;
   font-weight: 600;
   min-width: 0;
+}
+
+.hf-trkg-row-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1416,11 +1535,1335 @@
 }
 
 .hf-trkg-row-kda {
-  color: var(--text-soft);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hf-trkg-row-delta {
+  min-width: 2.6rem;
+  text-align: right;
+}
+
+/* Points de classement gagnés/perdus (« +34 » / « −25 »). */
+.hf-trk-delta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.15rem;
+  font-weight: 800;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hf-trk-delta i {
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 700;
+  opacity: 0.7;
+}
+
+.hf-trk-delta.up {
+  color: #1b9d55;
+}
+
+.hf-trk-delta.down {
+  color: #d8524a;
+}
+
+.hf-trk-kda-line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
 }
 
 .hf-trkg-row-time {
   color: var(--text-soft);
   font-size: 0.78rem;
   white-space: nowrap;
+}
+
+/* ======================================================================
+   Card de fil : montée / descente de rang classé
+   ====================================================================== */
+.hf-rank {
+  border-left: 3px solid var(--border-strong);
+}
+
+.hf-rank.up {
+  border-left-color: #1b9d55;
+}
+
+.hf-rank.down {
+  border-left-color: #d8524a;
+}
+
+/* Petit chevron directionnel dans le coin de l'en-tête. */
+.hf-rank-dir {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.hf-rank-dir.up {
+  color: #1b9d55;
+  background: color-mix(in srgb, #1b9d55 15%, transparent);
+}
+
+.hf-rank-dir.down {
+  color: #d8524a;
+  background: color-mix(in srgb, #d8524a 15%, transparent);
+}
+
+/* Corps : ancien rang → nouveau rang (+ héros de session). */
+.hf-rank-body {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-top: 0.5rem;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.hf-rank-body:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.hf-rank-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.hf-rank-badge img {
+  object-fit: contain;
+  flex: none;
+}
+
+.hf-rank-badge.small {
+  opacity: 0.75;
+}
+
+.hf-rank-badge.small img {
+  width: 34px;
+  height: 34px;
+}
+
+.hf-rank-badge.big img {
+  width: 52px;
+  height: 52px;
+}
+
+.hf-rank-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.hf-rank-badge.small .hf-rank-tier {
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+
+.hf-rank-tier {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.hf-rank-badge.big .hf-rank-tier {
+  font-size: 1.05rem;
+}
+
+.hf-rank-rs {
+  font-size: 0.78rem;
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+.hf-rank-arrow {
+  color: var(--text-soft);
+  flex: none;
+}
+
+.hf-rank.up .hf-rank-arrow {
+  color: #1b9d55;
+}
+
+.hf-rank.down .hf-rank-arrow {
+  color: #d8524a;
+}
+
+.hf-rank-hero {
+  margin-left: auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  overflow: hidden;
+  flex: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.hf-rank-hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hf-rank-caption {
+  margin: 0.65rem 0 0.4rem;
+  font-size: 0.86rem;
+  color: var(--text-soft);
+  font-family: var(--font-fun);
+}
+
+/* La barre de réactions réutilise .rvc-reacts / .hf-reacts (cards review). */
+.hf-rank .hf-reacts {
+  margin-top: 0.2rem;
+}
+
+@media (max-width: 480px) {
+  .hf-rank-hero {
+    display: none;
+  }
+
+  .hf-rank-body {
+    gap: 0.6rem;
+    padding: 0.75rem;
+  }
+}
+
+/* ======================================================================
+   Sélecteur de jeu tracké (quand plusieurs comptes liés)
+   ====================================================================== */
+.trk-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.trk-switch {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.trk-switch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.95rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-soft);
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.trk-switch-btn:hover {
+  border-color: var(--orange);
+  color: var(--text);
+}
+
+.trk-switch-btn.on {
+  background: var(--accent-grad);
+  border-color: transparent;
+  color: #1a1205;
+}
+
+/* ======================================================================
+   Écran « aucun compte lié » : grille de jeux + modale de liaison
+   ====================================================================== */
+.trk-empty2 {
+  max-width: 720px;
+  margin: 1rem auto;
+  padding: 1.75rem 1.5rem;
+  text-align: center;
+}
+
+.trk-empty2-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 1.4rem;
+}
+
+.trk-empty2-ic {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--accent-ink);
+  margin-bottom: 0.2rem;
+}
+
+.trk-empty2-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+}
+
+.trk-empty2-head p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  max-width: 42ch;
+}
+
+.trk-games {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1rem;
+}
+
+.trk-game {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-align: center;
+}
+
+.trk-game[disabled] {
+  cursor: default;
+}
+
+.trk-game-cover {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: 16px;
+  overflow: hidden;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.trk-game:not(.off):hover .trk-game-cover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+}
+
+.trk-game.off .trk-game-cover {
+  filter: grayscale(0.9) brightness(0.6);
+}
+
+/* Voile + call-to-action au survol. */
+.trk-game-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0.7rem;
+  background: linear-gradient(180deg, transparent 40%, rgba(6, 8, 12, 0.82));
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.trk-game:not(.off):hover .trk-game-overlay,
+.trk-game.off .trk-game-overlay {
+  opacity: 1;
+}
+
+.trk-game-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #1a1205;
+  font-weight: 800;
+  font-size: 0.82rem;
+  transform: translateY(6px);
+  transition: transform 0.2s ease;
+}
+
+.trk-game:hover .trk-game-cta {
+  transform: translateY(0);
+}
+
+.trk-game-soon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #f4f5f9;
+  font-weight: 700;
+  font-size: 0.76rem;
+  backdrop-filter: blur(2px);
+}
+
+.trk-game-name {
+  /* Les <button> n'héritent pas de `color` (buttontext = noir) → invisible en
+     mode sombre. On force la couleur de texte du thème. */
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.trk-game.off .trk-game-name {
+  color: var(--text-soft);
+}
+
+/* ---- Modale de liaison (bannière jaquette + formulaire) ---- */
+.trk-link-modal {
+  width: min(520px, 94vw);
+  padding: 0;
+  overflow: hidden;
+}
+
+.trk-link-hero {
+  position: relative;
+  min-height: 148px;
+  display: flex;
+  align-items: flex-end;
+  padding: 1.1rem 1.3rem;
+  background-color: #12151d;
+  background-size: cover;
+  background-position: center 30%;
+}
+
+.trk-link-hero-veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(6, 8, 12, 0.35) 0%, rgba(6, 8, 12, 0.92) 100%);
+}
+
+.trk-link-hero-txt {
+  position: relative;
+  color: #f4f5f9;
+}
+
+.trk-link-hero-txt h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+}
+
+.trk-link-hero-txt p {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  color: #c4c8d4;
+}
+
+.trk-link-body {
+  padding: 1.2rem 1.3rem 1.4rem;
+}
+
+/* Liste des joueurs correspondant à une recherche par pseudo (homonymes). */
+.trk-candidates {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.trk-candidates-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.trk-candidates-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.55rem;
+  border: 0;
+  background: none;
+  color: var(--text-soft);
+  font-weight: 700;
+  font-size: 0.82rem;
+  border-radius: 8px;
+}
+
+.trk-candidates-back:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.trk-candidates-count {
+  color: var(--text-soft);
+  font-size: 0.8rem;
+}
+
+.trk-candidates-empty {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.trk-candidates-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.trk-candidate {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+}
+
+.trk-candidate:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+  transform: translateY(-1px);
+}
+
+.trk-candidate:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.trk-candidate-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trk-candidate-id {
+  flex-shrink: 0;
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ======================================================================
+   League of Legends — onglet Profil
+   ====================================================================== */
+/* Rangs Solo / Flex */
+.lol-ranks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.lol-rank {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.8rem 0.95rem 0.7rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(150% 120% at 0% 0%, rgba(242, 183, 11, 0.14), transparent 62%),
+    var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.lol-rank.unranked {
+  opacity: 0.9;
+}
+
+/* Bandeau de file : titre (« Classé en Solo/Duo ») + série éventuelle. */
+.lol-rank-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.lol-rank-queue {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-soft);
+  font-weight: 800;
+}
+
+/* Accent doré discret sur la file reine (Solo/Duo). */
+.lol-rank.solo .lol-rank-queue {
+  color: var(--accent-ink);
+}
+
+.lol-hot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #e5615a 20%, transparent);
+  color: #ff7d76;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* Ligne principale : gros emblème + palier/LP + bilan V/D. */
+.lol-rank-main {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+/* Pastille de rang : cadre carré qui recadre le blason Community Dragon
+   (image 1280×720 dont le blason ne fait que ~25 %, centré). On agrandit
+   l'image à l'intérieur et on masque le débordement. */
+.lol-rank-emblem {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  flex: none;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.22));
+}
+
+.lol-rank-emblem-img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 350%;
+  height: auto;
+  max-width: none;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.lol-rank-emblem.fb {
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: var(--surface-2);
+  color: var(--accent-ink);
+}
+
+.lol-rank-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 0.1rem;
+}
+
+.lol-rank-tier {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.lol-rank-lp {
+  color: var(--accent-ink);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.lol-rank-record {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  flex: none;
+}
+
+.lol-rank-wl {
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.lol-rank-wl .win {
+  color: #1b9d55;
+}
+
+.lol-rank-wl .loss {
+  color: #d8524a;
+}
+
+.lol-rank-wr {
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+/* Ligne « pic » : sommet atteint (notre historique maison, au fil des synchros). */
+.lol-rank-peak {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+}
+
+.lol-rank-peak svg {
+  color: var(--orange);
+  flex: none;
+}
+
+.lol-rank-peak b {
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* Historique des saisons (backfill op.gg) : tableau compact. */
+.lol-seasons {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.lol-season {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.42rem 0.7rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.lol-season:last-child {
+  border-bottom: 0;
+}
+
+.lol-season-name {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--text-soft);
+  min-width: 3.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.lol-season .lol-rank-emblem {
+  filter: none;
+}
+
+.lol-season-tier {
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lol-season-lp {
+  margin-left: auto;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--accent-ink);
+  flex: none;
+}
+
+/* Badge région dans l'en-tête */
+.lol-region-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.08rem 0.4rem;
+  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: var(--text-soft);
+}
+
+/* Badge niveau de maîtrise sur un champion */
+.lol-champ-mastery {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.4rem;
+  padding: 0.04rem 0.34rem;
+  border-radius: 6px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--orange) 18%, transparent);
+}
+
+/* ---------- Parties (cartes dépliables) ---------- */
+.lol-matches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.lol-match {
+  border-radius: var(--radius);
+}
+
+.lol-match-btn {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-height: 64px;
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.lol-match-btn:hover {
+  box-shadow: var(--shadow);
+}
+
+.lol-match.win .lol-match-btn {
+  border-left-color: #1fbf6a;
+}
+
+.lol-match.loss .lol-match-btn {
+  border-left-color: #e5615a;
+}
+
+.lol-match.open .lol-match-btn {
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.lol-match-champ {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border-radius: 11px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.lol-match-champ img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lol-match-champ-fb {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.lol-match-lvl {
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  padding: 0.02rem 0.28rem;
+  border-radius: 6px 0 8px 0;
+  background: rgba(9, 20, 40, 0.92);
+  color: #f4f5f9;
+  font-size: 0.58rem;
+  font-weight: 800;
+}
+
+.lol-match-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.lol-match-line1 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.lol-match-champ-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lol-match-line2 {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.lol-match-kda {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.22rem;
+  font-size: 0.9rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.lol-match-kda b {
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+
+.lol-match-kda b.d {
+  color: #d8524a;
+}
+
+.lol-match-kda i {
+  font-style: normal;
+  opacity: 0.5;
+}
+
+.lol-match-kda em {
+  margin-left: 0.3rem;
+  padding-left: 0.4rem;
+  border-left: 1px solid var(--border);
+  font-style: normal;
+  font-weight: 800;
+  font-size: 0.74rem;
+}
+
+.lol-match-cs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+
+.lol-match-cs i {
+  font-style: normal;
+  opacity: 0.75;
+}
+
+.lol-match-end {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.3rem;
+  flex: none;
+}
+
+.lol-match-res {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 0.7rem;
+  color: #fff;
+}
+
+.lol-match-res.win {
+  background: #1b9d55;
+}
+
+.lol-match-res.loss {
+  background: #d8524a;
+}
+
+.lol-match-meta {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.lol-match-caret {
+  color: var(--text-soft);
+  transition: transform 0.2s;
+  flex: none;
+}
+
+.lol-match.open .lol-match-caret {
+  transform: rotate(180deg);
+}
+
+.lol-match-detail {
+  padding: 0.6rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-top: 0;
+  border-left-width: 3px;
+  border-radius: 0 0 var(--radius) var(--radius);
+  animation: trk-expand 0.2s ease;
+}
+
+.lol-match.win .lol-match-detail {
+  border-left-color: #1fbf6a;
+}
+
+.lol-match.loss .lol-match-detail {
+  border-left-color: #e5615a;
+}
+
+/* ---------- Scoreboard déplié (2 équipes de 5) ---------- */
+.lol-sb {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.lol-sb-team {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.lol-sb-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-left: 3px solid var(--border-strong);
+}
+
+.lol-sb-team.win .lol-sb-head {
+  border-left-color: #1b9d55;
+  background: rgba(27, 157, 85, 0.08);
+}
+
+.lol-sb-team.loss .lol-sb-head {
+  border-left-color: #d8524a;
+  background: rgba(216, 82, 74, 0.08);
+}
+
+.lol-sb-head .win {
+  color: #1b9d55;
+}
+
+.lol-sb-head .loss {
+  color: #d8524a;
+}
+
+.lol-sb-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lol-sb-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.28rem 0.5rem;
+  font-size: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.lol-sb-row.me {
+  background: rgba(242, 183, 11, 0.12);
+}
+
+.lol-sb-row.me .lol-sb-name {
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+.lol-sb-champ {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex: none;
+  background: var(--surface-2);
+}
+
+.lol-sb-champ img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lol-sb-champ-fb {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.lol-sb-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lol-sb-kda {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-soft);
+  flex: none;
+}
+
+@media (max-width: 560px) {
+  .lol-sb {
+    grid-template-columns: 1fr;
+  }
+
+  .lol-match-cs {
+    display: none;
+  }
+}
+
+/* ======================================================================
+   League of Legends — enrichissements (KDA coloré, MVP/ACE, remake, mates)
+   ====================================================================== */
+/* K/D/A coloré par position. */
+.lol-kda-parts {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.18rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.lol-kda-parts b {
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+
+.lol-kda-parts b.k {
+  color: #1b9d55;
+}
+
+.lol-kda-parts b.d {
+  color: #e5615a;
+}
+
+.lol-kda-parts b.a {
+  color: #4f95e6;
+}
+
+.lol-kda-parts i {
+  font-style: normal;
+  opacity: 0.4;
+  font-weight: 500;
+}
+
+/* Pastille de perf (MVP / ACE / classement). */
+.lol-perf {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.06rem 0.4rem;
+  border-radius: 6px;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  line-height: 1.35;
+  flex: none;
+}
+
+.lol-perf.mvp {
+  background: linear-gradient(180deg, #ffdb63, #eaa400);
+  color: #2a1c00;
+}
+
+.lol-perf.ace {
+  background: linear-gradient(180deg, #b8a3ff, #7c5cff);
+  color: #14061f;
+}
+
+.lol-perf.place {
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.lol-perf.sb {
+  font-size: 0.56rem;
+  padding: 0.04rem 0.3rem;
+}
+
+/* Colonne CS du scoreboard. */
+.lol-sb-cs {
+  font-size: 0.68rem;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+  min-width: 3.2rem;
+  text-align: right;
+}
+
+.lol-sb-kda {
+  flex: none;
+}
+
+/* Remake : ni victoire ni défaite (liseré neutre). */
+.lol-match.remake .lol-match-btn {
+  border-left-color: var(--border-strong);
+}
+
+.lol-match-res.remake {
+  background: var(--surface-2);
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+}
+
+/* Survols plus vivants sur les cartes de match + rang. */
+.lol-match-btn:hover {
+  transform: translateY(-1px);
+}
+
+.lol-rank {
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.lol-rank:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow);
+  transform: translateY(-1px);
+}
+
+/* Champions : moyennes K/D/A + parties + CS. */
+.lol-champ-games {
+  margin-left: 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.trk-hero-meta .lol-champ-kda {
+  font-variant-numeric: tabular-nums;
+}
+
+.trk-hero-meta .lol-champ-kda b {
+  font-weight: 800;
+}
+
+.trk-hero-meta .lol-champ-kda b.d {
+  color: #e5615a;
+}
+
+.trk-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.trk-hero-meta .lol-champ-cs {
+  color: var(--text-soft);
+}
+
+/* Coéquipiers récurrents. */
+.lol-mates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.lol-mate {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+}
+
+.lol-mate-av {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex: none;
+  background: var(--surface-2);
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+.lol-mate-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lol-mate-info {
+  min-width: 0;
+}
+
+.lol-mate-name {
+  display: block;
+  font-weight: 700;
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lol-mate-meta {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+@media (max-width: 560px) {
+  .lol-mates {
+    grid-template-columns: 1fr;
+  }
+
+  .lol-sb-cs {
+    display: none;
+  }
 }

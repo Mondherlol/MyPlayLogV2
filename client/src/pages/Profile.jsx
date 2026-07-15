@@ -1008,7 +1008,12 @@ export default function Profile() {
 
       {/* ---------- Tracking in-game (Marvel Rivals…) ---------- */}
       {tab === "tracking" && (
-        <ProfileTrackers username={targetUsername} token={token} isMe={isMe} />
+        <ProfileTrackers
+          username={targetUsername}
+          token={token}
+          isMe={isMe}
+          providers={profile.trackers}
+        />
       )}
 
       {/* ---------- Succès ---------- */}

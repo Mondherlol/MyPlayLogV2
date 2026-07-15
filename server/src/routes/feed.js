@@ -5,7 +5,10 @@ import UserGame from "../models/UserGame.js";
 import Repost from "../models/Repost.js";
 import Download from "../models/Download.js";
 import TrackerMatch from "../models/TrackerMatch.js";
+import RankChange from "../models/RankChange.js";
 import { PROVIDER_LABEL } from "./trackers.js";
+import { getGameAssets } from "../lib/marvelRivals.js";
+import { SEASONS } from "../lib/marvelRivalsData.js";
 import Documentary from "../models/Documentary.js";
 import Activity from "../models/Activity.js";
 import GemDiscovery from "../models/GemDiscovery.js";
@@ -110,8 +113,19 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
   // quand une seule source remplit exactement la page (ex. onglet Médias).
   const cap = limit + 1;
 
-  const [reposts, docs, watched, liked, commented, later, acts, gems, downloads, trackerMatches] =
-    await Promise.all([
+  const [
+    reposts,
+    docs,
+    watched,
+    liked,
+    commented,
+    later,
+    acts,
+    gems,
+    downloads,
+    trackerMatches,
+    rankChanges,
+  ] = await Promise.all([
     Repost.find({ user: userScope, ...lt("createdAt") })
       .sort({ createdAt: -1 })
       .limit(cap)
@@ -210,6 +224,17 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
         })
           .sort({ playedAt: -1 })
           .limit(limit * 3) // plusieurs parties fusionnent en une carte
+          .populate("user", "username avatar")
+          .lean(),
+    // Montées / descentes de rang classé (session) → card « X est passé … ».
+    !wantAll
+      ? Promise.resolve([])
+      : RankChange.find({
+          user: userScope,
+          ...(hasBefore ? { lastAt: { $lt: before } } : {}),
+        })
+          .sort({ lastAt: -1 })
+          .limit(cap)
           .populate("user", "username avatar")
           .lean(),
   ]);
@@ -730,7 +755,19 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
   //     du même joueur (même provider) rapprochées dans le temps → UNE carte
   //     « a enchaîné N parties sur … » avec le héros le plus joué + bilan W/L
   //     et KDA moyen. Une seule partie = carte simple. ---
-  {
+  if (trackerMatches.length) {
+    // Vignette de la saison courante (jaquette IGDB, best-effort & mise en cache)
+    // affichée en coin de carte. Une seule résolution pour tout le batch.
+    const assets = await getGameAssets().catch(() => ({ seasons: {} }));
+    const curSeasonLabel = SEASONS[0]?.label || "";
+    const curSeasonNum = String(curSeasonLabel).match(/([\d.]+)/)?.[1] || null;
+    const seasonImage = curSeasonNum
+      ? assets.seasons?.[curSeasonNum] ||
+        assets.seasons?.[String(Math.floor(Number(curSeasonNum)))] ||
+        null
+      : null;
+    const seasonLabel = curSeasonLabel.replace(/season/i, "Saison").trim() || null;
+
     const byUser = new Map();
     for (const m of trackerMatches) {
       if (!m.user) continue;
@@ -753,6 +790,10 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
         const m0 = c.members[0];
         const provider = m0.provider;
         const gameName = PROVIDER_LABEL[provider] || provider;
+        // La pastille de saison n'a de sens que pour Marvel Rivals (jaquettes
+        // IGDB par saison). Les autres providers (LoL…) n'en affichent pas.
+        const chipImage = provider === "marvel-rivals" ? seasonImage : null;
+        const chipLabel = provider === "marvel-rivals" ? seasonLabel : null;
         const matchOut = (m) => ({
           matchUid: m.matchUid,
           hero: m.hero || null,
@@ -762,6 +803,9 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
           kda: m.kda,
           win: m.win,
           mode: m.mode,
+          // Partie classée : Marvel « Compétitif » ou file LoL « Classée … ».
+          ranked: m.mode === "Compétitif" || /^Class[ée]/i.test(m.mode || ""),
+          scoreDelta: m.scoreDelta ?? null, // points de classement gagnés/perdus
           date: m.playedAt,
         });
         if (c.members.length >= 2) {
@@ -787,9 +831,14 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
             user: person(m0.user),
             provider,
             game: gameName,
+            seasonImage: chipImage,
+            seasonLabel: chipLabel,
             count: c.members.length,
             wins,
             losses: c.members.length - wins,
+            rankedCount: c.members.filter(
+              (m) => m.mode === "Compétitif" || /^Class[ée]/i.test(m.mode || "")
+            ).length,
             avgKda,
             topHero,
             matches: c.members.map(matchOut),
@@ -802,6 +851,8 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
             user: person(m0.user),
             provider,
             game: gameName,
+            seasonImage: chipImage,
+            seasonLabel: chipLabel,
             match: matchOut(m0),
           });
         }
@@ -849,6 +900,34 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
       downloadId: String(d._id),
       reactions: counts,
       myReactions: mine,
+    });
+  }
+
+  // --- Montées / descentes de rang classé : « X est passé Grandmaster 2 » /
+  //     « X est descendu … » avec réactions (féliciter / soutenir). ---
+  for (const rc of rankChanges) {
+    if (!rc.user) continue;
+    const reactions = { heart: 0, clap: 0, funny: 0 };
+    let myReaction = null;
+    for (const r of rc.reactions || []) {
+      if (reactions[r.type] != null) reactions[r.type]++;
+      if (String(r.user) === String(req.userId)) myReaction = r.type;
+    }
+    events.push({
+      type: "rankchange",
+      id: `rc-${rc._id}`,
+      rankChangeId: String(rc._id),
+      date: rc.lastAt,
+      user: person(rc.user),
+      provider: rc.provider,
+      game: PROVIDER_LABEL[rc.provider] || rc.provider,
+      direction: rc.direction,
+      old: { level: rc.oldLevel, score: rc.oldScore, tier: rc.oldTier, image: rc.oldImage },
+      current: { level: rc.newLevel, score: rc.newScore, tier: rc.newTier, image: rc.newImage },
+      hero: rc.hero || null,
+      games: (rc.matchUids || []).length,
+      reactions,
+      myReaction,
     });
   }
 

@@ -25,7 +25,7 @@ import shareRoutes from "./routes/share.js";
 import clientErrorRoutes from "./routes/clientErrors.js";
 import patchesRoutes from "./routes/patches.js";
 import downloadRoutes from "./routes/downloads.js";
-import trackerRoutes from "./routes/trackers.js";
+import trackerRoutes, { startTrackerAutoSync } from "./routes/trackers.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -88,6 +88,8 @@ async function start() {
   try {
     await mongoose.connect(MONGODB_URI);
     console.log("✅ Connecté à MongoDB");
+    // Synchro automatique des comptes de tracking (League of Legends).
+    startTrackerAutoSync();
     const server = app.listen(PORT, () => {
       console.log(`🚀 API MyPlayLog sur http://localhost:${PORT}`);
     });

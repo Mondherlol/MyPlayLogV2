@@ -48,6 +48,9 @@ import {
   Megaphone,
   Cherry,
   Skull,
+  TrendingUp,
+  TrendingDown,
+  ArrowRight,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { timeAgo, fmtDuration } from "../lib/lists";
@@ -150,6 +153,7 @@ export function FeedCard(props) {
   if (item.type === "blindtestgroup") return <BlindTestGroupEvent {...props} />;
   if (item.type === "trackermatch") return <TrackerMatchEvent {...props} />;
   if (item.type === "trackermatchgroup") return <TrackerMatchGroupEvent {...props} />;
+  if (item.type === "rankchange") return <RankChangeEvent {...props} />;
   return null;
 }
 
@@ -1708,12 +1712,83 @@ function BlindTestGroupEvent({ item, onOpenBlindTest }) {
 // ============================================================
 //  Parties de jeux trackés (Marvel Rivals…)
 // ============================================================
+// Couleurs sémantiques du KDA (alignées sur l'onglet Tracking du profil).
+const TRK_GREEN = "#1b9d55";
+const TRK_GOLD = "#eaa908";
+const TRK_RED = "#d8524a";
+const trkKdaColor = (k) => (k >= 3 ? TRK_GREEN : k >= 2 ? TRK_GOLD : TRK_RED);
+
+// Pastille de saison (jaquette IGDB) posée dans le coin de l'en-tête de carte.
+function SeasonChip({ image, label }) {
+  if (!image && !label) return null;
+  return (
+    <span className="hf-trk-season" title={label || "Saison"}>
+      {image ? (
+        <img src={image} alt="" loading="lazy" draggable="false" />
+      ) : (
+        <Trophy size={12} />
+      )}
+      {label && <span className="hf-trk-season-lbl">{label}</span>}
+    </span>
+  );
+}
+
+// Un « clic n'importe où » sur la carte mène à l'onglet Tracking du profil.
+// Les liens internes (avatar / pseudo) coupent la propagation de leur côté.
+function useTrackingNav(username) {
+  const navigate = useNavigate();
+  const go = () => navigate(`/u/${username}?tab=tracking`);
+  return {
+    className: "clickable",
+    role: "link",
+    tabIndex: 0,
+    onClick: go,
+    onKeyDown: (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        go();
+      }
+    },
+  };
+}
+
+// Ligne K/D/A colorée + issue de la partie (réutilisée simple / groupe).
+function TrkKda({ m }) {
+  return (
+    <span className="hf-trk-kda" style={{ color: trkKdaColor(m.kda) }}>
+      <b>
+        {m.k}/{m.d}/{m.a}
+      </b>
+      <em>{m.kda} KDA</em>
+    </span>
+  );
+}
+
+// Points de classement gagnés/perdus sur une partie classée (« +34 » / « -25 »).
+// Rien à afficher hors classée (scoreDelta null).
+function TrkDelta({ v, unit }) {
+  if (v == null) return null;
+  const up = v >= 0;
+  return (
+    <span className={`hf-trk-delta ${up ? "up" : "down"}`}>
+      {up ? "+" : "−"}
+      {Math.abs(v)}
+      {unit && <i>RS</i>}
+    </span>
+  );
+}
+
 // Une seule partie : héros joué + K/D/A + issue.
 function TrackerMatchEvent({ item }) {
   const m = item.match;
+  const nav = useTrackingNav(item.user.username);
   return (
-    <article className={`hf-card hf-trk ${m.win ? "win" : "loss"}`}>
-      <EventHead user={item.user} date={item.date}>
+    <article {...nav} className={`hf-card hf-trk clickable ${m.win ? "win" : "loss"}`}>
+      <EventHead
+        user={item.user}
+        date={item.date}
+        badge={<SeasonChip image={item.seasonImage} label={item.seasonLabel} />}
+      >
         <Swords size={13} className="hf-inline-ic" /> a joué une partie de{" "}
         <b>{item.game}</b>
       </EventHead>
@@ -1727,12 +1802,17 @@ function TrackerMatchEvent({ item }) {
           )}
         </div>
         <div className="hf-trk-single-info">
-          <span className="hf-trk-hero-name">{m.hero?.name || "Héros"}</span>
-          <span className="hf-trk-kda">
-            {m.k} / {m.d} / {m.a} <b>· {m.kda} KDA</b>
+          <span className="hf-trk-hero-name">
+            {m.hero?.name || "Héros"}
+            {m.ranked && <span className="hf-trk-tag ranked">Classé</span>}
+          </span>
+          <span className="hf-trk-kda-line">
+            <TrkKda m={m} />
+            <TrkDelta v={m.scoreDelta} unit />
           </span>
         </div>
         <span className={`hf-trk-res ${m.win ? "win" : "loss"}`}>
+          {m.win ? <Trophy size={12} /> : <X size={12} />}
           {m.win ? "Victoire" : "Défaite"}
         </span>
       </div>
@@ -1745,9 +1825,14 @@ function TrackerMatchEvent({ item }) {
 function TrackerMatchGroupEvent({ item }) {
   const total = item.count;
   const wr = total ? Math.round((item.wins / total) * 100) : 0;
+  const nav = useTrackingNav(item.user.username);
   return (
-    <article className="hf-card hf-trk hf-trkg">
-      <EventHead user={item.user} date={item.date}>
+    <article {...nav} className="hf-card hf-trk hf-trkg clickable">
+      <EventHead
+        user={item.user}
+        date={item.date}
+        badge={<SeasonChip image={item.seasonImage} label={item.seasonLabel} />}
+      >
         <Swords size={13} className="hf-inline-ic" /> a enchaîné{" "}
         <b>{item.count} parties</b> sur <b>{item.game}</b>
       </EventHead>
@@ -1768,12 +1853,17 @@ function TrackerMatchGroupEvent({ item }) {
             <span className="hf-trkg-wl">
               <b className="win">{item.wins}V</b> · <b className="loss">{item.losses}D</b>
             </span>
-            <span className="hf-trkg-dot">·</span>
+            <span className="hf-trkg-sep">·</span>
             <span>{wr}% WR</span>
-            <span className="hf-trkg-dot">·</span>
+            <span className="hf-trkg-sep">·</span>
             <span>
-              <b>{item.avgKda}</b> KDA moy.
+              <b style={{ color: trkKdaColor(item.avgKda) }}>{item.avgKda}</b> KDA moy.
             </span>
+            {item.rankedCount > 0 && (
+              <span className="hf-trk-tag ranked">
+                {item.rankedCount} classée{item.rankedCount > 1 ? "s" : ""}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -1781,22 +1871,138 @@ function TrackerMatchGroupEvent({ item }) {
       <ul className="hf-trkg-list">
         {item.matches.slice(0, 6).map((m) => (
           <li key={m.matchUid} className={`hf-trkg-row ${m.win ? "win" : "loss"}`}>
-            <span className={`hf-trk-res mini ${m.win ? "win" : "loss"}`}>
-              {m.win ? "V" : "D"}
-            </span>
+            <span
+              className={`hf-trkg-res ${m.win ? "win" : "loss"}`}
+              title={m.win ? "Victoire" : "Défaite"}
+            />
             <span className="hf-trkg-row-hero">
               {m.hero?.thumb && (
                 <img src={m.hero.thumb} alt="" loading="lazy" draggable="false" />
               )}
-              {m.hero?.name || "Héros"}
+              <span className="hf-trkg-row-name">{m.hero?.name || "Héros"}</span>
+              {m.ranked && <span className="hf-trk-tag ranked sm">Classé</span>}
             </span>
-            <span className="hf-trkg-row-kda">
+            <span className="hf-trkg-row-kda" style={{ color: trkKdaColor(m.kda) }}>
               {m.k}/{m.d}/{m.a}
+            </span>
+            <span className="hf-trkg-row-delta">
+              <TrkDelta v={m.scoreDelta} />
             </span>
             <span className="hf-trkg-row-time">{timeAgo(m.date)}</span>
           </li>
         ))}
       </ul>
+    </article>
+  );
+}
+
+// ============================================================
+//  Montée / descente de rang classé (session) — avec réactions
+// ============================================================
+// Vignette d'un rang : badge + libellé de palier (+ RS sur le grand).
+function RankBadge({ r, big }) {
+  return (
+    <span className={`hf-rank-badge ${big ? "big" : "small"}`}>
+      {r.image ? (
+        <img src={r.image} alt="" loading="lazy" draggable="false" />
+      ) : (
+        <Trophy size={big ? 22 : 15} />
+      )}
+      <span className="hf-rank-txt">
+        <span className="hf-rank-tier">{r.tier || "Non classé"}</span>
+        {big && r.score != null && (
+          <span className="hf-rank-rs">{r.score.toLocaleString("fr-FR")} RS</span>
+        )}
+      </span>
+    </span>
+  );
+}
+
+// « X est passé Grandmaster 2 » (montée) / « X est descendu … » (descente).
+// Réactions single-select (féliciter / soutenir), comme les avis.
+function RankChangeEvent({ item, me, token }) {
+  const up = item.direction === "up";
+  const [reactions, setReactions] = useState(item.reactions || null);
+  const [myReaction, setMyReaction] = useState(item.myReaction || null);
+  const isMine = me && item.user.username === me;
+
+  async function react(type) {
+    if (!token || isMine) return;
+    const prev = { reactions, myReaction };
+    const counts = { heart: 0, clap: 0, funny: 0, ...(reactions || {}) };
+    if (myReaction === type) {
+      counts[type] = Math.max(0, (counts[type] || 0) - 1);
+      setMyReaction(null);
+    } else {
+      if (myReaction) counts[myReaction] = Math.max(0, (counts[myReaction] || 0) - 1);
+      counts[type] = (counts[type] || 0) + 1;
+      setMyReaction(type);
+    }
+    setReactions(counts);
+    try {
+      const res = await apiFetch(`/trackers/rank-changes/${item.rankChangeId}/react`, {
+        method: "POST",
+        token,
+        body: { type },
+      });
+      setReactions(res.reactions);
+      setMyReaction(res.myReaction);
+    } catch {
+      setReactions(prev.reactions);
+      setMyReaction(prev.myReaction);
+    }
+  }
+
+  return (
+    <article className={`hf-card hf-rank ${up ? "up" : "down"}`}>
+      <EventHead
+        user={item.user}
+        date={item.date}
+        badge={
+          <span className={`hf-rank-dir ${up ? "up" : "down"}`}>
+            {up ? <TrendingUp size={15} /> : <TrendingDown size={15} />}
+          </span>
+        }
+      >
+        {up ? (
+          <>
+            <TrendingUp size={13} className="hf-inline-ic" /> est passé{" "}
+            <b>{item.current.tier}</b> sur <b>{item.game}</b>
+          </>
+        ) : (
+          <>
+            <TrendingDown size={13} className="hf-inline-ic" /> est descendu{" "}
+            <b>{item.current.tier}</b> sur <b>{item.game}</b>
+          </>
+        )}
+      </EventHead>
+
+      <Link
+        to={`/u/${item.user.username}?tab=tracking`}
+        className="hf-rank-body clickable"
+      >
+        <RankBadge r={item.old} />
+        <ArrowRight size={20} className="hf-rank-arrow" />
+        <RankBadge r={item.current} big />
+        {item.hero?.thumb && (
+          <span className="hf-rank-hero" title={item.hero.name}>
+            <img src={item.hero.thumb} alt="" loading="lazy" draggable="false" />
+          </span>
+        )}
+      </Link>
+
+      <p className="hf-rank-caption">
+        {up
+          ? "Belle grimpette — envoie-lui un peu d'amour."
+          : "Petite descente… un soutien fait toujours du bien."}
+      </p>
+
+      <FeedReactions
+        reactions={reactions}
+        myReaction={myReaction}
+        readOnly={isMine || !token}
+        onReact={react}
+      />
     </article>
   );
 }

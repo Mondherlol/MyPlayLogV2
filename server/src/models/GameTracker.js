@@ -17,16 +17,23 @@ const gameTrackerSchema = new mongoose.Schema(
     provider: {
       type: String,
       required: true,
-      enum: ["marvel-rivals"],
+      enum: ["marvel-rivals", "league-of-legends"],
     },
     // Identifiant du joueur chez le provider (uid stable) + pseudo affiché.
     externalUid: { type: String, required: true },
     externalName: { type: String, default: null },
     profileUrl: { type: String, default: null },
+    // Région/plateforme chez le provider (League of Legends : euw1, na1, kr…).
+    // null pour les providers sans notion de région (Marvel Rivals).
+    region: { type: String, default: null },
 
     connectedAt: { type: Date, default: Date.now },
-    // Dernière synchro réussie (sert au throttle d'ouverture + cooldown refresh).
+    // Dernière synchro réussie (sert au throttle d'ouverture de profil : resync
+    // de fond si périmé). Mise à jour par TOUTE synchro, y compris de fond.
     lastSyncAt: { type: Date, default: null },
+    // Dernier clic manuel sur « Actualiser » (cooldown du bouton). Distinct de
+    // lastSyncAt pour que la resync de fond n'épuise pas le cooldown du bouton.
+    lastRefreshAt: { type: Date, default: null },
     // Curseur anti-doublon pour le fil : matchUid de la partie la plus récente
     // déjà connue. Les matchs postérieurs génèrent des cartes de feed.
     lastMatchUid: { type: String, default: null },
@@ -36,6 +43,15 @@ const gameTrackerSchema = new mongoose.Schema(
     // tombe (dégradation gracieuse).
     snapshot: { type: mongoose.Schema.Types.Mixed, default: null },
     snapshotAt: { type: Date, default: null },
+
+    // Historique classé (League of Legends). Persiste HORS du snapshot (celui-ci
+    // est intégralement réécrit à chaque synchro) :
+    //  - seasons : rangs des saisons PASSÉES, backfill op.gg à la liaison (l'API
+    //    Riot ne les expose pas), immuables. [{ season, tier, division, label, lp, image }]
+    //  - peak    : PIC de rang par file (solo/flex), construit au fil des synchros
+    //    (notre propre historique, indépendant d'op.gg). { solo: {...}, flex: {...} }
+    // null pour les providers sans notion de saison (Marvel Rivals).
+    rankHistory: { type: mongoose.Schema.Types.Mixed, default: null },
   },
   { timestamps: true }
 );
