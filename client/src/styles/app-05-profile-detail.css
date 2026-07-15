@@ -1834,6 +1834,798 @@ button.pf-stat:hover {
 }
 
 /* ======================================================================
+   PROFIL — aperçu : colonne latérale PERSONNALISABLE (édition + widgets)
+   ====================================================================== */
+/* Barre d'édition (bouton Personnaliser) en tête de l'aside. */
+.pfa-edit-bar {
+  display: flex;
+  justify-content: flex-end;
+}
+/* En édition, l'aside prend toute la largeur et les jeux s'effacent. */
+.pf-overview.aside-editing .pf-overview-main {
+  display: none;
+}
+@media (min-width: 1080px) {
+  .pf-overview.has-aside.aside-editing {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pf-overview.has-aside.aside-editing .pf-overview-aside {
+    position: static;
+  }
+}
+.pf-overview-aside.editing {
+  gap: 0.6rem;
+}
+
+/* Éditeur deux zones : cards actives (gauche) + boîte à outils (droite). */
+.pfa-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+  gap: 1.2rem;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .pfa-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.pfa-editor-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+.pfa-editor-hint svg {
+  color: var(--accent-ink);
+}
+
+/* Zone active (dépôt des cards affichées). */
+.pfa-dropzone {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  min-height: 120px;
+  padding: 0.6rem;
+  border-radius: 16px;
+  border: 1px dashed var(--border);
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+.pfa-dropzone.is-over {
+  border-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 7%, transparent);
+}
+.pfa-dropzone-empty {
+  padding: 1.6rem 0.8rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+
+/* Card déplaçable : la card ENTIÈRE est saisissable (glissable de n'importe où).
+   Son contenu est neutralisé (liens désactivés + pointeur transmis au wrapper). */
+.pfa-slot {
+  position: relative;
+}
+.pfa-slot.editing {
+  cursor: grab;
+  touch-action: none;
+  border-radius: 16px;
+}
+.pfa-slot.editing:active {
+  cursor: grabbing;
+}
+.pfa-slot.editing .pf-aside-card {
+  pointer-events: none;
+  user-select: none;
+  transition: box-shadow 0.14s ease, border-color 0.14s ease;
+}
+.pfa-slot.editing:hover .pf-aside-card {
+  border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+}
+.pfa-slot.dragging {
+  opacity: 0;
+}
+
+/* Aperçu de glissé (suit le curseur) : la card réelle, légèrement soulevée. */
+.pfa-drag-overlay {
+  width: 300px;
+  max-width: 90vw;
+  cursor: grabbing;
+  transform: rotate(-1.5deg);
+}
+.pfa-drag-overlay .pf-aside-card {
+  pointer-events: none;
+  border-color: var(--orange);
+  box-shadow: var(--shadow-md, 0 14px 34px rgba(0, 0, 0, 0.32));
+}
+
+/* Boîte à outils : les cards disponibles s'affichent EN VRAI, en grille.
+   Sticky : elle suit le scroll pendant qu'on organise la colonne active. */
+.pfa-editor-toolbox {
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  padding: 0.9rem;
+  box-shadow: var(--shadow-sm);
+}
+@media (min-width: 861px) {
+  .pfa-editor-toolbox {
+    position: sticky;
+    top: calc(var(--topbar-h, 60px) + 12px);
+    align-self: start;
+    max-height: calc(100vh - var(--topbar-h, 60px) - 28px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--orange) transparent;
+  }
+}
+
+/* Badge « configurable » (clic droit) sur les cards concernées en édition. */
+.pfa-slot.configurable > .pfa-slot-cog {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent-grad);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+  opacity: 0.85;
+  transition: transform 0.14s ease, opacity 0.14s ease;
+}
+.pfa-slot.configurable:hover > .pfa-slot-cog {
+  opacity: 1;
+  transform: rotate(35deg);
+}
+.pfa-toolbox-title {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.75rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-soft);
+}
+.pfa-toolbox-title svg {
+  color: var(--accent-ink);
+}
+.pfa-toolbox-drop {
+  border-radius: 12px;
+  min-height: 90px;
+  transition: background 0.14s ease;
+}
+.pfa-toolbox-drop.is-over {
+  background: color-mix(in srgb, var(--orange) 8%, transparent);
+}
+.pfa-toolbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.7rem;
+  align-items: start;
+}
+.pfa-toolbox-empty {
+  padding: 1.2rem 0.4rem;
+  font-size: 0.84rem;
+  color: var(--text-soft);
+}
+
+/* ---------- Modale de configuration d'une card (clic droit) ---------- */
+.pac-modal {
+  max-width: 460px;
+  width: 100%;
+}
+.pac-sub {
+  margin: 0.1rem 0 1rem;
+  font-size: 0.86rem;
+  color: var(--text-soft);
+}
+.pac-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.pac-mode {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  border-radius: 14px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  text-align: left;
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+.pac-mode:hover {
+  border-color: color-mix(in srgb, var(--orange) 45%, var(--border));
+}
+.pac-mode.on {
+  border-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 8%, transparent);
+}
+.pac-mode-ic {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  color: var(--accent-ink);
+}
+.pac-mode.on .pac-mode-ic {
+  background: var(--accent-grad);
+  color: #fff;
+}
+.pac-mode-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.pac-mode-txt b {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--text);
+}
+.pac-mode-txt i {
+  font-style: normal;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+.pac-mode-check {
+  flex: none;
+  color: var(--accent-ink);
+}
+
+.pac-picker {
+  margin-top: 0.9rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.8rem;
+}
+.pac-count {
+  margin: 0 0 0.5rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+/* Mini-barre de recherche du sélecteur. */
+.pac-search {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.55rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+.pac-search:focus-within {
+  border-color: var(--orange);
+}
+.pac-search svg {
+  flex: none;
+}
+.pac-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  color: var(--text);
+  font-size: 0.86rem;
+}
+.pac-search-clear {
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+.pac-search-clear:hover {
+  color: var(--accent-ink);
+}
+
+.pac-opts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 340px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--orange) transparent;
+}
+.pac-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.5rem 0.55rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  text-align: left;
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+.pac-opt:hover {
+  border-color: color-mix(in srgb, var(--orange) 45%, var(--border));
+}
+.pac-opt.on {
+  border-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 9%, transparent);
+}
+.pac-opt-thumb {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--accent-ink);
+}
+.pac-opt-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* Logos transparents (consoles, studios) : plaque claire + contain pour rester
+   lisibles (les logos IGDB sont souvent noirs détourés). */
+.pac-opt-thumb.contain {
+  background: #f3f3f5;
+}
+.pac-opt-thumb.contain img {
+  object-fit: contain;
+  padding: 4px;
+}
+/* Vignette-bouton « écouter un extrait » (cartes OST). */
+.pac-opt-thumb.play {
+  cursor: pointer;
+  border: none;
+  padding: 0;
+}
+.pac-opt-play-ic {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.42);
+  opacity: 0;
+  transition: opacity 0.14s ease;
+}
+.pac-opt-thumb.play:hover .pac-opt-play-ic,
+.pac-opt-thumb.play.playing .pac-opt-play-ic {
+  opacity: 1;
+}
+.pac-opt-thumb.play.playing .pac-opt-play-ic {
+  background: color-mix(in srgb, var(--orange) 62%, rgba(0, 0, 0, 0.45));
+}
+.pac-opt-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.pac-opt-title {
+  font-weight: 600;
+  font-size: 0.86rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pac-opt-meta {
+  font-size: 0.74rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pac-opt-check {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  color: var(--text-soft);
+}
+.pac-opt.on .pac-opt-check {
+  color: var(--accent-ink);
+}
+.pac-empty {
+  padding: 1.2rem 0.4rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+.pac-opt.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.pac-hint-lite {
+  margin: 0 0 0.5rem;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+
+/* Studios épinglés : pastilles retirables au-dessus de la recherche. */
+.pac-studio-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+.pac-studio-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.28rem 0.5rem 0.28rem 0.32rem;
+  border-radius: 999px;
+  border: 1px solid var(--orange);
+  background: color-mix(in srgb, var(--orange) 10%, transparent);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.pac-studio-chip:hover {
+  background: color-mix(in srgb, var(--orange) 18%, transparent);
+}
+.pac-studio-chip svg:last-child {
+  color: var(--text-soft);
+}
+.pac-studio-chip-logo {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--accent-ink);
+}
+.pac-studio-chip-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Note « carte vide » (propriétaire) sur une card configurable sans contenu. */
+.pfa-card-empty {
+  margin: 0;
+  padding: 0.35rem 0.1rem;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+.pac-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.1rem;
+}
+
+/* ---------- Grille de statistiques ---------- */
+.pfa-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.45rem;
+}
+.pfa-stat-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.55rem 0.3rem;
+  border-radius: 12px;
+  background: var(--surface-2);
+  text-align: center;
+}
+.pfa-stat-tile-ic {
+  color: var(--accent-ink);
+  margin-bottom: 0.1rem;
+}
+.pfa-stat-tile-val {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.02rem;
+  line-height: 1;
+  color: var(--text);
+}
+.pfa-stat-tile-lbl {
+  font-size: 0.66rem;
+  color: var(--text-soft);
+  line-height: 1.1;
+}
+
+/* ---------- Cartes de tracking in-game ---------- */
+.pfa-trk-card .pfa-trk-id {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+.pfa-trk-cover {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex: none;
+}
+.pfa-trk-cover.fb {
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--accent-ink);
+}
+.pfa-trk-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.86rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pfa-trk-rank {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.6rem;
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.pfa-trk-emblem {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+}
+.pfa-trk-badge {
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.25));
+}
+.pfa-trk-emblem-fb {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--accent-ink);
+}
+.pfa-trk-rankinfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+}
+.pfa-trk-tier {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pfa-trk-sub {
+  font-size: 0.74rem;
+  color: var(--text-soft);
+}
+.pfa-trk-peak {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-top: 0.15rem;
+  font-size: 0.7rem;
+  color: var(--accent-ink);
+}
+.pfa-trk-hero {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+  max-width: 100%;
+}
+.pfa-trk-hero-thumb {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+.pfa-trk-hero-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pfa-trk-hero-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Console favorite ---------- */
+.pfa-console {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.pfa-console-ic {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--accent-grad);
+  color: var(--accent-ink-on, #fff);
+}
+/* Logo de console (transparent, souvent noir) : plaque claire + contain. */
+.pfa-console-ic.has-logo {
+  background: #f3f3f5;
+  border: 1px solid var(--border);
+}
+.pfa-console-ic.has-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 5px;
+}
+.pfa-console-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.pfa-console-name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pfa-console-sub {
+  font-size: 0.74rem;
+  color: var(--text-soft);
+}
+
+/* ---------- Personnages favoris ---------- */
+.pfa-chars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.pfa-char {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  width: 58px;
+}
+.pfa-char-av {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 2px solid var(--border);
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--text-soft);
+  transition: border-color 0.14s ease, transform 0.14s ease;
+}
+.pfa-char-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pfa-char:hover .pfa-char-av {
+  border-color: var(--accent-ink);
+  transform: translateY(-2px);
+}
+.pfa-char-name {
+  font-size: 0.68rem;
+  color: var(--text-soft);
+  text-align: center;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* ---------- Playlist mise en avant ---------- */
+.pfa-playlist {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.pfa-playlist-thumb {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--accent-ink);
+}
+.pfa-playlist-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pfa-playlist-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transition: opacity 0.14s ease;
+}
+.pfa-playlist:hover .pfa-playlist-play {
+  opacity: 1;
+}
+.pfa-playlist-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.pfa-playlist-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pfa-playlist:hover .pfa-playlist-title {
+  color: var(--accent-ink);
+}
+.pfa-playlist-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+/* ======================================================================
    PROFIL — onglet "Tous les jeux" (filtres + grille)
    ====================================================================== */
 .pg-layout {

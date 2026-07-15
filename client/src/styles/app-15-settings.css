@@ -215,6 +215,25 @@
   background: var(--surface-2);
   color: var(--accent-ink);
 }
+/* Variante recadrée (blason Community Dragon LoL : image 1280×720 dont le blason
+   ne fait que ~25 %, centré). On agrandit l'image et on masque le débordement,
+   comme le fait RankEmblem dans ProfileTrackerLoL. */
+.trk-emblem.crop {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.22));
+}
+.trk-emblem-img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 350%;
+  height: auto;
+  max-width: none;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
 
 /* ---- Aperçu du compte trouvé (avant liaison) ---- */
 .trk-preview {
@@ -360,9 +379,20 @@
   margin-top: 1.1rem;
 }
 
-/* Liaison LoL : région (select) + Riot ID + bouton. Passe à la ligne au besoin. */
+/* Liaison LoL : région (select) + Riot ID sur la 1re ligne, bouton « Rechercher »
+   pleine largeur en dessous (évite un bouton coincé/renvoyé de travers). */
 .import-manual.lol-link {
   flex-wrap: wrap;
+}
+.import-manual.lol-link .lol-region {
+  flex: 0 0 auto;
+}
+.import-manual.lol-link input {
+  flex: 1 1 130px;
+}
+.import-manual.lol-link .btn-steam-primary {
+  flex: 1 0 100%;
+  justify-content: center;
 }
 .lol-region {
   padding: 0.6rem 0.7rem;

@@ -268,6 +268,9 @@ export default function ProfileOverview({
   onOpenTab,
 }) {
   const [editing, setEditing] = useState(false);
+  // Édition de la colonne latérale : masque les jeux et laisse l'aside occuper
+  // toute la largeur (boîte à outils des cards à côté des cards actives).
+  const [asideEditing, setAsideEditing] = useState(false);
   const [order, setOrder] = useState(() => resolveOrder(profile.overviewOrder));
   const [cards, setCards] = useState(() => resolveCards(profile.overviewCards));
   // Ordre manuel des jeux par section : { sectionKey: [gameId,…] }. Une section
@@ -526,7 +529,11 @@ export default function ProfileOverview({
   }
 
   return (
-    <div className={`pf-overview ${showAside ? "has-aside" : ""}`}>
+    <div
+      className={`pf-overview ${showAside ? "has-aside" : ""} ${
+        asideEditing ? "aside-editing" : ""
+      }`}
+    >
       <div className="pf-overview-main">
         {editing && (
           <div className="pf-edit-panel">
@@ -575,9 +582,12 @@ export default function ProfileOverview({
         <ProfileOverviewAside
           username={username}
           token={token}
+          isMe={isMe}
+          profile={profile}
           library={library}
           lists={lists}
-          favoriteCompanies={profile.favoriteCompanies || []}
+          onSavePrefs={onSavePrefs}
+          onEditingChange={setAsideEditing}
           onOpenTab={onOpenTab}
         />
       )}

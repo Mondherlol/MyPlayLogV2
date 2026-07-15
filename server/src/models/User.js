@@ -61,6 +61,15 @@ const userSchema = new mongoose.Schema(
     // défaut. `overviewCards` : détails affichés sur les jaquettes (note, heures…).
     overviewOrder: { type: [String], default: [] },
     overviewCards: { type: [String], default: [] },
+    // Colonne latérale de l'aperçu : ordre des widgets (drag & drop) et widgets
+    // masqués par le propriétaire. Vide = disposition par défaut. Clés alignées
+    // avec le registre client (ProfileOverviewAside) / ASIDE_WIDGETS côté route.
+    asideOrder: { type: [String], default: [] },
+    asideHidden: { type: [String], default: [] },
+    // Réglage par widget de la colonne latérale : objet { widgetKey: { mode,
+    // id/gameId/videoId/ids/platform/keys } }. Ex. épingler une playlist précise
+    // plutôt que « la plus récente ». Absent = comportement automatique.
+    asideConfig: { type: mongoose.Schema.Types.Mixed, default: {} },
     // Ordre manuel des jeux À L'INTÉRIEUR d'une section (favoris, en cours…) :
     // objet { sectionKey: [gameId,…] }. Une section présente ici est en tri
     // « manuel » (les jeux suivent cet ordre, les nouveaux tombent à la fin) ;
@@ -169,6 +178,9 @@ userSchema.methods.toPublic = function () {
     overviewOrder: this.overviewOrder || [],
     overviewCards: this.overviewCards || [],
     overviewGameOrder: this.overviewGameOrder || {},
+    asideOrder: this.asideOrder || [],
+    asideHidden: this.asideHidden || [],
+    asideConfig: this.asideConfig || {},
     psnConnected: !!(this.psn && this.psn.refreshToken),
     steamConnected: !!(this.steam && this.steam.steamId),
     steam: this.steam?.steamId

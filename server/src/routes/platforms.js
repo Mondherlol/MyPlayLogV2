@@ -1,10 +1,31 @@
 import express from "express";
 import { requireAuth } from "../middleware/auth.js";
 import { buildPlatformProfile, fetchPlatformGamesPage } from "../lib/platformProfile.js";
+import { ensureEntityLogos } from "../lib/entityLogos.js";
 import UserGame from "../models/UserGame.js";
 import User from "../models/User.js";
 
 const router = express.Router();
+
+// POST /api/platforms/logos { names:[...] } -> { logos: { name: url|null } }
+// Miniatures de consoles (logo IGDB, match exact par nom) pour la carte
+// « Console favorite » de l'aperçu et sa modale. Public (profils partageables),
+// best-effort + cache EntityLogo (les noms viennent d'IGDB → match par nom OK).
+router.post("/logos", async (req, res) => {
+  try {
+    const names = Array.isArray(req.body?.names)
+      ? req.body.names.map((n) => String(n || "").trim()).filter(Boolean).slice(0, 40)
+      : [];
+    if (!names.length) return res.json({ logos: {} });
+    const map = await ensureEntityLogos("platform", names);
+    const logos = {};
+    for (const [name, url] of map) logos[name] = url;
+    res.json({ logos });
+  } catch (err) {
+    console.error("platform logos error:", err.message);
+    res.json({ logos: {} });
+  }
+});
 
 // --- Affinité joueur ↔ console ---
 // Trois ingrédients (ratios 0..1, moyennés par leurs poids) :

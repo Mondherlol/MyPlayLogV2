@@ -72,6 +72,24 @@ const OVERVIEW_SECTIONS = new Set([
   "dropped",
 ]);
 const OVERVIEW_CARD_FIELDS = new Set(["rating", "hours", "platform", "title"]);
+// Widgets de la colonne latérale « Aperçu » que le propriétaire peut réordonner
+// et masquer (drag & drop + toggle). Doit rester aligné avec le registre client
+// (ProfileOverviewAside). Toute clé inconnue est ignorée à l'enregistrement.
+const ASIDE_WIDGETS = new Set([
+  "stats",
+  "playtime",
+  "tracking-lol",
+  "tracking-rivals",
+  "console",
+  "characters",
+  "studios",
+  "playlist",
+  "ost",
+  "video",
+  "lists",
+  "review",
+  "wanted",
+]);
 
 function entryCard(e) {
   return {
@@ -84,6 +102,9 @@ function entryCard(e) {
     playtimeHours: e.playtimeHours,
     favorite: e.favorite,
     rating: e.rating,
+    favoriteCharacter: e.favoriteCharacter?.name
+      ? { name: e.favoriteCharacter.name, image: e.favoriteCharacter.image || null }
+      : null,
     favoriteOst: e.favoriteOst?.name
       ? {
           name: e.favoriteOst.name,
@@ -225,6 +246,40 @@ router.put("/me/overview", requireAuth, async (req, res) => {
       set.overviewOrder = cleanKeys(b.overviewOrder, OVERVIEW_SECTIONS);
     if (b.overviewCards !== undefined)
       set.overviewCards = cleanKeys(b.overviewCards, OVERVIEW_CARD_FIELDS);
+    // Colonne latérale : ordre des widgets + widgets masqués.
+    if (b.asideOrder !== undefined)
+      set.asideOrder = cleanKeys(b.asideOrder, ASIDE_WIDGETS);
+    if (b.asideHidden !== undefined)
+      set.asideHidden = cleanKeys(b.asideHidden, ASIDE_WIDGETS);
+    // Réglage par widget (mode auto vs sélection épinglée). Assaini par champ.
+    if (b.asideConfig !== undefined) {
+      const src = b.asideConfig && typeof b.asideConfig === "object" ? b.asideConfig : {};
+      const clean = {};
+      for (const key of Object.keys(src)) {
+        if (!ASIDE_WIDGETS.has(key)) continue;
+        const v = src[key];
+        if (!v || typeof v !== "object") continue;
+        const c = { mode: String(v.mode || "").slice(0, 16) };
+        if (v.id != null) c.id = String(v.id).slice(0, 64);
+        if (v.gameId != null && Number.isFinite(Number(v.gameId))) c.gameId = Number(v.gameId);
+        if (v.videoId != null) c.videoId = String(v.videoId).slice(0, 20);
+        if (Array.isArray(v.ids)) c.ids = v.ids.map((x) => String(x).slice(0, 64)).slice(0, 3);
+        if (v.platform != null) c.platform = String(v.platform).slice(0, 80);
+        if (Array.isArray(v.keys)) c.keys = v.keys.map((x) => String(x).slice(0, 160)).slice(0, 24);
+        // Studios épinglés : objets { name, logo } (rendu direct de la carte).
+        if (Array.isArray(v.companies))
+          c.companies = v.companies
+            .filter((x) => x && x.name)
+            .map((x) => ({
+              name: String(x.name).slice(0, 120),
+              logo: x.logo ? String(x.logo).slice(0, 400) : null,
+              country: x.country ? String(x.country).slice(0, 80) : null,
+            }))
+            .slice(0, 3);
+        clean[key] = c;
+      }
+      set.asideConfig = clean;
+    }
     // Ordre manuel des jeux par section : { sectionKey: [gameId,…] }. On ne
     // garde que les sections connues et des ids numériques dédoublonnés.
     if (b.overviewGameOrder !== undefined) {
@@ -1506,6 +1561,9 @@ router.get("/:username", optionalAuth, async (req, res) => {
         overviewOrder: user.overviewOrder || [],
         overviewCards: user.overviewCards || [],
         overviewGameOrder: user.overviewGameOrder || {},
+        asideOrder: user.asideOrder || [],
+        asideHidden: user.asideHidden || [],
+        asideConfig: user.asideConfig || {},
         favoriteCompanies: user.favoriteCompanies || [],
         createdAt: user.createdAt,
         lastSeenAt: user.lastSeenAt || null,

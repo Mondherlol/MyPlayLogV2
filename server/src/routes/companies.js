@@ -1,12 +1,46 @@
 import express from "express";
 import { requireAuth } from "../middleware/auth.js";
 import { buildCompanyProfile } from "../lib/companyProfile.js";
+import { igdbQuery } from "../lib/igdb.js";
 import UserGame from "../models/UserGame.js";
 import User from "../models/User.js";
 
 const router = express.Router();
 
 const normName = (s) => String(s).trim().toLowerCase();
+const IGDB_IMG = "https://images.igdb.com/igdb/image/upload";
+
+// GET /api/companies/search?q= — recherche légère de studios/éditeurs (IGDB) pour
+// épingler des studios dans la carte « Studios favoris » de l'aperçu. Renvoie
+// juste nom + logo (rendu direct, pas de build de profil complet).
+router.get("/search", requireAuth, async (req, res) => {
+  try {
+    const q = String(req.query.q || "").trim();
+    if (q.length < 2) return res.json({ companies: [] });
+    const esc = q.replace(/["\\]/g, "");
+    const rows = await igdbQuery(
+      "companies",
+      `search "${esc}"; fields name,logo.image_id; limit 18;`
+    );
+    const seen = new Set();
+    const companies = [];
+    for (const c of rows || []) {
+      if (!c.name) continue;
+      const key = c.name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      companies.push({
+        name: c.name,
+        logo: c.logo?.image_id ? `${IGDB_IMG}/t_logo_med/${c.logo.image_id}.png` : null,
+      });
+      if (companies.length >= 12) break;
+    }
+    res.json({ companies });
+  } catch (err) {
+    console.error("company search error:", err.message);
+    res.status(502).json({ error: "Recherche de studios indisponible." });
+  }
+});
 
 // --- Affinité joueur ↔ studio ---
 // Trois ingrédients, chacun un ratio 0..1, moyennés par leurs poids :

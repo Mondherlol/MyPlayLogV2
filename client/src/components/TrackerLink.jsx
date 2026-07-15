@@ -29,13 +29,27 @@ export function CoverLogo({ cover, className = "", children }) {
   );
 }
 
-// Emblème de rang (ou icône) avec repli propre si l'image échoue.
-export function Emblem({ src, size = 34 }) {
+// Emblème de rang (ou icône) avec repli propre si l'image échoue. `crop` recadre
+// et agrandit l'image (blason LoL Community Dragon minuscule dans un grand cadre).
+export function Emblem({ src, size = 34, crop = false }) {
   const [broken, setBroken] = useState(false);
   if (!src || broken) {
     return (
       <span className="trk-emblem fb" style={{ width: size, height: size }}>
         <Trophy size={Math.round(size * 0.5)} />
+      </span>
+    );
+  }
+  if (crop) {
+    return (
+      <span className="trk-emblem crop" style={{ width: size, height: size }}>
+        <img
+          className="trk-emblem-img"
+          src={src}
+          alt=""
+          draggable="false"
+          onError={() => setBroken(true)}
+        />
       </span>
     );
   }
@@ -66,7 +80,7 @@ export function TrackerAvatar({ src, name, size = 46 }) {
 }
 
 // Aperçu du compte trouvé (avant liaison) : avatar + pseudo + rang + confirmation.
-function TrackerPreview({ preview, meta, onConfirm, onCancel, busy }) {
+function TrackerPreview({ preview, meta, onConfirm, onCancel, busy, cropRank }) {
   const hasRank = preview.rank?.image || preview.rank?.tier;
   return (
     <div className="trk-preview">
@@ -83,7 +97,7 @@ function TrackerPreview({ preview, meta, onConfirm, onCancel, busy }) {
         </div>
         {hasRank && (
           <div className="trk-preview-rank">
-            <Emblem src={preview.rank.image} size={44} />
+            <Emblem src={preview.rank.image} size={44} crop={cropRank} />
             {preview.rank.tier && <span>{preview.rank.tier}</span>}
           </div>
         )}
@@ -316,6 +330,7 @@ export function LeagueLinkForm({ status, onLinked, autoFocus }) {
           onConfirm={confirm}
           onCancel={() => setPreview(null)}
           busy={busy}
+          cropRank
         />
       ) : (
         <div className="import-manual lol-link" style={{ marginTop: 0 }}>
