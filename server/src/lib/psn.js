@@ -220,7 +220,12 @@ export async function resolveOnlineId(accessToken, onlineId) {
   if (!term) return null;
   const res = await makeUniversalSearch(auth(accessToken), term, "SocialAllAccounts");
   const results = res?.domainResponses?.[0]?.results || [];
-  if (!results.length) return null;
+  if (!results.length) {
+    // Sony a répondu mais sans résultat : soit l'ID n'existe pas, soit la
+    // recherche est filtrée depuis cette IP/région (fréquent sur un VPS).
+    console.warn("psn resolveOnlineId: 0 résultat pour", term);
+    return null;
+  }
   const norm = (s) => String(s || "").toLowerCase();
   const exact = results.find((r) => norm(r.socialMetadata?.onlineId) === norm(term));
   const m = (exact || results[0]).socialMetadata;

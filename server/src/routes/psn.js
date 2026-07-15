@@ -229,7 +229,21 @@ router.post("/connect", requireAuth, async (req, res) => {
     if (!psnId) return res.status(400).json({ error: "PSN ID manquant." });
 
     const accessToken = await getServiceAccessToken();
-    const resolved = await resolveOnlineId(accessToken, psnId).catch(() => null);
+    // On distingue « profil réellement introuvable » (résultat vide) d'un
+    // « échec de l'API PlayStation » (auth/token/IP du serveur). Avant, un
+    // .catch(() => null) écrasait les deux en « introuvable », ce qui masquait
+    // les problèmes côté VPS (Sony bloque parfois les IP de datacenter).
+    let resolved;
+    try {
+      resolved = await resolveOnlineId(accessToken, psnId);
+    } catch (e) {
+      const detail = e?.response?.status || e?.status || "";
+      console.error("psn resolveOnlineId error:", psnId, detail, e?.message);
+      return res.status(502).json({
+        error:
+          "La recherche PlayStation a échoué côté serveur (API Sony injoignable ou bloquée). Réessaie dans un instant.",
+      });
+    }
     if (!resolved)
       return res.status(404).json({
         error: "Profil PSN introuvable. Vérifie l'orthographe de ton PSN ID.",
