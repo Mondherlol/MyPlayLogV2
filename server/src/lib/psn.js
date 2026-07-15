@@ -430,3 +430,157 @@ export async function matchNamesToIgdb(names) {
 
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Import COMPLET pour le worker maison (contourne le blocage Akamai du VPS).
+// Le worker appelle buildPsnImportData depuis une IP résidentielle et renvoie
+// le résultat au VPS, qui n'a plus qu'à l'écrire en base. Fonctions PURES : pas
+// d'accès à la base MyPlayLog.
+// ---------------------------------------------------------------------------
+
+// Au-delà de ce temps de jeu, un jeu non catalogué est suggéré « Terminé ».
+const FINISHED_HOURS = 30;
+
+// Mappe les trophées psn-api vers la forme stockée dans GameAchievements.
+export function mapTrophies(trophies) {
+  return (trophies || []).map((t) => ({
+    apiName: String(t.id),
+    name: t.name,
+    description: t.detail,
+    icon: t.icon,
+    hidden: t.hidden,
+    unlocked: t.earned,
+    unlockedAt: t.earnedAt ? new Date(t.earnedAt) : null,
+    rarity: t.percent,
+    tier: t.type,
+  }));
+}
+
+// Fusionne l'historique joué (temps) et la liste de trophées (progression) par
+// nom simplifié. Pure (sans DB) : cumule le temps entre versions PS4/PS5.
+function mergePlayedAndTitles(played, titles) {
+  const merged = new Map();
+  for (const p of played) {
+    const key = simplifyName(p.name);
+    if (!key) continue;
+    const cur = merged.get(key);
+    if (cur) {
+      cur.playMinutes += p.playMinutes;
+      if (new Date(p.lastPlayed || 0) > new Date(cur.lastPlayed || 0)) cur.lastPlayed = p.lastPlayed;
+      if (!cur.icon) cur.icon = p.icon;
+    } else {
+      merged.set(key, {
+        name: p.name, icon: p.icon, playMinutes: p.playMinutes, lastPlayed: p.lastPlayed,
+        npCommunicationId: null, npServiceName: null, trophyProgress: null,
+        definedTrophies: 0, hasPlatinum: false, playedCategory: p.category || null, trophyPlatform: null,
+      });
+    }
+  }
+  for (const t of titles) {
+    const key = simplifyName(t.trophyTitleName);
+    if (!key) continue;
+    const defined = sumTrophies(t.definedTrophies);
+    const cur = merged.get(key);
+    if (cur) {
+      cur.npCommunicationId = t.npCommunicationId;
+      cur.npServiceName = t.npServiceName;
+      cur.trophyProgress = t.progress;
+      cur.definedTrophies = defined;
+      cur.hasPlatinum = (t.definedTrophies?.platinum || 0) > 0;
+      if (!cur.icon) cur.icon = t.trophyTitleIconUrl || null;
+      if (!cur.lastPlayed) cur.lastPlayed = t.lastUpdatedDateTime || null;
+      if (!cur.trophyPlatform) cur.trophyPlatform = t.trophyTitlePlatform || null;
+    } else {
+      merged.set(key, {
+        name: t.trophyTitleName, icon: t.trophyTitleIconUrl || null, playMinutes: 0,
+        lastPlayed: t.lastUpdatedDateTime || null, npCommunicationId: t.npCommunicationId,
+        npServiceName: t.npServiceName, trophyProgress: t.progress, definedTrophies: defined,
+        hasPlatinum: (t.definedTrophies?.platinum || 0) > 0, playedCategory: null,
+        trophyPlatform: t.trophyTitlePlatform || null,
+      });
+    }
+  }
+  return [...merged.values()];
+}
+
+// Construit le résultat d'import complet d'un compte (jeux matchés IGDB +
+// trophées complets, et jeux « à reconnaître »), prêt à être renvoyé au VPS.
+// onProgress(done, total) : callback facultatif pour l'avancement des trophées.
+export async function buildPsnImportData(accessToken, accountId, onProgress) {
+  const [played, titles] = await Promise.all([
+    fetchPlayedGames(accessToken, accountId).catch(() => []),
+    fetchUserTitles(accessToken, accountId).catch(() => []),
+  ]);
+  const list = mergePlayedAndTitles(played, titles);
+  if (!list.length) return { games: [], unmatched: [] };
+
+  const matchMap = await matchNamesToIgdb(list.map((g) => g.name));
+
+  const games = [];
+  const unmatched = [];
+  for (const g of list) {
+    const hours = Math.round((g.playMinutes / 60) * 10) / 10;
+    const m = matchMap.get(simplifyName(g.name));
+    const base = {
+      titleKey: simplifyName(g.name),
+      psnName: g.name,
+      icon: g.icon,
+      playtimeHours: hours,
+      lastPlayed: g.lastPlayed,
+      npCommunicationId: g.npCommunicationId,
+      npServiceName: g.npServiceName,
+      trophyProgress: g.trophyProgress,
+      definedTrophies: g.definedTrophies,
+      hasPlatinum: g.hasPlatinum,
+      canImportTrophies: !!g.npCommunicationId && g.definedTrophies > 0,
+      trophies: null,
+      trophyTotal: 0,
+      trophyUnlocked: 0,
+    };
+    const consoles = m?.consoles || [];
+    if (!m || consoles.length === 0) {
+      unmatched.push({ ...base, name: g.name });
+      continue;
+    }
+    const detected = detectPsnConsole(g.playedCategory, g.trophyPlatform);
+    const suggestedConsole =
+      detected && consoles.some((c) => c.name === detected) ? detected : consoles[0].name;
+    const progress = g.trophyProgress ?? 0;
+    const suggestedStatus = m.endless
+      ? "endless"
+      : progress >= 100 || hours >= FINISHED_HOURS
+      ? "finished"
+      : "paused";
+    games.push({
+      ...base,
+      gameId: m.gameId,
+      name: m.name,
+      cover: m.cover,
+      endless: m.endless,
+      consoles,
+      suggestedConsole,
+      suggestedStatus,
+    });
+  }
+
+  // Trophées complets pour tous les titres qui en ont (matchés + à reconnaître).
+  const withTrophies = [...games, ...unmatched].filter((g) => g.canImportTrophies);
+  let done = 0;
+  await pool(withTrophies, 3, async (g) => {
+    try {
+      const trophies = await fetchTitleTrophies(
+        accessToken, g.npCommunicationId, g.npServiceName, accountId
+      );
+      g.trophies = mapTrophies(trophies);
+      g.trophyTotal = g.trophies.length;
+      g.trophyUnlocked = g.trophies.filter((t) => t.unlocked).length;
+    } catch {
+      g.trophies = null;
+    }
+    done++;
+    onProgress?.(done, withTrophies.length);
+  });
+
+  games.sort((a, b) => new Date(b.lastPlayed || 0) - new Date(a.lastPlayed || 0));
+  return { games, unmatched };
+}

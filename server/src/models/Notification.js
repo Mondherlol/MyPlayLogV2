@@ -30,6 +30,8 @@ const notificationSchema = new mongoose.Schema(
         "recommendation_comment", // on a commenté une reco (reçue/faite)
         "download_react", // on s'est moqué de ton délit de téléchargement
         "import_pending", // (système) de nouveaux jeux à valider après une synchro
+        "psn_request", // (admin) un utilisateur a demandé une synchro PSN à traiter
+        "psn_ready", // (système) ton import PSN est prêt : jeux à valider
       ],
       required: true,
     },

@@ -25,7 +25,7 @@ import { useLibrary } from "../context/LibraryContext";
 import SteamIcon from "../components/SteamIcon";
 import SteamImportModal from "../components/SteamImportModal";
 import PsnIcon from "../components/PsnIcon";
-import PsnImportModal, {
+import {
   ConsolePicker,
   GameSearchPicker,
   psConsolesFromPlatforms,
@@ -561,9 +561,7 @@ function PsnCard() {
   const [psnId, setPsnId] = useState("");
   const [unlinkOpen, setUnlinkOpen] = useState(false);
   const [removeGames, setRemoveGames] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [syncMsg, setSyncMsg] = useState(null);
+  const [sent, setSent] = useState(false);
   const [pendingReload, setPendingReload] = useState(0);
 
   async function load() {
@@ -575,51 +573,27 @@ function PsnCard() {
     }
   }
 
-  // Synchro (bouton) : maj heures/trophées des jeux déjà en biblio + détection
-  // des nouveaux jeux (→ en attente de validation).
-  async function sync() {
-    setSyncing(true);
-    setSyncMsg(null);
-    setError(null);
-    try {
-      const r = await apiFetch("/psn/sync", { method: "POST", token });
-      const parts = [];
-      if (r.hoursUpdated) parts.push(`${r.hoursUpdated} temps de jeu`);
-      if (r.trophiesUpdated) parts.push(`${r.trophiesUpdated} jeux de trophées`);
-      if (r.newlyPending)
-        parts.push(
-          `${r.newlyPending} nouveau${r.newlyPending > 1 ? "x" : ""} jeu${
-            r.newlyPending > 1 ? "x" : ""
-          } à valider`
-        );
-      setSyncMsg(parts.length ? `Synchro : ${parts.join(", ")}.` : "Déjà à jour.");
-      await load();
-      setPendingReload((n) => n + 1);
-      await refresh();
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setSyncing(false);
-    }
-  }
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function connect() {
-    if (!psnId.trim()) return;
+  // Demande de synchro PSN, traitée par le worker maison (l'IP du serveur étant
+  // bloquée par Sony). withId=true → 1re liaison (le PSN ID est fourni) ;
+  // false → simple re-synchro d'un compte déjà lié.
+  async function requestSync(withId) {
+    if (withId && !psnId.trim()) return;
     setBusy(true);
     setError(null);
     try {
-      await apiFetch("/psn/connect", {
+      await apiFetch("/psn/request", {
         method: "POST",
         token,
-        body: { psnId: psnId.trim() },
+        body: withId ? { psnId: psnId.trim() } : {},
       });
-      setConnectOpen(false);
       setPsnId("");
-      updateUser({ psnConnected: true });
+      setConnectOpen(false);
+      setSent(true);
       await load();
     } catch (e) {
       setError(e.message);
@@ -658,6 +632,7 @@ function PsnCard() {
 
   const connected = status.connected;
   const psn = status.psn;
+  const req = status.request; // { status } en cours, ou null
 
   return (
     <div className={`import-card psn ${connected ? "connected" : ""}`}>
@@ -703,74 +678,65 @@ function PsnCard() {
         </div>
       )}
 
-      {!status.configured && (
-        <div className="import-error">
-          <AlertTriangle size={15} /> PlayStation n'est pas configuré côté serveur
-          (PSN_NPSSO).
+      {/* Bannière : demande en attente / en cours de traitement par le worker. */}
+      {req ? (
+        <div className="psn-request-banner">
+          <Loader2 size={15} className="spin" />
+          {req.status === "processing"
+            ? "Synchro en cours de traitement…"
+            : "Demande envoyée — en attente de traitement. Tu recevras une notification quand ton import sera prêt."}
         </div>
-      )}
+      ) : sent ? (
+        <div className="psn-request-banner ok">
+          <CheckCircle2 size={15} /> Demande envoyée.
+        </div>
+      ) : null}
 
       <div className="import-actions">
         {connected ? (
           <>
-            <button
-              className="btn-psn-primary clickable"
-              onClick={() => setImporting(true)}
-              disabled={busy || syncing}
-            >
-              <Gamepad2 size={17} /> Importer mes jeux
-            </button>
-            <button
-              className="btn-ghost clickable"
-              onClick={sync}
-              disabled={busy || syncing}
-              title="Mettre à jour temps de jeu et trophées, détecter les nouveaux jeux"
-            >
-              {syncing ? (
-                <Loader2 className="spin" size={16} />
-              ) : (
-                <RefreshCw size={16} />
-              )}{" "}
-              Synchroniser
-            </button>
+            {!req && (
+              <button
+                className="btn-psn-primary clickable"
+                onClick={() => requestSync(false)}
+                disabled={busy}
+              >
+                {busy ? <Loader2 className="spin" size={16} /> : <RefreshCw size={16} />} Demander
+                une synchro
+              </button>
+            )}
             <button
               className="btn-ghost-danger clickable"
               onClick={() => setUnlinkOpen(true)}
-              disabled={busy || syncing}
+              disabled={busy}
             >
               <Link2Off size={16} /> Délier
             </button>
           </>
         ) : (
-          <button
-            className="btn-psn-primary clickable"
-            onClick={() => setConnectOpen((v) => !v)}
-            disabled={busy || !status.configured}
-          >
-            <Link2 size={17} /> Connecter mon compte PlayStation
-          </button>
+          !req && (
+            <button
+              className="btn-psn-primary clickable"
+              onClick={() => setConnectOpen((v) => !v)}
+              disabled={busy}
+            >
+              <Link2 size={17} /> Connecter mon compte PlayStation
+            </button>
+          )
         )}
       </div>
 
-      {connected && (
+      {connected && psn?.lastSyncAt && (
         <div className="psn-sync-line">
-          {syncMsg ? (
-            <span className="psn-sync-msg">
-              <CheckCircle2 size={13} /> {syncMsg}
-            </span>
-          ) : psn?.lastSyncAt ? (
-            <span>
-              Dernière synchro le{" "}
-              {new Date(psn.lastSyncAt).toLocaleString("fr-FR", {
-                day: "2-digit",
-                month: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-          ) : (
-            <span>Jamais synchronisé — clique sur Synchroniser.</span>
-          )}
+          <span>
+            Dernière synchro le{" "}
+            {new Date(psn.lastSyncAt).toLocaleString("fr-FR", {
+              day: "2-digit",
+              month: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
         </div>
       )}
 
@@ -785,8 +751,8 @@ function PsnCard() {
         />
       )}
 
-      {/* Liaison par PSN ID (le serveur lit les trophées publics). */}
-      {connectOpen && !connected && (
+      {/* Première liaison : on enregistre une DEMANDE (traitée par le worker). */}
+      {connectOpen && !connected && !req && (
         <div className="psn-connect">
           <div className="import-manual">
             <input
@@ -794,16 +760,21 @@ function PsnCard() {
               placeholder="Ton PSN ID (identifiant en ligne)"
               value={psnId}
               onChange={(e) => setPsnId(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && connect()}
+              onKeyDown={(e) => e.key === "Enter" && requestSync(true)}
             />
-            <button className="btn-psn-primary clickable" onClick={connect} disabled={busy}>
+            <button
+              className="btn-psn-primary clickable"
+              onClick={() => requestSync(true)}
+              disabled={busy || !psnId.trim()}
+            >
               {busy ? <Loader2 className="spin" size={16} /> : <Link2 size={16} />}
-              Lier
+              Envoyer la demande
             </button>
           </div>
           <p className="psn-note">
             Ton profil PlayStation et tes trophées doivent être <strong>publics</strong>{" "}
-            (réglages PSN → Confidentialité) pour qu'on puisse les lire.
+            (réglages PSN → Confidentialité). Ta demande est traitée manuellement — tu
+            seras notifié dès que ton import est prêt.
           </p>
         </div>
       )}
@@ -835,15 +806,6 @@ function PsnCard() {
         </div>
       )}
 
-      {importing && (
-        <PsnImportModal
-          onClose={() => setImporting(false)}
-          onDone={async () => {
-            await refresh();
-            setPendingReload((n) => n + 1);
-          }}
-        />
-      )}
     </div>
   );
 }

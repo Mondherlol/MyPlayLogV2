@@ -4,7 +4,8 @@ import UserGame from "../models/UserGame.js";
 import GameAchievements from "../models/GameAchievements.js";
 import PendingImport from "../models/PendingImport.js";
 import Notification from "../models/Notification.js";
-import { requireAuth } from "../middleware/auth.js";
+import PsnSyncRequest from "../models/PsnSyncRequest.js";
+import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { warmGameMeta } from "../lib/gameMeta.js";
 import {
   isConfigured,
@@ -199,10 +200,16 @@ router.get("/status", requireAuth, async (req, res) => {
           state: "pending",
         })
       : 0;
+    // Demande de synchro en cours de traitement par le worker maison.
+    const activeReq = await PsnSyncRequest.findOne({
+      user: req.userId,
+      status: { $in: ["pending", "processing"] },
+    }).select("status createdAt");
     res.json({
       configured: isConfigured(),
       connected: linked,
       pending,
+      request: activeReq ? { status: activeReq.status, createdAt: activeReq.createdAt } : null,
       psn: linked
         ? {
             onlineId: psn.onlineId || null,
@@ -786,8 +793,27 @@ router.post("/pending/:id/validate", requireAuth, async (req, res) => {
     const result = await upsertUserGame(req.userId, it);
 
     if (b.importTrophies !== false && pend.canImportTrophies && pend.npCommunicationId) {
-      const accessToken = await getServiceAccessToken();
-      await syncTitleTrophies(req.userId, accountId, accessToken, it);
+      if (Array.isArray(pend.trophies) && pend.trophies.length) {
+        // Trophées pré-récupérés par le worker maison → écriture sans appel PSN.
+        await GameAchievements.updateOne(
+          { user: req.userId, gameId, platform: "psn" },
+          {
+            $set: {
+              platformAppId: String(pend.npCommunicationId),
+              gameName: it.name,
+              gameCover: it.cover || null,
+              total: pend.trophyTotal || pend.trophies.length,
+              unlocked: pend.trophyUnlocked ?? pend.trophies.filter((t) => t.unlocked).length,
+              achievements: pend.trophies,
+            },
+          },
+          { upsert: true }
+        );
+      } else {
+        // Repli (dev/localhost) : récupération en direct depuis PSN.
+        const accessToken = await getServiceAccessToken();
+        await syncTitleTrophies(req.userId, accountId, accessToken, it);
+      }
     }
 
     await PendingImport.deleteOne({ _id: pend._id });
@@ -824,6 +850,280 @@ router.post("/pending/:id/restore", requireAuth, async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error("psn restore error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// ======================================================================
+//  WORKER MAISON — traite les demandes de synchro PSN depuis une IP
+//  résidentielle (le VPS est bloqué par Akamai). Le VPS ne parle jamais à
+//  PSN : il file les demandes au worker (server/tools/psn-worker.mjs) qui
+//  renvoie le résultat, ingéré ici. Auth par secret partagé PSN_WORKER_SECRET.
+// ======================================================================
+
+function requireWorker(req, res, next) {
+  const secret = (process.env.PSN_WORKER_SECRET || "").trim();
+  if (!secret)
+    return res.status(503).json({ error: "Worker PSN non configuré (PSN_WORKER_SECRET)." });
+  if ((req.get("x-psn-worker-secret") || "") !== secret)
+    return res.status(401).json({ error: "Secret worker invalide." });
+  next();
+}
+
+// Notifie le compte admin (ADMIN_EMAIL) d'un évènement.
+async function notifyAdmin(type, snippet) {
+  const email = (process.env.ADMIN_EMAIL || "").trim();
+  if (!email) return;
+  const admin = await User.findOne({
+    email: new RegExp(`^${email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"),
+  }).select("_id");
+  if (admin)
+    await Notification.create({ user: admin._id, type, actor: null, snippet }).catch(() => {});
+}
+
+// Écrit/rafraîchit un jeu « à valider » à partir d'un item renvoyé par le worker.
+async function upsertPendingFromWorker(userId, g) {
+  const titleKey = g.titleKey || simplifyName(g.psnName || g.name);
+  if (!titleKey) return;
+  const doc = {
+    psnName: g.psnName || g.name || null,
+    icon: g.icon || null,
+    playtimeHours: g.playtimeHours ?? null,
+    npCommunicationId: g.npCommunicationId || null,
+    npServiceName: g.npServiceName || null,
+    definedTrophies: g.definedTrophies || 0,
+    trophyProgress: g.trophyProgress ?? null,
+    hasPlatinum: !!g.hasPlatinum,
+    canImportTrophies: !!g.canImportTrophies,
+    gameId: g.gameId || null,
+    name: g.name || null,
+    cover: g.cover || null,
+    consoles: g.consoles || [],
+    suggestedConsole: g.suggestedConsole || null,
+    suggestedStatus: g.suggestedStatus || "paused",
+    trophies: Array.isArray(g.trophies) ? g.trophies : null,
+    trophyTotal: g.trophyTotal || 0,
+    trophyUnlocked: g.trophyUnlocked || 0,
+  };
+  await PendingImport.updateOne(
+    { user: userId, platform: "psn", titleKey },
+    { $set: doc, $setOnInsert: { state: "pending" } },
+    { upsert: true }
+  );
+}
+
+// Écrit directement les trophées d'un jeu DÉJÀ en bibliothèque (aucun appel PSN).
+async function writeStoredAchievements(userId, g) {
+  if (!Array.isArray(g.trophies) || !g.trophies.length || !g.gameId) return false;
+  await GameAchievements.updateOne(
+    { user: userId, gameId: Number(g.gameId), platform: "psn" },
+    {
+      $set: {
+        platformAppId: String(g.npCommunicationId || ""),
+        gameName: g.name,
+        gameCover: g.cover || null,
+        total: g.trophyTotal || g.trophies.length,
+        unlocked: g.trophyUnlocked ?? g.trophies.filter((t) => t.unlocked).length,
+        achievements: g.trophies,
+      },
+    },
+    { upsert: true }
+  );
+  return true;
+}
+
+// --- Utilisateur : demande une synchro PSN (traitée par le worker maison). ---
+router.post("/request", requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select("psn username");
+    const psnId = String(req.body?.psnId || "").trim();
+    const linked = isLinked(user?.psn);
+    if (!linked && !psnId) return res.status(400).json({ error: "Entre ton PSN ID." });
+
+    // Une seule demande active par utilisateur.
+    let reqDoc = await PsnSyncRequest.findOne({
+      user: req.userId,
+      status: { $in: ["pending", "processing"] },
+    });
+    if (!reqDoc) {
+      reqDoc = await PsnSyncRequest.create({
+        user: req.userId,
+        psnId: linked ? null : psnId,
+      });
+      await notifyAdmin(
+        "psn_request",
+        `${user.username} a demandé une synchro PlayStation${linked ? "" : ` (${psnId})`}`
+      );
+    }
+    res.json({ status: reqDoc.status });
+  } catch (err) {
+    console.error("psn request error:", err.message);
+    res.status(500).json({ error: "Erreur lors de la demande." });
+  }
+});
+
+// --- Admin : liste des demandes de synchro (panel Admin). ---
+router.get("/requests", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const rows = await PsnSyncRequest.find({})
+      .sort({ createdAt: -1 })
+      .limit(40)
+      .populate("user", "username avatar");
+    res.json({
+      requests: rows.map((r) => ({
+        id: String(r._id),
+        username: r.user?.username || "?",
+        avatar: r.user?.avatar || null,
+        psnId: r.psnId || null,
+        status: r.status,
+        error: r.error || null,
+        summary: r.summary || null,
+        createdAt: r.createdAt,
+        processedAt: r.processedAt || null,
+      })),
+      active: rows.filter((r) => r.status === "pending" || r.status === "processing").length,
+    });
+  } catch (err) {
+    console.error("psn requests error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// --- Worker : réclame la prochaine demande à traiter (→ processing). ---
+router.get("/worker/jobs", requireWorker, async (req, res) => {
+  try {
+    // Reprend aussi les demandes coincées en « processing » depuis > 10 min
+    // (worker planté en cours de route).
+    const staleBefore = new Date(Date.now() - 10 * 60 * 1000);
+    const job = await PsnSyncRequest.findOneAndUpdate(
+      { $or: [{ status: "pending" }, { status: "processing", updatedAt: { $lt: staleBefore } }] },
+      { $set: { status: "processing" } },
+      { sort: { createdAt: 1 }, new: true }
+    );
+    if (!job) return res.json({ job: null });
+    const user = await User.findById(job.user).select("psn username");
+    res.json({
+      job: {
+        id: String(job._id),
+        psnId: job.psnId || null,
+        accountId: user?.psn?.accountId || null,
+        username: user?.username || null,
+      },
+    });
+  } catch (err) {
+    console.error("psn worker jobs error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// --- Worker : renvoie le résultat d'une demande → ingestion en base. ---
+router.post("/worker/jobs/:id/result", requireWorker, async (req, res) => {
+  try {
+    const job = await PsnSyncRequest.findById(req.params.id);
+    if (!job) return res.status(404).json({ error: "Demande introuvable." });
+    const user = await User.findById(job.user).select("psn username");
+    if (!user) {
+      job.status = "error";
+      job.error = "Utilisateur supprimé.";
+      await job.save();
+      return res.status(404).json({ error: "Utilisateur introuvable." });
+    }
+
+    const body = req.body || {};
+    // Liaison du compte (première demande) : le worker a résolu le PSN ID.
+    if (body.account?.accountId) {
+      user.psn = {
+        accountId: body.account.accountId,
+        onlineId: body.account.onlineId || job.psnId || user.psn?.onlineId || null,
+        avatar: body.account.avatar || null,
+        connectedAt: user.psn?.connectedAt || new Date(),
+      };
+    }
+    if (!isLinked(user.psn)) {
+      job.status = "error";
+      job.error = "Compte PSN non résolu (profil introuvable ou privé ?).";
+      await job.save();
+      return res.status(400).json({ error: job.error });
+    }
+
+    const games = Array.isArray(body.games) ? body.games : [];
+    const unmatched = Array.isArray(body.unmatched) ? body.unmatched : [];
+
+    const libRows = await UserGame.find({ user: user._id }).select(
+      "gameId playtimeHours psnPlaytimeHours"
+    );
+    const libMap = new Map(libRows.map((r) => [r.gameId, r]));
+    const ignoredRows = await PendingImport.find({
+      user: user._id,
+      platform: "psn",
+      state: "ignored",
+    }).select("titleKey");
+    const ignoredSet = new Set(ignoredRows.map((r) => r.titleKey));
+
+    let trophiesWritten = 0;
+
+    for (const g of games) {
+      if (ignoredSet.has(g.titleKey)) continue;
+      const existing = libMap.get(Number(g.gameId));
+      if (existing) {
+        // Déjà en biblio : maj heures (respect saisie manuelle) + trophées.
+        const patch = nextPlaytime(existing, g.playtimeHours);
+        if (patch) await UserGame.updateOne({ _id: existing._id }, { $set: patch });
+        if (await writeStoredAchievements(user._id, g)) trophiesWritten++;
+      } else {
+        await upsertPendingFromWorker(user._id, g);
+      }
+    }
+    for (const g of unmatched) {
+      if (ignoredSet.has(g.titleKey)) continue;
+      await upsertPendingFromWorker(user._id, g);
+    }
+
+    const pendingCount = await PendingImport.countDocuments({
+      user: user._id,
+      platform: "psn",
+      state: "pending",
+    });
+
+    await Notification.deleteMany({ user: user._id, type: "psn_ready", read: false });
+    await Notification.create({
+      user: user._id,
+      type: "psn_ready",
+      actor: null,
+      snippet: `Ton import PlayStation est prêt : ${pendingCount} jeu${
+        pendingCount > 1 ? "x" : ""
+      } à valider`,
+    }).catch(() => {});
+
+    user.psn.lastSyncAt = new Date();
+    await user.save();
+
+    job.status = "done";
+    job.error = null;
+    job.processedAt = new Date();
+    job.summary = { games: games.length, trophies: trophiesWritten, pending: pendingCount };
+    await job.save();
+
+    res.json({ ok: true, pending: pendingCount, trophies: trophiesWritten });
+  } catch (err) {
+    console.error("psn worker result error:", err.message);
+    res.status(500).json({ error: err.message || "Erreur d'ingestion." });
+  }
+});
+
+// --- Worker : signale un échec de traitement d'une demande. ---
+router.post("/worker/jobs/:id/error", requireWorker, async (req, res) => {
+  try {
+    const job = await PsnSyncRequest.findById(req.params.id);
+    if (!job) return res.status(404).json({ error: "Demande introuvable." });
+    job.status = "error";
+    job.error = String(req.body?.error || "Erreur inconnue").slice(0, 500);
+    job.processedAt = new Date();
+    await job.save();
+    await notifyAdmin("psn_request", `Échec synchro PSN : ${job.error}`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("psn worker error report:", err.message);
     res.status(500).json({ error: "Erreur." });
   }
 });

@@ -19,6 +19,7 @@ import {
   Search,
   Crown,
   Gamepad2,
+  RefreshCw,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -39,6 +40,7 @@ export default function Admin() {
       </header>
 
       <PsnManager token={token} updateUser={updateUser} />
+      <PsnRequestsManager token={token} />
       <UsersManager token={token} />
       <PatchnoteManager token={token} />
     </div>
@@ -369,6 +371,107 @@ function PsnManager({ token, updateUser }) {
           </div>
           {err && <p className="psn-err">{err}</p>}
         </>
+      )}
+    </section>
+  );
+}
+
+// ======================================================================
+//  Demandes de synchro PSN (traitées par le worker maison) — admin only
+// ======================================================================
+const PSN_REQ_STATUS = {
+  pending: "En attente",
+  processing: "En cours",
+  done: "Traité",
+  error: "Échec",
+};
+
+function PsnRequestsManager({ token }) {
+  const [data, setData] = useState(null);
+  const [allowed, setAllowed] = useState(true);
+  const [loading, setLoading] = useState(true);
+
+  function load() {
+    setLoading(true);
+    apiFetch("/psn/requests", { token })
+      .then((d) => {
+        setData(d);
+        setAllowed(true);
+      })
+      .catch((e) => {
+        if (/administrateur/i.test(e.message)) setAllowed(false);
+      })
+      .finally(() => setLoading(false));
+  }
+  useEffect(load, [token]);
+
+  if (!allowed) return null;
+
+  const requests = data?.requests || [];
+  const active = data?.active || 0;
+
+  return (
+    <section className="admin-card">
+      <div className="admin-card-head">
+        <span className="admin-card-icon">
+          <Gamepad2 size={18} />
+        </span>
+        <div className="admin-card-titles">
+          <h2>Demandes de synchro PSN</h2>
+          <p>
+            Les utilisateurs demandent leur synchro ici. Lance{" "}
+            <code>run-psn-worker.bat</code> sur ton PC pour les traiter (l'IP du
+            serveur est bloquée par Sony).
+          </p>
+        </div>
+        <button className="btn btn-ghost" onClick={load} disabled={loading}>
+          {loading ? <Loader2 size={15} className="spin" /> : <RefreshCw size={15} />}{" "}
+          Rafraîchir
+        </button>
+      </div>
+
+      {active > 0 && (
+        <p className="psn-req-hint">
+          {active} demande{active > 1 ? "s" : ""} à traiter — lance le worker sur ton PC.
+        </p>
+      )}
+
+      {loading && !data ? (
+        <div className="gp-troph-state">
+          <Loader2 size={18} className="spin" /> Chargement…
+        </div>
+      ) : requests.length === 0 ? (
+        <p className="pn-admin-empty">Aucune demande pour l'instant.</p>
+      ) : (
+        <div className="psn-req-list">
+          {requests.map((r) => (
+            <div className={`psn-req-row ${r.status}`} key={r.id}>
+              <div className="psn-req-main">
+                <strong>{r.username}</strong>
+                <span className="psn-req-sub">
+                  {r.psnId ? r.psnId : "re-synchro"} ·{" "}
+                  {new Date(r.createdAt).toLocaleString("fr-FR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+                {r.status === "done" && r.summary && (
+                  <span className="psn-req-detail">
+                    {r.summary.pending} à valider · {r.summary.trophies} jeux de trophées
+                  </span>
+                )}
+                {r.status === "error" && r.error && (
+                  <span className="psn-req-detail err">{r.error}</span>
+                )}
+              </div>
+              <span className={`psn-req-badge ${r.status}`}>
+                {PSN_REQ_STATUS[r.status] || r.status}
+              </span>
+            </div>
+          ))}
+        </div>
       )}
     </section>
   );

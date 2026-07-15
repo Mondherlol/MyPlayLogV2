@@ -45,7 +45,9 @@ app.use(
       .map((s) => s.trim()),
   })
 );
-app.use(express.json());
+// Limite relevée : le worker PSN maison renvoie l'import complet (jeux +
+// trophées de tout un compte) en un seul POST, ce qui dépasse les 100 ko par défaut.
+app.use(express.json({ limit: "25mb" }));
 
 // Fichiers uploadés (covers custom)
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));

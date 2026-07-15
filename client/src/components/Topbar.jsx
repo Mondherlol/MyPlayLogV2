@@ -52,6 +52,8 @@ const NOTIF_META = {
   download_react: { Icon: Megaphone, verb: "se moque de ton téléchargement de" },
   // Notif système (pas d'acteur) : le texte vient du snippet.
   import_pending: { Icon: Gamepad2, verb: "", system: true },
+  psn_ready: { Icon: Gamepad2, verb: "", system: true },
+  psn_request: { Icon: Gamepad2, verb: "", system: true },
 };
 
 export default function Topbar() {
@@ -180,8 +182,13 @@ export default function Topbar() {
   function openNotifTarget(n) {
     setMenu(null);
     // Notif système : jeux à valider après une synchro → Paramètres > Imports.
-    if (n.type === "import_pending") {
+    if (n.type === "import_pending" || n.type === "psn_ready") {
       navigate("/settings?tab=imports");
+      return;
+    }
+    // Admin : une demande de synchro PSN à traiter → panel Admin.
+    if (n.type === "psn_request") {
+      navigate("/admin");
       return;
     }
     // OST : ouvre l'onglet OST du profil concerné, sur la bonne piste.

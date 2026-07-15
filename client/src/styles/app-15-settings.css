@@ -1662,3 +1662,104 @@
   .settings-tab.active::before { display: none; }
   .steam-cards { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   Demande de synchro PSN (worker maison) — bannière côté user
+   ============================================================ */
+.psn-request-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.6rem 0 0.2rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--orange) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--orange) 30%, var(--border));
+}
+.psn-request-banner.ok {
+  color: #1f8f4e;
+  background: color-mix(in srgb, #35c46b 14%, var(--surface));
+  border-color: color-mix(in srgb, #35c46b 34%, var(--border));
+}
+:root[data-theme="dark"] .psn-request-banner.ok {
+  color: #52e08a;
+}
+
+/* ============================================================
+   Panel admin : liste des demandes de synchro PSN
+   ============================================================ */
+.psn-req-hint {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+.psn-req-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.psn-req-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.psn-req-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.psn-req-main strong {
+  font-size: 0.9rem;
+}
+.psn-req-sub {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+.psn-req-detail {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+  margin-top: 1px;
+}
+.psn-req-detail.err {
+  color: #d9534f;
+}
+.psn-req-badge {
+  flex-shrink: 0;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  border: 1px solid var(--border-strong);
+  color: var(--text-soft);
+  background: var(--surface);
+}
+.psn-req-badge.pending {
+  color: var(--accent-ink);
+  border-color: color-mix(in srgb, var(--orange) 40%, var(--border));
+  background: color-mix(in srgb, var(--orange) 12%, var(--surface));
+}
+.psn-req-badge.processing {
+  color: #2f8fd0;
+  border-color: color-mix(in srgb, #2f8fd0 40%, var(--border));
+  background: color-mix(in srgb, #2f8fd0 12%, var(--surface));
+}
+.psn-req-badge.done {
+  color: #1f8f4e;
+  border-color: color-mix(in srgb, #35c46b 40%, var(--border));
+  background: color-mix(in srgb, #35c46b 12%, var(--surface));
+}
+.psn-req-badge.error {
+  color: #d9534f;
+  border-color: color-mix(in srgb, #d9534f 40%, var(--border));
+  background: color-mix(in srgb, #d9534f 12%, var(--surface));
+}

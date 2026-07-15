@@ -32,6 +32,12 @@ const pendingImportSchema = new mongoose.Schema(
     trophyProgress: { type: Number, default: null },
     hasPlatinum: { type: Boolean, default: false },
     canImportTrophies: { type: Boolean, default: false },
+    // Liste complète des trophées, PRÉ-RÉCUPÉRÉE par le worker maison (l'IP du
+    // VPS ne peut pas appeler PSN). Permet à la validation d'écrire les succès
+    // sans nouvel appel PSN. Vide = à récupérer en direct (dev/localhost).
+    trophies: { type: mongoose.Schema.Types.Mixed, default: null },
+    trophyTotal: { type: Number, default: 0 },
+    trophyUnlocked: { type: Number, default: 0 },
 
     // --- Suggestion IGDB (null = non reconnu → à lier à la main dans Settings) ---
     gameId: { type: Number, default: null },
