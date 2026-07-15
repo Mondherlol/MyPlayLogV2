@@ -1378,6 +1378,7 @@ router.get("/:username/achievements", optionalAuth, async (req, res) => {
         if (!a.unlocked) continue;
         flat.push({
           name: a.name,
+          description: a.description,
           icon: a.icon,
           rarity: a.rarity,
           unlockedAt: a.unlockedAt,

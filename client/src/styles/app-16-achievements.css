@@ -155,12 +155,67 @@
 .ach-rail-title svg {
   color: var(--accent-ink);
 }
+.ach-rail-wrap {
+  position: relative;
+}
 .ach-rail-row {
   display: flex;
   gap: 0.7rem;
   overflow-x: auto;
   padding-bottom: 0.4rem;
-  scrollbar-width: thin;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  /* Pas de scrollbar : on navigue au drag / aux flèches */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.ach-rail-row::-webkit-scrollbar {
+  display: none;
+}
+.ach-rail-row.dragging {
+  cursor: grabbing;
+}
+.ach-rail-row.dragging * {
+  pointer-events: none;
+}
+.ach-rail-row img {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
+/* Flèches de navigation flottantes */
+.ach-rail-arrow {
+  position: absolute;
+  top: calc(50% - 0.2rem);
+  transform: translateY(-50%);
+  z-index: 5;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-grad);
+  border: none;
+  color: #1a1204;
+  box-shadow: 0 4px 14px rgba(234, 169, 8, 0.45);
+  transition: transform 0.12s, box-shadow 0.12s, filter 0.12s;
+}
+.ach-rail-arrow:hover {
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 6px 18px rgba(234, 169, 8, 0.6);
+  filter: brightness(1.05);
+}
+.ach-rail-arrow.left {
+  left: -8px;
+}
+.ach-rail-arrow.right {
+  right: -8px;
+}
+@media (max-width: 760px) {
+  .ach-rail-arrow {
+    display: none;
+  }
 }
 .ach-rare-card,
 .ach-recent-card {
@@ -401,6 +456,7 @@
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--surface);
+  color: var(--text);
   text-align: left;
   transition: transform 0.14s, box-shadow 0.14s, border-color 0.14s;
 }
@@ -588,63 +644,127 @@
   overflow: hidden;
   animation: steam-pop 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.3);
 }
+/* En-tête « hero » illustré : la jaquette occupe le fond, texte en clair.
+   Toujours sombre (façon Steam / PSN) → cohérent en thème clair comme sombre. */
 .ach-modal-head {
   position: relative;
   display: flex;
-  gap: 0.9rem;
-  padding: 1.3rem 1.2rem;
-  border-bottom: 1px solid var(--border);
+  align-items: flex-end;
+  gap: 1.1rem;
+  padding: 1.5rem 1.4rem 1.3rem;
+  min-height: 152px;
   overflow: hidden;
+  color: #fff;
+  isolation: isolate;
 }
-/* Jaquette floutée en fond de l'en-tête */
+/* Jaquette en fond, plein cadre */
 .ach-modal-head::before {
   content: "";
   position: absolute;
   inset: 0;
   background-image: var(--ach-modal-bg);
   background-size: cover;
-  background-position: center;
-  filter: blur(26px) saturate(1.2);
-  opacity: 0.28;
-  transform: scale(1.25);
-  z-index: 0;
+  background-position: center 28%;
+  filter: saturate(1.15);
+  transform: scale(1.08);
+  z-index: -2;
 }
+/* Voile dégradé pour la lisibilité du texte */
 .ach-modal-head::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent, var(--surface));
-  z-index: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(8, 10, 16, 0.32) 0%,
+    rgba(8, 10, 16, 0.62) 52%,
+    rgba(8, 10, 16, 0.9) 100%
+  );
+  z-index: -1;
 }
-.ach-modal-cover,
-.ach-modal-head-info {
-  position: relative;
-  z-index: 1;
+/* Repli si le jeu n'a pas de jaquette */
+.ach-modal-head:not([style]) {
+  background: linear-gradient(150deg, #2a2d38, #14161c);
 }
 .ach-modal-cover {
-  width: 74px;
-  aspect-ratio: 3 / 4;
+  width: 84px;
+  height: 112px; /* ratio 3/4 figé : jamais écrasé */
   object-fit: cover;
-  border-radius: 10px;
+  border-radius: 12px;
   flex-shrink: 0;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
+  border: 2px solid rgba(255, 255, 255, 0.14);
 }
 .ach-modal-head-info {
   min-width: 0;
-  align-self: center;
+  flex: 1;
+  padding-bottom: 0.15rem;
 }
 .ach-modal-head h3 {
   font-family: var(--font-display);
-  margin: 0 0 0.3rem;
-  font-size: 1.25rem;
+  margin: 0 0 0.5rem;
+  font-size: 1.4rem;
+  line-height: 1.15;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
-.ach-modal-sub {
+/* Badges d'infos (plateforme / ratio / temps / complété) */
+.ach-modal-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.7rem;
+}
+.ach-mb {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(6px);
+}
+.ach-mb.gold {
+  color: #1a1204;
+  background: var(--accent-grad);
+  border-color: transparent;
+}
+/* Barre de progression + pourcentage */
+.ach-modal-progress {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.82rem;
-  color: var(--text-soft);
-  font-weight: 600;
+  gap: 0.6rem;
+}
+.ach-modal-progress .ach-progress.big {
+  flex: 1;
+  margin: 0;
+  max-width: none;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.22);
+}
+.ach-modal-pct {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
+/* Bouton fermer lisible sur le header illustré */
+.ach-modal .steam-modal-close {
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  backdrop-filter: blur(4px);
+}
+.ach-modal .steam-modal-close:hover {
+  background: rgba(0, 0, 0, 0.6);
 }
 .ach-modal-tabs {
   display: flex;
@@ -745,6 +865,142 @@
 .ach-row.r-legendary .ach-row-rarity { color: var(--r-legendary); }
 .ach-row.r-epic .ach-row-rarity { color: var(--r-epic); }
 .ach-row.r-rare .ach-row-rarity { color: var(--r-rare); }
+
+/* ============================================================
+   Modale détail d'UN succès
+   ============================================================ */
+.ach-single {
+  position: relative;
+  width: min(400px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 2rem 1.6rem 1.6rem;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  isolation: isolate;
+  animation: steam-pop 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+/* Halo coloré selon la rareté, en fond */
+.ach-single::before {
+  content: "";
+  position: absolute;
+  top: -40%;
+  left: 50%;
+  width: 320px;
+  height: 320px;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--tier, var(--orange)) 34%, transparent),
+    transparent
+  );
+  pointer-events: none;
+  z-index: -1;
+}
+.ach-single.r-legendary { --tier: var(--r-legendary); }
+.ach-single.r-epic { --tier: var(--r-epic); }
+.ach-single.r-rare { --tier: var(--r-rare); }
+.ach-single.r-common { --tier: var(--border-strong); }
+
+.ach-single-icon {
+  width: 84px;
+  height: 84px;
+  border-radius: 18px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  border: 2px solid color-mix(in srgb, var(--tier, var(--border-strong)) 60%, var(--border));
+}
+.ach-single-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ach-single-tier {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.9rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tier, var(--text));
+  background: color-mix(in srgb, var(--tier, var(--orange)) 14%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--tier, var(--orange)) 35%, var(--border));
+}
+.ach-single-tier em {
+  font-style: normal;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-soft);
+}
+.ach-single-name {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  margin: 0.7rem 0 0;
+  color: var(--text);
+}
+.ach-single-desc {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+.ach-single-game {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  margin-top: 1.3rem;
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+  text-align: left;
+  transition: border-color 0.12s, background 0.12s;
+}
+.ach-single-game:hover {
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--orange) 8%, var(--surface-2));
+}
+.ach-single-game img {
+  width: 40px;
+  height: 53px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.ach-single-game-label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+.ach-single-game strong {
+  display: block;
+  font-size: 0.92rem;
+  color: var(--text);
+  margin-top: 2px;
+}
+.ach-single-date {
+  margin-top: 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
 
 /* ============================================================
    Responsive

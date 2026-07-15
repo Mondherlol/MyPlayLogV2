@@ -12,6 +12,8 @@ import {
   Clock,
   Gamepad2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Check,
   ArrowUpDown,
   Search,
@@ -46,6 +48,14 @@ function fmtHours(h) {
   if (h == null) return null;
   return `${Math.round(h).toLocaleString("fr-FR")} h`;
 }
+// Libellé de palier de rareté (aligné sur rarityClass).
+function rarityLabel(pct) {
+  if (pct == null) return null;
+  if (pct < 5) return "Légendaire";
+  if (pct < 15) return "Épique";
+  if (pct < 40) return "Rare";
+  return "Commun";
+}
 
 // Options de tri de la grille « par jeu ».
 const SORTS = [
@@ -62,6 +72,7 @@ export default function ProfileAchievements({ username, token, isMe }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [openGame, setOpenGame] = useState(null);
+  const [openAch, setOpenAch] = useState(null);
 
   // Contrôles de la grille par jeu.
   const [sort, setSort] = useState("completion");
@@ -171,9 +182,15 @@ export default function ProfileAchievements({ username, token, isMe }) {
           <h3 className="ach-rail-title">
             <Gem size={16} /> Tes succès les plus rares
           </h3>
-          <div className="ach-rail-row">
+          <Rail>
             {data.rarest.map((a, i) => (
-              <div key={i} className={`ach-rare-card ${rarityClass(a.rarity)}`}>
+              <div
+                key={i}
+                className={`ach-rare-card clickable ${rarityClass(a.rarity)}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => setOpenAch(a)}
+              >
                 <div className="ach-rare-icon">
                   {a.icon ? <img src={a.icon} alt="" /> : <Trophy size={20} />}
                 </div>
@@ -184,7 +201,7 @@ export default function ProfileAchievements({ username, token, isMe }) {
                 <div className="ach-rare-pct">{a.rarity}%</div>
               </div>
             ))}
-          </div>
+          </Rail>
         </section>
       )}
 
@@ -194,9 +211,15 @@ export default function ProfileAchievements({ username, token, isMe }) {
           <h3 className="ach-rail-title">
             <Sparkles size={16} /> Débloqués récemment
           </h3>
-          <div className="ach-rail-row">
+          <Rail>
             {data.recent.map((a, i) => (
-              <div key={i} className="ach-recent-card">
+              <div
+                key={i}
+                className="ach-recent-card clickable"
+                role="button"
+                tabIndex={0}
+                onClick={() => setOpenAch(a)}
+              >
                 <div className="ach-recent-icon">
                   {a.icon ? <img src={a.icon} alt="" /> : <Trophy size={18} />}
                 </div>
@@ -208,7 +231,7 @@ export default function ProfileAchievements({ username, token, isMe }) {
                 </div>
               </div>
             ))}
-          </div>
+          </Rail>
         </section>
       )}
 
@@ -318,6 +341,116 @@ export default function ProfileAchievements({ username, token, isMe }) {
           onClose={() => setOpenGame(null)}
         />
       )}
+
+      {openAch && <AchievementModal ach={openAch} onClose={() => setOpenAch(null)} />}
+    </div>
+  );
+}
+
+// Carrousel horizontal : glissé-déposé à la souris + flèches (sans scrollbar).
+function Rail({ children }) {
+  const ref = useRef(null);
+  const drag = useRef({ down: false, startX: 0, startScroll: 0, moved: false });
+  const [edges, setEdges] = useState({ left: false, right: false });
+
+  const update = () => {
+    const el = ref.current;
+    if (!el) return;
+    setEdges({
+      left: el.scrollLeft > 4,
+      right: el.scrollLeft < el.scrollWidth - el.clientWidth - 4,
+    });
+  };
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+
+    // Drag piloté au niveau window : le geste continue même si le curseur
+    // sort de la piste, et on ne touche pas au setPointerCapture (qui pouvait
+    // avaler le clic sur une carte).
+    const onMove = (e) => {
+      const d = drag.current;
+      if (!d.down) return;
+      const dx = e.clientX - d.startX;
+      if (!d.moved && Math.abs(dx) > 6) {
+        d.moved = true;
+        el.classList.add("dragging");
+      }
+      if (d.moved) {
+        el.scrollLeft = d.startScroll - dx;
+        e.preventDefault();
+      }
+    };
+    const onUp = () => {
+      if (!drag.current.down) return;
+      drag.current.down = false;
+      el.classList.remove("dragging");
+    };
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+
+    return () => {
+      el.removeEventListener("scroll", update);
+      ro.disconnect();
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, []);
+
+  const nudge = (dir) => {
+    const el = ref.current;
+    if (el) el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: "smooth" });
+  };
+
+  const onPointerDown = (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const el = ref.current;
+    drag.current = { down: true, startX: e.clientX, startScroll: el.scrollLeft, moved: false };
+  };
+  // Supprime UNIQUEMENT le clic « fantôme » qui suit un vrai glisser.
+  const onClickCapture = (e) => {
+    if (drag.current.moved) {
+      e.preventDefault();
+      e.stopPropagation();
+      drag.current.moved = false;
+    }
+  };
+
+  return (
+    <div className="ach-rail-wrap">
+      {edges.left && (
+        <button
+          className="ach-rail-arrow left clickable"
+          onClick={() => nudge(-1)}
+          aria-label="Précédent"
+        >
+          <ChevronLeft size={18} />
+        </button>
+      )}
+      <div
+        ref={ref}
+        className="ach-rail-row"
+        onPointerDown={onPointerDown}
+        onClickCapture={onClickCapture}
+      >
+        {children}
+      </div>
+      {edges.right && (
+        <button
+          className="ach-rail-arrow right clickable"
+          onClick={() => nudge(1)}
+          aria-label="Suivant"
+        >
+          <ChevronRight size={18} />
+        </button>
+      )}
     </div>
   );
 }
@@ -423,6 +556,46 @@ function SortMenu({ sort, setSort, dir, setDir }) {
   );
 }
 
+// Modale de détail d'UN succès (ouverte depuis les rails rares / récents).
+function AchievementModal({ ach, onClose }) {
+  const cls = rarityClass(ach.rarity);
+  const label = rarityLabel(ach.rarity);
+  return (
+    <div className="ach-modal-overlay" onClick={onClose}>
+      <div className={`ach-single ${cls}`} onClick={(e) => e.stopPropagation()}>
+        <button className="steam-modal-close clickable" onClick={onClose}>
+          <X size={18} />
+        </button>
+        <div className="ach-single-icon">
+          {ach.icon ? <img src={ach.icon} alt="" /> : <Trophy size={40} />}
+        </div>
+        {label && (
+          <span className={`ach-single-tier ${cls}`}>
+            <Gem size={13} /> {label}
+            {ach.rarity != null && <em> · {ach.rarity}% des joueurs</em>}
+          </span>
+        )}
+        <h3 className="ach-single-name">{ach.name}</h3>
+        {ach.description && <p className="ach-single-desc">{ach.description}</p>}
+
+        <Link to={`/game/${ach.gameId}`} className="ach-single-game clickable">
+          {ach.cover && <img src={ach.cover} alt="" />}
+          <div>
+            <span className="ach-single-game-label">
+              <PlatformIcon platform={ach.platform} size={12} /> Succès de
+            </span>
+            <strong>{ach.gameName}</strong>
+          </div>
+        </Link>
+
+        {ach.unlockedAt && (
+          <div className="ach-single-date">Débloqué le {fmtDate(ach.unlockedAt)}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function GameAchievementsModal({ username, token, game, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -460,18 +633,30 @@ function GameAchievementsModal({ username, token, game, onClose }) {
           {game.cover && <img src={game.cover} alt="" className="ach-modal-cover" />}
           <div className="ach-modal-head-info">
             <h3>{game.name}</h3>
-            <div className="ach-modal-sub">
-              <PlatformIcon platform={game.platform} size={14} />
-              {game.unlocked} / {game.total} succès · {game.percent}%
+            <div className="ach-modal-badges">
+              <span className="ach-mb">
+                <PlatformIcon platform={game.platform} size={13} />
+                {game.platform === "psn" ? "PlayStation" : game.platform === "steam" ? "Steam" : "Succès"}
+              </span>
+              <span className="ach-mb">
+                <Trophy size={13} /> {game.unlocked}/{game.total}
+              </span>
               {game.playtime != null && game.playtime > 0 && (
-                <>
-                  {" "}
-                  · <Clock size={13} /> {fmtHours(game.playtime)}
-                </>
+                <span className="ach-mb">
+                  <Clock size={13} /> {fmtHours(game.playtime)}
+                </span>
+              )}
+              {game.perfect && (
+                <span className="ach-mb gold">
+                  <Star size={13} /> Complété
+                </span>
               )}
             </div>
-            <div className="ach-progress big">
-              <div className="ach-progress-fill" style={{ width: `${game.percent}%` }} />
+            <div className="ach-modal-progress">
+              <div className="ach-progress big">
+                <div className="ach-progress-fill" style={{ width: `${game.percent}%` }} />
+              </div>
+              <span className="ach-modal-pct">{game.percent}%</span>
             </div>
           </div>
         </div>
