@@ -1958,32 +1958,39 @@ button.pf-stat:hover {
     align-self: start;
     max-height: calc(100vh - var(--topbar-h, 60px) - 28px);
     overflow-y: auto;
-    overscroll-behavior: contain;
+    /* Une fois la boîte à outils scrollée jusqu'au bout, la molette enchaîne sur
+       la page (plus ergonomique que de « bloquer » le scroll ici). */
+    overscroll-behavior: auto;
     scrollbar-width: thin;
     scrollbar-color: var(--orange) transparent;
   }
 }
 
-/* Badge « configurable » (clic droit) sur les cards concernées en édition. */
+/* Engrenage de configuration, en HAUT À DROITE de la card et cliquable. */
 .pfa-slot.configurable > .pfa-slot-cog {
   position: absolute;
-  top: -8px;
-  left: -8px;
-  z-index: 3;
+  top: -9px;
+  right: -9px;
+  left: auto;
+  z-index: 4;
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
   border-radius: 50%;
   background: var(--accent-grad);
   color: #fff;
   box-shadow: var(--shadow-sm);
-  opacity: 0.85;
-  transition: transform 0.14s ease, opacity 0.14s ease;
+  cursor: pointer;
+  opacity: 0.9;
+  transition: transform 0.16s ease, opacity 0.16s ease, box-shadow 0.16s ease;
 }
-.pfa-slot.configurable:hover > .pfa-slot-cog {
+.pfa-slot.configurable > .pfa-slot-cog:hover {
   opacity: 1;
-  transform: rotate(35deg);
+  transform: rotate(45deg) scale(1.08);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--orange) 45%, transparent);
 }
 .pfa-toolbox-title {
   display: flex;
@@ -2352,122 +2359,218 @@ button.pf-stat:hover {
   line-height: 1.1;
 }
 
-/* ---------- Cartes de tracking in-game ---------- */
-.pfa-trk-card .pfa-trk-id {
+/* ---------- Cartes de tracking in-game (sexy) ---------- */
+/* Chaque jeu porte son accent (--trk / --trk2). La carte laisse DÉBORDER le
+   portrait du héros/champion fétiche (overflow visible) : effet « hors-cadre ». */
+.pfa-trk-card {
+  position: relative;
+  overflow: visible;
+  background:
+    radial-gradient(
+      130% 90% at 100% 0%,
+      color-mix(in srgb, var(--trk) 16%, transparent),
+      transparent 58%
+    ),
+    var(--surface);
+  border-color: color-mix(in srgb, var(--trk) 24%, var(--border));
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.pfa-trk-card.lol {
+  --trk: #17b3a3;
+  --trk2: #c99b3f;
+}
+.pfa-trk-card.rivals {
+  --trk: #f5453f;
+  --trk2: #ffb020;
+}
+.pfa-trk-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--trk) 55%, var(--border));
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--trk) 24%, transparent);
+}
+
+/* En-tête : jaquette du jeu (pas d'icône) + nom du jeu + pseudo. */
+.pfa-trk-top {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.6rem;
 }
-.pfa-trk-cover {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  object-fit: cover;
+.pfa-trk-gamecover {
   flex: none;
-}
-.pfa-trk-cover.fb {
   display: grid;
   place-items: center;
-  background: var(--surface-2);
-  color: var(--accent-ink);
-}
-.pfa-trk-name {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.86rem;
-  color: var(--text);
-  white-space: nowrap;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
   overflow: hidden;
-  text-overflow: ellipsis;
-}
-.pfa-trk-rank {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.55rem 0.6rem;
-  border-radius: 12px;
   background: var(--surface-2);
+  color: var(--trk);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--trk) 30%, transparent);
 }
-.pfa-trk-emblem {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 52px;
-  height: 52px;
+.pfa-trk-gamecover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
-.pfa-trk-badge {
-  width: 46px;
-  height: 46px;
-  object-fit: contain;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.25));
-}
-.pfa-trk-emblem-fb {
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
-  background: var(--surface);
-  color: var(--accent-ink);
-}
-.pfa-trk-rankinfo {
+.pfa-trk-titles {
   display: flex;
   flex-direction: column;
   min-width: 0;
   line-height: 1.15;
 }
-.pfa-trk-tier {
+.pfa-trk-game {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 1rem;
+  font-size: 0.9rem;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.pfa-trk-sub {
-  font-size: 0.74rem;
-  color: var(--text-soft);
-}
-.pfa-trk-peak {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2rem;
-  margin-top: 0.15rem;
-  font-size: 0.7rem;
-  color: var(--accent-ink);
-}
-.pfa-trk-hero {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-top: 0.55rem;
-  max-width: 100%;
-}
-.pfa-trk-hero-thumb {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  overflow: hidden;
-  background: var(--surface-2);
-  color: var(--text-soft);
-}
-.pfa-trk-hero-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.pfa-trk-hero-name {
-  font-size: 0.78rem;
-  font-weight: 600;
+.pfa-trk-player {
+  font-size: 0.72rem;
   color: var(--text-soft);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Corps : blason + infos de rang, avec la zone droite réservée au portrait. */
+.pfa-trk-body {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 62px;
+  padding: 0.55rem 0.6rem;
+  border-radius: 13px;
+  background: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--trk) 12%, var(--surface-2)),
+    var(--surface-2) 72%
+  );
+  border: 1px solid color-mix(in srgb, var(--trk) 16%, transparent);
+}
+.pfa-trk-body.has-splash {
+  padding-right: 78px;
+}
+.pfa-trk-emblem {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+}
+/* Halo lumineux derrière l'emblème / badge, plus vif au survol. */
+.pfa-trk-emblem::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--trk) 48%, transparent),
+    transparent 68%
+  );
+  opacity: 0.4;
+  transition: opacity 0.18s ease;
+}
+.pfa-trk-card:hover .pfa-trk-emblem::before {
+  opacity: 0.9;
+}
+.pfa-trk-emblem > * {
+  position: relative;
+  z-index: 1;
+}
+.pfa-trk-badge {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.28));
+  transition: transform 0.18s ease;
+}
+.pfa-trk-card:hover .pfa-trk-badge,
+.pfa-trk-card:hover .lol-rank-emblem {
+  transform: scale(1.07);
+}
+.pfa-trk-emblem-fb {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--trk);
+}
+.pfa-trk-rankinfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+.pfa-trk-tier {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.98rem;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pfa-trk-games {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--trk) 55%, var(--text-soft));
+}
+.pfa-trk-games svg {
+  color: var(--trk);
+}
+.pfa-trk-heroname {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Portrait du héros/champion fétiche : DÉBORDE en bas à droite de la card, avec
+   un fondu sur le bord gauche pour se fondre dans le panneau. */
+.pfa-trk-hero-splash {
+  position: absolute;
+  right: -6px;
+  bottom: -8px;
+  width: 92px;
+  height: 108px;
+  z-index: 2;
+  pointer-events: none;
+}
+.pfa-trk-hero-splash img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  border-radius: 16px;
+  filter: drop-shadow(-3px 3px 8px rgba(0, 0, 0, 0.32));
+  -webkit-mask-image: linear-gradient(to left, #000 56%, transparent 94%);
+  mask-image: linear-gradient(to left, #000 56%, transparent 94%);
+  transition: transform 0.2s ease;
+}
+.pfa-trk-card:hover .pfa-trk-hero-splash img {
+  transform: translateY(-2px) scale(1.03);
+}
+.pfa-trk-hero-fb {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: color-mix(in srgb, var(--trk) 45%, var(--text-soft));
 }
 
 /* ---------- Console favorite ---------- */
@@ -2497,6 +2600,25 @@ button.pf-stat:hover {
   height: 100%;
   object-fit: contain;
   padding: 5px;
+}
+/* Vraie photo de la console : vignette plus large (format paysage), fond neutre,
+   contain pour ne rien rogner. */
+.pfa-console-ic.has-photo {
+  width: 58px;
+  height: 48px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.pfa-console-ic.has-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 4px;
+  transition: transform 0.18s ease;
+}
+.pfa-console:hover .pfa-console-ic.has-photo img {
+  transform: scale(1.07);
 }
 .pfa-console-body {
   display: flex;

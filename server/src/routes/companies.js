@@ -13,15 +13,40 @@ const IGDB_IMG = "https://images.igdb.com/igdb/image/upload";
 // GET /api/companies/search?q= — recherche légère de studios/éditeurs (IGDB) pour
 // épingler des studios dans la carte « Studios favoris » de l'aperçu. Renvoie
 // juste nom + logo (rendu direct, pas de build de profil complet).
+// NB : la clause `search` d'IGDB ne renvoie RIEN sur l'endpoint /companies —
+// on filtre donc par nom (`name ~ *"…"*`, contient, insensible à la casse) puis
+// on classe la pertinence côté serveur (IGDB ne trie pas par score).
+const norm = (s) =>
+  String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
 router.get("/search", requireAuth, async (req, res) => {
   try {
     const q = String(req.query.q || "").trim();
     if (q.length < 2) return res.json({ companies: [] });
-    const esc = q.replace(/["\\]/g, "");
+    const esc = q.replace(/["\\*]/g, "");
     const rows = await igdbQuery(
       "companies",
-      `search "${esc}"; fields name,logo.image_id; limit 18;`
+      `fields name,logo.image_id; where name ~ *"${esc}"*; limit 50;`
     );
+    const nq = norm(q);
+    // Suffixes « corporate » : « Rockstar Games », « CD Projekt Red », « Ubisoft
+    // Entertainment »… = la maison mère, à privilégier sur les studios régionaux.
+    const CORP = /^(games?|entertainment|interactive|studios?|productions?|inc|corp|company|sa|ltd|red|montreal|the game)$/;
+    // Score de pertinence : correspondance exacte > maison mère > préfixe > contient ;
+    // à égalité, le nom le plus court et la présence d'un logo priment.
+    const score = (name, hasLogo) => {
+      const n = norm(name);
+      let s;
+      if (n === nq) s = 1000;
+      else if (n.startsWith(nq)) {
+        const rest = n.slice(nq.length).replace(/^[\s\-·|:.]+/, "").trim();
+        s = !rest ? 900 : CORP.test(rest) ? 720 : 600;
+      } else if (new RegExp(`\\b${nq.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).test(n)) s = 400;
+      else s = 200;
+      s -= Math.min(n.length, 120); // à score égal, préférer le nom court
+      if (hasLogo) s += 40;
+      return s;
+    };
     const seen = new Set();
     const companies = [];
     for (const c of rows || []) {
@@ -33,9 +58,9 @@ router.get("/search", requireAuth, async (req, res) => {
         name: c.name,
         logo: c.logo?.image_id ? `${IGDB_IMG}/t_logo_med/${c.logo.image_id}.png` : null,
       });
-      if (companies.length >= 12) break;
     }
-    res.json({ companies });
+    companies.sort((a, b) => score(b.name, !!b.logo) - score(a.name, !!a.logo));
+    res.json({ companies: companies.slice(0, 12) });
   } catch (err) {
     console.error("company search error:", err.message);
     res.status(502).json({ error: "Recherche de studios indisponible." });

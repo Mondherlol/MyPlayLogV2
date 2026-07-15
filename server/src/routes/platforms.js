@@ -2,6 +2,7 @@ import express from "express";
 import { requireAuth } from "../middleware/auth.js";
 import { buildPlatformProfile, fetchPlatformGamesPage } from "../lib/platformProfile.js";
 import { ensureEntityLogos } from "../lib/entityLogos.js";
+import { ensurePlatformImages } from "../lib/platformImages.js";
 import UserGame from "../models/UserGame.js";
 import User from "../models/User.js";
 
@@ -24,6 +25,34 @@ router.post("/logos", async (req, res) => {
   } catch (err) {
     console.error("platform logos error:", err.message);
     res.json({ logos: {} });
+  }
+});
+
+// POST /api/platforms/images { names:[...] } -> { images: { name: url|null } }
+// Vraies photos de consoles (source Wikipedia, comme la fiche console) pour la
+// carte « Console favorite » de l'aperçu, qui ne connaît que le nom. Public
+// (profils partageables), best-effort + cache EntityLogo (kind platform-photo).
+router.post("/images", async (req, res) => {
+  try {
+    const names = Array.isArray(req.body?.names)
+      ? req.body.names.map((n) => String(n || "").trim()).filter(Boolean).slice(0, 40)
+      : [];
+    if (!names.length) return res.json({ images: {} });
+    const map = await ensurePlatformImages(names);
+    const base = `${req.protocol}://${req.get("host")}`;
+    const images = {};
+    for (const [name, file] of map) {
+      // `file` = nom de fichier local rapatrié ; on tolère un ancien hotlink http.
+      images[name] = file
+        ? /^https?:/i.test(file)
+          ? file
+          : `${base}/uploads/platforms/${file}`
+        : null;
+    }
+    res.json({ images });
+  } catch (err) {
+    console.error("platform images error:", err.message);
+    res.json({ images: {} });
   }
 });
 

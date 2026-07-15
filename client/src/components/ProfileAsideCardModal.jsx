@@ -65,9 +65,9 @@ const SPEC = {
   characters: {
     Icon: Users,
     title: "Personnages favoris",
-    auto: "Les plus récents",
-    pin: "Choisir mes persos",
-    select: "multi",
+    auto: "Les 4 plus récents",
+    pin: "Choisir jusqu'à 4 persos",
+    select: "multi4",
   },
   studios: {
     Icon: Building2,
@@ -134,7 +134,8 @@ function buildOptions(widget, data) {
       return (data.platforms || []).map((p) => ({
         value: p.platform,
         label: p.platform,
-        thumb: data.platformLogos?.[p.platform] || null,
+        // Vraie photo de la console d'abord, logo IGDB en repli.
+        thumb: data.platformImages?.[p.platform] || data.platformLogos?.[p.platform] || null,
         thumbContain: true,
         meta: `${p.count} jeu${p.count > 1 ? "x" : ""}`,
         FB: Joystick,
@@ -242,8 +243,10 @@ export default function ProfileAsideCardModal({ widget, config, data, token, onS
   }, [query, isStudios, mode, token]);
 
   if (!spec) return null;
-  const multi = spec.select === "multi" || spec.select === "multi3";
-  const max = spec.select === "multi3" ? 3 : Infinity;
+  // Sélection multiple : « multi » illimité, « multiN » plafonné à N.
+  const capped = /^multi(\d+)$/.exec(spec.select);
+  const multi = spec.select === "multi" || !!capped;
+  const max = capped ? Number(capped[1]) : Infinity;
   const showSearch = options.length > 3;
   const filtered =
     showSearch && query.trim()
@@ -422,8 +425,10 @@ export default function ProfileAsideCardModal({ widget, config, data, token, onS
 
         {mode === "pin" && !isStudios && (
           <div className="pac-picker">
-            {spec.select === "multi3" && (
-              <p className="pac-count">{sel.length}/3 sélectionnée{sel.length > 1 ? "s" : ""}</p>
+            {capped && (
+              <p className="pac-count">
+                {sel.length}/{max} sélectionnée{sel.length > 1 ? "s" : ""}
+              </p>
             )}
             {showSearch && (
               <div className="pac-search">

@@ -364,7 +364,7 @@ async function fetchCatalog(platformId) {
 }
 
 // -- Wikipedia : résumé (bio + image + id Wikidata) --
-async function fetchWikiSummary(name) {
+export async function fetchWikiSummary(name) {
   for (const lang of ["fr", "en"]) {
     let sum = await getJson(
       `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`
@@ -387,6 +387,9 @@ async function fetchWikiSummary(name) {
         extract: sum.extract,
         url: sum.content_urls?.desktop?.page || null,
         image: sum.originalimage?.source || sum.thumbnail?.source || null,
+        // Vignette redimensionnée (petite, rapide, fiable à télécharger) — utile
+        // quand on rapatrie l'image plutôt que de dépendre du plein format.
+        thumbnail: sum.thumbnail?.source || null,
         wikibaseId: sum.wikibase_item || null,
       };
     }

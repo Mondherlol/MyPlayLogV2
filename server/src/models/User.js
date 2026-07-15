@@ -87,13 +87,15 @@ const userSchema = new mongoose.Schema(
       connectedAt: { type: Date, default: null },
     },
 
-    // --- Connexion PSN (tokens de l'API non officielle, jamais renvoyés au client) ---
+    // --- Connexion PSN (modèle « compte de service » : le serveur lit les
+    //     trophées PUBLICS via son propre compte. On ne stocke ici que
+    //     l'identité du joueur, aucun secret). ---
     psn: {
-      accessToken: { type: String, default: null },
-      refreshToken: { type: String, default: null },
-      expiresAt: { type: Number, default: 0 },
-      refreshExpiresAt: { type: Number, default: 0 },
+      accountId: { type: String, default: null }, // id numérique interne PSN
+      onlineId: { type: String, default: null }, // PSN ID (pseudo public)
+      avatar: { type: String, default: null },
       connectedAt: { type: Date, default: null },
+      lastSyncAt: { type: Date, default: null }, // dernière synchro (bouton)
     },
 
     // --- Passkey C411 personnel (onglet Pack HD) ---
@@ -181,7 +183,14 @@ userSchema.methods.toPublic = function () {
     asideOrder: this.asideOrder || [],
     asideHidden: this.asideHidden || [],
     asideConfig: this.asideConfig || {},
-    psnConnected: !!(this.psn && this.psn.refreshToken),
+    psnConnected: !!(this.psn && this.psn.accountId),
+    psn: this.psn?.accountId
+      ? {
+          onlineId: this.psn.onlineId || null,
+          avatar: this.psn.avatar || null,
+          connectedAt: this.psn.connectedAt || null,
+        }
+      : null,
     steamConnected: !!(this.steam && this.steam.steamId),
     steam: this.steam?.steamId
       ? {

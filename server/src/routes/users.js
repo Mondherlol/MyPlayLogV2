@@ -16,7 +16,7 @@ import GameTracker from "../models/GameTracker.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { ensureGameMeta } from "../lib/gameMeta.js";
 import { ensureEntityLogos } from "../lib/entityLogos.js";
-import { connectWithNpsso } from "../lib/psn.js";
+import { setServiceNpsso, getServiceStatus, clearServiceTokens } from "../lib/psn.js";
 import { isAdminEmail } from "../lib/admin.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { summarizeReactions, reviewComment } from "../lib/reviewSerialize.js";
@@ -306,19 +306,16 @@ router.put("/me/overview", requireAuth, async (req, res) => {
   }
 });
 
-// --- Statut de la connexion PSN (pour la page Admin) ---
+// --- Statut du compte de service PSN (source des trophées) pour la page Admin ---
 router.get("/me/psn", requireAuth, async (req, res) => {
   try {
-    const user = await User.findById(req.userId).select("psn email");
-    const isAdmin = isAdminEmail(user?.email);
-    const psn = user?.psn;
-    const hasToken = !!(psn && psn.refreshToken);
-    const expired = hasToken && Date.now() >= (psn.refreshExpiresAt || 0);
+    const me = await User.findById(req.userId).select("email");
+    const s = getServiceStatus();
     res.json({
-      isAdmin,
-      connected: hasToken && !expired,
-      expired,
-      connectedAt: psn?.connectedAt || null,
+      isAdmin: isAdminEmail(me?.email),
+      connected: s.connected,
+      expired: s.expired,
+      connectedAt: s.connectedAt,
     });
   } catch (err) {
     console.error("psn status error:", err.message);
@@ -326,8 +323,9 @@ router.get("/me/psn", requireAuth, async (req, res) => {
   }
 });
 
-// --- Connexion PSN (admin uniquement) : le compte connecté sert de source des
-//     trophées pour TOUS les utilisateurs. On échange le NPSSO contre des tokens. ---
+// --- Connexion du compte de service PSN (admin uniquement) : on échange le NPSSO
+//     collé contre des tokens de service. Ce compte sert de source des trophées
+//     pour TOUS les utilisateurs. Permet de faire tourner le NPSSO sans redéploi. ---
 router.post("/me/psn", requireAuth, async (req, res) => {
   try {
     const me = await User.findById(req.userId).select("email");
@@ -337,24 +335,13 @@ router.post("/me/psn", requireAuth, async (req, res) => {
     const npsso = String(req.body?.npsso || "").trim();
     if (!npsso) return res.status(400).json({ error: "Token NPSSO manquant." });
 
-    let stored;
     try {
-      stored = await connectWithNpsso(npsso);
+      await setServiceNpsso(npsso);
     } catch {
       return res
         .status(400)
         .json({ error: "NPSSO invalide ou expiré. Récupère-en un nouveau et réessaie." });
     }
-
-    const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
-    if (!user.psn) user.psn = {};
-    user.psn.accessToken = stored.accessToken;
-    user.psn.refreshToken = stored.refreshToken;
-    user.psn.expiresAt = stored.expiresAt;
-    user.psn.refreshExpiresAt = stored.refreshExpiresAt;
-    user.psn.connectedAt = new Date();
-    await user.save();
     res.json({ connected: true });
   } catch (err) {
     console.error("psn connect error:", err.message);
@@ -362,21 +349,13 @@ router.post("/me/psn", requireAuth, async (req, res) => {
   }
 });
 
-// --- Déconnexion PSN (admin uniquement) ---
+// --- Déconnexion du compte de service PSN (admin uniquement) ---
 router.delete("/me/psn", requireAuth, async (req, res) => {
   try {
-    const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
-    if (!isAdminEmail(user.email))
+    const me = await User.findById(req.userId).select("email");
+    if (!isAdminEmail(me?.email))
       return res.status(403).json({ error: "Réservé à l'administrateur." });
-    user.psn = {
-      accessToken: null,
-      refreshToken: null,
-      expiresAt: 0,
-      refreshExpiresAt: 0,
-      connectedAt: null,
-    };
-    await user.save();
+    clearServiceTokens();
     res.json({ connected: false });
   } catch (err) {
     console.error("psn disconnect error:", err.message);
@@ -1340,20 +1319,37 @@ router.get("/:username/common/:other", optionalAuth, async (req, res) => {
 router.get("/:username/achievements", optionalAuth, async (req, res) => {
   try {
     const user = await User.findOne({ username: req.params.username }).select(
-      "_id steam"
+      "_id steam psn"
     );
     if (!user) return res.status(404).json({ error: "Profil introuvable." });
     const isMe = String(user._id) === String(req.userId);
 
     const docs = await GameAchievements.find({ user: user._id }).lean();
 
+    // Temps de jeu / note depuis la bibliothèque (jointure par gameId) pour
+    // permettre les tris « temps de jeu » et « note » côté client.
+    const ugs = await UserGame.find({ user: user._id })
+      .select("gameId playtimeHours rating")
+      .lean();
+    const ugMap = new Map(ugs.map((u) => [u.gameId, u]));
+
     const games = docs
       .map((d) => {
         const percent = d.total ? Math.round((d.unlocked / d.total) * 100) : 0;
+        const list = d.achievements || [];
         // Succès débloqué le plus rare de ce jeu (rareté = % de joueurs).
-        const rarest = (d.achievements || [])
+        const rarest = list
           .filter((a) => a.unlocked && a.rarity != null)
           .sort((a, b) => a.rarity - b.rarity)[0];
+        // Date du dernier succès débloqué (pour le tri « activité récente »).
+        let lastUnlock = null;
+        for (const a of list) {
+          if (a.unlocked && a.unlockedAt) {
+            const t = new Date(a.unlockedAt).getTime();
+            if (!lastUnlock || t > lastUnlock) lastUnlock = t;
+          }
+        }
+        const ug = ugMap.get(d.gameId);
         return {
           gameId: d.gameId,
           name: d.gameName,
@@ -1363,6 +1359,10 @@ router.get("/:username/achievements", optionalAuth, async (req, res) => {
           unlocked: d.unlocked,
           percent,
           perfect: d.total > 0 && d.unlocked === d.total,
+          playtime: ug?.playtimeHours ?? null,
+          rating: ug?.rating ?? null,
+          lastUnlock: lastUnlock ? new Date(lastUnlock) : null,
+          createdAt: d.createdAt,
           updatedAt: d.updatedAt,
           rarest: rarest
             ? { name: rarest.name, rarity: rarest.rarity, icon: rarest.icon }
@@ -1403,16 +1403,30 @@ router.get("/:username/achievements", optionalAuth, async (req, res) => {
     const avgCompletion = withAch.length
       ? Math.round(withAch.reduce((s, g) => s + g.percent, 0) / withAch.length)
       : 0;
+    // Succès « légendaires » débloqués : rareté mondiale < 5 %.
+    const legendaryUnlocked = flat.filter(
+      (a) => a.rarity != null && a.rarity < 5
+    ).length;
+    // Répartition des jeux suivis par plateforme (pour les filtres client).
+    const byPlatform = games.reduce((acc, g) => {
+      acc[g.platform] = (acc[g.platform] || 0) + 1;
+      return acc;
+    }, {});
 
     res.json({
       isMe,
-      connected: !!user.steam?.steamId,
+      connected: !!user.steam?.steamId || !!user.psn?.accountId,
       stats: {
         games: games.length,
         totalUnlocked,
         totalAchievements,
+        globalCompletion: totalAchievements
+          ? Math.round((totalUnlocked / totalAchievements) * 100)
+          : 0,
         avgCompletion,
         perfectGames: games.filter((g) => g.perfect).length,
+        legendaryUnlocked,
+        byPlatform,
       },
       games,
       recent,

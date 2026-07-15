@@ -12,14 +12,26 @@ import {
   CheckCircle2,
   AlertTriangle,
   Gamepad2,
-  Trophy,
   Swords,
+  RefreshCw,
+  Check,
+  X,
+  Trophy,
+  RotateCcw,
 } from "lucide-react";
 import { apiFetch, API_BASE } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLibrary } from "../context/LibraryContext";
 import SteamIcon from "../components/SteamIcon";
 import SteamImportModal from "../components/SteamImportModal";
+import PsnIcon from "../components/PsnIcon";
+import PsnImportModal, {
+  ConsolePicker,
+  GameSearchPicker,
+  psConsolesFromPlatforms,
+  PLAYED_STATUSES,
+  fmtHours,
+} from "../components/PsnImportModal";
 import {
   CoverLogo,
   Emblem,
@@ -54,10 +66,20 @@ function openCentered(url, w = 720, h = 720) {
 
 export default function Settings() {
   // L'onglet actif se lit dans l'URL (?tab=…) → liens profonds vers « Tracking ».
+  const { token } = useAuth();
   const [params, setParams] = useSearchParams();
   const urlTab = params.get("tab");
   const tab = TAB_KEYS.includes(urlTab) ? urlTab : "imports";
   const setTab = (key) => setParams({ tab: key }, { replace: true });
+
+  // Badge « à valider » sur l'onglet Imports (jeux détectés par une synchro PSN).
+  const [pendingCount, setPendingCount] = useState(0);
+  useEffect(() => {
+    if (!token) return;
+    apiFetch("/psn/status", { token })
+      .then((s) => setPendingCount(s?.pending || 0))
+      .catch(() => {});
+  }, [token]);
 
   return (
     <div className="settings-page">
@@ -77,6 +99,9 @@ export default function Settings() {
             >
               <Icon size={18} />
               <span>{label}</span>
+              {key === "imports" && pendingCount > 0 && (
+                <span className="settings-tab-badge">{pendingCount}</span>
+              )}
               {soon && <span className="settings-soon">bientôt</span>}
             </button>
           ))}
@@ -101,7 +126,10 @@ function ImportsPanel() {
         Relie tes plateformes pour importer ta bibliothèque et tes succès. Rien
         n'est ajouté sans ta validation.
       </p>
-      <SteamCard />
+      <div className="import-cards">
+        <SteamCard />
+        <PsnCard />
+      </div>
     </div>
   );
 }
@@ -506,9 +534,6 @@ function SteamCard() {
 
       {/* Autres plateformes à venir */}
       <div className="import-soon-row">
-        <div className="import-soon-chip">
-          <Trophy size={14} /> PlayStation — bientôt
-        </div>
         <div className="import-soon-chip">Xbox — bientôt</div>
       </div>
 
@@ -519,6 +544,521 @@ function SteamCard() {
             await refresh();
           }}
         />
+      )}
+    </div>
+  );
+}
+
+// Carte d'import PlayStation. La liaison se fait avec le PSN ID : le serveur lit
+// les trophées PUBLICS via son propre compte (aucun secret côté utilisateur).
+function PsnCard() {
+  const { token, updateUser } = useAuth();
+  const { refresh } = useLibrary();
+  const [status, setStatus] = useState(null); // { configured, connected, psn }
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [connectOpen, setConnectOpen] = useState(false);
+  const [psnId, setPsnId] = useState("");
+  const [unlinkOpen, setUnlinkOpen] = useState(false);
+  const [removeGames, setRemoveGames] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState(null);
+  const [pendingReload, setPendingReload] = useState(0);
+
+  async function load() {
+    try {
+      const s = await apiFetch("/psn/status", { token });
+      setStatus(s);
+    } catch {
+      setStatus({ configured: false, connected: false });
+    }
+  }
+
+  // Synchro (bouton) : maj heures/trophées des jeux déjà en biblio + détection
+  // des nouveaux jeux (→ en attente de validation).
+  async function sync() {
+    setSyncing(true);
+    setSyncMsg(null);
+    setError(null);
+    try {
+      const r = await apiFetch("/psn/sync", { method: "POST", token });
+      const parts = [];
+      if (r.hoursUpdated) parts.push(`${r.hoursUpdated} temps de jeu`);
+      if (r.trophiesUpdated) parts.push(`${r.trophiesUpdated} jeux de trophées`);
+      if (r.newlyPending)
+        parts.push(
+          `${r.newlyPending} nouveau${r.newlyPending > 1 ? "x" : ""} jeu${
+            r.newlyPending > 1 ? "x" : ""
+          } à valider`
+        );
+      setSyncMsg(parts.length ? `Synchro : ${parts.join(", ")}.` : "Déjà à jour.");
+      await load();
+      setPendingReload((n) => n + 1);
+      await refresh();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSyncing(false);
+    }
+  }
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function connect() {
+    if (!psnId.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await apiFetch("/psn/connect", {
+        method: "POST",
+        token,
+        body: { psnId: psnId.trim() },
+      });
+      setConnectOpen(false);
+      setPsnId("");
+      updateUser({ psnConnected: true });
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function unlink() {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiFetch(`/psn?removeGames=${removeGames}`, {
+        method: "DELETE",
+        token,
+      });
+      setUnlinkOpen(false);
+      setRemoveGames(false);
+      updateUser({ psnConnected: false, psn: null });
+      await load();
+      if (removeGames) await refresh();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!status) {
+    return (
+      <div className="import-card">
+        <Loader2 className="spin" size={20} /> Chargement…
+      </div>
+    );
+  }
+
+  const connected = status.connected;
+  const psn = status.psn;
+
+  return (
+    <div className={`import-card psn ${connected ? "connected" : ""}`}>
+      <div className="import-card-glow psn-glow" />
+      <div className="import-card-main">
+        <div className="import-logo psn-logo">
+          <PsnIcon size={30} />
+        </div>
+        <div className="import-card-info">
+          <div className="import-card-title">
+            PlayStation
+            {connected && (
+              <span className="import-badge">
+                <CheckCircle2 size={13} /> Lié
+              </span>
+            )}
+          </div>
+          {connected && psn ? (
+            <div className="import-steam-user">
+              {psn.avatar && <img src={psn.avatar} alt="" />}
+              <div>
+                <strong>{psn.onlineId || "Compte PSN"}</strong>
+                <span>
+                  Lié{" "}
+                  {psn.connectedAt
+                    ? new Date(psn.connectedAt).toLocaleDateString("fr-FR")
+                    : ""}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <p className="import-card-desc">
+              Relie ton compte PlayStation pour importer tes jeux, ton temps de
+              jeu et tes trophées.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {error && (
+        <div className="import-error">
+          <AlertTriangle size={15} /> {error}
+        </div>
+      )}
+
+      {!status.configured && (
+        <div className="import-error">
+          <AlertTriangle size={15} /> PlayStation n'est pas configuré côté serveur
+          (PSN_NPSSO).
+        </div>
+      )}
+
+      <div className="import-actions">
+        {connected ? (
+          <>
+            <button
+              className="btn-psn-primary clickable"
+              onClick={() => setImporting(true)}
+              disabled={busy || syncing}
+            >
+              <Gamepad2 size={17} /> Importer mes jeux
+            </button>
+            <button
+              className="btn-ghost clickable"
+              onClick={sync}
+              disabled={busy || syncing}
+              title="Mettre à jour temps de jeu et trophées, détecter les nouveaux jeux"
+            >
+              {syncing ? (
+                <Loader2 className="spin" size={16} />
+              ) : (
+                <RefreshCw size={16} />
+              )}{" "}
+              Synchroniser
+            </button>
+            <button
+              className="btn-ghost-danger clickable"
+              onClick={() => setUnlinkOpen(true)}
+              disabled={busy || syncing}
+            >
+              <Link2Off size={16} /> Délier
+            </button>
+          </>
+        ) : (
+          <button
+            className="btn-psn-primary clickable"
+            onClick={() => setConnectOpen((v) => !v)}
+            disabled={busy || !status.configured}
+          >
+            <Link2 size={17} /> Connecter mon compte PlayStation
+          </button>
+        )}
+      </div>
+
+      {connected && (
+        <div className="psn-sync-line">
+          {syncMsg ? (
+            <span className="psn-sync-msg">
+              <CheckCircle2 size={13} /> {syncMsg}
+            </span>
+          ) : psn?.lastSyncAt ? (
+            <span>
+              Dernière synchro le{" "}
+              {new Date(psn.lastSyncAt).toLocaleString("fr-FR", {
+                day: "2-digit",
+                month: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          ) : (
+            <span>Jamais synchronisé — clique sur Synchroniser.</span>
+          )}
+        </div>
+      )}
+
+      {connected && (
+        <PsnPendingManager
+          token={token}
+          reloadKey={pendingReload}
+          onChanged={() => {
+            load();
+            refresh();
+          }}
+        />
+      )}
+
+      {/* Liaison par PSN ID (le serveur lit les trophées publics). */}
+      {connectOpen && !connected && (
+        <div className="psn-connect">
+          <div className="import-manual">
+            <input
+              type="text"
+              placeholder="Ton PSN ID (identifiant en ligne)"
+              value={psnId}
+              onChange={(e) => setPsnId(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && connect()}
+            />
+            <button className="btn-psn-primary clickable" onClick={connect} disabled={busy}>
+              {busy ? <Loader2 className="spin" size={16} /> : <Link2 size={16} />}
+              Lier
+            </button>
+          </div>
+          <p className="psn-note">
+            Ton profil PlayStation et tes trophées doivent être <strong>publics</strong>{" "}
+            (réglages PSN → Confidentialité) pour qu'on puisse les lire.
+          </p>
+        </div>
+      )}
+
+      {/* Confirmation de déliaison : retirer ou garder les jeux importés. */}
+      {unlinkOpen && (
+        <div className="import-unlink">
+          <p>Délier ton compte PlayStation ?</p>
+          <label className="import-check">
+            <input
+              type="checkbox"
+              checked={removeGames}
+              onChange={(e) => setRemoveGames(e.target.checked)}
+            />
+            <span>
+              Retirer aussi les jeux ajoutés par l'import PSN (tes jeux existants
+              et modifiés à la main sont conservés).
+            </span>
+          </label>
+          <div className="import-unlink-actions">
+            <button className="btn-ghost clickable" onClick={() => setUnlinkOpen(false)}>
+              Annuler
+            </button>
+            <button className="btn-ghost-danger clickable" onClick={unlink} disabled={busy}>
+              {busy ? <Loader2 className="spin" size={15} /> : <Link2Off size={15} />}
+              Délier
+            </button>
+          </div>
+        </div>
+      )}
+
+      {importing && (
+        <PsnImportModal
+          onClose={() => setImporting(false)}
+          onDone={async () => {
+            await refresh();
+            setPendingReload((n) => n + 1);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Gère les jeux « en attente de validation » (détectés par une synchro) et la
+// liste des jeux « ignorés ». Rendu sous la carte PlayStation des Paramètres.
+function PsnPendingManager({ token, reloadKey, onChanged }) {
+  const [data, setData] = useState(null); // { pending, ignored }
+  const [busyId, setBusyId] = useState(null);
+  const [showIgnored, setShowIgnored] = useState(false);
+
+  async function load() {
+    try {
+      const d = await apiFetch("/psn/pending", { token });
+      setData(d);
+    } catch {
+      setData({ pending: [], ignored: [] });
+    }
+  }
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reloadKey]);
+
+  if (!data) return null;
+  const { pending = [], ignored = [] } = data;
+  if (!pending.length && !ignored.length) return null;
+
+  async function act(id, path, body) {
+    setBusyId(id);
+    try {
+      await apiFetch(`/psn/pending/${id}/${path}`, { method: "POST", token, body });
+      await load();
+      onChanged?.();
+    } catch {
+      /* best-effort */
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div className="psn-pending">
+      {pending.length > 0 && (
+        <div className="psn-pending-block">
+          <div className="psn-pending-head">
+            <Gamepad2 size={16} /> {pending.length} jeu{pending.length > 1 ? "x" : ""} à
+            valider
+          </div>
+          <div className="psn-pending-list">
+            {pending.map((p) => (
+              <PendingCard
+                key={p.id}
+                p={p}
+                busy={busyId === p.id}
+                token={token}
+                onValidate={(body) => act(p.id, "validate", body)}
+                onIgnore={() => act(p.id, "ignore")}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {ignored.length > 0 && (
+        <div className="psn-pending-block">
+          <button
+            className="psn-ignored-toggle clickable"
+            onClick={() => setShowIgnored((v) => !v)}
+          >
+            {ignored.length} jeu{ignored.length > 1 ? "x" : ""} ignoré
+            {ignored.length > 1 ? "s" : ""} {showIgnored ? "▲" : "▼"}
+          </button>
+          {showIgnored && (
+            <div className="psn-ignored-list">
+              {ignored.map((p) => (
+                <div key={p.id} className="psn-ignored-row">
+                  <span className="psn-ignored-name">{p.name || p.psnName}</span>
+                  <button
+                    className="btn-ghost clickable"
+                    disabled={busyId === p.id}
+                    onClick={() => act(p.id, "restore")}
+                  >
+                    {busyId === p.id ? (
+                      <Loader2 className="spin" size={14} />
+                    ) : (
+                      <RotateCcw size={14} />
+                    )}{" "}
+                    Reproposer
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Carte d'un jeu en attente : jeu détecté (ou à choisir si non reconnu), statut,
+// console, puis Valider / Ignorer.
+function PendingCard({ p, busy, token, onValidate, onIgnore }) {
+  const [sel, setSel] = useState({
+    gameId: p.gameId,
+    name: p.name,
+    cover: p.cover,
+    console: p.suggestedConsole || null,
+    status: p.suggestedStatus || "paused",
+    consoles: p.consoles || [],
+  });
+
+  function pickGame(game) {
+    const cons = psConsolesFromPlatforms(game.platforms);
+    setSel((s) => ({
+      ...s,
+      gameId: game.id,
+      name: game.name,
+      cover: game.cover,
+      consoles: cons,
+      console: cons[0]?.name || null,
+    }));
+  }
+
+  const ready = !!sel.gameId;
+
+  return (
+    <div className="psn-pending-card">
+      <div className="psn-pending-main">
+        <div className="steam-game-cover psn-pending-cover">
+          {sel.cover ? (
+            <img src={sel.cover} alt="" />
+          ) : p.icon ? (
+            <img src={p.icon} alt="" />
+          ) : (
+            <PsnIcon size={18} />
+          )}
+        </div>
+        <div className="psn-pending-info">
+          <div className="steam-game-name">{sel.name || p.psnName}</div>
+          <div className="steam-game-meta">
+            {p.playtimeHours > 0 && <span>{fmtHours(p.playtimeHours)} de jeu</span>}
+            {p.definedTrophies > 0 && (
+              <span className="psn-unmatched-trophy">
+                <Trophy size={12} />
+                {p.trophyProgress != null ? `${p.trophyProgress}%` : "trophées"}
+              </span>
+            )}
+          </div>
+        </div>
+        <button
+          className="psn-pending-dismiss clickable"
+          onClick={onIgnore}
+          disabled={busy}
+          title="Ignorer ce jeu"
+        >
+          <X size={15} />
+        </button>
+      </div>
+
+      {ready ? (
+        <>
+          <div className="steam-status-pick">
+            {PLAYED_STATUSES.map(({ key, label, Icon }) => (
+              <button
+                key={key}
+                className={`steam-status-btn clickable ${sel.status === key ? "active" : ""}`}
+                onClick={() => setSel((s) => ({ ...s, status: key }))}
+                title={label}
+              >
+                <Icon size={13} /> {label}
+              </button>
+            ))}
+          </div>
+          {sel.consoles?.length > 0 && (
+            <ConsolePicker
+              options={sel.consoles}
+              value={sel.console}
+              onChange={(nm) => setSel((s) => ({ ...s, console: nm }))}
+            />
+          )}
+          <div className="psn-pending-actions">
+            <button
+              className="psn-relink clickable"
+              onClick={() => setSel((s) => ({ ...s, gameId: null }))}
+              title="Choisir un autre jeu"
+            >
+              <RefreshCw size={13} /> Changer
+            </button>
+            <button
+              className="btn-psn-primary clickable"
+              disabled={busy}
+              onClick={() =>
+                onValidate({
+                  gameId: sel.gameId,
+                  name: sel.name,
+                  cover: sel.cover,
+                  platform: sel.console,
+                  status: sel.status,
+                  importTrophies: true,
+                })
+              }
+            >
+              {busy ? <Loader2 className="spin" size={15} /> : <Check size={15} />} Valider
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="psn-pending-search">
+          <GameSearchPicker
+            query={(p.psnName || "").replace(/[™®©℠]/g, "").trim()}
+            token={token}
+            onPick={pickGame}
+          />
+        </div>
       )}
     </div>
   );

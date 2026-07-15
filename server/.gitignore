@@ -1,5 +1,6 @@
 node_modules/
 .env
 .igdb-token.json
+.psn-token.json
 server.log
 uploads/

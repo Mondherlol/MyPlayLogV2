@@ -29,14 +29,16 @@ const notificationSchema = new mongoose.Schema(
         "recommendation_boost", // on a fait +1 sur une reco que tu as faite
         "recommendation_comment", // on a commenté une reco (reçue/faite)
         "download_react", // on s'est moqué de ton délit de téléchargement
+        "import_pending", // (système) de nouveaux jeux à valider après une synchro
       ],
       required: true,
     },
-    // Qui a déclenché la notif.
+    // Qui a déclenché la notif. Optionnel : les notifs système (import_pending)
+    // n'ont pas d'acteur humain.
     actor: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      default: null,
     },
     // Cible « liste » (pour les notifs de listes/commentaires). Optionnel.
     list: { type: mongoose.Schema.Types.ObjectId, ref: "List", default: null },

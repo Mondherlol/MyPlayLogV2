@@ -6,7 +6,7 @@ import mongoose from "mongoose";
 // réinterroger IGDB à chaque affichage des stats.
 const entityLogoSchema = new mongoose.Schema(
   {
-    kind: { type: String, enum: ["company", "platform"], required: true },
+    kind: { type: String, enum: ["company", "platform", "platform-photo"], required: true },
     name: { type: String, required: true },
     image: { type: String, default: null }, // URL complète du logo, ou null
   },

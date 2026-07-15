@@ -42,7 +42,6 @@ import {
   SlidersHorizontal,
   Plus,
   Settings,
-  TrendingUp,
   Crown,
   BarChart3,
 } from "lucide-react";
@@ -165,30 +164,82 @@ function SortableCard({ id, onConfigure, children }) {
         onConfigure ? "configurable" : ""
       }`}
       onContextMenu={onContextMenu}
-      title={onConfigure ? "Clic droit pour configurer cette carte" : undefined}
       {...attributes}
       {...listeners}
     >
       {onConfigure && (
-        <span className="pfa-slot-cog" aria-hidden="true">
+        <button
+          type="button"
+          className="pfa-slot-cog clickable"
+          title="Configurer cette carte"
+          // Stoppe le glissé : un clic sur l'engrenage ouvre la config sans
+          // déclencher le drag de la card (les listeners vivent sur le parent).
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onConfigure(id);
+          }}
+        >
           <Settings size={13} />
-        </span>
+        </button>
       )}
       {children}
     </div>
   );
 }
 
-// Petite pastille « champion / héros le plus joué » d'une carte de tracking.
-function TopHero({ thumb, name, games, fallbackIcon: FB }) {
-  if (!name) return null;
+// Carte de tracking in-game « sexy » : jaquette du jeu en tête (pas d'icône), rang
+// + total de parties inline, et portrait du héros/champion fétiche qui DÉBORDE de
+// la carte (overflow visible) pour un effet « hors-cadre ». LoL & Marvel Rivals.
+function TrackingCard({
+  variant,
+  cover,
+  title,
+  player,
+  emblem,
+  tier,
+  games,
+  hero,
+  fallbackIcon: FB,
+}) {
   return (
-    <span className="pfa-trk-hero" title={`${name}${games ? ` · ${games} parties` : ""}`}>
-      <span className="pfa-trk-hero-thumb">
-        {thumb ? <img src={thumb} alt="" loading="lazy" /> : <FB size={13} />}
-      </span>
-      <span className="pfa-trk-hero-name">{name}</span>
-    </span>
+    <section className={`pf-aside-card pfa-trk-card ${variant}`}>
+      <header className="pfa-trk-top">
+        <span className="pfa-trk-gamecover">
+          {cover ? <img src={cover} alt="" loading="lazy" /> : <FB size={16} />}
+        </span>
+        <span className="pfa-trk-titles">
+          <span className="pfa-trk-game">{title}</span>
+          {player && <span className="pfa-trk-player">{player}</span>}
+        </span>
+      </header>
+
+      <div className={`pfa-trk-body ${hero?.name ? "has-splash" : ""}`}>
+        <span className="pfa-trk-emblem">{emblem}</span>
+        <span className="pfa-trk-rankinfo">
+          <span className="pfa-trk-tier">{tier}</span>
+          {games != null && (
+            <span className="pfa-trk-games">
+              <Gamepad2 size={12} /> {nf.format(games)} partie{games > 1 ? "s" : ""}
+            </span>
+          )}
+          {hero?.name && <span className="pfa-trk-heroname">{hero.name}</span>}
+        </span>
+      </div>
+
+      {hero?.name && (
+        <span className="pfa-trk-hero-splash" title={hero.name}>
+          {hero.thumb ? (
+            <img src={hero.thumb} alt="" loading="lazy" />
+          ) : (
+            <span className="pfa-trk-hero-fb">
+              <FB size={30} />
+            </span>
+          )}
+        </span>
+      )}
+    </section>
   );
 }
 
@@ -373,9 +424,13 @@ export default function ProfileOverviewAside({
   const charsPin = cfg("characters");
   const charsPinned =
     charsPin?.mode === "pin" && charsPin.keys?.length
-      ? charsPin.keys.map((k) => characterPool.find((c) => c.key === k)).filter(Boolean)
+      ? charsPin.keys
+          .map((k) => characterPool.find((c) => c.key === k))
+          .filter(Boolean)
+          .slice(0, 4)
       : null;
-  const charactersShown = charsPinned?.length ? charsPinned : characterPool.slice(0, 8);
+  // Max 4 personnages favoris (auto : les 4 plus récents).
+  const charactersShown = charsPinned?.length ? charsPinned : characterPool.slice(0, 4);
 
   // ---------- Contenus qui nécessitent une requête (best-effort) ----------
   const [videos, setVideos] = useState(undefined); // liste (pour l'épinglage)
@@ -420,8 +475,11 @@ export default function ProfileOverviewAside({
     };
   }, [username, token, hasLol, hasRivals]);
 
-  // Logos des consoles (IGDB, match par nom) pour la carte + la modale console.
+  // Consoles (par nom) : vraie PHOTO de la console (Wikipedia, comme la fiche
+  // console) pour l'affichage + logo IGDB en repli. Les deux alimentent la carte
+  // « Console favorite » et sa modale.
   const [platformLogos, setPlatformLogos] = useState({});
+  const [platformImages, setPlatformImages] = useState({});
   const platformNamesKey = platforms.map((p) => p.platform).join("|");
   useEffect(() => {
     const names = platforms.map((p) => p.platform);
@@ -429,6 +487,9 @@ export default function ProfileOverviewAside({
     let alive = true;
     apiFetch("/platforms/logos", { method: "POST", token, body: { names } })
       .then((d) => alive && setPlatformLogos(d.logos || {}))
+      .catch(() => {});
+    apiFetch("/platforms/images", { method: "POST", token, body: { names } })
+      .then((d) => alive && setPlatformImages(d.images || {}))
       .catch(() => {});
     return () => {
       alive = false;
@@ -525,50 +586,28 @@ export default function ProfileOverviewAside({
         const t = trackers.find((x) => x.provider === "league-of-legends");
         const snap = lol?.tracker?.snapshot;
         const rank = snap?.ranks?.find((r) => r.queue === "solo") || snap?.ranks?.[0];
-        const peak = lol?.tracker?.rankHistory?.peak?.[rank?.queue || "solo"];
         const champ = snap?.champions?.[0];
-        const showPeak = peak && (peak.value || 0) > (rank?.value || 0);
+        const emblem = rank?.emblem ? (
+          <span className="lol-rank-emblem" style={{ width: 46, height: 46 }}>
+            <img className="lol-rank-emblem-img" src={rank.emblem} alt="" loading="lazy" />
+          </span>
+        ) : (
+          <span className="pfa-trk-emblem-fb">
+            <Crown size={20} />
+          </span>
+        );
         return (
-          <AsideCard Icon={Swords} title="League of Legends" className="pfa-trk-card lol">
-            <div className="pfa-trk-id">
-              {lol?.game?.cover ? (
-                <img className="pfa-trk-cover" src={lol.game.cover} alt="" loading="lazy" />
-              ) : (
-                <span className="pfa-trk-cover fb">
-                  <Swords size={14} />
-                </span>
-              )}
-              <span className="pfa-trk-name">{t?.externalName || "Invocateur"}</span>
-            </div>
-            <div className="pfa-trk-rank">
-              <span className="pfa-trk-emblem">
-                {rank?.emblem ? (
-                  <span className="lol-rank-emblem" style={{ width: 52, height: 52 }}>
-                    <img className="lol-rank-emblem-img" src={rank.emblem} alt="" loading="lazy" />
-                  </span>
-                ) : (
-                  <span className="pfa-trk-emblem-fb">
-                    <Crown size={22} />
-                  </span>
-                )}
-              </span>
-              <span className="pfa-trk-rankinfo">
-                <span className="pfa-trk-tier">{rank?.label || "Non classé"}</span>
-                {rank?.lp != null && <span className="pfa-trk-sub">{rank.lp} LP</span>}
-                {showPeak && (
-                  <span className="pfa-trk-peak">
-                    <TrendingUp size={11} /> Pic&nbsp;: {peak.label}
-                  </span>
-                )}
-              </span>
-            </div>
-            <TopHero
-              thumb={champ?.thumb}
-              name={champ?.name}
-              games={champ?.games}
-              fallbackIcon={Crown}
-            />
-          </AsideCard>
+          <TrackingCard
+            variant="lol"
+            cover={lol?.game?.cover}
+            title="League of Legends"
+            player={t?.externalName || "Invocateur"}
+            emblem={emblem}
+            tier={rank?.label || "Non classé"}
+            games={rank?.games}
+            hero={champ ? { name: champ.name, thumb: champ.thumb } : null}
+            fallbackIcon={Crown}
+          />
         );
       }
 
@@ -578,62 +617,46 @@ export default function ProfileOverviewAside({
         const t = trackers.find((x) => x.provider === "marvel-rivals");
         const snap = rivals?.tracker?.snapshot;
         const rank = snap?.rank;
-        const peak = snap?.peak;
         const hero = snap?.heroes?.[0];
-        const showPeak = peak?.tier && peak.tier !== rank?.tier;
+        const emblem = rank?.image ? (
+          <img className="pfa-trk-badge" src={rank.image} alt="" loading="lazy" />
+        ) : (
+          <span className="pfa-trk-emblem-fb">
+            <Trophy size={20} />
+          </span>
+        );
         return (
-          <AsideCard Icon={Swords} title="Marvel Rivals" className="pfa-trk-card rivals">
-            <div className="pfa-trk-id">
-              {rivals?.game?.cover ? (
-                <img className="pfa-trk-cover" src={rivals.game.cover} alt="" loading="lazy" />
-              ) : (
-                <span className="pfa-trk-cover fb">
-                  <Swords size={14} />
-                </span>
-              )}
-              <span className="pfa-trk-name">{t?.externalName || "Joueur"}</span>
-            </div>
-            <div className="pfa-trk-rank">
-              <span className="pfa-trk-emblem">
-                {rank?.image ? (
-                  <img className="pfa-trk-badge" src={rank.image} alt="" loading="lazy" />
-                ) : (
-                  <span className="pfa-trk-emblem-fb">
-                    <Trophy size={22} />
-                  </span>
-                )}
-              </span>
-              <span className="pfa-trk-rankinfo">
-                <span className="pfa-trk-tier">{rank?.tier || "Non classé"}</span>
-                {rank?.score != null && (
-                  <span className="pfa-trk-sub">{nf.format(rank.score)} RS</span>
-                )}
-                {showPeak && (
-                  <span className="pfa-trk-peak">
-                    <TrendingUp size={11} /> Pic&nbsp;: {peak.tier}
-                  </span>
-                )}
-              </span>
-            </div>
-            <TopHero
-              thumb={hero?.thumb}
-              name={hero?.name}
-              games={hero?.matches}
-              fallbackIcon={Trophy}
-            />
-          </AsideCard>
+          <TrackingCard
+            variant="rivals"
+            cover={rivals?.game?.cover}
+            title="Marvel Rivals"
+            player={t?.externalName || "Joueur"}
+            emblem={emblem}
+            tier={rank?.tier || "Non classé"}
+            games={snap?.overall?.matches}
+            hero={hero ? { name: hero.name, thumb: hero.thumb } : null}
+            fallbackIcon={Trophy}
+          />
         );
       }
 
       // -------- Console favorite --------
       case "console": {
         if (!consoleShown) return null;
+        // Vraie photo de la console d'abord, logo IGDB en repli, icône sinon.
+        const cphoto = platformImages[consoleShown.platform];
         const clogo = platformLogos[consoleShown.platform];
         return (
           <AsideCard Icon={Joystick} title="Console favorite">
             <div className="pfa-console">
-              <span className={`pfa-console-ic ${clogo ? "has-logo" : ""}`}>
-                {clogo ? (
+              <span
+                className={`pfa-console-ic ${
+                  cphoto ? "has-photo" : clogo ? "has-logo" : ""
+                }`}
+              >
+                {cphoto ? (
+                  <img src={cphoto} alt="" loading="lazy" />
+                ) : clogo ? (
                   <img src={clogo} alt="" loading="lazy" />
                 ) : (
                   <Gamepad2 size={22} />
@@ -1066,7 +1089,7 @@ export default function ProfileOverviewAside({
             {/* Zone active : les cards affichées sur le profil */}
             <div className="pfa-editor-active">
               <p className="pfa-editor-hint font-fun">
-                <GripVertical size={13} /> Glisse pour organiser · <Settings size={12} /> clic droit
+                <GripVertical size={13} /> Glisse pour organiser · <Settings size={12} /> l'engrenage
                 pour configurer une card.
               </p>
               <SortableContext items={cols.active} strategy={verticalListSortingStrategy}>
@@ -1140,6 +1163,7 @@ export default function ProfileOverviewAside({
             listCandidates,
             platforms,
             platformLogos,
+            platformImages,
             characters: characterPool,
             favorites: favoriteCompanies,
           }}

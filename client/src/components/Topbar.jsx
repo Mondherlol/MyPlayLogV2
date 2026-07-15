@@ -50,6 +50,8 @@ const NOTIF_META = {
   recommendation_boost: { Icon: Plus, verb: "a fait +1 sur ta reco de" },
   recommendation_comment: { Icon: MessageSquare, verb: "a commenté la reco de" },
   download_react: { Icon: Megaphone, verb: "se moque de ton téléchargement de" },
+  // Notif système (pas d'acteur) : le texte vient du snippet.
+  import_pending: { Icon: Gamepad2, verb: "", system: true },
 };
 
 export default function Topbar() {
@@ -177,6 +179,11 @@ export default function Topbar() {
 
   function openNotifTarget(n) {
     setMenu(null);
+    // Notif système : jeux à valider après une synchro → Paramètres > Imports.
+    if (n.type === "import_pending") {
+      navigate("/settings?tab=imports");
+      return;
+    }
     // OST : ouvre l'onglet OST du profil concerné, sur la bonne piste.
     if (n.ostOwner) {
       navigate(`/u/${n.ostOwner}?tab=ost${n.game ? `&ost=${n.game}` : ""}`);
@@ -376,25 +383,31 @@ export default function Topbar() {
                         onClick={() => openNotifTarget(n)}
                       >
                         <span className="notif-avatar">
-                          {n.actor?.avatar ? (
+                          {meta.system ? (
+                            <meta.Icon size={16} />
+                          ) : n.actor?.avatar ? (
                             <img src={n.actor.avatar} alt="" />
                           ) : (
                             (n.actor?.username || "?")[0].toUpperCase()
                           )}
-                          <span className={`notif-type t-${n.type}`}>
-                            <meta.Icon size={11} />
-                          </span>
+                          {!meta.system && (
+                            <span className={`notif-type t-${n.type}`}>
+                              <meta.Icon size={11} />
+                            </span>
+                          )}
                         </span>
                         <span className="notif-body">
-                          <span className="notif-text">
-                            <strong>{n.actor?.username || "Quelqu'un"}</strong> {verb}
-                            {n.listTitle && (
-                              <> «&nbsp;{n.listTitle}&nbsp;»</>
-                            )}
-                            {n.gameName && (
-                              <> «&nbsp;{n.gameName}&nbsp;»</>
-                            )}
-                          </span>
+                          {meta.system ? (
+                            <span className="notif-text">
+                              <strong>Jeux à valider</strong>
+                            </span>
+                          ) : (
+                            <span className="notif-text">
+                              <strong>{n.actor?.username || "Quelqu'un"}</strong> {verb}
+                              {n.listTitle && <> «&nbsp;{n.listTitle}&nbsp;»</>}
+                              {n.gameName && <> «&nbsp;{n.gameName}&nbsp;»</>}
+                            </span>
+                          )}
                           {n.snippet && (
                             <span className="notif-snippet">{n.snippet}</span>
                           )}

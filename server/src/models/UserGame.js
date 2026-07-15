@@ -74,10 +74,19 @@ const userGameSchema = new mongoose.Schema(
     // proposer de retirer les jeux ajoutés lors d'une déliaison du compte Steam.
     steamAppId: { type: Number, default: null },
     steamImported: { type: Boolean, default: false },
+    // Origine « import PSN » : npCommunicationId PSN rattaché, et vrai UNIQUEMENT
+    // si l'entrée a été CRÉÉE par un import PSN (même logique que Steam). Sert à
+    // proposer de retirer les jeux ajoutés lors d'une déliaison du compte PSN.
+    psnCommunicationId: { type: String, default: null },
+    psnImported: { type: Boolean, default: false },
     // Planning perso : mois où je compte jouer à ce jeu ("2026-08"), ou null.
     // Alimenté par le mode Planning de la page Sorties.
     plannedMonth: { type: String, default: null },
     playtimeHours: { type: Number, default: null },
+    // Dernier temps de jeu RAPPORTÉ par PSN (à l'import / à la dernière synchro).
+    // Sert à ne mettre à jour `playtimeHours` automatiquement que si l'utilisateur
+    // ne l'a pas modifié à la main (playtimeHours === psnPlaytimeHours).
+    psnPlaytimeHours: { type: Number, default: null },
     note: { type: String, default: "" }, // (déprécié) où je me suis arrêté
     review: { type: String, default: "" }, // texte de review
     reviewMedia: { type: [reviewMediaSchema], default: [] }, // GIF / images joints

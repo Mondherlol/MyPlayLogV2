@@ -12,6 +12,8 @@ const achievementSchema = new mongoose.Schema(
     unlockedAt: { type: Date, default: null },
     // Rareté mondiale : % de joueurs ayant débloqué ce succès (null si inconnu).
     rarity: { type: Number, default: null },
+    // PSN uniquement : grade du trophée (bronze | silver | gold | platinum).
+    tier: { type: String, default: null },
   },
   { _id: false }
 );

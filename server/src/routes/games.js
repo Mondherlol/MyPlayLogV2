@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import multer from "multer";
 import mongoose from "mongoose";
 import { igdbQuery } from "../lib/igdb.js";
-import { getValidAccessToken, fetchUserTitles, fetchTitleTrophies } from "../lib/psn.js";
+import { isConfigured, getServiceAccessToken, fetchUserTitles, fetchTitleTrophies } from "../lib/psn.js";
 import { isAdminEmail } from "../lib/admin.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { notify } from "../lib/notify.js";
@@ -1675,13 +1675,6 @@ function normName(s) {
     .trim();
 }
 
-async function getAdminPsnUser() {
-  const email = (process.env.ADMIN_EMAIL || "").trim();
-  if (!email) return null;
-  const admin = await User.findOne({ email: email.toLowerCase() });
-  return admin && isAdminEmail(admin.email) ? admin : null;
-}
-
 // Le viewer (par son id) est-il l'administrateur ? Sert à la modération des
 // reviews et des réponses (suppression de n'importe quel contenu).
 async function isUserAdmin(userId) {
@@ -1692,21 +1685,20 @@ async function isUserAdmin(userId) {
 
 router.get("/:id/psn-trophies", optionalAuth, async (req, res) => {
   try {
-    const admin = await getAdminPsnUser();
-    if (!admin?.psn?.refreshToken) return res.json({ available: false, reason: "not_connected" });
+    if (!isConfigured()) return res.json({ available: false, reason: "not_connected" });
 
     let accessToken = null;
     try {
-      accessToken = await getValidAccessToken(admin);
+      accessToken = await getServiceAccessToken();
     } catch {
       accessToken = null;
     }
     if (!accessToken) return res.json({ available: false, reason: "not_connected" });
 
-    // Bibliothèque de trophées du compte admin (cache global 30 min)
+    // Bibliothèque de trophées du compte de service (cache global 30 min)
     let titles = psnTitlesCache.titles;
     if (!titles || Date.now() - psnTitlesCache.ts >= PSN_TITLES_TTL) {
-      titles = await fetchUserTitles(accessToken);
+      titles = await fetchUserTitles(accessToken, "me");
       psnTitlesCache.titles = titles;
       psnTitlesCache.ts = Date.now();
     }
@@ -1727,7 +1719,8 @@ router.get("/:id/psn-trophies", optionalAuth, async (req, res) => {
     const raw = await fetchTitleTrophies(
       accessToken,
       match.npCommunicationId,
-      match.npServiceName
+      match.npServiceName,
+      "me"
     );
     // On enlève tout ce qui est personnel à l'admin (obtenu / date). On garde la
     // définition du trophée + sa rareté globale (% de joueurs l'ayant débloqué).
