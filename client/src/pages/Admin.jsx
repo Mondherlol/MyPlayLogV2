@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   Shield,
+  ShieldCheck,
   Trophy,
   Check,
   Loader2,
@@ -12,6 +13,7 @@ import {
   Trash2,
   Pencil,
   EyeOff,
+  Eye,
   ImagePlus,
   X,
   Send,
@@ -20,36 +22,118 @@ import {
   Crown,
   Gamepad2,
   RefreshCw,
+  KeyRound,
+  Mail,
+  Lock,
+  UserMinus,
+  Save,
+  AlertTriangle,
+  Copy,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { PN_ICONS } from "../components/PatchnotePopup";
 
+// ======================================================================
+//  Page Admin — shell à onglets verticaux (façon Discord).
+// ======================================================================
+const TAB_KEYS = ["users", "psn", "secrets", "patchnotes"];
+
 export default function Admin() {
-  const { token, updateUser } = useAuth();
+  const { token, user, loading, updateUser } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const urlTab = params.get("tab");
+  const tab = TAB_KEYS.includes(urlTab) ? urlTab : "users";
+  const setTab = (key) => setParams({ tab: key }, { replace: true });
+
+  const isSuper = !!user?.isSuperAdmin;
+
+  // Badge « demandes PSN à traiter » sur l'onglet PSN.
+  const [psnActive, setPsnActive] = useState(0);
+  useEffect(() => {
+    if (!token || !user?.isAdmin) return;
+    apiFetch("/psn/requests", { token })
+      .then((d) => setPsnActive(d?.active || 0))
+      .catch(() => {});
+  }, [token, user?.isAdmin, tab]);
+
+  const TABS = [
+    { key: "users", label: "Utilisateurs", Icon: Users },
+    { key: "psn", label: "PlayStation", Icon: Trophy, badge: psnActive },
+    ...(isSuper ? [{ key: "secrets", label: "Secrets", Icon: KeyRound }] : []),
+    { key: "patchnotes", label: "Patch notes", Icon: Sparkles },
+  ];
+  // Onglet Secrets réservé au super-admin : on retombe sur Utilisateurs sinon.
+  const safeTab = tab === "secrets" && !isSuper ? "users" : tab;
+
+  if (loading) {
+    return (
+      <div className="admin-wrap">
+        <div className="gp-troph-state">
+          <Loader2 size={20} className="spin" /> Chargement…
+        </div>
+      </div>
+    );
+  }
+
+  if (!user?.isAdmin) {
+    return (
+      <div className="admin-wrap">
+        <div className="admin-denied">
+          <Shield size={30} />
+          <h1>Accès réservé</h1>
+          <p>Cette section est réservée aux administrateurs.</p>
+          <Link to="/app" className="btn btn-primary">
+            Retour à l'accueil
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="admin-page">
-      <header className="admin-head">
+    <div className="admin-wrap">
+      <header className="admin-topbar">
         <span className="admin-head-icon">
           <Shield size={22} />
         </span>
         <div>
-          <h1>Admin</h1>
-          <p>Réglages avancés de ton compte.</p>
+          <h1>Administration</h1>
+          <p>Gestion des utilisateurs, du PlayStation et de la configuration.</p>
         </div>
+        {isSuper && (
+          <span className="admin-super-badge" title="Super-administrateur (ADMIN_EMAIL)">
+            <Crown size={13} /> Super-admin
+          </span>
+        )}
       </header>
 
-      <PsnManager token={token} updateUser={updateUser} />
-      <PsnRequestsManager token={token} />
-      <UsersManager token={token} />
-      <PatchnoteManager token={token} />
+      <div className="admin-layout">
+        <nav className="admin-rail">
+          {TABS.map(({ key, label, Icon, badge }) => (
+            <button
+              key={key}
+              className={`admin-tab clickable ${safeTab === key ? "active" : ""}`}
+              onClick={() => setTab(key)}
+            >
+              <Icon size={18} />
+              <span>{label}</span>
+              {badge > 0 && <span className="admin-tab-badge">{badge}</span>}
+            </button>
+          ))}
+        </nav>
+
+        <section className="admin-panel">
+          {safeTab === "users" && <UsersPanel token={token} me={user} />}
+          {safeTab === "psn" && <PsnPanel token={token} updateUser={updateUser} />}
+          {safeTab === "secrets" && isSuper && <SecretsPanel token={token} />}
+          {safeTab === "patchnotes" && <PatchnoteManager token={token} />}
+        </section>
+      </div>
     </div>
   );
 }
 
-// ======================================================================
-//  Gestion des utilisateurs du site (liste + suppression) — admin only
-// ======================================================================
 function timeAgo(date) {
   if (!date) return null;
   const diff = Date.now() - new Date(date).getTime();
@@ -63,62 +147,39 @@ function timeAgo(date) {
   return new Date(date).toLocaleDateString("fr-FR");
 }
 
-function UsersManager({ token }) {
+// ======================================================================
+//  Onglet Utilisateurs — liste + recherche + filtres + fiche détaillée.
+// ======================================================================
+const USER_FILTERS = [
+  { key: "all", label: "Tous" },
+  { key: "admin", label: "Admins" },
+];
+
+function UsersPanel({ token, me }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [allowed, setAllowed] = useState(true);
   const [err, setErr] = useState(null);
   const [q, setQ] = useState("");
-  const [deleting, setDeleting] = useState(null); // id en cours de suppression
+  const [filter, setFilter] = useState("all");
+  const [openId, setOpenId] = useState(null); // fiche ouverte
 
   function load(search = "") {
     setLoading(true);
     apiFetch(`/admin/users${search ? `?q=${encodeURIComponent(search)}` : ""}`, { token })
-      .then((d) => {
-        setUsers(d.users || []);
-        setAllowed(true);
-      })
-      .catch((e) => {
-        if (/administrateur/i.test(e.message)) setAllowed(false);
-        else setErr(e.message);
-      })
+      .then((d) => setUsers(d.users || []))
+      .catch((e) => setErr(e.message))
       .finally(() => setLoading(false));
   }
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
-
-  // Recherche débattue (300 ms) côté serveur.
-  useEffect(() => {
-    const t = setTimeout(() => load(q.trim()), 300);
+    const t = setTimeout(() => load(q.trim()), 250);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
-  async function remove(u) {
-    if (
-      !confirm(
-        `Supprimer définitivement « ${u.username} » ?\n\nToutes ses données (jeux, listes, avis, republications, notifications, abonnements…) seront effacées. Cette action est irréversible.`
-      )
-    )
-      return;
-    setDeleting(u.id);
-    setErr(null);
-    try {
-      await apiFetch(`/admin/users/${u.id}`, { method: "DELETE", token });
-      setUsers((list) => list.filter((x) => x.id !== u.id));
-    } catch (e) {
-      setErr(e.message);
-    } finally {
-      setDeleting(null);
-    }
-  }
-
-  if (!allowed) return null;
+  const shown = users.filter((u) => (filter === "admin" ? u.isAdmin : true));
 
   return (
-    <section className="admin-card">
+    <div className="admin-card">
       <div className="admin-card-head">
         <span className="admin-card-icon">
           <Users size={18} />
@@ -126,8 +187,8 @@ function UsersManager({ token }) {
         <div className="admin-card-titles">
           <h2>Utilisateurs</h2>
           <p>
-            Tous les comptes inscrits sur le site. Recherche par pseudo ou email,
-            consulte un profil ou supprime un compte.
+            Recherche, consulte, édite ou supprime les comptes. Clique une ligne pour
+            gérer email, mot de passe, rôle et abonnements.
           </p>
         </div>
         {!loading && (
@@ -137,18 +198,31 @@ function UsersManager({ token }) {
         )}
       </div>
 
-      <div className="au-search">
-        <Search size={16} />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Rechercher un pseudo ou un email…"
-        />
-        {q && (
-          <button className="au-search-clear clickable" onClick={() => setQ("")}>
-            <X size={15} />
-          </button>
-        )}
+      <div className="au-toolbar">
+        <div className="au-search">
+          <Search size={16} />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Rechercher un pseudo ou un email…"
+          />
+          {q && (
+            <button className="au-search-clear clickable" onClick={() => setQ("")}>
+              <X size={15} />
+            </button>
+          )}
+        </div>
+        <div className="au-filters">
+          {USER_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              className={`au-filter clickable ${filter === f.key ? "active" : ""}`}
+              onClick={() => setFilter(f.key)}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {err && <p className="psn-err">{err}</p>}
@@ -157,13 +231,18 @@ function UsersManager({ token }) {
         <div className="gp-troph-state">
           <Loader2 size={18} className="spin" /> Chargement…
         </div>
-      ) : users.length === 0 ? (
+      ) : shown.length === 0 ? (
         <p className="pn-admin-empty">Aucun utilisateur trouvé.</p>
       ) : (
         <div className="au-list">
-          {users.map((u) => (
-            <div className="au-row" key={u.id}>
-              <Link to={`/u/${u.username}`} className="au-avatar clickable" title="Voir le profil">
+          {shown.map((u) => (
+            <button
+              type="button"
+              className="au-row clickable"
+              key={u.id}
+              onClick={() => setOpenId(u.id)}
+            >
+              <span className="au-avatar">
                 {u.avatar ? (
                   <img src={u.avatar} alt="" />
                 ) : (
@@ -171,63 +250,436 @@ function UsersManager({ token }) {
                     {u.username?.[0]?.toUpperCase() || "?"}
                   </span>
                 )}
-              </Link>
+              </span>
               <div className="au-info">
                 <div className="au-name-row">
-                  <Link to={`/u/${u.username}`} className="au-name clickable">
-                    {u.username}
-                  </Link>
-                  {u.isAdmin && (
-                    <span className="au-admin-badge" title="Administrateur">
-                      <Crown size={12} /> Admin
+                  <span className="au-name">{u.username}</span>
+                  {u.isSuper ? (
+                    <span className="au-admin-badge super" title="Super-administrateur">
+                      <Crown size={12} /> Super
                     </span>
-                  )}
+                  ) : u.isAdmin ? (
+                    <span className="au-admin-badge" title="Administrateur">
+                      <ShieldCheck size={12} /> Admin
+                    </span>
+                  ) : null}
                 </div>
                 <span className="au-email">{u.email}</span>
                 <span className="au-meta">
                   <Gamepad2 size={12} /> {u.gameCount} jeu{u.gameCount > 1 ? "x" : ""}
                   {" · "}
                   {u.followersCount} abonné{u.followersCount > 1 ? "s" : ""}
+                  {" · "}
+                  {u.followingCount} abonnement{u.followingCount > 1 ? "s" : ""}
+                  {u.lastSeenAt ? ` · vu ${timeAgo(u.lastSeenAt)}` : ""}
+                </span>
+              </div>
+              <span className="au-chevron">Gérer →</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {openId && (
+        <UserDrawer
+          token={token}
+          userId={openId}
+          me={me}
+          onClose={() => setOpenId(null)}
+          onDirty={() => load(q.trim())}
+        />
+      )}
+    </div>
+  );
+}
+
+// --- Fiche détaillée d'un utilisateur (drawer latéral) ---
+function UserDrawer({ token, userId, me, onClose, onDirty }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+
+  function load() {
+    setLoading(true);
+    apiFetch(`/admin/users/${userId}`, { token })
+      .then(setData)
+      .catch((e) => setErr(e.message))
+      .finally(() => setLoading(false));
+  }
+  useEffect(load, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fermeture à la touche Échap.
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const u = data?.user;
+  const isSuperMe = !!me?.isSuperAdmin;
+
+  async function remove() {
+    if (
+      !confirm(
+        `Supprimer définitivement « ${u.username} » ?\n\nToutes ses données seront effacées. Action irréversible.`
+      )
+    )
+      return;
+    try {
+      await apiFetch(`/admin/users/${u.id}`, { method: "DELETE", token });
+      onDirty();
+      onClose();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  return (
+    <div className="admin-drawer-overlay" onClick={onClose}>
+      <aside className="admin-drawer" onClick={(e) => e.stopPropagation()}>
+        <button className="admin-drawer-close clickable" onClick={onClose} aria-label="Fermer">
+          <X size={18} />
+        </button>
+
+        {loading ? (
+          <div className="gp-troph-state">
+            <Loader2 size={18} className="spin" /> Chargement…
+          </div>
+        ) : err ? (
+          <p className="psn-err">{err}</p>
+        ) : (
+          <>
+            <div className="admin-drawer-head">
+              <span className="au-avatar lg">
+                {u.avatar ? (
+                  <img src={u.avatar} alt="" />
+                ) : (
+                  <span className="au-avatar-fallback">
+                    {u.username?.[0]?.toUpperCase() || "?"}
+                  </span>
+                )}
+              </span>
+              <div className="admin-drawer-id">
+                <div className="au-name-row">
+                  <strong>{u.username}</strong>
+                  {u.isSuper ? (
+                    <span className="au-admin-badge super">
+                      <Crown size={12} /> Super
+                    </span>
+                  ) : u.isAdmin ? (
+                    <span className="au-admin-badge">
+                      <ShieldCheck size={12} /> Admin
+                    </span>
+                  ) : null}
+                </div>
+                <span className="au-email">{u.email}</span>
+                <span className="au-meta">
+                  <Gamepad2 size={12} /> {u.gameCount} jeu{u.gameCount > 1 ? "x" : ""}
                   {" · inscrit le "}
                   {new Date(u.createdAt).toLocaleDateString("fr-FR")}
                   {u.lastSeenAt ? ` · vu ${timeAgo(u.lastSeenAt)}` : ""}
                 </span>
-              </div>
-              <div className="au-actions">
-                <Link
-                  to={`/u/${u.username}`}
-                  className="icon-btn clickable"
-                  title="Voir le profil"
-                >
-                  <ExternalLink size={16} />
+                <Link to={`/u/${u.username}`} className="admin-drawer-profile clickable">
+                  <ExternalLink size={13} /> Voir le profil public
                 </Link>
-                {u.isAdmin ? (
-                  <span
-                    className="icon-btn au-locked"
-                    title="Un administrateur ne peut pas être supprimé"
-                  >
-                    <Shield size={16} />
-                  </span>
-                ) : (
-                  <button
-                    className="icon-btn clickable danger"
-                    onClick={() => remove(u)}
-                    disabled={deleting === u.id}
-                    title="Supprimer ce compte"
-                  >
-                    {deleting === u.id ? (
-                      <Loader2 size={16} className="spin" />
-                    ) : (
-                      <Trash2 size={16} />
-                    )}
-                  </button>
-                )}
               </div>
+            </div>
+
+            <div className="admin-drawer-body">
+              {/* --- Compte --- */}
+              <h3 className="admin-drawer-sec">Compte</h3>
+
+              <EmailForm token={token} user={u} onSaved={load} onDirty={onDirty} />
+              <PasswordForm token={token} user={u} />
+
+              {isSuperMe && !u.isSuper && (
+                <AdminToggle token={token} user={u} onSaved={load} onDirty={onDirty} />
+              )}
+
+              {!u.isSuper && (
+                <button className="admin-danger-btn clickable" onClick={remove}>
+                  <Trash2 size={15} /> Supprimer ce compte
+                </button>
+              )}
+              {u.isSuper && (
+                <p className="admin-hint">
+                  <Shield size={13} /> Compte super-admin (défini par <code>ADMIN_EMAIL</code>) —
+                  non modifiable ni supprimable.
+                </p>
+              )}
+
+              {/* --- Abonnements --- */}
+              <RelationList
+                token={token}
+                title="Abonnements"
+                empty="Ne suit personne."
+                items={data.following}
+                userId={u.id}
+                mode="following"
+                onDirty={() => {
+                  load();
+                  onDirty();
+                }}
+              />
+
+              {/* --- Abonnés --- */}
+              <RelationList
+                token={token}
+                title="Abonnés"
+                empty="Aucun abonné."
+                items={data.followers}
+                userId={u.id}
+                mode="followers"
+                onDirty={() => {
+                  load();
+                  onDirty();
+                }}
+              />
+            </div>
+          </>
+        )}
+      </aside>
+    </div>
+  );
+}
+
+function EmailForm({ token, user, onSaved, onDirty }) {
+  const [email, setEmail] = useState(user.email);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const changed = email.trim().toLowerCase() !== user.email;
+
+  async function save() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await apiFetch(`/admin/users/${user.id}/email`, {
+        method: "PATCH",
+        token,
+        body: { email: email.trim() },
+      });
+      setMsg({ ok: true, text: "Email mis à jour." });
+      onSaved();
+      onDirty();
+    } catch (e) {
+      setMsg({ ok: false, text: e.message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="admin-field">
+      <label>
+        <Mail size={14} /> Email
+      </label>
+      <div className="admin-field-row">
+        <input
+          type="email"
+          value={email}
+          disabled={user.isSuper}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <button
+          className="btn btn-primary sm"
+          onClick={save}
+          disabled={busy || !changed || user.isSuper}
+        >
+          {busy ? <Loader2 size={14} className="spin" /> : <Save size={14} />} Enregistrer
+        </button>
+      </div>
+      {msg && <p className={msg.ok ? "admin-ok" : "psn-err"}>{msg.text}</p>}
+    </div>
+  );
+}
+
+function PasswordForm({ token, user }) {
+  const [pw, setPw] = useState("");
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  async function save() {
+    if (pw.length < 3) {
+      setMsg({ ok: false, text: "Au moins 3 caractères." });
+      return;
+    }
+    setBusy(true);
+    setMsg(null);
+    try {
+      await apiFetch(`/admin/users/${user.id}/password`, {
+        method: "PATCH",
+        token,
+        body: { password: pw },
+      });
+      setPw("");
+      setMsg({ ok: true, text: "Mot de passe changé." });
+    } catch (e) {
+      setMsg({ ok: false, text: e.message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="admin-field">
+      <label>
+        <Lock size={14} /> Nouveau mot de passe
+      </label>
+      <div className="admin-field-row">
+        <div className="admin-pw-input">
+          <input
+            type={show ? "text" : "password"}
+            value={pw}
+            placeholder="Laisse vide pour ne pas changer…"
+            onChange={(e) => setPw(e.target.value)}
+          />
+          <button
+            className="admin-pw-eye clickable"
+            onClick={() => setShow((s) => !s)}
+            type="button"
+            aria-label={show ? "Masquer" : "Afficher"}
+          >
+            {show ? <EyeOff size={15} /> : <Eye size={15} />}
+          </button>
+        </div>
+        <button className="btn btn-primary sm" onClick={save} disabled={busy || !pw}>
+          {busy ? <Loader2 size={14} className="spin" /> : <Save size={14} />} Changer
+        </button>
+      </div>
+      {msg && <p className={msg.ok ? "admin-ok" : "psn-err"}>{msg.text}</p>}
+    </div>
+  );
+}
+
+function AdminToggle({ token, user, onSaved, onDirty }) {
+  const [busy, setBusy] = useState(false);
+
+  async function toggle() {
+    setBusy(true);
+    try {
+      await apiFetch(`/admin/users/${user.id}/admin`, {
+        method: "PATCH",
+        token,
+        body: { isAdmin: !user.isAdmin },
+      });
+      onSaved();
+      onDirty();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="admin-field">
+      <label>
+        <ShieldCheck size={14} /> Rôle administrateur
+      </label>
+      <div className="admin-toggle-row">
+        <span>{user.isAdmin ? "Cet utilisateur est administrateur." : "Utilisateur standard."}</span>
+        <button
+          className={`admin-switch clickable ${user.isAdmin ? "on" : ""}`}
+          onClick={toggle}
+          disabled={busy}
+          role="switch"
+          aria-checked={user.isAdmin}
+        >
+          <span className="admin-switch-knob">
+            {busy && <Loader2 size={11} className="spin" />}
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RelationList({ token, title, empty, items, userId, mode, onDirty }) {
+  const [busyId, setBusyId] = useState(null);
+
+  async function remove(target) {
+    const label =
+      mode === "following"
+        ? `Retirer l'abonnement à « ${target.username} » ?`
+        : `Retirer « ${target.username} » des abonnés ?`;
+    if (!confirm(label)) return;
+    setBusyId(target.id);
+    try {
+      if (mode === "following") {
+        await apiFetch(`/admin/users/${userId}/unfollow`, {
+          method: "POST",
+          token,
+          body: { targetId: target.id },
+        });
+      } else {
+        await apiFetch(`/admin/users/${userId}/remove-follower`, {
+          method: "POST",
+          token,
+          body: { followerId: target.id },
+        });
+      }
+      onDirty();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div className="admin-rel">
+      <h3 className="admin-drawer-sec">
+        {title} <span className="admin-rel-count">{items.length}</span>
+      </h3>
+      {items.length === 0 ? (
+        <p className="admin-rel-empty">{empty}</p>
+      ) : (
+        <div className="admin-rel-list">
+          {items.map((r) => (
+            <div className="admin-rel-row" key={r.id}>
+              <Link to={`/u/${r.username}`} className="admin-rel-user clickable">
+                <span className="au-avatar sm">
+                  {r.avatar ? (
+                    <img src={r.avatar} alt="" />
+                  ) : (
+                    <span className="au-avatar-fallback">
+                      {r.username?.[0]?.toUpperCase() || "?"}
+                    </span>
+                  )}
+                </span>
+                <span className="admin-rel-name">{r.username}</span>
+                {r.isAdmin && <ShieldCheck size={12} className="admin-rel-admin" />}
+              </Link>
+              <button
+                className="icon-btn clickable danger"
+                onClick={() => remove(r)}
+                disabled={busyId === r.id}
+                title={mode === "following" ? "Retirer l'abonnement" : "Retirer l'abonné"}
+              >
+                {busyId === r.id ? (
+                  <Loader2 size={15} className="spin" />
+                ) : (
+                  <UserMinus size={15} />
+                )}
+              </button>
             </div>
           ))}
         </div>
       )}
-    </section>
+    </div>
+  );
+}
+
+// ======================================================================
+//  Onglet PlayStation — NPSSO de service + demandes de synchro.
+// ======================================================================
+function PsnPanel({ token, updateUser }) {
+  return (
+    <div className="admin-stack">
+      <PsnManager token={token} updateUser={updateUser} />
+      <PsnRequestsManager token={token} />
+    </div>
   );
 }
 
@@ -271,7 +723,7 @@ function PsnManager({ token, updateUser }) {
   }
 
   async function disconnect() {
-    if (!confirm("Déconnecter ton compte PSN ?")) return;
+    if (!confirm("Déconnecter le compte PSN de service ?")) return;
     try {
       await apiFetch("/users/me/psn", { method: "DELETE", token });
       updateUser?.({ psnConnected: false });
@@ -290,7 +742,7 @@ function PsnManager({ token, updateUser }) {
           <Trophy size={18} />
         </span>
         <div className="admin-card-titles">
-          <h2>Gestion du PSN</h2>
+          <h2>Token NPSSO (compte de service)</h2>
           <p>
             Le compte PlayStation connecté ici sert de <strong>source des trophées</strong> :
             la liste des trophées à débloquer devient visible par tous les utilisateurs sur
@@ -309,13 +761,11 @@ function PsnManager({ token, updateUser }) {
           <Loader2 size={18} className="spin" /> Chargement…
         </div>
       ) : !status.isAdmin ? (
-        <p className="psn-err">
-          Section réservée à l'administrateur (défini par <code>ADMIN_EMAIL</code> côté serveur).
-        </p>
+        <p className="psn-err">Section réservée à l'administrateur.</p>
       ) : status.connected ? (
         <div className="psn-connected-row">
           <p>
-            Ton compte PSN est connecté
+            Le compte PSN de service est connecté
             {status.connectedAt
               ? ` depuis le ${new Date(status.connectedAt).toLocaleDateString("fr-FR")}`
               : ""}
@@ -329,7 +779,7 @@ function PsnManager({ token, updateUser }) {
         <>
           {status.expired && (
             <p className="psn-err">
-              Ta session PSN a expiré — colle un nouveau NPSSO pour te reconnecter.
+              La session PSN a expiré — colle un nouveau NPSSO pour te reconnecter.
             </p>
           )}
           <ol className="psn-steps">
@@ -356,7 +806,7 @@ function PsnManager({ token, updateUser }) {
           <div className="psn-connect-form">
             <input
               type="password"
-              placeholder="Ton token NPSSO…"
+              placeholder="Token NPSSO…"
               value={npsso}
               onChange={(e) => setNpsso(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && connect()}
@@ -376,9 +826,6 @@ function PsnManager({ token, updateUser }) {
   );
 }
 
-// ======================================================================
-//  Demandes de synchro PSN (traitées par le worker maison) — admin only
-// ======================================================================
 const PSN_REQ_STATUS = {
   pending: "En attente",
   processing: "En cours",
@@ -388,24 +835,16 @@ const PSN_REQ_STATUS = {
 
 function PsnRequestsManager({ token }) {
   const [data, setData] = useState(null);
-  const [allowed, setAllowed] = useState(true);
   const [loading, setLoading] = useState(true);
 
   function load() {
     setLoading(true);
     apiFetch("/psn/requests", { token })
-      .then((d) => {
-        setData(d);
-        setAllowed(true);
-      })
-      .catch((e) => {
-        if (/administrateur/i.test(e.message)) setAllowed(false);
-      })
+      .then(setData)
+      .catch(() => {})
       .finally(() => setLoading(false));
   }
   useEffect(load, [token]);
-
-  if (!allowed) return null;
 
   const requests = data?.requests || [];
   const active = data?.active || 0;
@@ -478,7 +917,233 @@ function PsnRequestsManager({ token }) {
 }
 
 // ======================================================================
-//  Gestionnaire de patch notes (nouveautés affichées aux utilisateurs)
+//  Onglet Secrets — variables du .env (super-admin uniquement).
+// ======================================================================
+function SecretsPanel({ token }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  const [adding, setAdding] = useState(false);
+
+  function load() {
+    setLoading(true);
+    apiFetch("/admin/secrets", { token })
+      .then((d) => {
+        setData(d);
+        setErr(null);
+      })
+      .catch((e) => setErr(e.message))
+      .finally(() => setLoading(false));
+  }
+  useEffect(load, [token]);
+
+  return (
+    <section className="admin-card">
+      <div className="admin-card-head">
+        <span className="admin-card-icon">
+          <KeyRound size={18} />
+        </span>
+        <div className="admin-card-titles">
+          <h2>Secrets & configuration (.env)</h2>
+          <p>
+            Variables d'environnement du serveur. Modifie une valeur ou ajoute-en une.
+            Prend effet immédiatement pour la plupart des réglages ; certains (port, base,
+            clés lues au démarrage) nécessitent un redémarrage.
+          </p>
+        </div>
+        {!adding && (
+          <button className="btn btn-primary" onClick={() => setAdding(true)}>
+            <Plus size={16} /> Ajouter
+          </button>
+        )}
+      </div>
+
+      {data && !data.writable && (
+        <p className="admin-warn">
+          <AlertTriangle size={14} /> Le fichier <code>{data.path}</code>
+          {data.exists ? " n'est pas modifiable" : " est introuvable"} sur ce serveur — les
+          écritures échoueront. En production (Docker), édite le <code>.env</code> sur l'hôte
+          puis redémarre le conteneur.
+        </p>
+      )}
+
+      {err && <p className="psn-err">{err}</p>}
+
+      {adding && (
+        <SecretAddForm
+          token={token}
+          onCancel={() => setAdding(false)}
+          onAdded={() => {
+            setAdding(false);
+            load();
+          }}
+        />
+      )}
+
+      {loading ? (
+        <div className="gp-troph-state">
+          <Loader2 size={18} className="spin" /> Chargement…
+        </div>
+      ) : !data?.entries?.length ? (
+        <p className="pn-admin-empty">Aucune variable trouvée.</p>
+      ) : (
+        <div className="sec-list">
+          {data.entries.map((e) => (
+            <SecretRow key={e.key} token={token} entry={e} onChanged={load} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function SecretRow({ token, entry, onChanged }) {
+  const [value, setValue] = useState(entry.value);
+  const [reveal, setReveal] = useState(!entry.secret);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const changed = value !== entry.value;
+
+  // Resynchronise si la liste est rechargée (valeur externe modifiée).
+  useEffect(() => {
+    setValue(entry.value);
+  }, [entry.value]);
+
+  async function save() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await apiFetch(`/admin/secrets/${encodeURIComponent(entry.key)}`, {
+        method: "PUT",
+        token,
+        body: { value },
+      });
+      setMsg("ok");
+      onChanged();
+      setTimeout(() => setMsg(null), 1500);
+    } catch (e) {
+      setMsg(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    if (!confirm(`Supprimer la variable « ${entry.key} » ?`)) return;
+    try {
+      await apiFetch(`/admin/secrets/${encodeURIComponent(entry.key)}`, {
+        method: "DELETE",
+        token,
+      });
+      onChanged();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  function copy() {
+    navigator.clipboard?.writeText(entry.value).catch(() => {});
+  }
+
+  return (
+    <div className="sec-row">
+      <div className="sec-key">
+        <code>{entry.key}</code>
+        {entry.secret && <span className="sec-tag">secret</span>}
+      </div>
+      <div className="sec-val">
+        <input
+          type={reveal ? "text" : "password"}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          spellCheck={false}
+        />
+        <button
+          className="icon-btn clickable"
+          onClick={() => setReveal((r) => !r)}
+          title={reveal ? "Masquer" : "Révéler"}
+        >
+          {reveal ? <EyeOff size={15} /> : <Eye size={15} />}
+        </button>
+        <button className="icon-btn clickable" onClick={copy} title="Copier la valeur">
+          <Copy size={15} />
+        </button>
+        <button
+          className="btn btn-primary sm"
+          onClick={save}
+          disabled={busy || !changed}
+          title="Enregistrer"
+        >
+          {busy ? <Loader2 size={14} className="spin" /> : <Save size={14} />}
+        </button>
+        <button className="icon-btn clickable danger" onClick={remove} title="Supprimer">
+          <Trash2 size={15} />
+        </button>
+      </div>
+      {msg && (
+        <p className={msg === "ok" ? "admin-ok" : "psn-err"}>
+          {msg === "ok" ? "Enregistré." : msg}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function SecretAddForm({ token, onCancel, onAdded }) {
+  const [key, setKey] = useState("");
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  async function save() {
+    setBusy(true);
+    setErr(null);
+    try {
+      await apiFetch("/admin/secrets", {
+        method: "POST",
+        token,
+        body: { key: key.trim(), value },
+      });
+      onAdded();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="sec-add">
+      <div className="sec-add-grid">
+        <input
+          className="sec-add-key"
+          value={key}
+          onChange={(e) => setKey(e.target.value.toUpperCase())}
+          placeholder="NOM_DE_LA_VARIABLE"
+          spellCheck={false}
+        />
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="valeur"
+          spellCheck={false}
+        />
+      </div>
+      {err && <p className="psn-err">{err}</p>}
+      <div className="sec-add-foot">
+        <button className="btn btn-ghost sm" onClick={onCancel} disabled={busy}>
+          Annuler
+        </button>
+        <button className="btn btn-primary sm" onClick={save} disabled={busy || !key.trim()}>
+          {busy ? <Loader2 size={14} className="spin" /> : <Plus size={14} />} Ajouter
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ======================================================================
+//  Onglet Patch notes (inchangé — nouveautés affichées aux utilisateurs).
 // ======================================================================
 const ICON_NAMES = Object.keys(PN_ICONS);
 const blankItem = () => ({ icon: "Sparkles", title: "", description: "", images: [] });
@@ -492,21 +1157,14 @@ const blankNote = () => ({
 function PatchnoteManager({ token }) {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [allowed, setAllowed] = useState(true);
   const [editing, setEditing] = useState(null); // note en cours d'édition/création
   const [err, setErr] = useState(null);
 
   function load() {
     setLoading(true);
     apiFetch("/patchnotes", { token })
-      .then((d) => {
-        setNotes(d.patchnotes || []);
-        setAllowed(true);
-      })
-      .catch((e) => {
-        if (/administrateur/i.test(e.message)) setAllowed(false);
-        else setErr(e.message);
-      })
+      .then((d) => setNotes(d.patchnotes || []))
+      .catch((e) => setErr(e.message))
       .finally(() => setLoading(false));
   }
   useEffect(load, [token]);
@@ -533,8 +1191,6 @@ function PatchnoteManager({ token }) {
       alert(e.message);
     }
   }
-
-  if (!allowed) return null;
 
   return (
     <section className="admin-card">

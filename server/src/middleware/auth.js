@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
-import { isAdminEmail } from "../lib/admin.js";
+import { isAdminEmail, isUserAdmin } from "../lib/admin.js";
 
 // Présence : on note le dernier passage de chaque utilisateur (affiché sur son
 // profil). Throttlé en mémoire pour ne pas écrire en base à chaque requête.
@@ -57,13 +57,16 @@ export function optionalAuth(req, _res, next) {
   next();
 }
 
-// À chaîner APRÈS requireAuth : réserve la route à l'admin (ADMIN_EMAIL).
+// À chaîner APRÈS requireAuth : réserve la route aux administrateurs (le
+// super-admin ADMIN_EMAIL ou tout compte promu isAdmin). Renseigne au passage
+// req.isSuperAdmin pour les actions réservées au super-admin.
 export async function requireAdmin(req, res, next) {
   try {
-    const user = await User.findById(req.userId).select("email");
-    if (!user || !isAdminEmail(user.email)) {
+    const user = await User.findById(req.userId).select("email isAdmin");
+    if (!isUserAdmin(user)) {
       return res.status(403).json({ error: "Accès réservé à l'administrateur." });
     }
+    req.isSuperAdmin = isAdminEmail(user.email);
     next();
   } catch {
     return res.status(500).json({ error: "Erreur d'authentification admin." });

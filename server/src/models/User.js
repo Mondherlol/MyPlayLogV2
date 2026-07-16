@@ -21,6 +21,12 @@ const userSchema = new mongoose.Schema(
       required: true,
     },
 
+    // --- Rôle administrateur ---
+    // Le « super-admin » reste défini par ADMIN_EMAIL (server/.env) : il est
+    // toujours admin, ne peut être ni rétrogradé ni supprimé. Ce booléen permet
+    // au super-admin de NOMMER d'autres administrateurs depuis le panel Admin.
+    isAdmin: { type: Boolean, default: false },
+
     // --- Réinitialisation de mot de passe ---
     // On stocke le HASH du token (jamais le token en clair) + son expiration.
     resetTokenHash: { type: String, default: null, select: false },
@@ -200,7 +206,8 @@ userSchema.methods.toPublic = function () {
           connectedAt: this.steam.connectedAt || null,
         }
       : null,
-    isAdmin: isAdminEmail(this.email),
+    isAdmin: isAdminEmail(this.email) || !!this.isAdmin,
+    isSuperAdmin: isAdminEmail(this.email),
     followingCount: (this.following || []).length,
     createdAt: this.createdAt,
   };

@@ -17,7 +17,7 @@ import { igdbQuery } from "../lib/igdb.js";
 import { ensureGameMeta } from "../lib/gameMeta.js";
 import { ensureEntityLogos } from "../lib/entityLogos.js";
 import { setServiceNpsso, getServiceStatus, clearServiceTokens } from "../lib/psn.js";
-import { isAdminEmail } from "../lib/admin.js";
+import { isUserAdmin } from "../lib/admin.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { summarizeReactions, reviewComment } from "../lib/reviewSerialize.js";
 import { recordActivity, removeActivity } from "../lib/activity.js";
@@ -309,10 +309,10 @@ router.put("/me/overview", requireAuth, async (req, res) => {
 // --- Statut du compte de service PSN (source des trophées) pour la page Admin ---
 router.get("/me/psn", requireAuth, async (req, res) => {
   try {
-    const me = await User.findById(req.userId).select("email");
+    const me = await User.findById(req.userId).select("email isAdmin");
     const s = getServiceStatus();
     res.json({
-      isAdmin: isAdminEmail(me?.email),
+      isAdmin: isUserAdmin(me),
       connected: s.connected,
       expired: s.expired,
       connectedAt: s.connectedAt,
@@ -328,8 +328,8 @@ router.get("/me/psn", requireAuth, async (req, res) => {
 //     pour TOUS les utilisateurs. Permet de faire tourner le NPSSO sans redéploi. ---
 router.post("/me/psn", requireAuth, async (req, res) => {
   try {
-    const me = await User.findById(req.userId).select("email");
-    if (!isAdminEmail(me?.email))
+    const me = await User.findById(req.userId).select("email isAdmin");
+    if (!isUserAdmin(me))
       return res.status(403).json({ error: "Réservé à l'administrateur." });
 
     const npsso = String(req.body?.npsso || "").trim();
@@ -352,8 +352,8 @@ router.post("/me/psn", requireAuth, async (req, res) => {
 // --- Déconnexion du compte de service PSN (admin uniquement) ---
 router.delete("/me/psn", requireAuth, async (req, res) => {
   try {
-    const me = await User.findById(req.userId).select("email");
-    if (!isAdminEmail(me?.email))
+    const me = await User.findById(req.userId).select("email isAdmin");
+    if (!isUserAdmin(me))
       return res.status(403).json({ error: "Réservé à l'administrateur." });
     clearServiceTokens();
     res.json({ connected: false });
