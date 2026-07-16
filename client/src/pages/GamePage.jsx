@@ -1540,9 +1540,36 @@ function FavCard({ Icon, title, children, onAdd, filled }) {
 }
 
 function InfosTab({ game, onOpenImage, navigate }) {
+  const { token } = useAuth();
   const media = game.media || [];
   const videos = media.filter((m) => m.type === "video");
   const images = media.filter((m) => m.type !== "video");
+
+  // Traduction FR à la demande du résumé/scénario (voir bloc « À propos »).
+  // Pré-remplie si une trad est déjà en cache serveur (affichée direct).
+  const [fr, setFr] = useState({ summary: game.summaryFr, storyline: game.storylineFr });
+  const [showFr, setShowFr] = useState(Boolean(game.summaryFr || game.storylineFr));
+  const [translating, setTranslating] = useState(false);
+  const [transErr, setTransErr] = useState(null);
+  const hasFr = Boolean(fr.summary || fr.storyline);
+
+  async function handleTranslate() {
+    if (hasFr) {
+      setShowFr((v) => !v); // trad déjà dispo : simple bascule original/FR
+      return;
+    }
+    setTranslating(true);
+    setTransErr(null);
+    try {
+      const out = await apiFetch(`/games/${game.id}/translate`, { method: "POST", token });
+      setFr({ summary: out.summaryFr, storyline: out.storylineFr });
+      setShowFr(true);
+    } catch (e) {
+      setTransErr(e.message || "Traduction impossible.");
+    } finally {
+      setTranslating(false);
+    }
+  }
 
   const [imgFilter, setImgFilter] = useState("all");
   const imgFilters = [
@@ -1581,17 +1608,44 @@ function InfosTab({ game, onOpenImage, navigate }) {
   ].filter(Boolean);
 
   const storyLong = game.storyline && game.storyline !== game.summary;
+  const shownSummary = showFr && fr.summary ? fr.summary : game.summary;
+  const shownStoryline = showFr && fr.storyline ? fr.storyline : game.storyline;
+  // Bouton visible s'il y a du texte ET qu'on peut agir : traduire (connecté)
+  // ou basculer une trad déjà en cache (même déconnecté).
+  const canTranslate = (game.summary || storyLong) && (token || hasFr);
 
   return (
     <div className="gp-infos">
       {(game.summary || storyLong) && (
         <section className="gp-block">
-          <h2 className="gp-h2">À propos</h2>
-          {game.summary && <p className="gp-para">{game.summary}</p>}
+          <div className="gp-about-head">
+            <h2 className="gp-h2">À propos</h2>
+            {canTranslate && (
+              <button
+                type="button"
+                className="gp-translate"
+                onClick={handleTranslate}
+                disabled={translating}
+              >
+                {translating ? (
+                  <>
+                    <Loader2 size={14} className="spin" /> Traduction…
+                  </>
+                ) : (
+                  <>
+                    <Languages size={14} />
+                    {showFr ? "Afficher l'original" : hasFr ? "Afficher la traduction" : "Traduire"}
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+          {transErr && <p className="gp-translate-err">{transErr}</p>}
+          {shownSummary && <p className="gp-para">{shownSummary}</p>}
           {storyLong && (
             <details className="gp-story">
               <summary className="clickable">Scénario</summary>
-              <p className="gp-para">{game.storyline}</p>
+              <p className="gp-para">{shownStoryline}</p>
             </details>
           )}
         </section>

@@ -7544,6 +7544,51 @@
   content: "▾ ";
 }
 
+/* En-tête « À propos » avec le bouton de traduction à droite */
+.gp-about-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.gp-about-head .gp-h2 {
+  margin-bottom: 0;
+}
+
+.gp-translate {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.32rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent-ink);
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.gp-translate:hover:not(:disabled) {
+  background: var(--accent-soft, rgba(242, 183, 11, 0.14));
+  border-color: var(--accent-ink);
+}
+
+.gp-translate:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.gp-translate-err {
+  color: var(--danger, #c0392b);
+  font-size: 0.85rem;
+  margin: 0.6rem 0 0;
+}
+
 /* Fiche technique (grille compacte) */
 .gp-factgrid {
   display: grid;

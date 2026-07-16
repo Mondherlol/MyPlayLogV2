@@ -14,7 +14,7 @@ export function isGeminiConfigured() {
 // est moins malin mais quasiment toujours disponible.
 const FALLBACK_MODEL = "gemini-flash-lite-latest";
 
-async function callModel(model, prompt, timeoutMs) {
+async function callModel(model, prompt, timeoutMs, temperature) {
   const res = await fetch(`${API_ROOT}/${model}:generateContent`, {
     method: "POST",
     headers: {
@@ -24,9 +24,10 @@ async function callModel(model, prompt, timeoutMs) {
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
-        // Un peu de température : deux fournées avec les mêmes jeux de départ
-        // doivent pouvoir surprendre différemment.
-        temperature: 0.9,
+        // Par défaut un peu de température : deux fournées avec les mêmes jeux
+        // de départ doivent pouvoir surprendre différemment. Surchargeable :
+        // une traduction, elle, veut rester fidèle (température basse).
+        temperature,
         responseMimeType: "application/json",
       },
     }),
@@ -55,7 +56,7 @@ async function callModel(model, prompt, timeoutMs) {
 // `responseMimeType: application/json` force le modèle à ne produire QUE du
 // JSON valide (pas de prose ni de ```json autour). Si le modèle principal
 // est indisponible (503/404/429), on retente une fois sur le modèle de secours.
-export async function geminiJson(prompt, { timeoutMs = 25_000 } = {}) {
+export async function geminiJson(prompt, { timeoutMs = 25_000, temperature = 0.9 } = {}) {
   if (!isGeminiConfigured()) {
     const err = new Error("GEMINI_API_KEY manquant dans server/.env.");
     err.status = 503;
@@ -64,13 +65,13 @@ export async function geminiJson(prompt, { timeoutMs = 25_000 } = {}) {
   const model = process.env.GEMINI_MODEL || "gemini-flash-latest";
 
   try {
-    return await callModel(model, prompt, timeoutMs);
+    return await callModel(model, prompt, timeoutMs, temperature);
   } catch (err) {
     const retryable = [429, 404, 503].includes(err.status);
     if (!retryable || model === FALLBACK_MODEL) throw err;
     console.warn(
       `gemini: ${model} indisponible (${err.status}), repli sur ${FALLBACK_MODEL}`
     );
-    return callModel(FALLBACK_MODEL, prompt, timeoutMs);
+    return callModel(FALLBACK_MODEL, prompt, timeoutMs, temperature);
   }
 }

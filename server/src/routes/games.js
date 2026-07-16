@@ -28,6 +28,7 @@ import { ensureScraped, ytPlaylistTracks } from "../lib/ostScrape.js";
 import { fetchC411Packs, fetchC411Torrent, rewriteAnnounce } from "../lib/c411.js";
 import { fetchFitgirlRepacks } from "../lib/fitgirl.js";
 import { fetchZipertoGames } from "../lib/ziperto.js";
+import { getCachedTranslation, translateGameText } from "../lib/gameText.js";
 
 function youtubeId(url) {
   const m = String(url).match(
@@ -1238,12 +1239,22 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
         }
       : null;
 
+    // Traduction FR du résumé/scénario si elle a déjà été demandée une fois
+    // (best-effort, lecture Mongo seule — jamais d'appel Gemini ici).
+    const translation = await getCachedTranslation(
+      id,
+      g.summary || null,
+      g.storyline || null
+    ).catch(() => ({ summaryFr: null, storylineFr: null }));
+
     res.json({
       id: g.id,
       name: fr?.name || g.name,
       originalName: g.name,
       summary: g.summary || null,
       storyline: g.storyline || null,
+      summaryFr: translation.summaryFr,
+      storylineFr: translation.storylineFr,
       cover: g.cover?.image_id ? `${IMG_BASE}/t_cover_big/${g.cover.image_id}.jpg` : null,
       backdrop,
       media,
@@ -1284,6 +1295,29 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
   } catch (err) {
     console.error("game full error:", err.message);
     res.status(err.status || 500).json({ error: err.message || "Erreur." });
+  }
+});
+
+// --- Traduire en FR le résumé (« À propos ») et le scénario, à la demande.
+// Traduit via Gemini au 1er clic puis met en cache (GameText) : les visites
+// suivantes de tous les utilisateurs relisent la trad sans rappeler l'IA. ---
+router.post("/:id/translate", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+
+    const arr = await igdbQuery("games", `fields summary,storyline; where id = ${id};`);
+    const g = arr[0];
+    if (!g) return res.status(404).json({ error: "Jeu introuvable." });
+    if (!g.summary && !g.storyline) {
+      return res.status(400).json({ error: "Rien à traduire pour ce jeu." });
+    }
+
+    const out = await translateGameText(id, g.summary || null, g.storyline || null);
+    res.json(out);
+  } catch (err) {
+    console.error("game translate error:", err.message);
+    res.status(err.status || 500).json({ error: err.message || "Traduction impossible." });
   }
 });
 
