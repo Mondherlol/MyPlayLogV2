@@ -6,7 +6,6 @@ import multer from "multer";
 import mongoose from "mongoose";
 import { igdbQuery } from "../lib/igdb.js";
 import { isConfigured, getServiceAccessToken, fetchUserTitles, fetchTitleTrophies } from "../lib/psn.js";
-import { isAdminEmail } from "../lib/admin.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { notify } from "../lib/notify.js";
 import { recordActivity, removeActivity } from "../lib/activity.js";
@@ -1675,12 +1674,12 @@ function normName(s) {
     .trim();
 }
 
-// Le viewer (par son id) est-il l'administrateur ? Sert à la modération des
+// Le viewer (par son id) est-il administrateur ? Sert à la modération des
 // reviews et des réponses (suppression de n'importe quel contenu).
 async function isUserAdmin(userId) {
   if (!userId) return false;
-  const u = await User.findById(userId).select("email").lean();
-  return isAdminEmail(u?.email);
+  const u = await User.findById(userId).select("isAdmin isSuperAdmin").lean();
+  return !!(u?.isSuperAdmin || u?.isAdmin);
 }
 
 router.get("/:id/psn-trophies", optionalAuth, async (req, res) => {

@@ -7,7 +7,6 @@ import {
   Check,
   Loader2,
   ExternalLink,
-  Link2Off,
   Sparkles,
   Plus,
   Trash2,
@@ -40,7 +39,7 @@ import { PN_ICONS } from "../components/PatchnotePopup";
 const TAB_KEYS = ["users", "psn", "secrets", "patchnotes"];
 
 export default function Admin() {
-  const { token, user, loading, updateUser } = useAuth();
+  const { token, user, loading } = useAuth();
   const [params, setParams] = useSearchParams();
   const urlTab = params.get("tab");
   const tab = TAB_KEYS.includes(urlTab) ? urlTab : "users";
@@ -125,7 +124,7 @@ export default function Admin() {
 
         <section className="admin-panel">
           {safeTab === "users" && <UsersPanel token={token} me={user} />}
-          {safeTab === "psn" && <PsnPanel token={token} updateUser={updateUser} />}
+          {safeTab === "psn" && <PsnPanel token={token} />}
           {safeTab === "secrets" && isSuper && <SecretsPanel token={token} />}
           {safeTab === "patchnotes" && <PatchnoteManager token={token} />}
         </section>
@@ -325,6 +324,8 @@ function UserDrawer({ token, userId, me, onClose, onDirty }) {
 
   const u = data?.user;
   const isSuperMe = !!me?.isSuperAdmin;
+  // Le compte super-admin n'est éditable que par le super-admin lui-même.
+  const canEditAccount = isSuperMe || !u?.isSuper;
 
   async function remove() {
     if (
@@ -397,11 +398,30 @@ function UserDrawer({ token, userId, me, onClose, onDirty }) {
               {/* --- Compte --- */}
               <h3 className="admin-drawer-sec">Compte</h3>
 
-              <EmailForm token={token} user={u} onSaved={load} onDirty={onDirty} />
-              <PasswordForm token={token} user={u} />
+              {canEditAccount ? (
+                <>
+                  <EmailForm
+                    token={token}
+                    user={u}
+                    canEdit={canEditAccount}
+                    onSaved={load}
+                    onDirty={onDirty}
+                  />
+                  <PasswordForm token={token} user={u} />
+                </>
+              ) : (
+                <p className="admin-hint">
+                  <Shield size={13} /> Compte super-administrateur — non modifiable par un
+                  autre administrateur.
+                </p>
+              )}
 
               {isSuperMe && !u.isSuper && (
                 <AdminToggle token={token} user={u} onSaved={load} onDirty={onDirty} />
+              )}
+
+              {isSuperMe && !u.isSuper && (
+                <TransferSuperButton token={token} user={u} />
               )}
 
               {!u.isSuper && (
@@ -409,10 +429,10 @@ function UserDrawer({ token, userId, me, onClose, onDirty }) {
                   <Trash2 size={15} /> Supprimer ce compte
                 </button>
               )}
-              {u.isSuper && (
+              {u.isSuper && isSuperMe && (
                 <p className="admin-hint">
-                  <Shield size={13} /> Compte super-admin (défini par <code>ADMIN_EMAIL</code>) —
-                  non modifiable ni supprimable.
+                  <Crown size={13} /> C'est ton compte super-admin. Pour transférer ce rôle,
+                  ouvre la fiche de l'utilisateur à qui le confier.
                 </p>
               )}
 
@@ -451,7 +471,7 @@ function UserDrawer({ token, userId, me, onClose, onDirty }) {
   );
 }
 
-function EmailForm({ token, user, onSaved, onDirty }) {
+function EmailForm({ token, user, canEdit = true, onSaved, onDirty }) {
   const [email, setEmail] = useState(user.email);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
@@ -487,7 +507,7 @@ function EmailForm({ token, user, onSaved, onDirty }) {
           inputMode="email"
           name="mpl-admin-email"
           value={email}
-          disabled={user.isSuper}
+          disabled={!canEdit}
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="off"
           autoCorrect="off"
@@ -499,7 +519,7 @@ function EmailForm({ token, user, onSaved, onDirty }) {
         <button
           className="btn btn-primary sm"
           onClick={save}
-          disabled={busy || !changed || user.isSuper}
+          disabled={busy || !changed || !canEdit}
         >
           {busy ? <Loader2 size={14} className="spin" /> : <Save size={14} />} Enregistrer
         </button>
@@ -615,6 +635,40 @@ function AdminToggle({ token, user, onSaved, onDirty }) {
   );
 }
 
+function TransferSuperButton({ token, user }) {
+  const [busy, setBusy] = useState(false);
+
+  async function transfer() {
+    if (
+      !confirm(
+        `Transférer le rôle de SUPER-ADMINISTRATEUR à « ${user.username} » ?\n\n` +
+          `Tu perdras le contrôle total (secrets, gestion des admins) et deviendras ` +
+          `administrateur simple. L'effet est immédiat.`
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      await apiFetch(`/admin/users/${user.id}/transfer-super`, { method: "POST", token });
+      alert(
+        `« ${user.username} » est désormais le super-administrateur.\nTu es maintenant administrateur simple.`
+      );
+      // Recharge tout : /auth/me renverra le nouveau rôle (l'onglet Secrets disparaît…).
+      window.location.reload();
+    } catch (e) {
+      alert(e.message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button className="admin-transfer-btn clickable" onClick={transfer} disabled={busy}>
+      {busy ? <Loader2 size={15} className="spin" /> : <Crown size={15} />}
+      Transférer le super-admin à cet utilisateur
+    </button>
+  );
+}
+
 function RelationList({ token, title, empty, items, userId, mode, onDirty }) {
   const [busyId, setBusyId] = useState(null);
 
@@ -694,67 +748,18 @@ function RelationList({ token, title, empty, items, userId, mode, onDirty }) {
 // ======================================================================
 //  Onglet PlayStation — NPSSO de service + demandes de synchro.
 // ======================================================================
-function PsnPanel({ token, updateUser }) {
+function PsnPanel({ token }) {
   return (
     <div className="admin-stack">
-      <PsnManager token={token} updateUser={updateUser} />
+      <PsnTokenReminder />
       <PsnRequestsManager token={token} />
     </div>
   );
 }
 
-function PsnManager({ token, updateUser }) {
-  const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState({ connected: false });
-  const [npsso, setNpsso] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState(null);
-
-  function load() {
-    setLoading(true);
-    apiFetch("/users/me/psn", { token })
-      .then(setStatus)
-      .catch(() => setStatus({ connected: false }))
-      .finally(() => setLoading(false));
-  }
-  useEffect(load, [token]);
-
-  async function connect() {
-    const val = npsso.trim();
-    if (!val || busy) return;
-    setBusy(true);
-    setErr(null);
-    try {
-      // Certains collent le JSON entier {"npsso":"..."} → on extrait la valeur.
-      const m = val.match(/"npsso"\s*:\s*"([^"]+)"/);
-      await apiFetch("/users/me/psn", {
-        method: "POST",
-        token,
-        body: { npsso: m ? m[1] : val },
-      });
-      setNpsso("");
-      updateUser?.({ psnConnected: true });
-      load();
-    } catch (e) {
-      setErr(e.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function disconnect() {
-    if (!confirm("Déconnecter le compte PSN de service ?")) return;
-    try {
-      await apiFetch("/users/me/psn", { method: "DELETE", token });
-      updateUser?.({ psnConnected: false });
-      setStatus({ connected: false });
-    } catch (e) {
-      alert(e.message);
-    }
-  }
-
-  const state = status.connected ? "on" : status.expired ? "warn" : "off";
-
+// Le token NPSSO de service est configuré côté serveur (PSN_NPSSO). On garde ici
+// juste un rappel de l'endroit où en récupérer un nouveau quand il expire.
+function PsnTokenReminder() {
   return (
     <section className="admin-card">
       <div className="admin-card-head">
@@ -762,90 +767,32 @@ function PsnManager({ token, updateUser }) {
           <Trophy size={18} />
         </span>
         <div className="admin-card-titles">
-          <h2>Token NPSSO (compte de service)</h2>
+          <h2>Token NPSSO</h2>
           <p>
-            Le compte PlayStation connecté ici sert de <strong>source des trophées</strong> :
-            la liste des trophées à débloquer devient visible par tous les utilisateurs sur
-            les pages de jeux.
+            Le token de service (source des trophées) est configuré côté serveur via{" "}
+            <code>PSN_NPSSO</code>. Pour en récupérer un nouveau quand il expire :
           </p>
         </div>
-        {!loading && status.isAdmin && (
-          <span className={`psn-status ${state}`}>
-            {status.connected ? "Connecté" : status.expired ? "Session expirée" : "Non connecté"}
-          </span>
-        )}
       </div>
-
-      {loading ? (
-        <div className="gp-troph-state">
-          <Loader2 size={18} className="spin" /> Chargement…
-        </div>
-      ) : !status.isAdmin ? (
-        <p className="psn-err">Section réservée à l'administrateur.</p>
-      ) : status.connected ? (
-        <div className="psn-connected-row">
-          <p>
-            Le compte PSN de service est connecté
-            {status.connectedAt
-              ? ` depuis le ${new Date(status.connectedAt).toLocaleDateString("fr-FR")}`
-              : ""}
-            .
-          </p>
-          <button className="btn btn-ghost" onClick={disconnect}>
-            <Link2Off size={16} /> Déconnecter
-          </button>
-        </div>
-      ) : (
-        <>
-          {status.expired && (
-            <p className="psn-err">
-              La session PSN a expiré — colle un nouveau NPSSO pour te reconnecter.
-            </p>
-          )}
-          <ol className="psn-steps">
-            <li>
-              Connecte-toi sur{" "}
-              <a href="https://www.playstation.com" target="_blank" rel="noreferrer">
-                playstation.com <ExternalLink size={12} />
-              </a>
-            </li>
-            <li>
-              Dans le même navigateur, ouvre{" "}
-              <a
-                href="https://ca.account.sony.com/api/v1/ssocookie"
-                target="_blank"
-                rel="noreferrer"
-              >
-                ce lien <ExternalLink size={12} />
-              </a>
-            </li>
-            <li>
-              Copie la valeur de <code>npsso</code> et colle-la ci-dessous
-            </li>
-          </ol>
-          <div className="psn-connect-form">
-            <input
-              type="password"
-              name="mpl-npsso"
-              placeholder="Token NPSSO…"
-              value={npsso}
-              onChange={(e) => setNpsso(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && connect()}
-              autoComplete="new-password"
-              data-1p-ignore="true"
-              data-lpignore="true"
-            />
-            <button
-              className="btn btn-primary"
-              onClick={connect}
-              disabled={busy || !npsso.trim()}
-            >
-              {busy ? <Loader2 size={16} className="spin" /> : <Check size={16} />} Connecter
-            </button>
-          </div>
-          {err && <p className="psn-err">{err}</p>}
-        </>
-      )}
+      <ol className="psn-steps">
+        <li>
+          Connecte-toi sur{" "}
+          <a href="https://www.playstation.com" target="_blank" rel="noreferrer">
+            playstation.com <ExternalLink size={12} />
+          </a>
+        </li>
+        <li>
+          Dans le même navigateur, ouvre{" "}
+          <a
+            href="https://ca.account.sony.com/api/v1/ssocookie"
+            target="_blank"
+            rel="noreferrer"
+          >
+            le lien ssocookie <ExternalLink size={12} />
+          </a>{" "}
+          et copie la valeur <code>npsso</code>
+        </li>
+      </ol>
     </section>
   );
 }

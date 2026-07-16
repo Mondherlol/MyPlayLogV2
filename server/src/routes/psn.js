@@ -979,13 +979,17 @@ function requireWorker(req, res, next) {
   next();
 }
 
-// Notifie le compte admin (ADMIN_EMAIL) d'un évènement.
+// Notifie le super-admin (rôle en base) d'un évènement. Repli sur ADMIN_EMAIL
+// tant qu'aucun super-admin n'a été bootstrappé.
 async function notifyAdmin(type, snippet) {
-  const email = (process.env.ADMIN_EMAIL || "").trim();
-  if (!email) return;
-  const admin = await User.findOne({
-    email: new RegExp(`^${email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"),
-  }).select("_id");
+  let admin = await User.findOne({ isSuperAdmin: true }).select("_id");
+  if (!admin) {
+    const email = (process.env.ADMIN_EMAIL || "").trim();
+    if (!email) return;
+    admin = await User.findOne({
+      email: new RegExp(`^${email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"),
+    }).select("_id");
+  }
   if (admin)
     await Notification.create({ user: admin._id, type, actor: null, snippet }).catch(() => {});
 }

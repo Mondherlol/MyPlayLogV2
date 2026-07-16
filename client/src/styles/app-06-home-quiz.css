@@ -7257,6 +7257,25 @@
 .admin-danger-btn:hover {
   background: color-mix(in srgb, #e0483f 18%, transparent);
 }
+.admin-transfer-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--orange) 45%, transparent);
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  color: color-mix(in srgb, var(--orange) 82%, var(--text));
+  font-weight: 700;
+  font-size: 0.88rem;
+  width: fit-content;
+}
+.admin-transfer-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--orange) 20%, transparent);
+}
+.admin-transfer-btn svg {
+  color: var(--orange);
+}
 
 /* Interrupteur admin */
 .admin-toggle-row {

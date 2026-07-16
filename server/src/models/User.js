@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import { isAdminEmail } from "../lib/admin.js";
 
 const userSchema = new mongoose.Schema(
   {
@@ -21,10 +20,13 @@ const userSchema = new mongoose.Schema(
       required: true,
     },
 
-    // --- Rôle administrateur ---
-    // Le « super-admin » reste défini par ADMIN_EMAIL (server/.env) : il est
-    // toujours admin, ne peut être ni rétrogradé ni supprimé. Ce booléen permet
-    // au super-admin de NOMMER d'autres administrateurs depuis le panel Admin.
+    // --- Rôles ---
+    // Le « super-admin » est un rôle stocké en base (un seul compte à la fois) :
+    // il peut tout faire, se transférer, et n'est ni rétrogradable ni supprimable
+    // par les autres. Au tout premier démarrage sans super-admin, il est
+    // bootstrappé depuis ADMIN_EMAIL (server/.env) — ensuite la base fait foi.
+    // `isAdmin` : administrateur « simple » nommé par le super-admin.
+    isSuperAdmin: { type: Boolean, default: false },
     isAdmin: { type: Boolean, default: false },
 
     // --- Réinitialisation de mot de passe ---
@@ -206,8 +208,8 @@ userSchema.methods.toPublic = function () {
           connectedAt: this.steam.connectedAt || null,
         }
       : null,
-    isAdmin: isAdminEmail(this.email) || !!this.isAdmin,
-    isSuperAdmin: isAdminEmail(this.email),
+    isAdmin: !!this.isSuperAdmin || !!this.isAdmin,
+    isSuperAdmin: !!this.isSuperAdmin,
     followingCount: (this.following || []).length,
     createdAt: this.createdAt,
   };

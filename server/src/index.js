@@ -4,6 +4,7 @@ import cors from "cors";
 import mongoose from "mongoose";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import User from "./models/User.js";
 import authRoutes from "./routes/auth.js";
 import gameRoutes from "./routes/games.js";
 import libraryRoutes from "./routes/library.js";
@@ -88,10 +89,35 @@ const PORT = process.env.PORT || 4000;
 const MONGODB_URI =
   process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/myplaylog";
 
+// Bootstrap du super-admin : si aucun compte n'a le rôle isSuperAdmin en base
+// (première migration, ou base neuve), on le pose sur le compte ADMIN_EMAIL.
+// Ensuite la base fait foi — le rôle peut être transféré depuis le panel Admin.
+async function ensureSuperAdmin() {
+  try {
+    const existing = await User.findOne({ isSuperAdmin: true }).select("_id").lean();
+    if (existing) return;
+    const email = (process.env.ADMIN_EMAIL || "").trim().toLowerCase();
+    if (!email) {
+      console.warn("⚠️  Aucun super-admin en base et ADMIN_EMAIL non défini.");
+      return;
+    }
+    const u = await User.findOne({ email }).select("_id email");
+    if (!u) {
+      console.warn(`⚠️  ADMIN_EMAIL=${email} introuvable en base — super-admin non bootstrappé.`);
+      return;
+    }
+    await User.updateOne({ _id: u._id }, { $set: { isSuperAdmin: true, isAdmin: true } });
+    console.log(`👑 Super-admin bootstrappé depuis ADMIN_EMAIL : ${u.email}`);
+  } catch (err) {
+    console.error("ensureSuperAdmin error:", err.message);
+  }
+}
+
 async function start() {
   try {
     await mongoose.connect(MONGODB_URI);
     console.log("✅ Connecté à MongoDB");
+    await ensureSuperAdmin();
     // Synchro automatique des comptes de tracking (League of Legends).
     startTrackerAutoSync();
     const server = app.listen(PORT, () => {

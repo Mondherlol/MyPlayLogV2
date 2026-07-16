@@ -14,13 +14,13 @@ import HiddenOst from "../models/HiddenOst.js";
 import OstRename from "../models/OstRename.js";
 import GemSkip from "../models/GemSkip.js";
 import GemDiscovery from "../models/GemDiscovery.js";
-import { isAdminEmail, isUserAdmin } from "../lib/admin.js";
+import { isUserAdmin } from "../lib/admin.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { listEnv, setEnvVar, deleteEnvVar } from "../lib/envFile.js";
 
 const router = express.Router();
 
-// Toutes les routes de ce fichier sont réservées à l'admin (ADMIN_EMAIL).
+// Toutes les routes de ce fichier sont réservées aux administrateurs.
 router.use(requireAuth, requireAdmin);
 
 // --- Liste des utilisateurs du site (avec recherche + nb de jeux) ---
@@ -35,7 +35,7 @@ router.get("/users", async (req, res) => {
     }
 
     const users = await User.find(filter)
-      .select("username email avatar createdAt lastSeenAt following isAdmin")
+      .select("username email avatar createdAt lastSeenAt following isAdmin isSuperAdmin")
       .sort({ createdAt: -1 })
       .limit(500)
       .lean();
@@ -61,7 +61,7 @@ router.get("/users", async (req, res) => {
         createdAt: u.createdAt,
         lastSeenAt: u.lastSeenAt || null,
         isAdmin: isUserAdmin(u),
-        isSuper: isAdminEmail(u.email),
+        isSuper: !!u.isSuperAdmin,
         gameCount: gameCount.get(String(u._id)) || 0,
         followingCount: (u.following || []).length,
         followersCount: followers.get(String(u._id)) || 0,
@@ -83,10 +83,10 @@ router.delete("/users/:id", async (req, res) => {
     if (String(id) === String(req.userId))
       return res.status(400).json({ error: "Tu ne peux pas supprimer ton propre compte." });
 
-    const target = await User.findById(id).select("email");
+    const target = await User.findById(id).select("isSuperAdmin");
     if (!target) return res.status(404).json({ error: "Utilisateur introuvable." });
-    if (isAdminEmail(target.email))
-      return res.status(403).json({ error: "Impossible de supprimer un compte administrateur." });
+    if (target.isSuperAdmin)
+      return res.status(403).json({ error: "Impossible de supprimer le super-administrateur." });
 
     // Contenu possédé par l'utilisateur.
     await Promise.all([
@@ -150,14 +150,14 @@ router.get("/users/:id", async (req, res) => {
       return res.status(404).json({ error: "Utilisateur introuvable." });
 
     const user = await User.findById(id)
-      .select("username email avatar bio createdAt lastSeenAt following isAdmin")
-      .populate("following", "username avatar email isAdmin")
+      .select("username email avatar bio createdAt lastSeenAt following isAdmin isSuperAdmin")
+      .populate("following", "username avatar isAdmin isSuperAdmin")
       .lean();
     if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
 
     // Abonnés : les comptes qui suivent cet utilisateur.
     const followers = await User.find({ following: id })
-      .select("username avatar email isAdmin")
+      .select("username avatar isAdmin isSuperAdmin")
       .sort({ username: 1 })
       .limit(500)
       .lean();
@@ -174,7 +174,7 @@ router.get("/users/:id", async (req, res) => {
         createdAt: user.createdAt,
         lastSeenAt: user.lastSeenAt || null,
         isAdmin: isUserAdmin(user),
-        isSuper: isAdminEmail(user.email),
+        isSuper: !!user.isSuperAdmin,
         gameCount,
       },
       following: (user.following || []).map(userCard),
@@ -197,12 +197,12 @@ router.patch("/users/:id/email", async (req, res) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
       return res.status(400).json({ error: "Adresse email invalide." });
 
-    const target = await User.findById(id).select("email");
+    const target = await User.findById(id).select("isSuperAdmin");
     if (!target) return res.status(404).json({ error: "Utilisateur introuvable." });
-    // On protège le super-admin : changer son email lui ferait perdre son statut.
-    if (isAdminEmail(target.email))
+    // Le compte super-admin n'est modifiable que par le super-admin lui-même.
+    if (target.isSuperAdmin && !req.isSuperAdmin)
       return res.status(403).json({
-        error: "L'email du super-administrateur est défini par ADMIN_EMAIL et ne peut pas être modifié ici.",
+        error: "Seul le super-administrateur peut modifier son propre compte.",
       });
 
     const clash = await User.findOne({ email, _id: { $ne: id } }).select("_id");
@@ -227,8 +227,12 @@ router.patch("/users/:id/password", async (req, res) => {
     if (password.length < 3)
       return res.status(400).json({ error: "Le mot de passe doit faire au moins 3 caractères." });
 
-    const target = await User.findById(id).select("_id");
+    const target = await User.findById(id).select("isSuperAdmin");
     if (!target) return res.status(404).json({ error: "Utilisateur introuvable." });
+    if (target.isSuperAdmin && !req.isSuperAdmin)
+      return res.status(403).json({
+        error: "Seul le super-administrateur peut modifier son propre compte.",
+      });
 
     const passwordHash = await bcrypt.hash(password, 10);
     // On invalide les liens de reset en cours pour ce compte.
@@ -256,16 +260,51 @@ router.patch("/users/:id/admin", async (req, res) => {
       return res.status(404).json({ error: "Utilisateur introuvable." });
 
     const makeAdmin = !!req.body?.isAdmin;
-    const target = await User.findById(id).select("email isAdmin");
+    const target = await User.findById(id).select("isSuperAdmin isAdmin");
     if (!target) return res.status(404).json({ error: "Utilisateur introuvable." });
-    if (isAdminEmail(target.email))
-      return res.status(400).json({ error: "Le super-administrateur est toujours admin." });
+    if (target.isSuperAdmin)
+      return res.status(400).json({
+        error: "Le super-administrateur est toujours admin — utilise le transfert de rôle.",
+      });
 
     await User.updateOne({ _id: id }, { $set: { isAdmin: makeAdmin } });
     res.json({ ok: true, isAdmin: makeAdmin });
   } catch (err) {
     console.error("admin user role error:", err.message);
     res.status(500).json({ error: "Erreur lors du changement de rôle." });
+  }
+});
+
+// --- Transférer le rôle de super-admin à un autre utilisateur (super-admin
+//     uniquement). L'ancien super-admin est rétrogradé en administrateur simple.
+//     Garantit qu'il n'existe qu'UN seul super-admin. ---
+router.post("/users/:id/transfer-super", async (req, res) => {
+  try {
+    if (!req.isSuperAdmin)
+      return res
+        .status(403)
+        .json({ error: "Seul le super-administrateur peut transférer son rôle." });
+
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id))
+      return res.status(404).json({ error: "Utilisateur introuvable." });
+    if (String(id) === String(req.userId))
+      return res.status(400).json({ error: "Tu es déjà le super-administrateur." });
+
+    const target = await User.findById(id).select("_id isSuperAdmin");
+    if (!target) return res.status(404).json({ error: "Utilisateur introuvable." });
+
+    // Rétrograde tous les super-admins actuels en admin simple, puis promeut la
+    // cible → il n'y a jamais qu'un seul super-admin en base.
+    await User.updateMany(
+      { isSuperAdmin: true },
+      { $set: { isSuperAdmin: false, isAdmin: true } }
+    );
+    await User.updateOne({ _id: id }, { $set: { isSuperAdmin: true, isAdmin: false } });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("admin transfer super error:", err.message);
+    res.status(500).json({ error: "Erreur lors du transfert." });
   }
 });
 
@@ -306,7 +345,7 @@ function requireSuper(req, res, next) {
   if (!req.isSuperAdmin)
     return res
       .status(403)
-      .json({ error: "Section réservée au super-administrateur (ADMIN_EMAIL)." });
+      .json({ error: "Section réservée au super-administrateur." });
   next();
 }
 
