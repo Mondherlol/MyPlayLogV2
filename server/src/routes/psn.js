@@ -1071,6 +1071,21 @@ router.get("/requests", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+// --- Admin : effacer une demande de synchro (panel Admin). ---
+router.delete("/requests/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!/^[a-f0-9]{24}$/i.test(id))
+      return res.status(404).json({ error: "Demande introuvable." });
+    const r = await PsnSyncRequest.findByIdAndDelete(id);
+    if (!r) return res.status(404).json({ error: "Demande introuvable." });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("psn request delete error:", err.message);
+    res.status(500).json({ error: "Erreur lors de la suppression." });
+  }
+});
+
 // --- Worker : réclame la prochaine demande à traiter (→ processing). ---
 router.get("/worker/jobs", requireWorker, async (req, res) => {
   try {

@@ -1763,3 +1763,11 @@
   border-color: color-mix(in srgb, #d9534f 40%, var(--border));
   background: color-mix(in srgb, #d9534f 12%, var(--surface));
 }
+.psn-req-del {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+}
+.psn-req-del:hover:not(:disabled) {
+  color: #e0483f;
+}

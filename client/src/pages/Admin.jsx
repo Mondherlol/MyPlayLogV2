@@ -807,6 +807,7 @@ const PSN_REQ_STATUS = {
 function PsnRequestsManager({ token }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(null);
 
   function load() {
     setLoading(true);
@@ -816,6 +817,25 @@ function PsnRequestsManager({ token }) {
       .finally(() => setLoading(false));
   }
   useEffect(load, [token]);
+
+  async function remove(r) {
+    if (!confirm(`Effacer la demande de synchro de « ${r.username} » ?`)) return;
+    setDeleting(r.id);
+    try {
+      await apiFetch(`/psn/requests/${r.id}`, { method: "DELETE", token });
+      setData((d) => {
+        const requests = d.requests.filter((x) => x.id !== r.id);
+        const active = requests.filter(
+          (x) => x.status === "pending" || x.status === "processing"
+        ).length;
+        return { ...d, requests, active };
+      });
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   const requests = data?.requests || [];
   const active = data?.active || 0;
@@ -879,6 +899,18 @@ function PsnRequestsManager({ token }) {
               <span className={`psn-req-badge ${r.status}`}>
                 {PSN_REQ_STATUS[r.status] || r.status}
               </span>
+              <button
+                className="icon-btn clickable danger psn-req-del"
+                onClick={() => remove(r)}
+                disabled={deleting === r.id}
+                title="Effacer cette demande"
+              >
+                {deleting === r.id ? (
+                  <Loader2 size={15} className="spin" />
+                ) : (
+                  <Trash2 size={15} />
+                )}
+              </button>
             </div>
           ))}
         </div>
