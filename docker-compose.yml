@@ -23,6 +23,11 @@ services:
     volumes:
       # Les images uploadées (covers, avatars, reposts…) persistent hors conteneur.
       - uploads_data:/app/uploads
+      # Le .env de l'hôte est monté dans le conteneur → l'onglet Secrets du panel
+      # Admin peut le LIRE et l'ÉCRIRE (les modifs persistent sur l'hôte).
+      # Écritures en place (writeFileSync) → l'inode ne change pas, le mount tient.
+      # Rappel : les valeurs lues au démarrage nécessitent un restart du conteneur.
+      - ./server/.env:/app/.env
     depends_on:
       - mongo
     networks:

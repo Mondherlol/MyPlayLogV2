@@ -202,9 +202,17 @@ function UsersPanel({ token, me }) {
         <div className="au-search">
           <Search size={16} />
           <input
+            type="search"
+            name="mpl-admin-search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Rechercher un pseudo ou un email…"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            data-1p-ignore="true"
+            data-lpignore="true"
           />
           {q && (
             <button className="au-search-clear clickable" onClick={() => setQ("")}>
@@ -475,10 +483,18 @@ function EmailForm({ token, user, onSaved, onDirty }) {
       </label>
       <div className="admin-field-row">
         <input
-          type="email"
+          type="text"
+          inputMode="email"
+          name="mpl-admin-email"
           value={email}
           disabled={user.isSuper}
           onChange={(e) => setEmail(e.target.value)}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          data-1p-ignore="true"
+          data-lpignore="true"
         />
         <button
           className="btn btn-primary sm"
@@ -530,9 +546,13 @@ function PasswordForm({ token, user }) {
         <div className="admin-pw-input">
           <input
             type={show ? "text" : "password"}
+            name="mpl-admin-newpw"
             value={pw}
             placeholder="Laisse vide pour ne pas changer…"
             onChange={(e) => setPw(e.target.value)}
+            autoComplete="new-password"
+            data-1p-ignore="true"
+            data-lpignore="true"
           />
           <button
             className="admin-pw-eye clickable"
@@ -806,10 +826,14 @@ function PsnManager({ token, updateUser }) {
           <div className="psn-connect-form">
             <input
               type="password"
+              name="mpl-npsso"
               placeholder="Token NPSSO…"
               value={npsso}
               onChange={(e) => setNpsso(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && connect()}
+              autoComplete="new-password"
+              data-1p-ignore="true"
+              data-lpignore="true"
             />
             <button
               className="btn btn-primary"
@@ -958,12 +982,22 @@ function SecretsPanel({ token }) {
         )}
       </div>
 
-      {data && !data.writable && (
+      {data && (!data.exists || !data.writable) && (
         <p className="admin-warn">
-          <AlertTriangle size={14} /> Le fichier <code>{data.path}</code>
-          {data.exists ? " n'est pas modifiable" : " est introuvable"} sur ce serveur — les
-          écritures échoueront. En production (Docker), édite le <code>.env</code> sur l'hôte
-          puis redémarre le conteneur.
+          <AlertTriangle size={14} />
+          {!data.exists ? (
+            <span>
+              Le fichier <code>{data.path}</code> est introuvable dans le conteneur. En
+              production (Docker), le <code>.env</code> n'est pas embarqué dans l'image :
+              monte-le dans <code>docker-compose.yml</code> (
+              <code>- ./server/.env:/app/.env</code>) puis redéploie pour l'éditer ici.
+            </span>
+          ) : (
+            <span>
+              Le fichier <code>{data.path}</code> n'est pas modifiable sur ce serveur — les
+              écritures échoueront. Vérifie les permissions du fichier sur l'hôte.
+            </span>
+          )}
         </p>
       )}
 
@@ -1054,9 +1088,13 @@ function SecretRow({ token, entry, onChanged }) {
       <div className="sec-val">
         <input
           type={reveal ? "text" : "password"}
+          name={`mpl-secret-${entry.key}`}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           spellCheck={false}
+          autoComplete="new-password"
+          data-1p-ignore="true"
+          data-lpignore="true"
         />
         <button
           className="icon-btn clickable"
@@ -1121,12 +1159,18 @@ function SecretAddForm({ token, onCancel, onAdded }) {
           onChange={(e) => setKey(e.target.value.toUpperCase())}
           placeholder="NOM_DE_LA_VARIABLE"
           spellCheck={false}
+          autoComplete="off"
+          data-1p-ignore="true"
+          data-lpignore="true"
         />
         <input
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="valeur"
           spellCheck={false}
+          autoComplete="off"
+          data-1p-ignore="true"
+          data-lpignore="true"
         />
       </div>
       {err && <p className="psn-err">{err}</p>}
