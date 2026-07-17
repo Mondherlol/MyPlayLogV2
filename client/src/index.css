@@ -35,6 +35,12 @@
 
   --radius: 14px;
   --radius-lg: 20px;
+
+  /* Curseur : valeur PAR DÉFAUT, surchargeable sur <html> par
+     CosmeticsContext quand un curseur gagné à l'arcade est équipé.
+     Format : `url("…") <hotspotX> <hotspotY>`. */
+  --cursor-default: url("/cursor.svg") 2 2;
+  --cursor-pointer: url("/cursor.svg") 2 2;
 }
 
 :root[data-theme="dark"] {
@@ -106,18 +112,18 @@ h3 {
   font-weight: 700;
 }
 
-/* ---------- Curseur pixel-art ---------- */
+/* ---------- Curseur pixel-art (ou celui équipé à l'arcade) ---------- */
 @media (pointer: fine) {
   html,
   body {
-    cursor: url("/cursor.svg") 2 2, auto;
+    cursor: var(--cursor-default), auto;
   }
   a,
   button,
   [role="button"],
   .clickable,
   label {
-    cursor: url("/cursor.svg") 2 2, pointer;
+    cursor: var(--cursor-pointer), pointer;
   }
   input,
   textarea,

@@ -146,6 +146,34 @@ const userSchema = new mongoose.Schema(
       default: [],
     },
 
+    // --- Gamification : points, inventaire, cosmétiques équipés ---
+    // `points` est le solde DÉPENSABLE (gagné au blind test, dépensé en
+    // caisses) : c'est un porte-monnaie, à ne pas confondre avec le score
+    // cumulé du classement blind test, qui lui ne bouge jamais. L'historique
+    // détaillé vit dans le modèle PointEntry (voir lib/points.js).
+    points: { type: Number, default: 0, min: 0 },
+    // Lots gagnés. On stocke le SLUG du lot (Reward.key) et non son id : un lot
+    // recréé sous le même slug reste possédé, et la lecture ne demande aucun
+    // populate. `count` compte les doublons (gagnés puis reconvertis en points).
+    inventory: {
+      type: [
+        {
+          rewardKey: { type: String, required: true },
+          obtainedAt: { type: Date, default: Date.now },
+          count: { type: Number, default: 1 },
+          _id: false,
+        },
+      ],
+      default: [],
+    },
+    // Cosmétique équipé par famille : { cursor: "slug", ornament: …, badge: … }.
+    // Une famille absente = rien d'équipé → l'app garde son apparence par défaut.
+    equipped: {
+      cursor: { type: String, default: null },
+      ornament: { type: String, default: null },
+      badge: { type: String, default: null },
+    },
+
     // --- Abonnements (qui JE suis) ---
     following: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
@@ -210,6 +238,14 @@ userSchema.methods.toPublic = function () {
       : null,
     isAdmin: !!this.isSuperAdmin || !!this.isAdmin,
     isSuperAdmin: !!this.isSuperAdmin,
+    points: this.points || 0,
+    // Slugs seulement : le détail des lots équipés (image, rareté…) se récupère
+    // via /api/arcade/cosmetics, qui sait résoudre les slugs en lots.
+    equipped: {
+      cursor: this.equipped?.cursor || null,
+      ornament: this.equipped?.ornament || null,
+      badge: this.equipped?.badge || null,
+    },
     followingCount: (this.following || []).length,
     createdAt: this.createdAt,
   };

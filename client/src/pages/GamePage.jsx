@@ -885,7 +885,7 @@ export default function GamePage() {
 
             {/* Onglets */}
             {/* Ancre (hors flux sticky) pour recaler le scroll au changement d'onglet. */}
-            <div ref={tabsTopRef} aria-hidden="true" />
+            <div ref={tabsTopRef} className="gp-tabs-anchor" aria-hidden="true" />
             <div className="gp-tabs-wrap">
               <button
                 className={`gp-tabs-arrow left clickable ${tabScroll.left ? "show" : ""}`}

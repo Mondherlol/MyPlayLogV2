@@ -31,6 +31,7 @@ import {
   Tag,
   Timer,
   Home,
+  Coins,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { usePlayer } from "../context/PlayerContext";
@@ -1321,6 +1322,19 @@ function Scoreboard({ final, challengeId, copied, onCopy, onReplay, token }) {
         <p className="bt-done-sub">
           {final.correctCount} / {final.roundCount} trouvés · {pct}% de réussite
         </p>
+
+        {/* Les points crédités à l'arcade. Absent si le crédit n'a pas pu se
+            faire (partie jouée hors-ligne, serveur indispo) : mieux vaut ne
+            rien promettre que d'annoncer des points qui n'existent pas. */}
+        {final.pointsEarned > 0 && (
+          <Link to="/arcade" className="bt-earned clickable">
+            <Coins size={15} />
+            <span>
+              <b>+{final.pointsEarned}</b> points gagnés
+            </span>
+            <em>Dépense-les à l'arcade →</em>
+          </Link>
+        )}
 
         {ch && (
           <div className={`bt-versus ${ch.beaten ? "win" : "lose"}`}>

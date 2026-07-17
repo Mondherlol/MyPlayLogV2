@@ -9,6 +9,7 @@ import { ensureScraped } from "../lib/ostScrape.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { requireAuth } from "../middleware/auth.js";
 import { recordActivity } from "../lib/activity.js";
+import { grantPoints } from "../lib/points.js";
 
 // Blind test musical : on fait écouter un extrait d'OST tiré au sort et le
 // joueur doit deviner de quel jeu il vient. Les manches viennent surtout de SES
@@ -572,6 +573,16 @@ router.post("/finish", requireAuth, async (req, res) => {
     });
     sessions.delete(sessionId);
 
+    // Le score se transforme en points DÉPENSABLES à l'arcade (1 pour 1). Le
+    // score du classement, lui, ne bouge pas : dépenser ses points ne fait pas
+    // reculer au leaderboard. Best-effort — une partie reste valide même si le
+    // crédit échoue (le grand livre le dirait).
+    const balance = await grantPoints(req.userId, score, "blindtest", {
+      blindTestId: String(doc._id),
+      correct: correctCount,
+      total: rounds.length,
+    });
+
     // Journal pour le fil des abonnés (best-effort).
     recordActivity({
       actor: req.userId,
@@ -597,6 +608,10 @@ router.post("/finish", requireAuth, async (req, res) => {
       correctCount,
       roundCount: rounds.length,
       durationSec: dur,
+      // Arcade : points crédités par cette partie + nouveau solde (null si le
+      // crédit n'a pas pu se faire — le scoreboard masque alors la mention).
+      pointsEarned: balance != null ? score : null,
+      points: balance,
       challenge: session.challengedUser
         ? {
             username: session.challengedUsername || "",

@@ -28,15 +28,17 @@ import {
   Save,
   AlertTriangle,
   Copy,
+  Gift,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { PN_ICONS } from "../components/PatchnotePopup";
+import RewardsPanel from "../components/AdminRewards";
 
 // ======================================================================
 //  Page Admin — shell à onglets verticaux (façon Discord).
 // ======================================================================
-const TAB_KEYS = ["users", "psn", "secrets", "patchnotes"];
+const TAB_KEYS = ["users", "rewards", "psn", "secrets", "patchnotes"];
 
 export default function Admin() {
   const { token, user, loading } = useAuth();
@@ -58,6 +60,7 @@ export default function Admin() {
 
   const TABS = [
     { key: "users", label: "Utilisateurs", Icon: Users },
+    { key: "rewards", label: "Récompenses", Icon: Gift },
     { key: "psn", label: "PlayStation", Icon: Trophy, badge: psnActive },
     ...(isSuper ? [{ key: "secrets", label: "Secrets", Icon: KeyRound }] : []),
     { key: "patchnotes", label: "Patch notes", Icon: Sparkles },
@@ -124,6 +127,7 @@ export default function Admin() {
 
         <section className="admin-panel">
           {safeTab === "users" && <UsersPanel token={token} me={user} />}
+          {safeTab === "rewards" && <RewardsPanel token={token} />}
           {safeTab === "psn" && <PsnPanel token={token} />}
           {safeTab === "secrets" && isSuper && <SecretsPanel token={token} />}
           {safeTab === "patchnotes" && <PatchnoteManager token={token} />}

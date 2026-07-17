@@ -10,6 +10,7 @@ import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { LibraryProvider } from "./context/LibraryContext.jsx";
 import { PlayerProvider } from "./context/PlayerContext.jsx";
+import { CosmeticsProvider } from "./context/CosmeticsContext.jsx";
 
 // Capture les erreurs non-rattrapées (hors rendu React) et les remonte au
 // backend, pour diagnostiquer les crashs qui n'arrivent que sur certains
@@ -25,14 +26,18 @@ createRoot(document.getElementById("root")).render(
       <BrowserRouter>
         <ThemeProvider>
           <AuthProvider>
-            <LibraryProvider>
-              {/* Lecteur audio global : monté une seule fois au-dessus des
-                  routes pour survivre à TOUTE navigation (y compris /game/:id
-                  et /u/:username, servis hors du layout connecté). */}
-              <PlayerProvider>
-                <App />
-              </PlayerProvider>
-            </LibraryProvider>
+            {/* Curseur & cosmétiques gagnés à l'arcade : au-dessus des routes,
+                l'apparence équipée vaut pour toute l'app. */}
+            <CosmeticsProvider>
+              <LibraryProvider>
+                {/* Lecteur audio global : monté une seule fois au-dessus des
+                    routes pour survivre à TOUTE navigation (y compris /game/:id
+                    et /u/:username, servis hors du layout connecté). */}
+                <PlayerProvider>
+                  <App />
+                </PlayerProvider>
+              </LibraryProvider>
+            </CosmeticsProvider>
           </AuthProvider>
         </ThemeProvider>
       </BrowserRouter>

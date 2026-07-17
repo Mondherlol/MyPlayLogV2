@@ -1,0 +1,1157 @@
+/* ======================================================================
+   Arcade — magasin de points, caisses et inventaire (+ ouverture CS:GO)
+   ======================================================================
+   Convention de ce fichier : chaque élément « raretable » porte une variable
+   locale --arc-rarity (ou --co-rarity dans la modale), posée en style inline
+   depuis le JS d'après lib/rarity.js. Toutes les auras, bordures et lueurs en
+   découlent — aucune couleur de rareté n'est écrite en dur ici.
+   ====================================================================== */
+
+.arc-wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 4rem;
+}
+
+.arc-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  min-height: 50vh;
+  color: var(--text-soft);
+}
+
+.arc-err {
+  background: rgba(235, 75, 75, 0.1);
+  border: 1px solid rgba(235, 75, 75, 0.3);
+  color: #eb4b4b;
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--radius);
+  font-size: 0.88rem;
+  margin: 0 0 1rem;
+}
+
+/* ---------- En-tête + porte-monnaie ---------- */
+.arc-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+.arc-hero-main {
+  min-width: 260px;
+  flex: 1;
+}
+.arc-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  margin-bottom: 0.5rem;
+}
+.arc-title {
+  font-size: clamp(1.8rem, 4vw, 2.5rem);
+  margin-bottom: 0.45rem;
+}
+.arc-sub {
+  color: var(--text-soft);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  max-width: 46ch;
+  margin: 0;
+}
+
+.arc-wallet {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 0.15rem 0.7rem;
+  padding: 1rem 1.4rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+/* Halo doré : le solde est la donnée la plus importante de la page. */
+.arc-wallet::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    140px 90px at 20% 0%,
+    rgba(242, 183, 11, 0.16),
+    transparent 70%
+  );
+  pointer-events: none;
+}
+.arc-wallet-coin {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--accent-grad);
+  color: #3b2a02;
+  box-shadow: 0 4px 14px rgba(242, 183, 11, 0.4);
+}
+.arc-wallet-num {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.arc-wallet-label {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.arc-wallet-hist {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-top: 0.6rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.75rem;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.arc-wallet-hist:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+/* ---------- Historique des points ---------- */
+.arc-hist {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 0.5rem;
+  margin-bottom: 1.75rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.arc-hist-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.arc-hist-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+.arc-hist-row:nth-child(odd) {
+  background: var(--surface-2);
+}
+.arc-hist-src {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.arc-hist-date {
+  color: var(--text-soft);
+  font-size: 0.76rem;
+}
+.arc-hist-amt {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 4ch;
+  text-align: right;
+}
+.arc-hist-amt.up {
+  color: #24a55c;
+}
+.arc-hist-amt.down {
+  color: #eb4b4b;
+}
+
+/* ---------- Sections ---------- */
+.arc-section {
+  margin-bottom: 2.5rem;
+}
+.arc-h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.15rem;
+  margin-bottom: 1rem;
+}
+.arc-h2 svg {
+  color: var(--accent-ink);
+}
+.arc-empty {
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+/* ---------- Caisses ---------- */
+.arc-cases {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+.arc-case {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 1.25rem 1rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.18s ease, box-shadow 0.24s ease, border-color 0.18s ease;
+}
+.arc-case:hover {
+  transform: translateY(-4px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow);
+}
+.arc-case.poor {
+  opacity: 0.82;
+}
+
+.arc-case-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 116px;
+  height: 116px;
+  margin-bottom: 0.85rem;
+}
+.arc-case-art img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.22));
+}
+.arc-case-ph {
+  color: var(--accent-ink);
+  position: relative;
+  z-index: 1;
+}
+.arc-case-glow {
+  position: absolute;
+  inset: -10%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(242, 183, 11, 0.22), transparent 65%);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.arc-case:hover .arc-case-glow {
+  transform: scale(1.15);
+}
+
+.arc-case-name {
+  font-size: 1.02rem;
+  margin-bottom: 0.3rem;
+}
+.arc-case-desc {
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  margin: 0 0 0.75rem;
+}
+
+/* Aperçu du contenu : trois pastilles de rareté + le compte. */
+.arc-case-teaser {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.9rem;
+}
+.arc-case-pip {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--arc-rarity);
+  box-shadow: 0 0 7px var(--arc-rarity);
+}
+.arc-case-count {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  margin-left: 0.3rem;
+}
+
+.arc-case-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  justify-content: center;
+  padding: 0.6rem 0.9rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #3b2a02;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.88rem;
+  margin-top: auto;
+  transition: filter 0.18s ease, transform 0.12s ease;
+}
+.arc-case-btn:hover:not(:disabled) {
+  filter: brightness(1.07);
+}
+.arc-case-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.arc-case-btn:disabled {
+  background: var(--surface-2);
+  color: var(--text-soft);
+  cursor: not-allowed;
+}
+.arc-case-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.16);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+.arc-case-btn:disabled .arc-case-price {
+  background: rgba(0, 0, 0, 0.08);
+}
+.arc-case-need {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  margin-top: 0.5rem;
+}
+
+/* ---------- Inventaire ---------- */
+.arc-inv-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.arc-inv-head .arc-h2 {
+  margin-bottom: 0;
+}
+.arc-inv-tabs {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.arc-inv-tab {
+  padding: 0.35rem 0.85rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+.arc-inv-tab.on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.arc-empty-inv {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2.5rem 1rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--text-soft);
+  text-align: center;
+}
+.arc-empty-inv p {
+  margin: 0;
+  font-size: 0.9rem;
+  max-width: 40ch;
+}
+
+.arc-inv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+  gap: 0.85rem;
+}
+.arc-inv-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 1rem 0.75rem 0.85rem;
+  border: 1px solid var(--border);
+  /* La rareté colore la carte par le BAS : une barre franche + un dégradé qui
+     s'éteint. Assez lisible pour trier d'un coup d'œil, assez sobre pour ne
+     pas hurler sur fond blanc. */
+  border-bottom: 3px solid var(--arc-rarity);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+  transition: transform 0.16s ease, box-shadow 0.2s ease;
+}
+.arc-inv-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+}
+.arc-inv-aura {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--arc-rarity) 20%, transparent),
+    transparent 62%
+  );
+  pointer-events: none;
+}
+.arc-inv-card.equipped {
+  border-color: var(--arc-rarity);
+  box-shadow: 0 0 0 1px var(--arc-rarity), var(--shadow-sm);
+}
+.arc-inv-count {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.5rem;
+  z-index: 2;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+.arc-inv-art {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  height: 66px;
+  margin-bottom: 0.6rem;
+}
+.arc-inv-rarity {
+  position: relative;
+  z-index: 1;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--arc-rarity);
+  margin-bottom: 0.2rem;
+}
+.arc-inv-name {
+  position: relative;
+  z-index: 1;
+  font-size: 0.86rem;
+  line-height: 1.25;
+  margin-bottom: 0.7rem;
+}
+.arc-equip {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  width: 100%;
+  margin-top: auto;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+.arc-equip:hover:not(:disabled) {
+  border-color: var(--arc-rarity);
+  color: var(--arc-rarity);
+}
+.arc-equip.on {
+  background: var(--arc-rarity);
+  border-color: var(--arc-rarity);
+  color: #fff;
+}
+.arc-inv-note {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+  margin: 0.85rem 0 0;
+}
+
+/* ---------- Légende des raretés ---------- */
+.arc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.arc-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+.arc-legend-item i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--arc-rarity);
+  box-shadow: 0 0 6px var(--arc-rarity);
+}
+
+/* ---------- Visuel générique d'un lot ---------- */
+.rw-art-img {
+  object-fit: contain;
+  image-rendering: pixelated; /* les curseurs sont du pixel-art : pas de flou */
+  display: block;
+}
+.rw-art-fallback {
+  color: var(--text-soft);
+  opacity: 0.5;
+}
+
+/* ======================================================================
+   Modale d'ouverture — la bobine
+   ====================================================================== */
+.co-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(8, 8, 12, 0.78);
+  animation: co-fade 0.2s ease;
+}
+@keyframes co-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.co-modal {
+  position: relative;
+  width: min(920px, 100%);
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 1.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.co-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+.co-close:hover {
+  color: var(--text);
+}
+
+/* ---------- Aperçu du contenu ---------- */
+.co-preview {
+  text-align: center;
+}
+.co-kicker {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+}
+.co-title {
+  font-size: 1.6rem;
+  margin: 0.35rem 0 0.4rem;
+}
+.co-sub {
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  margin: 0 auto 1.25rem;
+  max-width: 52ch;
+}
+
+.co-pool {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 1.4rem;
+  text-align: center;
+}
+.co-pool-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.75rem 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-bottom: 3px solid var(--co-rarity);
+  border-radius: var(--radius);
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--co-rarity) 14%, transparent),
+    transparent 60%
+  );
+}
+.co-pool-art {
+  display: grid;
+  place-items: center;
+  height: 46px;
+}
+.co-pool-name {
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.co-pool-chance {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--co-rarity);
+  font-variant-numeric: tabular-nums;
+}
+
+.co-err {
+  color: #eb4b4b;
+  font-size: 0.85rem;
+  margin: 0 0 0.85rem;
+}
+
+.co-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.8rem 1.6rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #3b2a02;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  box-shadow: 0 8px 24px rgba(242, 183, 11, 0.35);
+  transition: filter 0.16s ease, transform 0.12s ease;
+}
+.co-open-btn:hover:not(:disabled) {
+  filter: brightness(1.07);
+}
+.co-open-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.co-open-btn:disabled {
+  filter: grayscale(0.5);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.co-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.18);
+  font-size: 0.85rem;
+}
+
+/* ---------- La piste ---------- */
+.co-stage {
+  --co-item-w: 132px;
+  --co-gap: 10px;
+}
+.co-track {
+  position: relative;
+  overflow: hidden;
+  padding: 1.1rem 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  /* Le contenu qui défile est lourd : on isole la piste pour que le navigateur
+     ne repeigne pas toute la page à chaque frame. */
+  contain: paint;
+}
+
+/* Le repère central : c'est LUI qui désigne le gagnant. Volontairement doré et
+   franc — l'œil doit s'y accrocher pendant toute la descente. */
+.co-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 3px;
+  transform: translateX(-50%);
+  background: var(--accent-grad);
+  box-shadow: 0 0 16px 3px rgba(242, 183, 11, 0.7);
+  z-index: 3;
+  border-radius: 2px;
+}
+.co-marker::before,
+.co-marker::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+}
+.co-marker::before {
+  top: -1px;
+  border-top-color: var(--amber);
+}
+.co-marker::after {
+  bottom: -1px;
+  border-bottom-color: var(--amber);
+}
+
+/* Fondus latéraux : la bande semble venir de nulle part et repartir de même. */
+.co-fade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 90px;
+  z-index: 2;
+  pointer-events: none;
+}
+.co-fade.left {
+  left: 0;
+  background: linear-gradient(to right, var(--surface-2), transparent);
+}
+.co-fade.right {
+  right: 0;
+  background: linear-gradient(to left, var(--surface-2), transparent);
+}
+
+.co-strip {
+  display: flex;
+  gap: var(--co-gap);
+  will-change: transform;
+}
+.co-item {
+  flex: 0 0 var(--co-item-w);
+  width: var(--co-item-w);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 132px;
+  padding: 0.6rem 0.5rem;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--co-rarity) 45%, transparent);
+  border-bottom: 3px solid var(--co-rarity);
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--co-rarity) 28%, transparent),
+    color-mix(in srgb, var(--co-rarity) 5%, transparent)
+  );
+}
+.co-item-art {
+  display: grid;
+  place-items: center;
+  height: 58px;
+}
+.co-item-name {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.2;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* ---------- La révélation ---------- */
+.co-result {
+  margin-top: 1.5rem;
+  padding: 1.5rem 1.25rem 1.25rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--co-rarity);
+  background: radial-gradient(
+    420px 200px at 50% 0%,
+    color-mix(in srgb, var(--co-rarity) 22%, transparent),
+    transparent 70%
+  );
+  text-align: center;
+  animation: co-pop 0.42s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+@keyframes co-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.88) translateY(10px);
+  }
+}
+.co-result-rarity {
+  display: inline-block;
+  padding: 0.22rem 0.75rem;
+  border-radius: 999px;
+  background: var(--co-rarity);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.co-result-art {
+  display: grid;
+  place-items: center;
+  height: 92px;
+  margin: 0.9rem 0 0.5rem;
+}
+/* Halo pulsé derrière le lot : la respiration de la carte de résultat. */
+.co-result-art::before {
+  content: "";
+  position: absolute;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--co-rarity), transparent 62%);
+  opacity: 0.34;
+  animation: co-breathe 2.6s ease-in-out infinite;
+}
+@keyframes co-breathe {
+  50% {
+    transform: scale(1.16);
+    opacity: 0.5;
+  }
+}
+.co-result-name {
+  font-size: 1.4rem;
+  margin-bottom: 0.35rem;
+}
+.co-result-desc {
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  margin: 0 auto 0.9rem;
+  max-width: 46ch;
+}
+.co-dup,
+.co-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  margin: 0 0 1.1rem;
+}
+.co-new {
+  background: rgba(36, 165, 92, 0.14);
+  border: 1px solid rgba(36, 165, 92, 0.34);
+  color: #24a55c;
+}
+.co-dup {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+}
+.co-dup b {
+  color: var(--accent-ink);
+}
+
+.co-result-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.co-balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.co-balance svg {
+  color: var(--accent-ink);
+}
+.co-again {
+  padding: 0.55rem 1.4rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #3b2a02;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.co-again:hover {
+  filter: brightness(1.07);
+}
+
+/* ======================================================================
+   Onglet Admin « Récompenses » — réutilise les classes du panel (admin-card,
+   pn-editor, pn-field…) ; on n'ajoute ici que ce qui lui est propre.
+   ====================================================================== */
+.arw-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.6rem;
+}
+.arw-card {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--arc-rarity);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.arw-card.off {
+  opacity: 0.5;
+}
+.arw-card-art {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.arw-card-info {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.arw-card-info strong {
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.arw-card-meta {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+.arw-hint {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  margin: 0.35rem 0 0;
+}
+.arw-img-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+.arw-img-row .arw-hint {
+  flex: 1;
+  min-width: 200px;
+  margin: 0;
+}
+.arw-img-preview {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  /* Damier : seul moyen de juger la transparence d'un curseur avant de le
+     publier (un PNG à fond blanc se voit sur-le-champ). */
+  background-color: var(--surface-2);
+  background-image: linear-gradient(45deg, var(--border) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--border) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--border) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--border) 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+}
+.arw-img-preview img {
+  max-width: 64px;
+  max-height: 64px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+/* Sélecteur du contenu d'une caisse */
+.arw-pick {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 0.4rem;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 0.25rem;
+}
+.arw-pick-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--arc-rarity);
+  border-radius: 10px;
+  background: var(--surface);
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.arw-pick-item:hover {
+  border-color: var(--border-strong);
+}
+.arw-pick-item.on {
+  background: color-mix(in srgb, var(--arc-rarity) 12%, var(--surface));
+  border-color: var(--arc-rarity);
+}
+.arw-pick-item.off {
+  opacity: 0.5;
+}
+.arw-pick-art {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+}
+.arw-pick-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.arw-pick-rarity {
+  font-size: 0.65rem;
+  color: var(--arc-rarity);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.arw-pick-check {
+  color: var(--arc-rarity);
+  flex: 0 0 auto;
+}
+
+/* ======================================================================
+   Passerelle depuis le blind test : les points gagnés, cliquables.
+   (Vit ici plutôt que dans app-14-blindtest.css : c'est l'arcade qui parle.)
+   ====================================================================== */
+.bt-earned {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid rgba(242, 183, 11, 0.42);
+  border-radius: 999px;
+  background: rgba(242, 183, 11, 0.12);
+  color: var(--text);
+  font-size: 0.87rem;
+  transition: background 0.18s ease, transform 0.12s ease;
+}
+.bt-earned:hover {
+  background: rgba(242, 183, 11, 0.2);
+  transform: translateY(-1px);
+}
+.bt-earned svg {
+  color: var(--accent-ink);
+}
+.bt-earned b {
+  font-family: var(--font-display);
+}
+.bt-earned em {
+  font-style: normal;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+/* ---------- Mobile ---------- */
+@media (max-width: 760px) {
+  .arc-wrap {
+    padding: 1rem 0.85rem 3rem;
+  }
+  .arc-hero {
+    gap: 1rem;
+  }
+  .arc-wallet {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .co-modal {
+    padding: 1.1rem 0.85rem;
+  }
+  .co-stage {
+    /* Bande plus étroite : sinon deux lots à peine tiennent à l'écran et la
+       descente perd sa lisibilité. La géométrie JS lit ces mêmes valeurs. */
+    --co-item-w: 104px;
+  }
+  .co-item {
+    height: 112px;
+  }
+  .co-fade {
+    width: 48px;
+  }
+  .arc-inv-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  }
+}
+
+/* Le défilement est le cœur du plaisir, mais il reste une longue animation :
+   qui demande moins de mouvement obtient le résultat sans la descente. */
+@media (prefers-reduced-motion: reduce) {
+  .co-strip {
+    transition: none !important;
+  }
+  .co-result,
+  .co-result-art::before {
+    animation: none;
+  }
+}

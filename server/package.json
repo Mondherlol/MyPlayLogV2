@@ -8,6 +8,8 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "seed:patch11": "node src/scripts/seedPatchnoteV11.js",
+    "seed:arcade": "node src/scripts/seedArcade.js",
+    "backfill:arcade": "node src/scripts/backfillArcadePoints.js",
     "migrate:ost-youtube": "node src/scripts/migrateItunesOst.js",
     "migrate:video-social": "node src/scripts/migrateVideoSocial.js",
     "backfill:feed": "node src/scripts/backfillFeedActivities.js"

@@ -134,3 +134,12 @@ Temps speedrun
 PB personnel
 
 - Patch FR
+
+
+
+
+
+
+En mode mobile : 
+- Fixer note qui s'affiche 
+-Onglets trop bas
