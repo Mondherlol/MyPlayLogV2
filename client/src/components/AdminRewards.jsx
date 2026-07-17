@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { RARITIES, RARITY_ORDER, REWARD_TYPES, rarityColor, rarityLabel } from "../lib/rarity";
+import { parseCursorFile, dataUrlToBlob } from "../lib/cursorFile";
 import RewardArt from "./RewardArt";
 
 // ======================================================================
@@ -320,6 +321,148 @@ function ImageField({ token, value, onChange, label, hint }) {
   );
 }
 
+// Aperçu qui rejoue une animation de curseur (cycle des images selon leurs durées).
+function AnimatedFramePreview({ frames, durationsMs, size = 48 }) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    setI(0);
+    if (!frames || frames.length < 2) return;
+    let idx = 0;
+    let timer;
+    const tick = () => {
+      idx = (idx + 1) % frames.length;
+      setI(idx);
+      timer = setTimeout(tick, durationsMs?.[idx] || 100);
+    };
+    timer = setTimeout(tick, durationsMs?.[0] || 100);
+    return () => clearTimeout(timer);
+  }, [frames, durationsMs]);
+  const src = frames?.[i] || frames?.[0];
+  if (!src) return null;
+  return (
+    <img
+      src={src}
+      alt=""
+      style={{ maxWidth: size, maxHeight: size, imageRendering: "pixelated" }}
+    />
+  );
+}
+
+// --- Champ « image du curseur » : accepte PNG/SVG classiques ET les vrais
+// fichiers curseur Windows (.cur / .ani). Les .cur/.ani sont décodés dans le
+// navigateur et convertis en PNG (universellement acceptés par `cursor:url()`) ;
+// le point actif est récupéré automatiquement, et un .ani devient une animation. ---
+function CursorField({ token, data, onChange }) {
+  const fileRef = useRef(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const frames = data.animated && data.frames?.length ? data.frames : data.url ? [data.url] : [];
+  const animated = !!data.animated && (data.frames?.length || 0) > 1;
+
+  async function uploadDataUrl(dataUrl) {
+    const fd = new FormData();
+    fd.append("image", dataUrlToBlob(dataUrl), "cursor.png");
+    const d = await apiUpload("/arcade/admin/upload", fd, token);
+    return d.url;
+  }
+
+  async function onFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      const isCursorFile =
+        /\.(cur|ani|ico)$/i.test(file.name) || !file.type.startsWith("image/");
+      if (isCursorFile) {
+        const parsed = await parseCursorFile(file); // { animated, frames:[dataUrl], durationsMs, hotspotX, hotspotY }
+        if (parsed.frames.length > 240)
+          throw new Error("Curseur trop long (trop d'images).");
+        // Dédup des uploads : deux étapes identiques pointent vers le même fichier.
+        const cache = new Map();
+        const urls = [];
+        for (const f of parsed.frames) {
+          if (!cache.has(f)) cache.set(f, await uploadDataUrl(f));
+          urls.push(cache.get(f));
+        }
+        onChange({
+          url: urls[0],
+          frames: parsed.animated ? urls : undefined,
+          durationsMs: parsed.animated ? parsed.durationsMs : undefined,
+          animated: parsed.animated || undefined,
+          hotspotX: parsed.hotspotX,
+          hotspotY: parsed.hotspotY,
+        });
+      } else {
+        // Image PNG/SVG classique : comportement d'origine.
+        const fd = new FormData();
+        fd.append("image", file);
+        const d = await apiUpload("/arcade/admin/upload", fd, token);
+        onChange({ url: d.url, frames: undefined, durationsMs: undefined, animated: undefined });
+      }
+    } catch (e2) {
+      setErr(e2.message || "Fichier de curseur non pris en charge.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function clear() {
+    onChange({ url: "", frames: undefined, durationsMs: undefined, animated: undefined });
+  }
+
+  return (
+    <div className="admin-field">
+      <label>
+        <ImagePlus size={14} /> Image du curseur
+      </label>
+      <div className="arw-img-row">
+        {data.url ? (
+          <div className="arw-img-preview arw-cursor-preview">
+            {animated ? (
+              <AnimatedFramePreview frames={frames} durationsMs={data.durationsMs} />
+            ) : (
+              <img src={data.url} alt="" style={{ imageRendering: "pixelated" }} />
+            )}
+            {animated && <span className="arw-cursor-badge">GIF · {data.frames.length}</span>}
+            <button
+              className="pn-shot-del clickable"
+              onClick={clear}
+              aria-label="Retirer le curseur"
+            >
+              <X size={13} />
+            </button>
+          </div>
+        ) : (
+          <button
+            className="pn-shot-add clickable"
+            onClick={() => fileRef.current?.click()}
+            disabled={busy}
+          >
+            {busy ? <Loader2 size={18} className="spin" /> : <ImagePlus size={18} />}
+            <span>{busy ? "Conversion…" : "Curseur"}</span>
+          </button>
+        )}
+        <p className="admin-hint arw-hint">
+          <strong>.cur</strong> et <strong>.ani</strong> (curseurs Windows) acceptés — un
+          .ani devient un curseur animé, le point actif est repris tout seul. Aussi PNG /
+          SVG à fond transparent (32×32 idéal, 128 px max).
+        </p>
+      </div>
+      {err && <p className="psn-err arw-hint">{err}</p>}
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".cur,.ani,.ico,image/*"
+        hidden
+        onChange={onFile}
+      />
+    </div>
+  );
+}
+
 // --- Créer / modifier un lot ---
 function RewardEditor({ token, initial, onCancel, onSaved }) {
   const [r, setR] = useState(initial);
@@ -417,17 +560,17 @@ function RewardEditor({ token, initial, onCancel, onSaved }) {
         />
       </label>
 
-      <ImageField
-        token={token}
-        value={r.data.url}
-        onChange={(url) => setData({ url })}
-        label={r.type === "cursor" ? "Image du curseur" : "Image du lot"}
-        hint={
-          r.type === "cursor"
-            ? "PNG ou SVG, 32×32 idéalement (128×128 maximum, au-delà les navigateurs ignorent le curseur). Fond transparent."
-            : "PNG ou SVG à fond transparent."
-        }
-      />
+      {r.type === "cursor" ? (
+        <CursorField token={token} data={r.data} onChange={(patch) => setData(patch)} />
+      ) : (
+        <ImageField
+          token={token}
+          value={r.data.url}
+          onChange={(url) => setData({ url })}
+          label="Image du lot"
+          hint="PNG ou SVG à fond transparent."
+        />
+      )}
 
       {r.type === "cursor" && (
         <div className="pn-editor-grid">

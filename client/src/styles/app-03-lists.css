@@ -1789,3 +1789,175 @@
 .list-card-del:hover {
   background: #e0483f;
 }
+
+/* ======================================================================
+   Export d'une liste en PNG — bouton + modale (aperçu live + options)
+   ====================================================================== */
+.ld-export {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.88rem;
+  transition: all 0.15s ease;
+}
+.ld-export:hover {
+  border-color: var(--orange);
+  color: var(--accent-ink);
+}
+
+.le-modal {
+  width: min(96vw, 1000px);
+  max-width: 1000px;
+}
+.le-body {
+  display: flex;
+  gap: 1.25rem;
+  margin-top: 0.5rem;
+}
+.le-preview {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.9rem;
+  max-height: 72vh;
+  overflow: auto;
+}
+.le-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+.le-preview-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--text-soft);
+  padding: 4rem 1rem;
+}
+
+.le-side {
+  flex: 0 0 250px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.le-theme {
+  display: flex;
+  background: var(--surface-2);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+.le-theme-opt {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  border-radius: 999px;
+  padding: 0.45rem 0.6rem;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.le-theme-opt.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.le-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.le-group-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+.le-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.le-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  border-radius: 10px;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+.le-check:hover:not(.disabled) {
+  background: var(--surface-2);
+}
+.le-check.disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.le-check-box {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border-strong);
+  display: grid;
+  place-items: center;
+  color: #2a1c00;
+  flex: 0 0 auto;
+  transition: all 0.15s ease;
+}
+.le-check.on .le-check-box {
+  background: var(--accent-grad);
+  border-color: transparent;
+}
+
+.le-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: auto;
+}
+.le-actions .btn {
+  width: 100%;
+  justify-content: center;
+}
+
+@media (max-width: 760px) {
+  .le-body {
+    flex-direction: column;
+  }
+  .le-side {
+    flex-basis: auto;
+  }
+  .le-preview {
+    max-height: 52vh;
+  }
+}

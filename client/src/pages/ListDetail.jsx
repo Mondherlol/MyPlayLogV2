@@ -19,6 +19,7 @@ import {
   ChevronDown,
   ChevronUp,
   ImagePlus,
+  ImageDown,
 } from "lucide-react";
 import {
   DndContext,
@@ -48,6 +49,7 @@ import ItemEditModal from "../components/ItemEditModal";
 import ListComments from "../components/ListComments";
 import ListGameCard from "../components/ListGameCard";
 import ListCharacterCard from "../components/ListCharacterCard";
+import ListExportModal from "../components/ListExportModal";
 
 const TIER_COLORS = [
   "#ff5470", "#ff8b3d", "#f2b70b", "#3dd68c", "#4aa8ff", "#a879ff", "#8b93a7",
@@ -74,6 +76,7 @@ export default function ListDetail() {
   const [editItem, setEditItem] = useState(null);
   const [activeId, setActiveId] = useState(null); // drag en cours (dnd-kit)
   const [poolCollapsed, setPoolCollapsed] = useState(false); // vivier replié
+  const [exporting, setExporting] = useState(false); // modale d'export PNG
   // Mode édition : activé uniquement à la création (state de navigation) ou
   // via le bouton « Modifier ». À l'ouverture normale, on est en lecture.
   const [editing, setEditing] = useState(!!location.state?.edit);
@@ -515,6 +518,15 @@ export default function ListDetail() {
             <Heart size={18} fill={list.liked ? "currentColor" : "none"} />
             {list.likeCount}
           </button>
+          {!editing && items.length > 0 && (
+            <button
+              className="ld-export clickable"
+              onClick={() => (token ? setExporting(true) : navigate("/login"))}
+              title="Exporter en image"
+            >
+              <ImageDown size={16} /> Exporter
+            </button>
+          )}
           {isOwner && !editing && (
             <>
               <button
@@ -725,6 +737,15 @@ export default function ListDetail() {
             setEditItem(null);
           }}
           onClose={() => setEditItem(null)}
+        />
+      )}
+      {exporting && (
+        <ListExportModal
+          list={list}
+          items={items}
+          tiers={tiers}
+          token={token}
+          onClose={() => setExporting(false)}
         />
       )}
     </div>

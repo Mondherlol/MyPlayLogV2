@@ -1019,6 +1019,23 @@
   object-fit: contain;
   image-rendering: pixelated;
 }
+/* Pastille « curseur animé (.ani) » sur l'aperçu. */
+.arw-cursor-badge {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  background: var(--accent-grad);
+  color: #3a2600;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+  pointer-events: none;
+}
 
 /* Sélecteur du contenu d'une caisse */
 .arw-pick {

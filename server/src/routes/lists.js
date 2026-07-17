@@ -319,6 +319,54 @@ router.post(
   }
 );
 
+// Garde-fou SSRF : on ne relaie que du http(s) public (jamais une IP privée).
+function isSafeImageUrl(raw) {
+  let u;
+  try {
+    u = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (!/^https?:$/.test(u.protocol)) return false;
+  const host = u.hostname.toLowerCase();
+  if (host === "localhost" || host.endsWith(".local")) return false;
+  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(host)) {
+    const [a, b] = host.split(".").map(Number);
+    if (a === 10 || a === 127 || a === 0 || (a === 192 && b === 168)) return false;
+    if (a === 172 && b >= 16 && b <= 31) return false;
+    if (a === 169 && b === 254) return false;
+  }
+  if (host.includes(":")) return false;
+  return true;
+}
+
+// GET /api/lists/proxy-image?url= — relaie une image distante (jaquettes IGDB…)
+// pour l'export PNG côté client : passer par notre origine évite de « souiller »
+// le canvas (cross-origin), ce qui bloquerait `toBlob()`. Déclaré AVANT /:id.
+router.get("/proxy-image", requireAuth, async (req, res) => {
+  const url = String(req.query.url || "");
+  if (!isSafeImageUrl(url))
+    return res.status(400).json({ error: "URL d'image refusée." });
+  try {
+    const r = await fetch(url, {
+      headers: { "User-Agent": "MyPlayLog/1.0" },
+      redirect: "follow",
+    });
+    if (!r.ok) return res.status(502).json({ error: "Image indisponible." });
+    const ct = (r.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    if (!ct.startsWith("image/"))
+      return res.status(415).json({ error: "Le contenu n'est pas une image." });
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > 10 * 1024 * 1024)
+      return res.status(413).json({ error: "Image trop lourde." });
+    res.setHeader("Content-Type", ct);
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(buf);
+  } catch {
+    res.status(502).json({ error: "Relais d'image indisponible." });
+  }
+});
+
 // GET /api/lists/mine/for-item?refId=&kind= — mes listes compatibles avec un
 // élément, avec l'info « contient déjà ». Sert au quick-add depuis l'Explorer.
 // Déclarée AVANT /:id pour ne pas être capturée par la route paramétrée.

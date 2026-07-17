@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import User from "./models/User.js";
 import authRoutes from "./routes/auth.js";
 import gameRoutes from "./routes/games.js";
+import gameMediaRoutes from "./routes/gameMedia.js";
 import libraryRoutes from "./routes/library.js";
 import listRoutes from "./routes/lists.js";
 import userRoutes from "./routes/users.js";
@@ -60,6 +61,7 @@ app.get("/api/health", (req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/games", gameRoutes);
+app.use("/api/game-media", gameMediaRoutes);
 app.use("/api/library", libraryRoutes);
 app.use("/api/lists", listRoutes);
 app.use("/api/users", userRoutes);

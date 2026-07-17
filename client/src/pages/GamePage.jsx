@@ -43,6 +43,7 @@ import {
   CornerLeftUp,
   Wrench,
   Download,
+  Camera,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { makeCache } from "../lib/cache";
@@ -58,6 +59,7 @@ import RecommendModal from "../components/RecommendModal";
 import GameCharacters from "../components/GameCharacters";
 import GameOst from "../components/GameOst";
 import GameFeed from "../components/GameFeed";
+import GameMediaWall from "../components/GameMediaWall";
 import GameRelated from "../components/GameRelated";
 import GamePatches from "../components/GamePatches";
 import { useTabSwipe } from "../hooks/useTabSwipe";
@@ -92,6 +94,7 @@ const TABS = [
   { id: "infos", label: "Infos", Icon: Info, ready: true },
   { id: "related", label: "Univers", Icon: Orbit, ready: true },
   { id: "feed", label: "Feed", Icon: Flame, ready: true },
+  { id: "media", label: "Média", Icon: Camera, ready: true },
   { id: "reviews", label: "Reviews", Icon: MessageSquareText, ready: true },
   { id: "trophies", label: "Trophées", Icon: Trophy, ready: true },
   { id: "ost", label: "OST", Icon: Music, ready: true },
@@ -952,6 +955,10 @@ export default function GamePage() {
                 un remontage propre par jeu. */}
             {tab === "feed" && String(game.id) === String(id) && (
               <GameFeed key={id} gameId={id} gameName={game.name} token={token} />
+            )}
+
+            {tab === "media" && String(game.id) === String(id) && (
+              <GameMediaWall key={id} gameId={id} gameName={game.name} token={token} />
             )}
 
             {tab === "reviews" && (

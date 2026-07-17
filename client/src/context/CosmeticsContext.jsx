@@ -16,25 +16,65 @@ const CosmeticsContext = createContext({ cosmetics: {}, setCosmetic: () => {} })
 
 // Valeur d'une variable CSS de curseur : `url("…") x y`. Le point actif
 // (hotspot) est là où « clique » vraiment la pointe de l'image.
-function cursorValue(cursor) {
-  if (!cursor?.data?.url) return null;
-  const x = Number(cursor.data.hotspotX) || 0;
-  const y = Number(cursor.data.hotspotY) || 0;
-  return `url("${cursor.data.url}") ${x} ${y}`;
+function frameValue(url, x, y) {
+  return `url("${url}") ${x} ${y}`;
+}
+
+function setCursorVars(value) {
+  const root = document.documentElement;
+  root.style.setProperty("--cursor-default", value);
+  root.style.setProperty("--cursor-pointer", value);
+}
+
+// Timer de l'animation en cours (curseur .ani). Un seul à la fois : on le coupe
+// à chaque changement de curseur.
+let cursorAnim = null;
+function clearCursorAnim() {
+  if (cursorAnim) {
+    clearTimeout(cursorAnim);
+    cursorAnim = null;
+  }
 }
 
 function applyCursor(cursor) {
+  clearCursorAnim();
   const root = document.documentElement;
-  const value = cursorValue(cursor);
-  if (!value) {
+  const data = cursor?.data;
+  if (!data?.url) {
     // Retour au curseur pixel d'origine : on retire la surcharge, la valeur
     // par défaut de la feuille de style reprend d'elle-même.
     root.style.removeProperty("--cursor-default");
     root.style.removeProperty("--cursor-pointer");
     return;
   }
-  root.style.setProperty("--cursor-default", value);
-  root.style.setProperty("--cursor-pointer", value);
+  const x = Number(data.hotspotX) || 0;
+  const y = Number(data.hotspotY) || 0;
+  const frames =
+    data.animated && Array.isArray(data.frames) && data.frames.length > 1
+      ? data.frames
+      : null;
+  if (!frames) {
+    setCursorVars(frameValue(data.url, x, y));
+    return;
+  }
+  // Curseur animé (.ani) : on cycle la variable CSS d'une image à l'autre.
+  // Préchargement pour éviter tout clignotement au premier tour.
+  frames.forEach((u) => {
+    const im = new Image();
+    im.src = u;
+  });
+  const durations =
+    Array.isArray(data.durationsMs) && data.durationsMs.length === frames.length
+      ? data.durationsMs
+      : frames.map(() => 100);
+  let i = 0;
+  const tick = () => {
+    setCursorVars(frameValue(frames[i], x, y));
+    const d = Math.max(16, durations[i] || 100);
+    i = (i + 1) % frames.length;
+    cursorAnim = setTimeout(tick, d);
+  };
+  tick();
 }
 
 export function CosmeticsProvider({ children }) {
@@ -62,6 +102,9 @@ export function CosmeticsProvider({ children }) {
     };
     // `user?.id` : on refait le tour après une reconnexion sur un autre compte.
   }, [token, user?.id]);
+
+  // Coupe l'animation du curseur au démontage (évite un timer orphelin).
+  useEffect(() => () => clearCursorAnim(), []);
 
   // Appelé par l'arcade au moment d'équiper : effet immédiat, sans refetch.
   const setCosmetic = useCallback((type, reward) => {
