@@ -250,6 +250,16 @@ function drawRankBadge(ctx, rank, x, y, theme) {
 // ---------------------------------------------------------------------
 const CW = EXPORT_WIDTH - PAD * 2;
 
+// Grille : nombre de colonnes calculé automatiquement (repli quand l'utilisateur
+// n'a pas fixé de valeur). Bornes autorisées pour le choix manuel : 1 → 12.
+const GRID_GAP = 22;
+const GRID_TARGET = 190; // largeur de tuile visée
+export const GRID_MIN_COLS = 1;
+export const GRID_MAX_COLS = 12;
+export function gridAutoColumns() {
+  return Math.max(3, Math.min(8, Math.round((CW + GRID_GAP) / (GRID_TARGET + GRID_GAP))));
+}
+
 function planHeader(ctx, list, opts, theme, coverImg) {
   const showCover = opts.showCover && list.cover && coverImg;
   const coverW = 132;
@@ -357,9 +367,11 @@ function drawHeader(ctx, p, list, theme, originY) {
 // Grille (classic / ranked)
 function planGrid(ctx, items, opts, list) {
   const ranked = list.type === "ranked";
-  const GAP = 22;
-  const target = 190;
-  let cols = Math.max(3, Math.min(8, Math.round((CW + GAP) / (target + GAP))));
+  const GAP = GRID_GAP;
+  // Colonnes choisies par l'utilisateur (bornées), sinon calcul auto.
+  let cols = opts.columns
+    ? Math.max(GRID_MIN_COLS, Math.min(GRID_MAX_COLS, opts.columns))
+    : gridAutoColumns();
   cols = Math.min(cols, Math.max(1, items.length));
   const tileW = (CW - (cols - 1) * GAP) / cols;
   const coverH = tileW * (4 / 3);
@@ -625,8 +637,9 @@ export function renderList(canvas, { list, items, tiers, opts, imageMap }) {
   return { width: EXPORT_WIDTH, height: totalH };
 }
 
-// Options par défaut selon le type de liste.
-export function defaultExportOpts(list) {
+// Options par défaut selon le type de liste. `itemCount` sert à ne pas proposer
+// plus de colonnes qu'il n'y a d'éléments.
+export function defaultExportOpts(list, itemCount = 0) {
   return {
     theme: "dark",
     showTitle: true,
@@ -639,6 +652,7 @@ export function defaultExportOpts(list) {
     showNames: true,
     showNotes: false,
     showRank: list.type === "ranked",
+    columns: Math.max(1, Math.min(gridAutoColumns(), itemCount || gridAutoColumns())),
     // tier
     showPool: true,
     showCounts: false,

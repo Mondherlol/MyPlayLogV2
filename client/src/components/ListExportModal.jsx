@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Loader2, ExternalLink, Download, ImageIcon, Check, Moon, Sun } from "lucide-react";
+import { X, Loader2, ExternalLink, Download, ImageIcon, Check, Moon, Sun, Minus, Plus } from "lucide-react";
 import {
   ensureFonts,
   loadImages,
   collectImageUrls,
   renderList,
   defaultExportOpts,
+  GRID_MIN_COLS,
+  GRID_MAX_COLS,
 } from "../lib/listExport";
 
 const slugify = (s) =>
@@ -53,7 +55,9 @@ function optionGroups(list) {
 }
 
 export default function ListExportModal({ list, items, tiers, token, onClose }) {
-  const [opts, setOpts] = useState(() => defaultExportOpts(list));
+  const [opts, setOpts] = useState(() => defaultExportOpts(list, items.length));
+  // Pas plus de colonnes qu'il n'y a d'éléments (au-delà, une colonne resterait vide).
+  const maxCols = Math.max(GRID_MIN_COLS, Math.min(GRID_MAX_COLS, items.length));
   const [imageMap, setImageMap] = useState(null);
   const [loading, setLoading] = useState(true);
   const [pngUrl, setPngUrl] = useState(null);
@@ -113,6 +117,11 @@ export default function ListExportModal({ list, items, tiers, token, onClose }) 
   );
 
   const toggle = (key) => setOpts((o) => ({ ...o, [key]: !o[key] }));
+  const changeCols = (delta) =>
+    setOpts((o) => ({
+      ...o,
+      columns: Math.max(GRID_MIN_COLS, Math.min(maxCols, (o.columns || 1) + delta)),
+    }));
 
   function openInTab() {
     if (pngUrlRef.current) window.open(pngUrlRef.current, "_blank", "noopener");
@@ -186,6 +195,31 @@ export default function ListExportModal({ list, items, tiers, token, onClose }) 
                       {o.label}
                     </button>
                   ))}
+                  {/* Nombre de jeux par ligne (grille uniquement). */}
+                  {g.title === "Cartes" && (
+                    <div className="le-stepper">
+                      <span className="le-stepper-label">Jeux par ligne</span>
+                      <div className="le-stepper-ctrl">
+                        <button
+                          className="le-stepper-btn clickable"
+                          onClick={() => changeCols(-1)}
+                          disabled={opts.columns <= GRID_MIN_COLS}
+                          aria-label="Moins de colonnes"
+                        >
+                          <Minus size={15} />
+                        </button>
+                        <span className="le-stepper-val">{opts.columns}</span>
+                        <button
+                          className="le-stepper-btn clickable"
+                          onClick={() => changeCols(1)}
+                          disabled={opts.columns >= maxCols}
+                          aria-label="Plus de colonnes"
+                        >
+                          <Plus size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
