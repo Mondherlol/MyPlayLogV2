@@ -2317,3 +2317,196 @@
   transform: translateY(-2px) scale(1.04);
   box-shadow: var(--shadow);
 }
+
+/* ======================================================================
+   Page /clip/:id — un post partagé, ouvert en grand (lien public)
+   ====================================================================== */
+.clip-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 1.4rem 1rem 3rem;
+}
+
+.clip-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.clip-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.85rem 1rem;
+}
+
+.clip-av {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-family: var(--font-display);
+  color: var(--text-soft);
+}
+.clip-av a {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: inherit;
+  text-decoration: none;
+}
+.clip-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.clip-who {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.clip-name {
+  font-weight: 700;
+  color: var(--text);
+  text-decoration: none;
+}
+.clip-name:hover {
+  color: var(--accent-ink);
+}
+.clip-sub {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+/* Chip du jeu (jaquette + nom) en coin de l'en-tête */
+.clip-game {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 45%;
+  padding: 0.3rem 0.6rem 0.3rem 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.clip-game img {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+.clip-game span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.clip-game:hover {
+  border-color: var(--orange);
+  transform: translateY(-1px);
+}
+
+/* Le clip, pleine largeur de la card */
+.clip-main {
+  background: #000;
+}
+.clip-main video {
+  max-height: 72vh;
+}
+
+.clip-body {
+  padding: 0.8rem 1rem 0;
+}
+.clip-body:empty {
+  padding: 0;
+}
+.clip-body .gm-text {
+  font-size: 1rem;
+}
+
+.clip-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  padding: 0.7rem 1rem 0.9rem;
+}
+.clip-actions .gm-act {
+  text-decoration: none;
+}
+
+.clip-cta {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #1a1408;
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.clip-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* États chargement / introuvable */
+.clip-loading {
+  display: grid;
+  place-items: center;
+  padding: 4rem 0;
+  color: var(--text-soft);
+}
+.clip-missing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 3.5rem 1rem;
+  color: var(--text-soft);
+  text-align: center;
+}
+.clip-missing-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--accent-ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+.clip-missing-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 560px) {
+  .clip-page {
+    padding: 0.6rem 0.5rem 2.5rem;
+  }
+  .clip-game span {
+    display: none;
+  }
+  .clip-cta {
+    font-size: 0.8rem;
+  }
+}

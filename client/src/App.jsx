@@ -12,6 +12,7 @@ import Playtopia from "./pages/Playtopia";
 import Explorer from "./pages/Explorer";
 import Releases from "./pages/Releases";
 import GamePage from "./pages/GamePage";
+import ClipPage from "./pages/ClipPage";
 import CompanyPage from "./pages/CompanyPage";
 import PlatformPage from "./pages/PlatformPage";
 import Profile from "./pages/Profile";
@@ -105,6 +106,14 @@ export default function App() {
         element={
           <PublicOrApp>
             <GamePage />
+          </PublicOrApp>
+        }
+      />
+      <Route
+        path="/clip/:id"
+        element={
+          <PublicOrApp>
+            <ClipPage />
           </PublicOrApp>
         }
       />

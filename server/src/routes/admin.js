@@ -1,7 +1,13 @@
 import express from "express";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
+import os from "node:os";
+import fs from "node:fs";
+import fsp from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import User from "../models/User.js";
+import GameMedia from "../models/GameMedia.js";
 import UserGame from "../models/UserGame.js";
 import List from "../models/List.js";
 import Recommendation from "../models/Recommendation.js";
@@ -335,6 +341,244 @@ router.post("/users/:id/remove-follower", async (req, res) => {
   } catch (err) {
     console.error("admin remove follower error:", err.message);
     res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// ======================================================================
+//  Système — disque, RAM, CPU, base Mongo et poids des uploads (par
+//  dossier et par utilisateur) pour l'onglet « Système » du panel.
+// ======================================================================
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const UPLOADS_DIR = path.join(__dirname, "../../uploads");
+const AUDIO_CACHE_DIR = path.join(__dirname, "../../cache/audio");
+
+const VIDEO_EXT = new Set([".mp4", ".mov", ".webm", ".mkv", ".avi", ".m4v"]);
+
+// RAM de la machine. Sur Linux on lit MemAvailable (os.freemem() sous-estime
+// beaucoup : le cache disque du noyau est récupérable) ; ailleurs, repli sur os.
+function readMemory() {
+  const total = os.totalmem();
+  let available = os.freemem();
+  try {
+    const info = fs.readFileSync("/proc/meminfo", "utf8");
+    const m = info.match(/^MemAvailable:\s+(\d+) kB/m);
+    if (m) available = Number(m[1]) * 1024;
+  } catch {
+    /* pas de /proc (Windows, macOS) */
+  }
+  return { total, available, used: total - available };
+}
+
+// Espace disque du système de fichiers qui porte les uploads (= le volume
+// Docker monté depuis l'hôte en prod, donc bien le disque du VPS).
+async function readDisk() {
+  try {
+    const s = await fsp.statfs(UPLOADS_DIR);
+    const total = s.blocks * s.bsize;
+    const free = s.bavail * s.bsize; // dispo pour les non-root, comme `df`
+    return { total, free, used: total - free };
+  } catch {
+    return null;
+  }
+}
+
+// Parcourt uploads/ : totaux par sous-dossier + attribution par utilisateur.
+// Attribution : préfixe ObjectId dans le nom (avatars, covers, reposts) ; pour
+// le mur média (gm-…) le nom ne dit rien, on passe par la collection GameMedia.
+async function scanUploads() {
+  const mediaOwners = new Map();
+  try {
+    const posts = await GameMedia.find({}, "user media.url").lean();
+    for (const p of posts)
+      for (const m of p.media || []) {
+        const file = String(m.url || "").split("/uploads/gamemedia/")[1];
+        if (file && !file.includes("/")) mediaOwners.set(file, String(p.user));
+      }
+  } catch {
+    /* best-effort */
+  }
+
+  const folders = [];
+  const perUser = new Map();
+  let entries = [];
+  try {
+    entries = await fsp.readdir(UPLOADS_DIR, { withFileTypes: true });
+  } catch {
+    /* dossier absent (première installation) */
+  }
+
+  for (const ent of entries) {
+    if (!ent.isDirectory()) continue;
+    const dir = path.join(UPLOADS_DIR, ent.name);
+    const folder = { name: ent.name, files: 0, bytes: 0, images: 0, videos: 0 };
+    let names = [];
+    try {
+      names = await fsp.readdir(dir);
+    } catch {
+      /* ignore */
+    }
+    for (const name of names) {
+      let st;
+      try {
+        st = await fsp.stat(path.join(dir, name));
+      } catch {
+        continue;
+      }
+      if (!st.isFile()) continue; // ignore les sous-dossiers (gamemedia/tmp…)
+      const kind = VIDEO_EXT.has(path.extname(name).toLowerCase())
+        ? "videos"
+        : "images";
+      folder.files += 1;
+      folder.bytes += st.size;
+      folder[kind] += st.size;
+
+      let owner = null;
+      const prefix = name.split("-")[0];
+      if (/^[0-9a-f]{24}$/i.test(prefix)) owner = prefix.toLowerCase();
+      else if (ent.name === "gamemedia") owner = mediaOwners.get(name) || null;
+      if (owner) {
+        const u =
+          perUser.get(owner) || { files: 0, bytes: 0, images: 0, videos: 0 };
+        u.files += 1;
+        u.bytes += st.size;
+        u[kind] += st.size;
+        perUser.set(owner, u);
+      }
+    }
+    folders.push(folder);
+  }
+  folders.sort((a, b) => b.bytes - a.bytes);
+  return { folders, perUser };
+}
+
+// Cache audio des OST (m4a extraits par yt-dlp) + son quota.
+async function scanAudioCache() {
+  const out = {
+    files: 0,
+    bytes: 0,
+    maxBytes: Number(process.env.AUDIO_CACHE_MAX_MB || 500) * 1024 * 1024,
+  };
+  try {
+    for (const name of await fsp.readdir(AUDIO_CACHE_DIR)) {
+      try {
+        const st = await fsp.stat(path.join(AUDIO_CACHE_DIR, name));
+        if (!st.isFile()) continue;
+        out.files += 1;
+        out.bytes += st.size;
+      } catch {
+        continue;
+      }
+    }
+  } catch {
+    /* dossier absent */
+  }
+  return out;
+}
+
+// Stats MongoDB : totaux + les collections les plus lourdes.
+async function readDbStats() {
+  const db = mongoose.connection.db;
+  const stats = await db.stats();
+  let collections = [];
+  try {
+    const cols = await db.listCollections({}, { nameOnly: true }).toArray();
+    collections = (
+      await Promise.all(
+        cols.map(async (c) => {
+          try {
+            const [s] = await db
+              .collection(c.name)
+              .aggregate([{ $collStats: { storageStats: {} } }])
+              .toArray();
+            const ss = s?.storageStats || {};
+            return {
+              name: c.name,
+              count: ss.count ?? 0,
+              dataBytes: ss.size ?? 0,
+              storageBytes: ss.storageSize ?? 0,
+              indexBytes: ss.totalIndexSize ?? 0,
+            };
+          } catch {
+            return null; // vues, collections système…
+          }
+        })
+      )
+    )
+      .filter(Boolean)
+      .sort((a, b) => b.dataBytes - a.dataBytes);
+  } catch {
+    /* best-effort */
+  }
+  return {
+    dataBytes: stats.dataSize ?? 0,
+    storageBytes: stats.storageSize ?? 0,
+    indexBytes: stats.indexSize ?? 0,
+    objects: stats.objects ?? 0,
+    collections,
+  };
+}
+
+router.get("/system", async (req, res) => {
+  try {
+    const [disk, uploads, audioCache, db] = await Promise.all([
+      readDisk(),
+      scanUploads(),
+      scanAudioCache(),
+      readDbStats().catch(() => null),
+    ]);
+
+    // Résolution des propriétaires (pseudo + avatar) des fichiers attribués.
+    const ids = [...uploads.perUser.keys()].filter((id) =>
+      mongoose.isValidObjectId(id)
+    );
+    const docs = ids.length
+      ? await User.find({ _id: { $in: ids } }, "username avatar").lean()
+      : [];
+    const known = new Map(docs.map((u) => [String(u._id), u]));
+    const users = [...uploads.perUser.entries()]
+      .map(([id, s]) => ({
+        id,
+        username: known.get(id)?.username || null,
+        avatar: known.get(id)?.avatar || null,
+        ...s,
+      }))
+      .sort((a, b) => b.bytes - a.bytes);
+
+    const mem = process.memoryUsage();
+    res.json({
+      generatedAt: new Date().toISOString(),
+      disk,
+      memory: readMemory(),
+      cpu: {
+        cores: os.cpus().length,
+        model: os.cpus()[0]?.model || null,
+        load: os.loadavg(), // [1, 5, 15 min] — 0 sous Windows
+      },
+      host: {
+        uptime: os.uptime(),
+        platform: os.platform(),
+        arch: os.arch(),
+        hostname: os.hostname(),
+      },
+      process: {
+        uptime: process.uptime(),
+        node: process.version,
+        rss: mem.rss,
+        heapUsed: mem.heapUsed,
+        heapTotal: mem.heapTotal,
+      },
+      db,
+      uploads: {
+        files: uploads.folders.reduce((n, f) => n + f.files, 0),
+        bytes: uploads.folders.reduce((n, f) => n + f.bytes, 0),
+        folders: uploads.folders,
+      },
+      audioCache,
+      users,
+    });
+  } catch (err) {
+    console.error("admin system error:", err.message);
+    res.status(500).json({ error: "Erreur lors du relevé des stats système." });
   }
 });
 

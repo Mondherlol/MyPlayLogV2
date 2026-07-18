@@ -20,6 +20,8 @@ import {
   Camera,
   MessageCircle,
   Smile,
+  Share2,
+  Check,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { timeAgo } from "../lib/lists";
@@ -717,6 +719,44 @@ function Composer({ gameId, gameName, gameCover, token, user, requireLogin, onPo
 }
 
 // ============================================================
+//  Bouton « Partager » d'un post à clip : copie le lien public /clip/:id.
+//  Collé sur Discord & co, le lien s'embed avec le lecteur vidéo (balises
+//  Open Graph rendues côté serveur, cf. server/src/routes/share.js).
+//  Exporté : les cards du fil d'accueil (FeedCards) l'utilisent aussi.
+// ============================================================
+export function SharePostButton({ post, className = "gm-act", size = 17 }) {
+  const [copied, setCopied] = useState(false);
+
+  async function share() {
+    const url = `${window.location.origin}/clip/${post.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // Repli (vieux navigateurs / contexte non sécurisé)
+      const ta = document.createElement("textarea");
+      ta.value = url;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <button
+      className={`${className} clickable ${copied ? "on" : ""}`}
+      onClick={share}
+      title="Copier le lien du clip"
+    >
+      {copied ? <Check size={size} /> : <Share2 size={size} />}
+      {copied && <span>Copié !</span>}
+    </button>
+  );
+}
+
+// ============================================================
 //  Carte d'un post
 // ============================================================
 function PostCard({ post, token, forceReveal, onLike, onLikeById, onDelete }) {
@@ -781,6 +821,7 @@ function PostCard({ post, token, forceReveal, onLike, onLikeById, onDelete }) {
             <MessageCircle size={17} />
             {commentCount > 0 && <span>{commentCount}</span>}
           </button>
+          {media.some((m) => m.kind === "video") && <SharePostButton post={post} />}
         </div>
 
         {showComments && (

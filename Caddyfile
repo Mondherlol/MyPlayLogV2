@@ -20,7 +20,7 @@ myplaylog.cc {
     # ils ne voient que les méta génériques de la SPA. Les vraies personnes
     # (autres User-Agent) tombent dans le `handle` suivant et reçoivent la SPA.
     @crawler {
-        path /lists/* /u/* /game/*
+        path /lists/* /u/* /game/* /clip/*
         header_regexp User-Agent (?i)(facebookexternalhit|facebot|WhatsApp|Twitterbot|Discordbot|TelegramBot|Slackbot|LinkedInBot|redditbot|Pinterest|SkypeUriPreview|vkShare|Embedly|Iframely|Googlebot|bingbot|Applebot|ia_archiver|Google-InspectionTool)
     }
     handle @crawler {

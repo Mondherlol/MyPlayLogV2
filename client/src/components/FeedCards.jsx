@@ -61,7 +61,7 @@ import { usePlayer } from "../context/PlayerContext";
 import ReviewComments from "./ReviewComments";
 import ReviewThreadModal from "./ReviewThreadModal";
 import { CommentThreadModal } from "./ListComments";
-import { MediaGrid, PostText, PostEmbed, extractEmbeds } from "./GameMediaWall";
+import { MediaGrid, PostText, PostEmbed, extractEmbeds, SharePostButton } from "./GameMediaWall";
 import { WantedModal } from "./WantedPoster";
 
 // Cards du fil social — partagées entre le fil d'accueil (HomeFeed) et
@@ -1299,6 +1299,9 @@ function GameMediaPostEvent({ item, onLike, onComments, onOpenImage }) {
           <MessageCircle size={16} />
           <span>{p.commentCount > 0 ? p.commentCount : ""}</span>
         </button>
+        {(p.media || []).some((m) => m.kind === "video") && (
+          <SharePostButton post={p} className="hf-act" size={16} />
+        )}
       </div>
     </article>
   );

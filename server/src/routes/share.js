@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import List from "../models/List.js";
 import User from "../models/User.js";
 import UserGame from "../models/UserGame.js";
+import GameMedia from "../models/GameMedia.js";
 import { igdbQuery } from "../lib/igdb.js";
 
 // Rendu HTML "Open Graph" pour les aperçus de partage (WhatsApp, Facebook,
@@ -62,6 +63,7 @@ function renderOgPage({
   url,
   type = "website",
   imageSize = null, // { w, h } pour l'image de repli (dimensions connues)
+  video = null, // { url, type, w, h } : vidéo lisible dans l'embed (Discord…)
 }) {
   const t = escapeHtml(title);
   const d = escapeHtml(description);
@@ -71,6 +73,16 @@ function renderOgPage({
     ? `
     <meta property="og:image:width" content="${imageSize.w}" />
     <meta property="og:image:height" content="${imageSize.h}" />`
+    : "";
+  // og:video sur un fichier mp4 direct : Discord (et Telegram…) affichent
+  // alors un vrai lecteur dans le chat, comme pour un lien YouTube.
+  const videoTags = video
+    ? `
+    <meta property="og:video" content="${escapeHtml(video.url)}" />
+    <meta property="og:video:secure_url" content="${escapeHtml(video.url)}" />
+    <meta property="og:video:type" content="${escapeHtml(video.type || "video/mp4")}" />
+    <meta property="og:video:width" content="${video.w || 1280}" />
+    <meta property="og:video:height" content="${video.h || 720}" />`
     : "";
 
   return `<!doctype html>
@@ -87,7 +99,7 @@ function renderOgPage({
     <meta property="og:title" content="${t}" />
     <meta property="og:description" content="${d}" />
     <meta property="og:url" content="${u}" />
-    <meta property="og:image" content="${img}" />${sizeTags}
+    <meta property="og:image" content="${img}" />${sizeTags}${videoTags}
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="${img}" />
     <meta name="twitter:title" content="${t}" />
@@ -216,6 +228,73 @@ router.get("/u/:username", async (req, res) => {
     );
   } catch (err) {
     console.error("share profile og error:", err.message);
+    sendHtml(res, genericPage(url));
+  }
+});
+
+// ============================================================
+//  Clips (posts du mur média) — GET /clip/:id
+// ============================================================
+// Type MIME de la vidéo d'après son extension (les rendus serveur sont en mp4).
+const videoMime = (url) => {
+  if (/\.webm(\?|$)/i.test(url)) return "video/webm";
+  if (/\.(ogv|ogg)(\?|$)/i.test(url)) return "video/ogg";
+  return "video/mp4";
+};
+
+router.get("/clip/:id", async (req, res) => {
+  const url = `${SITE_URL}/clip/${encodeURIComponent(req.params.id)}`;
+  res.set("Cache-Control", "public, max-age=300");
+  try {
+    if (!mongoose.isValidObjectId(req.params.id))
+      return sendHtml(res, genericPage(url));
+
+    const p = await GameMedia.findById(req.params.id)
+      .populate("user", "username")
+      .lean();
+    if (!p) return sendHtml(res, genericPage(url));
+
+    // Anciens posts : média unique (objet) au lieu d'un tableau.
+    const media = Array.isArray(p.media) ? p.media : p.media?.url ? [p.media] : [];
+    const video = media.find((m) => m.kind === "video" && m.url);
+    const firstImg = media.find((m) => m.kind !== "video" && m.url);
+
+    const author = p.user?.username ? `@${p.user.username}` : "un joueur";
+    const noun = video ? "Le clip de" : "Le post de";
+    const title = p.gameName
+      ? `${noun} ${author} sur ${p.gameName} · ${SITE_NAME}`
+      : `${noun} ${author} · ${SITE_NAME}`;
+    let description = clip(p.text, 300);
+    if (!description)
+      description = p.gameName
+        ? `Un moment de jeu sur ${p.gameName}, partagé sur ${SITE_NAME}.`
+        : DEFAULT_DESC;
+
+    // Image d'aperçu : le poster du clip, sinon un screen du post, sinon la
+    // jaquette du jeu.
+    const image = video?.thumbnail || firstImg?.url || absImage(p.gameCover) || null;
+
+    sendHtml(
+      res,
+      renderOgPage({
+        title,
+        description,
+        image,
+        url,
+        type: video ? "video.other" : "article",
+        video: video
+          ? {
+              url: video.url,
+              type: videoMime(video.url),
+              w: video.width || null,
+              h: video.height || null,
+            }
+          : null,
+        imageSize: image ? null : { w: 1200, h: 630 },
+      })
+    );
+  } catch (err) {
+    console.error("share clip og error:", err.message);
     sendHtml(res, genericPage(url));
   }
 });

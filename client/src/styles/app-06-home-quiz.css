@@ -17332,3 +17332,261 @@ b.hf-dl-src {
 .hf-radar-more:hover {
   color: var(--accent-ink);
 }
+/* ============================================================
+   Panel Admin — onglet Système (disque, RAM, stockage, Mongo)
+   ============================================================ */
+
+.sys-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.7rem;
+}
+
+.sys-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.sys-stat-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.sys-stat-label svg {
+  color: var(--orange);
+}
+
+.sys-stat-value {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.sys-stat-sub {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  line-height: 1.35;
+}
+
+/* Jauge générique */
+.sys-bar {
+  height: 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--border) 60%, transparent);
+  overflow: hidden;
+}
+
+.sys-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  min-width: 2px;
+  transition: width 0.4s ease;
+}
+
+.sys-bar-fill.ok {
+  background: #22a35a;
+}
+
+.sys-bar-fill.warn {
+  background: #d9971a;
+}
+
+.sys-bar-fill.danger {
+  background: var(--danger, #c0392b);
+}
+
+.sys-bar-fill.neutral {
+  background: var(--orange);
+}
+
+/* --- Dossiers d'uploads --- */
+.sys-folders {
+  display: flex;
+  flex-direction: column;
+}
+
+.sys-folder-row {
+  display: grid;
+  grid-template-columns: 170px 1fr auto;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.sys-folder-row:last-child {
+  border-bottom: none;
+}
+
+.sys-folder-row.cache {
+  margin-top: 0.35rem;
+  border-top: 1px dashed var(--border);
+  padding-top: 0.8rem;
+}
+
+.sys-folder-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sys-folder-name svg {
+  color: var(--orange);
+  flex-shrink: 0;
+}
+
+.sys-folder-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.sys-folder-detail,
+.sys-user-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sys-folder-detail svg,
+.sys-user-detail svg {
+  flex-shrink: 0;
+}
+
+.sys-folder-size,
+.sys-user-size {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+/* --- Table des collections Mongo --- */
+.sys-table-wrap {
+  overflow-x: auto;
+}
+
+.sys-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.sys-table th {
+  text-align: left;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-soft);
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.sys-table td {
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  white-space: nowrap;
+}
+
+.sys-table tr:last-child td {
+  border-bottom: none;
+}
+
+.sys-table td code {
+  font-size: 0.8rem;
+}
+
+.sys-table-more {
+  margin: 0.5rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+/* --- Stockage par utilisateur --- */
+.sys-users {
+  display: flex;
+  flex-direction: column;
+}
+
+.sys-user-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.sys-user-row:last-child {
+  border-bottom: none;
+}
+
+.sys-user-rank {
+  width: 1.4rem;
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+.sys-user-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.sys-user-name {
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: inherit;
+  text-decoration: none;
+  width: fit-content;
+}
+
+.sys-user-name:hover {
+  color: var(--orange);
+}
+
+.sys-user-name.deleted {
+  color: var(--text-soft);
+  font-style: italic;
+}
+
+@media (max-width: 640px) {
+  .sys-folder-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .sys-folder-row .sys-folder-bar {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+}

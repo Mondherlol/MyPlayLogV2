@@ -1,4 +1,5 @@
 import express from "express";
+import mongoose from "mongoose";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -273,6 +274,27 @@ router.post("/game/:gameId", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("game media create error:", err.message);
     res.status(500).json({ error: "Erreur lors de la publication." });
+  }
+});
+
+// GET /api/game-media/post/:postId — un post seul, avec les infos du jeu.
+// Sert la page publique de partage /clip/:id (accessible sans compte).
+router.get("/post/:postId", optionalAuth, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.postId))
+      return res.status(404).json({ error: "Post introuvable." });
+    const p = await GameMedia.findById(req.params.postId)
+      .populate("user", "username avatar")
+      .populate("comments.user", "username avatar")
+      .lean();
+    if (!p) return res.status(404).json({ error: "Post introuvable." });
+    res.json({
+      post: toPost(p, req.userId),
+      game: { id: p.gameId, name: p.gameName, cover: p.gameCover },
+    });
+  } catch (err) {
+    console.error("game media get error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement du post." });
   }
 });
 
