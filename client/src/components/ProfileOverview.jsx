@@ -451,7 +451,17 @@ export default function ProfileOverview({
         {rest.length > 0 && (
           <ShowMoreTile
             rest={rest}
-            onClick={() => goAllGames(isFav ? { fav: "1" } : { st: isUpcoming ? "wishlist" : key })}
+            onClick={() =>
+              goAllGames(
+                isFav
+                  ? { fav: "1" }
+                  : isUpcoming
+                    ? { st: "wishlist", rel: "upcoming" }
+                    : key === "wishlist"
+                      ? { st: "wishlist", rel: "released" }
+                      : { st: key }
+              )
+            }
           />
         )}
         {/* Trop de favoris pour tout ranger à la main : le reste suit en récent. */}

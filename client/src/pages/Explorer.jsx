@@ -77,21 +77,40 @@ const GAME_TYPES = [
 ];
 const DEFAULT_TYPES = [0, 8];
 
+// (Dé)sérialisation des filtres dans l'URL : au retour arrière depuis une
+// fiche jeu, le composant est remonté avec les mêmes params → on retrouve
+// exactement les mêmes filtres (et le cache de résultats fait le reste).
+const csvNums = (s) =>
+  s ? s.split(",").map(Number).filter((n) => Number.isFinite(n)) : [];
+const catFromParam = (sp, idsKey, modeKey) => ({
+  ids: csvNums(sp.get(idsKey)),
+  mode: sp.get(modeKey) === "and" ? "and" : "or",
+});
+// « ty » absent = types par défaut ; « none » = aucun type coché (0 est un
+// vrai id IGDB, on ne peut pas encoder « vide » par une liste vide).
+const typeFromParam = (sp) => {
+  const raw = sp.get("ty");
+  if (raw == null) return { ids: [...DEFAULT_TYPES], mode: "or" };
+  return { ids: raw === "none" ? [] : csvNums(raw), mode: "or" };
+};
+
 export default function Explorer() {
   const { token } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const q = searchParams.get("q") || "";
 
-  const [sort, setSort] = useState("popularity");
-  const [dir, setDir] = useState("desc");
-  const [filters, setFilters] = useState({
-    type: { ids: [...DEFAULT_TYPES], mode: "or" },
-    platform: { ...EMPTY },
-    genre: { ...EMPTY },
-    gameMode: { ...EMPTY },
-    theme: { ...EMPTY },
-    language: { ...EMPTY },
-  });
+  const [sort, setSort] = useState(() => searchParams.get("sort") || "popularity");
+  const [dir, setDir] = useState(() =>
+    searchParams.get("dir") === "asc" ? "asc" : "desc"
+  );
+  const [filters, setFilters] = useState(() => ({
+    type: typeFromParam(searchParams),
+    platform: catFromParam(searchParams, "plat", "platm"),
+    genre: catFromParam(searchParams, "gen", "genm"),
+    gameMode: catFromParam(searchParams, "mod", "modm"),
+    theme: catFromParam(searchParams, "thm", "thmm"),
+    language: catFromParam(searchParams, "lang", "langm"),
+  }));
 
   // Options des filtres
   const [opts, setOpts] = useState({
@@ -148,6 +167,36 @@ export default function Explorer() {
   }, [token]);
 
   useEffect(() => setSearchInput(q), [q]);
+
+  // Réécrit tri + filtres dans l'URL (replace : pas d'entrée d'historique par
+  // clic). On ne touche qu'à nos clés — « q » est géré par la soumission de la
+  // recherche. Les valeurs par défaut ne polluent pas l'URL.
+  useEffect(() => {
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        const set = (k, v) => (v ? p.set(k, v) : p.delete(k));
+        set("sort", sort !== "popularity" ? sort : "");
+        set("dir", dir !== "desc" ? dir : "");
+        const typesChanged =
+          filters.type.ids.length !== DEFAULT_TYPES.length ||
+          !DEFAULT_TYPES.every((t) => filters.type.ids.includes(t));
+        set("ty", typesChanged ? filters.type.ids.join(",") || "none" : "");
+        set("plat", filters.platform.ids.join(","));
+        set("platm", filters.platform.mode === "and" ? "and" : "");
+        set("gen", filters.genre.ids.join(","));
+        set("genm", filters.genre.mode === "and" ? "and" : "");
+        set("mod", filters.gameMode.ids.join(","));
+        set("modm", filters.gameMode.mode === "and" ? "and" : "");
+        set("thm", filters.theme.ids.join(","));
+        set("thmm", filters.theme.mode === "and" ? "and" : "");
+        set("lang", filters.language.ids.join(","));
+        set("langm", filters.language.mode === "and" ? "and" : "");
+        return p;
+      },
+      { replace: true }
+    );
+  }, [sort, dir, filters, setSearchParams]);
 
   // Panneau de filtres mobile (bottom sheet) : bloque le scroll de la page
   // derrière et se ferme avec Échap.

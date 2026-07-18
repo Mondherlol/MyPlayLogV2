@@ -163,7 +163,7 @@ export default function Profile() {
   const goAllGames = (preset) => {
     setSearchParams((prev) => {
       const p = new URLSearchParams(prev);
-      ["q", "st", "fav", "rop", "rv", "sort", "dir", "plat", "platm", "gen", "genm", "mod", "modm", "thm", "thmm"].forEach(
+      ["q", "st", "fav", "rop", "rv", "pf", "fmt", "ptv", "ptop", "rel", "sort", "dir", "plat", "platm", "gen", "genm", "mod", "modm", "thm", "thmm"].forEach(
         (k) => p.delete(k)
       );
       p.set("tab", "allgames");

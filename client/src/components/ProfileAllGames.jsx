@@ -17,7 +17,9 @@ import {
   Disc,
   Eye,
   Check,
+  CalendarClock,
 } from "lucide-react";
+import { apiFetch } from "../lib/api";
 import { loadFilters } from "../lib/filters";
 import { useAuth } from "../context/AuthContext";
 import FilterSection from "./FilterSection";
@@ -230,6 +232,11 @@ export default function ProfileAllGames({ library, onOpen }) {
   });
   const [ptOp, setPtOp] = useState(() => (searchParams.get("ptop") === "lte" ? "lte" : "gte"));
   const [ptVal, setPtVal] = useState(() => searchParams.get("ptv") || "");
+  // Sortie : « pas encore sorti » (date IGDB future) / « déjà sorti ».
+  const [rel, setRel] = useState(() => {
+    const r = searchParams.get("rel");
+    return r === "upcoming" || r === "released" ? r : "";
+  });
   const [sort, setSort] = useState(() => searchParams.get("sort") || "recent");
   const [dir, setDir] = useState(() => searchParams.get("dir") || "desc");
   const [panelOpen, setPanelOpen] = useState(false);
@@ -252,6 +259,38 @@ export default function ProfileAllGames({ library, onOpen }) {
   useEffect(() => {
     loadFilters(token).then(setOpts).catch(() => {});
   }, [token]);
+
+  // Dates de sortie des jeux « à jouer » (non stockées en base) : comme dans
+  // l'aperçu, /games/releases ne renvoie que les sorties FUTURES parmi les ids
+  // fournis → la map ne contient que les jeux pas encore sortis.
+  const wishIdsKey = useMemo(
+    () =>
+      library
+        .filter((e) => e.status === "wishlist")
+        .map((e) => e.gameId)
+        .sort((a, b) => a - b)
+        .join(","),
+    [library]
+  );
+  const [releaseMap, setReleaseMap] = useState({});
+  useEffect(() => {
+    if (!wishIdsKey || !token) {
+      setReleaseMap({});
+      return;
+    }
+    let alive = true;
+    apiFetch(`/games/releases?ids=${wishIdsKey}`, { token })
+      .then((d) => {
+        if (!alive) return;
+        const map = {};
+        for (const g of d.games || []) if (g.releaseDate) map[g.id] = g.releaseDate;
+        setReleaseMap(map);
+      })
+      .catch(() => alive && setReleaseMap({}));
+    return () => {
+      alive = false;
+    };
+  }, [wishIdsKey, token]);
 
   // Consoles réellement jouées présentes dans la bibliothèque (pour les chips).
   const playedPlatformOptions = useMemo(
@@ -278,6 +317,7 @@ export default function ProfileAllGames({ library, onOpen }) {
         set("fmt", format);
         set("ptv", ptVal);
         set("ptop", ptVal !== "" && ptOp === "lte" ? "lte" : "");
+        set("rel", rel);
         set("sort", sort !== "recent" ? sort : "");
         set("dir", dir !== "desc" ? dir : "");
         set("plat", filters.platform.ids.join(","));
@@ -302,6 +342,7 @@ export default function ProfileAllGames({ library, onOpen }) {
     format,
     ptOp,
     ptVal,
+    rel,
     sort,
     dir,
     filters,
@@ -360,6 +401,9 @@ export default function ProfileAllGames({ library, onOpen }) {
         if (e.playtimeHours == null) return false;
         if (ptOp === "gte" ? e.playtimeHours < n : e.playtimeHours > n) return false;
       }
+      // Un jeu est « pas encore sorti » s'il figure dans la map des sorties futures.
+      if (rel === "upcoming" && !releaseMap[e.gameId]) return false;
+      if (rel === "released" && releaseMap[e.gameId]) return false;
       if (!matchCat(e.platforms, filters.platform)) return false;
       if (!matchCat(e.genres, filters.genre)) return false;
       if (!matchCat(e.modes, filters.gameMode)) return false;
@@ -394,6 +438,8 @@ export default function ProfileAllGames({ library, onOpen }) {
     format,
     ptOp,
     ptVal,
+    rel,
+    releaseMap,
     filters,
     sort,
     dir,
@@ -411,6 +457,7 @@ export default function ProfileAllGames({ library, onOpen }) {
     playedPlats.size +
     (format ? 1 : 0) +
     (ptVal !== "" ? 1 : 0) +
+    (rel ? 1 : 0) +
     catCount;
 
   function resetAll() {
@@ -423,6 +470,7 @@ export default function ProfileAllGames({ library, onOpen }) {
     setFormat("");
     setPtOp("gte");
     setPtVal("");
+    setRel("");
     setSort("recent");
     setDir("desc");
     setFilters({
@@ -477,6 +525,29 @@ export default function ProfileAllGames({ library, onOpen }) {
                 {s.label}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Sortie (date IGDB) — un seul état à la fois, ou aucun */}
+        <div className="pg-filter-block">
+          <label className="pg-filter-label">
+            <CalendarClock size={13} style={{ verticalAlign: "-2px" }} /> Sortie
+          </label>
+          <div className="pg-format-row">
+            <button
+              className={`pg-chip clickable ${rel === "upcoming" ? "active" : ""}`}
+              onClick={() => setRel((r) => (r === "upcoming" ? "" : "upcoming"))}
+            >
+              <CalendarClock size={13} />
+              Pas encore sorti
+            </button>
+            <button
+              className={`pg-chip clickable ${rel === "released" ? "active" : ""}`}
+              onClick={() => setRel((r) => (r === "released" ? "" : "released"))}
+            >
+              <Check size={13} />
+              Déjà sorti
+            </button>
           </div>
         </div>
 
