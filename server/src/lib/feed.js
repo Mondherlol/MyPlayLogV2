@@ -171,6 +171,24 @@ async function fetchSafebooru(name) {
   }
 }
 
+// Un post Tumblr parle-t-il bien du JEU ? Le tag seul est ambigu (« sleeping
+// dogs » → photos de chiens) : on exige un signal gaming dans les tags ou le
+// résumé (fanart, gaming, le nom du jeu collé, screenshot…).
+const GAMING_SIGNAL =
+  /fan ?arts?|game|gaming|jeu ?vid|videojuego|screenshot|playthrough|ps[2-5]|xbox|nintendo|steam/i;
+function tumblrLooksGaming(p, name) {
+  const tags = (p.tags || []).join(" ");
+  const hay = `${tags} ${p.summary || ""}`.toLowerCase();
+  const slug = tagSlug(name);
+  if (slug && hay.replace(/[^a-z0-9]/g, "").includes(slug)) {
+    // Le nom complet du jeu apparaît : on demande AUSSI un signal gaming pour
+    // écarter les homonymes littéraux (« sleeping dogs » : les vrais chiens
+    // sont taggés pareil). Un seul mot-clé suffit.
+    return GAMING_SIGNAL.test(hay);
+  }
+  return GAMING_SIGNAL.test(hay);
+}
+
 async function fetchTumblr(name) {
   const key = process.env.TUMBLR_API_KEY;
   if (!key) return [];
@@ -185,6 +203,7 @@ async function fetchTumblr(name) {
     const j = await r.json();
     const out = [];
     for (const p of j?.response || []) {
+      if (!tumblrLooksGaming(p, name)) continue;
       // Images dans le post lui-même + dans le trail (pour les reblogs).
       const blocks = [
         ...(Array.isArray(p.content) ? p.content : []),
@@ -231,6 +250,90 @@ async function fetchFanart(name) {
     }
   }
   return out.slice(0, 40);
+}
+
+// ---------------------------------------------------------------------------
+// Nettoyage du nom de jeu pour la recherche de fan arts.
+// « Yuppie Psycho Deluxe Edition » → « Yuppie Psycho » ; « Ace Attorney
+// Trilogy » → « Ace Attorney » ; « Le sanglot des cigales R ~…~ : Tome 8 » →
+// on préfère le nom ORIGINAL (international) fourni par le client.
+// ---------------------------------------------------------------------------
+const EDITION_RE = new RegExp(
+  "[\\s:\\-–—]*\\b(" +
+    [
+      "deluxe",
+      "definitive",
+      "complete",
+      "goty",
+      "game of the year",
+      "remastered?",
+      "enhanced",
+      "special",
+      "collector'?s?",
+      "gold",
+      "ultimate",
+      "premium",
+      "legendary",
+      "anniversary",
+      "digital",
+      "standard",
+      "hd",
+      "trilogy",
+      "collection",
+      "bundle",
+      "director'?s cut",
+    ].join("|") +
+    ")\\b( edition| cut| version)?\\s*$",
+  "i"
+);
+
+export function cleanFanartName(raw) {
+  let n = String(raw || "").trim();
+  // Blocs « ~sous-titre~ » (jeux japonais localisés) : retirés.
+  n = n.replace(/~[^~]*~/g, " ");
+  // Suffixes d'édition, appliqués en boucle (« HD Remastered Edition »).
+  let prev;
+  do {
+    prev = n;
+    n = n.replace(EDITION_RE, "").trim();
+  } while (n !== prev && n.length > 3);
+  return n.replace(/\s{2,}/g, " ").replace(/[\s:\-–—]+$/, "").trim();
+}
+
+// Candidats de recherche, du plus précis au plus large : nom original nettoyé
+// (international — décisif pour les titres localisés en français), nom affiché
+// nettoyé, puis leur segment principal avant « : » / « - » (saga).
+export function fanartCandidates(name, altName) {
+  const out = [];
+  const push = (v) => {
+    const c = cleanFanartName(v);
+    if (c && c.length >= 3 && !out.some((x) => x.toLowerCase() === c.toLowerCase()))
+      out.push(c);
+  };
+  push(altName);
+  push(name);
+  for (const base of [altName, name]) {
+    const seg = cleanFanartName(String(base || "").split(/\s*(?::|—|–| - )\s*/)[0]);
+    if (seg && seg.split(/\s+/).length >= 2) push(seg);
+  }
+  // Ultime repli : premier mot du nom original s'il est assez distinctif
+  // (« Higurashi … » → « Higurashi »). Jamais atteint si un candidat précédent
+  // a déjà donné assez de résultats.
+  const first = String(altName || "").trim().split(/\s+/)[0] || "";
+  if (first.length >= 8) push(first);
+  return out.slice(0, 5);
+}
+
+// Essaie chaque candidat jusqu'à avoir assez d'œuvres (≥ 5), sinon garde la
+// meilleure moisson rencontrée.
+async function fetchFanartSmart(name, altName) {
+  let best = [];
+  for (const cand of fanartCandidates(name, altName)) {
+    const arts = await fetchFanart(cand);
+    if (arts.length >= 5) return arts;
+    if (arts.length > best.length) best = arts;
+  }
+  return best;
 }
 
 // ---------------------------------------------------------------------------
@@ -539,19 +642,20 @@ async function fetchYouTube(name) {
 const cache = new Map(); // gameId -> { ts, data }
 const TTL = 30 * 60 * 1000;
 
-export async function buildGameFeed(gameId, name) {
-  const key = String(gameId);
+// v2 : plus de Twitch ni de YouTube (l'onglet Feed est désormais posts des
+// joueurs + fan arts). `altName` = nom original/international du jeu (IGDB),
+// décisif pour la recherche quand le titre affiché est localisé.
+export async function buildGameFeed(gameId, name, altName = null) {
+  const key = `v2-${gameId}`;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.ts < TTL) return hit.data;
 
-  const [streams, fanart, posts, videos] = await Promise.all([
-    fetchTwitchStreams(name),
-    fetchFanart(name),
+  const [fanart, posts] = await Promise.all([
+    fetchFanartSmart(name, altName),
     fetchSocial(name),
-    fetchYouTube(name),
   ]);
 
-  const data = { streams, fanart, posts, videos };
+  const data = { streams: [], fanart, posts, videos: [] };
   cache.set(key, { ts: Date.now(), data });
   return data;
 }

@@ -10,6 +10,7 @@ import { PROVIDER_LABEL } from "./trackers.js";
 import { getGameAssets } from "../lib/marvelRivals.js";
 import { SEASONS } from "../lib/marvelRivalsData.js";
 import Documentary from "../models/Documentary.js";
+import GameMedia from "../models/GameMedia.js";
 import Activity from "../models/Activity.js";
 import GemDiscovery from "../models/GemDiscovery.js";
 import GemSkip from "../models/GemSkip.js";
@@ -20,6 +21,7 @@ import { geminiJson, isGeminiConfigured } from "../lib/gemini.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { summarizeReactions } from "../lib/reviewSerialize.js";
 import { buildRepostStats } from "./reposts.js";
+import { toPost as toMediaPost } from "./gameMedia.js";
 import { playlistDuration } from "./lists.js";
 import { loadSocialCounts } from "../lib/videoSocial.js";
 
@@ -125,6 +127,7 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
     downloads,
     trackerMatches,
     rankChanges,
+    mediaPosts,
   ] = await Promise.all([
     Repost.find({ user: userScope, ...lt("createdAt") })
       .sort({ createdAt: -1 })
@@ -236,6 +239,15 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
           .sort({ lastAt: -1 })
           .limit(cap)
           .populate("user", "username avatar")
+          .lean(),
+    // Posts du mur média des jeux → carte « X a posté sur … ».
+    !wantAll
+      ? Promise.resolve([])
+      : GameMedia.find({ user: userScope, ...lt("createdAt") })
+          .sort({ createdAt: -1 })
+          .limit(cap)
+          .populate("user", "username avatar")
+          .populate("comments.user", "username avatar")
           .lean(),
   ]);
 
@@ -587,6 +599,58 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
           String(r.user._id) === String(req.userId) || myItemIds.has(r.itemId),
       },
       game: { id: r.gameId, name: r.gameName, cover: r.gameCover || null },
+    });
+  }
+
+  // --- Posts du mur média (« X a posté sur … ») : le post complet est
+  //     embarqué (texte, médias avec spoiler, commentaires) pour pouvoir
+  //     liker / répondre directement depuis le fil. ---
+  // Jaquette du jeu : stockée sur les nouveaux posts ; pour les anciens, une
+  // requête IGDB batchée résout les manquantes (+ backfill best-effort).
+  const noCoverIds = [
+    ...new Set(mediaPosts.filter((p) => p.user && !p.gameCover && p.gameId).map((p) => p.gameId)),
+  ];
+  const coverById = new Map();
+  if (noCoverIds.length) {
+    try {
+      const rows = await igdbQuery(
+        "games",
+        `fields cover.image_id; where id = (${noCoverIds.join(",")}); limit ${noCoverIds.length};`
+      );
+      for (const g of rows || []) {
+        if (g.cover?.image_id)
+          coverById.set(
+            g.id,
+            `https://images.igdb.com/igdb/image/upload/t_cover_big/${g.cover.image_id}.jpg`
+          );
+      }
+      // Backfill : la prochaine page n'aura plus à interroger IGDB.
+      for (const [gid, cov] of coverById) {
+        GameMedia.updateMany(
+          { gameId: gid, gameCover: null },
+          { $set: { gameCover: cov } },
+          { timestamps: false }
+        ).catch(() => {});
+      }
+    } catch {
+      /* best-effort : cards sans jaquette */
+    }
+  }
+  for (const p of mediaPosts) {
+    if (!p.user) continue;
+    events.push({
+      type: "gamemediapost",
+      id: `gmp-${p._id}`,
+      date: p.createdAt,
+      user: person(p.user),
+      post: toMediaPost(p, req.userId),
+      game: p.gameId
+        ? {
+            id: p.gameId,
+            name: p.gameName || "",
+            cover: p.gameCover || coverById.get(p.gameId) || null,
+          }
+        : null,
     });
   }
 

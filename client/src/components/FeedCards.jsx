@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -60,6 +60,7 @@ import { usePlayer } from "../context/PlayerContext";
 import ReviewComments from "./ReviewComments";
 import ReviewThreadModal from "./ReviewThreadModal";
 import { CommentThreadModal } from "./ListComments";
+import { MediaGrid, PostText, PostEmbed, extractEmbeds } from "./GameMediaWall";
 import { WantedModal } from "./WantedPoster";
 
 // Cards du fil social — partagées entre le fil d'accueil (HomeFeed) et
@@ -139,6 +140,7 @@ export function FeedCard(props) {
   if (item.type === "follow") return <FollowEvent {...props} />;
   if (item.type === "interaction") return <InteractionEvent {...props} />;
   if (item.type === "repost") return <RepostEvent {...props} />;
+  if (item.type === "gamemediapost") return <GameMediaPostEvent {...props} />;
   if (item.type === "video") return <VideoEvent {...props} />;
   if (item.type === "videoact") return <VideoActivityEvent {...props} />;
   if (item.type === "videoactgroup") return <VideoActivityGroupEvent {...props} />;
@@ -1204,6 +1206,103 @@ function RecoPreview({ item, token }) {
 // ============================================================
 //  Repost : fan art republié (image locale)
 // ============================================================
+// ============================================================
+//  « X a posté <un clip / deux screens / un tweet…> sur <jeu> » : post du mur
+//  média d'un jeu, rendu comme sur la fiche (texte + médias avec flou spoiler
+//  + embeds), likable / commentable directement depuis le fil.
+// ============================================================
+
+// Ce qui a été posté, en français : clips (vidéos), screens (images/GIF),
+// mélange → « des médias » ; sinon les liens (tweet / vidéo / TikTok) ;
+// texte seul → rien (« a posté sur … »).
+function postKindLabel(media, embeds) {
+  const vids = (media || []).filter((m) => m.kind === "video").length;
+  const imgs = (media || []).length - vids;
+  const n = (count, one, plural) =>
+    count === 1 ? one : count === 2 ? `deux ${plural}` : `${count} ${plural}`;
+  if (vids && imgs) return "des médias";
+  if (vids) return n(vids, "un clip", "clips");
+  if (imgs) return n(imgs, "un screen", "screens");
+  if (embeds.length) {
+    const kinds = new Set(embeds.map((e) => e.kind));
+    if (kinds.size > 1) return "des liens";
+    const k = embeds[0].kind;
+    if (k === "twitter") return n(embeds.length, "un tweet", "tweets");
+    if (k === "youtube") return n(embeds.length, "une vidéo", "vidéos");
+    if (k === "tiktok") return n(embeds.length, "un TikTok", "TikToks");
+    return "des liens";
+  }
+  return null;
+}
+
+function GameMediaPostEvent({ item, onLike, onComments, onOpenImage }) {
+  const p = item.post;
+  const g = item.game;
+  const { embeds, hide } = useMemo(() => extractEmbeds(p.text), [p.text]);
+  const kindLabel = postKindLabel(p.media, embeds);
+  return (
+    <article className="hf-card hf-gmpost">
+      <EventHead
+        user={item.user}
+        date={item.date}
+        badge={
+          g?.cover ? (
+            <Link
+              to={`/game/${g.id}?tab=feed`}
+              className="hf-gmpost-cover clickable"
+              title={g.name}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img src={g.cover} alt={g.name} loading="lazy" draggable="false" />
+            </Link>
+          ) : null
+        }
+      >
+        <Flame size={13} className="hf-inline-ic" /> a posté
+        {kindLabel ? ` ${kindLabel}` : ""}
+        {g?.id ? (
+          <>
+            {" "}
+            sur{" "}
+            <Link
+              to={`/game/${g.id}?tab=feed`}
+              className="hf-gmpost-game clickable"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {g.name}
+            </Link>
+          </>
+        ) : null}
+      </EventHead>
+
+      <div className="hf-gmpost-body">
+        <PostText text={p.text} hide={hide} />
+        {p.media?.length > 0 && (
+          <MediaGrid media={p.media} forceReveal={false} onOpen={(i) => onOpenImage?.(i)} />
+        )}
+        {embeds.map((e, i) => (
+          <PostEmbed key={i} embed={e} />
+        ))}
+      </div>
+
+      <div className="hf-actions">
+        <button
+          className={`hf-act like clickable ${p.liked ? "on" : ""}`}
+          onClick={onLike}
+          title="J'aime"
+        >
+          <Heart size={16} fill={p.liked ? "currentColor" : "none"} />
+          <span>{p.likeCount > 0 ? p.likeCount : ""}</span>
+        </button>
+        <button className="hf-act clickable" onClick={onComments} title="Répondre">
+          <MessageCircle size={16} />
+          <span>{p.commentCount > 0 ? p.commentCount : ""}</span>
+        </button>
+      </div>
+    </article>
+  );
+}
+
 function RepostEvent({ item, me, onLike, onComments, onRepost, onOpenImage, onRemove }) {
   const r = item.repost;
   const g = item.game;

@@ -1,15 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  Radio,
   Palette,
-  Video,
   MessageCircle,
-  Play,
   ExternalLink,
-  Eye,
   X,
-  Sparkles,
   Heart,
   ChevronLeft,
   ChevronRight,
@@ -24,14 +19,14 @@ import {
 import { apiFetch } from "../lib/api";
 import { makeCache } from "../lib/cache";
 import { useAuth } from "../context/AuthContext";
+import GameMediaWall from "./GameMediaWall";
 
-// Feed communautaire d'un jeu, centré sur les fan arts (priorité). Twitch FR en
-// direct et vidéos YouTube / posts sociaux sont relégués en rails horizontaux
-// (drag-to-scroll) pour ne pas noyer les fan arts. Les avis Steam vivent dans
-// l'onglet Reviews. Agrégé côté serveur (cache 30 min) + cache client SWR.
-// v2 du préfixe : invalide les entrées empoisonnées écrites par l'ancien bug
-// (contenu d'un jeu enregistré sous l'id d'un autre).
-const feedCache = makeCache("mpl_feed2_", 30 * 60 * 1000);
+// Onglet « Feed » d'un jeu : le fil des POSTS DES JOUEURS (GameMediaWall,
+// texte + screens + clips + embeds) d'abord, puis « Découvrez quelques fan
+// arts » (DeviantArt/Safebooru/Tumblr, agrégé côté serveur, cache 30 min) et
+// les réactions Bluesky/Mastodon en rail. Les lives Twitch et vidéos YouTube
+// ont été retirés (v3 du cache : nouvelle forme de données).
+const feedCache = makeCache("mpl_feed3_", 30 * 60 * 1000);
 
 function compact(n) {
   if (n == null) return "";
@@ -75,7 +70,6 @@ function useDragScroll() {
       down = false;
       el.classList.remove("dragging");
     };
-    // Annule le clic (ouverture modal / lien) si l'utilisateur a fait glisser.
     const onClick = (e) => {
       if (moved) {
         e.preventDefault();
@@ -98,12 +92,9 @@ function useDragScroll() {
   return ref;
 }
 
-export default function GameFeed({ gameId, gameName, token }) {
+export default function GameFeed({ gameId, gameName, altName, gameCover, token }) {
   const cached = feedCache.get(String(gameId));
   const [data, setData] = useState(cached?.data || null);
-  const [loading, setLoading] = useState(!cached);
-  const [video, setVideo] = useState(null);
-  const [stream, setStream] = useState(null);
   const [artIndex, setArtIndex] = useState(null);
   // Fan arts déjà republiés sur mon feed (ids source), pour l'état des boutons.
   const [reposted, setReposted] = useState(() => new Set());
@@ -119,8 +110,7 @@ export default function GameFeed({ gameId, gameName, token }) {
     };
   }, [gameId, token]);
 
-  // Toggle repost (optimiste : le bouton réagit tout de suite, le serveur
-  // télécharge l'image en fond ; on resynchronise / annule selon la réponse).
+  // Toggle repost (optimiste).
   async function toggleRepost(item) {
     const was = reposted.has(item.id);
     const apply = (on) =>
@@ -154,73 +144,43 @@ export default function GameFeed({ gameId, gameName, token }) {
     }
   }
 
+  // Fan arts + réactions (agrégés côté serveur), chargés en fond : le fil des
+  // posts s'affiche sans attendre.
   useEffect(() => {
     let alive = true;
     const c = feedCache.get(String(gameId));
     if (c) {
-      // Affiche immédiatement la donnée du BON jeu (fraîche ou périmée),
-      // jamais celle du jeu précédent.
       setData(c.data);
-      setLoading(false);
-      if (c.fresh) return; // à jour : pas de revalidation
+      if (c.fresh) return;
     } else {
-      // Aucune donnée pour ce jeu : on repart du skeleton.
       setData(null);
-      setLoading(true);
     }
-    apiFetch(`/games/${gameId}/feed?name=${encodeURIComponent(gameName)}`, { token })
+    const alt = altName && altName !== gameName ? `&alt=${encodeURIComponent(altName)}` : "";
+    apiFetch(`/games/${gameId}/feed?name=${encodeURIComponent(gameName)}${alt}`, { token })
       .then((d) => {
         if (!alive) return;
         setData(d);
         feedCache.set(String(gameId), d);
       })
-      .catch(() => {})
-      .finally(() => alive && setLoading(false));
+      .catch(() => {});
     return () => {
       alive = false;
     };
-  }, [gameId, gameName, token]);
+  }, [gameId, gameName, altName, token]);
 
-  if (loading) return <FeedSkeleton />;
-
-  const streams = data?.streams || [];
   const fanart = data?.fanart || [];
   const posts = data?.posts || [];
-  const videos = data?.videos || [];
-
-  const empty = !streams.length && !fanart.length && !posts.length && !videos.length;
-
-  if (empty) {
-    return (
-      <div className="gp-feed">
-        <div className="gp-feed-empty">
-          <Sparkles size={28} />
-          <p className="font-fun">
-            Rien à afficher dans le feed pour ce jeu pour l'instant — la
-            communauté est peut-être discrète, reviens plus tard.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="gp-feed">
-      {/* Streams Twitch FR — rail horizontal en haut, lecture dans une modal */}
-      {streams.length > 0 && (
-        <Rail title="En direct sur Twitch" Icon={Radio} count={streams.length} live>
-          {streams.map((s) => (
-            <TwitchCard key={s.id} s={s} onPlay={setStream} />
-          ))}
-        </Rail>
-      )}
+      {/* Les posts des joueurs — la pièce maîtresse de l'onglet */}
+      <GameMediaWall gameId={gameId} gameName={gameName} gameCover={gameCover} token={token} />
 
-      {/* Fan arts — la pièce maîtresse : fil vertical façon Twitter, une œuvre
-          sous l'autre, révélées par lots au scroll. Clic = visionneuse. */}
+      {/* Fin des posts : découverte de fan arts */}
       {fanart.length > 0 && (
-        <section className="gp-fanart-sec">
+        <section className="gp-fanart-sec gp-fanart-after">
           <h3 className="gp-feed-h3">
-            <Palette size={16} /> Fan arts
+            <Palette size={16} /> Découvrez quelques fan arts
             <span className="gp-feed-count">{fanart.length}</span>
           </h3>
           <FanartFeed
@@ -232,16 +192,7 @@ export default function GameFeed({ gameId, gameName, token }) {
         </section>
       )}
 
-      {/* Vidéos YouTube (FR, contenu travaillé) — rail horizontal */}
-      {videos.length > 0 && (
-        <Rail title="Vidéos" Icon={Video} count={videos.length}>
-          {videos.map((v) => (
-            <VideoCard key={`v-${v.videoId}`} c={v} onPlay={setVideo} />
-          ))}
-        </Rail>
-      )}
-
-      {/* Réactions Bluesky / Mastodon — rail horizontal */}
+      {/* Réactions Bluesky / Mastodon — rail horizontal en pied */}
       {posts.length > 0 && (
         <Rail title="Réactions" Icon={MessageCircle} count={posts.length}>
           {posts.map((p) => (
@@ -250,8 +201,6 @@ export default function GameFeed({ gameId, gameName, token }) {
         </Rail>
       )}
 
-      {video && <YouTubeModal videoId={video} onClose={() => setVideo(null)} />}
-      {stream && <TwitchModal stream={stream} onClose={() => setStream(null)} />}
       {artIndex != null && (
         <FanartViewer
           items={fanart}
@@ -267,7 +216,7 @@ export default function GameFeed({ gameId, gameName, token }) {
 }
 
 // Rail horizontal : en-tête + flèches + drag-to-scroll.
-function Rail({ title, Icon, count, live, children }) {
+function Rail({ title, Icon, count, children }) {
   const ref = useDragScroll();
   const scroll = (dir) => {
     const el = ref.current;
@@ -277,7 +226,7 @@ function Rail({ title, Icon, count, live, children }) {
     <section className="gp-rail-sec">
       <div className="gp-rail-head">
         <h3 className="gp-feed-h3">
-          {live ? <span className="gp-live-dot" /> : Icon && <Icon size={16} />}
+          {Icon && <Icon size={16} />}
           {title}
           {count > 0 && <span className="gp-feed-count">{count}</span>}
         </h3>
@@ -294,62 +243,6 @@ function Rail({ title, Icon, count, live, children }) {
         {children}
       </div>
     </section>
-  );
-}
-
-function TwitchCard({ s, onPlay }) {
-  return (
-    <button className="gp-tw-card gp-rail-item clickable" onClick={() => onPlay(s)}>
-      <div className="gp-tw-thumb">
-        <img src={s.thumbnail} alt="" loading="lazy" draggable="false" />
-        <span className="gp-tw-shade" />
-        <span className="gp-tw-live">
-          <span className="gp-live-dot sm" /> EN DIRECT
-        </span>
-        <span className="gp-tw-viewers">
-          <Eye size={12} /> {compact(s.viewers)}
-        </span>
-        <span className="gp-tw-playover">
-          <Play size={20} fill="currentColor" strokeWidth={0} />
-        </span>
-      </div>
-      <div className="gp-tw-info">
-        <span className="gp-tw-title" title={s.title}>
-          {s.title}
-        </span>
-        <span className="gp-tw-user">
-          <span className="gp-tw-glyph">
-            <Radio size={11} />
-          </span>
-          {s.user}
-        </span>
-      </div>
-    </button>
-  );
-}
-
-function VideoCard({ c, onPlay }) {
-  return (
-    <button className="gp-yt-card gp-rail-item clickable" onClick={() => onPlay(c.videoId)}>
-      <div className="gp-yt-thumb">
-        <img src={c.thumb} alt="" loading="lazy" draggable="false" />
-        <span className="gp-yt-shade" />
-        <span className="gp-yt-playover">
-          <Play size={22} fill="currentColor" strokeWidth={0} />
-        </span>
-        {c.duration && <span className="gp-yt-dur">{c.duration}</span>}
-      </div>
-      <div className="gp-yt-info">
-        <span className="gp-yt-title" title={c.title}>
-          {c.title}
-        </span>
-        {c.author && (
-          <span className="gp-yt-chan">
-            <span className="gp-yt-dot" /> {c.author}
-          </span>
-        )}
-      </div>
-    </button>
   );
 }
 
@@ -391,20 +284,15 @@ function PostCard({ c }) {
   );
 }
 
-// Fil vertical des fan arts : les œuvres sont déjà chargées côté données,
-// mais on ne MONTE que `ART_BATCH` cartes à la fois — les images suivantes ne
-// se chargent qu'en approchant de la sentinelle (fini le mur qui rame).
+// Fil vertical des fan arts : on ne MONTE que `ART_BATCH` cartes à la fois.
 const ART_BATCH = 5;
 
 function FanartFeed({ items, reposted, onRepost, onOpen }) {
   const [shown, setShown] = useState(ART_BATCH);
   const sentinelRef = useRef(null);
 
-  // Changement de jeu / de données : on repart du premier lot.
   useEffect(() => setShown(ART_BATCH), [items]);
 
-  // Recréé à chaque lot : si la sentinelle est encore visible après la
-  // révélation, l'observer neuf redéclenche aussitôt le lot suivant.
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el || shown >= items.length) return;
@@ -439,8 +327,7 @@ function FanartFeed({ items, reposted, onRepost, onOpen }) {
   );
 }
 
-// Une œuvre du fil, façon tweet : en-tête artiste/source, image au ratio
-// réservé (zéro saut de mise en page), actions en pied de carte.
+// Une œuvre du fil, façon tweet.
 function FanartPost({ c, onOpen, reposted, onRepost }) {
   const src = c.source.toLowerCase();
   return (
@@ -503,8 +390,7 @@ function FanartPost({ c, onOpen, reposted, onRepost }) {
   );
 }
 
-// Bouton « en faire ma couverture de profil » : applique l'image du fan art
-// comme bannière du profil de l'utilisateur connecté (cadrage recentré).
+// Bouton « en faire ma couverture de profil ».
 function CoverButton({ image, token }) {
   const { updateUser } = useAuth();
   const [state, setState] = useState("idle"); // idle | busy | done
@@ -545,8 +431,7 @@ function CoverButton({ image, token }) {
   );
 }
 
-// Visionneuse fan art plein écran : doom-scroll vertical avec accroche,
-// chaque œuvre en grand + bouton vers le post original.
+// Visionneuse fan art plein écran : doom-scroll vertical avec accroche.
 function FanartViewer({ items, start, onClose, reposted, onRepost, token }) {
   const scrollRef = useRef(null);
 
@@ -560,7 +445,6 @@ function FanartViewer({ items, start, onClose, reposted, onRepost, token }) {
     };
   }, [onClose]);
 
-  // Positionne sur l'œuvre cliquée à l'ouverture (sans animation).
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = start * el.clientHeight;
@@ -618,114 +502,5 @@ function FanartViewer({ items, start, onClose, reposted, onRepost, token }) {
       </div>
     </div>,
     document.body
-  );
-}
-
-function TwitchModal({ stream, onClose }) {
-  useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  const host = window.location.hostname;
-  return createPortal(
-    <div className="gp-feed-lightbox" onClick={onClose}>
-      <button className="gp-feed-lb-close clickable" onClick={onClose} aria-label="Fermer">
-        <X size={22} />
-      </button>
-      <div className="gp-tw-lb" onClick={(e) => e.stopPropagation()}>
-        <iframe
-          src={`https://player.twitch.tv/?channel=${stream.login}&parent=${host}&autoplay=true`}
-          title={stream.title}
-          allow="autoplay; fullscreen"
-          allowFullScreen
-        />
-        <div className="gp-tw-lb-bar">
-          <div className="gp-tw-lb-meta">
-            <span className="gp-live-dot sm" />
-            <b>{stream.user}</b>
-            <span className="gp-tw-lb-title" title={stream.title}>
-              {stream.title}
-            </span>
-          </div>
-          <a className="gp-feed-lb-link clickable" href={stream.url} target="_blank" rel="noreferrer">
-            Ouvrir sur Twitch <ExternalLink size={14} />
-          </a>
-        </div>
-      </div>
-    </div>,
-    document.body
-  );
-}
-
-function YouTubeModal({ videoId, onClose }) {
-  useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  return createPortal(
-    <div className="gp-feed-lightbox" onClick={onClose}>
-      <button className="gp-feed-lb-close clickable" onClick={onClose} aria-label="Fermer">
-        <X size={22} />
-      </button>
-      <div className="gp-feed-lb-inner" onClick={(e) => e.stopPropagation()}>
-        <iframe
-          src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
-          title="Vidéo"
-          allow="autoplay; encrypted-media; fullscreen"
-          allowFullScreen
-        />
-        <a
-          className="gp-feed-lb-link clickable"
-          href={`https://www.youtube.com/watch?v=${videoId}`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Ouvrir sur YouTube <ExternalLink size={14} />
-        </a>
-      </div>
-    </div>,
-    document.body
-  );
-}
-
-function FeedSkeleton() {
-  return (
-    <div className="gp-feed" aria-busy="true">
-      <div className="gp-rail">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="gp-tw-card gp-rail-item">
-            <span
-              style={{ aspectRatio: "16/9", display: "block", borderRadius: 16 }}
-              className="gp-skel"
-            />
-            <div className="gp-tw-info">
-              <span className="gp-skel gp-skel-bar" style={{ width: "85%" }} />
-              <span className="gp-skel gp-skel-bar sm" style={{ width: "45%" }} />
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="gp-art-feed" style={{ marginTop: "1.5rem" }}>
-        {Array.from({ length: 2 }).map((_, i) => (
-          <div key={i} className="gp-artp">
-            <div className="gp-artp-head">
-              <span className="gp-skel" style={{ width: 40, height: 40, borderRadius: "50%" }} />
-              <div className="gp-artp-who">
-                <span className="gp-skel gp-skel-bar" style={{ width: "45%" }} />
-                <span className="gp-skel gp-skel-bar sm" style={{ width: "28%" }} />
-              </div>
-            </div>
-            <span
-              className="gp-skel"
-              style={{ display: "block", height: 320 + (i % 2) * 90, borderRadius: 14 }}
-            />
-          </div>
-        ))}
-      </div>
-    </div>
   );
 }

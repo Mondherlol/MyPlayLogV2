@@ -274,18 +274,37 @@ export function useCommentActions(base, token, setComments) {
   return { editComment, postComment, remove, toggleLike };
 }
 
-export default function ListComments({ listId, list, token }) {
-  const [comments, setComments] = useState(list.comments || []);
+// Fil de commentaires réutilisable (listes ET posts du mur média d'un jeu).
+// `base` = préfixe d'API (`/lists/<id>` ou `/game-media/<id>`) ; `moderatorMine`
+// = l'utilisateur possède l'objet parent (peut supprimer n'importe quel message).
+export function CommentThread({
+  base,
+  comments: initialComments,
+  moderatorMine,
+  token,
+  title = "Commentaires",
+  emptyText = "Sois le premier à commenter.",
+  placeholder = "Laisse un commentaire…",
+  onCountChange,
+}) {
+  const [comments, setComments] = useState(initialComments || []);
   const [replyFor, setReplyFor] = useState(null); // id du message dont l'input inline est ouvert
   const [viewer, setViewer] = useState(null); // { commentId, index } — lightbox média
   const [historyOf, setHistoryOf] = useState(null); // commentaire dont on montre l'historique
 
-  useEffect(() => setComments(list.comments || []), [list.comments]);
+  useEffect(() => setComments(initialComments || []), [initialComments]);
+
+  // Remonte le nombre de commentaires au parent (compteur du bouton « répondre »).
+  const countCb = useRef(onCountChange);
+  countCb.current = onCountChange;
+  useEffect(() => {
+    countCb.current?.(comments.length);
+  }, [comments.length]);
 
   const openViewer = useCallback((c, index) => setViewer({ commentId: c.id, index }), []);
 
   const { editComment, postComment, remove, toggleLike } = useCommentActions(
-    `/lists/${listId}`,
+    base,
     token,
     setComments
   );
@@ -306,7 +325,7 @@ export default function ListComments({ listId, list, token }) {
     arr.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
   );
 
-  const canModerate = (c) => c.mine || list.mine;
+  const canModerate = (c) => c.mine || moderatorMine;
 
   // Composer inline d'une réponse (rattachée à la racine `rootId`).
   const inlineComposer = (target, rootId) => (
@@ -326,15 +345,17 @@ export default function ListComments({ listId, list, token }) {
 
   return (
     <section className="ld-comments card">
-      <h3 className="ld-comments-title">
-        <MessageCircle size={18} /> Commentaires
-        <span className="ld-comments-count">{comments.length}</span>
-      </h3>
+      {title && (
+        <h3 className="ld-comments-title">
+          <MessageCircle size={18} /> {title}
+          <span className="ld-comments-count">{comments.length}</span>
+        </h3>
+      )}
 
       {/* Composer principal (nouveau fil) */}
       <Composer
         token={token}
-        placeholder="Laisse un commentaire…"
+        placeholder={placeholder}
         onSubmit={async ({ text, media }) => {
           await postComment({ text, media, parent: null });
         }}
@@ -343,9 +364,7 @@ export default function ListComments({ listId, list, token }) {
       {/* Fils */}
       <div className="ld-comment-list">
         {comments.length === 0 && (
-          <p className="ld-comments-empty font-fun">
-            Sois le premier à commenter cette liste.
-          </p>
+          <p className="ld-comments-empty font-fun">{emptyText}</p>
         )}
 
         {[...roots].reverse().map((root) => {
@@ -395,7 +414,7 @@ export default function ListComments({ listId, list, token }) {
         <MediaViewer
           viewer={viewer}
           comments={comments}
-          listMine={list.mine}
+          listMine={moderatorMine}
           token={token}
           onClose={() => setViewer(null)}
           onNavigate={setViewer}
@@ -412,6 +431,19 @@ export default function ListComments({ listId, list, token }) {
         <HistoryModal comment={historyOf} onClose={() => setHistoryOf(null)} />
       )}
     </section>
+  );
+}
+
+// Fil de commentaires d'une liste : fine enveloppe autour de CommentThread.
+export default function ListComments({ listId, list, token }) {
+  return (
+    <CommentThread
+      base={`/lists/${listId}`}
+      comments={list.comments || []}
+      moderatorMine={list.mine}
+      token={token}
+      emptyText="Sois le premier à commenter cette liste."
+    />
   );
 }
 
@@ -1425,7 +1457,7 @@ export function HistoryModal({ comment, onClose }) {
 }
 
 // --- Panneau émojis (emoji-picker-react, style Twitter, FR) ---
-function EmojiPanel({ onPick }) {
+export function EmojiPanel({ onPick }) {
   const { theme } = useTheme();
   return (
     <div className="lc-emoji-wrap">

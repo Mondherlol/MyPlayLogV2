@@ -4,6 +4,7 @@ import { Loader2, Users, Sparkles } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import RepostCommentsModal from "./RepostCommentsModal";
 import VideoCommentsModal from "./VideoCommentsModal";
+import GameMediaCommentsModal from "./GameMediaCommentsModal";
 import VideoPlayerModal from "./VideoPlayerModal";
 import GemsFeedModal from "./GemsFeedModal";
 import BlindTestResultsModal from "./BlindTestResultsModal";
@@ -97,6 +98,7 @@ export default function HomeFeed({ token, me, filterUser = null }) {
   const [playing, setPlaying] = useState(null); // vidéo en lecture (objet video)
   const [commentsFor, setCommentsFor] = useState(null); // repost → modale commentaires
   const [commentsForVideo, setCommentsForVideo] = useState(null); // vidéo → modale
+  const [commentsForPost, setCommentsForPost] = useState(null); // post mur média → modale
   const [gemsFor, setGemsFor] = useState(null); // découverte de pépites → modale liste
   const [blindTestFor, setBlindTestFor] = useState(null); // blind test → modale résultats
   // Refs miroirs pour que le chargement (déclenché par Virtuoso) lise l'état courant.
@@ -155,6 +157,24 @@ export default function HomeFeed({ token, me, filterUser = null }) {
     setItems((list) =>
       list.map((i) => (i.id === id ? { ...i, video: { ...i.video, ...patch } } : i))
     );
+
+  const patchPost = (id, patch) =>
+    setItems((list) =>
+      list.map((i) => (i.id === id ? { ...i, post: { ...i.post, ...patch } } : i))
+    );
+
+  // Like optimiste d'un post du mur média.
+  async function togglePostLike(item) {
+    const p = item.post;
+    const was = { liked: p.liked, likeCount: p.likeCount };
+    patchPost(item.id, { liked: !p.liked, likeCount: p.likeCount + (p.liked ? -1 : 1) });
+    try {
+      const d = await apiFetch(`/game-media/${p.id}/like`, { method: "POST", token });
+      patchPost(item.id, { liked: d.liked, likeCount: d.likeCount });
+    } catch {
+      patchPost(item.id, was);
+    }
+  }
 
   // Like optimiste d'une vidéo recommandée.
   async function toggleVideoLike(item) {
@@ -266,16 +286,26 @@ export default function HomeFeed({ token, me, filterUser = null }) {
               me={me}
               token={token}
               onLike={() =>
-                item.type === "video" ? toggleVideoLike(item) : toggleLike(item)
+                item.type === "video"
+                  ? toggleVideoLike(item)
+                  : item.type === "gamemediapost"
+                    ? togglePostLike(item)
+                    : toggleLike(item)
               }
               onComments={() =>
                 item.type === "video"
                   ? setCommentsForVideo(item)
-                  : setCommentsFor(item)
+                  : item.type === "gamemediapost"
+                    ? setCommentsForPost(item)
+                    : setCommentsFor(item)
               }
               onLater={() => toggleVideoLater(item)}
               onRepost={() => toggleRepost(item)}
-              onOpenImage={() => setLightbox(item)}
+              onOpenImage={() =>
+                item.type === "gamemediapost"
+                  ? setCommentsForPost(item)
+                  : setLightbox(item)
+              }
               onPlay={(v) => setPlaying(v)}
               onOpenGems={() => setGemsFor(item)}
               onOpenBlindTest={(payload) => setBlindTestFor(payload || item)}
@@ -309,6 +339,15 @@ export default function HomeFeed({ token, me, filterUser = null }) {
           token={token}
           onCountChange={(n) => patchVideo(commentsForVideo.id, { commentCount: n })}
           onClose={() => setCommentsForVideo(null)}
+        />
+      )}
+      {commentsForPost && (
+        <GameMediaCommentsModal
+          post={commentsForPost.post}
+          game={commentsForPost.game}
+          token={token}
+          onCountChange={(n) => patchPost(commentsForPost.id, { commentCount: n })}
+          onClose={() => setCommentsForPost(null)}
         />
       )}
       {gemsFor && <GemsFeedModal item={gemsFor} onClose={() => setGemsFor(null)} />}

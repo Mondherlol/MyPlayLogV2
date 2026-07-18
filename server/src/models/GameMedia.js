@@ -1,48 +1,45 @@
 import mongoose from "mongoose";
+import { commentSchema } from "./List.js";
 
-// Un post du « mur média » d'un jeu : une capture, un clip, une vidéo YouTube,
-// un post X/Twitter, un TikTok… posté par n'importe quel joueur pour partager
-// ses screens marrants, clips rigolos, etc. Un document par post (contrairement
-// aux commentaires embarqués des listes) : mieux pour la pagination, le tri par
-// popularité et le like par post.
+// Un média joint à un post : image / vidéo / GIF hébergés, chacun avec son
+// propre marqueur spoiler (flou tant qu'on ne clique pas).
+const postMediaSchema = new mongoose.Schema(
+  {
+    kind: { type: String, enum: ["image", "video", "gif"], required: true },
+    url: { type: String, required: true },
+    thumbnail: { type: String, default: null }, // poster (vidéo), best-effort
+    width: { type: Number, default: null },
+    height: { type: Number, default: null },
+    spoiler: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
+// Un post du « mur média » d'un jeu, façon fil Twitter : du texte (facultatif),
+// plusieurs médias (facultatifs, chacun spoiler ou non), des likes et un fil de
+// commentaires (réutilise exactement le schéma des listes). Les liens
+// YouTube/X/TikTok collés dans le texte sont transformés en embeds côté client.
 const gameMediaSchema = new mongoose.Schema(
   {
     gameId: { type: Number, required: true }, // id IGDB du jeu
-    gameName: { type: String, default: null }, // pour le fil / notifications
+    gameName: { type: String, default: null },
+    gameCover: { type: String, default: null }, // jaquette (card du fil d'accueil)
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
-    // Légende libre (optionnelle) : le média peut se suffire à lui-même.
-    caption: { type: String, default: "", maxlength: 600 },
-    // Masqué par un flou tant qu'on ne clique pas (choisi par l'auteur).
-    spoiler: { type: Boolean, default: false },
-    // Le média lui-même. `kind` pilote le rendu :
-    //  - image / video / gif : fichier hébergé (url) ou GIF GIPHY
-    //  - youtube / twitter / tiktok : embed identifié par `embedId`
-    //  - link : repli générique (carte cliquable)
-    media: {
-      kind: {
-        type: String,
-        enum: ["image", "video", "gif", "youtube", "twitter", "tiktok", "link"],
-        required: true,
-      },
-      url: { type: String, required: true }, // fichier hébergé OU URL d'origine
-      embedId: { type: String, default: null }, // id vidéo YouTube / tweet / tiktok
-      thumbnail: { type: String, default: null }, // poster (vidéo) / miniature
-      width: { type: Number, default: null },
-      height: { type: Number, default: null },
-    },
+    text: { type: String, default: "", maxlength: 1000 },
+    media: { type: [postMediaSchema], default: [] },
     likes: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
       default: [],
     },
+    comments: { type: [commentSchema], default: [] },
   },
   { timestamps: true }
 );
 
-// Fil d'un jeu, trié du plus récent au plus ancien (ou par popularité en mémoire).
 gameMediaSchema.index({ gameId: 1, createdAt: -1 });
 
 export default mongoose.model("GameMedia", gameMediaSchema);

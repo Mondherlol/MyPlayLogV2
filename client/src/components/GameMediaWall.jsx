@@ -4,9 +4,6 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   Loader2,
   ImagePlus,
-  Film,
-  ImageIcon,
-  Link2,
   Send,
   X,
   Heart,
@@ -14,23 +11,26 @@ import {
   Eye,
   EyeOff,
   AlertTriangle,
-  Sparkles,
   Flame,
   Clock3,
-  AtSign,
-  ExternalLink,
   Play,
   Search,
   ChevronLeft,
   ChevronRight,
   Camera,
+  MessageCircle,
+  Smile,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { timeAgo } from "../lib/lists";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import { CommentThread, EmojiPanel } from "./ListComments";
+import VideoEditorModal from "./VideoEditorModal";
+import GameVideoPlayer from "./GameVideoPlayer";
 
-const MAX_CAPTION = 600;
+const MAX_TEXT = 1000;
+const MAX_MEDIA = 8;
 
 // ============================================================
 //  Marques de plateforme (SVG inline — lucide n'a plus les logos)
@@ -57,22 +57,40 @@ function YouTubeMark({ size = 18 }) {
   );
 }
 
-const KIND_META = {
-  youtube: { label: "YouTube", Mark: YouTubeMark, color: "#ff0033" },
-  twitter: { label: "Post X", Mark: XMark, color: "#111" },
-  tiktok: { label: "TikTok", Mark: TikTokMark, color: "#111" },
-  link: { label: "Lien", Mark: () => <Link2 size={18} />, color: "#5b6472" },
-};
+// ============================================================
+//  Détection des embeds à partir des URLs du texte (façon Twitter)
+// ============================================================
+const URL_RE = /(https?:\/\/[^\s]+)/g;
+const YT_RE = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/;
+const TW_RE = /(?:twitter|x)\.com\/[^/]+\/status(?:es)?\/(\d+)/;
+const TK_RE = /tiktok\.com\/(?:@[^/]+\/video|v|embed)\/(\d+)/;
 
-// Filtres du mur (regroupent plusieurs `kind`).
-const FILTERS = [
-  { id: "all", label: "Tout", Icon: Sparkles },
-  { id: "image", label: "Images", Icon: ImageIcon, kinds: ["image", "gif"] },
-  { id: "video", label: "Vidéos", Icon: Film, kinds: ["video", "youtube"] },
-  { id: "social", label: "Réseaux", Icon: AtSign, kinds: ["twitter", "tiktok", "link"] },
-];
+function classifyUrl(url) {
+  let m;
+  if ((m = url.match(YT_RE))) return { kind: "youtube", id: m[1] };
+  if ((m = url.match(TW_RE))) return { kind: "twitter", url };
+  if ((m = url.match(TK_RE))) return { kind: "tiktok", url, id: m[1] };
+  return null;
+}
 
-const LIGHTBOXABLE = new Set(["image", "gif", "video"]);
+// Renvoie les embeds détectés + l'ensemble des URLs à retirer du texte affiché.
+export function extractEmbeds(text) {
+  const urls = String(text || "").match(URL_RE) || [];
+  const embeds = [];
+  const hide = new Set();
+  const seen = new Set();
+  for (const raw of urls) {
+    const url = raw.replace(/[).,!?;:]+$/, ""); // ponctuation collée
+    const c = classifyUrl(url);
+    if (!c) continue;
+    hide.add(raw);
+    const key = `${c.kind}:${c.id || c.url}`;
+    if (seen.has(key) || embeds.length >= 4) continue;
+    seen.add(key);
+    embeds.push(c);
+  }
+  return { embeds, hide };
+}
 
 // ============================================================
 //  Chargement paresseux des scripts d'embed (X / TikTok)
@@ -91,8 +109,6 @@ function loadScriptOnce(src) {
   scriptPromises.set(src, p);
   return p;
 }
-// TikTok : embed.js scanne le document AU chargement. On ré-injecte le script
-// pour forcer un nouveau scan quand un embed est monté après coup.
 function reloadTikTok() {
   return new Promise((resolve, reject) => {
     document.getElementById("tiktok-embed-script")?.remove();
@@ -106,9 +122,7 @@ function reloadTikTok() {
   });
 }
 
-// Carte de repli quand l'embed ne charge pas (ou pour le type « link »).
-function LinkCard({ url, kind }) {
-  const meta = KIND_META[kind] || KIND_META.link;
+function LinkCard({ url }) {
   let host = url;
   try {
     host = new URL(url).hostname.replace(/^www\./, "");
@@ -117,14 +131,13 @@ function LinkCard({ url, kind }) {
   }
   return (
     <a className="gm-linkcard" href={url} target="_blank" rel="noreferrer noopener">
-      <span className="gm-linkcard-ic" style={{ background: meta.color }}>
-        <meta.Mark size={20} />
+      <span className="gm-linkcard-ic">
+        <XMark size={20} />
       </span>
       <span className="gm-linkcard-txt">
-        <b>{meta.label}</b>
+        <b>Voir le post</b>
         <span>{host}</span>
       </span>
-      <ExternalLink size={16} className="gm-linkcard-go" />
     </a>
   );
 }
@@ -137,7 +150,6 @@ function EmbedSkeleton() {
   );
 }
 
-// Tweet / post X embarqué.
 function TwitterEmbed({ url }) {
   const { theme } = useTheme();
   const ref = useRef(null);
@@ -163,7 +175,7 @@ function TwitterEmbed({ url }) {
       cancelled = true;
     };
   }, [url, theme]);
-  if (failed) return <LinkCard url={url} kind="twitter" />;
+  if (failed) return <LinkCard url={url} />;
   return (
     <div className="gm-embed gm-embed-tw">
       <div ref={ref} className="gm-embed-host" />
@@ -172,7 +184,6 @@ function TwitterEmbed({ url }) {
   );
 }
 
-// Vidéo TikTok embarquée.
 function TikTokEmbed({ url, videoId }) {
   const ref = useRef(null);
   const [failed, setFailed] = useState(false);
@@ -186,7 +197,7 @@ function TikTokEmbed({ url, videoId }) {
       cancelled = true;
     };
   }, [url, videoId]);
-  if (failed) return <LinkCard url={url} kind="tiktok" />;
+  if (failed) return <LinkCard url={url} />;
   return (
     <div className="gm-embed gm-embed-tk">
       <div ref={ref} className="gm-embed-host" />
@@ -194,10 +205,9 @@ function TikTokEmbed({ url, videoId }) {
   );
 }
 
-// Aperçu YouTube cliquable → iframe (comme les commentaires).
-function YouTubeEmbed({ id, blurred }) {
+function YouTubeEmbed({ id }) {
   const [play, setPlay] = useState(false);
-  if (play && !blurred)
+  if (play)
     return (
       <div className="gm-yt">
         <iframe
@@ -209,13 +219,7 @@ function YouTubeEmbed({ id, blurred }) {
       </div>
     );
   return (
-    <button
-      type="button"
-      className="gm-yt gm-yt-preview"
-      onClick={() => !blurred && setPlay(true)}
-      aria-label="Lire la vidéo"
-      tabIndex={blurred ? -1 : 0}
-    >
+    <button type="button" className="gm-yt gm-yt-preview" onClick={() => setPlay(true)} aria-label="Lire la vidéo">
       <img src={`https://i.ytimg.com/vi/${id}/hqdefault.jpg`} alt="" loading="lazy" />
       <span className="gm-yt-play">
         <Play size={26} fill="currentColor" />
@@ -224,15 +228,27 @@ function YouTubeEmbed({ id, blurred }) {
   );
 }
 
-// Légende : liens cliquables, reste en texte brut.
-const URL_RE = /(https?:\/\/[^\s]+)/g;
-function Caption({ text }) {
+export function PostEmbed({ embed }) {
+  if (embed.kind === "youtube") return <YouTubeEmbed id={embed.id} />;
+  if (embed.kind === "twitter") return <TwitterEmbed url={embed.url} />;
+  if (embed.kind === "tiktok") return <TikTokEmbed url={embed.url} videoId={embed.id} />;
+  return null;
+}
+
+// Texte d'un post : liens cliquables, URLs d'embed retirées, sauts de ligne gardés.
+export function PostText({ text, hide }) {
   if (!text) return null;
+  let t = text;
+  hide.forEach((u) => {
+    t = t.split(u).join("");
+  });
+  t = t.replace(/[ \t]{2,}/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  if (!t) return null;
   return (
-    <p className="gm-caption">
-      {text.split(URL_RE).map((part, i) =>
-        URL_RE.test(part) ? (
-          <a key={i} href={part} target="_blank" rel="noreferrer noopener" className="gm-caption-link">
+    <p className="gm-text">
+      {t.split(URL_RE).map((part, i) =>
+        /^https?:\/\//.test(part) ? (
+          <a key={i} href={part} target="_blank" rel="noreferrer noopener" className="gm-text-link">
             {part.replace(/^https?:\/\//, "").slice(0, 46)}
           </a>
         ) : (
@@ -244,18 +260,16 @@ function Caption({ text }) {
 }
 
 // ============================================================
-//  Composant principal
+//  Composant principal — fil vertical façon Twitter
 // ============================================================
-export default function GameMediaWall({ gameId, gameName, token }) {
+export default function GameMediaWall({ gameId, gameName, gameCover, token }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [posts, setPosts] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sort, setSort] = useState("recent"); // recent | top
-  const [filter, setFilter] = useState("all");
   const [revealAll, setRevealAll] = useState(false);
-  const [viewer, setViewer] = useState(null); // { index } dans la liste lightboxable
 
   useEffect(() => {
     let alive = true;
@@ -276,24 +290,16 @@ export default function GameMediaWall({ gameId, gameName, token }) {
     return false;
   }, [user, navigate]);
 
-  function addPost(post) {
-    setPosts((prev) => [post, ...(prev || [])]);
-  }
-  function removePost(id) {
-    setPosts((prev) => (prev || []).filter((p) => p.id !== id));
-  }
-  function patchPost(id, patch) {
+  const addPost = (post) => setPosts((prev) => [post, ...(prev || [])]);
+  const removePost = (id) => setPosts((prev) => (prev || []).filter((p) => p.id !== id));
+  const patchPost = (id, patch) =>
     setPosts((prev) => (prev || []).map((p) => (p.id === id ? { ...p, ...patch } : p)));
-  }
 
   async function toggleLike(id) {
     if (!requireLogin()) return;
-    const cur = posts.find((p) => p.id === id);
+    const cur = (posts || []).find((p) => p.id === id);
     if (!cur) return;
-    patchPost(id, {
-      liked: !cur.liked,
-      likeCount: cur.likeCount + (cur.liked ? -1 : 1),
-    });
+    patchPost(id, { liked: !cur.liked, likeCount: cur.likeCount + (cur.liked ? -1 : 1) });
     try {
       const d = await apiFetch(`/game-media/${id}/like`, { method: "POST", token });
       patchPost(id, { liked: d.liked, likeCount: d.likeCount });
@@ -303,7 +309,7 @@ export default function GameMediaWall({ gameId, gameName, token }) {
   }
 
   async function deletePost(id) {
-    if (!confirm("Supprimer ce média ?")) return;
+    if (!confirm("Supprimer ce post ?")) return;
     removePost(id);
     try {
       await apiFetch(`/game-media/${id}`, { method: "DELETE", token });
@@ -312,95 +318,54 @@ export default function GameMediaWall({ gameId, gameName, token }) {
     }
   }
 
-  // Tri + filtre en mémoire (snappy, pas de refetch).
   const shown = useMemo(() => {
-    let list = [...(posts || [])];
-    const f = FILTERS.find((x) => x.id === filter);
-    if (f?.kinds) list = list.filter((p) => f.kinds.includes(p.media.kind));
+    const list = [...(posts || [])];
     if (sort === "top")
-      list.sort(
-        (a, b) => b.likeCount - a.likeCount || new Date(b.createdAt) - new Date(a.createdAt)
-      );
+      list.sort((a, b) => b.likeCount - a.likeCount || new Date(b.createdAt) - new Date(a.createdAt));
     else list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     return list;
-  }, [posts, filter, sort]);
+  }, [posts, sort]);
 
-  // Sous-ensemble ouvrable en lightbox (images / gifs / vidéos), dans l'ordre affiché.
-  const lightboxList = useMemo(
-    () => shown.filter((p) => LIGHTBOXABLE.has(p.media.kind)),
-    [shown]
-  );
-  const openViewer = useCallback(
-    (post) => {
-      const idx = lightboxList.findIndex((p) => p.id === post.id);
-      if (idx >= 0) setViewer({ index: idx });
-    },
-    [lightboxList]
-  );
-
-  const counts = useMemo(() => {
-    const c = { all: (posts || []).length };
-    FILTERS.forEach((f) => {
-      if (f.kinds) c[f.id] = (posts || []).filter((p) => f.kinds.includes(p.media.kind)).length;
-    });
-    return c;
-  }, [posts]);
-
-  const hasSpoilers = (posts || []).some((p) => p.spoiler);
+  const hasSpoilers = (posts || []).some((p) => p.media?.some((m) => m.spoiler));
 
   return (
     <div className="gm-wall">
       <Composer
         gameId={gameId}
         gameName={gameName}
+        gameCover={gameCover}
         token={token}
         user={user}
         requireLogin={requireLogin}
         onPosted={addPost}
       />
 
-      {/* Barre d'outils : filtres + tri + spoilers */}
       {(posts?.length > 0 || loading) && (
         <div className="gm-toolbar">
-          <div className="gm-filters">
-            {FILTERS.map((f) => (
-              <button
-                key={f.id}
-                className={`gm-chip clickable ${filter === f.id ? "active" : ""}`}
-                onClick={() => setFilter(f.id)}
-              >
-                <f.Icon size={14} /> {f.label}
-                {f.id !== "all" && counts[f.id] > 0 && (
-                  <span className="gm-chip-count">{counts[f.id]}</span>
-                )}
-              </button>
-            ))}
-          </div>
-          <div className="gm-toolbar-right">
-            {hasSpoilers && (
-              <button
-                className={`gm-chip clickable ${revealAll ? "active" : ""}`}
-                onClick={() => setRevealAll((v) => !v)}
-                title={revealAll ? "Re-masquer les spoilers" : "Afficher les spoilers"}
-              >
-                {revealAll ? <Eye size={14} /> : <EyeOff size={14} />}
-                Spoilers
-              </button>
-            )}
-            <div className="gm-sort">
-              <button
-                className={`gm-sort-opt clickable ${sort === "recent" ? "active" : ""}`}
-                onClick={() => setSort("recent")}
-              >
-                <Clock3 size={14} /> Récents
-              </button>
-              <button
-                className={`gm-sort-opt clickable ${sort === "top" ? "active" : ""}`}
-                onClick={() => setSort("top")}
-              >
-                <Flame size={14} /> Populaires
-              </button>
-            </div>
+          {hasSpoilers ? (
+            <button
+              className={`gm-chip clickable ${revealAll ? "active" : ""}`}
+              onClick={() => setRevealAll((v) => !v)}
+              title={revealAll ? "Re-masquer les spoilers" : "Afficher les spoilers"}
+            >
+              {revealAll ? <Eye size={14} /> : <EyeOff size={14} />} Spoilers
+            </button>
+          ) : (
+            <span />
+          )}
+          <div className="gm-sort">
+            <button
+              className={`gm-sort-opt clickable ${sort === "recent" ? "active" : ""}`}
+              onClick={() => setSort("recent")}
+            >
+              <Clock3 size={14} /> Récents
+            </button>
+            <button
+              className={`gm-sort-opt clickable ${sort === "top" ? "active" : ""}`}
+              onClick={() => setSort("top")}
+            >
+              <Flame size={14} /> Populaires
+            </button>
           </div>
         </div>
       )}
@@ -418,78 +383,84 @@ export default function GameMediaWall({ gameId, gameName, token }) {
         <div className="gm-empty">
           <Camera size={30} />
           <p className="font-fun">
-            {posts?.length
-              ? "Aucun média dans ce filtre."
-              : "Aucun média pour l'instant — sois le premier à partager un screen ou un clip !"}
+            Rien ici pour l'instant — lance la discussion avec un screen, un clip ou juste un mot !
           </p>
         </div>
       ) : (
-        <div className="gm-grid">
+        <div className="gm-feed">
           {shown.map((post) => (
-            <MediaCard
+            <PostCard
               key={post.id}
               post={post}
+              token={token}
               forceReveal={revealAll}
               onLike={() => toggleLike(post.id)}
+              onLikeById={toggleLike}
               onDelete={() => deletePost(post.id)}
-              onOpen={() => openViewer(post)}
             />
           ))}
         </div>
-      )}
-
-      {viewer && lightboxList[viewer.index] && (
-        <Lightbox
-          list={lightboxList}
-          index={viewer.index}
-          onIndex={(i) => setViewer({ index: i })}
-          onClose={() => setViewer(null)}
-          onLike={toggleLike}
-        />
       )}
     </div>
   );
 }
 
 // ============================================================
-//  Composer (publier un média)
+//  Composer d'un post
 // ============================================================
-function Composer({ gameId, gameName, token, user, requireLogin, onPosted }) {
-  const [media, setMedia] = useState(null); // média attaché/détecté
-  const [caption, setCaption] = useState("");
-  const [spoiler, setSpoiler] = useState(false);
-  const [linkOpen, setLinkOpen] = useState(false);
-  const [linkUrl, setLinkUrl] = useState("");
-  const [detecting, setDetecting] = useState(false);
+function Composer({ gameId, gameName, gameCover, token, user, requireLogin, onPosted }) {
+  const [text, setText] = useState("");
+  const [mediaList, setMediaList] = useState([]); // {kind,url,thumbnail?,width?,height?,spoiler}
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const [gifOpen, setGifOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [videoEdit, setVideoEdit] = useState(null); // fichier vidéo en cours d'édition
   const fileRef = useRef(null);
+  const inputRef = useRef(null);
+  const hlRef = useRef(null); // calque de coloration des liens, derrière le textarea
 
-  function reset() {
-    setMedia(null);
-    setCaption("");
-    setSpoiler(false);
-    setLinkOpen(false);
-    setLinkUrl("");
-    setGifOpen(false);
-    setError(null);
+  const slotsLeft = MAX_MEDIA - mediaList.length;
+  const full = slotsLeft <= 0;
+  const canSend = (text.trim() || mediaList.length) && !busy && !uploading;
+
+  // Auto-agrandissement du champ + synchro du calque de liens.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 220)}px`;
+    if (hlRef.current) hlRef.current.scrollTop = el.scrollTop;
+  }, [text]);
+
+  function syncScroll() {
+    if (hlRef.current && inputRef.current)
+      hlRef.current.scrollTop = inputRef.current.scrollTop;
   }
 
-  async function onUpload(fileList) {
-    const file = fileList?.[0];
-    if (!file) return;
+  const liveEmbeds = useMemo(() => extractEmbeds(text).embeds, [text]);
+
+  async function uploadFiles(fileList) {
     if (!requireLogin()) return;
+    const files = [...(fileList || [])]
+      .filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"))
+      .slice(0, slotsLeft);
+    if (!files.length) return;
     setError(null);
     setUploading(true);
+    setEmojiOpen(false);
     setGifOpen(false);
-    setLinkOpen(false);
     try {
-      const fd = new FormData();
-      fd.append("media", file);
-      const { media: m } = await apiUpload("/game-media/upload", fd, token);
-      setMedia(m);
+      const uploaded = await Promise.all(
+        files.map(async (f) => {
+          const fd = new FormData();
+          fd.append("media", f);
+          const { media } = await apiUpload("/game-media/upload", fd, token);
+          return { ...media, spoiler: false };
+        })
+      );
+      setMediaList((prev) => [...prev, ...uploaded].slice(0, MAX_MEDIA));
     } catch (e) {
       setError(e.message);
     } finally {
@@ -497,29 +468,51 @@ function Composer({ gameId, gameName, token, user, requireLogin, onPosted }) {
     }
   }
 
-  // Détection du lien collé (débouncé).
-  useEffect(() => {
-    const url = linkUrl.trim();
-    if (!url || !/^https?:\/\//i.test(url)) return;
-    setDetecting(true);
-    const t = setTimeout(() => {
-      apiFetch(`/game-media/detect?url=${encodeURIComponent(url)}`, { token })
-        .then((d) => {
-          setMedia(d.media);
-          setLinkOpen(false);
-          setLinkUrl("");
-        })
-        .catch(() => setError("Lien non reconnu."))
-        .finally(() => setDetecting(false));
-    }, 500);
-    return () => {
-      clearTimeout(t);
-      setDetecting(false);
-    };
-  }, [linkUrl, token]);
+  function onPaste(e) {
+    const imgs = [...(e.clipboardData?.items || [])]
+      .filter((it) => it.type.startsWith("image/"))
+      .map((it) => it.getAsFile())
+      .filter(Boolean);
+    if (imgs.length) {
+      e.preventDefault();
+      uploadFiles(imgs);
+    }
+  }
+
+  // Une vidéo seule → passe par le mini-éditeur (rogner / son / musique /
+  // compression) avant l'upload. Sinon (images, ou sélection multiple) : direct.
+  function onFilesChosen(fileList) {
+    const files = [...(fileList || [])];
+    if (files.length === 1 && files[0].type.startsWith("video/")) {
+      if (!requireLogin()) return;
+      setVideoEdit(files[0]);
+      return;
+    }
+    uploadFiles(files);
+  }
+
+  function toggleSpoiler(i) {
+    setMediaList((prev) => prev.map((m, k) => (k === i ? { ...m, spoiler: !m.spoiler } : m)));
+  }
+  function removeMedia(i) {
+    setMediaList((prev) => prev.filter((_, k) => k !== i));
+  }
+
+  function insertEmoji(emo) {
+    const el = inputRef.current;
+    if (!el) return setText((t) => t + emo);
+    const start = el.selectionStart ?? text.length;
+    const end = el.selectionEnd ?? text.length;
+    setText((t) => t.slice(0, start) + emo + t.slice(end));
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + emo.length;
+      el.setSelectionRange(pos, pos);
+    });
+  }
 
   async function submit() {
-    if (!media || busy) return;
+    if (!canSend) return;
     if (!requireLogin()) return;
     setBusy(true);
     setError(null);
@@ -527,10 +520,13 @@ function Composer({ gameId, gameName, token, user, requireLogin, onPosted }) {
       const { post } = await apiFetch(`/game-media/game/${gameId}`, {
         method: "POST",
         token,
-        body: { media, caption: caption.trim(), spoiler, gameName },
+        body: { text: text.trim(), media: mediaList, gameName, gameCover },
       });
       onPosted(post);
-      reset();
+      setText("");
+      setMediaList([]);
+      setEmojiOpen(false);
+      setGifOpen(false);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -543,56 +539,102 @@ function Composer({ gameId, gameName, token, user, requireLogin, onPosted }) {
   return (
     <div className="gm-composer">
       <div className="gm-composer-row">
-        <div className="gm-composer-av">
-          {user?.avatar ? <img src={user.avatar} alt="" /> : initial}
-        </div>
+        <div className="gm-composer-av">{user?.avatar ? <img src={user.avatar} alt="" /> : initial}</div>
         <div className="gm-composer-main">
-          {/* Aperçu du média attaché */}
-          {media && (
-            <div className={`gm-preview ${spoiler ? "spoiler" : ""}`}>
-              <ComposerPreview media={media} />
-              {spoiler && <span className="gm-preview-spoiler">Spoiler</span>}
-              <button
-                type="button"
-                className="gm-preview-remove clickable"
-                onClick={() => setMedia(null)}
-                aria-label="Retirer"
-              >
-                <X size={15} />
-              </button>
+          {/* Calque derrière le textarea : les liens s'affichent colorés
+              pendant la frappe (le texte du  textarea est transparent). */}
+          <div className="gm-input-field">
+            <div className="gm-input-hl" ref={hlRef} aria-hidden="true">
+              {text.split(URL_RE).map((part, i) =>
+                /^https?:\/\//.test(part) ? (
+                  <span key={i} className="gm-input-link">
+                    {part}
+                  </span>
+                ) : (
+                  <span key={i}>{part}</span>
+                )
+              )}
+              {"​"}
+            </div>
+            <textarea
+              ref={inputRef}
+              className="gm-composer-input"
+              value={text}
+              maxLength={MAX_TEXT}
+              rows={1}
+              placeholder="Quelque chose à partager ? Un screenshot, un clip, ou même un lien... Fais vivre ce thread pour garder un souvenir de ton aventure sur ce jeu !"
+              onChange={(e) => setText(e.target.value)}
+              onPaste={onPaste}
+              onScroll={syncScroll}
+            />
+          </div>
+
+          {/* Médias attachés — chacun avec son toggle spoiler */}
+          {(mediaList.length > 0 || uploading) && (
+            <div className="gm-attach">
+              {mediaList.map((m, i) => (
+                <div className={`gm-attach-item ${m.spoiler ? "spoiler" : ""}`} key={i}>
+                  {m.kind === "video" ? (
+                    <video src={m.url} muted playsInline />
+                  ) : (
+                    <img src={m.url} alt="" />
+                  )}
+                  <div className="gm-attach-actions">
+                    <button
+                      type="button"
+                      className={`gm-attach-btn ${m.spoiler ? "on" : ""}`}
+                      onClick={() => toggleSpoiler(i)}
+                      title={m.spoiler ? "Retirer le spoiler" : "Marquer comme spoiler"}
+                    >
+                      {m.spoiler ? <EyeOff size={13} /> : <Eye size={13} />}
+                    </button>
+                    <button
+                      type="button"
+                      className="gm-attach-btn"
+                      onClick={() => removeMedia(i)}
+                      title="Retirer"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                  {m.spoiler && <span className="gm-attach-tag">Spoiler</span>}
+                  {m.kind === "video" && <span className="gm-attach-play"><Play size={14} fill="currentColor" /></span>}
+                </div>
+              ))}
+              {uploading && (
+                <div className="gm-attach-item gm-attach-loading">
+                  <Loader2 size={18} className="spin" />
+                </div>
+              )}
             </div>
           )}
 
-          {/* Saisie de lien */}
-          {linkOpen && !media && (
-            <div className="gm-linkinput">
-              <Link2 size={16} />
-              <input
-                autoFocus
-                value={linkUrl}
-                onChange={(e) => setLinkUrl(e.target.value)}
-                placeholder="Colle un lien YouTube, X, TikTok ou une image…"
-              />
-              {detecting && <Loader2 size={15} className="spin" />}
+          {/* Aperçu discret des liens qui deviendront des embeds */}
+          {liveEmbeds.length > 0 && (
+            <div className="gm-embed-hint">
+              {liveEmbeds.map((e, i) => (
+                <span className="gm-embed-chip" key={i}>
+                  {e.kind === "youtube" ? <YouTubeMark size={13} /> : e.kind === "tiktok" ? <TikTokMark size={13} /> : <XMark size={13} />}
+                  {e.kind === "youtube" ? "YouTube" : e.kind === "tiktok" ? "TikTok" : "Post X"} intégré
+                </span>
+              ))}
             </div>
           )}
-
-          <textarea
-            className="gm-composer-input"
-            value={caption}
-            maxLength={MAX_CAPTION}
-            rows={media ? 2 : 1}
-            placeholder={media ? "Ajoute une légende (optionnel)…" : "Partage un screen marrant, un clip rigolo…"}
-            onChange={(e) => setCaption(e.target.value)}
-          />
 
           {error && <p className="gm-error">{error}</p>}
 
+          {emojiOpen && (
+            <div className="gm-pop">
+              <EmojiPanel onPick={insertEmoji} />
+            </div>
+          )}
           {gifOpen && (
             <GifPicker
               token={token}
               onPick={(g) => {
-                setMedia({ kind: "gif", url: g.url, width: g.width, height: g.height });
+                setMediaList((prev) =>
+                  [...prev, { kind: "gif", url: g.url, width: g.width, height: g.height, spoiler: false }].slice(0, MAX_MEDIA)
+                );
                 setGifOpen(false);
               }}
               onClose={() => setGifOpen(false)}
@@ -605,215 +647,216 @@ function Composer({ gameId, gameName, token, user, requireLogin, onPosted }) {
                 type="button"
                 className="gm-tool clickable"
                 onClick={() => fileRef.current?.click()}
-                disabled={uploading}
-                title="Image ou vidéo"
+                disabled={uploading || full}
+                title={full ? "8 médias maximum" : "Image ou vidéo"}
               >
                 {uploading ? <Loader2 size={18} className="spin" /> : <ImagePlus size={18} />}
-              </button>
-              <button
-                type="button"
-                className={`gm-tool clickable ${linkOpen ? "on" : ""}`}
-                onClick={() => {
-                  setLinkOpen((v) => !v);
-                  setGifOpen(false);
-                }}
-                title="Coller un lien (YouTube, X, TikTok…)"
-              >
-                <Link2 size={18} />
               </button>
               <button
                 type="button"
                 className={`gm-tool gm-tool-gif clickable ${gifOpen ? "on" : ""}`}
                 onClick={() => {
                   setGifOpen((v) => !v);
-                  setLinkOpen(false);
+                  setEmojiOpen(false);
                 }}
-                title="GIF"
+                disabled={full}
+                title={full ? "8 médias maximum" : "GIF"}
               >
                 GIF
               </button>
               <button
                 type="button"
-                className={`gm-tool gm-spoiler-toggle clickable ${spoiler ? "on" : ""}`}
-                onClick={() => setSpoiler((v) => !v)}
-                title="Marquer comme spoiler"
+                className={`gm-tool clickable ${emojiOpen ? "on" : ""}`}
+                onClick={() => {
+                  setEmojiOpen((v) => !v);
+                  setGifOpen(false);
+                }}
+                title="Émoji"
               >
-                {spoiler ? <EyeOff size={16} /> : <Eye size={16} />}
-                <span>Spoiler</span>
+                <Smile size={18} />
               </button>
+              {mediaList.length > 0 && <span className="gm-media-count">{mediaList.length}/{MAX_MEDIA}</span>}
               <input
                 ref={fileRef}
                 type="file"
                 accept="image/*,video/*"
+                multiple
                 hidden
                 onChange={(e) => {
-                  onUpload(e.target.files);
+                  onFilesChosen(e.target.files);
                   e.target.value = "";
                 }}
               />
             </div>
-            <button
-              type="button"
-              className="gm-post clickable"
-              onClick={submit}
-              disabled={!media || busy}
-            >
+            <button type="button" className="gm-post clickable" onClick={submit} disabled={!canSend}>
               {busy ? <Loader2 size={16} className="spin" /> : <Send size={15} />}
               <span>Publier</span>
             </button>
           </div>
         </div>
       </div>
+
+      {videoEdit && (
+        <VideoEditorModal
+          file={videoEdit}
+          token={token}
+          onCancel={() => setVideoEdit(null)}
+          onDone={(f) => {
+            setVideoEdit(null);
+            uploadFiles([f]);
+          }}
+          onRendered={(m) => {
+            // Le serveur a déjà monté/compressé le clip : on l'attache tel quel.
+            setVideoEdit(null);
+            setMediaList((prev) => [...prev, { ...m, spoiler: false }].slice(0, MAX_MEDIA));
+          }}
+        />
+      )}
     </div>
   );
 }
 
-// Aperçu compact du média dans le composer.
-function ComposerPreview({ media }) {
-  if (media.kind === "image" || media.kind === "gif")
-    return <img className="gm-preview-img" src={media.url} alt="" />;
-  if (media.kind === "video")
-    return <video className="gm-preview-img" src={media.url} muted playsInline />;
-  if (media.kind === "youtube")
-    return (
-      <div className="gm-preview-embed">
-        <img src={media.thumbnail || `https://i.ytimg.com/vi/${media.embedId}/hqdefault.jpg`} alt="" />
-        <span className="gm-preview-badge" style={{ background: KIND_META.youtube.color }}>
-          <YouTubeMark size={16} /> YouTube
-        </span>
+// ============================================================
+//  Carte d'un post
+// ============================================================
+function PostCard({ post, token, forceReveal, onLike, onLikeById, onDelete }) {
+  const [showComments, setShowComments] = useState(false);
+  const [commentCount, setCommentCount] = useState(post.commentCount || 0);
+  const [lightbox, setLightbox] = useState(null); // index dans post.media
+
+  const { embeds, hide } = useMemo(() => extractEmbeds(post.text), [post.text]);
+  const media = post.media || [];
+
+  return (
+    <article className="gm-postcard">
+      <div className="gm-post-av">
+        {post.author?.username ? (
+          <Link to={`/u/${post.author.username}`}>
+            {post.author.avatar ? <img src={post.author.avatar} alt="" /> : (post.author.username[0] || "?").toUpperCase()}
+          </Link>
+        ) : post.author?.avatar ? (
+          <img src={post.author.avatar} alt="" />
+        ) : (
+          "?"
+        )}
       </div>
-    );
-  const meta = KIND_META[media.kind] || KIND_META.link;
-  return (
-    <div className="gm-preview-chip">
-      <span className="gm-preview-chip-ic" style={{ background: meta.color }}>
-        <meta.Mark size={18} />
-      </span>
-      <span>{meta.label} prêt à publier</span>
-    </div>
-  );
-}
+      <div className="gm-post-main">
+        <div className="gm-post-head">
+          {post.author?.username ? (
+            <Link to={`/u/${post.author.username}`} className="gm-post-name">
+              {post.author.username}
+            </Link>
+          ) : (
+            <span className="gm-post-name">—</span>
+          )}
+          <span className="gm-post-dot">·</span>
+          <span className="gm-post-time">{timeAgo(post.createdAt)}</span>
+          {post.mine && (
+            <button className="gm-post-del clickable" onClick={onDelete} title="Supprimer">
+              <Trash2 size={15} />
+            </button>
+          )}
+        </div>
 
-// ============================================================
-//  Carte d'un média
-// ============================================================
-function MediaCard({ post, forceReveal, onLike, onDelete, onOpen }) {
-  const [revealed, setRevealed] = useState(false);
-  const hidden = post.spoiler && !revealed && !forceReveal;
+        <PostText text={post.text} hide={hide} />
 
-  return (
-    <div className={`gm-card ${hidden ? "is-hidden" : ""}`}>
-      <div className="gm-card-media">
-        <MediaBody post={post} blurred={hidden} onOpen={onOpen} />
-        {hidden && (
-          <button
-            type="button"
-            className="gm-spoiler-veil clickable"
-            onClick={() => setRevealed(true)}
-          >
-            <EyeOff size={22} />
-            <b>Spoiler</b>
-            <span>Cliquer pour révéler</span>
+        {media.length > 0 && (
+          <MediaGrid media={media} forceReveal={forceReveal} onOpen={(i) => setLightbox(i)} />
+        )}
+
+        {embeds.map((e, i) => (
+          <PostEmbed key={i} embed={e} />
+        ))}
+
+        <div className="gm-post-actions">
+          <button className={`gm-act clickable ${post.liked ? "liked" : ""}`} onClick={onLike} title="J'aime">
+            <Heart size={17} fill={post.liked ? "currentColor" : "none"} />
+            {post.likeCount > 0 && <span>{post.likeCount}</span>}
           </button>
+          <button
+            className={`gm-act clickable ${showComments ? "on" : ""}`}
+            onClick={() => setShowComments((v) => !v)}
+            title="Répondre"
+          >
+            <MessageCircle size={17} />
+            {commentCount > 0 && <span>{commentCount}</span>}
+          </button>
+        </div>
+
+        {showComments && (
+          <div className="gm-post-comments">
+            <CommentThread
+              base={`/game-media/${post.id}`}
+              comments={post.comments || []}
+              moderatorMine={post.mine}
+              token={token}
+              title={null}
+              placeholder="Écris une réponse…"
+              emptyText="Aucune réponse — sois le premier !"
+              onCountChange={setCommentCount}
+            />
+          </div>
         )}
       </div>
 
-      <div className="gm-card-foot">
-        <div className="gm-card-user">
-          <div className="gm-card-av">
-            {post.author?.avatar ? (
-              <img src={post.author.avatar} alt="" />
-            ) : (
-              (post.author?.username || "?")[0]?.toUpperCase()
-            )}
-          </div>
-          <div className="gm-card-meta">
-            {post.author?.username ? (
-              <Link to={`/u/${post.author.username}`} className="gm-card-name">
-                {post.author.username}
-              </Link>
-            ) : (
-              <span className="gm-card-name">—</span>
-            )}
-            <span className="gm-card-time">{timeAgo(post.createdAt)}</span>
-          </div>
-          <div className="gm-card-actions">
-            <button
-              className={`gm-like clickable ${post.liked ? "liked" : ""}`}
-              onClick={onLike}
-              title="J'aime"
-            >
-              <Heart size={16} fill={post.liked ? "currentColor" : "none"} />
-              {post.likeCount > 0 && <span>{post.likeCount}</span>}
-            </button>
-            {post.mine && (
-              <button className="gm-del clickable" onClick={onDelete} title="Supprimer">
-                <Trash2 size={15} />
-              </button>
-            )}
-          </div>
-        </div>
-        {post.caption && <Caption text={post.caption} />}
-      </div>
+      {lightbox != null && media[lightbox] && (
+        <Lightbox
+          media={media}
+          index={lightbox}
+          post={post}
+          onIndex={setLightbox}
+          onClose={() => setLightbox(null)}
+          onLike={() => onLikeById(post.id)}
+        />
+      )}
+    </article>
+  );
+}
+
+// Grille des médias d'un post (façon Twitter) — spoiler par média.
+// Exportée : le fil d'accueil (FeedCards) rend les posts pareil.
+export function MediaGrid({ media, forceReveal, onOpen }) {
+  const n = media.length;
+  const cls = n === 1 ? "n-1" : n === 2 ? "n-2" : n === 3 ? "n-3" : "n-4";
+  return (
+    <div className={`gm-media-grid ${cls}`}>
+      {media.map((m, i) => (
+        <MediaTile key={i} m={m} forceReveal={forceReveal} onOpen={() => onOpen(i)} />
+      ))}
     </div>
   );
 }
 
-// Rendu du média selon son type.
-function MediaBody({ post, blurred, onOpen }) {
-  const { kind, url, embedId } = post.media;
-  const style = blurred ? { filter: "blur(26px)", pointerEvents: "none" } : undefined;
-
-  if (kind === "image" || kind === "gif")
-    return (
-      <button
-        type="button"
-        className="gm-imgbtn"
-        onClick={() => !blurred && onOpen()}
-        tabIndex={blurred ? -1 : 0}
-      >
-        <img src={url} alt={post.caption || ""} loading="lazy" style={style} />
-        {kind === "gif" && !blurred && <span className="gm-gif-tag">GIF</span>}
-      </button>
-    );
-
-  if (kind === "video")
-    return (
-      <div className="gm-video" style={style}>
-        <video src={url} controls preload="metadata" playsInline />
-      </div>
-    );
-
-  if (kind === "youtube")
-    return (
-      <div style={style}>
-        <YouTubeEmbed id={embedId} blurred={blurred} />
-      </div>
-    );
-
-  if (kind === "twitter")
-    return (
-      <div style={style}>
-        <TwitterEmbed url={url} />
-      </div>
-    );
-
-  if (kind === "tiktok")
-    return (
-      <div style={style}>
-        <TikTokEmbed url={url} videoId={embedId} />
-      </div>
-    );
+function MediaTile({ m, forceReveal, onOpen }) {
+  const [revealed, setRevealed] = useState(false);
+  const hidden = m.spoiler && !revealed && !forceReveal;
+  const blur = hidden ? { filter: "blur(24px)", pointerEvents: "none" } : undefined;
 
   return (
-    <div style={style}>
-      <LinkCard url={url} kind={kind} />
+    <div className={`gm-tile ${hidden ? "is-hidden" : ""}`}>
+      {m.kind === "video" ? (
+        <div style={blur} className="gm-tile-video">
+          <GameVideoPlayer src={m.url} poster={m.thumbnail || undefined} />
+        </div>
+      ) : (
+        <button type="button" className="gm-tile-btn" onClick={() => !hidden && onOpen()} tabIndex={hidden ? -1 : 0}>
+          <img src={m.url} alt="" loading="lazy" style={blur} />
+          {m.kind === "gif" && !hidden && <span className="gm-gif-tag">GIF</span>}
+        </button>
+      )}
+      {hidden && (
+        <button type="button" className="gm-spoiler-veil clickable" onClick={() => setRevealed(true)}>
+          <EyeOff size={20} />
+          <b>Spoiler</b>
+          <span>Révéler</span>
+        </button>
+      )}
     </div>
   );
 }
 
 // ============================================================
-//  Recherche de GIF (réutilise le proxy GIPHY des listes)
+//  Recherche de GIF (proxy GIPHY des listes)
 // ============================================================
 function GifPicker({ token, onPick, onClose }) {
   const [q, setQ] = useState("");
@@ -839,12 +882,7 @@ function GifPicker({ token, onPick, onClose }) {
       <div className="gm-gifpanel-head">
         <label className="gm-gifsearch">
           <Search size={15} />
-          <input
-            autoFocus
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Rechercher un GIF…"
-          />
+          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un GIF…" />
           {loading && <Loader2 size={14} className="spin" />}
         </label>
         <button className="gm-gifclose clickable" onClick={onClose} aria-label="Fermer">
@@ -864,16 +902,16 @@ function GifPicker({ token, onPick, onClose }) {
 }
 
 // ============================================================
-//  Lightbox (images / gifs / vidéos)
+//  Lightbox (médias d'un post)
 // ============================================================
-function Lightbox({ list, index, onIndex, onClose, onLike }) {
-  const post = list[index];
+function Lightbox({ media, index, post, onIndex, onClose, onLike }) {
+  const item = media[index];
   const step = useCallback(
     (dir) => {
-      if (list.length < 2) return;
-      onIndex((index + dir + list.length) % list.length);
+      if (media.length < 2) return;
+      onIndex((index + dir + media.length) % media.length);
     },
-    [list.length, index, onIndex]
+    [media.length, index, onIndex]
   );
 
   useEffect(() => {
@@ -890,24 +928,23 @@ function Lightbox({ list, index, onIndex, onClose, onLike }) {
     };
   }, [onClose, step]);
 
-  if (!post) return null;
-  const { kind, url } = post.media;
+  if (!item) return null;
 
   return createPortal(
     <div className="gm-lb" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <button className="gm-lb-close clickable" onClick={onClose} aria-label="Fermer">
         <X size={22} />
       </button>
-      {list.length > 1 && (
+      {media.length > 1 && (
         <button className="gm-lb-nav prev clickable" onClick={() => step(-1)} aria-label="Précédent">
           <ChevronLeft size={28} />
         </button>
       )}
       <div className="gm-lb-stage" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-        {kind === "video" ? (
-          <video className="gm-lb-media" src={url} controls autoPlay playsInline />
+        {item.kind === "video" ? (
+          <GameVideoPlayer className="gm-lb-media gm-lb-player" src={item.url} autoPlay />
         ) : (
-          <img className="gm-lb-media" src={url} alt={post.caption || ""} />
+          <img className="gm-lb-media" src={item.url} alt="" />
         )}
         <div className="gm-lb-bar">
           <div className="gm-lb-user">
@@ -916,18 +953,15 @@ function Lightbox({ list, index, onIndex, onClose, onLike }) {
                 @{post.author.username}
               </Link>
             )}
-            {post.caption && <span className="gm-lb-caption">{post.caption}</span>}
+            {media.length > 1 && <span className="gm-lb-caption">{index + 1} / {media.length}</span>}
           </div>
-          <button
-            className={`gm-like clickable ${post.liked ? "liked" : ""}`}
-            onClick={() => onLike(post.id)}
-          >
+          <button className={`gm-act clickable ${post.liked ? "liked" : ""}`} onClick={onLike}>
             <Heart size={16} fill={post.liked ? "currentColor" : "none"} />
             {post.likeCount > 0 && <span>{post.likeCount}</span>}
           </button>
         </div>
       </div>
-      {list.length > 1 && (
+      {media.length > 1 && (
         <button className="gm-lb-nav next clickable" onClick={() => step(1)} aria-label="Suivant">
           <ChevronRight size={28} />
         </button>

@@ -2195,7 +2195,10 @@ router.get("/:id/feed", optionalAuth, async (req, res) => {
     if (!id) return res.status(400).json({ error: "id invalide." });
     const name = String(req.query.name || "").trim();
     if (!name) return res.status(400).json({ error: "Nom du jeu manquant." });
-    const feed = await buildGameFeed(id, name);
+    // `alt` : nom original/international (IGDB) — décisif pour la recherche de
+    // fan arts quand le titre affiché est localisé en français.
+    const alt = String(req.query.alt || "").trim() || null;
+    const feed = await buildGameFeed(id, name, alt);
     res.json(feed);
   } catch (err) {
     console.error("game feed error:", err.message);
