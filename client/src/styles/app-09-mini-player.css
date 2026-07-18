@@ -283,6 +283,66 @@ button.mp-disc {
   transform: scale(0.92);
 }
 
+/* ---------- Volume (PC uniquement, masqué sur mobile) ---------- */
+.mp-volume {
+  display: flex;
+  align-items: center;
+  gap: 0.05rem;
+  margin-right: 0.35rem;
+}
+
+/* Curseur natif restylé : rempli en doré jusqu'à --vol (posé par le JSX). */
+.mp-vol-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 72px;
+  height: 5px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    #f2b70b 0,
+    #ffd24a var(--vol, 100%),
+    rgba(255, 255, 255, 0.12) var(--vol, 100%)
+  );
+  cursor: pointer;
+  outline-offset: 3px;
+}
+
+.mp-vol-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 11px;
+  height: 11px;
+  border: none;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  transform: scale(0);
+  transition: transform 0.12s ease;
+}
+
+.mp-volume:hover .mp-vol-range::-webkit-slider-thumb,
+.mp-vol-range:focus-visible::-webkit-slider-thumb {
+  transform: scale(1);
+}
+
+.mp-vol-range::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border: none;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  transform: scale(0);
+  transition: transform 0.12s ease;
+}
+
+.mp-volume:hover .mp-vol-range::-moz-range-thumb,
+.mp-vol-range:focus-visible::-moz-range-thumb {
+  transform: scale(1);
+}
+
 /* Le contenu ne doit pas rester caché derrière la barre. */
 body.mpl-open .app-content {
   padding-bottom: calc(var(--content-pad, 1.6rem) + 80px);
@@ -322,9 +382,11 @@ body.mpl-open .app-content {
     grid-area: actions;
   }
 
-  /* Masqués sur mobile pour rester compact. */
+  /* Masqués sur mobile pour rester compact (le volume passe par les boutons
+     physiques du téléphone). */
   .mp-seek,
-  .mp-queue-btn {
+  .mp-queue-btn,
+  .mp-volume {
     display: none;
   }
 

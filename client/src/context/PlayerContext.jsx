@@ -67,6 +67,18 @@ export function PlayerProvider({ children }) {
   // D'où vient la file en cours (ex. { href: "/lists/xx", label: "Ma playlist" }) :
   // permet au mini-lecteur de proposer un retour vers la playlist écoutée.
   const [source, setSource] = useState(null);
+  // Volume global (0..1) + sourdine, appliqués aux deux moteurs. Persisté pour
+  // retrouver son réglage d'une session à l'autre (contrôle PC surtout).
+  const [volume, setVolumeState] = useState(() => {
+    try {
+      const v = parseFloat(localStorage.getItem("mpl-volume"));
+      if (isFinite(v)) return Math.max(0, Math.min(1, v));
+    } catch {
+      /* ignore */
+    }
+    return 1;
+  });
+  const [muted, setMuted] = useState(false);
 
   const audioRef = useRef(null);
   // Moteur actif ("yt" | "audio"). L'iframe est toujours le point de départ.
@@ -85,11 +97,15 @@ export function PlayerProvider({ children }) {
   const indexRef = useRef(index);
   const playingRef = useRef(playing);
   const loadingRef = useRef(loading);
+  const volumeRef = useRef(volume);
+  const mutedRef = useRef(muted);
 
   queueRef.current = queue;
   indexRef.current = index;
   playingRef.current = playing;
   loadingRef.current = loading;
+  volumeRef.current = volume;
+  mutedRef.current = muted;
 
   const current = queue[index] || null;
 
@@ -102,6 +118,26 @@ export function PlayerProvider({ children }) {
   }, []);
   const advanceRef = useRef(advance);
   advanceRef.current = advance;
+
+  // Pousse volume/sourdine vers les deux moteurs. L'un des deux peut ne pas
+  // exister encore : on le rappelle donc à la création de chacun.
+  const applyVolume = useCallback(() => {
+    const a = audioRef.current;
+    if (a) {
+      a.volume = volumeRef.current;
+      a.muted = mutedRef.current;
+    }
+    const p = ytRef.current;
+    if (p) {
+      try {
+        p.setVolume?.(Math.round(volumeRef.current * 100));
+        if (mutedRef.current) p.mute?.();
+        else p.unMute?.();
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
 
   // --- Player YouTube caché (créé au premier besoin) ---
   const ensureYT = useCallback(() => {
@@ -123,6 +159,7 @@ export function PlayerProvider({ children }) {
             events: {
               onReady: () => {
                 ytRef.current = p;
+                applyVolume();
                 resolve(p);
               },
               onStateChange: (e) => {
@@ -142,7 +179,7 @@ export function PlayerProvider({ children }) {
         })
     );
     return ytPromiseRef.current;
-  }, []);
+  }, [applyVolume]);
 
   const loadInYT = useCallback(
     (videoId, startSeconds = 0) => {
@@ -215,6 +252,7 @@ export function PlayerProvider({ children }) {
   useEffect(() => {
     const a = new Audio();
     a.preload = "auto";
+    a.volume = volumeRef.current;
     audioRef.current = a;
 
     const onPlaying = () => {
@@ -394,6 +432,16 @@ export function PlayerProvider({ children }) {
     return () => clearInterval(id);
   }, [playing]);
 
+  // Applique volume/sourdine dès qu'ils changent, et mémorise le volume.
+  useEffect(() => {
+    applyVolume();
+    try {
+      localStorage.setItem("mpl-volume", String(volume));
+    } catch {
+      /* ignore */
+    }
+  }, [volume, muted, applyVolume]);
+
   // Mobile : préchauffe l'extraction de la piste suivante côté serveur pendant
   // l'écoute en cours → sa bascule sera quasi immédiate.
   useEffect(() => {
@@ -549,6 +597,15 @@ export function PlayerProvider({ children }) {
     }
   }, []);
 
+  const setVolume = useCallback((v) => {
+    const clamped = Math.max(0, Math.min(1, v));
+    setVolumeState(clamped);
+    // Bouger le curseur rétablit le son (comportement standard des lecteurs).
+    if (clamped > 0) setMuted(false);
+  }, []);
+
+  const toggleMute = useCallback(() => setMuted((m) => !m), []);
+
   const close = useCallback(() => {
     const a = audioRef.current;
     if (a) {
@@ -654,6 +711,8 @@ export function PlayerProvider({ children }) {
       loading,
       progress,
       source,
+      volume,
+      muted,
       hasNext: index < queue.length - 1,
       hasPrev: index > 0,
       isCurrent,
@@ -665,6 +724,8 @@ export function PlayerProvider({ children }) {
       next,
       prev,
       seekFraction,
+      setVolume,
+      toggleMute,
       close,
     }),
     [
@@ -675,6 +736,8 @@ export function PlayerProvider({ children }) {
       loading,
       progress,
       source,
+      volume,
+      muted,
       isCurrent,
       isPlaying,
       playFromList,
@@ -684,6 +747,8 @@ export function PlayerProvider({ children }) {
       next,
       prev,
       seekFraction,
+      setVolume,
+      toggleMute,
       close,
     ]
   );

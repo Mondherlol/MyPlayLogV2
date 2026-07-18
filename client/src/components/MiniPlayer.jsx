@@ -13,6 +13,9 @@ import {
   ListMusic,
   ArrowUpRight,
   Loader2,
+  Volume2,
+  Volume1,
+  VolumeX,
 } from "lucide-react";
 import { usePlayer } from "../context/PlayerContext";
 
@@ -27,7 +30,17 @@ function fmt(sec) {
 // que lorsqu'une OST est lancée (depuis la page jeu, le profil ou l'aperçu).
 export default function MiniPlayer() {
   const player = usePlayer();
-  const { current, playing, loading, progress, hasNext, hasPrev, queue } = player;
+  const {
+    current,
+    playing,
+    loading,
+    progress,
+    hasNext,
+    hasPrev,
+    queue,
+    volume,
+    muted,
+  } = player;
   const barRef = useRef(null);
   const [showQueue, setShowQueue] = useState(false);
   // Réduit en « bulle » façon Messenger : le son continue, on rouvre au clic.
@@ -53,6 +66,9 @@ export default function MiniPlayer() {
   const pct = progress.duration
     ? Math.min(100, (progress.current / progress.duration) * 100)
     : 0;
+
+  const volPct = muted ? 0 : Math.round(volume * 100);
+  const VolumeIcon = volPct === 0 ? VolumeX : volPct < 50 ? Volume1 : Volume2;
 
   function onSeek(e) {
     const el = barRef.current;
@@ -181,6 +197,29 @@ export default function MiniPlayer() {
         </div>
 
         <div className="mp-actions">
+          {/* Volume : PC uniquement (masqué en CSS sur mobile, où les boutons
+              physiques font le travail). Clic sur l'icône = sourdine. */}
+          <div className="mp-volume" style={{ "--vol": `${volPct}%` }}>
+            <button
+              className="mp-icon-btn clickable"
+              onClick={player.toggleMute}
+              title={muted ? "Rétablir le son" : "Couper le son"}
+              aria-label={muted ? "Rétablir le son" : "Couper le son"}
+            >
+              <VolumeIcon size={18} />
+            </button>
+            <input
+              type="range"
+              className="mp-vol-range clickable"
+              min="0"
+              max="100"
+              step="1"
+              value={volPct}
+              onChange={(e) => player.setVolume(Number(e.target.value) / 100)}
+              aria-label="Volume"
+              title="Volume"
+            />
+          </div>
           {/* File de lecture : ouvre la playlist en cours dans une modale
               (au lieu de quitter la page). Icône seule pour rester compact. */}
           {queue.length > 1 && (
