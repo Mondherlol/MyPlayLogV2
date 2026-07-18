@@ -21,6 +21,11 @@ const rankChangeSchema = new mongoose.Schema(
       required: true,
       enum: ["marvel-rivals", "league-of-legends"],
     },
+    // Compte d'origine : slot du GameTracker (0 = principal, 1..3 = smurfs) +
+    // pseudo du compte (badge « Smurf » de la card). Les sessions sont suivies
+    // par compte : un smurf n'étend jamais la session du compte principal.
+    slot: { type: Number, default: 0 },
+    accountName: { type: String, default: null },
 
     // Rang de DÉPART (avant la 1re partie de la session ayant changé le rang).
     oldLevel: { type: Number, required: true },

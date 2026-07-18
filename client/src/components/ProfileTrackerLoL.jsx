@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { timeAgo } from "../lib/lists";
+import { AccountRail } from "./TrackerLink";
 
 // Onglet « Tracking » du profil — vue League of Legends. Données officielles
 // Riot (rang Solo/Flex, champions maîtrisés, dernières parties), synchronisées
@@ -319,6 +320,7 @@ const MATCH_PAGE = 10;
 
 export default function ProfileTrackerLoL({ username, token, isMe }) {
   const [state, setState] = useState({ loading: true });
+  const [account, setAccount] = useState(0); // slot affiché (0 = principal)
   const [refreshing, setRefreshing] = useState(false);
   const [note, setNote] = useState(null);
   // Parties chargées EN PLUS des 12 du snapshot (pagination « Voir plus »).
@@ -326,21 +328,34 @@ export default function ProfileTrackerLoL({ username, token, isMe }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [exhausted, setExhausted] = useState(false); // plus rien à charger
 
-  async function load() {
+  async function load(accountValue = account) {
+    const q = accountValue ? `?account=${accountValue}` : "";
     try {
-      const d = await apiFetch(`/trackers/league-of-legends/${username}`, { token });
+      const d = await apiFetch(`/trackers/league-of-legends/${username}${q}`, { token });
       setState({ loading: false, data: d });
+      // Le serveur peut replier sur un autre compte (slot délié) : on s'aligne.
+      if (d.tracker?.slot != null) setAccount(d.tracker.slot);
     } catch (e) {
       setState({ loading: false, error: e.message });
     }
   }
   useEffect(() => {
     setState({ loading: true });
+    setAccount(0);
     setMoreMatches([]);
     setExhausted(false);
-    load();
+    load(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username, token]);
+
+  // Bascule sur un autre compte lié (PP cliquée) : historique vierge.
+  async function changeAccount(slot) {
+    setAccount(slot);
+    setMoreMatches([]);
+    setExhausted(false);
+    setState({ loading: true });
+    await load(slot);
+  }
 
   // Charge la page suivante de l'historique et l'ajoute (dédoublonnage par uid).
   async function loadMore() {
@@ -350,7 +365,7 @@ export default function ProfileTrackerLoL({ username, token, isMe }) {
       const base = state.data?.matches?.length || 0;
       const start = base + moreMatches.length;
       const d = await apiFetch(
-        `/trackers/league-of-legends/${username}/matches?start=${start}&count=${MATCH_PAGE}`,
+        `/trackers/league-of-legends/${username}/matches?start=${start}&count=${MATCH_PAGE}&account=${account}`,
         { token }
       );
       const fresh = d.matches || [];
@@ -380,6 +395,7 @@ export default function ProfileTrackerLoL({ username, token, isMe }) {
       const d = await apiFetch("/trackers/league-of-legends/refresh", {
         method: "POST",
         token,
+        body: { slot: account },
       });
       if (d.cooldown) setNote("Patiente un instant avant de réactualiser.");
       setState((s) => ({ loading: false, data: { ...s.data, tracker: d.tracker } }));
@@ -408,7 +424,7 @@ export default function ProfileTrackerLoL({ username, token, isMe }) {
     );
   }
 
-  const { tracker, matches = [], stale, game } = state.data;
+  const { tracker, matches = [], stale, game, accounts = [] } = state.data;
   // Base (12 du snapshot) + pages « Voir plus », dédoublonnées par uid.
   const allMatches = (() => {
     const seen = new Set(matches.map((m) => m.matchUid));
@@ -439,6 +455,11 @@ export default function ProfileTrackerLoL({ username, token, isMe }) {
             <h3 className="trk-head-game">League of Legends</h3>
             <span className="trk-head-name">
               {tracker.externalName}
+              {tracker.smurf && (
+                <span className="trk-smurf-badge" title="Compte secondaire">
+                  Smurf
+                </span>
+              )}
               {tracker.region && (
                 <span className="lol-region-badge">
                   {String(tracker.region).toUpperCase()}
@@ -459,6 +480,12 @@ export default function ProfileTrackerLoL({ username, token, isMe }) {
           </div>
         </div>
         <div className="trk-head-actions">
+          {/* PP des comptes liés (principal + smurfs) : cliquer bascule la vue. */}
+          <AccountRail
+            accounts={accounts}
+            current={tracker.slot || 0}
+            onChange={changeAccount}
+          />
           {isMe && (
             <button
               className="trk-refresh clickable"

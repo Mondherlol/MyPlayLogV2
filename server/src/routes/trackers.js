@@ -79,10 +79,12 @@ const RANK_SESSION_GAP = 3 * 60 * 60 * 1000;
 async function applyRankTransition(tracker, prev, cur) {
   const dir = cur.rankLevel > prev.rankLevel ? "up" : "down";
   // Session ouverte récente et CONTINUE (son rang courant = celui d'avant la
-  // partie) → on l'étend en place plutôt que d'empiler les cards.
+  // partie) → on l'étend en place plutôt que d'empiler les cards. Suivi PAR
+  // COMPTE (slot) : un smurf n'étend jamais la session du compte principal.
   const open = await RankChange.findOne({
     user: tracker.user,
     provider: tracker.provider,
+    slot: tracker.slot || 0,
   }).sort({ lastAt: -1 });
   const continues =
     open &&
@@ -107,6 +109,8 @@ async function applyRankTransition(tracker, prev, cur) {
   await RankChange.create({
     user: tracker.user,
     provider: tracker.provider,
+    slot: tracker.slot || 0,
+    accountName: tracker.externalName || null,
     oldLevel: prev.rankLevel,
     oldScore: prev.rankScore,
     oldTier: rankLabel(prev.rankLevel),
@@ -139,11 +143,20 @@ export const PROVIDER_LABEL = {
   "league-of-legends": "League of Legends",
 };
 
+// Multi-comptes par provider : slot 0 = compte principal, 1..3 = smurfs.
+const MAX_TRACKER_ACCOUNTS = 4;
+const clampSlot = (v) => {
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 0 && n < MAX_TRACKER_ACCOUNTS ? n : 0;
+};
+
 // Vue publique d'un tracker (pas de secret : uniquement l'id public + snapshot).
 function trackerPublic(t) {
   return {
     provider: t.provider,
     label: PROVIDER_LABEL[t.provider] || t.provider,
+    slot: t.slot || 0,
+    smurf: (t.slot || 0) > 0,
     uid: t.externalUid,
     externalName: t.externalName,
     profileUrl: t.profileUrl,
@@ -155,6 +168,32 @@ function trackerPublic(t) {
     // Historique classé (LoL) : saisons passées + pic par file. null ailleurs.
     rankHistory: t.rankHistory || null,
   };
+}
+
+// Résumé léger d'un compte pour le SWITCHER de l'onglet Tracking (rangée de PP
+// cliquables) : slot, pseudo, avatar (icône joueur, repli héros/champion) + rang.
+function accountSummary(t) {
+  const snap = t.snapshot || {};
+  return {
+    slot: t.slot || 0,
+    smurf: (t.slot || 0) > 0,
+    name: t.externalName || null,
+    icon: snap.icon || snap.heroes?.[0]?.thumb || snap.champions?.[0]?.thumb || null,
+    rank: snap.rank?.tier || null,
+    rankImage: snap.rank?.image || null,
+  };
+}
+
+// Tous les comptes d'un joueur pour un provider, triés principal → smurfs.
+async function accountsOf(userId, provider) {
+  return GameTracker.find({ user: userId, provider }).sort({ slot: 1 });
+}
+
+// Compte demandé par ?account=<slot> (défaut : principal, repli 1er lié).
+function pickAccount(trackers, slotQuery) {
+  if (!trackers.length) return null;
+  const slot = clampSlot(slotQuery);
+  return trackers.find((t) => (t.slot || 0) === slot) || trackers[0];
 }
 
 // Synchronise un tracker Marvel Rivals : refetch stats (snapshot) + matchs.
@@ -210,6 +249,8 @@ async function syncMarvelRivals(tracker, { emitFeed = true } = {}) {
               $setOnInsert: {
                 user: tracker.user,
                 provider: tracker.provider,
+                slot: tracker.slot || 0,
+                accountName: tracker.externalName || null,
                 matchUid: m.matchUid,
                 playedAt: m.playedAt,
                 hero: m.hero,
@@ -277,6 +318,7 @@ async function applyLolRankChange(tracker, prev, cur, hero) {
   const open = await RankChange.findOne({
     user: tracker.user,
     provider: tracker.provider,
+    slot: tracker.slot || 0,
   }).sort({ lastAt: -1 });
   const continues =
     open &&
@@ -298,6 +340,8 @@ async function applyLolRankChange(tracker, prev, cur, hero) {
   await RankChange.create({
     user: tracker.user,
     provider: tracker.provider,
+    slot: tracker.slot || 0,
+    accountName: tracker.externalName || null,
     oldLevel: prev.value,
     oldScore: prev.lp,
     oldTier: prev.tier,
@@ -431,6 +475,8 @@ async function syncLeagueOfLegends(tracker, { emitFeed = true } = {}) {
               $setOnInsert: {
                 user: tracker.user,
                 provider: tracker.provider,
+                slot: tracker.slot || 0,
+                accountName: tracker.externalName || null,
                 matchUid: m.matchUid,
                 playedAt: m.playedAt,
                 hero: m.hero,
@@ -493,7 +539,7 @@ async function syncLeagueOfLegends(tracker, { emitFeed = true } = {}) {
 router.get("/status", requireAuth, async (req, res) => {
   try {
     const [trackers, marvelAssets, lolCover, art] = await Promise.all([
-      GameTracker.find({ user: req.userId }).lean(),
+      GameTracker.find({ user: req.userId }).sort({ provider: 1, slot: 1 }).lean(),
       getGameAssets().catch(() => ({ cover: null })),
       lol.getGameCover().catch(() => null),
       getTrackerArt().catch(() => ({})),
@@ -642,13 +688,15 @@ router.post("/marvel-rivals/preview", requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/trackers/marvel-rivals/link { username } — lie un compte. La saisie
-// accepte un pseudo (résolu via marvelrivalsapi si configuré), un identifiant
-// numérique, ou une URL de profil collée (rivalsmeta.com/player/…).
+// POST /api/trackers/marvel-rivals/link { username, slot } — lie un compte sur
+// un SLOT (0 = principal, 1..3 = smurfs). La saisie accepte un pseudo (résolu
+// via marvelrivalsapi si configuré), un identifiant numérique, ou une URL de
+// profil collée (rivalsmeta.com/player/…).
 router.post("/marvel-rivals/link", requireAuth, async (req, res) => {
   try {
     const input = String(req.body?.username || req.body?.input || "").trim();
     if (!input) return res.status(400).json({ error: "Pseudo ou identifiant manquant." });
+    const slot = clampSlot(req.body?.slot);
 
     const player = await resolvePlayer(input);
     if (!player)
@@ -663,8 +711,18 @@ router.post("/marvel-rivals/link", requireAuth, async (req, res) => {
     if (clash)
       return res.status(409).json({ error: "Ce compte Marvel Rivals est déjà lié ailleurs." });
 
+    // … ou déjà lié par MOI sur un autre slot (pas deux fois le même compte).
+    const dup = await GameTracker.findOne({
+      user: req.userId,
+      provider: "marvel-rivals",
+      externalUid: player.uid,
+      slot: { $ne: slot },
+    }).select("_id");
+    if (dup)
+      return res.status(409).json({ error: "Ce compte est déjà lié à ton profil." });
+
     const tracker = await GameTracker.findOneAndUpdate(
-      { user: req.userId, provider: "marvel-rivals" },
+      { user: req.userId, provider: "marvel-rivals", slot },
       {
         $set: {
           externalUid: player.uid,
@@ -688,14 +746,20 @@ router.post("/marvel-rivals/link", requireAuth, async (req, res) => {
   }
 });
 
-// DELETE /api/trackers/marvel-rivals — délie (option ?removeMatches=true).
+// DELETE /api/trackers/marvel-rivals?slot=N — délie UN compte (défaut : le
+// principal). Option ?removeMatches=true : purge ses parties du fil.
 router.delete("/marvel-rivals", requireAuth, async (req, res) => {
   try {
-    await GameTracker.deleteOne({ user: req.userId, provider: "marvel-rivals" });
+    const slot = clampSlot(req.query.slot ?? req.body?.slot);
+    await GameTracker.deleteOne({ user: req.userId, provider: "marvel-rivals", slot });
     const removeMatches =
       req.query.removeMatches === "true" || req.body?.removeMatches === true;
     if (removeMatches) {
-      await TrackerMatch.deleteMany({ user: req.userId, provider: "marvel-rivals" });
+      await TrackerMatch.deleteMany({
+        user: req.userId,
+        provider: "marvel-rivals",
+        slot,
+      });
     }
     res.json({ connected: false });
   } catch (err) {
@@ -704,12 +768,14 @@ router.delete("/marvel-rivals", requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/trackers/marvel-rivals/refresh — repush + resynchro (mon compte).
+// POST /api/trackers/marvel-rivals/refresh { slot } — repush + resynchro (mon
+// compte du slot demandé, défaut : principal).
 router.post("/marvel-rivals/refresh", requireAuth, async (req, res) => {
   try {
     const tracker = await GameTracker.findOne({
       user: req.userId,
       provider: "marvel-rivals",
+      slot: clampSlot(req.body?.slot),
     });
     if (!tracker) return res.status(404).json({ error: "Aucun compte lié." });
 
@@ -752,6 +818,7 @@ router.post("/league-of-legends/link", requireAuth, async (req, res) => {
 
     const riotId = String(req.body?.riotId || req.body?.input || "").trim();
     const region = lol.normalizePlatform(req.body?.region);
+    const slot = clampSlot(req.body?.slot);
     if (!riotId)
       return res.status(400).json({ error: "Renseigne ton Riot ID (Pseudo#TAG)." });
 
@@ -772,8 +839,18 @@ router.post("/league-of-legends/link", requireAuth, async (req, res) => {
         .status(409)
         .json({ error: "Ce compte League of Legends est déjà lié ailleurs." });
 
+    // … ou déjà lié par MOI sur un autre slot (pas deux fois le même compte).
+    const dup = await GameTracker.findOne({
+      user: req.userId,
+      provider: "league-of-legends",
+      externalUid: player.puuid,
+      slot: { $ne: slot },
+    }).select("_id");
+    if (dup)
+      return res.status(409).json({ error: "Ce compte est déjà lié à ton profil." });
+
     const tracker = await GameTracker.findOneAndUpdate(
-      { user: req.userId, provider: "league-of-legends" },
+      { user: req.userId, provider: "league-of-legends", slot },
       {
         $set: {
           externalUid: player.puuid,
@@ -802,16 +879,23 @@ router.post("/league-of-legends/link", requireAuth, async (req, res) => {
   }
 });
 
-// DELETE /api/trackers/league-of-legends — délie (option ?removeMatches=true).
+// DELETE /api/trackers/league-of-legends?slot=N — délie UN compte (défaut : le
+// principal). Option ?removeMatches=true : purge ses parties du fil.
 router.delete("/league-of-legends", requireAuth, async (req, res) => {
   try {
-    await GameTracker.deleteOne({ user: req.userId, provider: "league-of-legends" });
+    const slot = clampSlot(req.query.slot ?? req.body?.slot);
+    await GameTracker.deleteOne({
+      user: req.userId,
+      provider: "league-of-legends",
+      slot,
+    });
     const removeMatches =
       req.query.removeMatches === "true" || req.body?.removeMatches === true;
     if (removeMatches) {
       await TrackerMatch.deleteMany({
         user: req.userId,
         provider: "league-of-legends",
+        slot,
       });
     }
     res.json({ connected: false });
@@ -821,13 +905,14 @@ router.delete("/league-of-legends", requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/trackers/league-of-legends/refresh — resynchro manuelle (mon compte).
-// La synchro est automatique, mais on garde un bouton pour forcer un rafraîchissement.
+// POST /api/trackers/league-of-legends/refresh { slot } — resynchro manuelle (mon
+// compte du slot demandé). La synchro est automatique, mais on garde un bouton.
 router.post("/league-of-legends/refresh", requireAuth, async (req, res) => {
   try {
     const tracker = await GameTracker.findOne({
       user: req.userId,
       provider: "league-of-legends",
+      slot: clampSlot(req.body?.slot),
     });
     if (!tracker) return res.status(404).json({ error: "Aucun compte lié." });
 
@@ -864,10 +949,10 @@ router.get("/league-of-legends/:username/matches", optionalAuth, async (req, res
     const u = await User.findOne({ username: req.params.username }).select("_id");
     if (!u) return res.status(404).json({ error: "Profil introuvable." });
 
-    const tracker = await GameTracker.findOne({
-      user: u._id,
-      provider: "league-of-legends",
-    }).select("externalUid region");
+    const tracker = pickAccount(
+      await accountsOf(u._id, "league-of-legends"),
+      req.query.account
+    );
     if (!tracker) return res.status(404).json({ error: "Aucun compte lié." });
 
     const start = Math.max(0, Number(req.query.start) || 0);
@@ -920,18 +1005,17 @@ router.get("/league-of-legends/:username/matches", optionalAuth, async (req, res
   }
 });
 
-// GET /api/trackers/league-of-legends/:username — données de l'onglet Tracking
-// LoL (public / partageable). Resynchro de fond automatique si périmé.
+// GET /api/trackers/league-of-legends/:username?account=N — données de l'onglet
+// Tracking LoL (public / partageable) pour le compte demandé (défaut : principal).
+// Resynchro de fond automatique si périmé. `accounts` alimente le switcher de PP.
 router.get("/league-of-legends/:username", optionalAuth, async (req, res) => {
   try {
     const { default: User } = await import("../models/User.js");
     const u = await User.findOne({ username: req.params.username }).select("_id");
     if (!u) return res.status(404).json({ error: "Profil introuvable." });
 
-    const tracker = await GameTracker.findOne({
-      user: u._id,
-      provider: "league-of-legends",
-    });
+    const trackers = await accountsOf(u._id, "league-of-legends");
+    const tracker = pickAccount(trackers, req.query.account);
     if (!tracker) return res.status(404).json({ error: "Aucun compte lié." });
 
     const cover = await lol.getGameCover().catch(() => null);
@@ -949,6 +1033,7 @@ router.get("/league-of-legends/:username", optionalAuth, async (req, res) => {
 
     res.json({
       tracker: trackerPublic(tracker),
+      accounts: trackers.map(accountSummary),
       matches: tracker.snapshot?.recentMatches || [],
       stale,
       game: { cover },
@@ -960,23 +1045,33 @@ router.get("/league-of-legends/:username", optionalAuth, async (req, res) => {
 });
 
 // GET /api/trackers/:username/providers — liste publique des providers liés par
-// un joueur (onglet Tracking : sélecteur de jeu). Pas de secret exposé.
+// un joueur (onglet Tracking : sélecteur de jeu). Un provider = UNE entrée,
+// même avec plusieurs comptes (le principal représente, `accounts` détaille).
 router.get("/:username/providers", optionalAuth, async (req, res) => {
   try {
     const { default: User } = await import("../models/User.js");
     const u = await User.findOne({ username: req.params.username }).select("_id");
     if (!u) return res.status(404).json({ error: "Profil introuvable." });
     const trackers = await GameTracker.find({ user: u._id })
-      .select("provider externalName snapshot.rank")
+      .sort({ slot: 1 })
+      .select("provider slot externalName snapshot.rank snapshot.icon")
       .lean();
-    res.json({
-      providers: trackers.map((t) => ({
-        provider: t.provider,
-        label: PROVIDER_LABEL[t.provider] || t.provider,
-        externalName: t.externalName || null,
-        rank: t.snapshot?.rank?.tier || null,
-      })),
-    });
+    const byProvider = new Map();
+    for (const t of trackers) {
+      const entry =
+        byProvider.get(t.provider) ||
+        byProvider
+          .set(t.provider, {
+            provider: t.provider,
+            label: PROVIDER_LABEL[t.provider] || t.provider,
+            externalName: t.externalName || null,
+            rank: t.snapshot?.rank?.tier || null,
+            accounts: [],
+          })
+          .get(t.provider);
+      entry.accounts.push(accountSummary(t));
+    }
+    res.json({ providers: [...byProvider.values()] });
   } catch (err) {
     console.error("trackers providers error:", err.message);
     res.status(500).json({ error: "Erreur." });
@@ -1028,10 +1123,10 @@ router.get("/marvel-rivals/:username/matches", optionalAuth, async (req, res) =>
     const u = await User.findOne({ username: req.params.username }).select("_id");
     if (!u) return res.status(404).json({ error: "Profil introuvable." });
 
-    const tracker = await GameTracker.findOne({
-      user: u._id,
-      provider: "marvel-rivals",
-    }).select("externalUid");
+    const tracker = pickAccount(
+      await accountsOf(u._id, "marvel-rivals"),
+      req.query.account
+    );
     if (!tracker) return res.status(404).json({ error: "Aucun compte lié." });
 
     const skip = Math.max(0, Number(req.query.skip) || 0);
@@ -1046,8 +1141,10 @@ router.get("/marvel-rivals/:username/matches", optionalAuth, async (req, res) =>
   }
 });
 
-// GET /api/trackers/marvel-rivals/:username — données de l'onglet Tracking d'un
-// profil (public / partageable). Resynchro de fond si le snapshot est périmé.
+// GET /api/trackers/marvel-rivals/:username?account=N — données de l'onglet
+// Tracking d'un profil (public / partageable) pour le compte demandé (défaut :
+// principal). Resynchro de fond si le snapshot est périmé. `accounts` alimente
+// le switcher de PP (compte principal + smurfs).
 router.get("/marvel-rivals/:username", optionalAuth, async (req, res) => {
   try {
     // On résout le user par pseudo via le modèle User (import paresseux pour
@@ -1056,11 +1153,20 @@ router.get("/marvel-rivals/:username", optionalAuth, async (req, res) => {
     const u = await User.findOne({ username: req.params.username }).select("_id");
     if (!u) return res.status(404).json({ error: "Profil introuvable." });
 
-    const tracker = await GameTracker.findOne({
-      user: u._id,
-      provider: "marvel-rivals",
-    });
+    const trackers = await accountsOf(u._id, "marvel-rivals");
+    const tracker = pickAccount(trackers, req.query.account);
     if (!tracker) return res.status(404).json({ error: "Aucun compte lié." });
+    const accounts = trackers.map(accountSummary);
+
+    // Marvel Rivals n'a pas de boucle d'auto-sync : c'est l'ouverture du profil
+    // qui alimente le fil. On en profite pour resynchroniser EN FOND les autres
+    // comptes périmés (smurfs) — leurs parties génèrent aussi des cartes.
+    for (const sib of trackers) {
+      if (sib === tracker) continue;
+      const sibStale =
+        !sib.snapshotAt || Date.now() - sib.snapshotAt.getTime() > SNAPSHOT_TTL;
+      if (sibStale) syncMarvelRivals(sib, { emitFeed: true }).catch(() => {});
+    }
 
     // Saison demandée (défaut = courante). Une saison passée est lue à la volée
     // et N'EST PAS persistée (le snapshot stocké reste celui de la saison courante).
@@ -1081,6 +1187,7 @@ router.get("/marvel-rivals/:username", optionalAuth, async (req, res) => {
       if (snap) snap.recentMatches = (data.matches || []).slice(0, 20);
       return res.json({
         tracker: { ...trackerPublic(tracker), snapshot: snap, snapshotAt: new Date() },
+        accounts,
         matches: snap?.recentMatches || [],
         seasons: SEASONS,
         season: reqSeason,
@@ -1099,6 +1206,7 @@ router.get("/marvel-rivals/:username", optionalAuth, async (req, res) => {
 
     res.json({
       tracker: trackerPublic(tracker),
+      accounts,
       matches: tracker.snapshot?.recentMatches || [],
       seasons: SEASONS,
       season: CURRENT_SEASON_VALUE,

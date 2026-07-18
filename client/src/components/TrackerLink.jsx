@@ -79,6 +79,36 @@ export function TrackerAvatar({ src, name, size = 46 }) {
   );
 }
 
+// Rangée de PP des comptes liés d'un provider (compte principal + smurfs) dans
+// l'en-tête de l'onglet Tracking : le compte affiché est en avant (anneau doré),
+// cliquer la PP d'un autre compte bascule la vue dessus. Rien si un seul compte.
+export function AccountRail({ accounts, current, onChange }) {
+  if (!accounts || accounts.length < 2) return null;
+  return (
+    <div className="trk-accs" role="tablist" aria-label="Compte affiché">
+      {accounts.map((a) => {
+        const on = (a.slot || 0) === current;
+        return (
+          <button
+            key={a.slot}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            className={`trk-acc clickable ${on ? "on" : ""}`}
+            onClick={() => !on && onChange(a.slot || 0)}
+            title={`${a.name || "Compte"}${a.smurf ? " (smurf)" : ""}${
+              a.rank ? ` — ${a.rank}` : ""
+            }`}
+          >
+            <TrackerAvatar src={a.icon} name={a.name} size={on ? 38 : 30} />
+            {a.smurf && <span className="trk-acc-smurf">S</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // Aperçu du compte trouvé (avant liaison) : avatar + pseudo + rang + confirmation.
 function TrackerPreview({ preview, meta, onConfirm, onCancel, busy, cropRank }) {
   const hasRank = preview.rank?.image || preview.rank?.tier;
@@ -117,7 +147,8 @@ function TrackerPreview({ preview, meta, onConfirm, onCancel, busy, cropRank }) 
 
 // Formulaire de liaison Marvel Rivals : recherche par PSEUDO (liste de candidats,
 // pseudos non uniques) / identifiant / URL rivalsmeta → aperçu → confirmation.
-export function MarvelLinkForm({ onLinked, autoFocus }) {
+// `slot` : emplacement du compte (0 = principal, 1..3 = smurfs).
+export function MarvelLinkForm({ onLinked, autoFocus, slot = 0 }) {
   const { token } = useAuth();
   const [input, setInput] = useState("");
   const [candidates, setCandidates] = useState(null); // null = pas cherché, [] = aucun
@@ -174,7 +205,7 @@ export function MarvelLinkForm({ onLinked, autoFocus }) {
       await apiFetch("/trackers/marvel-rivals/link", {
         method: "POST",
         token,
-        body: { username: preview?.uid || input.trim() },
+        body: { username: preview?.uid || input.trim(), slot },
       });
       onLinked?.("marvel-rivals");
     } catch (e) {
@@ -261,7 +292,8 @@ export function MarvelLinkForm({ onLinked, autoFocus }) {
 }
 
 // Formulaire de liaison League of Legends (Riot ID + région).
-export function LeagueLinkForm({ status, onLinked, autoFocus }) {
+// `slot` : emplacement du compte (0 = principal, 1..3 = smurfs).
+export function LeagueLinkForm({ status, onLinked, autoFocus, slot = 0 }) {
   const { token } = useAuth();
   const [riotId, setRiotId] = useState("");
   const [region, setRegion] = useState("euw1");
@@ -297,7 +329,7 @@ export function LeagueLinkForm({ status, onLinked, autoFocus }) {
       await apiFetch("/trackers/league-of-legends/link", {
         method: "POST",
         token,
-        body: { riotId: riotId.trim(), region },
+        body: { riotId: riotId.trim(), region, slot },
       });
       onLinked?.("league-of-legends");
     } catch (e) {
@@ -379,7 +411,8 @@ export const TRACK_GAMES = {
 
 // Modale de liaison : bannière (jaquette du jeu) + formulaire. Réutilisable
 // depuis l'onglet Tracking d'un profil. `status` fourni par l'appelant.
-export function TrackerLinkModal({ provider, cover, banner, status, onClose, onLinked }) {
+// `slot` : emplacement visé (0 par défaut, 1..3 pour lier un smurf).
+export function TrackerLinkModal({ provider, cover, banner, status, onClose, onLinked, slot = 0 }) {
   useEffect(() => {
     document.body.style.overflow = "hidden";
     const onKey = (e) => e.key === "Escape" && onClose();
@@ -418,7 +451,7 @@ export function TrackerLinkModal({ provider, cover, banner, status, onClose, onL
         </div>
 
         <div className="trk-link-body">
-          <Form status={status} onLinked={onLinked} autoFocus />
+          <Form status={status} onLinked={onLinked} autoFocus slot={slot} />
         </div>
       </div>
     </div>,

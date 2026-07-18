@@ -22,7 +22,7 @@ import { apiFetch } from "../lib/api";
 import { timeAgo } from "../lib/lists";
 import MatchScoreboard from "./MatchScoreboard";
 import ProfileTrackerLoL from "./ProfileTrackerLoL";
-import { TrackerLinkModal } from "./TrackerLink";
+import { TrackerLinkModal, AccountRail } from "./TrackerLink";
 
 // Onglet « Tracking » du profil : stats in-game d'un compte lié (Marvel Rivals
 // pour l'instant). Consultable publiquement (profils partageables). Le
@@ -260,6 +260,7 @@ function MarvelRivalsTracker({ username, token, isMe }) {
   const [state, setState] = useState({ loading: true });
   const [season, setSeason] = useState(null); // null = saison courante (défaut serveur)
   const [seasonLoading, setSeasonLoading] = useState(false);
+  const [account, setAccount] = useState(0); // slot affiché (0 = principal)
   const [refreshing, setRefreshing] = useState(false);
   const [note, setNote] = useState(null);
   // Parties chargées EN PLUS des 20 du snapshot (pagination « Charger plus »).
@@ -267,11 +268,16 @@ function MarvelRivalsTracker({ username, token, isMe }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [exhausted, setExhausted] = useState(false); // plus rien à charger
 
-  async function load(seasonValue) {
-    const q = seasonValue != null ? `?season=${seasonValue}` : "";
+  async function load(seasonValue, accountValue = account) {
+    const q = new URLSearchParams();
+    if (seasonValue != null) q.set("season", seasonValue);
+    if (accountValue) q.set("account", String(accountValue));
+    const qs = q.toString() ? `?${q}` : "";
     try {
-      const d = await apiFetch(`/trackers/marvel-rivals/${username}${q}`, { token });
+      const d = await apiFetch(`/trackers/marvel-rivals/${username}${qs}`, { token });
       setState({ loading: false, data: d });
+      // Le serveur peut replier sur un autre compte (slot délié) : on s'aligne.
+      if (d.tracker?.slot != null) setAccount(d.tracker.slot);
       if (season == null && d.season != null) setSeason(d.season);
     } catch (e) {
       setState({ loading: false, error: e.message, notLinked: /aucun compte/i.test(e.message) });
@@ -280,9 +286,10 @@ function MarvelRivalsTracker({ username, token, isMe }) {
   useEffect(() => {
     setState({ loading: true });
     setSeason(null);
+    setAccount(0);
     setMoreMatches([]);
     setExhausted(false);
-    load(null);
+    load(null, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username, token]);
 
@@ -295,6 +302,17 @@ function MarvelRivalsTracker({ username, token, isMe }) {
     setSeasonLoading(false);
   }
 
+  // Bascule sur un autre compte lié (PP cliquée) : on repart sur la saison
+  // courante et un historique vierge pour ce compte.
+  async function changeAccount(slot) {
+    setAccount(slot);
+    setSeason(null);
+    setMoreMatches([]);
+    setExhausted(false);
+    setState({ loading: true });
+    await load(null, slot);
+  }
+
   // Charge la page suivante de l'historique et l'ajoute (dédoublonnage par uid).
   async function loadMore() {
     if (loadingMore || exhausted) return;
@@ -304,6 +322,7 @@ function MarvelRivalsTracker({ username, token, isMe }) {
       const skip = base + moreMatches.length;
       const q = new URLSearchParams({ skip: String(skip) });
       if (season != null) q.set("season", String(season));
+      if (account) q.set("account", String(account));
       const d = await apiFetch(
         `/trackers/marvel-rivals/${username}/matches?${q}`,
         { token }
@@ -330,6 +349,7 @@ function MarvelRivalsTracker({ username, token, isMe }) {
       const d = await apiFetch("/trackers/marvel-rivals/refresh", {
         method: "POST",
         token,
+        body: { slot: account },
       });
       setState((s) => ({
         loading: false,
@@ -379,7 +399,7 @@ function MarvelRivalsTracker({ username, token, isMe }) {
     );
   }
 
-  const { tracker, matches = [], stale, seasons = [], game } = state.data;
+  const { tracker, matches = [], stale, seasons = [], game, accounts = [] } = state.data;
   // Base (20 du snapshot) + pages « Charger plus », dédoublonnées par uid.
   const allMatches = (() => {
     const seen = new Set(matches.map((m) => m.matchUid));
@@ -408,6 +428,11 @@ function MarvelRivalsTracker({ username, token, isMe }) {
             <h3 className="trk-head-game">Marvel Rivals</h3>
             <span className="trk-head-name">
               {tracker.externalName}
+              {tracker.smurf && (
+                <span className="trk-smurf-badge" title="Compte secondaire">
+                  Smurf
+                </span>
+              )}
               {tracker.profileUrl && (
                 <a
                   href={tracker.profileUrl}
@@ -423,6 +448,12 @@ function MarvelRivalsTracker({ username, token, isMe }) {
           </div>
         </div>
         <div className="trk-head-actions">
+          {/* PP des comptes liés (principal + smurfs) : cliquer bascule la vue. */}
+          <AccountRail
+            accounts={accounts}
+            current={tracker.slot || 0}
+            onChange={changeAccount}
+          />
           {seasons.length > 0 && (
             <SeasonPicker
               seasons={seasons}

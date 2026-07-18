@@ -14,6 +14,7 @@ import userRoutes from "./routes/users.js";
 import notificationRoutes from "./routes/notifications.js";
 import recommendationRoutes from "./routes/recommendations.js";
 import ostRoutes from "./routes/ost.js";
+import audioRoutes from "./routes/audio.js";
 import repostRoutes from "./routes/reposts.js";
 import videoRoutes from "./routes/videos.js";
 import feedRoutes from "./routes/feed.js";
@@ -68,6 +69,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/ost", ostRoutes);
+app.use("/api/audio", audioRoutes);
 app.use("/api/reposts", repostRoutes);
 app.use("/api/videos", videoRoutes);
 app.use("/api/feed", feedRoutes);
@@ -117,11 +119,30 @@ async function ensureSuperAdmin() {
   }
 }
 
+// Migration douce multi-comptes de tracking (smurfs) : l'ancien index unique
+// { user, provider } empêcherait un second compte par jeu — on le supprime, et
+// on pose slot=0 (compte principal) sur les documents existants pour que les
+// requêtes { slot: 0 } les retrouvent. Idempotent, best-effort.
+async function migrateTrackerSlots() {
+  try {
+    const { default: GameTracker } = await import("./models/GameTracker.js");
+    const { default: TrackerMatch } = await import("./models/TrackerMatch.js");
+    const { default: RankChange } = await import("./models/RankChange.js");
+    await GameTracker.collection.dropIndex("user_1_provider_1").catch(() => {});
+    await GameTracker.updateMany({ slot: { $exists: false } }, { $set: { slot: 0 } });
+    await TrackerMatch.updateMany({ slot: { $exists: false } }, { $set: { slot: 0 } });
+    await RankChange.updateMany({ slot: { $exists: false } }, { $set: { slot: 0 } });
+  } catch (err) {
+    console.error("migrateTrackerSlots error:", err.message);
+  }
+}
+
 async function start() {
   try {
     await mongoose.connect(MONGODB_URI);
     console.log("✅ Connecté à MongoDB");
     await ensureSuperAdmin();
+    await migrateTrackerSlots();
     // Synchro automatique des comptes de tracking (League of Legends).
     startTrackerAutoSync();
     const server = app.listen(PORT, () => {

@@ -2,8 +2,9 @@ import mongoose from "mongoose";
 
 // Liaison d'un compte de jeu externe à des fins de TRACKING de performances
 // (rang, top héros, winrate/KDA, historique de matchs). Générique : un document
-// par utilisateur ET par provider. Marvel Rivals en premier ; LoL / Valorant…
-// réutiliseront le même modèle (juste un autre `provider` + une autre lib).
+// par utilisateur, par provider ET par slot (compte principal + smurfs).
+// Marvel Rivals en premier ; LoL / Valorant… réutiliseront le même modèle
+// (juste un autre `provider` + une autre lib).
 //
 // La clé d'API vit côté serveur (jamais ici) : on ne stocke que l'identifiant
 // public du joueur chez le provider + un instantané normalisé de ses stats.
@@ -19,6 +20,9 @@ const gameTrackerSchema = new mongoose.Schema(
       required: true,
       enum: ["marvel-rivals", "league-of-legends"],
     },
+    // Emplacement du compte : 0 = compte principal, 1..3 = smurfs. Chaque slot
+    // est un document indépendant (snapshot, curseurs, historique séparés).
+    slot: { type: Number, default: 0, min: 0, max: 3 },
     // Identifiant du joueur chez le provider (uid stable) + pseudo affiché.
     externalUid: { type: String, required: true },
     externalName: { type: String, default: null },
@@ -56,8 +60,10 @@ const gameTrackerSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Un seul compte lié par provider et par utilisateur.
-gameTrackerSchema.index({ user: 1, provider: 1 }, { unique: true });
+// Un seul compte lié par slot (principal + jusqu'à 3 smurfs par provider).
+// L'ancien index unique { user, provider } est supprimé au démarrage
+// (cf. migrateTrackerSlots dans index.js).
+gameTrackerSchema.index({ user: 1, provider: 1, slot: 1 }, { unique: true });
 // Empêcher de lier le même compte externe à deux utilisateurs.
 gameTrackerSchema.index({ provider: 1, externalUid: 1 });
 

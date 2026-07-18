@@ -2867,3 +2867,173 @@
     display: none;
   }
 }
+/* ==========================================================================
+   Multi-comptes de tracking (compte principal + smurfs)
+   - .trk-accs : rangée de PP cliquables dans l'en-tête de l'onglet Tracking
+   - .trk-smurf-badge : pastille « Smurf » (en-tête profil, lignes Settings)
+   - .trk-acc-list / .trk-add-smurf : gestion des comptes en Settings
+   - .hf-trk-tag.smurf : pastille smurf des cartes du fil
+   ========================================================================== */
+.trk-accs {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.trk-acc {
+  position: relative;
+  display: inline-flex;
+  border: none;
+  background: none;
+  padding: 0;
+  border-radius: 50%;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.trk-acc:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.trk-acc.on {
+  opacity: 1;
+}
+
+.trk-acc.on .trk-av {
+  border-color: var(--accent-ink);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--orange) 25%, transparent);
+}
+
+/* Mini pastille « S » sur la PP d'un smurf dans la rangée. */
+.trk-acc-smurf {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 14px;
+  height: 14px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-grad);
+  color: #fff;
+  font-size: 0.55rem;
+  font-weight: 800;
+  line-height: 1;
+  border: 2px solid var(--surface);
+}
+
+/* Badge « Smurf » à côté d'un pseudo (en-tête de l'onglet Tracking, Settings). */
+.trk-smurf-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.4rem;
+  padding: 0.08rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--orange) 30%, transparent);
+  vertical-align: middle;
+}
+
+/* Settings : liste des comptes liés (une ligne par compte). */
+.trk-acc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.9rem;
+}
+
+.trk-acc-row {
+  margin-top: 0;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.trk-acc-row .trk-connected-txt {
+  flex: 1;
+  min-width: 0;
+}
+
+.trk-add-smurf {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.8rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: 999px;
+  background: none;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.trk-add-smurf:hover {
+  color: var(--accent-ink);
+  border-color: var(--accent-ink);
+}
+
+.trk-add-form {
+  margin-top: 0.9rem;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+
+.trk-add-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.trk-add-form-head .trk-smurf-badge {
+  margin-left: 0;
+}
+
+.trk-add-cancel {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-soft);
+}
+
+.trk-add-cancel:hover {
+  color: var(--accent-ink);
+}
+
+/* Fil : pastille smurf sur les cartes de parties / montées de rang. */
+.hf-trk-tag.smurf {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.15rem;
+  padding: 0.08rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--orange) 28%, transparent);
+  vertical-align: middle;
+}

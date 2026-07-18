@@ -51,6 +51,7 @@ import {
   TrendingUp,
   TrendingDown,
   ArrowRight,
+  VenetianMask,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { timeAgo, fmtDuration } from "../lib/lists";
@@ -1851,6 +1852,18 @@ function useTrackingNav(username) {
   };
 }
 
+// Pastille « Smurf » des cartes de tracking : la partie / montée de rang vient
+// d'un compte secondaire (slot > 0), on affiche son pseudo pour lever le doute.
+function SmurfChip({ account }) {
+  if (!account?.smurf) return null;
+  return (
+    <span className="hf-trk-tag smurf" title="Compte secondaire (smurf)">
+      <VenetianMask size={11} />
+      {account.name || "Smurf"}
+    </span>
+  );
+}
+
 // Ligne K/D/A colorée + issue de la partie (réutilisée simple / groupe).
 function TrkKda({ m }) {
   return (
@@ -1889,7 +1902,7 @@ function TrackerMatchEvent({ item }) {
         badge={<SeasonChip image={item.seasonImage} label={item.seasonLabel} />}
       >
         <Swords size={13} className="hf-inline-ic" /> a joué une partie de{" "}
-        <b>{item.game}</b>
+        <b>{item.game}</b> <SmurfChip account={item.account} />
       </EventHead>
 
       <div className="hf-trk-single">
@@ -1933,7 +1946,8 @@ function TrackerMatchGroupEvent({ item }) {
         badge={<SeasonChip image={item.seasonImage} label={item.seasonLabel} />}
       >
         <Swords size={13} className="hf-inline-ic" /> a enchaîné{" "}
-        <b>{item.count} parties</b> sur <b>{item.game}</b>
+        <b>{item.count} parties</b> sur <b>{item.game}</b>{" "}
+        <SmurfChip account={item.account} />
       </EventHead>
 
       <div className="hf-trkg-summary">
@@ -2066,12 +2080,14 @@ function RankChangeEvent({ item, me, token }) {
         {up ? (
           <>
             <TrendingUp size={13} className="hf-inline-ic" /> est passé{" "}
-            <b>{item.current.tier}</b> sur <b>{item.game}</b>
+            <b>{item.current.tier}</b> sur <b>{item.game}</b>{" "}
+            <SmurfChip account={item.account} />
           </>
         ) : (
           <>
             <TrendingDown size={13} className="hf-inline-ic" /> est descendu{" "}
-            <b>{item.current.tier}</b> sur <b>{item.game}</b>
+            <b>{item.current.tier}</b> sur <b>{item.game}</b>{" "}
+            <SmurfChip account={item.account} />
           </>
         )}
       </EventHead>

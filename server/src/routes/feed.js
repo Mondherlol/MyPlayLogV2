@@ -832,10 +832,12 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
       : null;
     const seasonLabel = curSeasonLabel.replace(/season/i, "Saison").trim() || null;
 
+    // Un groupe par joueur, par provider ET par compte (slot) : les parties
+    // d'un smurf ne fusionnent jamais avec celles du compte principal.
     const byUser = new Map();
     for (const m of trackerMatches) {
       if (!m.user) continue;
-      const k = `${m.user._id}-${m.provider}`;
+      const k = `${m.user._id}-${m.provider}-${m.slot || 0}`;
       (byUser.get(k) || byUser.set(k, []).get(k)).push(m);
     }
     for (const list of byUser.values()) {
@@ -854,6 +856,12 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
         const m0 = c.members[0];
         const provider = m0.provider;
         const gameName = PROVIDER_LABEL[provider] || provider;
+        // Compte d'origine (badge « Smurf » de la carte quand slot > 0).
+        const account = {
+          slot: m0.slot || 0,
+          smurf: (m0.slot || 0) > 0,
+          name: m0.accountName || null,
+        };
         // La pastille de saison n'a de sens que pour Marvel Rivals (jaquettes
         // IGDB par saison). Les autres providers (LoL…) n'en affichent pas.
         const chipImage = provider === "marvel-rivals" ? seasonImage : null;
@@ -894,6 +902,7 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
             date: c.date,
             user: person(m0.user),
             provider,
+            account,
             game: gameName,
             seasonImage: chipImage,
             seasonLabel: chipLabel,
@@ -914,6 +923,7 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
             date: c.date,
             user: person(m0.user),
             provider,
+            account,
             game: gameName,
             seasonImage: chipImage,
             seasonLabel: chipLabel,
@@ -984,6 +994,11 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
       date: rc.lastAt,
       user: person(rc.user),
       provider: rc.provider,
+      account: {
+        slot: rc.slot || 0,
+        smurf: (rc.slot || 0) > 0,
+        name: rc.accountName || null,
+      },
       game: PROVIDER_LABEL[rc.provider] || rc.provider,
       direction: rc.direction,
       old: { level: rc.oldLevel, score: rc.oldScore, tier: rc.oldTier, image: rc.oldImage },

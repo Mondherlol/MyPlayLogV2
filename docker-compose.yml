@@ -23,6 +23,9 @@ services:
     volumes:
       # Les images uploadées (covers, avatars, reposts…) persistent hors conteneur.
       - uploads_data:/app/uploads
+      # Cache des flux audio extraits (OST) : survit aux redéploiements pour ne
+      # pas re-télécharger les pistes déjà écoutées.
+      - audio_cache:/app/cache
       # Le .env de l'hôte est monté dans le conteneur → l'onglet Secrets du panel
       # Admin peut le LIRE et l'ÉCRIRE (les modifs persistent sur l'hôte).
       # Écritures en place (writeFileSync) → l'inode ne change pas, le mount tient.
@@ -55,6 +58,7 @@ services:
 volumes:
   mongo_data:
   uploads_data:
+  audio_cache:
   caddy_data:
   caddy_config:
 

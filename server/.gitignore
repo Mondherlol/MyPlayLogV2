@@ -4,3 +4,4 @@ node_modules/
 .psn-token.json
 server.log
 uploads/
+cache/

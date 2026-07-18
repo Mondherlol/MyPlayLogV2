@@ -18,6 +18,8 @@ import {
   X,
   Trophy,
   RotateCcw,
+  Plus,
+  VenetianMask,
 } from "lucide-react";
 import { apiFetch, API_BASE } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -177,26 +179,77 @@ function TrackingPanel() {
   );
 }
 
+// Nombre max de comptes liés par jeu : le principal + 3 smurfs.
+const MAX_TRACKER_ACCOUNTS = 4;
+
+// Une ligne de compte lié (principal ou smurf) : avatar + pseudo + rang, badge
+// « Smurf » quand slot > 0, bouton Délier propre à la ligne.
+function TrackerAccountRow({ tracker, onUnlink, busy }) {
+  const snap = tracker?.snapshot;
+  const avatar = snap?.icon || snap?.heroes?.[0]?.thumb || snap?.champions?.[0]?.thumb;
+  return (
+    <div className="trk-connected trk-acc-row">
+      <TrackerAvatar src={avatar} name={tracker.externalName} size={36} />
+      <div className="trk-connected-txt">
+        <strong>
+          {tracker.externalName || "Compte lié"}
+          {tracker.smurf && (
+            <span className="trk-smurf-badge" title="Compte secondaire">
+              <VenetianMask size={12} /> Smurf
+            </span>
+          )}
+        </strong>
+        {snap?.rank?.tier && (
+          <span className="trk-connected-rank">
+            {snap.rank.image && <Emblem src={snap.rank.image} size={18} />}
+            {snap.rank.tier}
+          </span>
+        )}
+      </div>
+      <button
+        className="btn-ghost-danger clickable trk-unlink"
+        onClick={onUnlink}
+        disabled={busy}
+        title="Délier ce compte"
+      >
+        {busy ? <Loader2 className="spin" size={16} /> : <Link2Off size={16} />}
+        <span>Délier</span>
+      </button>
+    </div>
+  );
+}
+
 // Carte de liaison générique (Marvel Rivals / LoL) : logo (jaquette du jeu) +
-// titre, état connecté (avatar + rang, bouton Délier à droite) ou formulaire de
-// recherche/liaison en dessous. `Form` = MarvelLinkForm | LeagueLinkForm.
+// titre, puis la liste des comptes liés (principal + smurfs, jusqu'à 4) avec un
+// bouton « Ajouter un smurf » qui déplie le formulaire de liaison sur le premier
+// slot libre. `Form` = MarvelLinkForm | LeagueLinkForm.
 function TrackerCard({ status, reload, cover, provider, name, desc, Form }) {
   const { token } = useAuth();
-  const [busy, setBusy] = useState(false);
-  const tracker = status?.trackers?.find((t) => t.provider === provider);
-  const connected = !!tracker;
-  const snap = tracker?.snapshot;
-  const avatar = snap?.icon || snap?.heroes?.[0]?.thumb;
+  const [busySlot, setBusySlot] = useState(null); // slot en cours de déliaison
+  const [adding, setAdding] = useState(false); // formulaire smurf déplié
+  const accounts = (status?.trackers || [])
+    .filter((t) => t.provider === provider)
+    .sort((a, b) => (a.slot || 0) - (b.slot || 0));
+  const connected = accounts.length > 0;
+  // Premier slot libre (0..3) pour la prochaine liaison.
+  const usedSlots = new Set(accounts.map((t) => t.slot || 0));
+  let nextSlot = null;
+  for (let s = 0; s < MAX_TRACKER_ACCOUNTS; s++) {
+    if (!usedSlots.has(s)) {
+      nextSlot = s;
+      break;
+    }
+  }
 
-  async function unlink() {
-    setBusy(true);
+  async function unlink(slot) {
+    setBusySlot(slot);
     try {
-      await apiFetch(`/trackers/${provider}`, { method: "DELETE", token });
+      await apiFetch(`/trackers/${provider}?slot=${slot}`, { method: "DELETE", token });
       await reload();
     } catch {
       /* best-effort */
     } finally {
-      setBusy(false);
+      setBusySlot(null);
     }
   }
 
@@ -222,40 +275,63 @@ function TrackerCard({ status, reload, cover, provider, name, desc, Form }) {
               {connected && (
                 <span className="import-badge">
                   <CheckCircle2 size={13} /> Lié
+                  {accounts.length > 1 && ` · ${accounts.length} comptes`}
                 </span>
               )}
             </div>
-            {connected ? (
-              <div className="trk-connected">
-                <TrackerAvatar src={avatar} name={tracker.externalName} size={36} />
-                <div className="trk-connected-txt">
-                  <strong>{tracker.externalName || "Compte lié"}</strong>
-                  {snap?.rank?.tier && (
-                    <span className="trk-connected-rank">
-                      {snap.rank.image && <Emblem src={snap.rank.image} size={18} />}
-                      {snap.rank.tier}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <p className="import-card-desc">{desc}</p>
-            )}
+            {!connected && <p className="import-card-desc">{desc}</p>}
           </div>
         </div>
-        {connected && (
-          <button
-            className="btn-ghost-danger clickable trk-unlink"
-            onClick={unlink}
-            disabled={busy}
-          >
-            {busy ? <Loader2 className="spin" size={16} /> : <Link2Off size={16} />}
-            <span>Délier</span>
-          </button>
-        )}
       </div>
 
-      {!connected && <Form status={status} onLinked={reload} />}
+      {connected && (
+        <div className="trk-acc-list">
+          {accounts.map((t) => (
+            <TrackerAccountRow
+              key={t.slot || 0}
+              tracker={t}
+              busy={busySlot === (t.slot || 0)}
+              onUnlink={() => unlink(t.slot || 0)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Liaison : directe quand rien n'est lié, dépliée via « Ajouter un
+          smurf » ensuite (jusqu'à 3 smurfs en plus du compte principal). */}
+      {!connected && <Form status={status} onLinked={reload} slot={0} />}
+      {connected && nextSlot != null && !adding && (
+        <button className="trk-add-smurf clickable" onClick={() => setAdding(true)}>
+          <VenetianMask size={15} />
+          <span>Ajouter un smurf</span>
+          <Plus size={14} />
+        </button>
+      )}
+      {connected && adding && nextSlot != null && (
+        <div className="trk-add-form">
+          <div className="trk-add-form-head">
+            <span className="trk-smurf-badge">
+              <VenetianMask size={12} /> Nouveau smurf
+            </span>
+            <button
+              className="trk-add-cancel clickable"
+              onClick={() => setAdding(false)}
+              title="Annuler"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <Form
+            status={status}
+            slot={nextSlot}
+            autoFocus
+            onLinked={async () => {
+              setAdding(false);
+              await reload();
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

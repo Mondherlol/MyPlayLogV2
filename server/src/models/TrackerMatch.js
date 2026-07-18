@@ -17,6 +17,10 @@ const trackerMatchSchema = new mongoose.Schema(
       required: true,
       enum: ["marvel-rivals", "league-of-legends"],
     },
+    // Compte d'origine : slot du GameTracker (0 = principal, 1..3 = smurfs) +
+    // pseudo du compte au moment de la partie (badge « Smurf » des cartes de fil).
+    slot: { type: Number, default: 0 },
+    accountName: { type: String, default: null },
     matchUid: { type: String, required: true }, // id de la partie chez le provider
     playedAt: { type: Date, required: true },
 

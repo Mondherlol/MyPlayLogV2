@@ -1532,12 +1532,21 @@ router.get("/:username", optionalAuth, async (req, res) => {
       ]);
 
     // Résumé léger des comptes de tracking liés (badge + visibilité de l'onglet
-    // Tracking). On expose juste provider + pseudo + rang courant.
-    const trackers = (trackerDocs || []).map((t) => ({
-      provider: t.provider,
-      externalName: t.externalName || null,
-      rank: t.snapshot?.rank?.tier || null,
-    }));
+    // Tracking). UNE entrée par provider même avec plusieurs comptes (smurfs) :
+    // le compte principal (slot 0) représente, `accounts` compte le total.
+    const trackersByProvider = new Map();
+    for (const t of (trackerDocs || []).sort((a, b) => (a.slot || 0) - (b.slot || 0))) {
+      const entry = trackersByProvider.get(t.provider);
+      if (entry) entry.accounts += 1;
+      else
+        trackersByProvider.set(t.provider, {
+          provider: t.provider,
+          externalName: t.externalName || null,
+          rank: t.snapshot?.rank?.tier || null,
+          accounts: 1,
+        });
+    }
+    const trackers = [...trackersByProvider.values()];
 
     const library = entries.map(entryCard);
 
