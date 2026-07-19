@@ -127,7 +127,7 @@ const REACTIONS = [
 
 // Ordre de priorité pour choisir le VERBE principal d'une carte jeu quand
 // plusieurs actions sont regroupées (le reste devient chips / lignes détail).
-const CHANGE_PRIORITY = ["status", "added", "review", "rating", "ost", "character", "favorite", "time"];
+const CHANGE_PRIORITY = ["status", "added", "bundle", "review", "rating", "ost", "character", "favorite", "time"];
 
 // ============================================================
 //  Dispatcher
@@ -208,6 +208,18 @@ function primaryChange(changes, status) {
     if (kind === "status" || kind === "added") {
       const meta = STATUS_META[c.to || c.status || status] || STATUS_META.playing;
       return { kind, verb: meta.verb, Icon: meta.Icon, cls: meta.cls };
+    }
+    // Progression bundle : « a terminé <jeu inclus> dans <bundle> » — le
+    // bundle lui-même n'est PAS marqué terminé pour autant.
+    if (kind === "bundle") {
+      const names = c.names || [];
+      const verb =
+        names.length === 1
+          ? `a terminé ${names[0]} dans`
+          : names.length > 1
+            ? `a terminé ${names.length} jeux de`
+            : "a progressé dans";
+      return { kind, verb, Icon: CircleCheck, cls: "finished" };
     }
     if (kind === "review")
       return { kind, verb: "a partagé son avis sur", Icon: Star, cls: "review" };
@@ -339,6 +351,7 @@ function GameEvent({ item, me, token }) {
     item.rating != null ||
     (statusMeta && primary.kind !== "status" && primary.kind !== "added") ||
     !!item.platform ||
+    !!item.bundle ||
     item.playtimeHours != null ||
     item.favorite ||
     kinds.has("favorite");
@@ -442,6 +455,11 @@ function GameEvent({ item, me, token }) {
               </span>
             )}
             {item.platform && <span className="hf-chip">{item.platform}</span>}
+            {item.bundle && (
+              <span className={`hf-chip bundle ${kinds.has("bundle") ? "new" : ""}`}>
+                <Layers size={11} /> {item.bundle.done}/{item.bundle.total} terminés
+              </span>
+            )}
             {item.playtimeHours != null && (
               <span className={`hf-chip ${timeChange ? "new" : ""}`}>
                 <Clock size={11} /> {item.playtimeHours} h

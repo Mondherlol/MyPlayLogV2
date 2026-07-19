@@ -48,8 +48,20 @@ export async function recordGameActivity({ actor, gameId, gameName, gameCover, c
       const merged = [...(recent.meta?.changes || [])];
       for (const ch of changes) {
         const i = merged.findIndex((m) => m.kind === ch.kind);
-        if (i >= 0) merged[i] = ch;
-        else merged.push(ch);
+        if (i >= 0) {
+          // Un changement de même nature remplace l'ancien — SAUF la
+          // progression bundle, dont les jeux terminés se cumulent (finir A
+          // puis B dans l'heure doit lister les deux, pas seulement B).
+          merged[i] =
+            ch.kind === "bundle"
+              ? {
+                  ...ch,
+                  names: [
+                    ...new Set([...(merged[i].names || []), ...(ch.names || [])]),
+                  ].slice(0, 4),
+                }
+              : ch;
+        } else merged.push(ch);
       }
       // Driver natif : createdAt est immutable côté mongoose, or on veut
       // RE-DATER la carte fusionnée pour qu'elle remonte en tête du fil

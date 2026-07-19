@@ -24,11 +24,14 @@ import {
   Sun,
   Moon,
   Megaphone,
+  History,
+  Trash2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useClickOutside } from "../hooks/useClickOutside";
 import { apiFetch } from "../lib/api";
+import { safeSetItem } from "../lib/storage";
 import { timeAgo } from "../lib/lists";
 
 // Libellé + icône selon le type de notification.
@@ -55,6 +58,20 @@ const NOTIF_META = {
   psn_ready: { Icon: Gamepad2, verb: "", system: true },
   psn_request: { Icon: Gamepad2, verb: "", system: true },
 };
+
+// Historique local des derniers jeux ouverts depuis la recherche : affiché
+// dès l'ouverture de la barre, avant de taper quoi que ce soit.
+const SEARCH_HISTORY_KEY = "mpl_search_history";
+const SEARCH_HISTORY_MAX = 8;
+
+function loadSearchHistory() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || "[]");
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
 
 export default function Topbar() {
   const { user, token, logout } = useAuth();
@@ -131,9 +148,40 @@ export default function Topbar() {
     closeSearch();
   }
 
+  // --- Historique des derniers jeux cherchés (localStorage) ---
+  const [history, setHistory] = useState(loadSearchHistory);
+
+  function pushHistory(g) {
+    const next = [
+      { id: g.id, name: g.name, cover: g.cover || null },
+      ...history.filter((h) => h.id !== g.id),
+    ].slice(0, SEARCH_HISTORY_MAX);
+    setHistory(next);
+    safeSetItem(SEARCH_HISTORY_KEY, JSON.stringify(next));
+  }
+
+  function removeFromHistory(id) {
+    const next = history.filter((h) => h.id !== id);
+    setHistory(next);
+    safeSetItem(SEARCH_HISTORY_KEY, JSON.stringify(next));
+  }
+
+  function clearHistory() {
+    setHistory([]);
+    safeSetItem(SEARCH_HISTORY_KEY, "[]");
+  }
+
+  function openHistoryGame(g) {
+    pushHistory(g); // remonte le jeu en tête de l'historique
+    navigate(`/game/${g.id}`);
+    closeSearch();
+  }
+
   function openResult(r) {
-    if (searchMode === "games") navigate(`/game/${r.id}`);
-    else navigate(`/u/${r.username}`);
+    if (searchMode === "games") {
+      pushHistory(r);
+      navigate(`/game/${r.id}`);
+    } else navigate(`/u/${r.username}`);
     setQuery("");
     closeSearch();
   }
@@ -272,6 +320,58 @@ export default function Topbar() {
               onKeyDown={onSearchKeyDown}
             />
           </form>
+
+          {/* Historique : la barre vient d'être ouverte, rien n'est encore tapé */}
+          {searchOpen && !query.trim() && history.length > 0 && (
+            <div className="search-panel card">
+              <div className="search-hist-head">
+                <span className="search-hist-title">
+                  <History size={14} /> Derniers jeux cherchés
+                </span>
+                <button
+                  type="button"
+                  className="search-hist-clear clickable"
+                  onClick={clearHistory}
+                  title="Effacer l'historique"
+                >
+                  <Trash2 size={13} /> Effacer
+                </button>
+              </div>
+              <div className="search-results">
+                {history.map((g) => (
+                  <div
+                    key={g.id}
+                    className="search-res search-res-hist clickable"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openHistoryGame(g)}
+                    onKeyDown={(e) => e.key === "Enter" && openHistoryGame(g)}
+                  >
+                    <span className="search-res-cover">
+                      {g.cover ? (
+                        <img src={g.cover} alt="" loading="lazy" />
+                      ) : (
+                        <Gamepad2 size={16} />
+                      )}
+                    </span>
+                    <span className="search-res-name">{g.name}</span>
+                    <button
+                      type="button"
+                      className="search-res-x clickable"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFromHistory(g.id);
+                      }}
+                      aria-label="Retirer de l'historique"
+                      title="Retirer"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {searchOpen && query.trim() && (
             <div className="search-panel card">

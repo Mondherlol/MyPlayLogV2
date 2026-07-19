@@ -332,6 +332,15 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
       favorite: !!e?.favorite,
       platform: e?.platform || null,
       playtimeHours: e?.playtimeHours ?? null,
+      // Progression bundle (état ACTUEL de l'entrée) : chip « 2/5 terminés ».
+      bundle: e?.bundleGames?.length
+        ? {
+            done: e.bundleGames.filter(
+              (g) => g.status === "finished" || g.done
+            ).length,
+            total: e.bundleGames.length,
+          }
+        : null,
       hasReview: showReview,
       review: showReview ? String(e.review || "").slice(0, 420) : "",
       spoiler: !!e?.spoiler,

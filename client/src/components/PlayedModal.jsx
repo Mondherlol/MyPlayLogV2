@@ -23,6 +23,7 @@ import {
   EyeOff,
   AlertTriangle,
   Infinity as InfinityIcon,
+  Gamepad2,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { makeCache } from "../lib/cache";
@@ -55,8 +56,8 @@ const DIGITAL_ONLY = /windows|\bpc\b|android|ios|linux|\bmac\b|browser|stadia|lu
 
 // Infos statiques du jeu (plateformes, jaquettes, persos, temps de jeu) : elles
 // ne changent pas d'une ouverture à l'autre → cache mémoire + localStorage 24h,
-// pour afficher la modale instantanément la 2e fois. (v2 : + endlessHint)
-const detailsCache = makeCache("mpl_gamedetails2_", 24 * 60 * 60 * 1000);
+// pour afficher la modale instantanément la 2e fois. (v3 : + bundleGames)
+const detailsCache = makeCache("mpl_gamedetails3_", 24 * 60 * 60 * 1000);
 
 const EMPTY_DETAILS = {
   platforms: [],
@@ -64,6 +65,7 @@ const EMPTY_DETAILS = {
   characters: [],
   timeToBeat: null,
   endlessHint: false,
+  bundleGames: [],
 };
 
 // Forme canonique des champs éditables, comparée par valeur (JSON) pour savoir
@@ -86,14 +88,32 @@ function normalizeState(s) {
     favChar: s.favChar || null,
     favoriteOst: s.favoriteOst || null,
     cover: s.cover || null,
+    // Progression bundle : "id:statut" triés (forme canonique, indépendante
+    // de l'ordre des clics).
+    bundle: Object.entries(s.bundleStatus || {})
+      .filter(([, v]) => v)
+      .map(([k, v]) => `${k}:${v}`)
+      .sort(),
   };
+}
+
+// Statut global du bundle déduit de ses jeux : tout terminé → « Terminé »,
+// sinon « En cours » dès qu'un jeu est lancé ou fini, sinon pause/abandon.
+function deriveBundleStatus(list) {
+  const set = list.filter(Boolean);
+  if (!set.length) return null;
+  if (set.length === list.length && set.every((s) => s === "finished"))
+    return "finished";
+  if (set.some((s) => s === "playing" || s === "finished")) return "playing";
+  if (set.some((s) => s === "paused")) return "paused";
+  return "dropped";
 }
 
 // `onSaved` (optionnel) : appelé après un enregistrement réussi uniquement
 // (pas à l'annulation) — ex. le deck de pépites passe au jeu suivant.
 export default function PlayedModal({ game, onClose, onSaved, openReview = false }) {
   const { token } = useAuth();
-  const { map, upsertLocal, removeLocal } = useLibrary();
+  const { map, upsertLocal, removeLocal, refresh } = useLibrary();
 
   const [saving, setSaving] = useState(false);
   // Infos statiques (plateformes, temps de jeu…) : préremplies depuis le cache
@@ -138,6 +158,10 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   const [cover, setCover] = useState(game.cover);
   const [existing, setExisting] = useState(false);
   const [manualEndless, setManualEndless] = useState(false);
+  // Bundle : id IGDB du jeu inclus -> son statut (playing/finished/paused/
+  // dropped) ou absent. Permet de finir un jeu du bundle sans finir les autres ;
+  // chaque statut se reporte sur la fiche du jeu inclus à l'enregistrement.
+  const [bundleStatus, setBundleStatus] = useState({});
 
   useEffect(() => {
     let alive = true;
@@ -188,6 +212,12 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
         setFavChar(en.favoriteCharacter || null);
         setFavoriteOst(en.favoriteOst || null);
         if (en.cover) setCover(en.cover);
+        const bd = {};
+        for (const g of en.bundleGames || []) {
+          const st = g.status || (g.done ? "finished" : null); // rétrocompat V1
+          if (st) bd[g.id] = st;
+        }
+        setBundleStatus(bd);
         initialSnapshot.current = normalizeState({
           status: PLAYED.includes(en.status) ? en.status : "",
           platform: en.platform || "",
@@ -204,6 +234,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
           favChar: en.favoriteCharacter || null,
           favoriteOst: en.favoriteOst || null,
           cover: en.cover || game.cover,
+          bundleStatus: bd,
         });
       } else {
         // Jeu pas encore dans la bibliothèque : l'état de référence est vierge.
@@ -223,6 +254,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
           favChar: null,
           favoriteOst: null,
           cover: game.cover,
+          bundleStatus: {},
         });
       }
       setEntryLoading(false);
@@ -256,7 +288,31 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   live.current = {
     status, platform, format, playtime, favorite, hasRating, rating,
     review, reviewMedia, spoiler, pros, cons, favChar, favoriteOst, cover,
+    bundleStatus,
   };
+
+  // Choix du statut GLOBAL. Marquer un bundle « Terminé » passe évidemment
+  // tous ses jeux inclus en terminé.
+  function pickStatus(v) {
+    setStatus(v);
+    if (v === "finished" && details.bundleGames?.length) {
+      const next = { ...bundleStatus };
+      for (const b of details.bundleGames) next[b.id] = "finished";
+      setBundleStatus(next);
+    }
+  }
+
+  // Statut d'un jeu du bundle (re-cliquer la même icône = retirer). Le statut
+  // global du bundle se déduit ensuite de celui de ses jeux.
+  function setChildStatus(id, v) {
+    const next = { ...bundleStatus, [id]: v };
+    if (!v) delete next[id];
+    setBundleStatus(next);
+    const derived = deriveBundleStatus(
+      details.bundleGames.map((b) => next[b.id] || null)
+    );
+    if (derived) setStatus(derived);
+  }
 
   // Une modif est « non enregistrée » si l'état courant diffère de l'instantané
   // pris au chargement (ou de l'état vierge pour un jeu pas encore ajouté).
@@ -300,8 +356,27 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
         favoriteCharacter: favChar,
         favoriteOst,
       };
+      // Bundle : on n'envoie la progression que si on connaît les jeux inclus
+      // (détails chargés) — sinon on ne touche pas à l'existant côté serveur.
+      if (details.bundleGames?.length) {
+        body.bundleGames = details.bundleGames.map((b) => ({
+          id: b.id,
+          name: b.name,
+          cover: b.cover || null,
+          status: bundleStatus[b.id] || null,
+        }));
+      }
       const data = await apiFetch(`/library/${game.id}`, { method: "PUT", token, body });
       upsertLocal(game.id, { status: data.entry.status, favorite: data.entry.favorite });
+      // Les jeux du bundle ont maintenant leur propre entrée côté serveur :
+      // reflet immédiat dans la carte locale, puis resynchro complète (elle
+      // seule connaît les entrées supprimées par un statut décoché).
+      if (details.bundleGames?.length) {
+        for (const b of details.bundleGames) {
+          if (bundleStatus[b.id]) upsertLocal(b.id, { status: bundleStatus[b.id] });
+        }
+        refresh?.();
+      }
       onSaved?.();
       onClose();
     } catch (err) {
@@ -317,6 +392,8 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
     try {
       await apiFetch(`/library/${game.id}`, { method: "DELETE", token });
       removeLocal(game.id);
+      // Bundle : le serveur retire aussi les entrées héritées restées vierges.
+      if (details.bundleGames?.length) refresh?.();
       onClose();
     } catch (err) {
       alert(err.message);
@@ -482,7 +559,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                         className={`seg-opt ${s.value === "endless" ? "endless" : ""} ${
                           status === s.value ? "active" : ""
                         }`}
-                        onClick={() => setStatus(s.value)}
+                        onClick={() => pickStatus(s.value)}
                       >
                         <s.Icon size={16} />
                         {s.label}
@@ -500,6 +577,76 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                     >
                       <InfinityIcon size={13} /> Ce jeu n'a pas de fin ?
                     </button>
+                  )}
+
+                  {/* Bundle : un statut PAR jeu inclus (icônes en cours /
+                      terminé / en pause / abandonné) — on peut finir un jeu du
+                      bundle sans finir les autres. Statut + plateforme se
+                      reportent sur la fiche de chaque jeu à l'enregistrement. */}
+                  {details.bundleGames?.length > 0 && (
+                    <div className="bundle-block">
+                      <label className="field-label">
+                        Jeux du bundle
+                        <span className="bundle-count">
+                          {
+                            details.bundleGames.filter(
+                              (b) => bundleStatus[b.id] === "finished"
+                            ).length
+                          }
+                          /{details.bundleGames.length} terminés
+                        </span>
+                      </label>
+                      <div className="bundle-list">
+                        {details.bundleGames.map((b) => {
+                          const cur = bundleStatus[b.id] || null;
+                          return (
+                            <div
+                              key={b.id}
+                              className={`bundle-item ${cur ? `st-${cur}` : ""}`}
+                            >
+                              <span className="bundle-cover">
+                                {b.cover ? (
+                                  <img src={b.cover} alt="" loading="lazy" draggable="false" />
+                                ) : (
+                                  <Gamepad2 size={15} />
+                                )}
+                              </span>
+                              <span className="bundle-name" title={b.name}>
+                                {b.name}
+                              </span>
+                              <span className="bundle-seg">
+                                {STATUSES.map((s) => (
+                                  <button
+                                    key={s.value}
+                                    type="button"
+                                    className={`bundle-st clickable st-${s.value} ${
+                                      cur === s.value ? "active" : ""
+                                    }`}
+                                    onClick={() =>
+                                      setChildStatus(
+                                        b.id,
+                                        cur === s.value ? null : s.value
+                                      )
+                                    }
+                                    title={
+                                      cur === s.value
+                                        ? `Retirer « ${s.label} »`
+                                        : s.label
+                                    }
+                                  >
+                                    <s.Icon size={13} />
+                                  </button>
+                                ))}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="bundle-hint">
+                        Le statut et la plateforme se reportent sur la fiche de
+                        chaque jeu du bundle.
+                      </p>
+                    </div>
                   )}
 
                   <label className="field-label">Plateforme</label>

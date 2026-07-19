@@ -63,7 +63,9 @@ const activitySchema = new mongoose.Schema(
     snippet: { type: String, default: "" },
     // Détails structurés selon le type :
     //  game_update → { changes: [{ kind: "added"|"status"|"rating"|"review"|
-    //                  "favorite"|"ost"|"character"|"time", ... }] }
+    //                  "favorite"|"ost"|"character"|"time"|"bundle", ... }] }
+    //                 ("bundle" = jeux d'un bundle cochés terminés :
+    //                  { done, total, names: [noms nouvellement finis] })
     //  list_items  → { added: n }
     meta: { type: mongoose.Schema.Types.Mixed, default: null },
   },

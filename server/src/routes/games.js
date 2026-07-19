@@ -868,6 +868,30 @@ router.post("/:id/ost/rename", requireAuth, async (req, res) => {
 });
 
 // --- Détails d'un jeu pour la modal : covers alternatives, plateformes, temps ---
+// Jeux inclus dans un bundle (game_type 3) : IGDB n'a pas de champ « contenu »
+// sur le bundle lui-même — on interroge les jeux qui le référencent dans LEUR
+// champ `bundles`. Ordre chronologique de sortie.
+async function fetchBundleGames(bundleId) {
+  const list = await igdbQuery(
+    "games",
+    `fields name,cover.image_id,total_rating,first_release_date; where bundles = (${bundleId}); limit 50;`
+  ).catch(() => []);
+  return list
+    .map((g) => ({
+      id: g.id,
+      name: g.name,
+      cover: g.cover?.image_id
+        ? `${IMG_BASE}/t_cover_big/${g.cover.image_id}.jpg`
+        : null,
+      rating: g.total_rating ? Math.round(g.total_rating) : null,
+      year: g.first_release_date
+        ? new Date(g.first_release_date * 1000).getFullYear()
+        : null,
+      releaseDate: g.first_release_date || null,
+    }))
+    .sort((a, b) => (a.releaseDate || Infinity) - (b.releaseDate || Infinity));
+}
+
 router.get("/:id/details", optionalAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -876,7 +900,7 @@ router.get("/:id/details", optionalAuth, async (req, res) => {
     const [gameArr, customCovers, charArr, customChars] = await Promise.all([
       igdbQuery(
         "games",
-        `fields name,cover.image_id,artworks.image_id,platforms.id,platforms.name,genres.id,genres.name,game_modes,first_release_date,total_rating_count; where id = ${id};`
+        `fields name,game_type,cover.image_id,artworks.image_id,platforms.id,platforms.name,genres.id,genres.name,game_modes,first_release_date,total_rating_count; where id = ${id};`
       ),
       CustomCover.find({ gameId: id }).sort({ createdAt: -1 }),
       igdbQuery(
@@ -921,9 +945,11 @@ router.get("/:id/details", optionalAuth, async (req, res) => {
     const released =
       (g.first_release_date && g.first_release_date <= nowSec) ||
       (!g.first_release_date && (g.total_rating_count || 0) > 0);
-    const [ttb, vnChars] = await Promise.all([
+    const [ttb, vnChars, bundleGames] = await Promise.all([
       resolveTimeToBeat(id, g.name, released),
       isVn ? resolveVnCharacters(id, g.name) : Promise.resolve([]),
+      // Bundle : la modale « joué » propose de cocher chaque jeu inclus.
+      g.game_type === 3 ? fetchBundleGames(id) : Promise.resolve([]),
     ]);
 
     // Dédoublonnage : on n'ajoute un perso VNDB que si son nom n'existe pas déjà.
@@ -952,6 +978,7 @@ router.get("/:id/details", optionalAuth, async (req, res) => {
       // Scrape HLTB en cours : le client re-poll pour récupérer les temps.
       timeToBeatPending: ttb.pending,
       endlessHint,
+      bundleGames,
     });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
@@ -1241,11 +1268,13 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
 
     // Traduction FR du résumé/scénario si elle a déjà été demandée une fois
     // (best-effort, lecture Mongo seule — jamais d'appel Gemini ici).
-    const translation = await getCachedTranslation(
-      id,
-      g.summary || null,
-      g.storyline || null
-    ).catch(() => ({ summaryFr: null, storylineFr: null }));
+    const [translation, bundleGames] = await Promise.all([
+      getCachedTranslation(id, g.summary || null, g.storyline || null).catch(
+        () => ({ summaryFr: null, storylineFr: null })
+      ),
+      // Bundle : les jeux inclus, affichés en section sur la fiche.
+      g.game_type === 3 ? fetchBundleGames(id) : Promise.resolve([]),
+    ]);
 
     res.json({
       id: g.id,
@@ -1288,6 +1317,7 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
       engines: (g.game_engines || []).map((e) => e.name).filter(Boolean),
       franchise: g.franchises?.[0]?.name || g.collections?.[0]?.name || null,
       relation,
+      bundleGames,
       websites,
       similar,
       timeToBeat,

@@ -7,6 +7,11 @@ import { recordGameActivity, removeActivity } from "../lib/activity.js";
 const router = express.Router();
 
 const STATUSES = ["wishlist", "playing", "finished", "paused", "dropped", "endless"];
+// Statuts possibles pour un jeu INCLUS dans un bundle (pas de wishlist/endless).
+const BUNDLE_STATUSES = ["playing", "finished", "paused", "dropped"];
+
+// Statut d'un jeu de bundle, avec rétrocompat V1 (simple case `done`).
+const bundleChildStatus = (g) => g.status || (g.done ? "finished" : null);
 
 function toPublic(e) {
   return {
@@ -17,6 +22,7 @@ function toPublic(e) {
     platform: e.platform,
     format: e.format || "digital",
     plannedMonth: e.plannedMonth || null,
+    bundleGames: e.bundleGames || [],
     playtimeHours: e.playtimeHours,
     note: e.note,
     review: e.review,
@@ -124,7 +130,69 @@ function diffChanges(prev, entry, b) {
     changes.push({ kind: "time", hours: entry.playtimeHours });
   }
 
+  // Progression dans un bundle : on journalise les jeux inclus NOUVELLEMENT
+  // passés « terminé », avec le compteur global — le fil peut alors dire
+  // « a terminé X dans <bundle> (2/5) » sans marquer tout le bundle terminé.
+  if (b.bundleGames !== undefined && (entry.bundleGames || []).length) {
+    const prevDone = new Set(
+      (prev?.bundleGames || [])
+        .filter((g) => bundleChildStatus(g) === "finished")
+        .map((g) => g.id)
+    );
+    const newly = entry.bundleGames.filter(
+      (g) => bundleChildStatus(g) === "finished" && !prevDone.has(g.id)
+    );
+    if (newly.length) {
+      changes.push({
+        kind: "bundle",
+        done: entry.bundleGames.filter((g) => bundleChildStatus(g) === "finished")
+          .length,
+        total: entry.bundleGames.length,
+        names: newly.map((g) => g.name).slice(0, 3),
+      });
+    }
+  }
+
   return changes;
+}
+
+// Reporte le statut coché sur chaque jeu du bundle vers SA propre entrée de
+// bibliothèque (créée au besoin) : le jeu apparaît alors « joué » sur sa fiche
+// et dans les stats. Il hérite aussi de la plateforme/du format du bundle.
+// AUCUNE carte de fil n'est créée pour les enfants — le fil raconte déjà
+// « a terminé X dans <bundle> ».
+async function syncBundleChildren(userId, bundleId, entry) {
+  for (const g of entry.bundleGames || []) {
+    const st = bundleChildStatus(g);
+    if (st) {
+      await UserGame.findOneAndUpdate(
+        { user: userId, gameId: g.id },
+        {
+          $set: {
+            status: st,
+            platform: entry.platform || null,
+            format: entry.format || "digital",
+            bundleParentId: bundleId,
+          },
+          $setOnInsert: { name: g.name, cover: g.cover || null },
+        },
+        { upsert: true, setDefaultsOnInsert: true }
+      );
+      warmGameMeta(g.id);
+    } else {
+      // Statut retiré : on ne supprime QUE l'entrée créée par CE bundle et
+      // restée vierge (pas de note/avis/temps/coup de cœur ajoutés à la main).
+      await UserGame.deleteOne({
+        user: userId,
+        gameId: g.id,
+        bundleParentId: bundleId,
+        rating: null,
+        review: "",
+        favorite: false,
+        playtimeHours: null,
+      });
+    }
+  }
 }
 
 // Toutes les entrées de l'utilisateur (option ?status=)
@@ -178,6 +246,30 @@ router.put("/:gameId", requireAuth, async (req, res) => {
     ) {
       return res.status(400).json({ error: "Mois de planning invalide." });
     }
+    // Progression bundle : liste assainie des jeux inclus + statut par jeu
+    // (`done` V1 accepté en entrée et gardé synchronisé pour la rétrocompat).
+    if (b.bundleGames !== undefined) {
+      if (!Array.isArray(b.bundleGames)) {
+        return res.status(400).json({ error: "bundleGames invalide." });
+      }
+      b.bundleGames = b.bundleGames
+        .filter((g) => g && Number(g.id) && g.name)
+        .slice(0, 50)
+        .map((g) => {
+          const status = BUNDLE_STATUSES.includes(g.status)
+            ? g.status
+            : g.done
+              ? "finished"
+              : null;
+          return {
+            id: Number(g.id),
+            name: String(g.name).slice(0, 160),
+            cover: g.cover ? String(g.cover) : null,
+            status,
+            done: status === "finished",
+          };
+        });
+    }
 
     const update = { user: req.userId, gameId };
     // n'écrase que les champs fournis
@@ -199,6 +291,7 @@ router.put("/:gameId", requireAuth, async (req, res) => {
       "favoriteCharacter",
       "favoriteOst",
       "plannedMonth",
+      "bundleGames",
     ]) {
       if (b[key] !== undefined) update[key] = b[key];
     }
@@ -221,6 +314,14 @@ router.put("/:gameId", requireAuth, async (req, res) => {
       { $set: update },
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
+    // Les jeux du bundle héritent du statut coché et de la plateforme : on
+    // attend la synchro pour que leurs fiches soient à jour dès la fermeture
+    // de la modale (quelques upserts au plus).
+    if (b.bundleGames !== undefined && (entry.bundleGames || []).length) {
+      await syncBundleChildren(req.userId, gameId, entry).catch((err) =>
+        console.error("bundle children sync error:", err.message)
+      );
+    }
     // Pré-chauffe le cache de métadonnées (genres/studios…) pour l'onglet
     // Stats, sans bloquer la réponse.
     warmGameMeta(gameId);
@@ -243,6 +344,16 @@ router.put("/:gameId", requireAuth, async (req, res) => {
 router.delete("/:gameId", requireAuth, async (req, res) => {
   const gameId = Number(req.params.gameId);
   await UserGame.deleteOne({ user: req.userId, gameId });
+  // Si c'était un bundle : retire aussi les entrées héritées restées vierges
+  // (les enfants enrichis à la main — note, avis… — sont conservés).
+  await UserGame.deleteMany({
+    user: req.userId,
+    bundleParentId: gameId,
+    rating: null,
+    review: "",
+    favorite: false,
+    playtimeHours: null,
+  });
   // Le jeu n'est plus dans la bibliothèque : ses cartes du fil n'ont plus de sens.
   removeActivity({ actor: req.userId, type: "game_update", game: gameId });
   res.json({ ok: true });

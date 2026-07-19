@@ -1333,6 +1333,84 @@
   color: var(--orange);
 }
 
+/* --- Historique de recherche (panneau ouvert avant de taper) --- */
+.search-hist-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.15rem 0.3rem 0.35rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.search-hist-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.search-hist-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: background 0.13s ease, color 0.13s ease;
+}
+
+.search-hist-clear:hover {
+  background: var(--surface-2);
+  color: #d65454;
+}
+
+.search-res-hist {
+  cursor: pointer;
+}
+
+.search-res-hist .search-res-name {
+  flex: 1;
+}
+
+/* Croix « retirer » : visible au survol de la ligne (toujours sur tactile) */
+.search-res-x {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transition: opacity 0.13s ease, background 0.13s ease, color 0.13s ease;
+}
+
+.search-res-hist:hover .search-res-x,
+.search-res-x:focus-visible {
+  opacity: 1;
+}
+
+.search-res-x:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+@media (hover: none) {
+  .search-res-x {
+    opacity: 1;
+  }
+}
+
 /* Dropdowns (notif + profil) */
 .dd {
   position: relative;

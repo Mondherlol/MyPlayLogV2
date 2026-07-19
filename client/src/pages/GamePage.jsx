@@ -81,7 +81,8 @@ const STATUS_META = {
 
 // Détails complets du jeu (infos IGDB, médias, similaires…) : statiques → cache
 // mémoire + localStorage 24h pour rouvrir la page instantanément.
-const gameCache = makeCache("mpl_gamefull_", 24 * 60 * 60 * 1000);
+// (v2 : + bundleGames — les jeux inclus dans un bundle)
+const gameCache = makeCache("mpl_gamefull2_", 24 * 60 * 60 * 1000);
 
 // Trophées/succès : cache mémoire + localStorage. Évite de refaire l'appel API
 // quand on quitte l'onglet Trophées puis qu'on y revient (TTL 30 min).
@@ -942,6 +943,7 @@ export default function GamePage() {
             {tab === "infos" && (
               <InfosTab
                 game={game}
+                entry={fav}
                 onOpenImage={(images, index) => setViewer({ images, index })}
                 navigate={navigate}
               />
@@ -1548,7 +1550,10 @@ function FavCard({ Icon, title, children, onAdd, filled }) {
   );
 }
 
-function InfosTab({ game, onOpenImage, navigate }) {
+// Jeu d'un bundle « terminé » : statut par jeu, ou l'ancienne case V1 (`done`).
+const isBundleGameDone = (b) => b.status === "finished" || b.done;
+
+function InfosTab({ game, entry, onOpenImage, navigate }) {
   const { token } = useAuth();
   const media = game.media || [];
   const videos = media.filter((m) => m.type === "video");
@@ -1657,6 +1662,59 @@ function InfosTab({ game, onOpenImage, navigate }) {
               <p className="gp-para">{shownStoryline}</p>
             </details>
           )}
+        </section>
+      )}
+
+      {/* Bundle : les jeux inclus, avec la progression perso (cases cochées
+          dans la modale « joué ») matérialisée par un badge sur la jaquette. */}
+      {game.bundleGames?.length > 0 && (
+        <section className="gp-block">
+          <div className="gp-about-head">
+            <h2 className="gp-h2">Jeux inclus dans ce bundle</h2>
+            {(entry?.bundleGames || []).some(isBundleGameDone) && (
+              <span className="gp-bundle-progress">
+                <Trophy size={13} />
+                {entry.bundleGames.filter(isBundleGameDone).length}/
+                {game.bundleGames.length} terminés
+              </span>
+            )}
+          </div>
+          <ScrollRow className="gp-similar-row">
+            {game.bundleGames.map((s) => {
+              const done = (entry?.bundleGames || []).some(
+                (b) => b.id === s.id && isBundleGameDone(b)
+              );
+              return (
+                <button
+                  key={s.id}
+                  className="gp-similar clickable"
+                  onClick={() => navigate(`/game/${s.id}`)}
+                >
+                  <div className={`gp-similar-cover ${done ? "bundle-done" : ""}`}>
+                    {s.cover ? (
+                      <img src={s.cover} alt={s.name} loading="lazy" draggable="false" />
+                    ) : (
+                      <span className="gp-bundle-ph">
+                        <Gamepad size={22} />
+                      </span>
+                    )}
+                    {done && (
+                      <span className="gp-bundle-check">
+                        <Check size={12} strokeWidth={3} />
+                      </span>
+                    )}
+                    {s.rating != null && (
+                      <span className="gp-similar-rating">
+                        <Star size={11} fill="currentColor" strokeWidth={0} />
+                        {Math.round(s.rating / 10)}
+                      </span>
+                    )}
+                  </div>
+                  <span className="gp-similar-name">{s.name}</span>
+                </button>
+              );
+            })}
+          </ScrollRow>
         </section>
       )}
 
