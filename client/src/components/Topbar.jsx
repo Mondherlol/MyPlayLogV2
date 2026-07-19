@@ -26,6 +26,7 @@ import {
   Megaphone,
   History,
   Trash2,
+  Shield,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
@@ -574,6 +575,17 @@ export default function Topbar() {
               >
                 <User size={17} /> Mon profil
               </button>
+              {user?.isAdmin && (
+                <button
+                  className="dd-item clickable"
+                  onClick={() => {
+                    setMenu(null);
+                    navigate("/admin");
+                  }}
+                >
+                  <Shield size={17} /> Administration
+                </button>
+              )}
               <button
                 className="dd-item clickable"
                 onClick={() => {

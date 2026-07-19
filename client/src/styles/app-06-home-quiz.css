@@ -7470,23 +7470,97 @@
 }
 
 @media (max-width: 760px) {
+  .admin-wrap {
+    padding: 0.9rem 0.75rem 3rem;
+  }
+  .admin-topbar {
+    flex-wrap: wrap;
+    gap: 0.7rem;
+    margin-bottom: 1rem;
+  }
+  .admin-topbar h1 {
+    font-size: 1.35rem;
+  }
+  .admin-topbar p {
+    font-size: 0.84rem;
+  }
   .admin-layout {
     grid-template-columns: 1fr;
+    gap: 1rem;
   }
+  /* Le rail vertical devient une barre d'onglets horizontale scrollable */
   .admin-rail {
     position: static;
     flex-direction: row;
     overflow-x: auto;
     top: 0;
+    padding: 0.45rem;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .admin-rail::-webkit-scrollbar {
+    display: none;
   }
   .admin-rail .admin-tab.active::before {
     display: none;
   }
+  .admin-tab {
+    flex-shrink: 0;
+    padding: 0.5rem 0.7rem;
+  }
   .admin-tab span {
     white-space: nowrap;
   }
+  .admin-card {
+    padding: 1rem 0.85rem;
+    border-radius: 14px;
+  }
+  /* Le bouton d'action de l'en-tête (Nouveau, Rafraîchir…) passe dessous si étroit */
+  .admin-card-head {
+    flex-wrap: wrap;
+  }
+  .admin-card-titles {
+    flex: 1 1 55%;
+    min-width: 180px;
+  }
+  /* Lignes utilisateurs : le « Gérer → » est implicite au tap */
+  .au-chevron {
+    display: none;
+  }
+  .au-meta {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+  /* Drawer plein écran */
   .admin-drawer {
     width: 100%;
+    padding: 1.1rem 0.9rem;
+    border-left: none;
+  }
+  /* Champs email / mot de passe : bouton sous le champ */
+  .admin-field-row {
+    flex-wrap: wrap;
+  }
+  .admin-field-row > input,
+  .admin-field-row > .admin-pw-input {
+    flex: 1 1 100%;
+  }
+  .admin-field-row > .btn {
+    flex: 1;
+    justify-content: center;
+  }
+  /* Secrets : la valeur au-dessus, les actions en dessous */
+  .sec-val {
+    flex-wrap: wrap;
+  }
+  .sec-val input {
+    flex: 1 1 100%;
+  }
+  .psn-req-row {
+    flex-wrap: wrap;
+  }
+  .pn-editor-grid {
+    flex-direction: column;
   }
   .sec-add-grid {
     flex-direction: column;
