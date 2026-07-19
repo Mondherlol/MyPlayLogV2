@@ -539,14 +539,14 @@ export default function ProfileAllGames({ library, onOpen }) {
               onClick={() => setRel((r) => (r === "upcoming" ? "" : "upcoming"))}
             >
               <CalendarClock size={13} />
-              Pas encore sorti
+              A venir
             </button>
             <button
               className={`pg-chip clickable ${rel === "released" ? "active" : ""}`}
               onClick={() => setRel((r) => (r === "released" ? "" : "released"))}
             >
               <Check size={13} />
-              Déjà sorti
+              Sortis
             </button>
           </div>
         </div>
