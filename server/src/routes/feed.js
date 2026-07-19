@@ -332,13 +332,20 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
       favorite: !!e?.favorite,
       platform: e?.platform || null,
       playtimeHours: e?.playtimeHours ?? null,
-      // Progression bundle (état ACTUEL de l'entrée) : chip « 2/5 terminés ».
+      // Progression bundle (état ACTUEL de l'entrée) : chip « 2/5 terminés »
+      // + mini-jaquettes des jeux inclus (les terminés en avant).
       bundle: e?.bundleGames?.length
         ? {
             done: e.bundleGames.filter(
               (g) => g.status === "finished" || g.done
             ).length,
             total: e.bundleGames.length,
+            games: e.bundleGames.slice(0, 10).map((g) => ({
+              id: g.id,
+              name: g.name,
+              cover: g.cover || null,
+              done: g.status === "finished" || !!g.done,
+            })),
           }
         : null,
       hasReview: showReview,

@@ -472,6 +472,38 @@ function GameEvent({ item, me, token }) {
             )}
           </div>
 
+          {/* Mini-jaquettes des jeux inclus dans le bundle (terminés en couleur) */}
+          {item.bundle?.games?.length > 0 && (
+            <div className="hf-bundle-games" onClick={(e) => e.stopPropagation()}>
+              {item.bundle.games.map((bg) => (
+                <Link
+                  key={bg.id}
+                  to={`/game/${bg.id}`}
+                  className={`hf-bundle-g clickable ${bg.done ? "done" : ""}`}
+                  title={bg.done ? `${bg.name} — terminé` : bg.name}
+                >
+                  {bg.cover ? (
+                    <img src={bg.cover} alt={bg.name} loading="lazy" draggable="false" />
+                  ) : (
+                    <span className="hf-bundle-g-ph">
+                      <Gamepad2 size={13} />
+                    </span>
+                  )}
+                  {bg.done && (
+                    <span className="hf-bundle-g-check">
+                      <CircleCheck size={12} strokeWidth={2.6} />
+                    </span>
+                  )}
+                </Link>
+              ))}
+              {item.bundle.total > item.bundle.games.length && (
+                <span className="hf-bundle-g-more">
+                  +{item.bundle.total - item.bundle.games.length}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Sous-actions regroupées : OST choisie, personnage élu */}
           {item.ost && (
             <div onClick={(e) => e.stopPropagation()}>
