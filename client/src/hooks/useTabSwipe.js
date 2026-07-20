@@ -30,7 +30,13 @@ export function useTabSwipe({ onPrev, onNext, threshold = 55 }) {
     state.current = {
       x: t.clientX,
       y: t.clientY,
-      ignore: startedInHorizontalScroller(e.target, e.currentTarget),
+      // On ignore le geste s'il vient d'un scroller horizontal, OU d'un contenu
+      // rendu hors de la racine via un portail (modale, lightbox…) : les
+      // évènements React de ces portails « remontent » quand même jusqu'ici,
+      // mais un swipe dans une modale ne doit pas changer d'onglet.
+      ignore:
+        !e.currentTarget.contains(e.target) ||
+        startedInHorizontalScroller(e.target, e.currentTarget),
     };
   }
 

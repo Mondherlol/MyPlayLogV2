@@ -387,8 +387,20 @@ export default function ListDetail() {
     <div className="ld-page">
       {/* --- En-tête --- */}
       <div className="ld-topbar">
-        <Link to="/lists" className="ld-back clickable">
-          <ArrowLeft size={18} /> Listes
+        <Link
+          to="/lists"
+          className="ld-back clickable"
+          onClick={(e) => {
+            // Revenir d'où l'on vient (profil, feed, recherche…) quand on y est
+            // arrivé depuis l'app ; sinon le Link fait son travail natif vers
+            // /lists (accès direct, lien partagé, nouvel onglet).
+            if (location.key !== "default") {
+              e.preventDefault();
+              navigate(-1);
+            }
+          }}
+        >
+          <ArrowLeft size={18} /> Retour
         </Link>
         {editable && (
           <span className={`ld-save save-${saveStatus}`}>

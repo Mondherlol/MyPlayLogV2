@@ -396,8 +396,19 @@ export default function PlaylistDetail({ id, initial }) {
   return (
     <div className="pld-page">
       <div className="ld-topbar">
-        <Link to="/lists" className="ld-back clickable">
-          <ArrowLeft size={18} /> Listes
+        <Link
+          to="/lists"
+          className="ld-back clickable"
+          onClick={(e) => {
+            // Revenir d'où l'on vient (profil, feed…) quand on y est arrivé
+            // depuis l'app ; sinon le Link retombe nativement sur /lists.
+            if (location.key !== "default") {
+              e.preventDefault();
+              navigate(-1);
+            }
+          }}
+        >
+          <ArrowLeft size={18} /> Retour
         </Link>
         {editable && (
           <span className={`ld-save save-${saveStatus}`}>
