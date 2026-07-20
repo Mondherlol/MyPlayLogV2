@@ -1,12 +1,31 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { MessageCircle, Loader2, X, Star, Gamepad2 } from "lucide-react";
+import { Loader2, X, Star, Gamepad2 } from "lucide-react";
 import { apiFetch } from "../lib/api";
-import ReviewComments from "./ReviewComments";
+import { ReviewItem } from "./GameReviews";
 
-// Modale du fil de réponses sous un avis, ouverte depuis le fil d'accueil quand
-// on clique une carte « a répondu à / a commenté l'avis de … ». Charge l'avis
-// visé (celui de `reviewUserId`) et met en avant la réponse `commentId`.
+// Applique un toggle de réaction (cœur / bravo / rigolo) en local, façon
+// optimiste — même logique que l'onglet Reviews.
+function applyReaction(rv, type) {
+  const counts = { heart: 0, clap: 0, funny: 0, ...(rv.reactions || {}) };
+  const prev = rv.myReaction;
+  let next;
+  if (prev === type) {
+    counts[type] = Math.max(0, (counts[type] || 0) - 1);
+    next = null;
+  } else {
+    if (prev) counts[prev] = Math.max(0, (counts[prev] || 0) - 1);
+    counts[type] = (counts[type] || 0) + 1;
+    next = type;
+  }
+  return { ...rv, reactions: counts, myReaction: next };
+}
+
+// Modale ouverte depuis le fil quand on clique une carte « a réagi à / a
+// commenté / a répondu à l'avis de … ». On y AFFICHE l'avis complet (note,
+// texte, points forts/faibles, médias, réactions) — et de là on peut réagir ou
+// répondre. Le fil de réponses s'ouvre déjà déplié, avec la réponse `commentId`
+// mise en avant s'il y en a une.
 export default function ReviewThreadModal({
   gameId,
   reviewUserId,
@@ -16,7 +35,6 @@ export default function ReviewThreadModal({
   token,
   onClose,
 }) {
-  const [comments, setComments] = useState([]);
   const [review, setReview] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -25,11 +43,7 @@ export default function ReviewThreadModal({
     let alive = true;
     setLoading(true);
     apiFetch(`/games/${gameId}/reviews/${reviewUserId}`, { token })
-      .then((d) => {
-        if (!alive) return;
-        setReview(d.review || null);
-        setComments(d.review?.comments || []);
-      })
+      .then((d) => alive && setReview(d.review || null))
       .catch((e) => alive && setError(e.message))
       .finally(() => alive && setLoading(false));
     return () => {
@@ -46,6 +60,23 @@ export default function ReviewThreadModal({
       document.removeEventListener("keydown", onKey);
     };
   }, [onClose]);
+
+  async function reactTo(userId, type) {
+    if (!userId || !token) return;
+    setReview((rv) => (rv ? applyReaction(rv, type) : rv));
+    try {
+      const res = await apiFetch(`/games/${gameId}/reviews/${userId}/react`, {
+        method: "POST",
+        token,
+        body: { type },
+      });
+      setReview((rv) =>
+        rv ? { ...rv, reactions: res.reactions, myReaction: res.myReaction } : rv
+      );
+    } catch {
+      /* on garde l'état optimiste */
+    }
+  }
 
   return createPortal(
     <div
@@ -73,28 +104,28 @@ export default function ReviewThreadModal({
           </div>
         </div>
 
-        <h2 className="modal-title ost-cmodal-title">
-          <MessageCircle size={18} /> Réponses
-          {comments.length > 0 && (
-            <span className="ld-comments-count">{comments.length}</span>
-          )}
-        </h2>
-
         {loading ? (
           <div className="modal-loading">
             <Loader2 size={20} className="spin" /> Chargement…
           </div>
         ) : error ? (
           <p className="lc-error">{error}</p>
+        ) : review ? (
+          <div className="rp-cmodal-review">
+            <ReviewItem
+              r={review}
+              gameId={gameId}
+              token={token}
+              isMine={review.isMe}
+              viewerFinished
+              forceReveal
+              defaultThreadOpen
+              highlightId={commentId}
+              onReact={reactTo}
+            />
+          </div>
         ) : (
-          <ReviewComments
-            gameId={gameId}
-            reviewUserId={reviewUserId}
-            token={token}
-            comments={comments}
-            setComments={setComments}
-            highlightId={commentId}
-          />
+          <p className="lc-error">Avis introuvable.</p>
         )}
       </div>
     </div>,

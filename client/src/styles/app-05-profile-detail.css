@@ -987,16 +987,36 @@ button.pf-stat:hover {
     border-radius: 16px;
   }
 
-  /* Avatar + pseudo sur la même ligne (façon réseau social). */
+  /* Plus de bandeau défilant ni de points de slide sur mobile : la couverture
+     reste épurée, l'identité prend le relais. */
+  .pf-marquee,
+  .pf-cover-dots {
+    display: none;
+  }
+
+  /* Identité façon réseau social : l'avatar ET le pseudo remontent ensemble sur
+     le bas de la couverture ; la bio puis les compteurs s'empilent en dessous,
+     pleine largeur, sur le fond de page. On « efface » .pf-idmain
+     (display:contents) pour que ses enfants rejoignent directement la grille et
+     puissent être placés indépendamment. */
   .pf-identity {
-    align-items: flex-start;
-    gap: 0.85rem;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    column-gap: 0.85rem;
+    row-gap: 0.5rem;
     padding: 0 1rem;
-    row-gap: 0.55rem;
+    margin-top: -58px; /* remonte la 1re rangée (avatar + pseudo) sur la cover */
+  }
+
+  .pf-idmain {
+    display: contents;
   }
 
   .pf-avatar-wrap {
-    margin-top: -34px;
+    grid-column: 1;
+    grid-row: 1;
+    margin-top: 0;
   }
 
   .pf-avatar {
@@ -1016,31 +1036,40 @@ button.pf-stat:hover {
     border-width: 2px;
   }
 
-  /* idmain peut rétrécir pour rester COLLÉ à l'avatar : sans ça, sur les petits
-     écrans le min-width le faisait passer sous la photo. */
-  .pf-idmain {
+  /* Pseudo à côté de l'avatar, SUR la couverture → texte blanc + ombre pour
+     rester lisible par-dessus l'image (tronqué si trop long). */
+  .pf-namerow {
+    grid-column: 2;
+    grid-row: 1;
+    flex-wrap: nowrap;
     min-width: 0;
-    flex: 1 1 auto;
-    padding-top: 0.35rem;
-    padding-bottom: 0;
+    margin: 0;
   }
 
   .pf-username {
     font-size: 1.3rem;
+    color: #fff;
+    text-shadow: 0 1px 5px rgba(0, 0, 0, 0.6);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
+  /* Bio + compteurs + action : pleine largeur, sous la couverture. */
   .pf-bio {
+    grid-column: 1 / -1;
     font-size: 0.9rem;
-    margin-top: 0.4rem;
+    margin: 0.1rem 0 0;
   }
 
   .pf-stats {
-    gap: 1rem;
-    margin-top: 0.55rem;
+    grid-column: 1 / -1;
+    gap: 1.3rem;
+    margin: 0;
   }
 
-  /* Actions sur leur propre ligne, alignées à droite. */
   .pf-actions {
+    grid-column: 1 / -1;
     width: 100%;
     display: flex;
     justify-content: flex-end;

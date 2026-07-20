@@ -963,21 +963,31 @@ function PostCard({ post, token, forceReveal, onLike, onLikeById, onDelete }) {
   );
 }
 
-// Grille des médias d'un post (façon Twitter) — spoiler par média.
-// Exportée : le fil d'accueil (FeedCards) rend les posts pareil.
+// Grille des médias d'un post (façon Twitter) — spoiler par média. Au-delà de
+// 4 médias, on n'affiche que les 4 premiers, le dernier portant un « +N »
+// (clic → lightbox, qui les parcourt tous). Exportée : le fil d'accueil
+// (FeedCards) rend les posts pareil.
 export function MediaGrid({ media, forceReveal, onOpen }) {
   const n = media.length;
   const cls = n === 1 ? "n-1" : n === 2 ? "n-2" : n === 3 ? "n-3" : "n-4";
+  const shown = media.slice(0, 4);
+  const extra = n - shown.length;
   return (
     <div className={`gm-media-grid ${cls}`}>
-      {media.map((m, i) => (
-        <MediaTile key={i} m={m} forceReveal={forceReveal} onOpen={() => onOpen(i)} />
+      {shown.map((m, i) => (
+        <MediaTile
+          key={i}
+          m={m}
+          forceReveal={forceReveal}
+          onOpen={() => onOpen(i)}
+          moreCount={i === shown.length - 1 && extra > 0 ? extra : 0}
+        />
       ))}
     </div>
   );
 }
 
-function MediaTile({ m, forceReveal, onOpen }) {
+function MediaTile({ m, forceReveal, onOpen, moreCount = 0 }) {
   const [revealed, setRevealed] = useState(false);
   const hidden = m.spoiler && !revealed && !forceReveal;
   const blur = hidden ? { filter: "blur(24px)", pointerEvents: "none" } : undefined;
@@ -994,6 +1004,7 @@ function MediaTile({ m, forceReveal, onOpen }) {
           {m.kind === "gif" && !hidden && <span className="gm-gif-tag">GIF</span>}
         </button>
       )}
+      {moreCount > 0 && !hidden && <span className="gm-tile-more">+{moreCount}</span>}
       {hidden && (
         <button type="button" className="gm-spoiler-veil clickable" onClick={() => setRevealed(true)}>
           <EyeOff size={20} />

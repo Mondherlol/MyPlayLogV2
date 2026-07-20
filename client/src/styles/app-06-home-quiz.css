@@ -13281,6 +13281,15 @@
   overflow: visible;
 }
 
+/* Avis complet affiché dans la modale d'un fil d'avis (ouverte depuis le fil) :
+   la carte review se pose telle quelle sous l'en-tête, fil de réponses déplié. */
+.rp-cmodal-review {
+  margin-top: 0.6rem;
+}
+.rp-cmodal-review .rvc {
+  margin: 0;
+}
+
 .rp-cmodal-head {
   display: flex;
   align-items: center;

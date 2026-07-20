@@ -1196,20 +1196,26 @@
   grid-template-columns: 1fr;
 }
 
-.gm-media-grid.n-2 {
-  grid-template-columns: 1fr 1fr;
-}
-
-.gm-media-grid.n-3 {
-  grid-template-columns: 1fr 1fr;
-}
-
-.gm-media-grid.n-3 .gm-tile:first-child {
-  grid-row: span 2;
-}
-
+/* Mosaïque multi-médias façon Twitter : le CADRE global porte le ratio, et des
+   pistes de lignes EXPLICITES définissent la hauteur des cellules. Chaque tuile
+   remplit sa cellule — on ne s'appuie plus sur `aspect-ratio` par tuile, qui
+   faisait s'effondrer les lignes 2-3 quand la 1re tuile s'étend sur 2 lignes
+   (→ une seule image visible sous Chrome). */
+.gm-media-grid.n-2,
+.gm-media-grid.n-3,
 .gm-media-grid.n-4 {
   grid-template-columns: 1fr 1fr;
+  aspect-ratio: 16 / 9;
+}
+
+.gm-media-grid.n-3,
+.gm-media-grid.n-4 {
+  grid-template-rows: 1fr 1fr;
+}
+
+/* 3 médias : grande image à gauche (pleine hauteur) + 2 empilées à droite */
+.gm-media-grid.n-3 .gm-tile:first-child {
+  grid-row: 1 / span 2;
 }
 
 .gm-tile {
@@ -1223,8 +1229,26 @@
   max-height: 560px;
 }
 
+/* En mosaïque, la tuile remplit la cellule définie par la grille (hauteur
+   imposée par les pistes de lignes) — pas de min-height qui déborderait. */
 .gm-media-grid:not(.n-1) .gm-tile {
-  aspect-ratio: 1 / 1;
+  min-height: 0;
+  height: 100%;
+}
+
+/* Voile « +N » sur la 4e tuile quand le post a plus de 4 médias */
+.gm-tile-more {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  z-index: 2;
 }
 
 .gm-tile-btn {

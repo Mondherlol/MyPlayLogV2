@@ -8,6 +8,23 @@ import GameMedia from "../models/GameMedia.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { sanitizeMediaList, resolveMentions, toComment } from "../lib/commentThread.js";
 import { sanitizeEdit, renderEditedVideo } from "../lib/videoEdit.js";
+import { notify } from "../lib/notify.js";
+
+// Notifie chaque @pseudo mentionné dans un post ou un commentaire du mur média
+// (le helper `notify` ignore de lui-même l'auto-mention). Lien → onglet Feed du
+// jeu, où vit le post.
+function notifyMentions(mentions, { actor, gameId, gameName, snippet }) {
+  for (const m of mentions || []) {
+    notify({
+      user: m.user,
+      type: "gamemedia_mention",
+      actor,
+      game: gameId,
+      gameName: gameName || "",
+      snippet,
+    });
+  }
+}
 
 const router = express.Router();
 
@@ -273,6 +290,12 @@ router.post("/game/:gameId", requireAuth, async (req, res) => {
     const full = await GameMedia.findById(post._id)
       .populate("user", "username avatar")
       .lean();
+    notifyMentions(mentions, {
+      actor: req.userId,
+      gameId,
+      gameName: post.gameName,
+      snippet: text || (media.length ? "a partagé un média" : ""),
+    });
     res.status(201).json({ post: toPost(full, req.userId) });
   } catch (err) {
     console.error("game media create error:", err.message);
@@ -364,6 +387,12 @@ router.post("/:postId/comments", requireAuth, async (req, res) => {
     await post.save({ validateModifiedOnly: true, timestamps: false });
     await post.populate("comments.user", "username avatar");
     const c = post.comments[post.comments.length - 1];
+    notifyMentions(mentions, {
+      actor: req.userId,
+      gameId: post.gameId,
+      gameName: post.gameName,
+      snippet: text || (media.length ? "a envoyé un média" : ""),
+    });
     res.status(201).json({ comment: toComment(c, post.comments, req.userId) });
   } catch (err) {
     console.error("game media comment error:", err.message);

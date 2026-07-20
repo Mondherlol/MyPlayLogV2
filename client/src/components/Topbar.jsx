@@ -38,6 +38,7 @@ import { timeAgo } from "../lib/lists";
 // Libellé + icône selon le type de notification.
 const NOTIF_META = {
   mention: { Icon: AtSign, verb: "t'a mentionné" },
+  gamemedia_mention: { Icon: AtSign, verb: "t'a mentionné sur" },
   comment_reply: { Icon: Reply, verb: "a répondu à ton commentaire" },
   comment_like: { Icon: Heart, verb: "a aimé ton commentaire" },
   list_comment: { Icon: MessageSquare, verb: "a commenté ta liste" },
@@ -257,6 +258,9 @@ export default function Topbar() {
       navigate("/profile?tab=feed");
     } else if (n.type?.startsWith("review") && n.game) {
       navigate(`/game/${n.game}?tab=reviews`);
+    } else if (n.type === "gamemedia_mention" && n.game) {
+      // Ping dans un post/commentaire du mur média → onglet Feed du jeu.
+      navigate(`/game/${n.game}?tab=feed`);
     } else if (n.listId) navigate(`/lists/${n.listId}`);
     // Mention dans une réponse de review : pas de liste, mais un jeu ciblé.
     else if (n.game) navigate(`/game/${n.game}?tab=reviews`);

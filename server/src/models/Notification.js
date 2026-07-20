@@ -12,7 +12,8 @@ const notificationSchema = new mongoose.Schema(
     type: {
       type: String,
       enum: [
-        "mention", // mentionné dans un commentaire
+        "mention", // mentionné dans un commentaire (liste / review)
+        "gamemedia_mention", // mentionné dans un post/commentaire du mur média d'un jeu
         "comment_reply", // réponse à ton commentaire
         "comment_like", // like sur ton commentaire
         "list_comment", // commentaire sur ta liste

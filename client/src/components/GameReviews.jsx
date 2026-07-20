@@ -361,6 +361,8 @@ export function ReviewItem({
   isMine,
   canModerate,
   variant = "user",
+  defaultThreadOpen = false,
+  highlightId,
   onEdit,
   onDelete,
   onReact,
@@ -368,7 +370,7 @@ export function ReviewItem({
   onOpenReview,
 }) {
   const [revealed, setRevealed] = useState(false);
-  const [showThread, setShowThread] = useState(false);
+  const [showThread, setShowThread] = useState(defaultThreadOpen);
   const [comments, setComments] = useState(r.comments || []);
   const sm = STATUS_META[r.status] || STATUS_META.finished;
   const hidden = r.spoiler && !isMine && !viewerFinished && !forceReveal && !revealed;
@@ -536,6 +538,7 @@ export function ReviewItem({
                 token={token}
                 comments={comments}
                 setComments={setComments}
+                highlightId={highlightId}
               />
             )}
           </>

@@ -1592,6 +1592,9 @@
   border: 1px solid var(--border);
   background: var(--surface);
   text-align: left;
+  /* Sans ça, le titre (.atl-title, sans couleur propre) hérite du noir par
+     défaut des <button> → illisible en mode sombre. */
+  color: var(--text);
 }
 
 .atl-row:hover {
