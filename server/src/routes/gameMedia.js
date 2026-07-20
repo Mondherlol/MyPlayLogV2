@@ -103,6 +103,7 @@ export function toPost(p, userId) {
       ? { id: p.user._id, username: p.user.username, avatar: p.user.avatar || null }
       : null,
     mine: userId ? String(p.user?._id || p.user) === String(userId) : false,
+    mentions: (p.mentions || []).map((m) => m.username).filter(Boolean),
     likeCount: (p.likes || []).length,
     liked: userId ? (p.likes || []).some((u) => String(u) === String(userId)) : false,
     comments: (p.comments || []).map((c) => toComment(c, p.comments || [], userId)),
@@ -258,6 +259,7 @@ router.post("/game/:gameId", requireAuth, async (req, res) => {
     const media = sanitizePostMedia(req.body?.media);
     if (!text && media.length === 0)
       return res.status(400).json({ error: "Écris quelque chose ou ajoute un média." });
+    const mentions = await resolveMentions(text);
 
     const post = await GameMedia.create({
       gameId,
@@ -266,6 +268,7 @@ router.post("/game/:gameId", requireAuth, async (req, res) => {
       user: req.userId,
       text,
       media,
+      mentions,
     });
     const full = await GameMedia.findById(post._id)
       .populate("user", "username avatar")

@@ -1327,7 +1327,7 @@ function GameMediaPostEvent({ item, onLike, onComments, onOpenImage }) {
       </EventHead>
 
       <div className="hf-gmpost-body">
-        <PostText text={p.text} hide={hide} />
+        <PostText text={p.text} hide={hide} mentions={p.mentions} />
         {p.media?.length > 0 && (
           <MediaGrid media={p.media} forceReveal={false} onOpen={(i) => onOpenImage?.(i)} />
         )}

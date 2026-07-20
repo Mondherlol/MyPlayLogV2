@@ -128,7 +128,8 @@ export function renderMessage(text, mentions) {
 }
 
 // Calque de surlignage derrière le textarea : mentions existantes + liens en bleu.
-function renderHighlight(text, valid) {
+// Exportée : le composer du mur média (GameMediaWall) la réutilise.
+export function renderHighlight(text, valid) {
   return text.split(TOKEN_SPLIT).map((part, i) => {
     if (!part) return null;
     if (part[0] === "@" && valid.has(part.slice(1).toLowerCase()))

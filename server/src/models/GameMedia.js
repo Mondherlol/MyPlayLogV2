@@ -15,6 +15,15 @@ const postMediaSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// Mention @user résolue à la création (pour la coloration côté client).
+const postMentionSchema = new mongoose.Schema(
+  {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    username: { type: String },
+  },
+  { _id: false }
+);
+
 // Un post du « mur média » d'un jeu, façon fil Twitter : du texte (facultatif),
 // plusieurs médias (facultatifs, chacun spoiler ou non), des likes et un fil de
 // commentaires (réutilise exactement le schéma des listes). Les liens
@@ -31,6 +40,7 @@ const gameMediaSchema = new mongoose.Schema(
     },
     text: { type: String, default: "", maxlength: 1000 },
     media: { type: [postMediaSchema], default: [] },
+    mentions: { type: [postMentionSchema], default: [] },
     likes: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
       default: [],

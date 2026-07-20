@@ -27,7 +27,7 @@ import { apiFetch, apiUpload } from "../lib/api";
 import { timeAgo } from "../lib/lists";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
-import { CommentThread, EmojiPanel } from "./ListComments";
+import { CommentThread, EmojiPanel, renderMessage, renderHighlight } from "./ListComments";
 import VideoEditorModal from "./VideoEditorModal";
 import GameVideoPlayer from "./GameVideoPlayer";
 
@@ -238,7 +238,7 @@ export function PostEmbed({ embed }) {
 }
 
 // Texte d'un post : liens cliquables, URLs d'embed retirées, sauts de ligne gardés.
-export function PostText({ text, hide }) {
+export function PostText({ text, hide, mentions }) {
   if (!text) return null;
   let t = text;
   hide.forEach((u) => {
@@ -246,19 +246,7 @@ export function PostText({ text, hide }) {
   });
   t = t.replace(/[ \t]{2,}/g, " ").replace(/\n{3,}/g, "\n\n").trim();
   if (!t) return null;
-  return (
-    <p className="gm-text">
-      {t.split(URL_RE).map((part, i) =>
-        /^https?:\/\//.test(part) ? (
-          <a key={i} href={part} target="_blank" rel="noreferrer noopener" className="gm-text-link">
-            {part.replace(/^https?:\/\//, "").slice(0, 46)}
-          </a>
-        ) : (
-          <span key={i}>{part}</span>
-        )
-      )}
-    </p>
-  );
+  return <p className="gm-text">{renderMessage(t, mentions)}</p>;
 }
 
 // ============================================================
@@ -419,9 +407,15 @@ function Composer({ gameId, gameName, gameCover, token, user, requireLogin, onPo
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [videoEdit, setVideoEdit] = useState(null); // fichier vidéo en cours d'édition
+  // Autocomplétion des mentions @ (même logique que le composer des commentaires).
+  const [mention, setMention] = useState(null); // { start, query }
+  const [suggestions, setSuggestions] = useState([]);
+  const [mentionIdx, setMentionIdx] = useState(0);
+  const [validMentions, setValidMentions] = useState(() => new Set());
+  const mentionCache = useRef(new Map());
   const fileRef = useRef(null);
   const inputRef = useRef(null);
-  const hlRef = useRef(null); // calque de coloration des liens, derrière le textarea
+  const hlRef = useRef(null); // calque de coloration des liens/mentions, derrière le textarea
 
   const slotsLeft = MAX_MEDIA - mediaList.length;
   const full = slotsLeft <= 0;
@@ -442,6 +436,91 @@ function Composer({ gameId, gameName, gameCover, token, user, requireLogin, onPo
   }
 
   const liveEmbeds = useMemo(() => extractEmbeds(text).embeds, [text]);
+
+  // Mémorise l'existence d'un pseudo (et le colore si existant).
+  const markMention = useCallback((name, exists) => {
+    const key = name.toLowerCase();
+    if (mentionCache.current.get(key) === exists) return;
+    mentionCache.current.set(key, exists);
+    if (exists) setValidMentions((prev) => new Set(prev).add(key));
+  }, []);
+
+  // Détecte si le curseur est dans un token @… et met à jour l'état mention.
+  function detectMention(val, caret) {
+    const upto = val.slice(0, caret ?? val.length);
+    const m = upto.match(/(?:^|\s)@([\p{L}\p{N}_.-]{0,32})$/u);
+    setMention(m ? { start: (caret ?? val.length) - m[1].length - 1, query: m[1] } : null);
+  }
+
+  function onChangeText(e) {
+    setText(e.target.value);
+    detectMention(e.target.value, e.target.selectionStart);
+  }
+
+  // Cherche les users correspondants (débouncé).
+  const mentionQuery = mention?.query ?? null;
+  useEffect(() => {
+    if (mentionQuery == null || mentionQuery.length < 1) {
+      setSuggestions([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      apiFetch(`/users/search/mentions?q=${encodeURIComponent(mentionQuery)}`, { token })
+        .then((d) => {
+          setSuggestions(d.users || []);
+          setMentionIdx(0);
+          (d.users || []).forEach((u) => markMention(u.username, true));
+        })
+        .catch(() => setSuggestions([]));
+    }, 180);
+    return () => clearTimeout(t);
+  }, [mentionQuery, token, markMention]);
+
+  // Valide (débouncé) tous les @tokens du texte pour ne colorer que les
+  // pseudos existants — y compris ceux collés directement.
+  useEffect(() => {
+    const tokens = [
+      ...new Set([...text.matchAll(/@([\p{L}\p{N}_.-]{2,32})/gu)].map((m) => m[1])),
+    ].filter((tk) => !mentionCache.current.has(tk.toLowerCase()));
+    if (!tokens.length) return;
+    const timer = setTimeout(() => {
+      tokens.forEach(async (tk) => {
+        try {
+          const d = await apiFetch(`/users/search/mentions?q=${encodeURIComponent(tk)}`, {
+            token,
+          });
+          const exists = (d.users || []).some(
+            (u) => u.username.toLowerCase() === tk.toLowerCase()
+          );
+          markMention(tk, exists);
+          (d.users || []).forEach((u) => markMention(u.username, true));
+        } catch {
+          /* ignore */
+        }
+      });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [text, token, markMention]);
+
+  function pickMention(u) {
+    if (!mention) return;
+    const start = mention.start;
+    const end = start + 1 + mention.query.length; // '@' + saisie
+    const insert = `@${u.username} `;
+    const next = text.slice(0, start) + insert + text.slice(end);
+    setText(next);
+    setMention(null);
+    setSuggestions([]);
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      el.focus();
+      const pos = start + insert.length;
+      el.setSelectionRange(pos, pos);
+    });
+  }
+
+  const mentionOpen = mention && suggestions.length > 0;
 
   async function uploadFiles(fileList) {
     if (!requireLogin()) return;
@@ -543,19 +622,33 @@ function Composer({ gameId, gameName, gameCover, token, user, requireLogin, onPo
       <div className="gm-composer-row">
         <div className="gm-composer-av">{user?.avatar ? <img src={user.avatar} alt="" /> : initial}</div>
         <div className="gm-composer-main">
-          {/* Calque derrière le textarea : les liens s'affichent colorés
-              pendant la frappe (le texte du  textarea est transparent). */}
+          {/* Calque derrière le textarea : mentions et liens s'affichent
+              colorés pendant la frappe (le texte du textarea est transparent). */}
           <div className="gm-input-field">
+            {/* Autocomplétion des mentions @ — flotte AU-DESSUS de l'input */}
+            {mentionOpen && (
+              <div className="lc-mention-list lc-mention-pop">
+                {suggestions.map((u, i) => (
+                  <button
+                    type="button"
+                    key={u.id}
+                    className={`lc-mention-item ${i === mentionIdx ? "active" : ""}`}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      pickMention(u);
+                    }}
+                    onMouseEnter={() => setMentionIdx(i)}
+                  >
+                    <span className="lc-mention-av">
+                      {u.avatar ? <img src={u.avatar} alt="" /> : (u.username[0] || "?").toUpperCase()}
+                    </span>
+                    <span className="lc-mention-name">{u.username}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="gm-input-hl" ref={hlRef} aria-hidden="true">
-              {text.split(URL_RE).map((part, i) =>
-                /^https?:\/\//.test(part) ? (
-                  <span key={i} className="gm-input-link">
-                    {part}
-                  </span>
-                ) : (
-                  <span key={i}>{part}</span>
-                )
-              )}
+              {renderHighlight(text, validMentions)}
               {"​"}
             </div>
             <textarea
@@ -565,9 +658,25 @@ function Composer({ gameId, gameName, gameCover, token, user, requireLogin, onPo
               maxLength={MAX_TEXT}
               rows={1}
               placeholder="Quelque chose à partager ? Un screenshot, un clip, ou même un lien... Fais vivre ce thread pour garder un souvenir de ton aventure sur ce jeu !"
-              onChange={(e) => setText(e.target.value)}
+              onChange={onChangeText}
               onPaste={onPaste}
               onScroll={syncScroll}
+              onKeyDown={(e) => {
+                if (!mentionOpen) return;
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setMentionIdx((i) => (i + 1) % suggestions.length);
+                } else if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setMentionIdx((i) => (i - 1 + suggestions.length) % suggestions.length);
+                } else if (e.key === "Enter" || e.key === "Tab") {
+                  e.preventDefault();
+                  pickMention(suggestions[mentionIdx]);
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  setMention(null);
+                }
+              }}
             />
           </div>
 
@@ -798,7 +907,7 @@ function PostCard({ post, token, forceReveal, onLike, onLikeById, onDelete }) {
           )}
         </div>
 
-        <PostText text={post.text} hide={hide} />
+        <PostText text={post.text} hide={hide} mentions={post.mentions} />
 
         {media.length > 0 && (
           <MediaGrid media={media} forceReveal={forceReveal} onOpen={(i) => setLightbox(i)} />
@@ -943,9 +1052,10 @@ function GifPicker({ token, onPick, onClose }) {
 }
 
 // ============================================================
-//  Lightbox (médias d'un post)
+//  Lightbox (médias d'un post) — exportée : réutilisée par FeedCards
+//  (fil d'accueil / profil) pour ouvrir les images en grand.
 // ============================================================
-function Lightbox({ media, index, post, onIndex, onClose, onLike }) {
+export function Lightbox({ media, index, post, onIndex, onClose, onLike }) {
   const item = media[index];
   const step = useCallback(
     (dir) => {

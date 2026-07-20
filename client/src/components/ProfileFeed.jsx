@@ -18,6 +18,7 @@ import { useAuth } from "../context/AuthContext";
 import RepostCommentsModal from "./RepostCommentsModal";
 import VideoCommentsModal from "./VideoCommentsModal";
 import GameMediaCommentsModal from "./GameMediaCommentsModal";
+import { Lightbox as GameMediaLightbox } from "./GameMediaWall";
 import VideoPlayerModal from "./VideoPlayerModal";
 import GemsFeedModal from "./GemsFeedModal";
 import BlindTestResultsModal from "./BlindTestResultsModal";
@@ -66,6 +67,7 @@ export default function ProfileFeed({ username, isMe, token, onSetCover }) {
   const [commentsFor, setCommentsFor] = useState(null); // repost → modale commentaires
   const [commentsForVideo, setCommentsForVideo] = useState(null); // vidéo → modale
   const [commentsForPost, setCommentsForPost] = useState(null); // post mur média → modale
+  const [mediaViewer, setMediaViewer] = useState(null); // { item, index } — images d'un post en grand
   const [gemsFor, setGemsFor] = useState(null); // découverte de pépites → modale
   const [blindTestFor, setBlindTestFor] = useState(null); // blind test → modale résultats
   const sentinelRef = useRef(null);
@@ -346,9 +348,9 @@ export default function ProfileFeed({ username, isMe, token, onSetCover }) {
                   }
                   onLater={() => toggleVideoLater(item)}
                   onRepost={() => toggleRepost(item)}
-                  onOpenImage={() =>
+                  onOpenImage={(i) =>
                     item.type === "gamemediapost"
-                      ? setCommentsForPost(item)
+                      ? setMediaViewer({ item, index: i })
                       : setLightbox(item)
                   }
                   onPlay={(v) => setPlaying(v)}
@@ -422,6 +424,16 @@ export default function ProfileFeed({ username, isMe, token, onSetCover }) {
           token={token}
           onCountChange={(n) => patchPost(commentsForPost.id, { commentCount: n })}
           onClose={() => setCommentsForPost(null)}
+        />
+      )}
+      {mediaViewer && (
+        <GameMediaLightbox
+          media={mediaViewer.item.post.media}
+          index={mediaViewer.index}
+          post={mediaViewer.item.post}
+          onIndex={(i) => setMediaViewer((v) => ({ ...v, index: i }))}
+          onClose={() => setMediaViewer(null)}
+          onLike={() => togglePostLike(mediaViewer.item)}
         />
       )}
       {gemsFor && <GemsFeedModal item={gemsFor} onClose={() => setGemsFor(null)} />}
