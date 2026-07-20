@@ -1112,8 +1112,11 @@ const FULL_FIELDS = [
   "screenshots.image_id",
   "screenshots.width",
   "screenshots.height",
+  "genres.id",
   "genres.name",
+  "themes.id",
   "themes.name",
+  "game_modes.id",
   "game_modes.name",
   "player_perspectives.name",
   "platforms.id",
@@ -1287,9 +1290,11 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
       cover: g.cover?.image_id ? `${IMG_BASE}/t_cover_big/${g.cover.image_id}.jpg` : null,
       backdrop,
       media,
-      genres: (g.genres || []).map((x) => frName(GENRES_FR, x.name)),
-      themes: (g.themes || []).map((x) => frName(THEMES_FR, x.name)),
-      gameModes: (g.game_modes || []).map((x) => frName(MODES_FR, x.name)),
+      // { id, name } : l'id IGDB permet de rendre les puces cliquables côté
+      // client (→ Explorer filtré). Le name est traduit pour l'affichage.
+      genres: (g.genres || []).map((x) => ({ id: x.id, name: frName(GENRES_FR, x.name) })),
+      themes: (g.themes || []).map((x) => ({ id: x.id, name: frName(THEMES_FR, x.name) })),
+      gameModes: (g.game_modes || []).map((x) => ({ id: x.id, name: frName(MODES_FR, x.name) })),
       perspectives: (g.player_perspectives || []).map((x) => x.name),
       platforms: (g.platforms || []).map((p) => ({
         id: p.id,

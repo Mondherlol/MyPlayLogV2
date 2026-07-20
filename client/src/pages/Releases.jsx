@@ -511,11 +511,15 @@ function RelGameModal({ game, token, onClose }) {
           ) : (
             <>
               <div className="relm-chips">
-                {(full.genres || []).slice(0, 4).map((x) => (
-                  <span className="relm-chip" key={x}>
-                    {x}
-                  </span>
-                ))}
+                {(full.genres || []).slice(0, 4).map((x) => {
+                  // `genres` du /full = { id, name } (chaîne pour un cache ancien).
+                  const name = typeof x === "string" ? x : x.name;
+                  return (
+                    <span className="relm-chip" key={name}>
+                      {name}
+                    </span>
+                  );
+                })}
                 {(full.platforms || []).slice(0, 5).map((p) => (
                   <span className="relm-chip soft" key={p.id}>
                     {p.abbr}

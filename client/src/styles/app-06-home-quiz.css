@@ -7817,8 +7817,9 @@
   font-weight: 500;
 }
 
-/* Plateformes cliquables → page console */
-.gp-chip-plat {
+/* Chips cliquables → page console (plateforme) / Explorer filtré (facettes) */
+.gp-chip-plat,
+.gp-chip-facet {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
@@ -7826,18 +7827,21 @@
   transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 
-.gp-chip-plat svg {
+.gp-chip-plat svg,
+.gp-chip-facet svg {
   opacity: 0.5;
   transition: transform 0.15s ease, opacity 0.15s ease;
 }
 
-.gp-chip-plat:hover {
+.gp-chip-plat:hover,
+.gp-chip-facet:hover {
   border-color: var(--accent);
   color: var(--accent-ink);
   background: var(--accent-soft, var(--surface-2));
 }
 
-.gp-chip-plat:hover svg {
+.gp-chip-plat:hover svg,
+.gp-chip-facet:hover svg {
   opacity: 1;
   transform: translateX(2px);
 }

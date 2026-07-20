@@ -1594,10 +1594,12 @@ function InfosTab({ game, entry, onOpenImage, navigate }) {
   const shownImages =
     imgFilter === "all" ? images : images.filter((m) => m.type === imgFilter);
 
+  // Genres / thèmes / modes : cliquables → Explorer pré-filtré sur cette
+  // facette (via l'id IGDB). `param` = clé d'URL attendue par Explorer.
   const chipGroups = [
-    { label: "Genres", items: game.genres },
-    { label: "Thèmes", items: game.themes },
-    { label: "Modes de jeu", items: game.gameModes },
+    { label: "Genres", items: game.genres, param: "gen" },
+    { label: "Thèmes", items: game.themes, param: "thm" },
+    { label: "Modes de jeu", items: game.gameModes, param: "mod" },
   ].filter((g) => g.items?.length);
 
   const facts = [
@@ -1787,11 +1789,23 @@ function InfosTab({ game, entry, onOpenImage, navigate }) {
         <section className="gp-block" key={grp.label}>
           <h3 className="gp-h3">{grp.label}</h3>
           <div className="gp-chips">
-            {grp.items.map((it) => (
-              <span className="gp-chip" key={it}>
-                {it}
-              </span>
-            ))}
+            {grp.items.map((it) => {
+              // Rétrocompat cache : anciennes entrées = simple chaîne (sans id).
+              const name = typeof it === "string" ? it : it.name;
+              const id = typeof it === "string" ? null : it.id;
+              if (id == null) return <span className="gp-chip" key={name}>{name}</span>;
+              return (
+                <button
+                  key={id}
+                  className="gp-chip gp-chip-facet clickable"
+                  onClick={() => navigate(`/explore?${grp.param}=${id}`)}
+                  title={`Explorer : ${name}`}
+                >
+                  {name}
+                  <ChevronRight size={13} />
+                </button>
+              );
+            })}
           </div>
         </section>
       ))}
