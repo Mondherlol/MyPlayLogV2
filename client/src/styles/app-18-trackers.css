@@ -1734,14 +1734,40 @@
   margin-top: 0.2rem;
 }
 
-@media (max-width: 480px) {
-  .hf-rank-hero {
+@media (max-width: 560px) {
+  /* Card « a enchaîné N parties » : lignes allégées → on masque le nom du héros
+     et les points de classement (RS) gagnés/perdus. Reste : pastille d'issue,
+     mini-portrait du héros, K/D/A, heure. */
+  .hf-trkg-row {
+    grid-template-columns: auto auto 1fr auto;
+  }
+  .hf-trkg-row-name,
+  .hf-trkg-row-delta {
     display: none;
   }
 
+  /* Card montée / descente de rang : compacte. Portrait du héros masqué, corps
+     centré, ancien rang réduit à son badge (sans libellé), nouveau rang avec
+     l'image AU-DESSUS du texte. */
+  .hf-rank-hero {
+    display: none;
+  }
   .hf-rank-body {
-    gap: 0.6rem;
+    gap: 0.7rem;
     padding: 0.75rem;
+    justify-content: center;
+  }
+  .hf-rank-badge.small .hf-rank-txt {
+    display: none;
+  }
+  .hf-rank-badge.big {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.25rem;
+  }
+  .hf-rank-badge.big .hf-rank-txt {
+    align-items: center;
   }
 }
 

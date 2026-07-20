@@ -13337,8 +13337,31 @@
 .rp-cmodal-review {
   margin-top: 0.6rem;
 }
+/* La pp de l'auteur passe DANS la bulle, à côté du pseudo, au lieu de déborder
+   à gauche façon chat. Le petit bec disparaît et l'en-tête n'est plus collant
+   (inutile dans une modale courte). Scopé à CETTE modale — ailleurs (onglet
+   Reviews…) la review garde sa présentation avatar-hors-bulle. */
 .rp-cmodal-review .rvc {
   margin: 0;
+  position: relative;
+  display: block;
+}
+.rp-cmodal-review .rvc-av {
+  position: absolute;
+  top: 0.9rem;
+  left: 0.9rem;
+  width: 38px;
+  height: 38px;
+  margin: 0;
+  border-color: var(--border);
+  z-index: 4;
+}
+.rp-cmodal-review .rvc-bubble::before {
+  display: none;
+}
+.rp-cmodal-review .rvc-top {
+  position: static;
+  padding-left: 3.4rem;
 }
 
 .rp-cmodal-head {
