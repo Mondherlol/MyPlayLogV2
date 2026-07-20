@@ -2039,6 +2039,12 @@ function ImageViewer({
     }
   }
 
+  // Swipe tactile gauche/droite pour passer d'une image à l'autre (mobile).
+  const swipe = useTabSwipe({
+    onPrev: () => setIndex((i) => (i - 1 + list.length) % list.length),
+    onNext: () => setIndex((i) => (i + 1) % list.length),
+  });
+
   if (!list.length) return null;
   const safeIndex = Math.min(index, list.length - 1);
   const cur = list[safeIndex];
@@ -2092,7 +2098,7 @@ function ImageViewer({
           </div>
         )}
 
-        <div className="gp-viewer-stage">
+        <div className="gp-viewer-stage" {...swipe}>
           {list.length > 1 && (
             <button
               className="gp-viewer-nav left clickable"

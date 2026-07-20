@@ -8394,25 +8394,25 @@
 
 /* --- Responsive --- */
 @media (max-width: 780px) {
-  /* La feuille remonte plus haut : moins de fond mort avant le contenu, la
-     jaquette vient chevaucher le backdrop flouté et les onglets sont vite
-     visibles sans scroller pendant 3000 ans. */
+  /* La feuille remonte : la jaquette vient chevaucher le backdrop flouté et les
+     onglets sont vite visibles sans scroller pendant 3000 ans. */
   .gp-sheet {
-    margin-top: clamp(155px, 25vh, 215px);
+    margin-top: clamp(175px, 28vh, 240px);
     padding-top: 1.1rem;
     border-radius: 22px 22px 0 0;
   }
 
-  /* Hero mobile : on aplatit la grille en une colonne et on « libère » les
-     enfants (display: contents) pour les réordonner librement malgré la
-     structure à deux colonnes : jaquette → titre → notes → actions → onglets.
-     Les cartes latérales (ma note, temps de jeu, OST/perso favoris) sont
+  /* Hero mobile : grille 2 colonnes → grand poster remonté HAUT sur le backdrop
+     (gauche) + notes joueurs/critiques empilées à sa droite ; tout le reste
+     passe pleine largeur en dessous. On « libère » les 3 conteneurs
+     (display: contents) pour placer leurs enfants dans la même grille, séquencée
+     avec `order`. Les cartes latérales (ma note, temps de jeu, favoris) sont
      masquées — déjà accessibles depuis le bouton « Jouer ». */
   .gp-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 0.85rem;
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 1.1rem;
+    row-gap: 0.85rem;
   }
   .gp-left,
   .gp-right,
@@ -8420,27 +8420,78 @@
     display: contents;
   }
 
-  /* Jaquette réduite, centrée et remontée par-dessus le backdrop. */
+  /* Poster : plus grand et remonté haut sur le backdrop, collé en bas de la
+     1re rangée (à côté des notes). */
   .gp-cover {
     order: 1;
-    align-self: center;
-    width: 122px;
-    max-width: 122px;
-    margin: -92px 0 0.3rem;
+    grid-column: 1;
+    align-self: end;
+    width: 140px;
+    max-width: none;
+    margin: -120px 0 0;
     border-width: 3px;
   }
 
-  /* Au tactile, l'infobulle « Modifier » est toujours visible */
+  /* Au tactile, l'infobulle « Modifier » est toujours visible. */
   .gp-cover-edit {
     opacity: 1;
-    font-size: 0.68rem;
-    padding: 0.32rem;
+    font-size: 0.66rem;
+    padding: 0.3rem;
   }
 
-  /* Bloc titre centré sous la jaquette. */
-  .gp-rhead-main {
+  /* Notes joueurs / critiques : pastilles empilées verticalement à droite du
+     poster, collées à son bas. Le fond (surface + bord) les garde lisibles même
+     quand elles débordent sur le backdrop. */
+  .gp-gauges {
     order: 2;
-    flex: 0 0 auto;
+    grid-column: 2;
+    align-self: end;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.45rem;
+    margin-top: -60px;
+    min-width: 0;
+  }
+  .gp-gauge {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 0.5rem;
+    min-width: 0;
+    max-width: 100%;
+    padding: 0.26rem 0.8rem 0.26rem 0.28rem;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 22px rgba(10, 10, 20, 0.28);
+  }
+  .gp-gauge-vis {
+    grid-row: 1 / span 2;
+    width: 42px;
+    height: 42px;
+  }
+  .gp-gauge-num {
+    font-size: 0.8rem;
+  }
+  .gp-gauge-label {
+    grid-column: 2;
+    align-self: end;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .gp-gauge-sub {
+    grid-column: 2;
+    align-self: start;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Titre centré sous le hero, pleine largeur. */
+  .gp-rhead-main {
+    order: 3;
+    grid-column: 1 / -1;
     text-align: center;
   }
   .gp-title {
@@ -8454,24 +8505,21 @@
     justify-content: center;
   }
 
-  /* Notes (jauges joueurs / critiques) centrées, juste sous le titre. */
-  .gp-gauges {
-    order: 3;
-    justify-content: center;
-  }
-
   /* Compteur à rebours / TBD juste avant les actions. */
   .gp-countdown,
   .gp-tbd {
     order: 4;
+    grid-column: 1 / -1;
   }
 
   /* Actions puis recommandation, pleine largeur. */
   .gp-actions {
     order: 5;
+    grid-column: 1 / -1;
   }
   .gp-recommend {
     order: 6;
+    grid-column: 1 / -1;
   }
 
   /* Cartes latérales masquées sur mobile (accessibles depuis « Jouer »). */
@@ -8480,9 +8528,10 @@
   }
 
   /* Ancre de scroll, réordonnée juste au-dessus des onglets. Élément vide :
-     on annule le gap flex qu'il ajouterait au-dessus. */
+     on annule le gap qu'il ajouterait au-dessus. */
   .gp-tabs-anchor {
     order: 7;
+    grid-column: 1 / -1;
     margin-top: -0.85rem;
   }
 
@@ -8490,6 +8539,7 @@
      padding de .gp-sheet) plutôt que de laisser voir le fond sur les côtés. */
   .gp-tabs-wrap {
     order: 8;
+    grid-column: 1 / -1;
     margin: 0 calc(-1 * clamp(1.1rem, 3vw, 2.2rem));
   }
   .gp-tabs {
@@ -8497,6 +8547,7 @@
   }
   .gp-tabpanel {
     order: 9;
+    grid-column: 1 / -1;
   }
 }
 
