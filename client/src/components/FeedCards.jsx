@@ -54,6 +54,7 @@ import {
   VenetianMask,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
+import { downloadImage } from "../lib/download";
 import { timeAgo, fmtDuration } from "../lib/lists";
 import { usePlayPlaylist } from "../lib/usePlayPlaylist";
 import { extractVideoId } from "../lib/youtube";
@@ -2423,6 +2424,17 @@ export function FanartLightbox({ item, onClose }) {
 
   return createPortal(
     <div className="gp-feed-lightbox" onClick={onClose}>
+      <button
+        className="gp-feed-lb-dl clickable"
+        onClick={(e) => {
+          e.stopPropagation();
+          downloadImage(r.image, `fanart-${item.game?.name || r.source || "art"}`);
+        }}
+        aria-label="Télécharger"
+        title="Télécharger"
+      >
+        <Download size={20} />
+      </button>
       <button className="gp-feed-lb-close clickable" onClick={onClose} aria-label="Fermer">
         <X size={22} />
       </button>

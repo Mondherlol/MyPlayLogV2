@@ -1747,8 +1747,8 @@
   }
 
   /* Card montée / descente de rang : compacte. Portrait du héros masqué, corps
-     centré, ancien rang réduit à son badge (sans libellé), nouveau rang avec
-     l'image AU-DESSUS du texte. */
+     centré, et les deux rangs (ancien comme nouveau) avec l'image AU-DESSUS du
+     libellé — empilé et centré. */
   .hf-rank-hero {
     display: none;
   }
@@ -1757,16 +1757,13 @@
     padding: 0.75rem;
     justify-content: center;
   }
-  .hf-rank-badge.small .hf-rank-txt {
-    display: none;
-  }
-  .hf-rank-badge.big {
+  .hf-rank-badge {
     flex-direction: column;
     align-items: center;
     text-align: center;
     gap: 0.25rem;
   }
-  .hf-rank-badge.big .hf-rank-txt {
+  .hf-rank-badge .hf-rank-txt {
     align-items: center;
   }
 }

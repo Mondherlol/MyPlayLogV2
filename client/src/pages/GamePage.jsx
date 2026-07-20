@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { makeCache } from "../lib/cache";
+import { downloadImage } from "../lib/download";
 import { safeSetItem } from "../lib/storage";
 import { useAuth } from "../context/AuthContext";
 import { useLibrary } from "../context/LibraryContext";
@@ -1957,6 +1958,12 @@ function ImageViewer({
   const [busy, setBusy] = useState(false);
   const thumbsRef = useRef(null);
   const drag = useRef({ down: false, moved: false, startX: 0, startScroll: 0 });
+  // Carrousel glissable (tactile + souris) : on suit le doigt, l'image bouge et
+  // la voisine arrive ; on valide au relâchement si le geste est assez ample.
+  const stageRef = useRef(null);
+  const [dragDx, setDragDx] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const cdrag = useRef(null);
 
   const list =
     filter === "all" ? images : images.filter((m) => m.type === filter);
@@ -1968,8 +1975,8 @@ function ImageViewer({
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowLeft") setIndex((i) => (i - 1 + list.length) % list.length);
-      else if (e.key === "ArrowRight") setIndex((i) => (i + 1) % list.length);
+      else if (e.key === "ArrowLeft") setIndex((i) => Math.max(0, i - 1));
+      else if (e.key === "ArrowRight") setIndex((i) => Math.min(list.length - 1, i + 1));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -2039,15 +2046,58 @@ function ImageViewer({
     }
   }
 
-  // Swipe tactile gauche/droite pour passer d'une image à l'autre (mobile).
-  const swipe = useTabSwipe({
-    onPrev: () => setIndex((i) => (i - 1 + list.length) % list.length),
-    onNext: () => setIndex((i) => (i + 1) % list.length),
-  });
-
   if (!list.length) return null;
   const safeIndex = Math.min(index, list.length - 1);
   const cur = list[safeIndex];
+
+  // --- Glisser pour naviguer (pointer events : tactile + souris) ---
+  function onStageDown(e) {
+    if (list.length < 2 || e.target.closest("button")) return;
+    cdrag.current = {
+      x: e.clientX,
+      y: e.clientY,
+      w: stageRef.current?.offsetWidth || 1,
+      dx: 0,
+      active: false,
+      decided: false,
+    };
+  }
+  function onStageMove(e) {
+    const d = cdrag.current;
+    if (!d) return;
+    const dx = e.clientX - d.x;
+    const dy = e.clientY - d.y;
+    if (!d.decided) {
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      d.decided = true;
+      if (Math.abs(dx) < Math.abs(dy)) {
+        cdrag.current = null; // geste vertical : on laisse tomber
+        return;
+      }
+      d.active = true;
+      setDragging(true);
+      try {
+        stageRef.current?.setPointerCapture?.(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+    }
+    if (!d.active) return;
+    let v = dx;
+    // Résistance élastique aux extrémités (pas de bouclage).
+    if ((safeIndex === 0 && v > 0) || (safeIndex === list.length - 1 && v < 0)) v *= 0.35;
+    d.dx = v;
+    setDragDx(v);
+  }
+  function onStageUp() {
+    const d = cdrag.current;
+    cdrag.current = null;
+    if (!d?.active) return;
+    setDragging(false);
+    setDragDx(0);
+    if (Math.abs(d.dx) > d.w * 0.16)
+      setIndex((i) => Math.min(list.length - 1, Math.max(0, i + (d.dx < 0 ? 1 : -1))));
+  }
 
   const available = [
     { id: "all", label: "Tout" },
@@ -2079,6 +2129,14 @@ function ImageViewer({
 
   return createPortal(
     <div className="gp-viewer" onClick={onClose}>
+      <button
+        className="gp-viewer-dl clickable"
+        onClick={() => downloadImage(cur.full, `${cur.type || "image"}-${safeIndex + 1}`)}
+        aria-label="Télécharger l'image"
+        title="Télécharger"
+      >
+        <Download size={18} />
+      </button>
       <button className="gp-viewer-close clickable" onClick={onClose} aria-label="Fermer">
         <X size={22} />
       </button>
@@ -2098,23 +2156,50 @@ function ImageViewer({
           </div>
         )}
 
-        <div className="gp-viewer-stage" {...swipe}>
+        <div
+          className="gp-viewer-stage"
+          ref={stageRef}
+          onPointerDown={onStageDown}
+          onPointerMove={onStageMove}
+          onPointerUp={onStageUp}
+          onPointerCancel={onStageUp}
+        >
           {list.length > 1 && (
             <button
               className="gp-viewer-nav left clickable"
-              onClick={() => setIndex((i) => (i - 1 + list.length) % list.length)}
+              onClick={() => setIndex((i) => Math.max(0, i - 1))}
               aria-label="Précédent"
             >
               <ChevronLeft size={26} />
             </button>
           )}
 
-          <img className="gp-viewer-img" src={cur.full} alt="" />
+          <div className="gp-viewer-viewport">
+            <div
+              className="gp-viewer-track"
+              style={{
+                transform: `translateX(calc(${-safeIndex * 100}% + ${dragDx}px))`,
+                transition: dragging ? "none" : undefined,
+              }}
+            >
+              {list.map((m, i) => (
+                <div className="gp-viewer-slide" key={m.id}>
+                  <img
+                    className="gp-viewer-img"
+                    src={m.full}
+                    alt=""
+                    draggable="false"
+                    loading={Math.abs(i - safeIndex) <= 1 ? "eager" : "lazy"}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
 
           {list.length > 1 && (
             <button
               className="gp-viewer-nav right clickable"
-              onClick={() => setIndex((i) => (i + 1) % list.length)}
+              onClick={() => setIndex((i) => Math.min(list.length - 1, i + 1))}
               aria-label="Suivant"
             >
               <ChevronRight size={26} />

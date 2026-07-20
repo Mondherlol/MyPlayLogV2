@@ -1068,10 +1068,15 @@ function GifPicker({ token, onPick, onClose }) {
 // ============================================================
 export function Lightbox({ media, index, post, onIndex, onClose, onLike }) {
   const item = media[index];
+  const vpRef = useRef(null);
+  const [dragDx, setDragDx] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const cdrag = useRef(null);
+
   const step = useCallback(
     (dir) => {
       if (media.length < 2) return;
-      onIndex((index + dir + media.length) % media.length);
+      onIndex(Math.min(media.length - 1, Math.max(0, index + dir)));
     },
     [media.length, index, onIndex]
   );
@@ -1090,6 +1095,56 @@ export function Lightbox({ media, index, post, onIndex, onClose, onLike }) {
     };
   }, [onClose, step]);
 
+  // Glisser (tactile + souris) pour changer d'image : l'image suit le doigt et
+  // la voisine arrive. On n'amorce pas de glissement sur une vidéo ni sur les
+  // boutons/liens (le lecteur garde ses propres gestes).
+  function onVpDown(e) {
+    if (media.length < 2 || e.target.closest("button, a, video, .gvp")) return;
+    cdrag.current = {
+      x: e.clientX,
+      y: e.clientY,
+      w: vpRef.current?.offsetWidth || 1,
+      dx: 0,
+      active: false,
+      decided: false,
+    };
+  }
+  function onVpMove(e) {
+    const d = cdrag.current;
+    if (!d) return;
+    const dx = e.clientX - d.x;
+    const dy = e.clientY - d.y;
+    if (!d.decided) {
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      d.decided = true;
+      if (Math.abs(dx) < Math.abs(dy)) {
+        cdrag.current = null;
+        return;
+      }
+      d.active = true;
+      setDragging(true);
+      try {
+        vpRef.current?.setPointerCapture?.(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+    }
+    if (!d.active) return;
+    let v = dx;
+    if ((index === 0 && v > 0) || (index === media.length - 1 && v < 0)) v *= 0.35;
+    d.dx = v;
+    setDragDx(v);
+  }
+  function onVpUp() {
+    const d = cdrag.current;
+    cdrag.current = null;
+    if (!d?.active) return;
+    setDragging(false);
+    setDragDx(0);
+    if (Math.abs(d.dx) > d.w * 0.16)
+      onIndex(Math.min(media.length - 1, Math.max(0, index + (d.dx < 0 ? 1 : -1))));
+  }
+
   if (!item) return null;
 
   return createPortal(
@@ -1103,11 +1158,42 @@ export function Lightbox({ media, index, post, onIndex, onClose, onLike }) {
         </button>
       )}
       <div className="gm-lb-stage" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-        {item.kind === "video" ? (
-          <GameVideoPlayer className="gm-lb-media gm-lb-player" src={item.url} autoPlay />
-        ) : (
-          <img className="gm-lb-media" src={item.url} alt="" />
-        )}
+        <div
+          className="gm-lb-viewport"
+          ref={vpRef}
+          onPointerDown={onVpDown}
+          onPointerMove={onVpMove}
+          onPointerUp={onVpUp}
+          onPointerCancel={onVpUp}
+        >
+          <div
+            className="gm-lb-track"
+            style={{
+              transform: `translateX(calc(${-index * 100}% + ${dragDx}px))`,
+              transition: dragging ? "none" : undefined,
+            }}
+          >
+            {media.map((m, i) => (
+              <div className="gm-lb-slide" key={i}>
+                {m.kind === "video" ? (
+                  i === index ? (
+                    <GameVideoPlayer className="gm-lb-media gm-lb-player" src={m.url} autoPlay />
+                  ) : (
+                    <div className="gm-lb-vposter">
+                      {m.thumbnail ? (
+                        <img src={m.thumbnail} alt="" draggable="false" />
+                      ) : (
+                        <Play size={40} fill="currentColor" />
+                      )}
+                    </div>
+                  )
+                ) : (
+                  <img className="gm-lb-media" src={m.url} alt="" draggable="false" />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
         <div className="gm-lb-bar">
           <div className="gm-lb-user">
             {post.author?.username && (
