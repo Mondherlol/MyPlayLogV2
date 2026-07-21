@@ -19,6 +19,8 @@ import {
   Trophy,
   Crown,
   Swords,
+  Clock,
+  ExternalLink,
   X,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -29,6 +31,7 @@ import DocumentaryModal from "../components/DocumentaryModal";
 import DiscoverGemsModal, { GEMS_RESUME_KEY } from "../components/DiscoverGemsModal";
 import HomeFeed, { FeedUserFilter } from "../components/HomeFeed";
 import GameCard from "../components/GameCard";
+import ArcadeBar from "../components/ArcadeBar";
 
 // Réglages par défaut du feed documentaire, persistés en localStorage.
 const PREFS_KEY = "mpl_doc_prefs";
@@ -148,6 +151,9 @@ export default function Welcome() {
             </p>
           </div>
 
+          {/* Solde + accès aux caisses et aux curseurs (ex-page /arcade). */}
+          <ArcadeBar />
+
           <div className="hf-hero-actions">
             <div className="doc-cta">
               <button className="doc-cta-btn clickable" onClick={() => setShowDoc(true)}>
@@ -261,6 +267,9 @@ export default function Welcome() {
             </DragCarousel>
           ) : null}
         </section>
+
+        {/* --- Jeux gratuits de la semaine (Epic / Steam / GOG / Prime…) --- */}
+        <FreeGamesSection token={token} />
 
         {/* --- Fil d'actualité --- */}
         <section className="hf-sec">
@@ -457,6 +466,123 @@ function WishlistRadar({ token }) {
         Calendrier des sorties <ChevronRight size={14} />
       </Link>
     </div>
+  );
+}
+
+// --- Jeux gratuits de la semaine ---
+// Giveaways de jeux à récupérer (Epic, Steam, GOG, Prime…), agrégés côté
+// serveur depuis GamerPower (/free-games). Carrousel horizontal de cards
+// paysage : image du magasin, pastille de la boutique, prix barré + « Gratuit »
+// et le temps restant avant la fin de l'offre. Section masquée si rien en cours.
+
+// Slug de magasin → couleur de la pastille (identité de la boutique).
+const STORE_COLORS = {
+  epic: "#2a2a2a",
+  steam: "#1b2838",
+  gog: "#7a3ff2",
+  ubisoft: "#0a6cff",
+  ea: "#e0403f",
+  battlenet: "#1486e8",
+  prime: "#00a8e1",
+  itchio: "#fa5c5c",
+  "drm-free": "#5a6472",
+  pc: "#5a6472",
+};
+
+// « Encore 3 j » / « Dernier jour » — combien de temps reste-t-il pour récupérer.
+function freeEndsLabel(endsAt) {
+  if (!endsAt) return null;
+  const days = Math.ceil((Date.parse(endsAt) - Date.now()) / 86400000);
+  if (days < 0) return null;
+  if (days === 0) return { text: "Dernier jour", urgent: true };
+  if (days === 1) return { text: "Encore 1 j", urgent: true };
+  return { text: `Encore ${days} j`, urgent: days <= 2 };
+}
+
+function FreeGameCard({ game }) {
+  const ends = freeEndsLabel(game.endsAt);
+  const color = STORE_COLORS[game.store.slug] || STORE_COLORS.pc;
+  return (
+    <a
+      className="hf-free-card clickable"
+      href={game.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={`${game.title} — gratuit sur ${game.store.label}`}
+    >
+      <div className="hf-free-thumb">
+        {game.image ? (
+          <img src={game.image} alt="" loading="lazy" draggable="false" />
+        ) : (
+          <span className="hf-free-noimg">
+            <Gamepad2 size={24} />
+          </span>
+        )}
+        <span className="hf-free-store" style={{ background: color }}>
+          {game.store.label}
+        </span>
+        {ends && (
+          <span className={`hf-free-ends ${ends.urgent ? "urgent" : ""}`}>
+            <Clock size={11} /> {ends.text}
+          </span>
+        )}
+        <span className="hf-free-get">
+          <ExternalLink size={14} /> Récupérer
+        </span>
+      </div>
+      <div className="hf-free-body">
+        <span className="hf-free-title">{game.title}</span>
+        <span className="hf-free-meta">
+          {game.worth && <span className="hf-free-was">{game.worth}</span>}
+          <span className="hf-free-free">
+            <Gift size={12} /> Gratuit
+          </span>
+        </span>
+      </div>
+    </a>
+  );
+}
+
+function FreeGamesSection({ token }) {
+  const [games, setGames] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    apiFetch("/free-games", { token })
+      .then((d) => alive && setGames(d.games || []))
+      .catch(() => alive && setGames([]));
+    return () => {
+      alive = false;
+    };
+  }, [token]);
+
+  // Rien en cours (ou API en carafe) : on masque toute la section.
+  if (games !== null && games.length === 0) return null;
+
+  return (
+    <section className="hf-sec">
+      <div className="hf-sec-head">
+        <h2 className="hf-sec-title">
+          <Gift size={17} /> Jeux gratuits à récupérer
+        </h2>
+        <span className="hf-sec-note">Epic · Steam · GOG · Prime…</span>
+      </div>
+      {games === null ? (
+        <div className="hf-carousel" aria-busy="true">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <span key={i} className="gp-skel hf-free-skel" />
+          ))}
+        </div>
+      ) : (
+        <DragCarousel>
+          {games.map((g) => (
+            <div className="hf-free-item" key={g.id}>
+              <FreeGameCard game={g} />
+            </div>
+          ))}
+        </DragCarousel>
+      )}
+    </section>
   );
 }
 

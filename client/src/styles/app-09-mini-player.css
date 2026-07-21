@@ -67,7 +67,7 @@ button.mp-disc {
 }
 
 .mp-disc.mp-disc-btn {
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: box-shadow 0.15s ease, transform 0.1s ease;
 }
 
@@ -189,7 +189,7 @@ button.mp-disc {
 
 .mp-btn:disabled {
   opacity: 0.32;
-  cursor: default;
+  cursor: var(--cursor-default), auto;
 }
 
 .mp-play {
@@ -227,7 +227,7 @@ button.mp-disc {
   height: 6px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 
 .mp-bar-fill {
@@ -305,7 +305,7 @@ button.mp-disc {
     #ffd24a var(--vol, 100%),
     rgba(255, 255, 255, 0.12) var(--vol, 100%)
   );
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   outline-offset: 3px;
 }
 

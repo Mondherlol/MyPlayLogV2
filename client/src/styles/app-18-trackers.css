@@ -106,7 +106,7 @@
   color: var(--text);
   font-weight: 600;
   font-size: 0.85rem;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: border-color 0.15s, background 0.15s;
 }
 
@@ -116,7 +116,7 @@
 
 .trk-refresh:disabled {
   opacity: 0.6;
-  cursor: default;
+  cursor: var(--cursor-default), auto;
 }
 
 /* ---------- Sélecteur de saison (vignettes IGDB) ---------- */
@@ -135,7 +135,7 @@
   color: var(--text);
   font-weight: 600;
   font-size: 0.85rem;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: border-color 0.15s;
 }
 
@@ -201,7 +201,7 @@
   font-size: 0.88rem;
   font-weight: 600;
   text-align: left;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 
 .trk-season-opt:hover {
@@ -551,7 +551,7 @@
   color: var(--text);
   font-weight: 600;
   font-size: 0.85rem;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: border-color 0.15s, background 0.15s;
 }
 
@@ -562,7 +562,7 @@
 
 .trk-loadmore:disabled {
   opacity: 0.65;
-  cursor: default;
+  cursor: var(--cursor-default), auto;
 }
 
 .trk-match {
@@ -588,7 +588,7 @@
   min-height: 72px;
   padding: 0.55rem 0.7rem;
   text-align: left;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   /* border: 1px solid rgba(255, 255, 255, 0.08); */
   border-left: 3px solid var(--border-strong);
   border-radius: var(--radius);
@@ -1206,7 +1206,7 @@
   background: var(--surface);
   color: var(--text);
   font-size: 0.76rem;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 
 .sb-copy:hover {
@@ -1272,7 +1272,7 @@
   /* Fond de carte explicite (identique aux autres cards du fil). */
   background: var(--surface);
   border-left: 3px solid var(--border-strong);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
@@ -1797,7 +1797,7 @@
   color: var(--text-soft);
   font-weight: 700;
   font-size: 0.88rem;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 
@@ -1867,12 +1867,12 @@
   padding: 0;
   border: 0;
   background: none;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   text-align: center;
 }
 
 .trk-game[disabled] {
-  cursor: default;
+  cursor: var(--cursor-default), auto;
 }
 
 .trk-game-cover {
@@ -2079,7 +2079,7 @@
 
 .trk-candidate:disabled {
   opacity: 0.6;
-  cursor: default;
+  cursor: var(--cursor-default), auto;
 }
 
 .trk-candidate-name {
@@ -2369,7 +2369,7 @@
   min-height: 64px;
   padding: 0.55rem 0.7rem;
   text-align: left;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   border: 1px solid var(--border);
   border-left: 3px solid var(--border-strong);
   border-radius: var(--radius);

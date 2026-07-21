@@ -1373,7 +1373,7 @@
 }
 
 .search-res-hist {
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 
 .search-res-hist .search-res-name {

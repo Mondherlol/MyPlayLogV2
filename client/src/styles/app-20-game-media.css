@@ -97,7 +97,7 @@
   padding: 0.4rem 0.5rem;
   font-weight: 700;
   font-size: 0.85rem;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
 }
 
@@ -111,7 +111,7 @@
 
 .gm-tool:disabled {
   opacity: 0.5;
-  cursor: default;
+  cursor: var(--cursor-default), auto;
 }
 
 .gm-tool.on {
@@ -143,7 +143,7 @@
   font-size: 0.9rem;
   padding: 0.5rem 1rem;
   border-radius: 999px;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   box-shadow: 0 4px 14px rgba(242, 183, 11, 0.35);
   transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
   flex: 0 0 auto;
@@ -156,7 +156,7 @@
 
 .gm-post:disabled {
   opacity: 0.45;
-  cursor: default;
+  cursor: var(--cursor-default), auto;
   box-shadow: none;
 }
 
@@ -236,7 +236,7 @@
   color: #fff;
   display: grid;
   place-items: center;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 
 .gm-preview-embed {
@@ -317,7 +317,7 @@
   padding: 0.35rem 0.75rem;
   font-size: 0.83rem;
   font-weight: 600;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: all 0.15s ease;
 }
 
@@ -363,7 +363,7 @@
   padding: 0.32rem 0.7rem;
   font-size: 0.82rem;
   font-weight: 700;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 
 .gm-sort-opt.active {
@@ -453,7 +453,7 @@
   border: none;
   background: rgba(20, 20, 30, 0.35);
   color: #fff;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   text-align: center;
   line-height: 1.3;
 }
@@ -549,7 +549,7 @@
   padding: 0.32rem 0.45rem;
   font-size: 0.8rem;
   font-weight: 700;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: color 0.15s ease, background 0.15s ease;
 }
 
@@ -605,7 +605,7 @@
 .gm-yt-preview {
   border: none;
   padding: 0;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 
 .gm-yt-preview img {
@@ -746,7 +746,7 @@
   border: none;
   background: transparent;
   color: var(--text-soft);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   padding: 0.25rem;
   border-radius: 8px;
 }
@@ -766,7 +766,7 @@
   background: var(--surface-2);
   border-radius: 8px;
   overflow: hidden;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   aspect-ratio: 1 / 1;
 }
 
@@ -826,7 +826,7 @@
   color: #fff;
   display: grid;
   place-items: center;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 
 .gm-lb-close:hover {
@@ -845,7 +845,7 @@
   color: #fff;
   display: grid;
   place-items: center;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 
 .gm-lb-nav:hover {
@@ -1048,7 +1048,7 @@
   color: #fff;
   display: grid;
   place-items: center;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 
 .gm-attach-btn.on {
@@ -1202,7 +1202,7 @@
   color: var(--text-soft);
   border-radius: 8px;
   padding: 0.3rem;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 
 .gm-post-del:hover {
@@ -1339,7 +1339,7 @@
   color: var(--text-soft);
   font-size: 0.85rem;
   font-weight: 600;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   padding: 0.25rem;
   border-radius: 8px;
   transition: color 0.15s ease;
@@ -1439,7 +1439,7 @@
   color: #fff;
   display: grid;
   place-items: center;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: background 0.15s ease, transform 0.1s ease;
 }
 
@@ -1577,7 +1577,7 @@
   padding: 0.45rem 0.8rem;
   font-size: 0.85rem;
   font-weight: 600;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: all 0.15s ease;
 }
 
@@ -1622,7 +1622,7 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   flex: 0 0 auto;
 }
 
@@ -1649,7 +1649,7 @@
   padding: 0.5rem;
   font-size: 0.85rem;
   font-weight: 700;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: all 0.15s ease;
 }
 
@@ -1808,7 +1808,7 @@
   height: 22px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   position: relative;
   touch-action: none;
 }
@@ -1857,11 +1857,11 @@
 .ve-clip-music {
   background: rgba(168, 121, 255, 0.28);
   border: 1px solid rgba(168, 121, 255, 0.65);
-  cursor: grab;
+  cursor: var(--cursor-grab);
   touch-action: none;
 }
 .ve-clip-music:active {
-  cursor: grabbing;
+  cursor: var(--cursor-grabbing);
 }
 .ve-clip-name {
   font-size: 0.68rem;
@@ -1915,7 +1915,7 @@
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--text-soft);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: all 0.15s ease;
 }
 .ve-addmusic:hover {
@@ -1963,7 +1963,7 @@
   color: var(--text);
   display: grid;
   place-items: center;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   flex: 0 0 auto;
   transition: color 0.15s ease, background 0.15s ease;
 }
@@ -1986,7 +1986,7 @@
   border-radius: 999px;
   background: linear-gradient(90deg, var(--orange) var(--val, 50%), var(--border-strong) var(--val, 50%));
   outline: none;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 .ve-vol.music {
   background: linear-gradient(90deg, #a879ff var(--val, 50%), var(--border-strong) var(--val, 50%));
@@ -1999,7 +1999,7 @@
   background: #fff;
   border: 2px solid var(--orange);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-  cursor: grab;
+  cursor: var(--cursor-grab);
 }
 .ve-vol.music::-webkit-slider-thumb {
   border-color: #a879ff;
@@ -2010,7 +2010,7 @@
   border: 2px solid var(--orange);
   border-radius: 50%;
   background: #fff;
-  cursor: grab;
+  cursor: var(--cursor-grab);
 }
 .ve-vol.music::-moz-range-thumb {
   border-color: #a879ff;
@@ -2030,12 +2030,12 @@
 }
 .ve-vol:disabled {
   opacity: 0.5;
-  cursor: default;
+  cursor: var(--cursor-default), auto;
 }
 
 /* Import audio en cours + barre indéterminée du montage serveur */
 .ve-addmusic.is-loading {
-  cursor: default;
+  cursor: var(--cursor-default), auto;
   color: var(--accent-ink);
   border-style: solid;
 }
@@ -2079,7 +2079,7 @@
 .gvp-surface {
   position: absolute;
   inset: 0 0 44px 0;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   touch-action: manipulation;
 }
 .gvp-bigplay {
@@ -2157,7 +2157,7 @@
 .gvp-bar {
   position: relative;
   height: 14px;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   touch-action: none;
   margin-bottom: 0.25rem;
 }
@@ -2219,7 +2219,7 @@
   border-radius: 8px;
   display: grid;
   place-items: center;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
 .gvp-btn:hover {
@@ -2240,7 +2240,7 @@
   border-radius: 999px;
   background: linear-gradient(90deg, #ffd24a var(--val, 100%), rgba(255, 255, 255, 0.3) var(--val, 100%));
   outline: none;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: width 0.2s ease, opacity 0.2s ease;
 }
 .gvp-volume:hover .gvp-vol,
@@ -2261,7 +2261,7 @@
   height: 12px;
   border-radius: 50%;
   background: #fff;
-  cursor: grab;
+  cursor: var(--cursor-grab);
 }
 .gvp-vol::-moz-range-thumb {
   width: 12px;

@@ -38,7 +38,7 @@
   font: inherit;
   font-size: 0.85rem;
   font-weight: 600;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
 .cp-back:hover {
@@ -136,7 +136,7 @@
   border-radius: 999px;
 }
 .cp-chip-link {
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
 .cp-chip-link:hover {
@@ -167,7 +167,7 @@
   animation: cp-rise 0.5s ease both;
 }
 .cp-ring.clickable {
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: transform 0.15s ease, filter 0.15s ease;
 }
 .cp-ring.clickable:hover {
@@ -239,7 +239,7 @@
   border: 0;
   background: transparent;
   color: var(--text-soft);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   padding: 2px;
 }
 .cp-affinity-info:hover {
@@ -264,7 +264,7 @@
   font: inherit;
   font-size: 0.8rem;
   font-weight: 600;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 .cp-fav-btn:hover {
@@ -278,7 +278,7 @@
 }
 .cp-fav-btn:disabled {
   opacity: 0.6;
-  cursor: default;
+  cursor: var(--cursor-default), auto;
 }
 
 /* ---------- Onglets ---------- */
@@ -298,7 +298,7 @@
   font: inherit;
   font-size: 0.9rem;
   font-weight: 600;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   transition: color 0.15s ease, border-color 0.15s ease;
@@ -350,7 +350,7 @@
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--accent-ink);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 .cp-panel-more:hover {
   text-decoration: underline;
@@ -400,7 +400,7 @@
   font-size: 0.82rem;
   font-weight: 600;
   color: var(--accent-ink);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 .cp-see-more:hover {
   text-decoration: underline;
@@ -723,7 +723,7 @@
   font-weight: 600;
   padding: 0.28rem 0.7rem;
   border-radius: 999px;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
 .cp-seg button.active {
@@ -743,7 +743,7 @@
   font: inherit;
   font-size: 0.8rem;
   font-weight: 600;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 .cp-toggle.active {
@@ -760,7 +760,7 @@
   font: inherit;
   font-size: 0.8rem;
   font-weight: 600;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 
 .cp-empty {
@@ -844,7 +844,7 @@ a.cp-person:hover {
   background: transparent;
   font: inherit;
   color: var(--text); /* un <button> n'hérite pas de color : illisible sinon en sombre */
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   text-align: center;
   min-width: 0;
   width: 100%;

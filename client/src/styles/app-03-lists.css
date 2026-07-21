@@ -1209,7 +1209,7 @@
   color: var(--text);
   font-size: 0.9rem;
   font-weight: 600;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 
 .lists-select:focus {
@@ -1727,11 +1727,11 @@
 }
 
 .lg-card.char {
-  cursor: default;
+  cursor: var(--cursor-default), auto;
 }
 
 .lg-card.char.clickable {
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 
 /* Badge visibilité (public/privé) sur les cartes de « Mes listes » */
@@ -1879,7 +1879,7 @@
   padding: 0.45rem 0.6rem;
   font-weight: 700;
   font-size: 0.85rem;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 .le-theme-opt.active {
   background: var(--surface);
@@ -1915,7 +1915,7 @@
   padding: 0.4rem 0.5rem;
   font-size: 0.9rem;
   font-weight: 500;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   text-align: left;
   transition: background 0.15s ease;
 }
@@ -1924,7 +1924,7 @@
 }
 .le-check.disabled {
   opacity: 0.4;
-  cursor: default;
+  cursor: var(--cursor-default), auto;
 }
 .le-check-box {
   width: 20px;
@@ -1996,7 +1996,7 @@
   border-radius: 50%;
   background: var(--surface);
   color: var(--text);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   box-shadow: var(--shadow-sm);
   transition: all 0.12s ease;
 }
@@ -2005,7 +2005,7 @@
 }
 .le-stepper-btn:disabled {
   opacity: 0.35;
-  cursor: default;
+  cursor: var(--cursor-default), auto;
   box-shadow: none;
 }
 .le-stepper-val {

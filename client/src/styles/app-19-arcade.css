@@ -805,6 +805,196 @@
   -webkit-box-orient: vertical;
 }
 
+/* ======================================================================
+   Le « juice » de la révélation : flash, rayons, confettis, tremblement.
+   Tout est décoratif et coupé si prefers-reduced-motion (voir plus bas).
+   ====================================================================== */
+.co-fx {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  /* Clippe la gerbe au viewport : sans ça les confettis qui sortent de l'écran
+     allongeraient la zone défilable de l'overlay. */
+  overflow: hidden;
+}
+
+/* Éclair coloré au moment où le lot se pose. */
+.co-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 46%,
+    color-mix(in srgb, var(--co-rarity) 55%, transparent),
+    transparent 62%
+  );
+  animation: co-flash 0.55s ease-out forwards;
+}
+@keyframes co-flash {
+  from {
+    opacity: 0.95;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Rayons tournants derrière la carte — réservés aux raretés hautes. */
+.co-rays {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 150vmax;
+  height: 150vmax;
+  opacity: 0.3;
+  background: repeating-conic-gradient(
+    from 0deg,
+    color-mix(in srgb, var(--co-rarity) 32%, transparent) 0deg 5deg,
+    transparent 5deg 17deg
+  );
+  /* Fondu circulaire : les rayons naissent du centre et se perdent au bord. */
+  -webkit-mask-image: radial-gradient(circle, #000 0%, transparent 55%);
+  mask-image: radial-gradient(circle, #000 0%, transparent 55%);
+  animation: co-rays-spin 16s linear infinite, co-rays-in 0.6s ease-out;
+}
+@keyframes co-rays-spin {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+@keyframes co-rays-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Gerbe de confettis : chaque particule porte sa trajectoire en variables. */
+.co-burst {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 0;
+  height: 0;
+}
+.co-particle {
+  position: absolute;
+  width: var(--sz);
+  height: var(--sz);
+  background: var(--pc);
+  border-radius: 2px;
+  opacity: 0;
+  animation-name: co-particle;
+  animation-timing-function: cubic-bezier(0.15, 0.7, 0.3, 1);
+  animation-fill-mode: forwards;
+}
+.co-particle.s1 {
+  border-radius: 50%;
+}
+.co-particle.s2 {
+  height: calc(var(--sz) * 0.4);
+  border-radius: 1px;
+}
+@keyframes co-particle {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(0deg) scale(0.4);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty)))
+      rotate(var(--rot)) scale(1);
+  }
+}
+
+/* Secousse de la modale, proportionnelle à la rareté (--co-shake). */
+.co-modal.shake {
+  animation: co-shake 0.5s ease-out;
+}
+@keyframes co-shake {
+  10%,
+  90% {
+    transform: translate3d(calc(var(--co-shake) * -1px), 0, 0);
+  }
+  20%,
+  80% {
+    transform: translate3d(calc(var(--co-shake) * 1px), 0, 0);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translate3d(calc(var(--co-shake) * -0.55px), 0, 0);
+  }
+  40%,
+  60% {
+    transform: translate3d(calc(var(--co-shake) * 0.55px), 0, 0);
+  }
+}
+
+/* Halo central de la piste : l'œil sait où regarder pendant que ça défile. */
+.co-spot {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 160px;
+  transform: translateX(-50%);
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, var(--accent-ink) 22%, transparent),
+    transparent 70%
+  );
+}
+/* Le repère bat tant que la bande tourne, puis se calme à l'arrêt. */
+.co-stage:not(.done) .co-marker {
+  animation: co-marker-pulse 0.55s ease-in-out infinite;
+}
+@keyframes co-marker-pulse {
+  50% {
+    box-shadow: 0 0 26px 6px rgba(242, 183, 11, 0.95);
+  }
+}
+
+/* Bouton « Arrêter » : discret à côté de la relance, qui reste l'action mise
+   en avant. */
+.co-stop {
+  padding: 0.6rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.co-stop:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.co-again:disabled {
+  opacity: 0.5;
+  filter: grayscale(0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .co-flash,
+  .co-rays,
+  .co-particle,
+  .co-modal.shake,
+  .co-stage:not(.done) .co-marker {
+    animation: none;
+  }
+  .co-fx {
+    display: none;
+  }
+}
+
 /* ---------- La révélation ---------- */
 .co-result {
   margin-top: 1.5rem;
@@ -871,7 +1061,8 @@
   max-width: 46ch;
 }
 .co-dup,
-.co-new {
+.co-new,
+.co-try-note {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -879,6 +1070,12 @@
   border-radius: 999px;
   font-size: 0.82rem;
   margin: 0 0 1.1rem;
+}
+/* Essai admin : ni gain ni perte, on le dit clairement en doré neutre. */
+.co-try-note {
+  background: color-mix(in srgb, var(--accent-ink) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-ink) 34%, transparent);
+  color: var(--accent-ink);
 }
 .co-new {
   background: rgba(36, 165, 92, 0.14);
@@ -917,7 +1114,10 @@
   color: var(--accent-ink);
 }
 .co-again {
-  padding: 0.55rem 1.4rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 1.1rem;
   border: none;
   border-radius: 999px;
   background: var(--accent-grad);
@@ -983,6 +1183,153 @@
   font-size: 0.75rem;
   line-height: 1.45;
   margin: 0.35rem 0 0;
+}
+
+/* Barre export / import (transfert entre instances). */
+.arw-transfer {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.arw-transfer-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+.arw-transfer-opt input {
+  accent-color: var(--accent-ink);
+}
+
+/* Bouton « Tester » d'un lot curseur : accentué quand le test est actif. */
+.arw-test-btn.on {
+  color: #3a2600;
+  background: var(--accent-grad);
+  border-color: transparent;
+}
+
+/* ======================================================================
+   Banc d'essai du curseur : un panneau flottant, une zone par rôle.
+   ====================================================================== */
+.ctest {
+  position: fixed;
+  z-index: 60;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 224px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--accent-ink) 42%, var(--border));
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28);
+}
+.ctest-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.ctest-head > svg {
+  color: var(--accent-ink);
+  flex: 0 0 auto;
+}
+.ctest-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.84rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ctest-close {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-soft);
+}
+.ctest-close:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.ctest-sub {
+  margin: 0 0 0.15rem;
+  font-size: 0.7rem;
+  color: var(--text-soft);
+}
+
+/* Chaque zone déclenche la variable de SON rôle — même cascade que l'app. */
+.ctest-zone {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  border: 1px dashed var(--border);
+  border-radius: 9px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.74rem;
+  text-align: left;
+}
+.ctest-zone.normal {
+  cursor: var(--cursor-default), auto;
+}
+.ctest-zone.grab {
+  cursor: var(--cursor-grab);
+}
+.ctest-zone.grab:active {
+  cursor: var(--cursor-grabbing);
+}
+.ctest-zone.text::placeholder {
+  color: var(--text-soft);
+}
+
+.ctest-stop {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-top: 0.2rem;
+  padding: 0.45rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent-grad);
+  color: #3a2600;
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+.ctest-stop kbd {
+  font-size: 0.64rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+/* Bouton « Tester » du pied d'éditeur : repoussé à gauche. */
+.pn-foot-left {
+  margin-right: auto;
+}
+.pn-foot-left.on {
+  border-color: var(--accent-ink);
+  color: var(--accent-ink);
+}
+
+@media (max-width: 760px) {
+  .ctest {
+    right: 0.5rem;
+    width: 190px;
+  }
 }
 .arw-img-row {
   display: flex;
@@ -1056,6 +1403,9 @@
   border-left: 3px solid var(--arc-rarity);
   border-radius: 10px;
   background: var(--surface);
+  /* Sans ça, le <button> garde la couleur système et le nom devient illisible
+     en thème sombre (texte sombre sur fond sombre). */
+  color: var(--text);
   text-align: left;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
@@ -1095,6 +1445,570 @@
 .arw-pick-check {
   color: var(--arc-rarity);
   flex: 0 0 auto;
+}
+
+/* Carte d'inventaire entièrement cliquable (un clic = équiper / retirer). */
+.arc-inv-card[role="button"] {
+  transition: transform 0.12s ease, border-color 0.15s ease;
+}
+.arc-inv-card[role="button"]:hover {
+  transform: translateY(-2px);
+  border-color: var(--arc-rarity);
+}
+.arc-inv-card[role="button"]:focus-visible {
+  outline: 2px solid var(--arc-rarity);
+  outline-offset: 2px;
+}
+/* L'état n'est plus un bouton : il ne doit plus réagir au survol. */
+.arc-inv-card .arc-equip {
+  pointer-events: none;
+}
+
+/* ======================================================================
+   Barre d'arcade de l'accueil (remplace l'ancienne page /arcade).
+   ====================================================================== */
+.abar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.abar-points {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid rgba(242, 183, 11, 0.42);
+  border-radius: 999px;
+  background: rgba(242, 183, 11, 0.12);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+.abar-points svg {
+  color: var(--accent-ink);
+}
+.abar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 600;
+  transition: border-color 0.15s ease, transform 0.12s ease;
+}
+.abar-btn:hover:not(:disabled) {
+  border-color: var(--accent-ink);
+  transform: translateY(-1px);
+}
+.abar-btn:disabled {
+  opacity: 0.5;
+}
+
+/* Modale commune aux caisses et aux curseurs. */
+.abar-modal {
+  position: relative;
+  width: min(940px, 100%);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.abar-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+.abar-modal-head h2 {
+  flex: 1;
+  min-width: 0;
+  font-size: 1.15rem;
+}
+.abar-modal-head .modal-close {
+  position: static;
+}
+.abar-modal-body {
+  padding: 1.25rem;
+  overflow-y: auto;
+}
+
+/* ======================================================================
+   Contrôle segmenté (remplace les <select> Famille / Rareté).
+   ====================================================================== */
+.seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding: 0.25rem;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.seg-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.seg-item:hover:not(.on) {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+.seg-item.on {
+  /* Fond doré vif dans les deux thèmes → encre sombre FIXE (pas --accent-ink,
+     qui vire au doré clair en thème sombre et devient illisible ici). */
+  color: #3a2600;
+  background: var(--accent-grad);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+}
+.seg-item.on svg {
+  color: #3a2600;
+}
+/* Raretés : chaque option porte SA couleur (pastille au repos, remplissage
+   quand active). Le sélecteur d'attribut cible les items qui déclarent
+   --seg-color en style inline. */
+.seg-item[style*="--seg-color"]::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--seg-color);
+  flex: 0 0 auto;
+}
+.seg-item[style*="--seg-color"].on {
+  color: #fff;
+  background: var(--seg-color);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--seg-color) 45%, transparent);
+}
+.seg-item[style*="--seg-color"].on::before {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+/* ======================================================================
+   Thème de curseur multi-rôles : import, revue, slots.
+   ====================================================================== */
+.cur-url {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+  padding: 0.3rem 0.35rem 0.3rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.cur-url > svg {
+  color: var(--accent-ink);
+  flex: 0 0 auto;
+}
+.cur-url input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 0.3rem 0;
+  font-size: 0.84rem;
+  color: var(--text);
+}
+.cur-url input:focus {
+  outline: none;
+}
+.cur-url-go {
+  flex: 0 0 auto;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.82rem;
+}
+.cur-or {
+  margin: 0.45rem 0 0.15rem;
+  text-align: center;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-soft);
+}
+
+.cur-drop {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  margin-top: 0.1rem;
+  padding: 1.05rem 1rem;
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  text-align: center;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.cur-drop:hover:not(:disabled) {
+  border-color: var(--accent-ink);
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent-ink) 7%, var(--surface-2));
+}
+.cur-drop-main {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.cur-drop-sub {
+  font-size: 0.73rem;
+}
+
+.cur-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+.cur-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.cur-slot.filled {
+  border-color: color-mix(in srgb, var(--accent-ink) 38%, var(--border));
+}
+/* Le slot dont le menu contextuel est ouvert reste visuellement désigné. */
+.cur-slot.menued {
+  border-color: var(--accent-ink);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-ink) 22%, transparent);
+}
+
+/* Menu contextuel d'un rôle (clic droit). */
+.cur-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 196px;
+  padding: 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+.cur-menu-title {
+  display: block;
+  padding: 0.3rem 0.5rem 0.35rem;
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-soft);
+}
+.cur-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.8rem;
+  text-align: left;
+}
+.cur-menu-item:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.cur-menu-item:disabled {
+  opacity: 0.4;
+}
+.cur-menu-item.danger:hover:not(:disabled) {
+  color: #e5484d;
+}
+/* Vignette du curseur en presse-papier, à côté de « Coller ». */
+.cur-menu-chip {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: var(--surface-2);
+}
+.cur-menu-chip img {
+  image-rendering: pixelated;
+}
+.cur-slot-head {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.cur-slot-head strong {
+  font-size: 0.82rem;
+}
+.cur-slot-head svg {
+  color: var(--accent-ink);
+  flex: 0 0 auto;
+}
+.cur-slot-req {
+  margin-left: auto;
+  font-size: 0.58rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--accent-ink) 15%, transparent);
+  padding: 0.06rem 0.32rem;
+  border-radius: 999px;
+}
+.cur-slot-desc {
+  margin: 0;
+  font-size: 0.67rem;
+  line-height: 1.3;
+  color: var(--text-soft);
+}
+.cur-slot-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: stretch;
+}
+.cur-slot-preview {
+  width: 100%;
+  height: 68px;
+}
+.cur-slot-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.cur-slot-add:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--accent-ink);
+}
+.cur-hotspot {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.67rem;
+  color: var(--text-soft);
+}
+.cur-hotspot span {
+  flex: 1;
+  min-width: 0;
+}
+.cur-hotspot input {
+  width: 46px;
+  padding: 0.2rem 0.3rem;
+  font-size: 0.74rem;
+}
+
+/* Presets de taille d'un rôle. */
+.cur-size {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.67rem;
+  color: var(--text-soft);
+}
+.cur-size > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex: 0 0 auto;
+}
+.cur-size-chips {
+  display: flex;
+  gap: 0.2rem;
+  flex-wrap: wrap;
+}
+.cur-size-chip {
+  min-width: 24px;
+  padding: 0.12rem 0.28rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.cur-size-chip:hover:not(:disabled):not(.on) {
+  color: var(--text);
+  border-color: var(--accent-ink);
+}
+.cur-size-chip.on {
+  color: #3a2600;
+  background: var(--accent-grad);
+  border-color: transparent;
+}
+
+/* Bibliothèque du pack importé (palette réassignable). */
+.cur-lib {
+  margin-top: 0.6rem;
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.cur-lib-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.55rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.cur-lib-head svg {
+  color: var(--accent-ink);
+}
+.cur-lib-sub {
+  margin-left: auto;
+  font-weight: 500;
+  font-size: 0.7rem;
+  color: var(--text-soft);
+}
+.cur-lib-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.45rem;
+}
+.cur-lib-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.cur-lib-thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 46px;
+  border-radius: 8px;
+  background-color: var(--surface-2);
+  background-image: linear-gradient(45deg, var(--border) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--border) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--border) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--border) 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+}
+.cur-lib-thumb img {
+  image-rendering: pixelated;
+}
+.cur-lib-name {
+  max-width: 100%;
+  font-size: 0.65rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cur-lib-item .cur-rev-role {
+  width: 100%;
+}
+
+.cur-review {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--accent-ink) 30%, var(--border));
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.cur-review-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+.cur-review-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(146px, 1fr));
+  gap: 0.5rem;
+}
+.cur-rev-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  transition: opacity 0.15s ease;
+}
+.cur-rev-card.ignored {
+  opacity: 0.45;
+}
+.cur-rev-thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 54px;
+  border-radius: 8px;
+  background-color: var(--surface);
+  background-image: linear-gradient(45deg, var(--border) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--border) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--border) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--border) 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+}
+.cur-rev-thumb img {
+  image-rendering: pixelated;
+}
+.cur-rev-name {
+  max-width: 100%;
+  font-size: 0.67rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cur-rev-role {
+  width: 100%;
+  padding: 0.25rem 0.3rem;
+  font-size: 0.74rem;
+}
+.cur-review-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
 }
 
 /* ======================================================================

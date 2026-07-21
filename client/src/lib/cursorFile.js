@@ -251,10 +251,11 @@ function rgbaToDataUrl({ rgba, width, height }) {
   return { url: dst.toDataURL("image/png"), width: w, height: h };
 }
 
-// Charge un PNG embarqué (rare) via <img> et le normalise en data URL PNG ≤128.
-function pngBytesToDataUrl(bytes) {
+// Charge une image (PNG embarqué, ou fichier PNG/GIF/BMP d'un pack) via <img>
+// et la normalise en data URL PNG ≤128.
+function imageBytesToDataUrl(bytes, mime = "image/png") {
   return new Promise((resolve, reject) => {
-    const blob = new Blob([bytes], { type: "image/png" });
+    const blob = new Blob([bytes], { type: mime });
     const url = URL.createObjectURL(blob);
     const img = new Image();
     img.onload = () => {
@@ -280,7 +281,7 @@ function pngBytesToDataUrl(bytes) {
 async function iconFileToFrame(buf) {
   const dec = decodeIconFile(buf);
   const out = dec.png
-    ? await pngBytesToDataUrl(dec.png)
+    ? await imageBytesToDataUrl(dec.png)
     : rgbaToDataUrl(dec);
   return { ...out, hotspotX: dec.hotspotX, hotspotY: dec.hotspotY };
 }
@@ -308,7 +309,11 @@ function looksLikeAni(buf) {
 // `frames` est déjà dans l'ordre de lecture (séquence dépliée pour un .ani).
 export async function parseCursorFile(file) {
   const buf = await readArrayBuffer(file);
+  return parseCursorBuffer(buf);
+}
 
+// Même chose à partir d'un ArrayBuffer déjà en mémoire (entrée d'un .zip).
+export async function parseCursorBuffer(buf) {
   if (looksLikeAni(buf)) {
     const { icons, seq, durationsMs } = parseAni(buf);
     // Décode chaque image UNIQUE une seule fois, puis déplie la séquence.
@@ -344,4 +349,94 @@ export function dataUrlToBlob(dataUrl) {
   const arr = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
   return new Blob([arr], { type: mime });
+}
+
+// Une image « classique » (PNG/GIF/BMP d'un pack) → même descripteur qu'un
+// curseur, pour que l'admin la traite comme les .cur/.ani (un seul état).
+export async function parseImageBytes(bytes, mime = "image/png") {
+  const { url } = await imageBytesToDataUrl(bytes, mime);
+  return { animated: false, frames: [url], durationsMs: [100], hotspotX: 0, hotspotY: 0 };
+}
+
+// ---------------------------------------------------------------------
+//  Lecture d'un .zip — sans dépendance, comme le reste du fichier.
+// ---------------------------------------------------------------------
+// Un pack de curseurs se distribue quasi toujours en .zip. On lit le répertoire
+// central (fin de fichier), puis chaque entrée ; la décompression DEFLATE passe
+// par `DecompressionStream`, natif dans les navigateurs modernes. On ignore le
+// ZIP64 (les curseurs pèsent quelques Ko) et les méthodes autres que stocké (0)
+// ou dégonflé (8).
+
+async function inflateRaw(bytes) {
+  if (typeof DecompressionStream === "undefined")
+    throw new Error("Décompression .zip non supportée par ce navigateur.");
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+const MIME_BY_EXT = {
+  png: "image/png",
+  gif: "image/gif",
+  bmp: "image/bmp",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  svg: "image/svg+xml",
+};
+
+// Lit un File .zip → [{ name, bytes, ext, mime, isCursor }]. Ne garde que les
+// images et fichiers curseur utiles ; les dossiers et le bruit sont écartés.
+export async function readCursorZip(file) {
+  const buf = file instanceof ArrayBuffer ? file : await readArrayBuffer(file);
+  const dv = new DataView(buf);
+  const u8 = new Uint8Array(buf);
+
+  // Signature de fin de répertoire central (EOCD), cherchée depuis la fin.
+  const min = Math.max(0, buf.byteLength - 22 - 0xffff);
+  let eocd = -1;
+  for (let p = buf.byteLength - 22; p >= min; p--) {
+    if (dv.getUint32(p, true) === 0x06054b50) {
+      eocd = p;
+      break;
+    }
+  }
+  if (eocd < 0) throw new Error("Archive .zip invalide.");
+
+  const count = dv.getUint16(eocd + 10, true);
+  let cd = dv.getUint32(eocd + 16, true);
+  const decoder = new TextDecoder();
+  const out = [];
+
+  for (let i = 0; i < count && cd + 46 <= buf.byteLength; i++) {
+    if (dv.getUint32(cd, true) !== 0x02014b50) break; // entrée de répertoire central
+    const method = dv.getUint16(cd + 10, true);
+    const compSize = dv.getUint32(cd + 20, true);
+    const nameLen = dv.getUint16(cd + 28, true);
+    const extraLen = dv.getUint16(cd + 30, true);
+    const commentLen = dv.getUint16(cd + 32, true);
+    const localOff = dv.getUint32(cd + 42, true);
+    const name = decoder.decode(u8.subarray(cd + 46, cd + 46 + nameLen));
+    cd += 46 + nameLen + extraLen + commentLen;
+
+    if (name.endsWith("/") || name.startsWith("__MACOSX")) continue;
+    const ext = (name.split(".").pop() || "").toLowerCase();
+    const isCursor = ext === "cur" || ext === "ani" || ext === "ico";
+    const mime = MIME_BY_EXT[ext];
+    if (!isCursor && !mime) continue; // ni curseur ni image : on saute
+
+    // L'entête LOCAL redonne les longueurs nom/extra (parfois ≠ du central).
+    const lNameLen = dv.getUint16(localOff + 26, true);
+    const lExtraLen = dv.getUint16(localOff + 28, true);
+    const start = localOff + 30 + lNameLen + lExtraLen;
+    const comp = u8.subarray(start, start + compSize);
+    let bytes;
+    if (method === 0) bytes = comp.slice();
+    else if (method === 8) bytes = await inflateRaw(comp);
+    else continue; // méthode de compression non gérée
+
+    out.push({ name, bytes, ext, mime, isCursor });
+  }
+
+  if (!out.length) throw new Error("Aucun curseur ni image trouvé dans le .zip.");
+  return out;
 }

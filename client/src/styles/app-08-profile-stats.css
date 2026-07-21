@@ -1178,10 +1178,10 @@
 
 /* ---------- Facettes cliquables (pop-up « voir les jeux ») ---------- */
 .ps-barrow.clickable {
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 .ps-col.clickable {
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 .ps-col.clickable:hover .ps-col-fill,
 .ps-col.clickable:focus-visible .ps-col-fill {
@@ -1193,7 +1193,7 @@
   border-radius: 6px;
 }
 .ps-legend-col li.clickable {
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   border-radius: 8px;
   transition: color 0.15s ease;
 }
@@ -1204,7 +1204,7 @@
   color: var(--accent-ink);
 }
 .ps-franchise.clickable {
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   padding: 0.3rem 0.4rem;
   margin: -0.3rem -0.4rem;
   border-radius: 10px;
@@ -1224,7 +1224,7 @@
   padding: 0;
 }
 .ps-format-item.clickable {
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   border-radius: 8px;
   transition: opacity 0.15s ease;
 }

@@ -237,6 +237,34 @@ router.post("/cases/:id/open", requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/arcade/admin/cases/:id/try — ouverture À BLANC (admin). Même tirage
+// et même bobine que la vraie ouverture, mais ZÉRO effet : pas de débit, pas
+// d'inventaire, pas de remboursement. Sert à sentir l'animation et la
+// distribution d'une caisse (même désactivée) avant de la mettre en ligne.
+router.post("/admin/cases/:id/try", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id))
+      return res.status(404).json({ error: "Caisse introuvable." });
+    const box = await LootCase.findById(req.params.id).populate("rewards");
+    if (!box) return res.status(404).json({ error: "Caisse introuvable." });
+    const pool = (box.rewards || []).filter((r) => r.enabled);
+    if (!pool.length)
+      return res.status(422).json({ error: "Cette caisse est vide pour le moment." });
+
+    const winner = drawReward(pool);
+    const reel = buildReel(pool, winner);
+    res.json({
+      reward: winner.toPublic(),
+      reel: reel.map((r) => r.toPublic()),
+      winnerIndex: REEL_WINNER_INDEX,
+      dryRun: true,
+    });
+  } catch (err) {
+    console.error("arcade try error:", err.message);
+    res.status(500).json({ error: "Essai impossible." });
+  }
+});
+
 // POST /api/arcade/equip — équipe (ou retire, si rewardKey est null) un lot.
 router.post("/equip", requireAuth, async (req, res) => {
   try {
@@ -341,6 +369,102 @@ router.post(
     res.json({ url });
   }
 );
+
+// --- Import d'un curseur depuis une page custom-cursor.com -----------------
+// Le navigateur ne peut pas aller chercher custom-cursor.com (CORS) : c'est le
+// serveur qui récupère la page, en extrait les images de curseur, les télécharge
+// dans uploads/arcade, et renvoie chacune avec son rôle deviné. Convention du
+// site : le fichier « …-cursor.png » est la flèche (normal), « …-pointer.png »
+// la main de survol (pointer).
+const CC_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";
+
+async function ccFetchText(url) {
+  const r = await fetch(url, { headers: { "User-Agent": CC_UA, "Accept-Language": "en" } });
+  if (!r.ok) throw new Error(`Page inaccessible (${r.status}).`);
+  return r.text();
+}
+async function ccFetchImage(url) {
+  const r = await fetch(url, { headers: { "User-Agent": CC_UA } });
+  if (!r.ok) throw new Error(`Image inaccessible (${r.status}).`);
+  const buf = Buffer.from(await r.arrayBuffer());
+  if (buf.length > 2 * 1024 * 1024) throw new Error("Image trop lourde.");
+  if (buf.length < 8 || !(buf[0] === 0x89 && buf[1] === 0x50)) throw new Error("Ce n'est pas un PNG.");
+  return buf;
+}
+function ccRoleFromSlug(slug) {
+  if (/-pointer$/i.test(slug)) return "pointer"; // la main / le lien
+  if (/-cursor$/i.test(slug)) return "normal"; // la flèche
+  return null; // ambigu : l'admin tranchera dans la revue
+}
+
+router.post("/admin/cursor-from-url", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    let u;
+    try {
+      u = new URL(String(req.body?.url || "").trim());
+    } catch {
+      throw new Error("URL invalide.");
+    }
+    if (!/(^|\.)custom-cursor\.com$/i.test(u.hostname))
+      throw new Error("Seuls les liens custom-cursor.com sont pris en charge.");
+
+    const page = await ccFetchText(u.href);
+
+    // Le CDN est derrière Cloudflare : si une page de vérification nous est
+    // servie, autant le dire clairement plutôt que de conclure « rien trouvé ».
+    if (/Just a moment|cf_chl|Enable JavaScript and cookies/i.test(page))
+      throw new Error(
+        "custom-cursor.com a servi une page de vérification anti-bot au serveur. " +
+          "Réessaie dans un instant, ou télécharge le curseur et importe le fichier."
+      );
+
+    // Images individuelles du pack : cdn.custom-cursor.com/db/{id}/{taille?}/{slug}.png.
+    // Par id, on garde la plus grande variante ≤ 128 px (repli : l'originale).
+    const re = /cdn\.custom-cursor\.com\/db\/(\d+)\/(?:(\d+)\/)?([a-z0-9-]+)\.png/gi;
+    const byId = new Map();
+    for (let m; (m = re.exec(page)); ) {
+      const [full, id, sizeStr, slug] = m;
+      const size = sizeStr ? Number(sizeStr) : 0;
+      const eff = size > 128 ? -1 : size === 0 ? 1 : size; // originale = repli faible
+      const prev = byId.get(id);
+      if (eff >= 0 && (!prev || eff > prev.eff))
+        byId.set(id, { slug, eff, url: `https://${full}` });
+    }
+    // Aucune image individuelle : le plus souvent parce que l'URL pointe une
+    // COLLECTION (une liste de packs) et non la page d'un curseur. On distingue
+    // les deux grâce aux vignettes de packs, pour donner la bonne consigne.
+    if (!byId.size) {
+      const isListing = /cdn\.custom-cursor\.com\/packs\//.test(page);
+      throw new Error(
+        isListing
+          ? "Cette page est une collection (une liste de packs). Ouvre le curseur " +
+            "qui t'intéresse et colle l'adresse de SA page."
+          : "Aucun curseur trouvé sur cette page."
+      );
+    }
+
+    const name = (page.match(/property="og:title"\s+content="([^"]+)"/i)?.[1] || "")
+      .replace(/\s*[–—-]\s*Custom Cursor.*$/i, "")
+      .trim();
+
+    const cursors = [];
+    for (const { slug, url } of byId.values()) {
+      const buf = await ccFetchImage(url);
+      const filename = `ar-${Date.now()}-${Math.round(Math.random() * 1e6)}.png`;
+      fs.writeFileSync(path.join(UPLOAD_DIR, filename), buf);
+      cursors.push({
+        role: ccRoleFromSlug(slug),
+        slug,
+        url: `${req.protocol}://${req.get("host")}/uploads/arcade/${filename}`,
+      });
+    }
+    // Le rôle normal d'abord (c'est le requis).
+    cursors.sort((a, b) => (a.role === "normal" ? -1 : b.role === "normal" ? 1 : 0));
+    res.json({ name, cursors });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
 
 function readRewardBody(body) {
   const type = String(body?.type || "");
@@ -494,6 +618,185 @@ router.post("/admin/grant", requireAuth, requireAdmin, async (req, res) => {
       return res.status(400).json({ error: "Solde insuffisant pour ce retrait." });
     console.error("arcade grant error:", err.message);
     res.status(500).json({ error: "Ajustement impossible." });
+  }
+});
+
+// ======================================================================
+//  Export / import de l'arcade — transfert local ⇄ prod.
+// ======================================================================
+// Deux pièges que ce format règle :
+//  1. Les URLs d'images sont ABSOLUES et pointent sur l'instance qui les
+//     héberge. Telles quelles, un export local donnerait des curseurs cassés
+//     en prod. On EMBARQUE donc les fichiers (base64) et on remplace chaque
+//     URL locale par une référence `asset:<fichier>`, ré-hébergée à l'import.
+//  2. Les caisses référencent leurs lots par ObjectId, qui diffère d'une base
+//     à l'autre. À l'export on écrit les CLÉS (slugs stables), résolues à
+//     l'import contre la base d'arrivée.
+
+const ASSET_PREFIX = "asset:";
+
+// Transforme toutes les chaînes d'une valeur JSON (récursif, renvoie une copie).
+// Permet de traiter url / frames[] / roles.* / base / library[] d'un coup, sans
+// avoir à énumérer les chemins — donc rien à maintenir si `data` s'enrichit.
+function mapStrings(value, fn) {
+  if (typeof value === "string") return fn(value);
+  if (Array.isArray(value)) return value.map((v) => mapStrings(v, fn));
+  if (value && typeof value === "object") {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) out[k] = mapStrings(v, fn);
+    return out;
+  }
+  return value;
+}
+
+// « …/uploads/arcade/ar-123.png?x=1 » → « ar-123.png ». null si l'URL n'est pas
+// un upload local (on la laisse alors telle quelle : elle reste peut-être
+// joignable, par ex. un CDN externe).
+function localUploadName(url) {
+  const m = /\/uploads\/arcade\/([A-Za-z0-9._-]+)/.exec(String(url));
+  return m ? m[1] : null;
+}
+
+// GET /api/arcade/admin/export — tout l'arcade dans un JSON autoportant.
+router.get("/admin/export", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const [rewards, cases] = await Promise.all([
+      Reward.find().sort({ createdAt: 1 }),
+      LootCase.find().sort({ order: 1, createdAt: 1 }).populate("rewards"),
+    ]);
+
+    const assets = {};
+    const grab = (url) => {
+      const name = localUploadName(url);
+      if (!name) return url;
+      if (!assets[name]) {
+        try {
+          assets[name] = fs.readFileSync(path.join(UPLOAD_DIR, name)).toString("base64");
+        } catch {
+          return url; // fichier disparu : on garde l'URL d'origine
+        }
+      }
+      return ASSET_PREFIX + name;
+    };
+
+    res.json({
+      kind: "myplaylog-arcade",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      rewards: rewards.map((r) => ({
+        key: r.key,
+        type: r.type,
+        name: r.name,
+        description: r.description || "",
+        rarity: r.rarity,
+        weight: r.weight ?? null,
+        enabled: r.enabled,
+        data: mapStrings(r.data || {}, grab),
+      })),
+      cases: cases.map((c) => ({
+        key: c.key,
+        name: c.name,
+        description: c.description || "",
+        price: c.price,
+        image: c.image ? grab(c.image) : null,
+        enabled: c.enabled,
+        order: c.order || 0,
+        rewardKeys: (c.rewards || []).map((r) => r.key).filter(Boolean),
+      })),
+      assets,
+    });
+  } catch (err) {
+    console.error("arcade export error:", err.message);
+    res.status(500).json({ error: "Export impossible." });
+  }
+});
+
+// POST /api/arcade/admin/import — relit un export sur cette instance.
+// `overwrite` décide du sort des clés déjà présentes (sinon : ignorées).
+router.post("/admin/import", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const p = req.body?.payload ?? req.body;
+    if (!p || p.kind !== "myplaylog-arcade")
+      throw new Error("Fichier d'export non reconnu.");
+    const overwrite = req.body?.overwrite === true;
+
+    // 1. Ré-héberge les images embarquées, sous de NOUVEAUX noms (aucun risque
+    //    d'écraser un fichier déjà là).
+    const urlByAsset = {};
+    let i = 0;
+    for (const [name, b64] of Object.entries(p.assets || {})) {
+      const ext = (name.split(".").pop() || "png").toLowerCase();
+      const filename = `ar-${Date.now()}-${i++}-${Math.round(Math.random() * 1e6)}.${ext}`;
+      fs.writeFileSync(path.join(UPLOAD_DIR, filename), Buffer.from(b64, "base64"));
+      urlByAsset[name] = `${req.protocol}://${req.get("host")}/uploads/arcade/${filename}`;
+    }
+    const rehydrate = (s) =>
+      typeof s === "string" && s.startsWith(ASSET_PREFIX)
+        ? urlByAsset[s.slice(ASSET_PREFIX.length)] || s
+        : s;
+
+    const stats = {
+      rewardsCreated: 0,
+      rewardsUpdated: 0,
+      rewardsSkipped: 0,
+      casesCreated: 0,
+      casesUpdated: 0,
+      casesSkipped: 0,
+    };
+
+    // 2. Les lots, upsert par clé (c'est elle que les inventaires référencent :
+    //    réimporter un lot existant ne dépossède donc personne).
+    for (const r of p.rewards || []) {
+      if (!r?.key || !REWARD_TYPE_KEYS.includes(r.type)) continue;
+      const w = Number(r.weight);
+      const fields = {
+        type: r.type,
+        name: String(r.name || "").trim() || r.key,
+        description: String(r.description || "").slice(0, 200),
+        rarity: isRarity(r.rarity) ? r.rarity : "common",
+        weight: Number.isFinite(w) && w > 0 ? w : null,
+        enabled: r.enabled !== false,
+        data: mapStrings(r.data || {}, rehydrate),
+      };
+      const existing = await Reward.findOne({ key: r.key });
+      if (!existing) {
+        await Reward.create({ ...fields, key: r.key, createdBy: req.userId });
+        stats.rewardsCreated++;
+      } else if (overwrite) {
+        await Reward.updateOne({ _id: existing._id }, fields);
+        stats.rewardsUpdated++;
+      } else stats.rewardsSkipped++;
+    }
+
+    // 3. Les caisses : leur pool est retrouvé par CLÉ dans la base d'arrivée.
+    for (const c of p.cases || []) {
+      if (!c?.key) continue;
+      const keys = Array.isArray(c.rewardKeys) ? c.rewardKeys : [];
+      const found = await Reward.find({ key: { $in: keys } }).select("_id key");
+      const byKey = new Map(found.map((d) => [d.key, d._id]));
+      const fields = {
+        name: String(c.name || "").trim() || c.key,
+        description: String(c.description || "").slice(0, 240),
+        price: Math.max(0, Math.round(Number(c.price) || 0)),
+        image: c.image ? rehydrate(c.image) : null,
+        rewards: keys.map((k) => byKey.get(k)).filter(Boolean),
+        enabled: c.enabled !== false,
+        order: Number(c.order) || 0,
+      };
+      const existing = await LootCase.findOne({ key: c.key });
+      if (!existing) {
+        await LootCase.create({ ...fields, key: c.key });
+        stats.casesCreated++;
+      } else if (overwrite) {
+        await LootCase.updateOne({ _id: existing._id }, fields);
+        stats.casesUpdated++;
+      } else stats.casesSkipped++;
+    }
+
+    res.json({ ok: true, ...stats });
+  } catch (err) {
+    console.error("arcade import error:", err.message);
+    res.status(400).json({ error: err.message || "Import impossible." });
   }
 });
 

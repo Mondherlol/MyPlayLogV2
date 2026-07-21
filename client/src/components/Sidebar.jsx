@@ -9,7 +9,6 @@ import {
   User,
   Palmtree,
   Shield,
-  Joystick,
   ChevronLeft,
   ChevronRight,
   Sun,
@@ -29,7 +28,6 @@ const NAV = [
   { to: "/explore", label: "Explorer", Icon: Compass },
   { to: "/releases", label: "Sorties", Icon: CalendarDays },
   { to: "/lists", label: "Listes", Icon: List },
-  { to: "/arcade", label: "Arcade", Icon: Joystick, adminOnly: true },
   { to: "/profile", label: "Profil", Icon: User },
   { to: "/admin", label: "Admin", Icon: Shield, adminOnly: true },
 ];

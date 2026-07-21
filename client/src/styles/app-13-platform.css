@@ -33,7 +33,7 @@
   background: var(--surface);
   color: var(--text-soft);
   font-size: 0.85rem;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
 .pv-back:hover {
@@ -166,7 +166,7 @@
   border-radius: 999px;
   font-size: 0.86rem;
   font-weight: 600;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   border: 1px solid rgba(255, 255, 255, 0.28);
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
@@ -221,7 +221,7 @@
   place-items: center;
 }
 .pv-ring.clickable {
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 .pv-ring-hole {
   width: 48px;
@@ -288,10 +288,10 @@
   flex-direction: row;
   align-items: center;
   gap: 0.75rem;
-  cursor: default;
+  cursor: var(--cursor-default), auto;
 }
 .pv-stat-aff.clickable {
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 .pv-stat-aff.clickable:hover {
   border-color: var(--orange);
@@ -349,7 +349,7 @@
   margin-right: 0.8rem;
   border: 0;
   background: none;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--text-soft);
@@ -420,7 +420,7 @@
   gap: 0.2rem;
   border: 0;
   background: none;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   font-size: 0.8rem;
   color: var(--orange);
   font-weight: 600;
@@ -570,7 +570,7 @@
      donc une plaque claire garantit leur lisibilité en thème clair ET sombre. */
   background: #f7f7f9;
   border: 1px solid var(--border);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   overflow: hidden;
   transition: border-color 0.15s ease, transform 0.15s ease;
 }
@@ -615,7 +615,7 @@
   transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 .pv-ver.has-specs {
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 .pv-ver:hover {
   border-color: var(--orange);
@@ -789,7 +789,7 @@
   gap: 0.85rem;
   padding: 0.55rem 0.75rem;
   border-radius: 12px;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: background 0.15s ease;
 }
 .pv-lead-row:hover {
@@ -889,7 +889,7 @@
   border-radius: 14px;
   background: var(--surface);
   border: 1px solid var(--border);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: border-color 0.15s ease, transform 0.15s ease;
 }
 .pv-fam-item:hover {
@@ -965,7 +965,7 @@
   border: 1px solid var(--border);
   color: var(--text-soft);
   font-size: 0.86rem;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 .pv-toggle.active {
   color: #241a02;

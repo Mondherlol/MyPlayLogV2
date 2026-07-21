@@ -36,11 +36,17 @@
   --radius: 14px;
   --radius-lg: 20px;
 
-  /* Curseur : valeur PAR DÉFAUT, surchargeable sur <html> par
-     CosmeticsContext quand un curseur gagné à l'arcade est équipé.
-     Format : `url("…") <hotspotX> <hotspotY>`. */
+  /* Curseur : valeurs PAR DÉFAUT, surchargées sur <html> par CosmeticsContext
+     quand un thème gagné à l'arcade est équipé (un rôle par variable).
+     Format des rôles avec image : `url("…") <hotspotX> <hotspotY>`.
+     default/pointer laissent leur repli (`, auto` / `, pointer`) dans les
+     règles ci-dessous ; text/grab/grabbing partent d'un mot-clé système et
+     le JS intègre le repli dans la variable quand une image est posée. */
   --cursor-default: url("/cursor.svg") 2 2;
   --cursor-pointer: url("/cursor.svg") 2 2;
+  --cursor-text: text;
+  --cursor-grab: grab;
+  --cursor-grabbing: grabbing;
 }
 
 :root[data-theme="dark"] {
@@ -128,7 +134,17 @@ h3 {
   input,
   textarea,
   select {
-    cursor: text;
+    cursor: var(--cursor-text);
+  }
+  /* Rôles « saisir / glisser » : au repos les éléments déplaçables prennent la
+     main ouverte, et la main fermée pendant le glisser (défaut système, ou le
+     thème équipé). Les vraies poignées drag&drop (dnd-kit) posent souvent leur
+     propre `cursor:grabbing` inline — on ne l'écrase pas. */
+  [draggable="true"] {
+    cursor: var(--cursor-grab);
+  }
+  [draggable="true"]:active {
+    cursor: var(--cursor-grabbing);
   }
 }
 

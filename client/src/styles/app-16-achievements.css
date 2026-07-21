@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
    Onglet « Succès » du profil
    ============================================================ */
 
@@ -163,7 +163,7 @@
   gap: 0.7rem;
   overflow-x: auto;
   padding-bottom: 0.4rem;
-  cursor: grab;
+  cursor: var(--cursor-grab);
   user-select: none;
   -webkit-user-select: none;
   /* Pas de scrollbar : on navigue au drag / aux flèches */
@@ -174,7 +174,7 @@
   display: none;
 }
 .ach-rail-row.dragging {
-  cursor: grabbing;
+  cursor: var(--cursor-grabbing);
 }
 .ach-rail-row.dragging * {
   pointer-events: none;

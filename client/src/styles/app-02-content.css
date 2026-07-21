@@ -569,7 +569,7 @@
   border: 1.5px solid var(--border-strong);
   border-radius: 12px;
   padding: 0.62rem 2rem 0.62rem 0.8rem;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   appearance: none;
   -webkit-appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
@@ -1619,11 +1619,11 @@
    `touch-action: none` évite que la page scrolle pendant le drag sur mobile. */
 .gauge-svg.grabbable {
   touch-action: none;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 
 .gauge-svg.grabbable:active {
-  cursor: grabbing;
+  cursor: var(--cursor-grabbing);
 }
 
 .gauge-thumb {
@@ -2050,7 +2050,7 @@
 
 .ttb-chip.empty {
   opacity: 0.55;
-  cursor: default;
+  cursor: var(--cursor-default), auto;
   border-style: dashed;
 }
 
@@ -2708,7 +2708,7 @@
 
 /* Drag-to-scroll à la souris */
 .pick-row.dragging {
-  cursor: grabbing;
+  cursor: var(--cursor-grabbing);
   user-select: none;
 }
 
@@ -3613,7 +3613,7 @@
 
 /* Carte « Ajouter » */
 .gp-ost-add {
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 
 .gp-vinyl-add .gp-vinyl-disc {
@@ -3881,7 +3881,7 @@
   margin-top: 0.7rem;
   font-size: 0.85rem;
   color: var(--text-soft);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 
 .mass-rename-preview {
@@ -4072,13 +4072,13 @@
 
 @media (hover: hover) and (pointer: fine) {
   .profile-tabs {
-    cursor: grab;
+    cursor: var(--cursor-grab);
   }
   /* Pendant le drag, le curseur « poing fermé » l'emporte partout (y compris
      au-dessus des onglets, qui ont normalement un curseur pointer). */
   .profile-tabs.dragging,
   .profile-tabs.dragging .profile-tab {
-    cursor: grabbing;
+    cursor: var(--cursor-grabbing);
   }
   .profile-tabs-arrow.show {
     display: inline-flex;

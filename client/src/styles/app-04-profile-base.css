@@ -311,11 +311,11 @@
 }
 
 .ic-card.grab {
-  cursor: grab;
+  cursor: var(--cursor-grab);
 }
 
 .ic-card.grab:active {
-  cursor: grabbing;
+  cursor: var(--cursor-grabbing);
 }
 
 .ic-card:hover {
@@ -516,7 +516,7 @@
   font-weight: 800;
   font-size: 1.35rem;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 
 .tier-label-text {
@@ -671,7 +671,7 @@
 
 /* Repliée : toute la barre (pas seulement le texte) rouvre le vivier. */
 .tier-pool.is-collapsed .tier-pool-head {
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   padding: 0.15rem 0.1rem;
   border-radius: 10px;
   transition: background 0.12s ease;
@@ -926,7 +926,7 @@
    ni de transform, sinon la preview est éjectée hors de l'écran). */
 .drag-overlay-card {
   width: 92px;
-  cursor: grabbing;
+  cursor: var(--cursor-grabbing);
   filter: drop-shadow(0 16px 30px rgba(0, 0, 0, 0.4));
   rotate: -3deg;
 }
@@ -1106,7 +1106,7 @@
 }
 
 .lc-yt-preview {
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 
 .lc-yt-preview img {

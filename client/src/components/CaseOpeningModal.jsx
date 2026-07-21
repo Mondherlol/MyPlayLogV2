@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { X, Loader2, Sparkles, Coins, Copy, Check } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { X, Loader2, Sparkles, Coins, Copy, Check, RotateCcw } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { rarityColor, rarityLabel, formatChance } from "../lib/rarity";
 import RewardArt from "./RewardArt";
@@ -24,6 +24,48 @@ function measureStrip(strip) {
     // Pas d'un lot au suivant = largeur + gouttière, lue telle qu'appliquée.
     pitch: second ? second.offsetLeft - first.offsetLeft : first.offsetWidth,
   };
+}
+
+// ---------------------------------------------------------------------
+//  Le « juice » de la révélation, dosé par la rareté.
+// ---------------------------------------------------------------------
+// Un commun ne doit pas déclencher un feu d'artifice : l'intensité monte avec
+// la rareté pour que l'œil sache AVANT de lire le nom que le lot est gros.
+const FX = {
+  common: { particles: 12, rays: false, shake: 0 },
+  uncommon: { particles: 20, rays: false, shake: 0 },
+  rare: { particles: 32, rays: true, shake: 3 },
+  epic: { particles: 46, rays: true, shake: 5 },
+  legendary: { particles: 62, rays: true, shake: 8 },
+  mythic: { particles: 86, rays: true, shake: 11 },
+};
+const fxFor = (r) => FX[r] || FX.common;
+
+// Les animations décoratives sont coupées si la personne a demandé moins de
+// mouvement : la modale reste parfaitement utilisable sans elles.
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" &&
+  !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+// Gerbe de confettis : direction, distance, rotation et durée tirées au sort
+// une fois par ouverture. Tout est ensuite joué par le CSS (aucune boucle JS).
+function buildParticles(count, color) {
+  const palette = [color, "#ffd24a", "#ffffff"];
+  return Array.from({ length: count }, (_, i) => {
+    const angle = (Math.PI * 2 * i) / count + Math.random() * 0.6;
+    const dist = 90 + Math.random() * 200;
+    return {
+      id: i,
+      tx: Math.round(Math.cos(angle) * dist),
+      ty: Math.round(Math.sin(angle) * dist - 30), // léger biais vers le haut
+      rot: Math.round(Math.random() * 720 - 360),
+      delay: +(Math.random() * 0.14).toFixed(3),
+      dur: +(0.75 + Math.random() * 0.65).toFixed(3),
+      size: Math.round(5 + Math.random() * 7),
+      shape: i % 3,
+      color: palette[i % palette.length],
+    };
+  });
 }
 
 const SPIN_MS = 6200;
@@ -85,7 +127,7 @@ function useSfx() {
   return { resume, tick, reveal };
 }
 
-export default function CaseOpeningModal({ box, token, onClose, onResult }) {
+export default function CaseOpeningModal({ box, token, onClose, onResult, dryRun = false }) {
   // phase : preview | opening | spinning | revealed
   const [phase, setPhase] = useState("preview");
   const [error, setError] = useState("");
@@ -114,13 +156,27 @@ export default function CaseOpeningModal({ box, token, onClose, onResult }) {
     setError("");
     setPhase("opening");
     try {
-      const d = await apiFetch(`/arcade/cases/${box.id}/open`, { method: "POST", token });
+      // Mode admin « essayer » : tirage à blanc, aucun débit ni gain.
+      const url = dryRun
+        ? `/arcade/admin/cases/${box.id}/try`
+        : `/arcade/cases/${box.id}/open`;
+      const d = await apiFetch(url, { method: "POST", token });
       setResult(d);
       setPhase("spinning");
     } catch (e) {
       setError(e.message || "Impossible d'ouvrir la caisse.");
       setPhase("preview");
     }
+  }
+
+  // Relance un essai (mode admin) : on remet la bande à zéro et on rouvre.
+  function replay() {
+    revealedRef.current = false;
+    setResult(null);
+    setSpinning(false);
+    setOffset(0);
+    setPhase("preview");
+    setTimeout(open, 0);
   }
 
   // Lance la bande dès que le résultat est là et que la piste est mesurable.
@@ -212,10 +268,26 @@ export default function CaseOpeningModal({ box, token, onClose, onResult }) {
 
   const reward = result?.reward;
   const color = reward ? rarityColor(reward.rarity) : null;
+  const fx = fxFor(reward?.rarity);
+  const revealed = phase === "revealed";
+  // Regénérées à chaque ouverture (l'identité de `reward` change) : deux
+  // tirages ne donnent jamais exactement la même gerbe.
+  const particles = useMemo(
+    () => (reward && !prefersReducedMotion() ? buildParticles(fx.particles, color) : []),
+    [reward, fx.particles, color]
+  );
+  // Rouvrir tout de suite : en essai c'est gratuit, sinon il faut le prix.
+  const canReopen = dryRun || (result?.points ?? 0) >= box.price;
 
   return (
     <div className="co-overlay" role="dialog" aria-modal="true">
-      <div className="co-modal" style={color ? { "--co-rarity": color } : undefined}>
+      <div
+        className={`co-modal ${revealed && fx.shake ? "shake" : ""}`}
+        style={{
+          ...(color ? { "--co-rarity": color } : null),
+          ...(fx.shake ? { "--co-shake": fx.shake } : null),
+        }}
+      >
         {phase !== "spinning" && phase !== "opening" && (
           <button className="co-close clickable" onClick={onClose} aria-label="Fermer">
             <X size={18} />
@@ -251,17 +323,19 @@ export default function CaseOpeningModal({ box, token, onClose, onResult }) {
             <button
               className="co-open-btn clickable"
               onClick={open}
-              disabled={phase === "opening" || !box.openable}
+              disabled={phase === "opening" || (!dryRun && !box.openable)}
             >
               {phase === "opening" ? (
                 <Loader2 size={18} className="spin" />
               ) : (
                 <Sparkles size={18} />
               )}
-              Ouvrir
-              <span className="co-price">
-                <Coins size={14} /> {box.price}
-              </span>
+              {dryRun ? "Essayer" : "Ouvrir"}
+              {!dryRun && (
+                <span className="co-price">
+                  <Coins size={14} /> {box.price}
+                </span>
+              )}
             </button>
           </div>
         ) : null}
@@ -270,6 +344,7 @@ export default function CaseOpeningModal({ box, token, onClose, onResult }) {
         {(phase === "spinning" || phase === "revealed") && result && (
           <div className={`co-stage ${phase === "revealed" ? "done" : ""}`}>
             <div className="co-track" ref={trackRef}>
+              <span className="co-spot" aria-hidden="true" />
               <span className="co-marker" aria-hidden="true" />
               <div
                 className="co-strip"
@@ -310,30 +385,93 @@ export default function CaseOpeningModal({ box, token, onClose, onResult }) {
                   <p className="co-result-desc">{reward.description}</p>
                 )}
 
-                {result.duplicate ? (
-                  <p className="co-dup">
-                    <Copy size={14} /> Déjà dans ton inventaire — reconverti en{" "}
-                    <b>+{result.refund}</b> points
-                  </p>
+                {dryRun ? (
+                  <>
+                    <p className="co-try-note">
+                      <Sparkles size={14} /> Essai — rien n'a été dépensé ni gagné
+                    </p>
+                    <div className="co-result-foot">
+                      <button className="co-again clickable" onClick={replay}>
+                        <RotateCcw size={15} /> Relancer
+                      </button>
+                      <button className="co-stop clickable" onClick={onClose}>
+                        Arrêter
+                      </button>
+                    </div>
+                  </>
                 ) : (
-                  <p className="co-new">
-                    <Check size={14} /> Nouveau ! Ajouté à ton inventaire
-                  </p>
-                )}
+                  <>
+                    {result.duplicate ? (
+                      <p className="co-dup">
+                        <Copy size={14} /> Déjà dans ton inventaire — reconverti en{" "}
+                        <b>+{result.refund}</b> points
+                      </p>
+                    ) : (
+                      <p className="co-new">
+                        <Check size={14} /> Nouveau ! Ajouté à ton inventaire
+                      </p>
+                    )}
 
-                <div className="co-result-foot">
-                  <span className="co-balance">
-                    <Coins size={14} /> {result.points} points
-                  </span>
-                  <button className="co-again clickable" onClick={onClose}>
-                    Continuer
-                  </button>
-                </div>
+                    <div className="co-result-foot">
+                      <span className="co-balance">
+                        <Coins size={14} /> {result.points} points
+                      </span>
+                      <button
+                        className="co-again clickable"
+                        onClick={replay}
+                        disabled={!canReopen}
+                        title={
+                          canReopen ? "Rouvrir une caisse" : "Pas assez de points"
+                        }
+                      >
+                        <RotateCcw size={15} /> Rouvrir
+                        <span className="co-price">
+                          <Coins size={13} /> {box.price}
+                        </span>
+                      </button>
+                      <button className="co-stop clickable" onClick={onClose}>
+                        Arrêter
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
         )}
       </div>
+
+      {/* Couche décorative de la révélation. Sœur de la modale (et non enfant)
+          pour que le tremblement, qui pose un `transform`, ne redéfinisse pas
+          le référentiel de positionnement des effets. */}
+      {revealed && color && (
+        <div
+          className="co-fx"
+          aria-hidden="true"
+          style={{ "--co-rarity": color }}
+          key={reward.key || reward.id}
+        >
+          <span className="co-flash" />
+          {fx.rays && <span className="co-rays" />}
+          <span className="co-burst">
+            {particles.map((p) => (
+              <i
+                key={p.id}
+                className={`co-particle s${p.shape}`}
+                style={{
+                  "--tx": `${p.tx}px`,
+                  "--ty": `${p.ty}px`,
+                  "--rot": `${p.rot}deg`,
+                  "--sz": `${p.size}px`,
+                  "--pc": p.color,
+                  animationDelay: `${p.delay}s`,
+                  animationDuration: `${p.dur}s`,
+                }}
+              />
+            ))}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

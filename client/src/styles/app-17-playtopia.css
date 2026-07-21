@@ -212,7 +212,7 @@
   border-radius: 999px;
   background: #fffdf7;
   box-shadow: 0 5px 0 rgba(150, 110, 60, 0.28), 0 10px 20px rgba(20, 50, 30, 0.25);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 .pt-charbtn:hover {
@@ -325,7 +325,7 @@
   border-radius: 50%;
   color: #6a4a00;
   background: rgba(255, 255, 255, 0.35);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 .pt-modal-close:hover {
   background: rgba(255, 255, 255, 0.6);
@@ -381,7 +381,7 @@
   font-family: var(--font-fun);
   font-weight: 600;
   font-size: 13px;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: all 0.12s ease;
 }
 .pt-cc-tab.on {
@@ -402,7 +402,7 @@
   border-radius: 50%;
   border: 3px solid transparent;
   background: var(--sw);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   display: grid;
   place-items: center;
   color: #fff;
@@ -424,7 +424,7 @@
   font-family: var(--font-fun);
   font-weight: 600;
   font-size: 13.5px;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: all 0.12s ease;
 }
 .pt-cc-opt:hover {
@@ -452,7 +452,7 @@
   font-family: var(--font-fun);
   font-weight: 600;
   font-size: 14px;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 .pt-ghost-btn:hover {
   color: var(--text);
@@ -470,7 +470,7 @@
   font-family: var(--font-fun);
   font-weight: 600;
   font-size: 14.5px;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   box-shadow: 0 5px 0 rgba(150, 105, 5, 0.32);
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }

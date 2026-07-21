@@ -27,11 +27,11 @@
 .pf-cover.multi {
   touch-action: pan-y; /* le scroll vertical reste au navigateur */
   user-select: none;
-  cursor: grab;
+  cursor: var(--cursor-grab);
 }
 
 .pf-cover.multi.dragging {
-  cursor: grabbing;
+  cursor: var(--cursor-grabbing);
 }
 
 .pf-cover-track {
@@ -222,13 +222,13 @@
   border-radius: 16px;
   border: 1px solid var(--border);
   background: var(--surface-2);
-  cursor: grab;
+  cursor: var(--cursor-grab);
   touch-action: none;
   user-select: none;
 }
 
 .reframe-stage:active {
-  cursor: grabbing;
+  cursor: var(--cursor-grabbing);
 }
 
 .reframe-stage img {
@@ -1132,7 +1132,7 @@ button.pf-stat:hover {
   font-weight: 600;
   font-size: 0.82rem;
   /* Le bloc parent passe en cursor:grab en édition ; le bouton reste cliquable normalement. */
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
@@ -1225,12 +1225,12 @@ button.pf-stat:hover {
   border: 1px dashed var(--border-strong);
   border-radius: 14px;
   background: var(--surface-2);
-  cursor: grab;
+  cursor: var(--cursor-grab);
   touch-action: none;
 }
 
 .pf-block.editing:active {
-  cursor: grabbing;
+  cursor: var(--cursor-grabbing);
 }
 
 .pf-block.editing:hover {
@@ -1288,11 +1288,11 @@ button.pf-stat:hover {
 .pf-game-sortable {
   flex: 0 0 auto;
   width: 108px;
-  cursor: grab;
+  cursor: var(--cursor-grab);
 }
 
 .pf-game-sortable:active {
-  cursor: grabbing;
+  cursor: var(--cursor-grabbing);
 }
 
 .pf-game-sortable.dragging {
@@ -1681,7 +1681,7 @@ button.pf-stat:hover {
 }
 
 .pfa-ost-disc.mute {
-  cursor: default;
+  cursor: var(--cursor-default), auto;
 }
 
 .pfa-ost-body {
@@ -1791,7 +1791,7 @@ button.pf-stat:hover {
 .pfa-review {
   display: flex;
   gap: 0.6rem;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 
 .pfa-review-cover {
@@ -1938,12 +1938,12 @@ button.pf-stat:hover {
   position: relative;
 }
 .pfa-slot.editing {
-  cursor: grab;
+  cursor: var(--cursor-grab);
   touch-action: none;
   border-radius: 16px;
 }
 .pfa-slot.editing:active {
-  cursor: grabbing;
+  cursor: var(--cursor-grabbing);
 }
 .pfa-slot.editing .pf-aside-card {
   pointer-events: none;
@@ -1962,7 +1962,7 @@ button.pf-stat:hover {
 .pfa-drag-overlay {
   width: 300px;
   max-width: 90vw;
-  cursor: grabbing;
+  cursor: var(--cursor-grabbing);
   transform: rotate(-1.5deg);
 }
 .pfa-drag-overlay .pf-aside-card {
@@ -2012,7 +2012,7 @@ button.pf-stat:hover {
   background: var(--accent-grad);
   color: #fff;
   box-shadow: var(--shadow-sm);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   opacity: 0.9;
   transition: transform 0.16s ease, opacity 0.16s ease, box-shadow 0.16s ease;
 }
@@ -2230,7 +2230,7 @@ button.pf-stat:hover {
 }
 /* Vignette-bouton « écouter un extrait » (cartes OST). */
 .pac-opt-thumb.play {
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   border: none;
   padding: 0;
 }

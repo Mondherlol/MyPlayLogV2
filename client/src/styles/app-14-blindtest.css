@@ -987,7 +987,7 @@
     var(--bts-gold) 0 var(--bt-vol-pct, 100%),
     var(--bts-btn-line) var(--bt-vol-pct, 100%) 100%
   );
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   outline: none;
 }
 .bt-vol-slider::-webkit-slider-thumb {
@@ -999,7 +999,7 @@
   background: var(--bts-gold-2);
   border: 2px solid var(--bts-btn-bg);
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: transform 0.12s ease;
 }
 .bt-vol-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
@@ -1020,7 +1020,7 @@
   background: var(--bts-gold-2);
   border: 2px solid var(--bts-btn-bg);
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 .bt-vol-slider:focus-visible { outline: 2px solid var(--bts-gold); outline-offset: 3px; }
 @media (max-width: 520px) {
@@ -1321,7 +1321,7 @@
     repeating-radial-gradient(circle at center, #14141a 0 2px, #24242c 2px 4px);
   box-shadow: inset 0 0 34px rgba(0, 0, 0, 0.65);
   overflow: hidden;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 /* Icône pause qui se dévoile au survol du vinyle */
 .bt-vinyl-pause {
@@ -1628,7 +1628,7 @@
   color: var(--bts-btn-text);
   background: var(--bts-btn-bg-2);
 }
-.bt-chip:disabled { opacity: 0.4; cursor: default; }
+.bt-chip:disabled { opacity: 0.4; cursor: var(--cursor-default), auto; }
 
 /* Révélation — overlay plein écran, card centrée : LE moment du résultat.
    L'extrait est coupé ; le bouton « réécouter » le relance à la demande. */

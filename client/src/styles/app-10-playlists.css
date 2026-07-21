@@ -228,11 +228,11 @@
 
 /* Élément déplaçable dans l'éditeur : liseré au survol, cadre doré si choisi */
 .cvr-el.editor {
-  cursor: grab;
+  cursor: var(--cursor-grab);
 }
 
 .cvr-el.editor:active {
-  cursor: grabbing;
+  cursor: var(--cursor-grabbing);
 }
 
 .cvr-el.editor img {
@@ -326,7 +326,7 @@
   border-radius: 7px;
   padding: 2px;
   background: var(--surface);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 
 .cvr-ed-chip {
@@ -1231,11 +1231,11 @@
 
 .pld-row.grab {
   touch-action: none;
-  cursor: grab;
+  cursor: var(--cursor-grab);
 }
 
 .pld-row.grab:active {
-  cursor: grabbing;
+  cursor: var(--cursor-grabbing);
 }
 
 .pld-row.edit.dragging {
