@@ -7147,6 +7147,30 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
+/* Montants tout prêts sous le champ « Points d'arcade » de la fiche. */
+.au-points-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 0.5rem;
+}
+.au-preset {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  transition: border-color 0.15s, color 0.15s;
+}
+.au-preset:hover {
+  border-color: var(--accent-ink);
+  color: var(--text);
+}
+
 /* Lignes cliquables (ouvrent la fiche) */
 .au-list .au-row {
   width: 100%;

@@ -1264,6 +1264,26 @@
   accent-color: var(--accent-ink);
 }
 
+/* ⚠ PROVISOIRE (démo vidéo) : bloc « Tirage truqué ». Supprimable d'un bloc. */
+.arw-rig-pick {
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.82rem;
+  max-width: 340px;
+}
+/* Truquage actif : la carte se signale, on ne l'oublie pas en la quittant. */
+.arw-rig.on {
+  border-color: var(--accent-ink);
+  box-shadow: inset 3px 0 0 var(--accent-ink);
+}
+.arw-rig-on {
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
 /* ======================================================================
    Vue liste des lots : édition rapide (rareté, description) à la volée.
    ====================================================================== */

@@ -103,6 +103,7 @@ export default function RewardsPanel({ token }) {
   const [overwrite, setOverwrite] = useState(false);
   const [bf, setBf] = useState(null); // aperçu du rattrapage de points
   const [bfBusy, setBfBusy] = useState(false);
+  const [rigBusy, setRigBusy] = useState(false); // ⚠ démo : lot forcé
   // Vue des lots : grille (visuelle) ou liste (édition rapide). Le choix est
   // gardé d'une session à l'autre — on travaille rarement dans les deux modes.
   const [listView, setListView] = useState(
@@ -158,6 +159,24 @@ export default function RewardsPanel({ token }) {
       alert(e.message);
     } finally {
       setBfBusy(false);
+    }
+  }
+
+  // ⚠ PROVISOIRE (démo vidéo) : force UN lot à sortir de toutes les caisses.
+  // Se supprime avec la section « Tirage truqué » et la route /admin/demo-force.
+  async function setForced(rewardId) {
+    setRigBusy(true);
+    try {
+      const d = await apiFetch("/arcade/admin/demo-force", {
+        method: "POST",
+        token,
+        body: { rewardId: rewardId || null },
+      });
+      setData((prev) => (prev ? { ...prev, forcedRewardId: d.forcedRewardId } : prev));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setRigBusy(false);
     }
   }
   const { testCursor, endTest } = useCosmetics();
@@ -320,6 +339,8 @@ export default function RewardsPanel({ token }) {
   const rewards = data?.rewards || [];
   const cases = data?.cases || [];
   const testing = rewards.find((x) => x.id === testingId);
+  // ⚠ démo : le lot qui sort à tous les coups, s'il y en a un.
+  const forcedReward = rewards.find((x) => x.id === data?.forcedRewardId);
   // Mode FOCUS : pendant une édition, tout ce qui n'est pas l'objet édité est
   // du bruit (liste des autres lots, caisses, transfert) — on le retire.
   const focus = !!editReward || !!editCase;
@@ -670,6 +691,57 @@ export default function RewardsPanel({ token }) {
           </div>
         )}
       </section>
+      )}
+
+      {/* ---------- ⚠ PROVISOIRE : tirage truqué (démo vidéo) ----------
+          Bloc jetable : le supprimer d'un bloc supprime la fonctionnalité côté
+          client (voir aussi Reward.demoForce et /arcade/admin/demo-force). */}
+      {!focus && (
+        <section className={`admin-card arw-rig ${forcedReward ? "on" : ""}`}>
+          <div className="admin-card-head">
+            <span className="admin-card-icon">
+              <Sparkles size={18} />
+            </span>
+            <div className="admin-card-titles">
+              <h2>Tirage truqué — démo</h2>
+              <p>
+                Le lot choisi sort à <strong>tous les coups</strong>, de n'importe
+                quelle caisse, en ignorant les raretés. Pour filmer, pas pour la prod
+                : à remettre sur « Aucun » juste après.
+              </p>
+            </div>
+          </div>
+
+          <div className="arw-transfer">
+            <select
+              className="arw-rig-pick"
+              value={data?.forcedRewardId || ""}
+              onChange={(e) => setForced(e.target.value)}
+              disabled={rigBusy}
+              aria-label="Lot forcé"
+            >
+              <option value="">Aucun — tirage normal</option>
+              {rewards.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name} · {rarityLabel(r.rarity)}
+                </option>
+              ))}
+            </select>
+            {rigBusy && <Loader2 size={16} className="spin" />}
+            {forcedReward && !rigBusy && (
+              <button className="btn btn-ghost" onClick={() => setForced("")}>
+                <Undo2 size={15} /> Rendre le hasard
+              </button>
+            )}
+          </div>
+
+          {forcedReward && (
+            <p className="admin-hint arw-hint arw-rig-on">
+              « {forcedReward.name} » tombe à chaque ouverture — y compris pour les
+              autres joueurs.
+            </p>
+          )}
+        </section>
       )}
 
       {/* ---------- Rattrapage des points ---------- */}

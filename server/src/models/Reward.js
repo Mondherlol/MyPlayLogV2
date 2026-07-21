@@ -38,6 +38,12 @@ const rewardSchema = new mongoose.Schema(
     // qui l'ont déjà gagné (on ne dépossède jamais un joueur).
     enabled: { type: Boolean, default: true },
 
+    // ⚠ PROVISOIRE (démo vidéo) : le lot ainsi marqué sort de TOUTES les caisses
+    // à chaque ouverture, en ignorant les poids. Un seul lot à la fois (le panel
+    // admin démarque l'ancien). À retirer avant la mise en prod : ce champ, la
+    // route /admin/demo-force, et le bloc « Tirage truqué » d'AdminRewards.
+    demoForce: { type: Boolean, default: false },
+
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   },
   { timestamps: true }

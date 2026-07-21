@@ -41,7 +41,7 @@ router.get("/users", async (req, res) => {
     }
 
     const users = await User.find(filter)
-      .select("username email avatar createdAt lastSeenAt following isAdmin isSuperAdmin")
+      .select("username email avatar createdAt lastSeenAt following isAdmin isSuperAdmin points")
       .sort({ createdAt: -1 })
       .limit(500)
       .lean();
@@ -69,6 +69,7 @@ router.get("/users", async (req, res) => {
         isAdmin: isUserAdmin(u),
         isSuper: !!u.isSuperAdmin,
         gameCount: gameCount.get(String(u._id)) || 0,
+        points: u.points || 0, // solde d'arcade, ajustable depuis la fiche
         followingCount: (u.following || []).length,
         followersCount: followers.get(String(u._id)) || 0,
       })),
@@ -156,7 +157,7 @@ router.get("/users/:id", async (req, res) => {
       return res.status(404).json({ error: "Utilisateur introuvable." });
 
     const user = await User.findById(id)
-      .select("username email avatar bio createdAt lastSeenAt following isAdmin isSuperAdmin")
+      .select("username email avatar bio createdAt lastSeenAt following isAdmin isSuperAdmin points")
       .populate("following", "username avatar isAdmin isSuperAdmin")
       .lean();
     if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
@@ -182,6 +183,7 @@ router.get("/users/:id", async (req, res) => {
         isAdmin: isUserAdmin(user),
         isSuper: !!user.isSuperAdmin,
         gameCount,
+        points: user.points || 0,
       },
       following: (user.following || []).map(userCard),
       followers: followers.map(userCard),

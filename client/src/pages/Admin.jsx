@@ -30,6 +30,8 @@ import {
   Copy,
   Gift,
   Activity,
+  Coins,
+  Minus,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -283,6 +285,9 @@ function UsersPanel({ token, me }) {
                 <span className="au-meta">
                   <Gamepad2 size={12} /> {u.gameCount} jeu{u.gameCount > 1 ? "x" : ""}
                   {" · "}
+                  <Coins size={12} /> {(u.points || 0).toLocaleString("fr-FR")} pt
+                  {u.points > 1 ? "s" : ""}
+                  {" · "}
                   {u.followersCount} abonné{u.followersCount > 1 ? "s" : ""}
                   {" · "}
                   {u.followingCount} abonnement{u.followingCount > 1 ? "s" : ""}
@@ -444,6 +449,10 @@ function UserDrawer({ token, userId, me, onClose, onDirty }) {
                 </p>
               )}
 
+              {/* --- Points d'arcade --- */}
+              <h3 className="admin-drawer-sec">Points d'arcade</h3>
+              <PointsForm token={token} user={u} onDirty={onDirty} />
+
               {/* --- Abonnements --- */}
               <RelationList
                 token={token}
@@ -594,6 +603,99 @@ function PasswordForm({ token, user }) {
         <button className="btn btn-primary sm" onClick={save} disabled={busy || !pw}>
           {busy ? <Loader2 size={14} className="spin" /> : <Save size={14} />} Changer
         </button>
+      </div>
+      {msg && <p className={msg.ok ? "admin-ok" : "psn-err"}>{msg.text}</p>}
+    </div>
+  );
+}
+
+// --- Solde d'arcade : créditer ou retirer des points à la main ---
+// On ne pose jamais un solde absolu, on applique un ÉCART : le serveur passe par
+// grantPoints/spendPoints, donc chaque geste laisse une ligne « admin » dans le
+// grand livre du joueur (visible dans son historique de points).
+const POINT_PRESETS = [100, 500, 1000, 5000];
+
+function PointsForm({ token, user, onDirty }) {
+  const [balance, setBalance] = useState(user.points || 0);
+  const [amount, setAmount] = useState("");
+  const [busy, setBusy] = useState(null); // "add" | "sub"
+  const [msg, setMsg] = useState(null);
+
+  const n = Math.round(Number(amount));
+  const valid = Number.isFinite(n) && n > 0;
+
+  async function apply(sign) {
+    if (!valid || busy) return;
+    setBusy(sign > 0 ? "add" : "sub");
+    setMsg(null);
+    try {
+      const d = await apiFetch("/arcade/admin/grant", {
+        method: "POST",
+        token,
+        body: { userId: user.id, amount: sign * n },
+      });
+      setBalance(d.points);
+      setAmount("");
+      setMsg({
+        ok: true,
+        text: `${sign > 0 ? "+" : "−"}${n.toLocaleString("fr-FR")} — nouveau solde : ${d.points.toLocaleString("fr-FR")}.`,
+      });
+      onDirty(); // la liste derrière affiche le solde
+    } catch (e) {
+      setMsg({ ok: false, text: e.message });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="admin-field">
+      <label>
+        <Coins size={14} /> Solde — {balance.toLocaleString("fr-FR")} point
+        {balance > 1 ? "s" : ""}
+      </label>
+      <div className="admin-field-row">
+        <input
+          type="number"
+          min="1"
+          step="1"
+          name="mpl-admin-points"
+          value={amount}
+          placeholder="Combien ?"
+          onChange={(e) => setAmount(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && apply(1)}
+          autoComplete="off"
+        />
+        <button
+          className="btn btn-primary sm"
+          onClick={() => apply(1)}
+          disabled={!valid || !!busy}
+          title="Créditer"
+        >
+          {busy === "add" ? <Loader2 size={14} className="spin" /> : <Plus size={14} />}
+          Créditer
+        </button>
+        <button
+          className="btn btn-ghost sm"
+          onClick={() => apply(-1)}
+          disabled={!valid || !!busy || n > balance}
+          title={n > balance ? "Solde insuffisant" : "Retirer"}
+        >
+          {busy === "sub" ? <Loader2 size={14} className="spin" /> : <Minus size={14} />}
+          Retirer
+        </button>
+      </div>
+      <div className="au-points-presets">
+        {POINT_PRESETS.map((p) => (
+          <button
+            key={p}
+            type="button"
+            className="au-preset clickable"
+            onClick={() => setAmount(String(p))}
+          >
+            +{p.toLocaleString("fr-FR")}
+          </button>
+        ))}
       </div>
       {msg && <p className={msg.ok ? "admin-ok" : "psn-err"}>{msg.text}</p>}
     </div>

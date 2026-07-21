@@ -163,6 +163,14 @@ function drawReward(pool) {
   return pool[pool.length - 1]; // filet de sécurité (arrondis flottants)
 }
 
+// ⚠ PROVISOIRE (démo vidéo) : si un lot est marqué `demoForce`, c'est LUI qui
+// sort, de n'importe quelle caisse, quels que soient les poids — et même s'il
+// n'est pas dans le pool (on veut pouvoir filmer un mythique à la demande).
+// À supprimer avec le champ du modèle et le bloc « Tirage truqué » de l'admin.
+function forcedReward() {
+  return Reward.findOne({ demoForce: true });
+}
+
 // La bobine que le client fait défiler. Purement décorative : le gagnant est
 // déjà décidé, on l'assoit à une position FIXE et on remplit le reste au
 // hasard (pondéré, pour que la bobine « ressemble » au contenu de la caisse).
@@ -203,8 +211,8 @@ router.post("/cases/:id/open", requireAuth, async (req, res) => {
       throw e;
     }
 
-    // 2. Le tirage.
-    const winner = drawReward(pool);
+    // 2. Le tirage (⚠ démo : un lot forcé court-circuite tout).
+    const winner = (await forcedReward()) || drawReward(pool);
     const reel = buildReel(pool, winner);
 
     // 3. Rangement. Doublon → on incrémente le compteur et on rembourse une
@@ -267,7 +275,7 @@ router.post("/admin/cases/:id/try", requireAuth, requireAdmin, async (req, res) 
     if (!pool.length)
       return res.status(422).json({ error: "Cette caisse est vide pour le moment." });
 
-    const winner = drawReward(pool);
+    const winner = (await forcedReward()) || drawReward(pool);
     const reel = buildReel(pool, winner);
     res.json({
       reward: winner.toPublic(),
@@ -349,6 +357,8 @@ router.get("/admin/data", requireAuth, requireAdmin, async (req, res) => {
     ]);
     res.json({
       rarities: RARITIES,
+      // ⚠ démo : le lot qui sort à tous les coups (null la plupart du temps).
+      forcedRewardId: String(rewards.find((r) => r.demoForce)?._id || "") || null,
       rewards: rewards.map((r) => ({
         ...r.toPublic(),
         weight: r.weight ?? null,
@@ -506,6 +516,25 @@ router.post("/admin/backfill", requireAuth, requireAdmin, async (req, res) => {
   } catch (err) {
     console.error("arcade backfill error:", err.message);
     res.status(500).json({ error: "Rattrapage impossible." });
+  }
+});
+
+// POST /api/arcade/admin/demo-force — ⚠ PROVISOIRE (démo vidéo).
+// `rewardId: null` remet le hasard. Un seul lot forcé à la fois : on démarque
+// tous les autres avant de marquer celui-là.
+router.post("/admin/demo-force", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const id = req.body?.rewardId ? String(req.body.rewardId) : null;
+    await Reward.updateMany({ demoForce: true }, { $set: { demoForce: false } });
+    if (!id) return res.json({ forcedRewardId: null });
+    if (!mongoose.isValidObjectId(id))
+      return res.status(400).json({ error: "Lot invalide." });
+    const doc = await Reward.findByIdAndUpdate(id, { $set: { demoForce: true } });
+    if (!doc) return res.status(404).json({ error: "Lot introuvable." });
+    res.json({ forcedRewardId: id });
+  } catch (err) {
+    console.error("arcade demo-force error:", err.message);
+    res.status(500).json({ error: "Impossible de forcer ce lot." });
   }
 });
 
@@ -720,6 +749,10 @@ router.post("/admin/grant", requireAuth, requireAdmin, async (req, res) => {
       amount > 0
         ? await grantPoints(userId, amount, "admin", { by: String(req.userId) })
         : await spendPoints(userId, -amount, "admin", { by: String(req.userId) });
+    // grantPoints est best-effort et rend null si l'écriture a échoué (compte
+    // supprimé entre-temps…) : ne pas renvoyer un solde vide comme un succès.
+    if (balance == null)
+      return res.status(404).json({ error: "Compte introuvable — rien n'a été crédité." });
     res.json({ points: balance });
   } catch (err) {
     if (err.code === "INSUFFICIENT_POINTS")
