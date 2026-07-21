@@ -1694,12 +1694,12 @@
 .abar-modal-head {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
+  gap: 0.6rem;
+  flex-wrap: wrap;
   padding: 1rem 1.25rem;
   border-bottom: 1px solid var(--border);
 }
 .abar-modal-head h2 {
-  flex: 1;
   min-width: 0;
   font-size: 1.15rem;
 }
@@ -1722,167 +1722,63 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- Le rail des caisses, en tête de la collection ---------- */
-.abar-rail {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 0.6rem;
-  margin-bottom: 1.4rem;
-}
-.abar-crate {
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 0.85rem;
-  border: 1px solid rgba(242, 183, 11, 0.45);
-  border-radius: var(--radius);
-  background: linear-gradient(
-    120deg,
-    color-mix(in srgb, var(--accent-ink) 12%, var(--surface)),
-    var(--surface) 65%
-  );
-  text-align: left;
-  transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
-}
-.abar-crate:hover:not(:disabled) {
-  transform: translateY(-2px);
-  border-color: var(--accent-ink);
-  box-shadow: 0 10px 26px rgba(242, 183, 11, 0.18);
-}
-.abar-crate:disabled {
-  opacity: 0.55;
-}
-/* Halo qui balaie la carte au survol : la caisse « brille » avant l'ouverture. */
-.abar-crate-glow {
-  position: absolute;
-  inset: -40% -20%;
-  background: radial-gradient(
-    circle at 20% 50%,
-    rgba(255, 207, 58, 0.35),
-    transparent 60%
-  );
-  opacity: 0;
-  transition: opacity 0.25s ease;
-  pointer-events: none;
-}
-.abar-crate:hover:not(:disabled) .abar-crate-glow {
-  opacity: 1;
-}
-.abar-crate-art {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 58px;
-  height: 58px;
-  flex: 0 0 58px;
-  border-radius: 12px;
-  background: var(--surface-2);
-  color: var(--accent-ink);
-}
-.abar-crate-art img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-}
-.abar-crate-body {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-.abar-crate-body strong {
-  font-size: 0.92rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.abar-crate-meta {
-  font-size: 0.72rem;
-  color: var(--text-soft);
-}
-.abar-crate-cta {
-  position: relative;
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.2rem;
-  padding: 0.4rem 0.7rem;
-  border-radius: 10px;
-  background: var(--accent-grad);
-  color: #3a2600;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 0.8rem;
-}
-.abar-crate.poor .abar-crate-cta {
-  background: var(--surface-2);
-  color: var(--text-soft);
-}
-.abar-crate-cta b {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  opacity: 0.85;
-}
-
-/* ---------- En-tête de la collection + jauge ---------- */
-.abar-collec-head {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  margin-bottom: 0.7rem;
-}
-.abar-collec-head h3 {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 1rem;
-}
-.abar-collec-head h3 svg {
-  color: var(--accent-ink);
-}
-.abar-progress {
-  position: relative;
-  flex: 1;
-  max-width: 220px;
-  height: 18px;
-  margin-left: auto;
+/* Compteur de collection, à côté du titre de la modale. */
+.abar-count {
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface-2);
-  border: 1px solid var(--border);
-  overflow: hidden;
-}
-.abar-progress i {
-  position: absolute;
-  inset: 0 auto 0 0;
-  background: var(--accent-grad);
-  transition: width 0.4s ease;
-}
-.abar-progress em {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-style: normal;
-  font-size: 0.68rem;
-  font-weight: 800;
-  color: var(--text);
+  color: var(--text-soft);
+  font-size: 0.74rem;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
+/* « Nouveau curseur » : l'action qui fait grandir la collection. Doré mais
+   compact — une seule caisse existe, elle ne mérite pas une carte à elle. */
+.abar-get {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #3a2600;
+  font-weight: 700;
+  font-size: 0.83rem;
+  transition: filter 0.15s ease, transform 0.12s ease;
+}
+.abar-get:hover {
+  filter: brightness(1.07);
+  transform: translateY(-1px);
+}
+.abar-get b {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.16);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+/* Solde insuffisant : on laisse cliquable (l'aperçu du contenu a de l'intérêt)
+   mais on ne le fait plus briller. */
+.abar-get.poor {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--text-soft);
+}
+.abar-get.poor b {
+  background: var(--surface-2);
+}
+
 @media (max-width: 560px) {
-  .abar-rail {
-    grid-template-columns: 1fr;
-  }
-  .abar-progress {
-    max-width: 130px;
+  .abar-get span,
+  .abar-count {
+    display: none;
   }
 }
 

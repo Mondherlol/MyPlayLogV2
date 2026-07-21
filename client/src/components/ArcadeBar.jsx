@@ -9,7 +9,6 @@ import {
   MousePointer2,
   Check,
   X,
-  Lock,
   Music2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -128,76 +127,16 @@ export default function ArcadeBar() {
 
       {open && data && (
         <CollectionModal
-          data={data}
           points={data.points}
+          // Une seule caisse dans les faits : le bouton d'obtention vit dans
+          // l'en-tête plutôt que dans un rail qui n'aurait qu'une carte.
+          crate={data.cases[0] || null}
+          owned={cursors.length}
+          total={total}
+          onOpenCrate={setOpeningBox}
           onClose={() => setOpen(false)}
         >
           {err && <p className="arc-err">{err}</p>}
-
-          {/* --- Les caisses, en tête : c'est l'action qui fait grandir la collection --- */}
-          {data.cases.length > 0 && (
-            <div className="abar-rail">
-              {data.cases.map((c) => {
-                const afford = data.points >= c.price;
-                const missing = c.price - data.points;
-                return (
-                  <button
-                    key={c.id}
-                    className={`abar-crate clickable ${afford ? "" : "poor"}`}
-                    onClick={() => setOpeningBox(c)}
-                    disabled={!c.openable}
-                  >
-                    <span className="abar-crate-glow" aria-hidden="true" />
-                    <span className="abar-crate-art">
-                      {c.image ? (
-                        <img src={c.image} alt="" draggable="false" />
-                      ) : (
-                        <PackageOpen size={38} />
-                      )}
-                    </span>
-                    <span className="abar-crate-body">
-                      <strong>{c.name}</strong>
-                      <span className="abar-crate-meta">
-                        {c.rewards.length} lot{c.rewards.length > 1 ? "s" : ""}
-                        {!c.openable
-                          ? " · bientôt"
-                          : afford
-                            ? ""
-                            : ` · il te manque ${missing.toLocaleString("fr-FR")}`}
-                      </span>
-                    </span>
-                    <span className="abar-crate-cta">
-                      {!c.openable ? (
-                        <Lock size={14} />
-                      ) : (
-                        <>
-                          <Sparkles size={14} /> Ouvrir
-                        </>
-                      )}
-                      <b>
-                        <Coins size={12} /> {c.price}
-                      </b>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {/* --- La collection --- */}
-          <div className="abar-collec-head">
-            <h3>
-              <MousePointer2 size={15} /> Mes curseurs
-            </h3>
-            {total > 0 && (
-              <span className="abar-progress">
-                <i style={{ width: `${Math.round((cursors.length / total) * 100)}%` }} />
-                <em>
-                  {cursors.length} / {total}
-                </em>
-              </span>
-            )}
-          </div>
 
           {cursors.length === 0 ? (
             <div className="arc-empty-inv">
@@ -276,8 +215,16 @@ export default function ArcadeBar() {
   );
 }
 
-// Coquille de la modale : titre, solde, fermeture.
-function CollectionModal({ points, onClose, children }) {
+// Coquille de la modale : titre, progression, obtention, solde, fermeture.
+function CollectionModal({
+  points,
+  crate,
+  owned,
+  total,
+  onOpenCrate,
+  onClose,
+  children,
+}) {
   useEffect(() => {
     document.body.style.overflow = "hidden";
     const onKey = (e) => e.key === "Escape" && onClose();
@@ -288,6 +235,9 @@ function CollectionModal({ points, onClose, children }) {
     };
   }, [onClose]);
 
+  const afford = crate ? points >= crate.price : false;
+  const missing = crate ? crate.price - points : 0;
+
   return createPortal(
     <div
       className="modal-overlay"
@@ -296,6 +246,30 @@ function CollectionModal({ points, onClose, children }) {
       <div className="abar-modal">
         <div className="abar-modal-head">
           <h2>Ma collection</h2>
+          {total > 0 && (
+            <span className="abar-count">
+              {owned} / {total}
+            </span>
+          )}
+
+          {crate && crate.openable && (
+            <button
+              className={`abar-get clickable ${afford ? "" : "poor"}`}
+              onClick={() => onOpenCrate(crate)}
+              title={
+                afford
+                  ? `Ouvrir une caisse — ${crate.price} points`
+                  : `Il te manque ${missing.toLocaleString("fr-FR")} points`
+              }
+            >
+              <Sparkles size={15} />
+              Nouveau curseur
+              <b>
+                <Coins size={12} /> {crate.price}
+              </b>
+            </button>
+          )}
+
           <span className="abar-points">
             <Coins size={15} />
             {points.toLocaleString("fr-FR")}
