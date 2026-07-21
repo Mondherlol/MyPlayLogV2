@@ -98,7 +98,27 @@ export default function RewardsPanel({ token }) {
   const [busyIO, setBusyIO] = useState(null); // "export" | "import" | null
   const [ioMsg, setIoMsg] = useState(null);
   const [overwrite, setOverwrite] = useState(false);
+  const [bf, setBf] = useState(null); // aperçu du rattrapage de points
+  const [bfBusy, setBfBusy] = useState(false);
   const transferRef = useRef(null);
+
+  // Rattrapage des points de blind test gagnés avant l'arcade. Deux temps :
+  // on regarde d'abord (rien n'est écrit), on crédite ensuite.
+  async function runBackfill(apply) {
+    setBfBusy(true);
+    try {
+      const d = await apiFetch("/arcade/admin/backfill", {
+        method: "POST",
+        token,
+        body: { apply },
+      });
+      setBf(d);
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBfBusy(false);
+    }
+  }
   const { testCursor, endTest } = useCosmetics();
 
   // Télécharge tout l'arcade (lots + caisses + images embarquées) en un fichier.
@@ -217,6 +237,26 @@ export default function RewardsPanel({ token }) {
     }
   }
 
+  // Suppression de masse : on exige une saisie exacte plutôt qu'un simple OK.
+  // Ça dépossède les joueurs, donc un clic de trop ne doit pas suffire.
+  async function wipeRewards() {
+    const n = rewards.length;
+    const typed = prompt(
+      `Supprimer les ${n} lots ?\n\n` +
+        `Ils seront retirés des caisses ET des inventaires des joueurs : les ` +
+        `curseurs déjà gagnés seront perdus. C'est irréversible.\n\n` +
+        `Pense à « Exporter » d'abord (section Transfert).\n\n` +
+        `Tape SUPPRIMER pour confirmer :`
+    );
+    if (typed !== "SUPPRIMER") return;
+    try {
+      await apiFetch("/arcade/admin/rewards", { method: "DELETE", token });
+      load();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
   async function removeCase(c) {
     if (!confirm(`Supprimer la caisse « ${c.name} » ?\n\nLes lots déjà gagnés restent acquis.`))
       return;
@@ -282,6 +322,11 @@ export default function RewardsPanel({ token }) {
               </p>
             )}
           </div>
+          {!editReward && rewards.length > 0 && (
+            <button className="btn btn-ghost arw-wipe" onClick={wipeRewards}>
+              <Trash2 size={16} /> Effacer tout
+            </button>
+          )}
           {!editReward && (
             <button className="btn btn-primary" onClick={() => setEditReward(blankReward())}>
               <Plus size={16} /> Nouveau lot
@@ -449,6 +494,81 @@ export default function RewardsPanel({ token }) {
           </div>
         )}
       </section>
+      )}
+
+      {/* ---------- Rattrapage des points ---------- */}
+      {!focus && (
+        <section className="admin-card">
+          <div className="admin-card-head">
+            <span className="admin-card-icon">
+              <Coins size={18} />
+            </span>
+            <div className="admin-card-titles">
+              <h2>Points</h2>
+              <p>
+                L'arcade ne crédite que les parties finies depuis sa mise en ligne. Si
+                des joueurs ont un score au classement mais <strong>0 point</strong>,
+                c'est qu'ils ont joué avant : ce rattrapage comble l'écart.
+              </p>
+            </div>
+          </div>
+
+          <div className="arw-transfer">
+            <button
+              className="btn btn-ghost"
+              onClick={() => runBackfill(false)}
+              disabled={bfBusy}
+            >
+              {bfBusy ? <Loader2 size={16} className="spin" /> : <Coins size={16} />}
+              Analyser
+            </button>
+            {bf && !bf.applied && bf.users.length > 0 && (
+              <button
+                className="btn btn-primary"
+                onClick={() => runBackfill(true)}
+                disabled={bfBusy}
+              >
+                <Check size={16} /> Créditer {bf.total.toLocaleString("fr-FR")} points
+              </button>
+            )}
+          </div>
+
+          {bf && (
+            <div className="arw-bf">
+              {bf.users.length === 0 ? (
+                <p className="admin-hint arw-hint">
+                  Tout le monde est à jour — rien à créditer ({bf.upToDate} joueur
+                  {bf.upToDate > 1 ? "s" : ""} vérifié{bf.upToDate > 1 ? "s" : ""}).
+                </p>
+              ) : (
+                <>
+                  <p className="admin-hint arw-hint">
+                    {bf.applied
+                      ? `✅ ${bf.total.toLocaleString("fr-FR")} points crédités à ${bf.users.length} joueur(s).`
+                      : `${bf.users.length} joueur(s) à créditer — rien n'a encore été écrit.`}
+                  </p>
+                  <ul className="arw-bf-list">
+                    {bf.users.map((u) => (
+                      <li key={u.username}>
+                        <strong>{u.username}</strong>
+                        <span>
+                          {u.games} partie{u.games > 1 ? "s" : ""}
+                        </span>
+                        <em>+{u.missing.toLocaleString("fr-FR")}</em>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          )}
+
+          <p className="admin-hint arw-hint">
+            Sans danger à relancer : on ne calcule pas « combien ajouter » mais
+            « combien il devrait y avoir », donc un crédit n'est jamais doublé. Les
+            points déjà dépensés en caisses ne faussent rien.
+          </p>
+        </section>
       )}
 
       {/* ---------- Transfert entre instances ---------- */}

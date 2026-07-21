@@ -10,6 +10,7 @@ import PointEntry from "../models/PointEntry.js";
 import User from "../models/User.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { grantPoints, spendPoints } from "../lib/points.js";
+import { planArcadeBackfill, runArcadeBackfill } from "../lib/arcadeBackfill.js";
 import { RARITIES, isRarity, rewardWeight, duplicateRefund } from "../lib/rarity.js";
 
 // ======================================================================
@@ -466,6 +467,33 @@ router.post("/admin/cursor-from-url", requireAuth, requireAdmin, async (req, res
   }
 });
 
+// POST /api/arcade/admin/backfill — rattrapage des points de blind test gagnés
+// avant la mise en ligne de l'arcade. Sans `apply: true`, c'est un APERÇU qui
+// n'écrit rien : la même sécurité en deux temps que le script en ligne de
+// commande (npm run backfill:arcade). Rejouable, ne double jamais un crédit.
+router.post("/admin/backfill", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const rows = await planArcadeBackfill();
+    const pending = rows.filter((r) => r.missing > 0);
+    const apply = req.body?.apply === true;
+    if (apply) await runArcadeBackfill(pending);
+    res.json({
+      applied: apply,
+      total: pending.reduce((a, r) => a + r.missing, 0),
+      upToDate: rows.length - pending.length,
+      users: pending.map((r) => ({
+        username: r.username,
+        missing: r.missing,
+        games: r.games,
+        points: r.points,
+      })),
+    });
+  } catch (err) {
+    console.error("arcade backfill error:", err.message);
+    res.status(500).json({ error: "Rattrapage impossible." });
+  }
+});
+
 function readRewardBody(body) {
   const type = String(body?.type || "");
   if (!REWARD_TYPE_KEYS.includes(type)) throw new Error("Type de lot inconnu.");
@@ -510,6 +538,39 @@ router.put("/admin/rewards/:id", requireAuth, requireAdmin, async (req, res) => 
     res.json({ reward: doc.toPublic() });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// DELETE /api/arcade/admin/rewards — vide TOUS les lots d'un coup, avec les
+// mêmes conséquences que la suppression unitaire (pools de caisses vidés,
+// inventaires et équipements des joueurs nettoyés). Irréversible : la sortie
+// de secours est l'export de l'onglet Transfert, à faire AVANT.
+router.delete("/admin/rewards", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const docs = await Reward.find().select("key").lean();
+    if (!docs.length) return res.json({ deleted: 0 });
+    const keys = docs.map((d) => d.key);
+    await Promise.all([
+      Reward.deleteMany({}),
+      // Plus aucun lot n'existe : tous les pools deviennent vides.
+      LootCase.updateMany({}, { $set: { rewards: [] } }),
+      User.updateMany(
+        { "inventory.rewardKey": { $in: keys } },
+        { $pull: { inventory: { rewardKey: { $in: keys } } } },
+        { timestamps: false }
+      ),
+      ...REWARD_TYPE_KEYS.map((t) =>
+        User.updateMany(
+          { [`equipped.${t}`]: { $in: keys } },
+          { $set: { [`equipped.${t}`]: null } },
+          { timestamps: false }
+        )
+      ),
+    ]);
+    res.json({ deleted: docs.length });
+  } catch (err) {
+    console.error("arcade wipe error:", err.message);
+    res.status(500).json({ error: "Suppression impossible." });
   }
 });
 
