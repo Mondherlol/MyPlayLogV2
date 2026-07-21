@@ -30,6 +30,9 @@ import {
   ArrowLeftRight,
   Copy,
   Clipboard,
+  LayoutGrid,
+  List,
+  Undo2,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { useCosmetics } from "../context/CosmeticsContext";
@@ -100,6 +103,44 @@ export default function RewardsPanel({ token }) {
   const [overwrite, setOverwrite] = useState(false);
   const [bf, setBf] = useState(null); // aperçu du rattrapage de points
   const [bfBusy, setBfBusy] = useState(false);
+  // Vue des lots : grille (visuelle) ou liste (édition rapide). Le choix est
+  // gardé d'une session à l'autre — on travaille rarement dans les deux modes.
+  const [listView, setListView] = useState(
+    () => localStorage.getItem("mpl_arw_view") === "list"
+  );
+  // Modifications en attente : { [id]: { rarity?, description?, … } }.
+  const [edits, setEdits] = useState({});
+  const [savingEdits, setSavingEdits] = useState(false);
+  const dirtyCount = Object.keys(edits).length;
+
+  function toggleView() {
+    setListView((v) => {
+      localStorage.setItem("mpl_arw_view", v ? "grid" : "list");
+      return !v;
+    });
+  }
+  const setEdit = (id, field, value) =>
+    setEdits((e) => ({ ...e, [id]: { ...e[id], [field]: value } }));
+
+  // Un seul PATCH pour toutes les lignes touchées. Les images ne transitent
+  // pas : cette route ne connaît que les métadonnées.
+  async function saveEdits() {
+    setSavingEdits(true);
+    try {
+      const updates = Object.entries(edits).map(([id, patch]) => ({ id, ...patch }));
+      await apiFetch("/arcade/admin/rewards", {
+        method: "PATCH",
+        token,
+        body: { updates },
+      });
+      setEdits({});
+      load();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setSavingEdits(false);
+    }
+  }
   const transferRef = useRef(null);
 
   // Rattrapage des points de blind test gagnés avant l'arcade. Deux temps :
@@ -323,6 +364,20 @@ export default function RewardsPanel({ token }) {
             )}
           </div>
           {!editReward && rewards.length > 0 && (
+            <button
+              className="btn btn-ghost"
+              onClick={toggleView}
+              title={
+                listView
+                  ? "Revenir à la grille"
+                  : "Vue liste : éditer rareté et description à la volée"
+              }
+            >
+              {listView ? <LayoutGrid size={16} /> : <List size={16} />}
+              {listView ? "Grille" : "Édition rapide"}
+            </button>
+          )}
+          {!editReward && rewards.length > 0 && (
             <button className="btn btn-ghost arw-wipe" onClick={wipeRewards}>
               <Trash2 size={16} /> Effacer tout
             </button>
@@ -346,7 +401,128 @@ export default function RewardsPanel({ token }) {
           />
         )}
 
-        {editReward ? null : rewards.length === 0 ? (
+        {/* ---- Vue liste : édition rapide rareté / description ---- */}
+        {!editReward && listView && rewards.length > 0 && (
+          <div className="arw-list">
+            <div className="arw-list-head">
+              <span />
+              <span>Nom</span>
+              <span>Rareté</span>
+              <span>Description</span>
+              <span>Actif</span>
+              <span />
+            </div>
+            {rewards.map((r) => {
+              const e = edits[r.id] || {};
+              const rarity = e.rarity ?? r.rarity;
+              const enabled = e.enabled ?? r.enabled;
+              return (
+                <div
+                  className={`arw-list-row ${edits[r.id] ? "dirty" : ""} ${
+                    enabled ? "" : "off"
+                  }`}
+                  key={r.id}
+                  style={{ "--arc-rarity": rarityColor(rarity) }}
+                >
+                  <span className="arw-list-art">
+                    <RewardArt reward={r} size={26} />
+                  </span>
+                  <input
+                    className="arw-list-name"
+                    value={e.name ?? r.name}
+                    onChange={(ev) => setEdit(r.id, "name", ev.target.value)}
+                    aria-label={`Nom de ${r.name}`}
+                  />
+                  <select
+                    className="arw-list-rarity"
+                    value={rarity}
+                    onChange={(ev) => setEdit(r.id, "rarity", ev.target.value)}
+                    aria-label={`Rareté de ${r.name}`}
+                  >
+                    {RARITY_ORDER.map((k) => (
+                      <option key={k} value={k}>
+                        {RARITIES[k].label}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    className="arw-list-desc"
+                    value={e.description ?? r.description ?? ""}
+                    placeholder="Une phrase pour situer le lot…"
+                    maxLength={200}
+                    onChange={(ev) => setEdit(r.id, "description", ev.target.value)}
+                    aria-label={`Description de ${r.name}`}
+                  />
+                  <button
+                    className={`admin-switch clickable sm ${enabled ? "on" : ""}`}
+                    onClick={() => setEdit(r.id, "enabled", !enabled)}
+                    role="switch"
+                    aria-checked={enabled}
+                    aria-label={`Activer ${r.name}`}
+                  >
+                    <span className="admin-switch-knob" />
+                  </button>
+                  <span className="pn-admin-actions">
+                    {r.type === "cursor" && (
+                      <button
+                        className={`icon-btn clickable arw-test-btn ${
+                          testingId === r.id ? "on" : ""
+                        }`}
+                        onClick={() => toggleTest(r)}
+                        title={testingId === r.id ? "Arrêter le test" : "Tester"}
+                      >
+                        {testingId === r.id ? <Square size={15} /> : <Play size={15} />}
+                      </button>
+                    )}
+                    <button
+                      className="icon-btn clickable"
+                      onClick={() =>
+                        setEditReward({
+                          ...r,
+                          weight: r.weight ?? "",
+                          data: { hotspotX: 0, hotspotY: 0, ...(r.data || {}) },
+                        })
+                      }
+                      title="Ouvrir l'éditeur complet"
+                    >
+                      <Pencil size={15} />
+                    </button>
+                    <button
+                      className="icon-btn clickable danger"
+                      onClick={() => removeReward(r)}
+                      title="Supprimer"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Barre d'enregistrement, visible dès qu'une ligne est touchée. */}
+        {dirtyCount > 0 && (
+          <div className="arw-save-bar">
+            <span>
+              {dirtyCount} lot{dirtyCount > 1 ? "s" : ""} modifié
+              {dirtyCount > 1 ? "s" : ""}
+            </span>
+            <button
+              className="btn btn-ghost"
+              onClick={() => setEdits({})}
+              disabled={savingEdits}
+            >
+              <Undo2 size={15} /> Annuler
+            </button>
+            <button className="btn btn-primary" onClick={saveEdits} disabled={savingEdits}>
+              {savingEdits ? <Loader2 size={15} className="spin" /> : <Check size={15} />}
+              Enregistrer
+            </button>
+          </div>
+        )}
+
+        {editReward || listView ? null : rewards.length === 0 ? (
           <p className="pn-admin-empty">Aucun lot pour l'instant.</p>
         ) : (
           <div className="arw-grid">

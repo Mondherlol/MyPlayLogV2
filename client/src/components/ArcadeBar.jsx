@@ -20,18 +20,18 @@ import RewardArt from "./RewardArt";
 import CaseOpeningModal from "./CaseOpeningModal";
 
 // ======================================================================
-//  L'arcade, réduite à une barre : solde + deux portes d'entrée.
+//  L'arcade, réduite à une barre : le solde et une porte d'entrée.
 // ======================================================================
-// Remplace l'ancienne page /arcade : on n'envoie plus le joueur ailleurs pour
-// dépenser ses points, tout se joue en modale depuis l'accueil. Le tirage et
-// l'équipement restent EXACTEMENT les mêmes appels serveur qu'avant.
+// Remplace l'ancienne page /arcade. Une seule modale « Ma collection » : les
+// caisses y sont l'appel à l'action en tête, la collection s'étale dessous.
+// Le tirage et l'équipement restent les mêmes appels serveur qu'avant.
 
 export default function ArcadeBar() {
   const { token, updateUser } = useAuth();
   const { setCosmetic } = useCosmetics();
 
   const [data, setData] = useState(null);
-  const [view, setView] = useState(null); // "cases" | "cursors" | null
+  const [open, setOpen] = useState(false);
   const [openingBox, setOpeningBox] = useState(null);
   const [equipping, setEquipping] = useState(null);
   const [err, setErr] = useState("");
@@ -99,6 +99,12 @@ export default function ArcadeBar() {
         new Date(b.obtainedAt || 0) - new Date(a.obtainedAt || 0)
     );
 
+  // Progression : combien de curseurs tirables existent, combien sont à moi.
+  const catalog = new Set();
+  for (const c of data?.cases || [])
+    for (const r of c.rewards || []) if (r.type === "cursor") catalog.add(r.key);
+  const total = catalog.size;
+
   return (
     <>
       <div className="abar">
@@ -108,162 +114,154 @@ export default function ArcadeBar() {
         </span>
         <button
           className="abar-btn clickable"
-          onClick={() => setView("cases")}
+          onClick={() => setOpen(true)}
           disabled={!data}
         >
-          <PackageOpen size={16} /> Ouvrir une caisse
-        </button>
-        <button
-          className="abar-btn clickable"
-          onClick={() => setView("cursors")}
-          disabled={!data}
-        >
-          <MousePointer2 size={16} /> Curseurs
+          <MousePointer2 size={16} /> Ma collection
+          {total > 0 && (
+            <span className="abar-btn-count">
+              {cursors.length}/{total}
+            </span>
+          )}
         </button>
       </div>
 
-      {view && data && (
-        <ArcadeModal
-          title={view === "cases" ? "Caisses" : "Mes curseurs"}
+      {open && data && (
+        <CollectionModal
+          data={data}
           points={data.points}
-          onClose={() => setView(null)}
+          onClose={() => setOpen(false)}
         >
           {err && <p className="arc-err">{err}</p>}
 
-          {view === "cases" &&
-            (data.cases.length === 0 ? (
-              <p className="arc-empty">
-                Aucune caisse disponible pour l'instant — reviens plus tard.
-              </p>
-            ) : (
-              <div className="arc-cases">
-                {data.cases.map((c) => {
-                  const afford = data.points >= c.price;
-                  // Les 3 meilleurs lots, déjà triés « plus rare d'abord » par l'API.
-                  const teaser = c.rewards.slice(0, 3);
-                  return (
-                    <article className={`arc-case ${afford ? "" : "poor"}`} key={c.id}>
-                      <div className="arc-case-art">
-                        {c.image ? (
-                          <img src={c.image} alt="" draggable="false" />
-                        ) : (
-                          <PackageOpen size={44} className="arc-case-ph" />
-                        )}
-                        <span className="arc-case-glow" aria-hidden="true" />
-                      </div>
-                      <h3 className="arc-case-name">{c.name}</h3>
-                      {c.description && <p className="arc-case-desc">{c.description}</p>}
-                      <div className="arc-case-teaser" aria-hidden="true">
-                        {teaser.map((r) => (
-                          <span
-                            className="arc-case-pip"
-                            key={r.id}
-                            style={{ "--arc-rarity": rarityColor(r.rarity) }}
-                            title={`${r.name} · ${rarityLabel(r.rarity)}`}
-                          />
-                        ))}
-                        <span className="arc-case-count">
-                          {c.rewards.length} lot{c.rewards.length > 1 ? "s" : ""}
-                        </span>
-                      </div>
-                      <button
-                        className="arc-case-btn clickable"
-                        onClick={() => setOpeningBox(c)}
-                        disabled={!c.openable}
-                      >
-                        {!c.openable ? (
-                          <>
-                            <Lock size={15} /> Bientôt
-                          </>
-                        ) : afford ? (
-                          <>
-                            <Sparkles size={15} /> Ouvrir
-                          </>
-                        ) : (
-                          "Voir le contenu"
-                        )}
-                        <span className="arc-case-price">
-                          <Coins size={13} /> {c.price}
-                        </span>
-                      </button>
-                      {!afford && c.openable && (
-                        <span className="arc-case-need">
-                          Il te manque{" "}
-                          {(c.price - data.points).toLocaleString("fr-FR")} points
-                        </span>
+          {/* --- Les caisses, en tête : c'est l'action qui fait grandir la collection --- */}
+          {data.cases.length > 0 && (
+            <div className="abar-rail">
+              {data.cases.map((c) => {
+                const afford = data.points >= c.price;
+                const missing = c.price - data.points;
+                return (
+                  <button
+                    key={c.id}
+                    className={`abar-crate clickable ${afford ? "" : "poor"}`}
+                    onClick={() => setOpeningBox(c)}
+                    disabled={!c.openable}
+                  >
+                    <span className="abar-crate-glow" aria-hidden="true" />
+                    <span className="abar-crate-art">
+                      {c.image ? (
+                        <img src={c.image} alt="" draggable="false" />
+                      ) : (
+                        <PackageOpen size={38} />
                       )}
+                    </span>
+                    <span className="abar-crate-body">
+                      <strong>{c.name}</strong>
+                      <span className="abar-crate-meta">
+                        {c.rewards.length} lot{c.rewards.length > 1 ? "s" : ""}
+                        {!c.openable
+                          ? " · bientôt"
+                          : afford
+                            ? ""
+                            : ` · il te manque ${missing.toLocaleString("fr-FR")}`}
+                      </span>
+                    </span>
+                    <span className="abar-crate-cta">
+                      {!c.openable ? (
+                        <Lock size={14} />
+                      ) : (
+                        <>
+                          <Sparkles size={14} /> Ouvrir
+                        </>
+                      )}
+                      <b>
+                        <Coins size={12} /> {c.price}
+                      </b>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* --- La collection --- */}
+          <div className="abar-collec-head">
+            <h3>
+              <MousePointer2 size={15} /> Mes curseurs
+            </h3>
+            {total > 0 && (
+              <span className="abar-progress">
+                <i style={{ width: `${Math.round((cursors.length / total) * 100)}%` }} />
+                <em>
+                  {cursors.length} / {total}
+                </em>
+              </span>
+            )}
+          </div>
+
+          {cursors.length === 0 ? (
+            <div className="arc-empty-inv">
+              <PackageOpen size={30} />
+              <p>
+                Aucun curseur pour l'instant. Ouvre une caisse pour commencer ta
+                collection.
+              </p>
+              <Link to="/blindtest" className="btn btn-primary sm">
+                <Music2 size={15} /> Gagner des points au blind test
+              </Link>
+            </div>
+          ) : (
+            <>
+              <div className="arc-inv-grid">
+                {cursors.map((r) => {
+                  const on = data.equipped[r.type] === r.key;
+                  return (
+                    // La carte entière bascule l'équipement.
+                    <article
+                      className={`arc-inv-card ${on ? "equipped" : ""}`}
+                      key={r.key}
+                      style={{ "--arc-rarity": rarityColor(r.rarity) }}
+                      role="button"
+                      tabIndex={0}
+                      aria-pressed={on}
+                      title={on ? "Cliquer pour retirer" : "Cliquer pour équiper"}
+                      onClick={() => toggleEquip(r)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          toggleEquip(r);
+                        }
+                      }}
+                    >
+                      <span className="arc-inv-aura" aria-hidden="true" />
+                      {r.count > 1 && <span className="arc-inv-count">×{r.count}</span>}
+                      <div className="arc-inv-art">
+                        <RewardArt reward={r} size={54} />
+                      </div>
+                      <span className="arc-inv-rarity">{rarityLabel(r.rarity)}</span>
+                      <h3 className="arc-inv-name">{r.name}</h3>
+                      <span className={`arc-equip ${on ? "on" : ""}`}>
+                        {equipping === r.key ? (
+                          <Loader2 size={13} className="spin" />
+                        ) : on ? (
+                          <>
+                            <Check size={13} /> Équipé
+                          </>
+                        ) : (
+                          "Équiper"
+                        )}
+                      </span>
                     </article>
                   );
                 })}
               </div>
-            ))}
-
-          {view === "cursors" &&
-            (cursors.length === 0 ? (
-              <div className="arc-empty-inv">
-                <PackageOpen size={30} />
-                <p>
-                  Aucun curseur pour l'instant. Ouvre une caisse pour commencer ta
-                  collection.
-                </p>
-                <Link to="/blindtest" className="btn btn-primary sm">
-                  <Music2 size={15} /> Gagner des points au blind test
-                </Link>
-              </div>
-            ) : (
-              <>
-                <div className="arc-inv-grid">
-                  {cursors.map((r) => {
-                    const on = data.equipped[r.type] === r.key;
-                    return (
-                      // La carte ENTIÈRE bascule l'équipement : viser le petit
-                      // bouton n'apportait rien. L'état reste affiché en bas,
-                      // mais en simple étiquette (plus de bouton imbriqué).
-                      <article
-                        className={`arc-inv-card ${on ? "equipped" : ""}`}
-                        key={r.key}
-                        style={{ "--arc-rarity": rarityColor(r.rarity) }}
-                        role="button"
-                        tabIndex={0}
-                        aria-pressed={on}
-                        title={on ? "Cliquer pour retirer" : "Cliquer pour équiper"}
-                        onClick={() => toggleEquip(r)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            toggleEquip(r);
-                          }
-                        }}
-                      >
-                        <span className="arc-inv-aura" aria-hidden="true" />
-                        {r.count > 1 && <span className="arc-inv-count">×{r.count}</span>}
-                        <div className="arc-inv-art">
-                          <RewardArt reward={r} size={54} />
-                        </div>
-                        <span className="arc-inv-rarity">{rarityLabel(r.rarity)}</span>
-                        <h3 className="arc-inv-name">{r.name}</h3>
-                        <span className={`arc-equip ${on ? "on" : ""}`}>
-                          {equipping === r.key ? (
-                            <Loader2 size={13} className="spin" />
-                          ) : on ? (
-                            <>
-                              <Check size={13} /> Équipé
-                            </>
-                          ) : (
-                            "Équiper"
-                          )}
-                        </span>
-                      </article>
-                    );
-                  })}
-                </div>
-                <p className="arc-inv-note">
-                  Le curseur équipé s'applique partout dans l'app, sur ordinateur
-                  uniquement.
-                </p>
-              </>
-            ))}
-        </ArcadeModal>
+              <p className="arc-inv-note">
+                Le curseur équipé s'applique partout dans l'app, sur ordinateur
+                uniquement.
+              </p>
+            </>
+          )}
+        </CollectionModal>
       )}
 
       {openingBox && (
@@ -278,8 +276,8 @@ export default function ArcadeBar() {
   );
 }
 
-// Coquille de modale commune aux deux vues : titre, solde, fermeture.
-function ArcadeModal({ title, points, onClose, children }) {
+// Coquille de la modale : titre, solde, fermeture.
+function CollectionModal({ points, onClose, children }) {
   useEffect(() => {
     document.body.style.overflow = "hidden";
     const onKey = (e) => e.key === "Escape" && onClose();
@@ -297,7 +295,7 @@ function ArcadeModal({ title, points, onClose, children }) {
     >
       <div className="abar-modal">
         <div className="abar-modal-head">
-          <h2>{title}</h2>
+          <h2>Ma collection</h2>
           <span className="abar-points">
             <Coins size={15} />
             {points.toLocaleString("fr-FR")}

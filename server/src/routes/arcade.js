@@ -541,6 +541,38 @@ router.put("/admin/rewards/:id", requireAuth, requireAdmin, async (req, res) => 
   }
 });
 
+// PATCH /api/arcade/admin/rewards — édition rapide, en lot, des MÉTADONNÉES.
+// Ne touche jamais à `data` : les images et les rôles restent la chasse gardée
+// de l'éditeur complet. C'est tout l'intérêt d'avoir une route à part — le PUT
+// reconstruit le document entier et effacerait `data` s'il arrivait sans lui.
+router.patch("/admin/rewards", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const updates = Array.isArray(req.body?.updates) ? req.body.updates : [];
+    let updated = 0;
+    for (const u of updates) {
+      if (!mongoose.isValidObjectId(u?.id)) continue;
+      const set = {};
+      if (typeof u.name === "string" && u.name.trim()) set.name = u.name.trim();
+      if (typeof u.description === "string")
+        set.description = u.description.trim().slice(0, 200);
+      if (isRarity(u.rarity)) set.rarity = String(u.rarity);
+      if (typeof u.enabled === "boolean") set.enabled = u.enabled;
+      if (u.weight === null || u.weight === "") set.weight = null;
+      else if (u.weight !== undefined) {
+        const w = Number(u.weight);
+        if (Number.isFinite(w) && w > 0) set.weight = w;
+      }
+      if (!Object.keys(set).length) continue;
+      const r = await Reward.updateOne({ _id: u.id }, { $set: set });
+      if (r.matchedCount) updated++;
+    }
+    res.json({ updated });
+  } catch (err) {
+    console.error("arcade patch error:", err.message);
+    res.status(500).json({ error: "Enregistrement impossible." });
+  }
+});
+
 // DELETE /api/arcade/admin/rewards — vide TOUS les lots d'un coup, avec les
 // mêmes conséquences que la suppression unitaire (pools de caisses vidés,
 // inventaires et équipements des joueurs nettoyés). Irréversible : la sortie

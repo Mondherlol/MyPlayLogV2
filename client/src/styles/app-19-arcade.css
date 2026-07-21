@@ -1256,6 +1256,122 @@
   accent-color: var(--accent-ink);
 }
 
+/* ======================================================================
+   Vue liste des lots : édition rapide (rareté, description) à la volée.
+   ====================================================================== */
+.arw-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.arw-list-head,
+.arw-list-row {
+  display: grid;
+  grid-template-columns: 34px minmax(110px, 1fr) 128px minmax(180px, 2fr) 44px auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+.arw-list-head {
+  padding: 0 0.55rem 0.2rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+}
+.arw-list-row {
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--arc-rarity);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.arw-list-row.off {
+  opacity: 0.55;
+}
+/* Ligne touchée mais pas encore enregistrée : liseré doré. */
+.arw-list-row.dirty {
+  border-color: var(--accent-ink);
+  background: color-mix(in srgb, var(--accent-ink) 7%, var(--surface));
+}
+.arw-list-art {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+}
+.arw-list-row input,
+.arw-list-row select {
+  width: 100%;
+  min-width: 0;
+  padding: 0.32rem 0.45rem;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.8rem;
+}
+.arw-list-row input:hover,
+.arw-list-row select:hover {
+  border-color: var(--border);
+}
+.arw-list-row input:focus,
+.arw-list-row select:focus {
+  outline: none;
+  border-color: var(--accent-ink);
+  background: var(--surface);
+}
+.arw-list-name {
+  font-weight: 600;
+}
+/* La rareté se lit à la couleur avant même de lire le mot. */
+.arw-list-rarity {
+  color: var(--arc-rarity) !important;
+  font-weight: 700;
+}
+.arw-list-row .admin-switch.sm {
+  transform: scale(0.8);
+}
+.arw-list-row .pn-admin-actions {
+  display: flex;
+  gap: 0.15rem;
+}
+
+/* Barre d'enregistrement des modifications rapides. */
+.arw-save-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.7rem -1.3rem -1.3rem;
+  padding: 0.7rem 1.3rem;
+  border-top: 1px solid var(--accent-ink);
+  border-radius: 0 0 16px 16px;
+  background: color-mix(in srgb, var(--accent-ink) 8%, var(--surface));
+}
+.arw-save-bar > span {
+  flex: 1;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+@media (max-width: 860px) {
+  .arw-list-head {
+    display: none;
+  }
+  .arw-list-row {
+    grid-template-columns: 34px 1fr 44px auto;
+    row-gap: 0.35rem;
+  }
+  /* Rareté et description passent sur une seconde ligne, pleine largeur. */
+  .arw-list-rarity,
+  .arw-list-desc {
+    grid-column: 2 / -1;
+  }
+}
+
 /* Bouton « Tester » d'un lot curseur : accentué quand le test est actif. */
 .arw-test-btn.on {
   color: #3a2600;
@@ -1593,6 +1709,181 @@
 .abar-modal-body {
   padding: 1.25rem;
   overflow-y: auto;
+}
+
+/* Pastille de progression sur le bouton de la barre. */
+.abar-btn-count {
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Le rail des caisses, en tête de la collection ---------- */
+.abar-rail {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 1.4rem;
+}
+.abar-crate {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(242, 183, 11, 0.45);
+  border-radius: var(--radius);
+  background: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--accent-ink) 12%, var(--surface)),
+    var(--surface) 65%
+  );
+  text-align: left;
+  transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
+}
+.abar-crate:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--accent-ink);
+  box-shadow: 0 10px 26px rgba(242, 183, 11, 0.18);
+}
+.abar-crate:disabled {
+  opacity: 0.55;
+}
+/* Halo qui balaie la carte au survol : la caisse « brille » avant l'ouverture. */
+.abar-crate-glow {
+  position: absolute;
+  inset: -40% -20%;
+  background: radial-gradient(
+    circle at 20% 50%,
+    rgba(255, 207, 58, 0.35),
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.abar-crate:hover:not(:disabled) .abar-crate-glow {
+  opacity: 1;
+}
+.abar-crate-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  flex: 0 0 58px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--accent-ink);
+}
+.abar-crate-art img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.abar-crate-body {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.abar-crate-body strong {
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.abar-crate-meta {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+.abar-crate-cta {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 10px;
+  background: var(--accent-grad);
+  color: #3a2600;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.8rem;
+}
+.abar-crate.poor .abar-crate-cta {
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+.abar-crate-cta b {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+/* ---------- En-tête de la collection + jauge ---------- */
+.abar-collec-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 0.7rem;
+}
+.abar-collec-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 1rem;
+}
+.abar-collec-head h3 svg {
+  color: var(--accent-ink);
+}
+.abar-progress {
+  position: relative;
+  flex: 1;
+  max-width: 220px;
+  height: 18px;
+  margin-left: auto;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.abar-progress i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent-grad);
+  transition: width 0.4s ease;
+}
+.abar-progress em {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 560px) {
+  .abar-rail {
+    grid-template-columns: 1fr;
+  }
+  .abar-progress {
+    max-width: 130px;
+  }
 }
 
 /* ======================================================================
