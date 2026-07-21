@@ -280,7 +280,18 @@ export default function CaseOpeningModal({ box, token, onClose, onResult, dryRun
   const canReopen = dryRun || (result?.points ?? 0) >= box.price;
 
   return (
-    <div className="co-overlay" role="dialog" aria-modal="true">
+    <div
+      className="co-overlay"
+      role="dialog"
+      aria-modal="true"
+      // Clic hors de la modale = fermeture, sauf pendant que la bande tourne :
+      // on ne quitte pas une ouverture en cours (même règle que Échap).
+      onMouseDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (phase === "spinning" || phase === "opening") return;
+        onClose();
+      }}
+    >
       <div
         className={`co-modal ${revealed && fx.shake ? "shake" : ""}`}
         style={{

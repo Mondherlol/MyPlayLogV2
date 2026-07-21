@@ -553,7 +553,9 @@
 .co-overlay {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  /* Au-dessus de .modal-overlay (1000) : l'ouverture est lancée DEPUIS la
+     modale de collection, elle doit donc passer par-dessus, pas dessous. */
+  z-index: 1100;
   display: grid;
   place-items: center;
   padding: 1rem;
@@ -664,6 +666,11 @@
 }
 
 .co-open-btn {
+  /* Le contenu de la caisse peut être long : le bouton reste collé en bas de
+     la modale (c'est elle qui défile) pour ne jamais sortir de l'écran. */
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -675,7 +682,8 @@
   font-family: var(--font-display);
   font-size: 1rem;
   font-weight: 700;
-  box-shadow: 0 8px 24px rgba(242, 183, 11, 0.35);
+  /* Halo large : détache le bouton de la grille qui défile dessous. */
+  box-shadow: 0 8px 24px rgba(242, 183, 11, 0.35), 0 0 0 10px var(--surface);
   transition: filter 0.16s ease, transform 0.12s ease;
 }
 .co-open-btn:hover:not(:disabled) {
@@ -1722,6 +1730,23 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* « Gagner » : greffé sur la pastille de solde, séparé d'un filet. */
+.abar-earn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.15rem;
+  padding-left: 0.45rem;
+  border-left: 1px solid rgba(242, 183, 11, 0.42);
+  color: var(--accent-ink);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.abar-earn:hover {
+  text-decoration: underline;
+}
+
 /* Compteur de collection, à côté du titre de la modale. */
 .abar-count {
   padding: 0.15rem 0.5rem;
@@ -1776,8 +1801,9 @@
 }
 
 @media (max-width: 560px) {
-  .abar-get span,
-  .abar-count {
+  /* Place comptée : on garde les icônes et les montants, on coupe les mots. */
+  .abar-count,
+  .abar-earn span {
     display: none;
   }
 }

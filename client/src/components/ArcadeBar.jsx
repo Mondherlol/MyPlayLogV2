@@ -145,9 +145,14 @@ export default function ArcadeBar() {
                 Aucun curseur pour l'instant. Ouvre une caisse pour commencer ta
                 collection.
               </p>
-              <Link to="/blindtest" className="btn btn-primary sm">
-                <Music2 size={15} /> Gagner des points au blind test
-              </Link>
+              {data.cases[0]?.openable && (
+                <button
+                  className="btn btn-primary sm"
+                  onClick={() => setOpeningBox(data.cases[0])}
+                >
+                  <Sparkles size={15} /> Nouveau curseur
+                </button>
+              )}
             </div>
           ) : (
             <>
@@ -273,6 +278,15 @@ function CollectionModal({
           <span className="abar-points">
             <Coins size={15} />
             {points.toLocaleString("fr-FR")}
+            {/* Comment en gagner plus : collé au solde, là où la question se pose. */}
+            <Link
+              to="/blindtest"
+              className="abar-earn clickable"
+              title="Gagner des points au blind test"
+            >
+              <Music2 size={13} />
+              <span>Gagner</span>
+            </Link>
           </span>
           <button className="modal-close clickable" onClick={onClose} aria-label="Fermer">
             <X size={18} />
