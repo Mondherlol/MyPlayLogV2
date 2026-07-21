@@ -1856,8 +1856,14 @@ function CaseOpenEvent({ item }) {
 // vedette, les autres défilent en petites vignettes sous elle.
 function CaseOpenGroupEvent({ item }) {
   const best = item.best;
-  const color = rarityColor(best.rarity);
-  const bestReward = { type: best.rewardType || "cursor", data: best.art || {} };
+  // Vignette sous le curseur (ou épinglée d'un clic, seul geste possible au
+  // doigt) : c'est ELLE que la vedette affiche, pour détailler chaque lot du
+  // lot sans quitter la carte. `null` → retour à la plus belle prise.
+  const [peek, setPeek] = useState(null);
+  const shown = peek || best;
+  const color = rarityColor(shown.rarity);
+  const shownReward = { type: shown.rewardType || "cursor", data: shown.art || {} };
+
   return (
     <article className="hf-card hf-drop hf-dropg" style={{ "--drop-rarity": color }}>
       <EventHead user={item.user} date={item.date}>
@@ -1868,34 +1874,57 @@ function CaseOpenGroupEvent({ item }) {
       <div className="hf-drop-body">
         <span className="hf-drop-aura" aria-hidden="true" />
         <span className="hf-drop-art">
-          <RewardArt reward={bestReward} size={52} />
+          <RewardArt reward={shownReward} size={52} />
         </span>
         <span className="hf-drop-info">
           <span className="hf-drop-rarity">
-            {rarityLabel(best.rarity)} · plus belle prise
+            {rarityLabel(shown.rarity)}
+            {shown === best && " · plus belle prise"}
           </span>
-          <strong className="hf-drop-name">{best.rewardName}</strong>
-          <span className="hf-drop-new">
-            <SparklesIc size={11} /> {item.count} lots obtenus
-          </span>
+          <strong className="hf-drop-name">{shown.rewardName}</strong>
+          {/* Au survol on décrit CE lot ; au repos, le bilan de la série. */}
+          {peek ? (
+            peek.duplicate ? (
+              <span className="hf-drop-dup">
+                <CopyIc size={11} /> doublon, reconverti en points
+              </span>
+            ) : (
+              <span className="hf-drop-new">
+                <SparklesIc size={11} /> nouveau dans sa collection
+              </span>
+            )
+          ) : (
+            <span className="hf-drop-new">
+              <SparklesIc size={11} /> {item.count} lots obtenus
+            </span>
+          )}
         </span>
       </div>
 
       <ul className="hf-dropg-list">
         {item.drops.map((d) => (
-          <li
-            key={d.id}
-            className={`hf-dropg-chip ${d === best ? "best" : ""}`}
-            style={{ "--drop-rarity": rarityColor(d.rarity) }}
-            title={`${d.rewardName} · ${rarityLabel(d.rarity)}${
-              d.duplicate ? " (doublon)" : ""
-            }`}
-          >
-            <RewardArt
-              reward={{ type: d.rewardType || "cursor", data: d.art || {} }}
-              size={26}
-            />
-            {d.duplicate && <i className="hf-dropg-dup" aria-hidden="true" />}
+          <li key={d.id}>
+            <button
+              type="button"
+              className={`hf-dropg-chip clickable ${d === best ? "best" : ""} ${
+                d === peek ? "peek" : ""
+              }`}
+              style={{ "--drop-rarity": rarityColor(d.rarity) }}
+              title={`${d.rewardName} · ${rarityLabel(d.rarity)}${
+                d.duplicate ? " (doublon)" : ""
+              }`}
+              onMouseEnter={() => setPeek(d)}
+              onMouseLeave={() => setPeek((p) => (p === d ? null : p))}
+              onFocus={() => setPeek(d)}
+              onBlur={() => setPeek((p) => (p === d ? null : p))}
+              onClick={() => setPeek((p) => (p === d ? null : d))}
+            >
+              <RewardArt
+                reward={{ type: d.rewardType || "cursor", data: d.art || {} }}
+                size={26}
+              />
+              {d.duplicate && <i className="hf-dropg-dup" aria-hidden="true" />}
+            </button>
           </li>
         ))}
       </ul>

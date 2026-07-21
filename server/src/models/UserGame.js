@@ -148,5 +148,9 @@ const userGameSchema = new mongoose.Schema(
 
 // Un seul enregistrement par (utilisateur, jeu)
 userGameSchema.index({ user: 1, gameId: 1 }, { unique: true });
+// « Dernières OST mises en favori », tous joueurs confondus (accueil) : sans
+// cet index, le tri par date se ferait en mémoire sur toute la collection —
+// qui grossit vite avec les imports Steam/PSN.
+userGameSchema.index({ "favoriteOst.name": 1, updatedAt: -1 });
 
 export default mongoose.model("UserGame", userGameSchema);

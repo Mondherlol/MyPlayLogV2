@@ -376,7 +376,7 @@ export default function ProfileFeed({ username, isMe, token, onSetCover }) {
 
         {/* Rail latéral : stats fan arts + bento médias (masqué sur mobile) */}
         <aside className="pff-rail">
-          <StatsWidget stats={stats} />
+          <StatsWidget stats={stats} isMe={isMe} />
           <MediaBento
             items={bento}
             total={stats?.total ?? null}
@@ -449,8 +449,23 @@ export default function ProfileFeed({ username, isMe, token, onSetCover }) {
 }
 
 // Widget stats : total, répartition par source (barres), jeux les plus republiés.
-function StatsWidget({ stats }) {
-  if (!stats || !stats.total) return null;
+// Toujours affiché, même à zéro : le rail ne doit pas disparaître d'un profil
+// à l'autre — une colonne qui apparaît/disparaît décale toute la page.
+function StatsWidget({ stats, isMe }) {
+  if (!stats || !stats.total) {
+    return (
+      <div className="pff-widget">
+        <h3 className="pff-w-title">
+          <BarChart3 size={15} /> Fan arts
+        </h3>
+        <p className="pff-w-empty">
+          {isMe
+            ? "Aucun fan art republié — republies-en depuis l'onglet Feed d'un jeu et tes statistiques s'afficheront ici."
+            : "Aucun fan art republié pour l'instant."}
+        </p>
+      </div>
+    );
+  }
   const max = Math.max(...stats.sources.map((s) => s.n), 1);
   return (
     <div className="pff-widget">
@@ -508,7 +523,22 @@ function StatsWidget({ stats }) {
 // Médias (tous les fan arts).
 function MediaBento({ items, total, onOpen, onOpenAll }) {
   const shown = items.slice(0, 6);
-  if (!shown.length) return null;
+  // Vide : on garde la carte (avec sa mosaïque fantôme) pour que le rail ait
+  // la même silhouette sur tous les profils.
+  if (!shown.length) {
+    return (
+      <div className="pff-widget">
+        <h3 className="pff-w-title">
+          <Images size={15} /> Médias
+        </h3>
+        <div className="pff-bento empty" aria-hidden="true">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <span key={i} className="pff-bento-ph" />
+          ))}
+        </div>
+      </div>
+    );
+  }
   const rest = (total ?? items.length) - shown.length;
   return (
     <div className="pff-widget">

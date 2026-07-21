@@ -42,8 +42,12 @@ export default function RewardArt({ reward, size = 56 }) {
         draggable="false"
         loading="lazy"
         style={{
-          maxWidth: size,
-          maxHeight: size,
+          // Boîte carrée FIXE (et non un simple plafond) : les sources vont du
+          // 32×32 au 350×350, donc borner par max-width donnerait des vignettes
+          // de tailles très différentes. `object-fit: contain` (feuille de
+          // style) met chaque visuel à l'échelle et le centre dans cette boîte.
+          width: size,
+          height: size,
           // Curseurs : rendu net (pixel art nostalgique) plutôt que lissé.
           imageRendering: reward?.type === "cursor" ? "pixelated" : undefined,
         }}
@@ -51,7 +55,11 @@ export default function RewardArt({ reward, size = 56 }) {
     );
   }
   // Pas d'image (badge purement iconographique, ou lot mal configuré) :
-  // l'icône de sa famille fait un repli honnête.
+  // l'icône de sa famille fait un repli honnête, dans la même boîte.
   const Icon = FALLBACK_ICON[reward?.type] || HelpCircle;
-  return <Icon size={Math.round(size * 0.6)} className="rw-art-fallback" />;
+  return (
+    <span className="rw-art-fallback" style={{ width: size, height: size }}>
+      <Icon size={Math.round(size * 0.6)} />
+    </span>
+  );
 }

@@ -32,17 +32,27 @@ import {
   Activity,
   Coins,
   Minus,
+  Award,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { PN_ICONS } from "../components/PatchnotePopup";
 import RewardsPanel from "../components/AdminRewards";
 import SystemPanel from "../components/AdminSystem";
+import MissionsPanel from "../components/AdminMissions";
 
 // ======================================================================
 //  Page Admin — shell à onglets verticaux (façon Discord).
 // ======================================================================
-const TAB_KEYS = ["users", "rewards", "psn", "system", "secrets", "patchnotes"];
+const TAB_KEYS = [
+  "users",
+  "rewards",
+  "missions",
+  "psn",
+  "system",
+  "secrets",
+  "patchnotes",
+];
 
 export default function Admin() {
   const { token, user, loading } = useAuth();
@@ -65,6 +75,7 @@ export default function Admin() {
   const TABS = [
     { key: "users", label: "Utilisateurs", Icon: Users },
     { key: "rewards", label: "Récompenses", Icon: Gift },
+    { key: "missions", label: "Missions", Icon: Award },
     { key: "psn", label: "PlayStation", Icon: Trophy, badge: psnActive },
     { key: "system", label: "Système", Icon: Activity },
     ...(isSuper ? [{ key: "secrets", label: "Secrets", Icon: KeyRound }] : []),
@@ -133,6 +144,7 @@ export default function Admin() {
         <section className="admin-panel">
           {safeTab === "users" && <UsersPanel token={token} me={user} />}
           {safeTab === "rewards" && <RewardsPanel token={token} />}
+          {safeTab === "missions" && <MissionsPanel token={token} />}
           {safeTab === "psn" && <PsnPanel token={token} />}
           {safeTab === "system" && <SystemPanel token={token} />}
           {safeTab === "secrets" && isSuper && <SecretsPanel token={token} />}

@@ -5,6 +5,7 @@ import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { notify } from "../lib/notify.js";
 import { recordActivity, removeActivity } from "../lib/activity.js";
+import { triggerMissionCheck } from "../lib/missions.js";
 
 const router = express.Router();
 
@@ -77,6 +78,7 @@ router.post("/", requireAuth, async (req, res) => {
       snippet: msg.slice(0, 120),
     });
 
+    triggerMissionCheck(req.userId); // mission « Passeur de jeux »
     res.status(201).json({ ok: true, count: count(rec) });
   } catch (err) {
     console.error("reco create error:", err.message);
@@ -128,6 +130,7 @@ router.post("/:id/boost", requireAuth, async (req, res) => {
       }
     }
     await rec.save();
+    if (!has) triggerMissionCheck(req.userId); // mission « Je plussoie »
     res.json({ boosted: !has, count: count(rec) });
   } catch (err) {
     console.error("reco boost error:", err.message);

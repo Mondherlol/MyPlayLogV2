@@ -27,6 +27,7 @@ import {
   Film,
   BarChart3,
   Swords,
+  Award,
 } from "lucide-react";
 import twemoji from "@twemoji/api";
 import { apiFetch, apiUpload } from "../lib/api";
@@ -46,6 +47,7 @@ import ProfileVideos from "../components/ProfileVideos";
 import ProfileStats from "../components/ProfileStats";
 import ProfileTrackers from "../components/ProfileTrackers";
 import ProfileAchievements from "../components/ProfileAchievements";
+import ProfileBadges from "../components/ProfileBadges";
 import ProfileLists from "../components/ProfileLists";
 import EditProfileModal from "../components/EditProfileModal";
 import CoverPickerModal from "../components/CoverPickerModal";
@@ -61,6 +63,7 @@ const TAB_ORDER = [
   "allgames",
   "stats",
   "tracking",
+  "badges",
   "achievements",
   "lists",
   "ost",
@@ -902,6 +905,13 @@ export default function Profile() {
           </button>
         )}
         <button
+          className={`profile-tab ${tab === "badges" ? "active" : ""}`}
+          onClick={() => setTab("badges")}
+        >
+          <Award size={16} /> Badges
+          {c.badges > 0 && <span className="tab-count">{c.badges}</span>}
+        </button>
+        <button
           className={`profile-tab ${tab === "achievements" ? "active" : ""}`}
           onClick={() => setTab("achievements")}
         >
@@ -1014,6 +1024,11 @@ export default function Profile() {
           isMe={isMe}
           providers={profile.trackers}
         />
+      )}
+
+      {/* ---------- Badges & missions ---------- */}
+      {tab === "badges" && (
+        <ProfileBadges username={targetUsername} token={token} isMe={isMe} />
       )}
 
       {/* ---------- Succès ---------- */}

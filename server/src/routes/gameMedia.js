@@ -9,6 +9,7 @@ import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { sanitizeMediaList, resolveMentions, toComment } from "../lib/commentThread.js";
 import { sanitizeEdit, renderEditedVideo } from "../lib/videoEdit.js";
 import { notify } from "../lib/notify.js";
+import { triggerMissionCheck } from "../lib/missions.js";
 
 // Notifie chaque @pseudo mentionné dans un post ou un commentaire du mur média
 // (le helper `notify` ignore de lui-même l'auto-mention). Lien → onglet Feed du
@@ -296,6 +297,7 @@ router.post("/game/:gameId", requireAuth, async (req, res) => {
       gameName: post.gameName,
       snippet: text || (media.length ? "a partagé un média" : ""),
     });
+    triggerMissionCheck(req.userId); // mission « Reporter de terrain »
     res.status(201).json({ post: toPost(full, req.userId) });
   } catch (err) {
     console.error("game media create error:", err.message);

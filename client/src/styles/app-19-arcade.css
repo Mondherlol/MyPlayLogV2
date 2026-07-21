@@ -537,12 +537,19 @@
 }
 
 /* ---------- Visuel générique d'un lot ---------- */
+/* Boîte carrée de côté `size` (posé en style inline par RewardArt) : toutes
+   les vignettes de lots ont ainsi le même encombrement, quelle que soit la
+   définition du fichier source (32×32 → 350×350). `contain` met à l'échelle
+   sans déformer et centre le visuel dans la boîte. */
 .rw-art-img {
   object-fit: contain;
+  object-position: center;
   image-rendering: pixelated; /* les curseurs sont du pixel-art : pas de flou */
   display: block;
 }
 .rw-art-fallback {
+  display: grid;
+  place-items: center;
   color: var(--text-soft);
   opacity: 0.5;
 }
@@ -1755,16 +1762,29 @@
   place-items: center;
   width: 40px;
   height: 40px;
+  padding: 0; /* c'est un <button> : sans ça le remplissage UA décentre l'art */
   border: 1px solid color-mix(in srgb, var(--drop-rarity) 55%, transparent);
   border-bottom: 2px solid var(--drop-rarity);
   border-radius: 9px;
   background: color-mix(in srgb, var(--drop-rarity) 10%, var(--surface-2));
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 .hf-dropg-chip img {
   image-rendering: pixelated;
 }
 .hf-dropg-chip.best {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--drop-rarity) 55%, transparent);
+}
+
+/* Vignette pointée : elle prend la vedette de la carte (voir
+   CaseOpenGroupEvent), on le signale ici pour qu'on sache d'où vient l'aperçu. */
+.hf-dropg-chip:hover,
+.hf-dropg-chip.peek {
+  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--drop-rarity) 22%, var(--surface-2));
+}
+.hf-dropg-chip.peek {
+  box-shadow: 0 0 0 2px var(--drop-rarity);
 }
 /* Pastille discrète en coin : ce lot était un doublon. */
 .hf-dropg-dup {

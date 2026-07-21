@@ -180,6 +180,12 @@ const userSchema = new mongoose.Schema(
       default: [],
     },
 
+    // Gestes accomplis côté CLIENT et invisibles en base (passer en thème
+    // sombre, par exemple) : le client les signale une fois via
+    // POST /api/missions/event, et les missions concernées les lisent ici.
+    // Liste de slugs libres, dédoublonnée ($addToSet).
+    missionFlags: { type: [String], default: [] },
+
     // Dernière version de patch note vue par l'utilisateur : sert à n'afficher
     // la pop-up des nouveautés qu'UNE SEULE fois, à sa prochaine ouverture.
     seenPatchnote: { type: String, default: null },

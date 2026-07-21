@@ -27,6 +27,7 @@ import {
   History,
   Trash2,
   Shield,
+  Award,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
@@ -55,10 +56,12 @@ const NOTIF_META = {
   recommendation_boost: { Icon: Plus, verb: "a fait +1 sur ta reco de" },
   recommendation_comment: { Icon: MessageSquare, verb: "a commenté la reco de" },
   download_react: { Icon: Megaphone, verb: "se moque de ton téléchargement de" },
-  // Notif système (pas d'acteur) : le texte vient du snippet.
-  import_pending: { Icon: Gamepad2, verb: "", system: true },
-  psn_ready: { Icon: Gamepad2, verb: "", system: true },
-  psn_request: { Icon: Gamepad2, verb: "", system: true },
+  // Notif système (pas d'acteur) : le titre vient de `title`, le détail du snippet.
+  import_pending: { Icon: Gamepad2, verb: "", system: true, title: "Jeux à valider" },
+  psn_ready: { Icon: Gamepad2, verb: "", system: true, title: "Jeux à valider" },
+  psn_request: { Icon: Gamepad2, verb: "", system: true, title: "Jeux à valider" },
+  // Badge de mission débloqué : le nom du badge est dans `gameName`.
+  mission_unlocked: { Icon: Award, verb: "", system: true, badge: true, title: "Badge débloqué" },
 };
 
 // Historique local des derniers jeux ouverts depuis la recherche : affiché
@@ -239,6 +242,11 @@ export default function Topbar() {
     // Admin : une demande de synchro PSN à traiter → panel Admin.
     if (n.type === "psn_request") {
       navigate("/admin");
+      return;
+    }
+    // Badge de mission débloqué → onglet Badges de mon profil.
+    if (n.type === "mission_unlocked") {
+      navigate("/profile?tab=badges");
       return;
     }
     // OST : ouvre l'onglet OST du profil concerné, sur la bonne piste.
@@ -511,7 +519,11 @@ export default function Topbar() {
                         <span className="notif-body">
                           {meta.system ? (
                             <span className="notif-text">
-                              <strong>Jeux à valider</strong>
+                              <strong>{meta.title || "Notification"}</strong>
+                              {/* Badge de mission : son nom vit dans gameName. */}
+                              {meta.badge && n.gameName && (
+                                <> «&nbsp;{n.gameName}&nbsp;»</>
+                              )}
                             </span>
                           ) : (
                             <span className="notif-text">

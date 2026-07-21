@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { loadFilters } from "../lib/filters";
+import { reportMissionFlag } from "../lib/missionFlags";
 import { makeCache } from "../lib/cache";
 import { useAuth } from "../context/AuthContext";
 import GameCard from "../components/GameCard";
@@ -137,6 +138,9 @@ export default function Explorer() {
   function changeView(v) {
     setView(v);
     localStorage.setItem("mpl_explorer_view", v);
+    // Mission « Vue d'ensemble » : essayer l'affichage en liste. Geste client,
+    // donc signalé au serveur (une seule fois, cf. reportMissionFlag).
+    if (v === "list") reportMissionFlag("explorer-list", token);
   }
 
   const loadingRef = useRef(false);

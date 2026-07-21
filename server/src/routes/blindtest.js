@@ -10,6 +10,7 @@ import { igdbQuery } from "../lib/igdb.js";
 import { requireAuth } from "../middleware/auth.js";
 import { recordActivity } from "../lib/activity.js";
 import { grantPoints } from "../lib/points.js";
+import { triggerMissionCheck } from "../lib/missions.js";
 
 // Blind test musical : on fait écouter un extrait d'OST tiré au sort et le
 // joueur doit deviner de quel jeu il vient. Les manches viennent surtout de SES
@@ -601,6 +602,8 @@ router.post("/finish", requireAuth, async (req, res) => {
           : null,
       },
     });
+    // Mission « Oreille absolue ».
+    triggerMissionCheck(req.userId);
 
     res.json({
       blindTestId: String(doc._id),
@@ -722,11 +725,12 @@ router.get("/:id/results", requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/blindtest/leaderboard — score CUMULÉ par joueur (moi + mes suivis) :
-// on additionne toutes les parties, donc le classement monte à chaque partie
-// jouée (et pas seulement quand on bat son record). Le blindTestId retenu est
-// celui de la partie la plus récente → le bouton « Défier » pointe sur un set
-// à jour.
+// GET /api/blindtest/leaderboard — une ligne par joueur (moi + mes suivis) avec
+// SES DEUX scores : `bestScore` (record sur une partie) et `score` (cumul de
+// toutes les parties). Le widget de l'accueil bascule entre les deux classements
+// via ses onglets, donc on ne tranche pas ici : on renvoie les deux et le client
+// trie. Le blindTestId retenu est celui de la partie la plus récente → le bouton
+// « Défier » pointe sur un set à jour.
 router.get("/leaderboard", requireAuth, async (req, res) => {
   try {
     const me = await User.findById(req.userId).select("following").lean();
@@ -750,7 +754,7 @@ router.get("/leaderboard", requireAuth, async (req, res) => {
         },
       },
       { $sort: { score: -1, date: -1 } },
-      { $limit: 12 },
+      { $limit: 30 },
     ]);
     const users = await User.find({ _id: { $in: rows.map((r) => r._id) } })
       .select("username avatar")

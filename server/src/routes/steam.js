@@ -5,6 +5,7 @@ import UserGame from "../models/UserGame.js";
 import GameAchievements from "../models/GameAchievements.js";
 import { requireAuth } from "../middleware/auth.js";
 import { warmGameMeta } from "../lib/gameMeta.js";
+import { triggerMissionCheck } from "../lib/missions.js";
 import {
   isConfigured,
   buildLoginUrl,
@@ -134,6 +135,7 @@ router.get("/return", async (req, res) => {
       connectedAt: new Date(),
     };
     await user.save();
+    triggerMissionCheck(user._id); // mission « Tout est relié »
     res.send(closerPage(true));
   } catch (err) {
     console.error("steam return error:", err.message);
@@ -164,6 +166,7 @@ router.post("/link-manual", requireAuth, async (req, res) => {
       connectedAt: new Date(),
     };
     await user.save();
+    triggerMissionCheck(req.userId); // mission « Tout est relié »
     res.json({ connected: true, steam: user.toPublic().steam });
   } catch (err) {
     console.error("steam link-manual error:", err.message);

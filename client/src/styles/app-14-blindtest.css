@@ -1,36 +1,11 @@
 /* ======================================================================
-   Blind Test musical — page /blindtest + bouton hero, widget classement
-   (Welcome) et card du fil (FeedCards). Accent doré, esprit arcade/vinyle.
+   Blind Test musical — page /blindtest, widget classement (Welcome) et card
+   du fil (FeedCards). Accent doré, esprit arcade/vinyle.
    ====================================================================== */
 
-/* ---------------------------------------------------------------------
-   Bouton « Blind test » dans le hero de l'accueil — le plus alléchant
-   (rempli doré, contrairement aux autres pills).
-   --------------------------------------------------------------------- */
-.hf-blindtest-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  height: 44px;
-  padding: 0 1.15rem;
-  border-radius: 999px;
-  border: 1.5px solid transparent;
-  background: var(--accent-grad);
-  color: #3a2600;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.92rem;
-  box-shadow: 0 6px 18px -6px color-mix(in srgb, var(--orange) 70%, transparent);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
-}
-.hf-blindtest-btn:hover {
-  transform: translateY(-2px);
-  filter: saturate(1.1);
-  box-shadow: 0 10px 24px -8px color-mix(in srgb, var(--orange) 80%, transparent);
-}
-.hf-blindtest-btn svg {
-  animation: bt-note-bob 1.8s ease-in-out infinite;
-}
+/* La note de musique qui se dandine : elle animait le bouton du hero de
+   l'accueil, retiré depuis. On la garde sur le CTA du classement, devenu la
+   seule porte d'entrée du blind test. */
 @keyframes bt-note-bob {
   0%, 100% { transform: translateY(0) rotate(0deg); }
   50% { transform: translateY(-2px) rotate(-8deg); }
@@ -40,6 +15,41 @@
    Widget classement (rail de droite sur l'accueil)
    --------------------------------------------------------------------- */
 .hf-bt-widget .hf-w-title svg { color: var(--accent-ink); }
+
+/* Titre + onglets (Record / Total) sur une même ligne */
+.hf-bt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.hf-bt-tabs {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--surface-2);
+}
+
+.hf-bt-tab {
+  padding: 0.2rem 0.5rem;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.hf-bt-tab:hover { color: var(--text); }
+.hf-bt-tab.on {
+  background: var(--accent-grad);
+  color: #3a2600;
+}
 
 .hf-bt-empty {
   margin: 0;
@@ -167,6 +177,9 @@
   border-color: var(--orange);
   color: var(--accent-ink);
   background: color-mix(in srgb, var(--orange) 8%, transparent);
+}
+.hf-bt-cta svg {
+  animation: bt-note-bob 1.8s ease-in-out infinite;
 }
 
 /* ---------------------------------------------------------------------

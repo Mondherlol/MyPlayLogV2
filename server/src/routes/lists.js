@@ -14,6 +14,7 @@ import {
   recordListItemsActivity,
 } from "../lib/activity.js";
 import { sanitizeMediaList, resolveMentions, toComment } from "../lib/commentThread.js";
+import { triggerMissionCheck } from "../lib/missions.js";
 
 const router = express.Router();
 
@@ -463,6 +464,8 @@ router.post("/", requireAuth, async (req, res) => {
     // Fil : « X a créé une liste » (les listes privées n'y apparaissent pas —
     // le feed refiltre de toute façon sur la visibilité actuelle).
     recordActivity({ actor: req.userId, type: "list_create", list: list._id });
+    // Missions « Grand ordonnateur » (tier list) / « DJ du dimanche » (playlist).
+    triggerMissionCheck(req.userId);
 
     const full = await List.findById(list._id)
       .populate("user", "username")
@@ -593,6 +596,8 @@ router.post("/:id/like", requireAuth, async (req, res) => {
         list: list._id,
         snippet: list.title,
       });
+      // Mission « Bon public ».
+      triggerMissionCheck(req.userId);
     } else {
       removeActivity({ actor: req.userId, type: "list_like", list: list._id });
     }
@@ -863,6 +868,7 @@ router.post("/:id/comments", requireAuth, async (req, res) => {
       snippet,
     });
 
+    triggerMissionCheck(req.userId); // mission « Mot de la fin »
     res.status(201).json({ comment: toComment(c, list.comments, req.userId) });
   } catch (err) {
     console.error("list comment error:", err.message);

@@ -12,6 +12,7 @@ import {
   Search,
   MessageCircle,
   CornerDownRight,
+  Trash2,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { timeAgo } from "../lib/lists";
@@ -227,6 +228,22 @@ export default function ProfileRecommendations({ username, token, isMe }) {
     }
   }
 
+  // Retirer une recommandation que J'AI faite. Côté serveur je suis simplement
+  // sorti des recommandeurs (la carte survit si quelqu'un d'autre l'a aussi
+  // recommandée) ; ici elle quitte ma liste « Envoyées » dans tous les cas.
+  // Retrait optimiste, remis en place si l'appel échoue.
+  async function removeSent(rec) {
+    if (!window.confirm(`Retirer ta recommandation de « ${rec.name} » ?`)) return;
+    const prev = data.sent;
+    setData((d) => ({ ...d, sent: d.sent.filter((r) => r.id !== rec.id) }));
+    try {
+      await apiFetch(`/recommendations/${rec.id}`, { method: "DELETE", token });
+    } catch (err) {
+      setData((d) => ({ ...d, sent: prev }));
+      alert(err.message);
+    }
+  }
+
   function onCommentAdded(recId, comment) {
     setData((d) => ({
       ...d,
@@ -354,6 +371,17 @@ export default function ProfileRecommendations({ username, token, isMe }) {
                 <span className="reco-sent-up" title="+1 au total">
                   <Flame size={13} /> {r.count}
                 </span>
+                {/* On ne retire que SES propres recommandations. */}
+                {isMe && (
+                  <button
+                    className="reco-sent-del clickable"
+                    onClick={() => removeSent(r)}
+                    title="Retirer cette recommandation"
+                    aria-label={`Retirer la recommandation de ${r.name}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
               </article>
             ))}
           </div>

@@ -23,6 +23,11 @@ import GemDiscovery from "../models/GemDiscovery.js";
 import { isUserAdmin } from "../lib/admin.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { listEnv, setEnvVar, deleteEnvVar } from "../lib/envFile.js";
+import {
+  listMissionsForAdmin,
+  updateMissionConfig,
+  resetMissionConfig,
+} from "../lib/missions.js";
 
 const router = express.Router();
 
@@ -645,6 +650,46 @@ router.delete("/secrets/:key", requireSuper, (req, res) => {
   } catch (err) {
     console.error("admin secrets delete error:", err.message);
     res.status(500).json({ error: err.message || "Impossible d'écrire dans le .env." });
+  }
+});
+
+// ======================================================================
+//  Missions & badges — retoucher l'habillage et le barème.
+// ======================================================================
+// On peut changer titre / description / icône / points. On ne peut NI créer NI
+// supprimer une mission, NI toucher à sa condition : tout ça vit dans le code
+// (lib/missions.js), et c'est volontaire — une condition est du comportement,
+// pas de la configuration.
+
+// GET /api/admin/missions — catalogue avec valeurs effectives + valeurs d'origine.
+router.get("/missions", async (_req, res) => {
+  try {
+    res.json({ missions: await listMissionsForAdmin() });
+  } catch (err) {
+    console.error("admin missions list error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement des missions." });
+  }
+});
+
+// PUT /api/admin/missions/:key — retoucher une mission (champ vide = défaut).
+router.put("/missions/:key", async (req, res) => {
+  try {
+    const mission = await updateMissionConfig(req.params.key, req.body || {});
+    res.json({ mission });
+  } catch (err) {
+    if (!err.status) console.error("admin mission update error:", err.message);
+    res.status(err.status || 500).json({ error: err.message || "Erreur." });
+  }
+});
+
+// DELETE /api/admin/missions/:key — revenir aux valeurs du code.
+router.delete("/missions/:key", async (req, res) => {
+  try {
+    const mission = await resetMissionConfig(req.params.key);
+    res.json({ mission });
+  } catch (err) {
+    console.error("admin mission reset error:", err.message);
+    res.status(500).json({ error: "Erreur." });
   }
 });
 

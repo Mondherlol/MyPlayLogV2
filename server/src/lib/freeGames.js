@@ -5,6 +5,11 @@
 // Résultat mis en cache mémoire 1 h pour ne pas marteler l'API à chaque visite
 // de l'accueil. En cas d'échec réseau, on sert le dernier cache connu (même
 // périmé) plutôt que de casser la section.
+//
+// Chaque giveaway est rattaché à sa fiche IGDB (par titre) : la carte de
+// l'accueil renvoie alors vers la page du jeu sur le site, qui affiche à son
+// tour une banderole « récupérer gratuitement » (voir FreeGameBanner.jsx).
+import { matchNamesToIgdb, simplifyName } from "./psn.js";
 
 // platform=pc : méta-plateforme qui couvre Steam, Epic, GOG, itch.io… et exclut
 // mobile/console — on veut les jeux gratuits à récupérer sur PC.
@@ -75,7 +80,27 @@ function normalize(g) {
     url: g.open_giveaway_url || g.gamerpower_url || null,
     endsAt: parseEnd(g.end_date),
     users: g.users || 0,
+    // Renseignés par attachIgdb() (null si le titre n'a pas été reconnu).
+    gameId: null,
+    cover: null,
   };
+}
+
+// Rattache les giveaways à IGDB par nom (même matching que l'import PSN).
+// Best-effort : un titre non reconnu garde gameId null et la carte pointe
+// alors directement vers l'offre du magasin.
+async function attachIgdb(games) {
+  try {
+    const map = await matchNamesToIgdb(games.map((g) => g.title));
+    for (const g of games) {
+      const hit = map.get(simplifyName(g.title));
+      if (!hit) continue;
+      g.gameId = hit.gameId;
+      g.cover = hit.cover;
+    }
+  } catch (err) {
+    console.error("free-games igdb match error:", err.message);
+  }
 }
 
 export async function getFreeGames() {
@@ -107,6 +132,17 @@ export async function getFreeGames() {
     })
     .slice(0, 12);
 
+  await attachIgdb(games);
+
   cache = { at: Date.now(), games };
   return games;
+}
+
+// Le giveaway en cours pour un jeu IGDB donné (null si ce jeu n'est pas
+// gratuit en ce moment) — alimente la banderole de la fiche de jeu.
+export async function getFreeGameForIgdbId(gameId) {
+  const id = Number(gameId);
+  if (!id) return null;
+  const games = await getFreeGames();
+  return games.find((g) => g.gameId === id) || null;
 }

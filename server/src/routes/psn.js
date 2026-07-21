@@ -8,6 +8,7 @@ import PsnSyncRequest from "../models/PsnSyncRequest.js";
 import PsnScan from "../models/PsnScan.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { warmGameMeta } from "../lib/gameMeta.js";
+import { triggerMissionCheck } from "../lib/missions.js";
 import {
   isConfigured,
   getServiceAccessToken,
@@ -292,6 +293,7 @@ router.post("/connect", requireAuth, async (req, res) => {
       connectedAt: new Date(),
     };
     await user.save();
+    triggerMissionCheck(req.userId); // mission « Tout est relié »
 
     res.json({
       connected: true,

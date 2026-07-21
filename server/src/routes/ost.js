@@ -23,6 +23,44 @@ async function getOst(owner, gameId) {
   return e?.favoriteOst?.name ? e : null;
 }
 
+// GET /api/ost/recent — les dernières OST mises en favori, TOUS joueurs
+// confondus (section « Coups de cœur OST » de l'accueil). Une seule entrée par
+// jeu : sans ça, une bande-son populaire monopoliserait la section. Déclarée
+// avant les routes en /:owner/… — un chemin d'un seul segment ne peut pas les
+// percuter, mais l'ordre garde l'intention lisible.
+router.get("/recent", requireAuth, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 4, 1), 12);
+    const rows = await UserGame.find({ "favoriteOst.name": { $nin: [null, ""] } })
+      .select("gameId name cover favoriteOst user updatedAt")
+      .populate("user", "username avatar")
+      .sort({ updatedAt: -1 })
+      // De la marge pour dédoublonner par jeu sans repasser en base.
+      .limit(limit * 8)
+      .lean();
+
+    const seen = new Set();
+    const items = [];
+    for (const r of rows) {
+      if (!r.user || seen.has(r.gameId)) continue;
+      seen.add(r.gameId);
+      items.push({
+        gameId: r.gameId,
+        gameName: r.name,
+        cover: r.cover || null,
+        ost: r.favoriteOst,
+        user: { username: r.user.username, avatar: r.user.avatar || null },
+        at: r.updatedAt,
+      });
+      if (items.length >= limit) break;
+    }
+    res.json({ items });
+  } catch (err) {
+    console.error("ost recent error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement des OST." });
+  }
+});
+
 // GET /api/ost/:owner/:gameId/comments — fil de commentaires d'une OST.
 router.get("/:owner/:gameId/comments", requireAuth, async (req, res) => {
   try {

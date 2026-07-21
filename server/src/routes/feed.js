@@ -1275,7 +1275,7 @@ const DISCOVER_FIELDS =
 
 // « Jeux du moment » et « sorties marquantes » : identiques pour tout le
 // monde, mis en cache mémoire par jour (comme /games/releases).
-const sharedCache = { day: 0, hot: null, upcoming: null };
+const sharedCache = { day: 0, hot: null, upcoming: null, indies: null };
 // Suggestions personnalisées : cache par utilisateur (6 h).
 const forYouCache = new Map();
 const FOR_YOU_TTL = 6 * 60 * 60 * 1000;
@@ -1292,6 +1292,52 @@ async function fetchUpcoming(now) {
   const q = `${DISCOVER_FIELDS}; where cover != null & version_parent = null & game_type = (0,8,9) & first_release_date > ${now} & first_release_date <= ${now + 240 * 86400} & hypes > 5; sort hypes desc; limit 12;`;
   const games = (await igdbQuery("games", q)).map(discoverGame);
   return games.sort((a, b) => (a.releaseDate || 0) - (b.releaseDate || 0));
+}
+
+// « Sorties indés » : les meilleurs jeux indépendants juste sortis ET ceux qui
+// arrivent (genre IGDB 32 = Indie). Deux pools distincts parce que le critère
+// de qualité diffère : un jeu sorti se juge à sa note, un jeu à venir à sa
+// hype (il n'a pas encore de note). On en garde 6, les plus proches d'aujourd'hui.
+
+// Genre IGDB « Indie ». Sert ici ET au moteur de recommandation de pépites
+// plus bas, qui l'exige dans ses pools stricts (des pépites indés, pas des AAA
+// qui traînent dans les similar_games).
+const INDIE_GENRE = 32;
+
+async function fetchIndies(now) {
+  const HALF = 180 * 86400; // fenêtre : 6 mois avant / 6 mois après
+  const base = `${DISCOVER_FIELDS}; where cover != null & version_parent = null & game_type = (0,8,9) & genres = (${INDIE_GENRE})`;
+  const [out, soon] = await Promise.all([
+    igdbQuery(
+      "games",
+      `${base} & first_release_date >= ${now - HALF} & first_release_date <= ${now} & total_rating_count > 4; sort total_rating desc; limit 12;`
+    ).catch(() => []),
+    igdbQuery(
+      "games",
+      `${base} & first_release_date > ${now} & first_release_date <= ${now + HALF} & hypes > 0; sort hypes desc; limit 12;`
+    ).catch(() => []),
+  ]);
+
+  const released = out.map(discoverGame);
+  const upcoming = soon.map(discoverGame);
+  // Moitié-moitié quand les deux pools sont fournis, sinon on complète avec
+  // celui qui a de la matière (une période creuse ne doit pas vider la section).
+  const picked = [];
+  const seen = new Set();
+  const push = (g) => {
+    if (picked.length >= 6 || seen.has(g.id)) return;
+    seen.add(g.id);
+    picked.push(g);
+  };
+  released.slice(0, 3).forEach(push);
+  upcoming.slice(0, 3).forEach(push);
+  [...released.slice(3), ...upcoming.slice(3)].forEach(push);
+
+  // Les sorties les plus proches d'aujourd'hui d'abord (de part et d'autre) :
+  // la section raconte « ce qui se passe maintenant côté indé ».
+  return picked.sort(
+    (a, b) => Math.abs((a.releaseDate || 0) - now) - Math.abs((b.releaseDate || 0) - now)
+  );
 }
 
 // Suggestions « pour toi » : jeux bien notés dans les genres favoris de la
@@ -1333,16 +1379,18 @@ router.get("/discover", requireAuth, async (req, res) => {
     const day = now - (now % 86400);
 
     if (sharedCache.day !== day) {
-      const [hot, upcoming] = await Promise.all([
+      const [hot, upcoming, indies] = await Promise.all([
         fetchHot(now).catch(() => []),
         fetchUpcoming(now).catch(() => []),
+        fetchIndies(now).catch(() => []),
       ]);
       // On n'écrase le cache que si IGDB a répondu (sinon on retente au
       // prochain appel tout en servant l'ancien contenu s'il existe).
-      if (hot.length || upcoming.length) {
+      if (hot.length || upcoming.length || indies.length) {
         sharedCache.day = day;
         sharedCache.hot = hot;
         sharedCache.upcoming = upcoming;
+        sharedCache.indies = indies;
       }
     }
 
@@ -1356,6 +1404,7 @@ router.get("/discover", requireAuth, async (req, res) => {
     res.json({
       hot: sharedCache.hot || [],
       upcoming: sharedCache.upcoming || [],
+      indies: sharedCache.indies || [],
       forYou: forYou.games,
     });
   } catch (err) {
@@ -1380,9 +1429,6 @@ router.get("/discover", requireAuth, async (req, res) => {
 
 const RECO_FIELDS = `${DISCOVER_FIELDS},themes`;
 const SIX_YEARS = 6 * 365 * 86400;
-// Genre IGDB « Indie » : exigé dans les pools stricts — on veut des pépites
-// indés, pas des AAA qui traînent dans les similar_games.
-const INDIE_GENRE = 32;
 
 // Score d'un candidat : plus il recoupe les 3 jeux de départ (et plus il est
 // confidentiel/bien noté), plus il remonte.

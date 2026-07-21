@@ -3,6 +3,7 @@ import UserGame from "../models/UserGame.js";
 import { requireAuth } from "../middleware/auth.js";
 import { warmGameMeta } from "../lib/gameMeta.js";
 import { recordGameActivity, removeActivity } from "../lib/activity.js";
+import { triggerMissionCheck } from "../lib/missions.js";
 
 const router = express.Router();
 
@@ -333,6 +334,8 @@ router.put("/:gameId", requireAuth, async (req, res) => {
       gameCover: entry.cover || null,
       changes: diffChanges(prev, entry, b),
     });
+    // Missions « Générique de fin », « À mon humble avis », « Collectionneur ».
+    triggerMissionCheck(req.userId);
     res.json({ entry: toPublic(entry) });
   } catch (err) {
     console.error("library put error:", err.message);

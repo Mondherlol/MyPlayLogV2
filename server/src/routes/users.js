@@ -21,6 +21,7 @@ import { isUserAdmin } from "../lib/admin.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { summarizeReactions, reviewComment } from "../lib/reviewSerialize.js";
 import { recordActivity, removeActivity } from "../lib/activity.js";
+import { evaluateMissions, countBadges, triggerMissionCheck } from "../lib/missions.js";
 
 const router = express.Router();
 
@@ -220,6 +221,9 @@ router.put("/me", requireAuth, async (req, res) => {
         .slice(0, 500);
     }
     await user.save();
+    // Missions « Galerie perso » (2 couvertures) et « Mon classement » (ordre
+    // des OST) — les deux se jouent dans cette route.
+    triggerMissionCheck(req.userId);
     res.json({ user: user.toPublic() });
   } catch (err) {
     console.error("profile update error:", err.message);
@@ -442,7 +446,11 @@ router.post("/:id/follow", requireAuth, async (req, res) => {
 
     // Fil : « X s'est abonné à Y » (retiré si on se désabonne).
     if (has) removeActivity({ actor: req.userId, type: "follow", target: target._id });
-    else recordActivity({ actor: req.userId, type: "follow", target: target._id });
+    else {
+      recordActivity({ actor: req.userId, type: "follow", target: target._id });
+      // Missions « Premier contact » / « Papillon social ».
+      triggerMissionCheck(req.userId);
+    }
 
     const followers = await User.countDocuments({ following: target._id });
     res.json({ following: !has, followersCount: followers });
@@ -939,6 +947,24 @@ router.get("/:username/recommendations", optionalAuth, async (req, res) => {
   } catch (err) {
     console.error("reco fetch error:", err.message);
     res.status(500).json({ error: "Erreur lors du chargement des recommandations." });
+  }
+});
+
+// --- Missions & badges (onglet Badges du profil) ---
+// Renvoie le catalogue des missions avec la progression du joueur. Sur SON
+// propre profil (isMe), l'évaluation marque au passage celles qui viennent
+// d'être accomplies (statut « à récupérer » + notif) — d'où `award: isMe`.
+// Les points, eux, n'arrivent que sur POST /api/missions/:key/claim.
+router.get("/:username/missions", optionalAuth, async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.params.username }).select("_id");
+    if (!user) return res.status(404).json({ error: "Profil introuvable." });
+    const isMe = String(user._id) === String(req.userId);
+    const data = await evaluateMissions(user._id, { award: isMe });
+    res.json({ ...data, isMe });
+  } catch (err) {
+    console.error("missions fetch error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement des badges." });
   }
 });
 
@@ -1512,7 +1538,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
       (u) => String(u) === String(user._id)
     );
 
-    const [entries, followers, listQuery, recoCount, videoCount, achievementsCount, trackerDocs] =
+    const [entries, followers, listQuery, recoCount, videoCount, achievementsCount, trackerDocs, badgeCount] =
       await Promise.all([
         UserGame.find({ user: user._id }).sort({ updatedAt: -1 }),
         User.countDocuments({ following: user._id }),
@@ -1529,6 +1555,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
         Documentary.countDocuments({ user: user._id, recommended: true }),
         GameAchievements.countDocuments({ user: user._id }),
         GameTracker.find({ user: user._id }).lean(),
+        countBadges(user._id),
       ]);
 
     // Résumé léger des comptes de tracking liés (badge + visibilité de l'onglet
@@ -1627,6 +1654,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
           videos: videoCount,
           achievements: achievementsCount,
           trackers: trackers.length,
+          badges: badgeCount,
         },
       },
       favorites,

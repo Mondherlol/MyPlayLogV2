@@ -32,6 +32,7 @@ import clientErrorRoutes from "./routes/clientErrors.js";
 import patchesRoutes from "./routes/patches.js";
 import downloadRoutes from "./routes/downloads.js";
 import trackerRoutes, { startTrackerAutoSync } from "./routes/trackers.js";
+import missionRoutes from "./routes/missions.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -86,6 +87,7 @@ app.use("/api/platforms", platformRoutes);
 app.use("/api/patches", patchesRoutes);
 app.use("/api/downloads", downloadRoutes);
 app.use("/api/trackers", trackerRoutes);
+app.use("/api/missions", missionRoutes);
 // Remontée des crashs du front (voir routes/clientErrors.js).
 app.use("/api/client-errors", clientErrorRoutes);
 

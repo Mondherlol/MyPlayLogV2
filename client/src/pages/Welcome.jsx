@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import {
   Clapperboard,
@@ -11,7 +10,6 @@ import {
   Gift,
   Radar,
   Sparkles,
-  Brain,
   ChevronRight,
   ChevronLeft,
   Gamepad2,
@@ -21,40 +19,67 @@ import {
   Swords,
   Clock,
   ExternalLink,
-  X,
+  Sprout,
+  Disc3,
+  Play,
+  Pause,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { usePlayer } from "../context/PlayerContext";
 import { useClickOutside } from "../hooks/useClickOutside";
 import { apiFetch } from "../lib/api";
-import QuizCard from "../components/QuizCard";
+import { extractVideoId } from "../lib/youtube";
 import DocumentaryModal from "../components/DocumentaryModal";
 import DiscoverGemsModal, { GEMS_RESUME_KEY } from "../components/DiscoverGemsModal";
 import HomeFeed, { FeedUserFilter } from "../components/HomeFeed";
-import GameCard from "../components/GameCard";
 import ArcadeBar from "../components/ArcadeBar";
+import { STORE_COLORS, freeEndsLabel } from "../components/FreeGameBanner";
 
 // Réglages par défaut du feed documentaire, persistés en localStorage.
 const PREFS_KEY = "mpl_doc_prefs";
 const DEFAULT_PREFS = { lang: ["fr"], scope: "played" };
-const QUIZ_KEY = "mpl_home_quiz_open";
-// Même seuil que la bottom bar de l'app-shell (voir app-01-landing-shell.css).
-const MOBILE_BP = 760;
 
-// Sur mobile le rail latéral passe sous le feed (potentiellement long) : on
-// ouvre le quiz dans une modale plutôt que de compter sur le scroll pour le
-// révéler, sinon le bouton "Quiz" paraît ne rien faire.
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(
-    () => typeof window !== "undefined" && window.innerWidth <= MOBILE_BP
-  );
+// Rail latéral « qui suit le scroll » : il défile avec la page jusqu'à montrer
+// son dernier widget, puis se fige là ; et dès qu'on remonte, il redescend
+// vers son haut (comme les navbars qui réapparaissent au scroll vers le haut).
+// Le rail est en `position: sticky` : on ne fait que piloter son `top`, qu'on
+// déplace à l'inverse du scroll entre `top` (haut visible) et la valeur qui
+// aligne son bas sur le bas du viewport. Sans effet si le rail tient à l'écran.
+function useFollowingRail(ref, { top = 76, bottom = 24 } = {}) {
   useEffect(() => {
-    const mq = window.matchMedia(`(max-width: ${MOBILE_BP}px)`);
-    const onChange = () => setIsMobile(mq.matches);
-    onChange();
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
-  return isMobile;
+    const el = ref.current;
+    if (!el) return;
+    let lastY = window.scrollY;
+    let offset = top;
+
+    const clamp = (dy = 0) => {
+      // Plus bas que le rail peut remonter : son bas contre le bas du viewport.
+      const floor = Math.min(top, window.innerHeight - el.offsetHeight - bottom);
+      offset = Math.min(top, Math.max(floor, offset - dy));
+      el.style.top = `${offset}px`;
+    };
+
+    const onScroll = () => {
+      const y = Math.max(0, window.scrollY);
+      const dy = y - lastY;
+      lastY = y;
+      clamp(dy);
+    };
+
+    clamp();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    // Les widgets arrivent en asynchrone : la hauteur du rail change sous nos
+    // pieds, il faut re-borner sans quoi il reste figé trop haut ou trop bas.
+    const ro = new ResizeObserver(() => clamp());
+    ro.observe(el);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      ro.disconnect();
+      el.style.top = "";
+    };
+  }, [ref, top, bottom]);
 }
 
 function loadPrefs() {
@@ -86,16 +111,13 @@ export default function Welcome() {
     () => !!sessionStorage.getItem(GEMS_RESUME_KEY)
   );
   const [showSettings, setShowSettings] = useState(false);
-  const [showQuiz, setShowQuiz] = useState(
-    () => localStorage.getItem(QUIZ_KEY) === "1"
-  );
-  const [quizModalOpen, setQuizModalOpen] = useState(false);
   const [discover, setDiscover] = useState(null);
   // Filtre du fil : id du joueur suivi dont on veut voir l'activité (null = tous).
   const [feedUser, setFeedUser] = useState(null);
-  const isMobile = useIsMobile();
   const settingsRef = useRef(null);
+  const railRef = useRef(null);
   useClickOutside(settingsRef, () => setShowSettings(false), showSettings);
+  useFollowingRail(railRef);
 
   // Le CTA « Chercher mes pépites aussi » des cartes du fil ouvre la modale.
   useEffect(() => {
@@ -124,23 +146,11 @@ export default function Welcome() {
     savePrefs({ ...prefs, lang: hasEn ? ["fr"] : ["fr", "en"] });
   }
 
-  function toggleQuiz() {
-    // Mobile : le rail latéral est sous le feed (potentiellement long), donc
-    // on ouvre directement une modale au lieu de compter sur le scroll.
-    if (isMobile) {
-      setQuizModalOpen(true);
-      return;
-    }
-    setShowQuiz((v) => {
-      localStorage.setItem(QUIZ_KEY, v ? "0" : "1");
-      return !v;
-    });
-  }
-
   return (
     <div className="home">
       <div className="home-main">
-        {/* --- En-tête : salut + actions bien visibles --- */}
+        {/* --- En-tête : le salut et la cagnotte d'arcade. Le blind test se
+            lance depuis son classement, dans le rail de droite. --- */}
         <header className="hf-hero">
           <div className="hf-hello">
             <h1 className="hf-hello-title">
@@ -153,123 +163,7 @@ export default function Welcome() {
 
           {/* Solde + accès aux caisses et aux curseurs (ex-page /arcade). */}
           <ArcadeBar />
-
-          <div className="hf-hero-actions">
-            <div className="doc-cta">
-              <button className="doc-cta-btn clickable" onClick={() => setShowDoc(true)}>
-                <Clapperboard size={19} /> Lancer un documentaire
-              </button>
-              <div className="doc-cta-settings" ref={settingsRef}>
-                <button
-                  className={`doc-cta-gear clickable ${showSettings ? "active" : ""}`}
-                  onClick={() => setShowSettings((v) => !v)}
-                  aria-label="Réglages du feed"
-                  title="Réglages"
-                >
-                  <Settings size={18} />
-                </button>
-                {showSettings && (
-                  <div className="doc-settings card">
-                    <div className="doc-settings-group">
-                      <span className="doc-settings-label">Langue</span>
-                      <label className="doc-settings-opt disabled">
-                        <span className="doc-check on">
-                          <Check size={13} />
-                        </span>
-                        Français
-                      </label>
-                      <label className="doc-settings-opt clickable" onClick={toggleEn}>
-                        <span className={`doc-check ${prefs.lang.includes("en") ? "on" : ""}`}>
-                          {prefs.lang.includes("en") && <Check size={13} />}
-                        </span>
-                        Anglais
-                      </label>
-                    </div>
-                    <div className="doc-settings-group">
-                      <span className="doc-settings-label">Jeux</span>
-                      <label
-                        className="doc-settings-opt clickable"
-                        onClick={() => savePrefs({ ...prefs, scope: "played" })}
-                      >
-                        <span className={`doc-radio ${prefs.scope === "played" ? "on" : ""}`} />
-                        Jeux joués uniquement
-                      </label>
-                      <label
-                        className="doc-settings-opt clickable"
-                        onClick={() => savePrefs({ ...prefs, scope: "all" })}
-                      >
-                        <span className={`doc-radio ${prefs.scope === "all" ? "on" : ""}`} />
-                        Tous mes jeux
-                      </label>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <Link
-              to="/blindtest"
-              className="hf-blindtest-btn clickable"
-              title="Devine le jeu à partir d'un extrait d'OST"
-            >
-              <Music2 size={18} /> Blind test
-            </Link>
-
-            <button
-              className={`hf-quiz-btn clickable ${
-                (isMobile ? quizModalOpen : showQuiz) ? "on" : ""
-              }`}
-              onClick={toggleQuiz}
-              title={
-                isMobile
-                  ? "Ouvrir le quiz"
-                  : showQuiz
-                    ? "Masquer le quiz"
-                    : "Afficher le quiz"
-              }
-            >
-              <Brain size={18} /> Quiz
-            </button>
-
-            <button
-              className="hf-gems-btn clickable"
-              onClick={() => setShowGems(true)}
-              title="3 jeux que tu aimes → des pépites indés sur mesure"
-            >
-              Découvrir une pépite indé
-            </button>
-          </div>
         </header>
-
-        {/* --- Jeux du moment : carrousel horizontal --- */}
-        <section className="hf-sec">
-          <div className="hf-sec-head">
-            <h2 className="hf-sec-title">
-              <Flame size={17} /> Jeux du moment
-            </h2>
-            <Link to="/explore" className="hf-sec-link clickable">
-              Explorer <ChevronRight size={14} />
-            </Link>
-          </div>
-          {discover === null ? (
-            <div className="hf-carousel" aria-busy="true">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <span key={i} className="gp-skel hf-carousel-skel" />
-              ))}
-            </div>
-          ) : discover.hot.length > 0 ? (
-            <DragCarousel>
-              {discover.hot.map((g) => (
-                <div className="hf-carousel-item" key={g.id}>
-                  <GameCard game={g} />
-                </div>
-              ))}
-            </DragCarousel>
-          ) : null}
-        </section>
-
-        {/* --- Jeux gratuits de la semaine (Epic / Steam / GOG / Prime…) --- */}
-        <FreeGamesSection token={token} />
 
         {/* --- Fil d'actualité --- */}
         <section className="hf-sec">
@@ -289,27 +183,347 @@ export default function Welcome() {
         </section>
       </div>
 
-      {/* --- Rail latéral : quiz (sur demande), sorties, suggestions --- */}
-      <div className="home-aside hf-aside">
-        {/* Sur mobile, le quiz ne vit que dans la modale (voir toggleQuiz) —
-            évite d'avoir deux instances qui se disputent le même localStorage. */}
-        {showQuiz && !isMobile && <QuizCard />}
+      {/* --- Rail de droite : classement en tête, puis découverte ---
+          Suit le scroll de la page et se fige sur son dernier widget
+          (voir useFollowingRail). */}
+      <div className="home-aside">
+        <div className="hf-rail" ref={railRef}>
+          {/* Classement du blind test (moi + les joueurs que je suis) */}
+          <BlindTestLeaderboard token={token} myId={user?.id} />
 
-        {/* Classement du blind test (moi + les joueurs que je suis) */}
-        <BlindTestLeaderboard token={token} myId={user?.id} />
+          {/* Documentaire : juste sous le classement, avec ses réglages. */}
+          <div className="doc-cta">
+            <button className="doc-cta-btn clickable" onClick={() => setShowDoc(true)}>
+              <Clapperboard size={19} /> Lancer un documentaire
+            </button>
+            <div className="doc-cta-settings" ref={settingsRef}>
+              <button
+                className={`doc-cta-gear clickable ${showSettings ? "active" : ""}`}
+                onClick={() => setShowSettings((v) => !v)}
+                aria-label="Réglages du feed"
+                title="Réglages"
+              >
+                <Settings size={18} />
+              </button>
+              {showSettings && (
+                <div className="doc-settings card">
+                  <div className="doc-settings-group">
+                    <span className="doc-settings-label">Langue</span>
+                    <label className="doc-settings-opt disabled">
+                      <span className="doc-check on">
+                        <Check size={13} />
+                      </span>
+                      Français
+                    </label>
+                    <label className="doc-settings-opt clickable" onClick={toggleEn}>
+                      <span className={`doc-check ${prefs.lang.includes("en") ? "on" : ""}`}>
+                        {prefs.lang.includes("en") && <Check size={13} />}
+                      </span>
+                      Anglais
+                    </label>
+                  </div>
+                  <div className="doc-settings-group">
+                    <span className="doc-settings-label">Jeux</span>
+                    <label
+                      className="doc-settings-opt clickable"
+                      onClick={() => savePrefs({ ...prefs, scope: "played" })}
+                    >
+                      <span className={`doc-radio ${prefs.scope === "played" ? "on" : ""}`} />
+                      Jeux joués uniquement
+                    </label>
+                    <label
+                      className="doc-settings-opt clickable"
+                      onClick={() => savePrefs({ ...prefs, scope: "all" })}
+                    >
+                      <span className={`doc-radio ${prefs.scope === "all" ? "on" : ""}`} />
+                      Tous mes jeux
+                    </label>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
 
-        {/* Radar wishlist : jeux voulus déjà sortis / sorties imminentes */}
-        <WishlistRadar token={token} />
-        <UpcomingWidget games={discover?.upcoming} loading={discover === null} />
-        <ForYouWidget games={discover?.forYou} loading={discover === null} />
+          {/* Radar wishlist : jeux voulus déjà sortis / sorties imminentes */}
+          <WishlistRadar token={token} />
+
+          <FreeGamesWidget token={token} />
+          <UpcomingWidget games={discover?.upcoming} loading={discover === null} />
+          <HotGamesWidget games={discover?.hot} loading={discover === null} />
+
+          {/* La pépite indé ouvre le deck : juste avant « Pour toi », les deux
+              répondent à la même envie (« qu'est-ce que je joue ensuite ? »). */}
+          <button
+            className="hf-gems-btn rail clickable"
+            onClick={() => setShowGems(true)}
+            title="3 jeux que tu aimes → des pépites indés sur mesure"
+          >
+            <Sparkles size={18} /> Découvrir une pépite indé
+          </button>
+
+          <ForYouWidget games={discover?.forYou} loading={discover === null} />
+          <IndieReleasesWidget games={discover?.indies} loading={discover === null} />
+          <RecentOstWidget token={token} />
+        </div>
       </div>
 
       {showDoc && (
         <DocumentaryModal prefs={prefs} token={token} onClose={() => setShowDoc(false)} />
       )}
-      {quizModalOpen && <QuizModal onClose={() => setQuizModalOpen(false)} />}
       {showGems && (
         <DiscoverGemsModal token={token} onClose={() => setShowGems(false)} />
+      )}
+    </div>
+  );
+}
+
+// Widget « Jeux du moment » : les sorties chaudes, en jaquettes cliquables —
+// même grille sobre que « Pour toi » (pas de bouton d'ajout : dans un rail de
+// découverte, on veut ouvrir la fiche, pas remplir sa biblio en un clic).
+function HotGamesWidget({ games, loading }) {
+  if (loading) {
+    return (
+      <div className="hf-widget card" aria-busy="true">
+        <span className="gp-skel gp-skel-bar" style={{ width: "55%" }} />
+        <div className="hf-fy-grid">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <span key={i} className="gp-skel hf-fy-skel" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (!games?.length) return null;
+  return (
+    <div className="hf-widget card">
+      <div className="hf-w-head">
+        <h3 className="hf-w-title">
+          <Flame size={15} /> Jeux du moment
+        </h3>
+        <Link to="/explore" className="hf-sec-link clickable">
+          Explorer <ChevronRight size={14} />
+        </Link>
+      </div>
+      <div className="hf-fy-grid">
+        {games.slice(0, 6).map((g) => (
+          <Link
+            key={g.id}
+            to={`/game/${g.id}`}
+            className="hf-fy-item clickable"
+            title={g.name}
+          >
+            {g.cover ? (
+              <img src={g.cover} alt={g.name} loading="lazy" draggable="false" />
+            ) : (
+              <span className="hf-fy-ph">
+                <Gamepad2 size={16} />
+              </span>
+            )}
+            <span className="hf-fy-name">{g.name}</span>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Widget « Sorties indés » : les meilleurs jeux indépendants tout juste sortis
+// ET ceux qui arrivent (genre IGDB « Indie », voir fetchIndies côté serveur).
+// Chaque jaquette porte une pastille : compte à rebours pour l'à-venir, date
+// courte pour ce qui vient de sortir.
+function IndieReleasesWidget({ games, loading }) {
+  if (loading) {
+    return (
+      <div className="hf-widget card" aria-busy="true">
+        <span className="gp-skel gp-skel-bar" style={{ width: "50%" }} />
+        <div className="hf-fy-grid">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <span key={i} className="gp-skel hf-fy-skel" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (!games?.length) return null;
+  const now = Date.now() / 1000;
+  return (
+    <div className="hf-widget card">
+      <div className="hf-w-head">
+        <h3 className="hf-w-title">
+          <Sprout size={15} /> Sorties indés
+        </h3>
+        <Link to="/explore?gen=32" className="hf-sec-link clickable">
+          Explorer <ChevronRight size={14} />
+        </Link>
+      </div>
+      <p className="hf-w-sub">Le meilleur de l'indé, juste sorti ou tout proche</p>
+      <div className="hf-fy-grid">
+        {games.slice(0, 6).map((g) => {
+          const soon = g.releaseDate && g.releaseDate > now;
+          const days = soon ? Math.ceil((g.releaseDate - now) / 86400) : 0;
+          return (
+            <Link
+              key={g.id}
+              to={`/game/${g.id}`}
+              className="hf-fy-item clickable"
+              title={g.name}
+            >
+              {g.cover ? (
+                <img src={g.cover} alt={g.name} loading="lazy" draggable="false" />
+              ) : (
+                <span className="hf-fy-ph">
+                  <Gamepad2 size={16} />
+                </span>
+              )}
+              {g.releaseDate && (
+                <span className={`hf-indie-tag ${soon ? "soon" : ""}`}>
+                  {soon ? `J-${days}` : shortDate(g.releaseDate)}
+                </span>
+              )}
+              <span className="hf-fy-name">{g.name}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Widget « Coups de cœur OST » : les dernières bandes-son mises en favori par
+// N'IMPORTE QUEL joueur. On reprend telles quelles les cards pochette + CD de
+// l'onglet OST du profil (classes .pfo-*) — le CD sort au survol et tourne à
+// la lecture, pilotée par le mini-lecteur global.
+function RecentOstWidget({ token }) {
+  const [items, setItems] = useState(null);
+  const player = usePlayer();
+
+  useEffect(() => {
+    let alive = true;
+    apiFetch("/ost/recent?limit=4", { token })
+      .then((d) => alive && setItems(d.items || []))
+      .catch(() => alive && setItems([]));
+    return () => {
+      alive = false;
+    };
+  }, [token]);
+
+  if (items !== null && items.length === 0) return null;
+
+  // Une piste n'est jouable que si on sait en tirer une vidéo YouTube.
+  const playable = (t) => !!(t?.videoId || extractVideoId(t?.url || ""));
+  // La file de lecture = les OST affichées, chacune enrichie de son jeu (le
+  // mini-lecteur en a besoin pour son lien « voir la fiche »).
+  const withGame = (i) => ({ ...i.ost, gameId: i.gameId, gameName: i.gameName });
+
+  return (
+    <div className="hf-widget card hf-ost">
+      <div className="hf-w-head">
+        <h3 className="hf-w-title">
+          <Disc3 size={15} /> Coups de cœur OST
+        </h3>
+      </div>
+      <p className="hf-w-sub">Les dernières bandes-son adoubées par la communauté</p>
+
+      {items === null ? (
+        <div className="pfo-grid" aria-busy="true">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <span key={i} className="gp-skel hf-ost-skel" />
+          ))}
+        </div>
+      ) : (
+        <div className="pfo-grid">
+          {items.map((item) => {
+            const t = item.ost;
+            const playing = player.isPlaying(t);
+            const canPlay = playable(t);
+            return (
+              <div key={item.gameId} className={`pfo-card ${playing ? "playing" : ""}`}>
+                <div className="pfo-sleeve">
+                  <div className="pfo-cd">
+                    <div className="pfo-disc">
+                      <span className="pfo-disc-label">
+                        {t.artwork ? (
+                          <img src={t.artwork} alt="" loading="lazy" draggable="false" />
+                        ) : (
+                          <Music2 size={18} />
+                        )}
+                        <span className="pfo-disc-hole" />
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pfo-album">
+                    {item.cover ? (
+                      <img
+                        src={item.cover}
+                        alt={item.gameName}
+                        loading="lazy"
+                        draggable="false"
+                      />
+                    ) : (
+                      <span className="pfo-album-ph">{item.gameName?.[0] || "?"}</span>
+                    )}
+                    <span className="pfo-album-mouth" />
+                  </div>
+
+                  <button
+                    className={`pfo-play clickable ${canPlay ? "" : "mute"}`}
+                    onClick={
+                      canPlay
+                        ? () => player.toggleTrack(t, items.map(withGame), {})
+                        : undefined
+                    }
+                    disabled={!canPlay}
+                    title={
+                      canPlay ? (playing ? "Pause" : "Écouter") : "Extrait indisponible"
+                    }
+                  >
+                    {playing ? (
+                      <Pause size={18} />
+                    ) : (
+                      <Play size={18} fill="currentColor" strokeWidth={0} />
+                    )}
+                  </button>
+                </div>
+
+                <div className="pfo-body">
+                  <span className="pfo-name" title={t.name}>
+                    {t.name}
+                  </span>
+                  {t.artist && (
+                    <span className="pfo-artist" title={t.artist}>
+                      {t.artist}
+                    </span>
+                  )}
+                  <div className="pfo-foot">
+                    <Link
+                      to={`/game/${item.gameId}`}
+                      className="pfo-game clickable"
+                      title={item.gameName}
+                    >
+                      <Disc3 size={13} />
+                      <span className="pfo-game-name">{item.gameName}</span>
+                    </Link>
+                    {/* Qui l'a mise en favori — le clin d'œil « communauté ». */}
+                    <Link
+                      to={`/u/${item.user.username}?tab=ost`}
+                      className="hf-ost-by clickable"
+                      title={`Choisie par ${item.user.username}`}
+                    >
+                      {item.user.avatar ? (
+                        <img src={item.user.avatar} alt="" loading="lazy" />
+                      ) : (
+                        <span className="hf-ost-by-fb">
+                          {item.user.username[0].toUpperCase()}
+                        </span>
+                      )}
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
@@ -475,41 +689,15 @@ function WishlistRadar({ token }) {
 // paysage : image du magasin, pastille de la boutique, prix barré + « Gratuit »
 // et le temps restant avant la fin de l'offre. Section masquée si rien en cours.
 
-// Slug de magasin → couleur de la pastille (identité de la boutique).
-const STORE_COLORS = {
-  epic: "#2a2a2a",
-  steam: "#1b2838",
-  gog: "#7a3ff2",
-  ubisoft: "#0a6cff",
-  ea: "#e0403f",
-  battlenet: "#1486e8",
-  prime: "#00a8e1",
-  itchio: "#fa5c5c",
-  "drm-free": "#5a6472",
-  pc: "#5a6472",
-};
-
-// « Encore 3 j » / « Dernier jour » — combien de temps reste-t-il pour récupérer.
-function freeEndsLabel(endsAt) {
-  if (!endsAt) return null;
-  const days = Math.ceil((Date.parse(endsAt) - Date.now()) / 86400000);
-  if (days < 0) return null;
-  if (days === 0) return { text: "Dernier jour", urgent: true };
-  if (days === 1) return { text: "Encore 1 j", urgent: true };
-  return { text: `Encore ${days} j`, urgent: days <= 2 };
-}
-
 function FreeGameCard({ game }) {
   const ends = freeEndsLabel(game.endsAt);
   const color = STORE_COLORS[game.store.slug] || STORE_COLORS.pc;
-  return (
-    <a
-      className="hf-free-card clickable"
-      href={game.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={`${game.title} — gratuit sur ${game.store.label}`}
-    >
+  // Le serveur rattache le giveaway à sa fiche IGDB quand il reconnaît le
+  // titre : on reste alors sur le site (la page du jeu affiche une banderole
+  // flottante pour aller le récupérer). Sinon, lien direct vers l'offre.
+  const inside = !!game.gameId;
+  const body = (
+    <>
       <div className="hf-free-thumb">
         {game.image ? (
           <img src={game.image} alt="" loading="lazy" draggable="false" />
@@ -527,7 +715,15 @@ function FreeGameCard({ game }) {
           </span>
         )}
         <span className="hf-free-get">
-          <ExternalLink size={14} /> Récupérer
+          {inside ? (
+            <>
+              <Gamepad2 size={14} /> Voir la fiche
+            </>
+          ) : (
+            <>
+              <ExternalLink size={14} /> Récupérer
+            </>
+          )}
         </span>
       </div>
       <div className="hf-free-body">
@@ -539,11 +735,28 @@ function FreeGameCard({ game }) {
           </span>
         </span>
       </div>
+    </>
+  );
+
+  const title = `${game.title} — gratuit sur ${game.store.label}`;
+  return inside ? (
+    <Link className="hf-free-card clickable" to={`/game/${game.gameId}`} title={title}>
+      {body}
+    </Link>
+  ) : (
+    <a
+      className="hf-free-card clickable"
+      href={game.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={title}
+    >
+      {body}
     </a>
   );
 }
 
-function FreeGamesSection({ token }) {
+function FreeGamesWidget({ token }) {
   const [games, setGames] = useState(null);
 
   useEffect(() => {
@@ -556,20 +769,20 @@ function FreeGamesSection({ token }) {
     };
   }, [token]);
 
-  // Rien en cours (ou API en carafe) : on masque toute la section.
+  // Rien en cours (ou API en carafe) : on masque tout le widget.
   if (games !== null && games.length === 0) return null;
 
   return (
-    <section className="hf-sec">
-      <div className="hf-sec-head">
-        <h2 className="hf-sec-title">
-          <Gift size={17} /> Jeux gratuits à récupérer
-        </h2>
-        <span className="hf-sec-note">Epic · Steam · GOG · Prime…</span>
+    <div className="hf-widget card hf-free-w">
+      <div className="hf-w-head">
+        <h3 className="hf-w-title">
+          <Gift size={15} /> Jeux gratuits à récupérer
+        </h3>
       </div>
+      <p className="hf-w-sub">Epic · Steam · GOG · Prime…</p>
       {games === null ? (
         <div className="hf-carousel" aria-busy="true">
-          {Array.from({ length: 4 }).map((_, i) => (
+          {Array.from({ length: 3 }).map((_, i) => (
             <span key={i} className="gp-skel hf-free-skel" />
           ))}
         </div>
@@ -582,43 +795,23 @@ function FreeGamesSection({ token }) {
           ))}
         </DragCarousel>
       )}
-    </section>
+    </div>
   );
 }
 
-// Modale mobile du quiz (voir toggleQuiz) : même carte que le rail latéral,
-// juste encapsulée dans un overlay pour un accès immédiat.
-function QuizModal({ onClose }) {
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    const onKey = (e) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = "";
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [onClose]);
-
-  return createPortal(
-    <div
-      className="modal-overlay"
-      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div className="quiz-modal">
-        <button className="modal-close clickable" onClick={onClose} aria-label="Fermer">
-          <X size={18} />
-        </button>
-        <QuizCard />
-      </div>
-    </div>,
-    document.body
-  );
-}
-
-// Classement du blind test : meilleur score par joueur parmi moi + mes suivis.
+// Classement du blind test parmi moi + mes suivis, en DEUX classements que
+// les onglets du coin haut-droit permutent : « Record » (meilleur score sur
+// une seule partie) et « Total » (cumul de toutes les parties). Le serveur
+// renvoie les deux valeurs par joueur, on ne fait que trier ici.
 // Chaque ligne (sauf la mienne) est défiable → rejoue le même set d'extraits.
+const BT_MODES = [
+  { key: "best", label: "Record", pick: (e) => e.bestScore ?? 0, hint: "Meilleur score en une partie" },
+  { key: "total", label: "Total", pick: (e) => e.score ?? 0, hint: "Total cumulé de toutes les parties" },
+];
+
 function BlindTestLeaderboard({ token, myId }) {
   const [entries, setEntries] = useState(null);
+  const [mode, setMode] = useState("best");
 
   useEffect(() => {
     if (!token) return;
@@ -649,12 +842,38 @@ function BlindTestLeaderboard({ token, myId }) {
     );
   }
 
-  const top = entries.slice(0, 6);
+  const active = BT_MODES.find((m) => m.key === mode) || BT_MODES[0];
+  // Tri à égalité : on départage sur l'autre score, puis sur la date.
+  const other = BT_MODES.find((m) => m.key !== active.key);
+  const top = [...entries]
+    .sort(
+      (a, b) =>
+        active.pick(b) - active.pick(a) ||
+        other.pick(b) - other.pick(a) ||
+        new Date(b.date) - new Date(a.date)
+    )
+    .slice(0, 6);
+
   return (
     <div className="hf-widget card hf-bt-widget">
-      <h3 className="hf-w-title">
-        <Crown size={15} /> Classement blind test
-      </h3>
+      <div className="hf-bt-head">
+        <h3 className="hf-w-title">
+          <Crown size={15} /> Classement blind test
+        </h3>
+        <div className="hf-bt-tabs" role="group" aria-label="Type de classement">
+          {BT_MODES.map((m) => (
+            <button
+              key={m.key}
+              className={`hf-bt-tab clickable ${mode === m.key ? "on" : ""}`}
+              onClick={() => setMode(m.key)}
+              title={m.hint}
+              aria-pressed={mode === m.key}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <ol className="hf-bt-list">
         {top.map((e, i) => (
           <li key={e.blindTestId} className={`hf-bt-row ${e.isMe ? "me" : ""}`}>
@@ -680,12 +899,13 @@ function BlindTestLeaderboard({ token, myId }) {
               className="hf-bt-score"
               title={
                 e.games != null
-                  ? `Total cumulé · ${e.games} partie${e.games > 1 ? "s" : ""}` +
-                    (e.bestScore != null ? ` · record ${e.bestScore}` : "")
+                  ? `Record ${e.bestScore ?? 0} · total ${e.score} sur ${e.games} partie${
+                      e.games > 1 ? "s" : ""
+                    }`
                   : undefined
               }
             >
-              <Trophy size={12} /> {e.score}
+              <Trophy size={12} /> {active.pick(e)}
             </span>
           </li>
         ))}

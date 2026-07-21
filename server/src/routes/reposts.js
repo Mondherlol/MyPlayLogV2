@@ -8,6 +8,7 @@ import { igdbQuery } from "../lib/igdb.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { notify } from "../lib/notify.js";
 import { sanitizeMediaList, resolveMentions, toComment } from "../lib/commentThread.js";
+import { triggerMissionCheck } from "../lib/missions.js";
 
 const router = express.Router();
 
@@ -245,6 +246,7 @@ router.post("/", requireAuth, async (req, res) => {
           gameName: src.gameName,
           gameCover: src.gameCover,
         });
+        triggerMissionCheck(req.userId); // mission « Galeriste »
         return res.status(201).json({ reposted: true, repost: repostCard(repost, req) });
       } catch (err) {
         deleteImageFile(filename);
@@ -287,6 +289,7 @@ router.post("/", requireAuth, async (req, res) => {
         gameName: String(game.name).slice(0, 200),
         gameCover,
       });
+      triggerMissionCheck(req.userId); // mission « Galeriste »
       res.status(201).json({ reposted: true, repost: repostCard(repost, req) });
     } catch (err) {
       deleteImageFile(filename);

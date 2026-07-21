@@ -1,18 +1,23 @@
 /* ======================================================================
-   HOME (page d'accueil connectée) — flux principal + quiz flottant
+   HOME (page d'accueil connectée) — fil principal + rail de découverte
    ====================================================================== */
+/* Deux colonnes CENTRÉES sur la page (même parti pris que .pff-layout) : le
+   fil garde le gabarit lisible de 620 px et le duo colonne/rail ne dérive pas
+   vers la gauche des grands écrans.
+   `align-items` reste sur `stretch` (défaut) : le rail doit être aussi haut
+   que le fil, sinon son bloc collant se décroche dès qu'on dépasse sa boîte. */
 .home {
   display: grid;
-  grid-template-columns: 1fr 372px;
+  grid-template-columns: minmax(0, 620px) 424px;
   gap: 1.8rem;
-  align-items: start;
+  justify-content: center;
 }
 
 .home-main {
   min-width: 0;
 }
 
-/* --- En-tête : salut + actions (documentaire, quiz) --- */
+/* --- En-tête : le salut et la cagnotte d'arcade --- */
 .hf-hero {
   display: flex;
   align-items: flex-end;
@@ -31,46 +36,6 @@
   margin: 0;
   color: var(--text-soft);
   font-size: 0.95rem;
-}
-
-.hf-hero-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-}
-
-.hf-hero-actions .doc-cta {
-  margin-top: 0;
-}
-
-.hf-quiz-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  height: 44px;
-  padding: 0 1.1rem;
-  border-radius: 999px;
-  border: 1.5px solid var(--border-strong);
-  background: var(--surface);
-  color: var(--text);
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.92rem;
-  transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease,
-    background 0.15s ease, box-shadow 0.15s ease;
-}
-
-.hf-quiz-btn:hover {
-  border-color: var(--orange);
-  transform: translateY(-2px);
-}
-
-.hf-quiz-btn.on {
-  border-color: transparent;
-  background: color-mix(in srgb, var(--orange) 16%, var(--surface));
-  color: var(--accent-ink);
-  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--orange) 45%, transparent);
 }
 
 /* --- Sections de la colonne principale --- */
@@ -176,19 +141,6 @@
 .hf-car-arrow.off {
   opacity: 0;
   pointer-events: none;
-}
-
-.hf-carousel-item {
-  width: 152px;
-  flex-shrink: 0;
-  scroll-snap-align: start;
-}
-
-.hf-carousel-skel {
-  width: 152px;
-  aspect-ratio: 3 / 4;
-  flex-shrink: 0;
-  border-radius: 16px;
 }
 
 /* --- Jeux gratuits de la semaine (Epic / Steam / GOG / Prime…) --- */
@@ -357,6 +309,7 @@
   gap: 1rem;
   min-width: 0;
 }
+
 
 /* Espacement des cartes dans le fil virtualisé : Virtuoso rend son propre
    conteneur, donc le `gap` de .hf-feed ne s'applique plus entre les items —
@@ -1287,29 +1240,147 @@
 }
 
 /* --- Rail latéral --- */
+/* Colonne de droite : une simple pile. Elle s'étire sur toute la hauteur de la
+   ligne (voir .home) pour servir de piste aux deux blocs collants ci-dessous. */
 .home-aside {
-  position: sticky;
-  top: 76px;
-}
-
-.hf-aside {
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
-  max-height: calc(100vh - 90px);
-  overflow-y: auto;
-  scrollbar-width: none;
+  min-width: 0;
+}
+
+/* --- Rail de droite : il défile avec la page (pas de scroll interne) et son
+   `top` collant est piloté par useFollowingRail (Welcome.jsx) pour se figer
+   sur son dernier widget, puis se redérouler quand on remonte. --- */
+.hf-rail {
+  position: sticky;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  min-width: 0;
   padding-bottom: 0.5rem;
 }
 
-.hf-aside::-webkit-scrollbar {
-  display: none;
+/* Sans ça, les cartes du rail se font compresser à quelques pixels pour tenir
+   dans la hauteur. */
+.hf-rail>* {
+  flex-shrink: 0;
 }
 
-/* Le rail est une colonne flex scrollable : sans ça, ses cartes (quiz en
-   tête) se font compresser à quelques pixels pour tenir dans la hauteur. */
-.hf-aside>* {
-  flex-shrink: 0;
+/* Titre + lien « Explorer » sur une même ligne, dans un widget du rail. */
+.hf-w-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+/* --- « Lancer un documentaire » dans le rail : pleine largeur, sous le
+   classement. L'engrenage garde sa taille, le bouton prend le reste. --- */
+.hf-rail .doc-cta {
+  margin-top: 0;
+}
+
+.hf-rail .doc-cta-btn {
+  flex: 1;
+  min-width: 0;
+  justify-content: center;
+}
+
+/* Le popover de réglages s'ouvre depuis l'engrenage, tout à droite du rail :
+   on l'ancre par la droite pour qu'il ne déborde pas hors de l'écran. */
+.hf-rail .doc-settings {
+  right: 0;
+  left: auto;
+}
+
+/* « Découvrir une pépite indé » posé dans le rail : pleine largeur, comme les
+   autres blocs de la colonne (dans l'en-tête c'était une pilule calibrée sur
+   son texte). */
+.hf-gems-btn.rail {
+  width: 100%;
+  justify-content: center;
+}
+
+/* --- Sorties indés : pastille de date sur la jaquette --- */
+.hf-indie-tag {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  z-index: 2;
+  padding: 0.1rem 0.38rem;
+  border-radius: 999px;
+  background: rgba(8, 8, 12, 0.72);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+/* À venir : la pastille passe en doré (c'est l'info qui donne envie). */
+.hf-indie-tag.soon {
+  background: var(--accent-grad);
+  color: #3a2600;
+}
+
+/* --- Coups de cœur OST : les cards pochette + CD du profil, en 2 colonnes
+   pour tenir dans la largeur du rail (la grille du profil vise 230 px mini,
+   ce qui ne donnerait qu'une seule colonne géante ici). --- */
+.hf-ost .pfo-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.hf-ost-skel {
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-lg);
+}
+
+/* Avatar de la personne qui a mis l'OST en favori, en pied de card. */
+.hf-ost-by {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.hf-ost-by:hover {
+  transform: scale(1.12);
+  border-color: var(--orange);
+}
+
+.hf-ost-by img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hf-ost-by-fb {
+  font-size: 0.66rem;
+  font-weight: 800;
+  color: var(--text-soft);
+}
+
+/* Carrousel du rail : la colonne est étroite, donc des vignettes plus petites
+   que dans la colonne principale — on veut en voir plusieurs d'un coup. */
+.hf-free-w .hf-carousel {
+  padding-bottom: 0.2rem;
+}
+
+.hf-free-w .hf-free-item,
+.hf-free-w .hf-free-skel {
+  width: 186px;
+}
+
+.hf-free-w .hf-free-skel {
+  height: 148px;
 }
 
 .hf-widget {
@@ -1503,594 +1574,16 @@
   border-radius: 11px;
 }
 
-/* ======================================================================
-   QUIZ CARD — deck glissable, esprit TV Time
-   ====================================================================== */
-.quiz {
-  position: relative;
-  padding: 1.15rem 1.15rem 1.25rem;
-  border: 1px solid var(--border);
-  border-radius: 22px;
-  overflow: hidden;
-  box-shadow: var(--shadow);
-  background: radial-gradient(130% 100% at 100% 0%,
-      color-mix(in srgb, var(--orange) 12%, transparent),
-      transparent 60%),
-    var(--surface);
-}
-
-/* Liseré doré en haut */
-.quiz::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 3px;
-  background: var(--accent-grad);
-  opacity: 0.9;
-}
-
-.quiz-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
-  margin-bottom: 0.95rem;
-}
-
-.quiz-head-title {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-}
-
-.quiz-badge {
-  width: 40px;
-  height: 40px;
-  border-radius: 13px;
-  display: grid;
-  place-items: center;
-  background: var(--accent-grad);
-  color: #1a1204;
-  box-shadow: 0 6px 16px rgba(242, 183, 11, 0.4);
-  flex-shrink: 0;
-}
-
-.quiz-title {
-  font-size: 1.08rem;
-  line-height: 1.1;
-}
-
-.quiz-sub {
-  margin: 0.16rem 0 0;
-  font-size: 0.76rem;
-  color: var(--text-soft);
-}
-
-.quiz-score {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: #1a1204;
-  padding: 0.36rem 0.75rem;
-  border-radius: 999px;
-  background: var(--accent-grad);
-  box-shadow: 0 4px 12px rgba(242, 183, 11, 0.32);
-  flex-shrink: 0;
-}
-
-/* ---------- Sélecteur de difficulté ---------- */
-.quiz-diffs {
-  display: flex;
-  gap: 0.3rem;
-  padding: 0.28rem;
-  margin-bottom: 1rem;
-  border-radius: 13px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-}
-
-.quiz-diff-pill {
-  flex: 1;
-  border: none;
-  background: transparent;
-  color: var(--text-soft);
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 0.78rem;
-  padding: 0.42rem 0.3rem;
-  border-radius: 9px;
-  transition: color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
-}
-
-.quiz-diff-pill:not(:disabled):hover {
-  color: var(--text);
-}
-
-.quiz-diff-pill.active {
-  background: var(--surface);
-  color: var(--accent-ink);
-  box-shadow: var(--shadow-sm);
-}
-
-.quiz-diff-pill:disabled {
-  cursor: var(--cursor-default), auto;
-  opacity: 0.6;
-}
-
-/* ---------- Barre de progression ---------- */
-.quiz-progress {
-  height: 6px;
-  border-radius: 999px;
-  background: var(--surface-2);
-  overflow: hidden;
-  margin-bottom: 0.9rem;
-}
-
-.quiz-progress-fill {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  background: var(--accent-grad);
-  box-shadow: 0 0 10px rgba(242, 183, 11, 0.5);
-  transition: width 0.45s cubic-bezier(0.2, 0.8, 0.3, 1);
-}
-
-/* ---------- Deck ---------- */
-.quiz-stack {
-  position: relative;
-  min-height: 208px;
-  margin-bottom: 1rem;
-  perspective: 1000px;
-}
-
-/* Indices de sens (Faux à gauche, Vrai à droite) */
-.quiz-hint {
-  position: absolute;
-  top: 50%;
-  z-index: 3;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 0.62rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  writing-mode: vertical-rl;
-  transition: opacity 0.15s ease;
-  pointer-events: none;
-}
-
-.quiz-hint.left {
-  left: -13px;
-  color: #e0483f;
-  transform: translateY(-50%) rotate(180deg);
-}
-
-.quiz-hint.right {
-  right: -13px;
-  color: #22a35a;
-}
-
-.quiz-qcard {
-  position: absolute;
-  inset: 0;
-  border-radius: 18px;
-}
-
-/* Cartes du dessous — dépassent en bas façon deck */
-.quiz-qcard-behind {
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  transform-origin: center top;
-}
-
-.quiz-qcard-behind.depth-1 {
-  transform: translateY(11px) scale(0.945);
-  opacity: 0.9;
-  z-index: 1;
-  box-shadow: var(--shadow-sm);
-}
-
-.quiz-qcard-behind.depth-2 {
-  transform: translateY(22px) scale(0.89);
-  opacity: 0.55;
-  z-index: 0;
-}
-
-/* Carte active */
-.quiz-qcard-active {
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  padding: 1rem 1.05rem 0.9rem;
-  border: 1px solid var(--border-strong);
-  background: linear-gradient(165deg,
-      color-mix(in srgb, var(--orange) 5%, var(--surface)),
-      var(--surface) 55%);
-  box-shadow: 0 16px 34px rgba(20, 20, 40, 0.16);
-  overflow: hidden;
-  touch-action: pan-y;
-  user-select: none;
-  -webkit-user-select: none;
-  cursor: var(--cursor-grab);
-  animation: quizIn 0.34s cubic-bezier(0.2, 0.8, 0.3, 1);
-  transition: transform 0.42s cubic-bezier(0.2, 0.85, 0.3, 1), opacity 0.42s ease,
-    border-color 0.25s ease, box-shadow 0.25s ease;
-}
-
-.quiz-qcard-active.is-dragging {
-  cursor: var(--cursor-grabbing);
-  box-shadow: 0 22px 46px rgba(20, 20, 40, 0.26);
-}
-
-.quiz-qcard-active.is-correct {
-  border-color: #22a35a;
-}
-
-.quiz-qcard-active.is-wrong {
-  border-color: #e0483f;
-}
-
-@keyframes quizIn {
-  from {
-    opacity: 0;
-    transform: translateY(-12px) scale(0.96);
-  }
-}
-
-/* Halo directionnel pendant le grab */
-.quiz-glow {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  transition: opacity 0.12s ease;
-}
-
-.quiz-glow[data-side="left"] {
-  background: radial-gradient(120% 120% at 0% 50%,
-      rgba(224, 72, 63, 0.26),
-      transparent 55%);
-}
-
-.quiz-glow[data-side="right"] {
-  background: radial-gradient(120% 120% at 100% 50%,
-      rgba(34, 163, 90, 0.28),
-      transparent 55%);
-}
-
-/* Stamps VRAI / FAUX qui apparaissent au grab */
-.quiz-stamp {
-  position: absolute;
-  top: 0.9rem;
-  z-index: 3;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 0.9rem;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  padding: 0.28rem 0.6rem;
-  border-radius: 10px;
-  border: 2.5px solid currentColor;
-  pointer-events: none;
-}
-
-.quiz-stamp.vrai {
-  left: 0.9rem;
-  color: #1f9c56;
-  transform: rotate(-11deg);
-}
-
-.quiz-stamp.faux {
-  right: 0.9rem;
-  color: #d8483f;
-  transform: rotate(11deg);
-}
-
-.quiz-qcard-top {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.7rem;
-}
-
-.quiz-badge-diff {
-  font-family: var(--font-display);
-  font-size: 0.64rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 0.24rem 0.55rem;
-  border-radius: 999px;
-}
-
-.quiz-badge-diff.diff-easy {
-  background: rgba(34, 163, 90, 0.15);
-  color: #1f9c56;
-}
-
-.quiz-badge-diff.diff-medium {
-  background: color-mix(in srgb, var(--orange) 20%, transparent);
-  color: var(--accent-ink);
-}
-
-.quiz-badge-diff.diff-hard {
-  background: rgba(224, 72, 63, 0.15);
-  color: #d8483f;
-}
-
-.quiz-count {
-  font-family: var(--font-display);
-  font-size: 0.86rem;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.quiz-count i {
-  font-style: normal;
-  color: var(--text-soft);
-  font-weight: 600;
-}
-
-.quiz-question {
-  position: relative;
-  z-index: 1;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  margin: 0;
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 1.06rem;
-  line-height: 1.42;
-  color: var(--text);
-}
-
-.quiz-qcard-foot {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin-top: 0.8rem;
-  font-size: 0.72rem;
-  color: var(--text-soft);
-}
-
-.quiz-qcard-foot svg {
-  opacity: 0.7;
-}
-
-/* Voile de résultat */
-.quiz-result {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.2rem;
-  text-align: center;
-  color: #fff;
-  animation: resultIn 0.28s cubic-bezier(0.2, 0.8, 0.3, 1);
-}
-
-.quiz-result.is-correct {
-  background: linear-gradient(150deg, #1f9c56, #2fb968);
-}
-
-.quiz-result.is-wrong {
-  background: linear-gradient(150deg, #d8483f, #ef6a5a);
-}
-
-.quiz-result strong {
-  font-family: var(--font-display);
-  font-size: 1.3rem;
-}
-
-.quiz-result-icon {
-  display: grid;
-  place-items: center;
-  width: 52px;
-  height: 52px;
-  margin-bottom: 0.3rem;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.22);
-  animation: resultPop 0.4s cubic-bezier(0.2, 0.8, 0.3, 1);
-}
-
-.quiz-result-sub {
-  font-size: 0.82rem;
-  opacity: 0.9;
-}
-
-@keyframes resultIn {
-  from {
-    opacity: 0;
-  }
-}
-
-@keyframes resultPop {
-  0% {
-    transform: scale(0.3);
-  }
-
-  60% {
-    transform: scale(1.15);
-  }
-}
-
-/* +1 flottant */
-.quiz-plusone {
-  position: absolute;
-  top: 4px;
-  left: 50%;
-  z-index: 6;
-  transform: translateX(-50%);
-  display: inline-flex;
-  align-items: center;
-  gap: 0.15rem;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 1.7rem;
-  color: #22c06d;
-  text-shadow: 0 4px 16px rgba(34, 163, 90, 0.5);
-  pointer-events: none;
-  animation: plusOne 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
-}
-
-.quiz-plusone svg {
-  color: var(--amber);
-}
-
-@keyframes plusOne {
-  0% {
-    opacity: 0;
-    transform: translateX(-50%) translateY(10px) scale(0.5);
-  }
-
-  25% {
-    opacity: 1;
-    transform: translateX(-50%) translateY(-6px) scale(1.2);
-  }
-
-  100% {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-52px) scale(1);
-  }
-}
-
-/* ---------- Boutons de réponse ---------- */
-.quiz-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-}
-
-.quiz-answer {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  padding: 0.75rem 0.5rem;
-  border-radius: 14px;
-  border: 1.5px solid var(--border-strong);
-  background: var(--surface);
-  color: var(--text);
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.96rem;
-  transition: transform 0.14s ease, border-color 0.15s ease,
-    background 0.15s ease, color 0.15s ease, box-shadow 0.18s ease;
-}
-
-.quiz-answer:not(:disabled):hover {
-  transform: translateY(-2px);
-}
-
-.quiz-true:not(:disabled):hover {
-  border-color: #22a35a;
-  color: #1f9c56;
-  background: rgba(34, 163, 90, 0.09);
-  box-shadow: 0 8px 18px rgba(34, 163, 90, 0.18);
-}
-
-.quiz-false:not(:disabled):hover {
-  border-color: #e0483f;
-  color: #d8483f;
-  background: rgba(224, 72, 63, 0.09);
-  box-shadow: 0 8px 18px rgba(224, 72, 63, 0.18);
-}
-
-.quiz-answer:disabled {
-  cursor: var(--cursor-default), auto;
-  opacity: 0.55;
-}
-
-/* Compteur de série */
-.quiz-streak {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2rem;
-  flex-shrink: 0;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 0.85rem;
-  color: #fff;
-  padding: 0.4rem 0.6rem;
-  border-radius: 999px;
-  background: linear-gradient(100deg, #ff7a18, #ff4d4d);
-  box-shadow: 0 6px 16px rgba(255, 77, 77, 0.4);
-  animation: resultPop 0.4s ease;
-}
-
-/* ---------- États ---------- */
-.quiz-state {
-  min-height: 230px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.7rem;
-  text-align: center;
-  color: var(--text-soft);
-  font-size: 0.92rem;
-}
-
-.quiz-spin {
-  color: var(--accent-ink);
-  animation: spin 0.9s linear infinite;
-}
-
-.quiz-retry {
-  padding: 0.5rem 0.9rem;
-  font-size: 0.88rem;
-}
-
-.quiz-done-badge {
-  width: 68px;
-  height: 68px;
-  border-radius: 20px;
-  display: grid;
-  place-items: center;
-  background: var(--accent-grad);
-  color: #1a1204;
-  box-shadow: 0 10px 26px rgba(242, 183, 11, 0.45);
-  animation: pop 0.5s ease;
-}
-
-.quiz-done-title {
-  font-size: 1.35rem;
-}
-
-.quiz-done-sub {
-  margin: 0;
-  color: var(--text-soft);
-}
-
-.quiz-done-sub strong {
-  color: var(--accent-ink);
-  font-size: 1.1em;
-}
-
-.quiz-replay {
-  margin-top: 0.4rem;
-}
-
-@media (max-width: 1040px) {
+/* Une seule colonne : le rail passe sous le fil.
+   Seuil calé sur la place réellement disponible : sidebar (208 px) + marges
+   (~70 px) + rail (424 px) + gouttière, pour que le fil garde au moins ~520 px
+   tant qu'on reste sur deux colonnes. */
+@media (max-width: 1240px) {
   .home {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 620px);
   }
 
-  .home-aside {
+  .hf-rail {
     position: static;
     max-width: 460px;
   }
@@ -2107,7 +1600,7 @@
     display: none;
   }
 
-  .home-aside {
+  .hf-rail {
     max-width: none;
   }
 
@@ -2116,24 +1609,6 @@
   .doc-settings {
     max-width: calc(100vw - 2.4rem);
   }
-}
-
-/* ---------- Modale Quiz (mobile) ---------- */
-/* Sur téléphone, l'aside (donc le quiz) passe sous le feed : on ouvre plutôt
-   une modale pour un accès immédiat sans avoir à scroller. */
-.quiz-modal {
-  position: relative;
-  width: 100%;
-  max-width: 420px;
-  margin: auto;
-}
-
-.quiz-modal .modal-close {
-  top: -14px;
-  right: -14px;
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  box-shadow: var(--shadow);
 }
 
 /* ======================================================================
@@ -4753,6 +4228,140 @@
     z-index: 90;
     padding: 0.4rem 0.75rem;
     font-size: 0.85rem;
+  }
+}
+
+/* --- Banderole « ce jeu est gratuit en ce moment » (FreeGameBanner.jsx) ---
+   Flotte en haut à droite, en miroir du bouton Retour : on la voit en
+   arrivant depuis le carrousel « Jeux gratuits à récupérer » de l'accueil,
+   sans qu'elle mange le contenu de la fiche. */
+.gp-free-banner {
+  position: fixed;
+  top: calc(var(--topbar-h, 60px) + 0.9rem);
+  right: clamp(1rem, 4vw, 2rem);
+  z-index: 70;
+  max-width: min(420px, calc(100vw - 2rem));
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.7rem 0.6rem 0.75rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(15, 15, 20, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #fff;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.35);
+  animation: gp-free-in 0.35s ease both;
+}
+
+@keyframes gp-free-in {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: none; }
+}
+
+.gp-free-gift {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: var(--accent-grad);
+  color: #3a2600;
+}
+
+.gp-free-txt {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.gp-free-head {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.gp-free-store {
+  padding: 0.1rem 0.42rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.gp-free-sub {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.74rem;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.gp-free-sub svg {
+  flex: 0 0 auto;
+}
+
+.gp-free-cta {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.42rem 0.7rem;
+  border-radius: 11px;
+  background: var(--accent-grad);
+  color: #3a2600;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.82rem;
+  text-decoration: none;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.gp-free-cta:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+
+.gp-free-close {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.gp-free-close:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+/* Sur mobile, le bouton Retour occupe la topbar : la banderole passe sous
+   elle, sur toute la largeur. */
+@media (max-width: 760px) {
+  .gp-free-banner {
+    top: calc(var(--topbar-h, 60px) + 0.5rem);
+    left: 0.7rem;
+    right: 0.7rem;
+    max-width: none;
+    padding: 0.5rem 0.55rem;
+    gap: 0.55rem;
+  }
+
+  .gp-free-sub {
+    font-size: 0.7rem;
   }
 }
 
@@ -10099,6 +9708,35 @@
   font-size: 0.82rem;
 }
 
+/* Retirer une recommandation qu'on a faite : discret au repos, rouge au
+   survol — c'est une action destructrice, mais pas la vedette de la ligne. */
+.reco-sent-del {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-soft);
+  opacity: 0.55;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.reco-sent:hover .reco-sent-del {
+  opacity: 1;
+}
+
+.reco-sent-del:hover {
+  opacity: 1;
+  color: #d5342b;
+  border-color: color-mix(in srgb, #d5342b 40%, transparent);
+  background: color-mix(in srgb, #d5342b 10%, transparent);
+}
+
 /* Couleurs des nouveaux types de notif */
 .notif-type.t-recommendation {
   background: var(--accent-grad);
@@ -13082,6 +12720,31 @@
   gap: 6px;
 }
 
+/* Message des widgets du rail quand le profil n'a encore rien republié : le
+   rail reste en place (même silhouette d'un profil à l'autre), simplement vide. */
+.pff-w-empty {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text-soft);
+}
+
+/* Mosaïque fantôme : les cases du bento en pointillé, sans contenu. */
+.pff-bento.empty {
+  grid-auto-rows: 58px;
+}
+
+.pff-bento-ph {
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+}
+
+.pff-bento.empty .pff-bento-ph:first-child {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+
 .pff-bento-item {
   position: relative;
   padding: 0;
@@ -14384,7 +14047,7 @@
    (3 jeux + plateformes → deck de pépites à swiper ; voir DiscoverGemsModal)
    ====================================================================== */
 
-/* Bouton hero : même style que le bouton Quiz (pill neutre, hover doré). */
+/* Pilule neutre, hover doré (le bouton vit dans le rail — voir .rail). */
 .hf-gems-btn {
   display: inline-flex;
   align-items: center;

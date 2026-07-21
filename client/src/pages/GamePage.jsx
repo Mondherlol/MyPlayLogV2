@@ -61,6 +61,7 @@ import GameOst from "../components/GameOst";
 import GameFeed from "../components/GameFeed";
 import GameRelated from "../components/GameRelated";
 import GamePatches from "../components/GamePatches";
+import FreeGameBanner from "../components/FreeGameBanner";
 import { useTabSwipe } from "../hooks/useTabSwipe";
 
 const FRIEND_GROUPS = [
@@ -636,6 +637,9 @@ export default function GamePage() {
       <button className="gp-back clickable" onClick={() => navigate(-1)}>
         <ArrowLeft size={18} /> Retour
       </button>
+
+      {/* Ce jeu est offert quelque part en ce moment → banderole flottante */}
+      <FreeGameBanner gameId={id} token={token} />
 
       {/* Feuille de contenu qui remonte */}
       <div className="gp-sheet">

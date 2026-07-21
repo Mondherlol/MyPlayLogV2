@@ -12,6 +12,7 @@ import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { grantPoints, spendPoints } from "../lib/points.js";
 import { planArcadeBackfill, runArcadeBackfill } from "../lib/arcadeBackfill.js";
 import { recordActivity } from "../lib/activity.js";
+import { triggerMissionCheck } from "../lib/missions.js";
 import { RARITIES, isRarity, rewardWeight, duplicateRefund } from "../lib/rarity.js";
 
 // ======================================================================
@@ -246,6 +247,8 @@ router.post("/cases/:id/open", requireAuth, async (req, res) => {
         duplicate: !!existing,
       },
     });
+    // Mission « Chasseur de butin ».
+    triggerMissionCheck(req.userId);
 
     res.json({
       reward: winner.toPublic(),

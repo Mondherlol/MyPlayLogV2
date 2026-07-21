@@ -12,7 +12,8 @@
     "backfill:arcade": "node src/scripts/backfillArcadePoints.js",
     "migrate:ost-youtube": "node src/scripts/migrateItunesOst.js",
     "migrate:video-social": "node src/scripts/migrateVideoSocial.js",
-    "backfill:feed": "node src/scripts/backfillFeedActivities.js"
+    "backfill:feed": "node src/scripts/backfillFeedActivities.js",
+    "reset:mission-claims": "node src/scripts/resetMissionClaims.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -33,6 +33,7 @@ const notificationSchema = new mongoose.Schema(
         "import_pending", // (système) de nouveaux jeux à valider après une synchro
         "psn_request", // (admin) un utilisateur a demandé une synchro PSN à traiter
         "psn_ready", // (système) ton import PSN est prêt : jeux à valider
+        "mission_unlocked", // (système) tu as débloqué un badge de mission
       ],
       required: true,
     },
