@@ -11,6 +11,7 @@ import User from "../models/User.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { grantPoints, spendPoints } from "../lib/points.js";
 import { planArcadeBackfill, runArcadeBackfill } from "../lib/arcadeBackfill.js";
+import { recordActivity } from "../lib/activity.js";
 import { RARITIES, isRarity, rewardWeight, duplicateRefund } from "../lib/rarity.js";
 
 // ======================================================================
@@ -223,6 +224,20 @@ router.post("/cases/:id/open", requireAuth, async (req, res) => {
       user.inventory.push({ rewardKey: winner.key, obtainedAt: new Date(), count: 1 });
       await user.save({ timestamps: false });
     }
+
+    // Journal pour le fil des abonnés (best-effort : une panne ici ne doit pas
+    // priver le joueur de son lot, déjà acquis).
+    recordActivity({
+      actor: req.userId,
+      type: "case_open",
+      meta: {
+        rewardKey: winner.key,
+        rewardName: winner.name,
+        rarity: winner.rarity,
+        caseName: box.name,
+        duplicate: !!existing,
+      },
+    });
 
     res.json({
       reward: winner.toPublic(),

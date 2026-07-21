@@ -1642,6 +1642,123 @@
 }
 
 /* ======================================================================
+   Cartes de fil « caisse ouverte » (voir FeedCards.jsx).
+   Toute la carte est teintée par --drop-rarity : on juge la prise à l'œil.
+   ====================================================================== */
+.hf-drop-body {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-top: 0.6rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--drop-rarity) 45%, transparent);
+  border-left: 3px solid var(--drop-rarity);
+  border-radius: var(--radius);
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--drop-rarity) 14%, transparent),
+    transparent 70%
+  );
+}
+/* Halo derrière le lot : la couleur « respire » sans animer la carte entière. */
+.hf-drop-aura {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  width: 116px;
+  height: 116px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--drop-rarity), transparent 62%);
+  opacity: 0.28;
+  pointer-events: none;
+}
+.hf-drop-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  flex: 0 0 62px;
+}
+.hf-drop-art img {
+  image-rendering: pixelated;
+}
+.hf-drop-info {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.hf-drop-rarity {
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--drop-rarity);
+}
+.hf-drop-name {
+  font-size: 1.02rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hf-drop-new,
+.hf-drop-dup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+.hf-drop-new {
+  color: var(--drop-rarity);
+  font-weight: 600;
+}
+
+/* Les autres prises de la fournée, en vignettes. */
+.hf-dropg-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.55rem 0 0;
+  padding: 0;
+}
+.hf-dropg-chip {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid color-mix(in srgb, var(--drop-rarity) 55%, transparent);
+  border-bottom: 2px solid var(--drop-rarity);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--drop-rarity) 10%, var(--surface-2));
+}
+.hf-dropg-chip img {
+  image-rendering: pixelated;
+}
+.hf-dropg-chip.best {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--drop-rarity) 55%, transparent);
+}
+/* Pastille discrète en coin : ce lot était un doublon. */
+.hf-dropg-dup {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-soft);
+  border: 1.5px solid var(--surface);
+}
+
+/* ======================================================================
    Barre d'arcade de l'accueil (remplace l'ancienne page /arcade).
    ====================================================================== */
 .abar {

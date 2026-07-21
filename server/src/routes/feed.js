@@ -12,6 +12,10 @@ import { SEASONS } from "../lib/marvelRivalsData.js";
 import Documentary from "../models/Documentary.js";
 import GameMedia from "../models/GameMedia.js";
 import Activity from "../models/Activity.js";
+import Reward from "../models/Reward.js";
+// Ordonné du plus commun au plus rare : sert à désigner la plus belle prise
+// d'une fournée de caisses.
+import { RARITY_KEYS } from "../lib/rarity.js";
 import GemDiscovery from "../models/GemDiscovery.js";
 import GemSkip from "../models/GemSkip.js";
 import Recommendation from "../models/Recommendation.js";
@@ -253,6 +257,7 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
 
   const events = [];
   const blindtests = []; // regroupés en rafale après la boucle des activités
+  const caseopens = []; // idem : ouvrir plusieurs caisses d'affilée est la norme
 
   // --- Actions de bibliothèque (game_update) : on complète la carte avec
   // l'état ACTUEL de l'entrée (review, note, réactions…) pour pouvoir y
@@ -482,6 +487,22 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
         correct: a.meta.correct || 0,
         total: a.meta.total || 0,
         challenge: a.meta.challenge || null,
+      });
+      continue;
+    }
+
+    if (a.type === "case_open") {
+      if (!a.meta?.rewardKey) continue;
+      caseopens.push({
+        type: "caseopen",
+        id: `a-${a._id}`,
+        date: a.createdAt,
+        user: person(a.actor),
+        rewardKey: a.meta.rewardKey,
+        rewardName: a.meta.rewardName || "",
+        rarity: a.meta.rarity || "common",
+        caseName: a.meta.caseName || "",
+        duplicate: !!a.meta.duplicate,
       });
       continue;
     }
@@ -824,6 +845,64 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
             total: m.total,
             challenge: m.challenge,
           })),
+        });
+      } else {
+        events.push(c.members[0]);
+      }
+    }
+  }
+
+  // --- Caisses ouvertes : on en ouvre rarement une seule, donc les ouvertures
+  //     rapprochées d'un même joueur donnent UNE carte « a ouvert N caisses ».
+  //     Les visuels des lots sont résolus en un seul aller-retour. ---
+  if (caseopens.length) {
+    const keys = [...new Set(caseopens.map((c) => c.rewardKey))];
+    const rewards = await Reward.find({ key: { $in: keys } })
+      .select("key name rarity data type")
+      .lean()
+      .catch(() => []);
+    const byKey = new Map(rewards.map((r) => [r.key, r]));
+    for (const c of caseopens) {
+      const r = byKey.get(c.rewardKey);
+      // Le lot a pu être renommé (ou supprimé) depuis : la base fait foi.
+      if (r) {
+        c.rewardName = r.name || c.rewardName;
+        c.rarity = r.rarity || c.rarity;
+      }
+      c.art = r?.data || null;
+      c.rewardType = r?.type || "cursor";
+    }
+
+    caseopens.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const clusters = [];
+    for (const co of caseopens) {
+      const last = clusters[clusters.length - 1];
+      if (
+        last &&
+        last.user.id === co.user.id &&
+        new Date(last.lastDate) - new Date(co.date) <= GROUP_GAP
+      ) {
+        last.members.push(co);
+        last.lastDate = co.date;
+      } else {
+        clusters.push({ user: co.user, date: co.date, lastDate: co.date, members: [co] });
+      }
+    }
+    for (const c of clusters) {
+      if (c.members.length >= 2) {
+        // Le plus rare de la fournée porte la carte : c'est lui l'évènement.
+        const best = c.members.reduce((a, b) =>
+          RARITY_KEYS.indexOf(b.rarity) > RARITY_KEYS.indexOf(a.rarity) ? b : a
+        );
+        events.push({
+          type: "caseopengroup",
+          id: `co-g-${c.members[0].id}`,
+          date: c.date,
+          user: c.user,
+          count: c.members.length,
+          caseName: c.members[0].caseName,
+          best,
+          drops: c.members,
         });
       } else {
         events.push(c.members[0]);

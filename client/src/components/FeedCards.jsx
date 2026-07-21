@@ -53,6 +53,9 @@ import {
   ArrowRight,
   VenetianMask,
 } from "lucide-react";
+import { PackageOpen, Sparkles as SparklesIc, Copy as CopyIc } from "lucide-react";
+import { rarityColor, rarityLabel } from "../lib/rarity";
+import RewardArt from "./RewardArt";
 import { apiFetch } from "../lib/api";
 import { downloadImage } from "../lib/download";
 import { timeAgo, fmtDuration } from "../lib/lists";
@@ -155,6 +158,8 @@ export function FeedCard(props) {
   if (item.type === "gems") return <GemsEvent {...props} />;
   if (item.type === "blindtest") return <BlindTestEvent {...props} />;
   if (item.type === "blindtestgroup") return <BlindTestGroupEvent {...props} />;
+  if (item.type === "caseopen") return <CaseOpenEvent {...props} />;
+  if (item.type === "caseopengroup") return <CaseOpenGroupEvent {...props} />;
   if (item.type === "trackermatch") return <TrackerMatchEvent {...props} />;
   if (item.type === "trackermatchgroup") return <TrackerMatchGroupEvent {...props} />;
   if (item.type === "rankchange") return <RankChangeEvent {...props} />;
@@ -1806,6 +1811,94 @@ function BlindTestEvent({ item, onOpenBlindTest }) {
       >
         <Disc3 size={15} /> Voir les résultats
       </button>
+    </article>
+  );
+}
+
+// ============================================================
+//  Caisse ouverte — le lot obtenu, mis en scène par sa rareté
+// ============================================================
+// La couleur de rareté pilote toute la carte (aura, liseré, étiquette) : on
+// reconnaît une belle prise avant même d'avoir lu le nom du lot.
+function CaseOpenEvent({ item }) {
+  const color = rarityColor(item.rarity);
+  const reward = { type: item.rewardType || "cursor", data: item.art || {} };
+  return (
+    <article className="hf-card hf-drop" style={{ "--drop-rarity": color }}>
+      <EventHead user={item.user} date={item.date}>
+        <PackageOpen size={13} className="hf-inline-ic" /> a ouvert une caisse
+      </EventHead>
+
+      <div className="hf-drop-body">
+        <span className="hf-drop-aura" aria-hidden="true" />
+        <span className="hf-drop-art">
+          <RewardArt reward={reward} size={52} />
+        </span>
+        <span className="hf-drop-info">
+          <span className="hf-drop-rarity">{rarityLabel(item.rarity)}</span>
+          <strong className="hf-drop-name">{item.rewardName}</strong>
+          {item.duplicate ? (
+            <span className="hf-drop-dup">
+              <CopyIc size={11} /> doublon, reconverti en points
+            </span>
+          ) : (
+            <span className="hf-drop-new">
+              <SparklesIc size={11} /> nouveau dans sa collection
+            </span>
+          )}
+        </span>
+      </div>
+    </article>
+  );
+}
+
+// Plusieurs caisses d'affilée → une seule carte. La plus belle prise tient la
+// vedette, les autres défilent en petites vignettes sous elle.
+function CaseOpenGroupEvent({ item }) {
+  const best = item.best;
+  const color = rarityColor(best.rarity);
+  const bestReward = { type: best.rewardType || "cursor", data: best.art || {} };
+  return (
+    <article className="hf-card hf-drop hf-dropg" style={{ "--drop-rarity": color }}>
+      <EventHead user={item.user} date={item.date}>
+        <PackageOpen size={13} className="hf-inline-ic" /> a ouvert {item.count}{" "}
+        caisses
+      </EventHead>
+
+      <div className="hf-drop-body">
+        <span className="hf-drop-aura" aria-hidden="true" />
+        <span className="hf-drop-art">
+          <RewardArt reward={bestReward} size={52} />
+        </span>
+        <span className="hf-drop-info">
+          <span className="hf-drop-rarity">
+            {rarityLabel(best.rarity)} · plus belle prise
+          </span>
+          <strong className="hf-drop-name">{best.rewardName}</strong>
+          <span className="hf-drop-new">
+            <SparklesIc size={11} /> {item.count} lots obtenus
+          </span>
+        </span>
+      </div>
+
+      <ul className="hf-dropg-list">
+        {item.drops.map((d) => (
+          <li
+            key={d.id}
+            className={`hf-dropg-chip ${d === best ? "best" : ""}`}
+            style={{ "--drop-rarity": rarityColor(d.rarity) }}
+            title={`${d.rewardName} · ${rarityLabel(d.rarity)}${
+              d.duplicate ? " (doublon)" : ""
+            }`}
+          >
+            <RewardArt
+              reward={{ type: d.rewardType || "cursor", data: d.art || {} }}
+              size={26}
+            />
+            {d.duplicate && <i className="hf-dropg-dup" aria-hidden="true" />}
+          </li>
+        ))}
+      </ul>
     </article>
   );
 }
