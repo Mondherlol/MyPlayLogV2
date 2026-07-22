@@ -14,6 +14,8 @@ import { planArcadeBackfill, runArcadeBackfill } from "../lib/arcadeBackfill.js"
 import { recordActivity } from "../lib/activity.js";
 import { triggerMissionCheck } from "../lib/missions.js";
 import { RARITIES, isRarity, rewardWeight, duplicateRefund } from "../lib/rarity.js";
+// Les cartes des mini-jeux s'illustrent avec de vraies jaquettes du joueur.
+import { userCovers } from "./pixel.js";
 
 // ======================================================================
 //  Arcade — les points gagnés en jouant s'échangent contre des cosmétiques.
@@ -92,9 +94,10 @@ function publicCase(c, rewards) {
 // mon solde, les caisses ouvrables, et mon inventaire.
 router.get("/", requireAuth, async (req, res) => {
   try {
-    const [user, cases] = await Promise.all([
+    const [user, cases, covers] = await Promise.all([
       User.findById(req.userId).select("points inventory equipped").lean(),
       LootCase.find({ enabled: true }).sort({ order: 1, createdAt: 1 }).populate("rewards"),
+      userCovers(req.userId, 4),
     ]);
     if (!user) return res.status(404).json({ error: "Compte introuvable." });
 
@@ -111,7 +114,9 @@ router.get("/", requireAuth, async (req, res) => {
         cursor: user.equipped?.cursor || null,
         ornament: user.equipped?.ornament || null,
         badge: user.equipped?.badge || null,
+        theme: user.equipped?.theme || null,
       },
+      covers,
       cases: cases.map((c) => publicCase(c, c.rewards || [])),
       inventory: ownedRewards.map((r) => ({
         ...r.toPublic(),

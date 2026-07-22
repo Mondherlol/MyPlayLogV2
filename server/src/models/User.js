@@ -172,11 +172,37 @@ const userSchema = new mongoose.Schema(
       cursor: { type: String, default: null },
       ornament: { type: String, default: null },
       badge: { type: String, default: null },
+      theme: { type: String, default: null },
     },
 
     // --- Abonnements (qui JE suis) ---
     following: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+      default: [],
+    },
+
+    // --- Confidentialité ---
+    // `isPrivate` : seuls les abonnés voient le contenu du profil ; s'abonner
+    // passe alors par une DEMANDE à valider. Les trois autres options sont des
+    // SOUS-options : elles n'ont aucun effet tant que le compte est public
+    // (voir privacyOf() dans lib/privacy.js, qui les neutralise).
+    privacy: {
+      isPrivate: { type: Boolean, default: false },
+      hideAvatar: { type: Boolean, default: false }, // photo de profil masquée
+      hideCover: { type: Boolean, default: false }, // bannière masquée
+      hideReviews: { type: Boolean, default: false }, // reviews hors des pages de jeux
+    },
+
+    // Demandes d'abonnement REÇUES et encore en attente (comptes privés).
+    // Acceptée → le demandeur passe dans SON `following` ; refusée → oubliée.
+    followRequests: {
+      type: [
+        {
+          user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+          createdAt: { type: Date, default: Date.now },
+          _id: false,
+        },
+      ],
       default: [],
     },
 
@@ -251,8 +277,17 @@ userSchema.methods.toPublic = function () {
       cursor: this.equipped?.cursor || null,
       ornament: this.equipped?.ornament || null,
       badge: this.equipped?.badge || null,
+      theme: this.equipped?.theme || null,
     },
     followingCount: (this.following || []).length,
+    privacy: {
+      isPrivate: !!this.privacy?.isPrivate,
+      hideAvatar: !!this.privacy?.hideAvatar,
+      hideCover: !!this.privacy?.hideCover,
+      hideReviews: !!this.privacy?.hideReviews,
+    },
+    // Pastille « demandes d'abonnement en attente » (compte privé).
+    followRequestCount: (this.followRequests || []).length,
     createdAt: this.createdAt,
   };
 };

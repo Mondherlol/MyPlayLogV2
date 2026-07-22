@@ -649,6 +649,7 @@ export function Composer({
   const [mediaList, setMediaList] = useState(initialMedia); // [{type,url,width,height}]
   const [panel, setPanel] = useState(null); // null | "emoji" | "gif"
   const [popUp, setPopUp] = useState(false); // popover vers le haut si pas de place en bas
+  const [popPos, setPopPos] = useState(null); // { left, top | bottom } en coords viewport
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
@@ -663,6 +664,7 @@ export function Composer({
   const inputRef = useRef(null);
   const fileRef = useRef(null);
   const toolbarRef = useRef(null);
+  const popRef = useRef(null); // popover émoji / GIF (rendu dans un portail)
   const hlRef = useRef(null); // calque de surlignage aligné sur le textarea
 
   // Mode « éditeur contrôlé » : remonte le contenu au parent à chaque frappe.
@@ -687,7 +689,11 @@ export function Composer({
   useEffect(() => {
     if (!panel) return;
     function onDocDown(e) {
-      if (toolbarRef.current && !toolbarRef.current.contains(e.target)) {
+      const inToolbar = toolbarRef.current?.contains(e.target);
+      // Le popover vit dans un portail : il n'est PLUS dans la barre d'outils,
+      // il faut donc le tester à part (sinon cliquer un GIF ferme le panneau).
+      const inPop = popRef.current?.contains(e.target);
+      if (!inToolbar && !inPop) {
         e.preventDefault();
         e.stopPropagation();
         setPanel(null);
@@ -697,17 +703,40 @@ export function Composer({
     return () => document.removeEventListener("mousedown", onDocDown, true);
   }, [panel]);
 
-  // À l'ouverture d'un popover : s'il n'y a pas assez de place en bas, on
-  // l'ouvre vers le haut (ancré au bouton) plutôt que d'agrandir la page.
-  useLayoutEffect(() => {
-    if (!panel) return;
+  // Place le popover en coordonnées VIEWPORT, ancré au bouton : s'il n'y a pas
+  // assez de place en bas, il s'ouvre vers le haut.
+  const placePop = useCallback(() => {
     const el = toolbarRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const estimated = 380; // hauteur approx. du popover (émoji/gif)
+    const width = panel === "gif" ? 360 : 340;
     const below = window.innerHeight - rect.bottom;
-    setPopUp(below < estimated && rect.top > below);
+    const up = below < estimated && rect.top > below;
+    setPopUp(up);
+    setPopPos({
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
+      ...(up
+        ? { bottom: window.innerHeight - rect.top + 8 }
+        : { top: rect.bottom + 8 }),
+    });
   }, [panel]);
+
+  useLayoutEffect(() => {
+    if (!panel) {
+      setPopPos(null);
+      return;
+    }
+    placePop();
+    // Le fil peut défiler SOUS le popover (liste scrollable d'une modale) : on
+    // le garde collé à son bouton. `capture` pour attraper les scrolls internes.
+    window.addEventListener("scroll", placePop, true);
+    window.addEventListener("resize", placePop);
+    return () => {
+      window.removeEventListener("scroll", placePop, true);
+      window.removeEventListener("resize", placePop);
+    };
+  }, [panel, placePop]);
 
   const slotsLeft = MAX_MEDIA - mediaList.length;
   const full = slotsLeft <= 0;
@@ -996,22 +1025,32 @@ export function Composer({
 
       {/* Barre d'outils SOUS l'input (esprit Twitter) + popovers flottants */}
       <div className="lc-toolbar-wrap" ref={toolbarRef}>
-        {panel === "emoji" && (
-          <div className={`lc-pop lc-pop-emoji ${popUp ? "up" : "down"}`}>
-            <EmojiPanel onPick={insertEmoji} />
-          </div>
-        )}
-        {panel === "gif" && (
-          <div className={`lc-pop lc-pop-gif ${popUp ? "up" : "down"}`}>
-            <GifPanel
-              token={token}
-              onPick={(g) => {
-                addMedia([{ type: "gif", url: g.url, width: g.width, height: g.height }]);
-                setPanel(null);
-              }}
-            />
-          </div>
-        )}
+        {/* Popovers rendus dans un PORTAIL sur <body> : dans une modale, le fil
+            de commentaires scrolle (overflow) et rognait le panneau, qui
+            semblait passer derrière l'en-tête. En portail + position fixed, il
+            n'est plus prisonnier d'aucun conteneur. */}
+        {panel &&
+          popPos &&
+          createPortal(
+            <div
+              ref={popRef}
+              className={`lc-pop lc-pop-${panel} ${popUp ? "up" : "down"}`}
+              style={popPos}
+            >
+              {panel === "emoji" ? (
+                <EmojiPanel onPick={insertEmoji} />
+              ) : (
+                <GifPanel
+                  token={token}
+                  onPick={(g) => {
+                    addMedia([{ type: "gif", url: g.url, width: g.width, height: g.height }]);
+                    setPanel(null);
+                  }}
+                />
+              )}
+            </div>,
+            document.body
+          )}
         <div className="lc-toolbar">
           <div className="lc-toolbar-left">
           <button

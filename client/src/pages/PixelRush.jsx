@@ -1,27 +1,20 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import {
-  Music2,
+  Grid2x2,
   Play,
   Pause,
   Search,
   Trophy,
   ArrowLeft,
   RotateCcw,
-  Share2,
   Check,
   X,
   Gamepad2,
   Crown,
   Loader2,
   Swords,
-  Volume1,
   Volume2,
   VolumeX,
   SkipForward,
@@ -32,13 +25,13 @@ import {
   Timer,
   Home,
   Coins,
+  Maximize2,
+  Minimize2,
+  Scan,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { usePlayer } from "../context/PlayerContext";
 import { apiFetch } from "../lib/api";
-import { loadYT } from "../lib/youtube";
-// Règles communes aux mini-jeux « devine le jeu » (partagées avec Pixel Rush) :
-// normalisation des titres, recherche tolérante, estimation des points.
+import PixelCanvas from "../components/PixelCanvas";
 import {
   dedupeCandidates,
   estimatePoints,
@@ -48,24 +41,158 @@ import {
 import { useGameSfx } from "../lib/useGameSfx";
 
 // ============================================================
-//  Blind test musical — devine le jeu à partir d'un extrait d'OST
+//  Pixel Rush — devine le jeu derrière des screenshots pixelisés
 // ============================================================
+// Toutes les captures de la manche sont posées d'emblée en grille (2 par
+// ligne) : rien à faire défiler, on embrasse l'ensemble d'un coup d'œil et on
+// clique pour zoomer sur l'une d'elles. Pendant la manche (`durationSec`) :
+//   • la définition remonte un peu (PIX_START → PIX_END blocs de large), sans
+//     jamais devenir lisible : le rendu net est réservé à la révélation ;
+//   • chaque seconde écoulée coûte des points (cf. lib/guessGame).
 
-// Fractions de l'extrait auxquelles les indices se dévoilent.
-const HINT_FRACS = [0.35, 0.55, 0.75];
+// Largeur de l'image en « blocs ». On reste volontairement TRÈS grossier : à
+// 24 blocs on lit des masses de couleur et une ambiance, jamais une scène.
+const PIX_START = 9;
+const PIX_END = 24;
 
 // Décompte avant le passage automatique à la manche suivante après la
 // révélation (la barre CSS .bt-reveal-progress dure aussi 5 s — garder synchro).
 const AUTO_NEXT_MS = 5000;
 
-// Temps supplémentaire APRÈS la fin de l'extrait pour finir de taper sa
-// réponse (le son est coupé, le chrono devient rouge).
-const GRACE_MS = 10000;
+// Fractions de la manche auxquelles les indices se dévoilent.
+const HINT_FRACS = [0.35, 0.55, 0.75];
 
-export default function BlindTest() {
+// Une capture de la révélation : elle arrive dans son état pixelisé de fin de
+// manche, puis se « développe » comme une photo — les blocs fondent jusqu'à
+// l'image nette. Chaque capture démarre un peu après la précédente (`delay`),
+// ce qui donne la cascade.
+const REVEAL_ANIM_MS = 700;
+
+function RevealShot({ src, from, delay = 0, label }) {
+  const [blocks, setBlocks] = useState(from);
+  const [sharp, setSharp] = useState(false);
+
+  useEffect(() => {
+    setBlocks(from);
+    setSharp(false);
+    let raf = 0;
+    let start = 0;
+    const step = (t) => {
+      if (!start) start = t;
+      const p = Math.min(1, (t - start) / REVEAL_ANIM_MS);
+      // Courbe douce, puis on passe au rendu net : au-delà de ~180 blocs, un
+      // cran de plus ne se voit plus, autant afficher la vraie image.
+      const eased = p * p;
+      const v = from + (200 - from) * eased;
+      // On ne repeint que si le palier bouge vraiment : sans ça, 4 canvas se
+      // redessineraient 60 fois par seconde pour un écart invisible.
+      setBlocks((prev) => (Math.abs(v - prev) >= 2 ? v : prev));
+      if (p < 1) raf = requestAnimationFrame(step);
+      else setSharp(true);
+    };
+    const timer = setTimeout(() => {
+      raf = requestAnimationFrame(step);
+    }, delay);
+    return () => {
+      clearTimeout(timer);
+      cancelAnimationFrame(raf);
+    };
+  }, [src, from, delay]);
+
+  return (
+    <span className="px-reveal-tile" style={{ animationDelay: `${delay}ms` }}>
+      <PixelCanvas src={src} blocks={blocks} reveal={sharp} label={label} />
+    </span>
+  );
+}
+
+// ============================================================
+//  La carte de l'écran d'accueil
+// ============================================================
+// Elle se retourne en boucle et joue une manche en miniature : d'un côté la
+// jaquette d'un des jeux du joueur NOYÉE SOUS LES PIXELS avec le « ? », de
+// l'autre la même jaquette nette — la réponse. On comprend la règle sans
+// lire une ligne. HERO_FLIP_MS est calé sur la durée de l'animation CSS
+// px-hero-flip, à garder synchro.
+const HERO_FLIP_MS = 7000;
+// Instant du cycle où l'on change de jeu : 95 %, c'est-à-dire pile quand la
+// carte est SUR LA TRANCHE pendant son second retournement. Changer l'image
+// quand une face nous regarde la ferait sauter sous les yeux.
+const HERO_SWAP_AT = 0.95;
+const HERO_CV_W = 300; // 3/4 : format jaquette, pas le 16/9 des captures
+const HERO_CV_H = 400;
+
+function HeroCard({ token }) {
+  const [games, setGames] = useState([]);
+  const [i, setI] = useState(0);
+
+  useEffect(() => {
+    let alive = true;
+    apiFetch("/pixel/covers", { token })
+      .then((d) => alive && setGames(d.games || []))
+      .catch(() => {
+        /* décoratif : on garde l'icône de repli */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [token]);
+
+  useEffect(() => {
+    if (games.length < 2) return;
+    const next = () => setI((n) => (n + 1) % games.length);
+    let iv = 0;
+    // Décalage initial pour caler les changements sur la tranche de la carte,
+    // puis un tour complet entre chaque.
+    const t = setTimeout(() => {
+      next();
+      iv = setInterval(next, HERO_FLIP_MS);
+    }, HERO_FLIP_MS * HERO_SWAP_AT);
+    return () => {
+      clearTimeout(t);
+      clearInterval(iv);
+    };
+  }, [games.length]);
+
+  const game = games[i] || null;
+
+  return (
+    <div className="px-hero" aria-hidden="true">
+      <span className="px-hero-glow" />
+      <span className="px-hero-card">
+        {/* La question : la jaquette noyée sous les pixels, et le « ? ». */}
+        <span className="px-hero-face back">
+          {game ? (
+            <PixelCanvas
+              src={game.cover}
+              blocks={13}
+              reveal={false}
+              label=""
+              w={HERO_CV_W}
+              h={HERO_CV_H}
+            />
+          ) : (
+            <span className="px-hero-grid" />
+          )}
+          <b>?</b>
+        </span>
+        {/* La réponse : la même jaquette, nette. */}
+        <span className="px-hero-face front">
+          {game ? (
+            <img src={game.cover} alt="" draggable="false" />
+          ) : (
+            <Scan size={44} className="px-hero-ic" />
+          )}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+export default function PixelRush() {
   const { token } = useAuth();
-  const player = usePlayer();
   const navigate = useNavigate();
+  const location = useLocation();
   const [params] = useSearchParams();
   const challengeId = params.get("challenge");
   const sfx = useGameSfx();
@@ -74,16 +201,7 @@ export default function BlindTest() {
   const [phase, setPhase] = useState("intro");
   const [error, setError] = useState("");
   const [roundCount, setRoundCount] = useState(10);
-  const [muted, setMutedState] = useState(false);
-  const [volume, setVolume] = useState(() => {
-    // getItem() renvoie null quand rien n'est stocké → Number(null) vaut 0 (et
-    // passe le test >= 0), d'où un volume à 0 au tout premier lancement. On
-    // teste donc l'ABSENCE de valeur explicitement, et on démarre à fond.
-    const raw = localStorage.getItem("bt_volume");
-    const v = raw == null ? NaN : Number(raw);
-    return Number.isFinite(v) && v >= 0 && v <= 100 ? v : 100;
-  });
-  const [paused, setPaused] = useState(false);
+  const [muted, setMuted] = useState(false);
 
   // Données de la partie
   const [sessionId, setSessionId] = useState(null);
@@ -94,13 +212,12 @@ export default function BlindTest() {
   // Déroulé
   const [idx, setIdx] = useState(0);
   const [score, setScore] = useState(0);
-  const [timeLeftMs, setTimeLeftMs] = useState(0);
-  const [reveal, setReveal] = useState(null); // { correct, points, round, guessName }
-  const [nextIn, setNextIn] = useState(5); // secondes avant l'auto-avance
-  const [replayOn, setReplayOn] = useState(false); // réécoute depuis la card résultat
-  const [clipLoading, setClipLoading] = useState(false); // le son charge encore
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [zoom, setZoom] = useState(null); // index du cliché agrandi (null = grille)
+  const [reveal, setReveal] = useState(null); // { correct, points, round, guessName, shot }
+  const [nextIn, setNextIn] = useState(5);
+  const [paused, setPaused] = useState(false);
   const [final, setFinal] = useState(null);
-  const [copied, setCopied] = useState(false);
 
   // Recherche (guess)
   const [input, setInput] = useState("");
@@ -115,234 +232,51 @@ export default function BlindTest() {
   const lastTickRef = useRef(-1);
   const finishingRef = useRef(false);
   const advanceRef = useRef(() => {});
-  const mutedRef = useRef(false); // miroir du mute pour les closures du player
-  const volumeRef = useRef(volume);
   const pausedRef = useRef(false);
   const pauseStartRef = useRef(0);
   const prevUnlockRef = useRef(0);
-  const replayRef = useRef(false); // miroir de replayOn pour les timers
-  const clipStartRef = useRef(0); // position (s) du début de l'extrait dans la vidéo
-  const revealAtRef = useRef(0); // instant de la révélation (anti Entrée « en retard »)
-  const loadingRef = useRef(false); // miroir de clipLoading pour le timer de manche
-  const graceRef = useRef(false); // l'extrait est fini, on est dans le temps bonus
-
-  // --- Player YouTube caché, propre à la page (indépendant du mini-lecteur) ---
-  const ytHostRef = useRef(null);
-  const ytRef = useRef(null);
-  const readyRef = useRef(false);
-  const pollRef = useRef(null);
-  const seekDoneRef = useRef(false);
+  const revealAtRef = useRef(0);
+  // Miroir du zoom : le timer de manche est armé une seule fois, sa closure ne
+  // verrait sinon que l'état initial.
+  const zoomRef = useRef(null);
+  // Définition atteinte à l'instant de la réponse : la révélation repart de là.
+  const blocksRef = useRef(PIX_START);
 
   useEffect(() => {
-    let destroyed = false;
-    loadYT().then((YT) => {
-      if (destroyed || !ytHostRef.current) return;
-      const host = document.createElement("div");
-      ytHostRef.current.appendChild(host);
-      ytRef.current = new YT.Player(host, {
-        height: "0",
-        width: "0",
-        playerVars: {
-          autoplay: 0,
-          playsinline: 1,
-          controls: 0,
-          disablekb: 1,
-          fs: 0,
-          rel: 0,
-          modestbranding: 1,
-        },
-        events: {
-          onReady: () => {
-            readyRef.current = true;
-          },
-        },
-      });
-    });
-    return () => {
-      destroyed = true;
-      if (pollRef.current) clearInterval(pollRef.current);
-      try {
-        ytRef.current?.destroy();
-      } catch {
-        /* ignore */
-      }
-      ytRef.current = null;
-      readyRef.current = false;
-      if (ytHostRef.current) ytHostRef.current.innerHTML = "";
-    };
-  }, []);
-
-  const stopClip = useCallback(() => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-    try {
-      ytRef.current?.pauseVideo?.();
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  // Charge un extrait : démarre muet, attend la durée, se cale au bon endroit,
-  // puis démasque le son (l'appli est lancée sur un clic → l'audio est autorisé).
-  // Pendant le chargement, un spinner s'affiche sur le vinyle et le chrono de la
-  // manche est réarmé au moment où le son démarre réellement.
-  const playClip = useCallback(
-    (round) => {
-      const p = ytRef.current;
-      if (!p) return;
-      seekDoneRef.current = false;
-      loadingRef.current = true;
-      setClipLoading(true);
-      try {
-        p.loadVideoById(round.videoId);
-        p.mute?.();
-      } catch {
-        /* ignore */
-      }
-      if (pollRef.current) clearInterval(pollRef.current);
-      const pollStart = Date.now();
-      pollRef.current = setInterval(() => {
-        const pl = ytRef.current;
-        if (!pl?.getDuration || seekDoneRef.current) return;
-        let dur = 0;
-        try {
-          dur = pl.getDuration() || 0;
-        } catch {
-          /* ignore */
-        }
-        if (dur > 0) {
-          seekDoneRef.current = true;
-          const clip = round.durationSec;
-          const maxStart = Math.max(0, dur - clip - 1);
-          const startAt = Math.min((round.startFrac || 0) * dur, maxStart);
-          clipStartRef.current = startAt;
-          try {
-            pl.seekTo(startAt, true);
-            if (!mutedRef.current) {
-              pl.unMute?.();
-              pl.setVolume?.(volumeRef.current);
-            }
-            if (!pausedRef.current) pl.playVideo?.();
-          } catch {
-            /* ignore */
-          }
-          // Le vrai départ de la manche : le chrono repart quand le son joue.
-          if (!lockedRef.current && !pausedRef.current) roundStartRef.current = Date.now();
-          loadingRef.current = false;
-          setClipLoading(false);
-          clearInterval(pollRef.current);
-          pollRef.current = null;
-        } else if (Date.now() - pollStart > 8000) {
-          // Vidéo qui ne répond pas : on retire le spinner, la manche continue.
-          if (!lockedRef.current && !pausedRef.current) roundStartRef.current = Date.now();
-          loadingRef.current = false;
-          setClipLoading(false);
-          clearInterval(pollRef.current);
-          pollRef.current = null;
-        }
-      }, 120);
-    },
-    []
-  );
-
-  // Applique le mute au player + aux bruitages.
-  useEffect(() => {
-    mutedRef.current = muted;
     sfx.setMuted(muted);
-    try {
-      if (muted) ytRef.current?.mute?.();
-      else if (readyRef.current) {
-        ytRef.current?.unMute?.();
-        ytRef.current?.setVolume?.(volumeRef.current);
-      }
-    } catch {
-      /* ignore */
-    }
   }, [muted, sfx]);
 
-  // Applique le volume au player + aux bruitages, et le retient pour la
-  // prochaine session.
-  useEffect(() => {
-    volumeRef.current = volume;
-    localStorage.setItem("bt_volume", String(volume));
-    sfx.setLevel(volume / 100);
-    try {
-      ytRef.current?.setVolume?.(volume);
-    } catch {
-      /* ignore */
-    }
-  }, [volume, sfx]);
-
-  // Met en pause le mini-lecteur global si quelque chose y jouait.
-  useEffect(() => {
-    player?.pause?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Mode immersif : sur mobile, masque la bottom bar de navigation le temps de
-  // la partie (sinon elle chevauche le champ quand le clavier virtuel s'ouvre).
+  // Mode immersif : sur mobile, masque la bottom bar le temps de la partie
+  // (sinon elle chevauche le champ quand le clavier virtuel s'ouvre).
   useEffect(() => {
     document.body.classList.add("bt-immersive");
     return () => document.body.classList.remove("bt-immersive");
   }, []);
 
-  // --- Pause / reprise : fige le chrono (décale l'origine de la manche du
-  //     temps passé en pause) et suspend l'extrait. ---
-  const togglePause = useCallback(() => {
-    if (lockedRef.current) return;
-    const next = !pausedRef.current;
-    pausedRef.current = next;
-    setPaused(next);
-    if (next) {
-      pauseStartRef.current = Date.now();
-      try {
-        ytRef.current?.pauseVideo?.();
-      } catch {
-        /* ignore */
-      }
-    } else {
-      roundStartRef.current += Date.now() - pauseStartRef.current;
-      // Pas de reprise du son si l'extrait était déjà terminé (temps bonus).
-      if (!graceRef.current) {
-        try {
-          ytRef.current?.playVideo?.();
-        } catch {
-          /* ignore */
-        }
-      }
-      setTimeout(() => inputRef.current?.focus(), 30);
-    }
-  }, []);
+  // Retour = on repart d'où l'on vient (l'arcade, le fil, un profil…).
+  // `key === "default"` signale une page ouverte directement (lien partagé,
+  // favori, rechargement) : là il n'y a rien derrière, on vise l'arcade.
+  const goBack = useCallback(() => {
+    if (location.key !== "default") navigate(-1);
+    else navigate("/arcade");
+  }, [location.key, navigate]);
 
-  // --- Réécoute de l'extrait depuis la card de résultat (toggle) ---
-  const toggleReplay = useCallback(() => {
-    const p = ytRef.current;
-    if (!p) return;
-    const next = !replayRef.current;
-    replayRef.current = next;
-    setReplayOn(next);
-    try {
-      if (next) {
-        p.seekTo?.(clipStartRef.current || 0, true);
-        if (!mutedRef.current) {
-          p.unMute?.();
-          p.setVolume?.(volumeRef.current);
-        }
-        p.playVideo?.();
-      } else {
-        p.pauseVideo?.();
-      }
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  const round = rounds[idx];
+  const durationMs = round ? round.durationSec * 1000 : 0;
+  const progress = durationMs ? Math.min(1, elapsedMs / durationMs) : 0;
+  const timeLeftMs = Math.max(0, durationMs - elapsedMs);
+  const secondsLeft = Math.ceil(timeLeftMs / 1000);
+
+  const shots = round?.shots || [];
+  // Définition courante — jamais lisible, même à la dernière seconde. Arrondie
+  // ici : les canvas ne se redessinent qu'au changement de palier (une quinzaine
+  // de fois par manche) et pas à chaque tic de 100 ms.
+  const blocks = Math.round(PIX_START + (PIX_END - PIX_START) * progress);
+  blocksRef.current = blocks;
 
   // --- Démarrage d'une partie ---
   async function startGame() {
     sfx.resume(); // crée/réveille l'AudioContext dans le geste utilisateur
-    player?.pause?.(); // coupe le mini-lecteur global (ex. OST des résultats)
     setError("");
     setPhase("loading");
     setFinal(null);
@@ -352,8 +286,8 @@ export default function BlindTest() {
     guessesRef.current = [];
     try {
       const d = challengeId
-        ? await apiFetch(`/blindtest/challenge/${challengeId}`, { token })
-        : await apiFetch("/blindtest/start", {
+        ? await apiFetch(`/pixel/challenge/${challengeId}`, { token })
+        : await apiFetch("/pixel/start", {
             method: "POST",
             token,
             body: { rounds: roundCount },
@@ -365,90 +299,83 @@ export default function BlindTest() {
       guessesRef.current = new Array((d.rounds || []).length).fill(null);
       setPhase("playing");
     } catch (e) {
-      setError(e.message || "Impossible de lancer le blind test.");
+      setError(e.message || "Impossible de lancer la partie.");
       setPhase("error");
     }
   }
 
-  // --- Verrouille la réponse de la manche courante (guess ou timeout) ---
-  // L'extrait est coupé : place aux bruitages + au résultat (bouton de
-  // réécoute dans la card pour qui veut réentendre le morceau).
+  // --- Verrouille la réponse de la manche courante (guess ou temps écoulé) ---
   const lockGuess = useCallback(
     (cand) => {
       if (lockedRef.current) return;
       lockedRef.current = true;
-      stopClip();
-      loadingRef.current = false;
-      setClipLoading(false);
-      const round = rounds[idx];
-      if (!round) return;
+      const r = rounds[idx];
+      if (!r) return;
       const timeMs = cand ? Date.now() - roundStartRef.current : null;
       const guessId = cand ? cand.id : null;
       const guessName = cand ? cand.name : "";
-      const points = estimatePoints(round, guessId, guessName, timeMs, round.durationSec);
-      const correct = sameGame(round, guessId, guessName);
+      const points = estimatePoints(r, guessId, guessName, timeMs, r.durationSec);
+      const correct = sameGame(r, guessId, guessName);
       guessesRef.current[idx] = {
-        id: round.id,
+        id: r.id,
         gameId: guessId,
-        name: cand ? cand.name : "",
+        name: guessName,
         timeMs,
       };
       setScore((s) => s + points);
       sfx.play(correct ? "correct" : "wrong");
       revealAtRef.current = Date.now();
-      replayRef.current = false;
-      setReplayOn(false);
-      setReveal({ correct, points, round, guessName: cand ? cand.name : null });
+      setReveal({
+        correct,
+        points,
+        round: r,
+        guessName: cand ? cand.name : null,
+        // On révèle en net le cliché zoomé, sinon le premier de la grille.
+        // Toutes les captures de la manche se dépixelisent dans la modale.
+        shots: r.shots || [],
+        blocks: blocksRef.current,
+      });
     },
-    [rounds, idx, stopClip, sfx]
+    [rounds, idx, sfx]
   );
 
   // --- Timer d'une manche ---
   useEffect(() => {
     if (phase !== "playing") return;
-    const round = rounds[idx];
-    if (!round) return;
+    const r = rounds[idx];
+    if (!r) return;
     setReveal(null);
     setInput("");
     setHighlight(0);
+    zoomRef.current = null;
+    setZoom(null);
+    setElapsedMs(0);
     lockedRef.current = false;
     lastTickRef.current = -1;
     pausedRef.current = false;
     setPaused(false);
     prevUnlockRef.current = 0;
-    graceRef.current = false;
     roundStartRef.current = Date.now();
-    // La manche dure : extrait (durationSec) + temps bonus pour taper (GRACE_MS).
-    const total = round.durationSec * 1000 + GRACE_MS;
-    setTimeLeftMs(total);
-    playClip(round);
     sfx.play("start");
-    // Focus le champ de recherche pour taper tout de suite.
     setTimeout(() => inputRef.current?.focus(), 60);
 
+    const total = r.durationSec * 1000;
     const iv = setInterval(() => {
-      // Réponse déjà donnée : on fige le chrono (plus de tic-tac ni d'anneau
-      // qui bouge derrière la correction).
       if (lockedRef.current) {
         clearInterval(iv);
         return;
       }
       if (pausedRef.current) return; // chrono gelé pendant la pause
-      // Chrono gelé tant que le son charge (playClip réarme roundStartRef au
-      // vrai départ) — évite le compteur qui descend puis remonte.
-      if (loadingRef.current) return;
-      const left = Math.max(0, total - (Date.now() - roundStartRef.current));
-      setTimeLeftMs(left);
-      // Fin de l'extrait → on coupe le son, place au temps bonus (une fois).
-      if (left <= GRACE_MS && !graceRef.current) {
-        graceRef.current = true;
-        stopClip();
-      }
-      if (left <= GRACE_MS && left > 0) {
+      const el = Date.now() - roundStartRef.current;
+      setElapsedMs(Math.min(el, total));
+      const left = Math.max(0, total - el);
+      // Manche courte : on n'égrène que les 3 dernières secondes (sur 5, le
+      // tic-tac couvrirait un tiers de la manche).
+      if (left <= 3000 && left > 0) {
         const sec = Math.ceil(left / 1000);
         if (sec !== lastTickRef.current) {
           lastTickRef.current = sec;
-          sfx.play(sec <= 3 ? "tick-hot" : "tick");
+          sfx.play("tick-hot");
         }
       }
       if (left <= 0) {
@@ -460,14 +387,26 @@ export default function BlindTest() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, idx]);
 
+  // --- Pause / reprise : fige le chrono ---
+  const togglePause = useCallback(() => {
+    if (lockedRef.current) return;
+    const next = !pausedRef.current;
+    pausedRef.current = next;
+    setPaused(next);
+    if (next) pauseStartRef.current = Date.now();
+    else {
+      roundStartRef.current += Date.now() - pauseStartRef.current;
+      setTimeout(() => inputRef.current?.focus(), 30);
+    }
+  }, []);
+
   // --- Envoi final ---
   const finishGame = useCallback(async () => {
     if (finishingRef.current) return;
     finishingRef.current = true;
-    stopClip();
     setPhase("loading");
     try {
-      const res = await apiFetch("/blindtest/finish", {
+      const res = await apiFetch("/pixel/finish", {
         method: "POST",
         token,
         body: { sessionId, guesses: guessesRef.current.filter(Boolean) },
@@ -484,8 +423,7 @@ export default function BlindTest() {
           gameId: r.gameId,
           gameName: r.gameName,
           cover: r.cover,
-          ostName: r.ostName,
-          videoId: r.videoId,
+          shots: r.shots || [],
           owned: r.owned,
           correct,
           guessedName: g?.name || "",
@@ -499,18 +437,17 @@ export default function BlindTest() {
           timeMs: g?.timeMs ?? null,
         };
       });
+      const total = Math.max(0, localRounds.reduce((a, r) => a + r.points, 0));
       setFinal({
-        blindTestId: null,
-        score: Math.max(0, localRounds.reduce((a, r) => a + r.points, 0)),
+        pixelGameId: null,
+        score: total,
         correctCount: localRounds.filter((r) => r.correct).length,
         roundCount: localRounds.length,
         challenge: challengeInfo
           ? {
               username: challengeInfo.user?.username,
               score: challengeInfo.score,
-              beaten:
-                Math.max(0, localRounds.reduce((a, r) => a + r.points, 0)) >
-                (challengeInfo.score ?? 0),
+              beaten: total > (challengeInfo.score ?? 0),
             }
           : null,
         rounds: localRounds,
@@ -521,21 +458,17 @@ export default function BlindTest() {
     } finally {
       finishingRef.current = false;
     }
-  }, [sessionId, token, rounds, stopClip, sfx, challengeInfo]);
+  }, [sessionId, token, rounds, sfx, challengeInfo]);
 
   // --- Passage à la manche suivante (ou fin) ---
   const goNext = useCallback(() => {
-    replayRef.current = false;
-    setReplayOn(false);
     setReveal(null);
     if (idx + 1 < rounds.length) setIdx((i) => i + 1);
     else finishGame();
   }, [idx, rounds.length, finishGame]);
   advanceRef.current = goNext;
 
-  // Décompte visible de 5 s après la révélation, puis auto-avance (le bouton
-  // « Suivant », Entrée ou Espace court-circuitent). Le décompte est SUSPENDU
-  // pendant la réécoute de l'extrait (la barre CSS se met en pause aussi).
+  // Décompte de 5 s après la révélation, puis auto-avance.
   useEffect(() => {
     if (!reveal) return;
     let left = AUTO_NEXT_MS;
@@ -543,7 +476,7 @@ export default function BlindTest() {
     setNextIn(Math.ceil(AUTO_NEXT_MS / 1000));
     const iv = setInterval(() => {
       const now = Date.now();
-      if (!replayRef.current) left -= now - last;
+      left -= now - last;
       last = now;
       if (left <= 0) {
         clearInterval(iv);
@@ -555,8 +488,18 @@ export default function BlindTest() {
     return () => clearInterval(iv);
   }, [reveal]);
 
-  // --- Raccourcis clavier (PC) : Entrée lance la partie / passe à la manche
-  //     suivante, Échap met en pause. Re-liés à chaque rendu → closures à jour.
+  // --- Zoom sur un cliché (re-clic = retour à la grille) ---
+  const toggleZoom = useCallback((i) => {
+    if (lockedRef.current || pausedRef.current) return;
+    setZoom((z) => {
+      const next = z === i ? null : i;
+      zoomRef.current = next;
+      return next;
+    });
+    sfx.play("shot");
+  }, [sfx]);
+
+  // --- Raccourcis clavier (PC) ---
   useEffect(() => {
     function onKey(e) {
       if (e.repeat) return;
@@ -568,10 +511,9 @@ export default function BlindTest() {
       }
       if (phase !== "playing") return;
       if (reveal) {
-        // Petit délai de grâce : une Entrée tapée « en retard » (pour valider
-        // une réponse) ne doit pas zapper le résultat qui vient d'apparaître.
+        // Une Entrée tapée « en retard » ne doit pas zapper le résultat.
         if (Date.now() - revealAtRef.current < 400) return;
-        if (k === "Enter" || k === " " || k === "ArrowRight") {
+        if (k === "Enter" || k === " ") {
           e.preventDefault();
           advanceRef.current();
         }
@@ -597,29 +539,34 @@ export default function BlindTest() {
     [input, uniqueCandidates]
   );
 
-  // La liste de suggestions est en position absolue sous le champ : quand le
-  // champ est bas dans la page (contenu centré verticalement), elle débordait
-  // sous l'écran sans qu'on puisse l'atteindre. On plafonne sa hauteur à
-  // l'espace réellement dispo jusqu'au bas du viewport → elle scrolle dedans.
+  // La liste de suggestions est en absolu autour du champ. L'écran de jeu est
+  // haut : sous le champ, il ne reste souvent pas la place: on bascule alors
+  // la liste AU-DESSUS, et on la borne à l'espace réellement disponible pour
+  // qu'elle scrolle dedans au lieu de déborder de la page.
   useEffect(() => {
     const el = suggestRef.current;
     if (!el) return;
-    const fit = () => {
-      const top = el.getBoundingClientRect().top;
-      const avail = window.innerHeight - top - 12;
-      el.style.maxHeight = `${Math.max(140, avail)}px`;
+    const place = () => {
+      const field = el.parentElement?.querySelector(".bt-search");
+      if (!field) return;
+      const r = field.getBoundingClientRect();
+      const below = window.innerHeight - r.bottom - 16;
+      const above = r.top - 16;
+      const up = below < 240 && above > below;
+      el.classList.toggle("up", up);
+      el.style.maxHeight = `${Math.max(140, Math.min(320, up ? above : below))}px`;
     };
-    fit();
-    window.addEventListener("resize", fit);
-    return () => window.removeEventListener("resize", fit);
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
   }, [suggestions]);
 
-  // Navigation clavier : garde la suggestion surlignée visible dans la liste
-  // (sinon on descend « dans le vide » sans que ça scrolle jusqu'à elle).
   useEffect(() => {
-    const el = suggestRef.current;
-    if (!el) return;
-    el.children[highlight]?.scrollIntoView({ block: "nearest" });
+    suggestRef.current?.children[highlight]?.scrollIntoView({ block: "nearest" });
   }, [highlight, suggestions]);
 
   function onKeyDown(e) {
@@ -634,7 +581,6 @@ export default function BlindTest() {
       return;
     }
     if (e.key === "Enter") {
-      // Entrée valide la suggestion surlignée, ou la première par défaut.
       e.preventDefault();
       const pick = suggestions[highlight] || suggestions[0];
       if (pick) lockGuess(pick);
@@ -649,32 +595,6 @@ export default function BlindTest() {
     }
   }
 
-  function copyChallenge() {
-    const id = final?.blindTestId;
-    if (!id) return;
-    const url = `${window.location.origin}/blindtest?challenge=${id}`;
-    navigator.clipboard?.writeText(url).then(
-      () => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      },
-      () => {}
-    );
-  }
-
-  const round = rounds[idx];
-  // La manche = écoute (durationSec) puis temps bonus (GRACE_MS, son coupé).
-  // L'anneau montre le temps d'écoute restant, puis se remplit en rouge et
-  // égrène les 5 dernières secondes.
-  const listenLeftMs = Math.max(0, timeLeftMs - GRACE_MS);
-  const inGrace = phase === "playing" && !!round && timeLeftMs > 0 && listenLeftMs <= 0;
-  const clipFrac = round
-    ? inGrace
-      ? timeLeftMs / GRACE_MS
-      : listenLeftMs / (round.durationSec * 1000)
-    : 0;
-  const secondsLeft = Math.ceil((inGrace ? timeLeftMs : listenLeftMs) / 1000);
-  const elapsedMs = round ? round.durationSec * 1000 - listenLeftMs : 0;
 
   // --- Indices progressifs : année → plateformes → studio (ou genre) ---
   const hintDefs = useMemo(() => {
@@ -696,73 +616,58 @@ export default function BlindTest() {
   }, [round]);
   const unlockedCount = hintDefs.filter((h) => elapsedMs >= h.atMs).length;
 
-  // Petit blip quand un indice se dévoile.
   useEffect(() => {
     if (phase !== "playing" || reveal) return;
     if (unlockedCount > prevUnlockRef.current) sfx.play("hint");
     prevUnlockRef.current = unlockedCount;
   }, [unlockedCount, phase, reveal, sfx]);
 
-  const volIcon = muted || volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
-  const VolIcon = volIcon;
-
   // ============================================================
-  //  Rendu
+  //  Rendu — la structure vient du blind test (.bt-topbar, .bt-search,
+  //  .bt-done…) mais PAS le décor : .px-page redéfinit toute la palette
+  //  et repose le plateau de quiz (projecteurs, public, cartes).
   // ============================================================
   return (
-    <div className="bt-page">
-      <div ref={ytHostRef} style={{ position: "fixed", left: -9999, top: -9999 }} />
+    <div className="bt-page px-page">
+      {/* Le plateau : deux projecteurs croisés, la nappe de lumière au sol
+          et le public en ombres chinoises. Purement décoratif. */}
+      <div className="px-scene" aria-hidden="true">
+        <span className="px-beam l" />
+        <span className="px-beam r" />
+        <span className="px-floor" />
+        <span className="px-crowd" />
+        <span className="px-sparks" />
+      </div>
 
       <header className="bt-topbar">
-        <button className="bt-back clickable" onClick={() => navigate("/app")}>
+        <button className="bt-back clickable" onClick={goBack}>
           <ArrowLeft size={17} /> <span>Retour</span>
         </button>
         <div className="bt-brand">
-          <Music2 size={17} /> Blind Test
+          <Grid2x2 size={17} /> Pixel Rush
         </div>
-        <div className="bt-volume">
-          <button
-            className="bt-vol-btn clickable"
-            onClick={() => setMutedState((m) => !m)}
-            title={muted ? "Réactiver le son" : "Couper le son"}
-          >
-            <VolIcon size={17} />
-          </button>
-          <input
-            type="range"
-            className="bt-vol-slider clickable"
-            min="0"
-            max="100"
-            value={muted ? 0 : volume}
-            style={{ "--bt-vol-pct": `${muted ? 0 : volume}%` }}
-            aria-label="Volume"
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              setVolume(v);
-              if (muted && v > 0) setMutedState(false);
-            }}
-          />
-        </div>
+        <button
+          className="bt-vol-btn clickable"
+          onClick={() => setMuted((m) => !m)}
+          title={muted ? "Réactiver les sons" : "Couper les sons"}
+        >
+          {muted ? <VolumeX size={17} /> : <Volume2 size={17} />}
+        </button>
       </header>
 
       <div className="bt-body">
         {/* ---------- INTRO ---------- */}
         {phase === "intro" && (
           <div className="bt-intro">
-            <div className="bt-hero-disc" aria-hidden="true">
-              <span className="bt-disc" />
-              <Music2 size={50} className="bt-hero-note" />
-            </div>
+            <HeroCard token={token} />
             <span className="bt-kicker">
-              {challengeId ? "Défi entre joueurs" : "Quiz musical"}
+              {challengeId ? "Défi entre joueurs" : "Quiz visuel"}
             </span>
-            <h1 className="bt-title">
-              {challengeId ? "Relève le défi" : "Blind Test"}
-            </h1>
+            <h1 className="bt-title">{challengeId ? "Relève le défi" : "Pixel Rush"}</h1>
             <p className="bt-sub">
               {challengeId
-                ? "Écoute les mêmes extraits qu'un autre joueur et bats son score."
-                : "On te fait écouter un morceau d'OST au pif.  À toi de deviner de quel jeu il vient — plus tu réponds vite, plus tu marques."}
+                ? "Les mêmes captures qu'un autre joueur, à toi de faire mieux."
+                : "Devine le jeu derrière les pixels. Plus tu réponds vite, plus tu marques."}
             </p>
 
             {!challengeId && (
@@ -784,13 +689,11 @@ export default function BlindTest() {
 
             <button className="bt-start clickable" onClick={startGame}>
               {challengeId ? <Swords size={20} /> : <Play size={20} />}
-              {challengeId ? "Relever le défi" : "Lancer le blind test"}
+              {challengeId ? "Relever le défi" : "Lancer Pixel Rush"}
             </button>
             <span className="bt-kbd-hint">
               ou appuie sur <kbd>Entrée</kbd>
             </span>
-
-      
           </div>
         )}
 
@@ -798,7 +701,11 @@ export default function BlindTest() {
         {phase === "loading" && (
           <div className="bt-loading">
             <Loader2 size={34} className="spin" />
-            <p>{final || finishingRef.current ? "On calcule ton score…" : "On prépare tes extraits…"}</p>
+            <p>
+              {final || finishingRef.current
+                ? "On calcule ton score…"
+                : "On pixelise tes captures…"}
+            </p>
           </div>
         )}
 
@@ -819,7 +726,7 @@ export default function BlindTest() {
 
         {/* ---------- PLAYING ---------- */}
         {phase === "playing" && round && (
-          <div className="bt-play">
+          <div className="bt-play px-play">
             <div className="bt-pips" aria-hidden="true">
               {rounds.map((_, i) => (
                 <i key={i} className={i < idx ? "done" : i === idx ? "cur" : ""} />
@@ -835,58 +742,57 @@ export default function BlindTest() {
               </span>
             </div>
 
-            <div
-              className={`bt-stage ${(inGrace || secondsLeft <= 3) && !paused ? "hot" : ""} ${
-                inGrace ? "grace" : ""
-              } ${paused ? "paused" : ""}`}
-            >
-              <button
-                className="bt-vinyl clickable"
-                onClick={togglePause}
-                title={paused ? "Reprendre" : "Mettre en pause"}
-                aria-label={paused ? "Reprendre" : "Mettre en pause"}
+            {/* ---- L'écran : toutes les captures, 2 par ligne ---- */}
+            <div className={`px-stage ${secondsLeft <= 5 ? "hot" : ""} ${paused ? "paused" : ""}`}>
+              <div
+                className={`px-grid n-${Math.min(shots.length, 4)} ${
+                  zoom != null ? "zoomed" : ""
+                }`}
               >
-                <span className="bt-vinyl-disc" />
-                <span className="bt-eq">
-                  {Array.from({ length: 7 }).map((_, i) => (
-                    <i key={i} style={{ animationDelay: `${i * 0.09}s` }} />
-                  ))}
-                </span>
-                <span className="bt-vinyl-pause" aria-hidden="true">
-                  <Pause size={28} />
-                </span>
-              </button>
-              <svg className="bt-ring" viewBox="0 0 120 120" aria-hidden="true">
-                <circle className="bt-ring-bg" cx="60" cy="60" r="54" />
-                <circle
-                  className="bt-ring-fg"
-                  cx="60"
-                  cy="60"
-                  r="54"
-                  style={{
-                    strokeDasharray: 2 * Math.PI * 54,
-                    strokeDashoffset: 2 * Math.PI * 54 * (1 - clipFrac),
-                  }}
-                />
-              </svg>
-              <span className="bt-timer-num">{secondsLeft}</span>
-              {clipLoading && !paused && !reveal && (
-                <span className="bt-clip-loading" aria-hidden="true">
-                  <Loader2 size={26} className="spin" />
-                  <span>Chargement…</span>
-                </span>
-              )}
+                {shots.map((s, i) => (
+                  <button
+                    key={s}
+                    className={`px-tile clickable ${zoom === i ? "on" : ""} ${
+                      zoom != null && zoom !== i ? "off" : ""
+                    }`}
+                    onClick={() => toggleZoom(i)}
+                    title={zoom === i ? "Revenir à la grille" : "Agrandir cette capture"}
+                    aria-label={
+                      zoom === i ? "Revenir à la grille" : `Agrandir la capture ${i + 1}`
+                    }
+                  >
+                    <PixelCanvas
+                      src={s}
+                      blocks={blocks}
+                      reveal={false}
+                      label={`Capture pixelisée ${i + 1} sur ${shots.length}`}
+                    />
+                    <span className="px-tile-n">{i + 1}</span>
+                    <span className="px-tile-zoom" aria-hidden="true">
+                      {zoom === i ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Chrono + définition, posés sur l'écran */}
+              <span className={`px-timer ${secondsLeft <= 5 ? "hot" : ""}`}>
+                <Timer size={13} /> {secondsLeft}s
+              </span>
+              <span className="px-def" title="Définition actuelle des captures">
+                {blocks}px
+              </span>
+
+              {/* Barre de progression = temps écoulé */}
+              <i className="px-progress" style={{ transform: `scaleX(${progress})` }} />
+
               {paused && (
-                <button className="bt-resume clickable" onClick={togglePause}>
+                <button className="px-resume clickable" onClick={togglePause}>
                   <Play size={34} />
                   <span>Reprendre</span>
                 </button>
               )}
             </div>
-
-            {inGrace && !reveal && !paused && (
-              <p className="bt-grace-hint">Extrait terminé — valide ta réponse !</p>
-            )}
 
             {/* ---- Indices progressifs ---- */}
             {hintDefs.length > 0 && !reveal && (
@@ -921,7 +827,6 @@ export default function BlindTest() {
                   }}
                   onKeyDown={onKeyDown}
                   onFocus={(e) => {
-                    // Mobile : remonte le champ au-dessus du clavier virtuel.
                     if (window.innerWidth <= 760) {
                       const el = e.target;
                       setTimeout(
@@ -978,66 +883,52 @@ export default function BlindTest() {
               </div>
             )}
 
-            {/* ---- Révélation : overlay centré plein écran ---- */}
+            {/* ---- Révélation : l'image enfin nette ---- */}
             {reveal && (
               <div className="bt-overlay" role="dialog" aria-modal="true">
-                <div className="bt-reveal-wrap">
-                <div
-                  className={`bt-reveal ${reveal.correct ? "good" : "bad"} ${
-                    replayOn ? "replaying" : ""
-                  }`}
-                >
+                <div className={`px-reveal ${reveal.correct ? "good" : "bad"}`}>
                   <i className="bt-reveal-progress" aria-hidden="true" />
+                  <div
+                    className={`px-reveal-shots n-${Math.min(reveal.shots.length, 4)}`}
+                  >
+                    {reveal.shots.map((s, i) => (
+                      <RevealShot
+                        key={s}
+                        src={s}
+                        from={reveal.blocks}
+                        delay={i * 130}
+                        label={`Capture de ${reveal.round.gameName}`}
+                      />
+                    ))}
+                    <span className="px-reveal-badge">
+                      {reveal.correct ? <Check size={20} /> : <X size={20} />}
+                    </span>
+                  </div>
                   <span className="bt-reveal-verdict">
                     {reveal.correct ? "Trouvé !" : "Raté !"}
                     <b className={`bt-reveal-pts ${reveal.points >= 0 ? "up" : "down"}`}>
                       {reveal.points >= 0 ? `+${reveal.points}` : reveal.points}
                     </b>
                   </span>
-                  <div className="bt-reveal-cover">
-                    {reveal.round.cover ? (
+                  <div className="px-reveal-game">
+                    {reveal.round.cover && (
                       <img src={reveal.round.cover} alt="" draggable="false" />
-                    ) : (
-                      <span className="bt-reveal-ph">
-                        <Gamepad2 size={34} />
-                      </span>
                     )}
-                    <span className="bt-reveal-badge">
-                      {reveal.correct ? <Check size={22} /> : <X size={22} />}
+                    <span>
+                      {!reveal.correct && <em>La réponse était</em>}
+                      <b>{reveal.round.gameName}</b>
+                      {!reveal.correct && reveal.guessName && (
+                        <i>
+                          Ta réponse : <s>{reveal.guessName}</s>
+                        </i>
+                      )}
+                      {!reveal.correct && !reveal.guessName && <i>Temps écoulé</i>}
                     </span>
                   </div>
-                  {!reveal.correct && (
-                    <span className="bt-reveal-anslabel">La réponse était</span>
-                  )}
-                  <span className="bt-reveal-game">{reveal.round.gameName}</span>
-                  <button
-                    className={`bt-reveal-listen clickable ${replayOn ? "on" : ""}`}
-                    onClick={toggleReplay}
-                  >
-                    {replayOn ? <Pause size={13} /> : <Play size={13} />}
-                    <span>{reveal.round.ostName || "Réécouter l'extrait"}</span>
-                  </button>
                   <button className="bt-next clickable" onClick={goNext}>
                     {idx + 1 < rounds.length ? "Manche suivante" : "Voir mon score"}
                     <span className="bt-next-count">{nextIn}</span>
                   </button>
-                  <span className="bt-reveal-keys">
-                    <kbd className="bt-kbd">↵</kbd> ou{" "}
-                    <kbd className="bt-kbd">Espace</kbd> pour continuer
-                  </span>
-                </div>
-                {/* Ta réponse : sous la card, en pill sur le voile */}
-                {!reveal.correct && (
-                  <span className="bt-reveal-your">
-                    {reveal.guessName ? (
-                      <>
-                        Ta réponse : <s>{reveal.guessName}</s>
-                      </>
-                    ) : (
-                      "Temps écoulé, aucune réponse"
-                    )}
-                  </span>
-                )}
                 </div>
               </div>
             )}
@@ -1049,10 +940,8 @@ export default function BlindTest() {
           <Scoreboard
             final={final}
             challengeId={challengeId}
-            copied={copied}
-            onCopy={copyChallenge}
             onReplay={() => {
-              if (challengeId) navigate("/blindtest");
+              if (challengeId) navigate("/pixel");
               setPhase("intro");
             }}
             token={token}
@@ -1066,34 +955,15 @@ export default function BlindTest() {
 // ============================================================
 //  Tableau des scores + classement
 // ============================================================
-function Scoreboard({ final, challengeId, copied, onCopy, onReplay, token }) {
+function Scoreboard({ final, challengeId, onReplay, token }) {
   const [board, setBoard] = useState(null);
-  const player = usePlayer();
+  const [viewer, setViewer] = useState(null); // manche dont on revoit les captures
   const pct = final.roundCount ? Math.round((final.correctCount / final.roundCount) * 100) : 0;
   const ch = final.challenge;
 
-  // Les OST de la partie, jouables dans le mini-lecteur global (file complète :
-  // lancer une piste permet d'enchaîner les autres avec suivant/précédent).
-  const tracks = useMemo(
-    () =>
-      final.rounds
-        .filter((r) => r.videoId)
-        .map((r) => ({
-          id: `bt-${r.gameId}-${r.videoId}`,
-          videoId: r.videoId,
-          name: r.ostName || r.gameName,
-          artist: r.gameName,
-          artwork: r.cover || null,
-          gameId: r.gameId,
-          gameName: r.gameName,
-        })),
-    [final.rounds]
-  );
-  const trackFor = (r) => tracks.find((t) => t.videoId === r.videoId) || null;
-
   useEffect(() => {
     let alive = true;
-    apiFetch("/blindtest/leaderboard", { token })
+    apiFetch("/pixel/leaderboard", { token })
       .then((d) => alive && setBoard(d.entries || []))
       .catch(() => alive && setBoard([]));
     return () => {
@@ -1113,9 +983,6 @@ function Scoreboard({ final, challengeId, copied, onCopy, onReplay, token }) {
           {final.correctCount} / {final.roundCount} trouvés · {pct}% de réussite
         </p>
 
-        {/* Les points crédités. Absent si le crédit n'a pas pu se faire (partie
-            jouée hors-ligne, serveur indispo) : mieux vaut ne rien promettre
-            que d'annoncer des points qui n'existent pas. */}
         {final.pointsEarned > 0 && (
           <Link to="/app" className="bt-earned clickable">
             <Coins size={15} />
@@ -1145,18 +1012,14 @@ function Scoreboard({ final, challengeId, copied, onCopy, onReplay, token }) {
           <button className="bt-start sm clickable" onClick={onReplay}>
             <RotateCcw size={16} /> Rejouer
           </button>
-          {final.blindTestId && !challengeId && (
-            <button className="bt-ghost clickable" onClick={onCopy}>
-              {copied ? <Check size={16} /> : <Share2 size={16} />}
-              {copied ? "Lien copié !" : "Défier un ami"}
-            </button>
-          )}
           <Link to="/app" className="bt-ghost clickable">
             <Home size={16} /> Accueil
           </Link>
         </div>
         {final._offline && (
-          <p className="bt-offline-note">Score affiché en local (enregistrement indisponible).</p>
+          <p className="bt-offline-note">
+            Score affiché en local (enregistrement indisponible).
+          </p>
         )}
       </div>
 
@@ -1167,9 +1030,20 @@ function Scoreboard({ final, challengeId, copied, onCopy, onReplay, token }) {
           <ul className="bt-recap-list">
             {final.rounds.map((r, i) => (
               <li key={i} className={`bt-recap-row ${r.correct ? "good" : "bad"}`}>
-                <span className="bt-recap-cover">
-                  {r.cover ? (
-                    <img src={r.cover} alt="" loading="lazy" draggable="false" />
+                {/* La vignette rouvre TOUTES les captures de la manche en grand */}
+                <button
+                  className="bt-recap-cover px-recap-shot clickable"
+                  onClick={() => r.shots?.length && setViewer(r)}
+                  disabled={!r.shots?.length}
+                  title={r.shots?.length ? `Revoir les captures de ${r.gameName}` : undefined}
+                >
+                  {r.shots?.[0] || r.cover ? (
+                    <img
+                      src={r.shots?.[0] || r.cover}
+                      alt=""
+                      loading="lazy"
+                      draggable="false"
+                    />
                   ) : (
                     <span className="bt-suggest-ph">
                       <Gamepad2 size={14} />
@@ -1178,17 +1052,14 @@ function Scoreboard({ final, challengeId, copied, onCopy, onReplay, token }) {
                   <span className="bt-recap-verdict">
                     {r.correct ? <Check size={13} /> : <X size={13} />}
                   </span>
-                </span>
+                  {r.shots?.length > 1 && (
+                    <span className="px-recap-count">{r.shots.length}</span>
+                  )}
+                </button>
                 <span className="bt-recap-info">
                   <Link to={`/game/${r.gameId}`} className="bt-recap-game clickable">
                     {r.gameName}
                   </Link>
-                  {r.ostName && (
-                    <span className="bt-recap-ost">
-                      <Music2 size={11} />
-                      <span>{r.ostName}</span>
-                    </span>
-                  )}
                   {!r.correct && r.guessedName && (
                     <span className="bt-recap-your">
                       Ta réponse : <s>{r.guessedName}</s>
@@ -1204,29 +1075,6 @@ function Scoreboard({ final, challengeId, copied, onCopy, onReplay, token }) {
                     {!r.owned && <span className="bt-recap-tag">Jamais joué</span>}
                   </span>
                 </span>
-                {r.videoId && (
-                  <button
-                    className={`bt-recap-play clickable ${
-                      player?.isPlaying?.(trackFor(r)) ? "on" : ""
-                    }`}
-                    onClick={() =>
-                      player?.toggleTrack?.(trackFor(r), tracks, {
-                        source: { label: "Blind test — le détail" },
-                      })
-                    }
-                    title={
-                      player?.isPlaying?.(trackFor(r))
-                        ? "Mettre en pause"
-                        : "Écouter l'OST"
-                    }
-                  >
-                    {player?.isPlaying?.(trackFor(r)) ? (
-                      <Pause size={13} />
-                    ) : (
-                      <Play size={13} />
-                    )}
-                  </button>
-                )}
                 <span className={`bt-recap-pts ${r.points >= 0 ? "up" : "down"}`}>
                   {r.points >= 0 ? `+${r.points}` : r.points}
                 </span>
@@ -1251,10 +1099,7 @@ function Scoreboard({ final, challengeId, copied, onCopy, onReplay, token }) {
           ) : (
             <ol className="bt-board-list">
               {board.map((e, i) => (
-                <li
-                  key={e.blindTestId}
-                  className={`bt-board-row ${e.isMe ? "me" : ""}`}
-                >
+                <li key={e.gameId} className={`bt-board-row ${e.isMe ? "me" : ""}`}>
                   <span className={`bt-board-rank r${i + 1}`}>{i + 1}</span>
                   <Link to={`/u/${e.user.username}`} className="bt-board-user clickable">
                     {e.user.avatar ? (
@@ -1268,7 +1113,7 @@ function Scoreboard({ final, challengeId, copied, onCopy, onReplay, token }) {
                   </Link>
                   {!e.isMe && (
                     <Link
-                      to={`/blindtest?challenge=${e.blindTestId}`}
+                      to={`/pixel?challenge=${e.gameId}`}
                       className="bt-board-challenge clickable"
                       title={`Défier ${e.user.username}`}
                     >
@@ -1292,6 +1137,61 @@ function Scoreboard({ final, challengeId, copied, onCopy, onReplay, token }) {
           )}
         </div>
       </div>
+
+      {viewer && <ShotViewer round={viewer} onClose={() => setViewer(null)} />}
     </div>
+  );
+}
+
+// Visionneuse des captures d'une manche, ouverte depuis le récap : l'image en
+// grand, les autres en pellicule dessous (flèches et Échap au clavier).
+function ShotViewer({ round, onClose }) {
+  const [i, setI] = useState(0);
+  const shots = round.shots || [];
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowLeft") setI((n) => Math.max(0, n - 1));
+      else if (e.key === "ArrowRight") setI((n) => Math.min(shots.length - 1, n + 1));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose, shots.length]);
+
+  return createPortal(
+    <div className="px-viewer" onClick={onClose}>
+      <button className="px-viewer-close clickable" onClick={onClose} aria-label="Fermer">
+        <X size={22} />
+      </button>
+      <figure className="px-viewer-body" onClick={(e) => e.stopPropagation()}>
+        <img className="px-viewer-img" src={shots[i]} alt="" draggable="false" />
+        <figcaption className="px-viewer-bar">
+          <Link to={`/game/${round.gameId}`} className="px-viewer-game clickable">
+            {round.cover && <img src={round.cover} alt="" draggable="false" />}
+            <span>{round.gameName}</span>
+          </Link>
+          {shots.length > 1 && (
+            <span className="px-viewer-thumbs">
+              {shots.map((s, n) => (
+                <button
+                  key={s}
+                  className={`px-viewer-thumb clickable ${n === i ? "on" : ""}`}
+                  onClick={() => setI(n)}
+                  aria-label={`Capture ${n + 1}`}
+                >
+                  <img src={s} alt="" loading="lazy" draggable="false" />
+                </button>
+              ))}
+            </span>
+          )}
+        </figcaption>
+      </figure>
+    </div>,
+    document.body
   );
 }

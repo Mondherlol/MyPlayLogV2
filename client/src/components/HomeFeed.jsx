@@ -300,7 +300,7 @@ export default function HomeFeed({ token, me, filterUser = null }) {
                     : toggleLike(item)
               }
               onComments={() =>
-                item.type === "video"
+                item.type === "video" || item.type === "videoact"
                   ? setCommentsForVideo(item)
                   : isPostItem(item)
                     ? setCommentsForPost(item)

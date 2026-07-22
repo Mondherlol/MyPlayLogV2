@@ -177,6 +177,7 @@ router.get("/users/:id", async (req, res) => {
       cursor: user.equipped?.cursor || null,
       ornament: user.equipped?.ornament || null,
       badge: user.equipped?.badge || null,
+      theme: user.equipped?.theme || null,
     };
     const inventory = user.inventory || [];
     const keys = [

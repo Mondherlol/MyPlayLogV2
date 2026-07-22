@@ -1468,6 +1468,69 @@
   justify-content: center;
 }
 
+/* --- Porte d'entrée de l'arcade dans le rail --- */
+.hf-arcade {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.2s ease;
+}
+.hf-arcade:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow);
+}
+.hf-arcade-ic {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--accent-grad);
+  color: #3b2a02;
+  box-shadow: 0 6px 16px -8px rgba(242, 183, 11, 0.9);
+}
+.hf-arcade-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+.hf-arcade-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.hf-arcade-sub {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hf-arcade-points {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.22rem 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--accent-ink);
+  font-weight: 700;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
 /* --- Sorties indés : pastille de date sur la jaquette --- */
 .hf-indie-tag {
   position: absolute;
@@ -3226,6 +3289,64 @@
 .hf-vmini-by {
   font-size: 0.78rem;
   color: var(--text-soft);
+}
+
+/* Carte « a commenté une vidéo » : le message d'abord, la vidéo réduite à une
+   ligne en dessous. La citation et le bloc titre ouvrent le fil ; la miniature
+   lance la vidéo (deux boutons distincts, cf. FeedCards). */
+.hf-vcom {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.hf-vcom-quote,
+.hf-vcom .hf-vmini-thumb,
+.hf-vcom .hf-vmini-info {
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+}
+
+.hf-vcom-quote {
+  display: block;
+  width: 100%;
+}
+
+.hf-vcom-quote:hover .hf-int-quote {
+  border-left-color: var(--accent-ink);
+}
+
+.hf-vcom .hf-vmini-thumb {
+  width: 108px;
+  border-radius: 8px;
+}
+
+/* Le chevron de lecture ne s'allume qu'au survol de la miniature (le reste de
+   la ligne mène aux commentaires, pas au lecteur). */
+.hf-vcom .hf-vmini-row:hover .hf-vmini-play {
+  opacity: 0;
+}
+
+.hf-vcom .hf-vmini-thumb:hover .hf-vmini-play {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.hf-vcom-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.1rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.hf-vcom .hf-vmini-info:hover .hf-vcom-cta {
+  color: var(--accent-ink);
 }
 
 /* État actif générique d'un bouton d'action du fil (ex. « Plus tard » vidéo). */

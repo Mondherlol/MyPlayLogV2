@@ -12,6 +12,7 @@ import mongoose from "mongoose";
 // concernée. Rien d'autre à câbler.
 export const POINT_SOURCES = {
   blindtest: "Blind test",
+  pixel: "Pixel Rush",
   case: "Ouverture de caisse",
   duplicate: "Doublon reconverti",
   admin: "Ajustement admin",

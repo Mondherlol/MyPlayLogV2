@@ -2474,12 +2474,8 @@ const VIDEO_ACT_META = {
     one: "a commenté une vidéo",
     many: (n) => `a commenté ${n} vidéos`,
   },
-  later: {
-    Icon: Clock,
-    filled: false,
-    one: "a mis une vidéo à regarder plus tard",
-    many: (n) => `a mis ${n} vidéos à regarder plus tard`,
-  },
+  // Pas de « à regarder plus tard » : le serveur n'en fait plus d'évènement
+  // (file d'attente privée, cf. routes/feed.js).
 };
 
 // Barre de reprise (visionnage) : proportion vue si on a la durée.
@@ -2489,10 +2485,67 @@ function resumePct(v) {
   return v.positionSeconds > 0 ? 6 : 0;
 }
 
-function VideoActivityEvent({ item, onPlay }) {
+function VideoActivityEvent({ item, onPlay, onComments }) {
   const v = item.video;
   const meta = VIDEO_ACT_META[item.kind] || VIDEO_ACT_META.watch;
   const pct = item.kind === "watch" ? resumePct(v) : 0;
+
+  // « A commenté une vidéo » : ce qui compte c'est le message, pas la vidéo —
+  // carte compacte façon tweet (citation + miniature réduite en pied), et le
+  // tout ouvre le fil de commentaires de la vidéo.
+  if (item.kind === "comment") {
+    return (
+      <article className="hf-card hf-video hf-vact hf-vmini k-comment">
+        <EventHead user={item.user} date={item.date}>
+          <span className="hf-vact-ic k-comment">
+            <MessageCircle size={13} />
+          </span>{" "}
+          a commenté une vidéo
+        </EventHead>
+
+        <div className="hf-vcom">
+          {v.comment && (
+            <button
+              className="hf-vcom-quote clickable"
+              onClick={onComments}
+              title="Voir les commentaires"
+            >
+              <p className="hf-int-quote">{v.comment}</p>
+            </button>
+          )}
+          {/* La miniature lance la vidéo, le reste ouvre le fil : deux boutons
+              côte à côte (imbriquer des <button> serait invalide). */}
+          <div className="hf-vmini-row">
+            <button
+              className="hf-vmini-thumb clickable"
+              onClick={() => onPlay(v)}
+              title="Lire la vidéo"
+            >
+              <img src={v.thumb} alt="" loading="lazy" draggable="false" />
+              <span className="hf-vmini-play">
+                <Play size={15} fill="currentColor" />
+              </span>
+              {v.duration && <span className="hf-video-dur">{v.duration}</span>}
+            </button>
+            <button
+              className="hf-vmini-info clickable"
+              onClick={onComments}
+              title="Voir les commentaires"
+            >
+              <span className="hf-vmini-title">{v.title}</span>
+              {v.author && <span className="hf-vmini-by">{v.author}</span>}
+              <span className="hf-vcom-cta">
+                <MessageCircle size={13} />
+                {v.commentCount > 1
+                  ? `${v.commentCount} commentaires`
+                  : "Voir le fil"}
+              </span>
+            </button>
+          </div>
+        </div>
+      </article>
+    );
+  }
 
   // « A aimé une vidéo » = a aimé la recommandation d'un autre joueur. Carte
   // compacte : verbe adapté (« a aimé une recommandation de X »), avatar du

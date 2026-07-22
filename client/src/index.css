@@ -36,6 +36,19 @@
   --radius: 14px;
   --radius-lg: 20px;
 
+  /* Fond de page + halo, exposés en variables pour qu'un THÈME gagné à l'arcade
+     puisse les remplacer (motif à carreaux → dégradé, cœurs, étoiles…). Le motif
+     par défaut référence --grid-line, donc il suit le thème clair/sombre tout
+     seul. CosmeticsContext surcharge ces variables en inline sur <html>. */
+  --app-bg-image: linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  --app-bg-size: 28px 28px;
+  --app-halo: radial-gradient(
+    900px 420px at 70% -15%,
+    rgba(242, 183, 11, 0.12),
+    transparent 65%
+  );
+
   /* Curseur : valeurs PAR DÉFAUT, surchargées sur <html> par CosmeticsContext
      quand un thème gagné à l'arcade est équipé (un rôle par variable).
      Format des rôles avec image : `url("…") <hotspotX> <hotspotY>`.
@@ -79,10 +92,9 @@ body {
 body {
   font-family: var(--font-body);
   background-color: var(--bg);
-  /* Motif bloc-note : grille fine */
-  background-image: linear-gradient(var(--grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-  background-size: 28px 28px;
+  /* Motif de fond : grille bloc-note par défaut, remplaçable par un thème. */
+  background-image: var(--app-bg-image);
+  background-size: var(--app-bg-size);
   color: var(--text);
   min-height: 100vh;
   overflow-x: hidden;
@@ -90,17 +102,13 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Halo d'accent très discret en haut */
+/* Halo d'accent discret en haut (remplaçable par un thème). */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
-  background: radial-gradient(
-    900px 420px at 70% -15%,
-    rgba(242, 183, 11, 0.12),
-    transparent 65%
-  );
+  background: var(--app-halo);
   pointer-events: none;
 }
 

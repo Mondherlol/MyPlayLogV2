@@ -11,10 +11,14 @@ import { RARITY_KEYS } from "../lib/rarity.js";
 //   cursor   → data: { url, hotspotX, hotspotY }  (image + point actif)
 //   ornament → data: { url }                      (cadre autour de l'avatar)
 //   badge    → data: { icon, color }              (pastille sur le profil)
+//   theme    → data: { mode: "light"|"dark", vars: { "--bg": …, … }, swatch: [couleurs] }
+//              (repeint tout le site : le client applique `vars` sur <html> et
+//               bascule le mode ; `swatch` sert d'aperçu — cf. RewardArt)
 export const REWARD_TYPES = {
   cursor: { label: "Curseur", plural: "Curseurs" },
   ornament: { label: "Ornement", plural: "Ornements" },
   badge: { label: "Badge", plural: "Badges" },
+  theme: { label: "Thème", plural: "Thèmes" },
 };
 export const REWARD_TYPE_KEYS = Object.keys(REWARD_TYPES);
 

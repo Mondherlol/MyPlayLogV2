@@ -345,7 +345,7 @@ export default function ProfileFeed({ username, isMe, token, onSetCover }) {
                         : toggleLike(item)
                   }
                   onComments={() =>
-                    item.type === "video"
+                    item.type === "video" || item.type === "videoact"
                       ? setCommentsForVideo(item)
                       : isPostItem(item)
                         ? setCommentsForPost(item)

@@ -7,22 +7,33 @@
    découlent — aucune couleur de rareté n'est écrite en dur ici.
    ====================================================================== */
 
-.arc-wrap {
-  max-width: 1180px;
+/* ======================================================================
+   Page /arcade : deux colonnes — la salle à gauche, les classements à droite
+   ====================================================================== */
+.arc-page {
+  max-width: 1240px;
   margin: 0 auto;
-  padding: 1.5rem 1.25rem 4rem;
+  padding: 1.25rem 1.25rem 4rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 336px;
+  gap: 1.5rem;
+  align-items: start;
+}
+.arc-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
 }
 
 .arc-state {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 0.9rem;
-  min-height: 50vh;
+  min-height: 30vh;
   color: var(--text-soft);
 }
-
 .arc-err {
   background: rgba(235, 75, 75, 0.1);
   border: 1px solid rgba(235, 75, 75, 0.3);
@@ -30,70 +41,122 @@
   padding: 0.6rem 0.85rem;
   border-radius: var(--radius);
   font-size: 0.88rem;
-  margin: 0 0 1rem;
+  margin: 0;
+}
+.arc-h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+  margin: 0;
+}
+.arc-h2 svg {
+  color: var(--accent-ink);
 }
 
-/* ---------- En-tête + porte-monnaie ---------- */
-.arc-hero {
+/* ======================================================================
+   Bannière — toujours sombre (effet néon arcade), même en thème clair.
+   ====================================================================== */
+.arc-banner {
+  position: relative;
+  overflow: hidden;
+  border-radius: 22px;
+  padding: 1.6rem 1.7rem;
+  color: #f5f3ea;
+  background:
+    radial-gradient(680px 320px at 88% -30%, rgba(242, 183, 11, 0.28), transparent 60%),
+    radial-gradient(520px 300px at 0% 130%, rgba(126, 96, 255, 0.24), transparent 62%),
+    linear-gradient(150deg, #191a24 0%, #101119 60%, #0b0c12 100%);
+  box-shadow:
+    0 26px 60px -30px rgba(6, 7, 14, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+/* Halo doré qui pulse doucement en fond. */
+.arc-banner-glow {
+  position: absolute;
+  top: -40%;
+  right: -8%;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(242, 183, 11, 0.4), transparent 66%);
+  filter: blur(8px);
+  pointer-events: none;
+  animation: arc-glow 7s ease-in-out infinite;
+}
+@keyframes arc-glow {
+  50% {
+    transform: scale(1.12);
+    opacity: 0.82;
+  }
+}
+/* Fines scanlines — clin d'œil borne d'arcade. */
+.arc-banner-scan {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.03) 0 1px,
+    transparent 1px 4px
+  );
+  -webkit-mask-image: linear-gradient(180deg, #000, transparent 70%);
+  mask-image: linear-gradient(180deg, #000, transparent 70%);
+}
+
+.arc-banner-top {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
   flex-wrap: wrap;
-  margin-bottom: 2rem;
 }
-.arc-hero-main {
-  min-width: 260px;
-  flex: 1;
+.arc-banner-id {
+  min-width: 220px;
 }
 .arc-kicker {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
   font-family: var(--font-display);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--accent-ink);
-  margin-bottom: 0.5rem;
+  color: #ffd76b;
+  margin-bottom: 0.35rem;
 }
 .arc-title {
-  font-size: clamp(1.8rem, 4vw, 2.5rem);
-  margin-bottom: 0.45rem;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4.5vw, 2.9rem);
+  font-weight: 700;
+  line-height: 1;
+  margin: 0 0 0.45rem;
+  background: linear-gradient(120deg, #fff 20%, #ffd24a 60%, #f2a50b);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 .arc-sub {
-  color: var(--text-soft);
-  font-size: 0.92rem;
-  line-height: 1.5;
-  max-width: 46ch;
   margin: 0;
+  color: rgba(240, 236, 222, 0.62);
+  font-size: 0.9rem;
 }
 
+/* Le porte-monnaie, dans la bannière */
 .arc-wallet {
+  position: relative;
   display: grid;
   grid-template-columns: auto auto;
   align-items: center;
-  gap: 0.15rem 0.7rem;
-  padding: 1rem 1.4rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  box-shadow: var(--shadow-sm);
-  position: relative;
-  overflow: hidden;
-}
-/* Halo doré : le solde est la donnée la plus importante de la page. */
-.arc-wallet::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    140px 90px at 20% 0%,
-    rgba(242, 183, 11, 0.16),
-    transparent 70%
-  );
-  pointer-events: none;
+  gap: 0.05rem 0.75rem;
+  padding: 0.9rem 1.2rem 0.75rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(4px);
 }
 .arc-wallet-coin {
   grid-row: span 2;
@@ -102,22 +165,23 @@
   width: 46px;
   height: 46px;
   border-radius: 50%;
-  background: var(--accent-grad);
+  background: linear-gradient(140deg, #ffd24a, #f2a50b);
   color: #3b2a02;
-  box-shadow: 0 4px 14px rgba(242, 183, 11, 0.4);
+  box-shadow: 0 6px 18px -4px rgba(242, 183, 11, 0.7);
 }
 .arc-wallet-num {
   font-family: var(--font-display);
-  font-size: 1.75rem;
+  font-size: 1.85rem;
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+  color: #fff;
 }
 .arc-wallet-label {
-  font-size: 0.76rem;
-  color: var(--text-soft);
-  letter-spacing: 0.05em;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  color: rgba(240, 236, 222, 0.55);
 }
 .arc-wallet-hist {
   grid-column: 1 / -1;
@@ -125,29 +189,45 @@
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  margin-top: 0.6rem;
+  margin-top: 0.65rem;
   padding: 0.35rem 0.6rem;
-  border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--surface-2);
-  color: var(--text-soft);
-  font-size: 0.75rem;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(240, 236, 222, 0.7);
+  font-size: 0.74rem;
+  font-weight: 600;
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
-.arc-wallet-hist:hover {
-  color: var(--text);
-  border-color: var(--border-strong);
+.arc-wallet-hist:hover,
+.arc-wallet-hist.on {
+  color: #ffd76b;
+  border-color: rgba(255, 215, 107, 0.4);
+}
+.arc-wallet-caret {
+  transition: transform 0.18s ease;
+}
+.arc-wallet-hist.on .arc-wallet-caret {
+  transform: rotate(180deg);
 }
 
-/* ---------- Historique des points ---------- */
+/* Historique déroulé sous la bannière */
 .arc-hist {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  padding: 0.5rem;
-  margin-bottom: 1.75rem;
-  max-height: 320px;
+  position: relative;
+  z-index: 1;
+  margin-top: 1.1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.22);
+  padding: 0.4rem;
+  max-height: 300px;
   overflow-y: auto;
+}
+.arc-hist-empty {
+  margin: 0;
+  padding: 0.6rem;
+  color: rgba(240, 236, 222, 0.6);
+  font-size: 0.85rem;
 }
 .arc-hist-list {
   list-style: none;
@@ -159,12 +239,13 @@
   grid-template-columns: 1fr auto auto;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.5rem 0.65rem;
-  border-radius: 8px;
-  font-size: 0.85rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 9px;
+  font-size: 0.84rem;
+  color: rgba(245, 243, 234, 0.9);
 }
 .arc-hist-row:nth-child(odd) {
-  background: var(--surface-2);
+  background: rgba(255, 255, 255, 0.035);
 }
 .arc-hist-src {
   font-weight: 500;
@@ -173,8 +254,8 @@
   white-space: nowrap;
 }
 .arc-hist-date {
-  color: var(--text-soft);
-  font-size: 0.76rem;
+  color: rgba(240, 236, 222, 0.5);
+  font-size: 0.74rem;
 }
 .arc-hist-amt {
   font-family: var(--font-display);
@@ -184,151 +265,409 @@
   text-align: right;
 }
 .arc-hist-amt.up {
-  color: #24a55c;
+  color: #3ddc84;
 }
 .arc-hist-amt.down {
-  color: #eb4b4b;
+  color: #ff6b70;
 }
 
-/* ---------- Sections ---------- */
-.arc-section {
-  margin-bottom: 2.5rem;
-}
-.arc-h2 {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 1.15rem;
-  margin-bottom: 1rem;
-}
-.arc-h2 svg {
-  color: var(--accent-ink);
-}
-.arc-empty {
-  color: var(--text-soft);
-  font-size: 0.9rem;
-  margin: 0;
-}
-
-/* ---------- Caisses ---------- */
-.arc-cases {
+/* ======================================================================
+   Les mini-jeux — deux cartes de lancement
+   ====================================================================== */
+.arc-games {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 1rem;
 }
-.arc-case {
+.arc-game {
+  --g-1: #f2b70b;
+  --g-2: #ff9d2e;
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 1.25rem 1rem 1rem;
+  gap: 0.4rem;
+  padding: 1.15rem 1.2rem 1.1rem;
+  border-radius: 18px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow-sm);
-  transition: transform 0.18s ease, box-shadow 0.24s ease, border-color 0.18s ease;
+  overflow: hidden;
+  isolation: isolate;
+  transition: transform 0.2s ease, box-shadow 0.24s ease, border-color 0.2s ease;
 }
-.arc-case:hover {
+.arc-game.g-pixel {
+  --g-1: #7e60ff;
+  --g-2: #2fa8f5;
+}
+/* Lueur colorée qui monte du bas au survol. */
+.arc-game-glow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(
+    120% 80% at 50% 120%,
+    color-mix(in srgb, var(--g-1) 20%, transparent),
+    transparent 62%
+  );
+  opacity: 0.55;
+  transition: opacity 0.24s ease;
+}
+.arc-game:hover {
   transform: translateY(-4px);
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow);
+  border-color: color-mix(in srgb, var(--g-1) 50%, var(--border));
+  box-shadow: 0 24px 50px -26px color-mix(in srgb, var(--g-1) 75%, transparent),
+    var(--shadow);
 }
-.arc-case.poor {
-  opacity: 0.82;
+.arc-game:hover .arc-game-glow {
+  opacity: 1;
 }
 
-.arc-case-art {
+.arc-game-top {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+/* ---- L'art de la carte ----
+   Pas une icône décorative : une VRAIE jaquette de la bibliothèque, traitée
+   dans l'idiome du mini-jeu (jaquette pixelisée posée sur une pile de cartes
+   pour Pixel Rush, pochette d'où sort le vinyle pour le Blind Test). Le but
+   est qu'on devine la règle sans lire le pitch. */
+.arc-game-art {
   position: relative;
+  flex: 0 0 auto;
+  width: 96px;
+  height: 90px;
+  perspective: 700px; /* pour le retournement de la carte Pixel Rush */
+}
+/* Repli sans jaquette (bibliothèque vide) : la pastille d'origine. */
+.arc-game-art.fallback {
   display: grid;
   place-items: center;
-  width: 116px;
-  height: 116px;
-  margin-bottom: 0.85rem;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(140deg, var(--g-1), var(--g-2));
+  color: #fff;
+  box-shadow: 0 12px 26px -12px color-mix(in srgb, var(--g-1) 85%, transparent);
 }
-.arc-case-art img {
+.arc-game-art svg {
+  filter: drop-shadow(0 3px 7px rgba(0, 0, 0, 0.3));
+}
+
+/* La jaquette, au premier plan dans les deux cas. */
+.arc-art-cover {
+  position: absolute;
+  z-index: 2;
+  top: 3px;
+  left: 0;
+  width: 63px;
+  height: 84px;
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 26px -12px rgba(0, 0, 0, 0.55);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.arc-art-cover img,
+.arc-art-cover canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.arc-game:hover .arc-art-cover {
+  transform: translateY(-3px) rotate(-2deg);
+}
+
+/* ---- Pixel Rush : la carte se retourne au survol ----
+   Jaquette pixelisée + « ? » d'un côté, la réponse de l'autre : la règle du
+   jeu en un geste. L'overflow:hidden est porté par les FACES, jamais par le
+   conteneur en preserve-3d (il aplatirait la scène 3D). */
+.arc-art-flip {
+  position: absolute;
+  z-index: 2;
+  top: 3px;
+  left: 0;
+  width: 63px;
+  height: 84px;
+  transform-style: preserve-3d;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.arc-game:hover .arc-art-flip {
+  transform: rotateY(180deg);
+}
+.arc-art-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 26px -12px rgba(0, 0, 0, 0.55);
+  backface-visibility: hidden;
+}
+.arc-art-face.front {
+  transform: rotateY(180deg);
+  border-color: color-mix(in srgb, var(--g-1) 45%, var(--border));
+}
+.arc-art-face img,
+.arc-art-face canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* Le « ? » posé sur les pixels : sans pastille il se noierait dans l'image. */
+.arc-art-face b {
+  position: relative; /* sinon il passe SOUS le canvas, qui est en absolute */
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(8, 9, 16, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.7);
+}
+
+/* Pixel Rush : la carte suivante de la pile, en biais dessous. */
+.arc-art-deck {
+  position: absolute;
+  z-index: 1;
+  top: 3px;
+  left: 0;
+  width: 63px;
+  height: 84px;
+  border-radius: 9px;
+  background: linear-gradient(160deg, var(--surface-2), var(--surface));
+  border: 1px solid var(--border);
+  transform-origin: bottom left;
+  transform: rotate(11deg);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.arc-game:hover .arc-art-deck {
+  transform: rotate(17deg) translateX(3px);
+}
+
+/* Blind Test : le vinyle sort de la pochette et se met à tourner. */
+.arc-art-disc {
+  position: absolute;
+  z-index: 1;
+  top: 14px;
+  left: 30px;
+  width: 62px;
+  height: 62px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.2), transparent 42%),
+    repeating-radial-gradient(
+      circle at center,
+      #17171b 0,
+      #17171b 1px,
+      #26262c 1px,
+      #26262c 3px
+    ),
+    #0e0e12;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    0 10px 22px -10px rgba(0, 0, 0, 0.65);
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.arc-art-disc::after {
+  content: "";
+  width: 15%;
+  height: 15%;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+.arc-game:hover .arc-art-disc {
+  transform: translateX(9px) rotate(90deg);
+}
+.arc-game-tag {
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--g-1) 72%, var(--text));
+}
+.arc-game-name {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.arc-game-pitch {
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  flex: 1;
+}
+.arc-game-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 0.85rem;
+}
+.arc-game-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+.arc-game-stat svg {
+  color: color-mix(in srgb, var(--g-1) 78%, var(--text));
+}
+.arc-game-stat b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.arc-game-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  background: linear-gradient(140deg, var(--g-1), var(--g-2));
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  box-shadow: 0 10px 22px -12px color-mix(in srgb, var(--g-1) 85%, transparent);
+}
+.arc-game-arrow {
+  transition: transform 0.2s ease;
+}
+.arc-game:hover .arc-game-arrow {
+  transform: translateX(3px);
+}
+
+/* ======================================================================
+   La caisse — carte horizontale
+   ====================================================================== */
+.arc-crate {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 1.1rem 1.25rem;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.arc-crate-glow {
+  position: absolute;
+  left: -60px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(242, 183, 11, 0.18), transparent 68%);
+  pointer-events: none;
+}
+.arc-crate-art {
+  position: relative;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  color: var(--accent-ink);
+}
+.arc-crate-art img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.25));
+}
+.arc-crate-body {
   position: relative;
-  z-index: 1;
-  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.22));
+  flex: 1;
+  min-width: 0;
 }
-.arc-case-ph {
-  color: var(--accent-ink);
-  position: relative;
-  z-index: 1;
-}
-.arc-case-glow {
-  position: absolute;
-  inset: -10%;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(242, 183, 11, 0.22), transparent 65%);
-  transition: opacity 0.25s ease, transform 0.25s ease;
-}
-.arc-case:hover .arc-case-glow {
-  transform: scale(1.15);
-}
-
-.arc-case-name {
-  font-size: 1.02rem;
-  margin-bottom: 0.3rem;
-}
-.arc-case-desc {
-  color: var(--text-soft);
-  font-size: 0.8rem;
-  line-height: 1.45;
-  margin: 0 0 0.75rem;
-}
-
-/* Aperçu du contenu : trois pastilles de rareté + le compte. */
-.arc-case-teaser {
-  display: flex;
+.arc-crate-kicker {
+  display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  margin-bottom: 0.9rem;
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
 }
-.arc-case-pip {
+.arc-crate-name {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  margin: 0.15rem 0 0.4rem;
+}
+.arc-crate-teaser {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.arc-crate-pip {
   width: 9px;
   height: 9px;
   border-radius: 50%;
   background: var(--arc-rarity);
   box-shadow: 0 0 7px var(--arc-rarity);
 }
-.arc-case-count {
-  font-size: 0.72rem;
+.arc-crate-count {
+  font-size: 0.76rem;
   color: var(--text-soft);
-  margin-left: 0.3rem;
+  margin-left: 0.35rem;
 }
-
-.arc-case-btn {
+.arc-crate-action {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+.arc-crate-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  width: 100%;
-  justify-content: center;
-  padding: 0.6rem 0.9rem;
+  padding: 0.6rem 1.1rem;
   border: none;
   border-radius: 999px;
   background: var(--accent-grad);
   color: #3b2a02;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 0.88rem;
-  margin-top: auto;
+  font-size: 0.9rem;
   transition: filter 0.18s ease, transform 0.12s ease;
 }
-.arc-case-btn:hover:not(:disabled) {
+.arc-crate-btn:hover:not(:disabled) {
   filter: brightness(1.07);
 }
-.arc-case-btn:active:not(:disabled) {
+.arc-crate-btn:active:not(:disabled) {
   transform: translateY(1px);
 }
-.arc-case-btn:disabled {
+.arc-crate-btn:disabled {
   background: var(--surface-2);
   color: var(--text-soft);
   cursor: not-allowed;
 }
-.arc-case-price {
+.arc-crate-price {
   display: inline-flex;
   align-items: center;
   gap: 0.22rem;
@@ -338,16 +677,558 @@
   font-size: 0.78rem;
   font-variant-numeric: tabular-nums;
 }
-.arc-case-btn:disabled .arc-case-price {
+.arc-crate-btn:disabled .arc-crate-price {
   background: rgba(0, 0, 0, 0.08);
 }
-.arc-case-need {
-  font-size: 0.72rem;
+.arc-crate-need {
+  font-size: 0.74rem;
+  color: #eb6a5e;
+  font-weight: 600;
+}
+
+/* ======================================================================
+   Rail droit — les classements empilés
+   ====================================================================== */
+.arc-rail {
+  position: sticky;
+  top: 76px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+.arc-rail-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 1rem;
+  margin: 0.2rem 0 -0.1rem;
+}
+.arc-rail-title svg {
+  color: var(--accent-ink);
+}
+
+.arc-board {
+  --g-1: #f2b70b;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.arc-board.g-pixel {
+  --g-1: #7e60ff;
+}
+.arc-board-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--g-1) 8%, transparent);
+}
+.arc-board-ic {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--g-1) 22%, transparent);
+  color: color-mix(in srgb, var(--g-1) 82%, var(--text));
+}
+.arc-board-name {
+  flex: 1;
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  margin: 0;
+}
+.arc-board-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.arc-board-tab {
+  padding: 0.2rem 0.5rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
   color: var(--text-soft);
-  margin-top: 0.5rem;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.arc-board-tab:hover {
+  color: var(--text);
+}
+.arc-board-tab.on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.arc-board-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.4rem;
+}
+.arc-board-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.38rem 0.4rem;
+  border-radius: 10px;
+}
+.arc-board-row:hover {
+  background: var(--surface-2);
+}
+.arc-board-row.me {
+  background: color-mix(in srgb, var(--g-1) 11%, transparent);
+  box-shadow: inset 2px 0 0 var(--g-1);
+}
+.arc-rank {
+  flex: 0 0 auto;
+  width: 21px;
+  height: 21px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+.arc-rank.r1 {
+  background: linear-gradient(140deg, #ffd24a, #e0a008);
+  color: #3b2a02;
+}
+.arc-rank.r2 {
+  background: linear-gradient(140deg, #e6e8ef, #b9bdc9);
+  color: #33363f;
+}
+.arc-rank.r3 {
+  background: linear-gradient(140deg, #e8a877, #c07338);
+  color: #3a2109;
+}
+.arc-board-user {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 1;
+  min-width: 0;
+  color: var(--text);
+}
+.arc-board-user img,
+.arc-board-av {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.arc-board-who {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.arc-board-user:hover .arc-board-who {
+  color: var(--accent-ink);
+}
+.arc-board-fight {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  color: var(--text-soft);
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.arc-board-row:hover .arc-board-fight {
+  opacity: 1;
+}
+.arc-board-fight:hover {
+  background: var(--surface);
+  color: var(--accent-ink);
+}
+.arc-board-score {
+  flex: 0 0 auto;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+.arc-board-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 1.4rem 1rem;
+  text-align: center;
+  color: var(--text-soft);
+}
+.arc-board-empty svg {
+  color: color-mix(in srgb, var(--g-1) 55%, var(--text-soft));
+}
+.arc-board-empty p {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.arc-board-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #3b2a02;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+/* ======================================================================
+   Collection
+   ====================================================================== */
+.arc-collection {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.arc-inv-progress {
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 940px) {
+  .arc-page {
+    grid-template-columns: 1fr;
+  }
+  .arc-rail {
+    position: static;
+    /* Sur mobile, deux classements côte à côte tant que la place le permet. */
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+  }
+  .arc-rail-title {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 560px) {
+  .arc-games {
+    grid-template-columns: 1fr;
+  }
+  /* Art resserré : la carte passe pleine largeur, l'illustration n'a plus
+     besoin d'occuper autant de place au-dessus du titre. */
+  .arc-game-art {
+    width: 84px;
+    height: 78px;
+  }
+  .arc-art-cover,
+  .arc-art-deck,
+  .arc-art-flip {
+    width: 54px;
+    height: 72px;
+  }
+  .arc-art-disc {
+    top: 12px;
+    left: 26px;
+    width: 54px;
+    height: 54px;
+  }
+  .arc-crate {
+    flex-wrap: wrap;
+  }
+  .arc-crate-action {
+    width: 100%;
+    align-items: stretch;
+  }
+  .arc-crate-btn {
+    justify-content: center;
+  }
+}
+
+/* ---------- Les caisses (pile de cartes horizontales) ---------- */
+.arc-crates {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
 }
 
 /* ---------- Inventaire ---------- */
+.arc-inv-empty {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+}
+
+/* ======================================================================
+   Cartes de thème : un vrai mini-écran de l'app en aperçu
+   ====================================================================== */
+.arc-themes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0.9rem;
+}
+.arc-theme {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-bottom: 3px solid var(--arc-rarity);
+  border-radius: 16px;
+  background: var(--surface);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.16s ease, box-shadow 0.2s ease, border-color 0.16s ease;
+}
+.arc-theme:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+}
+.arc-theme.equipped {
+  border-color: var(--arc-rarity);
+  box-shadow: 0 0 0 1px var(--arc-rarity), var(--shadow-sm);
+}
+.arc-theme.previewing {
+  border-color: var(--accent-ink);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-ink) 60%, transparent);
+}
+
+/* L'aperçu (le mini-écran) */
+.arc-theme-art {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+}
+.arc-theme-icon {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: rgba(10, 10, 14, 0.5);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.arc-theme-count {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 0.08rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(10, 10, 14, 0.55);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+/* Le mini-écran lui-même (tout en % pour rester net à toute taille) */
+.tp {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+.tp-side {
+  width: 22%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9%;
+  padding: 12% 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+.tp-nav {
+  width: 44%;
+  height: 5.5%;
+  min-height: 3px;
+  border-radius: 999px;
+}
+.tp-main {
+  flex: 1;
+  min-width: 0;
+  padding: 9% 9% 9% 8%;
+  display: flex;
+  flex-direction: column;
+  gap: 7%;
+}
+.tp-hello {
+  width: 48%;
+  height: 8%;
+  min-height: 4px;
+  border-radius: 999px;
+}
+.tp-card {
+  border-radius: 6px;
+  padding: 7% 8%;
+  display: flex;
+  flex-direction: column;
+  gap: 9%;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+.tp-line {
+  height: 7.5%;
+  min-height: 3px;
+  width: 82%;
+  border-radius: 999px;
+}
+.tp-line.short {
+  width: 54%;
+}
+.tp-btn {
+  height: 15%;
+  min-height: 6px;
+  width: 42%;
+  border-radius: 999px;
+  margin-top: 3%;
+}
+
+.arc-theme-info {
+  padding: 0.65rem 0.8rem 0.35rem;
+}
+.arc-theme-rarity {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--arc-rarity);
+}
+.arc-theme-name {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  margin: 0.1rem 0 0;
+}
+.arc-theme-actions {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem 0.75rem;
+}
+.arc-theme-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.arc-theme-btn:not(.ghost) {
+  border: none;
+  background: var(--accent-grad);
+  color: #3b2a02;
+}
+.arc-theme-btn.on:not(.ghost) {
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+.arc-theme-btn.ghost:hover,
+.arc-theme-btn.ghost.on {
+  border-color: var(--accent-ink);
+  color: var(--accent-ink);
+}
+.arc-theme-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+/* ---------- Barre d'aperçu flottante ---------- */
+.arc-preview-bar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(1.1rem + var(--bottom-bar-h, 0px) + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.5rem 0.55rem 0.5rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(18, 19, 28, 0.93);
+  color: #f5f3ea;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 22px 54px -20px rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: arc-preview-in 0.2s ease;
+  max-width: calc(100vw - 1.5rem);
+}
+@keyframes arc-preview-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+.arc-preview-eye {
+  display: grid;
+  place-items: center;
+  color: #ffd76b;
+}
+.arc-preview-txt {
+  font-size: 0.86rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.arc-preview-txt b {
+  font-weight: 700;
+}
+.arc-preview-equip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.85rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent-grad, linear-gradient(120deg, #ffd24a, #f2a50b));
+  color: #3b2a02;
+  font-weight: 700;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.arc-preview-equip:disabled {
+  opacity: 0.8;
+}
+.arc-preview-stop {
+  padding: 0.4rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(245, 243, 234, 0.75);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.arc-preview-stop:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
 .arc-inv-head {
   display: flex;
   align-items: center;
@@ -552,6 +1433,48 @@
   place-items: center;
   color: var(--text-soft);
   opacity: 0.5;
+}
+
+/* Vignette d'un thème : mini-écran de l'app (barre latérale + carte + accent). */
+.rw-theme-swatch {
+  position: relative;
+  display: block;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+.rw-theme-side {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 26%;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+.rw-theme-card {
+  position: absolute;
+  left: 36%;
+  right: 12%;
+  top: 22%;
+  bottom: 22%;
+  border-radius: 5px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14%;
+  padding: 0 10%;
+}
+.rw-theme-line {
+  height: 9%;
+  min-height: 2px;
+  border-radius: 999px;
+}
+.rw-theme-pill {
+  height: 20%;
+  min-height: 4px;
+  width: 62%;
+  border-radius: 999px;
 }
 
 /* ======================================================================
@@ -1799,173 +2722,6 @@
 }
 
 /* ======================================================================
-   Barre d'arcade de l'accueil (remplace l'ancienne page /arcade).
-   ====================================================================== */
-.abar {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-.abar-points {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.45rem 0.8rem;
-  border: 1px solid rgba(242, 183, 11, 0.42);
-  border-radius: 999px;
-  background: rgba(242, 183, 11, 0.12);
-  color: var(--text);
-  font-weight: 700;
-  font-size: 0.9rem;
-  font-variant-numeric: tabular-nums;
-}
-.abar-points svg {
-  color: var(--accent-ink);
-}
-.abar-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.5rem 0.9rem;
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--text);
-  font-size: 0.86rem;
-  font-weight: 600;
-  transition: border-color 0.15s ease, transform 0.12s ease;
-}
-.abar-btn:hover:not(:disabled) {
-  border-color: var(--accent-ink);
-  transform: translateY(-1px);
-}
-.abar-btn:disabled {
-  opacity: 0.5;
-}
-
-/* Modale commune aux caisses et aux curseurs. */
-.abar-modal {
-  position: relative;
-  width: min(940px, 100%);
-  max-height: 88vh;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow);
-}
-.abar-modal-head {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--border);
-}
-.abar-modal-head h2 {
-  min-width: 0;
-  font-size: 1.15rem;
-}
-.abar-modal-head .modal-close {
-  position: static;
-}
-.abar-modal-body {
-  padding: 1.25rem;
-  overflow-y: auto;
-}
-
-/* Pastille de progression sur le bouton de la barre. */
-.abar-btn-count {
-  padding: 0.05rem 0.4rem;
-  border-radius: 999px;
-  background: var(--surface-2);
-  color: var(--text-soft);
-  font-size: 0.72rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-/* « Gagner » : greffé sur la pastille de solde, séparé d'un filet. */
-.abar-earn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-left: 0.15rem;
-  padding-left: 0.45rem;
-  border-left: 1px solid rgba(242, 183, 11, 0.42);
-  color: var(--accent-ink);
-  font-size: 0.76rem;
-  font-weight: 700;
-  text-decoration: none;
-}
-.abar-earn:hover {
-  text-decoration: underline;
-}
-
-/* Compteur de collection, à côté du titre de la modale. */
-.abar-count {
-  padding: 0.15rem 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface-2);
-  color: var(--text-soft);
-  font-size: 0.74rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-/* « Nouveau curseur » : l'action qui fait grandir la collection. Doré mais
-   compact — une seule caisse existe, elle ne mérite pas une carte à elle. */
-.abar-get {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-left: auto;
-  padding: 0.45rem 0.8rem;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: var(--accent-grad);
-  color: #3a2600;
-  font-weight: 700;
-  font-size: 0.83rem;
-  transition: filter 0.15s ease, transform 0.12s ease;
-}
-.abar-get:hover {
-  filter: brightness(1.07);
-  transform: translateY(-1px);
-}
-.abar-get b {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2rem;
-  padding: 0.05rem 0.4rem;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.16);
-  font-size: 0.74rem;
-  font-weight: 800;
-}
-/* Solde insuffisant : on laisse cliquable (l'aperçu du contenu a de l'intérêt)
-   mais on ne le fait plus briller. */
-.abar-get.poor {
-  background: transparent;
-  border-color: var(--border-strong);
-  color: var(--text-soft);
-}
-.abar-get.poor b {
-  background: var(--surface-2);
-}
-
-@media (max-width: 560px) {
-  /* Place comptée : on garde les icônes et les montants, on coupe les mots. */
-  .abar-count,
-  .abar-earn span {
-    display: none;
-  }
-}
-
-/* ======================================================================
    Contrôle segmenté (remplace les <select> Famille / Rareté).
    ====================================================================== */
 .seg {
@@ -2467,18 +3223,8 @@
   color: var(--text-soft);
 }
 
-/* ---------- Mobile ---------- */
+/* ---------- Mobile (ouverture de caisse + inventaire) ---------- */
 @media (max-width: 760px) {
-  .arc-wrap {
-    padding: 1rem 0.85rem 3rem;
-  }
-  .arc-hero {
-    gap: 1rem;
-  }
-  .arc-wallet {
-    width: 100%;
-    justify-content: flex-start;
-  }
   .co-modal {
     padding: 1.1rem 0.85rem;
   }

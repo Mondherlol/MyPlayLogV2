@@ -35,6 +35,7 @@ import {
   Award,
   MousePointer2,
   Frame,
+  Palette,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { rarityColor, rarityLabel } from "../lib/rarity";
@@ -514,6 +515,7 @@ function UserDrawer({ token, userId, me, onClose, onDirty }) {
 // comme tel plutôt que masqué.
 const COSMETIC_FAMILIES = [
   { key: "cursor", label: "Curseur", Icon: MousePointer2, none: "Curseur par défaut" },
+  { key: "theme", label: "Thème", Icon: Palette, none: "Thème par défaut" },
   { key: "ornament", label: "Ornement", Icon: Frame, none: "Aucun ornement" },
   { key: "badge", label: "Badge", Icon: Award, none: "Aucun badge" },
 ];

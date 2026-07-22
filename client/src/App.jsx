@@ -7,6 +7,8 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Welcome from "./pages/Welcome";
 import BlindTest from "./pages/BlindTest";
+import PixelRush from "./pages/PixelRush";
+import Arcade from "./pages/Arcade";
 import Playtopia from "./pages/Playtopia";
 import Explorer from "./pages/Explorer";
 import Releases from "./pages/Releases";
@@ -126,7 +128,9 @@ export default function App() {
         }
       >
         <Route path="/app" element={<Welcome />} />
+        <Route path="/arcade" element={<Arcade />} />
         <Route path="/blindtest" element={<BlindTest />} />
+        <Route path="/pixel" element={<PixelRush />} />
         <Route path="/playtopia" element={<Playtopia />} />
         <Route path="/explore" element={<Explorer />} />
         <Route path="/releases" element={<Releases />} />

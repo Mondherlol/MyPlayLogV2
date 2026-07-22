@@ -18,6 +18,7 @@ import {
   FileArchive,
   Frame,
   Award,
+  Palette,
   Sparkles,
   Link2,
   Play,
@@ -50,7 +51,7 @@ import { CURSOR_ROLES, CURSOR_ROLE_KEYS, guessRole } from "../lib/cursorRoles";
 import RewardArt from "./RewardArt";
 
 // Icône lucide par famille de lots et par rôle de curseur (habillage seulement).
-const FAMILY_ICON = { cursor: MousePointer2, ornament: Frame, badge: Award };
+const FAMILY_ICON = { cursor: MousePointer2, ornament: Frame, badge: Award, theme: Palette };
 const ROLE_ICON = {
   normal: MousePointer2,
   pointer: Hand,
@@ -1950,6 +1951,14 @@ function RewardEditor({ token, initial, onCancel, onSaved }) {
             setR((v) => (v.name.trim() ? v : { ...v, name }))
           }
         />
+      ) : r.type === "theme" ? (
+        // Les thèmes se définissent par leur palette (data.vars), pas par une
+        // image : ils sont créés via le seed (npm run seed:arcade). Ici on ne
+        // fait que gérer nom / rareté / disponibilité.
+        <div className="admin-hint">
+          <Palette size={14} /> Thème « {r.name || "sans nom"} » — palette gérée par
+          le seed. Modifie ici son nom, sa rareté ou sa disponibilité.
+        </div>
       ) : (
         <ImageField
           token={token}

@@ -27,6 +27,16 @@ export function makeCache(keyPrefix, ttl) {
       if (!c) return null;
       return { data: c.data, fresh: Date.now() - c.ts < ttl };
     },
+    // Invalide une entrée : la prochaine lecture repartira du réseau (ex. un
+    // profil qui vient de changer de visibilité).
+    remove(key) {
+      mem.delete(key);
+      try {
+        localStorage.removeItem(keyPrefix + key);
+      } catch {
+        /* localStorage indispo */
+      }
+    },
     set(key, data) {
       const entry = { ts: Date.now(), data };
       mem.set(key, entry);

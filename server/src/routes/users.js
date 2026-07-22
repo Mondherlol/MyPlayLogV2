@@ -13,6 +13,7 @@ import Repost from "../models/Repost.js";
 import Documentary from "../models/Documentary.js";
 import GameAchievements from "../models/GameAchievements.js";
 import GameTracker from "../models/GameTracker.js";
+import Notification from "../models/Notification.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { ensureGameMeta } from "../lib/gameMeta.js";
 import { ensureEntityLogos } from "../lib/entityLogos.js";
@@ -22,6 +23,13 @@ import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { summarizeReactions, reviewComment } from "../lib/reviewSerialize.js";
 import { recordActivity, removeActivity } from "../lib/activity.js";
 import { evaluateMissions, countBadges, triggerMissionCheck } from "../lib/missions.js";
+import { notify } from "../lib/notify.js";
+import {
+  privacyOf,
+  blockIfPrivate,
+  hasPendingRequest,
+  invalidateAvatarMask,
+} from "../lib/privacy.js";
 
 const router = express.Router();
 
@@ -429,17 +437,54 @@ router.post("/me/cover", requireAuth, coverUpload.single("cover"), async (req, r
 });
 
 // --- Basculer l'abonnement à un utilisateur ---
+// Compte public : abonnement immédiat (et re-clic = désabonnement).
+// Compte privé : le 1er clic enregistre une DEMANDE (notif au propriétaire),
+// le suivant l'annule. Se désabonner reste immédiat dans tous les cas.
 router.post("/:id/follow", requireAuth, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id))
       return res.status(404).json({ error: "Utilisateur introuvable." });
     if (String(req.params.id) === String(req.userId))
       return res.status(400).json({ error: "Tu ne peux pas t'abonner à toi-même." });
-    const target = await User.findById(req.params.id).select("_id");
+    const target = await User.findById(req.params.id).select(
+      "_id privacy followRequests"
+    );
     if (!target) return res.status(404).json({ error: "Utilisateur introuvable." });
 
     const me = await User.findById(req.userId);
     const has = me.following.some((u) => String(u) === String(target._id));
+
+    // Compte privé et pas encore abonné : on bascule la demande d'abonnement
+    // au lieu de l'abonnement lui-même.
+    if (!has && privacyOf(target).isPrivate) {
+      const pending = hasPendingRequest(target, req.userId);
+      if (pending) {
+        await User.updateOne(
+          { _id: target._id },
+          { $pull: { followRequests: { user: me._id } } }
+        );
+        await Notification.deleteMany({
+          user: target._id,
+          actor: me._id,
+          type: "follow_request",
+        });
+      } else {
+        // Filtre sur followRequests.user : deux clics rapides ne peuvent pas
+        // enregistrer la demande en double.
+        await User.updateOne(
+          { _id: target._id, "followRequests.user": { $ne: me._id } },
+          { $push: { followRequests: { user: me._id, createdAt: new Date() } } }
+        );
+        notify({ user: target._id, type: "follow_request", actor: me._id });
+      }
+      const followers = await User.countDocuments({ following: target._id });
+      return res.json({
+        following: false,
+        requested: !pending,
+        followersCount: followers,
+      });
+    }
+
     if (has) me.following = me.following.filter((u) => String(u) !== String(target._id));
     else me.following.push(target._id);
     await me.save();
@@ -453,9 +498,118 @@ router.post("/:id/follow", requireAuth, async (req, res) => {
     }
 
     const followers = await User.countDocuments({ following: target._id });
-    res.json({ following: !has, followersCount: followers });
+    res.json({ following: !has, requested: false, followersCount: followers });
   } catch (err) {
     console.error("follow error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// --- Confidentialité : compte privé + sous-options ---
+// Repasser en public accepte automatiquement toutes les demandes en attente
+// (elles n'auraient plus aucun sens : le profil devient visible de tous).
+router.put("/me/privacy", requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
+    const b = req.body || {};
+    const wasPrivate = !!user.privacy?.isPrivate;
+    if (!user.privacy) user.privacy = {}; // comptes créés avant le réglage
+
+    for (const key of ["isPrivate", "hideAvatar", "hideCover", "hideReviews"]) {
+      if (b[key] !== undefined) user.privacy[key] = !!b[key];
+    }
+
+    const pending = (user.followRequests || []).map((r) => r.user);
+    if (wasPrivate && !user.privacy.isPrivate && pending.length) {
+      await User.updateMany(
+        { _id: { $in: pending } },
+        { $addToSet: { following: user._id } }
+      );
+      for (const requester of pending) {
+        recordActivity({ actor: requester, type: "follow", target: user._id });
+        notify({ user: requester, type: "follow_accepted", actor: user._id });
+      }
+      await Notification.deleteMany({ user: user._id, type: "follow_request" });
+      user.followRequests = [];
+    }
+
+    await user.save();
+    // Le middleware avatarPrivacy garde la liste des photos masquées en cache.
+    invalidateAvatarMask();
+    res.json({ user: user.toPublic() });
+  } catch (err) {
+    console.error("privacy update error:", err.message);
+    res.status(500).json({ error: "Erreur lors de l'enregistrement." });
+  }
+});
+
+// --- Demandes d'abonnement reçues (page Paramètres > Confidentialité) ---
+router.get("/me/follow-requests", requireAuth, async (req, res) => {
+  try {
+    const me = await User.findById(req.userId)
+      .select("followRequests")
+      .populate("followRequests.user", "username avatar bio");
+    const requests = (me?.followRequests || [])
+      .filter((r) => r.user)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .map((r) => ({
+        id: r.user._id,
+        username: r.user.username,
+        avatar: r.user.avatar || null,
+        bio: r.user.bio || "",
+        createdAt: r.createdAt,
+      }));
+    res.json({ requests, count: requests.length });
+  } catch (err) {
+    console.error("follow requests error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// --- Accepter / refuser une demande d'abonnement ---
+// L'abonnement est stocké chez le DEMANDEUR (`following`) : accepter revient
+// donc à l'ajouter à sa propre liste, exactement comme un abonnement direct.
+router.post("/me/follow-requests/:id/:action", requireAuth, async (req, res) => {
+  try {
+    const { id, action } = req.params;
+    if (!["accept", "reject"].includes(action))
+      return res.status(400).json({ error: "Action inconnue." });
+    if (!mongoose.isValidObjectId(id))
+      return res.status(404).json({ error: "Demande introuvable." });
+
+    const me = await User.findById(req.userId).select("_id followRequests");
+    if (!hasPendingRequest(me, id))
+      return res.status(404).json({ error: "Demande introuvable." });
+
+    await User.updateOne(
+      { _id: req.userId },
+      { $pull: { followRequests: { user: id } } }
+    );
+    await Notification.deleteMany({
+      user: req.userId,
+      actor: id,
+      type: "follow_request",
+    });
+
+    if (action === "accept") {
+      await User.updateOne({ _id: id }, { $addToSet: { following: req.userId } });
+      recordActivity({ actor: id, type: "follow", target: req.userId });
+      notify({ user: id, type: "follow_accepted", actor: req.userId });
+      triggerMissionCheck(id);
+    }
+
+    const [followers, left] = await Promise.all([
+      User.countDocuments({ following: req.userId }),
+      User.findById(req.userId).select("followRequests").lean(),
+    ]);
+    res.json({
+      ok: true,
+      followersCount: followers,
+      count: (left?.followRequests || []).length,
+    });
+  } catch (err) {
+    console.error("follow request action error:", err.message);
     res.status(500).json({ error: "Erreur." });
   }
 });
@@ -465,6 +619,7 @@ router.get("/:id/following", optionalAuth, async (req, res) => {
   try {
     const u = await User.findById(req.params.id).populate("following", "username avatar bio");
     if (!u) return res.status(404).json({ error: "Utilisateur introuvable." });
+    if (await blockIfPrivate(res, u, req.userId)) return;
     const me = await User.findById(req.userId).select("following");
     const mine = new Set((me?.following || []).map(String));
     const users = (u.following || []).map((f) => ({
@@ -481,6 +636,9 @@ router.get("/:id/following", optionalAuth, async (req, res) => {
 // --- Liste des abonnés d'un utilisateur ---
 router.get("/:id/followers", optionalAuth, async (req, res) => {
   try {
+    const owner = await User.findById(req.params.id).select("_id privacy");
+    if (!owner) return res.status(404).json({ error: "Utilisateur introuvable." });
+    if (await blockIfPrivate(res, owner, req.userId)) return;
     const followers = await User.find({ following: req.params.id }).select(
       "username avatar bio"
     );
@@ -573,9 +731,10 @@ function reviewCard(e, meId, author) {
 router.get("/:username/activity", optionalAuth, async (req, res) => {
   try {
     const user = await User.findOne({ username: req.params.username }).select(
-      "_id username avatar"
+      "_id username avatar privacy"
     );
     if (!user) return res.status(404).json({ error: "Profil introuvable." });
+    if (await blockIfPrivate(res, user, req.userId)) return;
     const isMe = String(user._id) === String(req.userId);
 
     const [entries, lists, reviewCommented, ostThreads, repostCommented] = await Promise.all([
@@ -868,8 +1027,9 @@ async function gameMetaMap(gameIds) {
 
 router.get("/:username/recommendations", optionalAuth, async (req, res) => {
   try {
-    const user = await User.findOne({ username: req.params.username }).select("_id");
+    const user = await User.findOne({ username: req.params.username }).select("_id privacy");
     if (!user) return res.status(404).json({ error: "Profil introuvable." });
+    if (await blockIfPrivate(res, user, req.userId)) return;
 
     const meId = String(req.userId);
     const person = (u) =>
@@ -957,8 +1117,9 @@ router.get("/:username/recommendations", optionalAuth, async (req, res) => {
 // Les points, eux, n'arrivent que sur POST /api/missions/:key/claim.
 router.get("/:username/missions", optionalAuth, async (req, res) => {
   try {
-    const user = await User.findOne({ username: req.params.username }).select("_id");
+    const user = await User.findOne({ username: req.params.username }).select("_id privacy");
     if (!user) return res.status(404).json({ error: "Profil introuvable." });
+    if (await blockIfPrivate(res, user, req.userId)) return;
     const isMe = String(user._id) === String(req.userId);
     const data = await evaluateMissions(user._id, { award: isMe });
     res.json({ ...data, isMe });
@@ -974,9 +1135,10 @@ router.get("/:username/missions", optionalAuth, async (req, res) => {
 router.get("/:username/stats", optionalAuth, async (req, res) => {
   try {
     const user = await User.findOne({ username: req.params.username }).select(
-      "_id following"
+      "_id following privacy"
     );
     if (!user) return res.status(404).json({ error: "Profil introuvable." });
+    if (await blockIfPrivate(res, user, req.userId)) return;
 
     const entries = await UserGame.find({ user: user._id })
       .select("gameId name cover status platform format playtimeHours favorite rating review")
@@ -1296,11 +1458,13 @@ router.get("/:username/stats", optionalAuth, async (req, res) => {
 router.get("/:username/common/:other", optionalAuth, async (req, res) => {
   try {
     const [user, other] = await Promise.all([
-      User.findOne({ username: req.params.username }).select("_id"),
-      User.findOne({ username: req.params.other }).select("_id"),
+      User.findOne({ username: req.params.username }).select("_id privacy"),
+      User.findOne({ username: req.params.other }).select("_id privacy"),
     ]);
     if (!user || !other)
       return res.status(404).json({ error: "Profil introuvable." });
+    if (await blockIfPrivate(res, user, req.userId)) return;
+    if (await blockIfPrivate(res, other, req.userId)) return;
 
     const [mine, theirs] = await Promise.all([
       UserGame.find({ user: user._id })
@@ -1345,9 +1509,10 @@ router.get("/:username/common/:other", optionalAuth, async (req, res) => {
 router.get("/:username/achievements", optionalAuth, async (req, res) => {
   try {
     const user = await User.findOne({ username: req.params.username }).select(
-      "_id steam psn"
+      "_id steam psn privacy"
     );
     if (!user) return res.status(404).json({ error: "Profil introuvable." });
+    if (await blockIfPrivate(res, user, req.userId)) return;
     const isMe = String(user._id) === String(req.userId);
 
     const docs = await GameAchievements.find({ user: user._id }).lean();
@@ -1468,8 +1633,9 @@ router.get("/:username/achievements", optionalAuth, async (req, res) => {
 // --- Liste complète des succès d'UN jeu (chargée à l'ouverture d'une carte). ---
 router.get("/:username/achievements/:gameId", optionalAuth, async (req, res) => {
   try {
-    const user = await User.findOne({ username: req.params.username }).select("_id");
+    const user = await User.findOne({ username: req.params.username }).select("_id privacy");
     if (!user) return res.status(404).json({ error: "Profil introuvable." });
+    if (await blockIfPrivate(res, user, req.userId)) return;
     const doc = await GameAchievements.findOne({
       user: user._id,
       gameId: Number(req.params.gameId),
@@ -1537,6 +1703,39 @@ router.get("/:username", optionalAuth, async (req, res) => {
     const isFollowing = (me?.following || []).some(
       (u) => String(u) === String(user._id)
     );
+
+    // Compte privé consulté par un non-abonné : on ne renvoie qu'une carte de
+    // visite (pseudo, bio, compteurs d'abonnés) — la photo et la bannière
+    // suivent les sous-options du propriétaire. Le reste ne quitte pas le
+    // serveur : les onglets du profil sont hors de portée côté client.
+    const flags = privacyOf(user);
+    if (flags.isPrivate && !isMe && !isFollowing) {
+      const followersCount = await User.countDocuments({ following: user._id });
+      return res.json({
+        profile: {
+          id: user._id,
+          username: user.username,
+          avatar: flags.hideAvatar ? null : user.avatar,
+          cover: flags.hideCover ? null : user.cover,
+          coverPos: flags.hideCover ? null : user.coverPos,
+          covers: flags.hideCover ? [] : user.effectiveCovers(),
+          bio: user.bio,
+          createdAt: user.createdAt,
+          isMe: false,
+          isFollowing: false,
+          locked: true,
+          isPrivate: true,
+          requested: hasPendingRequest(user, req.userId),
+          counts: {
+            followers: followersCount,
+            following: (user.following || []).length,
+          },
+        },
+        favorites: [],
+        library: [],
+        lists: [],
+      });
+    }
 
     const [entries, followers, listQuery, recoCount, videoCount, achievementsCount, trackerDocs, badgeCount] =
       await Promise.all([
@@ -1643,6 +1842,11 @@ router.get("/:username", optionalAuth, async (req, res) => {
         lastSeenAt: user.lastSeenAt || null,
         isMe,
         isFollowing,
+        // Le cadenas n'a pas été déclenché (je suis moi ou abonné), mais le
+        // client affiche quand même le badge « privé » sur la bannière.
+        isPrivate: flags.isPrivate,
+        locked: false,
+        requested: false,
         trackers,
         counts: {
           followers,

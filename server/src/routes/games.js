@@ -10,6 +10,7 @@ import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { notify } from "../lib/notify.js";
 import { recordActivity, removeActivity } from "../lib/activity.js";
 import { summarizeReactions, reviewComment } from "../lib/reviewSerialize.js";
+import { reviewVisibility, privacyOf, isFollower } from "../lib/privacy.js";
 import User from "../models/User.js";
 import UserGame from "../models/UserGame.js";
 import CustomCover from "../models/CustomCover.js";
@@ -1900,13 +1901,16 @@ router.get("/:id/reviews", optionalAuth, async (req, res) => {
 
     // Avis joueurs Steam en parallèle : complètent les reviews de nos users
     // (qui restent prioritaires). Échoue silencieusement en null.
-    const [entries, steam, viewerIsAdmin] = await Promise.all([
+    const [entries, steam, viewerIsAdmin, canSee] = await Promise.all([
       UserGame.find({ gameId: id })
-        .populate("user", "username avatar")
+        .populate("user", "username avatar privacy")
         .populate("comments.user", "username avatar")
         .sort({ updatedAt: -1 }),
       fetchSteamReviews(id).catch(() => null),
       isUserAdmin(req.userId),
+      // Reviews des comptes privés ayant coché « masquer mes reviews » :
+      // invisibles ici pour qui ne les suit pas.
+      reviewVisibility(req.userId),
     ]);
 
     // Une entrée compte comme review si elle a du contenu rédigé OU une note.
@@ -1919,6 +1923,7 @@ router.get("/:id/reviews", optionalAuth, async (req, res) => {
 
     const reviews = entries
       .filter(hasContent)
+      .filter((e) => canSee(e.user))
       .map((e) => gameReviewCard(e, req.userId, viewerIsAdmin));
     // Visiteur non connecté : pas de review « à moi ». (Le garde évite aussi
     // qu'une entrée orpheline — user supprimé, e.user null — matche req.userId
@@ -1947,11 +1952,18 @@ router.get("/:id/reviews/:userId", optionalAuth, async (req, res) => {
       return res.status(400).json({ error: "id invalide." });
     const [entry, viewerIsAdmin] = await Promise.all([
       UserGame.findOne({ gameId: id, user: req.params.userId })
-        .populate("user", "username avatar")
+        .populate("user", "username avatar privacy")
         .populate("comments.user", "username avatar"),
       isUserAdmin(req.userId),
     ]);
     if (!entry) return res.status(404).json({ error: "Review introuvable." });
+    // Review d'un compte privé qui les masque : réservée à ses abonnés.
+    if (
+      entry.user &&
+      privacyOf(entry.user).hideReviews &&
+      !(await isFollower(entry.user._id, req.userId))
+    )
+      return res.status(403).json({ error: "Ce compte est privé.", locked: true });
     res.json({ review: gameReviewCard(entry, req.userId, viewerIsAdmin) });
   } catch (err) {
     console.error("single review error:", err.message);

@@ -28,9 +28,12 @@ import {
   Trash2,
   Shield,
   Award,
+  UserPlus,
+  UserCheck,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import { useCosmetics } from "../context/CosmeticsContext";
 import { useClickOutside } from "../hooks/useClickOutside";
 import { apiFetch } from "../lib/api";
 import { safeSetItem } from "../lib/storage";
@@ -60,6 +63,8 @@ const NOTIF_META = {
   recommendation_boost: { Icon: Plus, verb: "a fait +1 sur ta reco de" },
   recommendation_comment: { Icon: MessageSquare, verb: "a commenté la reco de" },
   download_react: { Icon: Megaphone, verb: "se moque de ton téléchargement de" },
+  follow_request: { Icon: UserPlus, verb: "demande à s'abonner à toi" },
+  follow_accepted: { Icon: UserCheck, verb: "a accepté ta demande d'abonnement" },
   // Notif système (pas d'acteur) : le titre vient de `title`, le détail du snippet.
   import_pending: { Icon: Gamepad2, verb: "", system: true, title: "Jeux à valider" },
   psn_ready: { Icon: Gamepad2, verb: "", system: true, title: "Jeux à valider" },
@@ -85,6 +90,8 @@ function loadSearchHistory() {
 export default function Topbar() {
   const { user, token, logout } = useAuth();
   const { theme, toggle: toggleTheme } = useTheme();
+  const { cosmetics } = useCosmetics();
+  const arcadeTheme = cosmetics?.theme || null;
   const navigate = useNavigate();
 
   const [searchOpen, setSearchOpen] = useState(false);
@@ -253,6 +260,16 @@ export default function Topbar() {
       navigate("/profile?tab=badges");
       return;
     }
+    // Demande d'abonnement à valider → Paramètres > Confidentialité.
+    if (n.type === "follow_request") {
+      navigate("/settings?tab=privacy");
+      return;
+    }
+    // Demande acceptée → le profil enfin accessible.
+    if (n.type === "follow_accepted") {
+      if (n.actor?.username) navigate(`/u/${n.actor.username}`);
+      return;
+    }
     // OST : ouvre l'onglet OST du profil concerné, sur la bonne piste.
     if (n.ostOwner) {
       navigate(`/u/${n.ostOwner}?tab=ost${n.game ? `&ost=${n.game}` : ""}`);
@@ -302,15 +319,19 @@ export default function Topbar() {
   return (
     <header className="topbar">
       <div className="topbar-actions">
-        {/* Thème (mobile uniquement : sur desktop il vit dans la sidebar) */}
-        <button
-          className="icon-btn theme-btn-mobile clickable"
-          onClick={toggleTheme}
-          aria-label={theme === "light" ? "Thème sombre" : "Thème clair"}
-          title={theme === "light" ? "Thème sombre" : "Thème clair"}
-        >
-          {theme === "light" ? <Moon size={19} /> : <Sun size={19} />}
-        </button>
+        {/* Thème (mobile uniquement : sur desktop il vit dans la sidebar).
+            Masqué si un thème de l'arcade impose son mode : il se change alors
+            depuis /arcade. */}
+        {!arcadeTheme && (
+          <button
+            className="icon-btn theme-btn-mobile clickable"
+            onClick={toggleTheme}
+            aria-label={theme === "light" ? "Thème sombre" : "Thème clair"}
+            title={theme === "light" ? "Thème sombre" : "Thème clair"}
+          >
+            {theme === "light" ? <Moon size={19} /> : <Sun size={19} />}
+          </button>
+        )}
 
         {/* Recherche */}
         <div className={`search ${searchOpen ? "open" : ""}`} ref={searchRef}>

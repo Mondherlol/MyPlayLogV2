@@ -63,6 +63,7 @@ import GameRelated from "../components/GameRelated";
 import GamePatches from "../components/GamePatches";
 import FreeGameBanner from "../components/FreeGameBanner";
 import { useTabSwipe } from "../hooks/useTabSwipe";
+import useFollowingRail from "../hooks/useFollowingRail";
 
 const FRIEND_GROUPS = [
   { key: "played", label: "Y ont joué", match: (s) => s !== "wishlist" },
@@ -277,6 +278,9 @@ export default function GamePage() {
   // déborde depuis qu'il y a beaucoup d'onglets.
   const tabDrag = useRef({ down: false, moved: false, startX: 0, startScroll: 0 });
   const [tabScroll, setTabScroll] = useState({ left: false, right: false });
+  // La colonne de gauche suit le scroll : elle descend jusqu'à sa dernière
+  // carte puis se fige, et remonte dès qu'on scrolle vers le haut.
+  const leftRef = useFollowingRail();
 
   const entry = map[id];
   const isWishlist = entry?.status === "wishlist";
@@ -645,7 +649,7 @@ export default function GamePage() {
       <div className="gp-sheet">
         <div className="gp-grid">
           {/* ---------------- Colonne gauche (fixe) ---------------- */}
-          <aside className="gp-left">
+          <aside className="gp-left" ref={leftRef}>
             <button
               className="gp-cover clickable"
               onClick={() => setShowCover(true)}

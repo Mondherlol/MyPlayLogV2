@@ -19,11 +19,13 @@ import { triggerMissionCheck } from "../lib/missions.js";
 // la note du joueur, qui pondèrent la difficulté).
 const router = express.Router();
 
-const IMG = "https://images.igdb.com/igdb/image/upload";
+// Exportés : Pixel Rush (routes/pixel.js) rejoue exactement les mêmes règles de
+// comparaison de titres, le même pool de « gros jeux » et les mêmes indices.
+export const IMG = "https://images.igdb.com/igdb/image/upload";
 const CLIP_SEC = 15; // durée d'un extrait
 const DEFAULT_ROUNDS = 10;
 
-const person = (u) =>
+export const person = (u) =>
   u ? { id: String(u._id), username: u.username, avatar: u.avatar || null } : null;
 
 // Même normalisation que le client (pages/BlindTest.jsx).
@@ -42,26 +44,26 @@ const EDITION_RE =
 const canonName = (s) => norm(s).replace(EDITION_RE, " ").replace(/\s+/g, " ").trim();
 
 // Même jeu ? Par id IGDB, sinon par nom canonique.
-function sameGame(r, guessGameId, guessName) {
+export function sameGame(r, guessGameId, guessName) {
   if (guessGameId != null && Number(guessGameId) === Number(r.gameId)) return true;
   const a = canonName(guessName);
   return !!a && a === canonName(r.gameName);
 }
 
-function shuffle(a) {
+export function shuffle(a) {
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
 }
-const sample = (arr) => arr[Math.floor(Math.random() * arr.length)];
+export const sample = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 // Tirage sans remise PONDÉRÉ (Efraimidis–Spirakis : clé = rand^(1/poids)) : les
 // jeux sur lesquels le joueur a le plus d'heures (ou qu'il a le mieux notés)
 // remontent plus souvent en tête — sans être systématiques, le hasard garde sa
 // part pour la diversité. Retourne les jeux réordonnés.
-function weightedOrder(games) {
+export function weightedOrder(games) {
   const weight = (g) => {
     const h = Math.min(g.playtimeHours || 0, 120);
     const r = g.rating != null ? Math.max(0, g.rating - 60) / 40 : 0;
@@ -76,7 +78,7 @@ function weightedOrder(games) {
 // --- Pool de « gros jeux » pour les manches piège (jeux non joués) + décors de
 // recherche. Mis en cache par jour (comme /feed/discover). ---
 let famousCache = { day: 0, games: [] };
-async function getFamousPool() {
+export async function getFamousPool() {
   const day = Math.floor(Date.now() / 86400000);
   if (famousCache.day === day && famousCache.games.length) return famousCache.games;
   try {
@@ -130,7 +132,7 @@ function scrapeWithBudget(gameId, name, ms = 5000) {
 // Indices progressifs dévoilés au fil de l'extrait (année → plateformes →
 // studio). Récupérés en un seul appel IGDB pour tous les jeux du set ;
 // best-effort : sans réponse IGDB, la manche se joue simplement sans indices.
-async function hintsForGames(gameIds) {
+export async function hintsForGames(gameIds) {
   const ids = [...new Set(gameIds)].filter(Boolean);
   if (!ids.length) return new Map();
   try {
@@ -189,7 +191,7 @@ async function altNamesForGames(ids) {
 }
 
 // Attache les noms alternatifs à une liste de candidats (recherche tolérante).
-async function attachAltNames(candidates) {
+export async function attachAltNames(candidates) {
   const altMap = await altNamesForGames(candidates.map((c) => c.id));
   for (const c of candidates) {
     const a = altMap.get(c.id);

@@ -20,6 +20,15 @@ import {
   RotateCcw,
   Plus,
   VenetianMask,
+  Lock,
+  Globe,
+  EyeOff,
+  ImageOff,
+  MessageSquareText,
+  UserPlus,
+  UserCheck,
+  UserX,
+  Inbox,
 } from "lucide-react";
 import { apiFetch, API_BASE } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -44,15 +53,15 @@ import {
 
 const TAB_KEYS = ["imports", "tracking", "account", "appearance", "notifications", "privacy"];
 
-// Onglets de la page Paramètres (façon Discord / Steam). Seul « Imports » est
-// actif pour l'instant ; les autres sont là pour montrer la structure.
+// Onglets de la page Paramètres (façon Discord / Steam). Les onglets marqués
+// `soon` sont là pour montrer la structure et restent désactivés.
 const TABS = [
   { key: "imports", label: "Imports", Icon: DownloadCloud },
   { key: "tracking", label: "Tracking", Icon: Swords },
+  { key: "privacy", label: "Confidentialité", Icon: ShieldCheck },
   { key: "account", label: "Compte", Icon: UserCog, soon: true },
   { key: "appearance", label: "Apparence", Icon: Palette, soon: true },
   { key: "notifications", label: "Notifications", Icon: Bell, soon: true },
-  { key: "privacy", label: "Confidentialité", Icon: ShieldCheck, soon: true },
 ];
 
 // Ouvre une pop-up centrée (flux OpenID « Sign in through Steam »).
@@ -76,10 +85,15 @@ export default function Settings() {
 
   // Badge « à valider » sur l'onglet Imports (jeux détectés par une synchro PSN).
   const [pendingCount, setPendingCount] = useState(0);
+  // Badge « demandes d'abonnement » sur l'onglet Confidentialité (compte privé).
+  const [requestCount, setRequestCount] = useState(0);
   useEffect(() => {
     if (!token) return;
     apiFetch("/psn/status", { token })
       .then((s) => setPendingCount(s?.pending || 0))
+      .catch(() => {});
+    apiFetch("/users/me/follow-requests", { token })
+      .then((d) => setRequestCount(d?.count || 0))
       .catch(() => {});
   }, [token]);
 
@@ -104,6 +118,9 @@ export default function Settings() {
               {key === "imports" && pendingCount > 0 && (
                 <span className="settings-tab-badge">{pendingCount}</span>
               )}
+              {key === "privacy" && requestCount > 0 && (
+                <span className="settings-tab-badge">{requestCount}</span>
+              )}
               {soon && <span className="settings-soon">bientôt</span>}
             </button>
           ))}
@@ -112,6 +129,7 @@ export default function Settings() {
         <section className="settings-panel">
           {tab === "imports" && <ImportsPanel />}
           {tab === "tracking" && <TrackingPanel />}
+          {tab === "privacy" && <PrivacyPanel onCount={setRequestCount} />}
         </section>
       </div>
     </div>
@@ -131,6 +149,231 @@ function ImportsPanel() {
       <div className="import-cards">
         <SteamCard />
         <PsnCard />
+      </div>
+    </div>
+  );
+}
+
+// Interrupteur (façon iOS) réutilisé par tout l'onglet Confidentialité.
+function PrivacySwitch({ Icon, title, desc, checked, disabled, busy, onChange }) {
+  return (
+    <label className={`pv-row ${disabled ? "off" : ""} ${checked ? "on" : ""}`}>
+      <span className="pv-row-icon">
+        <Icon size={18} />
+      </span>
+      <span className="pv-row-txt">
+        <strong>{title}</strong>
+        <span>{desc}</span>
+      </span>
+      <span className="pv-switch">
+        {busy && <Loader2 className="spin pv-row-busy" size={14} />}
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={disabled || busy}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+        <span className="pv-switch-track" />
+      </span>
+    </label>
+  );
+}
+
+// Onglet « Confidentialité » : compte privé + sous-options, et validation des
+// demandes d'abonnement en attente. Chaque bascule est enregistrée aussitôt
+// (PUT /users/me/privacy) — pas de bouton « Enregistrer ».
+function PrivacyPanel({ onCount }) {
+  const { token, user, updateUser } = useAuth();
+  const [privacy, setPrivacy] = useState(
+    () =>
+      user?.privacy || {
+        isPrivate: false,
+        hideAvatar: false,
+        hideCover: false,
+        hideReviews: false,
+      }
+  );
+  const [busyKey, setBusyKey] = useState(null);
+  const [requests, setRequests] = useState(null); // null = chargement
+  const [busyId, setBusyId] = useState(null);
+
+  async function loadRequests() {
+    try {
+      const d = await apiFetch("/users/me/follow-requests", { token });
+      setRequests(d.requests || []);
+      onCount?.(d.count || 0);
+    } catch {
+      setRequests([]);
+    }
+  }
+  useEffect(() => {
+    loadRequests();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function save(key, value) {
+    const before = privacy;
+    setPrivacy((p) => ({ ...p, [key]: value }));
+    setBusyKey(key);
+    try {
+      const d = await apiFetch("/users/me/privacy", {
+        method: "PUT",
+        token,
+        body: { [key]: value },
+      });
+      setPrivacy(d.user.privacy);
+      updateUser({ privacy: d.user.privacy });
+      // Repasser en public accepte les demandes en attente côté serveur : la
+      // liste locale doit suivre.
+      if (key === "isPrivate" && !value) {
+        setRequests([]);
+        onCount?.(0);
+      }
+    } catch {
+      setPrivacy(before); // échec : on remet l'interrupteur comme avant
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function answer(id, action) {
+    setBusyId(id);
+    try {
+      const d = await apiFetch(`/users/me/follow-requests/${id}/${action}`, {
+        method: "POST",
+        token,
+      });
+      setRequests((r) => (r || []).filter((x) => x.id !== id));
+      onCount?.(d.count || 0);
+    } catch {
+      /* best-effort */
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const priv = !!privacy.isPrivate;
+
+  return (
+    <div className="settings-section">
+      <h2 className="settings-section-title">
+        <ShieldCheck size={20} /> Confidentialité
+      </h2>
+      <p className="settings-section-sub">
+        Choisis qui peut voir ton profil, tes jeux et tes reviews.
+      </p>
+
+      <div className="pv-block">
+        <PrivacySwitch
+          Icon={priv ? Lock : Globe}
+          title="Compte privé"
+          desc={
+            priv
+              ? "Seuls tes abonnés voient ton profil. S'abonner passe par une demande à valider."
+              : "Ton profil est visible par tout le monde, même sans compte."
+          }
+          checked={priv}
+          busy={busyKey === "isPrivate"}
+          onChange={(v) => save("isPrivate", v)}
+        />
+      </div>
+
+      {/* Sous-options : sans effet tant que le compte est public. */}
+      <div className={`pv-block pv-sub ${priv ? "" : "locked"}`}>
+        <div className="pv-sub-head">
+          <EyeOff size={15} /> Masquer aux non-abonnés
+          {!priv && <span className="pv-sub-hint">active le compte privé</span>}
+        </div>
+        <PrivacySwitch
+          Icon={ImageOff}
+          title="Ma photo de profil"
+          desc="Les visiteurs non abonnés voient un avatar vide à la place."
+          checked={!!privacy.hideAvatar}
+          disabled={!priv}
+          busy={busyKey === "hideAvatar"}
+          onChange={(v) => save("hideAvatar", v)}
+        />
+        <PrivacySwitch
+          Icon={ImageOff}
+          title="Ma bannière"
+          desc="La photo de couverture de ton profil reste réservée à tes abonnés."
+          checked={!!privacy.hideCover}
+          disabled={!priv}
+          busy={busyKey === "hideCover"}
+          onChange={(v) => save("hideCover", v)}
+        />
+        <PrivacySwitch
+          Icon={MessageSquareText}
+          title="Mes reviews"
+          desc="Tes avis disparaissent des pages de jeux pour qui ne te suit pas."
+          checked={!!privacy.hideReviews}
+          disabled={!priv}
+          busy={busyKey === "hideReviews"}
+          onChange={(v) => save("hideReviews", v)}
+        />
+      </div>
+
+      {/* Demandes d'abonnement en attente (comptes privés). */}
+      <div className="pv-block">
+        <div className="pv-sub-head">
+          <Inbox size={15} /> Demandes d'abonnement
+          {requests?.length > 0 && <span className="pv-count">{requests.length}</span>}
+        </div>
+        {requests === null ? (
+          <div className="pv-empty">
+            <Loader2 className="spin" size={18} />
+          </div>
+        ) : requests.length === 0 ? (
+          <div className="pv-empty">
+            <UserPlus size={20} />
+            <p>
+              {priv
+                ? "Aucune demande en attente."
+                : "Ton compte est public : on s'abonne à toi sans demander."}
+            </p>
+          </div>
+        ) : (
+          <div className="pv-req-list">
+            {requests.map((r) => (
+              <div key={r.id} className="pv-req">
+                <span className="pv-req-avatar">
+                  {r.avatar ? (
+                    <img src={r.avatar} alt="" />
+                  ) : (
+                    (r.username || "?")[0].toUpperCase()
+                  )}
+                </span>
+                <div className="pv-req-txt">
+                  <strong>{r.username}</strong>
+                  {r.bio && <span>{r.bio}</span>}
+                </div>
+                <div className="pv-req-actions">
+                  <button
+                    className="pv-req-ok clickable"
+                    onClick={() => answer(r.id, "accept")}
+                    disabled={busyId === r.id}
+                    title="Accepter"
+                  >
+                    {busyId === r.id ? (
+                      <Loader2 className="spin" size={15} />
+                    ) : (
+                      <UserCheck size={15} />
+                    )}
+                    <span>Accepter</span>
+                  </button>
+                  <button
+                    className="pv-req-no clickable"
+                    onClick={() => answer(r.id, "reject")}
+                    disabled={busyId === r.id}
+                    title="Refuser"
+                  >
+                    <UserX size={15} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

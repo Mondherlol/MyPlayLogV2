@@ -35,6 +35,7 @@ import {
   CalendarClock,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
+import useFollowingRail from "../hooks/useFollowingRail";
 import GameAddFan from "./GameAddFan";
 import ProfileOverviewAside from "./ProfileOverviewAside";
 
@@ -276,6 +277,9 @@ export default function ProfileOverview({
   // Ordre manuel des jeux par section : { sectionKey: [gameId,…] }. Une section
   // présente ⇒ tri manuel (drag & drop) ; absente ⇒ tri « récemment modifié ».
   const [gameOrder, setGameOrder] = useState(() => profile.overviewGameOrder || {});
+  // La colonne latérale suit le scroll : elle descend jusqu'à sa dernière card
+  // puis se fige, et remonte dès qu'on scrolle vers le haut.
+  const asideRef = useFollowingRail();
 
   // Resynchronise avec le serveur quand on n'édite pas (revalidation en fond).
   const savedOrderKey = (profile.overviewOrder || []).join("|");
@@ -599,6 +603,7 @@ export default function ProfileOverview({
           onSavePrefs={onSavePrefs}
           onEditingChange={setAsideEditing}
           onOpenTab={onOpenTab}
+          railRef={asideRef}
         />
       )}
     </div>

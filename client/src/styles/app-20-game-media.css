@@ -1341,6 +1341,28 @@
   max-height: 560px;
 }
 
+/* 2 médias dont un seul est une bande panoramique (très large, peu haute) :
+   côte à côte, la bande se retrouve rognée et zoomée à l'extrême. MediaGrid
+   pose alors `.stacked` (une fois les ratios mesurés) → colonne unique, la
+   bande en dessous (order: 2), chacune à sa hauteur naturelle. */
+.gm-media-grid.n-2.stacked {
+  grid-template-columns: 1fr;
+  aspect-ratio: auto;
+}
+
+.gm-media-grid.stacked .gm-tile,
+.gm-media-grid.stacked .gm-tile-btn {
+  height: auto;
+  min-height: 0;
+}
+
+.gm-media-grid.stacked .gm-tile-btn img {
+  height: auto;
+  object-fit: contain;
+  background: #000;
+  max-height: 560px;
+}
+
 /* Actions d'un post */
 .gm-post-actions {
   display: flex;

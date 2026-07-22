@@ -14,9 +14,8 @@ import {
   ChevronLeft,
   Gamepad2,
   Music2,
-  Trophy,
-  Crown,
-  Swords,
+  Joystick,
+  Coins,
   Clock,
   ExternalLink,
   Sprout,
@@ -27,60 +26,17 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { usePlayer } from "../context/PlayerContext";
 import { useClickOutside } from "../hooks/useClickOutside";
+import useFollowingRail from "../hooks/useFollowingRail";
 import { apiFetch } from "../lib/api";
 import { extractVideoId } from "../lib/youtube";
 import DocumentaryModal from "../components/DocumentaryModal";
 import DiscoverGemsModal, { GEMS_RESUME_KEY } from "../components/DiscoverGemsModal";
 import HomeFeed, { FeedUserFilter } from "../components/HomeFeed";
-import ArcadeBar from "../components/ArcadeBar";
 import { STORE_COLORS, freeEndsLabel } from "../components/FreeGameBanner";
 
 // Réglages par défaut du feed documentaire, persistés en localStorage.
 const PREFS_KEY = "mpl_doc_prefs";
 const DEFAULT_PREFS = { lang: ["fr"], scope: "played" };
-
-// Rail latéral « qui suit le scroll » : il défile avec la page jusqu'à montrer
-// son dernier widget, puis se fige là ; et dès qu'on remonte, il redescend
-// vers son haut (comme les navbars qui réapparaissent au scroll vers le haut).
-// Le rail est en `position: sticky` : on ne fait que piloter son `top`, qu'on
-// déplace à l'inverse du scroll entre `top` (haut visible) et la valeur qui
-// aligne son bas sur le bas du viewport. Sans effet si le rail tient à l'écran.
-function useFollowingRail(ref, { top = 76, bottom = 24 } = {}) {
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    let lastY = window.scrollY;
-    let offset = top;
-
-    const clamp = (dy = 0) => {
-      // Plus bas que le rail peut remonter : son bas contre le bas du viewport.
-      const floor = Math.min(top, window.innerHeight - el.offsetHeight - bottom);
-      offset = Math.min(top, Math.max(floor, offset - dy));
-      el.style.top = `${offset}px`;
-    };
-
-    const onScroll = () => {
-      const y = Math.max(0, window.scrollY);
-      const dy = y - lastY;
-      lastY = y;
-      clamp(dy);
-    };
-
-    clamp();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-    // Les widgets arrivent en asynchrone : la hauteur du rail change sous nos
-    // pieds, il faut re-borner sans quoi il reste figé trop haut ou trop bas.
-    const ro = new ResizeObserver(() => clamp());
-    ro.observe(el);
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-      ro.disconnect();
-      el.style.top = "";
-    };
-  }, [ref, top, bottom]);
-}
 
 function loadPrefs() {
   try {
@@ -115,9 +71,8 @@ export default function Welcome() {
   // Filtre du fil : id du joueur suivi dont on veut voir l'activité (null = tous).
   const [feedUser, setFeedUser] = useState(null);
   const settingsRef = useRef(null);
-  const railRef = useRef(null);
+  const railRef = useFollowingRail();
   useClickOutside(settingsRef, () => setShowSettings(false), showSettings);
-  useFollowingRail(railRef);
 
   // Le CTA « Chercher mes pépites aussi » des cartes du fil ouvre la modale.
   useEffect(() => {
@@ -149,8 +104,8 @@ export default function Welcome() {
   return (
     <div className="home">
       <div className="home-main">
-        {/* --- En-tête : le salut et la cagnotte d'arcade. Le blind test se
-            lance depuis son classement, dans le rail de droite. --- */}
+        {/* --- En-tête : juste le salut. Points, mini-jeux, classements et
+            curseurs vivent désormais sur la page /arcade. --- */}
         <header className="hf-hero">
           <div className="hf-hello">
             <h1 className="hf-hello-title">
@@ -160,9 +115,6 @@ export default function Welcome() {
               Voici ce qui se passe sur ton radar à jeux.
             </p>
           </div>
-
-          {/* Solde + accès aux caisses et aux curseurs (ex-page /arcade). */}
-          <ArcadeBar />
         </header>
 
         {/* --- Fil d'actualité --- */}
@@ -188,8 +140,9 @@ export default function Welcome() {
           (voir useFollowingRail). */}
       <div className="home-aside">
         <div className="hf-rail" ref={railRef}>
-          {/* Classement du blind test (moi + les joueurs que je suis) */}
-          <BlindTestLeaderboard token={token} myId={user?.id} />
+          {/* Porte d'entrée de l'arcade : le solde et un lien, rien de plus —
+              les classements et la collection vivent sur /arcade. */}
+          <ArcadeTeaser points={user?.points} />
 
           {/* Documentaire : juste sous le classement, avec ses réglages. */}
           <div className="doc-cta">
@@ -799,121 +752,24 @@ function FreeGamesWidget({ token }) {
   );
 }
 
-// Classement du blind test parmi moi + mes suivis, en DEUX classements que
-// les onglets du coin haut-droit permutent : « Record » (meilleur score sur
-// une seule partie) et « Total » (cumul de toutes les parties). Le serveur
-// renvoie les deux valeurs par joueur, on ne fait que trier ici.
-// Chaque ligne (sauf la mienne) est défiable → rejoue le même set d'extraits.
-const BT_MODES = [
-  { key: "best", label: "Record", pick: (e) => e.bestScore ?? 0, hint: "Meilleur score en une partie" },
-  { key: "total", label: "Total", pick: (e) => e.score ?? 0, hint: "Total cumulé de toutes les parties" },
-];
-
-function BlindTestLeaderboard({ token, myId }) {
-  const [entries, setEntries] = useState(null);
-  const [mode, setMode] = useState("best");
-
-  useEffect(() => {
-    if (!token) return;
-    let alive = true;
-    apiFetch("/blindtest/leaderboard", { token })
-      .then((d) => alive && setEntries(d.entries || []))
-      .catch(() => alive && setEntries([]));
-    return () => {
-      alive = false;
-    };
-  }, [token]);
-
-  // Rien tant qu'aucune partie n'a été jouée (garde le rail épuré).
-  if (!entries || entries.length === 0) {
-    if (entries === null) return null;
-    return (
-      <div className="hf-widget card hf-bt-widget">
-        <h3 className="hf-w-title">
-          <Crown size={15} /> Blind test
-        </h3>
-        <p className="hf-bt-empty">
-          Personne n'a encore joué. Lance-toi et deviens numéro 1&nbsp;!
-        </p>
-        <Link to="/blindtest" className="hf-bt-cta clickable">
-          <Music2 size={15} /> Jouer au blind test
-        </Link>
-      </div>
-    );
-  }
-
-  const active = BT_MODES.find((m) => m.key === mode) || BT_MODES[0];
-  // Tri à égalité : on départage sur l'autre score, puis sur la date.
-  const other = BT_MODES.find((m) => m.key !== active.key);
-  const top = [...entries]
-    .sort(
-      (a, b) =>
-        active.pick(b) - active.pick(a) ||
-        other.pick(b) - other.pick(a) ||
-        new Date(b.date) - new Date(a.date)
-    )
-    .slice(0, 6);
-
+// Porte d'entrée de l'arcade dans le rail : le solde et un lien. Tout le
+// reste (mini-jeux, classements, caisses, curseurs) vit sur la page /arcade —
+// l'accueil est un fil d'actualité, pas une salle de jeux.
+function ArcadeTeaser({ points }) {
   return (
-    <div className="hf-widget card hf-bt-widget">
-      <div className="hf-bt-head">
-        <h3 className="hf-w-title">
-          <Crown size={15} /> Classement blind test
-        </h3>
-        <div className="hf-bt-tabs" role="group" aria-label="Type de classement">
-          {BT_MODES.map((m) => (
-            <button
-              key={m.key}
-              className={`hf-bt-tab clickable ${mode === m.key ? "on" : ""}`}
-              onClick={() => setMode(m.key)}
-              title={m.hint}
-              aria-pressed={mode === m.key}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      <ol className="hf-bt-list">
-        {top.map((e, i) => (
-          <li key={e.blindTestId} className={`hf-bt-row ${e.isMe ? "me" : ""}`}>
-            <span className={`hf-bt-rank r${i + 1}`}>{i + 1}</span>
-            <Link to={`/u/${e.user.username}`} className="hf-bt-user clickable">
-              {e.user.avatar ? (
-                <img src={e.user.avatar} alt="" loading="lazy" draggable="false" />
-              ) : (
-                <span className="hf-bt-av-fb">{e.user.username[0].toUpperCase()}</span>
-              )}
-              <span className="hf-bt-name">{e.user.username}</span>
-            </Link>
-            {!e.isMe && String(e.user.id) !== String(myId) && (
-              <Link
-                to={`/blindtest?challenge=${e.blindTestId}`}
-                className="hf-bt-fight clickable"
-                title={`Défier ${e.user.username}`}
-              >
-                <Swords size={13} />
-              </Link>
-            )}
-            <span
-              className="hf-bt-score"
-              title={
-                e.games != null
-                  ? `Record ${e.bestScore ?? 0} · total ${e.score} sur ${e.games} partie${
-                      e.games > 1 ? "s" : ""
-                    }`
-                  : undefined
-              }
-            >
-              <Trophy size={12} /> {active.pick(e)}
-            </span>
-          </li>
-        ))}
-      </ol>
-      <Link to="/blindtest" className="hf-bt-cta clickable">
-        <Music2 size={15} /> Jouer au blind test
-      </Link>
-    </div>
+    <Link to="/arcade" className="hf-arcade clickable">
+      <span className="hf-arcade-ic">
+        <Joystick size={20} />
+      </span>
+      <span className="hf-arcade-body">
+        <span className="hf-arcade-title">Arcade</span>
+        <span className="hf-arcade-sub">Mini-jeux, classements et curseurs</span>
+      </span>
+      <span className="hf-arcade-points">
+        <Coins size={13} />
+        {Number(points || 0).toLocaleString("fr-FR")}
+      </span>
+    </Link>
   );
 }
 

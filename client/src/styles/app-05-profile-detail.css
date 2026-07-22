@@ -3541,3 +3541,67 @@ button.pf-stat:hover {
     box-shadow: 0 0 0 0 rgba(46, 204, 125, 0);
   }
 }
+
+/* ============================================================
+   Compte privé : pastille sur la bannière + profil verrouillé
+   ============================================================ */
+
+.pf-private-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.24rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--orange) 40%, var(--border));
+  background: color-mix(in srgb, var(--orange) 12%, var(--surface));
+  color: var(--accent-ink);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Demande d'abonnement envoyée : bouton en retrait (comme « Suivi(e) »). */
+.follow-btn.requested {
+  background: var(--surface);
+  color: var(--text-soft);
+  border: 1.5px solid var(--border-strong);
+  box-shadow: none;
+}
+.follow-btn.requested:hover {
+  border-color: #e0483f;
+  color: #e0483f;
+}
+
+/* Le profil verrouillé s'arrête à la bannière : pas d'onglets à afficher. */
+.pf-locked .pf-cover {
+  background: var(--surface-2);
+}
+
+.pf-lock-panel {
+  max-width: 520px;
+  margin: 2.5rem auto 4rem;
+  padding: 2rem 1.5rem;
+  text-align: center;
+}
+.pf-lock-icon {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 0.9rem;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+}
+.pf-lock-panel h2 {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  margin: 0 0 0.4rem;
+}
+.pf-lock-panel p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}

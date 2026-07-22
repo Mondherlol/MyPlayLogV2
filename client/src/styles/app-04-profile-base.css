@@ -1371,21 +1371,23 @@
 
 /* Popover flottant (émoji / gif) : ne décale pas le contenu.
    Ouvre vers le bas par défaut, vers le haut s'il manque de place. */
+/* Popover émoji / GIF : rendu dans un portail sur <body> et placé en
+   coordonnées viewport par le JS (left + top OU bottom). Sans ça, il se faisait
+   rogner par le conteneur qui scrolle — la liste de commentaires d'une modale —
+   et paraissait passer derrière l'en-tête. z-index au-dessus des modales
+   (.modal-overlay : 1000). */
 .lc-pop {
-  position: absolute;
-  left: 0;
-  z-index: 50;
+  position: fixed;
+  z-index: 2000;
   animation: lc-pop-in 0.12s ease;
 }
 
 .lc-pop.down {
-  top: calc(100% + 8px);
-  bottom: auto;
+  transform-origin: top left;
 }
 
 .lc-pop.up {
-  bottom: calc(100% + 8px);
-  top: auto;
+  transform-origin: bottom left;
 }
 
 .lc-pop-emoji {

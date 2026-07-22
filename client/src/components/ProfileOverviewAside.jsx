@@ -257,6 +257,7 @@ export default function ProfileOverviewAside({
   onSavePrefs,
   onEditingChange,
   onOpenTab,
+  railRef,
 }) {
   const favoriteCompanies = profile?.favoriteCompanies || [];
   const counts = profile?.counts || {};
@@ -1056,7 +1057,7 @@ export default function ProfileOverviewAside({
   const shownKeys = activeKeys; // hors édition : uniquement les cards actives
 
   return (
-    <aside className={`pf-overview-aside ${editing ? "editing" : ""}`}>
+    <aside className={`pf-overview-aside ${editing ? "editing" : ""}`} ref={railRef}>
       {isMe && (
         <div className="pfa-edit-bar">
           <button

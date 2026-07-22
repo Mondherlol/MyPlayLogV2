@@ -1,0 +1,1154 @@
+/* ======================================================================
+   Pixel Rush — le plateau de quiz
+   ======================================================================
+   IDENTITÉ VOLONTAIREMENT ÉLOIGNÉE DU BLIND TEST. Là-bas le décor tourne
+   autour du vinyle (disque, sillons, égaliseur, or sur ardoise) parce que
+   c'est un jeu d'écoute. Ici on devine une image : on est sur un plateau
+   de jeu télé — projecteurs croisés, public en ombres chinoises au fond,
+   et les captures posées comme des cartes qu'on distribue face cachée
+   puis qu'on retourne à la révélation.
+
+   La page emprunte la STRUCTURE du blind test (.bt-topbar, .bt-search,
+   .bt-suggest, .bt-done…) mais pas son décor : .px-page redéfinit toute
+   la palette --bts-* et redessine les pièces qui portent l'identité.
+   Le plateau reste sombre quel que soit le thème de l'appli : on éteint
+   la salle pour allumer les projecteurs.
+   ====================================================================== */
+
+/* ----------------------------------------------------------------------
+   Palette du plateau — thème CLAIR (par défaut) : plateau de jour, mur
+   crème, poursuites chaudes, public en gris doux. Les boutons secondaires
+   restent sombres, comme partout dans l'appli.
+   ----------------------------------------------------------------------
+   ATTENTION : les deux blocs de palette doivent déclarer EXACTEMENT les
+   mêmes variables. Le thème sombre passe par `:root[data-theme="dark"]
+   .px-page` pour battre `:root[data-theme="dark"] .bt-page` (plus
+   spécifique que `.px-page` seul) ; toute variable oubliée dans le bloc
+   sombre ne retomberait donc pas sur la valeur claire d'à côté mais sur
+   celle du BLIND TEST, et les deux palettes se mélangeraient. */
+.px-page {
+  /* Décor */
+  --px-night: #f4f2ee;
+  --px-spot: rgba(255, 190, 60, 0.16);
+  --px-rim-1: rgba(214, 76, 178, 0.09); /* rampe magenta, côté jardin */
+  --px-rim-2: rgba(52, 150, 245, 0.09); /* rampe cyan, côté cour */
+  --px-aud-back: #dedce8;
+  --px-aud-front: #c8c6d8;
+  --px-crowd-glow: rgba(255, 194, 84, 0.22);
+  --px-vignette: rgba(74, 68, 96, 0.14);
+  --px-spark: rgba(246, 160, 20, 0.95);
+  /* Cartes et pupitres */
+  --px-card: #ffffff;
+  --px-card-2: #fbfaf7;
+  --px-felt: #efece6;
+  --px-gold-deep: #c08c0a;
+  --px-cast: rgba(38, 34, 60, 0.2); /* ombre portée des cartes */
+  --px-sheen: rgba(255, 255, 255, 0.9); /* liseré de lumière en haut */
+
+  --bts-bg-base: var(--px-night);
+  --bts-text: #17161d;
+  --bts-soft: rgba(23, 22, 29, 0.6);
+  --bts-card: rgba(23, 22, 29, 0.04);
+  --bts-card-2: rgba(23, 22, 29, 0.08);
+  --bts-line: rgba(23, 22, 29, 0.1);
+  --bts-line-2: rgba(23, 22, 29, 0.16);
+  --bts-panel: #ffffff;
+  --bts-glass: rgba(255, 255, 255, 0.85);
+  --bts-hover: rgba(23, 22, 29, 0.05);
+  --bts-gold: #f2b70b;
+  --bts-gold-2: #ffd24a;
+  --bts-gold-ink: #96690a;
+  --bts-gold-soft: rgba(242, 183, 11, 0.16);
+  --bts-grad: linear-gradient(135deg, #ffd24a, #f2a50b);
+  --bts-good: #1f9d55;
+  --bts-bad: #d92d33;
+  --bts-good-bg: rgba(47, 174, 98, 0.1);
+  --bts-bad-bg: rgba(229, 72, 77, 0.08);
+  --bts-shadow: rgba(24, 26, 40, 0.28);
+  --bts-title-grad: linear-gradient(160deg, #191b24 25%, #494c5c 60%, #96690a);
+  --bts-stage-glow: rgba(255, 190, 60, 0.2);
+  --bts-overlay: rgba(18, 19, 28, 0.5);
+  --bts-btn-bg: #1b1a26;
+  --bts-btn-bg-2: #2a2837;
+  --bts-btn-text: #f6f2e8;
+  --bts-btn-soft: rgba(246, 242, 232, 0.68);
+  --bts-btn-line: rgba(255, 255, 255, 0.08);
+}
+
+/* Palette du plateau — thème SOMBRE : on éteint la salle, il ne reste que
+   les poursuites. */
+:root[data-theme="dark"] .px-page {
+  --px-night: #080a14;
+  --px-spot: rgba(255, 226, 150, 0.16);
+  --px-rim-1: rgba(226, 86, 190, 0.14);
+  --px-rim-2: rgba(64, 190, 255, 0.12);
+  --px-aud-back: #0b0e1c;
+  --px-aud-front: #04050a;
+  --px-crowd-glow: rgba(255, 206, 128, 0.14);
+  --px-vignette: rgba(3, 4, 9, 0.74);
+  --px-spark: rgba(255, 225, 150, 0.85);
+  --px-card: #161a2a;
+  --px-card-2: #1f2436;
+  --px-felt: #0b0e1a;
+  --px-gold-deep: #a9760a;
+  --px-cast: rgba(0, 0, 0, 0.92);
+  --px-sheen: rgba(255, 255, 255, 0.07);
+
+  --bts-bg-base: var(--px-night);
+  --bts-text: #f6f2e8;
+  --bts-soft: rgba(246, 242, 232, 0.62);
+  --bts-card: rgba(255, 255, 255, 0.05);
+  --bts-card-2: rgba(255, 255, 255, 0.1);
+  --bts-line: rgba(255, 255, 255, 0.1);
+  --bts-line-2: rgba(255, 255, 255, 0.18);
+  --bts-panel: #131627;
+  --bts-glass: rgba(13, 16, 32, 0.72);
+  --bts-hover: rgba(255, 255, 255, 0.07);
+  --bts-gold: #f2b70b;
+  --bts-gold-2: #ffd24a;
+  --bts-gold-ink: #ffd76b;
+  --bts-gold-soft: rgba(242, 183, 11, 0.14);
+  --bts-grad: linear-gradient(135deg, #ffd24a, #f2a50b);
+  --bts-good: #3ddc84;
+  --bts-bad: #ff5c62;
+  --bts-good-bg: rgba(61, 220, 132, 0.12);
+  --bts-bad-bg: rgba(255, 92, 98, 0.1);
+  --bts-shadow: rgba(0, 0, 0, 0.85);
+  --bts-title-grad: linear-gradient(160deg, #ffffff 18%, #ffe6a3 52%, #f2b70b);
+  --bts-stage-glow: rgba(255, 214, 130, 0.18);
+  --bts-overlay: rgba(3, 4, 9, 0.74);
+  --bts-btn-bg: rgba(255, 255, 255, 0.06);
+  --bts-btn-bg-2: rgba(255, 255, 255, 0.12);
+  --bts-btn-text: #f6f2e8;
+  --bts-btn-soft: rgba(246, 242, 232, 0.66);
+  --bts-btn-line: rgba(255, 255, 255, 0.16);
+}
+
+/* Le fond n'est qu'une base : tout le relief est peint par .px-scene. */
+.px-page {
+  background: var(--px-night);
+  color: var(--bts-text);
+}
+/* La modale de révélation est en `fixed` : sans correction elle se centre
+   sur TOUT le viewport, sidebar comprise, et tombe donc décalée à gauche
+   du jeu. --app-sidebar-w est posée par .app-shell (0 sur mobile). */
+.px-page .bt-overlay {
+  left: var(--app-sidebar-w, 0px);
+}
+/* Les scanlines « borne d'arcade » du blind test n'ont rien à faire sur
+   un plateau télé. */
+.px-page::before {
+  display: none;
+}
+
+/* ----------------------------------------------------------------------
+   Le décor (couche décorative, sous le contenu : .bt-body est en z-index 1)
+   ---------------------------------------------------------------------- */
+.px-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+/* Rampes de couleur au ras du sol, de part et d'autre de la scène. */
+.px-scene::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(620px 380px at 2% 98%, var(--px-rim-1), transparent 66%),
+    radial-gradient(620px 380px at 98% 98%, var(--px-rim-2), transparent 66%);
+}
+/* Vignette : on resserre le regard au centre, comme un cadrage caméra.
+   Le public s'y soustrait via son z-index (cf. .px-crowd). */
+.px-scene::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    124% 92% at 50% 32%,
+    transparent 44%,
+    var(--px-vignette)
+  );
+}
+
+/* Deux poursuites croisées qui balaient lentement la scène.
+   Le faisceau est un bandeau incliné dont les bords sont FONDUS PAR UN
+   MASQUE, pas par un flou : `filter` s'applique avant `clip-path`, donc un
+   cône découpé au clip-path ressortirait avec des bords nets malgré le
+   blur — et un blur plein écran coûte cher au scroll mobile.
+   L'angle de repos et l'angle de balayage passent par --a1/--a2 pour que
+   les deux poursuites s'inclinent en miroir sur les mêmes keyframes. */
+.px-beam {
+  position: absolute;
+  top: -26%;
+  width: 42%;
+  height: 132%;
+  background: linear-gradient(to bottom, var(--px-spot), transparent 72%);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 42%, #000 58%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 42%, #000 58%, transparent);
+  transform-origin: top center;
+  /* Angle de repos : sans lui, les poursuites retomberaient à la verticale
+     partout où l'animation est coupée (mobile, reduced-motion). */
+  transform: rotate(var(--a1));
+  animation: px-sway 13s ease-in-out infinite;
+}
+.px-beam.l {
+  left: 2%;
+  --a1: 7deg;
+  --a2: 17deg;
+}
+.px-beam.r {
+  right: 2%;
+  --a1: -7deg;
+  --a2: -17deg;
+  animation-duration: 17s;
+}
+@keyframes px-sway {
+  0%,
+  100% {
+    transform: rotate(var(--a1));
+  }
+  50% {
+    transform: rotate(var(--a2));
+  }
+}
+
+/* La nappe de lumière au sol, sur laquelle les cartes sont posées. */
+.px-floor {
+  position: absolute;
+  left: 50%;
+  bottom: 4%;
+  width: min(1200px, 130%);
+  height: 52vh;
+  transform: translateX(-50%);
+  background: radial-gradient(closest-side, var(--bts-stage-glow), transparent 76%);
+}
+
+/* ---- Le public ----
+   Deux rangées d'ombres chinoises : chaque rangée = une bande d'épaules
+   (linear-gradient à palier net) surmontée d'une tête répétée toutes les
+   N px (radial-gradient + background-size + repeat-x). La rangée du fond
+   est décalée d'une demi-tête pour que la foule paraisse dense. Le tout
+   est fondu par le masque : on veut le deviner, pas le regarder. */
+.px-crowd {
+  position: absolute;
+  left: -40px;
+  right: -40px;
+  bottom: 0;
+  height: 150px;
+  /* z-index : le public passe AU-DESSUS de la vignette (::after), sinon le
+     voile sombre des bords écraserait des silhouettes déjà presque noires
+     et il ne resterait rien à voir. */
+  z-index: 1;
+  /* Le contre-jour : la lumière de la scène qui déborde dans la salle. Il
+     est peint par l'élément lui-même, donc SOUS les deux rangées (ses
+     pseudo-éléments) — c'est lui qui détache les têtes du noir. Sans ça,
+     silhouettes et fond ont le même niveau et le public disparaît. */
+  background: radial-gradient(
+    72% 128% at 50% 106%,
+    var(--px-crowd-glow),
+    transparent 72%
+  );
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 42%);
+  mask-image: linear-gradient(180deg, transparent, #000 42%);
+  /* no-repeat, sinon le masque se carrelle : la moindre rangée qui dépasse
+     du bloc retomberait sur la partie opaque du dégradé suivant et le fondu
+     repartirait en plein milieu du public. */
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+.px-crowd::before,
+.px-crowd::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+/* Rangée du fond : têtes tous les 54 px, épaules à partir de 40 px (les
+   têtes font 44 px de haut, elles mordent donc sur la bande — sans ce
+   recouvrement on verrait un liseré entre la tête et le corps). */
+.px-crowd::before {
+  height: 118px;
+  background:
+    radial-gradient(ellipse 19px 22px at 50% 22px, var(--px-aud-back) 0 96%, transparent 100%)
+      0 0 / 54px 118px repeat-x,
+    linear-gradient(transparent 40px, var(--px-aud-back) 40px);
+}
+/* Rangée de devant : plus grande, plus sombre, et décalée d'une demi-tête
+   (27 px) pour boucher les trous de la rangée du fond. */
+.px-crowd::after {
+  height: 96px;
+  background:
+    radial-gradient(ellipse 22px 26px at 50% 26px, var(--px-aud-front) 0 96%, transparent 100%)
+      27px 0 / 62px 96px repeat-x,
+    linear-gradient(transparent 46px, var(--px-aud-front) 46px);
+}
+/* Quelques téléphones allumés dans la salle (un seul nœud, les autres
+   points sont des box-shadow décalées). */
+.px-sparks {
+  position: absolute;
+  z-index: 1; /* comme le public : au-dessus de la vignette */
+  left: 16%;
+  bottom: 88px; /* hauteur des têtes : des téléphones levés dans la salle */
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--px-spark);
+  box-shadow:
+    22vw 16px 0 color-mix(in srgb, var(--px-spark) 80%, transparent),
+    47vw -8px 0 color-mix(in srgb, var(--px-spark) 62%, transparent),
+    66vw 22px 0 color-mix(in srgb, var(--px-spark) 50%, transparent);
+  animation: px-twinkle 5.5s ease-in-out infinite;
+}
+@keyframes px-twinkle {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+/* ----------------------------------------------------------------------
+   Intro — la carte de quiz qui se retourne
+   ---------------------------------------------------------------------- */
+.px-hero {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 150px;
+  height: 192px;
+  margin-bottom: 0.35rem;
+  perspective: 900px;
+}
+.px-hero-glow {
+  position: absolute;
+  inset: -34% -46%;
+  background: radial-gradient(closest-side, var(--bts-stage-glow), transparent 78%);
+}
+.px-hero-card {
+  position: relative;
+  width: 134px;
+  height: 178px;
+  transform-style: preserve-3d;
+  /* Longs paliers, retournement bref : la carte se laisse regarder. */
+  animation: px-hero-flip 7s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes px-hero-flip {
+  0%,
+  40% {
+    transform: rotateY(0deg);
+  }
+  50%,
+  90% {
+    transform: rotateY(180deg);
+  }
+  100% {
+    transform: rotateY(360deg);
+  }
+}
+.px-hero-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--bts-line-2);
+  backface-visibility: hidden;
+  box-shadow:
+    0 28px 60px -22px var(--px-cast),
+    inset 0 1px 0 var(--px-sheen);
+}
+/* Face « question » : la jaquette pixelisée, avec le « ? » par-dessus. */
+.px-hero-face.back {
+  background: linear-gradient(160deg, var(--px-card-2), var(--px-card));
+}
+/* Pastille du « ? » : posée SUR la jaquette, il lui faut son propre fond —
+   un simple glyphe se perdrait dans les gros pixels colorés. Couleurs en dur
+   (et pas les variables de thème) : le fond est ici toujours l'image. */
+.px-hero-face.back b {
+  /* Le canvas est en position:absolute ; sans position ici, le « ? » passerait
+     DESSOUS (un enfant statique se peint sous un enfant positionné). */
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: rgba(8, 9, 16, 0.66);
+  border: 1px solid rgba(255, 214, 130, 0.45);
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  color: #ffd76b;
+  box-shadow: 0 10px 26px -10px rgba(0, 0, 0, 0.7);
+}
+.px-hero-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--bts-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--bts-line) 1px, transparent 1px);
+  background-size: 22px 22px;
+  animation: px-drift 9s linear infinite;
+}
+@keyframes px-drift {
+  to {
+    background-position: 22px 22px, 22px 22px;
+  }
+}
+/* Face « réponse » : la même jaquette, nette. Le liseré doré marque la
+   révélation. */
+.px-hero-face.front {
+  transform: rotateY(180deg);
+  background:
+    radial-gradient(closest-side, rgba(242, 183, 11, 0.18), transparent 76%),
+    linear-gradient(160deg, var(--px-card-2), var(--px-card));
+  border-color: rgba(255, 214, 130, 0.4);
+}
+.px-hero-face.front img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Icône de repli, quand le joueur n'a encore aucune jaquette à montrer. */
+.px-hero-ic {
+  color: var(--bts-gold-ink);
+  filter: drop-shadow(0 4px 16px rgba(242, 183, 11, 0.4));
+}
+
+/* ----------------------------------------------------------------------
+   Boutons du plateau — le CTA est un buzzer : bloc épais, tranche dorée
+   sombre, il s'enfonce quand on tape dessus. Rien à voir avec la pilule
+   lumineuse du blind test.
+   ---------------------------------------------------------------------- */
+.px-page .bt-start {
+  margin-top: 0.6rem;
+  padding: 0.95rem 2.2rem;
+  border-radius: 16px;
+  box-shadow:
+    0 6px 0 var(--px-gold-deep),
+    0 22px 44px -18px rgba(242, 165, 11, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.px-page .bt-start:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 0 var(--px-gold-deep),
+    0 28px 54px -18px rgba(242, 165, 11, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+.px-page .bt-start:active {
+  transform: translateY(4px);
+  box-shadow:
+    0 2px 0 var(--px-gold-deep),
+    0 10px 22px -16px rgba(242, 165, 11, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.px-page .bt-start.sm {
+  padding: 0.6rem 1.25rem;
+  border-radius: 13px;
+  box-shadow:
+    0 4px 0 var(--px-gold-deep),
+    0 14px 30px -18px rgba(242, 165, 11, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+/* Choix du nombre de manches : des touches de pupitre, pas des pastilles.
+   Le pupitre est CLAIR alors que le blind test posait ces touches sur un
+   fond sombre : il faut donc repasser leur texte sur les couleurs de
+   contenu (--bts-soft/--bts-text) et pas sur celles des boutons sombres
+   (--bts-btn-soft), sinon les chiffres disparaissent en thème clair. */
+.px-page .bt-rounds-opts {
+  border-radius: 14px;
+  border-color: var(--bts-line);
+  background: linear-gradient(180deg, var(--px-card), var(--px-felt));
+}
+.px-page .bt-round-opt {
+  border-radius: 10px;
+}
+/* :not(.on) est indispensable — sans lui ces règles, plus spécifiques que
+   `.bt-round-opt.on`, repeindraient aussi la touche sélectionnée et lui
+   feraient perdre son texte sombre sur l'or. */
+.px-page .bt-round-opt:not(.on) {
+  color: var(--bts-soft);
+}
+.px-page .bt-round-opt:not(.on):hover {
+  color: var(--bts-text);
+  background: var(--bts-hover);
+}
+
+/* ----------------------------------------------------------------------
+   L'écran de jeu — le pupitre où les cartes sont posées
+   ----------------------------------------------------------------------
+   Plus large que le blind test : ici c'est l'image qui porte tout. La
+   largeur est calibrée pour que les cartes, le champ de réponse et les
+   actions tiennent ensemble sans jamais avoir à faire défiler. */
+.px-play {
+  max-width: 700px;
+}
+
+.px-stage {
+  position: relative;
+  width: 100%;
+  margin: 0.5rem 0 0.7rem;
+  padding: 10px 10px 13px;
+  border-radius: 20px;
+  overflow: hidden;
+  /* Lumière rasante en haut du pupitre + feutre sombre en dessous. */
+  background:
+    radial-gradient(120% 80% at 50% -12%, rgba(255, 226, 150, 0.1), transparent 62%),
+    linear-gradient(180deg, var(--px-card), var(--px-felt));
+  border: 1px solid var(--bts-line);
+  box-shadow:
+    0 34px 90px -38px var(--px-cast),
+    inset 0 1px 0 var(--px-sheen);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+/* Dernières secondes : le pupitre vire au rouge. */
+.px-stage.hot {
+  border-color: color-mix(in srgb, var(--bts-bad) 55%, transparent);
+  box-shadow:
+    0 34px 90px -34px rgba(217, 45, 51, 0.55),
+    inset 0 1px 0 rgba(255, 92, 98, 0.22);
+}
+.px-stage.paused .px-canvas {
+  filter: saturate(0.25) brightness(0.55);
+}
+
+/* Les cartes : 2 par ligne, tout est visible d'emblée. */
+.px-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  perspective: 1100px;
+}
+.px-grid.n-1,
+.px-grid.zoomed {
+  grid-template-columns: 1fr;
+}
+
+/* Une carte de quiz : cadre biseauté, passe-partout autour de la capture,
+   index en coin. Elle est distribuée face à nous en début de manche. */
+.px-tile {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  border: 1px solid var(--bts-line-2);
+  border-radius: 13px;
+  background: linear-gradient(160deg, var(--px-card-2), var(--px-card));
+  box-shadow:
+    0 14px 28px -16px var(--px-cast),
+    inset 0 1px 0 var(--px-sheen);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  animation: px-deal 0.55s cubic-bezier(0.2, 0.9, 0.3, 1) backwards;
+}
+/* La distribution : chaque carte se retourne vers nous, l'une après
+   l'autre. Les clés React étant les URL des captures, le rendu se rejoue
+   naturellement à chaque manche. */
+@keyframes px-deal {
+  from {
+    opacity: 0;
+    transform: rotateY(-46deg) translateY(12px) scale(0.93);
+  }
+}
+.px-tile:nth-child(2) {
+  animation-delay: 0.09s;
+}
+.px-tile:nth-child(3) {
+  animation-delay: 0.18s;
+}
+.px-tile:nth-child(4) {
+  animation-delay: 0.27s;
+}
+.px-tile:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 214, 130, 0.45);
+  box-shadow:
+    0 22px 38px -16px var(--px-cast),
+    inset 0 1px 0 var(--px-sheen);
+}
+/* Zoom : les autres cartes quittent le pupitre, celle-ci prend la place. */
+.px-tile.off {
+  display: none;
+}
+.px-tile.on {
+  border-color: var(--bts-gold);
+  box-shadow:
+    0 0 0 1px var(--bts-gold),
+    0 22px 44px -18px rgba(242, 183, 11, 0.45);
+}
+
+/* Le passe-partout : la capture est encastrée, le cadre de la carte
+   reste visible tout autour. */
+.px-tile .px-canvas-wrap {
+  inset: 6px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #05060a;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+
+/* Index de la carte, dans le coin comme sur un jeu de cartes. */
+.px-tile-n {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  left: 12px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: rgba(6, 7, 12, 0.72);
+  border: 1px solid rgba(255, 214, 130, 0.35);
+  color: var(--bts-gold-2);
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.px-tile-zoom {
+  position: absolute;
+  inset: 6px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #fff;
+  background: rgba(6, 7, 12, 0.34);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.px-tile:hover .px-tile-zoom {
+  opacity: 1;
+}
+
+.px-canvas-wrap {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+.px-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  /* Le canvas est déjà en gros pixels : on interdit au navigateur de les
+     lisser en l'étirant, sinon tout le rendu devient flou au lieu d'être
+     net et carré. */
+  image-rendering: pixelated;
+  transition: filter 0.3s ease;
+}
+.px-canvas.sharp {
+  image-rendering: auto;
+}
+/* Le canvas sert aussi HORS du plateau (cartes de l'arcade), où les
+   variables --bts-* n'existent pas : d'où le repli sur l'accent global. */
+.px-canvas-loading {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  color: var(--bts-gold-2, var(--accent-ink, currentColor));
+}
+
+/* Chrono et définition, posés sur le pupitre */
+.px-timer,
+.px-def {
+  position: absolute;
+  top: 0.85rem;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.28rem 0.6rem;
+  border-radius: 8px;
+  background: rgba(6, 7, 12, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #f6f2e8;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.px-timer {
+  left: 0.85rem;
+  border-color: rgba(255, 214, 130, 0.35);
+  color: var(--bts-gold-2);
+}
+.px-timer.hot {
+  border-color: var(--bts-bad);
+  color: #ff8b8f;
+  animation: px-pulse 0.6s ease-in-out infinite;
+}
+.px-def {
+  right: 0.85rem;
+  color: rgba(246, 242, 232, 0.7);
+  font-weight: 600;
+}
+@keyframes px-pulse {
+  50% {
+    transform: scale(1.07);
+  }
+}
+
+/* Temps écoulé : fine barre dorée en pied de pupitre */
+.px-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 3px;
+  transform-origin: left center;
+  background: var(--bts-grad);
+  box-shadow: 0 0 12px rgba(242, 183, 11, 0.7);
+}
+.px-stage.hot .px-progress {
+  background: var(--bts-bad);
+  box-shadow: 0 0 12px rgba(217, 45, 51, 0.7);
+}
+
+.px-resume {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  background: rgba(6, 7, 12, 0.55);
+  color: var(--bts-gold-2);
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+}
+
+/* ----------------------------------------------------------------------
+   Indices — de petites fiches cartonnées, pas les pilules du blind test
+   ---------------------------------------------------------------------- */
+.px-page .bt-hint {
+  padding: 0.4rem 0.72rem;
+  border-radius: 10px;
+  border: 1px solid var(--bts-line);
+  border-top: 2px solid var(--bts-line-2);
+  background: linear-gradient(180deg, var(--px-card-2), var(--px-card));
+}
+.px-page .bt-hint.open {
+  border-color: rgba(242, 183, 11, 0.3);
+  border-top-color: var(--bts-gold);
+  background: linear-gradient(
+    180deg,
+    rgba(242, 183, 11, 0.18),
+    rgba(242, 183, 11, 0.05)
+  );
+  color: var(--bts-gold-ink);
+}
+
+/* Le champ de réponse : le pupitre du candidat. */
+.px-page .bt-search {
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--px-card), var(--px-felt));
+  border-color: var(--bts-line-2);
+}
+/* Suggestions : sur cet écran la grille pousse le champ bas dans la page,
+   la liste bascule alors au-dessus (classe posée par le JS). */
+.px-page .bt-suggest.up {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+/* ----------------------------------------------------------------------
+   Révélation — on retourne les cartes
+   ---------------------------------------------------------------------- */
+.px-reveal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  width: min(560px, 92vw);
+  padding: 0.9rem 1rem 1.1rem;
+  border-radius: 20px;
+  background:
+    radial-gradient(120% 70% at 50% -10%, rgba(255, 226, 150, 0.1), transparent 62%),
+    linear-gradient(180deg, var(--px-card), var(--px-felt));
+  border: 1px solid var(--bts-line-2);
+  box-shadow:
+    0 44px 100px -34px var(--px-cast),
+    inset 0 1px 0 var(--px-sheen);
+  overflow: hidden;
+  animation: px-pop 0.22s cubic-bezier(0.2, 1.2, 0.4, 1);
+}
+.px-reveal.good {
+  border-color: color-mix(in srgb, var(--bts-good) 55%, transparent);
+}
+.px-reveal.bad {
+  border-color: color-mix(in srgb, var(--bts-bad) 55%, transparent);
+}
+@keyframes px-pop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+}
+
+/* Le verdict et la barre de décompte viennent du blind test, mais leurs
+   variantes bonne/mauvaise réponse y sont scopées à .bt-reveal : on les
+   redéclare pour notre carte. */
+.px-reveal.good .bt-reveal-verdict {
+  color: var(--bts-good);
+}
+.px-reveal.bad .bt-reveal-verdict {
+  color: var(--bts-bad);
+}
+.px-reveal.good .bt-reveal-progress {
+  background: linear-gradient(90deg, #3ddc84, #2fae62);
+}
+.px-reveal.bad .bt-reveal-progress {
+  background: linear-gradient(90deg, #ff7a7d, #e5484d);
+}
+
+/* Les captures enfin nettes : chaque carte se retourne face visible, l'une
+   après l'autre (le délai vient du JSX), pendant que les gros pixels
+   fondent (cf. RevealShot). */
+.px-reveal-shots {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  width: 100%;
+  perspective: 1200px;
+}
+.px-reveal-shots.n-1 {
+  grid-template-columns: 1fr;
+}
+.px-reveal-tile {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  border-radius: 11px;
+  overflow: hidden;
+  background: #05060a;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  animation: px-flip-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) backwards;
+}
+@keyframes px-flip-in {
+  from {
+    opacity: 0;
+    transform: rotateY(-88deg);
+  }
+}
+.px-reveal-badge {
+  position: absolute;
+  right: 0.6rem;
+  bottom: 0.6rem;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  box-shadow: 0 8px 22px -6px rgba(0, 0, 0, 0.6);
+}
+.px-reveal.good .px-reveal-badge {
+  background: var(--bts-good);
+}
+.px-reveal.bad .px-reveal-badge {
+  background: var(--bts-bad);
+}
+
+.px-reveal-game {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  text-align: left;
+}
+.px-reveal-game img {
+  width: 44px;
+  height: 58px;
+  flex: 0 0 auto;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px -8px var(--bts-shadow);
+}
+.px-reveal-game > span {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.px-reveal-game em {
+  font-style: normal;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--bts-soft);
+}
+.px-reveal-game b {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  line-height: 1.2;
+  color: var(--bts-text);
+}
+.px-reveal-game i {
+  font-style: normal;
+  font-size: 0.82rem;
+  color: var(--bts-soft);
+}
+
+/* ----------------------------------------------------------------------
+   Scoreboard — pupitres du plateau
+   ---------------------------------------------------------------------- */
+.px-page .bt-recap,
+.px-page .bt-board {
+  background: linear-gradient(180deg, var(--px-card), var(--px-felt));
+  border-color: var(--bts-line);
+  box-shadow:
+    0 30px 70px -42px var(--px-cast),
+    inset 0 1px 0 var(--px-sheen);
+}
+
+/* Vignette du récap : une capture (16/9), pas une jaquette (2/3).
+   Cliquable : elle rouvre toutes les captures de la manche. Pas
+   d'overflow:hidden ici, la pastille de verdict déborde volontairement du
+   coin (règle .bt-recap-verdict) et serait rognée. */
+.px-recap-shot {
+  position: relative;
+  width: 74px !important;
+  height: 42px !important;
+  padding: 0;
+  border: 0;
+  background: none;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.px-recap-shot img {
+  border-radius: 8px;
+}
+.px-recap-shot:hover:not(:disabled) img {
+  filter: brightness(1.12);
+}
+.px-recap-shot:hover:not(:disabled) {
+  transform: scale(1.06);
+}
+.px-recap-count {
+  position: absolute;
+  left: 3px;
+  bottom: 3px;
+  padding: 0 4px;
+  border-radius: 5px;
+  background: rgba(6, 7, 12, 0.7);
+  color: rgba(246, 242, 232, 0.85);
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 14px;
+}
+
+/* ----------------------------------------------------------------------
+   Visionneuse des captures (récap)
+   ---------------------------------------------------------------------- */
+.px-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: grid;
+  place-items: center;
+  padding: 3vh 1rem;
+  background: rgba(3, 4, 9, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: px-fade 0.16s ease;
+}
+@keyframes px-fade {
+  from {
+    opacity: 0;
+  }
+}
+.px-viewer-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f6f2e8;
+}
+.px-viewer-close:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.px-viewer-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  align-items: center;
+  margin: 0;
+  max-width: min(1100px, 94vw);
+}
+.px-viewer-img {
+  max-width: 100%;
+  max-height: 74vh;
+  border-radius: 14px;
+  box-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.9);
+}
+.px-viewer-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.px-viewer-game {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.7rem 0.3rem 0.3rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #f6f2e8;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.px-viewer-game:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.px-viewer-game img {
+  width: 26px;
+  height: 34px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+.px-viewer-thumbs {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+.px-viewer-thumb {
+  width: 74px;
+  height: 42px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+.px-viewer-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.px-viewer-thumb:hover {
+  opacity: 0.85;
+}
+.px-viewer-thumb.on {
+  opacity: 1;
+  border-color: var(--bts-gold, #f2b70b);
+}
+
+/* ----------------------------------------------------------------------
+   Mobile
+   ---------------------------------------------------------------------- */
+@media (max-width: 760px) {
+  /* Décor allégé : les poursuites gardent leur angle de repos, sans balayage. */
+  .px-beam {
+    opacity: 0.75;
+    animation: none;
+  }
+  /* Jamais sous 118 px : c'est la hauteur de la rangée du fond, elle
+     dépasserait du masque. */
+  .px-crowd {
+    height: 124px;
+  }
+  .px-sparks {
+    display: none;
+  }
+
+  .px-hero {
+    width: 128px;
+    height: 166px;
+  }
+  .px-hero-card {
+    width: 114px;
+    height: 152px;
+  }
+  .px-hero-face.back b {
+    width: 48px;
+    height: 48px;
+    font-size: 1.7rem;
+  }
+
+  .px-stage {
+    border-radius: 15px;
+    padding: 6px 6px 9px;
+  }
+  .px-grid {
+    gap: 6px;
+  }
+  .px-tile {
+    border-radius: 10px;
+  }
+  .px-tile .px-canvas-wrap {
+    inset: 4px;
+    border-radius: 7px;
+  }
+  .px-tile-n {
+    top: 9px;
+    left: 9px;
+  }
+  .px-tile-zoom {
+    inset: 4px;
+    /* Pas de survol au doigt : l'icône reste discrète en permanence. */
+    opacity: 1;
+    background: none;
+    align-items: start;
+    justify-items: end;
+    padding: 6px;
+    color: rgba(255, 255, 255, 0.6);
+  }
+  .px-timer,
+  .px-def {
+    top: 0.6rem;
+  }
+  .px-timer {
+    left: 0.6rem;
+  }
+  .px-def {
+    right: 0.6rem;
+  }
+  .px-reveal-game b {
+    font-size: 0.95rem;
+  }
+}
+
+/* Le plateau reste lisible sans animation : on fige projecteurs, carte
+   d'intro, distribution et retournements. */
+@media (prefers-reduced-motion: reduce) {
+  .px-beam,
+  .px-sparks,
+  .px-hero-card,
+  .px-hero-grid,
+  .px-tile,
+  .px-reveal-tile,
+  .px-timer.hot {
+    animation: none;
+  }
+}

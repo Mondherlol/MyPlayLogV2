@@ -112,6 +112,45 @@ function applyCursor(cursor) {
   }
 }
 
+// ======================================================================
+//  Thème équipé — repeint le site (variables CSS + mode clair/sombre).
+// ======================================================================
+// Un thème gagné à l'arcade porte dans `data.vars` un jeu de variables CSS
+// (--bg, --surface, --accent-grad, --app-bg-image…) qu'on SURCHARGE en inline
+// sur <html> (priorité maximale, bat :root et :root[data-theme=dark]). Il porte
+// aussi `data.mode` : on bascule `data-theme` dessus pour que les règles
+// « sombres » des composants (blindtest, mur média…) s'appliquent au bon mode.
+// Sans thème équipé, on rend la main au choix manuel clair/sombre du joueur.
+
+// Variables posées par le thème courant : mémorisées pour tout retirer proprement
+// au changement (une variable du thème A absente du thème B doit disparaître).
+let themeVars = [];
+
+function applyTheme(theme) {
+  const root = document.documentElement;
+  // On enlève d'abord les surcharges du thème précédent.
+  for (const v of themeVars) root.style.removeProperty(v);
+  themeVars = [];
+
+  const vars = theme?.data?.vars;
+  if (!vars || typeof vars !== "object") {
+    // Plus de thème : on retire le marqueur et on rend son mode manuel au joueur.
+    root.removeAttribute("data-arcade-theme");
+    root.setAttribute("data-theme", localStorage.getItem("mpl_theme") || "light");
+    return;
+  }
+  for (const [k, val] of Object.entries(vars)) {
+    // Uniquement de vraies variables CSS (`--…`) : jamais de propriété arbitraire.
+    if (typeof k === "string" && k.startsWith("--") && val != null) {
+      root.style.setProperty(k, String(val));
+      themeVars.push(k);
+    }
+  }
+  const mode = theme.data?.mode;
+  if (mode === "light" || mode === "dark") root.setAttribute("data-theme", mode);
+  root.setAttribute("data-arcade-theme", theme.key || "on");
+}
+
 export function CosmeticsProvider({ children }) {
   const { token, user } = useAuth();
   const [cosmetics, setCosmetics] = useState({});
@@ -120,6 +159,7 @@ export function CosmeticsProvider({ children }) {
     if (!token) {
       setCosmetics({});
       applyCursor(null); // déconnexion : on rend son curseur au visiteur
+      applyTheme(null); // …et son thème (retour au clair/sombre manuel)
       return;
     }
     let alive = true;
@@ -128,6 +168,7 @@ export function CosmeticsProvider({ children }) {
         if (!alive) return;
         setCosmetics(d.cosmetics || {});
         applyCursor(d.cosmetics?.cursor || null);
+        applyTheme(d.cosmetics?.theme || null);
       })
       .catch(() => {
         /* pas de cosmétiques : l'app garde son apparence par défaut */
@@ -145,6 +186,7 @@ export function CosmeticsProvider({ children }) {
   const setCosmetic = useCallback((type, reward) => {
     setCosmetics((c) => ({ ...c, [type]: reward || undefined }));
     if (type === "cursor") applyCursor(reward);
+    else if (type === "theme") applyTheme(reward);
   }, []);
 
   // Aperçu ÉPHÉMÈRE (panel admin) : applique un curseur sans toucher à ce qui
@@ -156,8 +198,19 @@ export function CosmeticsProvider({ children }) {
     [cosmetics.cursor]
   );
 
+  // Aperçu ÉPHÉMÈRE d'un thème (arcade) : repeint tout le site sans rien
+  // enregistrer, pour « essayer avant d'équiper ». `endPreview` remet le thème
+  // réellement équipé (ou l'apparence par défaut).
+  const previewTheme = useCallback((reward) => applyTheme(reward || null), []);
+  const endPreview = useCallback(
+    () => applyTheme(cosmetics.theme || null),
+    [cosmetics.theme]
+  );
+
   return (
-    <CosmeticsContext.Provider value={{ cosmetics, setCosmetic, testCursor, endTest }}>
+    <CosmeticsContext.Provider
+      value={{ cosmetics, setCosmetic, testCursor, endTest, previewTheme, endPreview }}
+    >
       {children}
     </CosmeticsContext.Provider>
   );

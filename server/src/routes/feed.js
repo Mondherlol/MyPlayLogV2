@@ -12,6 +12,7 @@ import { SEASONS } from "../lib/marvelRivalsData.js";
 import Documentary from "../models/Documentary.js";
 import GameMedia from "../models/GameMedia.js";
 import Activity from "../models/Activity.js";
+import { blockIfPrivate } from "../lib/privacy.js";
 import Reward from "../models/Reward.js";
 // Ordonné du plus commun au plus rare : sert à désigner la plus belle prise
 // d'une fournée de caisses.
@@ -28,6 +29,7 @@ import { buildRepostStats } from "./reposts.js";
 import { toPost as toMediaPost } from "./gameMedia.js";
 import { playlistDuration } from "./lists.js";
 import { loadSocialCounts } from "../lib/videoSocial.js";
+import VideoSocial from "../models/VideoSocial.js";
 
 // Flux de la page d'accueil : activité des joueurs suivis (jeux, reviews,
 // listes, fan arts republiés, documentaires recommandés) fusionnée en une
@@ -125,7 +127,6 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
     watched,
     liked,
     commented,
-    later,
     acts,
     gems,
     downloads,
@@ -185,18 +186,8 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
           .limit(cap)
           .populate("user", "username avatar")
           .lean(),
-    // Vidéos mises en « à regarder plus tard » → évènement « a ajouté… ».
-    !wantAll
-      ? Promise.resolve([])
-      : Documentary.find({
-          user: userScope,
-          later: true,
-          ...(hasBefore ? { laterAt: { $lt: before } } : {}),
-        })
-          .sort({ laterAt: -1 })
-          .limit(cap)
-          .populate("user", "username avatar")
-          .lean(),
+    // Pas de carte pour « à regarder plus tard » : c'est une intention privée
+    // (une file d'attente), pas une action à raconter au fil.
     !wantAll
       ? Promise.resolve([])
       : Activity.find({ actor: actorScope, ...lt("createdAt") })
@@ -788,6 +779,29 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
     }
   }
 
+  // Qu'a dit le joueur ? La carte « a commenté une vidéo » cite son message
+  // (comme les cards de commentaire de liste / d'avis), donc on va chercher son
+  // DERNIER commentaire sur chaque vidéo concernée dans la couche sociale.
+  const commentedIds = [
+    ...new Set(commented.filter((d) => d.user).map((d) => d.videoId)),
+  ];
+  const myCommentOnVideo = new Map(); // `${userId}:${videoId}` -> texte
+  const commentCountByVideo = new Map();
+  if (commentedIds.length) {
+    const socials = await VideoSocial.find({ videoId: { $in: commentedIds } })
+      .select("videoId comments")
+      .lean();
+    for (const s of socials) {
+      const list = s.comments || [];
+      commentCountByVideo.set(s.videoId, list.length);
+      for (const c of list) {
+        // Les commentaires sont rangés du plus ancien au plus récent : on
+        // écrase, il reste le dernier de chaque auteur.
+        if (c.text) myCommentOnVideo.set(`${c.user}:${s.videoId}`, c.text);
+      }
+    }
+  }
+
   const actVideo = (d) => ({
     id: String(d._id),
     videoId: d.videoId,
@@ -799,6 +813,9 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
     durationSeconds: d.durationSeconds || 0,
     game: d.gameId ? { id: d.gameId, name: d.gameName } : null,
     recommender: recommenderByVideo.get(d.videoId) || null,
+    // Renseignés uniquement pour les cards « a commenté » (cf. plus haut).
+    comment: myCommentOnVideo.get(`${d.user?._id}:${d.videoId}`) || null,
+    commentCount: commentCountByVideo.get(d.videoId) || 0,
   });
   const pushVideoActivity = (kind, list, dateField) => {
     const items = list
@@ -844,7 +861,6 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
   pushVideoActivity("watch", watched, "watchedAt");
   pushVideoActivity("like", liked, "likedAt");
   pushVideoActivity("comment", commented, "commentedAt");
-  pushVideoActivity("later", later, "laterAt");
 
   // --- Blind tests : plusieurs parties d'un même joueur rapprochées dans le
   //     temps → UNE carte « a fait N blind tests » (jouer plusieurs fois de
@@ -1182,16 +1198,29 @@ router.get("/home", requireAuth, async (req, res) => {
     const onlyUser =
       req.query.u && mongoose.isValidObjectId(req.query.u) ? req.query.u : null;
 
+    // Filtre sur un joueur précis : un compte privé reste hors de portée.
+    if (onlyUser) {
+      const target = await User.findById(onlyUser).select("_id privacy");
+      if (!target) return res.status(404).json({ error: "Profil introuvable." });
+      if (await blockIfPrivate(res, target, req.userId)) return;
+    }
+
     const me = await User.findById(req.userId).select("following");
     const followed = (me?.following || []).map(String);
     // Personne à suivre encore : on ouvre le feed à toute la communauté pour
     // que la page ne soit jamais vide (petite appli entre amis). Dans tous
-    // les cas, on n'affiche jamais ses PROPRES activités dans son fil.
+    // les cas, on n'affiche jamais ses PROPRES activités dans son fil — ni
+    // celles des comptes privés, que le fil « communauté » exposerait sinon.
     const community = !onlyUser && followed.length === 0;
+    const privateIds = community
+      ? (await User.find({ "privacy.isPrivate": true }).select("_id").lean()).map(
+          (u) => u._id
+        )
+      : [];
     const userScope = onlyUser
       ? onlyUser
       : community
-        ? { $ne: req.userId }
+        ? { $ne: req.userId, $nin: privateIds }
         : { $in: followed };
 
     const events = await buildTimeline(req, {
@@ -1225,9 +1254,10 @@ router.get("/home", requireAuth, async (req, res) => {
 router.get("/wanted/:username", optionalAuth, async (req, res) => {
   try {
     const u = await User.findOne({ username: req.params.username }).select(
-      "_id username avatar"
+      "_id username avatar privacy"
     );
     if (!u) return res.status(404).json({ error: "Profil introuvable." });
+    if (await blockIfPrivate(res, u, req.userId)) return;
     const count = await Download.countDocuments({ user: u._id });
     res.json({
       username: u.username,
@@ -1243,8 +1273,11 @@ router.get("/wanted/:username", optionalAuth, async (req, res) => {
 
 router.get("/user/:username", optionalAuth, async (req, res) => {
   try {
-    const u = await User.findOne({ username: req.params.username }).select("_id avatar");
+    const u = await User.findOne({ username: req.params.username }).select(
+      "_id avatar privacy"
+    );
     if (!u) return res.status(404).json({ error: "Profil introuvable." });
+    if (await blockIfPrivate(res, u, req.userId)) return;
 
     const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 25);
     const before = req.query.before ? new Date(req.query.before) : null;

@@ -33,6 +33,7 @@ export const REWARD_TYPES = {
   cursor: { label: "Curseur", plural: "Curseurs" },
   ornament: { label: "Ornement", plural: "Ornements" },
   badge: { label: "Badge", plural: "Badges" },
+  theme: { label: "Thème", plural: "Thèmes" },
 };
 
 // Chance affichée : « 0,4 % » plutôt que « 0 % » pour les lots très rares.

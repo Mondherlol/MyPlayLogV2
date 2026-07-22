@@ -20,6 +20,7 @@ import videoRoutes from "./routes/videos.js";
 import feedRoutes from "./routes/feed.js";
 import freeGamesRoutes from "./routes/freeGames.js";
 import blindtestRoutes from "./routes/blindtest.js";
+import pixelRoutes from "./routes/pixel.js";
 import arcadeRoutes from "./routes/arcade.js";
 import steamRoutes from "./routes/steam.js";
 import psnRoutes from "./routes/psn.js";
@@ -33,6 +34,7 @@ import patchesRoutes from "./routes/patches.js";
 import downloadRoutes from "./routes/downloads.js";
 import trackerRoutes, { startTrackerAutoSync } from "./routes/trackers.js";
 import missionRoutes from "./routes/missions.js";
+import { avatarPrivacy } from "./middleware/avatarPrivacy.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -62,7 +64,14 @@ app.get("/api/health", (req, res) => {
   res.json({ ok: true, service: "myplaylog", time: new Date().toISOString() });
 });
 
+// Monté AVANT le filtre d'avatars : login/register répondent sans être
+// authentifiés (pas de req.userId), et le filtre prendrait alors la photo du
+// compte qui se connecte pour celle d'un tiers à masquer.
 app.use("/api/auth", authRoutes);
+
+// Retire les photos de profil masquées (comptes privés ayant coché « cacher ma
+// photo ») de toutes les réponses JSON qui suivent, quel que soit l'endpoint.
+app.use(avatarPrivacy);
 app.use("/api/games", gameRoutes);
 app.use("/api/game-media", gameMediaRoutes);
 app.use("/api/library", libraryRoutes);
@@ -77,6 +86,7 @@ app.use("/api/videos", videoRoutes);
 app.use("/api/feed", feedRoutes);
 app.use("/api/free-games", freeGamesRoutes);
 app.use("/api/blindtest", blindtestRoutes);
+app.use("/api/pixel", pixelRoutes);
 app.use("/api/arcade", arcadeRoutes);
 app.use("/api/steam", steamRoutes);
 app.use("/api/psn", psnRoutes);

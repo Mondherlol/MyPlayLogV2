@@ -834,17 +834,22 @@
 
 /* ---------- Sidebar ---------- */
 .sidebar {
-  /* Toujours sombre (effet TV Time), même en mode clair.
-     On redéfinit les variables localement -> les enfants suivent. */
-  --surface: #23262e;
-  --surface-2: #2f333d;
-  --border: rgba(255, 255, 255, 0.09);
-  --border-strong: rgba(255, 255, 255, 0.16);
-  --text: #f3f4f7;
-  --text-soft: #a6acba;
+  /* Sombre par défaut (effet TV Time), même en mode clair. Un THÈME gagné à
+     l'arcade peut la recolorer : les couleurs viennent de variables --side-*
+     dont le repli est justement ce look sombre d'origine. CosmeticsContext pose
+     les --side-* du thème sur <html>, et ces règles les récupèrent. */
+  --surface: var(--side-surface, #23262e);
+  --surface-2: var(--side-surface-2, #2f333d);
+  /* Fond de la barre (distinct de --surface pour les thèmes qui veulent deux
+     tons) — par défaut identique à l'ancien look. */
+  --side-canvas: var(--side-bg, #23262e);
+  --border: var(--side-border, rgba(255, 255, 255, 0.09));
+  --border-strong: var(--side-border-strong, rgba(255, 255, 255, 0.16));
+  --text: var(--side-text, #f3f4f7);
+  --text-soft: var(--side-text-soft, #a6acba);
   --shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
-  --accent-ink: #ffd24a;
-  --brand-grad: linear-gradient(100deg, #f0b012 0%, #ffd23f 100%);
+  --accent-ink: var(--side-accent, #ffd24a);
+  --brand-grad: var(--side-brand, linear-gradient(100deg, #f0b012 0%, #ffd23f 100%));
 
   width: 208px;
   flex-shrink: 0;
@@ -855,10 +860,10 @@
   display: flex;
   flex-direction: column;
   padding: 0.9rem 0.7rem;
-  background: var(--surface);
+  background: var(--side-canvas);
   color: var(--text);
   border-right: 1px solid rgba(0, 0, 0, 0.16);
-  transition: width 0.2s ease;
+  transition: width 0.2s ease, background 0.3s ease;
 }
 
 .sidebar.collapsed {

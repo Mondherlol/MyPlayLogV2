@@ -975,6 +975,10 @@ function PostCard({ post, token, focus, forceReveal, onLike, onLikeById, onDelet
   );
 }
 
+// Au-delà de ce ratio largeur/hauteur, une image est une « bande » : la
+// recadrer dans une case de mosaïque la zoome de façon hideuse.
+const PANORAMA_RATIO = 2.4;
+
 // Grille des médias d'un post (façon Twitter) — spoiler par média. Au-delà de
 // 4 médias, on n'affiche que les 4 premiers, le dernier portant un « +N »
 // (clic → lightbox, qui les parcourt tous). Exportée : le fil d'accueil
@@ -984,8 +988,23 @@ export function MediaGrid({ media, forceReveal, onOpen }) {
   const cls = n === 1 ? "n-1" : n === 2 ? "n-2" : n === 3 ? "n-3" : "n-4";
   const shown = media.slice(0, 4);
   const extra = n - shown.length;
+
+  // Ratios largeur/hauteur des images, mesurés au chargement : le serveur ne
+  // les connaît que pour les GIF. Indexés par URL → rien à réinitialiser.
+  const [ratios, setRatios] = useState({});
+  const ratioOf = (m) =>
+    m?.width && m?.height ? m.width / m.height : ratios[m?.url] || null;
+
+  // Cas « bande + image normale » : côte à côte dans une demi-colonne 16/9, la
+  // bande (très large, peu haute) finit rognée et zoomée à l'extrême. On les
+  // empile alors sur une seule colonne, la bande en dessous.
+  const [r0, r1] = [ratioOf(shown[0]), ratioOf(shown[1])];
+  const stacked =
+    n === 2 && r0 && r1 && (r0 >= PANORAMA_RATIO) !== (r1 >= PANORAMA_RATIO);
+  const bandIdx = stacked ? (r0 >= PANORAMA_RATIO ? 0 : 1) : -1;
+
   return (
-    <div className={`gm-media-grid ${cls}`}>
+    <div className={`gm-media-grid ${cls} ${stacked ? "stacked" : ""}`}>
       {shown.map((m, i) => (
         <MediaTile
           key={i}
@@ -993,26 +1012,41 @@ export function MediaGrid({ media, forceReveal, onOpen }) {
           forceReveal={forceReveal}
           onOpen={() => onOpen(i)}
           moreCount={i === shown.length - 1 && extra > 0 ? extra : 0}
+          onRatio={(r) =>
+            setRatios((p) => (p[m.url] ? p : { ...p, [m.url]: r }))
+          }
+          style={stacked ? { order: i === bandIdx ? 2 : 1 } : undefined}
         />
       ))}
     </div>
   );
 }
 
-function MediaTile({ m, forceReveal, onOpen, moreCount = 0 }) {
+function MediaTile({ m, forceReveal, onOpen, moreCount = 0, onRatio, style }) {
   const [revealed, setRevealed] = useState(false);
   const hidden = m.spoiler && !revealed && !forceReveal;
   const blur = hidden ? { filter: "blur(24px)", pointerEvents: "none" } : undefined;
 
   return (
-    <div className={`gm-tile ${hidden ? "is-hidden" : ""}`}>
+    <div className={`gm-tile ${hidden ? "is-hidden" : ""}`} style={style}>
       {m.kind === "video" ? (
         <div style={blur} className="gm-tile-video">
           <GameVideoPlayer src={m.url} poster={m.thumbnail || undefined} />
         </div>
       ) : (
         <button type="button" className="gm-tile-btn" onClick={() => !hidden && onOpen()} tabIndex={hidden ? -1 : 0}>
-          <img src={m.url} alt="" loading="lazy" style={blur} />
+          <img
+            src={m.url}
+            alt=""
+            loading="lazy"
+            style={blur}
+            onLoad={(e) =>
+              onRatio?.(
+                e.currentTarget.naturalWidth /
+                  (e.currentTarget.naturalHeight || 1)
+              )
+            }
+          />
           {m.kind === "gif" && !hidden && <span className="gm-gif-tag">GIF</span>}
         </button>
       )}

@@ -28,6 +28,8 @@ import {
   BarChart3,
   Swords,
   Award,
+  Lock,
+  Clock3,
 } from "lucide-react";
 import twemoji from "@twemoji/api";
 import { apiFetch, apiUpload } from "../lib/api";
@@ -59,8 +61,8 @@ import { useTabSwipe } from "../hooks/useTabSwipe";
 // Ordre des onglets (pour le swipe gauche/droite et le recentrage de la nav).
 const TAB_ORDER = [
   "overview",
-  "feed",
   "allgames",
+  "feed",
   "stats",
   "tracking",
   "badges",
@@ -130,6 +132,104 @@ function Presence({ lastSeenAt }) {
       <span className="pf-presence-dot" />
       {online ? "En ligne" : `Dernière activité ${timeAgo(lastSeenAt)}`}
     </span>
+  );
+}
+
+// Profil d'un compte privé vu par un non-abonné : bannière + carte de visite,
+// et un bouton qui envoie (ou annule) une demande d'abonnement. Le serveur ne
+// renvoie ici ni bibliothèque, ni listes, ni onglets — rien à masquer côté
+// client. La photo et la bannière sont déjà retirées côté serveur si le
+// propriétaire a coché les options correspondantes.
+function LockedProfile({ profile, covers, signedIn, busy, onFollow }) {
+  const cv = covers[0];
+  return (
+    <div className="profile pf pf-locked">
+      <header className="pf-banner">
+        <div className="pf-cover">
+          {cv && (
+            <div
+              className="pf-cover-slide"
+              style={{
+                backgroundImage: `url(${cv.url})`,
+                backgroundPosition: cv.pos || "center",
+              }}
+            />
+          )}
+          <div className="pf-cover-scrim" />
+        </div>
+
+        <div className="pf-identity">
+          <div className="pf-avatar-wrap">
+            <div className="pf-avatar">
+              {profile.avatar ? (
+                <img src={profile.avatar} alt={profile.username} />
+              ) : (
+                <span className="pf-avatar-fallback">
+                  {(profile.username || "?")[0].toUpperCase()}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="pf-idmain">
+            <div className="pf-namerow">
+              <h1 className="pf-username">{profile.username}</h1>
+              <span className="pf-private-chip">
+                <Lock size={12} /> Privé
+              </span>
+            </div>
+            {profile.bio && <p className="pf-bio">{profile.bio}</p>}
+            <div className="pf-stats">
+              <span className="pf-stat">
+                <strong>{profile.counts.followers}</strong> abonnés
+              </span>
+              <span className="pf-stat">
+                <strong>{profile.counts.following}</strong> abonnements
+              </span>
+            </div>
+          </div>
+
+          <div className="pf-actions">
+            {!signedIn ? (
+              <Link to="/login" className="follow-btn clickable">
+                <UserPlus size={17} /> Suivre
+              </Link>
+            ) : (
+              <button
+                className={`follow-btn clickable ${profile.requested ? "requested" : ""}`}
+                onClick={onFollow}
+                disabled={busy}
+                title={
+                  profile.requested
+                    ? "Annuler ma demande d'abonnement"
+                    : "Demander à s'abonner"
+                }
+              >
+                {busy ? (
+                  <Loader2 size={17} className="spin" />
+                ) : profile.requested ? (
+                  <><Clock3 size={17} /> Demande envoyée</>
+                ) : (
+                  <><UserPlus size={17} /> Demander à suivre</>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <div className="pf-lock-panel card">
+        <span className="pf-lock-icon">
+          <Lock size={26} />
+        </span>
+        <h2>Ce compte est privé</h2>
+        <p>
+          Abonne-toi à <strong>{profile.username}</strong> pour voir sa
+          collection, ses listes et ses reviews.
+          {profile.requested && " Ta demande est en attente de validation."}
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -446,29 +546,43 @@ export default function Profile() {
     if (followBusy || !profile) return;
     setFollowBusy(true);
     const was = profile.isFollowing;
-    setData((d) => ({
-      ...d,
-      profile: {
-        ...d.profile,
-        isFollowing: !was,
-        counts: { ...d.profile.counts, followers: d.profile.counts.followers + (was ? -1 : 1) },
-      },
-    }));
-    try {
-      const r = await apiFetch(`/users/${profile.id}/follow`, { method: "POST", token });
-      setData((d) => ({
-        ...d,
-        profile: { ...d.profile, isFollowing: r.following, counts: { ...d.profile.counts, followers: r.followersCount } },
-      }));
-    } catch {
+    // Compte privé pas encore suivi : le clic bascule une DEMANDE d'abonnement,
+    // pas l'abonnement lui-même — rien à anticiper côté compteurs.
+    const asking = profile.isPrivate && !was;
+    if (!asking)
       setData((d) => ({
         ...d,
         profile: {
           ...d.profile,
-          isFollowing: was,
-          counts: { ...d.profile.counts, followers: d.profile.counts.followers + (was ? 1 : -1) },
+          isFollowing: !was,
+          counts: { ...d.profile.counts, followers: d.profile.counts.followers + (was ? -1 : 1) },
         },
       }));
+    try {
+      const r = await apiFetch(`/users/${profile.id}/follow`, { method: "POST", token });
+      setData((d) => ({
+        ...d,
+        profile: {
+          ...d.profile,
+          isFollowing: r.following,
+          requested: !!r.requested,
+          // Se désabonner d'un compte privé referme aussitôt son profil.
+          locked: d.profile.isPrivate && !r.following,
+          counts: { ...d.profile.counts, followers: r.followersCount },
+        },
+      }));
+      // Le cache local ne doit pas resservir la version accessible du profil.
+      profileCache.remove(targetUsername);
+    } catch {
+      if (!asking)
+        setData((d) => ({
+          ...d,
+          profile: {
+            ...d.profile,
+            isFollowing: was,
+            counts: { ...d.profile.counts, followers: d.profile.counts.followers + (was ? 1 : -1) },
+          },
+        }));
     } finally {
       setFollowBusy(false);
     }
@@ -649,6 +763,19 @@ export default function Profile() {
     );
   if (!data) return null;
 
+  // Compte privé consulté par un non-abonné : le serveur n'a renvoyé qu'une
+  // carte de visite — on affiche le cadenas plutôt que des onglets vides.
+  if (profile.locked)
+    return (
+      <LockedProfile
+        profile={profile}
+        covers={covers}
+        signedIn={!!user}
+        busy={followBusy}
+        onFollow={toggleFollow}
+      />
+    );
+
   const { favorites, library, lists } = data;
   const c = profile.counts;
   const ostCount = library.filter((e) => e.favoriteOst?.name).length;
@@ -794,6 +921,11 @@ export default function Profile() {
           <div className="pf-idmain">
             <div className="pf-namerow">
               <h1 className="pf-username">{profile.username}</h1>
+              {profile.isPrivate && (
+                <span className="pf-private-chip" title="Compte privé">
+                  <Lock size={12} /> Privé
+                </span>
+              )}
               {isMe ? (
                 <button
                   className="pf-edit-icon clickable"
@@ -877,17 +1009,17 @@ export default function Profile() {
           <LayoutGrid size={16} /> Aperçu
         </button>
         <button
-          className={`profile-tab ${tab === "feed" ? "active" : ""}`}
-          onClick={() => setTab("feed")}
-        >
-          <Repeat2 size={16} /> Feed
-        </button>
-        <button
           className={`profile-tab ${tab === "allgames" ? "active" : ""}`}
           onClick={() => setTab("allgames")}
         >
           <Gamepad2 size={16} /> Tous les jeux
           <span className="tab-count">{c.games}</span>
+        </button>
+        <button
+          className={`profile-tab ${tab === "feed" ? "active" : ""}`}
+          onClick={() => setTab("feed")}
+        >
+          <Repeat2 size={16} /> Feed
         </button>
         <button
           className={`profile-tab ${tab === "stats" ? "active" : ""}`}
@@ -990,17 +1122,6 @@ export default function Profile() {
         />
       )}
 
-      {/* ---------- Feed (fan arts republiés) ---------- */}
-      {tab === "feed" && (
-        <ProfileFeed
-          username={targetUsername}
-          isMe={isMe}
-          token={token}
-          profile={profile}
-          onSetCover={applyCover}
-        />
-      )}
-
       {/* ---------- Tous les jeux ---------- */}
       {tab === "allgames" &&
         (library.length === 0 ? (
@@ -1012,6 +1133,17 @@ export default function Profile() {
         ) : (
           <ProfileAllGames library={library} onOpen={openGame} />
         ))}
+
+      {/* ---------- Feed (fan arts republiés) ---------- */}
+      {tab === "feed" && (
+        <ProfileFeed
+          username={targetUsername}
+          isMe={isMe}
+          token={token}
+          profile={profile}
+          onSetCover={applyCover}
+        />
+      )}
 
       {/* ---------- Stats ---------- */}
       {tab === "stats" && <ProfileStats username={targetUsername} token={token} />}

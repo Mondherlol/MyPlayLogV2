@@ -6,6 +6,7 @@ import {
   Compass,
   CalendarDays,
   List,
+  Joystick,
   User,
   Palmtree,
   Shield,
@@ -13,11 +14,13 @@ import {
   ChevronRight,
   Sun,
   Moon,
+  Palette,
   Check,
   ChevronUp,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
+import { useCosmetics } from "../context/CosmeticsContext";
 import { useClickOutside } from "../hooks/useClickOutside";
 
 // Version courante de l'app (affichée en bas de la sidebar).
@@ -28,6 +31,7 @@ const NAV = [
   { to: "/explore", label: "Explorer", Icon: Compass },
   { to: "/releases", label: "Sorties", Icon: CalendarDays },
   { to: "/lists", label: "Listes", Icon: List },
+  { to: "/arcade", label: "Arcade", Icon: Joystick },
   { to: "/profile", label: "Profil", Icon: User },
   { to: "/admin", label: "Admin", Icon: Shield, adminOnly: true },
 ];
@@ -40,6 +44,8 @@ function FlagFR() {
 export default function Sidebar({ collapsed, onToggle }) {
   const { theme, toggle } = useTheme();
   const { user } = useAuth();
+  const { cosmetics } = useCosmetics();
+  const arcadeTheme = cosmetics?.theme || null;
   const [langOpen, setLangOpen] = useState(false);
   const langRef = useRef(null);
   useClickOutside(langRef, () => setLangOpen(false), langOpen);
@@ -89,18 +95,34 @@ export default function Sidebar({ collapsed, onToggle }) {
       </nav>
 
       <div className="side-bottom">
-        <button
-          className="side-row clickable"
-          onClick={toggle}
-          title={theme === "light" ? "Thème sombre" : "Thème clair"}
-        >
-          <span className="side-icon">
-            {theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
-          </span>
-          <span className="side-label">
-            {theme === "light" ? "Thème sombre" : "Thème clair"}
-          </span>
-        </button>
+        {/* Un thème de l'arcade impose son mode clair/sombre : on remplace alors
+            le bouton de bascule par un raccourci vers l'arcade (où on le change
+            ou le retire). Sinon, la bascule clair/sombre habituelle. */}
+        {arcadeTheme ? (
+          <NavLink
+            to="/arcade"
+            className="side-row clickable"
+            title={`Thème « ${arcadeTheme.name || "Arcade"} » équipé`}
+          >
+            <span className="side-icon">
+              <Palette size={20} />
+            </span>
+            <span className="side-label">{arcadeTheme.name || "Thème équipé"}</span>
+          </NavLink>
+        ) : (
+          <button
+            className="side-row clickable"
+            onClick={toggle}
+            title={theme === "light" ? "Thème sombre" : "Thème clair"}
+          >
+            <span className="side-icon">
+              {theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
+            </span>
+            <span className="side-label">
+              {theme === "light" ? "Thème sombre" : "Thème clair"}
+            </span>
+          </button>
+        )}
 
         <div className="lang-wrap" ref={langRef}>
           {langOpen && (
