@@ -14,6 +14,10 @@ const notificationSchema = new mongoose.Schema(
       enum: [
         "mention", // mentionné dans un commentaire (liste / review)
         "gamemedia_mention", // mentionné dans un post/commentaire du mur média d'un jeu
+        "gamemedia_like", // like sur ton post du mur média
+        "gamemedia_comment", // commentaire sur ton post du mur média
+        "gamemedia_comment_reply", // réponse à ton commentaire sous un post du mur média
+        "gamemedia_comment_like", // like sur ton commentaire sous un post du mur média
         "comment_reply", // réponse à ton commentaire
         "comment_like", // like sur ton commentaire
         "list_comment", // commentaire sur ta liste
@@ -56,6 +60,9 @@ const notificationSchema = new mongoose.Schema(
     // Cible « vidéo » (commentaires sur une reco vidéo) : propriétaire de la
     // recommandation, pour le lien /u/…?tab=videos.
     videoOwner: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    // Cible « post du mur média » : combiné à `game`, permet d'ouvrir l'onglet
+    // Feed du jeu directement sur le post concerné (/game/…?tab=feed&post=…).
+    gameMedia: { type: mongoose.Schema.Types.ObjectId, ref: "GameMedia", default: null },
     // Cible « jeu » (pour les recommandations).
     game: { type: Number, default: null }, // id IGDB
     gameName: { type: String, default: "" },

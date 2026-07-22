@@ -299,6 +299,28 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
     recoMeta = meta;
   }
 
+  // Commentaires du mur média : la carte embarque le POST visé (comme les
+  // cartes « a posté »), pour ouvrir le fil de réponses sans aller-retour.
+  const gmcActs = acts.filter(
+    (a) =>
+      (a.type === "gamemedia_comment" || a.type === "gamemedia_comment_reply") &&
+      a.actor &&
+      a.meta?.postId
+  );
+  let gmPostById = new Map();
+  if (gmcActs.length) {
+    const ids = [...new Set(gmcActs.map((a) => a.meta.postId))].filter((id) =>
+      mongoose.isValidObjectId(id)
+    );
+    const rows = ids.length
+      ? await GameMedia.find({ _id: { $in: ids } })
+          .populate("user", "username avatar")
+          .populate("comments.user", "username avatar")
+          .lean()
+      : [];
+    gmPostById = new Map(rows.map((p) => [String(p._id), p]));
+  }
+
   const gameEvents = [];
   for (const a of gameActs) {
     const changes = a.meta?.changes || [];
@@ -503,6 +525,30 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
         rarity: a.meta.rarity || "common",
         caseName: a.meta.caseName || "",
         duplicate: !!a.meta.duplicate,
+      });
+      continue;
+    }
+
+    // Commentaire / réponse sur un post du mur média : carte sobre qui ouvre
+    // le post et ses réponses au clic. Post supprimé depuis → on masque.
+    if (a.type === "gamemedia_comment" || a.type === "gamemedia_comment_reply") {
+      const p = gmPostById.get(String(a.meta?.postId || ""));
+      if (!p) continue;
+      events.push({
+        type: "gamemediacomment",
+        id: `a-${a._id}`,
+        date: a.createdAt,
+        user: person(a.actor),
+        action: a.type,
+        target: person(a.target),
+        snippet: a.snippet || "",
+        commentId: a.comment ? String(a.comment) : null,
+        post: toMediaPost(p, req.userId),
+        game: {
+          id: p.gameId,
+          name: p.gameName || a.gameName || "",
+          cover: p.gameCover || a.gameCover || null,
+        },
       });
       continue;
     }

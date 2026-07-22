@@ -40,6 +40,10 @@ import { timeAgo } from "../lib/lists";
 const NOTIF_META = {
   mention: { Icon: AtSign, verb: "t'a mentionné" },
   gamemedia_mention: { Icon: AtSign, verb: "t'a mentionné sur" },
+  gamemedia_like: { Icon: Heart, verb: "a aimé ton post sur" },
+  gamemedia_comment: { Icon: MessageSquare, verb: "a commenté ton post sur" },
+  gamemedia_comment_reply: { Icon: Reply, verb: "a répondu à ton commentaire sur" },
+  gamemedia_comment_like: { Icon: Heart, verb: "a aimé ton commentaire sur" },
   comment_reply: { Icon: Reply, verb: "a répondu à ton commentaire" },
   comment_like: { Icon: Heart, verb: "a aimé ton commentaire" },
   list_comment: { Icon: MessageSquare, verb: "a commenté ta liste" },
@@ -266,9 +270,10 @@ export default function Topbar() {
       navigate("/profile?tab=feed");
     } else if (n.type?.startsWith("review") && n.game) {
       navigate(`/game/${n.game}?tab=reviews`);
-    } else if (n.type === "gamemedia_mention" && n.game) {
-      // Ping dans un post/commentaire du mur média → onglet Feed du jeu.
-      navigate(`/game/${n.game}?tab=feed`);
+    } else if (n.type?.startsWith("gamemedia") && n.game) {
+      // Mention / like / commentaire du mur média → onglet Feed du jeu, ancré
+      // sur le post concerné quand on le connaît.
+      navigate(`/game/${n.game}?tab=feed${n.postId ? `&post=${n.postId}` : ""}`);
     } else if (n.listId) navigate(`/lists/${n.listId}`);
     // Mention dans une réponse de review : pas de liste, mais un jeu ciblé.
     else if (n.game) navigate(`/game/${n.game}?tab=reviews`);
@@ -492,10 +497,13 @@ export default function Topbar() {
                   {notifs.map((n) => {
                     const meta = NOTIF_META[n.type] || NOTIF_META.list_like;
                     // Une action sur une playlist se dit « playlist », pas « liste ».
-                    const verb =
+                    let verb =
                       n.listType === "playlist"
                         ? meta.verb.replace("ta liste", "ta playlist")
                         : meta.verb;
+                    // « … sur « Jeu » » : sans nom de jeu (vieux posts), on
+                    // laisse tomber la préposition orpheline.
+                    if (!n.gameName && verb.endsWith(" sur")) verb = verb.slice(0, -4);
                     return (
                       <button
                         key={n.id}

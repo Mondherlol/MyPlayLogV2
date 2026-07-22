@@ -32,6 +32,8 @@ const activitySchema = new mongoose.Schema(
         "review_comment_reply", // réponse à un commentaire d'avis
         "review_comment_like", // like d'un commentaire d'avis
         "review_react", // réaction (cœur/bravo/rigolo) sur un avis
+        "gamemedia_comment", // commentaire (racine) sur un post du mur média
+        "gamemedia_comment_reply", // réponse à un commentaire d'un post du mur média
         "recommendation", // a recommandé un jeu à un joueur (target = destinataire)
         "recommendation_boost", // +1 sur une recommandation faite à target
         "recommendation_comment", // commentaire sous une recommandation faite à target
@@ -63,6 +65,7 @@ const activitySchema = new mongoose.Schema(
     // Extrait affiché (texte commenté / liké, ou type de réaction).
     snippet: { type: String, default: "" },
     // Détails structurés selon le type :
+    //  gamemedia_* → { postId } (post du mur média visé)
     //  game_update → { changes: [{ kind: "added"|"status"|"rating"|"review"|
     //                  "favorite"|"ost"|"character"|"time"|"bundle", ... }] }
     //                 ("bundle" = jeux d'un bundle cochés terminés :

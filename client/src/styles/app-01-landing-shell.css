@@ -1621,21 +1621,26 @@
   background: var(--text-soft);
 }
 
-.notif-type.t-mention {
+.notif-type.t-mention,
+.notif-type.t-gamemedia_mention {
   background: #1d9bf0;
 }
 
-.notif-type.t-comment_reply {
+.notif-type.t-comment_reply,
+.notif-type.t-gamemedia_comment_reply {
   background: #3dd68c;
   color: #06301d;
 }
 
 .notif-type.t-comment_like,
-.notif-type.t-list_like {
+.notif-type.t-list_like,
+.notif-type.t-gamemedia_like,
+.notif-type.t-gamemedia_comment_like {
   background: #e0483f;
 }
 
-.notif-type.t-list_comment {
+.notif-type.t-list_comment,
+.notif-type.t-gamemedia_comment {
   background: #a879ff;
 }
 

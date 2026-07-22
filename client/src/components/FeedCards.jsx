@@ -136,6 +136,12 @@ const CHANGE_PRIORITY = ["status", "added", "bundle", "review", "rating", "ost",
 // ============================================================
 //  Dispatcher
 // ============================================================
+// Évènements portant un post du mur média : le post lui-même, ou un
+// commentaire dessus — mêmes actions (like du post, fil de réponses), donc
+// même aiguillage côté fils (HomeFeed / ProfileFeed).
+export const isPostItem = (i) =>
+  i?.type === "gamemediapost" || i?.type === "gamemediacomment";
+
 export function FeedCard(props) {
   const { item } = props;
   if (item.type === "game") return <GameEvent {...props} />;
@@ -146,6 +152,7 @@ export function FeedCard(props) {
   if (item.type === "interaction") return <InteractionEvent {...props} />;
   if (item.type === "repost") return <RepostEvent {...props} />;
   if (item.type === "gamemediapost") return <GameMediaPostEvent {...props} />;
+  if (item.type === "gamemediacomment") return <GameMediaCommentEvent {...props} />;
   if (item.type === "video") return <VideoEvent {...props} />;
   if (item.type === "videoact") return <VideoActivityEvent {...props} />;
   if (item.type === "videoactgroup") return <VideoActivityGroupEvent {...props} />;
@@ -1358,6 +1365,95 @@ function GameMediaPostEvent({ item, onLike, onComments, onOpenImage }) {
         {(p.media || []).some((m) => m.kind === "video") && (
           <SharePostButton post={p} className="hf-act" size={16} />
         )}
+      </div>
+    </article>
+  );
+}
+
+// Commentaire / réponse sur un post du mur média. Carte volontairement sobre :
+// la citation du commentaire + un rappel compact du post visé. Le clic ouvre le
+// post et ses réponses en modale (like, réponse, like des réponses).
+function GameMediaCommentEvent({ item, onComments }) {
+  const p = item.post;
+  const g = item.game;
+  const isReply = item.action === "gamemedia_comment_reply";
+  const Icon = isReply ? CornerDownRight : MessageCircle;
+  // Aperçu du post visé : son texte, sinon la nature de son contenu.
+  const { embeds } = useMemo(() => extractEmbeds(p?.text), [p?.text]);
+  const thumb = (p?.media || []).find((m) => !m.spoiler);
+  const preview =
+    (p?.text || "").trim() || postKindLabel(p?.media, embeds) || "un post";
+
+  return (
+    <article className="hf-card hf-gmcom clickable" onClick={onComments}>
+      <EventHead
+        user={item.user}
+        date={item.date}
+        badge={
+          <span className="hf-int-badge act-gamemedia_comment">
+            <Icon size={13} />
+          </span>
+        }
+      >
+        {isReply ? "a répondu à" : "a commenté le post de"}
+        {item.target?.username && (
+          <>
+            {" "}
+            <Link
+              to={`/u/${item.target.username}`}
+              className="hf-int-target clickable"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {item.target.username}
+            </Link>
+          </>
+        )}
+        {g?.id && (
+          <>
+            {" "}
+            sur{" "}
+            <Link
+              to={`/game/${g.id}?tab=feed`}
+              className="hf-gmpost-game clickable"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {g.name}
+            </Link>
+          </>
+        )}
+      </EventHead>
+
+      {item.snippet && <p className="hf-int-quote">{item.snippet}</p>}
+
+      <div className="hf-gmcom-src">
+        {thumb ? (
+          <span className="hf-gmcom-thumb">
+            <img
+              src={thumb.kind === "video" ? thumb.thumbnail || "" : thumb.url}
+              alt=""
+              loading="lazy"
+              draggable="false"
+            />
+            {thumb.kind === "video" && (
+              <span className="hf-gmcom-play">
+                <Play size={11} fill="currentColor" strokeWidth={0} />
+              </span>
+            )}
+          </span>
+        ) : g?.cover ? (
+          <span className="hf-gmcom-thumb">
+            <img src={g.cover} alt="" loading="lazy" draggable="false" />
+          </span>
+        ) : null}
+        <span className="hf-gmcom-src-txt">
+          <strong>{p?.author?.username || "?"}</strong> {preview}
+        </span>
+        <span className="hf-gmcom-counts">
+          <Heart size={13} fill={p?.liked ? "currentColor" : "none"} className={p?.liked ? "on" : ""} />
+          {p?.likeCount > 0 ? p.likeCount : ""}
+          <MessageCircle size={13} />
+          {p?.commentCount > 0 ? p.commentCount : ""}
+        </span>
       </div>
     </article>
   );

@@ -22,7 +22,7 @@ import { Lightbox as GameMediaLightbox } from "./GameMediaWall";
 import VideoPlayerModal from "./VideoPlayerModal";
 import GemsFeedModal from "./GemsFeedModal";
 import BlindTestResultsModal from "./BlindTestResultsModal";
-import { FeedCard, FeedCardsSkeleton } from "./FeedCards";
+import { FeedCard, FeedCardsSkeleton, isPostItem } from "./FeedCards";
 
 // Onglet « Feed » du profil : TOUTE l'activité du joueur, façon Twitter —
 // actions de bibliothèque (terminé, noté, OST choisie…), listes créées,
@@ -70,6 +70,11 @@ export default function ProfileFeed({ username, isMe, token, onSetCover }) {
   const [mediaViewer, setMediaViewer] = useState(null); // { item, index } — images d'un post en grand
   const [gemsFor, setGemsFor] = useState(null); // découverte de pépites → modale
   const [blindTestFor, setBlindTestFor] = useState(null); // blind test → modale résultats
+  // La modale de réponses doit lire l'item À JOUR (un like posé dedans doit se
+  // voir tout de suite) : on garde l'id et on relit la liste.
+  const postItem = commentsForPost
+    ? items.find((i) => i.id === commentsForPost.id) || commentsForPost
+    : null;
   const sentinelRef = useRef(null);
   // Refs miroirs pour que l'observer (créé une fois) lise l'état courant.
   const stateRef = useRef({ cursor: null, busy: false });
@@ -335,14 +340,14 @@ export default function ProfileFeed({ username, isMe, token, onSetCover }) {
                   onLike={() =>
                     item.type === "video"
                       ? toggleVideoLike(item)
-                      : item.type === "gamemediapost"
+                      : isPostItem(item)
                         ? togglePostLike(item)
                         : toggleLike(item)
                   }
                   onComments={() =>
                     item.type === "video"
                       ? setCommentsForVideo(item)
-                      : item.type === "gamemediapost"
+                      : isPostItem(item)
                         ? setCommentsForPost(item)
                         : setCommentsFor(item)
                   }
@@ -417,12 +422,14 @@ export default function ProfileFeed({ username, isMe, token, onSetCover }) {
           onClose={() => setCommentsForVideo(null)}
         />
       )}
-      {commentsForPost && (
+      {postItem && (
         <GameMediaCommentsModal
-          post={commentsForPost.post}
-          game={commentsForPost.game}
+          post={postItem.post}
+          game={postItem.game}
           token={token}
-          onCountChange={(n) => patchPost(commentsForPost.id, { commentCount: n })}
+          focusCommentId={postItem.commentId || null}
+          onLike={() => togglePostLike(postItem)}
+          onCountChange={(n) => patchPost(postItem.id, { commentCount: n })}
           onClose={() => setCommentsForPost(null)}
         />
       )}

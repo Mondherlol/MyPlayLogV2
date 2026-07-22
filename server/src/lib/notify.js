@@ -12,6 +12,7 @@ export async function notify({
   ostOwner = null,
   repostOwner = null,
   videoOwner = null,
+  gameMedia = null,
   snippet = "",
 }) {
   if (!user || !actor || String(user) === String(actor)) return;
@@ -27,6 +28,7 @@ export async function notify({
       ostOwner,
       repostOwner,
       videoOwner,
+      gameMedia,
       snippet: String(snippet || "").slice(0, 120),
     });
   } catch (err) {

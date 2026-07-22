@@ -286,6 +286,8 @@ export function CommentThread({
   title = "Commentaires",
   emptyText = "Sois le premier à commenter.",
   placeholder = "Laisse un commentaire…",
+  // Message à mettre en évidence (on arrive dessus depuis une carte du fil).
+  highlightId = null,
   onCountChange,
 }) {
   const [comments, setComments] = useState(initialComments || []);
@@ -375,6 +377,7 @@ export function CommentThread({
               <CommentItem
                 c={root}
                 token={token}
+                highlight={!!highlightId && root.id === highlightId}
                 canDelete={canModerate(root)}
                 onDelete={remove}
                 onLike={toggleLike}
@@ -400,6 +403,7 @@ export function CommentThread({
                         onOpenMedia={openViewer}
                         onEditSubmit={editComment}
                         onShowHistory={setHistoryOf}
+                        highlight={!!highlightId && r.id === highlightId}
                       />
                       {replyFor === r.id && inlineComposer(r, root.id)}
                     </Fragment>

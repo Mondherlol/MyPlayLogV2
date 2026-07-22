@@ -9,7 +9,7 @@ import { Lightbox as GameMediaLightbox } from "./GameMediaWall";
 import VideoPlayerModal from "./VideoPlayerModal";
 import GemsFeedModal from "./GemsFeedModal";
 import BlindTestResultsModal from "./BlindTestResultsModal";
-import { FeedCard, FanartLightbox, FeedCardsSkeleton } from "./FeedCards";
+import { FeedCard, FanartLightbox, FeedCardsSkeleton, isPostItem } from "./FeedCards";
 
 // Rangée d'avatars des joueurs suivis : filtre le fil sur UN joueur (clic),
 // re-clic sur l'actif → retour à tout le monde. Affichée à droite du titre
@@ -103,6 +103,11 @@ export default function HomeFeed({ token, me, filterUser = null }) {
   const [mediaViewer, setMediaViewer] = useState(null); // { item, index } — images d'un post en grand
   const [gemsFor, setGemsFor] = useState(null); // découverte de pépites → modale liste
   const [blindTestFor, setBlindTestFor] = useState(null); // blind test → modale résultats
+  // La modale de réponses doit lire l'item À JOUR (un like posé dedans doit se
+  // voir tout de suite) : on garde l'id et on relit la liste.
+  const postItem = commentsForPost
+    ? items.find((i) => i.id === commentsForPost.id) || commentsForPost
+    : null;
   // Refs miroirs pour que le chargement (déclenché par Virtuoso) lise l'état courant.
   const stateRef = useRef({ cursor: null, busy: false });
   stateRef.current = { cursor, busy: loading || loadingMore };
@@ -290,14 +295,14 @@ export default function HomeFeed({ token, me, filterUser = null }) {
               onLike={() =>
                 item.type === "video"
                   ? toggleVideoLike(item)
-                  : item.type === "gamemediapost"
+                  : isPostItem(item)
                     ? togglePostLike(item)
                     : toggleLike(item)
               }
               onComments={() =>
                 item.type === "video"
                   ? setCommentsForVideo(item)
-                  : item.type === "gamemediapost"
+                  : isPostItem(item)
                     ? setCommentsForPost(item)
                     : setCommentsFor(item)
               }
@@ -343,12 +348,14 @@ export default function HomeFeed({ token, me, filterUser = null }) {
           onClose={() => setCommentsForVideo(null)}
         />
       )}
-      {commentsForPost && (
+      {postItem && (
         <GameMediaCommentsModal
-          post={commentsForPost.post}
-          game={commentsForPost.game}
+          post={postItem.post}
+          game={postItem.game}
           token={token}
-          onCountChange={(n) => patchPost(commentsForPost.id, { commentCount: n })}
+          focusCommentId={postItem.commentId || null}
+          onLike={() => togglePostLike(postItem)}
+          onCountChange={(n) => patchPost(postItem.id, { commentCount: n })}
           onClose={() => setCommentsForPost(null)}
         />
       )}

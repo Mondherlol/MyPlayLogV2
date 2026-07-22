@@ -836,6 +836,172 @@
   border-left-color: var(--accent-ink);
 }
 
+/* ---------- Commentaire sur un post du mur média (carte sobre) ---------- */
+.hf-gmcom.clickable {
+  cursor: var(--cursor-pointer), pointer;
+}
+
+.hf-gmcom:hover .hf-int-quote {
+  border-left-color: var(--accent-ink);
+}
+
+.hf-int-badge.act-gamemedia_comment {
+  background: color-mix(in srgb, var(--orange) 15%, transparent);
+  color: var(--accent-ink);
+}
+
+/* Rappel du post visé : vignette + auteur + extrait, sur une seule ligne. */
+.hf-gmcom-src {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.45rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  min-width: 0;
+}
+
+.hf-gmcom:hover .hf-gmcom-src {
+  border-color: var(--border-strong);
+}
+
+.hf-gmcom-thumb {
+  position: relative;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.hf-gmcom-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.hf-gmcom-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.hf-gmcom-src-txt {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.84rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hf-gmcom-src-txt strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.hf-gmcom-counts {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+.hf-gmcom-counts .on {
+  color: #e0483f;
+}
+
+/* ---------- Post original dans la modale de réponses ---------- */
+.gmc-post {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.2rem 0 0.9rem;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.gmc-post-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.gmc-post-av {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.gmc-post-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gmc-post-name {
+  font-weight: 700;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.gmc-post-name:hover {
+  color: var(--accent-ink);
+}
+
+.gmc-post-time {
+  color: var(--text-soft);
+  font-size: 0.8rem;
+}
+
+.gmc-post-actions {
+  display: flex;
+}
+
+.gmc-like {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.gmc-like:hover {
+  color: #e0483f;
+  border-color: #e0483f;
+}
+
+.gmc-like.on {
+  color: #e0483f;
+  border-color: #e0483f;
+}
+
 /* Renvoi vers l'avis (contexte review) */
 .hf-int-gamechip {
   display: inline-flex;

@@ -9,12 +9,13 @@ import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { sanitizeMediaList, resolveMentions, toComment } from "../lib/commentThread.js";
 import { sanitizeEdit, renderEditedVideo } from "../lib/videoEdit.js";
 import { notify } from "../lib/notify.js";
+import { recordActivity, removeActivity } from "../lib/activity.js";
 import { triggerMissionCheck } from "../lib/missions.js";
 
 // Notifie chaque @pseudo mentionné dans un post ou un commentaire du mur média
 // (le helper `notify` ignore de lui-même l'auto-mention). Lien → onglet Feed du
 // jeu, où vit le post.
-function notifyMentions(mentions, { actor, gameId, gameName, snippet }) {
+function notifyMentions(mentions, { actor, gameId, gameName, postId, snippet }) {
   for (const m of mentions || []) {
     notify({
       user: m.user,
@@ -22,9 +23,18 @@ function notifyMentions(mentions, { actor, gameId, gameName, snippet }) {
       actor,
       game: gameId,
       gameName: gameName || "",
+      gameMedia: postId || null,
       snippet,
     });
   }
+}
+
+// Extrait de texte affiché dans la notif quand on parle d'un post (un post peut
+// n'avoir aucun texte : on décrit alors son contenu).
+function postSnippet(post) {
+  const { text, media } = normalizePost(post);
+  if (text) return text;
+  return media.length ? "a partagé un média" : "";
 }
 
 const router = express.Router();
@@ -295,6 +305,7 @@ router.post("/game/:gameId", requireAuth, async (req, res) => {
       actor: req.userId,
       gameId,
       gameName: post.gameName,
+      postId: post._id,
       snippet: text || (media.length ? "a partagé un média" : ""),
     });
     triggerMissionCheck(req.userId); // mission « Reporter de terrain »
@@ -334,6 +345,7 @@ router.delete("/:postId", requireAuth, async (req, res) => {
     if (String(post.user) !== String(req.userId))
       return res.status(403).json({ error: "Action non autorisée." });
     await post.deleteOne();
+    removeActivity({ "meta.postId": String(post._id) }); // cartes de commentaires orphelines
     res.json({ ok: true });
   } catch (err) {
     console.error("game media delete error:", err.message);
@@ -351,6 +363,18 @@ router.post("/:postId/like", requireAuth, async (req, res) => {
     if (has) post.likes = post.likes.filter((u) => String(u) !== uid);
     else post.likes.push(req.userId);
     await post.save({ validateModifiedOnly: true, timestamps: false });
+    // Seulement à la pose du like (pas au retrait) : on prévient l'auteur.
+    if (!has) {
+      notify({
+        user: post.user,
+        type: "gamemedia_like",
+        actor: req.userId,
+        game: post.gameId,
+        gameName: post.gameName,
+        gameMedia: post._id,
+        snippet: postSnippet(post),
+      });
+    }
     res.json({ liked: !has, likeCount: post.likes.length });
   } catch (err) {
     console.error("game media like error:", err.message);
@@ -373,9 +397,13 @@ router.post("/:postId/comments", requireAuth, async (req, res) => {
     if (!post) return res.status(404).json({ error: "Post introuvable." });
 
     let parent = null;
+    let replyTargetUser = null; // auteur du message auquel on répond (pour la notif)
     if (req.body?.parent) {
       const p = post.comments.id(req.body.parent);
-      if (p) parent = p.parent || p._id;
+      if (p) {
+        parent = p.parent || p._id;
+        replyTargetUser = p.user;
+      }
     }
     const mentions = await resolveMentions(text);
     post.comments.push({
@@ -389,12 +417,49 @@ router.post("/:postId/comments", requireAuth, async (req, res) => {
     await post.save({ validateModifiedOnly: true, timestamps: false });
     await post.populate("comments.user", "username avatar");
     const c = post.comments[post.comments.length - 1];
-    notifyMentions(mentions, {
+
+    // Notifications : un seul message par destinataire, par ordre de priorité
+    // (réponse > mention > auteur du post) — même logique que les listes.
+    const recipients = new Map();
+    const actorStr = String(req.userId);
+    const add = (uid, type) => {
+      if (!uid) return;
+      const s = String(uid);
+      if (s === actorStr || recipients.has(s)) return;
+      recipients.set(s, type);
+    };
+    if (replyTargetUser) add(replyTargetUser, "gamemedia_comment_reply");
+    mentions.forEach((m) => add(m.user, "gamemedia_mention"));
+    add(post.user, "gamemedia_comment");
+    const snippet = text || (media.length ? "a envoyé un média" : "");
+    for (const [uid, type] of recipients) {
+      notify({
+        user: uid,
+        type,
+        actor: req.userId,
+        game: post.gameId,
+        gameName: post.gameName,
+        gameMedia: post._id,
+        comment: c._id,
+        snippet,
+      });
+    }
+
+    // Fil d'accueil / feed du profil : une carte « a commenté le post de X »
+    // (cible = auteur du commentaire répondu pour une réponse, sinon auteur
+    // du post). `meta.postId` permet d'embarquer le post dans la carte.
+    recordActivity({
       actor: req.userId,
-      gameId: post.gameId,
-      gameName: post.gameName,
-      snippet: text || (media.length ? "a envoyé un média" : ""),
+      type: replyTargetUser ? "gamemedia_comment_reply" : "gamemedia_comment",
+      target: replyTargetUser || post.user,
+      game: post.gameId,
+      gameName: post.gameName || "",
+      gameCover: post.gameCover || null,
+      comment: c._id,
+      snippet,
+      meta: { postId: String(post._id) },
     });
+
     res.status(201).json({ comment: toComment(c, post.comments, req.userId) });
   } catch (err) {
     console.error("game media comment error:", err.message);
@@ -448,6 +513,18 @@ router.post("/:postId/comments/:commentId/like", requireAuth, async (req, res) =
     if (has) c.likes = c.likes.filter((u) => String(u) !== uid);
     else c.likes.push(req.userId);
     await post.save({ validateModifiedOnly: true, timestamps: false });
+    if (!has) {
+      notify({
+        user: c.user,
+        type: "gamemedia_comment_like",
+        actor: req.userId,
+        game: post.gameId,
+        gameName: post.gameName,
+        gameMedia: post._id,
+        comment: c._id,
+        snippet: c.text,
+      });
+    }
     res.json({ liked: !has, likeCount: c.likes.length });
   } catch (err) {
     console.error("game media comment like error:", err.message);
@@ -469,6 +546,7 @@ router.delete("/:postId/comments/:commentId", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "Action non autorisée." });
     c.deleteOne();
     await post.save({ validateModifiedOnly: true, timestamps: false });
+    removeActivity({ comment: c._id }); // la carte du fil n'a plus d'objet
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: "Erreur." });

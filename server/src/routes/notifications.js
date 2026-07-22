@@ -24,6 +24,8 @@ function serialize(n) {
     repostOwner: n.repostOwner?.username || null,
     // Vidéo : pseudo du propriétaire de la reco (pour le lien /u/…?tab=videos).
     videoOwner: n.videoOwner?.username || null,
+    // Post du mur média visé (lien /game/…?tab=feed&post=…).
+    postId: n.gameMedia ? String(n.gameMedia) : null,
     snippet: n.snippet || "",
     read: n.read,
     createdAt: n.createdAt,

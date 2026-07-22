@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Loader2,
   ImagePlus,
@@ -255,6 +255,10 @@ export function PostText({ text, hide, mentions }) {
 export default function GameMediaWall({ gameId, gameName, gameCover, token }) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  // Post visé par une notification (/game/…?tab=feed&post=…) : on l'ouvre sur
+  // ses commentaires et on l'amène sous les yeux.
+  const [searchParams] = useSearchParams();
+  const focusId = searchParams.get("post");
   const [posts, setPosts] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -383,6 +387,7 @@ export default function GameMediaWall({ gameId, gameName, gameCover, token }) {
               key={post.id}
               post={post}
               token={token}
+              focus={post.id === focusId}
               forceReveal={revealAll}
               onLike={() => toggleLike(post.id)}
               onLikeById={toggleLike}
@@ -868,16 +873,23 @@ export function SharePostButton({ post, className = "gm-act", size = 17 }) {
 // ============================================================
 //  Carte d'un post
 // ============================================================
-function PostCard({ post, token, forceReveal, onLike, onLikeById, onDelete }) {
-  const [showComments, setShowComments] = useState(false);
+function PostCard({ post, token, focus, forceReveal, onLike, onLikeById, onDelete }) {
+  const [showComments, setShowComments] = useState(!!focus);
   const [commentCount, setCommentCount] = useState(post.commentCount || 0);
   const [lightbox, setLightbox] = useState(null); // index dans post.media
+  const cardRef = useRef(null);
 
   const { embeds, hide } = useMemo(() => extractEmbeds(post.text), [post.text]);
   const media = post.media || [];
 
+  // Arrivée depuis une notif : on centre le post visé.
+  useEffect(() => {
+    if (!focus || !cardRef.current) return;
+    cardRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focus]);
+
   return (
-    <article className="gm-postcard">
+    <article className={`gm-postcard ${focus ? "is-focus" : ""}`} ref={cardRef}>
       <div className="gm-post-av">
         {post.author?.username ? (
           <Link to={`/u/${post.author.username}`}>
