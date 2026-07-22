@@ -248,6 +248,7 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
 
   const events = [];
   const blindtests = []; // regroupés en rafale après la boucle des activités
+  const pixels = []; // idem pour Pixel Rush
   const caseopens = []; // idem : ouvrir plusieurs caisses d'affilée est la norme
 
   // --- Actions de bibliothèque (game_update) : on complète la carte avec
@@ -496,6 +497,22 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
         date: a.createdAt,
         user: person(a.actor),
         blindTestId: a.meta.blindTestId,
+        score: a.meta.score || 0,
+        correct: a.meta.correct || 0,
+        total: a.meta.total || 0,
+        challenge: a.meta.challenge || null,
+      });
+      continue;
+    }
+
+    if (a.type === "pixel") {
+      if (!a.meta?.pixelGameId) continue;
+      pixels.push({
+        type: "pixel",
+        id: `a-${a._id}`,
+        date: a.createdAt,
+        user: person(a.actor),
+        pixelGameId: a.meta.pixelGameId,
         score: a.meta.score || 0,
         correct: a.meta.correct || 0,
         total: a.meta.total || 0,
@@ -862,57 +879,60 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
   pushVideoActivity("like", liked, "likedAt");
   pushVideoActivity("comment", commented, "commentedAt");
 
-  // --- Blind tests : plusieurs parties d'un même joueur rapprochées dans le
-  //     temps → UNE carte « a fait N blind tests » (jouer plusieurs fois de
-  //     suite est courant et noyait le fil). Une seule partie = carte normale. ---
-  blindtests.sort((a, b) => new Date(b.date) - new Date(a.date));
-  {
+  // --- Parties de mini-jeu : plusieurs parties d'un même joueur rapprochées
+  //     dans le temps → UNE carte « a fait N parties » (enchaîner les parties
+  //     est courant et noyait le fil). Une seule partie = carte normale.
+  //     Blind test et Pixel Rush ont le même contrat de carte : seuls le type
+  //     du groupe et le nom de l'id de partie changent (`pick`). ---
+  const pushRuns = (runs, groupType, idPrefix, pick) => {
+    runs.sort((a, b) => new Date(b.date) - new Date(a.date));
     const clusters = [];
-    for (const bt of blindtests) {
+    for (const run of runs) {
       const last = clusters[clusters.length - 1];
       if (
         last &&
-        last.user.id === bt.user.id &&
-        new Date(last.lastDate) - new Date(bt.date) <= GROUP_GAP
+        last.user.id === run.user.id &&
+        new Date(last.lastDate) - new Date(run.date) <= GROUP_GAP
       ) {
-        last.members.push(bt);
-        last.lastDate = bt.date;
+        last.members.push(run);
+        last.lastDate = run.date;
       } else {
-        clusters.push({ user: bt.user, date: bt.date, lastDate: bt.date, members: [bt] });
+        clusters.push({ user: run.user, date: run.date, lastDate: run.date, members: [run] });
       }
     }
     for (const c of clusters) {
       if (c.members.length >= 2) {
         const best = c.members.reduce((a, b) => (b.score > a.score ? b : a));
         events.push({
-          type: "blindtestgroup",
-          id: `bt-g-${c.members[0].id}`,
+          type: groupType,
+          id: `${idPrefix}-g-${c.members[0].id}`,
           date: c.date, // le plus récent du groupe
           user: c.user,
           count: c.members.length,
           bestScore: best.score,
-          best: {
-            blindTestId: best.blindTestId,
-            score: best.score,
-            correct: best.correct,
-            total: best.total,
-            challenge: best.challenge,
-          },
-          games: c.members.map((m) => ({
-            id: m.id,
-            blindTestId: m.blindTestId,
-            date: m.date,
-            score: m.score,
-            correct: m.correct,
-            total: m.total,
-            challenge: m.challenge,
-          })),
+          best: pick(best),
+          games: c.members.map((m) => ({ id: m.id, date: m.date, ...pick(m) })),
         });
       } else {
         events.push(c.members[0]);
       }
     }
-  }
+  };
+
+  pushRuns(blindtests, "blindtestgroup", "bt", (m) => ({
+    blindTestId: m.blindTestId,
+    score: m.score,
+    correct: m.correct,
+    total: m.total,
+    challenge: m.challenge,
+  }));
+  pushRuns(pixels, "pixelgroup", "px", (m) => ({
+    pixelGameId: m.pixelGameId,
+    score: m.score,
+    correct: m.correct,
+    total: m.total,
+    challenge: m.challenge,
+  }));
 
   // --- Caisses ouvertes : on en ouvre rarement une seule, donc les ouvertures
   //     rapprochées d'un même joueur donnent UNE carte « a ouvert N caisses ».

@@ -22,6 +22,7 @@ import { Lightbox as GameMediaLightbox } from "./GameMediaWall";
 import VideoPlayerModal from "./VideoPlayerModal";
 import GemsFeedModal from "./GemsFeedModal";
 import BlindTestResultsModal from "./BlindTestResultsModal";
+import PixelResultsModal from "./PixelResultsModal";
 import { FeedCard, FeedCardsSkeleton, isPostItem } from "./FeedCards";
 
 // Onglet « Feed » du profil : TOUTE l'activité du joueur, façon Twitter —
@@ -70,6 +71,7 @@ export default function ProfileFeed({ username, isMe, token, onSetCover }) {
   const [mediaViewer, setMediaViewer] = useState(null); // { item, index } — images d'un post en grand
   const [gemsFor, setGemsFor] = useState(null); // découverte de pépites → modale
   const [blindTestFor, setBlindTestFor] = useState(null); // blind test → modale résultats
+  const [pixelFor, setPixelFor] = useState(null); // Pixel Rush → modale résultats
   // La modale de réponses doit lire l'item À JOUR (un like posé dedans doit se
   // voir tout de suite) : on garde l'id et on relit la liste.
   const postItem = commentsForPost
@@ -361,6 +363,7 @@ export default function ProfileFeed({ username, isMe, token, onSetCover }) {
                   onPlay={(v) => setPlaying(v)}
                   onOpenGems={() => setGemsFor(item)}
                   onOpenBlindTest={() => setBlindTestFor(item)}
+                  onOpenPixel={(payload) => setPixelFor(payload || item)}
                   onRemove={isMe ? () => removeRepost(item) : undefined}
                 />
               ))}
@@ -449,6 +452,13 @@ export default function ProfileFeed({ username, isMe, token, onSetCover }) {
           item={blindTestFor}
           token={token}
           onClose={() => setBlindTestFor(null)}
+        />
+      )}
+      {pixelFor && (
+        <PixelResultsModal
+          item={pixelFor}
+          token={token}
+          onClose={() => setPixelFor(null)}
         />
       )}
     </section>

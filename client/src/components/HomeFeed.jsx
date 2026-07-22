@@ -9,6 +9,7 @@ import { Lightbox as GameMediaLightbox } from "./GameMediaWall";
 import VideoPlayerModal from "./VideoPlayerModal";
 import GemsFeedModal from "./GemsFeedModal";
 import BlindTestResultsModal from "./BlindTestResultsModal";
+import PixelResultsModal from "./PixelResultsModal";
 import { FeedCard, FanartLightbox, FeedCardsSkeleton, isPostItem } from "./FeedCards";
 
 // Rangée d'avatars des joueurs suivis : filtre le fil sur UN joueur (clic),
@@ -103,6 +104,7 @@ export default function HomeFeed({ token, me, filterUser = null }) {
   const [mediaViewer, setMediaViewer] = useState(null); // { item, index } — images d'un post en grand
   const [gemsFor, setGemsFor] = useState(null); // découverte de pépites → modale liste
   const [blindTestFor, setBlindTestFor] = useState(null); // blind test → modale résultats
+  const [pixelFor, setPixelFor] = useState(null); // Pixel Rush → modale résultats
   // La modale de réponses doit lire l'item À JOUR (un like posé dedans doit se
   // voir tout de suite) : on garde l'id et on relit la liste.
   const postItem = commentsForPost
@@ -316,6 +318,7 @@ export default function HomeFeed({ token, me, filterUser = null }) {
               onPlay={(v) => setPlaying(v)}
               onOpenGems={() => setGemsFor(item)}
               onOpenBlindTest={(payload) => setBlindTestFor(payload || item)}
+              onOpenPixel={(payload) => setPixelFor(payload || item)}
             />
           </div>
         )}
@@ -375,6 +378,13 @@ export default function HomeFeed({ token, me, filterUser = null }) {
           item={blindTestFor}
           token={token}
           onClose={() => setBlindTestFor(null)}
+        />
+      )}
+      {pixelFor && (
+        <PixelResultsModal
+          item={pixelFor}
+          token={token}
+          onClose={() => setPixelFor(null)}
         />
       )}
     </div>

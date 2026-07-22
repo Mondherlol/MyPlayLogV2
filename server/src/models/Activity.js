@@ -45,6 +45,7 @@ const activitySchema = new mongoose.Schema(
         "list_items", // ajout d'éléments à une liste (meta.added, fusionné)
         "follow", // abonnement à un joueur (target)
         "blindtest", // a terminé un blind test musical (meta = score/manches/défi)
+        "pixel", // a terminé une partie de Pixel Rush (meta = score/manches/défi)
         "case_open", // a ouvert une caisse de l'arcade (meta = lot obtenu)
       ],
       required: true,

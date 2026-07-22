@@ -708,6 +708,164 @@
   color: var(--accent-ink);
 }
 
+/* ---- Porte d'entrée de la collection de curseurs (en tête du rail) ---- */
+.arc-rail-cursors {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+  transition: border-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+}
+.arc-rail-cursors:hover {
+  border-color: color-mix(in srgb, var(--orange) 45%, var(--border));
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+.arc-rail-cursors-ic {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: var(--accent-grad);
+  color: #3a2600;
+}
+.arc-rail-cursors-txt {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--text);
+}
+.arc-rail-cursors-txt em {
+  font-style: normal;
+  font-family: var(--font-body);
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+.arc-rail-cursors-arrow {
+  flex: 0 0 auto;
+  color: var(--text-soft);
+  transition: transform 0.16s ease, color 0.16s ease;
+}
+.arc-rail-cursors:hover .arc-rail-cursors-arrow {
+  transform: translateX(3px);
+  color: var(--accent-ink);
+}
+
+/* ---- La modale « Mes curseurs » ---- */
+.abar-modal {
+  position: relative;
+  width: min(940px, 100%);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.abar-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+/* Titre + compteur groupés et extensibles : c'est ce bloc qui pousse le
+   bouton et la croix à droite. Deux `margin-left:auto` concurrents se
+   partageraient l'espace libre et laisseraient le bouton au milieu. */
+.abar-modal-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.abar-modal-head h2 {
+  min-width: 0;
+  margin: 0;
+  font-size: 1.15rem;
+}
+.abar-modal-head .modal-close {
+  position: static;
+}
+.abar-modal-body {
+  padding: 1.25rem;
+  overflow-y: auto;
+}
+.abar-count {
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.74rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* « Nouveau curseur » : l'action qui fait grandir la collection. */
+.abar-get {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #3a2600;
+  font-weight: 700;
+  font-size: 0.83rem;
+  transition: filter 0.15s ease, transform 0.12s ease;
+}
+.abar-get:hover {
+  filter: brightness(1.07);
+  transform: translateY(-1px);
+}
+.abar-get b {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.16);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+/* Solde insuffisant : toujours cliquable (voir le contenu de la caisse a de
+   l'intérêt) mais il ne brille plus. */
+.abar-get.poor {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--text-soft);
+}
+.abar-get.poor b {
+  background: var(--surface-2);
+}
+@media (max-width: 560px) {
+  .abar-count {
+    display: none;
+  }
+  .abar-modal-body {
+    padding: 0.9rem;
+  }
+}
+
 .arc-board {
   --g-1: #f2b70b;
   border: 1px solid var(--border);

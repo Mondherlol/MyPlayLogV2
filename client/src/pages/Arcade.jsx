@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import {
   Coins,
@@ -8,6 +9,7 @@ import {
   MousePointer2,
   Palette,
   Check,
+  X,
   Music2,
   Grid2x2,
   Trophy,
@@ -104,6 +106,7 @@ export default function Arcade() {
   const [history, setHistory] = useState(null);
   const [showHist, setShowHist] = useState(false);
   const [openingBox, setOpeningBox] = useState(null);
+  const [showCursors, setShowCursors] = useState(false);
   const [equipping, setEquipping] = useState(null);
   const [preview, setPreview] = useState(null); // thème essayé en direct (non équipé)
   const [err, setErr] = useState("");
@@ -205,8 +208,12 @@ export default function Arcade() {
   }
 
   const points = data?.points ?? user?.points ?? 0;
-  const crate = data?.cases?.[0] || null;
   const covers = data?.covers || [];
+  // La caisse à proposer DANS la modale des curseurs : celle qui en distribue.
+  // `cases[0]` ne suffit plus depuis qu'il existe aussi une caisse de thèmes.
+  const cursorCrate =
+    (data?.cases || []).find((c) => (c.rewards || []).some((r) => r.type === "cursor")) ||
+    null;
 
   // Inventaire par famille (les plus rares en tête, puis les plus récents).
   const byRarity = (a, b) =>
@@ -328,49 +335,50 @@ export default function Arcade() {
           </div>
         )}
 
-        {/* ---------- Collection ---------- */}
+        {/* ---------- Collection ----------
+            Les curseurs ne sont plus ici mais dans leur modale (bouton du
+            rail droit) : la liste peut être longue et on ne la consulte que
+            pour équiper. Les thèmes restent en page, eux se choisissent à
+            l'œil et ont besoin de leurs grands aperçus. */}
         {!data ? (
           <div className="arc-state">
             <Loader2 size={22} className="spin" />
           </div>
-        ) : cursors.length === 0 && themes.length === 0 ? (
-          <div className="arc-empty-inv">
-            <PackageOpen size={30} />
-            <p>
-              Ta collection est vide. Ouvre une caisse pour débloquer ton premier
-              curseur ou ton premier thème.
-            </p>
-            {crate?.openable && (
-              <button className="btn btn-primary sm" onClick={() => setOpeningBox(crate)}>
-                <Sparkles size={15} /> Ouvrir une caisse
-              </button>
-            )}
-          </div>
         ) : (
-          <>
-            <ThemesGroup
-              items={themes}
-              total={catalog.theme.size}
-              equippedKey={data?.equipped?.theme || null}
-              previewKey={preview?.key || null}
-              equipping={equipping}
-              onEquip={toggleEquip}
-              onPreview={togglePreview}
-            />
-            <CollectionGroup
-              title="Mes curseurs"
-              Icon={MousePointer2}
-              items={cursors}
-              total={catalog.cursor.size}
-              note="Le curseur équipé s'applique partout dans l'app, sur ordinateur uniquement."
-              {...equipProps}
-            />
-          </>
+          <ThemesGroup
+            items={themes}
+            total={catalog.theme.size}
+            equippedKey={data?.equipped?.theme || null}
+            previewKey={preview?.key || null}
+            equipping={equipping}
+            onEquip={toggleEquip}
+            onPreview={togglePreview}
+          />
         )}
       </div>
 
-      {/* ---------- Rail droit : les classements ---------- */}
+      {/* ---------- Rail droit : collection + classements ---------- */}
       <aside className="arc-rail">
+        {/* La porte d'entrée de la collection de curseurs, au-dessus des
+            classements. */}
+        <button
+          className="arc-rail-cursors clickable"
+          onClick={() => setShowCursors(true)}
+        >
+          <span className="arc-rail-cursors-ic">
+            <MousePointer2 size={17} />
+          </span>
+          <span className="arc-rail-cursors-txt">
+            Mes curseurs
+            {catalog.cursor.size > 0 && (
+              <em>
+                {cursors.length} / {catalog.cursor.size}
+              </em>
+            )}
+          </span>
+          <ArrowRight size={16} className="arc-rail-cursors-arrow" />
+        </button>
+
         <h2 className="arc-rail-title">
           <Crown size={16} /> Classements
         </h2>
@@ -409,6 +417,18 @@ export default function Arcade() {
             Terminer
           </button>
         </div>
+      )}
+
+      {showCursors && (
+        <CursorsModal
+          items={cursors}
+          total={catalog.cursor.size}
+          points={points}
+          crate={cursorCrate}
+          onOpenCrate={(c) => setOpeningBox(c)}
+          onClose={() => setShowCursors(false)}
+          {...equipProps}
+        />
       )}
 
       {openingBox && (
@@ -640,76 +660,134 @@ function ThemesGroup({ items, total, equippedKey, previewKey, equipping, onEquip
   );
 }
 
-// ---------- Un groupe de la collection (curseurs) ----------
-// Masqué tant que le catalogue n'a rien de cette famille : inutile d'afficher
-// « Mes curseurs 0/0 » si aucune caisse n'en distribue.
-function CollectionGroup({ title, Icon, items, total, note, equippedOf, equipping, onEquip }) {
-  if (!total && items.length === 0) return null;
-  return (
-    <section className="arc-collection">
-      <div className="arc-inv-head">
-        <h2 className="arc-h2">
-          <Icon size={17} /> {title}
-        </h2>
-        {total > 0 && (
-          <span className="arc-inv-progress">
-            {items.length} / {total}
-          </span>
-        )}
-      </div>
+// ---------- La modale « Mes curseurs » ----------
+// La collection vit dans une modale plutôt qu'en pleine page : elle grandit à
+// chaque caisse et ne se consulte que ponctuellement, pour équiper. Le bouton
+// qui l'ouvre est en tête du rail droit.
+function CursorsModal({
+  items,
+  total,
+  points,
+  crate,
+  equippedOf,
+  equipping,
+  onEquip,
+  onOpenCrate,
+  onClose,
+}) {
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
 
-      {items.length === 0 ? (
-        <p className="arc-inv-empty">
-          Aucun pour l'instant — ouvre une caisse pour en débloquer.
-        </p>
-      ) : (
-        <>
-          <div className="arc-inv-grid">
-            {items.map((r) => {
-              const on = equippedOf(r);
-              return (
-                <article
-                  className={`arc-inv-card ${on ? "equipped" : ""}`}
-                  key={r.key}
-                  style={{ "--arc-rarity": rarityColor(r.rarity) }}
-                  role="button"
-                  tabIndex={0}
-                  aria-pressed={on}
-                  title={on ? "Cliquer pour retirer" : "Cliquer pour équiper"}
-                  onClick={() => onEquip(r)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onEquip(r);
-                    }
-                  }}
-                >
-                  <span className="arc-inv-aura" aria-hidden="true" />
-                  {r.count > 1 && <span className="arc-inv-count">×{r.count}</span>}
-                  <div className="arc-inv-art">
-                    <RewardArt reward={r} size={54} />
-                  </div>
-                  <span className="arc-inv-rarity">{rarityLabel(r.rarity)}</span>
-                  <h3 className="arc-inv-name">{r.name}</h3>
-                  <span className={`arc-equip ${on ? "on" : ""}`}>
-                    {equipping === r.key ? (
-                      <Loader2 size={13} className="spin" />
-                    ) : on ? (
-                      <>
-                        <Check size={13} /> Équipé
-                      </>
-                    ) : (
-                      "Équiper"
-                    )}
-                  </span>
-                </article>
-              );
-            })}
+  const afford = crate ? points >= crate.price : false;
+  const missing = crate ? crate.price - points : 0;
+
+  return createPortal(
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="abar-modal">
+        <div className="abar-modal-head">
+          <div className="abar-modal-title">
+            <h2>Mes curseurs</h2>
+            {total > 0 && (
+              <span className="abar-count">
+                {items.length} / {total}
+              </span>
+            )}
           </div>
-          {note && <p className="arc-inv-note">{note}</p>}
-        </>
-      )}
-    </section>
+
+          {/* Solde insuffisant : on laisse cliquable (voir le contenu de la
+              caisse a de l'intérêt) mais on ne le fait plus briller. */}
+          {crate?.openable && (
+            <button
+              className={`abar-get clickable ${afford ? "" : "poor"}`}
+              onClick={() => onOpenCrate(crate)}
+              title={
+                afford
+                  ? `Ouvrir une caisse — ${fmt(crate.price)} points`
+                  : `Il te manque ${fmt(missing)} points`
+              }
+            >
+              <Sparkles size={15} />
+              Nouveau curseur
+              <b>
+                <Coins size={12} /> {fmt(crate.price)}
+              </b>
+            </button>
+          )}
+
+          <button className="modal-close clickable" onClick={onClose} aria-label="Fermer">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="abar-modal-body">
+          {items.length === 0 ? (
+            <p className="arc-inv-empty">
+              Aucun curseur pour l'instant — ouvre une caisse pour en débloquer.
+            </p>
+          ) : (
+            <>
+              <div className="arc-inv-grid">
+                {items.map((r) => {
+                  const on = equippedOf(r);
+                  return (
+                    <article
+                      className={`arc-inv-card ${on ? "equipped" : ""}`}
+                      key={r.key}
+                      style={{ "--arc-rarity": rarityColor(r.rarity) }}
+                      role="button"
+                      tabIndex={0}
+                      aria-pressed={on}
+                      title={on ? "Cliquer pour retirer" : "Cliquer pour équiper"}
+                      onClick={() => onEquip(r)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onEquip(r);
+                        }
+                      }}
+                    >
+                      <span className="arc-inv-aura" aria-hidden="true" />
+                      {r.count > 1 && <span className="arc-inv-count">×{r.count}</span>}
+                      <div className="arc-inv-art">
+                        <RewardArt reward={r} size={54} />
+                      </div>
+                      <span className="arc-inv-rarity">{rarityLabel(r.rarity)}</span>
+                      <h3 className="arc-inv-name">{r.name}</h3>
+                      <span className={`arc-equip ${on ? "on" : ""}`}>
+                        {equipping === r.key ? (
+                          <Loader2 size={13} className="spin" />
+                        ) : on ? (
+                          <>
+                            <Check size={13} /> Équipé
+                          </>
+                        ) : (
+                          "Équiper"
+                        )}
+                      </span>
+                    </article>
+                  );
+                })}
+              </div>
+              <p className="arc-inv-note">
+                Le curseur équipé s'applique partout dans l'app, sur ordinateur
+                uniquement.
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 

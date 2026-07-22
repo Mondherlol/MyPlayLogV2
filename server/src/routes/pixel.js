@@ -6,6 +6,7 @@ import UserGame from "../models/UserGame.js";
 import User from "../models/User.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { requireAuth } from "../middleware/auth.js";
+import { recordActivity } from "../lib/activity.js";
 import { grantPoints } from "../lib/points.js";
 import { triggerMissionCheck } from "../lib/missions.js";
 // Règles communes aux mini-jeux « devine le jeu » (cf. routes/blindtest.js) :
@@ -451,6 +452,26 @@ router.post("/finish", requireAuth, async (req, res) => {
       total: rounds.length,
     });
 
+    // Carte du fil « a fait une partie de Pixel Rush » (cf. routes/feed.js et
+    // client/components/FeedCards.jsx). Best-effort, comme le blind test.
+    recordActivity({
+      actor: req.userId,
+      type: "pixel",
+      meta: {
+        pixelGameId: String(doc._id),
+        score,
+        correct: correctCount,
+        total: rounds.length,
+        challenge: session.challengedUser
+          ? {
+              username: session.challengedUsername || "",
+              score: session.challengedScore ?? null,
+              beaten: score > (session.challengedScore ?? 0),
+            }
+          : null,
+      },
+    });
+
     triggerMissionCheck(req.userId);
 
     res.json({
@@ -484,6 +505,90 @@ router.post("/finish", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("pixel finish error:", err.message);
     res.status(500).json({ error: "Impossible d'enregistrer le score." });
+  }
+});
+
+// GET /api/pixel/:id/results — le détail d'une partie terminée, pour la modale
+// « Voir les résultats » du fil : chaque manche avec sa réponse, la réponse
+// donnée, ET TOUTES SES CAPTURES (c'est tout l'intérêt ici — on veut revoir
+// les images sur lesquelles le joueur a séché). Pour les manches ratées, on
+// joint la jaquette du jeu répondu (IGDB, best-effort).
+router.get("/:id/results", requireAuth, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id))
+      return res.status(404).json({ error: "Partie introuvable." });
+    const doc = await PixelGame.findById(req.params.id)
+      .populate("user", "username avatar")
+      .populate("challengedUser", "username avatar")
+      .lean();
+    if (!doc) return res.status(404).json({ error: "Partie introuvable." });
+
+    const wrongIds = [
+      ...new Set(
+        (doc.rounds || [])
+          .filter((r) => !r.correct && r.guessedGameId != null && r.guessedGameId !== r.gameId)
+          .map((r) => r.guessedGameId)
+      ),
+    ];
+    let guessCovers = new Map();
+    if (wrongIds.length) {
+      try {
+        const raw = await igdbQuery(
+          "games",
+          `fields name,cover.image_id; where id = (${wrongIds.join(",")}); limit ${wrongIds.length};`
+        );
+        guessCovers = new Map(
+          raw.map((g) => [
+            g.id,
+            g.cover?.image_id ? `${IMG}/t_cover_big/${g.cover.image_id}.jpg` : null,
+          ])
+        );
+      } catch {
+        /* pas de jaquette, tant pis */
+      }
+    }
+
+    res.json({
+      id: String(doc._id),
+      user: person(doc.user),
+      score: doc.score,
+      correctCount: doc.correctCount,
+      roundCount: doc.roundCount,
+      durationSec: doc.durationSec,
+      date: doc.createdAt,
+      challenge: doc.challengedUser
+        ? {
+            user: person(doc.challengedUser),
+            score: doc.challengedScore ?? null,
+            beaten: doc.score > (doc.challengedScore ?? 0),
+          }
+        : null,
+      rounds: (doc.rounds || []).map((r) => {
+        const wrongGuess =
+          !r.correct && r.guessedGameId != null && r.guessedGameId !== r.gameId;
+        return {
+          gameId: r.gameId,
+          gameName: r.gameName,
+          cover: r.cover || null,
+          shots: r.shots || [],
+          owned: !!r.owned,
+          correct: !!r.correct,
+          guessedName: r.guessedName || "",
+          points: r.points || 0,
+          timeMs: r.timeMs ?? null,
+          guessed: wrongGuess
+            ? {
+                gameId: r.guessedGameId,
+                name: r.guessedName || "",
+                cover: guessCovers.get(r.guessedGameId) || null,
+              }
+            : null,
+        };
+      }),
+    });
+  } catch (err) {
+    console.error("pixel results error:", err.message);
+    res.status(500).json({ error: "Impossible de charger les résultats." });
   }
 });
 

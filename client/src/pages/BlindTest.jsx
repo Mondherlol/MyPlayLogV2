@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Music2,
   Play,
@@ -66,6 +66,7 @@ export default function BlindTest() {
   const { token } = useAuth();
   const player = usePlayer();
   const navigate = useNavigate();
+  const location = useLocation();
   const [params] = useSearchParams();
   const challengeId = params.get("challenge");
   const sfx = useGameSfx();
@@ -287,6 +288,15 @@ export default function BlindTest() {
     document.body.classList.add("bt-immersive");
     return () => document.body.classList.remove("bt-immersive");
   }, []);
+
+  // Retour = on repart d'où l'on vient (l'arcade, l'accueil, un profil…).
+  // `key === "default"` signale une page ouverte directement (lien de défi
+  // partagé, favori, rechargement) : là il n'y a rien derrière, on vise
+  // l'arcade, la porte d'entrée des mini-jeux.
+  const goBack = useCallback(() => {
+    if (location.key !== "default") navigate(-1);
+    else navigate("/arcade");
+  }, [location.key, navigate]);
 
   // --- Pause / reprise : fige le chrono (décale l'origine de la manche du
   //     temps passé en pause) et suspend l'extrait. ---
@@ -714,7 +724,7 @@ export default function BlindTest() {
       <div ref={ytHostRef} style={{ position: "fixed", left: -9999, top: -9999 }} />
 
       <header className="bt-topbar">
-        <button className="bt-back clickable" onClick={() => navigate("/app")}>
+        <button className="bt-back clickable" onClick={goBack}>
           <ArrowLeft size={17} /> <span>Retour</span>
         </button>
         <div className="bt-brand">

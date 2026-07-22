@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Grid2x2,
@@ -32,6 +31,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
 import PixelCanvas from "../components/PixelCanvas";
+import ShotViewer from "../components/ShotViewer";
 import {
   dedupeCandidates,
   estimatePoints,
@@ -1143,55 +1143,3 @@ function Scoreboard({ final, challengeId, onReplay, token }) {
   );
 }
 
-// Visionneuse des captures d'une manche, ouverte depuis le récap : l'image en
-// grand, les autres en pellicule dessous (flèches et Échap au clavier).
-function ShotViewer({ round, onClose }) {
-  const [i, setI] = useState(0);
-  const shots = round.shots || [];
-
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    const onKey = (e) => {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowLeft") setI((n) => Math.max(0, n - 1));
-      else if (e.key === "ArrowRight") setI((n) => Math.min(shots.length - 1, n + 1));
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = "";
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [onClose, shots.length]);
-
-  return createPortal(
-    <div className="px-viewer" onClick={onClose}>
-      <button className="px-viewer-close clickable" onClick={onClose} aria-label="Fermer">
-        <X size={22} />
-      </button>
-      <figure className="px-viewer-body" onClick={(e) => e.stopPropagation()}>
-        <img className="px-viewer-img" src={shots[i]} alt="" draggable="false" />
-        <figcaption className="px-viewer-bar">
-          <Link to={`/game/${round.gameId}`} className="px-viewer-game clickable">
-            {round.cover && <img src={round.cover} alt="" draggable="false" />}
-            <span>{round.gameName}</span>
-          </Link>
-          {shots.length > 1 && (
-            <span className="px-viewer-thumbs">
-              {shots.map((s, n) => (
-                <button
-                  key={s}
-                  className={`px-viewer-thumb clickable ${n === i ? "on" : ""}`}
-                  onClick={() => setI(n)}
-                  aria-label={`Capture ${n + 1}`}
-                >
-                  <img src={s} alt="" loading="lazy" draggable="false" />
-                </button>
-              ))}
-            </span>
-          )}
-        </figcaption>
-      </figure>
-    </div>,
-    document.body
-  );
-}

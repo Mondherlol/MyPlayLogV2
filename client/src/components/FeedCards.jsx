@@ -44,6 +44,7 @@ import {
   Trophy,
   Swords,
   Music2,
+  Grid2x2,
   Download,
   Megaphone,
   Cherry,
@@ -165,6 +166,8 @@ export function FeedCard(props) {
   if (item.type === "gems") return <GemsEvent {...props} />;
   if (item.type === "blindtest") return <BlindTestEvent {...props} />;
   if (item.type === "blindtestgroup") return <BlindTestGroupEvent {...props} />;
+  if (item.type === "pixel") return <PixelRushEvent {...props} />;
+  if (item.type === "pixelgroup") return <PixelRushGroupEvent {...props} />;
   if (item.type === "caseopen") return <CaseOpenEvent {...props} />;
   if (item.type === "caseopengroup") return <CaseOpenGroupEvent {...props} />;
   if (item.type === "trackermatch") return <TrackerMatchEvent {...props} />;
@@ -2072,6 +2075,105 @@ function BlindTestGroupEvent({ item, onOpenBlindTest }) {
                 onClick={() => onOpenBlindTest({ ...g, user: item.user })}
               >
                 <Disc3 size={14} /> Voir
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </article>
+  );
+}
+
+// ============================================================
+//  Pixel Rush terminé — mêmes cartes que le blind test (le contrat des
+//  évènements est identique), à l'accent et au vocabulaire près : ici on
+//  « reconnaît » des captures, on n'« écoute » pas des extraits.
+// ============================================================
+function PixelRushEvent({ item, onOpenPixel }) {
+  const pct = item.total ? Math.round((item.correct / item.total) * 100) : 0;
+  const ch = item.challenge;
+  return (
+    <article className="hf-card hf-blindtest hf-pixel">
+      <EventHead user={item.user} date={item.date}>
+        <Grid2x2 size={13} className="hf-inline-ic" />{" "}
+        {ch ? (
+          <>
+            a défié <b>{ch.username}</b> à Pixel Rush
+          </>
+        ) : (
+          "a fait une partie de Pixel Rush"
+        )}
+      </EventHead>
+
+      <div className="hf-bt-body">
+        <div className="hf-bt-scorebox">
+          <span className="hf-bt-score-num">{item.score}</span>
+          <span className="hf-bt-score-lbl">points</span>
+        </div>
+        <div className="hf-bt-meta">
+          <span className="hf-bt-stat">
+            <Trophy size={13} /> {item.correct}/{item.total} reconnus · {pct}%
+          </span>
+          {ch && (
+            <span className={`hf-bt-versus ${ch.beaten ? "win" : "lose"}`}>
+              <Swords size={12} />
+              {ch.beaten
+                ? `bat ${ch.username} (${ch.score})`
+                : `${ch.username} garde la tête (${ch.score})`}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <button className="hf-bt-challenge-cta clickable" onClick={() => onOpenPixel()}>
+        <Grid2x2 size={15} /> Voir les captures
+      </button>
+    </article>
+  );
+}
+
+// Plusieurs parties d'affilée du même joueur → une seule carte.
+function PixelRushGroupEvent({ item, onOpenPixel }) {
+  return (
+    <article className="hf-card hf-blindtest hf-pixel hf-btg">
+      <EventHead user={item.user} date={item.date}>
+        <Grid2x2 size={13} className="hf-inline-ic" /> a fait {item.count} parties
+        de Pixel Rush
+      </EventHead>
+
+      <div className="hf-btg-summary">
+        <div className="hf-bt-scorebox">
+          <span className="hf-bt-score-num">{item.bestScore}</span>
+          <span className="hf-bt-score-lbl">meilleur</span>
+        </div>
+        <span className="hf-btg-summary-txt">
+          {item.count} parties · {item.best.correct}/{item.best.total} au top
+        </span>
+      </div>
+
+      <ul className="hf-btg-list">
+        {item.games.map((g) => {
+          const pct = g.total ? Math.round((g.correct / g.total) * 100) : 0;
+          const best = g.score === item.bestScore;
+          return (
+            <li key={g.id} className={`hf-btg-row ${best ? "best" : ""}`}>
+              <span className="hf-btg-pts">
+                <b>{g.score}</b> pts
+              </span>
+              <span className="hf-btg-stat">
+                <Trophy size={12} /> {g.correct}/{g.total} · {pct}%
+              </span>
+              {g.challenge && (
+                <span className={`hf-btg-vs ${g.challenge.beaten ? "win" : "lose"}`}>
+                  <Swords size={11} /> {g.challenge.username}
+                </span>
+              )}
+              <span className="hf-btg-time">{timeAgo(g.date)}</span>
+              <button
+                className="hf-btg-see clickable"
+                onClick={() => onOpenPixel({ ...g, user: item.user })}
+              >
+                <Grid2x2 size={14} /> Voir
               </button>
             </li>
           );
