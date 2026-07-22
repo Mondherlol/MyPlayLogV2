@@ -7273,6 +7273,90 @@
   transform: translateX(20px);
 }
 
+/* Cosmétiques équipés (curseur / ornement / badge) */
+.admin-cos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 0.4rem;
+}
+.admin-cos-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.admin-cos-row.empty {
+  opacity: 0.72;
+}
+.admin-cos-art {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-soft);
+  overflow: hidden;
+}
+.admin-cos-art img {
+  object-fit: contain;
+}
+.admin-cos-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+.admin-cos-fam {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+}
+.admin-cos-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.admin-cos-name.none {
+  font-weight: 500;
+  color: var(--text-soft);
+}
+.admin-cos-name.warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #d65454;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.admin-cos-meta {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  overflow-wrap: anywhere;
+}
+.admin-cos-rarity {
+  font-weight: 700;
+}
+.admin-cos-owned {
+  flex: 0 0 auto;
+  min-width: 26px;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: center;
+}
+
 /* Listes d'abonnés / abonnements */
 .admin-rel-empty {
   margin: 0.3rem 0 0;

@@ -20,6 +20,7 @@ import HiddenOst from "../models/HiddenOst.js";
 import OstRename from "../models/OstRename.js";
 import GemSkip from "../models/GemSkip.js";
 import GemDiscovery from "../models/GemDiscovery.js";
+import Reward, { REWARD_TYPE_KEYS } from "../models/Reward.js";
 import { isUserAdmin } from "../lib/admin.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { listEnv, setEnvVar, deleteEnvVar } from "../lib/envFile.js";
@@ -162,10 +163,40 @@ router.get("/users/:id", async (req, res) => {
       return res.status(404).json({ error: "Utilisateur introuvable." });
 
     const user = await User.findById(id)
-      .select("username email avatar bio createdAt lastSeenAt following isAdmin isSuperAdmin points")
+      .select(
+        "username email avatar bio createdAt lastSeenAt following isAdmin isSuperAdmin points equipped inventory"
+      )
       .populate("following", "username avatar isAdmin isSuperAdmin")
       .lean();
     if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
+
+    // Cosmétiques de l'arcade : ce qu'il a équipé (curseur en tête) et combien
+    // de lots il possède par famille. L'inventaire ne garde que des slugs, on
+    // résout donc les lots pour renvoyer nom / rareté / visuel.
+    const equipped = {
+      cursor: user.equipped?.cursor || null,
+      ornament: user.equipped?.ornament || null,
+      badge: user.equipped?.badge || null,
+    };
+    const inventory = user.inventory || [];
+    const keys = [
+      ...new Set([...Object.values(equipped).filter(Boolean), ...inventory.map((i) => i.rewardKey)]),
+    ];
+    const rewards = keys.length ? await Reward.find({ key: { $in: keys } }) : [];
+    const byKey = new Map(rewards.map((r) => [r.key, r]));
+    const cosmetics = {};
+    const ownedCount = {};
+    for (const type of REWARD_TYPE_KEYS) {
+      const k = equipped[type];
+      // Lot supprimé depuis (slug orphelin) : on renvoie quand même le slug,
+      // l'admin doit pouvoir voir ce qui cloche.
+      cosmetics[type] = k
+        ? byKey.has(k)
+          ? { ...byKey.get(k).toPublic(), obtainedAt: inventory.find((i) => i.rewardKey === k)?.obtainedAt || null }
+          : { key: k, missing: true }
+        : null;
+      ownedCount[type] = inventory.filter((i) => byKey.get(i.rewardKey)?.type === type).length;
+    }
 
     // Abonnés : les comptes qui suivent cet utilisateur.
     const followers = await User.find({ following: id })
@@ -190,6 +221,8 @@ router.get("/users/:id", async (req, res) => {
         gameCount,
         points: user.points || 0,
       },
+      cosmetics,
+      ownedCount,
       following: (user.following || []).map(userCard),
       followers: followers.map(userCard),
     });

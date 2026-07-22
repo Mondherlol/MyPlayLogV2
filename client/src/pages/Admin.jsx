@@ -33,11 +33,15 @@ import {
   Coins,
   Minus,
   Award,
+  MousePointer2,
+  Frame,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
+import { rarityColor, rarityLabel } from "../lib/rarity";
 import { useAuth } from "../context/AuthContext";
 import { PN_ICONS } from "../components/PatchnotePopup";
 import RewardsPanel from "../components/AdminRewards";
+import RewardArt from "../components/RewardArt";
 import SystemPanel from "../components/AdminSystem";
 import MissionsPanel from "../components/AdminMissions";
 
@@ -465,6 +469,10 @@ function UserDrawer({ token, userId, me, onClose, onDirty }) {
               <h3 className="admin-drawer-sec">Points d'arcade</h3>
               <PointsForm token={token} user={u} onDirty={onDirty} />
 
+              {/* --- Cosmétiques équipés (curseur en tête) --- */}
+              <h3 className="admin-drawer-sec">Cosmétiques équipés</h3>
+              <CosmeticsPanel cosmetics={data.cosmetics} ownedCount={data.ownedCount} />
+
               {/* --- Abonnements --- */}
               <RelationList
                 token={token}
@@ -496,6 +504,67 @@ function UserDrawer({ token, userId, me, onClose, onDirty }) {
           </>
         )}
       </aside>
+    </div>
+  );
+}
+
+// --- Cosmétiques équipés : curseur, ornement, badge ---
+// Le curseur ouvre la marche : c'est celui qu'on cherche quand on se demande
+// « il joue avec quoi ? ». Un slug équipé dont le lot n'existe plus est signalé
+// comme tel plutôt que masqué.
+const COSMETIC_FAMILIES = [
+  { key: "cursor", label: "Curseur", Icon: MousePointer2, none: "Curseur par défaut" },
+  { key: "ornament", label: "Ornement", Icon: Frame, none: "Aucun ornement" },
+  { key: "badge", label: "Badge", Icon: Award, none: "Aucun badge" },
+];
+
+function CosmeticsPanel({ cosmetics, ownedCount }) {
+  return (
+    <div className="admin-cos-list">
+      {COSMETIC_FAMILIES.map(({ key, label, Icon, none }) => {
+        const c = cosmetics?.[key] || null;
+        const owned = ownedCount?.[key] || 0;
+        return (
+          <div className={`admin-cos-row ${c ? "" : "empty"}`} key={key}>
+            <span className="admin-cos-art">
+              {c && !c.missing ? <RewardArt reward={c} size={40} /> : <Icon size={20} />}
+            </span>
+            <div className="admin-cos-info">
+              <span className="admin-cos-fam">{label}</span>
+              {c ? (
+                c.missing ? (
+                  <span className="admin-cos-name warn">
+                    <AlertTriangle size={12} /> Lot introuvable — <code>{c.key}</code>
+                  </span>
+                ) : (
+                  <>
+                    <span className="admin-cos-name">{c.name}</span>
+                    <span className="admin-cos-meta">
+                      <span
+                        className="admin-cos-rarity"
+                        style={{ color: rarityColor(c.rarity) }}
+                      >
+                        {rarityLabel(c.rarity)}
+                      </span>
+                      {" · "}
+                      <code>{c.key}</code>
+                      {c.obtainedAt
+                        ? ` · gagné le ${new Date(c.obtainedAt).toLocaleDateString("fr-FR")}`
+                        : ""}
+                      {c.enabled === false ? " · lot désactivé" : ""}
+                    </span>
+                  </>
+                )
+              ) : (
+                <span className="admin-cos-name none">{none}</span>
+              )}
+            </div>
+            <span className="admin-cos-owned" title={`${owned} possédé${owned > 1 ? "s" : ""}`}>
+              {owned}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
