@@ -92,14 +92,15 @@ function Avatar({ conv, online, className = "" }) {
 }
 
 function DockWindow({ id, token, conversations, online, onMinimize, onClose }) {
-  const { registerActive, markRead, typing } = useChat();
+  const { registerActive, markRead, typing, isWindowFocused } = useChat();
   const conv = useDockConversation(id, conversations, token);
 
-  // Fenêtre ouverte = fil lu, et plus de son ni de pop-up pour lui.
+  // Fenêtre ouverte = fil lu (sauf onglet en arrière-plan : le ChatThread lira
+  // au retour au premier plan).
   useEffect(() => registerActive(id), [registerActive, id]);
   useEffect(() => {
-    if (conv?.unread) markRead(id);
-  }, [conv?.unread, id, markRead]);
+    if (conv?.unread && isWindowFocused()) markRead(id);
+  }, [conv?.unread, id, markRead, isWindowFocused]);
 
   const names = Object.keys(typing[String(id)] || {});
   const other = conv?.others?.[0];

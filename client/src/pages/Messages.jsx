@@ -32,6 +32,7 @@ export default function Messages() {
     typing,
     markRead,
     registerActive,
+    isWindowFocused,
     refresh,
   } = useChat();
 
@@ -98,9 +99,11 @@ export default function Messages() {
   // Fil ouvert = fil lu (et plus de son ni de pop-up pour lui).
   useEffect(() => registerActive(activeId), [activeId, registerActive]);
 
+  // Marque lu à l'ouverture — mais pas si l'onglet est en arrière-plan (le
+  // ChatThread s'en chargera au retour au premier plan).
   useEffect(() => {
-    if (active?.unread) markRead(active.id);
-  }, [active?.id, active?.unread, markRead]);
+    if (active?.unread && isWindowFocused()) markRead(active.id);
+  }, [active?.id, active?.unread, markRead, isWindowFocused]);
 
   // Arrivée sur la page : on repart d'une liste fraîche (l'app a pu tourner
   // longtemps avec un flux temps réel coupé en arrière-plan).

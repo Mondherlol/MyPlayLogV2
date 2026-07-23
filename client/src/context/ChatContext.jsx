@@ -63,6 +63,14 @@ export function ChatProvider({ children }) {
   // flottantes) : ni son, ni pop-up pour elles. C'est un ensemble, car
   // plusieurs fils peuvent être ouverts en même temps.
   const activeRef = useRef(new Set());
+  // La fenêtre du navigateur est-elle réellement AU PREMIER PLAN ? (onglet
+  // visible ET fenêtre focalisée). Un fil « ouvert » dans un onglet en arrière-
+  // plan ne compte pas comme lu, et reçoit quand même son pop-up.
+  const focusedRef = useRef(
+    typeof document === "undefined" ||
+      (document.visibilityState !== "hidden" && document.hasFocus())
+  );
+  const isWindowFocused = useCallback(() => focusedRef.current, []);
   // Abonnés aux évènements de messages (la page /messages s'y branche).
   const listeners = useRef(new Set());
   // Miroir de la liste : les handlers SSE vivent dans un effet qui ne se
@@ -91,6 +99,27 @@ export function ChatProvider({ children }) {
     listeners.current.add(fn);
     return () => listeners.current.delete(fn);
   }, []);
+
+  // Suit le passage au premier plan / en arrière-plan. Au retour au premier
+  // plan, on prévient les fils ouverts (évènement « focus ») pour qu'ils
+  // marquent enfin comme lus les messages arrivés en arrière-plan.
+  useEffect(() => {
+    const update = () => {
+      const next =
+        document.visibilityState !== "hidden" && document.hasFocus();
+      const gained = next && !focusedRef.current;
+      focusedRef.current = next;
+      if (gained) emit("focus", {});
+    };
+    window.addEventListener("focus", update);
+    window.addEventListener("blur", update);
+    document.addEventListener("visibilitychange", update);
+    return () => {
+      window.removeEventListener("focus", update);
+      window.removeEventListener("blur", update);
+      document.removeEventListener("visibilitychange", update);
+    };
+  }, [emit]);
 
   // Un fil affiché se déclare ici et se retire en partant (fonction rendue).
   const registerActive = useCallback((id) => {
@@ -158,7 +187,10 @@ export function ChatProvider({ children }) {
       const { conversationId, message } = JSON.parse(e.data);
       emit("message", { conversationId, message });
 
-      const isActive = activeRef.current.has(String(conversationId));
+      // « En train de le voir » = le fil est ouvert ET la fenêtre est au
+      // premier plan. Un onglet en arrière-plan ne « lit » rien.
+      const seeing =
+        activeRef.current.has(String(conversationId)) && focusedRef.current;
       const conv = convRef.current.find((c) => String(c.id) === String(conversationId));
 
       setConversations((prev) =>
@@ -174,7 +206,7 @@ export function ChatProvider({ children }) {
                   kind: kindOf(message),
                   at: message.createdAt,
                 },
-                unread: isActive || message.mine ? 0 : (c.unread || 0) + 1,
+                unread: seeing || message.mine ? 0 : (c.unread || 0) + 1,
               }
             : c
         )
@@ -182,7 +214,9 @@ export function ChatProvider({ children }) {
 
       if (message.mine || message.system) return;
       if (conv?.muted) return;
-      if (!isActive || document.hidden) {
+      // Pop-up + son SAUF si on est déjà en train de regarder ce fil au premier
+      // plan.
+      if (!seeing) {
         playMessageSound();
         const toast = {
           id: `${message.id}-${Date.now()}`,
@@ -208,7 +242,9 @@ export function ChatProvider({ children }) {
       // avant que notre accusé de lecture ne lui parvienne — on force à zéro.
       upsertConversation(
         conversation,
-        activeRef.current.has(String(conversation.id)) ? { unread: 0 } : null
+        activeRef.current.has(String(conversation.id)) && focusedRef.current
+          ? { unread: 0 }
+          : null
       );
     });
 
@@ -384,6 +420,7 @@ export function ChatProvider({ children }) {
     openWith,
     subscribe,
     registerActive,
+    isWindowFocused,
     docks,
     openDock,
     closeDock,
@@ -460,6 +497,7 @@ const EMPTY = {
   markRead: () => {},
   openWith: async () => {},
   subscribe: () => () => {},
+  isWindowFocused: () => true,
   registerActive: () => () => {},
   docks: [],
   openDock: () => {},

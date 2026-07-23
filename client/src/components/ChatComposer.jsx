@@ -86,8 +86,12 @@ export default function ChatComposer({
   );
 
   // Dès qu'on écrit (ou qu'on a joint un média), les boutons GIF/image se
-  // rangent dans un « + » et l'input gagne de la largeur.
-  const collapsed = text.length > 0 || media.length > 0;
+  // rangent dans un « + » et l'input gagne de la largeur. Sur téléphone, ils y
+  // restent TOUJOURS : la place est trop précieuse pour deux boutons de plus.
+  const isPhone =
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(max-width: 760px)")?.matches;
+  const collapsed = isPhone || text.length > 0 || media.length > 0;
 
   // Changement de conversation : on repart d'un champ vierge.
   useEffect(() => {

@@ -109,7 +109,7 @@ function systemText(m) {
 // `autoFocus` : place le curseur dans le champ à l'ouverture (fenêtres
 // flottantes — on veut écrire tout de suite).
 export default function ChatThread({ conversation, token, compact, autoFocus }) {
-  const { subscribe, typing, markRead, me } = useChat();
+  const { subscribe, typing, markRead, me, isWindowFocused } = useChat();
   const convId = String(conversation.id);
   // Chef de groupe : peut supprimer n'importe quel message du fil.
   const iOwnGroup =
@@ -156,6 +156,24 @@ export default function ChatThread({ conversation, token, compact, autoFocus }) 
     setNewBelow(false);
   }, []);
 
+  // Collage au bas FIABLE à l'ouverture : dans une fenêtre flottante (ou avec
+  // des images qui arrivent après coup), la hauteur du fil n'est pas encore
+  // stable au premier rendu — un seul scroll rate le bas. On répète sur
+  // quelques frames tant qu'on est censé rester collé.
+  const pinToBottom = useCallback(() => {
+    scrollToBottom();
+    requestAnimationFrame(() => scrollToBottom());
+    for (const d of [60, 160, 320]) {
+      setTimeout(() => stickRef.current && scrollToBottom(), d);
+    }
+  }, [scrollToBottom]);
+
+  // Une image du fil finit de charger → sa hauteur apparaît : si on était collé
+  // au bas, on s'y recolle (sinon le dernier message repasse sous le pli).
+  const onMediaLoad = useCallback(() => {
+    if (stickRef.current) scrollToBottom();
+  }, [scrollToBottom]);
+
   // --- Chargement de la dernière page à l'ouverture du fil ---
   useEffect(() => {
     let alive = true;
@@ -188,19 +206,26 @@ export default function ChatThread({ conversation, token, compact, autoFocus }) 
           );
           setDivider(first ? first.id : null);
         }
-        requestAnimationFrame(() => scrollToBottom());
+        stickRef.current = true;
+        requestAnimationFrame(() => pinToBottom());
       })
       .catch(() => alive && setMessages([]))
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
-  }, [convId, token, scrollToBottom]);
+  }, [convId, token, pinToBottom]);
 
   // --- Temps réel : nouveaux messages, corrections, suppressions ---
   useEffect(
     () =>
       subscribe((event, payload) => {
+        // Retour de la fenêtre au premier plan : on lit ENFIN ce qui est
+        // arrivé pendant qu'on était ailleurs (pas de conversationId ici).
+        if (event === "focus") {
+          markRead(convId);
+          return;
+        }
         if (String(payload.conversationId) !== convId) return;
         if (event === "message") {
           setMessages((prev) =>
@@ -209,7 +234,9 @@ export default function ChatThread({ conversation, token, compact, autoFocus }) 
               : [...prev, payload.message]
           );
           setFreshId(payload.message.id);
-          if (!payload.message.mine) markRead(convId);
+          // On ne « lit » que si la fenêtre est au premier plan ; sinon le
+          // badge reste et on lira au retour (évènement « focus » ci-dessus).
+          if (!payload.message.mine && isWindowFocused()) markRead(convId);
           if (!stickRef.current && !payload.message.mine) setNewBelow(true);
         } else if (event === "message:update") {
           setMessages((prev) =>
@@ -217,7 +244,7 @@ export default function ChatThread({ conversation, token, compact, autoFocus }) 
           );
         }
       }),
-    [subscribe, convId, markRead]
+    [subscribe, convId, markRead, isWindowFocused]
   );
 
   // Le fil suit le bas TANT QU'ON Y EST : si on lit plus haut, on ne saute pas.
@@ -479,6 +506,7 @@ export default function ChatThread({ conversation, token, compact, autoFocus }) 
                     fresh={freshId === m.id}
                     onJumpTo={setJumpTo}
                     onContext={openContext}
+                    onMediaLoad={onMediaLoad}
                     rowRefs={rowRefs}
                     onToggleReact={(e) => {
                       // Ancre = le bouton sourire : le popover (portail fixed)
@@ -715,6 +743,7 @@ function MessageRow({
   fresh,
   onJumpTo,
   onContext,
+  onMediaLoad,
   rowRefs,
   onToggleReact,
   onReact,
@@ -833,7 +862,7 @@ function MessageRow({
                       className="chat-media-item clickable"
                       onClick={() => onOpenImage(md.url)}
                     >
-                      <img src={md.url} alt="" loading="lazy" />
+                      <img src={md.url} alt="" loading="lazy" onLoad={onMediaLoad} />
                     </button>
                   ))}
                 </div>

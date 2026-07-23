@@ -2,6 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import { fileURLToPath } from "url";
 import multer from "multer";
 import jwt from "jsonwebtoken";
@@ -198,6 +199,45 @@ function sanitizeMedia(list) {
       width: Number(m.width) || null,
       height: Number(m.height) || null,
     }));
+}
+
+const GIF_MAX_BYTES = 12 * 1024 * 1024; // 12 Mo : au-delà on garde l'URL distante
+
+// Rapatrie un GIF GIPHY sur NOTRE serveur : GIPHY est parfois lent, et une fois
+// hébergé chez nous le GIF s'affiche instantanément pour tous les participants
+// (et reste dispo même si GIPHY tombe). Dédup par hash de l'URL. Best-effort :
+// au moindre souci on renvoie l'URL d'origine (jamais bloquant pour l'envoi).
+async function localizeGif(url, req) {
+  try {
+    const host = req.get("host");
+    if (!host || url.includes(host)) return url; // déjà chez nous
+    const ext = (url.match(/\.(gif|webp|mp4|png|jpe?g)(?:[?#]|$)/i)?.[1] || "gif").toLowerCase();
+    const hash = crypto.createHash("sha1").update(url).digest("hex").slice(0, 16);
+    const filename = `g-${hash}.${ext}`;
+    const dest = path.join(CHAT_DIR, filename);
+    const localUrl = `${req.protocol}://${host}/uploads/chat/${filename}`;
+    if (fs.existsSync(dest)) return localUrl; // déjà téléchargé (dédup)
+
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return url;
+    if (!/^image\//.test(res.headers.get("content-type") || "")) return url;
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (!buf.length || buf.length > GIF_MAX_BYTES) return url;
+    fs.writeFileSync(dest, buf);
+    return localUrl;
+  } catch {
+    return url;
+  }
+}
+
+// Localise les GIF d'une liste de médias (les images uploadées sont déjà chez
+// nous). Renvoie la liste avec les URL réécrites.
+async function localizeMedia(media, req) {
+  return Promise.all(
+    media.map(async (m) =>
+      m.kind === "gif" ? { ...m, url: await localizeGif(m.url, req) } : m
+    )
+  );
 }
 
 // Résout les @pseudos du texte en vrais comptes (pour la coloration + le lien).
@@ -885,9 +925,11 @@ router.post("/conversations/:id/messages", requireAuth, async (req, res) => {
     if (!conv) return res.status(404).json({ error: "Conversation introuvable." });
 
     const text = String(req.body?.text || "").trim().slice(0, MAX_TEXT);
-    const media = sanitizeMedia(req.body?.media);
+    let media = sanitizeMedia(req.body?.media);
     if (!text && !media.length)
       return res.status(400).json({ error: "Message vide." });
+    // Rapatrie les GIF GIPHY chez nous (affichage instantané côté destinataires).
+    media = await localizeMedia(media, req);
 
     let replyTo = null;
     if (req.body?.replyTo && mongoose.isValidObjectId(req.body.replyTo)) {

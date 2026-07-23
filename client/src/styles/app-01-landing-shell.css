@@ -1100,7 +1100,9 @@
 .topbar {
   position: sticky;
   top: 0;
-  z-index: 80;
+  /* Au-dessus des bulles de messagerie (chat-dock, z-index 130) : ses menus
+     déroulants (notifs, messages) doivent passer PAR-DESSUS, pas derrière. */
+  z-index: 140;
   height: 60px;
   display: flex;
   align-items: center;

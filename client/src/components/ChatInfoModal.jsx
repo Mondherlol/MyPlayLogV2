@@ -9,6 +9,7 @@ import {
   LogOut,
   UserPlus,
   UserMinus,
+  UserRound,
   Camera,
   Check,
   Loader2,
@@ -198,6 +199,16 @@ export default function ChatInfoModal({ conversation, token, me, onClose, onChan
           </div>
 
           <div className="chat-info-actions">
+            {/* DM : accès direct au profil de l'autre. */}
+            {!conv.isGroup && conv.others?.[0] && (
+              <Link
+                to={`/u/${conv.others[0].username}`}
+                className="chat-info-btn clickable"
+                onClick={onClose}
+              >
+                <UserRound size={16} /> Voir le profil
+              </Link>
+            )}
             <button type="button" className="chat-info-btn clickable" onClick={toggleMute}>
               {muted ? <BellOff size={16} /> : <Bell size={16} />}
               {muted ? "Réactiver le son" : "Mettre en sourdine"}
