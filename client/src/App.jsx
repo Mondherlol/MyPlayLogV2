@@ -18,6 +18,7 @@ import CompanyPage from "./pages/CompanyPage";
 import PlatformPage from "./pages/PlatformPage";
 import Profile from "./pages/Profile";
 import Lists from "./pages/Lists";
+import Messages from "./pages/Messages";
 import ListDetail from "./pages/ListDetail";
 import Admin from "./pages/Admin";
 import Settings from "./pages/Settings";
@@ -136,6 +137,7 @@ export default function App() {
         <Route path="/releases" element={<Releases />} />
         <Route path="/company/:name" element={<CompanyPage />} />
         <Route path="/platform/:id" element={<PlatformPage />} />
+        <Route path="/messages" element={<Messages />} />
         <Route path="/lists" element={<Lists />} />
         <Route path="/lists/:id" element={<ListDetail />} />
         <Route path="/profile" element={<Profile />} />

@@ -13,6 +13,7 @@ import {
   UserCheck,
   Loader2,
   MessageSquareText,
+  MessagesSquare,
   LayoutGrid,
   List,
   Music,
@@ -35,6 +36,7 @@ import twemoji from "@twemoji/api";
 import { apiFetch, apiUpload } from "../lib/api";
 import { makeCache } from "../lib/cache";
 import { useAuth } from "../context/AuthContext";
+import { useChat } from "../context/ChatContext";
 import { useLibrary } from "../context/LibraryContext";
 import { timeAgo } from "../lib/lists";
 import PlayedModal from "../components/PlayedModal";
@@ -236,6 +238,8 @@ function LockedProfile({ profile, covers, signedIn, busy, onFollow }) {
 export default function Profile() {
   const { username: routeUsername } = useParams();
   const { user, token, updateUser } = useAuth();
+  // « Message » sous la bannière : ouvre (ou retrouve) le fil avec ce joueur.
+  const { openWith } = useChat();
   const { map } = useLibrary();
   const targetUsername = routeUsername || user?.username;
 
@@ -976,6 +980,16 @@ export default function Profile() {
                   ) : (
                     <><UserPlus size={17} /> Suivre</>
                   )}
+                </button>
+              )}
+              {/* On ne peut écrire qu'à quelqu'un qui est abonné à nous. */}
+              {user && profile.followsMe && (
+                <button
+                  className="follow-btn ghost clickable"
+                  onClick={() => openWith(profile.id).catch(() => {})}
+                  title={`Écrire à ${profile.username}`}
+                >
+                  <MessagesSquare size={17} /> Message
                 </button>
               )}
             </div>

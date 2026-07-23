@@ -1645,23 +1645,48 @@
   min-width: 0;
 }
 
-.hf-rank-badge img {
-  object-fit: contain;
+/* Cadre de l'emblème : taille fixe, l'image s'y inscrit (ou s'y recadre pour
+   les emblèmes League of Legends, cf. .hf-rank-img.crop). */
+.hf-rank-img {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
   flex: none;
+}
+
+.hf-rank-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Emblèmes Community Dragon (LoL) : PNG 1280×720 dont le blason ne fait que
+   ~25 %, centré dans un cadre vide → on l'agrandit et on masque le débordement,
+   comme RankEmblem de l'onglet Tracking. */
+.hf-rank-img.crop img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 350%;
+  height: auto;
+  max-width: none;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
 .hf-rank-badge.small {
   opacity: 0.75;
 }
 
-.hf-rank-badge.small img {
-  width: 34px;
-  height: 34px;
+.hf-rank-badge.small .hf-rank-img {
+  width: 36px;
+  height: 36px;
 }
 
-.hf-rank-badge.big img {
-  width: 52px;
-  height: 52px;
+.hf-rank-badge.big .hf-rank-img {
+  width: 56px;
+  height: 56px;
 }
 
 .hf-rank-txt {

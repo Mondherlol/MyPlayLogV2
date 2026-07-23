@@ -6,6 +6,7 @@ import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { searchDocs, searchEvergreen } from "../lib/videos.js";
 import { sanitizeMediaList, resolveMentions, toComment } from "../lib/commentThread.js";
 import { notify } from "../lib/notify.js";
+import { triggerMissionCheck } from "../lib/missions.js";
 import {
   resolveVideoId,
   getOrCreateSocial,
@@ -388,6 +389,7 @@ router.post("/progress", requireAuth, async (req, res) => {
       }
     }
     await applyAction(req.userId, video, set);
+    if (set.watched) triggerMissionCheck(req.userId); // mission « Ciné-club »
     res.json({ ok: true });
   } catch (err) {
     console.error("video progress error:", err.message);
@@ -474,7 +476,10 @@ router.post("/:id/like", requireAuth, async (req, res) => {
       liked: !has,
       likedAt: has ? null : new Date(),
       seen: true,
-    }).catch(() => {});
+    })
+      // Mission « Pouce en l'air » — après le marqueur, qui est ce qu'elle mesure.
+      .then(() => !has && triggerMissionCheck(req.userId))
+      .catch(() => {});
     res.json({ liked: !has, likeCount: social.likes.length });
   } catch (err) {
     console.error("video like error:", err.message);

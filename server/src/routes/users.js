@@ -311,6 +311,10 @@ router.put("/me/overview", requireAuth, async (req, res) => {
       set.overviewGameOrder = clean;
     }
     if (Object.keys(set).length) await User.updateOne({ _id: req.userId }, { $set: set });
+    // Épingler sa console dans la carte « Console favorite » accomplit la
+    // mission « Team console » (cf. lib/missions.js) : on réévalue tout de
+    // suite pour que la notif tombe au moment du geste.
+    if (set.asideConfig) triggerMissionCheck(req.userId);
     res.json({ ok: true, ...set });
   } catch (err) {
     console.error("overview prefs error:", err.message);
@@ -1842,6 +1846,12 @@ router.get("/:username", optionalAuth, async (req, res) => {
         lastSeenAt: user.lastSeenAt || null,
         isMe,
         isFollowing,
+        // Ce profil est-il abonné à MOI ? (autorise le bouton « Message » :
+        // on ne peut écrire qu'à quelqu'un qui nous suit.)
+        followsMe:
+          !isMe &&
+          !!req.userId &&
+          (user.following || []).some((u) => String(u) === String(req.userId)),
         // Le cadenas n'a pas été déclenché (je suis moi ou abonné), mais le
         // client affiche quand même le badge « privé » sur la bannière.
         isPrivate: flags.isPrivate,

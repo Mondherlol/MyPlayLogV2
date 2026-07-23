@@ -19,7 +19,12 @@ export async function apiFetch(path, { method = "GET", body, token } = {}) {
   }
 
   if (!res.ok) {
-    throw new Error(data?.error || "Une erreur est survenue.");
+    const err = new Error(data?.error || "Une erreur est survenue.");
+    // Le corps de la réponse porte parfois plus que le message (ex. le groupe
+    // en double renvoyé en 409) : on le garde à disposition de l'appelant.
+    err.status = res.status;
+    err.data = data;
+    throw err;
   }
   return data;
 }

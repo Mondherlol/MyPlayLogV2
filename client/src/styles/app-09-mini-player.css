@@ -283,6 +283,19 @@ button.mp-disc {
   transform: scale(0.92);
 }
 
+.mp-icon-btn:disabled {
+  opacity: 0.5;
+}
+
+/* Cœur « OST favorite » actif : doré, comme les autres accents. */
+.mp-like.on {
+  color: var(--orange);
+}
+
+.mp-like.on:hover {
+  color: var(--amber);
+}
+
 /* ---------- Volume (PC uniquement, masqué sur mobile) ---------- */
 .mp-volume {
   display: flex;
@@ -708,4 +721,82 @@ body.mpl-open .app-content {
   50% {
     transform: scaleY(1);
   }
+}
+/* ======================================================================
+   PARTAGE D'OST & CONFIRMATION DE REMPLACEMENT (depuis le mini-lecteur)
+   ====================================================================== */
+/* Aperçu de la piste en haut de la modale de partage. */
+.share-ost-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0.2rem 0 0.8rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.share-ost-art {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+
+.share-ost-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.share-ost-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.share-ost-meta strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.94rem;
+}
+
+.share-ost-meta span {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Confirmation « remplacer l'OST favorite ». */
+.mp-confirm-modal {
+  width: min(420px, 94vw);
+}
+
+.mp-confirm-modal .modal-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mp-confirm-modal .modal-title svg {
+  color: var(--orange);
+}
+
+.mp-confirm-text {
+  margin: 0.4rem 0 1.1rem;
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+
+.mp-confirm-text strong {
+  color: var(--text);
 }

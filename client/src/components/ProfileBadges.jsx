@@ -37,6 +37,11 @@ import {
   ImagePlus,
   Images,
   ArrowUpDown,
+  Grid2x2,
+  Medal,
+  Film,
+  ThumbsUp,
+  Reply,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { playRewardSound } from "../lib/sfx";
@@ -79,6 +84,12 @@ export const MISSION_ICONS = {
   ImagePlus,
   Images,
   ArrowUpDown,
+  Sparkles,
+  Grid2x2,
+  Medal,
+  Film,
+  ThumbsUp,
+  Reply,
 };
 
 const TIER_LABEL = { bronze: "Bronze", silver: "Argent", gold: "Or", platinum: "Platine" };

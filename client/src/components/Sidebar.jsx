@@ -5,6 +5,7 @@ import {
   Home,
   Compass,
   CalendarDays,
+  MessagesSquare,
   List,
   Joystick,
   User,
@@ -20,6 +21,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
+import { useChat } from "../context/ChatContext";
 import { useCosmetics } from "../context/CosmeticsContext";
 import { useClickOutside } from "../hooks/useClickOutside";
 
@@ -30,6 +32,8 @@ const NAV = [
   { to: "/app", label: "Accueil", Icon: Home, end: true },
   { to: "/explore", label: "Explorer", Icon: Compass },
   { to: "/releases", label: "Sorties", Icon: CalendarDays },
+  // `badge` : la pastille de non-lus vient du contexte de messagerie.
+  { to: "/messages", label: "Messages", Icon: MessagesSquare, badge: "chat" },
   { to: "/lists", label: "Listes", Icon: List },
   { to: "/arcade", label: "Arcade", Icon: Joystick },
   { to: "/profile", label: "Profil", Icon: User },
@@ -44,6 +48,7 @@ function FlagFR() {
 export default function Sidebar({ collapsed, onToggle }) {
   const { theme, toggle } = useTheme();
   const { user } = useAuth();
+  const { unread } = useChat();
   const { cosmetics } = useCosmetics();
   const arcadeTheme = cosmetics?.theme || null;
   const [langOpen, setLangOpen] = useState(false);
@@ -74,24 +79,34 @@ export default function Sidebar({ collapsed, onToggle }) {
       </div>
 
       <nav className="side-nav">
-        {NAV.filter((n) => !n.adminOnly || user?.isAdmin).map(({ to, label, Icon, end, adminOnly }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) =>
-              `side-row clickable ${isActive ? "active" : ""} ${
-                adminOnly ? "side-row-admin" : ""
-              }`
-            }
-            title={label}
-          >
-            <span className="side-icon">
-              <Icon size={20} strokeWidth={2} />
-            </span>
-            <span className="side-label">{label}</span>
-          </NavLink>
-        ))}
+        {NAV.filter((n) => !n.adminOnly || user?.isAdmin).map(
+          ({ to, label, Icon, end, adminOnly, badge }) => {
+            const count = badge === "chat" ? unread : 0;
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                className={({ isActive }) =>
+                  `side-row clickable ${isActive ? "active" : ""} ${
+                    adminOnly ? "side-row-admin" : ""
+                  } ${badge === "chat" ? "side-row-chat" : ""}`
+                }
+                title={label}
+              >
+                <span className="side-icon">
+                  <Icon size={20} strokeWidth={2} />
+                  {/* Replié, la pastille se colle à l'icône : c'est tout ce qui
+                      reste de visible. */}
+                  {count > 0 && (
+                    <span className="side-dot">{count > 9 ? "9+" : count}</span>
+                  )}
+                </span>
+                <span className="side-label">{label}</span>
+              </NavLink>
+            );
+          }
+        )}
       </nav>
 
       <div className="side-bottom">

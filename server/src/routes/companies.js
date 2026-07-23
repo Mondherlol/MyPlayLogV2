@@ -4,6 +4,7 @@ import { buildCompanyProfile } from "../lib/companyProfile.js";
 import { igdbQuery } from "../lib/igdb.js";
 import UserGame from "../models/UserGame.js";
 import User from "../models/User.js";
+import { triggerMissionCheck } from "../lib/missions.js";
 
 const router = express.Router();
 
@@ -256,6 +257,7 @@ router.post("/:name/favorite", requireAuth, async (req, res) => {
     }
     user.favoriteCompanies = list;
     await user.save();
+    if (favorited) triggerMissionCheck(req.userId); // mission « Fidèle au studio »
     res.json({ favorited, favoriteCompanies: user.favoriteCompanies });
   } catch (err) {
     console.error("company favorite error:", err.message);

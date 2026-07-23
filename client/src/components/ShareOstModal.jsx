@@ -1,17 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Search, Loader2, Check, Send, User } from "lucide-react";
+import { X, Search, Loader2, Check, Send, User, Music } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 
-// Choisir un utilisateur à qui recommander un jeu. La reco arrive désormais
-// dans sa messagerie privée : on ne propose donc que les gens qui peuvent
-// recevoir nos messages (nos abonnés), fournis par /chat/contacts.
-export default function RecommendModal({ game, onClose }) {
+// Partager une piste d'OST en message privé. Comme la recommandation d'un jeu,
+// ça arrive dans le DM : on ne propose donc que les gens qui peuvent recevoir
+// nos messages (nos abonnés), via /chat/contacts.
+export default function ShareOstModal({ track, onClose }) {
   const { token } = useAuth();
   const [contacts, setContacts] = useState([]);
   const [q, setQ] = useState("");
-  const [searching, setSearching] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [done, setDone] = useState({}); // userId -> true
   const [busyId, setBusyId] = useState(null);
   const [message, setMessage] = useState("");
@@ -29,35 +29,40 @@ export default function RecommendModal({ game, onClose }) {
 
   useEffect(() => {
     const id = ++reqRef.current;
-    setSearching(true);
+    setLoading(true);
     const t = setTimeout(() => {
       apiFetch(`/chat/contacts${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`, {
         token,
       })
         .then((d) => id === reqRef.current && setContacts(d.contacts || []))
         .catch(() => id === reqRef.current && setContacts([]))
-        .finally(() => id === reqRef.current && setSearching(false));
+        .finally(() => id === reqRef.current && setLoading(false));
     }, 250);
     return () => clearTimeout(t);
   }, [q, token]);
 
-  async function recommend(u) {
-    const uid = u.id;
-    if (busyId || done[uid]) return;
-    setBusyId(uid);
+  async function share(u) {
+    if (busyId || done[u.id]) return;
+    setBusyId(u.id);
     try {
-      await apiFetch("/recommendations", {
+      await apiFetch("/chat/share", {
         method: "POST",
         token,
         body: {
-          toUserId: uid,
-          gameId: game.id,
-          name: game.name,
-          cover: game.cover,
+          toUserId: u.id,
           message: message.trim() || undefined,
+          ost: {
+            name: track.name,
+            artist: track.artist || "",
+            artwork: track.artwork || null,
+            videoId: track.videoId || null,
+            url: track.url || null,
+            gameId: track.gameId || null,
+            gameName: track.gameName || null,
+          },
         },
       });
-      setDone((d) => ({ ...d, [uid]: true }));
+      setDone((d) => ({ ...d, [u.id]: true }));
     } catch (err) {
       alert(err.message);
     } finally {
@@ -65,22 +70,30 @@ export default function RecommendModal({ game, onClose }) {
     }
   }
 
-  const list = contacts;
-
   return createPortal(
-    <div className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div className="modal additems-modal">
         <button className="modal-close clickable" onClick={onClose} aria-label="Fermer">
           <X size={18} />
         </button>
-        <h2 className="modal-title">Recommander ce jeu</h2>
-        <p className="additems-hint font-fun" style={{ marginTop: 0 }}>
-          Envoie <strong>{game.name}</strong> en message privé à quelqu'un.
-        </p>
+        <h2 className="modal-title">Partager cette OST</h2>
+
+        <div className="share-ost-preview">
+          <span className="share-ost-art">
+            {track.artwork ? <img src={track.artwork} alt="" /> : <Music size={18} />}
+          </span>
+          <span className="share-ost-meta">
+            <strong>{track.name}</strong>
+            {track.artist && <span>{track.artist}</span>}
+          </span>
+        </div>
 
         <textarea
           className="reco-msg-input"
-          placeholder="Un petit mot (optionnel) — pourquoi tu le recommandes ?"
+          placeholder="Un petit mot (optionnel)…"
           value={message}
           onChange={(e) => setMessage(e.target.value.slice(0, 280))}
           rows={2}
@@ -94,15 +107,15 @@ export default function RecommendModal({ game, onClose }) {
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
-          {searching && <Loader2 size={16} className="spin" />}
+          {loading && <Loader2 size={16} className="spin" />}
         </div>
 
-        {!q.trim() && list.length > 0 && (
-          <p className="reco-pick-label">Peuvent recevoir ta reco</p>
+        {!q.trim() && contacts.length > 0 && (
+          <p className="reco-pick-label">Peuvent recevoir ton partage</p>
         )}
 
         <div className="reco-pick-list">
-          {list.map((u) => (
+          {contacts.map((u) => (
             <div className="reco-pick-row" key={u.id}>
               <span className="reco-pick-av">
                 {u.avatar ? <img src={u.avatar} alt="" /> : <User size={18} />}
@@ -110,24 +123,28 @@ export default function RecommendModal({ game, onClose }) {
               <span className="reco-pick-name">{u.username}</span>
               <button
                 className={`reco-pick-btn clickable ${done[u.id] ? "done" : ""}`}
-                onClick={() => recommend(u)}
+                onClick={() => share(u)}
                 disabled={busyId === u.id || done[u.id]}
               >
                 {busyId === u.id ? (
                   <Loader2 size={15} className="spin" />
                 ) : done[u.id] ? (
-                  <><Check size={15} /> Recommandé</>
+                  <>
+                    <Check size={15} /> Envoyé
+                  </>
                 ) : (
-                  <><Send size={15} /> Recommander</>
+                  <>
+                    <Send size={15} /> Envoyer
+                  </>
                 )}
               </button>
             </div>
           ))}
-          {!searching && list.length === 0 && (
+          {!loading && contacts.length === 0 && (
             <p className="additems-hint font-fun">
               {q.trim()
                 ? "Aucun abonné à ce nom."
-                : "Aucun abonné pour l'instant : seuls tes abonnés peuvent recevoir une reco."}
+                : "Seuls tes abonnés peuvent recevoir un partage."}
             </p>
           )}
         </div>

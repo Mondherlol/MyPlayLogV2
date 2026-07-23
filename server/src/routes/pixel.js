@@ -18,6 +18,7 @@ import {
   shuffle,
   weightedOrder,
   getFamousPool,
+  keepRealGames,
   attachAltNames,
   hintsForGames,
 } from "./blindtest.js";
@@ -87,13 +88,18 @@ async function buildRounds(userId, count) {
   const played = await UserGame.find({ user: userId, status: { $ne: "wishlist" } })
     .select("gameId name cover playtimeHours rating")
     .lean();
-  const playedGames = played.map((g) => ({
-    gameId: g.gameId,
-    name: g.name,
-    cover: g.cover || null,
-    playtimeHours: g.playtimeHours ?? null,
-    rating: g.rating ?? null,
-  }));
+  // Bundles, packs, DLC… sortent ici : ni manche, ni suggestion de recherche.
+  // (Les captures d'un bundle sont celles d'un des jeux inclus : impossible à
+  // deviner, et la réponse attendue serait le nom de la compilation.)
+  const playedGames = await keepRealGames(
+    played.map((g) => ({
+      gameId: g.gameId,
+      name: g.name,
+      cover: g.cover || null,
+      playtimeHours: g.playtimeHours ?? null,
+      rating: g.rating ?? null,
+    }))
+  );
   const ownedIds = playedGames.map((g) => g.gameId);
 
   const foreignTarget = ownedIds.length ? Math.max(1, Math.round(count * 0.25)) : count;
@@ -258,7 +264,9 @@ export async function userCovers(userId, limit = 6) {
       const famous = await getFamousPool();
       pool = pick(famous.map((g) => ({ gameId: g.id, name: g.name, cover: g.cover })));
     }
-    return shuffle(pool).slice(0, limit);
+    // Pas de jaquette de bundle non plus sur les cartes : elles annoncent le
+    // jeu, autant montrer ce qu'on peut réellement avoir à deviner.
+    return shuffle(await keepRealGames(pool)).slice(0, limit);
   } catch (err) {
     console.error("covers error:", err.message);
     return [];
@@ -353,7 +361,8 @@ router.get("/challenge/:id", requireAuth, async (req, res) => {
       candMap.set(id, { id, name, cover: cover || null });
     };
     for (const r of rounds) addCand(r.gameId, r.gameName, r.cover);
-    for (const g of played) addCand(g.gameId, g.name, g.cover || null);
+    // Même règle qu'au démarrage d'une partie : pas de bundle/DLC en suggestion.
+    for (const g of await keepRealGames(played)) addCand(g.gameId, g.name, g.cover || null);
     for (const g of famous) addCand(g.id, g.name, g.cover);
     const candidates = await attachAltNames([...candMap.values()]);
 

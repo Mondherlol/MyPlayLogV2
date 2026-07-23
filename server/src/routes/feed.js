@@ -25,6 +25,7 @@ import { igdbQuery } from "../lib/igdb.js";
 import { geminiJson, isGeminiConfigured } from "../lib/gemini.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { summarizeReactions } from "../lib/reviewSerialize.js";
+import { triggerMissionCheck } from "../lib/missions.js";
 import { buildRepostStats } from "./reposts.js";
 import { toPost as toMediaPost } from "./gameMedia.js";
 import { playlistDuration } from "./lists.js";
@@ -1876,7 +1877,10 @@ router.post("/recommend", requireAuth, async (req, res) => {
         $inc: { count: 1 },
       },
       { upsert: true }
-    ).catch(() => {});
+    )
+      // Mission « Chercheur d'or » — une fois la fournée journalisée.
+      .then(() => triggerMissionCheck(req.userId))
+      .catch(() => {});
 
     res.json({
       games: results,

@@ -2,6 +2,8 @@ import User from "../models/User.js";
 import UserGame from "../models/UserGame.js";
 import List from "../models/List.js";
 import BlindTest from "../models/BlindTest.js";
+import PixelGame from "../models/PixelGame.js";
+import GemDiscovery from "../models/GemDiscovery.js";
 import Repost from "../models/Repost.js";
 import Documentary from "../models/Documentary.js";
 import GameTracker from "../models/GameTracker.js";
@@ -94,6 +96,62 @@ export const MISSIONS = [
     points: 250,
     target: 1,
     progress: (id) => BlindTest.countDocuments({ user: id }),
+  },
+  {
+    key: "pixelrush",
+    title: "Œil de lynx",
+    description: "Termine une partie de Pixel Rush.",
+    icon: "Grid2x2",
+    tier: "bronze",
+    points: 250,
+    target: 1,
+    progress: (id) => PixelGame.countDocuments({ user: id }),
+  },
+  {
+    key: "discover-gem",
+    title: "Chercheur d'or",
+    description: "Déniche une pépite indé depuis l'accueil.",
+    icon: "Sparkles",
+    tier: "bronze",
+    points: 200,
+    target: 1,
+    // Une fournée de pépites = un document du jour (cf. models/GemDiscovery).
+    progress: (id) => GemDiscovery.countDocuments({ user: id }),
+  },
+  {
+    key: "watch-doc",
+    title: "Ciné-club",
+    description: "Lance un documentaire depuis l'accueil et regarde-le.",
+    icon: "Film",
+    tier: "bronze",
+    points: 200,
+    target: 1,
+    // `watched` est posé par le lecteur au bout de ~30 s (cf. routes/videos.js) :
+    // ouvrir puis fermer aussitôt ne compte pas.
+    progress: (id) => Documentary.countDocuments({ user: id, watched: true }),
+  },
+  {
+    key: "like-video",
+    title: "Pouce en l'air",
+    description: "Aime une vidéo recommandée par un joueur.",
+    icon: "ThumbsUp",
+    tier: "bronze",
+    points: 150,
+    target: 1,
+    progress: (id) => Documentary.countDocuments({ user: id, liked: true }),
+  },
+  {
+    key: "reply-review",
+    title: "Droit de réponse",
+    description: "Réponds à l'avis d'un autre joueur.",
+    icon: "Reply",
+    tier: "bronze",
+    points: 200,
+    target: 1,
+    // Les réponses vivent dans l'entrée de biblio qui porte l'avis : on cherche
+    // donc mes commentaires posés chez QUELQU'UN D'AUTRE.
+    progress: (id) =>
+      UserGame.countDocuments({ "comments.user": id, user: { $ne: id } }),
   },
   {
     key: "republish-fanart",
@@ -248,7 +306,16 @@ export const MISSIONS = [
     tier: "silver",
     points: 300,
     target: 1,
-    progress: (_id, { user }) => (user.favoritePlatforms || []).length,
+    // DEUX façons d'épingler sa console, et les deux comptent : depuis la page
+    // d'une console (/platform/:id → user.favoritePlatforms) ou depuis la carte
+    // « Console favorite » de l'aperçu du profil, qui range son choix dans
+    // asideConfig.console (cf. ProfileAsideCardModal). Ne regarder que la
+    // première laissait le badge inaccessible pour qui passe par le profil.
+    progress: (_id, { user }) =>
+      (user.favoritePlatforms || []).length ||
+      (user.asideConfig?.console?.mode === "pin" && user.asideConfig.console.platform
+        ? 1
+        : 0),
   },
   {
     key: "favorite-company",
@@ -279,6 +346,16 @@ export const MISSIONS = [
     points: 400,
     target: 1,
     progress: (id) => List.countDocuments({ user: id, type: "tier" }),
+  },
+  {
+    key: "ranked-list",
+    title: "Podium personnel",
+    description: "Crée une liste classée.",
+    icon: "Medal",
+    tier: "silver",
+    points: 400,
+    target: 1,
+    progress: (id) => List.countDocuments({ user: id, type: "ranked" }),
   },
   {
     key: "playlist",
@@ -378,7 +455,7 @@ function publicMission(m) {
 
 // Champs de User que lisent les `progress` (et le solde affiché).
 const USER_FIELDS =
-  "following inventory steam psn points equipped favoritePlatforms favoriteCompanies missionFlags covers cover ostOrder";
+  "following inventory steam psn points equipped favoritePlatforms favoriteCompanies missionFlags covers cover ostOrder asideConfig";
 
 // Marque une mission comme ACCOMPLIE (statut ready) et prévient le joueur qu'il
 // a une récompense à récupérer. Ne crédite aucun point : c'est claimMission qui

@@ -75,7 +75,7 @@ function youtubeId(url) {
   );
   return m ? m[1] : null;
 }
-function extractYouTubeIds(text) {
+export function extractYouTubeIds(text) {
   const ids = [];
   (String(text || "").match(/https?:\/\/[^\s<]+/g) || []).forEach((u) => {
     const id = youtubeId(u);
@@ -148,8 +148,9 @@ export function renderHighlight(text, valid) {
   });
 }
 
-// Lecteur YouTube inline : aperçu cliquable → iframe (lecture dans les commentaires).
-function YouTubeEmbed({ id }) {
+// Lecteur YouTube inline : aperçu cliquable → iframe (lecture dans les
+// commentaires ET dans les bulles du chat).
+export function YouTubeEmbed({ id }) {
   const [play, setPlay] = useState(false);
   if (play) {
     return (
@@ -1528,8 +1529,8 @@ export function EmojiPanel({ onPick }) {
   );
 }
 
-// --- Panneau recherche de GIF (GIPHY) ---
-function GifPanel({ token, onPick }) {
+// --- Panneau recherche de GIF (GIPHY) --- (partagé avec le chat)
+export function GifPanel({ token, onPick }) {
   const [q, setQ] = useState("");
   const [gifs, setGifs] = useState([]);
   const [loading, setLoading] = useState(false);

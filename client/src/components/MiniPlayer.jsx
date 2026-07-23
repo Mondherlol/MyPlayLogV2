@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import {
@@ -11,6 +11,9 @@ import {
   Music,
   Disc3,
   ListMusic,
+  ListPlus,
+  Heart,
+  Share2,
   ArrowUpRight,
   Loader2,
   Volume2,
@@ -18,6 +21,10 @@ import {
   VolumeX,
 } from "lucide-react";
 import { usePlayer } from "../context/PlayerContext";
+import { useAuth } from "../context/AuthContext";
+import { apiFetch } from "../lib/api";
+import AddToPlaylistModal from "./AddToPlaylistModal";
+import ShareOstModal from "./ShareOstModal";
 
 function fmt(sec) {
   if (!sec || !isFinite(sec)) return "0:00";
@@ -30,6 +37,7 @@ function fmt(sec) {
 // que lorsqu'une OST est lancée (depuis la page jeu, le profil ou l'aperçu).
 export default function MiniPlayer() {
   const player = usePlayer();
+  const { token } = useAuth();
   const {
     current,
     playing,
@@ -45,6 +53,81 @@ export default function MiniPlayer() {
   const [showQueue, setShowQueue] = useState(false);
   // Réduit en « bulle » façon Messenger : le son continue, on rouvre au clic.
   const [minimized, setMinimized] = useState(false);
+
+  // OST favorite du jeu de la piste courante (pour l'état du cœur + l'avertir
+  // qu'un like va remplacer un favori existant).
+  const [fav, setFav] = useState(null); // { name, artist, ... } | null
+  const [favBusy, setFavBusy] = useState(false);
+  const [confirmReplace, setConfirmReplace] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [playlistOpen, setPlaylistOpen] = useState(false);
+
+  const gameId = current?.gameId || null;
+  const canLike = !!token && !!gameId;
+
+  // Charge l'OST favorite du jeu quand la piste (donc le jeu) change.
+  useEffect(() => {
+    if (!canLike) {
+      setFav(null);
+      return;
+    }
+    let alive = true;
+    apiFetch(`/library/${gameId}`, { token })
+      .then((d) => alive && setFav(d.entry?.favoriteOst || null))
+      .catch(() => alive && setFav(null));
+    return () => {
+      alive = false;
+    };
+  }, [gameId, canLike, token]);
+
+  const isFav =
+    !!fav && !!current && fav.name === current.name && fav.artist === (current.artist || "");
+  // Un favori DIFFÉRENT existe déjà → liker celui-ci le remplacera.
+  const replaces = !!fav && !isFav;
+
+  // Écrit (ou retire) l'OST favorite du jeu côté serveur.
+  const saveFavorite = useCallback(
+    async (track) => {
+      if (!current || !gameId) return;
+      const favoriteOst = track
+        ? {
+            name: track.name,
+            artist: track.artist || "",
+            artwork: track.artwork || null,
+            youtube: true,
+            url: track.videoId
+              ? `https://www.youtube.com/watch?v=${track.videoId}`
+              : null,
+            preview: null,
+          }
+        : null;
+      setFav(favoriteOst); // optimiste
+      setFavBusy(true);
+      try {
+        await apiFetch(`/library/${gameId}`, {
+          method: "PUT",
+          token,
+          body: { favoriteOst, name: current.gameName || current.name },
+        });
+      } catch (err) {
+        alert(err.message);
+        // Rechargement pour retrouver l'état réel en cas d'échec.
+        apiFetch(`/library/${gameId}`, { token })
+          .then((d) => setFav(d.entry?.favoriteOst || null))
+          .catch(() => {});
+      } finally {
+        setFavBusy(false);
+      }
+    },
+    [current, gameId, token]
+  );
+
+  function onLike() {
+    if (!canLike || favBusy) return;
+    if (isFav) return saveFavorite(null); // déjà favori → on retire
+    if (replaces) return setConfirmReplace(true); // remplace un autre favori → on confirme
+    saveFavorite(current);
+  }
 
   // Décale le contenu pour ne pas le masquer derrière la barre (sauf en bulle,
   // qui flotte dans un coin sans réserver d'espace).
@@ -197,6 +280,47 @@ export default function MiniPlayer() {
         </div>
 
         <div className="mp-actions">
+          {/* Cœur : définir cette piste comme OST favorite du jeu. */}
+          {canLike && (
+            <button
+              className={`mp-icon-btn mp-like clickable ${isFav ? "on" : ""}`}
+              onClick={onLike}
+              disabled={favBusy}
+              title={
+                isFav
+                  ? "Retirer des favoris"
+                  : replaces
+                  ? "Définir comme OST favorite (remplace l'actuelle)"
+                  : "Définir comme OST favorite"
+              }
+              aria-label="OST favorite"
+            >
+              <Heart size={17} fill={isFav ? "currentColor" : "none"} />
+            </button>
+          )}
+          {/* Ajouter la piste à une playlist. */}
+          {token && (
+            <button
+              className="mp-icon-btn clickable"
+              onClick={() => setPlaylistOpen(true)}
+              title="Ajouter à une playlist"
+              aria-label="Ajouter à une playlist"
+            >
+              <ListPlus size={17} />
+            </button>
+          )}
+          {/* Partager la piste en message privé. */}
+          {token && (
+            <button
+              className="mp-icon-btn clickable"
+              onClick={() => setShareOpen(true)}
+              title="Partager en message"
+              aria-label="Partager en message"
+            >
+              <Share2 size={16} />
+            </button>
+          )}
+
           {/* Volume : PC uniquement (masqué en CSS sur mobile, où les boutons
               physiques font le travail). Clic sur l'icône = sourdine. */}
           <div className="mp-volume" style={{ "--vol": `${volPct}%` }}>
@@ -254,7 +378,90 @@ export default function MiniPlayer() {
       {showQueue && (
         <QueueModal player={player} onClose={() => setShowQueue(false)} />
       )}
+
+      {playlistOpen && current && (
+        <AddToPlaylistModal
+          track={{
+            id: current.id,
+            name: current.name,
+            artist: current.artist,
+            artwork: current.artwork,
+            videoId: current.videoId,
+            youtube: true,
+            url: current.videoId
+              ? `https://www.youtube.com/watch?v=${current.videoId}`
+              : null,
+          }}
+          gameId={current.gameId}
+          gameName={current.gameName}
+          onClose={() => setPlaylistOpen(false)}
+        />
+      )}
+
+      {shareOpen && current && (
+        <ShareOstModal track={current} onClose={() => setShareOpen(false)} />
+      )}
+
+      {confirmReplace && current && (
+        <ConfirmReplaceModal
+          fav={fav}
+          gameName={current.gameName}
+          onCancel={() => setConfirmReplace(false)}
+          onConfirm={() => {
+            setConfirmReplace(false);
+            saveFavorite(current);
+          }}
+        />
+      )}
     </>
+  );
+}
+
+// Confirme le remplacement de l'OST favorite déjà définie pour ce jeu.
+function ConfirmReplaceModal({ fav, gameName, onCancel, onConfirm }) {
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onCancel();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  return createPortal(
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => e.target === e.currentTarget && onCancel()}
+    >
+      <div className="modal mp-confirm-modal">
+        <button className="modal-close clickable" onClick={onCancel} aria-label="Fermer">
+          <X size={18} />
+        </button>
+        <h2 className="modal-title">
+          <Heart size={18} /> Remplacer l'OST favorite ?
+        </h2>
+        <p className="mp-confirm-text">
+          Tu as déjà une OST favorite
+          {gameName ? (
+            <>
+              {" "}
+              pour <strong>{gameName}</strong>
+            </>
+          ) : (
+            " pour ce jeu"
+          )}{" "}
+          : <strong>« {fav?.name} »</strong>
+          {fav?.artist ? ` — ${fav.artist}` : ""}. Elle sera remplacée par la piste
+          en cours.
+        </p>
+        <div className="modal-actions">
+          <button type="button" className="btn btn-ghost clickable" onClick={onCancel}>
+            Annuler
+          </button>
+          <button type="button" className="btn btn-primary clickable" onClick={onConfirm}>
+            <Heart size={15} /> Remplacer
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 

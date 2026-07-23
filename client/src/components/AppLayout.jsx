@@ -4,6 +4,7 @@ import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import PatchnotePopup from "./PatchnotePopup";
 import MiniPlayer from "./MiniPlayer";
+import ChatDock from "./ChatDock";
 
 export default function AppLayout({ children }) {
   const [collapsed, setCollapsed] = useState(
@@ -29,6 +30,9 @@ export default function AppLayout({ children }) {
       </div>
       <PatchnotePopup />
       <MiniPlayer />
+      {/* Fenêtres de discussion flottantes : disponibles sur toutes les pages
+          de l'espace connecté. */}
+      <ChatDock />
     </div>
   );
 }

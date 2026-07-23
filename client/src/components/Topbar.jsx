@@ -30,8 +30,12 @@ import {
   Award,
   UserPlus,
   UserCheck,
+  MessagesSquare,
+  PenSquare,
+  Image as ImageIcon,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useChat } from "../context/ChatContext";
 import { useTheme } from "../context/ThemeContext";
 import { useCosmetics } from "../context/CosmeticsContext";
 import { useClickOutside } from "../hooks/useClickOutside";
@@ -90,6 +94,9 @@ function loadSearchHistory() {
 export default function Topbar() {
   const { user, token, logout } = useAuth();
   const { theme, toggle: toggleTheme } = useTheme();
+  const { conversations, unread: chatUnread, online, focusConversation } = useChat();
+  // Les discussions « prêtes » (virtuelles, sans message) restent hors du panneau.
+  const realConversations = conversations.filter((c) => !c.virtual);
   const { cosmetics } = useCosmetics();
   const arcadeTheme = cosmetics?.theme || null;
   const navigate = useNavigate();
@@ -109,10 +116,12 @@ export default function Topbar() {
   const searchRef = useRef(null);
   const searchInput = useRef(null);
   const notifRef = useRef(null);
+  const chatRef = useRef(null);
   const profileRef = useRef(null);
 
   useClickOutside(searchRef, () => closeSearch(), searchOpen);
   useClickOutside(notifRef, () => setMenu(null), menu === "notif");
+  useClickOutside(chatRef, () => setMenu(null), menu === "chat");
   useClickOutside(profileRef, () => setMenu(null), menu === "profile");
 
   useEffect(() => {
@@ -484,6 +493,136 @@ export default function Topbar() {
                   <CornerDownLeft size={13} /> Entrée pour plus de résultats
                 </button>
               )}
+            </div>
+          )}
+        </div>
+
+        {/* Messages : aperçu des dernières discussions, tout le reste sur /messages */}
+        <div className="dd" ref={chatRef}>
+          <button
+            className="icon-btn clickable"
+            onClick={() => setMenu((m) => (m === "chat" ? null : "chat"))}
+            aria-label="Messages"
+            title="Messages"
+          >
+            <MessagesSquare size={19} />
+            {chatUnread > 0 && (
+              <span className="notif-badge">{chatUnread > 9 ? "9+" : chatUnread}</span>
+            )}
+          </button>
+          {menu === "chat" && (
+            <div className="dd-menu card notif-menu chat-menu">
+              <div className="dd-title">
+                Messages
+                <button
+                  className="chat-menu-new clickable"
+                  onClick={() => {
+                    setMenu(null);
+                    navigate("/messages");
+                  }}
+                  title="Nouvelle discussion"
+                >
+                  <PenSquare size={15} />
+                </button>
+              </div>
+              {/* Aperçu des VRAIES discussions : les fils encore vides
+                  proposés avec chaque abonné n'ont rien à montrer ici. */}
+              {realConversations.length === 0 ? (
+                <div className="notif-empty">
+                  <MessagesSquare size={22} />
+                  <p>Aucune discussion pour l'instant.</p>
+                </div>
+              ) : (
+                <div className="notif-list">
+                  {realConversations.slice(0, 6).map((c) => {
+                    const other = c.others?.[0];
+                    const isOnline =
+                      !c.isGroup && other && online.has(String(other.id));
+                    return (
+                      <button
+                        key={c.id}
+                        className={`notif-item chat-menu-item clickable ${
+                          c.unread ? "unread" : ""
+                        }`}
+                        onClick={() => {
+                          setMenu(null);
+                          focusConversation(c.id);
+                        }}
+                      >
+                        <span
+                          className={`notif-avatar chat-menu-av ${
+                            isOnline ? "online" : ""
+                          }`}
+                          role={!c.isGroup && other ? "link" : undefined}
+                          onClick={
+                            !c.isGroup && other
+                              ? (e) => {
+                                  // La photo mène au profil, pas à la discussion.
+                                  e.stopPropagation();
+                                  setMenu(null);
+                                  navigate(`/u/${other.username}`);
+                                }
+                              : undefined
+                          }
+                        >
+                          {c.avatar ? (
+                            <img src={c.avatar} alt="" />
+                          ) : c.isGroup ? (
+                            <Users size={16} />
+                          ) : (
+                            (c.title || "?")[0].toUpperCase()
+                          )}
+                        </span>
+                        <span className="notif-body">
+                          <span className="notif-text">
+                            <strong>{c.title}</strong>
+                          </span>
+                          <span className="notif-snippet">
+                            {c.lastMessage ? (
+                              c.lastMessage.kind === "image" ||
+                              c.lastMessage.kind === "gif" ? (
+                                <>
+                                  <ImageIcon size={12} />{" "}
+                                  {c.lastMessage.kind === "gif" ? "GIF" : "Photo"}
+                                </>
+                              ) : c.lastMessage.kind === "game" ? (
+                                <>
+                                  <Gamepad2 size={12} /> {c.lastMessage.text}
+                                </>
+                              ) : c.lastMessage.kind === "ost" ? (
+                                <>
+                                  <Music size={12} /> {c.lastMessage.text}
+                                </>
+                              ) : (
+                                c.lastMessage.text
+                              )
+                            ) : (
+                              "Nouvelle discussion"
+                            )}
+                          </span>
+                          <span className="notif-time">
+                            {c.lastMessage?.at ? timeAgo(c.lastMessage.at) : ""}
+                          </span>
+                        </span>
+                        {c.unread > 0 && (
+                          <span className="chat-menu-badge">
+                            {c.unread > 9 ? "9+" : c.unread}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <button
+                className="chat-menu-all clickable"
+                onClick={() => {
+                  setMenu(null);
+                  navigate("/messages");
+                }}
+              >
+                Voir tous les messages
+              </button>
             </div>
           )}
         </div>

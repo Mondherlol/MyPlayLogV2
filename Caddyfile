@@ -6,7 +6,12 @@ www.myplaylog.cc {
 }
 
 myplaylog.cc {
-    encode gzip zstd
+    # Compression partout SAUF sur le flux temps réel du chat : un flux SSE ne
+    # se termine jamais, et le compresseur peut retenir les évènements dans son
+    # tampon — les messages arriveraient par paquets, avec des secondes de
+    # retard. Le reste du site reste compressé normalement.
+    @compressible not path /api/chat/stream
+    encode @compressible gzip zstd
 
     # L'API et les fichiers uploadés vont vers le backend Express.
     @backend path /api/* /uploads/*

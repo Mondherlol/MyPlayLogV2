@@ -2387,11 +2387,17 @@ function TrackerMatchGroupEvent({ item }) {
 //  Montée / descente de rang classé (session) — avec réactions
 // ============================================================
 // Vignette d'un rang : badge + libellé de palier (+ RS sur le grand).
-function RankBadge({ r, big }) {
+// `crop` : emblèmes League of Legends (Community Dragon) livrés en 1280×720
+// avec le blason minuscule (~25 %) perdu au centre d'un cadre vide — on recadre
+// via un conteneur `overflow:hidden` en agrandissant l'image, exactement comme
+// RankEmblem dans l'onglet Tracking (cf. ProfileTrackerLoL).
+function RankBadge({ r, big, crop }) {
   return (
     <span className={`hf-rank-badge ${big ? "big" : "small"}`}>
       {r.image ? (
-        <img src={r.image} alt="" loading="lazy" draggable="false" />
+        <span className={`hf-rank-img ${crop ? "crop" : ""}`}>
+          <img src={r.image} alt="" loading="lazy" draggable="false" />
+        </span>
       ) : (
         <Trophy size={big ? 22 : 15} />
       )}
@@ -2409,6 +2415,7 @@ function RankBadge({ r, big }) {
 // Réactions single-select (féliciter / soutenir), comme les avis.
 function RankChangeEvent({ item, me, token }) {
   const up = item.direction === "up";
+  const cropEmblem = item.provider === "league-of-legends";
   const [reactions, setReactions] = useState(item.reactions || null);
   const [myReaction, setMyReaction] = useState(item.myReaction || null);
   const isMine = me && item.user.username === me;
@@ -2470,9 +2477,9 @@ function RankChangeEvent({ item, me, token }) {
         to={`/u/${item.user.username}?tab=tracking`}
         className="hf-rank-body clickable"
       >
-        <RankBadge r={item.old} />
+        <RankBadge r={item.old} crop={cropEmblem} />
         <ArrowRight size={20} className="hf-rank-arrow" />
-        <RankBadge r={item.current} big />
+        <RankBadge r={item.current} big crop={cropEmblem} />
         {item.hero?.thumb && (
           <span className="hf-rank-hero" title={item.hero.name}>
             <img src={item.hero.thumb} alt="" loading="lazy" draggable="false" />

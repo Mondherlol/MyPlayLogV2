@@ -34,6 +34,7 @@ import patchesRoutes from "./routes/patches.js";
 import downloadRoutes from "./routes/downloads.js";
 import trackerRoutes, { startTrackerAutoSync } from "./routes/trackers.js";
 import missionRoutes from "./routes/missions.js";
+import chatRoutes from "./routes/chat.js";
 import { avatarPrivacy } from "./middleware/avatarPrivacy.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -98,6 +99,8 @@ app.use("/api/patches", patchesRoutes);
 app.use("/api/downloads", downloadRoutes);
 app.use("/api/trackers", trackerRoutes);
 app.use("/api/missions", missionRoutes);
+// Messagerie (DM + groupes). Contient le flux temps réel SSE /api/chat/stream.
+app.use("/api/chat", chatRoutes);
 // Remontée des crashs du front (voir routes/clientErrors.js).
 app.use("/api/client-errors", clientErrorRoutes);
 

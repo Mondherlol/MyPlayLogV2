@@ -6,6 +6,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { notify } from "../lib/notify.js";
 import { recordActivity, removeActivity } from "../lib/activity.js";
 import { triggerMissionCheck } from "../lib/missions.js";
+import { deliverCard } from "./chat.js";
 
 const router = express.Router();
 
@@ -24,7 +25,7 @@ router.post("/", requireAuth, async (req, res) => {
     const gid = Number(gameId);
     if (!gid || !name) return res.status(400).json({ error: "Jeu invalide." });
 
-    const target = await User.findById(toUserId).select("_id");
+    const target = await User.findById(toUserId).select("_id username following");
     if (!target) return res.status(404).json({ error: "Utilisateur introuvable." });
 
     const msg = message ? String(message).slice(0, 280) : "";
@@ -68,18 +69,25 @@ router.post("/", requireAuth, async (req, res) => {
       });
     }
 
-    // Notifie le destinataire (auto +1 = nouvelle recommandation pour lui).
-    notify({
-      user: toUserId,
-      type: "recommendation",
-      actor: req.userId,
-      game: gid,
-      gameName: String(name),
-      snippet: msg.slice(0, 120),
-    });
+    // La recommandation n'envoie plus de notification : elle arrive directement
+    // dans la messagerie privée avec la personne, sous forme de carte de jeu
+    // (avec le petit mot en légende). On ne la dépose QUE si le destinataire
+    // peut recevoir nos messages (il est abonné à nous) — sinon elle reste
+    // visible dans son onglet « Reco » et le fil, sans DM.
+    const followsMe = (target.following || []).some(
+      (u) => String(u) === String(req.userId)
+    );
+    if (isNewRecommender && followsMe) {
+      deliverCard({
+        fromId: req.userId,
+        toId: toUserId,
+        text: msg,
+        game: { gameId: gid, name: String(name), cover: rec.cover || null },
+      }).catch((err) => console.error("reco deliverCard error:", err.message));
+    }
 
     triggerMissionCheck(req.userId); // mission « Passeur de jeux »
-    res.status(201).json({ ok: true, count: count(rec) });
+    res.status(201).json({ ok: true, count: count(rec), delivered: followsMe });
   } catch (err) {
     console.error("reco create error:", err.message);
     res.status(500).json({ error: "Échec de la recommandation." });

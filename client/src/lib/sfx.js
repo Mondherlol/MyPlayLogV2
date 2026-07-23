@@ -53,6 +53,36 @@ function note(ac, { freq, start, dur, gain = 0.16, type = "triangle" }) {
   osc.stop(start + dur + 0.02);
 }
 
+// Message reçu : deux notes claires qui montent (une tierce), courtes et
+// discrètes — le « toc-ding » d'une messagerie, pas une fanfare.
+export function playMessageSound() {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    const t = ac.currentTime + 0.01;
+    // La5 → Do#6, en sinus : rond, jamais agressif même à répétition.
+    note(ac, { freq: 880, start: t, dur: 0.12, gain: 0.1, type: "sine" });
+    note(ac, { freq: 1108.73, start: t + 0.09, dur: 0.22, gain: 0.09, type: "sine" });
+  } catch {
+    /* le son est un bonus : jamais bloquant */
+  }
+}
+
+// Message envoyé : une seule note brève et basse, en retrait — on confirme
+// l'envoi sans jamais couvrir le son de réception.
+export function playSentSound() {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    const t = ac.currentTime + 0.01;
+    note(ac, { freq: 523.25, start: t, dur: 0.1, gain: 0.05, type: "sine" });
+  } catch {
+    /* idem */
+  }
+}
+
 // Récompense récupérée : petit arpège ascendant façon pièce ramassée, avec une
 // quinte finale tenue pour la sensation de « ça y est, c'est à moi ».
 export function playRewardSound() {

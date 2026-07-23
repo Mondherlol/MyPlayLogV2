@@ -99,6 +99,48 @@ export async function getFamousPool() {
   return famousCache.games;
 }
 
+// --- Ce qui peut faire une manche : de VRAIS jeux, rien d'autre ---
+// Types IGDB (game_type) gardés : jeu principal (0), extension autonome (4),
+// remake (8), remaster (9), version enrichie (10), portage (11). On écarte donc
+// les bundles et packs (3, 13) — deviner « The Orange Box » ou « Kingdom Hearts
+// HD 1.5+2.5 ReMIX » n'a aucun sens — mais aussi les DLC/extensions (1, 2), les
+// mods (5), les épisodes et saisons (6, 7), les forks (12) et les mises à jour
+// (14). Le pool de gros jeux est déjà filtré à la source (cf. getFamousPool) ;
+// ce garde-fou sert surtout à la bibliothèque du joueur, où ces entrées
+// existent bel et bien.
+const PLAYABLE_TYPES = new Set([0, 4, 8, 9, 10, 11]);
+
+// Cache process gameId → game_type : le type d'un jeu ne change jamais, une
+// bibliothèque n'est donc interrogée qu'une fois par démarrage du serveur.
+const gameTypeCache = new Map();
+
+// Ne garde que les vrais jeux d'une liste de { gameId, … }. Un aller-retour
+// IGDB par tranche de 400 ids inconnus. Best-effort : un id sur lequel IGDB
+// n'a pas répondu reste jouable (mieux vaut une manche de trop qu'une partie
+// impossible à lancer).
+export async function keepRealGames(games) {
+  const unknown = [
+    ...new Set(games.map((g) => g.gameId).filter((id) => id && !gameTypeCache.has(id))),
+  ];
+  for (let i = 0; i < unknown.length; i += 400) {
+    const chunk = unknown.slice(i, i + 400);
+    try {
+      const raw = await igdbQuery(
+        "games",
+        `fields game_type; where id = (${chunk.join(",")}); limit ${chunk.length};`
+      );
+      // IGDB omet le champ quand il vaut 0 (jeu principal).
+      for (const g of raw) gameTypeCache.set(g.id, g.game_type ?? 0);
+    } catch (err) {
+      console.error("blindtest game types error:", err.message);
+    }
+  }
+  return games.filter((g) => {
+    const t = gameTypeCache.get(g.gameId);
+    return t === undefined || PLAYABLE_TYPES.has(t);
+  });
+}
+
 // Pistes déjà en base pour un lot de jeux → Map(gameId → [tracks]).
 async function tracksForGames(gameIds) {
   if (!gameIds.length) return new Map();
@@ -242,13 +284,16 @@ async function buildRounds(userId, count) {
   const played = await UserGame.find({ user: userId, status: { $ne: "wishlist" } })
     .select("gameId name cover playtimeHours rating")
     .lean();
-  const playedGames = played.map((g) => ({
-    gameId: g.gameId,
-    name: g.name,
-    cover: g.cover || null,
-    playtimeHours: g.playtimeHours ?? null,
-    rating: g.rating ?? null,
-  }));
+  // Bundles, packs, DLC… sortent ici : ni manche, ni suggestion de recherche.
+  const playedGames = await keepRealGames(
+    played.map((g) => ({
+      gameId: g.gameId,
+      name: g.name,
+      cover: g.cover || null,
+      playtimeHours: g.playtimeHours ?? null,
+      rating: g.rating ?? null,
+    }))
+  );
   const ownedIds = playedGames.map((g) => g.gameId);
 
   // Moins de manches « jamais joué » qu'avant (elles étaient trop nombreuses et
@@ -484,7 +529,8 @@ router.get("/challenge/:id", requireAuth, async (req, res) => {
       candMap.set(id, { id, name, cover: cover || null });
     };
     for (const r of rounds) addCand(r.gameId, r.gameName, r.cover);
-    for (const g of played) addCand(g.gameId, g.name, g.cover || null);
+    // Même règle qu'au démarrage d'une partie : pas de bundle/DLC en suggestion.
+    for (const g of await keepRealGames(played)) addCand(g.gameId, g.name, g.cover || null);
     for (const g of famous) addCand(g.id, g.name, g.cover);
     const candidates = await attachAltNames([...candMap.values()]);
 

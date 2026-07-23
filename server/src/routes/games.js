@@ -10,6 +10,7 @@ import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { notify } from "../lib/notify.js";
 import { recordActivity, removeActivity } from "../lib/activity.js";
 import { summarizeReactions, reviewComment } from "../lib/reviewSerialize.js";
+import { triggerMissionCheck } from "../lib/missions.js";
 import { reviewVisibility, privacyOf, isFollower } from "../lib/privacy.js";
 import User from "../models/User.js";
 import UserGame from "../models/UserGame.js";
@@ -2137,6 +2138,9 @@ router.post("/:id/reviews/:userId/comments", requireAuth, async (req, res) => {
       // d'ouvrir le bon thread de réponses focalisé sur ce commentaire.
       meta: { reviewUser: String(entry.user) },
     });
+
+    // Mission « Droit de réponse » (répondre à l'avis de quelqu'un d'autre).
+    if (String(entry.user) !== actorStr) triggerMissionCheck(req.userId);
 
     res.status(201).json({ comment: reviewComment(created, entry.comments, req.userId) });
   } catch (err) {

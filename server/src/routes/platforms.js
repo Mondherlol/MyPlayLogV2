@@ -5,6 +5,7 @@ import { ensureEntityLogos } from "../lib/entityLogos.js";
 import { ensurePlatformImages } from "../lib/platformImages.js";
 import UserGame from "../models/UserGame.js";
 import User from "../models/User.js";
+import { triggerMissionCheck } from "../lib/missions.js";
 
 const router = express.Router();
 
@@ -256,6 +257,7 @@ router.post("/:id/favorite", requireAuth, async (req, res) => {
     }
     user.favoritePlatforms = list;
     await user.save();
+    if (favorited) triggerMissionCheck(req.userId); // mission « Team console »
     res.json({ favorited, favoritePlatforms: user.favoritePlatforms });
   } catch (err) {
     console.error("platform favorite error:", err.message);
