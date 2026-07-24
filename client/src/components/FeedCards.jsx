@@ -55,6 +55,7 @@ import {
   VenetianMask,
 } from "lucide-react";
 import { PackageOpen, Sparkles as SparklesIc, Copy as CopyIc } from "lucide-react";
+import { Globe2, MapPin } from "lucide-react";
 import { rarityColor, rarityLabel } from "../lib/rarity";
 import RewardArt from "./RewardArt";
 import { apiFetch } from "../lib/api";
@@ -168,6 +169,8 @@ export function FeedCard(props) {
   if (item.type === "blindtestgroup") return <BlindTestGroupEvent {...props} />;
   if (item.type === "pixel") return <PixelRushEvent {...props} />;
   if (item.type === "pixelgroup") return <PixelRushGroupEvent {...props} />;
+  if (item.type === "geo") return <GeoEvent {...props} />;
+  if (item.type === "geogroup") return <GeoGroupEvent {...props} />;
   if (item.type === "caseopen") return <CaseOpenEvent {...props} />;
   if (item.type === "caseopengroup") return <CaseOpenGroupEvent {...props} />;
   if (item.type === "trackermatch") return <TrackerMatchEvent {...props} />;
@@ -2862,5 +2865,93 @@ export function FeedCardsSkeleton({ count = 3 }) {
         </div>
       ))}
     </div>
+  );
+}
+
+// ---------- GeoGamer : une partie d'exploration 360° ----------
+// Même gabarit que le blind test et Pixel Rush — score, réussite — pour que le
+// fil reste lisible d'une carte à l'autre. Carte purement informative : pas de
+// bouton d'action (les lieux ne se rejouent pas à l'identique).
+function GeoEvent({ item }) {
+  const pct = item.total ? Math.round((item.correct / item.total) * 100) : 0;
+  const ch = item.challenge;
+  return (
+    <article className="hf-card hf-blindtest hf-geo">
+      <EventHead user={item.user} date={item.date}>
+        <Globe2 size={13} className="hf-inline-ic" />{" "}
+        {ch ? (
+          <>
+            a défié <b>{ch.username}</b> à GeoGamer
+          </>
+        ) : (
+          "est parti en exploration sur GeoGamer"
+        )}
+      </EventHead>
+
+      <div className="hf-bt-body">
+        <div className="hf-bt-scorebox">
+          <span className="hf-bt-score-num">{item.score}</span>
+          <span className="hf-bt-score-lbl">points</span>
+        </div>
+        <div className="hf-bt-meta">
+          <span className="hf-bt-stat">
+            <MapPin size={13} /> {item.correct}/{item.total} lieux trouvés · {pct}%
+          </span>
+          {ch && (
+            <span className={`hf-bt-versus ${ch.beaten ? "win" : "lose"}`}>
+              <Swords size={12} />
+              {ch.beaten
+                ? `bat ${ch.username} (${ch.score})`
+                : `${ch.username} garde la tête (${ch.score})`}
+            </span>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+// Plusieurs expéditions d'affilée du même joueur → une seule carte.
+function GeoGroupEvent({ item }) {
+  return (
+    <article className="hf-card hf-blindtest hf-geo hf-btg">
+      <EventHead user={item.user} date={item.date}>
+        <Globe2 size={13} className="hf-inline-ic" /> a fait {item.count} expéditions
+        sur GeoGamer
+      </EventHead>
+
+      <div className="hf-btg-summary">
+        <div className="hf-bt-scorebox">
+          <span className="hf-bt-score-num">{item.bestScore}</span>
+          <span className="hf-bt-score-lbl">meilleur</span>
+        </div>
+        <span className="hf-btg-summary-txt">
+          {item.count} parties · {item.best.correct}/{item.best.total} au top
+        </span>
+      </div>
+
+      <ul className="hf-btg-list">
+        {item.games.map((g) => {
+          const pct = g.total ? Math.round((g.correct / g.total) * 100) : 0;
+          const best = g.score === item.bestScore;
+          return (
+            <li key={g.id} className={`hf-btg-row ${best ? "best" : ""}`}>
+              <span className="hf-btg-pts">
+                <b>{g.score}</b> pts
+              </span>
+              <span className="hf-btg-stat">
+                <MapPin size={12} /> {g.correct}/{g.total} · {pct}%
+              </span>
+              {g.challenge && (
+                <span className={`hf-btg-vs ${g.challenge.beaten ? "win" : "lose"}`}>
+                  <Swords size={11} /> {g.challenge.username}
+                </span>
+              )}
+              <span className="hf-btg-time">{timeAgo(g.date)}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </article>
   );
 }

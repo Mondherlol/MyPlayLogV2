@@ -250,6 +250,7 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
   const events = [];
   const blindtests = []; // regroupés en rafale après la boucle des activités
   const pixels = []; // idem pour Pixel Rush
+  const geos = []; // idem pour GeoGamer
   const caseopens = []; // idem : ouvrir plusieurs caisses d'affilée est la norme
 
   // --- Actions de bibliothèque (game_update) : on complète la carte avec
@@ -514,6 +515,22 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
         date: a.createdAt,
         user: person(a.actor),
         pixelGameId: a.meta.pixelGameId,
+        score: a.meta.score || 0,
+        correct: a.meta.correct || 0,
+        total: a.meta.total || 0,
+        challenge: a.meta.challenge || null,
+      });
+      continue;
+    }
+
+    if (a.type === "geo") {
+      if (!a.meta?.geoGameId) continue;
+      geos.push({
+        type: "geo",
+        id: `a-${a._id}`,
+        date: a.createdAt,
+        user: person(a.actor),
+        geoGameId: a.meta.geoGameId,
         score: a.meta.score || 0,
         correct: a.meta.correct || 0,
         total: a.meta.total || 0,
@@ -929,6 +946,13 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
   }));
   pushRuns(pixels, "pixelgroup", "px", (m) => ({
     pixelGameId: m.pixelGameId,
+    score: m.score,
+    correct: m.correct,
+    total: m.total,
+    challenge: m.challenge,
+  }));
+  pushRuns(geos, "geogroup", "geo", (m) => ({
+    geoGameId: m.geoGameId,
     score: m.score,
     correct: m.correct,
     total: m.total,

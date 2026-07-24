@@ -223,6 +223,17 @@ const userSchema = new mongoose.Schema(
     // Dernier passage sur le site (mis à jour par requireAuth, throttlé) :
     // alimente le « En ligne / Dernière activité il y a … » du profil.
     lastSeenAt: { type: Date, default: null },
+
+    // Série de connexions : jours civils CONSÉCUTIFS où le joueur est passé
+    // (cf. lib/streak.js, tenu à jour par requireAuth). `best` ne redescend
+    // jamais — c'est lui que lisent les missions « Connecte-toi N jours
+    // d'affilée », pour qu'un badge mérité ne se reperde pas à la première
+    // journée sautée. `lastDay` : jour civil (Europe/Paris) du dernier passage.
+    streak: {
+      current: { type: Number, default: 0 },
+      best: { type: Number, default: 0 },
+      lastDay: { type: String, default: null },
+    },
   },
   { timestamps: true }
 );

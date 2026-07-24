@@ -73,6 +73,32 @@ export function useGameSfx() {
             tone(f, 0.3, "triangle", 0.13, i * 0.1)
           );
           break;
+
+        // --- GeoGamer ---
+        // Départ d'expédition : une montée franche, plus ample que le « start »
+        // d'une simple manche — c'est le lancement de toute une partie.
+        case "launch":
+          [262, 392, 523, 784].forEach((f, i) =>
+            tone(f, 0.26, "triangle", 0.1, i * 0.06)
+          );
+          tone(1046, 0.4, "sine", 0.06, 0.24);
+          break;
+        // Atterrissage : le panorama vient de s'afficher, on est arrivé.
+        case "land":
+          tone(180, 0.18, "sine", 0.09);
+          tone(360, 0.22, "triangle", 0.06, 0.04);
+          break;
+        // Déploiement de la carte.
+        case "map-open":
+          tone(440, 0.1, "triangle", 0.07);
+          tone(660, 0.13, "triangle", 0.06, 0.06);
+          tone(880, 0.16, "sine", 0.05, 0.12);
+          break;
+        // Épingle posée : un « toc » sec et court, qu'on peut répéter sans
+        // fatiguer l'oreille puisqu'on déplace souvent son épingle.
+        case "pin":
+          tone(700, 0.04, "square", 0.05);
+          break;
         default:
           break;
       }

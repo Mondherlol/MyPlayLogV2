@@ -95,6 +95,45 @@ export function estimatePoints(r, guessGameId, guessName, timeMs, durationSec) {
   return -40;
 }
 
+// Miroir EXACT de scoreRound() de routes/geo.js. GeoGamer a sa propre fonction
+// plutôt qu'un paramètre en plus sur estimatePoints() : la difficulté du LIEU
+// n'existe que là, et lui donner une valeur par défaut ici décalerait
+// silencieusement les points affichés par le blind test et Pixel Rush.
+export function estimateGeoPoints(r, guessGameId, guessName, timeMs, durationSec) {
+  const correct = sameGame(r, guessGameId, guessName);
+  if (!correct) return 0; // aucune sanction pour une mauvaise réponse
+  const dur = durationSec * 1000;
+  const t = timeMs == null ? dur : Math.min(Math.max(timeMs, 0), dur);
+  const frac = dur > 0 ? (dur - t) / dur : 0;
+  const hard = (Math.min(Math.max(r.difficulty || 3, 1), 5) - 1) / 4;
+  return 300 + Math.round(300 * frac) + Math.round(200 * hard);
+}
+
+// Miroir EXACT de scoreMapGuess() de routes/geo.js — la manche bonus « où sur
+// la carte ? ». Les positions sont des FRACTIONS de la carte : ni les
+// dimensions du fichier ni la taille de l'écran n'entrent en jeu.
+//
+// Le barème vient de la source (relevé dans son geogamer.js), dont les paliers
+// sont exprimés dans un repère de 2100 unités — d'où la remise à l'échelle —
+// puis multiplié par 4 pour culminer à 400 comme nos autres manches.
+export const MAP_FRAME = 2100;
+export const MAP_MAX_POINTS = 400;
+
+function mapCurve(d) {
+  if (d <= 50) return 100;
+  if (d <= 150) return Math.round(100 - 0.15 * (d - 50));
+  if (d <= 300) return Math.round(85 - 0.133 * (d - 150));
+  if (d <= 500) return Math.round(65 - 0.125 * (d - 300));
+  if (d <= 800) return Math.round(40 - 0.083 * (d - 500));
+  return Math.max(0, Math.round(15 - 0.015 * (d - 800)));
+}
+
+export function estimateMapPoints(map, guess) {
+  if (!map || !guess) return { points: 0, distance: null };
+  const distance = Math.hypot(guess.x - map.answer.x, guess.y - map.answer.y);
+  return { points: mapCurve(distance * MAP_FRAME) * 4, distance };
+}
+
 // Une seule entrée par jeu « canonique » dans la recherche : pas de doublons
 // éditions / versions / remasters (le nom le plus court = le jeu de base, et
 // deviner l'un vaut l'autre grâce à sameGame). Précalcule au passage tout ce

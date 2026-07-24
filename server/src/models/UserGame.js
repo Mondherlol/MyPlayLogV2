@@ -87,6 +87,12 @@ const userGameSchema = new mongoose.Schema(
       enum: ["wishlist", "playing", "finished", "paused", "dropped", "endless"],
       default: "wishlist",
     },
+    // Ce jeu est passé par la wishlist à un moment de sa vie. Le statut seul ne
+    // le dirait pas (il est écrasé quand on se met à y jouer) : on le retient
+    // donc ici, une bonne fois — c'est ce qui permet de savoir qu'un jeu joué
+    // était un souhait (missions « Souhait exaucé »). Voir aussi le rattrapage
+    // des entrées d'avant ce champ : scripts/backfillWishlisted.js.
+    wasWishlisted: { type: Boolean, default: false },
     platform: { type: String, default: null },
     // Format d'achat sur console : dématérialisé ou boîte physique.
     format: { type: String, enum: ["digital", "physical"], default: "digital" },

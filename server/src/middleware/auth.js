@@ -1,21 +1,34 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import { canUserDownload, isUserAdmin } from "../lib/admin.js";
+import { dayKey, touchStreak } from "../lib/streak.js";
 
 // Présence : on note le dernier passage de chaque utilisateur (affiché sur son
-// profil). Throttlé en mémoire pour ne pas écrire en base à chaque requête.
+// profil) et, au passage, sa série de connexions. Throttlé en mémoire pour ne
+// pas écrire en base à chaque requête.
 const SEEN_THROTTLE = 3 * 60 * 1000; // 3 min
-const lastSeenWrites = new Map(); // userId -> timestamp de la dernière écriture
+const lastSeenWrites = new Map(); // userId -> { at, day } de la dernière écriture
 
 function touchLastSeen(userId) {
   const now = Date.now();
-  const prev = lastSeenWrites.get(userId) || 0;
-  if (now - prev < SEEN_THROTTLE) return;
-  lastSeenWrites.set(userId, now);
+  const today = dayKey();
+  const prev = lastSeenWrites.get(userId);
+  // Le throttle ne vaut qu'À L'INTÉRIEUR d'une journée : un passage à 00 h 01
+  // juste après un à 23 h 59 doit écrire, sinon la série saute un jour.
+  const sameDay = prev?.day === today;
+  if (sameDay && now - prev.at < SEEN_THROTTLE) return;
+  lastSeenWrites.set(userId, { at: now, day: today });
+  // Premier passage du jour : on repasse par la série (une lecture de plus).
+  // Le reste de la journée, on se contente de la simple écriture de présence.
   // Fire-and-forget : la présence ne doit jamais ralentir ni casser une requête.
-  User.updateOne({ _id: userId }, { $set: { lastSeenAt: new Date() } }, { timestamps: false }).catch(
-    () => lastSeenWrites.delete(userId)
-  );
+  const write = sameDay
+    ? User.updateOne(
+        { _id: userId },
+        { $set: { lastSeenAt: new Date() } },
+        { timestamps: false }
+      )
+    : touchStreak(userId, today);
+  write.catch(() => lastSeenWrites.delete(userId));
 }
 
 // Vérifie le token JWT présent dans l'en-tête Authorization: Bearer <token>

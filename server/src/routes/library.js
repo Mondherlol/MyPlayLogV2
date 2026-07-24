@@ -310,6 +310,16 @@ router.put("/:gameId", requireAuth, async (req, res) => {
       update.reviewedAt = new Date();
     }
 
+    // Passage par la wishlist, retenu une bonne fois (le statut, lui, sera
+    // écrasé le jour où le joueur s'y met) : c'est ce qui permet aux missions
+    // « Souhait exaucé » de reconnaître un jeu joué qui était un souhait. On le
+    // pose aussi bien à l'aller (statut wishlist) qu'au départ (on quitte la
+    // wishlist), pour les entrées créées avant ce champ.
+    const nextStatus = update.status ?? prev?.status ?? "wishlist";
+    if (nextStatus === "wishlist" || prev?.status === "wishlist") {
+      update.wasWishlisted = true;
+    }
+
     const entry = await UserGame.findOneAndUpdate(
       { user: req.userId, gameId },
       { $set: update },

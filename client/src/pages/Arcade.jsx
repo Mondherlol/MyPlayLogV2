@@ -12,6 +12,7 @@ import {
   X,
   Music2,
   Grid2x2,
+  Globe2,
   Trophy,
   Crown,
   Swords,
@@ -69,6 +70,16 @@ const GAMES = [
     api: "/pixel/leaderboard",
     idOf: (e) => e.gameId,
   },
+  {
+    key: "geo",
+    name: "GeoGamer",
+    tag: "Exploration",
+    pitch: "Lâché quelque part dans un jeu, tu as 60 secondes pour   trouver où tu es.",
+    Icon: Globe2,
+    path: "/geo",
+    api: "/geo/leaderboard",
+    idOf: (e) => e.geoGameId,
+  },
 ];
 
 // Libellés des lignes du grand livre (miroir de POINT_SOURCES,
@@ -76,6 +87,7 @@ const GAMES = [
 const SOURCE_LABELS = {
   blindtest: "Blind test",
   pixel: "Pixel Rush",
+  geo: "GeoGamer",
   case: "Ouverture de caisse",
   duplicate: "Doublon reconverti",
   admin: "Ajustement admin",
@@ -378,6 +390,10 @@ export default function Arcade() {
               cover={covers.length ? covers[i % covers.length] : null}
             />
           ))}
+          {/* Trois jeux, une grille de deux colonnes : la 4e case serait vide.
+              On y met une carte « à venir » — elle tient la promesse d'autres
+              mini-jeux et évite le trou à côté de GeoGamer. */}
+          <SoonCard />
         </div>
 
         {/* ---------- Les caisses ---------- */}
@@ -532,12 +548,16 @@ function GameCard({ game, mine, cover }) {
   return (
     <Link to={game.path} className={`arc-game g-${game.key} clickable`}>
       <span className="arc-game-glow" aria-hidden="true" />
+      {/* L'art à gauche, le titre et le pitch à sa droite : la carte se lit
+          d'un coup d'œil, l'ancien libellé (« Quiz musical »…) faisait
+          doublon avec la description. */}
       <span className="arc-game-top">
         <GameArt game={game} cover={cover} />
-        <span className="arc-game-tag">{game.tag}</span>
+        <span className="arc-game-head">
+          <span className="arc-game-name">{game.name}</span>
+          <span className="arc-game-pitch">{game.pitch}</span>
+        </span>
       </span>
-      <span className="arc-game-name">{game.name}</span>
-      <span className="arc-game-pitch">{game.pitch}</span>
       <span className="arc-game-foot">
         <span className="arc-game-stat">
           {mine ? (
@@ -558,11 +578,61 @@ function GameCard({ game, mine, cover }) {
   );
 }
 
+// ---------- La carte « à venir » ----------
+// Un placeholder assumé : non cliquable, grisé, un « ? » à la place de l'art.
+// Elle occupe la case libre de la grille sans faire semblant d'être jouable.
+function SoonCard() {
+  return (
+    <div className="arc-game arc-game-soon">
+      <span className="arc-game-glow" aria-hidden="true" />
+      <span className="arc-game-top">
+        <span className="arc-game-art soon" aria-hidden="true">
+          <b>?</b>
+        </span>
+        <span className="arc-game-head">
+          <span className="arc-game-name">Jeu mystère</span>
+          <span className="arc-game-pitch">
+            Un nouveau mini-jeu se prépare. Reviens vite pour le découvrir.
+          </span>
+        </span>
+      </span>
+      <span className="arc-game-foot">
+        <span className="arc-game-stat">
+          <Sparkles size={13} /> À venir bientôt
+        </span>
+        <span className="arc-game-cta soon">Bientôt</span>
+      </span>
+    </div>
+  );
+}
+
 // Format du canvas de la jaquette pixelisée : 3/4, comme une jaquette.
 const ART_CV_W = 186;
 const ART_CV_H = 248;
 
 function GameArt({ game, cover }) {
+  // GeoGamer ne dépend PAS de la bibliothèque du joueur : son art est un
+  // panorama fixe, le même pour tout le monde. D'où ce branchement avant le
+  // garde-fou ci-dessous — la carte a son globe même sur un compte vide.
+  if (game.key === "geo") {
+    // Un hublot ouvert sur un monde : la bande d'horizon d'un vrai panorama
+    // défile derrière la lentille, cerclée de méridiens qui tournent à la même
+    // cadence. Comme une équirectangulaire boucle horizontalement, la faire
+    // glisser EST une rotation — aucune 3D nécessaire pour une vignette.
+    return (
+      <span className="arc-game-art" aria-hidden="true">
+        <span className="arc-art-globe">
+          <span className="arc-art-world">
+            <span className="arc-art-pano" />
+            <span className="arc-art-shade" />
+          </span>
+          <i className="arc-art-mer a" />
+          <i className="arc-art-mer b" />
+          <i className="arc-art-eq" />
+        </span>
+      </span>
+    );
+  }
   // Bibliothèque vide ou jaquette manquante : on retombe sur la pastille.
   if (!cover?.cover) {
     return (

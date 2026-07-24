@@ -1,0 +1,2390 @@
+/* ======================================================================
+   GeoGamer — le cockpit
+   ======================================================================
+   PARTI PRIS : le panorama n'est pas une image posée dans une page, c'est
+   L'ÉCRAN. Aucun cadre, aucune marge, aucune carte : tout le reste flotte
+   par-dessus en verre sombre. C'est l'inverse exact des deux autres
+   mini-jeux, qui sont des pages-documents centrées sur un objet (le vinyle
+   du blind test, les cartes du plateau de Pixel Rush) — et c'est pourquoi
+   ce fichier ne réutilise AUCUNE classe .bt-*.
+
+   Le décor est toujours sombre, quel que soit le thème de l'appli : on
+   n'allume pas une salle blanche autour d'une photo de nuit. La couleur
+   d'accent est un cyan de signal — instruments, coordonnées, relevé — à
+   l'opposé de l'or du reste du site, qui n'a rien à faire ici.
+   ====================================================================== */
+.app-content {
+  padding: 0px !important;
+}
+
+.geo {
+  /* Fonds et verres */
+  --g-bg: #070b12;
+  --g-bg-2: #0d1524;
+  --g-glass: rgba(9, 15, 25, 0.72);
+  --g-glass-solid: rgba(9, 15, 25, 0.92);
+  --g-panel: #0e1727;
+  --g-line: rgba(255, 255, 255, 0.1);
+  --g-line-2: rgba(255, 255, 255, 0.2);
+  /* Texte */
+  --g-text: #eaf2f8;
+  --g-soft: rgba(234, 242, 248, 0.6);
+  --g-faint: rgba(234, 242, 248, 0.38);
+  /* Accent */
+  --g-acc: #22d3ee;
+  --g-acc-2: #67e8f9;
+  --g-acc-deep: #0e7490;
+  --g-grad: linear-gradient(135deg, #67e8f9, #22d3ee);
+  --g-glow: rgba(34, 211, 238, 0.35);
+  /* Verdicts */
+  --g-good: #34d399;
+  --g-bad: #fb7185;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - var(--topbar-h, 60px));
+  color: var(--g-text);
+  background: var(--g-bg);
+}
+
+/* ---------- Plein écran : le gabarit s'efface ----------
+   GeoGamer prend TOUT. La barre latérale disparaît complètement — on ne
+   navigue pas ailleurs pendant une expédition, et on en sort par le bouton
+   « quitter » du HUD. La page demande aussi son repli côté React
+   (mpl:sidebar-force) : ça garde le gabarit cohérent et n'écrase pas la
+   préférence de l'utilisateur, qui reprend la main en sortant. */
+body.geo-immersive .app-content {
+  padding: 0;
+  overflow: hidden;
+}
+
+body.geo-immersive .sidebar,
+body.geo-immersive .sidebar.collapsed {
+  display: none;
+}
+
+body.geo-immersive .app-shell {
+  --app-sidebar-w: 0px;
+}
+
+/* En partie, la page occupe exactement la hauteur disponible : le panorama
+   doit remplir, et rien ne doit défiler. */
+.geo.in-game {
+  height: calc(100dvh - var(--topbar-h, 60px));
+  overflow: hidden;
+}
+
+/* ======================================================================
+   Écran de lancement — tout se passe DANS le globe
+   ======================================================================
+   Le menu n'est pas posé DEVANT le globe, il est DEDANS. C'est ce qui a
+   dicté la technique : une sphère three.js ne peut pas héberger de DOM, donc
+   ce globe-ci est en CSS. Il y gagne un panorama qui défile derrière lui et
+   une inclinaison qui suit la souris — deux choses qui le font exister comme
+   un objet plutôt que comme une image de fond.
+
+   Il est DORÉ, pas cyan : c'est la couleur du site, et l'écran de lancement
+   appartient encore à l'arcade. Le cyan reprendra la main une fois en jeu,
+   quand le panorama occupera l'écran. */
+.geo-menu {
+  position: relative;
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: clamp(1rem, 4vw, 2rem);
+  overflow: hidden;
+  /* Le point de fuite de la bascule. Sans lui, les rotations du globe sont
+     plates et l'effet ne se lit pas. */
+  perspective: 1200px;
+  background: #06090f;
+}
+
+/* Le décor : la bande panoramique, floutée et assombrie. Elle ne doit jamais
+   disputer l'attention au globe — juste rappeler de quoi il est question. */
+.geo-menu-bg {
+  position: absolute;
+  inset: -40px;
+  /* débord : le flou ne doit pas révéler les bords */
+  background-image: url("/geo/globe-pano.webp");
+  background-repeat: repeat-x;
+  background-position: 0 center;
+  background-size: auto 130%;
+  filter: blur(7px) saturate(0.75) brightness(0.42);
+  animation: geo-bg-drift 90s linear infinite;
+}
+
+@keyframes geo-bg-drift {
+  to {
+    background-position-x: -1920px;
+  }
+}
+
+/* Un voile par-dessus : il assombrit les bords et laisse le centre respirer,
+   pour que le globe se détache. */
+.geo-menu-veil {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 18%, rgba(6, 9, 15, 0.86) 78%),
+    linear-gradient(rgba(6, 9, 15, 0.4), rgba(6, 9, 15, 0.4));
+}
+
+/* Le retour : HORS du globe, en haut à gauche de la page. C'est une sortie,
+   pas une option de jeu — il n'a rien à faire dans l'objet. */
+.geo-back {
+  position: absolute;
+  top: clamp(0.8rem, 2vw, 1.4rem);
+  left: clamp(0.8rem, 2vw, 1.4rem);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(10, 14, 22, 0.7);
+  color: rgba(234, 242, 248, 0.72);
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition: 0.18s;
+}
+
+.geo-back:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(10, 14, 22, 0.9);
+}
+
+/* ---------- Le globe ---------- */
+.geo-orb {
+  position: relative;
+  z-index: 2;
+  width: min(78vmin, 520px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  transform-style: preserve-3d;
+  /* La bascule suit la souris (transform posé en style inline). La transition
+     lisse les à-coups sans retarder le geste. */
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.4),
+    0 0 80px -16px rgba(34, 211, 238, 0.45),
+    0 40px 90px -30px rgba(0, 0, 0, 0.9);
+}
+
+/* La surface : un dégradé sphérique doré. Le point clair décalé en haut à
+   gauche fait la lumière, l'assombrissement du bas fait la courbure. */
+.geo-orb-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  /* Surface volontairement SOBRE : un verre bleuté à peine teinté, pas une
+     boule pleine. La couleur vit sur le pourtour, pas au centre — c'est là
+     que se lisent le titre et les boutons. */
+  background:
+    radial-gradient(circle at 34% 26%, rgba(103, 232, 249, 0.22) 0%, rgba(34, 211, 238, 0.1) 34%, rgba(6, 20, 32, 0.55) 68%, rgba(4, 10, 18, 0.85) 100%);
+  box-shadow: inset 0 0 60px -20px rgba(34, 211, 238, 0.45);
+}
+
+/* Méridiens et équateur : ce sont eux qui disent « sphère » plutôt que
+   « pastille ». Ils tournent lentement, à des cadences différentes. */
+.geo-orb-mer,
+.geo-orb-eq {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(103, 232, 249, 0.32);
+  pointer-events: none;
+}
+
+.geo-orb-mer.a {
+  animation: geo-orb-spin-a 26s linear infinite;
+}
+
+.geo-orb-mer.b {
+  animation: geo-orb-spin-b 38s linear infinite;
+  opacity: 0.55;
+}
+
+.geo-orb-eq {
+  inset: 50% 0 auto;
+  height: 0;
+  border-width: 1px 0 0 0;
+  opacity: 0.35;
+}
+
+@keyframes geo-orb-spin-a {
+  to {
+    transform: rotateY(360deg);
+  }
+}
+
+@keyframes geo-orb-spin-b {
+  from {
+    transform: rotateY(40deg);
+  }
+
+  to {
+    transform: rotateY(400deg);
+  }
+}
+
+/* Le reflet de verre, en haut à gauche : la touche qui rend l'objet solide. */
+.geo-orb-gloss {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse 46% 32% at 32% 20%, rgba(255, 255, 255, 0.3), transparent 70%);
+  pointer-events: none;
+}
+
+/* Le contenu, au cœur du globe. Le carré inscrit dans un cercle fait 70 % de
+   son diamètre : au-delà, les angles du bloc débordent de la sphère. */
+.geo-orb-in {
+  position: relative;
+  z-index: 3;
+  width: 70%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.85rem;
+}
+
+.geo-title {
+  margin: 0;
+  font-size: clamp(2rem, 6.5vmin, 3.2rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1;
+  background: linear-gradient(170deg, #fff 30%, #a8e6f5 70%, var(--g-acc));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.geo-lede {
+  margin: 0;
+  font-size: clamp(0.78rem, 1.6vmin, 0.92rem);
+  line-height: 1.45;
+  color: rgba(234, 242, 248, 0.62);
+}
+
+/* Sélecteur de manches : trois pastilles, la valeur au-dessus du mot. */
+.geo-seg {
+  display: flex;
+  gap: 0.3rem;
+  padding: 0.25rem;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(103, 232, 249, 0.2);
+}
+
+.geo-seg-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 56px;
+  padding: 0.4rem 0.5rem;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: rgba(234, 242, 248, 0.6);
+  font-weight: 800;
+  font-size: 1rem;
+  line-height: 1;
+  transition: 0.18s;
+}
+
+.geo-seg-opt em {
+  font-style: normal;
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.geo-seg-opt:hover {
+  color: #fff;
+}
+
+.geo-seg-opt.on {
+  background: var(--g-grad);
+  color: #04222b;
+  box-shadow: 0 4px 14px -4px var(--g-glow);
+}
+
+.geo-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.85rem 1.6rem;
+  border: 0;
+  border-radius: 15px;
+  background: var(--g-grad);
+  color: #04222b;
+  font-size: 1.04rem;
+  font-weight: 800;
+  box-shadow: 0 12px 34px -10px var(--g-glow);
+  transition: transform 0.18s, box-shadow 0.18s;
+}
+
+.geo-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 44px -10px rgba(34, 211, 238, 0.6);
+}
+
+.geo-cta.sm {
+  width: auto;
+  padding: 0.6rem 1.2rem;
+  font-size: 0.92rem;
+}
+
+/* Le son : HORS du globe, en haut à droite de la page, symétrique du bouton
+   retour à gauche. Ce sont deux commandes de page, pas des options de jeu. */
+.geo-menu-sound {
+  position: absolute;
+  top: clamp(0.8rem, 2vw, 1.4rem);
+  right: clamp(0.8rem, 2vw, 1.4rem);
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(10, 14, 22, 0.7);
+  color: rgba(234, 242, 248, 0.72);
+  transition: 0.18s;
+}
+
+.geo-menu-sound.on {
+  color: var(--g-acc-2);
+  border-color: rgba(34, 211, 238, 0.4);
+}
+
+.geo-menu-sound:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(10, 14, 22, 0.9);
+}
+
+.geo-kbd-hint {
+  margin-top: 0.5rem;
+  font-size: 0.74rem;
+  color: rgba(234, 242, 248, 0.5);
+}
+
+.geo-kbd-hint kbd {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font: inherit;
+  font-size: 0.7rem;
+}
+
+/* Le bouton fantôme reste utilisé par l'écran d'erreur et le tableau final. */
+.geo-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.7rem 1.2rem;
+  border-radius: 13px;
+  color: var(--g-soft);
+  text-decoration: none;
+  border: 1px solid var(--g-line);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.92rem;
+  font-weight: 700;
+  transition: 0.18s;
+}
+
+.geo-ghost:hover {
+  color: var(--g-text);
+  border-color: var(--g-line-2);
+}
+
+
+/* Petits écrans : le globe prend la largeur, le contenu s'y resserre. */
+@media (max-width: 560px) {
+  .geo-orb {
+    width: min(92vmin, 420px);
+  }
+
+  .geo-orb-in {
+    width: 76%;
+    gap: 0.65rem;
+  }
+
+  .geo-seg-opt {
+    min-width: 46px;
+  }
+}
+
+/* ---------- Attente / erreur ---------- */
+.geo-wait {
+  flex: 1;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.9rem;
+  padding: 2rem;
+  text-align: center;
+  color: var(--g-soft);
+}
+
+.geo-wait .spin {
+  color: var(--g-acc);
+}
+
+.geo-wait.err p {
+  color: var(--g-bad);
+  max-width: 420px;
+}
+
+.geo-wait-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ======================================================================
+   La partie — le panorama plein cadre, le HUD par-dessus
+   ====================================================================== */
+.geo-game {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: #05070b;
+}
+
+/* Voile de lisibilité : sans lui, du texte blanc sur un panorama enneigé
+   devient illisible. Deux dégradés discrets, en haut et en bas seulement —
+   le centre de l'image reste intact, c'est là qu'on cherche les indices. */
+.geo-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(4, 8, 14, 0.72), transparent 22%),
+    linear-gradient(transparent 62%, rgba(4, 8, 14, 0.78));
+}
+
+/* Toutes les couches de HUD laissent passer les gestes : la couche de saisie
+   du viewer est EN DESSOUS, et une barre qui capterait le clic créerait une
+   bande morte où le décor refuserait de tourner. Seuls les éléments
+   réellement actionnables réactivent les évènements. */
+/* Les couches de HUD laissent passer les gestes : la couche de saisie du
+   viewer est EN DESSOUS, et une barre qui capterait le clic créerait une bande
+   morte où le décor refuserait de tourner. Seuls les éléments réellement
+   actionnables réactivent les évènements. */
+.geo-hud-top,
+.geo-hud-bottom {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.geo-hud-top button,
+.geo-hud-bottom button,
+.geo-hud-bottom input,
+.geo-hud-bottom ul {
+  pointer-events: auto;
+}
+
+.geo-hud-top {
+  top: 0;
+  left: 0;
+  right: 0;
+  display: grid;
+  /* Trois colonnes égales : c'est la seule façon d'avoir le chrono
+     RIGOUREUSEMENT au centre de l'écran, quelle que soit la largeur de ce qui
+     l'entoure. Un simple space-between le décalerait dès que le score gagne un
+     chiffre. */
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;
+  gap: 0.8rem;
+  /* Assez large pour que les boutons ne chevauchent jamais les équerres du
+     viseur, qui occupent les angles jusqu'à ~50 px. */
+  padding: clamp(1.5rem, 3.4vw, 2.4rem) clamp(1.4rem, 3vw, 2.2rem);
+}
+
+/* ---------- Le cadre de visée ----------
+   Quatre équerres aux angles, comme dans un viseur. C'est ce qui fait lire le
+   panorama comme une PRISE DE VUE et non comme un fond d'écran — et ça cadre
+   l'image sans lui poser de bordure continue, qui l'enfermerait. */
+.geo-frame {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.geo-frame i {
+  position: absolute;
+  width: clamp(22px, 3vw, 34px);
+  height: clamp(22px, 3vw, 34px);
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.7));
+  transition: border-color 0.3s ease;
+}
+
+.geo-frame .tl {
+  top: 14px;
+  left: 14px;
+  border-width: 2px 0 0 2px;
+  border-radius: 6px 0 0 0;
+}
+
+.geo-frame .tr {
+  top: 14px;
+  right: 14px;
+  border-width: 2px 2px 0 0;
+  border-radius: 0 6px 0 0;
+}
+
+.geo-frame .bl {
+  bottom: 14px;
+  left: 14px;
+  border-width: 0 0 2px 2px;
+  border-radius: 0 0 0 6px;
+}
+
+.geo-frame .br {
+  bottom: 14px;
+  right: 14px;
+  border-width: 0 2px 2px 0;
+  border-radius: 0 0 6px 0;
+}
+
+/* Dernières secondes : le viseur passe à l'alerte, comme le reste du HUD. */
+.geo-game.hot .geo-frame i {
+  border-color: var(--g-bad);
+}
+
+/* Les deux colonnes du HUD haut : le bouton d'abord, les informations SOUS
+   lui. Empilées plutôt qu'en ligne, pour que les angles restent des angles et
+   que le centre appartienne au seul chrono. */
+.geo-hud-l,
+.geo-hud-r {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.geo-hud-l {
+  align-items: flex-start;
+}
+
+.geo-hud-r {
+  align-items: flex-end;
+}
+
+.geo-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border: 1px solid var(--g-line);
+  border-radius: 11px;
+  background: var(--g-glass);
+  color: var(--g-text);
+  transition: 0.18s;
+}
+
+.geo-icon-btn:hover {
+  background: var(--g-glass-solid);
+  border-color: var(--g-line-2);
+}
+
+/* ---------- L'état de la partie : manche et score, ensemble ----------
+   Un seul bloc plutôt que deux pastilles séparées : ce sont deux chiffres
+   qu'on lit d'un même coup d'œil, et les séparer encombrait le coin pour
+   rien. Tout est en `tabular-nums` — sans ça, la largeur du bloc saute à
+   chaque changement de score et le regard est attiré par un mouvement qui ne
+   veut rien dire. */
+.geo-state {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 12px;
+  background: var(--g-glass);
+  border: 1px solid var(--g-line);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.geo-state-round {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--g-soft);
+}
+
+.geo-state-round em {
+  font-style: normal;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--g-faint);
+}
+
+.geo-state-sep {
+  align-self: stretch;
+  width: 1px;
+  background: var(--g-line-2);
+}
+
+.geo-state-score {
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: var(--g-text);
+}
+
+.geo-state-score em {
+  font-style: normal;
+  font-size: 0.68rem;
+  font-weight: 700;
+  margin-left: 2px;
+  color: var(--g-faint);
+}
+
+.geo-pips {
+  display: flex;
+  gap: 3px;
+}
+
+.geo-pips i {
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.geo-pips i.done {
+  background: var(--g-acc-deep);
+}
+
+.geo-pips i.cur {
+  background: var(--g-acc);
+  box-shadow: 0 0 8px var(--g-glow);
+}
+
+/* ---------- Le chrono ----------
+   Pièce maîtresse du HUD : c'est la seule information qui change en continu
+   et qui coûte des points. Il est donc seul au centre, plus grand que tout
+   le reste, et il vire au rouge quand ça devient urgent. */
+.geo-timer {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+
+.geo-timer svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* L'anneau doit partir de midi, pas de trois heures. */
+  transform: rotate(-90deg);
+}
+
+.geo-timer-track {
+  fill: var(--g-glass);
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 5;
+}
+
+.geo-timer-fill {
+  fill: none;
+  stroke: var(--g-acc);
+  stroke-width: 5;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 6px var(--g-glow));
+  transition: stroke-dashoffset 0.12s linear, stroke 0.3s;
+}
+
+.geo-timer-num {
+  position: relative;
+  font-size: 1.4rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.geo-timer.idle .geo-timer-num {
+  color: var(--g-faint);
+}
+
+.geo-timer.hot .geo-timer-fill {
+  stroke: var(--g-bad);
+  filter: drop-shadow(0 0 8px rgba(251, 113, 133, 0.6));
+}
+
+.geo-timer.hot .geo-timer-num {
+  color: var(--g-bad);
+  animation: geo-tick 1s ease-in-out infinite;
+}
+
+@keyframes geo-tick {
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+/* Le cadre entier réagit à l'urgence : liseré rouge au bord de l'écran. */
+.geo-game.hot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  box-shadow: inset 0 0 90px rgba(251, 113, 133, 0.22);
+  animation: geo-alarm 1s ease-in-out infinite;
+}
+
+@keyframes geo-alarm {
+  50% {
+    box-shadow: inset 0 0 130px rgba(251, 113, 133, 0.32);
+  }
+}
+
+/* ---------- HUD bas : la réponse ---------- */
+.geo-hud-bottom {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: clamp(1.4rem, 3vw, 2.2rem);
+  transition: opacity 0.2s;
+}
+
+.geo-answer {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: min(620px, 100%);
+}
+
+/* La rangée sous le champ : l'aveu à gauche, la pause à droite. */
+.geo-answer-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  width: min(620px, 100%);
+  pointer-events: none;
+}
+
+.geo-dunno {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--g-line);
+  background: var(--g-glass);
+  color: var(--g-soft);
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition: 0.18s;
+}
+
+.geo-dunno:hover:not(:disabled) {
+  color: var(--g-text);
+  border-color: var(--g-line-2);
+  background: var(--g-glass-solid);
+}
+
+.geo-dunno:disabled {
+  opacity: 0.4;
+}
+
+.geo-field {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 0.9rem;
+  height: 52px;
+  border-radius: 15px;
+  background: var(--g-glass-solid);
+  border: 1px solid var(--g-line-2);
+  box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.9);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.geo-field:focus-within {
+  border-color: var(--g-acc);
+  box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.9), 0 0 0 3px rgba(34, 211, 238, 0.18);
+}
+
+.geo-field svg {
+  color: var(--g-faint);
+  flex: none;
+}
+
+.geo-field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--g-text);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.geo-field input::placeholder {
+  color: var(--g-faint);
+  font-weight: 500;
+}
+
+/* Suggestions : elles montent AU-DESSUS du champ, qui est déjà en bas. */
+.geo-suggest {
+  width: min(620px, 100%);
+  max-height: min(46vh, 340px);
+  margin: 0;
+  padding: 0.3rem;
+  list-style: none;
+  overflow-y: auto;
+  border-radius: 15px;
+  background: var(--g-glass-solid);
+  border: 1px solid var(--g-line);
+  box-shadow: 0 18px 44px -14px rgba(0, 0, 0, 0.9);
+}
+
+.geo-suggest-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--g-text);
+  text-align: left;
+  transition: background 0.12s;
+}
+
+.geo-suggest-row.on {
+  background: rgba(34, 211, 238, 0.16);
+}
+
+.geo-suggest-row img,
+.geo-suggest-ph {
+  width: 30px;
+  height: 40px;
+  flex: none;
+  object-fit: cover;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.geo-suggest-ph {
+  display: grid;
+  place-items: center;
+  color: var(--g-faint);
+}
+
+.geo-suggest-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.geo-suggest-row kbd {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  font: inherit;
+  font-size: 0.72rem;
+  color: var(--g-soft);
+}
+
+
+/* ---------- Révélation ----------
+   Carte posée en bas, jamais une modale plein écran : le panorama reste
+   visible derrière, et c'est précisément le moment où l'on comprend le
+   détail qu'on avait sous les yeux sans le voir. */
+.geo-reveal {
+  position: absolute;
+  z-index: 8;
+  left: 50%;
+  bottom: clamp(0.8rem, 2vw, 1.3rem);
+  transform: translateX(-50%);
+  width: min(680px, calc(100% - 1.6rem));
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 17px;
+  overflow: hidden;
+  background: var(--g-glass-solid);
+  border: 1px solid var(--g-line-2);
+  box-shadow: 0 22px 50px -16px rgba(0, 0, 0, 0.95);
+  animation: geo-rv-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes geo-rv-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 14px);
+  }
+}
+
+.geo-reveal.good {
+  border-color: rgba(52, 211, 153, 0.55);
+}
+
+.geo-reveal.bad {
+  border-color: rgba(251, 113, 133, 0.55);
+}
+
+/* La barre du décompte avant passage automatique (5 s — synchro avec
+   AUTO_NEXT_MS côté JS). */
+.geo-rv-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 2px;
+  width: 100%;
+  transform-origin: left center;
+  background: var(--g-grad);
+  animation: geo-rv-count 5s linear both;
+}
+
+@keyframes geo-rv-count {
+  from {
+    transform: scaleX(1);
+  }
+
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.geo-rv-badge {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 50%;
+  color: #04222b;
+}
+
+.geo-reveal.good .geo-rv-badge {
+  background: var(--g-good);
+}
+
+.geo-reveal.bad .geo-rv-badge {
+  background: var(--g-bad);
+}
+
+.geo-rv-cover {
+  width: 38px;
+  height: 51px;
+  flex: none;
+  object-fit: cover;
+  border-radius: 7px;
+  border: 1px solid var(--g-line);
+}
+
+.geo-rv-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.geo-rv-verdict {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--g-faint);
+}
+
+.geo-rv-verdict b {
+  font-size: 0.92rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.geo-rv-verdict b.up {
+  color: var(--g-good);
+}
+
+.geo-rv-verdict b.down {
+  color: var(--g-bad);
+}
+
+.geo-rv-name {
+  font-size: 1.02rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.geo-rv-txt em {
+  font-style: normal;
+  font-size: 0.78rem;
+  color: var(--g-faint);
+}
+
+.geo-rv-next {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+  padding: 0.6rem 0.9rem;
+  border: 0;
+  border-radius: 12px;
+  background: var(--g-grad);
+  color: #04222b;
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+.geo-rv-next span {
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: rgba(4, 34, 43, 0.22);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ======================================================================
+   Manche bonus — « où sur la carte ? »
+   ======================================================================
+   Posée par-dessus le panorama, qui reste visible derrière : on peut encore
+   jeter un œil au décor pour se repérer.
+
+   La carte se manipule comme une vraie carte — molette pour zoomer, glisser
+   pour déplacer. Le cadre est fixe et c'est le CALQUE intérieur qui est
+   transformé (translate + scale), donc les épingles, posées en pourcentage
+   dans ce calque, suivent naturellement. Elles annulent le zoom sur
+   elles-mêmes pour garder leur taille à l'écran. */
+.geo-map-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: grid;
+  place-items: center;
+  padding: clamp(0.6rem, 2vw, 1.2rem);
+  background: rgba(4, 8, 14, 0.78);
+  animation: geo-map-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes geo-map-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.geo-map {
+  display: flex;
+  flex-direction: column;
+  width: min(900px, 100%);
+  max-height: 100%;
+  padding: 0.75rem;
+  gap: 0.6rem;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(18, 30, 46, 0.96), rgba(9, 15, 25, 0.96));
+  border: 1px solid var(--g-line-2);
+  box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.95), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  animation: geo-map-rise 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes geo-map-rise {
+  from {
+    transform: translateY(18px) scale(0.97);
+  }
+}
+
+.geo-map-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  padding: 0 0.25rem;
+}
+
+.geo-map-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  font-size: 0.92rem;
+  color: var(--g-soft);
+}
+
+.geo-map-title svg {
+  flex: none;
+  color: var(--g-acc);
+}
+
+.geo-map-title b {
+  color: var(--g-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.geo-map-timer {
+  flex: none;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.86rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--g-line);
+}
+
+.geo-map-timer.hot {
+  background: rgba(251, 113, 133, 0.85);
+  border-color: transparent;
+  color: #fff;
+  animation: geo-tick 1s ease-in-out infinite;
+}
+
+.geo-map-score {
+  flex: none;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  padding: 0.28rem 0.8rem;
+  border-radius: 999px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #04222b;
+  background: var(--g-grad);
+  animation: geo-score-pop 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.geo-map-score em {
+  font-style: normal;
+  font-size: 0.66rem;
+  font-weight: 700;
+  opacity: 0.7;
+}
+
+@keyframes geo-score-pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+}
+
+/* ---------- Le cadre et son calque transformable ---------- */
+.geo-map-stage {
+  position: relative;
+  width: 100%;
+  /* `min-height` et NON `flex:1; height` : c'est le correctif d'un bug où la
+     carte disparaissait. Avec `flex:1; min-height:0`, dès que le panneau était
+     un peu à l'étroit (viewport court), flexbox écrasait le stage jusqu'à zéro
+     et on ne voyait plus que l'en-tête et le pied, séparés par du vide.
+     `min-height` ne se laisse pas comprimer par le parent flex : la carte est
+     toujours visible, quitte à ce que le panneau déborde et scrolle. */
+  flex: 0 1 auto;
+  min-height: min(52vh, 440px);
+  overflow: hidden;
+  border-radius: 15px;
+  border: 1px solid var(--g-line);
+  background: #060d16;
+  cursor: crosshair;
+  /* Sans ça, un glissement vertical fait défiler la page au lieu de déplacer
+     la carte. */
+  touch-action: none;
+}
+
+.geo-map-stage.zoomed {
+  cursor: grab;
+}
+
+.geo-map-stage.zoomed:active {
+  cursor: grabbing;
+}
+
+.geo-map-stage.done {
+  cursor: default;
+}
+
+.geo-map-layer {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.geo-map-layer img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* `fill` et non `contain` : le calque a exactement la taille du cadre, et
+     les positions sont des fractions — un letterboxing décalerait tout. */
+  object-fit: fill;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Le trait entre le clic et la vérité : c'est lui qui fait comprendre
+   l'erreur d'un coup d'œil. `preserveAspectRatio: none` est voulu — le SVG
+   doit s'étirer exactement comme l'image. */
+.geo-map-link {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.geo-map-link line {
+  stroke: #fff;
+  stroke-width: 2.5;
+  stroke-dasharray: 9 9;
+  stroke-linecap: round;
+  opacity: 0.85;
+  /* L'épaisseur ne doit ni s'étirer avec le viewBox déformé, ni grossir au
+     zoom : elle reste constante à l'écran. */
+  vector-effect: non-scaling-stroke;
+  animation: geo-link-draw 0.45s ease both;
+}
+
+@keyframes geo-link-draw {
+  from {
+    opacity: 0;
+  }
+}
+
+.geo-map-pin {
+  position: absolute;
+  /* L'épingle pointe vers le BAS : sa pointe doit tomber sur le point, donc
+     on la remonte de toute sa hauteur au lieu de la centrer. Le scale inverse
+     (posé en style inline) annule le zoom du calque. */
+  transform-origin: 50% 100%;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.9));
+}
+
+.geo-map-pin.mine {
+  color: var(--g-acc);
+  z-index: 2;
+  animation: geo-pin-drop 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.geo-map-pin.truth {
+  color: var(--g-good);
+  z-index: 1;
+}
+
+@keyframes geo-pin-drop {
+  from {
+    opacity: 0;
+    margin-top: -14px;
+  }
+}
+
+/* Onde autour du vrai point : le regard y va tout de suite. */
+.geo-map-halo {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  margin: 0 0 -7px -7px;
+  border-radius: 50%;
+  border: 2px solid var(--g-good);
+  animation: geo-halo 1.6s ease-out infinite;
+}
+
+@keyframes geo-halo {
+  from {
+    transform: scale(0.5);
+    opacity: 0.9;
+  }
+
+  to {
+    transform: scale(4.5);
+    opacity: 0;
+  }
+}
+
+/* ---------- Commandes de vue ---------- */
+.geo-map-zoom {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgba(6, 13, 22, 0.82);
+  border: 1px solid var(--g-line);
+}
+
+.geo-map-zoom button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--g-soft);
+  transition: 0.15s;
+}
+
+.geo-map-zoom button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--g-text);
+}
+
+.geo-map-zoom button:disabled {
+  opacity: 0.3;
+}
+
+/* ---------- Pied ---------- */
+.geo-map-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  padding: 0 0.25rem;
+}
+
+.geo-map-help {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.86rem;
+  color: var(--g-soft);
+}
+
+.geo-map-help em {
+  font-style: normal;
+  font-size: 0.74rem;
+  color: var(--g-faint);
+}
+
+.geo-map-verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  color: var(--g-soft);
+}
+
+.geo-map-verdict svg {
+  color: var(--g-acc);
+}
+
+.geo-map-verdict b {
+  color: var(--g-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Pastille du récap : signale les manches où la carte a rapporté. */
+.geo-tag.map {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--g-acc-2);
+  background: rgba(34, 211, 238, 0.14);
+}
+
+@media (max-width: 760px) {
+  .geo-map {
+    padding: 0.6rem;
+    border-radius: 18px;
+  }
+
+  .geo-map-stage {
+    /* `min-height`, comme sur desktop : `height` se ferait écraser par flex
+       et la carte disparaîtrait sur écran court. */
+    min-height: 44vh;
+  }
+
+  .geo-map-title {
+    font-size: 0.82rem;
+  }
+
+  .geo-map-foot {
+    justify-content: center;
+  }
+
+  .geo-map-foot .geo-rv-next {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ======================================================================
+   Fin de partie
+   ====================================================================== */
+.geo-done {
+  flex: 1;
+  padding: clamp(1.4rem, 4vw, 2.6rem) clamp(1rem, 4vw, 2.4rem) 3rem;
+  background: radial-gradient(110% 70% at 50% -10%, #12293c 0%, var(--g-bg) 60%);
+}
+
+/* En-tête épuré, EN LIGNE : score | chiffres | actions, sur une seule barre
+   posée au-dessus du détail et du classement. Pas de médaille, pas d'anneau,
+   pas de carte — juste l'essentiel, aligné. */
+.geo-done-hero {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.9rem, 3vw, 2rem);
+  flex-wrap: wrap;
+  max-width: 1080px;
+  margin: 0 auto 1.1rem;
+  padding: 0 0.2rem 1.1rem;
+  border-bottom: 1px solid var(--g-line);
+}
+
+/* Le score : gros chiffre + unité en dessous, calé à gauche. */
+.geo-done-score {
+  display: flex;
+  flex-direction: column;
+  line-height: 0.95;
+}
+.geo-done-score b {
+  font-size: clamp(2.4rem, 7vw, 3.4rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  background: var(--g-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-variant-numeric: tabular-nums;
+}
+.geo-done-score span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--g-faint);
+}
+
+/* Les chiffres, en ligne, séparés d'un point. */
+.geo-done-facts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  flex: 1;
+  font-size: 0.92rem;
+  color: var(--g-soft);
+}
+.geo-done-fact b {
+  color: var(--g-text);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.geo-done-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--g-faint);
+}
+.geo-done-earned {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  text-decoration: none;
+  font-weight: 800;
+  color: var(--g-acc-2);
+  background: rgba(34, 211, 238, 0.12);
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  transition: 0.18s;
+}
+.geo-done-earned:hover {
+  background: rgba(34, 211, 238, 0.2);
+}
+.geo-done-vs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid var(--g-line);
+}
+.geo-done-vs.win {
+  color: var(--g-good);
+  border-color: rgba(52, 211, 153, 0.45);
+}
+.geo-done-vs.lose {
+  color: var(--g-bad);
+  border-color: rgba(251, 113, 133, 0.4);
+}
+
+.geo-done-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.geo-offline {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--g-faint);
+}
+
+.geo-done-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 1rem;
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.geo-panel {
+  padding: 1rem;
+  border-radius: 16px;
+  background: var(--g-panel);
+  border: 1px solid var(--g-line);
+}
+
+.geo-panel-h {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--g-faint);
+}
+
+.geo-panel-h svg {
+  color: var(--g-acc);
+}
+
+.geo-panel-wait {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  color: var(--g-acc);
+}
+
+.geo-panel-empty {
+  font-size: 0.88rem;
+  color: var(--g-faint);
+}
+
+.geo-recap {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.geo-recap-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.45rem;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.03);
+  border-left: 2px solid transparent;
+}
+
+.geo-recap-row.good {
+  border-left-color: var(--g-good);
+}
+
+.geo-recap-row.bad {
+  border-left-color: var(--g-bad);
+}
+
+.geo-recap-art {
+  position: relative;
+  width: 40px;
+  height: 54px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.geo-recap-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.geo-recap-verdict {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  color: #04222b;
+}
+
+.geo-recap-row.good .geo-recap-verdict {
+  background: var(--g-good);
+}
+
+.geo-recap-row.bad .geo-recap-verdict {
+  background: var(--g-bad);
+}
+
+.geo-recap-360 {
+  position: absolute;
+  bottom: 3px;
+  left: 3px;
+  padding: 0 4px;
+  border-radius: 999px;
+  font-size: 0.55rem;
+  font-weight: 800;
+  background: rgba(4, 8, 14, 0.75);
+  color: var(--g-acc-2);
+}
+
+.geo-recap-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.geo-recap-name {
+  color: var(--g-text);
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.geo-recap-name:hover {
+  color: var(--g-acc-2);
+}
+
+.geo-recap-your {
+  font-size: 0.76rem;
+  color: var(--g-faint);
+}
+
+.geo-recap-meta {
+  display: flex;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  color: var(--g-faint);
+}
+
+.geo-tag {
+  padding: 0 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.geo-recap-pts {
+  flex: none;
+  font-size: 0.9rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.geo-recap-pts.up {
+  color: var(--g-good);
+}
+
+.geo-recap-pts.down {
+  color: var(--g-bad);
+}
+
+.geo-board {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.geo-board-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.45rem;
+  border-radius: 10px;
+}
+
+.geo-board-row.me {
+  background: rgba(34, 211, 238, 0.12);
+}
+
+.geo-rank {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 7px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--g-soft);
+}
+
+.geo-rank.r1 {
+  background: var(--g-grad);
+  color: #04222b;
+}
+
+.geo-rank.r2,
+.geo-rank.r3 {
+  background: rgba(34, 211, 238, 0.22);
+  color: var(--g-acc-2);
+}
+
+.geo-board-user {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 1;
+  min-width: 0;
+  color: var(--g-text);
+  text-decoration: none;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.geo-board-user span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.geo-board-user img,
+.geo-board-av {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 0.7rem;
+}
+
+.geo-board-fight {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 7px;
+  color: var(--g-faint);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.geo-board-fight:hover {
+  color: var(--g-acc);
+}
+
+.geo-board-score {
+  flex: none;
+  font-size: 0.88rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Revisiter un lieu ---------- */
+.geo-revisit {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(3, 6, 11, 0.82);
+}
+
+.geo-revisit-box {
+  width: min(1100px, 100%);
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--g-panel, #0e1727);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #eaf2f8;
+}
+
+.geo-revisit-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.geo-revisit-head img {
+  width: 32px;
+  height: 43px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.geo-revisit-head>span {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.geo-revisit-head em {
+  font-style: normal;
+  font-size: 0.75rem;
+  opacity: 0.6;
+}
+
+.geo-revisit-stage {
+  position: relative;
+  height: min(66vh, 620px);
+  background: #05070b;
+}
+
+/* ======================================================================
+   PanoViewer — la sphère et sa couche de saisie
+   ====================================================================== */
+.pano {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #05070b;
+}
+
+/* On stylise le VRAI <canvas>, jamais le conteneur que R3F s'est fabriqué :
+   celui-ci porte son propre `position:relative; width:100%; height:100%`, et
+   R3F ne crée le canvas que si ce conteneur mesure plus de 0. Lui imposer un
+   positionnement depuis l'extérieur casse cette mesure — le rendu reste alors
+   noir, sans la moindre erreur. */
+.pano canvas {
+  display: block;
+  touch-action: none;
+  transition: filter 0.25s ease;
+}
+
+/* La couche qui capte les gestes. `touch-action: none` est indispensable :
+   sans elle, un glissement vertical sur mobile ferait défiler la page au lieu
+   de faire pivoter le décor. */
+.pano-input {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  touch-action: none;
+  cursor: grab;
+}
+
+.pano-input:active {
+  cursor: grabbing;
+}
+
+.pano.locked .pano-input {
+  pointer-events: none;
+}
+
+.pano-load {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.55rem;
+  color: #dbe7f0;
+  background: #05070b;
+}
+
+.pano-load .spin {
+  color: #22d3ee;
+}
+
+.pano-load-txt {
+  font-size: 0.9rem;
+  opacity: 0.7;
+}
+
+.pano-load-bar {
+  width: min(300px, 62vw);
+  height: 4px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.pano-load-bar i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: left center;
+  background: linear-gradient(135deg, #67e8f9, #22d3ee);
+  transition: transform 0.15s linear;
+}
+
+.pano-load-pct {
+  font-size: 0.78rem;
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+
+.pano-err {
+  color: #fb7185;
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 1rem;
+}
+
+
+/* ======================================================================
+   La carte GeoGamer dans l'arcade — le hublot
+   ======================================================================
+   Ces classes sont en `.arc-*` et vivraient donc dans app-19-arcade.css,
+   mais elles ne servent qu'à CE jeu : elles restent avec lui pour qu'ajouter
+   ou retirer GeoGamer ne demande de toucher qu'un seul fichier de style.
+
+   Le hublot montre un VRAI panorama — la bande d'horizon d'un des lieux du
+   catalogue, servie en asset statique (public/geo/globe-pano.webp, 53 Ko).
+   Comme une équirectangulaire boucle horizontalement, la faire défiler EST
+   une rotation : aucune 3D pour une vignette de 82 px.
+
+   La palette reste DORÉE, celle de l'arcade : la page n'a aucune raison de
+   virer au cyan pour une carte sur trois. Le gabarit (.arc-game-art : 96×90)
+   est imposé par la carte. */
+.arc-art-globe {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 82px;
+  height: 82px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid var(--orange, #f2b70b);
+  /* Indispensable pour les méridiens : leur `rotateY` a besoin d'un point de
+     fuite porté par LEUR parent. Celui de .arc-game-art ne s'applique qu'à ses
+     enfants directs, donc sans cette ligne les anneaux s'aplatissent au lieu
+     de tourner autour de la sphère. */
+  perspective: 240px;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 0 18px -4px rgba(242, 183, 11, 0.55),
+    0 10px 24px -10px rgba(0, 0, 0, 0.6);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.28s ease;
+}
+
+/* Le monde vu à travers la lentille.
+   ------------------------------------------------------------------
+   GÉOMÉTRIE, c'est tout le sujet. La bande fait 1920×320, soit 6:1. Si on
+   force sa hauteur à celle du hublot (68 px), une tuile ne fait que 408 px :
+   on voit alors ~60° d'horizon écrasés dans 68 pixels, ce qui donne cette
+   impression de photo prise de très loin, et le tout est illisible.
+
+   On agrandit donc la bande BIEN AU-DELÀ du cadre — 120 px de haut, soit une
+   tuile de 720 px — et le hublot n'en découpe qu'une tranche de 68 px, c'est
+   à dire ~34° de champ. On regarde à travers un hublot au lieu de contempler
+   une carte postale.
+
+   Les deux valeurs sont liées : tuile = hauteur × 6 (le ratio de la bande).
+   En changer une sans l'autre ferait sauter l'image à chaque boucle. */
+.arc-art-world {
+  /* Le panorama est un équirectangulaire ENTIER (2:1), pas une bande : il
+     remplit toute la hauteur du hublot et défile en boucle, ce qui lit comme
+     un globe qui tourne. La lentille fait 72 px de haut (82 − 5 px d'inset de
+     chaque côté), donc une image 2:1 y fait 144 px de large — c'est de cette
+     distance qu'on la fait défiler par tour pour que la boucle soit invisible.
+     Toucher à l'un sans l'autre ferait sauter l'image. */
+  --arc-tile: 144px;
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #0a1a26;
+}
+
+.arc-art-pano {
+  /* Remplit toute la lentille : l'image entière occupe la hauteur, sa largeur
+     suit (2× la hauteur), et elle se répète pour la boucle. */
+  position: absolute;
+  inset: 0;
+  background-image: url("/geo/globe-pano.webp");
+  background-repeat: repeat-x;
+  background-position: center;
+  background-size: auto 100%;
+  animation: arc-globe-turn 24s linear infinite;
+}
+
+@keyframes arc-globe-turn {
+  to {
+    background-position-x: calc(-1 * var(--arc-tile));
+  }
+}
+
+/* Le verre. C'est LUI qui fait la sphère : sans ces trois couches on ne voit
+   qu'un disque avec une image dedans.
+     1. un liseré clair sur tout le pourtour → l'épaisseur de la lentille ;
+     2. un reflet franc en haut à gauche → la source de lumière ;
+     3. un assombrissement qui se referme sur les bords → la courbure. */
+.arc-art-shade {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.5), transparent 38%),
+    radial-gradient(circle at 62% 76%,
+      rgba(255, 255, 255, 0.12),
+      transparent 30%),
+    radial-gradient(circle at 50% 50%, transparent 38%, rgba(2, 8, 14, 0.78) 96%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+    inset 0 3px 10px rgba(255, 255, 255, 0.16),
+    inset 0 -6px 14px rgba(0, 0, 0, 0.6);
+}
+
+/* Méridiens et équateur, calés sur la MÊME période que le panorama : les deux
+   mouvements se lisent alors comme une seule rotation. */
+.arc-art-mer,
+.arc-art-eq {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(242, 183, 11, 0.55);
+  pointer-events: none;
+}
+
+.arc-art-mer.a {
+  animation: arc-mer-a 26s linear infinite;
+}
+
+.arc-art-mer.b {
+  animation: arc-mer-b 39s linear infinite;
+  opacity: 0.6;
+}
+
+.arc-art-eq {
+  inset: 47% 2px auto;
+  height: 0;
+  border-width: 1px 0 0 0;
+  opacity: 0.5;
+}
+
+@keyframes arc-mer-a {
+  to {
+    transform: rotateY(360deg);
+  }
+}
+
+@keyframes arc-mer-b {
+  from {
+    transform: rotateY(30deg);
+  }
+
+  to {
+    transform: rotateY(390deg);
+  }
+}
+
+/* Au survol de la carte, le globe s'approche et s'allume — même langage que
+   les autres cartes de l'arcade. */
+.arc-game.g-geo:hover .arc-art-globe {
+  transform: translate(-50%, -50%) scale(1.07);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 0 26px -2px rgba(242, 183, 11, 0.75),
+    0 14px 30px -10px rgba(0, 0, 0, 0.7);
+}
+
+/* ======================================================================
+   En jeu : vies, notification « raté », volet social
+   ====================================================================== */
+.geo-lives-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: 26px;
+  pointer-events: none;
+}
+.geo-lives {
+  display: inline-flex;
+  gap: 0.3rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  background: var(--g-glass);
+  border: 1px solid var(--g-line);
+}
+.geo-lives .on {
+  color: var(--g-bad);
+  filter: drop-shadow(0 0 4px rgba(251, 113, 133, 0.5));
+}
+.geo-lives .off {
+  color: rgba(255, 255, 255, 0.2);
+}
+.geo-lives svg {
+  transition: color 0.3s, filter 0.3s;
+}
+.geo-wrong {
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(251, 113, 133, 0.9);
+  animation: geo-wrong-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes geo-wrong-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.9);
+  }
+}
+
+/* Volet social : « N amis l'ont trouvé » / « aucun de tes amis ». Discret,
+   informatif, jamais un spoiler : il ne dit pas QUEL jeu. */
+.geo-friends {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  align-self: center;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  pointer-events: none;
+  border: 1px solid var(--g-line);
+  background: var(--g-glass);
+  color: var(--g-soft);
+}
+.geo-friends.found {
+  color: var(--g-acc-2);
+  border-color: rgba(34, 211, 238, 0.35);
+  background: rgba(34, 211, 238, 0.1);
+}
+.geo-friends svg {
+  flex: none;
+}
+
+/* Carte de la manche bonus illisible : la sortie de secours. */
+.geo-map-broken {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.7rem;
+  background: #060d16;
+  color: var(--g-soft);
+}
+.geo-map-broken svg {
+  color: var(--g-faint);
+}
+
+/* ======================================================================
+   Épuisement : le joueur a fait le tour du catalogue
+   ====================================================================== */
+.geo-exhausted {
+  flex: 1;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.8rem;
+  padding: 2rem;
+  text-align: center;
+  background: radial-gradient(120% 80% at 50% 20%, #12293c 0%, var(--g-bg) 62%);
+}
+.geo-exhausted-badge {
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  color: var(--g-acc);
+  background: radial-gradient(circle at 40% 32%, #143243, #08151f);
+  box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.35), 0 0 40px -8px var(--g-glow);
+  animation: geo-badge-pulse 3s ease-in-out infinite;
+}
+.geo-exhausted h1 {
+  margin: 0.6rem 0 0;
+  font-size: clamp(1.5rem, 5vw, 2.1rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--g-text);
+}
+.geo-exhausted p {
+  margin: 0;
+  max-width: 440px;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--g-soft);
+}
+.geo-exhausted .geo-cta {
+  margin-top: 0.8rem;
+  width: auto;
+}
+
+/* ======================================================================
+   Fil : carte « est parti en exploration sur GeoGamer »
+   ======================================================================
+   La carte reprend la coquille du blind test (.hf-bt-*, cf.
+   app-14-blindtest.css) — même contrat de données, donc même gabarit, et le
+   fil reste lisible d'une carte à l'autre. On ne pose ici que ce qui change :
+   l'accent CYAN du jeu, celui de sa page.
+
+   Ces sélecteurs sont en `.hf-*` et vivraient donc dans le fichier du fil,
+   mais ils ne servent qu'à GeoGamer : ils restent avec lui, comme le fait
+   déjà app-22-pixel.css pour Pixel Rush. */
+.hf-geo .hf-bt-scorebox {
+  background: linear-gradient(140deg, #67e8f9, #0e7490);
+  color: #04222b;
+}
+
+.hf-geo .hf-bt-stat svg,
+.hf-geo .hf-btg-pts b,
+.hf-geo .hf-btg-stat svg {
+  color: #0e9bb5;
+}
+
+/* ======================================================================
+   Mobile
+   ====================================================================== */
+@media (max-width: 760px) {
+
+  /* La barre de navigation du bas recouvrirait le champ de réponse dès que
+     le clavier virtuel s'ouvre. Elle est désormais retirée pour TOUTES les
+     tailles d'écran (cf. le bloc en tête de fichier), il n'y a donc plus rien
+     de spécifique à faire ici. */
+  .geo,
+  .geo.in-game {
+    min-height: calc(100dvh - var(--topbar-h, 60px));
+    height: calc(100dvh - var(--topbar-h, 60px));
+  }
+
+  .geo-hud-top {
+    align-items: center;
+  }
+
+  .geo-state {
+    padding: 0.3rem 0.55rem;
+    gap: 0.4rem;
+  }
+
+  .geo-state-round {
+    font-size: 0.84rem;
+  }
+
+  .geo-pips {
+    display: none;
+    /* la fraction « 3/10 » suffit sur un petit écran */
+  }
+
+  .geo-timer {
+    width: 58px;
+    height: 58px;
+  }
+
+  .geo-timer-num {
+    font-size: 1.15rem;
+  }
+
+  .geo-state-score em {
+    display: none;
+  }
+
+  /* Les indices passent en bandeau horizontal : une colonne latérale mangerait
+     la moitié d'un écran de téléphone. */
+  .geo-field {
+    height: 46px;
+  }
+
+  .geo-suggest {
+    max-height: 38vh;
+  }
+
+  .geo-reveal {
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  .geo-rv-next {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .geo-done-cols {
+    grid-template-columns: 1fr;
+  }
+
+  .geo-revisit-stage {
+    height: 56vh;
+  }
+}
+
+/* Mouvement réduit : on coupe tout ce qui tourne en boucle. La dérive lente
+   du panorama est gérée côté JS et reste, elle — c'est le seul indice qui dit
+   que l'image se manipule. */
+@media (prefers-reduced-motion: reduce) {
+
+  .geo-timer.hot .geo-timer-num,
+  .geo-game.hot::after,
+  .arc-art-mer.a,
+  .arc-art-mer.b {
+    animation: none;
+  }
+}

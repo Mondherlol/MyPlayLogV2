@@ -11,6 +11,7 @@ import Message from "../models/Message.js";
 import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { addClient, removeClient, emitTo, onlineAmong } from "../lib/realtime.js";
+import { triggerMissionCheck } from "../lib/missions.js";
 
 const router = express.Router();
 
@@ -726,6 +727,8 @@ router.post("/conversations", requireAuth, async (req, res) => {
       names: targets.map((t) => t.username),
     });
     await broadcastConversation(conv._id);
+    // Mission « Bande organisée » — pour le créateur comme pour les invités.
+    for (const u of members) triggerMissionCheck(u);
 
     const online = onlineAmong(participantIds(conv));
     res.status(201).json({
@@ -815,6 +818,8 @@ router.post("/conversations/:id/members", requireAuth, async (req, res) => {
       names: targets.map((t) => t.username),
     });
     await broadcastConversation(conv._id);
+    // Mission « Bande organisée » : les nouveaux venus rejoignent un groupe.
+    for (const t of targets) triggerMissionCheck(t._id);
 
     const online = onlineAmong(participantIds(conv));
     res.json({ conversation: serializeConversation(conv, req.userId, online) });

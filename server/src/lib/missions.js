@@ -9,6 +9,7 @@ import Documentary from "../models/Documentary.js";
 import GameTracker from "../models/GameTracker.js";
 import Recommendation from "../models/Recommendation.js";
 import GameMedia from "../models/GameMedia.js";
+import Conversation from "../models/Conversation.js";
 import MissionAward from "../models/MissionAward.js";
 import MissionConfig from "../models/MissionConfig.js";
 import Notification from "../models/Notification.js";
@@ -35,6 +36,15 @@ import { grantPoints, getBalance } from "./points.js";
 // effort qui se mérite 800-1000. Une caisse coûtant quelques centaines de
 // points, une mission doit peser assez pour qu'on ait envie d'aller la chercher.
 // Ces montants sont retouchables depuis le panel admin (voir MissionConfig).
+
+// Les statuts qui veulent dire « j'y ai joué » — tout sauf la wishlist.
+const PLAYED_STATUSES = ["playing", "finished", "paused", "dropped", "endless"];
+
+// La plus longue série de connexions jamais atteinte. On regarde `best` (et
+// non `current`) : un badge décroché à la sueur de 30 jours ne doit pas
+// redevenir inaccessible parce qu'on a sauté un mardi. Voir lib/streak.js.
+const bestStreak = (user) =>
+  Math.max(user.streak?.best || 0, user.streak?.current || 0);
 
 export const MISSIONS = [
   {
@@ -279,6 +289,50 @@ export const MISSIONS = [
     progress: (_id, { user }) => (user.ostOrder || []).length,
   },
   {
+    key: "write-bio",
+    title: "Présentations",
+    description: "Écris ta bio sur ton profil.",
+    icon: "Quote",
+    tier: "bronze",
+    points: 150,
+    target: 1,
+    progress: (_id, { user }) => ((user.bio || "").trim() ? 1 : 0),
+  },
+  {
+    key: "profile-character",
+    title: "Si j'étais un perso",
+    description: "Choisis le personnage de jeu qui te représente.",
+    icon: "VenetianMask",
+    tier: "bronze",
+    points: 150,
+    target: 1,
+    // La « tagline » du profil : le personnage choisi dans la modale d'édition,
+    // celle-là même où l'on écrit sa bio.
+    progress: (_id, { user }) => ((user.tagline || "").trim() ? 1 : 0),
+  },
+  {
+    key: "chat-group",
+    title: "Bande organisée",
+    description: "Crée ou rejoins ton premier groupe dans la messagerie.",
+    icon: "MessagesSquare",
+    tier: "bronze",
+    points: 200,
+    target: 1,
+    // Créé par soi ou rejoint sur invitation : dans les deux cas on est dans
+    // les participants — c'est la seule chose qui compte.
+    progress: (id) => Conversation.countDocuments({ isGroup: true, participants: id }),
+  },
+  {
+    key: "streak-3",
+    title: "Petit rituel",
+    description: "Connecte-toi 3 jours d'affilée.",
+    icon: "CalendarDays",
+    tier: "bronze",
+    points: 200,
+    target: 3,
+    progress: (_id, { user }) => bestStreak(user),
+  },
+  {
     key: "recommend-video",
     title: "Bon plan vidéo",
     description: "Recommande une vidéo depuis ton profil.",
@@ -379,6 +433,83 @@ export const MISSIONS = [
       user.steam?.steamId || user.psn?.accountId ? 1 : 0,
   },
   {
+    key: "pixelrush-3000",
+    title: "Pixel perfect",
+    description: "Marque au moins 3 000 points en une partie de Pixel Rush.",
+    icon: "Target",
+    tier: "silver",
+    points: 500,
+    target: 1,
+    progress: (id) => PixelGame.countDocuments({ user: id, score: { $gte: 3000 } }),
+  },
+  {
+    key: "blindtest-3000",
+    title: "Diapason d'or",
+    description: "Marque au moins 3 000 points en une partie de blind test.",
+    icon: "Zap",
+    tier: "silver",
+    points: 500,
+    target: 1,
+    progress: (id) => BlindTest.countDocuments({ user: id, score: { $gte: 3000 } }),
+  },
+  {
+    key: "recommend-10",
+    title: "Bouche à oreille",
+    description: "Recommande 10 jeux à d'autres joueurs.",
+    icon: "Megaphone",
+    tier: "silver",
+    points: 500,
+    target: 10,
+    progress: (id) => Recommendation.countDocuments({ "recommenders.user": id }),
+  },
+  {
+    key: "rate-10",
+    title: "Jury populaire",
+    description: "Note 10 jeux.",
+    icon: "Stars",
+    tier: "silver",
+    points: 400,
+    target: 10,
+    progress: (id) => UserGame.countDocuments({ user: id, rating: { $ne: null } }),
+  },
+  {
+    key: "review-5",
+    title: "Chroniqueur",
+    description: "Écris 5 reviews.",
+    icon: "Feather",
+    tier: "silver",
+    points: 500,
+    target: 5,
+    progress: (id) => UserGame.countDocuments({ user: id, review: { $nin: [null, ""] } }),
+  },
+  {
+    key: "wishlist-played-10",
+    title: "Souhait exaucé",
+    description: "Joue à 10 jeux venus de ta wishlist.",
+    icon: "BookmarkCheck",
+    tier: "silver",
+    points: 500,
+    target: 10,
+    // Les jeux passés par la wishlist et qui n'y sont plus (cf. UserGame
+    // .wasWishlisted) : la liste de souhaits qui devient de vraies parties.
+    progress: (id) =>
+      UserGame.countDocuments({
+        user: id,
+        wasWishlisted: true,
+        status: { $in: PLAYED_STATUSES },
+      }),
+  },
+  {
+    key: "streak-7",
+    title: "Semaine pleine",
+    description: "Connecte-toi 7 jours d'affilée.",
+    icon: "CalendarRange",
+    tier: "silver",
+    points: 500,
+    target: 7,
+    progress: (_id, { user }) => bestStreak(user),
+  },
+  {
     key: "social-butterfly",
     title: "Papillon social",
     description: "Suis 5 joueurs.",
@@ -397,6 +528,86 @@ export const MISSIONS = [
     points: 1000,
     target: 10,
     progress: (id) => UserGame.countDocuments({ user: id }),
+  },
+  {
+    key: "rate-50",
+    title: "Critique assermenté",
+    description: "Note 50 jeux.",
+    icon: "Gauge",
+    tier: "gold",
+    points: 800,
+    target: 50,
+    progress: (id) => UserGame.countDocuments({ user: id, rating: { $ne: null } }),
+  },
+  {
+    key: "review-20",
+    title: "Éditorialiste",
+    description: "Écris 20 reviews.",
+    icon: "ScrollText",
+    tier: "gold",
+    points: 1000,
+    target: 20,
+    progress: (id) => UserGame.countDocuments({ user: id, review: { $nin: [null, ""] } }),
+  },
+  {
+    key: "wishlist-played-50",
+    title: "Backlog en fumée",
+    description: "Joue à 50 jeux venus de ta wishlist.",
+    icon: "Rocket",
+    tier: "gold",
+    points: 1000,
+    target: 50,
+    progress: (id) =>
+      UserGame.countDocuments({
+        user: id,
+        wasWishlisted: true,
+        status: { $in: PLAYED_STATUSES },
+      }),
+  },
+  {
+    key: "streak-30",
+    title: "Pilier de comptoir",
+    description: "Connecte-toi 30 jours d'affilée.",
+    icon: "Flame",
+    tier: "gold",
+    points: 1200,
+    target: 30,
+    progress: (_id, { user }) => bestStreak(user),
+  },
+  {
+    key: "rate-100",
+    title: "Barème absolu",
+    description: "Note 100 jeux.",
+    icon: "Scale",
+    tier: "platinum",
+    points: 1500,
+    target: 100,
+    progress: (id) => UserGame.countDocuments({ user: id, rating: { $ne: null } }),
+  },
+  {
+    key: "review-100",
+    title: "Œuvre complète",
+    description: "Écris 100 reviews.",
+    icon: "NotebookPen",
+    tier: "platinum",
+    points: 2000,
+    target: 100,
+    progress: (id) => UserGame.countDocuments({ user: id, review: { $nin: [null, ""] } }),
+  },
+  {
+    key: "wishlist-played-100",
+    title: "Rien ne se perd",
+    description: "Joue à 100 jeux venus de ta wishlist.",
+    icon: "Crown",
+    tier: "platinum",
+    points: 1800,
+    target: 100,
+    progress: (id) =>
+      UserGame.countDocuments({
+        user: id,
+        wasWishlisted: true,
+        status: { $in: PLAYED_STATUSES },
+      }),
   },
 ];
 
@@ -455,7 +666,7 @@ function publicMission(m) {
 
 // Champs de User que lisent les `progress` (et le solde affiché).
 const USER_FIELDS =
-  "following inventory steam psn points equipped favoritePlatforms favoriteCompanies missionFlags covers cover ostOrder asideConfig";
+  "following inventory steam psn points equipped favoritePlatforms favoriteCompanies missionFlags covers cover ostOrder asideConfig bio tagline streak";
 
 // Marque une mission comme ACCOMPLIE (statut ready) et prévient le joueur qu'il
 // a une récompense à récupérer. Ne crédite aucun point : c'est claimMission qui
