@@ -8,3 +8,5 @@
 /server/.igdb-token.json
 /server/.psn-token.json
 /server/uploads
+/server/uploads-deploy
+*.tar

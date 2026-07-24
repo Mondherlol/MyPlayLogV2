@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   Shield,
@@ -38,8 +38,10 @@ import {
   Palette,
   Download,
   DownloadCloud,
+  Globe2,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
+import { applyGeoGlobe } from "../lib/geoGlobe";
 import { rarityColor, rarityLabel } from "../lib/rarity";
 import { useAuth } from "../context/AuthContext";
 import { PN_ICONS } from "../components/PatchnotePopup";
@@ -56,6 +58,7 @@ const TAB_KEYS = [
   "rewards",
   "missions",
   "psn",
+  "geo",
   "system",
   "secrets",
   "patchnotes",
@@ -84,6 +87,7 @@ export default function Admin() {
     { key: "rewards", label: "Récompenses", Icon: Gift },
     { key: "missions", label: "Missions", Icon: Award },
     { key: "psn", label: "PlayStation", Icon: Trophy, badge: psnActive },
+    { key: "geo", label: "GeoGamer", Icon: Globe2 },
     { key: "system", label: "Système", Icon: Activity },
     ...(isSuper ? [{ key: "secrets", label: "Secrets", Icon: KeyRound }] : []),
     { key: "patchnotes", label: "Patch notes", Icon: Sparkles },
@@ -153,6 +157,7 @@ export default function Admin() {
           {safeTab === "rewards" && <RewardsPanel token={token} />}
           {safeTab === "missions" && <MissionsPanel token={token} />}
           {safeTab === "psn" && <PsnPanel token={token} />}
+          {safeTab === "geo" && <GeoGlobePanel token={token} />}
           {safeTab === "system" && <SystemPanel token={token} />}
           {safeTab === "secrets" && isSuper && <SecretsPanel token={token} />}
           {safeTab === "patchnotes" && <PatchnoteManager token={token} />}
@@ -1169,6 +1174,172 @@ function PsnPanel({ token }) {
     <div className="admin-stack">
       <PsnTokenReminder />
       <PsnRequestsManager token={token} />
+    </div>
+  );
+}
+
+// ======================================================================
+//  Onglet GeoGamer — choix de l'image du globe (arcade + fond du menu)
+// ======================================================================
+// L'admin cherche un jeu, choisit un de ses panoramas, le prévisualise DANS le
+// vrai globe (même markup que la carte de l'arcade, image posée en variable
+// CSS locale) puis l'applique. Côté serveur, /geo/admin/globe ré-encode l'image
+// en 2:1 et retient le choix ; le client la relit ensuite via /geo/globe.
+function GeoGlobePanel({ token }) {
+  const [q, setQ] = useState("");
+  const [items, setItems] = useState([]);
+  const [current, setCurrent] = useState(null);
+  const [selected, setSelected] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const load = useCallback(
+    (search = "") => {
+      setLoading(true);
+      apiFetch(
+        `/geo/admin/globe/search${search ? `?q=${encodeURIComponent(search)}` : ""}`,
+        { token }
+      )
+        .then((d) => {
+          setItems(d.items || []);
+          setCurrent(d.current || null);
+        })
+        .catch(() => setItems([]))
+        .finally(() => setLoading(false));
+    },
+    [token]
+  );
+
+  useEffect(() => {
+    load();
+    // Pour que l'aperçu (globe non sélectionné) montre l'image RÉELLE en cours.
+    applyGeoGlobe(token);
+  }, [load, token]);
+
+  async function apply() {
+    if (!selected) return;
+    setSaving(true);
+    setMsg(null);
+    try {
+      const d = await apiFetch("/geo/admin/globe", {
+        method: "POST",
+        token,
+        body: { panoramaId: selected.id },
+      });
+      setCurrent({ panoramaId: selected.id, gameName: d.gameName });
+      setMsg({ ok: true, text: `Globe mis à jour avec « ${d.gameName} ».` });
+      // La variable globale suit tout de suite : en ouvrant l'arcade dans la
+      // foulée, le nouveau globe est déjà là (pas besoin de recharger).
+      if (d.url)
+        document.documentElement.style.setProperty("--geo-globe", `url("${d.url}")`);
+    } catch (err) {
+      setMsg({ ok: false, text: err.message });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="admin-stack geo-pick">
+      <div className="admin-card geo-pick-head">
+        <div className="geo-pick-intro">
+          <h2>Image du globe</h2>
+          <p>
+            L'image qui tourne dans le globe de l'arcade et derrière le menu de
+            GeoGamer. Cherche un jeu, choisis un panorama, prévisualise dans le
+            globe, puis applique — tu peux en tester autant que tu veux.
+          </p>
+          {current?.gameName && (
+            <span className="geo-pick-current">
+              <Check size={14} /> Actuel : <b>{current.gameName}</b>
+            </span>
+          )}
+        </div>
+
+        {/* Aperçu : le vrai globe, avec le panorama sélectionné posé en
+            variable CSS locale (sinon il montre l'image en vigueur). */}
+        <div
+          className="geo-pick-preview"
+          style={selected ? { "--geo-globe": `url("${selected.image}")` } : undefined}
+        >
+          <span className="arc-art-globe" aria-hidden="true">
+            <span className="arc-art-world">
+              <span className="arc-art-pano" />
+              <span className="arc-art-shade" />
+            </span>
+            <i className="arc-art-mer a" />
+            <i className="arc-art-mer b" />
+            <i className="arc-art-eq" />
+          </span>
+        </div>
+      </div>
+
+      <form
+        className="geo-pick-search"
+        onSubmit={(e) => {
+          e.preventDefault();
+          load(q.trim());
+        }}
+      >
+        <span className="geo-pick-field">
+          <Search size={16} />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Chercher un jeu (vide = échantillon)…"
+          />
+        </span>
+        <button type="submit" className="btn btn-primary clickable">
+          Chercher
+        </button>
+        {selected && (
+          <button
+            type="button"
+            className="btn btn-primary clickable geo-pick-apply"
+            onClick={apply}
+            disabled={saving}
+          >
+            {saving ? <Loader2 size={15} className="spin" /> : <Check size={15} />}
+            Définir comme globe
+          </button>
+        )}
+      </form>
+
+      {msg && (
+        <div className={`geo-pick-msg ${msg.ok ? "ok" : "err"}`}>
+          {msg.ok ? <Check size={15} /> : <AlertTriangle size={15} />}
+          {msg.text}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="gp-troph-state">
+          <Loader2 size={18} className="spin" /> Chargement…
+        </div>
+      ) : items.length === 0 ? (
+        <p className="geo-pick-empty">Aucun panorama pour cette recherche.</p>
+      ) : (
+        <div className="geo-pick-grid">
+          {items.map((it) => (
+            <button
+              key={it.id}
+              type="button"
+              className={`geo-pick-tile clickable ${selected?.id === it.id ? "on" : ""}`}
+              onClick={() => setSelected(it)}
+              title={it.gameName}
+            >
+              <img src={it.image} alt="" loading="lazy" draggable="false" />
+              <span className="geo-pick-name">{it.gameName}</span>
+              {selected?.id === it.id && (
+                <span className="geo-pick-check">
+                  <Check size={14} />
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

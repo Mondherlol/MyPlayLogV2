@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
+import { applyGeoGlobe } from "../lib/geoGlobe";
 import {
   dedupeCandidates,
   estimateGeoPoints,
@@ -525,6 +526,11 @@ export default function GeoGamer() {
     sfx.setMuted(muted);
   }, [muted, sfx]);
 
+  // Image du globe du menu (var CSS --geo-globe), choisie par l'admin.
+  useEffect(() => {
+    if (token) applyGeoGlobe(token);
+  }, [token]);
+
   // Mode immersif : dès le CHARGEMENT et pendant la partie. Le menu de
   // lancement, l'écran d'épuisement et le tableau final restent des pages
   // normales (avec barre latérale) ; mais « on choisit tes destinations » fait
@@ -593,18 +599,22 @@ export default function GeoGamer() {
     (r, cand, correct) => {
       lockedRef.current = true;
       const timeMs = cand ? Date.now() - roundStartRef.current : null;
+      // Essais ratés faits sur ce lieu avant de verrouiller (0 = first try).
+      const misses = LIVES - livesRef.current;
       const points = estimateGeoPoints(
         r,
         cand?.id ?? null,
         cand?.name ?? "",
         timeMs,
-        r.durationSec
+        r.durationSec,
+        misses
       );
       guessesRef.current[idx] = {
         id: r.id,
         gameId: cand?.id ?? null,
         name: cand?.name ?? "",
         timeMs,
+        misses,
       };
       setScore((s) => s + points);
       sfx.play(correct ? "correct" : "wrong");
@@ -770,7 +780,8 @@ export default function GeoGamer() {
             g?.gameId ?? null,
             g?.name || "",
             g?.timeMs ?? null,
-            r.durationSec
+            r.durationSec,
+            g?.misses ?? 0
           ),
           timeMs: g?.timeMs ?? null,
         };
@@ -1245,10 +1256,13 @@ export default function GeoGamer() {
           )}
 
           {/* ---- Manche bonus : où sur la carte ? ----
-              Posée par-dessus le panorama, qui reste visible derrière : on peut
-              encore jeter un œil au décor pour se repérer. */}
+              Ancrée dans le coin bas droit, PAS en modale plein écran : le reste
+              de l'écran laisse passer les clics jusqu'au panorama (le dock est
+              en pointer-events:none, seul le panneau capture). On peut donc
+              continuer à tourner la tête dans le décor pour se repérer pendant
+              qu'on place son épingle. */}
           {mapStage && round.map && (
-            <div className="geo-map-veil">
+            <div className="geo-map-dock">
               <MapRound
                 map={round.map}
                 gameName={round.gameName}

@@ -15,13 +15,28 @@ import { Loader2 } from "lucide-react";
 // zoom qui traverse la sphère, et on perd le contrôle du tangage. Deux angles
 // (lon/lat) et un lookAt font le travail, avec l'inertie qu'on veut.
 
-// Résolution maximale ENVOYÉE AU GPU. Les panoramas sont archivés en 8192×4096,
-// mais une telle texture coûte ~134 Mo de VRAM (et le double avec ses mipmaps),
-// dépasse la limite matérielle de beaucoup de mobiles (souvent 4096), et
-// n'apporte rien de visible dans un champ de vision de 70°. On redescend donc
-// systématiquement à 4096 de large : ~33 Mo, net partout, et ça passe sur
-// téléphone. Le fichier d'origine reste intact sur le disque.
-const RENDER_MAX = 4096;
+// Résolution maximale ENVOYÉE AU GPU — adaptative selon l'appareil.
+//   • Sur TÉLÉPHONE / tablette : plafond à 4096. Au-delà, beaucoup de mobiles
+//     dépassent leur limite matérielle (le décor deviendrait noir) et une
+//     texture 8K coûte ~134 Mo de VRAM, hors budget d'un téléphone.
+//   • Sur PC : pas de plafond artificiel — on laisse la pleine résolution des
+//     panoramas (jusqu'à ~8K/9,6K), bornée uniquement par ce que le GPU accepte.
+// Le repli reste le plancher prudent de 4096 si on ne sait pas trancher.
+const MOBILE_MAX = 4096;
+
+// Un pointeur fin qui survole = souris = poste fixe/portable. Un écran tactile
+// (mobile, tablette) n'a ni l'un ni l'autre. C'est le critère le plus fiable
+// pour distinguer « PC » de « mobile » sans se fier au user-agent.
+function isDesktop() {
+  return !!window.matchMedia?.("(hover: hover) and (pointer: fine)")?.matches;
+}
+
+// La borne effective : le GPU d'abord (jamais au-dessus, sinon rien ne
+// s'affiche), puis le plafond mobile si on n'est pas sur un PC.
+function renderCap() {
+  const gpu = maxTextureSize();
+  return isDesktop() ? gpu : Math.min(MOBILE_MAX, gpu);
+}
 
 // Champ de vision : petit = zoomé (on scrute un panneau au loin), grand = large
 // (on embrasse la scène). Au-delà de ~95° la déformation devient pénible.
@@ -129,7 +144,7 @@ function makeTexture(source) {
 // et on retombe sur un <img> classique si le flux n'est pas exploitable
 // (réponse sans content-length, ou image servie par un domaine tiers sans CORS).
 async function loadPanorama(url, signal, onProgress) {
-  const limit = Math.min(RENDER_MAX, maxTextureSize());
+  const limit = renderCap();
   try {
     const res = await fetch(url, { signal, mode: "cors" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);

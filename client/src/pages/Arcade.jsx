@@ -33,6 +33,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useCosmetics } from "../context/CosmeticsContext";
 import { apiFetch } from "../lib/api";
+import { applyGeoGlobe } from "../lib/geoGlobe";
 import { makeCache } from "../lib/cache";
 import { rarityColor, rarityLabel, rarityRank } from "../lib/rarity";
 import RewardArt from "../components/RewardArt";
@@ -180,6 +181,8 @@ export default function Arcade() {
     // On attend de savoir QUI est connecté : c'est la clé du cache.
     if (!token || !meId) return;
     let alive = true;
+    // L'image du globe choisie par l'admin (var CSS --geo-globe).
+    applyGeoGlobe(token);
     // Revalidation systématique, sans vider l'affichage : le cache reste à
     // l'écran tant que la réponse n'est pas là.
     apiFetch("/arcade", { token })

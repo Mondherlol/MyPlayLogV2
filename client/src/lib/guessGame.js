@@ -99,14 +99,20 @@ export function estimatePoints(r, guessGameId, guessName, timeMs, durationSec) {
 // plutôt qu'un paramètre en plus sur estimatePoints() : la difficulté du LIEU
 // n'existe que là, et lui donner une valeur par défaut ici décalerait
 // silencieusement les points affichés par le blind test et Pixel Rush.
-export function estimateGeoPoints(r, guessGameId, guessName, timeMs, durationSec) {
+// Malus quand on trouve APRÈS des essais ratés (miroir de MISS_FACTOR côté
+// serveur) : first try plein pot, puis on tombe vite.
+const GEO_MISS_FACTOR = [1, 0.65, 0.3];
+
+export function estimateGeoPoints(r, guessGameId, guessName, timeMs, durationSec, misses = 0) {
   const correct = sameGame(r, guessGameId, guessName);
   if (!correct) return 0; // aucune sanction pour une mauvaise réponse
   const dur = durationSec * 1000;
   const t = timeMs == null ? dur : Math.min(Math.max(timeMs, 0), dur);
   const frac = dur > 0 ? (dur - t) / dur : 0;
   const hard = (Math.min(Math.max(r.difficulty || 3, 1), 5) - 1) / 4;
-  return 300 + Math.round(300 * frac) + Math.round(200 * hard);
+  const raw = 150 + Math.round(90 * frac) + Math.round(60 * hard);
+  const factor = GEO_MISS_FACTOR[Math.min(Math.max(misses, 0), GEO_MISS_FACTOR.length - 1)];
+  return Math.round(raw * factor);
 }
 
 // Miroir EXACT de scoreMapGuess() de routes/geo.js — la manche bonus « où sur
@@ -115,9 +121,10 @@ export function estimateGeoPoints(r, guessGameId, guessName, timeMs, durationSec
 //
 // Le barème vient de la source (relevé dans son geogamer.js), dont les paliers
 // sont exprimés dans un repère de 2100 unités — d'où la remise à l'échelle —
-// puis multiplié par 4 pour culminer à 400 comme nos autres manches.
+// puis multiplié par 2 pour culminer à 200 : la carte est un BONUS, elle pèse
+// moins que le fait de trouver le jeu.
 export const MAP_FRAME = 2100;
-export const MAP_MAX_POINTS = 400;
+export const MAP_MAX_POINTS = 200;
 
 function mapCurve(d) {
   if (d <= 50) return 100;
@@ -131,7 +138,7 @@ function mapCurve(d) {
 export function estimateMapPoints(map, guess) {
   if (!map || !guess) return { points: 0, distance: null };
   const distance = Math.hypot(guess.x - map.answer.x, guess.y - map.answer.y);
-  return { points: mapCurve(distance * MAP_FRAME) * 4, distance };
+  return { points: mapCurve(distance * MAP_FRAME) * 2, distance };
 }
 
 // Une seule entrée par jeu « canonique » dans la recherche : pas de doublons

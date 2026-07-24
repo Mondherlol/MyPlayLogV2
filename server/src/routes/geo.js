@@ -1,13 +1,19 @@
 import express from "express";
 import mongoose from "mongoose";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import fsp from "node:fs/promises";
+import path from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
 import GeoGame from "../models/GeoGame.js";
 import GeoSeen from "../models/GeoSeen.js";
 import Panorama from "../models/Panorama.js";
 import UserGame from "../models/UserGame.js";
 import User from "../models/User.js";
 import { igdbQuery } from "../lib/igdb.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { recordActivity } from "../lib/activity.js";
 import { grantPoints } from "../lib/points.js";
 import { triggerMissionCheck } from "../lib/missions.js";
@@ -60,6 +66,55 @@ const baseOf = (req) => `${req.protocol}://${req.get("host")}`;
 const absolutize = (base, url) =>
   url && url.startsWith("/uploads/") ? `${base}${url}` : url;
 
+// ---------------------------------------------------------------------------
+//  Image du globe (carte de l'arcade + fond du menu GeoGamer)
+// ---------------------------------------------------------------------------
+// L'admin choisit quel panorama tourne dans le globe. On ré-encode son image en
+// équirectangulaire 2:1 « propre » (2048×1024) rangé dans uploads/geo, et un
+// petit sidecar JSON retient lequel c'était. Le client lit /api/geo/globe et
+// pose l'URL dans une variable CSS ; sans réglage, il garde l'asset livré.
+const __geoDir = path.dirname(fileURLToPath(import.meta.url));
+const UPLOADS_DIR = path.join(__geoDir, "../../uploads");
+const GLOBE_DIR = path.join(UPLOADS_DIR, "geo");
+const GLOBE_FILE = path.join(GLOBE_DIR, "globe-pano.webp");
+const GLOBE_META = path.join(GLOBE_DIR, "globe.json");
+const GLOBE_URL = "/uploads/geo/globe-pano.webp";
+const execFileAsync = promisify(execFile);
+const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+async function readGlobeMeta() {
+  try {
+    return JSON.parse(await fsp.readFile(GLOBE_META, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+// Chemin disque d'une image stockée en « /uploads/… ».
+const uploadPathOf = (url) =>
+  path.join(UPLOADS_DIR, String(url).replace(/^\/uploads\//, ""));
+
+// Ré-encode le panorama choisi vers l'asset du globe. On FORCE le 2:1 : la
+// tuile du globe suppose ce ratio, un panorama non-2:1 serait sinon étiré à
+// l'affichage. `-frames:v 1` au cas où la source serait un webp animé.
+async function buildGlobe(srcAbs) {
+  await fsp.mkdir(GLOBE_DIR, { recursive: true });
+  const ffmpeg = (await import("ffmpeg-static")).default;
+  await execFileAsync(ffmpeg, [
+    "-hide_banner",
+    "-y",
+    "-i",
+    srcAbs,
+    "-frames:v",
+    "1",
+    "-vf",
+    "scale=2048:1024:flags=lanczos",
+    "-quality",
+    "82",
+    GLOBE_FILE,
+  ]);
+}
+
 // Ordre pondéré par la difficulté du lieu : on veut de la variété mais on
 // préfère commencer doucement, donc les lieux faciles remontent légèrement.
 // Le facteur reste petit — un lieu difficile doit rester tirable.
@@ -106,9 +161,9 @@ function mkRound(pano, mine) {
 // Le barème est celui de la source, relevé tel quel dans son geogamer.js : il a
 // le mérite d'être déjà éprouvé. Ses paliers sont exprimés dans le repère de
 // 2100 unités, d'où la remise à l'échelle avant application ; le résultat est
-// ensuite multiplié par 4 pour culminer à 400 et non à 100, à la mesure des
-// autres manches. Repères : pile dessus = 400, à 2 % de la carte = 400,
-// à 7 % = 340, à 14 % = 260, à 24 % = 160, à 38 % = 60.
+// ensuite multiplié par 2 pour culminer à 200 (la carte est un BONUS, elle ne
+// doit pas peser plus que le fait de trouver le jeu). Repères : pile dessus =
+// 200, à 2 % de la carte = 200, à 7 % = 170, à 14 % = 130, à 24 % = 80, à 38 % = 30.
 const MAP_FRAME = 2100;
 
 function mapCurve(d) {
@@ -124,7 +179,7 @@ function scoreMapGuess(map, guess) {
   if (!map || !guess) return { points: 0, distance: null };
   // 0 = pile dessus, ~1,41 = d'un coin à l'autre.
   const distance = Math.hypot(guess.x - map.answer.x, guess.y - map.answer.y);
-  return { points: mapCurve(distance * MAP_FRAME) * 4, distance };
+  return { points: mapCurve(distance * MAP_FRAME) * 2, distance };
 }
 
 // Nettoie le clic reçu du client : une fraction, donc forcément dans [0,1].
@@ -290,13 +345,19 @@ async function friendsOf(userId) {
   return (me?.following || []).map((id) => new mongoose.Types.ObjectId(id));
 }
 
-// Score d'une manche (serveur). Deux principes voulus par le jeu :
-//   • on ne PERD JAMAIS de points : rater un jeu rapporte simplement 0, pas de
-//     pénalité — l'exploration doit rester détendue ;
-//   • trouver le jeu rapporte un lot de base, plus vite = un peu plus, et un
-//     lieu difficile (un recoin obscur) vaut davantage qu'une place centrale.
-// La précision sur la carte, elle, est un bonus À PART (cf. scoreMapGuess).
-function scoreRound(r, guessGameId, guessName, timeMs, durationSec) {
+// Malus quand on trouve APRÈS des essais ratés (3 vies → jusqu'à 2 ratés avant
+// de trouver). Trouver du premier coup doit rapporter nettement plus que trouver
+// au forceps : plein pot, puis on tombe vite.
+const MISS_FACTOR = [1, 0.65, 0.3]; // 0, 1, 2 essais ratés avant de trouver
+
+// Score d'une manche (serveur). Principes voulus par le jeu :
+//   • on ne PERD JAMAIS de points : rater un jeu rapporte 0, pas de négatif ;
+//   • trouver rapporte un lot de base, plus vite = un peu plus, un lieu
+//     difficile vaut davantage — mais chaque essai raté rabote le total ;
+//   • le tout est calibré pour qu'une partie de 10 manches ne dépasse pas
+//     ~3000 sur les seuls jeux (300 au mieux par manche), la précision sur la
+//     carte étant un bonus À PART plafonné plus bas (cf. scoreMapGuess).
+function scoreRound(r, guessGameId, guessName, timeMs, durationSec, misses = 0) {
   const correct = sameGame(r, guessGameId, guessName);
   if (!correct) return 0; // aucune sanction pour une mauvaise réponse
 
@@ -306,8 +367,11 @@ function scoreRound(r, guessGameId, guessName, timeMs, durationSec) {
   // 0 pour un lieu évident (1), 1 pour un cauchemar (5).
   const hard = (Math.min(Math.max(r.difficulty || 3, 1), 5) - 1) / 4;
 
-  // Base 300, jusqu'à +300 pour la vitesse, jusqu'à +200 pour la difficulté.
-  return 300 + Math.round(300 * frac) + Math.round(200 * hard);
+  // Base 150, jusqu'à +90 pour la vitesse, jusqu'à +60 pour la difficulté → 300
+  // au mieux (first try, instantané, lieu le plus dur).
+  const raw = 150 + Math.round(90 * frac) + Math.round(60 * hard);
+  const factor = MISS_FACTOR[Math.min(Math.max(misses, 0), MISS_FACTOR.length - 1)];
+  return Math.round(raw * factor);
 }
 
 // --- Sessions en cours (réponses gardées serveur). Mémoire process, TTL 30 min. ---
@@ -529,8 +593,11 @@ router.post("/finish", requireAuth, async (req, res) => {
       const guessId = g.gameId != null ? Number(g.gameId) : null;
       const guessName = String(g.name || "").slice(0, 160);
       const timeMs = g.timeMs != null ? Number(g.timeMs) : null;
+      // Nombre d'essais ratés avant de trouver (envoyé par le client). Borné :
+      // on ne fait pas confiance à une valeur arbitraire pour gonfler le malus.
+      const misses = Math.min(Math.max(Number(g.misses) || 0, 0), 5);
       const correct = sameGame(r, guessId, guessName);
-      const points = scoreRound(r, guessId, guessName, timeMs, dur);
+      const points = scoreRound(r, guessId, guessName, timeMs, dur, misses);
       score += points;
       if (correct) correctCount += 1;
 
@@ -810,6 +877,77 @@ router.get("/leaderboard", requireAuth, async (req, res) => {
     console.error("geo leaderboard error:", err.message);
     res.status(500).json({ error: "Erreur lors du chargement du classement." });
   }
+});
+
+// ======================================================================
+//  Image du globe
+// ======================================================================
+
+// Lecture (tout compte connecté) : quelle image afficher dans le globe. On
+// renvoie null tant que rien n'a été réglé — le client garde alors son asset
+// livré. Le suffixe ?v= casse le cache quand l'admin change d'image (le fichier
+// garde le même chemin).
+router.get("/globe", requireAuth, async (req, res) => {
+  const meta = await readGlobeMeta();
+  if (!meta || !fs.existsSync(GLOBE_FILE)) return res.json({ url: null });
+  res.json({
+    url: `${absolutize(baseOf(req), GLOBE_URL)}?v=${meta.updatedAt || 0}`,
+    gameName: meta.gameName || null,
+  });
+});
+
+// Recherche de panoramas pour le sélecteur admin : renvoie les vignettes des
+// lieux dont le nom du jeu correspond (sans filtre → un échantillon).
+router.get("/admin/globe/search", requireAuth, requireAdmin, async (req, res) => {
+  const q = String(req.query.q || "").trim();
+  const filter = { active: true, image: { $ne: null } };
+  if (q) filter.gameName = { $regex: escapeRegex(q), $options: "i" };
+  const rows = await Panorama.find(filter)
+    .select("gameName image cover sourceKey")
+    .sort({ gameName: 1 })
+    .limit(60)
+    .lean();
+  const base = baseOf(req);
+  const meta = await readGlobeMeta();
+  res.json({
+    current: meta ? { panoramaId: meta.panoramaId, gameName: meta.gameName } : null,
+    items: rows.map((p) => ({
+      id: String(p._id),
+      gameName: p.gameName,
+      image: absolutize(base, p.image),
+      cover: absolutize(base, p.cover),
+    })),
+  });
+});
+
+// Définit l'image du globe : ré-encode le panorama choisi et retient lequel.
+router.post("/admin/globe", requireAuth, requireAdmin, async (req, res) => {
+  const { panoramaId } = req.body || {};
+  if (!mongoose.isValidObjectId(panoramaId))
+    return res.status(400).json({ error: "Panorama invalide." });
+  const pano = await Panorama.findById(panoramaId).lean();
+  if (!pano || !pano.image)
+    return res.status(404).json({ error: "Panorama introuvable." });
+  const srcAbs = uploadPathOf(pano.image);
+  if (!fs.existsSync(srcAbs))
+    return res.status(404).json({ error: "Fichier image absent du serveur." });
+  try {
+    await buildGlobe(srcAbs);
+  } catch (err) {
+    console.error("geo globe encode error:", err?.message);
+    return res.status(500).json({ error: "Ré-encodage impossible (ffmpeg)." });
+  }
+  const meta = {
+    panoramaId: String(pano._id),
+    gameName: pano.gameName,
+    sourceKey: pano.sourceKey,
+    updatedAt: Date.now(),
+  };
+  await fsp.writeFile(GLOBE_META, JSON.stringify(meta));
+  res.json({
+    url: `${absolutize(baseOf(req), GLOBE_URL)}?v=${meta.updatedAt}`,
+    gameName: meta.gameName,
+  });
 });
 
 export default router;
