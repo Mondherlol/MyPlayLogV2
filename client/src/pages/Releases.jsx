@@ -1,4 +1,14 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  forwardRef,
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
 import {
@@ -40,6 +50,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLibrary } from "../context/LibraryContext";
 import { useClickOutside } from "../hooks/useClickOutside";
 import GameAddFan from "../components/GameAddFan";
+import MediaLightbox from "../components/MediaLightbox";
 
 // ============================================================
 //  Page « Sorties » : un feed vertical par jour — on descend vers le futur,
@@ -151,6 +162,24 @@ const PAST_MAX = 365 * 86400; // on ne remonte pas plus d'un an en arrière
 
 // Un « gros jeu » : très attendu (hype IGDB) avant sa sortie, très noté après.
 const isBig = (g) => (g.hypes || 0) >= 10 || (g.ratingCount || 0) >= 50;
+
+// Hauteur occupée en haut de l'écran par ce qui est collant (barre de l'app +
+// barre d'outils de la page) : c'est de ça qu'il faut décaler un scroll ciblé,
+// sinon la cible se range DERRIÈRE ces barres. Les deux sont mesurées plutôt
+// que devinées — `--topbar-h` change selon la taille d'écran, et la barre
+// d'outils passe sur deux rangées en mobile.
+function stickyOffset() {
+  const host = document.querySelector(".app-content, .public-shell");
+  const topbar = host
+    ? parseFloat(getComputedStyle(host).getPropertyValue("--topbar-h"))
+    : NaN;
+  const bar = document.querySelector(".rel-toolbar");
+  return (
+    (Number.isFinite(topbar) ? topbar : 60) +
+    (bar ? bar.getBoundingClientRect().height : 0) +
+    12
+  );
+}
 
 // Minuit local d'une date (repère pour compter les jours pleins).
 function startOfDay(d) {
@@ -328,12 +357,26 @@ function MonthMenu({ value, onPick, compact = false }) {
 // ============================================================
 //  Carte d'un jeu dans le feed — ouvre la modale de découverte
 // ============================================================
-function RelCard({ g, inWish, onOpen }) {
+// Mémoïsée, et `onOpen` reçoit le jeu plutôt qu'une fermeture recréée à chaque
+// rendu : la page entière se re-rend à chaque changement de jour au focus (donc
+// en continu pendant le défilement), et sans ça toutes les cartes — avec leur
+// menu radial d'ajout, quatre boutons chacune — étaient repeintes avec elle.
+const RelCard = memo(function RelCard({ g, inWish, onOpen }) {
   return (
-    <div className={`relc clickable ${inWish ? "is-wish" : ""}`} onClick={onOpen} title={g.name}>
+    <div
+      className={`relc clickable ${inWish ? "is-wish" : ""}`}
+      onClick={() => onOpen(g)}
+      title={g.name}
+    >
       <span className="relc-cover">
         {g.cover ? (
-          <img src={g.cover} alt="" loading="lazy" draggable="false" />
+          <img
+            src={g.cover}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            draggable="false"
+          />
         ) : (
           <span className="relc-ph">
             <Gamepad2 size={22} />
@@ -363,7 +406,23 @@ function RelCard({ g, inWish, onOpen }) {
       )}
     </div>
   );
-}
+});
+
+// ============================================================
+//  Le repère « aujourd'hui » de la timeline
+// ============================================================
+// Posé entre le dernier jour passé et le premier jour à venir, il existe même
+// quand aucun jeu ne sort aujourd'hui : c'est la cible du calage initial et du
+// bouton « Aujourd'hui », qui ne peuvent donc jamais tomber à côté.
+const NowMarker = forwardRef(function NowMarker(_props, ref) {
+  return (
+    <div className="rel-now" ref={ref}>
+      <span className="rel-now-dot" aria-hidden="true" />
+      <span className="rel-now-label">Aujourd'hui</span>
+      <span className="rel-now-line" aria-hidden="true" />
+    </div>
+  );
+});
 
 // ============================================================
 //  Modale de découverte d'un jeu : backdrop, compte à rebours, infos,
@@ -374,7 +433,7 @@ function RelGameModal({ game, token, onClose }) {
   const [full, setFull] = useState(null); // fiche IGDB complète
   const [entry, setEntry] = useState(undefined); // undefined = chargement
   const [busy, setBusy] = useState(false);
-  const [shot, setShot] = useState(null); // capture ouverte en grand
+  const [shotIdx, setShotIdx] = useState(null); // index de la capture ouverte en grand
 
   useEffect(() => {
     let alive = true;
@@ -554,14 +613,20 @@ function RelGameModal({ game, token, onClose }) {
               {/* Bandeau d'images : captures & artworks, clic = plein écran */}
               {shots.length > 0 && (
                 <div className="relm-shots">
-                  {shots.map((m) => (
+                  {shots.map((m, i) => (
                     <button
                       key={m.id}
                       className="relm-shot clickable"
-                      onClick={() => setShot(m.full)}
+                      onClick={() => setShotIdx(i)}
                       title="Voir en grand"
                     >
-                      <img src={m.thumb} alt="" loading="lazy" draggable="false" />
+                      <img
+                        src={m.thumb}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        draggable="false"
+                      />
                     </button>
                   ))}
                 </div>
@@ -628,16 +693,20 @@ function RelGameModal({ game, token, onClose }) {
           </div>
         </div>
 
-        {/* Capture en plein écran, par-dessus la modale */}
-        {shot && (
-          <div className="relm-shot-lb" onClick={() => setShot(null)}>
-            <img src={shot} alt="" draggable="false" />
-            <button className="modal-close clickable" aria-label="Fermer">
-              <X size={18} />
-            </button>
-          </div>
-        )}
       </div>
+
+      {/* Visionneuse plein écran. Hors de .relm : posée dedans, elle restait
+          bornée à la carte de la modale (« plein écran » grand comme une
+          fenêtre). Elle se portalise elle-même sur <body>. */}
+      {shotIdx !== null && (
+        <MediaLightbox
+          items={shots}
+          index={shotIdx}
+          onIndex={setShotIdx}
+          onClose={() => setShotIdx(null)}
+          title={game.name}
+        />
+      )}
     </div>,
     document.body
   );
@@ -1033,10 +1102,14 @@ export default function Releases() {
     };
   }, [token]);
 
-  // --- Jours passés : chargés par fenêtres de 30 jours en remontant le feed.
-  // Avant d'insérer, on mémorise la hauteur de page pour compenser le scroll
-  // (sinon tout le contenu saute vers le bas sous les yeux du lecteur). ---
-  const compRef = useRef(null);
+  // --- Jours passés : chargés par fenêtres de 7 jours en remontant le feed.
+  // Insérer du contenu AU-DESSUS de ce qu'on regarde pousse tout vers le bas :
+  // il faut compenser le scroll d'autant. On s'ancre sur le premier jour déjà
+  // affiché et on rétablit sa position exacte à l'écran — mesurer la hauteur
+  // totale du document (l'ancienne méthode) était approximatif, car les images
+  // qui finissent de charger la font bouger en même temps, ce qui décalait le
+  // repère d'un jour ou deux. ---
+  const anchorRef = useRef(null);
   async function loadPast() {
     if (pastLoading || pastDone || !token) return;
     setPastLoading(true);
@@ -1044,10 +1117,10 @@ export default function Releases() {
     const from = pastCursor - PAST_CHUNK;
     try {
       const d = await apiFetch(`/games/releases?from=${from}&to=${to}`, { token });
-      compRef.current = {
-        h: document.documentElement.scrollHeight,
-        y: window.scrollY,
-      };
+      const first = timelineRef.current?.querySelector("[data-day]");
+      anchorRef.current = first
+        ? { day: first.dataset.day, top: first.getBoundingClientRect().top }
+        : null;
       setPastGames((prev) => [...(d.games || []), ...prev]);
       setPastCursor(from);
       if (from <= todaySec() - PAST_MAX) setPastDone(true);
@@ -1061,54 +1134,26 @@ export default function Releases() {
   loadPastRef.current = loadPast;
 
   useLayoutEffect(() => {
-    if (!compRef.current) return;
-    const { h, y } = compRef.current;
-    compRef.current = null;
-    const delta = document.documentElement.scrollHeight - h;
-    if (delta > 0) window.scrollTo(0, y + delta);
+    const a = anchorRef.current;
+    if (!a) return;
+    anchorRef.current = null;
+    const el = timelineRef.current?.querySelector(`[data-day="${a.day}"]`);
+    if (!el) return;
+    const delta = el.getBoundingClientRect().top - a.top;
+    if (delta) window.scrollBy(0, delta);
   }, [pastGames]);
 
-  // --- Jour « au focus » : le jour sous la ligne de lecture (≈ 35 % du
-  // viewport) reste net, les autres sont grisés — on voit d'un coup d'œil où
-  // on en est dans la timeline. Recalculé au scroll (throttlé par rAF). ---
+  // --- Jour « au focus » : le jour traversé par la ligne de lecture (≈ 35 % du
+  // viewport) reste net, les autres sont grisés — on voit d'un coup d'œil où on
+  // en est dans la timeline.
+  //
+  // Un IntersectionObserver, et non un scan au scroll : l'ancienne version
+  // relisait la position de CHAQUE section à chaque frame, soit des centaines
+  // de mesures de layout par seconde une fois plusieurs mois chargés — de loin
+  // le premier poste de saccade de la page sur mobile. Ici le navigateur ne
+  // nous réveille qu'aux rares entrées/sorties de la bande de lecture. ---
   const timelineRef = useRef(null);
   const [activeDay, setActiveDay] = useState(null);
-  const scanRef = useRef(() => {});
-  useEffect(() => {
-    let raf = 0;
-    const scan = () => {
-      raf = 0;
-      const root = timelineRef.current;
-      if (!root) return;
-      const focus = window.innerHeight * 0.35;
-      let best = null;
-      for (const el of root.querySelectorAll("[data-day]")) {
-        const r = el.getBoundingClientRect();
-        if (r.top <= focus && r.bottom >= focus) {
-          best = el.dataset.day;
-          break;
-        }
-        // Ligne dans un « trou » entre deux jours : le premier jour en dessous.
-        if (r.top > focus) {
-          best = el.dataset.day;
-          break;
-        }
-      }
-      setActiveDay(best);
-    };
-    scanRef.current = scan;
-    const onScroll = () => {
-      if (!raf) raf = requestAnimationFrame(scan);
-    };
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, []);
 
   // Sentinelle en haut du feed : s'en approcher charge les jours d'avant.
   const topRef = useRef(null);
@@ -1190,11 +1235,98 @@ export default function Releases() {
 
   const total = groups.reduce((n, g) => n + g.items.length, 0);
   const todayStart = startOfDay(new Date()).getTime();
+  // Où poser le repère « aujourd'hui » : juste avant le premier jour qui n'est
+  // pas passé. -1 (aucun) = tout est derrière nous, le repère ferme la marche.
+  const nowIndex = groups.findIndex((g) => g.dayStart >= todayStart);
 
-  // Regroupement changé (chargement passé, filtres…) → re-scan du jour au focus.
+  // Le jour traversé par la ligne de lecture (≈ 35 % de la hauteur) reste net,
+  // les autres sont grisés — on voit d'un coup d'œil où on en est.
+  //
+  // Un IntersectionObserver, et non un scan au scroll : l'ancienne version
+  // relisait la position de CHAQUE section à chaque frame, soit des centaines
+  // de mesures de layout par seconde une fois plusieurs mois chargés — de loin
+  // le premier poste de saccade de la page sur mobile. Ici le navigateur ne
+  // nous réveille qu'aux rares entrées/sorties de la bande de lecture.
+  // Ré-observé à chaque changement de regroupement (filtres, jours chargés).
   useEffect(() => {
-    scanRef.current();
+    const root = timelineRef.current;
+    if (!root) return;
+    const days = root.querySelectorAll("[data-day]");
+    if (!days.length) return;
+
+    const inBand = new Set();
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) inBand.add(e.target.dataset.day);
+          else inBand.delete(e.target.dataset.day);
+        }
+        // Une poignée d'éléments au plus dans la bande : on relit leur position
+        // pour garder le plus haut, le coût reste négligeable.
+        let best = null;
+        let bestTop = Infinity;
+        for (const day of inBand) {
+          const el = root.querySelector(`[data-day="${day}"]`);
+          if (!el) continue;
+          const top = el.getBoundingClientRect().top;
+          if (top < bestTop) {
+            bestTop = top;
+            best = day;
+          }
+        }
+        setActiveDay(best);
+      },
+      // Bande fine à 35 % de la hauteur : ce qui la traverse est « au focus ».
+      // Un peu d'épaisseur (10 %) pour qu'aucun interstice entre deux jours ne
+      // laisse la bande vide, ce qui ferait clignoter tout le feed.
+      { rootMargin: "-35% 0px -55% 0px" }
+    );
+    for (const el of days) io.observe(el);
+    return () => io.disconnect();
   }, [groups]);
+
+  // --- « Aujourd'hui » : le repère de la timeline ---
+  // Le feed s'ouvrait simplement en haut de page en espérant qu'aujourd'hui s'y
+  // trouve — mais les jours passés se chargent aussitôt au-dessus, et la moindre
+  // approximation de compensation faisait atterrir sur la veille. On pose donc
+  // un repère explicite (toujours présent, même sans sortie ce jour-là) et on
+  // s'y cale nous-mêmes.
+  const nowRef = useRef(null);
+  const jumpedRef = useRef(false);
+  const [showJump, setShowJump] = useState(false);
+
+  const jumpToToday = useCallback((smooth = true) => {
+    const el = nowRef.current;
+    if (!el) return false;
+    // Sous la barre du haut ET la barre d'outils collante, sinon le repère
+    // atterrit dessous.
+    const top = window.scrollY + el.getBoundingClientRect().top - stickyOffset();
+    window.scrollTo({ top: Math.max(0, top), behavior: smooth ? "smooth" : "auto" });
+    return true;
+  }, []);
+
+  // Calage initial, une seule fois, dès que le feed a de quoi s'afficher.
+  useLayoutEffect(() => {
+    if (jumpedRef.current || loading || view !== "feed" || total === 0) return;
+    if (jumpToToday(false)) jumpedRef.current = true;
+  }, [loading, view, total, jumpToToday]);
+
+  // Bouton flottant « Aujourd'hui » : proposé seulement quand le repère est
+  // sorti de l'écran (sinon il n'aurait rien à faire).
+  useEffect(() => {
+    const el = nowRef.current;
+    if (!el) {
+      setShowJump(false);
+      return;
+    }
+    const io = new IntersectionObserver(([e]) => setShowJump(!e.isIntersecting), {
+      rootMargin: "-15% 0px -15% 0px",
+    });
+    io.observe(el);
+    return () => io.disconnect();
+    // `nowIndex` : le repère change de place dans la liste quand des jours
+    // passés arrivent — il faut alors observer le nouvel élément.
+  }, [loading, view, total, nowIndex]);
 
   return (
     <div className="releases">
@@ -1327,47 +1459,59 @@ export default function Releases() {
               </p>
             </div>
           ) : (
-            groups.map(({ dayStart, items }) => {
+            groups.map(({ dayStart, items }, i) => {
               const date = new Date(dayStart);
               const isToday = dayStart === todayStart;
               const isPast = dayStart < todayStart;
               const dim = activeDay != null && activeDay !== String(dayStart);
               return (
-                <section
-                  className={`rel-day ${dim ? "dim" : ""}`}
-                  data-day={dayStart}
-                  key={dayStart}
-                >
-                  <div
-                    className={`rel-day-badge ${isToday ? "today" : ""} ${
-                      isPast ? "past" : ""
-                    }`}
-                  >
-                    <span className="rel-weekday">{fmtWeekday.format(date)}</span>
-                    <span className="rel-daynum">{date.getDate()}</span>
-                    <span className="rel-month">
-                      {fmtMonth.format(date)}
-                      {date.getFullYear() !== new Date().getFullYear()
-                        ? ` ${date.getFullYear()}`
-                        : ""}
-                    </span>
-                    <span className="rel-count">{dayLabel(dayStart)}</span>
-                  </div>
-                  <div className="rel-grid">
-                    {items.map((g) => (
-                      <RelCard
-                        key={g.id}
-                        g={g}
-                        inWish={map[g.id]?.status === "wishlist"}
-                        onOpen={() => setModalGame(g)}
-                      />
-                    ))}
-                  </div>
-                </section>
+                <Fragment key={dayStart}>
+                  {i === nowIndex && <NowMarker ref={nowRef} />}
+                  <section className={`rel-day ${dim ? "dim" : ""}`} data-day={dayStart}>
+                    <div
+                      className={`rel-day-badge ${isToday ? "today" : ""} ${
+                        isPast ? "past" : ""
+                      }`}
+                    >
+                      <span className="rel-weekday">{fmtWeekday.format(date)}</span>
+                      <span className="rel-daynum">{date.getDate()}</span>
+                      <span className="rel-month">
+                        {fmtMonth.format(date)}
+                        {date.getFullYear() !== new Date().getFullYear()
+                          ? ` ${date.getFullYear()}`
+                          : ""}
+                      </span>
+                      <span className="rel-count">{dayLabel(dayStart)}</span>
+                    </div>
+                    <div className="rel-grid">
+                      {items.map((g) => (
+                        <RelCard
+                          key={g.id}
+                          g={g}
+                          inWish={map[g.id]?.status === "wishlist"}
+                          onOpen={setModalGame}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                </Fragment>
               );
             })
           )}
+          {/* Plus rien à venir : le repère ferme la timeline. */}
+          {total > 0 && nowIndex === -1 && <NowMarker ref={nowRef} />}
         </div>
+      )}
+
+      {/* Retour au présent, quand on s'est perdu dans le passé ou le futur. */}
+      {view === "feed" && showJump && (
+        <button
+          className="rel-jump clickable"
+          onClick={() => jumpToToday(true)}
+          title="Revenir à aujourd'hui"
+        >
+          <CalendarDays size={15} /> Aujourd'hui
+        </button>
       )}
 
       {modalGame && (

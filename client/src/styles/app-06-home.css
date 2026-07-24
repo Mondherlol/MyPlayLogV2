@@ -5,28 +5,26 @@
    fil garde le gabarit lisible de 620 px et le duo colonne/rail ne dérive pas
    vers la gauche des grands écrans.
    `align-items` reste sur `stretch` (défaut) : le rail doit être aussi haut
-   que le fil, sinon son bloc collant se décroche dès qu'on dépasse sa boîte. */
-/* Le salut et la barre d'onglets sont des lignes à part entière de la grille :
-   sur grand écran ils coiffent la colonne du fil pendant que le rail court sur
-   toute la hauteur (`aside` occupe les trois lignes), et en une colonne ils
-   restent en tête, communs aux deux onglets. */
+   que le fil, sinon son bloc collant se décroche dès qu'on dépasse sa boîte.
+
+   UNE seule ligne : le salut, les onglets et le fil sont regroupés dans
+   .home-col plutôt que d'occuper chacun une ligne de la grille. Un rail plus
+   haut que la colonne de gauche (le cas courant) verrait sinon son surplus de
+   hauteur réparti sur toutes les lignes qu'il traverse — dont la ligne vide des
+   onglets sur grand écran — ce qui repoussait le fil tout en bas de la page. */
 .home {
   display: grid;
   grid-template-columns: minmax(0, 620px) 424px;
-  grid-template-areas:
-    "hero aside"
-    "tabs aside"
-    "main aside";
-  gap: 0 1.8rem;
+  gap: 1.8rem;
   justify-content: center;
 }
 
-.hf-hero {
-  grid-area: hero;
+/* Colonne de gauche : salut + onglets (mobile) + fil. */
+.home-col {
+  min-width: 0;
 }
 
 .home-main {
-  grid-area: main;
   min-width: 0;
 }
 
@@ -1422,7 +1420,6 @@
 /* Colonne de droite : une simple pile. Elle s'étire sur toute la hauteur de la
    ligne (voir .home) pour servir de piste aux deux blocs collants ci-dessous. */
 .home-aside {
-  grid-area: aside;
   display: flex;
   flex-direction: column;
   gap: 1.1rem;

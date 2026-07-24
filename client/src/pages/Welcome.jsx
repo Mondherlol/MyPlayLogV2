@@ -160,62 +160,67 @@ export default function Welcome() {
     // `data-tab` pilote l'affichage des deux panneaux : sous 1240 px le CSS en
     // masque un, au-dessus il les remet côte à côte et l'attribut ne sert plus.
     <div className="home" data-tab={tab} {...(compact ? swipe : null)}>
-      {/* --- En-tête : juste le salut. Points, mini-jeux, classements et
-          curseurs vivent désormais sur la page /arcade. --- */}
-      <header className="hf-hero">
-        <div className="hf-hello">
-          <h1 className="hf-hello-title">
-            Salut <span className="grad-text">{user?.username}</span>
-          </h1>
-          <p className="hf-hello-sub">
-            Voici ce qui se passe sur ton radar à jeux.
-          </p>
-        </div>
-      </header>
-
-      {compact && (
-        <nav className="hf-tabs" role="tablist" aria-label="Sections de l'accueil">
-          <span className="hf-tabs-ink" aria-hidden="true" />
-          <button
-            id="hf-tab-feed"
-            className={`hf-tab clickable ${tab === "feed" ? "on" : ""}`}
-            role="tab"
-            aria-selected={tab === "feed"}
-            aria-controls="hf-panel-feed"
-            onClick={() => pickTab("feed")}
-          >
-            <Rss size={15} /> Fil
-          </button>
-          <button
-            id="hf-tab-discover"
-            className={`hf-tab clickable ${tab === "discover" ? "on" : ""}`}
-            role="tab"
-            aria-selected={tab === "discover"}
-            aria-controls="hf-panel-discover"
-            onClick={() => pickTab("discover")}
-          >
-            <Compass size={15} /> Découvrir
-          </button>
-        </nav>
-      )}
-
-      <div className="home-main" {...panelProps("feed")}>
-        {/* --- Fil d'actualité --- */}
-        <section className="hf-sec">
-          <div className="hf-sec-head">
-            <h2 className="hf-sec-title">
-              <Sparkles size={17} /> Fil d'actualité
-            </h2>
-            {/* Avatars des joueurs suivis : filtre le fil sur un seul joueur */}
-            <FeedUserFilter
-              token={token}
-              myId={user?.id}
-              value={feedUser}
-              onChange={setFeedUser}
-            />
+      {/* Colonne de gauche : le salut coiffe les deux onglets, donc il vit ici
+          plutôt que dans le panneau du fil. Ce regroupement est aussi ce qui
+          garde la grille sur UNE ligne (voir app-06-home.css). */}
+      <div className="home-col">
+        {/* --- En-tête : juste le salut. Points, mini-jeux, classements et
+            curseurs vivent désormais sur la page /arcade. --- */}
+        <header className="hf-hero">
+          <div className="hf-hello">
+            <h1 className="hf-hello-title">
+              Salut <span className="grad-text">{user?.username}</span>
+            </h1>
+            <p className="hf-hello-sub">
+              Voici ce qui se passe sur ton radar à jeux.
+            </p>
           </div>
-          <HomeFeed token={token} me={user?.username} filterUser={feedUser} />
-        </section>
+        </header>
+
+        {compact && (
+          <nav className="hf-tabs" role="tablist" aria-label="Sections de l'accueil">
+            <span className="hf-tabs-ink" aria-hidden="true" />
+            <button
+              id="hf-tab-feed"
+              className={`hf-tab clickable ${tab === "feed" ? "on" : ""}`}
+              role="tab"
+              aria-selected={tab === "feed"}
+              aria-controls="hf-panel-feed"
+              onClick={() => pickTab("feed")}
+            >
+              <Rss size={15} /> Fil
+            </button>
+            <button
+              id="hf-tab-discover"
+              className={`hf-tab clickable ${tab === "discover" ? "on" : ""}`}
+              role="tab"
+              aria-selected={tab === "discover"}
+              aria-controls="hf-panel-discover"
+              onClick={() => pickTab("discover")}
+            >
+              <Compass size={15} /> Découvrir
+            </button>
+          </nav>
+        )}
+
+        <div className="home-main" {...panelProps("feed")}>
+          {/* --- Fil d'actualité --- */}
+          <section className="hf-sec">
+            <div className="hf-sec-head">
+              <h2 className="hf-sec-title">
+                <Sparkles size={17} /> Fil d'actualité
+              </h2>
+              {/* Avatars des joueurs suivis : filtre le fil sur un seul joueur */}
+              <FeedUserFilter
+                token={token}
+                myId={user?.id}
+                value={feedUser}
+                onChange={setFeedUser}
+              />
+            </div>
+            <HomeFeed token={token} me={user?.username} filterUser={feedUser} />
+          </section>
+        </div>
       </div>
 
       {/* --- Rail de droite : classement en tête, puis découverte ---

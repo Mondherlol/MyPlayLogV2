@@ -1,0 +1,251 @@
+/* ======================================================================
+   Visionneuse d'images plein écran (components/MediaLightbox.jsx)
+   ====================================================================== */
+/* Portalisée sur <body> et posée en `fixed` : elle couvre TOUT le viewport,
+   même ouverte depuis une modale. `100dvh` (et non 100vh) pour que la barre
+   d'URL mobile qui se rétracte ne laisse pas une bande vide en bas. */
+.mlb {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background: rgba(6, 5, 10, 0.96);
+  /* Marges de sécurité sous l'encoche et la barre gestuelle. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+  overscroll-behavior: contain;
+  animation: mlb-in 0.16s ease-out;
+}
+
+@keyframes mlb-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---------- Barre du haut : compteur + actions ---------- */
+.mlb-top {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  color: #fff;
+}
+
+.mlb-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.mlb-count {
+  margin-right: auto;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Cibles de 40px : confortables au pouce, discrètes à la souris. */
+.mlb-btn {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  transition: background 0.15s ease;
+}
+
+.mlb-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.mlb-btn.close:hover {
+  background: #e5484d;
+}
+
+/* ---------- Scène : l'image, glissable ---------- */
+.mlb-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  /* Le geste horizontal nous appartient (swipe) ; le vertical reste au
+     navigateur pour fermer d'un geste système / faire défiler. */
+  touch-action: pan-y;
+}
+
+.mlb-viewport {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.mlb-track {
+  display: flex;
+  height: 100%;
+  will-change: transform;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Pendant le glissé, l'image colle au doigt : aucune animation. */
+.mlb-track.dragging {
+  transition: none;
+}
+
+.mlb-slide {
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 0.5rem;
+}
+
+.mlb-slide img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 10px;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.mlb-slide-ph {
+  width: 60%;
+  height: 60%;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* ---------- Flèches (souris) ---------- */
+.mlb-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.mlb-nav:hover:not(:disabled) {
+  background: var(--accent-grad);
+  color: #1a1204;
+}
+
+.mlb-nav:disabled {
+  opacity: 0.25;
+}
+
+.mlb-nav.left {
+  left: 0.75rem;
+}
+
+.mlb-nav.right {
+  right: 0.75rem;
+}
+
+/* ---------- Bande de vignettes ---------- */
+.mlb-strip {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.6rem 0.75rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.mlb-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.mlb-thumb {
+  flex: 0 0 auto;
+  width: 92px;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.07);
+  opacity: 0.55;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.mlb-thumb:hover {
+  opacity: 0.85;
+}
+
+.mlb-thumb.on {
+  opacity: 1;
+  border-color: var(--orange);
+}
+
+.mlb-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ---------- Mobile ---------- */
+@media (max-width: 760px) {
+  /* Au doigt, le swipe remplace les flèches : elles ne feraient que manger
+     de la place au-dessus de l'image. */
+  .mlb-nav {
+    display: none;
+  }
+
+  .mlb-slide {
+    padding: 0.25rem;
+  }
+
+  .mlb-thumb {
+    width: 68px;
+  }
+
+  .mlb-strip {
+    padding: 0.5rem;
+  }
+}
+
+/* Écran bas (paysage sur téléphone) : la bande de vignettes prend trop de la
+   hauteur utile, on la retire pour laisser l'image respirer. */
+@media (max-height: 460px) {
+  .mlb-strip {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .mlb,
+  .mlb-track {
+    animation: none;
+    transition: none;
+  }
+}

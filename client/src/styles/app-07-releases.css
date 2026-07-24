@@ -388,12 +388,95 @@
   display: flex;
   flex-direction: column;
   gap: 2.2rem;
+  /* Les jours passés s'insèrent EN HAUT du feed. On compense nous-mêmes le
+     décalage (voir loadPast/useLayoutEffect) : l'ancrage automatique du
+     navigateur ferait une seconde correction par-dessus, et on atterrissait à
+     côté du jour visé. */
+  overflow-anchor: none;
 }
+
 .rel-day {
   display: grid;
   grid-template-columns: 92px 1fr;
   gap: 1.4rem;
   align-items: start;
+}
+
+/* ---------- Repère « aujourd'hui » ---------- */
+/* Toujours présent entre le dernier jour passé et le premier jour à venir,
+   même si rien ne sort aujourd'hui : c'est la cible du calage initial. */
+.rel-now {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  /* Compense la gouttière du flex parent pour rester serré contre les jours. */
+  margin: -0.8rem 0;
+}
+
+.rel-now-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--orange);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--orange) 25%, transparent);
+}
+
+.rel-now-label {
+  flex: 0 0 auto;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #1a1204;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+}
+
+.rel-now-line {
+  flex: 1 1 auto;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--orange) 60%, transparent),
+    transparent
+  );
+}
+
+/* ---------- Bouton flottant « Aujourd'hui » ---------- */
+/* Apparaît dès que le repère sort de l'écran : le feed est infini dans les
+   deux sens, il faut toujours pouvoir rentrer chez soi. */
+.rel-jump {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: calc(1.2rem + env(safe-area-inset-bottom));
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #1a1204;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  box-shadow: 0 10px 26px -8px rgba(0, 0, 0, 0.55);
+  animation: rel-jump-in 0.18s ease-out;
+}
+
+.rel-jump:hover {
+  filter: brightness(1.06);
+}
+
+@keyframes rel-jump-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
 .rel-day-badge {
@@ -919,23 +1002,10 @@
   display: block;
 }
 
-/* Capture plein écran par-dessus la modale */
-.relm-shot-lb {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  display: grid;
-  place-items: center;
-  background: rgba(8, 6, 12, 0.92);
-  border-radius: 20px;
-  cursor: zoom-out;
-}
-.relm-shot-lb img {
-  max-width: 96%;
-  max-height: 92%;
-  border-radius: 12px;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
-}
+/* (La visionneuse plein écran vit dans components/MediaLightbox.jsx —
+   app-24-lightbox.css. Elle était auparavant posée en `absolute` DANS cette
+   modale, donc bornée à la carte : d'où un « plein écran » de la taille d'une
+   fenêtre, sans navigation ni swipe.) */
 
 /* --- Langues disponibles --- */
 .relm-langs {
@@ -1464,49 +1534,279 @@
   text-overflow: ellipsis;
 }
 
-/* ---------- Responsive ---------- */
+/* ======================================================================
+   Responsive
+   ====================================================================== */
+
+/* --- Tablette : la colonne de dates se resserre --- */
+@media (max-width: 1000px) {
+  .rel-day {
+    grid-template-columns: 78px 1fr;
+    gap: 1rem;
+  }
+
+  .rel-daynum {
+    font-size: 1.7rem;
+  }
+}
+
+/* --- Mobile --- */
 @media (max-width: 760px) {
+
+  /* L'en-tête mangeait un tiers du premier écran pour une icône décorative. */
+  .rel-hero {
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .rel-hero-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+  }
+
+  .rel-sub {
+    font-size: 0.85rem;
+    margin-top: 0.2rem;
+  }
+
+  /* La barre d'outils RESTE collante (c'est là que vivent les filtres), mais
+     elle passe en deux rangées compactes qui défilent horizontalement plutôt
+     que d'empiler cinq boutons sur trois lignes. */
+  .rel-toolbar {
+    position: sticky;
+    top: calc(var(--topbar-h, 60px) + 0.25rem);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    margin-bottom: 1.1rem;
+    padding: 0.45rem 0;
+    /* Le fond suit la page sous les cartes qui défilent dessous. */
+    background: var(--bg);
+    /* Déborde des marges du contenu pour que le fond aille bord à bord. */
+    margin-inline: calc(-1 * var(--content-pad, 1.2rem));
+    padding-inline: var(--content-pad, 1.2rem);
+  }
+
+  .rel-views {
+    align-self: stretch;
+  }
+
+  .rel-view {
+    flex: 1 1 0;
+    justify-content: center;
+    padding: 0.5rem 0.6rem;
+    font-size: 0.85rem;
+  }
+
+  /* Une seule rangée qui glisse au doigt : aucun bouton ne se retrouve à la
+     ligne, et on garde tous les filtres accessibles. */
+  .rel-actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    /* Les ombres des chips ne doivent pas être rognées par l'overflow. */
+    padding: 0.15rem calc(var(--content-pad, 1.2rem)) 0.15rem 0;
+    margin-right: calc(-1 * var(--content-pad, 1.2rem));
+    scroll-padding-left: 0.2rem;
+  }
+
+  .rel-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .rel-actions>* {
+    flex: 0 0 auto;
+  }
+
+  .rel-big,
+  .rel-wish,
+  .rel-ai-toggle,
+  .rel-dd-btn {
+    font-size: 0.82rem;
+    padding: 0.45rem 0.7rem;
+    border-radius: 999px;
+  }
+
+  /* Le menu déroulant s'ancre à gauche de son bouton et ne dépasse jamais. */
+  .rel-dd-menu {
+    max-width: calc(100vw - 1.6rem);
+  }
+
+  /* La date passe en bandeau horizontal collé sous la barre d'outils : on sait
+     toujours quel jour on regarde, sans sacrifier une colonne de largeur. */
   .rel-day {
     grid-template-columns: 1fr;
-    gap: 0.9rem;
+    gap: 0.6rem;
   }
+
+  /* Se cale juste sous la barre d'outils collante (barre du haut + ses deux
+     rangées) : on garde le jour affiché sous les yeux pendant qu'on parcourt
+     une longue journée. */
   .rel-day-badge {
-    position: static;
+    position: sticky;
+    top: calc(var(--topbar-h, 60px) + 6rem);
+    z-index: 5;
     flex-direction: row;
-    align-items: baseline;
-    gap: 0.5rem;
-    padding: 0.5rem 0.85rem;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: 12px;
   }
+
+  .rel-weekday {
+    font-size: 0.66rem;
+  }
+
   .rel-daynum {
-    font-size: 1.4rem;
+    font-size: 1.25rem;
+    line-height: 1;
   }
+
+  .rel-month {
+    font-size: 0.72rem;
+  }
+
   .rel-count {
     margin-top: 0;
     margin-left: auto;
+    font-size: 0.62rem;
   }
+
+  /* Trois jaquettes par rangée sur un écran courant : assez grandes pour
+     reconnaître un jeu, assez petites pour en voir une journée entière. */
   .rel-grid {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 0.8rem;
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: 0.65rem;
   }
-  .rel-toolbar {
-    position: static;
+
+  .rel-timeline {
+    gap: 1.5rem;
   }
-  .rel-views {
-    overflow-x: auto;
+
+  .relc-cover {
+    border-radius: 11px;
   }
+
+  .relc-name {
+    font-size: 0.78rem;
+  }
+
+  .relc-plats {
+    font-size: 0.67rem;
+  }
+
+  .rel-now {
+    margin: -0.45rem 0;
+  }
+
+  /* Au doigt, le survol n'existe pas : le « + » d'ajout rapide resterait
+     invisible. On le laisse visible en permanence sur les cartes. */
+  .relc .add-fan.hover-only {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Le grisage hors focus repeint des dizaines de jaquettes (grayscale sur
+     image = filtre coûteux) pour un effet qu'on ne perçoit pas sur un petit
+     écran — on le coupe, c'est autant de travail en moins au défilement. */
+  .rel-day.dim .relc-cover,
+  .rel-day.dim .relc-name,
+  .rel-day.dim .relc-plats,
+  .rel-day.dim .rel-day-badge {
+    filter: none;
+    opacity: 1;
+  }
+
+  /* --- Modale de découverte : feuille plein écran --- */
+  /* Une carte flottante de 94 vw avec des coins arrondis et 4 % de fond visible
+     autour, c'est le pire des deux mondes sur téléphone. */
+  .relm {
+    width: 100%;
+    max-width: none;
+    max-height: 100dvh;
+    height: 100dvh;
+    border-radius: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* La feuille occupe tout : plus de marge de 2vh autour ni de défilement de
+     l'overlay lui-même (c'est .relm qui défile). */
+  .relm-overlay {
+    padding: 0;
+    align-items: stretch;
+    overflow: hidden;
+  }
+
   .relm-hero-row {
     padding: 2rem 1rem 0.9rem;
   }
+
   .relm-body {
-    padding: 0.9rem 1rem 1.1rem;
+    padding: 0.9rem 1rem 1.4rem;
   }
+
   .relm-cover {
     width: 78px;
   }
+
+  .relm-title {
+    font-size: 1.15rem;
+  }
+
+  .relm-shot {
+    width: 124px;
+  }
+
+  /* Les actions se collent en bas de la feuille : « Je le veux » reste sous le
+     pouce quel que soit l'endroit où on a lu. */
+  .relm-actions {
+    position: sticky;
+    bottom: 0;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-inline: -1rem;
+    margin-bottom: -1.4rem;
+    padding: 0.7rem 1rem calc(0.7rem + env(safe-area-inset-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+
+  .relm-wish {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
   .relm-go {
     margin-left: 0;
   }
+
   .plan-months {
     grid-template-columns: 1fr;
+  }
+
+  .rel-jump {
+    /* Au-dessus de la barre de navigation du bas de l'app. */
+    bottom: calc(var(--bottom-bar-h, 60px) + 0.8rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* --- Petits téléphones --- */
+@media (max-width: 400px) {
+  .rel-grid {
+    grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+    gap: 0.5rem;
+  }
+}
+
+/* Le mini-lecteur flotte en bas : le bouton « Aujourd'hui » lui laisse la place.
+   `--bottom-bar-h` vaut 0 hors mobile, la règle sert donc dans les deux cas. */
+body.mpl-open .rel-jump {
+  bottom: calc(var(--bottom-bar-h, 0px) + 84px + env(safe-area-inset-bottom));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rel-jump {
+    animation: none;
   }
 }
