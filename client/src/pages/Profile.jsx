@@ -80,6 +80,17 @@ const TAB_ORDER = [
 // dernière version connue, puis on rafraîchit en fond (stale-while-revalidate).
 const profileCache = makeCache("mpl_profile_", 10 * 60 * 1000);
 
+// Marge à gauche quand on recentre la barre sur l'onglet actif. Dès que la barre
+// est défilée, la flèche gauche (64 px, avec son dégradé vers le fond) se pose
+// par-dessus : sans cette marge, le bord de l'onglet qu'on vient de choisir
+// passait sous le fondu. La flèche n'existe qu'au pointeur fin (voir le CSS),
+// donc au tactile on garde un simple filet.
+const TAB_ARROW_W = 64;
+const tabLeftSafe = () =>
+  window.matchMedia("(hover: hover) and (pointer: fine)").matches
+    ? TAB_ARROW_W + 10
+    : 12;
+
 // Rend un texte avec les emojis en style Twitter (twemoji), comme les commentaires.
 function escapeHtml(s) {
   return String(s)
@@ -318,7 +329,7 @@ export default function Profile() {
   useEffect(() => {
     const nav = tabsNavRef.current;
     const active = nav?.querySelector(".profile-tab.active");
-    if (active) nav.scrollTo({ left: active.offsetLeft - 12, behavior: "smooth" });
+    if (active) nav.scrollTo({ left: active.offsetLeft - tabLeftSafe(), behavior: "smooth" });
     updateTabArrows();
   }, [tab, loading]);
 

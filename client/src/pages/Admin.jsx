@@ -36,6 +36,8 @@ import {
   MousePointer2,
   Frame,
   Palette,
+  Download,
+  DownloadCloud,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { rarityColor, rarityLabel } from "../lib/rarity";
@@ -179,6 +181,33 @@ function timeAgo(date) {
 const USER_FILTERS = [
   { key: "all", label: "Tous" },
   { key: "admin", label: "Admins" },
+  { key: "download", label: "Téléchargement" },
+];
+
+// Les gestes de masse. `danger` colore le bouton et déclenche une confirmation
+// détaillée : supprimer une sélection entière est irréversible.
+const BULK_ACTIONS = [
+  {
+    key: "grant-download",
+    label: "Donner l'accès au téléchargement",
+    Icon: Download,
+    verb: (n) => `Donner l'accès au téléchargement à ${n} compte${n > 1 ? "s" : ""} ?`,
+  },
+  {
+    key: "revoke-download",
+    label: "Révoquer l'accès au téléchargement",
+    Icon: DownloadCloud,
+    verb: (n) => `Révoquer l'accès au téléchargement de ${n} compte${n > 1 ? "s" : ""} ?`,
+  },
+  {
+    key: "delete",
+    label: "Supprimer les comptes",
+    Icon: Trash2,
+    danger: true,
+    verb: (n) =>
+      `Supprimer définitivement ${n} compte${n > 1 ? "s" : ""} ?\n\n` +
+      `Toutes leurs données seront effacées. Action irréversible.`,
+  },
 ];
 
 function UsersPanel({ token, me }) {
@@ -188,6 +217,11 @@ function UsersPanel({ token, me }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all");
   const [openId, setOpenId] = useState(null); // fiche ouverte
+  // Sélection pour les actions de masse (Set d'ids).
+  const [picked, setPicked] = useState(() => new Set());
+  const [action, setAction] = useState(BULK_ACTIONS[0].key);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkMsg, setBulkMsg] = useState(null);
 
   function load(search = "") {
     setLoading(true);
@@ -202,7 +236,59 @@ function UsersPanel({ token, me }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
-  const shown = users.filter((u) => (filter === "admin" ? u.isAdmin : true));
+  const shown = users.filter((u) =>
+    filter === "admin" ? u.isAdmin : filter === "download" ? u.canDownload : true
+  );
+
+  // La sélection ne porte que sur ce qui est À L'ÉCRAN : cocher « tout » puis
+  // affiner la recherche ne doit pas agir sur des comptes devenus invisibles.
+  const shownIds = shown.map((u) => u.id);
+  const pickedShown = shownIds.filter((id) => picked.has(id));
+  const allPicked = shownIds.length > 0 && pickedShown.length === shownIds.length;
+
+  const toggleOne = (id) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const toggleAll = () =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (allPicked) shownIds.forEach((id) => next.delete(id));
+      else shownIds.forEach((id) => next.add(id));
+      return next;
+    });
+
+  async function runBulk() {
+    const conf = BULK_ACTIONS.find((a) => a.key === action);
+    const ids = pickedShown;
+    if (!conf || !ids.length || bulkBusy) return;
+    if (!confirm(conf.verb(ids.length))) return;
+    setBulkBusy(true);
+    setBulkMsg(null);
+    try {
+      const d = await apiFetch("/admin/users/bulk", {
+        method: "POST",
+        token,
+        body: { action, ids },
+      });
+      const skipped = d.skipped?.length || 0;
+      setBulkMsg({
+        ok: true,
+        text:
+          `${d.done} compte${d.done > 1 ? "s" : ""} traité${d.done > 1 ? "s" : ""}.` +
+          (skipped ? ` ${skipped} ignoré${skipped > 1 ? "s" : ""} (compte protégé).` : ""),
+      });
+      setPicked(new Set());
+      load(q.trim());
+    } catch (e) {
+      setBulkMsg({ ok: false, text: e.message });
+    } finally {
+      setBulkBusy(false);
+    }
+  }
 
   return (
     <div className="admin-card">
@@ -213,8 +299,9 @@ function UsersPanel({ token, me }) {
         <div className="admin-card-titles">
           <h2>Utilisateurs</h2>
           <p>
-            Recherche, consulte, édite ou supprime les comptes. Clique une ligne pour
-            gérer email, mot de passe, rôle et abonnements.
+            Les plus récemment connectés en tête. Clique une ligne pour gérer email,
+            mot de passe, rôle, accès au téléchargement et abonnements — ou coche
+            plusieurs comptes pour agir en une fois.
           </p>
         </div>
         {!loading && (
@@ -259,6 +346,58 @@ function UsersPanel({ token, me }) {
         </div>
       </div>
 
+      {/* --- Barre d'actions de masse --- */}
+      {/* Toujours visible (et non surgissante) : la case « tout cocher » y vit,
+          donc elle doit exister AVANT qu'on ait coché quoi que ce soit. */}
+      <div className={`au-bulk ${pickedShown.length ? "armed" : ""}`}>
+        <label className="au-bulk-all clickable">
+          <input
+            type="checkbox"
+            checked={allPicked}
+            // État « certains cochés » : la case affiche un tiret.
+            ref={(el) => {
+              if (el) el.indeterminate = pickedShown.length > 0 && !allPicked;
+            }}
+            onChange={toggleAll}
+            disabled={!shownIds.length}
+          />
+          <span>
+            {allPicked ? "Tout décocher" : "Tout cocher"}
+            {shownIds.length > 0 && <em> ({shownIds.length})</em>}
+          </span>
+        </label>
+
+        <span className="au-bulk-count">
+          {pickedShown.length
+            ? `${pickedShown.length} sélectionné${pickedShown.length > 1 ? "s" : ""}`
+            : "Aucune sélection"}
+        </span>
+
+        <select
+          className="au-bulk-select"
+          value={action}
+          onChange={(e) => setAction(e.target.value)}
+          aria-label="Action à appliquer"
+        >
+          {BULK_ACTIONS.map((a) => (
+            <option key={a.key} value={a.key}>
+              {a.label}
+            </option>
+          ))}
+        </select>
+
+        <button
+          className={`btn sm clickable ${
+            BULK_ACTIONS.find((a) => a.key === action)?.danger ? "btn-danger" : "btn-primary"
+          }`}
+          onClick={runBulk}
+          disabled={!pickedShown.length || bulkBusy}
+        >
+          {bulkBusy ? <Loader2 size={14} className="spin" /> : <Check size={14} />} Appliquer
+        </button>
+      </div>
+
+      {bulkMsg && <p className={bulkMsg.ok ? "admin-ok" : "psn-err"}>{bulkMsg.text}</p>}
       {err && <p className="psn-err">{err}</p>}
 
       {loading ? (
@@ -270,49 +409,75 @@ function UsersPanel({ token, me }) {
       ) : (
         <div className="au-list">
           {shown.map((u) => (
-            <button
-              type="button"
-              className="au-row clickable"
-              key={u.id}
-              onClick={() => setOpenId(u.id)}
-            >
-              <span className="au-avatar">
-                {u.avatar ? (
-                  <img src={u.avatar} alt="" />
-                ) : (
-                  <span className="au-avatar-fallback">
-                    {u.username?.[0]?.toUpperCase() || "?"}
-                  </span>
-                )}
-              </span>
-              <div className="au-info">
-                <div className="au-name-row">
-                  <span className="au-name">{u.username}</span>
-                  {u.isSuper ? (
-                    <span className="au-admin-badge super" title="Super-administrateur">
-                      <Crown size={12} /> Super
+            <div className={`au-row ${picked.has(u.id) ? "picked" : ""}`} key={u.id}>
+              {/* Hors du bouton « Gérer » : cocher ne doit pas ouvrir la fiche. */}
+              <label
+                className="au-pick clickable"
+                onClick={(e) => e.stopPropagation()}
+                title="Sélectionner pour une action de masse"
+              >
+                <input
+                  type="checkbox"
+                  checked={picked.has(u.id)}
+                  onChange={() => toggleOne(u.id)}
+                />
+              </label>
+
+              <button
+                type="button"
+                className="au-row-main clickable"
+                onClick={() => setOpenId(u.id)}
+              >
+                <span className="au-avatar">
+                  {u.avatar ? (
+                    <img src={u.avatar} alt="" />
+                  ) : (
+                    <span className="au-avatar-fallback">
+                      {u.username?.[0]?.toUpperCase() || "?"}
                     </span>
-                  ) : u.isAdmin ? (
-                    <span className="au-admin-badge" title="Administrateur">
-                      <ShieldCheck size={12} /> Admin
-                    </span>
-                  ) : null}
-                </div>
-                <span className="au-email">{u.email}</span>
-                <span className="au-meta">
-                  <Gamepad2 size={12} /> {u.gameCount} jeu{u.gameCount > 1 ? "x" : ""}
-                  {" · "}
-                  <Coins size={12} /> {(u.points || 0).toLocaleString("fr-FR")} pt
-                  {u.points > 1 ? "s" : ""}
-                  {" · "}
-                  {u.followersCount} abonné{u.followersCount > 1 ? "s" : ""}
-                  {" · "}
-                  {u.followingCount} abonnement{u.followingCount > 1 ? "s" : ""}
-                  {u.lastSeenAt ? ` · vu ${timeAgo(u.lastSeenAt)}` : ""}
+                  )}
                 </span>
-              </div>
-              <span className="au-chevron">Gérer →</span>
-            </button>
+                <div className="au-info">
+                  <div className="au-name-row">
+                    <span className="au-name">{u.username}</span>
+                    {u.isSuper ? (
+                      <span className="au-admin-badge super" title="Super-administrateur">
+                        <Crown size={12} /> Super
+                      </span>
+                    ) : u.isAdmin ? (
+                      <span className="au-admin-badge" title="Administrateur">
+                        <ShieldCheck size={12} /> Admin
+                      </span>
+                    ) : null}
+                    {u.canDownload && (
+                      <span
+                        className="au-dl-badge"
+                        title={
+                          u.downloadFlag
+                            ? "Accès au téléchargement accordé"
+                            : "Accès au téléchargement (via le rôle admin)"
+                        }
+                      >
+                        <Download size={12} /> DL
+                      </span>
+                    )}
+                  </div>
+                  <span className="au-email">{u.email}</span>
+                  <span className="au-meta">
+                    <Gamepad2 size={12} /> {u.gameCount} jeu{u.gameCount > 1 ? "x" : ""}
+                    {" · "}
+                    <Coins size={12} /> {(u.points || 0).toLocaleString("fr-FR")} pt
+                    {u.points > 1 ? "s" : ""}
+                    {" · "}
+                    {u.followersCount} abonné{u.followersCount > 1 ? "s" : ""}
+                    {" · "}
+                    {u.followingCount} abonnement{u.followingCount > 1 ? "s" : ""}
+                    {u.lastSeenAt ? ` · vu ${timeAgo(u.lastSeenAt)}` : ""}
+                  </span>
+                </div>
+                <span className="au-chevron">Gérer →</span>
+              </button>
+            </div>
           ))}
         </div>
       )}
@@ -445,6 +610,10 @@ function UserDrawer({ token, userId, me, onClose, onDirty }) {
                   autre administrateur.
                 </p>
               )}
+
+              {/* Accès au téléchargement : le seul moyen d'ouvrir l'onglet
+                  « Téléchargements » d'une fiche de jeu. Fermé par défaut. */}
+              <DownloadToggle token={token} user={u} onSaved={load} onDirty={onDirty} />
 
               {isSuperMe && !u.isSuper && (
                 <AdminToggle token={token} user={u} onSaved={load} onDirty={onDirty} />
@@ -781,6 +950,60 @@ function PointsForm({ token, user, onDirty }) {
         ))}
       </div>
       {msg && <p className={msg.ok ? "admin-ok" : "psn-err"}>{msg.text}</p>}
+    </div>
+  );
+}
+
+// --- Accès à l'onglet « Téléchargements » des fiches de jeu ---
+// L'interrupteur porte sur le DRAPEAU du compte (`downloadFlag`), pas sur
+// l'accès effectif : un administrateur y a droit par son rôle, et l'éteindre ne
+// lui retirerait rien — on le dit plutôt que de laisser croire à une panne.
+function DownloadToggle({ token, user, onSaved, onDirty }) {
+  const [busy, setBusy] = useState(false);
+  const viaRole = user.isAdmin && !user.downloadFlag;
+
+  async function toggle() {
+    setBusy(true);
+    try {
+      await apiFetch(`/admin/users/${user.id}/download`, {
+        method: "PATCH",
+        token,
+        body: { canDownload: !user.downloadFlag },
+      });
+      onSaved();
+      onDirty();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="admin-field">
+      <label>
+        <Download size={14} /> Accès au téléchargement
+      </label>
+      <div className="admin-toggle-row">
+        <span>
+          {user.downloadFlag
+            ? "L'onglet « Téléchargements » lui est ouvert."
+            : viaRole
+              ? "Ouvert d'office : c'est un administrateur."
+              : "Onglet « Téléchargements » masqué et API refusée."}
+        </span>
+        <button
+          className={`admin-switch clickable ${user.downloadFlag ? "on" : ""}`}
+          onClick={toggle}
+          disabled={busy}
+          role="switch"
+          aria-checked={user.downloadFlag}
+        >
+          <span className="admin-switch-knob">
+            {busy && <Loader2 size={11} className="spin" />}
+          </span>
+        </button>
+      </div>
     </div>
   );
 }

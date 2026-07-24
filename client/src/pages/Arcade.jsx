@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import {
@@ -27,13 +27,16 @@ import {
   Leaf,
   Sunset,
   Contrast,
+  Users,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCosmetics } from "../context/CosmeticsContext";
 import { apiFetch } from "../lib/api";
+import { makeCache } from "../lib/cache";
 import { rarityColor, rarityLabel, rarityRank } from "../lib/rarity";
 import RewardArt from "../components/RewardArt";
 import CaseOpeningModal from "../components/CaseOpeningModal";
+import FriendsCollectionModal from "../components/FriendsCollectionModal";
 import PixelCanvas from "../components/PixelCanvas";
 
 // ======================================================================
@@ -97,16 +100,45 @@ const MODES = [
 
 const fmt = (n) => Number(n || 0).toLocaleString("fr-FR");
 
+// --- Caches stale-while-revalidate (mémoire + localStorage) ---
+// La page était intégralement reconstruite à chaque visite : squelettes des
+// classements, et surtout les jaquettes des cartes Blind Test / Pixel Rush qui
+// repartaient de zéro (re-téléchargées, re-pixelisées) alors qu'elles ne
+// changent quasiment jamais. On réaffiche donc la dernière version connue
+// instantanément, puis on revalide en fond — le solde et l'inventaire se
+// recalent sans que rien ne clignote.
+// Clés préfixées par l'id du compte : changer d'utilisateur ne montre jamais
+// l'inventaire du précédent.
+const arcadeCache = makeCache("mpl_arcade_", 10 * 60 * 1000);
+const boardCache = makeCache("mpl_arcboard_", 5 * 60 * 1000);
+
 export default function Arcade() {
   const { token, user, updateUser } = useAuth();
   const { setCosmetic, previewTheme, endPreview } = useCosmetics();
 
-  const [data, setData] = useState(null); // /arcade : solde, caisses, inventaire
-  const [boards, setBoards] = useState({}); // classement par jeu
+  // Clé de cache : le compte courant. `null` tant que /auth/me n'a pas répondu —
+  // et dans ce cas on ne lit ni n'écrit RIEN : une entrée « anonyme » partagée
+  // montrerait l'inventaire du compte précédent au suivant.
+  const meId = user?.id || null;
+
+  // /arcade : solde, caisses, inventaire — amorcé depuis le cache s'il existe.
+  const [data, setData] = useState(() => (meId && arcadeCache.get(meId)?.data) || null);
+  // Classement par jeu. Une clé absente = « pas encore chargé » (squelette) ;
+  // le cache la remplit d'emblée, donc plus de squelette au retour sur la page.
+  const [boards, setBoards] = useState(() => {
+    const b = {};
+    if (!meId) return b;
+    for (const g of GAMES) {
+      const c = boardCache.get(`${meId}-${g.key}`);
+      if (c) b[g.key] = c.data;
+    }
+    return b;
+  });
   const [history, setHistory] = useState(null);
   const [showHist, setShowHist] = useState(false);
   const [openingBox, setOpeningBox] = useState(null);
   const [showCursors, setShowCursors] = useState(false);
+  const [showFriends, setShowFriends] = useState(false);
   const [equipping, setEquipping] = useState(null);
   const [preview, setPreview] = useState(null); // thème essayé en direct (non équipé)
   const [err, setErr] = useState("");
@@ -119,23 +151,50 @@ export default function Arcade() {
     if (previewRef.current) endPreview();
   }, [endPreview]);
 
+  // Toute écriture de `data` passe par ici : l'état ET le cache restent alignés,
+  // sinon un ajustement local (ouverture de caisse, équipement) serait perdu au
+  // retour sur la page, qui réafficherait la version d'avant.
+  const commitData = useCallback(
+    (next) =>
+      setData((prev) => {
+        const value = typeof next === "function" ? next(prev) : next;
+        if (value && meId) arcadeCache.set(meId, value);
+        return value;
+      }),
+    [meId]
+  );
+
   useEffect(() => {
-    if (!token) return;
+    // On attend de savoir QUI est connecté : c'est la clé du cache.
+    if (!token || !meId) return;
     let alive = true;
+    // Revalidation systématique, sans vider l'affichage : le cache reste à
+    // l'écran tant que la réponse n'est pas là.
     apiFetch("/arcade", { token })
-      .then((d) => alive && setData(d))
-      .catch((e) => alive && setErr(e.message));
+      .then((d) => {
+        if (!alive) return;
+        setErr("");
+        commitData(d);
+      })
+      // Une revalidation ratée ne doit pas effacer un affichage valide : on ne
+      // remonte l'erreur que si on n'avait rien à montrer.
+      .catch((e) => alive && !arcadeCache.get(meId) && setErr(e.message));
     // Les deux classements en parallèle : ils sont affichés côte à côte, pas
     // l'un derrière l'autre — inutile de les charger à la demande.
     for (const g of GAMES) {
       apiFetch(g.api, { token })
-        .then((d) => alive && setBoards((b) => ({ ...b, [g.key]: d.entries || [] })))
-        .catch(() => alive && setBoards((b) => ({ ...b, [g.key]: [] })));
+        .then((d) => {
+          if (!alive) return;
+          const entries = d.entries || [];
+          boardCache.set(`${meId}-${g.key}`, entries);
+          setBoards((b) => ({ ...b, [g.key]: entries }));
+        })
+        .catch(() => alive && setBoards((b) => (b[g.key] ? b : { ...b, [g.key]: [] })));
     }
     return () => {
       alive = false;
     };
-  }, [token]);
+  }, [token, meId, commitData]);
 
   function toggleHistory() {
     setShowHist((v) => !v);
@@ -147,7 +206,7 @@ export default function Arcade() {
 
   // Résultat d'une ouverture : on recale solde + inventaire sans refetch.
   function applyResult(res) {
-    setData((d) => {
+    commitData((d) => {
       if (!d) return d;
       const has = d.inventory.some((r) => r.key === res.reward.key);
       return {
@@ -177,7 +236,7 @@ export default function Arcade() {
         token,
         body: isOn ? { rewardKey: null, type: reward.type } : { rewardKey: reward.key },
       });
-      setData((prev) => ({ ...prev, equipped: d.equipped }));
+      commitData((prev) => (prev ? { ...prev, equipped: d.equipped } : prev));
       updateUser({ equipped: d.equipped });
       // Effet immédiat : le curseur / thème change sous les yeux, sans recharger.
       setCosmetic(reward.type, isOn ? null : reward);
@@ -379,6 +438,23 @@ export default function Arcade() {
           <ArrowRight size={16} className="arc-rail-cursors-arrow" />
         </button>
 
+        {/* Et juste dessous, celles des autres : une collection se regarde en
+            comparant. Même gabarit de bouton, ton plus discret — la sienne
+            reste la porte principale. */}
+        <button
+          className="arc-rail-cursors friends clickable"
+          onClick={() => setShowFriends(true)}
+        >
+          <span className="arc-rail-cursors-ic">
+            <Users size={17} />
+          </span>
+          <span className="arc-rail-cursors-txt">
+            Les collections
+            <em>Ce que les joueurs suivis ont débloqué</em>
+          </span>
+          <ArrowRight size={16} className="arc-rail-cursors-arrow" />
+        </button>
+
         <h2 className="arc-rail-title">
           <Crown size={16} /> Classements
         </h2>
@@ -429,6 +505,10 @@ export default function Arcade() {
           onClose={() => setShowCursors(false)}
           {...equipProps}
         />
+      )}
+
+      {showFriends && (
+        <FriendsCollectionModal token={token} onClose={() => setShowFriends(false)} />
       )}
 
       {openingBox && (

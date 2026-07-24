@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Clapperboard,
@@ -17,7 +17,9 @@ import {
   Joystick,
   Coins,
   Clock,
+  Compass,
   ExternalLink,
+  Rss,
   Sprout,
   Disc3,
   Play,
@@ -27,6 +29,8 @@ import { useAuth } from "../context/AuthContext";
 import { usePlayer } from "../context/PlayerContext";
 import { useClickOutside } from "../hooks/useClickOutside";
 import useFollowingRail from "../hooks/useFollowingRail";
+import useMediaQuery from "../hooks/useMediaQuery";
+import { useTabSwipe } from "../hooks/useTabSwipe";
 import { apiFetch } from "../lib/api";
 import { extractVideoId } from "../lib/youtube";
 import DocumentaryModal from "../components/DocumentaryModal";
@@ -47,6 +51,13 @@ function loadPrefs() {
   }
   return DEFAULT_PREFS;
 }
+
+// Sous ce seuil, la page n'a plus qu'une colonne : le rail de découverte
+// passerait SOUS le fil, donc hors de portée (le fil est infini, et chaque
+// paquet chargé le repoussait plus bas). On bascule alors en deux onglets.
+// Même valeur que la bascule une colonne du CSS (app-06-home.css) : les deux
+// doivent changer ensemble.
+const COMPACT_QUERY = "(max-width: 1240px)";
 
 // "12 juil." — date courte FR pour les sorties.
 function shortDate(ts) {
@@ -73,6 +84,45 @@ export default function Welcome() {
   const settingsRef = useRef(null);
   const railRef = useFollowingRail();
   useClickOutside(settingsRef, () => setShowSettings(false), showSettings);
+
+  // --- Une colonne = deux onglets ---
+  // Les deux panneaux restent MONTÉS (le CSS n'en cache qu'un) : revenir sur le
+  // fil ne relance ni sa requête ni sa pagination. On mémorise en revanche la
+  // position de défilement de chacun, sinon on retomberait au hasard dans un
+  // fil dont la hauteur a été rétablie entre-temps.
+  const compact = useMediaQuery(COMPACT_QUERY);
+  const [tab, setTab] = useState("feed");
+  const scrollMemo = useRef({ feed: 0, discover: 0 });
+  // Restaurer la position n'a de sens qu'après un VRAI changement d'onglet :
+  // au montage, on laisse la page où le navigateur l'a mise.
+  const switched = useRef(false);
+
+  const pickTab = useCallback((next) => {
+    setTab((cur) => {
+      if (cur === next) return cur;
+      scrollMemo.current[cur] = window.scrollY;
+      switched.current = true;
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!compact || !switched.current) return;
+    switched.current = false;
+    // Le panneau qui réapparaît (fil virtualisé) ne retrouve sa hauteur qu'au
+    // passage de layout suivant : restaurer tout de suite serait borné à zéro.
+    const id = requestAnimationFrame(() =>
+      window.scrollTo(0, scrollMemo.current[tab] || 0)
+    );
+    return () => cancelAnimationFrame(id);
+  }, [tab, compact]);
+
+  // Swipe horizontal entre les deux onglets (le hook ignore déjà les gestes
+  // partis d'un carrousel ou d'une modale).
+  const swipe = useTabSwipe({
+    onNext: () => pickTab("discover"),
+    onPrev: () => pickTab("feed"),
+  });
 
   // Le CTA « Chercher mes pépites aussi » des cartes du fil ouvre la modale.
   useEffect(() => {
@@ -101,22 +151,55 @@ export default function Welcome() {
     savePrefs({ ...prefs, lang: hasEn ? ["fr"] : ["fr", "en"] });
   }
 
-  return (
-    <div className="home">
-      <div className="home-main">
-        {/* --- En-tête : juste le salut. Points, mini-jeux, classements et
-            curseurs vivent désormais sur la page /arcade. --- */}
-        <header className="hf-hero">
-          <div className="hf-hello">
-            <h1 className="hf-hello-title">
-              Salut <span className="grad-text">{user?.username}</span>
-            </h1>
-            <p className="hf-hello-sub">
-              Voici ce qui se passe sur ton radar à jeux.
-            </p>
-          </div>
-        </header>
+  const panelProps = (name) =>
+    compact
+      ? { role: "tabpanel", id: `hf-panel-${name}`, "aria-labelledby": `hf-tab-${name}` }
+      : {};
 
+  return (
+    // `data-tab` pilote l'affichage des deux panneaux : sous 1240 px le CSS en
+    // masque un, au-dessus il les remet côte à côte et l'attribut ne sert plus.
+    <div className="home" data-tab={tab} {...(compact ? swipe : null)}>
+      {/* --- En-tête : juste le salut. Points, mini-jeux, classements et
+          curseurs vivent désormais sur la page /arcade. --- */}
+      <header className="hf-hero">
+        <div className="hf-hello">
+          <h1 className="hf-hello-title">
+            Salut <span className="grad-text">{user?.username}</span>
+          </h1>
+          <p className="hf-hello-sub">
+            Voici ce qui se passe sur ton radar à jeux.
+          </p>
+        </div>
+      </header>
+
+      {compact && (
+        <nav className="hf-tabs" role="tablist" aria-label="Sections de l'accueil">
+          <span className="hf-tabs-ink" aria-hidden="true" />
+          <button
+            id="hf-tab-feed"
+            className={`hf-tab clickable ${tab === "feed" ? "on" : ""}`}
+            role="tab"
+            aria-selected={tab === "feed"}
+            aria-controls="hf-panel-feed"
+            onClick={() => pickTab("feed")}
+          >
+            <Rss size={15} /> Fil
+          </button>
+          <button
+            id="hf-tab-discover"
+            className={`hf-tab clickable ${tab === "discover" ? "on" : ""}`}
+            role="tab"
+            aria-selected={tab === "discover"}
+            aria-controls="hf-panel-discover"
+            onClick={() => pickTab("discover")}
+          >
+            <Compass size={15} /> Découvrir
+          </button>
+        </nav>
+      )}
+
+      <div className="home-main" {...panelProps("feed")}>
         {/* --- Fil d'actualité --- */}
         <section className="hf-sec">
           <div className="hf-sec-head">
@@ -137,8 +220,8 @@ export default function Welcome() {
 
       {/* --- Rail de droite : classement en tête, puis découverte ---
           Suit le scroll de la page et se fige sur son dernier widget
-          (voir useFollowingRail). */}
-      <div className="home-aside">
+          (voir useFollowingRail). En une colonne, c'est l'onglet Découvrir. */}
+      <div className="home-aside" {...panelProps("discover")}>
         <div className="hf-rail" ref={railRef}>
           {/* Porte d'entrée de l'arcade : le solde et un lien, rien de plus —
               les classements et la collection vivent sur /arcade. */}
@@ -230,10 +313,15 @@ export default function Welcome() {
   );
 }
 
+// Tous les blocs du rail sont mémoïsés : ils ne dépendent que de props stables
+// (jeton, listes figées une fois chargées), alors que la page, elle, se re-rend
+// à chaque bascule d'onglet ou changement de filtre du fil. Sans ça, chaque
+// clic repeignait les dix widgets de découverte pour rien.
+
 // Widget « Jeux du moment » : les sorties chaudes, en jaquettes cliquables —
 // même grille sobre que « Pour toi » (pas de bouton d'ajout : dans un rail de
 // découverte, on veut ouvrir la fiche, pas remplir sa biblio en un clic).
-function HotGamesWidget({ games, loading }) {
+const HotGamesWidget = memo(function HotGamesWidget({ games, loading }) {
   if (loading) {
     return (
       <div className="hf-widget card" aria-busy="true">
@@ -278,13 +366,13 @@ function HotGamesWidget({ games, loading }) {
       </div>
     </div>
   );
-}
+});
 
 // Widget « Sorties indés » : les meilleurs jeux indépendants tout juste sortis
 // ET ceux qui arrivent (genre IGDB « Indie », voir fetchIndies côté serveur).
 // Chaque jaquette porte une pastille : compte à rebours pour l'à-venir, date
 // courte pour ce qui vient de sortir.
-function IndieReleasesWidget({ games, loading }) {
+const IndieReleasesWidget = memo(function IndieReleasesWidget({ games, loading }) {
   if (loading) {
     return (
       <div className="hf-widget card" aria-busy="true">
@@ -340,13 +428,13 @@ function IndieReleasesWidget({ games, loading }) {
       </div>
     </div>
   );
-}
+});
 
 // Widget « Coups de cœur OST » : les dernières bandes-son mises en favori par
 // N'IMPORTE QUEL joueur. On reprend telles quelles les cards pochette + CD de
 // l'onglet OST du profil (classes .pfo-*) — le CD sort au survol et tourne à
 // la lecture, pilotée par le mini-lecteur global.
-function RecentOstWidget({ token }) {
+const RecentOstWidget = memo(function RecentOstWidget({ token }) {
   const [items, setItems] = useState(null);
   const player = usePlayer();
 
@@ -480,7 +568,7 @@ function RecentOstWidget({ token }) {
       )}
     </div>
   );
-}
+});
 
 // --- Radar wishlist ---
 // Croise la liste « à jouer » avec les dates de sortie IGDB : les jeux voulus
@@ -518,7 +606,7 @@ function LiveCountdown({ ts }) {
   );
 }
 
-function WishlistRadar({ token }) {
+const WishlistRadar = memo(function WishlistRadar({ token }) {
   const [radar, setRadar] = useState(null);
 
   useEffect(() => {
@@ -634,7 +722,7 @@ function WishlistRadar({ token }) {
       </Link>
     </div>
   );
-}
+});
 
 // --- Jeux gratuits de la semaine ---
 // Giveaways de jeux à récupérer (Epic, Steam, GOG, Prime…), agrégés côté
@@ -709,7 +797,7 @@ function FreeGameCard({ game }) {
   );
 }
 
-function FreeGamesWidget({ token }) {
+const FreeGamesWidget = memo(function FreeGamesWidget({ token }) {
   const [games, setGames] = useState(null);
 
   useEffect(() => {
@@ -750,12 +838,12 @@ function FreeGamesWidget({ token }) {
       )}
     </div>
   );
-}
+});
 
 // Porte d'entrée de l'arcade dans le rail : le solde et un lien. Tout le
 // reste (mini-jeux, classements, caisses, curseurs) vit sur la page /arcade —
 // l'accueil est un fil d'actualité, pas une salle de jeux.
-function ArcadeTeaser({ points }) {
+const ArcadeTeaser = memo(function ArcadeTeaser({ points }) {
   return (
     <Link to="/arcade" className="hf-arcade clickable">
       <span className="hf-arcade-ic">
@@ -771,7 +859,7 @@ function ArcadeTeaser({ points }) {
       </span>
     </Link>
   );
-}
+});
 
 // Carrousel horizontal : drag à la souris + flèches gauche/droite.
 // Le tactile scrolle nativement ; à la souris on translate le scroll et on
@@ -879,7 +967,7 @@ function DragCarousel({ children }) {
 }
 
 // Widget « Prochaines sorties » : les sorties les plus attendues, par date.
-function UpcomingWidget({ games, loading }) {
+const UpcomingWidget = memo(function UpcomingWidget({ games, loading }) {
   if (loading) {
     return (
       <div className="hf-widget card" aria-busy="true">
@@ -933,10 +1021,10 @@ function UpcomingWidget({ games, loading }) {
       </Link>
     </div>
   );
-}
+});
 
 // Widget « Pour toi » : suggestions selon les genres de la bibliothèque.
-function ForYouWidget({ games, loading }) {
+const ForYouWidget = memo(function ForYouWidget({ games, loading }) {
   if (loading) {
     return (
       <div className="hf-widget card" aria-busy="true">
@@ -977,4 +1065,4 @@ function ForYouWidget({ games, loading }) {
       </div>
     </div>
   );
-}
+});

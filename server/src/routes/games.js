@@ -6,7 +6,7 @@ import multer from "multer";
 import mongoose from "mongoose";
 import { igdbQuery } from "../lib/igdb.js";
 import { isConfigured, getServiceAccessToken, fetchUserTitles, fetchTitleTrophies } from "../lib/psn.js";
-import { requireAuth, optionalAuth } from "../middleware/auth.js";
+import { requireAuth, optionalAuth, requireDownloadAccess } from "../middleware/auth.js";
 import { notify } from "../lib/notify.js";
 import { recordActivity, removeActivity } from "../lib/activity.js";
 import { summarizeReactions, reviewComment } from "../lib/reviewSerialize.js";
@@ -1361,7 +1361,7 @@ router.post("/:id/translate", requireAuth, async (req, res) => {
 // --- Onglet Patchs : mods + patchs de traduction. Cas spécifique traité : les
 // visual novels non disponibles en français → on cherche sur VNDB s'il existe
 // un patch de fan-traduction FR (avec son lien de téléchargement). ---
-router.get("/:id/patches", optionalAuth, async (req, res) => {
+router.get("/:id/patches", requireAuth, requireDownloadAccess, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
@@ -1418,7 +1418,7 @@ router.get("/:id/patches", optionalAuth, async (req, res) => {
 
 // --- Packs HD / torrents C411 pour un jeu (chargé à la demande depuis l'onglet
 // Patchs, car l'appel externe est lent et ne concerne pas tous les jeux). ---
-router.get("/:id/hd-packs", optionalAuth, async (req, res) => {
+router.get("/:id/hd-packs", requireAuth, requireDownloadAccess, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
@@ -1444,7 +1444,7 @@ router.get("/:id/hd-packs", optionalAuth, async (req, res) => {
 // --- Repacks FitGirl (jeux PC) pour un jeu, chargés à la demande depuis l'onglet
 // Patchs (l'appel externe est lent). Renvoie une liste de repacks avec poids et
 // lien magnet. Le client ne monte ce bloc que pour les jeux PC (data.isPc). ---
-router.get("/:id/fitgirl", optionalAuth, async (req, res) => {
+router.get("/:id/fitgirl", requireAuth, requireDownloadAccess, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
@@ -1465,7 +1465,7 @@ router.get("/:id/fitgirl", optionalAuth, async (req, res) => {
 // jeu, chargés à la demande depuis l'onglet Patchs (le scraping externe est lent).
 // Renvoie une liste de posts avec titre, plateforme, jaquette et lien vers la page
 // du jeu sur Ziperto (le lien de téléchargement se trouve sur cette page). ---
-router.get("/:id/ziperto", optionalAuth, async (req, res) => {
+router.get("/:id/ziperto", requireAuth, requireDownloadAccess, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
@@ -1487,7 +1487,7 @@ router.get("/:id/ziperto", optionalAuth, async (req, res) => {
 // consommé) puis on remplace l'URL d'annonce par le passkey de l'utilisateur
 // → le leech des données comptera sur SON ratio. Nécessite d'être connecté et
 // d'avoir renseigné son passkey. ---
-router.get("/:id/hd-packs/:torrentId/torrent", requireAuth, async (req, res) => {
+router.get("/:id/hd-packs/:torrentId/torrent", requireAuth, requireDownloadAccess, async (req, res) => {
   try {
     const torrentId = String(req.params.torrentId || "").toLowerCase();
     if (!/^[a-f0-9]{20,64}$/.test(torrentId))

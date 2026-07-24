@@ -21,7 +21,7 @@ import OstRename from "../models/OstRename.js";
 import GemSkip from "../models/GemSkip.js";
 import GemDiscovery from "../models/GemDiscovery.js";
 import Reward, { REWARD_TYPE_KEYS } from "../models/Reward.js";
-import { isUserAdmin } from "../lib/admin.js";
+import { canUserDownload, isUserAdmin } from "../lib/admin.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { listEnv, setEnvVar, deleteEnvVar } from "../lib/envFile.js";
 import {
@@ -46,9 +46,14 @@ router.get("/users", async (req, res) => {
       filter.$or = [{ username: rx }, { email: rx }];
     }
 
+    // Tri par défaut : le plus récemment vu en tête — c'est sur les comptes
+    // actifs qu'on agit. Les comptes qui ne se sont jamais connectés (pas de
+    // lastSeenAt) retombent en fin de liste, départagés par date d'inscription.
     const users = await User.find(filter)
-      .select("username email avatar createdAt lastSeenAt following isAdmin isSuperAdmin points")
-      .sort({ createdAt: -1 })
+      .select(
+        "username email avatar createdAt lastSeenAt following isAdmin isSuperAdmin points canDownload"
+      )
+      .sort({ lastSeenAt: -1, createdAt: -1 })
       .limit(500)
       .lean();
 
@@ -74,6 +79,11 @@ router.get("/users", async (req, res) => {
         lastSeenAt: u.lastSeenAt || null,
         isAdmin: isUserAdmin(u),
         isSuper: !!u.isSuperAdmin,
+        canDownload: canUserDownload(u),
+        // Le drapeau BRUT, sans le coup de pouce accordé aux admins : la case à
+        // cocher doit refléter ce qui est réellement stocké, sinon décocher un
+        // admin donnerait l'illusion de n'avoir aucun effet.
+        downloadFlag: !!u.canDownload,
         gameCount: gameCount.get(String(u._id)) || 0,
         points: u.points || 0, // solde d'arcade, ajustable depuis la fiche
         followingCount: (u.following || []).length,
@@ -87,22 +97,23 @@ router.get("/users", async (req, res) => {
   }
 });
 
-// --- Suppression d'un utilisateur + TOUTES ses données (irréversible) ---
-router.delete("/users/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    if (!mongoose.isValidObjectId(id))
-      return res.status(404).json({ error: "Utilisateur introuvable." });
-    if (String(id) === String(req.userId))
-      return res.status(400).json({ error: "Tu ne peux pas supprimer ton propre compte." });
+// Efface un compte et TOUT ce qui s'y rattache. Extrait de la route DELETE pour
+// que l'action de masse passe exactement par le même chemin — deux logiques de
+// suppression divergentes finiraient par laisser des orphelins d'un côté.
+// Renvoie { status, error } si le compte est intouchable, null si c'est fait.
+async function deleteUserCompletely(id, actorId) {
+  const nope = (status, error) => ({ status, error });
+  if (!mongoose.isValidObjectId(id)) return nope(404, "Utilisateur introuvable.");
+  if (String(id) === String(actorId))
+    return nope(400, "Tu ne peux pas supprimer ton propre compte.");
 
-    const target = await User.findById(id).select("isSuperAdmin");
-    if (!target) return res.status(404).json({ error: "Utilisateur introuvable." });
-    if (target.isSuperAdmin)
-      return res.status(403).json({ error: "Impossible de supprimer le super-administrateur." });
+  const target = await User.findById(id).select("isSuperAdmin");
+  if (!target) return nope(404, "Utilisateur introuvable.");
+  if (target.isSuperAdmin)
+    return nope(403, "Impossible de supprimer le super-administrateur.");
 
-    // Contenu possédé par l'utilisateur.
-    await Promise.all([
+  // Contenu possédé par l'utilisateur.
+  await Promise.all([
       UserGame.deleteMany({ user: id }),
       List.deleteMany({ user: id }),
       OstThread.deleteMany({ owner: id }),
@@ -112,35 +123,107 @@ router.delete("/users/:id", async (req, res) => {
       OstRename.deleteMany({ user: id }),
       GemSkip.deleteMany({ user: id }),
       GemDiscovery.deleteMany({ user: id }),
-      Notification.deleteMany({ $or: [{ user: id }, { actor: id }] }),
-      Activity.deleteMany({ $or: [{ actor: id }, { target: id }] }),
-      Recommendation.deleteMany({ to: id }),
-    ]);
+    Notification.deleteMany({ $or: [{ user: id }, { actor: id }] }),
+    Activity.deleteMany({ $or: [{ actor: id }, { target: id }] }),
+    Recommendation.deleteMany({ to: id }),
+  ]);
 
-    // Références de l'utilisateur laissées dans le contenu d'autrui.
-    await Promise.all([
-      // Abonnements : on retire ce user des « following » de tout le monde.
-      User.updateMany({ following: id }, { $pull: { following: id } }),
-      // Commentaires / likes / réactions écrits par ce user ailleurs.
-      UserGame.updateMany({}, { $pull: { comments: { user: id }, reactions: { user: id } } }),
-      List.updateMany({}, { $pull: { comments: { user: id }, likes: id } }),
-      OstThread.updateMany({}, { $pull: { comments: { user: id } } }),
-      Repost.updateMany({}, { $pull: { comments: { user: id }, likes: id } }),
-      Recommendation.updateMany(
-        {},
-        { $pull: { recommenders: { user: id }, boosters: id, comments: { user: id } } }
-      ),
-    ]);
+  // Références de l'utilisateur laissées dans le contenu d'autrui.
+  await Promise.all([
+    // Abonnements : on retire ce user des « following » de tout le monde.
+    User.updateMany({ following: id }, { $pull: { following: id } }),
+    // Commentaires / likes / réactions écrits par ce user ailleurs.
+    UserGame.updateMany({}, { $pull: { comments: { user: id }, reactions: { user: id } } }),
+    List.updateMany({}, { $pull: { comments: { user: id }, likes: id } }),
+    OstThread.updateMany({}, { $pull: { comments: { user: id } } }),
+    Repost.updateMany({}, { $pull: { comments: { user: id }, likes: id } }),
+    Recommendation.updateMany(
+      {},
+      { $pull: { recommenders: { user: id }, boosters: id, comments: { user: id } } }
+    ),
+  ]);
 
-    // Recommandations devenues vides (plus aucun recommandeur) : on les supprime.
-    await Recommendation.deleteMany({ recommenders: { $size: 0 } });
+  // Recommandations devenues vides (plus aucun recommandeur) : on les supprime.
+  await Recommendation.deleteMany({ recommenders: { $size: 0 } });
 
-    await User.findByIdAndDelete(id);
+  await User.findByIdAndDelete(id);
+  return null;
+}
 
+// --- Suppression d'un utilisateur + TOUTES ses données (irréversible) ---
+router.delete("/users/:id", async (req, res) => {
+  try {
+    const failure = await deleteUserCompletely(req.params.id, req.userId);
+    if (failure) return res.status(failure.status).json({ error: failure.error });
     res.json({ ok: true });
   } catch (err) {
     console.error("admin user delete error:", err.message);
     res.status(500).json({ error: "Erreur lors de la suppression de l'utilisateur." });
+  }
+});
+
+// --- Actions de masse sur une sélection de comptes ---
+// Un seul point d'entrée pour les trois gestes du panel (ouvrir / révoquer
+// l'accès au téléchargement, supprimer). Chaque compte est traité
+// indépendamment : un refus (super-admin, soi-même) n'annule pas le reste, il
+// est simplement remonté dans `skipped` pour que l'admin sache ce qui a résisté.
+const BULK_ACTIONS = ["grant-download", "revoke-download", "delete"];
+
+router.post("/users/bulk", async (req, res) => {
+  try {
+    const action = String(req.body?.action || "");
+    if (!BULK_ACTIONS.includes(action))
+      return res.status(400).json({ error: "Action inconnue." });
+
+    const ids = (Array.isArray(req.body?.ids) ? req.body.ids : [])
+      .map(String)
+      .filter((id) => mongoose.isValidObjectId(id));
+    if (!ids.length) return res.status(400).json({ error: "Aucun compte sélectionné." });
+
+    if (action === "delete") {
+      let done = 0;
+      const skipped = [];
+      // En série, pas en parallèle : chaque suppression balaie plusieurs
+      // collections entières ($pull sur tout le contenu d'autrui), les lancer
+      // toutes d'un coup mettrait la base à genoux sur une grosse sélection.
+      for (const id of ids) {
+        const failure = await deleteUserCompletely(id, req.userId);
+        if (failure) skipped.push({ id, reason: failure.error });
+        else done++;
+      }
+      return res.json({ done, skipped });
+    }
+
+    const value = action === "grant-download";
+    const r = await User.updateMany(
+      { _id: { $in: ids } },
+      { $set: { canDownload: value } },
+      { timestamps: false }
+    );
+    res.json({ done: r.modifiedCount ?? 0, matched: r.matchedCount ?? 0, skipped: [] });
+  } catch (err) {
+    console.error("admin users bulk error:", err.message);
+    res.status(500).json({ error: "L'action de masse a échoué." });
+  }
+});
+
+// --- Accès au téléchargement d'UN compte (interrupteur de la fiche) ---
+router.patch("/users/:id/download", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id))
+      return res.status(404).json({ error: "Utilisateur introuvable." });
+    const canDownload = req.body?.canDownload === true;
+    const u = await User.findByIdAndUpdate(
+      id,
+      { $set: { canDownload } },
+      { new: true, timestamps: false }
+    ).select("isAdmin isSuperAdmin canDownload");
+    if (!u) return res.status(404).json({ error: "Utilisateur introuvable." });
+    res.json({ downloadFlag: !!u.canDownload, canDownload: canUserDownload(u) });
+  } catch (err) {
+    console.error("admin user download error:", err.message);
+    res.status(500).json({ error: "Erreur lors de la mise à jour." });
   }
 });
 
@@ -164,7 +247,7 @@ router.get("/users/:id", async (req, res) => {
 
     const user = await User.findById(id)
       .select(
-        "username email avatar bio createdAt lastSeenAt following isAdmin isSuperAdmin points equipped inventory"
+        "username email avatar bio createdAt lastSeenAt following isAdmin isSuperAdmin canDownload points equipped inventory"
       )
       .populate("following", "username avatar isAdmin isSuperAdmin")
       .lean();
@@ -219,6 +302,8 @@ router.get("/users/:id", async (req, res) => {
         lastSeenAt: user.lastSeenAt || null,
         isAdmin: isUserAdmin(user),
         isSuper: !!user.isSuperAdmin,
+        canDownload: canUserDownload(user),
+        downloadFlag: !!user.canDownload,
         gameCount,
         points: user.points || 0,
       },

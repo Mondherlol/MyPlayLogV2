@@ -16,6 +16,13 @@ import { useEffect, useState } from "react";
 // `top` : position de repos. Par défaut celle du CSS — utile quand elle dépend
 // de media queries ou de la hauteur de la barre du haut ; 76 en repli si le CSS
 // laisse `top: auto`.
+//
+// Perf : le gestionnaire de scroll ne fait QUE cumuler un delta. Les mesures
+// (hauteur du rail, du viewport) sont mises en cache et rafraîchies par le
+// ResizeObserver / l'événement resize, et l'écriture du `top` est repoussée
+// dans une frame d'animation. Sans ça, chaque événement de scroll lisait
+// `offsetHeight` puis écrivait un style : un aller-retour de layout forcé par
+// événement, sur une page aussi longue que le fil d'actualité.
 export default function useFollowingRail({ top, bottom = 24 } = {}) {
   const [el, setEl] = useState(null);
 
@@ -25,6 +32,11 @@ export default function useFollowingRail({ top, bottom = 24 } = {}) {
     let rest = 0; // position de repos, en px
     let offset = 0;
     let sticky = false;
+    let railH = 0; // hauteur du rail, tenue à jour par le ResizeObserver
+    let viewH = window.innerHeight;
+    let pendingDy = 0; // scroll accumulé depuis la dernière frame
+    let applied = null; // dernier `top` réellement écrit (évite les écritures inutiles)
+    let frame = 0;
 
     // (Re)lit la position de repos dans le CSS : on vide d'abord notre `top`
     // en ligne, sinon on relirait notre propre valeur.
@@ -34,41 +46,59 @@ export default function useFollowingRail({ top, bottom = 24 } = {}) {
       sticky = cs.position === "sticky";
       rest = top != null ? top : parseFloat(cs.top) || 76;
       offset = rest;
+      applied = null;
+      railH = el.offsetHeight;
+      viewH = window.innerHeight;
     };
 
-    const clamp = (dy = 0) => {
+    const write = () => {
+      frame = 0;
+      const dy = pendingDy;
+      pendingDy = 0;
       if (!sticky) return;
       // Plus bas que le rail peut remonter : son bas contre le bas du viewport.
-      const floor = Math.min(rest, window.innerHeight - el.offsetHeight - bottom);
+      const floor = Math.min(rest, viewH - railH - bottom);
       offset = Math.min(rest, Math.max(floor, offset - dy));
-      el.style.top = `${offset}px`;
+      const px = Math.round(offset);
+      if (px === applied) return;
+      applied = px;
+      el.style.top = `${px}px`;
+    };
+
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(write);
     };
 
     const onScroll = () => {
       const y = Math.max(0, window.scrollY);
-      const dy = y - lastY;
+      pendingDy += y - lastY;
       lastY = y;
-      clamp(dy);
+      if (sticky) schedule();
     };
     // Le CSS de repos peut changer avec la largeur (media queries) : on
     // remesure avant de re-borner.
     const onResize = () => {
       measure();
-      clamp();
+      schedule();
     };
 
     measure();
-    clamp();
+    schedule();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onResize);
     // Le contenu arrive en asynchrone : la hauteur du rail change sous nos
     // pieds, il faut re-borner sans quoi il reste figé trop haut ou trop bas.
-    const ro = new ResizeObserver(() => clamp());
+    // On lit la hauteur DANS l'entrée observée : aucun accès au layout ici.
+    const ro = new ResizeObserver(([entry]) => {
+      railH = entry?.borderBoxSize?.[0]?.blockSize ?? el.offsetHeight;
+      schedule();
+    });
     ro.observe(el);
     return () => {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onResize);
       ro.disconnect();
+      if (frame) cancelAnimationFrame(frame);
       el.style.top = "";
     };
   }, [el, top, bottom]);

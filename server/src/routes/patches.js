@@ -1,6 +1,6 @@
 import { Router } from "express";
 import SwitchPatchCache from "../models/SwitchPatchCache.js";
-import { requireAuth, requireAdmin } from "../middleware/auth.js";
+import { requireAuth, requireAdmin, requireDownloadAccess } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -12,7 +12,7 @@ const router = Router();
 //   - l'app locale scrape puis pousse les données (POST /switch/:gameId, admin)
 
 // --- Un utilisateur demande le scrape d'un jeu Switch ---
-router.post("/switch/:gameId/request", requireAuth, async (req, res) => {
+router.post("/switch/:gameId/request", requireAuth, requireDownloadAccess, async (req, res) => {
   try {
     const gameId = Number(req.params.gameId);
     if (!gameId) return res.status(400).json({ error: "gameId invalide." });

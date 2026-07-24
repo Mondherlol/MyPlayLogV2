@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
-import { isUserAdmin } from "../lib/admin.js";
+import { canUserDownload, isUserAdmin } from "../lib/admin.js";
 
 // Présence : on note le dernier passage de chaque utilisateur (affiché sur son
 // profil). Throttlé en mémoire pour ne pas écrire en base à chaque requête.
@@ -70,5 +70,22 @@ export async function requireAdmin(req, res, next) {
     next();
   } catch {
     return res.status(500).json({ error: "Erreur d'authentification admin." });
+  }
+}
+
+// À chaîner APRÈS requireAuth : réserve la route aux comptes autorisés à
+// télécharger (User.canDownload, ou administrateur). C'est ICI que se joue la
+// restriction : le client se contente de cacher l'onglet, ce qui n'empêcherait
+// personne d'appeler l'API directement.
+export async function requireDownloadAccess(req, res, next) {
+  try {
+    const user = await User.findById(req.userId).select("isAdmin isSuperAdmin canDownload");
+    if (!canUserDownload(user))
+      return res
+        .status(403)
+        .json({ error: "Le téléchargement n'est pas activé sur ton compte." });
+    next();
+  } catch {
+    return res.status(500).json({ error: "Erreur d'authentification." });
   }
 }

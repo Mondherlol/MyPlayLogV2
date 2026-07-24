@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
@@ -60,7 +60,7 @@ import GameCharacters from "../components/GameCharacters";
 import GameOst from "../components/GameOst";
 import GameFeed from "../components/GameFeed";
 import GameRelated from "../components/GameRelated";
-import GamePatches from "../components/GamePatches";
+import GameDownloads from "../components/GameDownloads";
 import FreeGameBanner from "../components/FreeGameBanner";
 import { useTabSwipe } from "../hooks/useTabSwipe";
 import useFollowingRail from "../hooks/useFollowingRail";
@@ -286,10 +286,16 @@ export default function GamePage() {
   const isWishlist = entry?.status === "wishlist";
   const isPlayed = entry && PLAYED.includes(entry.status);
 
-  // Onglet « Patchs » : toujours présent (le bloc Pack HD concerne tout jeu).
+  // Onglet « Téléchargements » : fermé par défaut, il n'apparaît que pour les
+  // comptes à qui l'accès a été donné à la main depuis le panel admin (le
+  // serveur refuse de toute façon les routes correspondantes aux autres).
   // Les sous-sections (patch FR Switch, fan-trad VN) se masquent d'elles-mêmes
   // côté serveur si non pertinentes.
-  const tabs = TABS;
+  const canDownload = !!user?.canDownload;
+  const tabs = useMemo(
+    () => (canDownload ? TABS : TABS.filter((t) => t.id !== "patches")),
+    [canDownload]
+  );
 
   // Onglet actif : vit dans l'URL (?tab=…) pour survivre au refresh et au
   // retour arrière (replace : changer d'onglet n'empile pas d'historique).
@@ -1011,7 +1017,7 @@ export default function GamePage() {
             )}
 
             {tab === "patches" && (
-              <GamePatches
+              <GameDownloads
                 key={id}
                 gameId={id}
                 token={token}

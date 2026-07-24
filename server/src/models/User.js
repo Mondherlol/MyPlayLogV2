@@ -28,6 +28,10 @@ const userSchema = new mongoose.Schema(
     // `isAdmin` : administrateur « simple » nommé par le super-admin.
     isSuperAdmin: { type: Boolean, default: false },
     isAdmin: { type: Boolean, default: false },
+    // Accès à l'onglet « Téléchargements » des fiches de jeu. Fermé par défaut :
+    // il s'ouvre compte par compte depuis le panel admin (voir canUserDownload,
+    // lib/admin.js — les administrateurs l'ont sans le drapeau).
+    canDownload: { type: Boolean, default: false },
 
     // --- Réinitialisation de mot de passe ---
     // On stocke le HASH du token (jamais le token en clair) + son expiration.
@@ -270,6 +274,9 @@ userSchema.methods.toPublic = function () {
       : null,
     isAdmin: !!this.isSuperAdmin || !!this.isAdmin,
     isSuperAdmin: !!this.isSuperAdmin,
+    // Pilote l'affichage de l'onglet « Téléchargements » ; le serveur refait le
+    // contrôle sur chaque route concernée (masquer n'est pas protéger).
+    canDownload: !!this.isSuperAdmin || !!this.isAdmin || !!this.canDownload,
     points: this.points || 0,
     // Slugs seulement : le détail des lots équipés (image, rareté…) se récupère
     // via /api/arcade/cosmetics, qui sait résoudre les slugs en lots.

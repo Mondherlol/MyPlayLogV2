@@ -24,6 +24,13 @@ import { API_BASE } from "../lib/api";
 // Si l'extraction échoue pour une piste, on reste simplement en iframe.
 
 const PlayerContext = createContext(null);
+// La position de lecture change 2 à 4 fois par SECONDE. Laissée dans le
+// contexte principal, elle re-rendait tous ses abonnés au même rythme (fil
+// d'actualité, grille d'OST d'une page jeu, widgets de l'accueil…) pour une
+// info que seul le mini-lecteur affiche. Elle a donc son propre contexte : le
+// reste de l'app ne re-rend plus que sur un vrai changement d'état (piste,
+// play/pause, file).
+const PlayerProgressContext = createContext({ current: 0, duration: 0 });
 
 // Sur PC, l'iframe suffit ; la bascule vers le flux extrait ne sert que sur
 // mobile. (iPadOS se présente comme un Mac de bureau, d'où le test tactile.)
@@ -709,7 +716,6 @@ export function PlayerProvider({ children }) {
       index,
       playing,
       loading,
-      progress,
       source,
       volume,
       muted,
@@ -734,7 +740,6 @@ export function PlayerProvider({ children }) {
       index,
       playing,
       loading,
-      progress,
       source,
       volume,
       muted,
@@ -757,9 +762,16 @@ export function PlayerProvider({ children }) {
     <PlayerContext.Provider value={value}>
       {/* Hôte du player YouTube caché (iframe créée au premier besoin). */}
       <div ref={ytDivRef} style={{ position: "fixed", left: -9999, top: -9999 }} />
-      {children}
+      {/* `children` est la même référence d'un rendu à l'autre : un changement
+          de position ne re-rend donc QUE les abonnés à ce contexte-ci. */}
+      <PlayerProgressContext.Provider value={progress}>
+        {children}
+      </PlayerProgressContext.Provider>
     </PlayerContext.Provider>
   );
 }
 
 export const usePlayer = () => useContext(PlayerContext);
+// Position de lecture ({ current, duration }, en secondes). À n'appeler que là
+// où on l'AFFICHE : s'y abonner coûte un rendu toutes les ~250 ms.
+export const usePlayerProgress = () => useContext(PlayerProgressContext);

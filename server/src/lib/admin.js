@@ -19,3 +19,13 @@ export function isUserAdmin(user) {
   if (!user) return false;
   return !!user.isSuperAdmin || !!user.isAdmin;
 }
+
+// L'onglet « Téléchargements » d'une fiche de jeu n'est ouvert à PERSONNE par
+// défaut : l'accès se donne à la main, compte par compte, depuis le panel admin
+// (User.canDownload). Les administrateurs l'ont d'office — ce sont eux qui
+// distribuent le droit, les priver de la fonction qu'ils administrent n'aurait
+// pas de sens (et personne ne pourrait se l'accorder en premier).
+export function canUserDownload(user) {
+  if (!user) return false;
+  return isUserAdmin(user) || !!user.canDownload;
+}

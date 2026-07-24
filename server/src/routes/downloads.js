@@ -1,6 +1,6 @@
 import { Router } from "express";
 import Download from "../models/Download.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireDownloadAccess } from "../middleware/auth.js";
 import { notify } from "../lib/notify.js";
 
 // Journal humoristique des « délits de téléchargement » (cf. models/Download.js) :
@@ -22,7 +22,7 @@ const DEDUP_WINDOW = 30 * 60 * 1000; // 30 min
 
 // POST /api/downloads — journalise un téléchargement (bouton/lien de l'onglet
 // Patchs). body : { gameId, gameName, gameCover, source }.
-router.post("/", requireAuth, async (req, res) => {
+router.post("/", requireAuth, requireDownloadAccess, async (req, res) => {
   try {
     const gameId = Number(req.body?.gameId);
     const gameName = String(req.body?.gameName || "").trim().slice(0, 300);

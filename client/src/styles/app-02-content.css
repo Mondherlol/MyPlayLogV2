@@ -3424,6 +3424,19 @@
   aspect-ratio: 1;
 }
 
+/* Le grossissement au survol du disque passe par CETTE variable, jamais par un
+   `transform` posé directement sur le disque. Raison : la rotation est une
+   animation, et sa keyframe 0% est calculée à partir du transform sous-jacent.
+   Changer ce dernier au survol (ancien `transform: scale(1.03)`) recalculait
+   donc la keyframe de départ → le disque en lecture repartait de zéro le temps
+   du survol, et un disque en pause sautait à son angle initial. En passant le
+   scale DANS les keyframes, le transform sous-jacent ne bouge plus. */
+@property --vinyl-scale {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
 /* Le disque : sillons + étiquette. C'est LUI qui tourne. */
 .gp-vinyl-disc {
   position: absolute;
@@ -3442,8 +3455,10 @@
   box-shadow:
     0 10px 26px rgba(0, 0, 0, 0.45),
     inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-  transition: transform 0.4s ease, box-shadow 0.3s ease;
-  animation: vinyl-spin 4.5s linear infinite;
+  --vinyl-scale: 1;
+  transform: scale(var(--vinyl-scale, 1));
+  transition: --vinyl-scale 0.3s ease, box-shadow 0.3s ease;
+  animation: gp-vinyl-spin 4.5s linear infinite;
   animation-play-state: paused;
 }
 
@@ -3493,9 +3508,23 @@
       rgba(255, 255, 255, 0.07) 100%);
 }
 
+/* Utilisée par les cards OST du profil (.pfo-disc), qui n'ont pas de scale. */
 @keyframes vinyl-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* Les DEUX bornes sont explicites : sans keyframe 0% écrite, le navigateur la
+   déduit du transform courant de l'élément et la rotation se réinitialise dès
+   qu'on y touche (voir @property --vinyl-scale plus haut). */
+@keyframes gp-vinyl-spin {
+  from {
+    transform: scale(var(--vinyl-scale, 1)) rotate(0deg);
+  }
+
+  to {
+    transform: scale(var(--vinyl-scale, 1)) rotate(360deg);
   }
 }
 
@@ -3510,7 +3539,7 @@
 }
 
 .gp-vinyl:hover .gp-vinyl-disc {
-  transform: scale(1.03);
+  --vinyl-scale: 1.03;
 }
 
 /* Bouton lecture/pause au centre */
@@ -3626,12 +3655,11 @@
       #2a2a30 3px),
     #131317;
   opacity: 0.75;
-  transition: opacity 0.18s ease, transform 0.3s ease;
+  transition: opacity 0.18s ease, --vinyl-scale 0.3s ease;
 }
 
 .gp-ost-add:hover .gp-vinyl-disc {
   opacity: 1;
-  transform: scale(1.03);
 }
 
 .gp-vinyl-add-icon {

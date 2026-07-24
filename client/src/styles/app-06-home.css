@@ -6,14 +6,27 @@
    vers la gauche des grands écrans.
    `align-items` reste sur `stretch` (défaut) : le rail doit être aussi haut
    que le fil, sinon son bloc collant se décroche dès qu'on dépasse sa boîte. */
+/* Le salut et la barre d'onglets sont des lignes à part entière de la grille :
+   sur grand écran ils coiffent la colonne du fil pendant que le rail court sur
+   toute la hauteur (`aside` occupe les trois lignes), et en une colonne ils
+   restent en tête, communs aux deux onglets. */
 .home {
   display: grid;
   grid-template-columns: minmax(0, 620px) 424px;
-  gap: 1.8rem;
+  grid-template-areas:
+    "hero aside"
+    "tabs aside"
+    "main aside";
+  gap: 0 1.8rem;
   justify-content: center;
 }
 
+.hf-hero {
+  grid-area: hero;
+}
+
 .home-main {
+  grid-area: main;
   min-width: 0;
 }
 
@@ -1409,6 +1422,7 @@
 /* Colonne de droite : une simple pile. Elle s'étire sur toute la hauteur de la
    ligne (voir .home) pour servir de piste aux deux blocs collants ci-dessous. */
 .home-aside {
+  grid-area: aside;
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
@@ -1803,18 +1817,101 @@
   border-radius: 11px;
 }
 
-/* Une seule colonne : le rail passe sous le fil.
-   Seuil calé sur la place réellement disponible : sidebar (208 px) + marges
+/* ======================================================================
+   Accueil en une colonne — deux onglets (Fil / Découvrir)
+   ====================================================================== */
+/* Seuil calé sur la place réellement disponible : sidebar (208 px) + marges
    (~70 px) + rail (424 px) + gouttière, pour que le fil garde au moins ~520 px
-   tant qu'on reste sur deux colonnes. */
+   tant qu'on reste sur deux colonnes. Doit rester synchro avec COMPACT_QUERY
+   (Welcome.jsx), qui décide de MONTER ou non la barre d'onglets.
+
+   Empiler le rail sous le fil ne marchait pas : le fil est infini, donc le rail
+   reculait à chaque paquet chargé — on ne l'atteignait jamais, et quand on
+   l'effleurait il sautait. Les deux vivent maintenant dans des onglets. */
+
+/* Barre d'onglets : segmenté, avec une pastille qui glisse d'un onglet à
+   l'autre. Montée uniquement en une colonne (voir Welcome.jsx), et collée sous
+   la barre du haut pour rester à portée de pouce en plein défilement. */
+.hf-tabs {
+  position: sticky;
+  top: var(--topbar-h, 60px);
+  z-index: 30;
+  display: none;
+  gap: 0.25rem;
+  margin-bottom: 1.1rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+/* La pastille dorée glisse d'un onglet à l'autre ; le libellé de l'onglet actif
+   passe en encre sombre pour rester lisible dessus. */
+.hf-tabs-ink {
+  position: absolute;
+  top: 0.25rem;
+  bottom: 0.25rem;
+  left: 0.25rem;
+  width: calc(50% - 0.375rem);
+  border-radius: 999px;
+  background: var(--accent-grad);
+  box-shadow: 0 4px 14px -6px rgba(242, 183, 11, 0.9);
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.home[data-tab="discover"] .hf-tabs-ink {
+  transform: translateX(calc(100% + 0.25rem));
+}
+
+.hf-tab {
+  position: relative; /* au-dessus de la pastille */
+  flex: 1 1 0;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.8rem;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.92rem;
+  transition: color 0.2s ease;
+}
+
+.hf-tab.on {
+  color: #3b2a02;
+}
+
 @media (max-width: 1240px) {
+
+  /* Retour au flux normal : la barre d'onglets doit pouvoir rester collée
+     pendant tout le défilement du panneau, ce qu'un élément de grille ne peut
+     pas faire (son `sticky` est borné à sa propre cellule). */
   .home {
-    grid-template-columns: minmax(0, 620px);
+    display: block;
+    max-width: 620px;
+    margin-inline: auto;
+  }
+
+  .hf-tabs {
+    display: flex;
+  }
+
+  /* Les deux panneaux restent montés (le fil garde sa pagination, ses données
+     et sa position) : seul celui de l'onglet inactif est retiré du flux. */
+  .home[data-tab="feed"] .home-aside,
+  .home[data-tab="discover"] .home-main {
+    display: none;
   }
 
   .hf-rail {
     position: static;
-    max-width: 460px;
+    max-width: none;
   }
 }
 
@@ -1829,14 +1926,20 @@
     display: none;
   }
 
-  .hf-rail {
-    max-width: none;
-  }
-
   /* Le popover de réglages docs peut dépasser à droite si le bouton est
      proche du bord sur mobile : on le borne à la largeur du viewport. */
   .doc-settings {
     max-width: calc(100vw - 2.4rem);
+  }
+
+  /* L'onglet actif occupe déjà tout l'écran : le salut peut se faire discret
+     pour que la barre d'onglets et le contenu remontent. */
+  .hf-hero {
+    padding-bottom: 1rem;
+  }
+
+  .hf-tab {
+    font-size: 0.88rem;
   }
 }
 
@@ -7067,20 +7170,136 @@
   color: var(--text);
 }
 
-/* Lignes cliquables (ouvrent la fiche) */
+/* Lignes : conteneur = case à cocher + bouton « Gérer ». C'est le BOUTON qui
+   ouvre la fiche, jamais la case (qui sert aux actions de masse). */
 .au-list .au-row {
-  width: 100%;
-  text-align: left;
-  font: inherit;
-  cursor: var(--cursor-pointer), pointer;
-  transition: border-color 0.15s, background 0.15s, transform 0.05s;
+  transition: border-color 0.15s, background 0.15s;
 }
 .au-list .au-row:hover {
   border-color: color-mix(in srgb, var(--orange) 40%, var(--border));
   background: color-mix(in srgb, var(--orange) 5%, var(--surface-2));
 }
-.au-list .au-row:active {
+.au-list .au-row.picked {
+  border-color: var(--accent-ink);
+  background: color-mix(in srgb, var(--orange) 10%, var(--surface-2));
+}
+.au-row-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: var(--cursor-pointer), pointer;
+  transition: transform 0.05s;
+}
+.au-row-main:active {
   transform: translateY(1px);
+}
+
+/* Case de sélection, à gauche de chaque ligne. */
+.au-pick {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  padding: 0.15rem;
+}
+.au-pick input,
+.au-bulk-all input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--orange);
+  cursor: var(--cursor-pointer), pointer;
+}
+
+/* Pastille « a le droit de télécharger », à côté du badge admin. */
+.au-dl-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--orange) 45%, var(--border));
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  color: var(--accent-ink);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+/* --- Barre d'actions de masse --- */
+/* Toujours en place au-dessus de la liste (elle porte le « tout cocher »), et
+   elle s'allume dès qu'au moins un compte est sélectionné. */
+.au-bulk {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.8rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  transition: border-color 0.15s, background 0.15s;
+}
+.au-bulk.armed {
+  border-color: var(--accent-ink);
+  background: color-mix(in srgb, var(--orange) 7%, var(--surface-2));
+}
+.au-bulk-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.au-bulk-all em {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+.au-bulk-count {
+  flex: 1 1 auto;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+.au-bulk-select {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+}
+/* Geste destructeur : le bouton le dit. */
+.btn.btn-danger {
+  border: 1px solid var(--danger, #e5484d);
+  background: var(--danger, #e5484d);
+  color: #fff;
+}
+.btn.btn-danger:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+@media (max-width: 620px) {
+  .au-bulk-count {
+    flex-basis: 100%;
+  }
+  .au-bulk-select {
+    flex: 1 1 auto;
+  }
 }
 .au-chevron {
   flex-shrink: 0;

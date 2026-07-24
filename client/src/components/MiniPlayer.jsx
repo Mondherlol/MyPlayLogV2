@@ -20,7 +20,7 @@ import {
   Volume1,
   VolumeX,
 } from "lucide-react";
-import { usePlayer } from "../context/PlayerContext";
+import { usePlayer, usePlayerProgress } from "../context/PlayerContext";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
 import AddToPlaylistModal from "./AddToPlaylistModal";
@@ -42,13 +42,15 @@ export default function MiniPlayer() {
     current,
     playing,
     loading,
-    progress,
     hasNext,
     hasPrev,
     queue,
     volume,
     muted,
   } = player;
+  // Contexte séparé : le mini-lecteur est le seul à se re-rendre au rythme de
+  // la lecture (voir PlayerContext).
+  const progress = usePlayerProgress();
   const barRef = useRef(null);
   const [showQueue, setShowQueue] = useState(false);
   // Réduit en « bulle » façon Messenger : le son continue, on rouvre au clic.

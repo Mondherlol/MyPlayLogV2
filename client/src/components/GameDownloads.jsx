@@ -693,10 +693,15 @@ function ZipertoBlock({ gameId, token, game }) {
   );
 }
 
-// --- Onglet Patchs : Pack HD (C411) + patch FR Switch (nxbrew) + repacks FitGirl
-// (PC) + fan-traduction FR des visual novels non traduits (VNDB) + liens de
-// recherche de mods. ---
-export default function GamePatches({ gameId, token, game = null }) {
+// --- Onglet Téléchargements : Pack HD (C411) + patch FR Switch (nxbrew) +
+// repacks FitGirl (PC) + Ziperto + fan-traduction FR des visual novels non
+// traduits (VNDB) + liens de recherche de mods.
+//
+// L'onglet n'est pas ouvert à tout le monde : l'accès se donne compte par compte
+// depuis le panel admin (User.canDownload). GamePage ne monte ce composant que
+// pour les comptes autorisés, et TOUTES les routes utilisées ici sont fermées
+// côté serveur par requireDownloadAccess — masquer l'onglet ne protège rien. ---
+export default function GameDownloads({ gameId, token, game = null }) {
   const cached = patchCache.get(String(gameId));
   const [loading, setLoading] = useState(!cached);
   const [data, setData] = useState(cached?.data || null);

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
 import { Loader2, Users, Sparkles } from "lucide-react";
 import { apiFetch } from "../lib/api";
@@ -15,7 +15,12 @@ import { FeedCard, FanartLightbox, FeedCardsSkeleton, isPostItem } from "./FeedC
 // Rangée d'avatars des joueurs suivis : filtre le fil sur UN joueur (clic),
 // re-clic sur l'actif → retour à tout le monde. Affichée à droite du titre
 // « Fil d'actualité » (Welcome.jsx), état porté par le parent.
-export function FeedUserFilter({ token, myId, value, onChange }) {
+export const FeedUserFilter = memo(function FeedUserFilter({
+  token,
+  myId,
+  value,
+  onChange,
+}) {
   const [people, setPeople] = useState([]);
 
   useEffect(() => {
@@ -54,7 +59,7 @@ export function FeedUserFilter({ token, myId, value, onChange }) {
       })}
     </div>
   );
-}
+});
 
 // En-tête et pied du fil virtualisé (définis hors composant → références
 // stables, sinon Virtuoso remonte la liste à chaque render). L'état vivant
@@ -90,7 +95,10 @@ const feedComponents = { Header: FeedHeader, Footer: FeedFooter };
 // fan arts republiés, documentaires, pépites) — voir routes/feed.js et
 // FeedCards.jsx. Pagination par curseur + chargement automatique au scroll.
 // `filterUser` (id) restreint le fil à un seul joueur (avatars du titre).
-export default function HomeFeed({ token, me, filterUser = null }) {
+// Mémoïsé : ses props sont des primitives stables, alors que la page d'accueil
+// se re-rend à chaque bascule d'onglet — sans ça, toutes les cartes montées par
+// Virtuoso étaient repeintes à chaque fois.
+function HomeFeed({ token, me, filterUser = null }) {
   const [items, setItems] = useState([]);
   const [cursor, setCursor] = useState(null);
   const [community, setCommunity] = useState(false);
@@ -390,3 +398,5 @@ export default function HomeFeed({ token, me, filterUser = null }) {
     </div>
   );
 }
+
+export default memo(HomeFeed);

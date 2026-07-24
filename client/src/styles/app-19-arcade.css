@@ -766,6 +766,19 @@
   color: var(--accent-ink);
 }
 
+/* ---- La porte voisine : les collections des autres ----
+   Même gabarit, mais sa pastille reste neutre : c'est SA collection qui garde
+   le doré, celle des autres n'est qu'un détour. */
+.arc-rail-cursors.friends .arc-rail-cursors-ic {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+}
+.arc-rail-cursors.friends:hover .arc-rail-cursors-ic {
+  color: var(--accent-ink);
+  border-color: color-mix(in srgb, var(--orange) 45%, var(--border));
+}
+
 /* ---- La modale « Mes curseurs » ---- */
 .abar-modal {
   position: relative;
@@ -863,6 +876,283 @@
   }
   .abar-modal-body {
     padding: 0.9rem;
+  }
+}
+
+/* ======================================================================
+   La modale « Les collections » — comparer avec les joueurs suivis
+   ====================================================================== */
+/* Deux volets : QUI à gauche (la liste des joueurs et leur avancement), QUOI à
+   droite (sa vitrine complète, trous compris). Le volet gauche est la colonne
+   de navigation, il ne défile pas avec la vitrine. */
+.afc-modal {
+  width: min(1040px, 100%);
+}
+
+.afc-fams {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+.afc-fam {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  font-weight: 700;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+.afc-fam:hover {
+  color: var(--text);
+}
+.afc-fam.on {
+  background: var(--accent-grad);
+  color: #3a2600;
+}
+
+.afc-err {
+  margin: 0.9rem 1.25rem 0;
+}
+
+/* La modale est une colonne flex bornée à 88vh : ce bloc prend la hauteur
+   restante et `min-height: 0` autorise ses deux volets à défiler dedans (sans
+   ça, un enfant flex refuse de descendre sous sa hauteur de contenu). */
+.afc-body {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 244px) minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* --- Volet gauche : les joueurs --- */
+.afc-people {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.7rem;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.afc-person {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: none;
+  text-align: left;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+.afc-person:hover {
+  background: var(--surface-2);
+}
+.afc-person.on {
+  border-color: color-mix(in srgb, var(--orange) 45%, var(--border));
+  background: color-mix(in srgb, var(--orange) 9%, var(--surface));
+}
+.afc-person-av {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.afc-person-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.afc-person-txt {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.afc-person-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+/* Jauge d'avancement : la comparaison se lit d'un coup d'œil, sans lire les
+   chiffres. */
+.afc-person-bar {
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.afc-person-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  transition: width 0.3s ease;
+}
+.afc-person-num {
+  flex: 0 0 auto;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.afc-person-num em {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+/* --- Volet droit : la vitrine --- */
+.afc-shelf {
+  padding: 1.1rem 1.25rem 1.25rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.afc-shelf-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 0.9rem;
+}
+.afc-shelf-title {
+  margin: 0;
+  font-size: 1rem;
+}
+.afc-shelf-link {
+  flex: 0 0 auto;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+.afc-shelf-link:hover {
+  text-decoration: underline;
+}
+
+/* Un lot manquant : le visuel reste là (on veut savoir ce qu'on rate) mais
+   décoloré et en creux, avec un cadenas. */
+.afc-card.missing {
+  border-bottom-color: var(--border);
+  background: var(--surface-2);
+}
+.afc-card.missing .arc-inv-aura {
+  opacity: 0;
+}
+.afc-card.missing .arc-inv-art {
+  filter: grayscale(1);
+  opacity: 0.32;
+}
+.afc-card.missing .arc-inv-rarity {
+  color: var(--text-soft);
+}
+.afc-card.missing .arc-inv-name {
+  color: var(--text-soft);
+}
+.afc-card:hover {
+  transform: none; /* vitrine à consulter, pas de boutons à viser */
+}
+.afc-lock {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.5rem;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-soft);
+}
+.afc-equipped {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: auto;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: var(--arc-rarity);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+/* La grille de vitrine n'a pas de bouton en pied : des cases plus petites en
+   tiennent d'autant plus à l'écran. */
+.afc-grid {
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+}
+.afc-grid .arc-inv-name {
+  margin-bottom: 0.35rem;
+}
+
+.afc-empty {
+  display: grid;
+  place-items: center;
+  gap: 0.6rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--text-soft);
+}
+.afc-empty p {
+  max-width: 34ch;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+/* Sous 780 px, les deux volets s'empilent : la liste des joueurs devient une
+   rangée qui défile à l'horizontale, la vitrine prend le reste. */
+@media (max-width: 780px) {
+  .afc-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .afc-people {
+    flex-direction: row;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .afc-person {
+    flex: 0 0 auto;
+    width: 190px;
+  }
+  .afc-shelf {
+    padding: 0.9rem;
+  }
+  .afc-fams {
+    order: 3;
+    width: 100%;
+  }
+  .afc-fam {
+    flex: 1 1 0;
+    justify-content: center;
   }
 }
 

@@ -329,6 +329,78 @@ router.post("/equip", requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/arcade/friends — les collections des joueurs que je suis.
+// La comparaison est la moitié du plaisir d'une collection : on renvoie, pour
+// chacun, ce qu'il possède (avec ses doublons) et ce qu'il a équipé, plus le
+// catalogue complet côté client pour dessiner AUSSI les cases vides — « 3 / 8 »
+// ne veut rien dire si on ne voit pas les cinq qui manquent.
+//
+// Périmètre volontairement limité aux abonnements : suivre un compte privé
+// suppose une demande déjà acceptée, donc aucun contrôle supplémentaire à faire
+// ici. Le solde de points, lui, ne sort pas — ce n'est pas une collection.
+router.get("/friends", requireAuth, async (req, res) => {
+  try {
+    const me = await User.findById(req.userId)
+      .select("username avatar following inventory equipped")
+      .lean();
+    if (!me) return res.status(404).json({ error: "Compte introuvable." });
+
+    const friends = await User.find({ _id: { $in: me.following || [] } })
+      .select("username avatar inventory equipped")
+      .lean();
+
+    // Je passe en tête : c'est ma collection qui sert de référence.
+    const people = [me, ...friends];
+    const ownedKeys = new Set();
+    for (const u of people)
+      for (const i of u.inventory || []) ownedKeys.add(i.rewardKey);
+
+    // Le catalogue = tout ce qui est encore tirable + tout ce qui est possédé
+    // (un lot retiré des caisses reste acquis, il doit rester affichable).
+    const [cases, rewards] = await Promise.all([
+      LootCase.find({ enabled: true }).select("rewards").lean(),
+      Reward.find({
+        $or: [{ enabled: true }, { key: { $in: [...ownedKeys] } }],
+      }),
+    ]);
+    // `obtainable` : encore tirable aujourd'hui, c'est-à-dire actif ET rangé
+    // dans une caisse active. Un lot possédé mais retiré des caisses reste au
+    // catalogue — simplement, personne ne peut plus le débloquer.
+    const drawable = new Set();
+    for (const c of cases)
+      for (const id of c.rewards || []) drawable.add(String(id));
+
+    const catalog = rewards.map((r) => ({
+      ...r.toPublic(),
+      obtainable: r.enabled && drawable.has(String(r._id)),
+    }));
+
+    res.json({
+      catalog,
+      users: people.map((u) => ({
+        id: String(u._id),
+        username: u.username,
+        avatar: u.avatar || null,
+        isMe: String(u._id) === String(req.userId),
+        equipped: {
+          cursor: u.equipped?.cursor || null,
+          theme: u.equipped?.theme || null,
+          ornament: u.equipped?.ornament || null,
+          badge: u.equipped?.badge || null,
+        },
+        // { slug: nombre d'exemplaires } — plus léger qu'un tableau à parcourir
+        // pour chaque case du catalogue.
+        owned: Object.fromEntries(
+          (u.inventory || []).map((i) => [i.rewardKey, i.count || 1])
+        ),
+      })),
+    });
+  } catch (err) {
+    console.error("arcade friends error:", err.message);
+    res.status(500).json({ error: "Impossible de charger les collections." });
+  }
+});
+
 // GET /api/arcade/history — d'où viennent mes points (30 dernières lignes).
 router.get("/history", requireAuth, async (req, res) => {
   try {
