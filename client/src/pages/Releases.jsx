@@ -12,19 +12,7 @@ import {
 import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
 import {
-  DndContext,
-  DragOverlay,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  useDraggable,
-  useDroppable,
-  pointerWithin,
-} from "@dnd-kit/core";
-import {
   CalendarDays,
-  CalendarRange,
-  CalendarPlus,
   CalendarX,
   Bookmark,
   Loader2,
@@ -36,12 +24,10 @@ import {
   Search,
   Flame,
   Gamepad2,
-  Gamepad,
   Star,
   ArrowRight,
   ArrowUp,
   Languages,
-  PauseCircle,
   X,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
@@ -55,8 +41,7 @@ import MediaLightbox from "../components/MediaLightbox";
 // ============================================================
 //  Page « Sorties » : un feed vertical par jour — on descend vers le futur,
 //  on remonte vers les jours passés (chargés à la volée). Une carte ouvre une
-//  modale de découverte (pas la fiche du jeu directement), et un mode
-//  Planning permet de répartir ses jeux par mois (« je le fais en août »).
+//  modale de découverte plutôt que la fiche du jeu directement.
 // ============================================================
 
 // Menu déroulant multi-sélection tri-état (Console / Genre) avec recherche.
@@ -248,28 +233,6 @@ const fmtLongDate = new Intl.DateTimeFormat("fr-FR", {
   month: "long",
   year: "numeric",
 });
-const fmtMonthLong = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" });
-
-// --- Mois de planning ("2026-08") ---
-const monthKeyOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-const currentMonthKey = () => monthKeyOf(new Date());
-function monthLabel(key) {
-  const [y, m] = key.split("-");
-  const s = fmtMonthLong.format(new Date(Number(y), Number(m) - 1, 1));
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-// Les 6 prochains mois (mois courant inclus) — colonnes du planning.
-function nextMonths(n = 6) {
-  const out = [];
-  const d = new Date();
-  d.setDate(1);
-  for (let i = 0; i < n; i++) {
-    out.push(monthKeyOf(d));
-    d.setMonth(d.getMonth() + 1);
-  }
-  return out;
-}
-
 // ============================================================
 //  Compte à rebours en direct (modale) : J / h / min / s en segments
 // ============================================================
@@ -298,58 +261,6 @@ function CountdownBig({ ts }) {
       {seg(h, "h")}
       {seg(m, "min")}
       {seg(s, "s")}
-    </div>
-  );
-}
-
-// ============================================================
-//  Menu « Planifier » : choisir le mois où jouer le jeu
-// ============================================================
-function MonthMenu({ value, onPick, compact = false }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  useClickOutside(ref, () => setOpen(false), open);
-  const months = nextMonths(6);
-
-  return (
-    <div className="plan-menu" ref={ref} onClick={(e) => e.stopPropagation()}>
-      <button
-        className={`plan-menu-btn clickable ${value ? "on" : ""} ${compact ? "compact" : ""}`}
-        onClick={() => setOpen((v) => !v)}
-        title={value ? `Prévu : ${monthLabel(value)}` : "Choisir le mois où y jouer"}
-      >
-        <CalendarPlus size={13} />
-        {value ? (compact ? monthLabel(value).split(" ")[0] : monthLabel(value)) : "Planifier"}
-        <ChevronDown size={12} className={open ? "up" : ""} />
-      </button>
-      {open && (
-        <div className="plan-menu-pop card">
-          {months.map((mk) => (
-            <button
-              key={mk}
-              className={`plan-menu-item clickable ${value === mk ? "active" : ""}`}
-              onClick={() => {
-                setOpen(false);
-                onPick(mk);
-              }}
-            >
-              {monthLabel(mk)}
-              {value === mk && <Check size={13} />}
-            </button>
-          ))}
-          {value && (
-            <button
-              className="plan-menu-item clear clickable"
-              onClick={() => {
-                setOpen(false);
-                onPick(null);
-              }}
-            >
-              <X size={13} /> Retirer du planning
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -486,25 +397,6 @@ function RelGameModal({ game, token, onClose }) {
         setEntry(d.entry);
         upsertLocal(game.id, { status: "wishlist", favorite: false });
       }
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // Planifier = choisir un mois (ajoute le jeu à la wishlist s'il n'y est pas).
-  async function plan(month) {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const d = await apiFetch(`/library/${game.id}`, {
-        method: "PUT",
-        token,
-        body: { name: game.name, cover: game.cover, plannedMonth: month },
-      });
-      setEntry(d.entry);
-      upsertLocal(game.id, { status: d.entry.status, favorite: d.entry.favorite });
     } catch (err) {
       alert(err.message);
     } finally {
@@ -685,8 +577,6 @@ function RelGameModal({ game, token, onClose }) {
                   : "Je le veux"}
             </button>
 
-            <MonthMenu value={entry?.plannedMonth || null} onPick={plan} />
-
             <Link to={`/game/${game.id}`} className="relm-go clickable">
               Voir la fiche du jeu <ArrowRight size={15} />
             </Link>
@@ -713,313 +603,6 @@ function RelGameModal({ game, token, onClose }) {
 }
 
 // ============================================================
-//  Vue Planning : mes jeux répartis par mois (drag & drop + menus)
-// ============================================================
-
-// Statuts proposés dans le tiroir « à planifier ».
-const TRAY_STATUSES = [
-  { key: "wishlist", label: "À jouer", Icon: Bookmark },
-  { key: "paused", label: "En pause", Icon: PauseCircle },
-  { key: "dropped", label: "Abandonnés", Icon: X },
-];
-
-// Enveloppe déplaçable (dnd-kit) : la contrainte de distance du capteur
-// laisse passer les clics (liens, menus) tant qu'on ne tire pas vraiment.
-function DraggableGame({ id, entry, className, children }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id,
-    data: { entry },
-  });
-  return (
-    <div
-      ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      className={`${className} ${isDragging ? "dragging" : ""}`}
-    >
-      {children}
-    </div>
-  );
-}
-
-function PlanningView({ token }) {
-  const [entries, setEntries] = useState(null);
-  const [trayQ, setTrayQ] = useState(""); // recherche dans le tiroir
-  const [trayStatus, setTrayStatus] = useState("wishlist");
-  const [dragEntry, setDragEntry] = useState(null); // jeu en cours de glissé
-
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
-
-  useEffect(() => {
-    let alive = true;
-    apiFetch("/library", { token })
-      .then((d) => alive && setEntries(d.entries || []))
-      .catch(() => alive && setEntries([]));
-    return () => {
-      alive = false;
-    };
-  }, [token]);
-
-  async function setPlan(entry, month) {
-    const before = entry.plannedMonth || null;
-    if (before === month) return;
-    setEntries((list) =>
-      list.map((e) => (e.gameId === entry.gameId ? { ...e, plannedMonth: month } : e))
-    );
-    try {
-      await apiFetch(`/library/${entry.gameId}`, {
-        method: "PUT",
-        token,
-        body: { plannedMonth: month },
-      });
-    } catch {
-      setEntries((list) =>
-        list.map((e) => (e.gameId === entry.gameId ? { ...e, plannedMonth: before } : e))
-      );
-    }
-  }
-
-  function onDragEnd(ev) {
-    const entry = ev.active.data.current?.entry;
-    setDragEntry(null);
-    const over = ev.over?.id;
-    if (!entry || over == null) return;
-    if (over === "backlog") {
-      if (entry.plannedMonth) setPlan(entry, null);
-      return;
-    }
-    if (/^\d{4}-\d{2}$/.test(String(over))) setPlan(entry, String(over));
-  }
-
-  if (entries === null) {
-    return (
-      <div className="rel-state">
-        <Loader2 size={22} className="spin" /> Chargement de ton planning…
-      </div>
-    );
-  }
-
-  const nowKey = currentMonthKey();
-  // Colonnes : les 6 prochains mois + tout mois (passé ou lointain) où des
-  // jeux sont déjà planifiés. Tri chronologique ("YYYY-MM" trie tout seul).
-  const months = [
-    ...new Set([...nextMonths(6), ...entries.map((e) => e.plannedMonth).filter(Boolean)]),
-  ].sort();
-  // Le mois courant embarque automatiquement les jeux « en cours » non
-  // planifiés : c'est littéralement ce à quoi tu joues en ce moment.
-  const monthList = (mk) => {
-    const list = entries.filter((e) => e.plannedMonth === mk);
-    if (mk === nowKey) {
-      for (const e of entries) {
-        if (e.status === "playing" && !e.plannedMonth) list.push({ ...e, auto: true });
-      }
-    }
-    return list;
-  };
-  // Tiroir : le statut choisi, non planifié, filtré par la recherche.
-  const term = trayQ.trim().toLowerCase();
-  const backlog = entries.filter(
-    (e) =>
-      e.status === trayStatus &&
-      !e.plannedMonth &&
-      (!term || e.name.toLowerCase().includes(term))
-  );
-  const trayMeta = TRAY_STATUSES.find((s) => s.key === trayStatus);
-
-  return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={pointerWithin}
-      onDragStart={(ev) => setDragEntry(ev.active.data.current?.entry || null)}
-      onDragEnd={onDragEnd}
-      onDragCancel={() => setDragEntry(null)}
-    >
-      <div className="plan">
-        {/* --- Tiroir « à planifier » : recherche + switch de statut --- */}
-        <PlanTray
-          backlog={backlog}
-          trayQ={trayQ}
-          setTrayQ={setTrayQ}
-          trayStatus={trayStatus}
-          setTrayStatus={setTrayStatus}
-          trayMeta={trayMeta}
-          setPlan={setPlan}
-        />
-
-        {/* --- Colonnes par mois (zones de dépôt) --- */}
-        <div className="plan-months">
-          {months.map((mk) => (
-            <PlanMonth
-              key={mk}
-              mk={mk}
-              nowKey={nowKey}
-              list={monthList(mk)}
-              setPlan={setPlan}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Fantôme suivi par le curseur pendant le glissé */}
-      <DragOverlay dropAnimation={null}>
-        {dragEntry && (
-          <div className="plan-ghost">
-            {dragEntry.cover ? (
-              <img src={dragEntry.cover} alt="" draggable="false" />
-            ) : (
-              <span className="plan-cover-ph">
-                <Gamepad2 size={16} />
-              </span>
-            )}
-            <span>{dragEntry.name}</span>
-          </div>
-        )}
-      </DragOverlay>
-    </DndContext>
-  );
-}
-
-// Tiroir « à planifier » — aussi zone de dépôt pour DÉplanifier un jeu.
-function PlanTray({ backlog, trayQ, setTrayQ, trayStatus, setTrayStatus, trayMeta, setPlan }) {
-  const { setNodeRef, isOver } = useDroppable({ id: "backlog" });
-  return (
-    <section ref={setNodeRef} className={`plan-tray card ${isOver ? "drop-over" : ""}`}>
-      <div className="plan-tray-head">
-        <h3 className="plan-tray-title">
-          <trayMeta.Icon size={15} /> À planifier
-          <span className="plan-tray-count">{backlog.length}</span>
-        </h3>
-
-        <div className="plan-tray-tools">
-          {/* Mini switch : wishlist / en pause / abandonnés */}
-          <div className="plan-tray-switch" role="group" aria-label="Statut">
-            {TRAY_STATUSES.map((s) => (
-              <button
-                key={s.key}
-                className={`plan-tray-st clickable ${trayStatus === s.key ? "active" : ""}`}
-                onClick={() => setTrayStatus(s.key)}
-                title={s.label}
-              >
-                <s.Icon size={13} /> {s.label}
-              </button>
-            ))}
-          </div>
-          <div className="plan-tray-search">
-            <Search size={13} />
-            <input
-              placeholder="Chercher un jeu…"
-              value={trayQ}
-              onChange={(e) => setTrayQ(e.target.value)}
-            />
-            {trayQ && (
-              <button
-                className="plan-tray-search-clear clickable"
-                onClick={() => setTrayQ("")}
-                aria-label="Effacer"
-              >
-                <X size={12} />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <p className="plan-tray-sub">
-        Glisse un jeu vers un mois (ou utilise le menu) — redépose-le ici pour le déplanifier.
-      </p>
-
-      {backlog.length === 0 ? (
-        <p className="plan-month-empty font-fun">
-          {trayQ ? "Aucun jeu ne correspond." : "Rien à planifier dans ce statut."}
-        </p>
-      ) : (
-        <div className="plan-tray-row">
-          {backlog.map((e) => (
-            <DraggableGame
-              key={e.gameId}
-              id={`tray-${e.gameId}`}
-              entry={e}
-              className="plan-tray-item"
-            >
-              <Link to={`/game/${e.gameId}`} className="plan-tray-cover clickable" title={e.name}>
-                {e.cover ? (
-                  <img src={e.cover} alt="" loading="lazy" draggable="false" />
-                ) : (
-                  <span className="plan-cover-ph">
-                    <Gamepad2 size={16} />
-                  </span>
-                )}
-              </Link>
-              <span className="plan-tray-name" title={e.name}>
-                {e.name}
-              </span>
-              <MonthMenu value={null} onPick={(mk) => setPlan(e, mk)} compact />
-            </DraggableGame>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-// Une colonne mois — zone de dépôt du drag & drop.
-function PlanMonth({ mk, nowKey, list, setPlan }) {
-  const { setNodeRef, isOver } = useDroppable({ id: mk });
-  const isPast = mk < nowKey;
-  const isNow = mk === nowKey;
-  return (
-    <section
-      ref={setNodeRef}
-      className={`plan-month card ${isNow ? "now" : ""} ${isPast ? "late" : ""} ${
-        isOver ? "drop-over" : ""
-      }`}
-    >
-      <h3 className="plan-month-head">
-        {monthLabel(mk)}
-        {isNow && <span className="plan-month-now">en ce moment</span>}
-        {isPast && list.length > 0 && <span className="plan-month-late">à rattraper</span>}
-        {list.length > 0 && <span className="plan-month-count">{list.length}</span>}
-      </h3>
-      {list.length === 0 ? (
-        <p className="plan-month-empty font-fun">
-          {isOver ? "Dépose-le ici !" : "Rien de prévu — glisse un jeu ici."}
-        </p>
-      ) : (
-        <ul className="plan-list">
-          {list.map((e) => (
-            <li key={e.gameId}>
-              <DraggableGame id={`${mk}-${e.gameId}`} entry={e} className="plan-item">
-                <Link to={`/game/${e.gameId}`} className="plan-item-cover clickable">
-                  {e.cover ? (
-                    <img src={e.cover} alt="" loading="lazy" draggable="false" />
-                  ) : (
-                    <span className="plan-cover-ph">
-                      <Gamepad2 size={14} />
-                    </span>
-                  )}
-                </Link>
-                <div className="plan-item-info">
-                  <Link to={`/game/${e.gameId}`} className="plan-item-name clickable">
-                    {e.name}
-                  </Link>
-                  {e.auto ? (
-                    <span className="plan-item-auto" title="Tu y joues en ce moment">
-                      <Gamepad size={12} /> en cours
-                    </span>
-                  ) : (
-                    <MonthMenu value={mk} onPick={(m) => setPlan(e, m)} compact />
-                  )}
-                </div>
-              </DraggableGame>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-// ============================================================
 //  Page
 // ============================================================
 export default function Releases() {
@@ -1036,10 +619,7 @@ export default function Releases() {
   const [error, setError] = useState(null);
   const [modalGame, setModalGame] = useState(null);
 
-  // État initialisé depuis l'URL : le retour arrière restaure la vue/les filtres.
-  const [view, setView] = useState(() =>
-    searchParams.get("view") === "plan" ? "plan" : "feed"
-  );
+  // État initialisé depuis l'URL : le retour arrière restaure les filtres.
   const [bigOnly, setBigOnly] = useState(() => searchParams.get("big") === "1");
   const [wishlistOnly, setWishlistOnly] = useState(
     () => searchParams.get("wish") === "1"
@@ -1052,7 +632,6 @@ export default function Releases() {
 
   useEffect(() => {
     const next = new URLSearchParams();
-    if (view === "plan") next.set("view", "plan");
     if (bigOnly) next.set("big", "1");
     if (wishlistOnly) next.set("wish", "1");
     if (excludeAi) next.set("ai", "1");
@@ -1062,7 +641,7 @@ export default function Releases() {
     if (g) next.set("genre", g);
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, bigOnly, wishlistOnly, excludeAi, platformSel, genreSel]);
+  }, [bigOnly, wishlistOnly, excludeAi, platformSel, genreSel]);
 
   const cycleIn = (setter) => (val) =>
     setter((cur) => {
@@ -1159,7 +738,7 @@ export default function Releases() {
   const topRef = useRef(null);
   const ioStateRef = useRef({});
   ioStateRef.current = {
-    ready: !loading && view === "feed",
+    ready: !loading,
     busy: pastLoading,
     done: pastDone,
   };
@@ -1176,7 +755,7 @@ export default function Releases() {
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [loading, view]);
+  }, [loading]);
 
   // --- Filtres + regroupement par jour (passé et futur mélangés, triés) ---
   const allGames = useMemo(() => {
@@ -1307,9 +886,9 @@ export default function Releases() {
 
   // Calage initial, une seule fois, dès que le feed a de quoi s'afficher.
   useLayoutEffect(() => {
-    if (jumpedRef.current || loading || view !== "feed" || total === 0) return;
+    if (jumpedRef.current || loading || total === 0) return;
     if (jumpToToday(false)) jumpedRef.current = true;
-  }, [loading, view, total, jumpToToday]);
+  }, [loading, total, jumpToToday]);
 
   // Bouton flottant « Aujourd'hui » : proposé seulement quand le repère est
   // sorti de l'écran (sinon il n'aurait rien à faire).
@@ -1326,7 +905,7 @@ export default function Releases() {
     return () => io.disconnect();
     // `nowIndex` : le repère change de place dans la liste quand des jours
     // passés arrivent — il faut alors observer le nouvel élément.
-  }, [loading, view, total, nowIndex]);
+  }, [loading, total, nowIndex]);
 
   return (
     <div className="releases">
@@ -1345,74 +924,54 @@ export default function Releases() {
       </header>
 
       <div className="rel-toolbar">
-        {/* Vue : feed des sorties / mon planning */}
-        <div className="rel-views" role="group" aria-label="Vue">
+        <div className="rel-actions">
+          {hasFilters ? (
+            <button className="rel-filter-clear clickable" onClick={resetFilters}>
+              Effacer
+            </button>
+          ) : null}
+          <MultiDropdown
+            label="Console"
+            options={platformOpts}
+            selected={platformSel}
+            onCycle={cycleIn(setPlatformSel)}
+            onClear={() => setPlatformSel({})}
+          />
+          <MultiDropdown
+            label="Genre"
+            options={genreOpts}
+            selected={genreSel}
+            onCycle={cycleIn(setGenreSel)}
+            onClear={() => setGenreSel({})}
+          />
           <button
-            className={`rel-view clickable ${view === "feed" ? "active" : ""}`}
-            onClick={() => setView("feed")}
+            className={`rel-ai-toggle clickable ${excludeAi ? "active" : ""}`}
+            onClick={() => setExcludeAi((v) => !v)}
+            title="Masquer les jeux utilisant du contenu généré par IA"
           >
-            <CalendarDays size={15} /> Sorties
+            <span className="rel-ai-box">{excludeAi && <Check size={13} />}</span>
+            Exclure AI Slop
           </button>
           <button
-            className={`rel-view clickable ${view === "plan" ? "active" : ""}`}
-            onClick={() => setView("plan")}
+            className={`rel-big clickable ${bigOnly ? "active" : ""}`}
+            onClick={() => setBigOnly((v) => !v)}
+            title="Ne montrer que les grosses sorties (jeux très attendus)"
           >
-            <CalendarRange size={15} /> Mon planning
+            <Flame size={15} fill={bigOnly ? "currentColor" : "none"} />
+            Gros jeux
+          </button>
+          <button
+            className={`rel-wish clickable ${wishlistOnly ? "active" : ""}`}
+            onClick={() => setWishlistOnly((v) => !v)}
+            title="N'afficher que ma liste de souhaits"
+          >
+            <Bookmark size={16} fill={wishlistOnly ? "currentColor" : "none"} />
+            Ma liste de souhaits
           </button>
         </div>
-
-        {view === "feed" && (
-          <div className="rel-actions">
-            {hasFilters ? (
-              <button className="rel-filter-clear clickable" onClick={resetFilters}>
-                Effacer
-              </button>
-            ) : null}
-            <MultiDropdown
-              label="Console"
-              options={platformOpts}
-              selected={platformSel}
-              onCycle={cycleIn(setPlatformSel)}
-              onClear={() => setPlatformSel({})}
-            />
-            <MultiDropdown
-              label="Genre"
-              options={genreOpts}
-              selected={genreSel}
-              onCycle={cycleIn(setGenreSel)}
-              onClear={() => setGenreSel({})}
-            />
-            <button
-              className={`rel-ai-toggle clickable ${excludeAi ? "active" : ""}`}
-              onClick={() => setExcludeAi((v) => !v)}
-              title="Masquer les jeux utilisant du contenu généré par IA"
-            >
-              <span className="rel-ai-box">{excludeAi && <Check size={13} />}</span>
-              Exclure AI Slop
-            </button>
-            <button
-              className={`rel-big clickable ${bigOnly ? "active" : ""}`}
-              onClick={() => setBigOnly((v) => !v)}
-              title="Ne montrer que les grosses sorties (jeux très attendus)"
-            >
-              <Flame size={15} fill={bigOnly ? "currentColor" : "none"} />
-              Gros jeux
-            </button>
-            <button
-              className={`rel-wish clickable ${wishlistOnly ? "active" : ""}`}
-              onClick={() => setWishlistOnly((v) => !v)}
-              title="N'afficher que ma liste de souhaits"
-            >
-              <Bookmark size={16} fill={wishlistOnly ? "currentColor" : "none"} />
-              Ma liste de souhaits
-            </button>
-          </div>
-        )}
       </div>
 
-      {view === "plan" ? (
-        <PlanningView token={token} />
-      ) : loading ? (
+      {loading ? (
         <div className="rel-state">
           <Loader2 size={22} className="spin" /> Chargement des sorties…
         </div>
@@ -1504,7 +1063,7 @@ export default function Releases() {
       )}
 
       {/* Retour au présent, quand on s'est perdu dans le passé ou le futur. */}
-      {view === "feed" && showJump && (
+      {showJump && (
         <button
           className="rel-jump clickable"
           onClick={() => jumpToToday(true)}
