@@ -87,6 +87,23 @@ const tierSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// Événement d'origine d'une liste officielle (Nintendo Direct, Summer Game
+// Fest, State of Play…). Rempli par la synchro IGDB (`npm run sync:events`) et
+// jamais saisi à la main : c'est lui qui distingue une liste « Événements » des
+// listes de joueurs, et qui porte la rediff du live.
+const listEventSchema = new mongoose.Schema(
+  {
+    igdbId: { type: Number, required: true }, // clé d'idempotence de la synchro
+    slug: { type: String, default: null },
+    name: { type: String, default: "" }, // intitulé IGDB, avant francisation
+    startTime: { type: Date, default: null }, // date de diffusion
+    logo: { type: String, default: null }, // logo de l'événement (IGDB)
+    videoUrl: { type: String, default: null }, // page du live (YouTube)
+    videoId: { type: String, default: null }, // id extrait, pour l'intégration
+  },
+  { _id: false }
+);
+
 // Mention @user résolue à la création (pour la coloration et, plus tard, les notifs).
 const commentMentionSchema = new mongoose.Schema(
   {
@@ -167,6 +184,8 @@ const listSchema = new mongoose.Schema(
     },
     items: { type: [listItemSchema], default: [] },
     tiers: { type: [tierSchema], default: [] },
+    // Liste officielle adossée à un événement (null = liste de joueur).
+    event: { type: listEventSchema, default: null },
     likes: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
       default: [],
@@ -181,5 +200,9 @@ const listSchema = new mongoose.Schema(
 
 listSchema.index({ visibility: 1, updatedAt: -1 });
 listSchema.index({ user: 1, updatedAt: -1 });
+// Synchro des événements (recherche par id IGDB) + onglet « Événements »
+// (toutes les listes d'événement, de la plus récente à la plus ancienne).
+listSchema.index({ "event.igdbId": 1 });
+listSchema.index({ "event.startTime": -1 });
 
 export default mongoose.model("List", listSchema);

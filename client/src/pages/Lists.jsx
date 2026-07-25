@@ -12,6 +12,8 @@ import {
   X,
   Trash2,
   Disc3,
+  CalendarDays,
+  PlayCircle,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -27,9 +29,21 @@ import { Preview, Author } from "../components/ListPreview";
 
 const SCOPES = [
   { value: "feed", label: "Découvrir" },
+  { value: "events", label: "Événements" },
   { value: "playlists", label: "PlayLists" },
   { value: "mine", label: "Mes listes" },
 ];
+
+// Les onglets qui ont déjà un contenu bien défini ignorent les filtres
+// type / contenu : « PlayLists » ne montre que des playlists, « Événements »
+// que les listes officielles de conférences.
+const FIXED_SCOPES = ["playlists", "events"];
+
+const fmtEventDate = new Intl.DateTimeFormat("fr-FR", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
 
 function ListCard({ list, onDelete }) {
   return (
@@ -49,6 +63,21 @@ function ListCard({ list, onDelete }) {
       )}
       <Preview list={list} />
       <div className="list-card-body">
+        {/* Liste officielle d'un événement : sa date passe avant le titre, et
+            on annonce la rediff quand elle existe. */}
+        {list.event && (
+          <div className="list-card-event">
+            <CalendarDays size={12} />
+            {list.event.startTime
+              ? fmtEventDate.format(new Date(list.event.startTime))
+              : "Événement"}
+            {list.event.videoId && (
+              <span className="list-card-replay" title="Rediffusion disponible">
+                <PlayCircle size={12} /> Rediff
+              </span>
+            )}
+          </div>
+        )}
         <h3 className="list-card-title">{list.title}</h3>
         {list.description && (
           <p className="list-card-desc">{list.description}</p>
@@ -144,10 +173,13 @@ export default function Lists() {
     setError(null);
     const params = new URLSearchParams();
     if (scope === "mine") params.set("scope", "mine");
+    // Listes officielles de conférences : le serveur les range par date
+    // d'événement, la plus récente en tête.
+    if (scope === "events") params.set("scope", "events");
     params.set("sort", sort);
     // L'onglet « PlayLists » ne montre que les playlists (filtres type/contenu ignorés).
     if (scope === "playlists") params.set("type", "playlist");
-    else {
+    else if (scope !== "events") {
       if (typeFilter) params.set("type", typeFilter);
       if (kindFilter) params.set("itemKind", kindFilter);
     }
@@ -214,11 +246,19 @@ export default function Lists() {
         </div>
         <select
           className="lists-select"
-          value={scope === "playlists" ? "playlist" : typeFilter}
+          value={
+            scope === "playlists" ? "playlist" : scope === "events" ? "" : typeFilter
+          }
           onChange={(e) => setTypeFilter(e.target.value)}
-          disabled={scope === "playlists"}
+          disabled={FIXED_SCOPES.includes(scope)}
           aria-label="Filtrer par type"
-          title={scope === "playlists" ? "L'onglet PlayLists ne montre que les playlists" : "Filtrer par type"}
+          title={
+            scope === "playlists"
+              ? "L'onglet PlayLists ne montre que les playlists"
+              : scope === "events"
+                ? "L'onglet Événements ne montre que les listes officielles"
+                : "Filtrer par type"
+          }
         >
           {LIST_TYPE_FILTERS.map((o) => (
             <option key={o.value} value={o.value}>
@@ -228,9 +268,9 @@ export default function Lists() {
         </select>
         <select
           className="lists-select"
-          value={scope === "playlists" ? "" : kindFilter}
+          value={FIXED_SCOPES.includes(scope) ? "" : kindFilter}
           onChange={(e) => setKindFilter(e.target.value)}
-          disabled={scope === "playlists"}
+          disabled={FIXED_SCOPES.includes(scope)}
           aria-label="Filtrer par contenu"
         >
           {LIST_KIND_FILTERS.map((o) => (
@@ -265,22 +305,34 @@ export default function Lists() {
         </div>
       ) : lists.length === 0 ? (
         <div className="lists-empty card">
-          {scope === "playlists" ? <Disc3 size={34} /> : <Layers size={34} />}
+          {scope === "playlists" ? (
+            <Disc3 size={34} />
+          ) : scope === "events" ? (
+            <CalendarDays size={34} />
+          ) : (
+            <Layers size={34} />
+          )}
           <h3>
             {scope === "mine"
               ? "Tu n'as pas encore de liste"
               : scope === "playlists"
                 ? "Aucune playlist pour l'instant"
-                : "Rien par ici pour l'instant"}
+                : scope === "events"
+                  ? "Aucune conférence pour l'instant"
+                  : "Rien par ici pour l'instant"}
           </h3>
           <p className="font-fun">
             {scope === "playlists"
               ? "Crée la première playlist d'OST !"
-              : "Lance-toi et crée ta première liste !"}
+              : scope === "events"
+                ? "Les listes des Directs et showcases arrivent après chaque conférence."
+                : "Lance-toi et crée ta première liste !"}
           </p>
-          <button className="btn btn-primary" onClick={() => setCreating(true)}>
-            <Plus size={18} /> Créer une liste
-          </button>
+          {scope !== "events" && (
+            <button className="btn btn-primary" onClick={() => setCreating(true)}>
+              <Plus size={18} /> Créer une liste
+            </button>
+          )}
         </div>
       ) : (
         <div className={scope === "playlists" ? "plc-grid" : "lists-grid"}>

@@ -28,6 +28,12 @@ const userSchema = new mongoose.Schema(
     // `isAdmin` : administrateur « simple » nommé par le super-admin.
     isSuperAdmin: { type: Boolean, default: false },
     isAdmin: { type: Boolean, default: false },
+    // Compte de service du site (« MyPlayLog »), propriétaire des listes
+    // officielles générées automatiquement — les listes d'événements, par
+    // exemple. Personne ne s'y connecte : il est créé par script avec un mot de
+    // passe aléatoire jamais communiqué. Le drapeau sert surtout à l'afficher
+    // avec sa pastille de compte vérifié.
+    isSystem: { type: Boolean, default: false },
     // Accès à l'onglet « Téléchargements » des fiches de jeu. Fermé par défaut :
     // il s'ouvre compte par compte depuis le panel admin (voir canUserDownload,
     // lib/admin.js — les administrateurs l'ont sans le drapeau).

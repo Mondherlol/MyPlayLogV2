@@ -18415,3 +18415,55 @@ b.hf-dl-src {
     order: 3;
   }
 }
+
+/* ---------- Onglet Événements : synchro des listes de conférences ---------- */
+.adm-ev-log {
+  max-height: 260px;
+  overflow: auto;
+  margin: 0.6rem 0 0;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.adm-ev-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+}
+
+.adm-ev-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.adm-ev-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.adm-ev-main strong {
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adm-ev-main span {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}

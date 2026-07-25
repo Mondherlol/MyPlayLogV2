@@ -624,6 +624,105 @@ router.get("/languages", requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/games/list-details?ids=1,2,3 — fiche CONDENSÉE de plusieurs jeux en
+// une requête, pour la vue détaillée des listes (une ligne par jeu).
+//
+// `/:id/full` donnerait tout ça, mais il scrape HowLongToBeat, traduit, croise
+// la base… : soixante-douze appels pour afficher une liste, impensable. Ici,
+// une seule requête IGDB pour tout le lot, et uniquement les champs affichés.
+const LIST_DETAIL_FIELDS = [
+  "name",
+  "summary",
+  "cover.image_id",
+  "first_release_date",
+  "total_rating",
+  "total_rating_count",
+  "genres.name",
+  "platforms.id",
+  "platforms.name",
+  "platforms.abbreviation",
+  "language_supports.language.name",
+  "language_supports.language.locale",
+  "screenshots.image_id",
+  "screenshots.width",
+  "screenshots.height",
+  "videos.video_id",
+  "videos.name",
+].join(",");
+
+const MAX_LIST_DETAILS = 60;
+
+router.get("/list-details", optionalAuth, async (req, res) => {
+  try {
+    const ids = [...new Set(parseIds(req.query.ids))].slice(0, MAX_LIST_DETAILS);
+    if (!ids.length) return res.json({ games: [] });
+
+    const rows = await igdbQuery(
+      "games",
+      `fields ${LIST_DETAIL_FIELDS}; where id = (${ids.join(",")}); limit ${ids.length};`
+    );
+
+    const byArea = (a, b) =>
+      (b.width || 0) * (b.height || 0) - (a.width || 0) * (a.height || 0);
+    const nowSec = Math.floor(Date.now() / 1000);
+
+    const games = rows.map((g) => {
+      // Langues dédupliquées + code pays du drapeau (même logique que /full).
+      const langByName = new Map();
+      for (const ls of g.language_supports || []) {
+        const raw = ls.language?.name;
+        if (!raw) continue;
+        const name = frName(LANGUAGES_FR, raw);
+        if (langByName.has(name)) continue;
+        const region = (ls.language?.locale || "").split("-")[1];
+        langByName.set(name, { name, cc: region ? region.toLowerCase() : null });
+      }
+
+      // La bande-annonce d'abord : IGDB range rarement les vidéos, mais celle
+      // qui s'appelle « trailer » est presque toujours la bonne.
+      const videos = (g.videos || []).filter((v) => v.video_id);
+      const trailer =
+        videos.find((v) => /trailer|bande|reveal/i.test(v.name || "")) || videos[0];
+
+      return {
+        id: g.id,
+        name: g.name,
+        summary: g.summary ? String(g.summary).slice(0, 600) : null,
+        cover: g.cover?.image_id ? `${IMG_BASE}/t_cover_big/${g.cover.image_id}.jpg` : null,
+        releaseDate: g.first_release_date || null,
+        released: !!(g.first_release_date && g.first_release_date <= nowSec),
+        rating: g.total_rating ? Math.round(g.total_rating) : null,
+        ratingCount: g.total_rating_count || 0,
+        genres: (g.genres || []).map((x) => frName(GENRES_FR, x.name)),
+        platforms: (g.platforms || []).map((p) => ({
+          id: p.id,
+          name: p.name,
+          abbr: p.abbreviation || p.name,
+        })),
+        languages: [...langByName.values()].sort((a, b) =>
+          a.name.localeCompare(b.name, "fr")
+        ),
+        screenshots: (g.screenshots || [])
+          .filter((s) => s.image_id)
+          .sort(byArea)
+          .slice(0, 8)
+          .map((s) => ({
+            id: s.image_id,
+            thumb: `${IMG_BASE}/t_screenshot_med/${s.image_id}.jpg`,
+            full: `${IMG_BASE}/t_1080p/${s.image_id}.jpg`,
+          })),
+        trailer: trailer
+          ? { videoId: trailer.video_id, name: trailer.name || "Bande-annonce" }
+          : null,
+      };
+    });
+
+    res.json({ games });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 // Parmi une liste d'ids de jeux, ceux qui ont AU MOINS un personnage
 // (IGDB ou communauté) — pour signaler les jeux exploitables avant de cliquer.
 router.get("/characters-availability", requireAuth, async (req, res) => {

@@ -1,11 +1,14 @@
-import { Lock } from "lucide-react";
+import { Lock, BadgeCheck } from "lucide-react";
 import { typeMeta } from "../lib/lists";
 
 // Pseudo + photo de profil de l'auteur (pastille ronde, initiale en repli).
+// Le compte officiel du site (listes d'événements) porte une pastille de
+// vérification : on doit voir d'un coup d'œil que la liste vient de MyPlayLog
+// et non d'un joueur qui aurait pris le nom.
 export function Author({ author }) {
   if (!author) return <span className="list-card-author">—</span>;
   return (
-    <span className="list-card-author">
+    <span className={`list-card-author ${author.isSystem ? "is-system" : ""}`}>
       <span className="list-author-pp" aria-hidden="true">
         {author.avatar ? (
           <img src={author.avatar} alt="" loading="lazy" draggable="false" />
@@ -14,6 +17,9 @@ export function Author({ author }) {
         )}
       </span>
       {author.username}
+      {author.isSystem && (
+        <BadgeCheck size={13} className="list-author-check" aria-label="Compte officiel" />
+      )}
     </span>
   );
 }

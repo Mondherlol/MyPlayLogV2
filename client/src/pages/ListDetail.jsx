@@ -20,6 +20,11 @@ import {
   ChevronUp,
   ImagePlus,
   ImageDown,
+  Play,
+  MonitorPlay,
+  BadgeCheck,
+  LayoutGrid,
+  Rows3,
 } from "lucide-react";
 import {
   DndContext,
@@ -49,11 +54,89 @@ import ItemEditModal from "../components/ItemEditModal";
 import ListComments from "../components/ListComments";
 import ListGameCard from "../components/ListGameCard";
 import ListCharacterCard from "../components/ListCharacterCard";
+import ListRowsView from "../components/ListRowsView";
 import ListExportModal from "../components/ListExportModal";
 
 const TIER_COLORS = [
   "#ff5470", "#ff8b3d", "#f2b70b", "#3dd68c", "#4aa8ff", "#a879ff", "#8b93a7",
 ];
+
+const fmtEventDate = new Intl.DateTimeFormat("fr-FR", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
+
+// Rediffusion d'une conférence, en tête des listes officielles d'événements.
+// Façade avant tout : on affiche la vignette YouTube, et l'iframe (lourde, et
+// qui pose ses cookies) n'arrive QUE si on décide de regarder.
+function EventReplay({ event }) {
+  const [playing, setPlaying] = useState(false);
+  if (!event?.videoId) {
+    // Live hébergé ailleurs (Twitch…) : on ne sait pas l'intégrer, on donne
+    // au moins le lien.
+    if (!event?.videoUrl) return null;
+    return (
+      <a
+        className="ld-replay ld-replay-link clickable"
+        href={event.videoUrl}
+        target="_blank"
+        rel="noreferrer noopener"
+      >
+        <MonitorPlay size={18} /> Revoir la conférence
+      </a>
+    );
+  }
+
+  if (playing) {
+    return (
+      <div className="ld-replay is-playing">
+        <div className="ld-replay-frame">
+          <iframe
+            src={`https://www.youtube-nocookie.com/embed/${event.videoId}?autoplay=1`}
+            title={event.name || "Rediffusion"}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+          />
+        </div>
+        <button
+          type="button"
+          className="ld-replay-close clickable"
+          onClick={() => setPlaying(false)}
+          aria-label="Fermer la vidéo"
+        >
+          <X size={16} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button type="button" className="ld-replay clickable" onClick={() => setPlaying(true)}>
+      <span className="ld-replay-thumb">
+        <img
+          src={`https://i.ytimg.com/vi/${event.videoId}/hqdefault.jpg`}
+          alt=""
+          loading="lazy"
+          draggable="false"
+        />
+        <span className="ld-replay-play">
+          <Play size={22} fill="currentColor" strokeWidth={0} />
+        </span>
+      </span>
+      <span className="ld-replay-body">
+        <span className="ld-replay-kicker">
+          <MonitorPlay size={13} /> Rediffusion
+        </span>
+        <strong className="ld-replay-title">Revoir la conférence</strong>
+        <span className="ld-replay-sub">
+          {event.name}
+          {event.startTime ? ` · ${fmtEventDate.format(new Date(event.startTime))}` : ""}
+        </span>
+      </span>
+    </button>
+  );
+}
 
 // Conteneur virtuel pour les éléments non classés (tier list) / la liste simple.
 const POOL = "__pool__";
@@ -77,6 +160,15 @@ export default function ListDetail() {
   const [activeId, setActiveId] = useState(null); // drag en cours (dnd-kit)
   const [poolCollapsed, setPoolCollapsed] = useState(false); // vivier replié
   const [exporting, setExporting] = useState(false); // modale d'export PNG
+  // Cartes (jaquettes) ou liste détaillée (une ligne par jeu). Le choix suit
+  // le joueur d'une liste à l'autre : c'est une préférence de lecture.
+  const [view, setView] = useState(
+    () => localStorage.getItem("mpl_list_view") || "cards"
+  );
+  const setViewMode = (v) => {
+    setView(v);
+    localStorage.setItem("mpl_list_view", v);
+  };
   // Mode édition : activé uniquement à la création (state de navigation) ou
   // via le bouton « Modifier ». À l'ouverture normale, on est en lecture.
   const [editing, setEditing] = useState(!!location.state?.edit);
@@ -382,6 +474,10 @@ export default function ListDetail() {
   const isTier = list.type === "tier";
   const isGameList = (list.itemKind || "game") === "game";
   const pool = isTier ? items.filter((i) => !i.tier) : items;
+  // La vue détaillée n'a de sens que sur une liste de JEUX en lecture : elle
+  // s'appuie sur les fiches IGDB, et le réordonnancement se fait en cartes.
+  const canRows = isGameList && !isTier && !editable && items.length > 0;
+  const rowsView = canRows && view === "rows";
 
   return (
     <div className="ld-page">
@@ -509,6 +605,11 @@ export default function ListDetail() {
               {list.author?.username ? (
                 <Link to={`/u/${list.author.username}`} className="ld-author-link">
                   <strong>@{list.author.username}</strong>
+                  {/* Compte officiel du site : la pastille évite qu'on prenne
+                      une liste système pour celle d'un joueur homonyme. */}
+                  {list.author.isSystem && (
+                    <BadgeCheck size={14} className="ld-author-check" aria-label="Compte officiel" />
+                  )}
                 </Link>
               ) : (
                 <strong>—</strong>
@@ -604,6 +705,10 @@ export default function ListDetail() {
         </div>
       </header>
 
+      {/* Liste officielle d'une conférence : la rediff se regarde ici, sans
+          quitter la liste des jeux annoncés. */}
+      {list.event && <EventReplay event={list.event} />}
+
       {/* --- Corps --- */}
       <DndContext
         sensors={sensors}
@@ -660,6 +765,30 @@ export default function ListDetail() {
                 <span className="ld-hint font-fun">Glisse les cartes pour les réorganiser</span>
               </div>
             )}
+
+            {/* Cartes ou liste détaillée : deux façons de lire la même liste —
+                les jaquettes pour parcourir, les lignes pour se décider. */}
+            {canRows && (
+              <div className="ld-viewswitch" role="group" aria-label="Affichage">
+                <button
+                  type="button"
+                  className={`ld-view-opt clickable ${view === "cards" ? "active" : ""}`}
+                  onClick={() => setViewMode("cards")}
+                  title="Afficher en cartes"
+                >
+                  <LayoutGrid size={14} /> Cartes
+                </button>
+                <button
+                  type="button"
+                  className={`ld-view-opt clickable ${view === "rows" ? "active" : ""}`}
+                  onClick={() => setViewMode("rows")}
+                  title="Afficher en liste détaillée"
+                >
+                  <Rows3 size={14} /> Liste
+                </button>
+              </div>
+            )}
+
             {items.length === 0 ? (
               <div className="ld-empty card">
                 <meta.Icon size={30} />
@@ -670,6 +799,8 @@ export default function ListDetail() {
                   </button>
                 )}
               </div>
+            ) : rowsView ? (
+              <ListRowsView items={items} ranked={ranked} token={token} />
             ) : !editable ? (
               // Lecture : cards riches (lien jeu, menu d'actions, bulle
               // d'annotation). Pas de drag en lecture.

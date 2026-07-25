@@ -126,10 +126,37 @@ export function playlistDuration(items) {
   };
 }
 
+// Événement d'origine d'une liste officielle (null pour une liste de joueur).
+// Même forme côté carte et côté détail : la page en a besoin pour la rediff,
+// la carte pour son bandeau de date.
+function toEvent(l) {
+  if (!l.event?.igdbId) return null;
+  return {
+    name: l.event.name || null,
+    startTime: l.event.startTime || null,
+    logo: l.event.logo || null,
+    videoUrl: l.event.videoUrl || null,
+    videoId: l.event.videoId || null,
+  };
+}
+
+// Auteur d'une liste. `isSystem` distingue le compte officiel du site pour lui
+// coller sa pastille de compte vérifié.
+function toAuthor(u) {
+  if (!u) return null;
+  return {
+    id: u._id,
+    username: u.username,
+    avatar: u.avatar || null,
+    isSystem: !!u.isSystem,
+  };
+}
+
 // Vue "carte" (feed) : légère, sans les items complets.
 function toCard(l, userId) {
   const items = l.items || [];
   return {
+    event: toEvent(l),
     ...(l.type === "playlist" ? playlistDuration(items) : {}),
     id: l._id,
     title: l.title,
@@ -139,9 +166,7 @@ function toCard(l, userId) {
     type: l.type,
     itemKind: l.itemKind || "game",
     visibility: l.visibility,
-    author: l.user
-      ? { id: l.user._id, username: l.user.username, avatar: l.user.avatar || null }
-      : null,
+    author: toAuthor(l.user),
     mine: userId ? String(l.user?._id || l.user) === String(userId) : false,
     itemCount: items.length,
     // Aperçu : les premières images pour un montage visuel (jusqu'à 8 pour
@@ -189,7 +214,8 @@ function toFull(l, userId) {
     type: l.type,
     itemKind: l.itemKind || "game",
     visibility: l.visibility,
-    author: l.user ? { id: l.user._id, username: l.user.username } : null,
+    author: toAuthor(l.user),
+    event: toEvent(l),
     mine: userId ? String(l.user?._id || l.user) === String(userId) : false,
     items: (l.items || []).map((i) => ({
       _id: i._id,
@@ -240,7 +266,11 @@ router.get("/", optionalAuth, async (req, res) => {
         }
       : scope === "mine"
         ? { user: req.userId }
-        : { $or: [{ visibility: "public" }, { user: req.userId }] };
+        : scope === "events"
+          ? // Listes officielles adossées à un événement (Nintendo Direct,
+            // Summer Game Fest…), publiées par le compte du site.
+            { visibility: "public", "event.igdbId": { $exists: true } }
+          : { $or: [{ visibility: "public" }, { user: req.userId }] };
     // Filtres optionnels : type, itemKind (jeu/perso), recherche plein-texte.
     if (TYPES.includes(req.query.type)) filter.type = req.query.type;
     if (ITEM_KINDS.includes(req.query.itemKind))
@@ -251,8 +281,10 @@ router.get("/", optionalAuth, async (req, res) => {
       filter.$and = [{ $or: [{ title: rx }, { description: rx }] }];
     }
     const lists = await List.find(filter)
-      .populate("user", "username avatar")
-      .sort({ updatedAt: -1 })
+      .populate("user", "username avatar isSystem")
+      // Les événements se rangent par date de diffusion (la dernière
+      // conférence en tête), pas par date de mise à jour de la liste.
+      .sort(scope === "events" ? { "event.startTime": -1 } : { updatedAt: -1 })
       .limit(200)
       .lean();
     let cards = lists.map((l) => toCard(l, req.userId));
@@ -410,7 +442,7 @@ router.get("/:id", optionalAuth, async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id))
       return res.status(404).json({ error: "Liste introuvable." });
     const l = await List.findById(req.params.id)
-      .populate("user", "username")
+      .populate("user", "username avatar isSystem")
       .populate("comments.user", "username avatar")
       .lean();
     if (!l) return res.status(404).json({ error: "Liste introuvable." });
@@ -468,7 +500,7 @@ router.post("/", requireAuth, async (req, res) => {
     triggerMissionCheck(req.userId);
 
     const full = await List.findById(list._id)
-      .populate("user", "username")
+      .populate("user", "username avatar isSystem")
       .lean();
     res.status(201).json({ list: toFull(full, req.userId) });
   } catch (err) {
@@ -542,7 +574,7 @@ router.put("/:id", requireAuth, async (req, res) => {
     if (addedCount > 0)
       recordListItemsActivity({ actor: req.userId, list: list._id, added: addedCount });
     const full = await List.findById(list._id)
-      .populate("user", "username")
+      .populate("user", "username avatar isSystem")
       .populate("comments.user", "username avatar")
       .lean();
     res.json({ list: toFull(full, req.userId) });

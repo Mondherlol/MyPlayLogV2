@@ -29,6 +29,7 @@ import {
   updateMissionConfig,
   resetMissionConfig,
 } from "../lib/missions.js";
+import { defaultSince, syncEventLists } from "../lib/eventSync.js";
 
 const router = express.Router();
 
@@ -809,6 +810,68 @@ router.delete("/missions/:key", async (req, res) => {
   } catch (err) {
     console.error("admin mission reset error:", err.message);
     res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// ======================================================================
+//  Listes d'événements — synchro IGDB depuis le panel
+// ======================================================================
+// Même travail que `npm run sync:events`, mais déclenché d'un bouton : après
+// une conférence, plus besoin d'ouvrir un SSH sur le VPS.
+
+// GET /api/admin/events — état actuel (pour afficher quoi que ce soit d'utile
+// avant de lancer quoi que ce soit).
+router.get("/events", async (_req, res) => {
+  try {
+    const lists = await List.find({ "event.igdbId": { $exists: true } })
+      .select("title event.startTime items")
+      .sort({ "event.startTime": -1 })
+      .lean();
+    res.json({
+      count: lists.length,
+      gameCount: lists.reduce((n, l) => n + (l.items || []).length, 0),
+      latest: lists.slice(0, 5).map((l) => ({
+        title: l.title,
+        startTime: l.event?.startTime || null,
+        items: (l.items || []).length,
+      })),
+    });
+  } catch (err) {
+    console.error("admin events state error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement." });
+  }
+});
+
+// POST /api/admin/events/sync — lance la synchro et renvoie le journal.
+// Une trentaine d'appels IGDB : la requête tient la ligne une poignée de
+// secondes, d'où le bouton avec son indicateur côté client. On sérialise avec
+// un verrou : deux clics d'affilée créeraient les mêmes listes en double.
+let eventSyncRunning = false;
+
+router.post("/events/sync", async (req, res) => {
+  if (eventSyncRunning)
+    return res.status(409).json({ error: "Une synchro est déjà en cours." });
+  eventSyncRunning = true;
+  const log = [];
+  try {
+    const sinceRaw = String(req.body?.since || "").trim();
+    const parsed = sinceRaw ? Date.parse(sinceRaw) : NaN;
+    const since = Number.isFinite(parsed) ? Math.floor(parsed / 1000) : defaultSince();
+
+    const summary = await syncEventLists({
+      since,
+      all: !!req.body?.all,
+      // Les couvertures générées sont servies par /uploads : on prend le
+      // domaine de la requête en cours, pas besoin de configurer PUBLIC_URL.
+      baseUrl: process.env.PUBLIC_URL || `${req.protocol}://${req.get("host")}`,
+      log: (line) => log.push(line),
+    });
+    res.json({ summary, log });
+  } catch (err) {
+    console.error("admin events sync error:", err.message);
+    res.status(err.status || 500).json({ error: err.message, log });
+  } finally {
+    eventSyncRunning = false;
   }
 });
 

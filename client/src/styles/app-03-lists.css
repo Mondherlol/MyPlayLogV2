@@ -2016,3 +2016,653 @@
   font-size: 0.95rem;
   color: var(--text);
 }
+
+/* ======================================================================
+   Listes officielles « Événements » (Nintendo Direct, Summer Game Fest…)
+   ======================================================================
+   Publiées par le compte de service du site et synchronisées depuis IGDB
+   (server: npm run sync:events). Deux marqueurs les distinguent des listes
+   de joueurs : la pastille de compte vérifié sur l'auteur, et le bandeau de
+   date + rediff sur la carte. */
+
+/* Pastille « compte officiel » à côté du pseudo. */
+.list-author-check,
+.ld-author-check {
+  flex: none;
+  color: var(--accent-ink);
+  vertical-align: -2px;
+}
+
+.ld-author-check {
+  margin-left: 0.25rem;
+}
+
+/* Bandeau de la carte : date de diffusion + présence d'une rediff. */
+.list-card-event {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.15rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.list-card-replay {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  padding: 0.08rem 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  color: var(--accent-ink);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ---------- Rediffusion en tête de la page liste ---------- */
+/* Façade : vignette + bouton tant qu'on n'a pas cliqué, l'iframe YouTube
+   n'est montée qu'à la demande (elle pèse lourd et pose ses cookies). */
+.ld-replay {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  margin: 0 0 1.2rem;
+  padding: 0.7rem;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.ld-replay:hover {
+  border-color: color-mix(in srgb, var(--orange) 45%, var(--border));
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+}
+
+.ld-replay-thumb {
+  position: relative;
+  flex: none;
+  width: 190px;
+  aspect-ratio: 16 / 9;
+  border-radius: 11px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.ld-replay-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ld-replay-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.32);
+  transition: background 0.16s ease;
+}
+
+.ld-replay:hover .ld-replay-play {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.ld-replay-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.ld-replay-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent-ink);
+}
+
+.ld-replay-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}
+
+.ld-replay-sub {
+  font-size: 0.84rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Lecture en cours : la carte laisse place au lecteur, en 16/9 plein cadre. */
+.ld-replay.is-playing {
+  position: relative;
+  display: block;
+  padding: 0;
+  overflow: hidden;
+}
+
+.ld-replay.is-playing:hover {
+  transform: none;
+}
+
+.ld-replay-frame {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  background: #000;
+}
+
+.ld-replay-frame iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+.ld-replay-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+}
+
+.ld-replay-close:hover {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+/* Live hébergé hors YouTube : simple lien, pas de lecteur. */
+.ld-replay-link {
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--accent-ink);
+  text-decoration: none;
+}
+
+@media (max-width: 620px) {
+  .ld-replay {
+    gap: 0.7rem;
+    padding: 0.55rem;
+  }
+
+  .ld-replay-thumb {
+    width: 128px;
+    border-radius: 9px;
+  }
+
+  .ld-replay-title {
+    font-size: 0.95rem;
+  }
+
+  .ld-replay-sub {
+    font-size: 0.78rem;
+  }
+}
+
+/* ======================================================================
+   Vue « liste détaillée » — une ligne par jeu (components/ListRowsView)
+   ======================================================================
+   L'affichage en cartes sert à parcourir, celui-ci à se décider : plateformes,
+   langues, compte à rebours, captures et bande-annonce sous les yeux. Les
+   détails arrivent au fil du défilement (une requête pour tout ce qui apparaît
+   en même temps), d'où l'indicateur de chargement sur la ligne. */
+
+/* Sélecteur cartes / liste */
+.ld-viewswitch {
+  display: inline-flex;
+  gap: 0.2rem;
+  margin-bottom: 1rem;
+  padding: 0.2rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.ld-view-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.84rem;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+
+.ld-view-opt:hover {
+  color: var(--text);
+}
+
+.ld-view-opt.active {
+  background: var(--surface);
+  color: var(--accent-ink);
+  box-shadow: var(--shadow-sm);
+}
+
+/* --- La liste --- */
+.lr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.lr-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 104px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 1rem;
+  padding: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.lr-row:hover {
+  border-color: color-mix(in srgb, var(--orange) 35%, var(--border));
+  box-shadow: var(--shadow);
+}
+
+.lr-rank {
+  align-self: center;
+  min-width: 1.6rem;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.3rem;
+  color: var(--text-soft);
+  text-align: center;
+}
+
+.lr-cover {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: 11px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.lr-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.lr-cover-ph {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-soft);
+}
+
+/* Le « + » d'ajout rapide n'apparaît qu'au survol de la ligne. */
+.lr-row:hover .add-fan.hover-only {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.lr-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.lr-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.lr-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.08rem;
+  color: var(--text);
+  text-decoration: none;
+  line-height: 1.2;
+}
+
+.lr-title:hover {
+  color: var(--accent-ink);
+}
+
+.lr-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  color: var(--accent-ink);
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.lr-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.84rem;
+  color: var(--text-soft);
+}
+
+.lr-date.tbd {
+  font-style: italic;
+  opacity: 0.75;
+}
+
+/* Compte à rebours (même découpage que la fiche de jeu, en une ligne) */
+.lr-cd {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  align-self: flex-start;
+  padding: 0.28rem 0.6rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  color: var(--accent-ink);
+  font-size: 0.82rem;
+}
+
+.lr-cd-unit b {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.lr-cd-unit i {
+  font-style: normal;
+  opacity: 0.7;
+  margin-left: 1px;
+}
+
+.lr-plats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.lr-plat {
+  padding: 0.14rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.lr-plat:hover {
+  border-color: var(--orange);
+  color: var(--accent-ink);
+}
+
+.lr-plat.more {
+  opacity: 0.7;
+}
+
+.lr-summary {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--text-soft);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.lr-langs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+
+.lr-lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 6px;
+  background: var(--surface-2);
+}
+
+.lr-lang img {
+  width: 14px;
+  height: 11px;
+  border-radius: 2px;
+  object-fit: cover;
+}
+
+.lr-lang.more {
+  opacity: 0.7;
+}
+
+.lr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.15rem;
+}
+
+.lr-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.8rem;
+  transition: border-color 0.14s ease, color 0.14s ease;
+}
+
+.lr-act:hover {
+  border-color: var(--orange);
+  color: var(--accent-ink);
+}
+
+/* Bande de captures à droite de la ligne */
+.lr-shots {
+  display: grid;
+  grid-template-columns: repeat(2, 116px);
+  gap: 0.35rem;
+  align-self: center;
+}
+
+.lr-shot {
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--surface-2);
+  aspect-ratio: 16 / 9;
+  transition: transform 0.14s ease, border-color 0.14s ease;
+}
+
+.lr-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.lr-shot:hover {
+  transform: scale(1.04);
+  border-color: var(--orange);
+}
+
+.lr-loading {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  color: var(--text-soft);
+  opacity: 0.6;
+}
+
+/* La bulle d'annotation de l'auteur est posée en absolu sur les cartes :
+   dans une ligne, elle reprend sa place dans le flux. */
+.lr-title-row .lg-note-wrap {
+  position: static;
+}
+
+/* --- Bande-annonce en modale --- */
+.lr-trailer-overlay {
+  padding: 1rem;
+}
+
+.lr-trailer {
+  width: min(1100px, 100%);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.lr-trailer-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.lr-trailer-head strong {
+  font-family: var(--font-display);
+  font-size: 1rem;
+}
+
+.lr-trailer-head span {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lr-trailer-x {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 9px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.lr-trailer-x:hover {
+  color: var(--accent-ink);
+}
+
+.lr-trailer-frame {
+  aspect-ratio: 16 / 9;
+  background: #000;
+}
+
+.lr-trailer-frame iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+/* --- Tablette : les captures passent sous le texte --- */
+@media (max-width: 1080px) {
+  .lr-row {
+    grid-template-columns: auto 92px minmax(0, 1fr);
+  }
+
+  .lr-shots {
+    grid-column: 2 / -1;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-self: stretch;
+  }
+}
+
+/* --- Téléphone : jaquette + texte côte à côte, le reste dessous --- */
+@media (max-width: 620px) {
+  .lr-row {
+    grid-template-columns: 74px minmax(0, 1fr);
+    gap: 0.7rem;
+    padding: 0.7rem;
+    border-radius: 14px;
+  }
+
+  .lr-rank {
+    grid-column: 1 / -1;
+    justify-self: start;
+    min-width: 0;
+    font-size: 1rem;
+  }
+
+  .lr-shots {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .lr-shots .lr-shot:nth-child(4) {
+    display: none;
+  }
+
+  .lr-title {
+    font-size: 0.98rem;
+  }
+
+  .lr-summary {
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+  }
+
+  /* Pas de survol au doigt : le « + » d'ajout reste visible. */
+  .lr-row .add-fan.hover-only {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}

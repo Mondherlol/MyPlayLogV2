@@ -39,6 +39,7 @@ import {
   Download,
   DownloadCloud,
   Globe2,
+  CalendarDays,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { applyGeoGlobe } from "../lib/geoGlobe";
@@ -49,6 +50,7 @@ import RewardsPanel from "../components/AdminRewards";
 import RewardArt from "../components/RewardArt";
 import SystemPanel from "../components/AdminSystem";
 import MissionsPanel from "../components/AdminMissions";
+import EventsPanel from "../components/AdminEvents";
 
 // ======================================================================
 //  Page Admin — shell à onglets verticaux (façon Discord).
@@ -59,6 +61,7 @@ const TAB_KEYS = [
   "missions",
   "psn",
   "geo",
+  "events",
   "system",
   "secrets",
   "patchnotes",
@@ -88,6 +91,7 @@ export default function Admin() {
     { key: "missions", label: "Missions", Icon: Award },
     { key: "psn", label: "PlayStation", Icon: Trophy, badge: psnActive },
     { key: "geo", label: "GeoGamer", Icon: Globe2 },
+    { key: "events", label: "Événements", Icon: CalendarDays },
     { key: "system", label: "Système", Icon: Activity },
     ...(isSuper ? [{ key: "secrets", label: "Secrets", Icon: KeyRound }] : []),
     { key: "patchnotes", label: "Patch notes", Icon: Sparkles },
@@ -158,6 +162,7 @@ export default function Admin() {
           {safeTab === "missions" && <MissionsPanel token={token} />}
           {safeTab === "psn" && <PsnPanel token={token} />}
           {safeTab === "geo" && <GeoGlobePanel token={token} />}
+          {safeTab === "events" && <EventsPanel token={token} />}
           {safeTab === "system" && <SystemPanel token={token} />}
           {safeTab === "secrets" && isSuper && <SecretsPanel token={token} />}
           {safeTab === "patchnotes" && <PatchnoteManager token={token} />}
