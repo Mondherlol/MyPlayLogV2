@@ -449,6 +449,10 @@
 .rel-day-badge {
   position: sticky;
   top: calc(var(--topbar-h, 64px) + 4.5rem);
+  /* Au-dessus des cartes du jour d'à côté : le « + » d'ajout rapide monte à
+     15 (20 quand son éventail est ouvert), et le bandeau collant lui passait
+     derrière en défilant. Reste sous la barre d'outils collante (30). */
+  z-index: 22;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1165,7 +1169,6 @@
   .rel-day-badge {
     position: sticky;
     top: calc(var(--topbar-h, 60px) + 6rem);
-    z-index: 5;
     flex-direction: row;
     align-items: center;
     gap: 0.45rem;

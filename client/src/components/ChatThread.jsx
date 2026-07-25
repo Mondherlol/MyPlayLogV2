@@ -261,17 +261,41 @@ export default function ChatThread({ conversation, token, compact, autoFocus }) 
     settledRef.current = false;
   }, [convId]);
 
-  // Clavier virtuel : la zone visible se réduit → on se recolle au bas pour que
-  // le dernier message ne passe pas sous le clavier.
+  // La zone de lecture rétrécit sous nos pieds bien plus souvent qu'on ne le
+  // croit : clavier virtuel qui s'ouvre, champ de saisie qui passe sur
+  // plusieurs lignes, bandeau « réponse à… », pièces jointes en attente. Sans
+  // réaction, le dernier message glisse sous le pli et il faut aller le
+  // rechercher à la main. On observe donc la HAUTEUR du conteneur (sa boîte
+  // ne bouge pas quand le contenu grandit : il déborde) et on se recolle au
+  // bas dès qu'elle change — à condition d'y avoir été.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    let last = el.clientHeight;
+    const ro = new ResizeObserver(() => {
+      const h = el.clientHeight;
+      if (h === last) return;
+      last = h;
+      if (stickRef.current) scrollToBottom();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [scrollToBottom]);
+
+  // Clavier virtuel : filet de sécurité par-dessus l'observateur ci-dessus.
+  // La page recalcule `--chat-vh` sur CE même évènement, et son écouteur est
+  // posé après le nôtre (effets enfants d'abord) : on attend donc la mise en
+  // page suivante, sinon on viserait le bas d'avant le rétrécissement. Les
+  // reprises différées couvrent l'animation d'ouverture du clavier.
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
     const onResize = () => {
-      if (stickRef.current) scrollToBottom();
+      if (stickRef.current) pinToBottom();
     };
     vv.addEventListener("resize", onResize);
     return () => vv.removeEventListener("resize", onResize);
-  }, [scrollToBottom]);
+  }, [pinToBottom]);
 
   // --- Pagination : on remonte le temps quand on atteint le haut ---
   const loadMore = useCallback(async () => {

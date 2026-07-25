@@ -9,6 +9,8 @@ import {
   X,
 } from "lucide-react";
 import { downloadImage } from "../lib/download";
+import { useScrollLock } from "../hooks/useScrollLock";
+import { useBackClose } from "../hooks/useBackClose";
 
 // ======================================================================
 //  Visionneuse d'images plein écran — swipe, flèches, clavier, vignettes
@@ -54,14 +56,12 @@ export default function MediaLightbox({ items, index, onIndex, onClose, title = 
     return () => document.removeEventListener("keydown", onKey);
   }, [step, onClose]);
 
-  // Le fond ne doit pas défiler sous la visionneuse.
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, []);
+  // Le fond ne doit pas défiler sous la visionneuse. Verrou COMPTÉ : ouverte
+  // depuis une modale qui verrouille déjà, chacune relâche le sien sans écraser
+  // celui de l'autre (sinon la page restait bloquée après fermeture des deux).
+  useScrollLock();
+  // Sur téléphone, « retour » referme l'image et rend la main à la modale.
+  useBackClose(onClose, "mediaLightbox");
 
   // Plein écran NATIF (bouton dédié) : sur mobile c'est le seul moyen de
   // récupérer la barre d'URL et la barre système. On suit l'état réel plutôt

@@ -36,6 +36,8 @@ import { makeCache } from "../lib/cache";
 import { useAuth } from "../context/AuthContext";
 import { useLibrary } from "../context/LibraryContext";
 import { useClickOutside } from "../hooks/useClickOutside";
+import { useScrollLock } from "../hooks/useScrollLock";
+import { useBackClose } from "../hooks/useBackClose";
 import GameAddFan from "../components/GameAddFan";
 import MediaLightbox from "../components/MediaLightbox";
 
@@ -368,15 +370,22 @@ function RelGameModal({ game, token, onClose }) {
     };
   }, [game.id, token]);
 
+  // Verrou de défilement partagé : la visionneuse plein écran pose le sien
+  // par-dessus, et se fermer en même temps qu'elle laissait la page bloquée.
+  useScrollLock();
+  // Sur téléphone, « retour » referme la modale au lieu de quitter la page.
+  useBackClose(onClose, "relGameModal");
+
+  // Échap ferme la modale — mais la visionneuse plein écran passe d'abord :
+  // tant qu'elle est ouverte, Échap lui revient, sinon un seul appui fermerait
+  // les deux d'un coup.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
-    document.body.style.overflow = "hidden";
-    const onKey = (e) => e.key === "Escape" && onClose();
+    const onKey = (e) => e.key === "Escape" && shotIdx === null && closeRef.current();
     document.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = "";
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [onClose]);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [shotIdx]);
 
   const isFuture = game.releaseDate && game.releaseDate * 1000 > Date.now();
   const inWish = entry?.status === "wishlist";

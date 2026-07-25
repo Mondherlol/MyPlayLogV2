@@ -123,7 +123,17 @@ export default function Messages() {
       const h = vv?.height || window.innerHeight;
       document.documentElement.style.setProperty("--chat-vh", `${h}px`);
       const overlap = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
-      document.body.classList.toggle("chat-kb", overlap > 120);
+      const kb = overlap > 120;
+      document.body.classList.toggle("chat-kb", kb);
+      // À l'ouverture du clavier, le navigateur fait défiler la PAGE pour
+      // ramener le champ à l'écran — puis notre hauteur rétrécit et ce
+      // défilement n'a plus lieu d'être (la page tient pile dans la zone
+      // visible), mais Safari ne le rembobine pas toujours : l'en-tête reste
+      // à moitié dehors. On le remet à zéro une fois la nouvelle hauteur
+      // appliquée.
+      if (kb && window.scrollY > 0) {
+        requestAnimationFrame(() => window.scrollTo(0, 0));
+      }
     };
     apply();
     vv?.addEventListener("resize", apply);
