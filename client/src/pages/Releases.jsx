@@ -27,6 +27,7 @@ import {
   Star,
   ArrowRight,
   ArrowUp,
+  ArrowDown,
   Languages,
   X,
 } from "lucide-react";
@@ -144,6 +145,12 @@ const MS_DAY = 86400000;
 // retrouvait avec le 23 juin collé au 10 juillet).
 const PAST_CHUNK = 7 * 86400;
 const PAST_MAX = 365 * 86400; // on ne remonte pas plus d'un an en arrière
+// Chargement du FUTUR au-delà du 1er lot : même plafond IGDB (500/req), donc
+// mêmes fenêtres de 7 jours. La 1re requête générale (today → +300 j) est elle
+// aussi coupée à 500 jeux, ce qui la fait s'arrêter à ~1 mois — d'où ce loader
+// « vers le bas » qui reprend là où elle s'est arrêtée.
+const FUTURE_CHUNK = 7 * 86400;
+const FUTURE_MAX = 2 * 365 * 86400; // on descend jusqu'à ~2 ans dans le futur
 
 // Un « gros jeu » : très attendu (hype IGDB) avant sa sortie, très noté après.
 const isBig = (g) => (g.hypes || 0) >= 10 || (g.ratingCount || 0) >= 50;
@@ -610,11 +617,15 @@ export default function Releases() {
   const { map } = useLibrary();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [games, setGames] = useState([]); // aujourd'hui → futur (cache 24 h)
+  const [games, setGames] = useState([]); // aujourd'hui → futur (cache 24 h, plafonné à 500)
   const [pastGames, setPastGames] = useState([]); // jours passés, chargés en remontant
   const [pastCursor, setPastCursor] = useState(todaySec); // borne basse déjà chargée
   const [pastLoading, setPastLoading] = useState(false);
   const [pastDone, setPastDone] = useState(false);
+  const [futureGames, setFutureGames] = useState([]); // jours à venir au-delà du 1er lot, chargés en descendant
+  const [futureCursor, setFutureCursor] = useState(null); // borne haute déjà chargée (sec) ; null tant que le 1er lot n'est pas prêt
+  const [futureLoading, setFutureLoading] = useState(false);
+  const [futureDone, setFutureDone] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [modalGame, setModalGame] = useState(null);
@@ -722,6 +733,48 @@ export default function Releases() {
     if (delta) window.scrollBy(0, delta);
   }, [pastGames]);
 
+  // --- Jours à venir au-delà du 1er lot : chargés par fenêtres de 7 jours en
+  // DESCENDANT le feed. Le 1er lot (requête générale) est plafonné à 500 jeux
+  // par IGDB, donc il s'arrête à ~1 mois ; on reprend là où il finit. Contrairement
+  // au passé, on insère EN DESSOUS de ce qu'on regarde : aucun décalage de scroll
+  // à compenser. ---
+  useEffect(() => {
+    if (loading || futureCursor != null) return;
+    if (!games.length) {
+      setFutureDone(true);
+      return;
+    }
+    // Dernière date couverte par le 1er lot. On reprend au DÉBUT de ce jour-là :
+    // le plafond de 500 a pu le couper en plein milieu, le ré-interroger en
+    // entier récupère les jeux manquants (dédupliqués par id dans `allGames`).
+    const maxTs = games.reduce((m, g) => Math.max(m, g.releaseDate || 0), 0);
+    if (!maxTs) {
+      setFutureDone(true);
+      return;
+    }
+    setFutureCursor(Math.floor(startOfDay(new Date(maxTs * 1000)).getTime() / 1000));
+  }, [loading, games, futureCursor]);
+
+  async function loadFuture() {
+    if (futureLoading || futureDone || futureCursor == null || !token) return;
+    setFutureLoading(true);
+    const from = futureCursor;
+    const to = futureCursor + FUTURE_CHUNK - 1;
+    try {
+      const d = await apiFetch(`/games/releases?from=${from}&to=${to}`, { token });
+      setFutureGames((prev) => [...prev, ...(d.games || [])]);
+      const next = to + 1;
+      setFutureCursor(next);
+      if (next >= todaySec() + FUTURE_MAX) setFutureDone(true);
+    } catch {
+      /* on retentera au prochain passage */
+    } finally {
+      setFutureLoading(false);
+    }
+  }
+  const loadFutureRef = useRef(loadFuture);
+  loadFutureRef.current = loadFuture;
+
   // --- Jour « au focus » : le jour traversé par la ligne de lecture (≈ 35 % du
   // viewport) reste net, les autres sont grisés — on voit d'un coup d'œil où on
   // en est dans la timeline.
@@ -757,17 +810,40 @@ export default function Releases() {
     return () => io.disconnect();
   }, [loading]);
 
+  // Sentinelle en bas du feed : s'en approcher charge les jours suivants.
+  const bottomRef = useRef(null);
+  const futureIoStateRef = useRef({});
+  futureIoStateRef.current = {
+    ready: !loading && futureCursor != null,
+    busy: futureLoading,
+    done: futureDone,
+  };
+  useEffect(() => {
+    const el = bottomRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0].isIntersecting) return;
+        const s = futureIoStateRef.current;
+        if (s.ready && !s.busy && !s.done) loadFutureRef.current();
+      },
+      { rootMargin: "0px 0px 300px 0px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [loading]);
+
   // --- Filtres + regroupement par jour (passé et futur mélangés, triés) ---
   const allGames = useMemo(() => {
     const seen = new Set();
     const out = [];
-    for (const g of [...pastGames, ...games]) {
+    for (const g of [...pastGames, ...games, ...futureGames]) {
       if (seen.has(g.id)) continue;
       seen.add(g.id);
       out.push(g);
     }
     return out;
-  }, [pastGames, games]);
+  }, [pastGames, games, futureGames]);
 
   const platformOpts = useMemo(() => {
     const set = new Set();
@@ -1059,6 +1135,26 @@ export default function Releases() {
           )}
           {/* Plus rien à venir : le repère ferme la timeline. */}
           {total > 0 && nowIndex === -1 && <NowMarker ref={nowRef} />}
+
+          {/* Bas du feed : les jours suivants se chargent en descendant */}
+          {futureDone ? (
+            <p className="rel-past-end font-fun">
+              Fin du calendrier — les sorties plus lointaines ne sont pas encore datées.
+            </p>
+          ) : (
+            <div className="rel-past-hint">
+              {futureLoading ? (
+                <>
+                  <Loader2 size={15} className="spin" /> Chargement des sorties suivantes…
+                </>
+              ) : (
+                <>
+                  <ArrowDown size={14} /> Descends pour voir plus de sorties
+                </>
+              )}
+            </div>
+          )}
+          <div ref={bottomRef} className="rel-past-top" aria-hidden="true" />
         </div>
       )}
 
