@@ -13,9 +13,6 @@
    d'accent est un cyan de signal — instruments, coordonnées, relevé — à
    l'opposé de l'or du reste du site, qui n'a rien à faire ici.
    ====================================================================== */
-.app-content {
-  padding: 0px;
-}
 
 .geo {
   /* Fonds et verres */
@@ -1438,6 +1435,7 @@ body.geo-immersive .app-shell {
 }
 
 @media (max-width: 760px) {
+
   /* Sur téléphone, 46vw serait illisible : le dock reprend toute la largeur en
      bas de l'écran (le haut reste au panorama pour se repérer). */
   .geo-map-dock {
