@@ -15,18 +15,37 @@ export default function ChatLightbox({ url, onClose }) {
   // Repères du geste en cours (pincement ou glissement).
   const gesture = useRef(null);
   const lastTap = useRef(0);
+  // `onClose` est recréé à chaque rendu du parent (ChatThread se re-rend souvent
+  // : « écrit… », nouveaux messages, SSE). On le lit via une ref pour que l'effet
+  // ci-dessous ne tourne qu'au montage — sinon on empilerait une entrée
+  // d'historique à chaque rendu.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   const reset = useCallback(() => setT({ scale: 1, x: 0, y: 0 }), []);
 
   useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && onClose();
+    const close = () => onCloseRef.current();
+    // Sur mobile, le bouton « retour » doit fermer l'image, pas quitter la
+    // conversation : on empile une entrée d'historique à l'ouverture, et un
+    // « retour » la dépile (popstate) → on ferme la visionneuse au lieu de
+    // naviguer. L'URL ne change pas (pushState sans 3ᵉ argument).
+    window.history.pushState({ chatLightbox: true }, "");
+    const onPop = () => close();
+    const onKey = (e) => e.key === "Escape" && close();
+    window.addEventListener("popstate", onPop);
     window.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
     return () => {
+      window.removeEventListener("popstate", onPop);
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
+      // Fermeture par la croix / le fond / Échap (donc PAS par le bouton retour,
+      // qui a déjà dépilé notre entrée) : on retire l'entrée qu'on a empilée
+      // pour ne pas laisser un « retour » fantôme à consommer derrière soi.
+      if (window.history.state?.chatLightbox) window.history.back();
     };
-  }, [onClose]);
+  }, []);
 
   // Empêche le déplacement de sortir complètement l'image de l'écran.
   const clamp = useCallback((next) => {
