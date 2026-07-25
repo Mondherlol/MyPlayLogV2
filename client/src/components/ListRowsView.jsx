@@ -181,7 +181,7 @@ function GameRow({ item, rank, detail, onNeedDetail, onShots, onTrailer }) {
   const cover = item.image || d?.cover;
 
   return (
-    <article className="lr-row" ref={rowRef}>
+    <article className={`lr-row ${rank != null ? "is-ranked" : ""}`} ref={rowRef}>
       {rank != null && <span className="lr-rank">{rank}</span>}
 
       <div className="lr-cover">

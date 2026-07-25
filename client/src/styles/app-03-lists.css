@@ -2274,10 +2274,15 @@
   gap: 0.75rem;
 }
 
+/* Zones NOMMÉES, et non des colonnes positionnelles : le rang n'existe que sur
+   une liste classée, et sans lui tout se décalait d'un cran — la jaquette
+   héritait de la colonne `auto` (donc sa largeur naturelle, énorme) et le texte
+   des 104 px prévus pour le rang. */
 .lr-row {
   position: relative;
   display: grid;
-  grid-template-columns: auto 104px minmax(0, 1fr) auto;
+  grid-template-columns: 132px minmax(0, 1fr) auto;
+  grid-template-areas: "cover main shots";
   align-items: start;
   gap: 1rem;
   padding: 0.9rem;
@@ -2293,7 +2298,13 @@
   box-shadow: var(--shadow);
 }
 
+.lr-row.is-ranked {
+  grid-template-columns: auto 132px minmax(0, 1fr) auto;
+  grid-template-areas: "rank cover main shots";
+}
+
 .lr-rank {
+  grid-area: rank;
   align-self: center;
   min-width: 1.6rem;
   font-family: var(--font-display);
@@ -2304,6 +2315,7 @@
 }
 
 .lr-cover {
+  grid-area: cover;
   position: relative;
   aspect-ratio: 3 / 4;
   border-radius: 11px;
@@ -2334,6 +2346,7 @@
 }
 
 .lr-main {
+  grid-area: main;
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
@@ -2507,9 +2520,10 @@
 
 /* Bande de captures à droite de la ligne */
 .lr-shots {
+  grid-area: shots;
   display: grid;
-  grid-template-columns: repeat(2, 116px);
-  gap: 0.35rem;
+  grid-template-columns: repeat(2, 150px);
+  gap: 0.4rem;
   align-self: center;
 }
 
@@ -2613,37 +2627,55 @@
   display: block;
 }
 
-/* --- Tablette : les captures passent sous le texte --- */
+/* --- Tablette : les captures passent sous le texte, pleine largeur --- */
 @media (max-width: 1080px) {
   .lr-row {
-    grid-template-columns: auto 92px minmax(0, 1fr);
+    grid-template-columns: 116px minmax(0, 1fr);
+    grid-template-areas:
+      "cover main"
+      "shots shots";
+  }
+
+  .lr-row.is-ranked {
+    grid-template-columns: auto 116px minmax(0, 1fr);
+    grid-template-areas:
+      "rank cover main"
+      "shots shots shots";
   }
 
   .lr-shots {
-    grid-column: 2 / -1;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     align-self: stretch;
   }
 }
 
-/* --- Téléphone : jaquette + texte côte à côte, le reste dessous --- */
+/* --- Téléphone : jaquette + texte côte à côte, captures dessous --- */
 @media (max-width: 620px) {
   .lr-row {
-    grid-template-columns: 74px minmax(0, 1fr);
+    grid-template-columns: 84px minmax(0, 1fr);
+    grid-template-areas:
+      "cover main"
+      "shots shots";
     gap: 0.7rem;
     padding: 0.7rem;
     border-radius: 14px;
   }
 
+  .lr-row.is-ranked {
+    grid-template-columns: 84px minmax(0, 1fr);
+    grid-template-areas:
+      "rank rank"
+      "cover main"
+      "shots shots";
+  }
+
   .lr-rank {
-    grid-column: 1 / -1;
     justify-self: start;
     min-width: 0;
     font-size: 1rem;
   }
 
   .lr-shots {
-    grid-column: 1 / -1;
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 

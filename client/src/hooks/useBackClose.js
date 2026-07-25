@@ -21,14 +21,28 @@ export function useBackClose(onClose, key = "modal") {
   closeRef.current = onClose;
 
   useEffect(() => {
-    window.history.pushState({ [key]: true }, "");
+    // L'entrée est empilée au tick SUIVANT, et non tout de suite. React en
+    // mode strict (développement) monte, démonte puis remonte chaque composant
+    // dans la foulée : en empilant sur-le-champ, le nettoyage du premier
+    // montage déclenchait un `history.back()` — asynchrone — qui atterrissait
+    // APRÈS l'empilement du second, sur une entrée sans notre clé. Le nouvel
+    // écouteur y voyait un vrai « retour » et refermait la modale à peine
+    // ouverte. Différer l'empilement fait que ce cycle s'annule proprement :
+    // le minuteur est annulé avant d'avoir rien empilé, donc rien à dépiler.
+    let pushed = false;
+    const timer = setTimeout(() => {
+      window.history.pushState({ [key]: true }, "");
+      pushed = true;
+    }, 0);
+
     const onPop = () => {
       if (!window.history.state?.[key]) closeRef.current();
     };
     window.addEventListener("popstate", onPop);
     return () => {
+      clearTimeout(timer);
       window.removeEventListener("popstate", onPop);
-      if (window.history.state?.[key]) window.history.back();
+      if (pushed && window.history.state?.[key]) window.history.back();
     };
   }, [key]);
 }
