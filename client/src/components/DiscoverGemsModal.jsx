@@ -30,7 +30,7 @@ import { loadPopularGames } from "../lib/popularGames";
 import { useLibrary } from "../context/LibraryContext";
 import { usePlayer } from "../context/PlayerContext";
 import PlayedModal from "./PlayedModal";
-import TrailerPlayer from "./TrailerPlayer";
+import YouTubePlayer from "./YouTubePlayer";
 
 const MAX_SEEDS = 3;
 // Même cache que GamePage : une pépite ouverte ensuite en fiche est instantanée.
@@ -889,7 +889,7 @@ function GemAside({ full }) {
     <aside className="dg-aside">
       {vid ? (
         <div className="dg-aside-video">
-          <TrailerPlayer key={vid} videoId={vid} />
+          <YouTubePlayer key={vid} videoId={vid} title="Bande-annonce" />
         </div>
       ) : full ? (
         images.length === 0 && (

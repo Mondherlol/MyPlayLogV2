@@ -62,8 +62,12 @@ import GameFeed from "../components/GameFeed";
 import GameRelated from "../components/GameRelated";
 import GameDownloads from "../components/GameDownloads";
 import FreeGameBanner from "../components/FreeGameBanner";
+import YouTubePlayer from "../components/YouTubePlayer";
 import { useTabSwipe } from "../hooks/useTabSwipe";
 import useFollowingRail from "../hooks/useFollowingRail";
+import { useImageZoom } from "../hooks/useImageZoom";
+import { useScrollLock } from "../hooks/useScrollLock";
+import { useBackClose } from "../hooks/useBackClose";
 
 const FRIEND_GROUPS = [
   { key: "played", label: "Y ont joué", match: (s) => s !== "wishlist" },
@@ -1925,13 +1929,9 @@ function VideoGallery({ videos }) {
   return (
     <div className={`gp-videos ${solo ? "solo" : ""}`}>
       <div className="gp-video-main">
-        <iframe
-          key={active}
-          src={`https://www.youtube.com/embed/${active}`}
-          title="Bande-annonce"
-          allow="autoplay; encrypted-media; fullscreen"
-          allowFullScreen
-        />
+        {/* Notre lecteur plutôt que l'iframe nue : volume, ±10 s aux flèches ou
+            en double-tapant une moitié, et pas d'habillage YouTube. */}
+        <YouTubePlayer key={active} videoId={active} title="Bande-annonce" />
       </div>
       {videos.length > 1 && (
         <div className="gp-video-list">
@@ -1982,9 +1982,16 @@ function ImageViewer({
   const list =
     filter === "all" ? images : images.filter((m) => m.type === filter);
 
+  // Pincement au doigt / molette au PC, comme dans la visionneuse du chat.
+  const zoom = useImageZoom();
+  const { reset: resetZoom } = zoom;
+
   useEffect(() => {
     setDone("");
-  }, [index]);
+    // Changer d'image repart à l'échelle 1 : arriver sur la suivante déjà
+    // agrandie n'a aucun sens.
+    resetZoom();
+  }, [index, resetZoom]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -1996,12 +2003,9 @@ function ImageViewer({
     return () => window.removeEventListener("keydown", onKey);
   }, [list.length, onClose]);
 
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, []);
+  useScrollLock();
+  // Sur mobile, « retour » referme la visionneuse au lieu de quitter la fiche.
+  useBackClose(onClose, "gpImageViewer");
 
   // Drag-to-scroll (souris) sur la rangée de miniatures, comme la liste d'images.
   useEffect(() => {
@@ -2066,7 +2070,8 @@ function ImageViewer({
 
   // --- Glisser pour naviguer (pointer events : tactile + souris) ---
   function onStageDown(e) {
-    if (list.length < 2 || e.target.closest("button")) return;
+    // Zoomé, le glissement déplace l'image : on ne change pas de capture.
+    if (list.length < 2 || zoom.zoomed || e.target.closest("button")) return;
     cdrag.current = {
       x: e.clientX,
       y: e.clientY,
@@ -2142,7 +2147,8 @@ function ImageViewer({
   }
 
   return createPortal(
-    <div className="gp-viewer" onClick={onClose}>
+    // Zoomé, un clic sert à déplacer l'image : il ne doit pas tout refermer.
+    <div className="gp-viewer" onClick={() => !zoom.zoomed && onClose()}>
       <button
         className="gp-viewer-dl clickable"
         onClick={() => downloadImage(cur.full, `${cur.type || "image"}-${safeIndex + 1}`)}
@@ -2177,7 +2183,13 @@ function ImageViewer({
           onPointerMove={onStageMove}
           onPointerUp={onStageUp}
           onPointerCancel={onStageUp}
+          {...zoom.surfaceProps}
         >
+          {zoom.zoomed && (
+            <span className="gp-viewer-zoom">
+              {Math.round(zoom.scale * 100)} % · double-clic pour réinitialiser
+            </span>
+          )}
           {list.length > 1 && (
             <button
               className="gp-viewer-nav left clickable"
@@ -2197,7 +2209,14 @@ function ImageViewer({
               }}
             >
               {list.map((m, i) => (
-                <div className="gp-viewer-slide" key={m.id}>
+                <div
+                  className="gp-viewer-slide"
+                  key={m.id}
+                  // Le zoom ne s'applique qu'à l'image regardée.
+                  ref={i === safeIndex ? zoom.stageRef : undefined}
+                  style={i === safeIndex ? zoom.style : undefined}
+                  {...(i === safeIndex ? zoom.stageProps : {})}
+                >
                   <img
                     className="gp-viewer-img"
                     src={m.full}

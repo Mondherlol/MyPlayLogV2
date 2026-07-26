@@ -31,7 +31,12 @@ const STATUS_META = {
 
 // Bouton radial « + » d'ajout rapide (repris de GameCard), réutilisable sur les
 // vignettes. `hoverOnly` : le « + » n'apparaît qu'au survol de la vignette.
-export default function GameAddFan({ game, hoverOnly = false }) {
+//
+// `variant="row"` : les trois actions à plat, libellées, au lieu de l'éventail
+// derrière un « + ». Sur une vignette le « + » économise la place ; dans une
+// liste détaillée on a la largeur, et deviner ce que cache un « + » est une
+// friction inutile.
+export default function GameAddFan({ game, hoverOnly = false, variant = "fan" }) {
   const { token } = useAuth();
   const { map, upsertLocal, removeLocal } = useLibrary();
   const entry = map[game.id];
@@ -70,6 +75,51 @@ export default function GameAddFan({ game, hoverOnly = false }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (variant === "row") {
+    return (
+      <>
+        <div className="add-row" onClick={(e) => e.stopPropagation()}>
+          <button
+            className={`add-row-btn ${isWishlist ? "active" : ""}`}
+            onClick={toggleWishlist}
+            disabled={busy}
+            title={isWishlist ? "Retirer de ma wishlist" : "Je veux y jouer"}
+          >
+            <Bookmark size={15} fill={isWishlist ? "currentColor" : "none"} />
+            <span>{isWishlist ? "Dans ma wishlist" : "Je le veux"}</span>
+          </button>
+          <button
+            className={`add-row-btn ${isPlayed ? "active" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowModal(true);
+            }}
+            title="J'y ai joué"
+          >
+            {statusMeta && isPlayed ? <statusMeta.Icon size={15} /> : <Gamepad size={15} />}
+            <span>{isPlayed ? statusMeta?.label || "Joué" : "J'y ai joué"}</span>
+          </button>
+          <button
+            className="add-row-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowListModal(true);
+            }}
+            title="Ajouter à une liste"
+          >
+            <ListPlus size={15} />
+            <span>Ajouter à une liste</span>
+          </button>
+        </div>
+
+        {showModal && <PlayedModal game={game} onClose={() => setShowModal(false)} />}
+        {showListModal && (
+          <AddToListModal game={game} onClose={() => setShowListModal(false)} />
+        )}
+      </>
+    );
   }
 
   return (

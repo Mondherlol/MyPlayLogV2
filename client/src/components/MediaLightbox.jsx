@@ -11,6 +11,7 @@ import {
 import { downloadImage } from "../lib/download";
 import { useScrollLock } from "../hooks/useScrollLock";
 import { useBackClose } from "../hooks/useBackClose";
+import { useImageZoom } from "../hooks/useImageZoom";
 
 // ======================================================================
 //  Visionneuse d'images plein écran — swipe, flèches, clavier, vignettes
@@ -39,9 +40,17 @@ export default function MediaLightbox({ items, index, onIndex, onClose, title = 
   const [isFull, setIsFull] = useState(false);
   const drag = useRef(null);
 
+  // Pincement au doigt / molette au PC. Le zoom retombe à 1 dès qu'on change
+  // d'image : arriver sur la suivante déjà agrandie n'a aucun sens.
+  const zoom = useImageZoom();
+  const { reset: resetZoom } = zoom;
+
   const step = useCallback(
-    (dir) => onIndex(Math.min(list.length - 1, Math.max(0, safe + dir))),
-    [onIndex, safe, list.length]
+    (dir) => {
+      resetZoom();
+      onIndex(Math.min(list.length - 1, Math.max(0, safe + dir)));
+    },
+    [onIndex, safe, list.length, resetZoom]
   );
 
   // Clavier : flèches pour naviguer, Échap pour fermer (le navigateur gère déjà
@@ -89,8 +98,10 @@ export default function MediaLightbox({ items, index, onIndex, onClose, title = 
   }, [safe]);
 
   // --- Glissé (souris ET tactile via les événements pointeur) ---
+  // Zoomé, le glissement sert à se déplacer DANS l'image : on rend la main au
+  // zoom plutôt que de changer de capture sous les doigts.
   function onDown(e) {
-    if (list.length < 2 || e.button > 0) return;
+    if (list.length < 2 || e.button > 0 || zoom.zoomed) return;
     drag.current = {
       x: e.clientX,
       y: e.clientY,
@@ -136,7 +147,8 @@ export default function MediaLightbox({ items, index, onIndex, onClose, title = 
       aria-modal="true"
       aria-label={title || "Image en grand"}
       // Clic dans le vide = fermer ; un clic sur l'image ou les commandes non.
-      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+      onMouseDown={(e) => e.target === e.currentTarget && !zoom.zoomed && onClose()}
+      {...zoom.surfaceProps}
     >
       <div className="mlb-top">
         {title && <span className="mlb-title">{title}</span>}
@@ -193,7 +205,14 @@ export default function MediaLightbox({ items, index, onIndex, onClose, title = 
             style={{ transform: `translateX(calc(${-safe * 100}% + ${dragDx}px))` }}
           >
             {list.map((m, i) => (
-              <div className="mlb-slide" key={m.id ?? i}>
+              <div
+                className="mlb-slide"
+                key={m.id ?? i}
+                // Le zoom ne s'applique qu'à l'image regardée.
+                ref={i === safe ? zoom.stageRef : undefined}
+                style={i === safe ? zoom.style : undefined}
+                {...(i === safe ? zoom.stageProps : {})}
+              >
                 {/* Seules l'image courante et ses voisines sont chargées : une
                     galerie de 10 captures en pleine résolution, c'est lourd. */}
                 {Math.abs(i - safe) <= 1 ? (
@@ -222,6 +241,12 @@ export default function MediaLightbox({ items, index, onIndex, onClose, title = 
             <ChevronRight size={26} />
           </button>
         )}
+
+        {zoom.zoomed && (
+          <span className="mlb-zoom-hint">
+            {Math.round(zoom.scale * 100)} % · double-clic pour réinitialiser
+          </span>
+        )}
       </div>
 
       {list.length > 1 && (
@@ -231,7 +256,10 @@ export default function MediaLightbox({ items, index, onIndex, onClose, title = 
               key={m.id ?? i}
               data-i={i}
               className={`mlb-thumb clickable ${i === safe ? "on" : ""}`}
-              onClick={() => onIndex(i)}
+              onClick={() => {
+                zoom.reset();
+                onIndex(i);
+              }}
               aria-label={`Image ${i + 1}`}
               aria-current={i === safe}
             >

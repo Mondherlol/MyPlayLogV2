@@ -2698,3 +2698,66 @@
     pointer-events: auto;
   }
 }
+
+/* Trois actions à plat (wishlist / joué / ajouter à une liste), variante
+   « row » de GameAddFan : sur une ligne de liste on a la largeur, inutile de
+   les cacher derrière un « + » qu'il faut deviner. */
+.add-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.add-row-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: var(--cursor-pointer), pointer;
+  transition: border-color 0.14s ease, color 0.14s ease, background 0.14s ease;
+}
+
+.add-row-btn:hover:not(:disabled) {
+  border-color: var(--orange);
+  color: var(--accent-ink);
+}
+
+.add-row-btn.active {
+  border-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 15%, transparent);
+  color: var(--accent-ink);
+}
+
+.add-row-btn:disabled {
+  opacity: 0.55;
+}
+
+/* Indicateur de zoom des visionneuses (fiche de jeu et listes). */
+.mlb-zoom-hint,
+.gp-viewer-zoom {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 0.76rem;
+  font-weight: 600;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Le cadre transformé par le zoom ne doit pas déborder de la scène. */
+.mlb-slide,
+.gp-viewer-slide {
+  transform-origin: center center;
+}

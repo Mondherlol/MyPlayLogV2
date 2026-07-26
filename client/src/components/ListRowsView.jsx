@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 import {
   Clock,
   Gamepad2,
-  Images,
   Languages,
   Loader2,
   Play,
@@ -17,6 +16,7 @@ import { useBackClose } from "../hooks/useBackClose";
 import GameAddFan from "./GameAddFan";
 import AnnotationBubble from "./AnnotationBubble";
 import MediaLightbox from "./MediaLightbox";
+import YouTubePlayer from "./YouTubePlayer";
 
 // ======================================================================
 //  Vue « liste » d'une liste de jeux — une ligne par jeu, avec les détails
@@ -135,12 +135,7 @@ function TrailerModal({ trailer, gameName, onClose }) {
           </button>
         </div>
         <div className="lr-trailer-frame">
-          <iframe
-            src={`https://www.youtube-nocookie.com/embed/${trailer.videoId}?autoplay=1`}
-            title={trailer.name}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-          />
+          <YouTubePlayer videoId={trailer.videoId} title={trailer.name} />
         </div>
       </div>
     </div>,
@@ -194,7 +189,6 @@ function GameRow({ item, rank, detail, onNeedDetail, onShots, onTrailer }) {
             </span>
           )}
         </Link>
-        <GameAddFan game={{ id: gameId, name: item.name, cover }} hoverOnly />
       </div>
 
       <div className="lr-main">
@@ -268,28 +262,23 @@ function GameRow({ item, rank, detail, onNeedDetail, onShots, onTrailer }) {
           </div>
         )}
 
-        {(d?.trailer || d?.screenshots?.length > 0) && (
-          <div className="lr-actions">
-            {d.trailer && (
-              <button
-                type="button"
-                className="lr-act clickable"
-                onClick={() => onTrailer({ trailer: d.trailer, gameName: item.name })}
-              >
-                <Play size={14} fill="currentColor" strokeWidth={0} /> Bande-annonce
-              </button>
-            )}
-            {d.screenshots?.length > 0 && (
-              <button
-                type="button"
-                className="lr-act clickable"
-                onClick={() => onShots({ items: d.screenshots, index: 0, title: item.name })}
-              >
-                <Images size={14} /> {d.screenshots.length} captures
-              </button>
-            )}
-          </div>
-        )}
+        {/* Wishlist / joué / ajouter à une liste, en clair : sur une ligne on a
+            la largeur, inutile de les cacher derrière un « + ». */}
+        <div className="lr-actions">
+          {d?.trailer && (
+            <button
+              type="button"
+              className="lr-act clickable"
+              onClick={() => onTrailer({ trailer: d.trailer, gameName: item.name })}
+            >
+              <Play size={14} fill="currentColor" strokeWidth={0} /> Bande-annonce
+            </button>
+          )}
+          <GameAddFan
+            game={{ id: gameId, name: item.name, cover }}
+            variant="row"
+          />
+        </div>
       </div>
 
       {/* Bande de captures : le coup d'œil qui donne envie, cliquable en grand. */}
