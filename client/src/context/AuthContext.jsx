@@ -17,6 +17,11 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(readStoredToken);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(!!token);
+  // Les sections allumées ou éteintes depuis le panneau d'admin. Elles arrivent
+  // avec le bootstrap (/auth/me) pour que la barre latérale sache dès le
+  // premier rendu ce qu'elle affiche — un lien qui apparaît puis disparaît est
+  // pire que pas de lien du tout.
+  const [features, setFeatures] = useState({});
 
   // Au chargement, si on a un token, on récupère l'utilisateur.
   useEffect(() => {
@@ -25,7 +30,10 @@ export function AuthProvider({ children }) {
       return;
     }
     apiFetch("/auth/me", { token })
-      .then((data) => setUser(data.user))
+      .then((data) => {
+        setUser(data.user);
+        setFeatures(data.features || {});
+      })
       .catch(() => logout())
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -106,12 +114,28 @@ export function AuthProvider({ children }) {
     setUser((prev) => (prev ? { ...prev, ...patch } : prev));
   }
 
+  // Une section vient d'être allumée ou éteinte depuis le panneau d'admin : la
+  // barre latérale doit suivre sans rechargement.
+  function updateFeatures(next) {
+    setFeatures((prev) => ({ ...prev, ...next }));
+  }
+
+  // Une section est visible si elle est allumée — ou si l'on est admin, car
+  // c'est lui qui la prépare pendant qu'elle est éteinte. Même règle que côté
+  // serveur (lib/features.js), et il ne doit jamais y en avoir deux.
+  function hasFeature(name) {
+    return !!features[name] || !!user?.isAdmin;
+  }
+
   return (
     <AuthContext.Provider
       value={{
         user,
         token,
         loading,
+        features,
+        hasFeature,
+        updateFeatures,
         login,
         register,
         resetPassword,

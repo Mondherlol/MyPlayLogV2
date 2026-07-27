@@ -29,6 +29,7 @@ import { apiFetch, apiUpload } from "../lib/api";
 import { makeCache } from "../lib/cache";
 import { useAuth } from "../context/AuthContext";
 import { useLibrary } from "../context/LibraryContext";
+import { useBackClose } from "../hooks/useBackClose";
 import ScrollRow from "./ScrollRow";
 import CharacterPicker from "./CharacterPicker";
 import OstPicker from "./OstPicker";
@@ -267,20 +268,26 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
     };
   }, [game.id, token, openReview]);
 
+  // Échap et le bouton « retour » du téléphone font la même chose : refermer la
+  // couche du dessus (confirmation, review, puis la modale elle-même). Sans ça,
+  // « retour » quittait la page en laissant la saisie en cours.
+  const closeTopLayer = () => {
+    if (confirmClose) setConfirmClose(false);
+    else if (showReview) setShowReview(false);
+    else attemptClose();
+  };
+
   useEffect(() => {
     document.body.style.overflow = "hidden";
-    const onKey = (e) => {
-      if (e.key !== "Escape") return;
-      if (confirmClose) setConfirmClose(false);
-      else if (showReview) setShowReview(false);
-      else attemptClose();
-    };
+    const onKey = (e) => e.key === "Escape" && closeTopLayer();
     document.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = "";
       document.removeEventListener("keydown", onKey);
     };
-  }, [onClose, showReview, confirmClose]);
+  }, [onClose, showReview, confirmClose]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useBackClose(closeTopLayer, "playedModal");
 
   // Reflet « live » de tous les champs éditables, pour un contrôle fiable du non
   // enregistré même depuis un handler capturé par un effet (touche Échap).

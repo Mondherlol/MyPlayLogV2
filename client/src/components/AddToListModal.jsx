@@ -4,6 +4,7 @@ import { X, Plus, Check, Loader2, ListPlus } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { typeMeta } from "../lib/lists";
+import { useBackClose } from "../hooks/useBackClose";
 import CreateListModal from "./CreateListModal";
 
 // Modale « Ajouter à une liste » (quick-add depuis l'Explorer / une card).
@@ -23,6 +24,9 @@ export default function AddToListModal({ game, onClose }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  // Sur mobile, « retour » referme la modale au lieu de quitter la page.
+  useBackClose(onClose, "addToList");
 
   useEffect(() => {
     let alive = true;

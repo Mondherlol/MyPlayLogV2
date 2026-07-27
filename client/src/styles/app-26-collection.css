@@ -1,0 +1,3110 @@
+/* ======================================================================
+   Collection — l'étagère de médias (séries, films, animés)
+   ======================================================================
+   PARTI PRIS : la page reste une page de l'app (fond du thème, accent doré,
+   typo maison) — c'est un rayon de vidéoclub POSÉ dans MyPlayLog, pas un
+   univers parallèle. Ce qui bascule dans le sombre, ce sont les deux scènes
+   où l'on entre vraiment : l'étagère 3D (une pièce éclairée à la lampe) et le
+   poste cathodique (plein écran, lumières éteintes).
+
+   Le vocabulaire d'objet est constant : plastique sombre pour la coque,
+   papier crème pour les étiquettes, et la teinte propre de chaque titre
+   (--tint, servie par l'API) pour les liserés. Un boîtier n'est jamais
+   « une carte avec une image » : il a une tranche, une étiquette, un
+   film plastique, et la cassette qui glisse dehors quand on le survole.
+   ====================================================================== */
+
+.coll-page,
+.coll-detail {
+  --coll-plastic: #191a20;
+  --coll-plastic-2: #2a2c35;
+  --coll-paper: #f2ecdd;
+  --coll-paper-ink: #26251f;
+  --coll-tint: var(--orange);
+  --coll-room: #0b0a10;
+}
+
+/* ======================================================================
+   1. En-tête
+   ====================================================================== */
+
+.coll-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.coll-head-main {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.coll-head-icon {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  color: #1a1204;
+  background: var(--accent-grad);
+  box-shadow: 0 8px 22px rgba(242, 183, 11, 0.32);
+}
+
+/* Surtitre : la petite étiquette de rayon, façon casier de vidéoclub. */
+.coll-head-over {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  margin-bottom: 0.28rem;
+}
+
+.coll-head-over::after {
+  content: "";
+  width: 26px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--accent-grad);
+}
+
+.coll-head-title {
+  font-size: clamp(1.7rem, 4.4vw, 2.35rem);
+}
+
+.coll-head-sub {
+  margin: 0.3rem 0 0;
+  font-size: 0.88rem;
+  color: var(--text-soft);
+  max-width: 46ch;
+}
+
+.coll-head-stats {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.coll-head-stats span {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.34rem 0.7rem;
+}
+
+.coll-head-stats strong {
+  color: var(--text);
+  font-family: var(--font-display);
+}
+
+.coll-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+}
+
+.coll-section-title svg {
+  color: var(--accent-ink);
+}
+
+.coll-section-title em {
+  font-style: normal;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  margin-left: 0.2rem;
+}
+
+/* ======================================================================
+   2. Rangée « Reprendre »
+   ====================================================================== */
+
+/* Placée sous la collection : un filet la sépare du rayon. */
+.coll-resume {
+  margin-top: 2rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--border);
+}
+
+.coll-resume-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0.85rem;
+}
+
+.coll-resume-card {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 7;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--coll-plastic);
+  border: 1px solid var(--border);
+  transition: transform 0.16s ease, box-shadow 0.2s ease;
+}
+
+.coll-resume-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.26);
+}
+
+.coll-resume-card img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(1.05);
+}
+
+.coll-resume-grad {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    rgba(8, 8, 12, 0.9) 8%,
+    rgba(8, 8, 12, 0.35) 62%,
+    rgba(8, 8, 12, 0.08)
+  );
+}
+
+.coll-resume-play {
+  position: absolute;
+  top: 50%;
+  right: 0.9rem;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #10100c;
+  background: var(--tint, var(--orange));
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.coll-resume-info {
+  position: absolute;
+  left: 0.9rem;
+  bottom: 0.85rem;
+  right: 3.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  color: #fff;
+}
+
+.coll-resume-info strong {
+  font-family: var(--font-display);
+  font-size: 0.94rem;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-resume-info em {
+  font-style: normal;
+  font-size: 0.74rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.coll-resume-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.coll-resume-bar i {
+  display: block;
+  height: 100%;
+  background: var(--tint, var(--orange));
+}
+
+/* ======================================================================
+   3. Barre d'outils
+   ====================================================================== */
+
+.coll-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.1rem;
+}
+
+.coll-chips,
+.coll-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.coll-chip {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.42rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.coll-chip:hover {
+  border-color: var(--orange);
+  color: var(--text);
+}
+
+.coll-chip.active {
+  background: var(--accent-grad);
+  border-color: transparent;
+  color: #1a1204;
+}
+
+/* Les pastilles de FORMAT gardent la typo mécanique d'une étiquette. */
+.coll-chip.fmt {
+  font-family: var(--font-body);
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+}
+
+.coll-chips-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border-strong);
+  margin: 0 0.25rem;
+}
+
+.coll-search {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.42rem 0.7rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.coll-search:focus-within {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 4px var(--ring);
+}
+
+.coll-search svg {
+  color: var(--text-soft);
+  flex: 0 0 auto;
+}
+
+.coll-search input {
+  border: none;
+  background: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.86rem;
+  width: 190px;
+  max-width: 42vw;
+}
+
+.coll-search button {
+  border: none;
+  background: none;
+  color: var(--text-soft);
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.coll-views {
+  display: flex;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.coll-views button {
+  display: flex;
+  align-items: center;
+  gap: 0.34rem;
+  border: none;
+  background: none;
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.44rem 0.8rem;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.coll-views button.active {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* ======================================================================
+   4. États
+   ====================================================================== */
+
+.coll-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 300px;
+  color: var(--text-soft);
+  text-align: center;
+}
+
+.coll-state svg {
+  color: var(--accent-ink);
+}
+
+/* L'icône dans sa pastille : le même objet que l'en-tête, en creux — un état
+   vide reste une page de l'app, pas un message d'erreur brut. */
+.coll-state-icon {
+  width: 54px;
+  height: 54px;
+  margin-bottom: 0.35rem;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.coll-state strong {
+  font-family: var(--font-display);
+  font-size: 1.06rem;
+  color: var(--text);
+}
+
+.coll-state p {
+  margin: 0;
+  font-size: 0.86rem;
+  max-width: 42ch;
+}
+
+.coll-state .btn {
+  margin-top: 0.6rem;
+}
+
+.coll-spin {
+  animation: coll-spin 1s linear infinite;
+}
+
+@keyframes coll-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ======================================================================
+   4 bis. Squelettes de chargement
+   ======================================================================
+   L'attente a la FORME de ce qui arrive : une rangée de tranches debout sur
+   sa planche, ou une grille de boîtiers fermés. Même gabarit, mêmes
+   proportions, même place dans la page que le contenu réel — quand il arrive,
+   rien ne saute.
+
+   L'animation `shimmer` est celle de tout le site (app-02-content.css) : les
+   squelettes de la collection ne doivent pas scintiller autrement que les
+   autres.
+   ====================================================================== */
+
+.coll-shelf-skel {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  /* Le vide sous la planche, calé sur le cadrage de la scène 3D. En pixels et
+     non en % : un padding en pourcentage se mesure sur la LARGEUR. */
+  padding-bottom: clamp(28px, 6vh, 54px);
+}
+
+.coll-shelf-skel-row {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+  /* La part de hauteur que remplit la rangée : FILL, côté composant. */
+  height: 74%;
+  /* Les boîtiers se rangent en montant de derrière la planche : le débord se
+     coupe à son arête. */
+  overflow: hidden;
+}
+
+/* Une tranche de boîtier : capuchon sombre du support, fenêtre d'affiche,
+   corps, étiquette de pied — la partition exacte de paintSpine(). */
+.coll-skel-spine {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  width: clamp(22px, 3.2vw, 40px);
+  height: var(--h, 100%);
+  border-radius: 2px 3px 3px 2px;
+  overflow: hidden;
+  background: var(--surface-2);
+  box-shadow: 0 2px 4px rgba(10, 10, 20, 0.2), 0 10px 20px rgba(10, 10, 20, 0.14),
+    0 0 0 1px rgba(10, 10, 20, 0.08);
+  transform-origin: bottom center;
+  animation: coll-skel-stand 0.5s cubic-bezier(0.2, 0.9, 0.25, 1) var(--d, 0ms)
+    backwards;
+}
+
+/* Les boîtiers se rangent un à un, de gauche à droite. */
+@keyframes coll-skel-stand {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scaleY(0.92);
+  }
+}
+
+.coll-skel-spine i {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.coll-skel-cap {
+  height: 7%;
+  background: color-mix(in srgb, var(--text) 55%, transparent);
+}
+
+.coll-skel-art {
+  height: 26%;
+  background: linear-gradient(
+    100deg,
+    var(--surface-2) 30%,
+    var(--border-strong) 50%,
+    var(--surface-2) 70%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.3s infinite linear;
+}
+
+/* Sélecteur descendant : `.coll-skel-spine i` fige les autres bandes, seul le
+   corps prend la place qui reste. */
+.coll-skel-spine .coll-skel-body {
+  flex: 1 1 auto;
+  background: linear-gradient(
+    100deg,
+    var(--surface-2) 30%,
+    var(--border) 50%,
+    var(--surface-2) 70%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.3s infinite linear;
+}
+
+.coll-skel-foot {
+  height: 12%;
+  background: color-mix(in srgb, var(--coll-paper) 55%, var(--surface-2));
+}
+
+.coll-shelf-skel-plank {
+  flex: 0 0 auto;
+  height: 9px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--border-strong), var(--border));
+  box-shadow: 0 10px 24px rgba(10, 10, 20, 0.16);
+}
+
+.coll-shelf-skel-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0.2rem;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  opacity: 0.75;
+}
+
+/* ---------- la grille en attente ---------- */
+
+.coll-skel-case {
+  position: relative;
+  display: flex;
+  aspect-ratio: 2 / 3;
+  border-radius: 3px 7px 7px 3px;
+  overflow: hidden;
+  background: var(--surface-2);
+  box-shadow: 0 2px 4px rgba(10, 10, 20, 0.22), 0 14px 28px rgba(10, 10, 20, 0.14),
+    0 0 0 1px rgba(10, 10, 20, 0.08);
+  animation: coll-skel-stand 0.5s cubic-bezier(0.2, 0.9, 0.25, 1) var(--d, 0ms)
+    backwards;
+}
+
+.coll-skel-case-spine {
+  flex: 0 0 auto;
+  width: 8px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--text) 32%, transparent),
+    var(--border-strong)
+  );
+}
+
+.coll-skel-case-art {
+  flex: 1;
+  background: linear-gradient(
+    100deg,
+    var(--surface-2) 30%,
+    var(--border) 50%,
+    var(--surface-2) 70%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.3s infinite linear;
+}
+
+/* La plaque de titre, en bas de la jaquette — comme sur un vrai boîtier. */
+.coll-skel-case-art::after {
+  content: "";
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  height: 22%;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border-left: 3px solid var(--border-strong);
+}
+
+/* Pastilles de compteurs, dans l'en-tête. Sélecteur assez fort pour battre
+   `.coll-head-stats span`, qui leur donnerait sinon le fond des vraies. */
+.coll-head-stats .coll-skel-pill {
+  width: 74px;
+  height: 31px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: linear-gradient(
+    100deg,
+    var(--surface-2) 30%,
+    var(--border) 50%,
+    var(--surface-2) 70%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.3s infinite linear;
+}
+
+.coll-head-stats .coll-skel-pill.wide {
+  width: 96px;
+}
+
+.coll-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin: 1.6rem 0 0;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: var(--text-soft);
+  max-width: 74ch;
+}
+
+.coll-note svg {
+  flex: 0 0 auto;
+  margin-top: 0.2rem;
+}
+
+/* ======================================================================
+   5. Boîtiers 2D (vue grille)
+   ====================================================================== */
+
+.coll-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 1.5rem 1.3rem;
+  perspective: 1400px;
+}
+
+.coll-case {
+  display: block;
+  color: inherit;
+}
+
+/* La coque : c'est elle qui bascule sous le curseur, pas l'image. */
+.coll-case-body {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  border-radius: 3px 7px 7px 3px;
+  background: var(--coll-plastic);
+  /* Volontairement PAS de preserve-3d : la cassette et le disque sont placés
+     derrière la jaquette par z-index, et preserve-3d trierait les enfants par
+     leur profondeur 3D en ignorant cet ordre. La perspective de .coll-grid
+     suffit à la bascule. */
+  transition: transform 0.34s cubic-bezier(0.2, 0.9, 0.25, 1),
+    box-shadow 0.34s ease;
+  /* Un objet posé : ombre de contact serrée + ombre portée large. */
+  box-shadow: 0 2px 4px rgba(10, 10, 20, 0.34), 0 14px 28px rgba(10, 10, 20, 0.26),
+    0 0 0 1px rgba(10, 10, 20, 0.1);
+}
+
+.coll-case:hover .coll-case-body {
+  transform: rotateY(-15deg) translateZ(22px) translateY(-8px);
+  box-shadow: 4px 6px 10px rgba(10, 10, 20, 0.3),
+    26px 30px 52px rgba(10, 10, 20, 0.38), 0 0 0 1px rgba(10, 10, 20, 0.12);
+}
+
+/* Tranche : un bord épais à gauche, avec le titre imprimé dessus. Sur un DVD
+   elle est fine, sur une VHS elle est franche — c'est le seul repère qui
+   distingue les deux supports au premier coup d'œil. */
+.coll-case-spine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 13px;
+  border-radius: 3px 0 0 3px;
+  background: linear-gradient(
+    90deg,
+    #0d0e12 0%,
+    #24262e 45%,
+    var(--coll-plastic) 100%
+  );
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.coll-case.fmt-dvd .coll-case-spine {
+  width: 8px;
+}
+
+.coll-case-spine-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 0.42rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+  white-space: nowrap;
+  overflow: hidden;
+  max-height: 92%;
+}
+
+/* La jaquette */
+.coll-case-art {
+  position: absolute;
+  inset: 0 0 0 13px;
+  border-radius: 0 7px 7px 0;
+  overflow: hidden;
+  background: linear-gradient(150deg, var(--tint) 0%, #101118 78%);
+}
+
+.coll-case.fmt-dvd .coll-case-art {
+  inset: 0 0 0 8px;
+}
+
+.coll-case-art img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease, filter 0.3s ease;
+}
+
+.coll-case:hover .coll-case-art img {
+  transform: scale(1.05);
+}
+
+.coll-case-noart {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Film plastique : le reflet oblique du blister. DISCRET — c'est la jaquette
+   qu'on regarde, pas le reflet ; un éclat trop franc lave l'affiche en son
+   milieu et on ne lit plus l'image dessous. */
+.coll-case-shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    108deg,
+    rgba(255, 255, 255, 0) 32%,
+    rgba(255, 255, 255, 0.07) 45%,
+    rgba(255, 255, 255, 0.015) 52%,
+    rgba(255, 255, 255, 0) 60%
+  );
+  opacity: 0.6;
+  transition: transform 0.5s ease, opacity 0.3s ease;
+  pointer-events: none;
+}
+
+/* Au survol, le reflet glisse — et s'efface encore un peu : on se penche sur
+   l'objet, donc on veut voir l'image, pas le plastique. */
+.coll-case:hover .coll-case-shine {
+  opacity: 0.35;
+}
+
+.coll-case:hover .coll-case-shine {
+  transform: translateX(12%);
+}
+
+/* Pastille de support, en haut à gauche */
+.coll-case-fmt {
+  position: absolute;
+  top: 0.55rem;
+  left: 0.55rem;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  padding: 0.18rem 0.42rem;
+  border-radius: 3px;
+  color: #100f0a;
+  background: var(--tint);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+/* Provenance, en haut à droite : discrète mais toujours lisible. */
+.coll-case-lic {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.18rem 0.4rem;
+  border-radius: 3px;
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(10, 10, 16, 0.68);
+  backdrop-filter: blur(3px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.coll-case-lic.lic-public-domain {
+  color: #b8f5cf;
+  border-color: rgba(52, 211, 153, 0.4);
+}
+
+.coll-case-lic.lic-fan {
+  color: #ffd7a8;
+  border-color: rgba(251, 146, 60, 0.4);
+}
+
+/* Bouton de lecture : n'apparaît qu'au survol, au centre de l'affiche. */
+.coll-case-play {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.7);
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #100f0a;
+  background: var(--tint);
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.24s cubic-bezier(0.2, 1.4, 0.4, 1);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+}
+
+.coll-case:hover .coll-case-play {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* Étiquette du bas : papier crème pour la VHS, plaque laquée pour le DVD. */
+.coll-case-plate {
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  padding: 0.5rem 0.6rem 0.55rem;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.16rem;
+  background: var(--coll-paper);
+  color: var(--coll-paper-ink);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  border-top: 3px solid var(--tint);
+}
+
+.coll-case.fmt-dvd .coll-case-plate {
+  background: rgba(12, 12, 18, 0.82);
+  color: #fff;
+  backdrop-filter: blur(6px);
+  border-top: none;
+  border-left: 3px solid var(--tint);
+}
+
+.coll-case-franchise {
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.coll-case-title {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  line-height: 1.14;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.coll-case-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  opacity: 0.66;
+}
+
+.coll-case-meta em {
+  font-style: normal;
+}
+
+/* Le boîtier laisse dépasser son disque sur le côté au survol. */
+.coll-case.fmt-dvd .coll-case-body::after {
+  content: "";
+  position: absolute;
+  top: 22%;
+  right: 4px;
+  width: 62%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: conic-gradient(
+      from 210deg,
+      rgba(255, 255, 255, 0.5),
+      rgba(140, 200, 255, 0.35) 18%,
+      rgba(255, 220, 160, 0.4) 38%,
+      rgba(180, 255, 210, 0.32) 58%,
+      rgba(255, 255, 255, 0.45) 80%,
+      rgba(255, 255, 255, 0.5)
+    ),
+    #b9bec9;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5), 0 6px 16px rgba(0, 0, 0, 0.4);
+  transform: translateX(-8%) scale(0.9);
+  opacity: 0;
+  transition: transform 0.36s cubic-bezier(0.2, 0.9, 0.25, 1), opacity 0.22s ease;
+  z-index: -1;
+}
+
+.coll-case.fmt-dvd .coll-case-body::before {
+  /* Le trou central du disque. */
+  content: "";
+  position: absolute;
+  top: 22%;
+  right: 4px;
+  width: 62%;
+  aspect-ratio: 1;
+  z-index: -1;
+  background: radial-gradient(
+    circle,
+    var(--coll-room) 0 11%,
+    rgba(255, 255, 255, 0.6) 11% 13%,
+    transparent 13%
+  );
+  transform: translateX(-8%) scale(0.9);
+  opacity: 0;
+  transition: transform 0.36s cubic-bezier(0.2, 0.9, 0.25, 1), opacity 0.22s ease;
+}
+
+.coll-case.fmt-dvd:hover .coll-case-body::after,
+.coll-case.fmt-dvd:hover .coll-case-body::before {
+  transform: translateX(34%) scale(0.9) rotate(22deg);
+  opacity: 1;
+}
+
+.coll-case-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.coll-case-progress-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.coll-case-progress-bar span {
+  display: block;
+  height: 100%;
+  background: var(--tint, var(--orange));
+}
+
+.coll-case-progress-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+/* ======================================================================
+   6. Étagère 3D
+   ====================================================================== */
+
+/* Pas de cadre, pas de boîte : la scène est POSÉE dans la page. Le canvas est
+   transparent (gl alpha), donc le seul décor est un halo d'accent très diffus
+   derrière la planche — de quoi la détacher du blanc sans dessiner de fenêtre
+   autour d'elle. */
+.coll-shelf3d,
+.coll-shelf-skel {
+  position: relative;
+  /* Le rayon prend de la hauteur : c'est elle qui fait la taille des boîtiers
+     (la caméra cadre la rangée dans la hauteur disponible). Le composant range
+     la planche dans le BAS du cadre, mais SANS ciel démesuré au-dessus : la
+     rangée doit toucher le haut du bloc, sinon l'étagère a l'air posée par
+     terre au milieu d'une page vide. (Voir FILL / ABOVE côté composant.) */
+  height: min(64vh, 580px);
+  min-height: 340px;
+  /* Largeur pilotée par le nombre d'objets (--slots, posé par le composant) :
+     deux boîtiers dans un cadre pleine largeur seraient minuscules et perdus.
+     La colonne s'élargit avec la collection, jusqu'à toute la place. */
+  width: 100%;
+  max-width: min(100%, calc(var(--slots, 8) * 120px + 300px));
+  margin-inline: auto;
+}
+
+/* L'éclairage de la pièce, en CSS derrière le canvas transparent : une nappe
+   chaude qui tombe sur la rangée, et une ombre de contact large sous la
+   planche pour asseoir l'objet sur la page. Rien qui dessine un cadre — le
+   rayon reste POSÉ dans la page, il n'est pas dans une vitrine. */
+.coll-shelf3d::before,
+.coll-shelf-skel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+      58% 54% at 50% 42%,
+      color-mix(in srgb, var(--orange) 13%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(70% 20% at 50% 91%, rgba(10, 10, 20, 0.16), transparent 74%);
+  opacity: 0.9;
+  transition: opacity 0.3s ease;
+}
+
+/* Sur fond sombre, une ombre au sol ne se voit plus : c'est la LUEUR du bord
+   de planche qui assied la rangée. */
+:root[data-theme="dark"] .coll-shelf3d::before,
+:root[data-theme="dark"] .coll-shelf-skel::before {
+  background: radial-gradient(
+      58% 54% at 50% 42%,
+      color-mix(in srgb, var(--orange) 15%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(60% 16% at 50% 90%, rgba(255, 255, 255, 0.07), transparent 76%);
+}
+
+.coll-shelf3d.is-hover::before {
+  opacity: 1;
+}
+
+.coll-shelf3d canvas {
+  display: block;
+  position: relative;
+  z-index: 1;
+  cursor: var(--cursor-default), auto;
+  /* La scène se révèle une fois les premières jaquettes peintes : voir
+     `dressed` dans CollectionShelf. */
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+
+.coll-shelf3d.is-dressed canvas {
+  opacity: 1;
+}
+
+.coll-shelf3d.is-hover canvas {
+  cursor: var(--cursor-pointer), pointer;
+}
+
+/* Le squelette qui attend derrière la scène le temps qu'elle se garnisse : il
+   occupe exactement la place du canvas, sans imposer sa propre hauteur. */
+.coll-shelf3d .coll-shelf-skel {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  height: auto;
+  min-height: 0;
+  max-width: none;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+
+.coll-shelf3d .coll-shelf-skel::before {
+  display: none;
+}
+
+/* Fondu croisé : le squelette s'efface pendant que la scène monte. Il reste
+   monté le temps de la transition (voir `skelGone` dans le composant). */
+.coll-shelf3d.is-dressed .coll-shelf-skel {
+  opacity: 0;
+}
+
+/* ======================================================================
+   La vitrine — un boîtier pris en main, plein écran
+   ======================================================================
+   Portail au-dessus de toute l'app. LE FOND, C'EST LA PAGE : à peine floutée
+   derrière un voile du thème, elle reste reconnaissable — on n'a pas changé
+   de lieu, on s'est penché sur un objet. Pas de halo de couleur derrière le
+   boîtier : l'objet se suffit, et une aura teintée salissait le fond.
+
+   Le boîtier ne surgit pas du néant non plus : il décolle de sa place sur
+   l'étagère et vient au centre. Ce vol se joue DANS la scène 3D (voir
+   CollectionShelf.jsx) — transformer le canvas en CSS faussait la mesure que
+   R3F en fait, et la scène partait de travers.
+   ====================================================================== */
+
+.coll-inspect {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+  display: flex;
+  flex-direction: column;
+  /* PAS de backdrop-filter. Il oblige le navigateur à re-capturer et re-flouter
+     tout ce qui est derrière à CHAQUE image — et derrière, il y a un canvas
+     WebGL qui redessine en continu. C'était la source du saut visuel au moment
+     où l'on prend un boîtier en main. Un simple voile fait le même travail
+     pour rien du tout. */
+  background-color: transparent;
+  /* Ces durées suivent le vol du boîtier (FLY_OUT / FLY_BACK dans
+     CollectionShelf.jsx) : le voile monte pendant qu'il sort, se retire
+     pendant qu'il rentre. Changer l'une sans l'autre décale le relais. */
+  transition: background-color 0.4s ease;
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+
+/* Et le voile n'arrive QU'UNE FOIS le boîtier de la vitrine dessiné : tant que
+   celui du rayon est encore là, rien ne doit se poser par-dessus lui, pas même
+   un fond transparent — c'est ce qui trahissait le relais. */
+.coll-inspect.veiled {
+  background-color: color-mix(in srgb, var(--bg) 88%, transparent);
+}
+
+/* On repose le boîtier. LE VOILE se retire pendant qu'il rentre chez lui, de
+   sorte que la page soit redevenue nette au moment où il se pose. */
+.coll-inspect.leaving {
+  pointer-events: none;
+  background-color: transparent;
+  transition: background-color 0.24s ease 0.08s;
+}
+
+/* Mais LUI ne s'efface jamais : il rentre à pleine opacité et n'est démonté
+   qu'une fois celui du rayon rallumé dessous. Le faire fondre pendant son
+   retour, c'était la demi-seconde où il n'existait nulle part. Seuls les
+   habillages s'en vont. */
+.coll-inspect.leaving .coll-inspect-info,
+.coll-inspect.leaving .coll-inspect-close {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+/* Fermé sans place d'origine (tactile : pas de survol, donc pas de rangement à
+   montrer) — là, un fondu court suffit. */
+.coll-inspect.leaving.fast {
+  opacity: 0;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+}
+
+@keyframes coll-inspect-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.coll-inspect-close {
+  position: absolute;
+  top: calc(1rem + env(safe-area-inset-top));
+  right: 1.1rem;
+  z-index: 3;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 6px 18px rgba(10, 10, 20, 0.18);
+  transition: background 0.15s ease, transform 0.15s ease;
+  /* `backwards` et non `both` : une fois posée, la croix rend la main à sa
+     propre feuille de style — sinon plus aucun état ne pourrait la modifier. */
+  animation: coll-inspect-fade 0.28s ease 0.3s backwards;
+}
+
+.coll-inspect-close:hover {
+  background: var(--surface-2);
+  transform: rotate(90deg);
+}
+
+.coll-inspect-stage {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+  cursor: var(--cursor-grab), grab;
+}
+
+.coll-inspect-stage:active {
+  cursor: var(--cursor-grabbing), grabbing;
+}
+
+/* Le cartouche est POSÉ SUR la scène, pas empilé dessous : en occupant une
+   bande du flux, il rognait d'autant la place du boîtier, qui se retrouvait
+   coupé par le bas dès qu'on zoomait. Il flotte donc au-dessus, et s'écarte
+   dès qu'on zoome — on examine, on ne lit plus. */
+.coll-inspect-info {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 1rem calc(1.15rem + env(safe-area-inset-bottom));
+  color: var(--text);
+  /* Le bandeau lui-même ne capte rien : on attrape le boîtier au travers. */
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.3, 0.9, 0.3, 1);
+  /* Il arrive APRÈS le boîtier : on regarde l'objet venir, puis on lit ce
+     qu'il est. Tout ensemble, ça faisait une page qui s'ouvre. */
+  animation: coll-inspect-up 0.38s cubic-bezier(0.2, 0.9, 0.25, 1) 0.28s backwards;
+}
+
+.coll-inspect.zoomed .coll-inspect-info {
+  opacity: 0;
+  transform: translateY(18px);
+}
+
+/* La carte : un objet posé sur la scène, aux codes de l'app — surface, filet,
+   ombre portée — avec le liseré de la teinte du titre sur la tranche gauche. */
+.coll-inspect-card {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: clamp(0.9rem, 3vw, 1.8rem);
+  max-width: min(660px, 100%);
+  padding: 0.72rem 0.8rem 0.72rem 0.9rem;
+  border-radius: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 46px rgba(10, 10, 20, 0.22), 0 2px 8px rgba(10, 10, 20, 0.12);
+}
+
+.coll-inspect-card::before {
+  content: "";
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--tint);
+}
+
+.coll-inspect-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.14rem;
+  text-align: left;
+}
+
+@keyframes coll-inspect-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+/* Le texte est celui de la PAGE, pas d'un décor sombre : il suit le thème,
+   sinon du blanc sur un voile clair serait illisible. */
+.coll-inspect-franchise {
+  font-style: normal;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+}
+
+.coll-inspect-info strong {
+  font-family: var(--font-display);
+  font-size: clamp(1.02rem, 2.2vw, 1.32rem);
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-inspect-meta {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-inspect-card .btn {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.coll-inspect-hint {
+  font-size: 0.68rem;
+  color: var(--text-soft);
+  opacity: 0.7;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .coll-inspect-hint {
+    display: none;
+  }
+}
+
+/* Rappel du geste : discret, en bas à gauche, aux couleurs du thème (la scène
+   n'a plus de fond sombre sur lequel du texte blanc se lirait). */
+.coll-shelf-hint {
+  position: absolute;
+  left: 0.2rem;
+  bottom: 0.2rem;
+  z-index: 3;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+  opacity: 0.6;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+/* Tant que le rayon se garnit, le squelette parle à sa place : deux textes en
+   bas du même cadre se marcheraient dessus. */
+.coll-shelf3d:not(.is-dressed) .coll-shelf-hint {
+  opacity: 0;
+}
+
+/* Visuel manquant : signalé, jamais silencieux. */
+.coll-shelf-warn {
+  position: absolute;
+  right: 0.2rem;
+  bottom: 0.2rem;
+  z-index: 3;
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #d97706;
+}
+
+/* ----------------------------------------------------------------------
+   La bulle du boîtier survolé
+   ----------------------------------------------------------------------
+   Une bulle de bande dessinée : elle sort AU-DESSUS du boîtier, une pointe
+   la relie à lui, et elle grandit depuis cette pointe — c'est l'objet qui
+   parle. Sa position (`left`/`top`) et le décalage de la pointe (`--tail`,
+   pour les boîtiers de bord, quand la carte doit se recadrer) sont posés en
+   pixels par le composant, qui projette la 3D à l'écran.
+   ---------------------------------------------------------------------- */
+/* Compacte à dessein : la rangée est remontée dans la page (voir ABOVE côté
+   composant), donc le ciel au-dessus des boîtiers est court. Une bulle plus
+   haute mordrait sur la barre d'outils au lieu de flotter au-dessus du rayon. */
+.coll-shelf-bubble {
+  position: absolute;
+  z-index: 6;
+  width: 268px;
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.5rem;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 20px 42px rgba(10, 10, 20, 0.24), 0 3px 10px rgba(10, 10, 20, 0.14);
+  color: var(--text);
+  text-align: left;
+  pointer-events: none;
+  /* L'ancre est le HAUT de la tranche : la bulle remonte de toute sa hauteur,
+     et grandit depuis sa pointe — comme si le boîtier la soufflait. */
+  transform-origin: bottom center;
+  transform: translate(-50%, calc(-100% - 10px)) scale(0.92);
+  opacity: 0;
+  transition: opacity 0.16s ease, transform 0.24s cubic-bezier(0.2, 1.25, 0.4, 1);
+}
+
+.coll-shelf-bubble.show {
+  opacity: 1;
+  transform: translate(-50%, calc(-100% - 24px)) scale(1);
+}
+
+/* La tige : la bulle flotte haut au-dessus du boîtier, il faut donc un fil qui
+   redescende jusqu'à lui — sinon elle a l'air de flotter pour elle-même. Il
+   s'éteint dans la teinte du titre en arrivant sur la tranche. */
+.coll-shelf-bubble::before {
+  content: "";
+  position: absolute;
+  bottom: -24px;
+  left: calc(50% + var(--tail, 0px));
+  width: 2px;
+  height: 24px;
+  margin-left: -1px;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    var(--border-strong),
+    color-mix(in srgb, var(--tint) 70%, transparent)
+  );
+}
+
+/* La pointe : un carré tourné, posé sous la bulle, décalé jusqu'au boîtier. */
+.coll-shelf-bubble::after {
+  content: "";
+  position: absolute;
+  bottom: -7px;
+  left: calc(50% + var(--tail, 0px));
+  width: 13px;
+  height: 13px;
+  margin-left: -7px;
+  border-radius: 0 0 3px 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+  transform: rotate(45deg);
+}
+
+.coll-bubble-shot {
+  position: relative;
+  flex: 0 0 auto;
+  width: 46px;
+  aspect-ratio: 2 / 3;
+  border-radius: 7px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(150deg, var(--tint) 0%, #101118 82%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tint) 45%, transparent),
+    0 4px 12px rgba(10, 10, 20, 0.28);
+}
+
+.coll-bubble-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.coll-bubble-shot i {
+  font-style: normal;
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.coll-bubble-text {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.16rem;
+}
+
+.coll-bubble-text em {
+  font-style: normal;
+  font-size: 0.54rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-bubble-text strong {
+  font-family: var(--font-display);
+  font-size: 0.94rem;
+  line-height: 1.16;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.coll-bubble-meta {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-bubble-meta b {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.coll-bubble-bar {
+  margin-top: 0.18rem;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.coll-bubble-bar i {
+  display: block;
+  height: 100%;
+  background: var(--tint, var(--orange));
+}
+
+/* ======================================================================
+   7. Fiche d'un média
+   ====================================================================== */
+
+.coll-detail {
+  /* Le bandeau sort du padding de .app-content pour toucher les bords. */
+  margin: calc(var(--content-pad) * -1) calc(var(--content-pad) * -1) 0;
+}
+
+.coll-hero {
+  position: relative;
+  padding: clamp(1.4rem, 4vw, 2.6rem) var(--content-pad) clamp(1.6rem, 4vw, 2.4rem);
+  overflow: hidden;
+  background: var(--coll-room);
+  isolation: isolate;
+}
+
+.coll-hero-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(1.1) blur(2px);
+  transform: scale(1.06);
+  z-index: -2;
+}
+
+.coll-hero-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+      180deg,
+      rgba(8, 8, 12, 0.62) 0%,
+      rgba(8, 8, 12, 0.82) 55%,
+      var(--bg) 100%
+    ),
+    radial-gradient(
+      70% 100% at 18% 40%,
+      color-mix(in srgb, var(--tint) 26%, transparent),
+      transparent 70%
+    );
+}
+
+/* Grain d'image analogique sur tout le bandeau. */
+.coll-hero-grain {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.16;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.05) 0 1px,
+      transparent 1px 3px
+    ),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.06) 0 1px, transparent 1px 4px);
+}
+
+.coll-hero-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+  margin-bottom: 1.2rem;
+  transition: color 0.15s ease;
+}
+
+.coll-hero-back:hover {
+  color: #fff;
+}
+
+.coll-hero-body {
+  display: flex;
+  gap: clamp(1.2rem, 3vw, 2.2rem);
+  align-items: flex-end;
+  max-width: 1180px;
+}
+
+.coll-hero-poster {
+  position: relative;
+  flex: 0 0 auto;
+  width: clamp(120px, 18vw, 186px);
+  aspect-ratio: 2 / 3;
+  border-radius: 4px 10px 10px 4px;
+  overflow: hidden;
+  background: var(--coll-plastic);
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  /* Un vrai boîtier debout : un rien de perspective. */
+  transform: perspective(900px) rotateY(-7deg);
+}
+
+.coll-hero-poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.coll-hero-fmt {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  padding: 0.16rem 0.4rem;
+  border-radius: 3px;
+  color: #100f0a;
+  background: var(--tint);
+}
+
+.coll-hero-info {
+  min-width: 0;
+  color: #fff;
+}
+
+.coll-hero-franchise {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--tint);
+  margin-bottom: 0.35rem;
+}
+
+.coll-hero-info h1 {
+  font-size: clamp(1.5rem, 4.4vw, 2.6rem);
+  color: #fff;
+  text-shadow: 0 3px 24px rgba(0, 0, 0, 0.5);
+}
+
+.coll-hero-original {
+  margin: 0.3rem 0 0;
+  font-size: 0.82rem;
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.56);
+}
+
+.coll-hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.7rem;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.coll-hero-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.coll-hero-meta > span + span::before {
+  content: "·";
+  margin-right: 0.34rem;
+  opacity: 0.5;
+}
+
+.coll-hero-kind {
+  font-weight: 700;
+  color: #fff;
+}
+
+.coll-hero-rating {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--amber);
+}
+
+.coll-lic {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.46rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.coll-lic.lic-public-domain {
+  color: #b8f5cf;
+  border-color: rgba(52, 211, 153, 0.45);
+}
+
+.coll-lic.lic-fan {
+  color: #ffd7a8;
+  border-color: rgba(251, 146, 60, 0.45);
+}
+
+/* La pastille de provenance ne prend pas le séparateur « · ». */
+.coll-hero-meta > span.coll-lic + span::before,
+.coll-hero-meta > .coll-lic::before {
+  content: none;
+}
+
+.coll-hero-genres {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-top: 0.7rem;
+}
+
+.coll-hero-genres span {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  text-transform: capitalize;
+}
+
+.coll-hero-syn {
+  margin: 0.9rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.8);
+  max-width: 68ch;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.coll-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 1.2rem;
+}
+
+.coll-hero-actions .btn-ghost {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.24);
+  color: #fff;
+}
+
+.coll-hero-actions .btn-ghost:hover {
+  border-color: var(--tint);
+}
+
+.coll-hero-channel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.62);
+  transition: color 0.15s ease;
+}
+
+.coll-hero-channel:hover {
+  color: #fff;
+}
+
+.coll-hero-games {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin-top: 0.9rem;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.coll-hero-games a {
+  font-weight: 700;
+  color: var(--tint);
+  border-bottom: 1px solid transparent;
+}
+
+.coll-hero-games a:hover {
+  border-color: currentColor;
+}
+
+/* ---------- corps de la fiche ---------- */
+
+.coll-detail-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: clamp(1.2rem, 3vw, 2.2rem);
+  max-width: 1180px;
+  padding: clamp(1.4rem, 4vw, 2.2rem) var(--content-pad)
+    calc(var(--bottom-bar-h, 0px) + 2rem);
+}
+
+.coll-eps-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.coll-seasons {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.coll-seasons button {
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+}
+
+.coll-seasons button.active {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--orange);
+}
+
+.coll-eps-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.coll-ep {
+  display: flex;
+  align-items: stretch;
+  gap: 0.4rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.coll-ep:hover {
+  border-color: var(--orange);
+  transform: translateX(2px);
+}
+
+.coll-ep.current {
+  border-color: var(--tint);
+  box-shadow: inset 3px 0 0 var(--tint);
+}
+
+.coll-ep.seen .coll-ep-thumb img {
+  filter: grayscale(0.5) brightness(0.72);
+}
+
+.coll-ep-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
+  padding: 0.5rem;
+}
+
+.coll-ep-thumb {
+  position: relative;
+  flex: 0 0 auto;
+  width: 116px;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--coll-plastic);
+}
+
+.coll-ep-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: filter 0.2s ease;
+}
+
+.coll-ep-thumb-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(8, 8, 12, 0.42);
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+.coll-ep:hover .coll-ep-thumb-play {
+  opacity: 1;
+}
+
+.coll-ep-dur {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  font-style: normal;
+  padding: 0.08rem 0.28rem;
+  border-radius: 3px;
+  color: #fff;
+  background: rgba(8, 8, 12, 0.8);
+}
+
+/* Épisode servi ailleurs : l'hébergeur est affiché sur la vignette (et le
+   nombre de sources quand il y a des miroirs). On ne cache pas d'où ça vient. */
+.coll-ep-src {
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  max-width: calc(100% - 6px);
+  font-size: 0.56rem;
+  font-weight: 700;
+  font-style: normal;
+  letter-spacing: 0.04em;
+  padding: 0.08rem 0.28rem;
+  border-radius: 3px;
+  color: rgba(255, 255, 255, 0.86);
+  background: rgba(8, 8, 12, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-ep-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+}
+
+.coll-ep-text strong {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+
+.coll-ep-num {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+
+.coll-ep-text > span {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-soft);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.coll-ep-check {
+  flex: 0 0 auto;
+  width: 42px;
+  border: none;
+  border-left: 1px solid var(--border);
+  background: none;
+  color: var(--border-strong);
+  display: grid;
+  place-items: center;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.coll-ep-check:hover {
+  color: var(--text-soft);
+  background: var(--surface-2);
+}
+
+.coll-ep-check.on {
+  color: #1a1204;
+  background: var(--accent-grad);
+}
+
+/* ---------- colonne latérale ---------- */
+
+.coll-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.coll-aside section {
+  padding: 0.95rem 1rem 1.05rem;
+}
+
+.coll-aside h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-weight: 700;
+  margin: 0 0 0.7rem;
+}
+
+.coll-aside h3 svg {
+  color: var(--accent-ink);
+}
+
+.coll-cast ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.coll-cast li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.coll-cast-face {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+}
+
+.coll-cast-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.coll-cast-face i {
+  font-style: normal;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.coll-cast-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.coll-cast-text strong {
+  font-size: 0.84rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-cast-text em {
+  font-style: normal;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-facts dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 0.7rem;
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.coll-facts dt {
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
+.coll-facts dd {
+  margin: 0;
+  text-align: right;
+}
+
+.coll-sources {
+  margin: 0.9rem 0 0;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+
+.coll-sources a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  margin-left: 0.4rem;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+
+/* ======================================================================
+   8. Le poste cathodique
+   ======================================================================
+   Toujours sombre, quel que soit le thème : on éteint la lumière pour
+   regarder la télé. L'écran ne porte aucun bouton — tout est sur le
+   plastique, et c'est là tout l'intérêt.
+   ====================================================================== */
+
+.crt-room {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+  /* Centrage par `margin: auto` sur l'enfant, et non par `place-items` : un
+     poste plus haut que la fenêtre (téléphone en paysage) serait sinon rogné
+     par le haut, sans moyen de remonter. */
+  display: flex;
+  padding: clamp(0.8rem, 3vw, 2rem);
+  background: radial-gradient(120% 100% at 50% 40%, #14121c 0%, #06060a 62%, #030305 100%);
+  overflow: auto;
+  animation: crt-room-in 0.3s ease;
+}
+
+@keyframes crt-room-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* La lueur du tube qui bave sur les murs de la pièce. */
+.crt-room-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    50% 42% at 50% 42%,
+    color-mix(in srgb, var(--tint, #f2b70b) 22%, transparent),
+    transparent 72%
+  );
+  opacity: 0.55;
+  animation: crt-glow 5.5s ease-in-out infinite;
+}
+
+@keyframes crt-glow {
+  50% {
+    opacity: 0.72;
+  }
+}
+
+.crt-stage {
+  position: relative;
+  margin: auto;
+  width: min(1020px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+/* ---------- la carrosserie ---------- */
+
+.crt-set {
+  display: flex;
+  gap: clamp(0.6rem, 1.6vw, 1.1rem);
+  padding: clamp(0.7rem, 1.8vw, 1.15rem);
+  border-radius: 22px;
+  background: linear-gradient(168deg, #3a3b44 0%, #21222a 26%, #171820 72%, #0f1014 100%);
+  box-shadow: 0 40px 90px rgba(0, 0, 0, 0.7), inset 0 2px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -3px 12px rgba(0, 0, 0, 0.7);
+  transform-origin: center;
+  transition: transform 0.5s cubic-bezier(0.3, 1.2, 0.4, 1);
+}
+
+/* Bandeau de ventilation moulé dans le haut de la coque. */
+.crt-set-top {
+  position: absolute;
+  top: 0.42rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 34%;
+  height: 5px;
+  border-radius: 999px;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.35) 0 2px,
+    transparent 2px 6px
+  );
+  opacity: 0.7;
+}
+
+.crt-screen-wrap {
+  flex: 1;
+  min-width: 0;
+  padding: clamp(0.5rem, 1.4vw, 0.9rem);
+  border-radius: 18px;
+  background: linear-gradient(160deg, #0a0a0e, #16161d);
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Le tube : 4/3, coins généreusement arrondis comme un vrai bombé. */
+.crt-screen {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: 5% / 6.6%;
+  overflow: hidden;
+  background: #040407;
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.95), inset 0 0 0 2px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+  isolation: isolate;
+}
+
+.crt-tube {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  /* Le bombé du verre, approché : l'image est très légèrement gonflée au
+     centre par une mise à l'échelle, ce qui suffit avec les coins arrondis. */
+  transform: scale(1.012);
+}
+
+/* Cadre 16/9 dans lequel vit l'iframe. FORMAT = la façon de l'y poser. */
+.crt-frame {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  aspect-ratio: 16 / 9;
+}
+
+/* « LARGE » : l'image 16/9 entière, avec ses bandes noires en haut et en bas. */
+.crt-frame[data-fit="large"] {
+  width: 100%;
+}
+
+/* « PLEIN » : l'image remplit la hauteur du 4/3 et déborde sur les côtés —
+   exactement ce qu'il faut pour un épisode 4/3 mis en ligne dans une vidéo
+   16/9 (ses bandes latérales passent hors cadre). */
+.crt-frame[data-fit="plein"] {
+  height: 100%;
+}
+
+/* L'iframe déborde en haut et en bas : titre et barre YouTube hors champ. */
+.crt-crop {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+}
+
+.crt-crop iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+/* ---------- les deux autres lecteurs ---------- */
+
+/* Fichier vidéo servi en direct : on le pilote comme YouTube, donc il se pose
+   comme lui — plein cadre, sans commandes propres (les nôtres sont sur le
+   plastique). `object-fit: cover` pour que FORMAT ait le même effet. */
+.crt-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  border: 0;
+  background: #000;
+  object-fit: cover;
+}
+
+/* Lecteur d'un site tiers : SURTOUT PAS de rognage — ses commandes vivent en
+   bas de son cadre et ce sont les seules qui pilotent cette image. Il capte
+   donc aussi les clics, contrairement à l'iframe YouTube. */
+.crt-embed {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  border: 0;
+  background: #000;
+  z-index: 2;
+}
+
+/* Le logo de chaîne du pauvre : d'où vient l'image, en petit dans un coin. */
+.crt-source-tag {
+  position: absolute;
+  right: 0.7rem;
+  top: 0.7rem;
+  z-index: 7;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+  background: rgba(6, 8, 12, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  pointer-events: none;
+}
+
+/* Surface de tap invisible : lecture/pause au clic sur l'image. */
+.crt-tap {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: none;
+  z-index: 3;
+}
+
+/* ---------- le verre ---------- */
+
+.crt-scanlines {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  /* Lignes de balayage + masque de phosphores (grille d'ouverture). */
+  background-image: repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.3) 0 1px,
+      transparent 1px 3px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 0, 60, 0.045) 0 1px,
+      rgba(0, 255, 120, 0.045) 1px 2px,
+      rgba(0, 90, 255, 0.045) 2px 3px
+    );
+  mix-blend-mode: overlay;
+  opacity: 0.85;
+}
+
+/* Bruit de piste : la bande blanche qui remonte quand le tracking est faux. */
+.crt-noise {
+  position: absolute;
+  inset: -20% 0;
+  z-index: 5;
+  pointer-events: none;
+  opacity: calc(var(--tracking, 0.1) * 2.4);
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.14) 0 2px,
+    rgba(255, 255, 255, 0) 2px 5px,
+    rgba(255, 255, 255, 0.07) 5px 6px,
+    rgba(255, 255, 255, 0) 6px 14px
+  );
+  animation: crt-roll 2.6s linear infinite;
+  mix-blend-mode: screen;
+}
+
+@keyframes crt-roll {
+  to {
+    transform: translateY(28%);
+  }
+}
+
+/* Reflet du verre : deux ovales de lumière en haut à gauche. */
+.crt-glare {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  background: radial-gradient(
+      42% 30% at 22% 12%,
+      rgba(255, 255, 255, 0.13),
+      transparent 70%
+    ),
+    radial-gradient(20% 12% at 78% 8%, rgba(255, 255, 255, 0.07), transparent 70%);
+}
+
+/* Assombrissement des bords : le tube n'éclaire jamais ses coins. */
+.crt-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  box-shadow: inset 0 0 70px 24px rgba(0, 0, 0, 0.72);
+  border-radius: inherit;
+}
+
+/* Chauffe : le flash blanc qui s'ouvre en ligne puis remplit l'écran. */
+.crt-warmup {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  background: #fdfdff;
+  animation: crt-warmup 1.05s ease-out forwards;
+}
+
+@keyframes crt-warmup {
+  0% {
+    transform: scaleY(0.004);
+    opacity: 1;
+  }
+  22% {
+    transform: scaleY(0.02);
+    opacity: 1;
+  }
+  46% {
+    transform: scaleY(1);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 0;
+  }
+}
+
+/* Extinction : l'image se rétracte en trait puis s'éteint. */
+.crt-room.phase-off .crt-screen {
+  animation: crt-off 0.6s ease-in forwards;
+}
+
+@keyframes crt-off {
+  40% {
+    filter: brightness(2.6);
+  }
+  70% {
+    transform: scaleY(0.012);
+    filter: brightness(3.4);
+  }
+  100% {
+    transform: scale(0.004);
+    opacity: 0;
+  }
+}
+
+.crt-room.phase-off .crt-set {
+  transform: scale(0.985);
+}
+
+.crt-paused {
+  position: absolute;
+  top: 0.8rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 7;
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 0 12px rgba(120, 255, 190, 0.6);
+  animation: crt-blink 1.4s steps(1) infinite;
+}
+
+@keyframes crt-blink {
+  50% {
+    opacity: 0.15;
+  }
+}
+
+/* Affichage à l'écran : la typo verte des menus de télé. */
+.crt-osd {
+  position: absolute;
+  left: 6%;
+  bottom: 8%;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.44rem 0.8rem;
+  border-radius: 4px;
+  background: rgba(4, 10, 6, 0.62);
+  border: 1px solid rgba(150, 255, 190, 0.28);
+  color: #b9ffd8;
+  font-family: var(--font-display);
+  font-size: clamp(0.62rem, 1.3vw, 0.82rem);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-shadow: 0 0 10px rgba(120, 255, 190, 0.7);
+  max-width: 82%;
+  animation: crt-osd 1.6s ease forwards;
+}
+
+@keyframes crt-osd {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  12%,
+  76% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.crt-osd-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crt-osd-bars {
+  display: flex;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.crt-osd-bars i {
+  width: 5px;
+  height: 12px;
+  background: rgba(185, 255, 216, 0.2);
+}
+
+.crt-osd-bars i.on {
+  background: #b9ffd8;
+  box-shadow: 0 0 6px rgba(120, 255, 190, 0.8);
+}
+
+/* ---------- panneau de commandes ---------- */
+
+.crt-panel {
+  flex: 0 0 clamp(150px, 17vw, 194px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.8rem 0.7rem;
+  border-radius: 14px;
+  background: linear-gradient(170deg, #e9e2d2 0%, #cfc7b6 46%, #b3ab9b 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 -2px 6px rgba(0, 0, 0, 0.22),
+    0 4px 12px rgba(0, 0, 0, 0.4);
+  color: #2a2822;
+}
+
+.crt-brand {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.3rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(42, 40, 34, 0.18);
+}
+
+.crt-brand-name {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.crt-brand-model {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  opacity: 0.55;
+}
+
+/* Afficheur : les chiffres rouges d'un vieux tuner. */
+.crt-readout {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 6px;
+  background: #17110f;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.8);
+  font-family: var(--font-display);
+  color: #ff6a4a;
+  text-shadow: 0 0 10px rgba(255, 90, 60, 0.75);
+  font-variant-numeric: tabular-nums;
+}
+
+.crt-readout-ch {
+  font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.crt-readout-time {
+  font-size: 0.74rem;
+  opacity: 0.8;
+}
+
+.crt-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.38rem;
+}
+
+.crt-btn {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  border: none;
+  color: #f0ece2;
+  background: linear-gradient(180deg, #4a4b55 0%, #2e2f38 62%, #23242b 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 2px 0 rgba(0, 0, 0, 0.45),
+    0 3px 6px rgba(0, 0, 0, 0.32);
+  transition: transform 0.08s ease, box-shadow 0.12s ease, filter 0.14s ease;
+}
+
+.crt-btn:hover:not(:disabled) {
+  filter: brightness(1.18);
+}
+
+/* Une touche mécanique s'enfonce : elle descend et perd son ombre. */
+.crt-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.6);
+}
+
+.crt-btn:disabled {
+  opacity: 0.34;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.crt-btn.big {
+  grid-column: span 2;
+  aspect-ratio: 2 / 1;
+  background: linear-gradient(180deg, #5b5c68 0%, #383944 62%, #2a2b33 100%);
+}
+
+.crt-btn.power {
+  color: #ffd9d2;
+  background: linear-gradient(180deg, #a5382c 0%, #7e281f 62%, #611e17 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 2px 0 rgba(0, 0, 0, 0.45),
+    0 0 14px rgba(230, 70, 50, 0.34);
+}
+
+.crt-btn.active {
+  color: #10100c;
+  background: linear-gradient(180deg, #ffd24a, #e0a409);
+}
+
+.crt-knobs {
+  display: flex;
+  gap: 0.7rem;
+  justify-content: space-around;
+  padding-top: 0.2rem;
+}
+
+.crt-knob-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Potentiomètre : un cylindre strié, avec un repère qui tourne. */
+.crt-knob {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 30%, #55565f, #24252c 62%, #16171c 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 3px 7px rgba(0, 0, 0, 0.5);
+  transform: rotate(var(--angle, 0deg));
+  transition: transform 0.1s linear;
+  touch-action: none;
+}
+
+.crt-knob::after {
+  /* Stries de préhension */
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(255, 255, 255, 0.06) 0deg 4deg,
+    transparent 4deg 10deg
+  );
+}
+
+.crt-knob-mark {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 3px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--amber);
+  box-shadow: 0 0 6px rgba(255, 210, 74, 0.8);
+}
+
+.crt-knob:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 3px;
+}
+
+.crt-knob-label {
+  font-size: 0.54rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  opacity: 0.6;
+}
+
+/* Grille du haut-parleur */
+.crt-grille {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 0.5rem;
+}
+
+.crt-grille i {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(42, 40, 34, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* ---------- le magnétoscope ---------- */
+
+.crt-deck {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 14px;
+  background: linear-gradient(172deg, #2c2d36 0%, #1a1b22 58%, #12131a 100%);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.crt-deck-slot {
+  position: relative;
+  flex: 0 0 auto;
+  width: 74px;
+  height: 34px;
+  border-radius: 4px;
+  background: #0a0b0e;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.9);
+  overflow: hidden;
+}
+
+/* La cassette engagée dans la fente, teintée par le média. */
+.crt-deck-tape {
+  position: absolute;
+  inset: 5px 4px auto;
+  height: 22px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #33343d, #1b1c22);
+  border-top: 3px solid var(--tint, var(--orange));
+  animation: crt-tape-in 0.7s cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+
+@keyframes crt-tape-in {
+  from {
+    transform: translateY(-26px);
+  }
+}
+
+.crt-deck-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.crt-deck-title {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.86);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crt-deck-bar {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  touch-action: none;
+}
+
+.crt-deck-bar-cur {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: var(--tint, var(--orange));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--tint, #f2b70b) 60%, transparent);
+}
+
+.crt-deck-bar-thumb {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.crt-deck-bar:hover .crt-deck-bar-thumb {
+  opacity: 1;
+}
+
+.crt-deck-clock {
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* À la place de la barre, quand le lecteur ne nous dit rien : d'où vient
+   l'image, et la porte de sortie si l'hébergeur refuse d'être encadré. */
+.crt-deck-ext {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.crt-deck-ext em {
+  font-style: normal;
+  letter-spacing: 0.04em;
+}
+
+/* Les deux issues de secours du mode antenne : lever la bride du cadre, ou
+   ouvrir la source à part. Même traitement — ce sont des liens de dépannage,
+   pas des commandes du poste. */
+.crt-deck-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0;
+  border: none;
+  border-bottom: 1px solid transparent;
+  background: none;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 700;
+  color: var(--tint, #f2b70b);
+}
+
+.crt-deck-open:hover {
+  border-color: currentColor;
+}
+
+.crt-deck-clock em {
+  font-style: normal;
+  opacity: 0.6;
+}
+
+.crt-deck-eject {
+  flex: 0 0 auto;
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  padding: 0.5rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.78);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.crt-deck-eject:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+/* ---------- sélecteur d'épisodes ---------- */
+
+.crt-list {
+  position: absolute;
+  top: clamp(0.8rem, 3vw, 2rem);
+  right: clamp(0.8rem, 3vw, 2rem);
+  width: min(320px, 84vw);
+  max-height: min(70vh, 560px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(12, 12, 18, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6);
+  animation: crt-list-in 0.22s ease;
+}
+
+@keyframes crt-list-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
+
+.crt-list header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: var(--font-display);
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.crt-list header span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crt-list header button {
+  flex: 0 0 auto;
+  border: none;
+  background: none;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.crt-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem;
+  overflow-y: auto;
+}
+
+.crt-list li button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.44rem 0.5rem;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: rgba(255, 255, 255, 0.78);
+  text-align: left;
+  font-size: 0.8rem;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.crt-list li button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.crt-list li button.current {
+  background: color-mix(in srgb, var(--orange) 22%, transparent);
+  color: #fff;
+}
+
+.crt-list li button svg {
+  margin-left: auto;
+  color: #6ee7a8;
+  flex: 0 0 auto;
+}
+
+.crt-list-num {
+  flex: 0 0 auto;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.42);
+  font-variant-numeric: tabular-nums;
+}
+
+.crt-list-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ======================================================================
+   9. Écrans étroits
+   ====================================================================== */
+
+@media (max-width: 1000px) {
+  .coll-detail-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .coll-head-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .coll-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 1.2rem 0.9rem;
+  }
+
+  /* Sur écran tactile, le survol n'existe pas : on garde les boîtiers droits
+     et on montre l'essentiel tout de suite. */
+  .coll-case:hover .coll-case-body {
+    transform: none;
+  }
+
+  .coll-case-play,
+  .coll-case.fmt-dvd .coll-case-body::after,
+  .coll-case.fmt-dvd .coll-case-body::before {
+    display: none;
+  }
+
+  .coll-case-title {
+    font-size: 0.8rem;
+  }
+
+  .coll-hero-body {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .coll-hero-poster {
+    width: 118px;
+    transform: none;
+  }
+
+  .coll-ep-thumb {
+    width: 92px;
+  }
+
+  /* Le poste passe en colonne : écran puis carrosserie, comme une télé
+     portative posée sur une table. */
+  .crt-set {
+    flex-direction: column;
+  }
+
+  .crt-panel {
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  .crt-brand,
+  .crt-grille {
+    display: none;
+  }
+
+  .crt-buttons {
+    flex: 1;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .crt-knobs {
+    padding-top: 0;
+  }
+
+  .crt-knob {
+    width: 36px;
+    height: 36px;
+  }
+
+  .crt-list {
+    left: clamp(0.8rem, 3vw, 2rem);
+    right: clamp(0.8rem, 3vw, 2rem);
+    width: auto;
+  }
+
+  .crt-deck-slot {
+    display: none;
+  }
+}
+
+/* Les lignes de balayage et le bruit de piste sont des animations plein
+   écran : coupées quand l'utilisateur demande moins de mouvement. */
+@media (prefers-reduced-motion: reduce) {
+  .crt-noise,
+  .crt-room-glow {
+    animation: none;
+  }
+
+  .crt-warmup {
+    display: none;
+  }
+}

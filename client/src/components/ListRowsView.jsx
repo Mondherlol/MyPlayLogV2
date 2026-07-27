@@ -5,6 +5,7 @@ import {
   Clock,
   Gamepad2,
   Languages,
+  Layers,
   Loader2,
   Play,
   Star,
@@ -143,6 +144,46 @@ function TrailerModal({ trailer, gameName, onClose }) {
   );
 }
 
+// Une langue avec son drapeau.
+function Lang({ lang, label }) {
+  return (
+    <span className="lr-lang">
+      {lang.cc && /^[a-z]{2}$/.test(lang.cc) && (
+        <img
+          src={`https://flagcdn.com/20x15/${lang.cc}.png`}
+          alt=""
+          loading="lazy"
+          draggable="false"
+        />
+      )}
+      {label || lang.name}
+    </span>
+  );
+}
+
+// Langue d'origine + français (s'il est là), et le décompte du reste.
+function Langs({ detail: d }) {
+  const orig = d.originalLanguage;
+  const fr = d.french;
+  const shown = [orig, fr && fr.name !== orig?.name ? fr : null].filter(Boolean);
+  const others = d.languages.length - shown.length;
+
+  return (
+    <div className="lr-langs" title={d.languages.map((l) => l.name).join(", ")}>
+      <Languages size={13} />
+      {shown.map((l) => (
+        <Lang key={l.name} lang={l} />
+      ))}
+      {!fr && <span className="lr-lang nofr">Pas de français</span>}
+      {others > 0 && (
+        <span className="lr-lang more">
+          +{others} autre{others > 1 ? "s" : ""} langue{others > 1 ? "s" : ""}
+        </span>
+      )}
+    </div>
+  );
+}
+
 // L'id IGDB d'un élément. `gameId` est renseigné depuis toujours côté ajout,
 // mais `refId` porte la même valeur pour un jeu : de quoi rester debout sur une
 // vieille liste où il manquerait.
@@ -196,6 +237,29 @@ function GameRow({ item, rank, detail, onNeedDetail, onShots, onTrailer }) {
           <Link to={`/game/${gameId}`} className="lr-title">
             {item.name}
           </Link>
+          {/* DLC, remaster, bundle… : savoir qu'on ne regarde pas un jeu de
+              base change tout dans une liste de conférence. */}
+          {d?.kind && (
+            <span
+              className="lr-kind"
+              title={
+                d.kind.parent
+                  ? `${d.kind.label} de ${d.kind.parent.name}`
+                  : d.kind.label
+              }
+            >
+              <Layers size={11} />
+              {d.kind.label}
+              {d.kind.parent && (
+                <>
+                  {" de "}
+                  <Link to={`/game/${d.kind.parent.id}`} className="lr-kind-parent">
+                    {d.kind.parent.name}
+                  </Link>
+                </>
+              )}
+            </span>
+          )}
           {d?.rating != null && (
             <span className="lr-score" title={`${d.ratingCount} avis`}>
               <Star size={12} fill="currentColor" strokeWidth={0} />
@@ -240,51 +304,37 @@ function GameRow({ item, rank, detail, onNeedDetail, onShots, onTrailer }) {
 
         {d?.summary && <p className="lr-summary">{d.summary}</p>}
 
-        {d?.languages?.length > 0 && (
-          <div className="lr-langs" title={d.languages.map((l) => l.name).join(", ")}>
-            <Languages size={13} />
-            {d.languages.slice(0, 8).map((l) => (
-              <span className="lr-lang" key={l.name}>
-                {l.cc && /^[a-z]{2}$/.test(l.cc) && (
-                  <img
-                    src={`https://flagcdn.com/20x15/${l.cc}.png`}
-                    alt=""
-                    loading="lazy"
-                    draggable="false"
-                  />
-                )}
-                {l.name}
-              </span>
-            ))}
-            {d.languages.length > 8 && (
-              <span className="lr-lang more">+{d.languages.length - 8}</span>
-            )}
-          </div>
-        )}
+        {/* Langues : la langue d'origine et le français, rien de plus. La liste
+            complète noyait la ligne sous quinze drapeaux dont on n'a rien à
+            faire ; ce qu'on veut savoir, c'est « c'est en VO quoi ? » et
+            « est-ce jouable en français ? ». */}
+        {d?.languages?.length > 0 && <Langs detail={d} />}
 
-        {/* Wishlist / joué / ajouter à une liste, en clair : sur une ligne on a
-            la largeur, inutile de les cacher derrière un « + ». */}
-        <div className="lr-actions">
-          {d?.trailer && (
-            <button
-              type="button"
-              className="lr-act clickable"
-              onClick={() => onTrailer({ trailer: d.trailer, gameName: item.name })}
-            >
-              <Play size={14} fill="currentColor" strokeWidth={0} /> Bande-annonce
-            </button>
-          )}
-          <GameAddFan
-            game={{ id: gameId, name: item.name, cover }}
-            variant="row"
-          />
-        </div>
       </div>
 
-      {/* Bande de captures : le coup d'œil qui donne envie, cliquable en grand. */}
+      {/* Wishlist / joué / ajouter à une liste, en clair : sur une ligne on a la
+          largeur, inutile de les cacher derrière un « + ». Zone de grille à
+          part (et non dans .lr-main) pour pouvoir passer pleine largeur sous la
+          jaquette sur téléphone. */}
+      <div className="lr-actions">
+        {d?.trailer && (
+          <button
+            type="button"
+            className="lr-act clickable"
+            onClick={() => onTrailer({ trailer: d.trailer, gameName: item.name })}
+          >
+            <Play size={14} fill="currentColor" strokeWidth={0} /> Bande-annonce
+          </button>
+        )}
+        <GameAddFan game={{ id: gameId, name: item.name, cover }} variant="row" />
+      </div>
+
+      {/* Bande de captures : le coup d'œil qui donne envie, cliquable en grand.
+          Toutes sont là — en grille sur large écran, en rail qui glisse au
+          doigt sur téléphone (cf. CSS), plutôt que d'en jeter la moitié. */}
       {d?.screenshots?.length > 0 && (
         <div className="lr-shots">
-          {d.screenshots.slice(0, 4).map((s, i) => (
+          {d.screenshots.map((s, i) => (
             <button
               type="button"
               key={s.id}

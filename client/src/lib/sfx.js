@@ -83,6 +83,49 @@ export function playSentSound() {
   }
 }
 
+// Bouton de la télé cathodique (Collection) : le « clac » sec d'une touche
+// mécanique. Un carré très bref et très bas, presque pas une note — juste de
+// la matière, pour que la carrosserie ait du poids sous le doigt.
+export function playClackSound() {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    const t = ac.currentTime + 0.005;
+    note(ac, { freq: 165, start: t, dur: 0.05, gain: 0.07, type: "square" });
+    note(ac, { freq: 92, start: t + 0.008, dur: 0.07, gain: 0.05, type: "triangle" });
+  } catch {
+    /* idem */
+  }
+}
+
+// Allumage / extinction du tube : le coup sourd du relais, doublé du sifflement
+// aigu de la haute tension qui monte (allumage) ou retombe (extinction).
+export function playTubeSound(on = true) {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    const t = ac.currentTime + 0.01;
+    note(ac, { freq: on ? 70 : 55, start: t, dur: 0.16, gain: 0.09, type: "triangle" });
+
+    // Le sifflement : un glissando, donc on ne peut pas passer par note().
+    const osc = ac.createOscillator();
+    const env = ac.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(on ? 3200 : 15600, t);
+    osc.frequency.exponentialRampToValueAtTime(on ? 15600 : 2400, t + 0.34);
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(0.022, t + 0.06);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 0.36);
+    osc.connect(env).connect(ac.destination);
+    osc.start(t);
+    osc.stop(t + 0.38);
+  } catch {
+    /* idem */
+  }
+}
+
 // Récompense récupérée : petit arpège ascendant façon pièce ramassée, avec une
 // quinte finale tenue pour la sensation de « ça y est, c'est à moi ».
 export function playRewardSound() {

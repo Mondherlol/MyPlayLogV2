@@ -10,7 +10,7 @@ import {
   RotateCcw,
   RotateCw,
 } from "lucide-react";
-import { loadYT } from "../lib/youtube";
+import { useYouTubePlayer } from "../hooks/useYouTubePlayer";
 
 // ======================================================================
 //  Lecteur YouTube habillé maison — mêmes commandes que le lecteur du mur
@@ -27,9 +27,8 @@ import { loadYT } from "../lib/youtube";
 // une moitié de l'écran : tout ce que fait GameVideoPlayer, avec les mêmes
 // classes CSS pour un rendu identique.
 //
-// Piège respecté : YT.Player n'est jamais monté sur un nœud rendu par React
-// (page blanche au démontage). On crée un enfant DOM à la main dans un
-// conteneur stable ; React ne réconcilie que le conteneur.
+// Le dialogue avec YouTube (création, position, son, destruction) vit dans
+// useYouTubePlayer, partagé avec le téléviseur cathodique de la Collection.
 
 const SEEK_STEP = 10;
 const CROP = 62; // bandes rognées en haut et en bas (px)
@@ -48,109 +47,29 @@ export default function YouTubePlayer({
   title = "Vidéo",
 }) {
   const wrapRef = useRef(null);
-  const holderRef = useRef(null);
-  const playerRef = useRef(null);
   const barRef = useRef(null);
   const hideTimer = useRef(null);
   const tapRef = useRef({ time: 0, zone: null, timer: null });
 
-  const [ready, setReady] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [cur, setCur] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [loaded, setLoaded] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [muted, setMuted] = useState(false);
+  const {
+    holderRef,
+    playerRef,
+    isPlaying,
+    cur,
+    duration,
+    loaded,
+    volume,
+    muted,
+    togglePlay,
+    seekTo,
+    seekBy,
+    setVol,
+    toggleMute,
+  } = useYouTubePlayer({ videoId, autoPlay });
+
   const [fullscreen, setFullscreen] = useState(false);
   const [controlsShown, setControlsShown] = useState(true);
   const [ripple, setRipple] = useState(null);
-
-  // --- Cycle de vie du lecteur YouTube ---
-  useEffect(() => {
-    let destroyed = false;
-    let fallback = null;
-    const holder = holderRef.current;
-    if (!holder) return;
-    // Nœud créé à la main : YouTube le REMPLACE par son iframe, ce que React
-    // ne doit jamais découvrir sur un nœud qu'il gère.
-    const mount = document.createElement("div");
-    holder.appendChild(mount);
-
-    loadYT().then((YT) => {
-      if (destroyed) return;
-      playerRef.current = new YT.Player(mount, {
-        videoId,
-        playerVars: {
-          autoplay: autoPlay ? 1 : 0,
-          controls: 0,
-          rel: 0,
-          iv_load_policy: 3,
-          playsinline: 1,
-          disablekb: 1,
-          modestbranding: 1,
-          fs: 0,
-        },
-        events: {
-          onReady: (e) => {
-            if (destroyed) return;
-            setReady(true);
-            setDuration(e.target.getDuration?.() || 0);
-            e.target.setVolume?.(100);
-            if (autoPlay) {
-              e.target.playVideo?.();
-              // Autoplay sonore refusé par le navigateur ? On repart en muet,
-              // le bouton son rend la main d'un clic.
-              fallback = setTimeout(() => {
-                try {
-                  if (playerRef.current?.getPlayerState?.() !== 1) {
-                    playerRef.current?.mute?.();
-                    playerRef.current?.playVideo?.();
-                    setMuted(true);
-                  }
-                } catch {
-                  /* ignore */
-                }
-              }, 1400);
-            }
-          },
-          onStateChange: (e) => {
-            if (destroyed) return;
-            setIsPlaying(e.data === 1);
-            if (e.data === 1) setDuration(e.target.getDuration?.() || 0);
-          },
-        },
-      });
-    });
-
-    return () => {
-      destroyed = true;
-      clearTimeout(fallback);
-      try {
-        playerRef.current?.destroy?.();
-      } catch {
-        /* ignore */
-      }
-      playerRef.current = null;
-      // Le nœud a été remplacé par l'iframe : on vide le conteneur à la main.
-      while (holder.firstChild) holder.removeChild(holder.firstChild);
-    };
-  }, [videoId, autoPlay]);
-
-  // Progression : YouTube n'émet pas d'évènement de temps, on l'interroge.
-  useEffect(() => {
-    if (!ready) return;
-    const id = setInterval(() => {
-      const p = playerRef.current;
-      if (!p?.getCurrentTime) return;
-      try {
-        setCur(p.getCurrentTime() || 0);
-        setLoaded((p.getVideoLoadedFraction?.() || 0) * (p.getDuration?.() || 0));
-      } catch {
-        /* le lecteur est en train de mourir */
-      }
-    }, 250);
-    return () => clearInterval(id);
-  }, [ready]);
 
   useEffect(() => {
     const onFs = () => setFullscreen(document.fullscreenElement === wrapRef.current);
@@ -165,31 +84,20 @@ export default function YouTubePlayer({
     hideTimer.current = setTimeout(() => {
       if (playerRef.current?.getPlayerState?.() === 1) setControlsShown(false);
     }, 2200);
-  }, []);
+  }, [playerRef]);
   useEffect(() => () => clearTimeout(hideTimer.current), []);
   useEffect(() => {
     if (isPlaying) poke();
     else setControlsShown(true);
   }, [isPlaying, poke]);
 
-  const togglePlay = useCallback(() => {
-    const p = playerRef.current;
-    if (!p) return;
-    if (p.getPlayerState?.() === 1) p.pauseVideo?.();
-    else p.playVideo?.();
-  }, []);
-
-  const seekBy = useCallback(
+  const jump = useCallback(
     (delta, side) => {
-      const p = playerRef.current;
-      if (!p?.getCurrentTime) return;
-      const next = Math.max(0, Math.min(p.getCurrentTime() + delta, p.getDuration?.() || 0));
-      p.seekTo?.(next, true);
-      setCur(next);
+      seekBy(delta);
       if (side) setRipple({ side, id: Date.now() });
       poke();
     },
-    [poke]
+    [seekBy, poke]
   );
 
   // Flèches ← / → : ±10 s. Espace : lecture/pause. Le lecteur ne prend le
@@ -205,10 +113,10 @@ export default function YouTubePlayer({
         return;
       if (e.key === "ArrowLeft") {
         e.preventDefault();
-        seekBy(-SEEK_STEP, "left");
+        jump(-SEEK_STEP, "left");
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
-        seekBy(SEEK_STEP, "right");
+        jump(SEEK_STEP, "right");
       } else if (e.key === " " || e.key === "k") {
         e.preventDefault();
         togglePlay();
@@ -216,7 +124,7 @@ export default function YouTubePlayer({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [seekBy, togglePlay, fullscreen]);
+  }, [jump, togglePlay, fullscreen]);
 
   // Tap / double-tap : centre = lecture/pause, double-tap sur une moitié = ±10 s.
   function onSurface(e) {
@@ -230,7 +138,7 @@ export default function YouTubePlayer({
     if (zone !== "center" && now - t.time < 300 && t.zone === zone) {
       clearTimeout(t.timer);
       t.time = 0;
-      seekBy(zone === "left" ? -SEEK_STEP : SEEK_STEP, zone);
+      jump(zone === "left" ? -SEEK_STEP : SEEK_STEP, zone);
       return;
     }
     t.time = now;
@@ -245,11 +153,9 @@ export default function YouTubePlayer({
 
   function barSeek(clientX) {
     const r = barRef.current?.getBoundingClientRect();
-    const p = playerRef.current;
-    if (!r || !p || !duration) return;
+    if (!r || !duration) return;
     const ratio = Math.min(Math.max((clientX - r.left) / r.width, 0), 1);
-    p.seekTo?.(ratio * duration, true);
-    setCur(ratio * duration);
+    seekTo(ratio * duration);
   }
 
   function barDown(e) {
@@ -278,25 +184,6 @@ export default function YouTubePlayer({
     el.addEventListener("pointerup", up);
     el.addEventListener("pointercancel", up);
     poke();
-  }
-
-  function setVol(val) {
-    const p = playerRef.current;
-    setVolume(val);
-    setMuted(val === 0);
-    if (p) {
-      p.setVolume?.(Math.round(val * 100));
-      if (val === 0) p.mute?.();
-      else p.unMute?.();
-    }
-  }
-
-  function toggleMute() {
-    const p = playerRef.current;
-    const next = !muted;
-    setMuted(next);
-    if (p) next ? p.mute?.() : p.unMute?.();
-    if (!next && volume === 0) setVol(0.6);
   }
 
   function toggleFullscreen(e) {

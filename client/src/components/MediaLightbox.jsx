@@ -39,6 +39,8 @@ export default function MediaLightbox({ items, index, onIndex, onClose, title = 
   const [dragging, setDragging] = useState(false);
   const [isFull, setIsFull] = useState(false);
   const drag = useRef(null);
+  // Doigts posés : au-delà d'un seul, c'est un pincement, pas un glissé.
+  const pointers = useRef(new Set());
 
   // Pincement au doigt / molette au PC. Le zoom retombe à 1 dès qu'on change
   // d'image : arriver sur la suivante déjà agrandie n'a aucun sens.
@@ -99,8 +101,17 @@ export default function MediaLightbox({ items, index, onIndex, onClose, title = 
 
   // --- Glissé (souris ET tactile via les événements pointeur) ---
   // Zoomé, le glissement sert à se déplacer DANS l'image : on rend la main au
-  // zoom plutôt que de changer de capture sous les doigts.
+  // zoom plutôt que de changer de capture sous les doigts. Et un pincement
+  // commence toujours par UN doigt : sans le compteur ci-dessous, ce premier
+  // doigt lançait un changement d'image avant que le second n'arrive.
   function onDown(e) {
+    pointers.current.add(e.pointerId);
+    if (pointers.current.size > 1) {
+      drag.current = null;
+      setDragging(false);
+      setDragDx(0);
+      return;
+    }
     if (list.length < 2 || e.button > 0 || zoom.zoomed) return;
     drag.current = {
       x: e.clientX,
@@ -112,7 +123,7 @@ export default function MediaLightbox({ items, index, onIndex, onClose, title = 
   }
   function onMove(e) {
     const d = drag.current;
-    if (!d) return;
+    if (!d || pointers.current.size > 1) return;
     const dx = e.clientX - d.x;
     if (!d.active) {
       // On ne prend la main qu'à partir d'un geste franchement horizontal :
@@ -128,7 +139,8 @@ export default function MediaLightbox({ items, index, onIndex, onClose, title = 
     d.dx = v;
     setDragDx(v);
   }
-  function onUp() {
+  function onUp(e) {
+    if (e?.pointerId != null) pointers.current.delete(e.pointerId);
     const d = drag.current;
     drag.current = null;
     if (!d?.active) return;

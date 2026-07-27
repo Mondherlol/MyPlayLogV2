@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import {
   Shield,
   ShieldCheck,
+  Library,
   Trophy,
   Check,
   Loader2,
@@ -51,6 +52,7 @@ import RewardArt from "../components/RewardArt";
 import SystemPanel from "../components/AdminSystem";
 import MissionsPanel from "../components/AdminMissions";
 import EventsPanel from "../components/AdminEvents";
+import CollectionPanel from "../components/AdminCollection";
 
 // ======================================================================
 //  Page Admin — shell à onglets verticaux (façon Discord).
@@ -62,6 +64,7 @@ const TAB_KEYS = [
   "psn",
   "geo",
   "events",
+  "collection",
   "system",
   "secrets",
   "patchnotes",
@@ -92,6 +95,7 @@ export default function Admin() {
     { key: "psn", label: "PlayStation", Icon: Trophy, badge: psnActive },
     { key: "geo", label: "GeoGamer", Icon: Globe2 },
     { key: "events", label: "Événements", Icon: CalendarDays },
+    { key: "collection", label: "Collection", Icon: Library },
     { key: "system", label: "Système", Icon: Activity },
     ...(isSuper ? [{ key: "secrets", label: "Secrets", Icon: KeyRound }] : []),
     { key: "patchnotes", label: "Patch notes", Icon: Sparkles },
@@ -163,6 +167,7 @@ export default function Admin() {
           {safeTab === "psn" && <PsnPanel token={token} />}
           {safeTab === "geo" && <GeoGlobePanel token={token} />}
           {safeTab === "events" && <EventsPanel token={token} />}
+          {safeTab === "collection" && <CollectionPanel token={token} />}
           {safeTab === "system" && <SystemPanel token={token} />}
           {safeTab === "secrets" && isSuper && <SecretsPanel token={token} />}
           {safeTab === "patchnotes" && <PatchnoteManager token={token} />}

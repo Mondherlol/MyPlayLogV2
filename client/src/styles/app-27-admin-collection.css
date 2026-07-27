@@ -1,0 +1,1035 @@
+/* ======================================================================
+   Onglet Admin « Collection » — gestion des boîtiers
+   ======================================================================
+   Reprend les repères visuels de la page publique (tranche colorée, pastilles
+   de support et de provenance) pour que ce qu'on règle ici se reconnaisse tout
+   de suite sur l'étagère. Fichier séparé de app-26 : la page que voient les
+   joueurs et l'outil qui l'alimente n'ont pas à cohabiter.
+   ====================================================================== */
+
+.adm-coll-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.1rem;
+}
+
+.adm-coll-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.adm-coll-head p {
+  margin: 0.3rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+
+.adm-coll-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 140px;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.adm-coll-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.adm-coll-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: border-color 0.15s ease;
+}
+
+.adm-coll-row:hover {
+  border-color: var(--border-strong);
+}
+
+/* Vignette : la jaquette, avec un rappel de la tranche sur le bord gauche. */
+.adm-coll-thumb {
+  position: relative;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 60px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+
+.adm-coll-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.adm-coll-spine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 5px;
+  background: var(--tint, var(--orange));
+}
+
+.adm-coll-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.24rem;
+}
+
+.adm-coll-main strong {
+  font-family: var(--font-display);
+  font-size: 0.94rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adm-coll-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+}
+
+.adm-coll-pill {
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.14rem 0.4rem;
+  border-radius: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+/* Titre servi par un lecteur qu'on ne pilote pas : la pastille le dit, parce
+   que son entretien n'est pas le même (liste tenue à la main). */
+.adm-coll-pill.ext {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  color: var(--accent-ink);
+  border-color: color-mix(in srgb, var(--orange) 40%, transparent);
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
+}
+
+.adm-coll-actions {
+  display: flex;
+  gap: 0.3rem;
+  flex: 0 0 auto;
+}
+
+.adm-coll-icon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-soft);
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.adm-coll-icon:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--orange);
+}
+
+.adm-coll-icon.danger:hover:not(:disabled) {
+  color: #e0483f;
+  border-color: #e0483f;
+}
+
+.adm-coll-icon:disabled {
+  opacity: 0.5;
+}
+
+/* ---------- modale ---------- */
+
+.adm-coll-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  display: flex;
+  padding: clamp(0.8rem, 3vw, 2rem);
+  background: rgba(8, 8, 14, 0.62);
+  backdrop-filter: blur(3px);
+  overflow: auto;
+}
+
+.adm-coll-sheet {
+  margin: auto;
+  width: min(560px, 100%);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  max-height: 92vh;
+}
+
+.adm-coll-sheet.wide {
+  width: min(880px, 100%);
+}
+
+.adm-coll-sheet header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.adm-coll-sheet header h3 {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adm-coll-body {
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.adm-coll-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 1.2rem;
+}
+
+.adm-coll-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+/* ---------- champs ---------- */
+
+.adm-coll-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.32rem;
+  margin-bottom: 0.85rem;
+}
+
+.adm-coll-field > span {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.adm-coll-field input,
+.adm-coll-field select,
+.adm-coll-field textarea {
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  padding: 0.52rem 0.68rem;
+  border-radius: 9px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  width: 100%;
+}
+
+.adm-coll-field textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.adm-coll-field input:focus,
+.adm-coll-field select:focus,
+.adm-coll-field textarea:focus {
+  outline: none;
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.adm-coll-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0 0.7rem;
+}
+
+.adm-coll-inline {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.adm-coll-inline input {
+  flex: 1;
+  min-width: 0;
+}
+
+.adm-coll-inline .btn {
+  flex: 0 0 auto;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.82rem;
+}
+
+/* ---------- teintes ---------- */
+
+.adm-coll-tints {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.adm-coll-tint {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 2px solid transparent;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.adm-coll-tint.on {
+  border-color: var(--text);
+}
+
+.adm-coll-tint-pick {
+  width: 32px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: none;
+}
+
+/* ---------- aperçu de l'URL ---------- */
+
+.adm-coll-preview {
+  display: flex;
+  gap: 0.7rem;
+  padding: 0.7rem;
+  margin-bottom: 0.9rem;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.adm-coll-preview img {
+  width: 116px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 6px;
+  flex: 0 0 auto;
+}
+
+.adm-coll-preview strong {
+  display: block;
+  font-size: 0.88rem;
+  font-family: var(--font-display);
+}
+
+.adm-coll-preview > div > span {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+
+.adm-coll-preview ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+/* ---------- rattachement externe ---------- */
+
+.adm-coll-match {
+  padding: 0.8rem;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  margin-bottom: 0.9rem;
+}
+
+.adm-coll-picked {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.5rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #16a34a;
+}
+
+.adm-coll-results {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.adm-coll-results button {
+  width: 100%;
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.45rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  text-align: left;
+  color: inherit;
+}
+
+.adm-coll-results button:hover {
+  border-color: var(--orange);
+}
+
+.adm-coll-results img,
+.adm-coll-noimg {
+  width: 38px;
+  height: 54px;
+  flex: 0 0 auto;
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+
+.adm-coll-res-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.adm-coll-res-text strong {
+  font-size: 0.84rem;
+}
+
+.adm-coll-res-text em {
+  font-style: normal;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+}
+
+.adm-coll-res-text > span {
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: var(--text-soft);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---------- visuels ---------- */
+
+.adm-coll-art {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.adm-coll-art-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.adm-coll-art-box {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+
+.adm-coll-art-box.poster {
+  aspect-ratio: 2 / 3;
+  max-height: 200px;
+}
+
+.adm-coll-art-box.backdrop {
+  aspect-ratio: 16 / 9;
+}
+
+/* Jaquette dépliée : dos + tranche + couverture côte à côte. */
+.adm-coll-art-box.wrap {
+  aspect-ratio: 1825 / 1180;
+}
+
+/* Repères de pliage, aux proportions exactes du boîtier (--tranche = part de
+   la tranche dans la largeur totale, 0,105 / 1,825). */
+.adm-coll-folds {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.adm-coll-folds i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.85) 0 4px,
+    transparent 4px 8px
+  );
+  mix-blend-mode: difference;
+}
+
+.adm-coll-folds i:first-child {
+  left: 47.12%;
+}
+
+.adm-coll-folds i:last-child {
+  left: 52.88%;
+}
+
+.adm-coll-art-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.adm-coll-art-busy {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 8, 14, 0.55);
+  color: #fff;
+}
+
+.adm-coll-upload {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.42rem;
+  border-radius: 8px;
+  border: 1px dashed var(--border-strong);
+  background: none;
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.adm-coll-upload:hover {
+  border-color: var(--orange);
+  color: var(--text);
+}
+
+/* ---------- aperçu de la tranche ---------- */
+
+.adm-coll-boxprev {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: flex-start;
+}
+
+.adm-coll-spine-prev {
+  position: relative;
+  width: 34px;
+  height: 190px;
+  border-radius: 2px;
+  background: var(--tint, var(--orange));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  box-shadow: 0 6px 16px rgba(10, 10, 20, 0.3),
+    inset 3px 0 6px rgba(0, 0, 0, 0.28), inset -3px 0 6px rgba(0, 0, 0, 0.28);
+}
+
+.adm-coll-spine-prev.fmt-dvd {
+  width: 22px;
+}
+
+.adm-coll-spine-prev .cap,
+.adm-coll-spine-prev .foot {
+  flex: 0 0 auto;
+  width: 100%;
+  font-style: normal;
+  font-size: 0.5rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-align: center;
+  padding: 0.2rem 0;
+}
+
+.adm-coll-spine-prev .cap {
+  background: #101118;
+  color: #fff;
+}
+
+.adm-coll-spine-prev .foot {
+  margin-top: auto;
+  background: #f2ecdd;
+  color: #26251f;
+}
+
+/* Le titre court à la verticale, comme sur la vraie tranche. */
+.adm-coll-spine-prev b {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  padding: 0.3rem 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* ======================================================================
+   Choix du lecteur + liste d'épisodes collée
+   ======================================================================
+   Deux façons d'alimenter un boîtier, donc deux cartes à choisir AVANT tout le
+   reste : la modale change de forme selon la réponse. */
+
+.adm-coll-sources {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.5rem;
+}
+
+.adm-coll-source {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.15rem 0.55rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.adm-coll-source svg {
+  grid-row: span 2;
+  color: var(--text-soft);
+}
+
+.adm-coll-source strong {
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+}
+
+.adm-coll-source em {
+  font-style: normal;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--text-soft);
+}
+
+.adm-coll-source:hover {
+  border-color: var(--orange);
+}
+
+.adm-coll-source.on {
+  border-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 10%, transparent);
+}
+
+.adm-coll-source.on svg {
+  color: var(--accent-ink);
+}
+
+/* La zone de liste : du texte technique, donc une chasse fixe et pas de
+   correction automatique — une URL n'est pas une phrase. */
+.adm-coll-field textarea.adm-coll-list {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.76rem;
+  line-height: 1.6;
+  white-space: pre;
+  overflow-x: auto;
+  tab-size: 2;
+}
+
+/* ======================================================================
+   Interrupteur de visibilité de la section
+   ======================================================================
+   En TÊTE de l'onglet, avant le catalogue : c'est le premier réglage à voir,
+   parce qu'il décide si tout ce qui suit existe pour les autres. Éteint, le
+   bloc reste sobre (gris) ; allumé, il prend l'accent — l'état se lit d'un
+   coup d'œil, sans avoir à trouver la position du curseur. */
+
+.adm-coll-visib {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.1rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.adm-coll-visib.on {
+  border-color: color-mix(in srgb, var(--orange) 45%, transparent);
+  background: color-mix(in srgb, var(--orange) 9%, transparent);
+}
+
+.adm-coll-visib-icon {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.adm-coll-visib.on .adm-coll-visib-icon {
+  color: #1a1204;
+  background: var(--accent-grad);
+  border-color: transparent;
+}
+
+.adm-coll-visib-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.adm-coll-visib-text strong {
+  font-family: var(--font-display);
+  font-size: 0.94rem;
+}
+
+.adm-coll-visib-text span {
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-soft);
+}
+
+/* ---------- import depuis un répertoire de liens ---------- */
+
+.adm-coll-import {
+  padding: 0.75rem 0.85rem 0.85rem;
+  margin-bottom: 0.9rem;
+  border-radius: 12px;
+  border: 1px dashed var(--border-strong);
+  background: var(--surface-2);
+}
+
+.adm-coll-import .adm-coll-field {
+  margin: 0;
+}
+
+.adm-coll-import .adm-coll-field > span {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Un select POSÉ À CÔTÉ d'un champ ne s'étire pas : il tient sa propre largeur
+   et laisse la place à l'input. La règle générale `.adm-coll-field select` lui
+   donne `width: 100%` — dans une rangée flex, ça lui fait une base démesurée et
+   il avale toute la ligne. Il faut donc reprendre la main avec au moins autant
+   de spécificité (classe + classe + type), pas seulement `.adm-coll-lang`. */
+.adm-coll-field .adm-coll-inline select,
+.adm-coll-field select.adm-coll-lang {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 96px;
+}
+
+.adm-coll-import-report {
+  display: flex;
+  gap: 0.8rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.adm-coll-import-report img {
+  flex: 0 0 auto;
+  width: 84px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.adm-coll-import-report > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.adm-coll-import-report strong {
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+}
+
+.adm-coll-import-report > div > span {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+
+.adm-coll-import-report ul {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+}
+
+.adm-coll-import-report li::before {
+  content: "▸ ";
+  color: var(--accent-ink);
+}
+
+/* Une saison sans épisode dans la langue demandée n'est pas une erreur — mais
+   elle doit se voir, sinon on croit l'import complet. */
+.adm-coll-import-report li.empty {
+  color: #d97706;
+}
+
+.adm-coll-import-report li.empty::before {
+  color: #d97706;
+}
+
+.adm-coll-import-hosts {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  margin-top: 0.35rem;
+}
+
+.adm-coll-import-hosts em {
+  font-style: normal;
+  font-size: 0.66rem;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+}
+
+.adm-coll-import-hosts b {
+  color: var(--text);
+}
+
+/* ---------- relecture de la liste ---------- */
+
+.adm-coll-listprev {
+  margin-top: 0.7rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.adm-coll-listprev-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.adm-coll-listprev-head strong {
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+}
+
+.adm-coll-listprev-warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #d97706;
+}
+
+.adm-coll-listprev-hosts {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.adm-coll-listprev-hosts em {
+  font-style: normal;
+  font-size: 0.68rem;
+  padding: 0.14rem 0.42rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+}
+
+.adm-coll-listprev-hosts b {
+  color: var(--text);
+}
+
+.adm-coll-listprev ul {
+  list-style: none;
+  margin: 0;
+  padding: 0.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.adm-coll-listprev li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 0.45rem;
+  border-radius: 7px;
+  font-size: 0.78rem;
+}
+
+.adm-coll-listprev li:nth-child(odd) {
+  background: var(--surface);
+}
+
+.adm-coll-listprev-num {
+  flex: 0 0 auto;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--accent-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.adm-coll-listprev-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adm-coll-listprev-title em {
+  font-style: italic;
+  color: var(--text-soft);
+}
+
+.adm-coll-listprev-host {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.7rem;
+  color: var(--text-soft);
+}
+
+.adm-coll-listprev-host b {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  font-size: 0.66rem;
+  color: var(--accent-ink);
+}
+
+.adm-coll-listprev-more {
+  justify-content: center;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+}
+
+/* ---------- pied de modale ---------- */
+
+.adm-coll-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.adm-coll-hint {
+  margin: 0.6rem 0 0;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+  text-align: right;
+}
+
+.adm-coll-error {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.7rem 0 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 9px;
+  font-size: 0.8rem;
+  background: rgba(230, 60, 60, 0.1);
+  border: 1px solid rgba(230, 60, 60, 0.28);
+  color: #e0483f;
+}
+
+@media (max-width: 720px) {
+  .adm-coll-split {
+    grid-template-columns: 1fr;
+  }
+
+  .adm-coll-art-box.poster {
+    max-height: 260px;
+  }
+}

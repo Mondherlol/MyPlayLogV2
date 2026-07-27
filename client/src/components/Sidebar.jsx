@@ -7,6 +7,7 @@ import {
   CalendarDays,
   MessagesSquare,
   List,
+  Library,
   Joystick,
   User,
   Palmtree,
@@ -35,6 +36,9 @@ const NAV = [
   // `badge` : la pastille de non-lus vient du contexte de messagerie.
   { to: "/messages", label: "Messages", Icon: MessagesSquare, badge: "chat" },
   { to: "/lists", label: "Listes", Icon: List },
+  // `feature` : entrée soumise à un drapeau réglé dans le panneau d'admin.
+  // Éteinte, elle n'apparaît que pour l'admin (qui prépare la page).
+  { to: "/collection", label: "Collection", Icon: Library, feature: "collection" },
   { to: "/arcade", label: "Arcade", Icon: Joystick },
   { to: "/profile", label: "Profil", Icon: User },
   { to: "/admin", label: "Admin", Icon: Shield, adminOnly: true },
@@ -47,7 +51,7 @@ function FlagFR() {
 
 export default function Sidebar({ collapsed, onToggle }) {
   const { theme, toggle } = useTheme();
-  const { user } = useAuth();
+  const { user, hasFeature } = useAuth();
   const { unread } = useChat();
   const { cosmetics } = useCosmetics();
   const arcadeTheme = cosmetics?.theme || null;
@@ -79,7 +83,10 @@ export default function Sidebar({ collapsed, onToggle }) {
       </div>
 
       <nav className="side-nav">
-        {NAV.filter((n) => !n.adminOnly || user?.isAdmin).map(
+        {NAV.filter(
+          (n) =>
+            (!n.adminOnly || user?.isAdmin) && (!n.feature || hasFeature(n.feature))
+        ).map(
           ({ to, label, Icon, end, adminOnly, badge }) => {
             const count = badge === "chat" ? unread : 0;
             return (

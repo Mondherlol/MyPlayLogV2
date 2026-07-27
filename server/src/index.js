@@ -36,6 +36,9 @@ import downloadRoutes from "./routes/downloads.js";
 import trackerRoutes, { startTrackerAutoSync } from "./routes/trackers.js";
 import missionRoutes from "./routes/missions.js";
 import chatRoutes from "./routes/chat.js";
+import collectionRoutes from "./routes/collection.js";
+import settingsRoutes from "./routes/settings.js";
+import { requireFeature } from "./lib/features.js";
 import { avatarPrivacy } from "./middleware/avatarPrivacy.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -101,6 +104,11 @@ app.use("/api/patches", patchesRoutes);
 app.use("/api/downloads", downloadRoutes);
 app.use("/api/trackers", trackerRoutes);
 app.use("/api/missions", missionRoutes);
+// Réglages de l'app : les drapeaux qui allument ou éteignent des sections.
+app.use("/api/settings", settingsRoutes);
+// Collection : séries / films / animés liés au jeu vidéo (l'étagère). Toute la
+// section est derrière son drapeau — éteinte, elle n'existe que pour l'admin.
+app.use("/api/collection", requireFeature("collection"), collectionRoutes);
 // Messagerie (DM + groupes). Contient le flux temps réel SSE /api/chat/stream.
 app.use("/api/chat", chatRoutes);
 // Remontée des crashs du front (voir routes/clientErrors.js).

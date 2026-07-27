@@ -19,6 +19,8 @@ import CompanyPage from "./pages/CompanyPage";
 import PlatformPage from "./pages/PlatformPage";
 import Profile from "./pages/Profile";
 import Lists from "./pages/Lists";
+import Collection from "./pages/Collection";
+import CollectionDetail from "./pages/CollectionDetail";
 import Messages from "./pages/Messages";
 import ListDetail from "./pages/ListDetail";
 import Admin from "./pages/Admin";
@@ -47,6 +49,17 @@ function PublicOrApp({ children }) {
   ) : (
     <PublicShell>{children}</PublicShell>
   );
+}
+
+// Section soumise à un drapeau réglé dans le panneau d'admin. Éteinte, elle
+// n'existe pas : l'URL ramène à l'accueil plutôt que d'afficher une page vide
+// ou un message d'erreur. L'admin, lui, passe toujours — c'est lui qui prépare
+// la section pendant qu'elle est cachée (même règle que lib/features.js côté
+// serveur, qui refuse les requêtes de son côté).
+function FeatureRoute({ name, element }) {
+  const { hasFeature, loading } = useAuth();
+  if (loading) return <div className="center-screen">Chargement…</div>;
+  return hasFeature(name) ? element : <Navigate to="/app" replace />;
 }
 
 function GuestOnly({ children }) {
@@ -142,6 +155,15 @@ export default function App() {
         <Route path="/messages" element={<Messages />} />
         <Route path="/lists" element={<Lists />} />
         <Route path="/lists/:id" element={<ListDetail />} />
+        {/* Le rayon vidéo s'allume depuis le panneau d'admin. Éteint, l'URL
+            ramène à l'accueil pour tout le monde sauf l'admin — qui prépare la
+            page pendant qu'elle est cachée. Le serveur refuse de son côté :
+            masquer une route n'a jamais protégé une API. */}
+        <Route path="/collection" element={<FeatureRoute name="collection" element={<Collection />} />} />
+        <Route
+          path="/collection/:slug"
+          element={<FeatureRoute name="collection" element={<CollectionDetail />} />}
+        />
         <Route path="/profile" element={<Profile />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/settings" element={<Settings />} />

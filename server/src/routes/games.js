@@ -648,7 +648,51 @@ const LIST_DETAIL_FIELDS = [
   "screenshots.height",
   "videos.video_id",
   "videos.name",
+  // « DLC de … », « Remaster de … » : le type IGDB et le jeu parent.
+  "game_type",
+  "parent_game.id",
+  "parent_game.name",
+  "version_parent.id",
+  "version_parent.name",
+  // Pays du studio : sert à deviner la langue d'origine (cf. ORIGIN_LANGUAGES).
+  "involved_companies.developer",
+  "involved_companies.company.country",
 ].join(",");
+
+// Langue d'origine, devinée depuis le PAYS DU STUDIO (code ISO 3166-1
+// numérique, tel qu'IGDB le fournit). C'est le seul signal disponible : l'API
+// dit quelles langues un jeu propose, jamais laquelle est la sienne. Un studio
+// japonais → jeu pensé en japonais, un studio polonais → en polonais, etc.
+// Pour tout le reste (et les studios sans pays renseigné), on retombe sur
+// l'anglais, qui est la langue de référence du secteur.
+const ORIGIN_LANGUAGES = {
+  392: "Japonais",
+  410: "Coréen",
+  156: "Chinois (simplifié)",
+  158: "Chinois (traditionnel)",
+  250: "Français",
+  276: "Allemand",
+  380: "Italien",
+  724: "Espagnol (Espagne)",
+  616: "Polonais",
+  643: "Russe",
+  804: "Ukrainien",
+  752: "Suédois",
+  578: "Norvégien",
+  208: "Danois",
+  246: "Finnois",
+  528: "Néerlandais",
+  76: "Portugais (Brésil)",
+  620: "Portugais (Portugal)",
+  203: "Tchèque",
+  348: "Hongrois",
+  792: "Turc",
+  764: "Thaï",
+  704: "Vietnamien",
+  360: "Indonésien",
+  484: "Espagnol (Amérique latine)",
+  32: "Espagnol (Amérique latine)",
+};
 
 const MAX_LIST_DETAILS = 60;
 
@@ -684,6 +728,22 @@ router.get("/list-details", optionalAuth, async (req, res) => {
       const trailer =
         videos.find((v) => /trailer|bande|reveal/i.test(v.name || "")) || videos[0];
 
+      // Langue d'origine : pays du premier studio de développement connu.
+      const devCountry = (g.involved_companies || []).find(
+        (c) => c.developer && c.company?.country
+      )?.company?.country;
+      const guessed = ORIGIN_LANGUAGES[devCountry] || "Anglais";
+      // On ne l'annonce que si le jeu la propose vraiment ; sinon la mention
+      // serait fausse (studio japonais dont le jeu ne sort qu'en anglais).
+      const original =
+        [...langByName.values()].find((l) => l.name === guessed) ||
+        langByName.get("Anglais") ||
+        null;
+
+      // « DLC de … », « Remaster de … » : rien à afficher pour un jeu de base.
+      const typeFr = GAME_TYPES_FR[g.game_type];
+      const parent = g.parent_game || g.version_parent || null;
+
       return {
         id: g.id,
         name: g.name,
@@ -702,10 +762,20 @@ router.get("/list-details", optionalAuth, async (req, res) => {
         languages: [...langByName.values()].sort((a, b) =>
           a.name.localeCompare(b.name, "fr")
         ),
+        originalLanguage: original,
+        french: langByName.get("Français") || null,
+        kind: typeFr
+          ? {
+              label: typeFr.label,
+              parent: parent ? { id: parent.id, name: parent.name } : null,
+            }
+          : null,
         screenshots: (g.screenshots || [])
           .filter((s) => s.image_id)
           .sort(byArea)
-          .slice(0, 8)
+          // Le rail mobile les fait toutes défiler : une douzaine donne de quoi
+          // glisser sans gonfler la réponse pour soixante jeux.
+          .slice(0, 12)
           .map((s) => ({
             id: s.image_id,
             thumb: `${IMG_BASE}/t_screenshot_med/${s.image_id}.jpg`,

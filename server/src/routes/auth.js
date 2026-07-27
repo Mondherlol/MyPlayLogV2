@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { sendMail } from "../lib/mailer.js";
+import { readFeatures } from "../lib/features.js";
 
 const router = express.Router();
 
@@ -222,7 +223,10 @@ function resetEmailHtml(username, link) {
 router.get("/me", requireAuth, async (req, res) => {
   const user = await User.findById(req.userId);
   if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
-  res.json({ user: user.toPublic() });
+  // Les drapeaux de sections partent avec le bootstrap : la barre latérale doit
+  // savoir dès le premier rendu ce qu'elle a le droit d'afficher, sans une
+  // requête de plus (et sans faire clignoter un lien qui disparaît).
+  res.json({ user: user.toPublic(), features: await readFeatures() });
 });
 
 export default router;

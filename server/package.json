@@ -10,6 +10,7 @@
     "seed:patch11": "node src/scripts/seedPatchnoteV11.js",
     "seed:arcade": "node src/scripts/seedArcade.js",
     "sync:events": "node src/scripts/syncEventLists.js",
+    "seed:collection": "node src/scripts/seedCollection.js",
     "import:geo": "node src/scripts/importGeoPanoramas.js",
     "geo:export": "node src/scripts/geoCatalog.js --export",
     "geo:import": "node src/scripts/geoCatalog.js --import",

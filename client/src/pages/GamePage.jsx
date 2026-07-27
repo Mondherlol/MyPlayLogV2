@@ -1978,6 +1978,8 @@ function ImageViewer({
   const [dragDx, setDragDx] = useState(0);
   const [dragging, setDragging] = useState(false);
   const cdrag = useRef(null);
+  // Doigts posés : au-delà d'un seul, c'est un pincement, pas un glissé.
+  const pointers = useRef(new Set());
 
   const list =
     filter === "all" ? images : images.filter((m) => m.type === filter);
@@ -2070,6 +2072,15 @@ function ImageViewer({
 
   // --- Glisser pour naviguer (pointer events : tactile + souris) ---
   function onStageDown(e) {
+    // Un pincement commence par UN doigt : sans ce compteur, ce premier doigt
+    // lançait un changement de capture avant l'arrivée du second.
+    pointers.current.add(e.pointerId);
+    if (pointers.current.size > 1) {
+      cdrag.current = null;
+      setDragging(false);
+      setDragDx(0);
+      return;
+    }
     // Zoomé, le glissement déplace l'image : on ne change pas de capture.
     if (list.length < 2 || zoom.zoomed || e.target.closest("button")) return;
     cdrag.current = {
@@ -2083,7 +2094,7 @@ function ImageViewer({
   }
   function onStageMove(e) {
     const d = cdrag.current;
-    if (!d) return;
+    if (!d || pointers.current.size > 1) return;
     const dx = e.clientX - d.x;
     const dy = e.clientY - d.y;
     if (!d.decided) {
@@ -2108,7 +2119,8 @@ function ImageViewer({
     d.dx = v;
     setDragDx(v);
   }
-  function onStageUp() {
+  function onStageUp(e) {
+    if (e?.pointerId != null) pointers.current.delete(e.pointerId);
     const d = cdrag.current;
     cdrag.current = null;
     if (!d?.active) return;

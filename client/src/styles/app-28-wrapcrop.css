@@ -1,0 +1,175 @@
+/* ======================================================================
+   Alignement d'une jaquette dépliée (panneau Admin)
+   ======================================================================
+   Le gabarit est aux proportions exactes du boîtier, et les deux traits de
+   pliage sont posés là où le découpage tombera vraiment. Tout le reste de
+   l'écran s'efface : on ne regarde que la tranche.
+   ====================================================================== */
+
+.wrapcrop {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  display: flex;
+  padding: clamp(0.8rem, 3vw, 2rem);
+  background: rgba(6, 6, 10, 0.78);
+  backdrop-filter: blur(4px);
+  overflow: auto;
+}
+
+.wrapcrop-sheet {
+  margin: auto;
+  width: min(760px, 100%);
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.wrapcrop-sheet header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 0.6rem;
+}
+
+.wrapcrop-sheet h3 {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  margin: 0;
+}
+
+.wrapcrop-help {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.7rem;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+.wrapcrop-help strong {
+  color: var(--text);
+}
+
+/* Le gabarit : fenêtre au rapport du boîtier, l'image se déplace derrière. */
+.wrapcrop-frame {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 8px;
+  background: repeating-conic-gradient(
+      var(--surface-2) 0% 25%,
+      var(--surface) 0% 50%
+    )
+    50% / 18px 18px;
+  border: 1px solid var(--border-strong);
+  touch-action: none;
+  cursor: var(--cursor-grab), grab;
+}
+
+.wrapcrop-frame:active {
+  cursor: var(--cursor-grabbing), grabbing;
+}
+
+.wrapcrop-frame img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  max-width: none;
+  width: 100%;
+  transform-origin: center;
+  user-select: none;
+}
+
+.wrapcrop-load {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  text-align: center;
+  padding: 1rem;
+}
+
+/* Traits de pliage : la tranche vit entre les deux. */
+.wrapcrop-fold {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 2px dashed rgba(255, 255, 255, 0.9);
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9));
+  pointer-events: none;
+}
+
+.wrapcrop-spine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--orange) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--orange) 60%, transparent);
+}
+
+.wrapcrop-tag {
+  position: absolute;
+  bottom: 0.5rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.16rem 0.42rem;
+  border-radius: 4px;
+  color: #fff;
+  background: rgba(8, 8, 14, 0.72);
+  pointer-events: none;
+}
+
+.wrapcrop-tag.back {
+  left: 0.5rem;
+}
+
+.wrapcrop-tag.front {
+  right: 0.5rem;
+}
+
+/* Réglages */
+.wrapcrop-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.9rem;
+  margin-top: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.wrapcrop-controls label {
+  flex: 1;
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.24rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.wrapcrop-controls input[type="range"] {
+  width: 100%;
+  accent-color: var(--orange);
+}
+
+.wrapcrop-controls em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+@media (max-width: 620px) {
+  .wrapcrop-controls label {
+    min-width: 100%;
+  }
+}
