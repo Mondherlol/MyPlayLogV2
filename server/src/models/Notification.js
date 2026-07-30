@@ -65,6 +65,9 @@ const notificationSchema = new mongoose.Schema(
     // Cible « post du mur média » : combiné à `game`, permet d'ouvrir l'onglet
     // Feed du jeu directement sur le post concerné (/game/…?tab=feed&post=…).
     gameMedia: { type: mongoose.Schema.Types.ObjectId, ref: "GameMedia", default: null },
+    // Cible « titre de la collection » : le slug suffit à rouvrir la fiche
+    // (/collection/…), un titre du rayon n'ayant pas de propriétaire.
+    collectionSlug: { type: String, default: null },
     // Cible « jeu » (pour les recommandations).
     game: { type: Number, default: null }, // id IGDB
     gameName: { type: String, default: "" },

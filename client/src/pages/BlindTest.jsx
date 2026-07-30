@@ -36,6 +36,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { usePlayer } from "../context/PlayerContext";
 import { apiFetch } from "../lib/api";
+import { useLiveStatus } from "../lib/presence";
 import { loadYT } from "../lib/youtube";
 // Règles communes aux mini-jeux « devine le jeu » (partagées avec Pixel Rush) :
 // normalisation des titres, recherche tolérante, estimation des points.
@@ -94,6 +95,12 @@ export default function BlindTest() {
 
   // Déroulé
   const [idx, setIdx] = useState(0);
+
+  // Annonce « Joue à … · manche 3/10 » dans la messagerie de ceux avec qui on
+  // discute (cf. lib/presence.js). Rien à nettoyer : le hook s'éteint seul.
+  useLiveStatus("blindtest", rounds.length ? `manche ${idx + 1}/${rounds.length}` : "", {
+    token,
+  });
   const [score, setScore] = useState(0);
   const [timeLeftMs, setTimeLeftMs] = useState(0);
   const [reveal, setReveal] = useState(null); // { correct, points, round, guessName }

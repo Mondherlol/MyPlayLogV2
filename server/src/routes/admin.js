@@ -12,6 +12,7 @@ import UserGame from "../models/UserGame.js";
 import List from "../models/List.js";
 import Recommendation from "../models/Recommendation.js";
 import OstThread from "../models/OstThread.js";
+import CollectionThread from "../models/CollectionThread.js";
 import Repost from "../models/Repost.js";
 import Documentary from "../models/Documentary.js";
 import Notification from "../models/Notification.js";
@@ -137,6 +138,7 @@ async function deleteUserCompletely(id, actorId) {
     UserGame.updateMany({}, { $pull: { comments: { user: id }, reactions: { user: id } } }),
     List.updateMany({}, { $pull: { comments: { user: id }, likes: id } }),
     OstThread.updateMany({}, { $pull: { comments: { user: id } } }),
+    CollectionThread.updateMany({}, { $pull: { comments: { user: id } } }),
     Repost.updateMany({}, { $pull: { comments: { user: id }, likes: id } }),
     Recommendation.updateMany(
       {},

@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
+import { useLiveStatus } from "../lib/presence";
 import { applyGeoGlobe } from "../lib/geoGlobe";
 import {
   dedupeCandidates,
@@ -489,6 +490,12 @@ export default function GeoGamer() {
 
   // Déroulé
   const [idx, setIdx] = useState(0);
+
+  // Annonce « Joue à … · manche 3/10 » dans la messagerie de ceux avec qui on
+  // discute (cf. lib/presence.js). Rien à nettoyer : le hook s'éteint seul.
+  useLiveStatus("geo", rounds.length ? `manche ${idx + 1}/${rounds.length}` : "", {
+    token,
+  });
   const [score, setScore] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [reveal, setReveal] = useState(null);

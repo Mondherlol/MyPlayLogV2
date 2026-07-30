@@ -810,6 +810,7 @@
 .hf-int-badge.act-list_like,
 .hf-int-badge.act-comment_like,
 .hf-int-badge.act-review_comment_like,
+.hf-int-badge.act-collection_comment_like,
 .hf-int-badge.act-review_react {
   background: rgba(230, 74, 74, 0.12);
   color: #d65454;
@@ -930,6 +931,145 @@
 
 .hf-gmcom-counts .on {
   color: #e0483f;
+}
+
+/* ---------- Discussion du rayon vidéo (collection) ----------
+   Le rayon a un repère et un seul : la TRANCHE colorée d'un boîtier debout.
+   La carte le reprend en miniature — même couleur, même objet — pour qu'on
+   reconnaisse le titre avant d'avoir lu la ligne. Tout le bloc est teinté par
+   `--tint`, posé par la carte d'après la couleur du titre. */
+.hf-collcom.clickable {
+  cursor: var(--cursor-pointer), pointer;
+}
+
+.hf-collcom:hover .hf-int-quote {
+  border-left-color: var(--tint);
+}
+
+/* Le titre dont on parle : boîtier, identité, et la flèche qui dit où ça mène. */
+.hf-collcom-src {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.45rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  min-width: 0;
+  /* Un souffle de la teinte du titre par la gauche, d'où sort le boîtier. */
+  background: linear-gradient(
+      100deg,
+      color-mix(in srgb, var(--tint) 12%, transparent),
+      transparent 58%
+    ),
+    var(--surface-2);
+  transition: border-color 0.18s ease;
+}
+
+.hf-collcom:hover .hf-collcom-src {
+  border-color: color-mix(in srgb, var(--tint) 48%, var(--border));
+}
+
+/* Le boîtier. Debout, proportions d'une jaquette, et il se soulève au survol
+   comme sur l'étagère — c'est le même geste, en tout petit. */
+.hf-collcom-case {
+  position: relative;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 56px;
+  border-radius: 4px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  box-shadow: 0 5px 14px rgba(10, 10, 20, 0.2);
+  transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1), box-shadow 0.2s ease;
+}
+
+.hf-collcom:hover .hf-collcom-case {
+  transform: translateY(-3px) rotate(-1.5deg);
+  box-shadow: 0 10px 22px rgba(10, 10, 20, 0.3);
+}
+
+.hf-collcom-case img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* La tranche : le filet de couleur qui court sur le chant, plus clair en haut
+   comme si la lumière tombait dessus. */
+.hf-collcom-spine {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--tint) 70%, #fff),
+    var(--tint) 45%,
+    color-mix(in srgb, var(--tint) 78%, #000)
+  );
+  box-shadow: 1px 0 4px rgba(0, 0, 0, 0.3);
+}
+
+.hf-collcom-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.hf-collcom-txt em {
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hf-collcom-txt strong {
+  font-family: var(--font-display);
+  font-size: 0.96rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hf-collcom-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+}
+
+.hf-collcom-go {
+  flex: 0 0 auto;
+  color: var(--text-soft);
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.hf-collcom:hover .hf-collcom-go {
+  color: var(--tint);
+  transform: translateX(3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hf-collcom:hover .hf-collcom-case,
+  .hf-collcom:hover .hf-collcom-go {
+    transform: none;
+  }
 }
 
 /* ---------- Post original dans la modale de réponses ---------- */

@@ -26,6 +26,8 @@ function serialize(n) {
     videoOwner: n.videoOwner?.username || null,
     // Post du mur média visé (lien /game/…?tab=feed&post=…).
     postId: n.gameMedia ? String(n.gameMedia) : null,
+    // Titre de la collection visé (lien /collection/…).
+    collectionSlug: n.collectionSlug || null,
     snippet: n.snippet || "",
     read: n.read,
     createdAt: n.createdAt,

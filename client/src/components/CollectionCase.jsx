@@ -1,6 +1,14 @@
 import { Link } from "react-router-dom";
-import { Play, Film, Tv } from "lucide-react";
-import { FORMATS, LICENCES, fmtYears, resumeLabel } from "../lib/collection";
+import { Play, Film, Tv, BookOpen, Gamepad2 } from "lucide-react";
+import {
+  CONSOLE,
+  FORMATS,
+  LICENCES,
+  fmtYears,
+  resumeLabel,
+  isComic,
+  isGame,
+} from "../lib/collection";
 
 // ======================================================================
 //  Boîtier de collection, en 2D — la vue « grille »
@@ -12,6 +20,8 @@ import { FORMATS, LICENCES, fmtYears, resumeLabel } from "../lib/collection";
 // au survol.
 
 export default function CollectionCase({ media }) {
+  const comic = isComic(media);
+  const game = isGame(media);
   const format = FORMATS[media.format] || FORMATS.dvd;
   const licence = LICENCES[media.licence] || LICENCES.official;
   const resume = resumeLabel(media);
@@ -52,7 +62,7 @@ export default function CollectionCase({ media }) {
           </span>
 
           <span className="coll-case-play" aria-hidden="true">
-            <Play size={20} fill="currentColor" />
+            {game ? <Gamepad2 size={20} /> : <Play size={20} fill="currentColor" />}
           </span>
 
           <div className="coll-case-plate">
@@ -61,12 +71,27 @@ export default function CollectionCase({ media }) {
             )}
             <strong className="coll-case-title">{media.title}</strong>
             <span className="coll-case-meta">
-              {media.kind === "series" ? <Tv size={11} /> : <Film size={11} />}
-              {media.kind === "series"
-                ? `${media.episodeCount} ép.`
-                : media.runtime
-                  ? `${media.runtime} min`
-                  : "Film"}
+              {/* Le papier se compte en planches, jamais en minutes : un manga
+                  annoncé « Film » ici, c'est la même confusion que le boîtier
+                  DVD sur l'étagère. */}
+              {comic ? (
+                <BookOpen size={11} />
+              ) : game ? (
+                <Gamepad2 size={11} />
+              ) : media.kind === "series" ? (
+                <Tv size={11} />
+              ) : (
+                <Film size={11} />
+              )}
+              {comic
+                ? `${media.pageCount || 0} planches`
+                : game
+                  ? CONSOLE
+                  : media.kind === "series"
+                    ? `${media.episodeCount} ép.`
+                    : media.runtime
+                      ? `${media.runtime} min`
+                      : "Film"}
               {fmtYears(media) && <em>· {fmtYears(media)}</em>}
             </span>
           </div>
@@ -76,9 +101,14 @@ export default function CollectionCase({ media }) {
 
       {(resume || done > 0) && (
         <div className="coll-case-progress">
-          <span className="coll-case-progress-bar">
-            <span style={{ width: `${done || pct}%` }} />
-          </span>
+          {/* Un jeu n'a pas d'avancement mesurable de notre côté : la jauge
+              serait toujours à zéro, ce qui dirait le contraire du temps de jeu
+              affiché juste à côté. */}
+          {!game && (
+            <span className="coll-case-progress-bar">
+              <span style={{ width: `${done || pct}%` }} />
+            </span>
+          )}
           <span className="coll-case-progress-label">
             {done > 0 && media.kind === "series"
               ? `${p.watched.length}/${media.episodeCount} vus`

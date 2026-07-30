@@ -11,6 +11,7 @@
     "seed:arcade": "node src/scripts/seedArcade.js",
     "sync:events": "node src/scripts/syncEventLists.js",
     "seed:collection": "node src/scripts/seedCollection.js",
+    "build:mots": "node src/scripts/buildMotsDict.js",
     "import:geo": "node src/scripts/importGeoPanoramas.js",
     "geo:export": "node src/scripts/geoCatalog.js --export",
     "geo:import": "node src/scripts/geoCatalog.js --import",
@@ -19,9 +20,12 @@
     "migrate:video-social": "node src/scripts/migrateVideoSocial.js",
     "backfill:feed": "node src/scripts/backfillFeedActivities.js",
     "backfill:wishlisted": "node src/scripts/backfillWishlisted.js",
-    "reset:mission-claims": "node src/scripts/resetMissionClaims.js"
+    "backfill:comic-thumbs": "node src/scripts/backfillComicThumbs.js",
+    "reset:mission-claims": "node src/scripts/resetMissionClaims.js",
+    "purge:ds": "node src/scripts/purgeDsGames.js"
   },
   "dependencies": {
+    "adm-zip": "^0.6.0",
     "bcryptjs": "^2.4.3",
     "cheerio": "^1.2.0",
     "cors": "^2.8.5",
@@ -31,6 +35,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.5.1",
     "multer": "^2.2.0",
+    "node-unrar-js": "^2.0.2",
     "nodemailer": "^9.0.3",
     "psn-api": "^2.18.0"
   },

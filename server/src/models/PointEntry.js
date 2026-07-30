@@ -14,6 +14,7 @@ export const POINT_SOURCES = {
   blindtest: "Blind test",
   pixel: "Pixel Rush",
   geo: "GeoGamer",
+  mot: "Mot du jour",
   case: "Ouverture de caisse",
   duplicate: "Doublon reconverti",
   admin: "Ajustement admin",

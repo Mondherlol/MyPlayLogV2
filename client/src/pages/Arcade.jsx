@@ -29,6 +29,7 @@ import {
   Sunset,
   Contrast,
   Users,
+  Thermometer,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCosmetics } from "../context/CosmeticsContext";
@@ -81,6 +82,19 @@ const GAMES = [
     api: "/geo/leaderboard",
     idOf: (e) => e.geoGameId,
   },
+  {
+    key: "mot",
+    name: "Mot du jour",
+    tag: "Devinette",
+    pitch:
+      "Un mot, le même pour tout le monde jusqu'à minuit. Propose des mots proches : ça chauffe.",
+    Icon: Thermometer,
+    path: "/mot",
+    api: "/mot/leaderboard",
+    // Pas de bouton « Défier » ici : tout le monde joue DÉJÀ la même énigme le
+    // même jour, il n'y a pas de set à rejouer. D'où l'absence d'identifiant.
+    idOf: () => null,
+  },
 ];
 
 // Libellés des lignes du grand livre (miroir de POINT_SOURCES,
@@ -89,6 +103,7 @@ const SOURCE_LABELS = {
   blindtest: "Blind test",
   pixel: "Pixel Rush",
   geo: "GeoGamer",
+  mot: "Mot du jour",
   case: "Ouverture de caisse",
   duplicate: "Doublon reconverti",
   admin: "Ajustement admin",
@@ -393,10 +408,6 @@ export default function Arcade() {
               cover={covers.length ? covers[i % covers.length] : null}
             />
           ))}
-          {/* Trois jeux, une grille de deux colonnes : la 4e case serait vide.
-              On y met une carte « à venir » — elle tient la promesse d'autres
-              mini-jeux et évite le trou à côté de GeoGamer. */}
-          <SoonCard />
         </div>
 
         {/* ---------- Les caisses ---------- */}
@@ -581,34 +592,6 @@ function GameCard({ game, mine, cover }) {
   );
 }
 
-// ---------- La carte « à venir » ----------
-// Un placeholder assumé : non cliquable, grisé, un « ? » à la place de l'art.
-// Elle occupe la case libre de la grille sans faire semblant d'être jouable.
-function SoonCard() {
-  return (
-    <div className="arc-game arc-game-soon">
-      <span className="arc-game-glow" aria-hidden="true" />
-      <span className="arc-game-top">
-        <span className="arc-game-art soon" aria-hidden="true">
-          <b>?</b>
-        </span>
-        <span className="arc-game-head">
-          <span className="arc-game-name">Jeu mystère</span>
-          <span className="arc-game-pitch">
-            Un nouveau mini-jeu se prépare. Reviens vite pour le découvrir.
-          </span>
-        </span>
-      </span>
-      <span className="arc-game-foot">
-        <span className="arc-game-stat">
-          <Sparkles size={13} /> À venir bientôt
-        </span>
-        <span className="arc-game-cta soon">Bientôt</span>
-      </span>
-    </div>
-  );
-}
-
 // Format du canvas de la jaquette pixelisée : 3/4, comme une jaquette.
 const ART_CV_W = 186;
 const ART_CV_H = 248;
@@ -632,6 +615,28 @@ function GameArt({ game, cover }) {
           <i className="arc-art-mer a" />
           <i className="arc-art-mer b" />
           <i className="arc-art-eq" />
+        </span>
+      </span>
+    );
+  }
+  // Le Mot du jour ne dépend pas non plus de la bibliothèque : son art est
+  // l'instrument lui-même. Une fiche d'essais au gabarit d'une jaquette (pour
+  // rester dans la grammaire des autres cartes) et, posé derrière comme le
+  // vinyle du Blind Test, le thermomètre dont le mercure monte en boucle
+  // lente. On lit la règle — des mots, une température — sans avoir cliqué.
+  if (game.key === "mot") {
+    return (
+      <span className="arc-game-art" aria-hidden="true">
+        <span className="arc-art-mot">
+          <span className="arc-art-mot-thermo">
+            <span className="arc-art-mot-fill" />
+          </span>
+          <span className="arc-art-mot-bulb" />
+          <span className="arc-art-mot-sheet">
+            <i className="cold" />
+            <i className="warm" />
+            <i className="hot" />
+          </span>
         </span>
       </span>
     );

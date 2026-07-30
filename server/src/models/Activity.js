@@ -34,6 +34,9 @@ const activitySchema = new mongoose.Schema(
         "review_react", // réaction (cœur/bravo/rigolo) sur un avis
         "gamemedia_comment", // commentaire (racine) sur un post du mur média
         "gamemedia_comment_reply", // réponse à un commentaire d'un post du mur média
+        "collection_comment", // commentaire (racine) sur un titre de la collection
+        "collection_comment_reply", // réponse à un commentaire de la collection
+        "collection_comment_like", // like d'un commentaire (ou d'une réponse) de la collection
         "recommendation", // a recommandé un jeu à un joueur (target = destinataire)
         "recommendation_boost", // +1 sur une recommandation faite à target
         "recommendation_comment", // commentaire sous une recommandation faite à target
@@ -47,6 +50,9 @@ const activitySchema = new mongoose.Schema(
         "blindtest", // a terminé un blind test musical (meta = score/manches/défi)
         "pixel", // a terminé une partie de Pixel Rush (meta = score/manches/défi)
         "geo", // a terminé une partie de GeoGamer (meta = score/manches/défi)
+        "mot", // a trouvé le mot du jour (meta = score/essais/temps — JAMAIS le
+        // mot lui-même : la carte ne doit rien divulguer aux amis qui n'ont pas
+        // encore joué)
         "case_open", // a ouvert une caisse de l'arcade (meta = lot obtenu)
       ],
       required: true,
@@ -67,7 +73,12 @@ const activitySchema = new mongoose.Schema(
     // Extrait affiché (texte commenté / liké, ou type de réaction).
     snippet: { type: String, default: "" },
     // Détails structurés selon le type :
-    //  gamemedia_* → { postId } (post du mur média visé)
+    //  gamemedia_*  → { postId } (post du mur média visé)
+    //  collection_* → { slug } (titre de la collection visé). Le SLUG et non un
+    //                 identifiant : c'est la clé de toutes les routes du rayon,
+    //                 et le fil recharge le titre à l'affichage — de sorte
+    //                 qu'une jaquette remplacée se voie sur les vieilles cartes,
+    //                 et qu'un titre retiré de l'étagère les fasse disparaître.
     //  game_update → { changes: [{ kind: "added"|"status"|"rating"|"review"|
     //                  "favorite"|"ost"|"character"|"time"|"bundle", ... }] }
     //                 ("bundle" = jeux d'un bundle cochés terminés :

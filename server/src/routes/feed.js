@@ -11,6 +11,7 @@ import { getGameAssets } from "../lib/marvelRivals.js";
 import { SEASONS } from "../lib/marvelRivalsData.js";
 import Documentary from "../models/Documentary.js";
 import GameMedia from "../models/GameMedia.js";
+import CollectionMedia from "../models/CollectionMedia.js";
 import Activity from "../models/Activity.js";
 import { blockIfPrivate } from "../lib/privacy.js";
 import Reward from "../models/Reward.js";
@@ -41,6 +42,12 @@ const router = express.Router();
 const person = (u) =>
   u ? { id: String(u._id), username: u.username, avatar: u.avatar || null } : null;
 
+// Un visuel déposé chez nous est stocké en chemin relatif ; ce qui vient
+// d'ailleurs est déjà une URL complète. Même règle que `abs` dans
+// routes/collection.js — le fil sert les mêmes fichiers.
+const absUpload = (req, p) =>
+  p ? (p.startsWith("/uploads/") ? `${req.protocol}://${req.get("host")}${p}` : p) : null;
+
 // Interactions sociales « secondaires » (l'acteur agit sur le contenu d'un autre).
 const INTERACTIONS = [
   "list_comment",
@@ -57,6 +64,14 @@ const INTERACTIONS = [
   "recommendation_comment",
 ];
 const RECO_TYPES = ["recommendation", "recommendation_boost", "recommendation_comment"];
+// Discussions du rayon vidéo (cf. routes/collection.js) : leur carte porte le
+// TITRE dont on parle, pas une liste ni un jeu — d'où un type d'évènement à
+// part plutôt qu'une interaction de plus.
+const COLLECTION_TYPES = [
+  "collection_comment",
+  "collection_comment_reply",
+  "collection_comment_like",
+];
 
 // Mini-carte de liste embarquée dans les évènements.
 function listMini(l) {
@@ -252,6 +267,10 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
   const pixels = []; // idem pour Pixel Rush
   const geos = []; // idem pour GeoGamer
   const caseopens = []; // idem : ouvrir plusieurs caisses d'affilée est la norme
+  // Victoires collectives au Mot du jour déjà sorties : chaque membre de
+  // l'équipe a SA ligne d'activité (c'est son résultat, il a ses points), mais
+  // le fil n'en montre qu'une — elle nomme déjà toute l'équipe.
+  const motSessionsSeen = new Set();
 
   // --- Actions de bibliothèque (game_update) : on complète la carte avec
   // l'état ACTUEL de l'entrée (review, note, réactions…) pour pouvoir y
@@ -313,6 +332,27 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
           .lean()
       : [];
     gmPostById = new Map(rows.map((p) => [String(p._id), p]));
+  }
+
+  // Discussions du rayon vidéo : la carte montre l'OBJET dont on parle (sa
+  // jaquette, sa nature, sa teinte). Le titre est relu maintenant plutôt que
+  // recopié dans l'activité — une jaquette remplacée apparaît alors sur les
+  // vieilles cartes, et un titre retiré de l'étagère les fait disparaître au
+  // lieu de laisser un lien mort.
+  const collActs = acts.filter(
+    (a) => COLLECTION_TYPES.includes(a.type) && a.actor && a.meta?.slug
+  );
+  let collBySlug = new Map();
+  if (collActs.length) {
+    const slugs = [...new Set(collActs.map((a) => a.meta.slug))];
+    const rows = await CollectionMedia.find({ slug: { $in: slugs } })
+      // `pages` tranché à la première : c'est la couverture d'un titre de
+      // papier (voir `coverOf` dans routes/collection.js), et un tome relié en
+      // porte trois cents dont on n'a que faire ici.
+      .select({ slug: 1, title: 1, kind: 1, color: 1, franchise: 1, artwork: 1 })
+      .slice("pages", 1)
+      .lean();
+    collBySlug = new Map(rows.map((m) => [m.slug, m]));
   }
 
   const gameEvents = [];
@@ -539,6 +579,33 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
       continue;
     }
 
+    if (a.type === "mot") {
+      if (!a.meta?.motPlayId) continue;
+      if (a.meta.session) {
+        if (motSessionsSeen.has(a.meta.session)) continue;
+        motSessionsSeen.add(a.meta.session);
+      }
+      // Poussé DIRECTEMENT dans `events`, sans passer par pushRuns : il n'y a
+      // qu'une partie par joueur et par jour, donc jamais de série à regrouper.
+      //
+      // Et surtout : aucune trace du mot lui-même. La carte annonce l'exploit
+      // sans divulguer la réponse aux amis qui n'ont pas encore joué — c'est
+      // pour ça que routes/mot.js ne met pas le mot dans meta.
+      events.push({
+        type: "mot",
+        id: `a-${a._id}`,
+        date: a.createdAt,
+        user: person(a.actor),
+        score: a.meta.score || 0,
+        tries: a.meta.tries || 0,
+        timeMs: a.meta.timeMs ?? null,
+        day: a.meta.date || "",
+        // Équipe d'une victoire à plusieurs (vide en solo).
+        team: Array.isArray(a.meta.team) ? a.meta.team : [],
+      });
+      continue;
+    }
+
     if (a.type === "case_open") {
       if (!a.meta?.rewardKey) continue;
       caseopens.push({
@@ -574,6 +641,41 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
           id: p.gameId,
           name: p.gameName || a.gameName || "",
           cover: p.gameCover || a.gameCover || null,
+        },
+      });
+      continue;
+    }
+
+    // Discussion sur un titre du rayon : commentaire, réponse ou like.
+    if (COLLECTION_TYPES.includes(a.type)) {
+      const m = collBySlug.get(a.meta?.slug || "");
+      // Titre retiré de l'étagère depuis : la carte n'a plus d'objet à montrer
+      // ni de fiche où mener.
+      if (!m) continue;
+      events.push({
+        type: "collectioncomment",
+        id: `a-${a._id}`,
+        date: a.createdAt,
+        user: person(a.actor),
+        action: a.type,
+        target: person(a.target),
+        snippet: a.snippet || "",
+        commentId: a.comment ? String(a.comment) : null,
+        // Like posé sur une réponse plutôt que sur un message racine : la carte
+        // le dit (« a aimé une réponse de … »).
+        reply: !!a.meta?.reply,
+        media: {
+          slug: m.slug,
+          title: m.title,
+          kind: m.kind,
+          color: m.color || null,
+          franchise: m.franchise || "",
+          // La couverture d'un titre de papier est sa première planche ; pour
+          // tout le reste, c'est l'affiche (même règle que la fiche).
+          poster: absUpload(
+            req,
+            m.kind === "comic" && m.pages?.length ? m.pages[0].file : m.artwork?.poster
+          ),
         },
       });
       continue;

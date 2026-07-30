@@ -448,6 +448,48 @@ body.mpl-open .chat-page {
   color: var(--text-soft);
 }
 
+/* « Joue au Mot du jour · 68° » — ce que fait l'interlocuteur, à la place du
+   « en ligne ». Les deux disent la même chose, mais le premier donne envie
+   d'aller voir : il prend donc la couleur d'accent et un point qui bat, pour
+   ne surtout pas se lire comme un « hors ligne ». */
+.chat-head-sub.playing,
+.chat-win-sub.playing {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+.chat-head-sub.playing::before,
+.chat-win-sub.playing::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--orange);
+  animation: chat-play-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes chat-play-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.78);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-head-sub.playing::before,
+  .chat-win-sub.playing::before {
+    animation: none;
+  }
+}
+
 .chat-head-muted {
   color: var(--text-soft);
   opacity: 0.75;

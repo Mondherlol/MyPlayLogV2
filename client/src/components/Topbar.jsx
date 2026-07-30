@@ -279,6 +279,13 @@ export default function Topbar() {
       if (n.actor?.username) navigate(`/u/${n.actor.username}`);
       return;
     }
+    // Collection : la fiche du titre commenté. Testé avant les autres cibles —
+    // un fil de la collection n'a ni liste ni jeu IGDB derrière lui, et les
+    // replis plus bas n'auraient nulle part où l'emmener.
+    if (n.collectionSlug) {
+      navigate(`/collection/${n.collectionSlug}`);
+      return;
+    }
     // OST : ouvre l'onglet OST du profil concerné, sur la bonne piste.
     if (n.ostOwner) {
       navigate(`/u/${n.ostOwner}?tab=ost${n.game ? `&ost=${n.game}` : ""}`);

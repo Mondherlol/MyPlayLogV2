@@ -9,8 +9,13 @@ import jwt from "jsonwebtoken";
 import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
 import User from "../models/User.js";
+// Le modèle seulement, jamais le routeur : c'est `routes/watchparty.js` qui
+// dépend d'ici (pour déposer une invitation en DM), et l'inverse ferait un
+// cycle d'imports.
+import WatchParty from "../models/WatchParty.js";
 import { requireAuth } from "../middleware/auth.js";
 import { addClient, removeClient, emitTo, onlineAmong } from "../lib/realtime.js";
+import { statusOf, clearStatus } from "../lib/liveStatus.js";
 import { triggerMissionCheck } from "../lib/missions.js";
 
 const router = express.Router();
@@ -59,12 +64,31 @@ function quoteOf(m) {
   if (!m) return null;
   const text = m.deletedAt
     ? ""
-    : m.text || (m.game ? `🎮 ${m.game.name}` : m.ost ? `🎵 ${m.ost.name}` : "");
+    : m.text ||
+      (m.game
+        ? `🎮 ${m.game.name}`
+        : m.ost
+          ? `🎵 ${m.ost.name}`
+          : m.party
+            ? `📺 ${m.party.title}`
+            : m.mot
+              ? "🌡️ Mot du jour"
+              : "");
   return {
     id: m._id,
     author: userCard(m.author),
     text,
-    kind: m.game ? "game" : m.ost ? "ost" : m.media?.length ? m.media[0].kind : "text",
+    kind: m.game
+      ? "game"
+      : m.ost
+        ? "ost"
+        : m.party
+          ? "party"
+          : m.mot
+            ? "mot"
+            : m.media?.length
+            ? m.media[0].kind
+            : "text",
     deleted: !!m.deletedAt,
   };
 }
@@ -93,9 +117,11 @@ function serializeMessage(m, meId) {
     mentions: (m.mentions || []).map((x) => x.username).filter(Boolean),
     replyTo: quoteOf(m.replyTo),
     reactions: deleted ? [] : groupReactions(m.reactions, meId),
-    // Cartes riches (jeu recommandé / OST partagée).
+    // Cartes riches (jeu recommandé / OST partagée / invitation à une séance).
     game: deleted ? null : m.game || null,
     ost: deleted ? null : m.ost || null,
+    party: deleted ? null : m.party || null,
+    mot: deleted ? null : m.mot || null,
     system: m.system || null,
     systemData: m.systemData || null,
     edited: !!m.editedAt,
@@ -110,6 +136,10 @@ function serializeConversation(c, meId, online) {
   const participants = (c.participants || []).map((p) => ({
     ...userCard(p),
     online: online.has(String(p._id || p)),
+    // « Joue au Mot du jour · 39° » : ce que la personne est en train de faire,
+    // affiché à la place de « en ligne » (cf. lib/liveStatus.js). Null la
+    // plupart du temps — c'est un bonus, pas une donnée de la conversation.
+    status: statusOf(p._id || p),
   }));
   const others = participants.filter((p) => String(p.id) !== String(meId));
   const mine = (c.reads || []).find((r) => String(r.user) === String(meId));
@@ -152,7 +182,7 @@ const POPULATE_MESSAGE = [
   { path: "author", select: "username avatar" },
   {
     path: "replyTo",
-    select: "text author media deletedAt game ost",
+    select: "text author media deletedAt game ost party mot",
     populate: { path: "author", select: "username avatar" },
   },
 ];
@@ -263,6 +293,8 @@ function previewText(msg) {
   if (msg.system) return systemPreview(msg);
   if (msg.game) return msg.text || `Jeu : ${msg.game.name}`;
   if (msg.ost) return msg.text || `OST : ${msg.ost.name}`;
+  if (msg.party) return msg.text || `Watchparty : ${msg.party.title}`;
+  if (msg.mot) return msg.text || "Mot du jour : rejoins la partie";
   if (msg.text) return msg.text.slice(0, 120);
   if (msg.media?.length) return msg.media[0].kind === "gif" ? "GIF" : "Photo";
   return "";
@@ -273,6 +305,8 @@ function previewKind(msg) {
   if (msg.system) return "system";
   if (msg.game) return "game";
   if (msg.ost) return "ost";
+  if (msg.party) return "party";
+  if (msg.mot) return "mot";
   if (msg.media?.length) return msg.media[0].kind;
   return "text";
 }
@@ -396,14 +430,25 @@ export async function getOrCreateDm(aId, bId) {
   return conv;
 }
 
-// Dépose une carte (jeu / OST, avec un mot optionnel) dans le DM et la diffuse.
-export async function deliverCard({ fromId, toId, text = "", game = null, ost = null }) {
+// Dépose une carte (jeu / OST / invitation à une séance, avec un mot optionnel)
+// dans le DM et la diffuse.
+export async function deliverCard({
+  fromId,
+  toId,
+  text = "",
+  game = null,
+  ost = null,
+  party = null,
+  mot = null,
+}) {
   const conv = await getOrCreateDm(fromId, toId);
   const msg = await persistMessage(conv, fromId, {
     author: fromId,
     text: String(text || "").slice(0, MAX_TEXT),
     game,
     ost,
+    party,
+    mot,
   });
   broadcastMessage(conv, msg);
   await broadcastConversation(conv._id);
@@ -464,7 +509,37 @@ async function notifyPresence(userId, online) {
         if (id !== String(userId)) targets.add(id);
       }
     }
-    emitTo(targets, "presence", { userId: String(userId), online });
+    // Dernier onglet fermé : on éteint aussi le statut d'activité, sinon
+    // « Joue au Mot du jour » survivrait à la fermeture du navigateur pendant
+    // toute la durée du TTL.
+    if (!online) clearStatus(userId);
+    emitTo(targets, "presence", {
+      userId: String(userId),
+      online,
+      status: online ? statusOf(userId) : null,
+    });
+
+    // LES SALLES DE PROJECTION AUSSI. Fermer l'onglet en pleine séance n'envoie
+    // aucun « je pars » — c'est le flux qui tombe, et rien d'autre. Sans cette
+    // ligne, la tête de quelqu'un resterait allumée en haut de la salle des
+    // heures après son départ, et les autres l'attendraient. La liste des
+    // membres, elle, ne bouge pas : partir vraiment se fait par la porte
+    // (POST /leave), un onglet fermé n'est qu'une absence.
+    const parties = await WatchParty.find({ "members.user": userId, endedAt: null })
+      .select("code members")
+      .lean();
+    for (const p of parties) {
+      const others = p.members
+        .map((m) => String(m.user))
+        .filter((id) => id !== String(userId));
+      if (others.length)
+        emitTo(others, "party", {
+          code: p.code,
+          kind: "presence",
+          userId: String(userId),
+          online,
+        });
+    }
   } catch {
     /* la présence est un bonus : jamais bloquant */
   }

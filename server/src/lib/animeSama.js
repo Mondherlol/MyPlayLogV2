@@ -31,6 +31,27 @@ export const LANGS = ["vf", "vostfr", "va", "vf1", "vf2", "vkr", "vcn", "vqc"];
 const MAX_SEASONS = 24;
 const TIMEOUT = 9000;
 
+// La signature d'un mur anti-robots Cloudflare. Le site peut l'allumer du
+// jour au lendemain sans rien changer d'autre : les adresses restent valides,
+// les pages restent en ligne pour un navigateur, et TOUT devient inaccessible
+// depuis un serveur. C'est un cas assez fréquent, et assez déroutant, pour
+// mériter d'être reconnu plutôt que confondu avec une page disparue.
+// Exporté : l'import de films (lib/filmIndex.js) va chercher des pages sur
+// d'autres sites, et se heurte exactement au même mur — une seule définition,
+// sinon l'un des deux finira par ne plus le reconnaître.
+export const CHALLENGE_RE =
+  /Just a moment\.\.\.|challenge-platform|cf-browser-verification|__cf_chl|cf_chl_opt/i;
+
+// Le mur est mémorisé le temps d'un import : une fiche de douze saisons
+// enverrait sinon vingt-cinq requêtes qui se feront toutes refouler, et
+// l'admin attendrait pour rien.
+export class BlockedError extends Error {
+  constructor() {
+    super("blocked");
+    this.blocked = true;
+  }
+}
+
 async function fetchText(url) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT);
@@ -40,9 +61,22 @@ async function fetchText(url) {
       signal: ctrl.signal,
       redirect: "follow",
     });
+    // 403 et 503 sont les codes du mur ; on ne se fie pas au seul code, un
+    // vrai 403 existe aussi — c'est le corps de la réponse qui tranche.
+    if (r.status === 403 || r.status === 503) {
+      const body = await r.text().catch(() => "");
+      if (CHALLENGE_RE.test(body)) throw new BlockedError();
+      return null;
+    }
     if (!r.ok) return null;
-    return await r.text();
-  } catch {
+    const body = await r.text();
+    // Le mur peut aussi répondre 200 avec la page d'attente à la place du
+    // contenu : sans ce test, on parserait le challenge et on conclurait
+    // « aucune saison trouvée ».
+    if (CHALLENGE_RE.test(body.slice(0, 4000))) throw new BlockedError();
+    return body;
+  } catch (err) {
+    if (err?.blocked) throw err;
     return null;
   } finally {
     clearTimeout(timer);
@@ -220,6 +254,39 @@ async function fetchSeason({ origin, slug, path }, langs) {
   return null;
 }
 
+// Qui héberge, et combien de fois. C'est le premier chiffre qu'on regarde sur
+// un import : un hébergeur qui n'apparaît que trois fois sur vingt épisodes
+// trahit une liste incomplète. Partagé par les deux imports — le panneau
+// d'admin l'affiche sans savoir d'où vient le résultat, et une forme
+// manquante le faisait planter.
+function countHosts(episodes) {
+  const tally = new Map();
+  for (const url of episodes.flatMap((e) => e.urls)) {
+    let host = "";
+    try {
+      host = new URL(url).hostname.replace(/^www\./, "");
+    } catch {
+      continue;
+    }
+    tally.set(host, (tally.get(host) || 0) + 1);
+  }
+  return [...tally.entries()].map(([host, count]) => ({ host, count }));
+}
+
+// La forme attendue par la zone de texte du panneau d'admin :
+// « S01E02 Titre — lien | miroir ». Partagée par les deux imports (le
+// téléchargé et le collé) : deux écritures divergeraient au premier réglage,
+// et c'est ce texte qui devient les épisodes en base.
+function toList(episodes) {
+  return episodes
+    .map(
+      (e) =>
+        `S${String(e.season).padStart(2, "0")}E${String(e.number).padStart(2, "0")}` +
+        `${e.title ? ` ${e.title}` : ""} — ${e.urls.join(" | ")}`
+    )
+    .join("\n");
+}
+
 // ------------------------------------------------------------- l'import --
 
 // Renvoie de quoi remplir le formulaire d'ajout : les métadonnées, le détail
@@ -229,7 +296,18 @@ export async function importFromUrl(rawUrl, { lang } = {}) {
   const ref = parseUrl(rawUrl);
   if (!ref) throw new Error("Ce lien n'est pas une fiche anime-sama.");
 
-  const html = await fetchText(`${ref.origin}/catalogue/${ref.slug}/`);
+  let html;
+  try {
+    html = await fetchText(`${ref.origin}/catalogue/${ref.slug}/`);
+  } catch (err) {
+    if (!err?.blocked) throw err;
+    throw new Error(
+      "anime-sama est passé derrière un filtre anti-robots (Cloudflare) : le " +
+        "serveur ne peut plus lire la page, alors qu'elle s'ouvre normalement " +
+        "dans ton navigateur. Ouvre la fiche, puis colle la source ici — " +
+        "l'import fera le reste."
+    );
+  }
   if (!html) throw new Error("Fiche introuvable (page inaccessible).");
   const info = parseCatalogue(html);
 
@@ -275,13 +353,7 @@ export async function importFromUrl(rawUrl, { lang } = {}) {
       "Aucun épisode lisible — la fiche existe mais ses listes sont vides dans cette langue."
     );
 
-  const list = out
-    .map(
-      (e) =>
-        `S${String(e.season).padStart(2, "0")}E${String(e.number).padStart(2, "0")}` +
-        `${e.title ? ` ${e.title}` : ""} — ${e.urls.join(" | ")}`
-    )
-    .join("\n");
+  const list = toList(out);
 
   return {
     slug: ref.slug,
@@ -296,20 +368,78 @@ export async function importFromUrl(rawUrl, { lang } = {}) {
     cover: info.cover,
     seasons: report,
     count: out.length,
-    hosts: [
-      ...out
-        .flatMap((e) => e.urls)
-        .reduce((map, u) => {
-          let h = "";
-          try {
-            h = new URL(u).hostname.replace(/^www\./, "");
-          } catch {
-            return map;
-          }
-          return map.set(h, (map.get(h) || 0) + 1);
-        }, new Map())
-        .entries(),
-    ].map(([host, n]) => ({ host, count: n })),
+    hosts: countHosts(out),
     list,
+  };
+}
+
+// ======================================================================
+//  Import à partir d'une source COLLÉE
+// ======================================================================
+// Quand le site se ferme aux robots, il reste ouvert aux navigateurs — et
+// l'admin en a un. Il ouvre la page, copie la source, la colle ici : c'est LUI
+// qui va chercher, l'app se contente de lire. Aucune barrière n'est contournée,
+// et le travail fastidieux (démêler quarante adresses d'hébergeurs et les
+// mettre en forme) reste fait par la machine.
+//
+// Deux natures de collage, reconnues à ce qu'elles CONTIENNENT plutôt qu'à ce
+// qu'on déclare — personne ne sait dire s'il vient de copier « du HTML » ou
+// « du JS », mais tout le monde sait faire Ctrl+A :
+//
+//   • la PAGE d'une fiche → titre, affiche, synopsis et la liste des saisons,
+//     donc de quoi savoir quels fichiers d'épisodes aller chercher ensuite ;
+//   • un fichier EPISODES.JS → les épisodes d'une saison, mis en forme pour la
+//     zone de texte.
+export function importFromSource(text, { season = 1, label = "" } = {}) {
+  const raw = String(text || "").trim();
+  if (raw.length < 40)
+    throw new Error("Colle la source de la page, ou le contenu d'un episodes.js.");
+
+  // La signature d'un episodes.js : une ou plusieurs listes « var epsX = [ … ] ».
+  if (/var\s+eps[A-Za-z0-9_]*\s*=\s*\[/.test(raw)) {
+    const episodes = parseEpisodesJs(raw);
+    if (!episodes.length)
+      throw new Error("Ce fichier ne contient aucune adresse d'épisode lisible.");
+    const rank = Number(season) > 0 ? Number(season) : 1;
+    const out = episodes.map((ep) => ({
+      season: rank,
+      number: ep.number,
+      title: "",
+      urls: ep.urls,
+    }));
+    return {
+      kind: "episodes",
+      title: "",
+      // La MÊME forme que l'import par URL, champ pour champ : le panneau
+      // d'admin affiche un rapport sans savoir d'où vient le résultat, et le
+      // moindre champ manquant y devient une erreur de rendu.
+      seasons: [
+        { label: label || "Saison " + rank, path: "collage-" + rank, rank, count: episodes.length },
+      ],
+      hosts: countHosts(out),
+      list: toList(out),
+      count: episodes.length,
+    };
+  }
+
+  // Sinon, une page. On n'exige pas qu'elle soit entière : un collage partiel
+  // donne ce qu'il donne, et le reste se saisit à la main.
+  if (!/<\w/.test(raw))
+    throw new Error(
+      "Source non reconnue : attendu la page d'une fiche, ou un fichier episodes.js."
+    );
+
+  const info = parseCatalogue(raw);
+  const seasons = parseSeasons(raw);
+  if (!info.title && !seasons.length)
+    throw new Error("Rien de reconnaissable ici — est-ce bien la page d'une fiche ?");
+
+  return {
+    kind: "catalogue",
+    ...info,
+    seasons: seasons.map((x, i) => ({ ...x, rank: seasonRank(x.path) ?? i + 1, count: 0 })),
+    hosts: [],
+    list: "",
+    count: 0,
   };
 }

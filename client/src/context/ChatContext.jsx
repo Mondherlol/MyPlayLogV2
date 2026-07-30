@@ -27,6 +27,8 @@ const MAX_WINDOWS = 3;
 function previewOf(m) {
   if (m.game) return m.text || `Jeu : ${m.game.name}`;
   if (m.ost) return m.text || `OST : ${m.ost.name}`;
+  if (m.party) return m.text || `Watchparty : ${m.party.title}`;
+  if (m.mot) return m.text || "Mot du jour : rejoins la partie";
   if (m.text) return m.text;
   if (m.media?.length) return m.media[0].kind === "gif" ? "GIF" : "Photo";
   return "";
@@ -34,6 +36,8 @@ function previewOf(m) {
 function kindOf(m) {
   if (m.game) return "game";
   if (m.ost) return "ost";
+  if (m.party) return "party";
+  if (m.mot) return "mot";
   if (m.media?.length) return m.media[0].kind;
   return "text";
 }
@@ -41,6 +45,10 @@ function kindOf(m) {
 function toastTextOf(m) {
   if (m.game) return m.text || `t'a recommandé ${m.game.name}`;
   if (m.ost) return m.text || `t'a partagé « ${m.ost.name} »`;
+  // Une invitation est PÉRISSABLE : elle vaut pour la séance qui commence, et la
+  // pop-up est souvent le seul endroit où elle sera lue à temps.
+  if (m.party) return m.text || `t'invite à regarder « ${m.party.title} »`;
+  if (m.mot) return m.text || "t'invite à chercher le mot du jour";
   if (m.text) return m.text;
   if (m.media?.length)
     return m.media[0].kind === "gif" ? "a envoyé un GIF" : "a envoyé une photo";
@@ -53,6 +61,9 @@ export function ChatProvider({ children }) {
 
   const [conversations, setConversations] = useState([]);
   const [online, setOnline] = useState(() => new Set());
+  // « Joue au Mot du jour · 39° » par utilisateur. Éphémère : le serveur ne le
+  // stocke pas non plus (cf. server/src/lib/liveStatus.js).
+  const [statuses, setStatuses] = useState({});
   const [typing, setTyping] = useState({}); // convId -> { [username]: expiresAt }
   const [toasts, setToasts] = useState([]);
   const [connected, setConnected] = useState(false);
@@ -142,6 +153,13 @@ export function ChatProvider({ children }) {
             .map((p) => String(p.id))
         )
       );
+      // Les statuts d'activité voyagent avec les participants : on repart donc
+      // avec le bon libellé dès le chargement, sans attendre un évènement SSE
+      // qui ne viendra qu'au prochain changement.
+      const st = {};
+      for (const c of d.conversations || [])
+        for (const p of c.participants || []) if (p.status) st[String(p.id)] = p.status;
+      setStatuses(st);
     } catch {
       /* silencieux : le badge se remettra à jour au prochain passage */
     }
@@ -283,13 +301,39 @@ export function ChatProvider({ children }) {
       emit("read", { conversationId, userId, at });
     });
 
+    // TOUT CE QUI SE PASSE DANS UNE SALLE DE PROJECTION passe par ce seul
+    // évènement : lecture, pause, message, arrivée, réaction… Le `kind` est dans
+    // la charge, et la page de la séance trie. C'est délibéré — un écouteur par
+    // geste obligerait à revenir ici chaque fois qu'on en invente un, alors que
+    // ce contexte n'a rien à savoir des watchparties (il ne fait que relayer).
+    // Parties à plusieurs du Mot du jour. Même économie que la watchparty : un
+    // seul nom d'évènement, le `kind` de la charge dit ce qui s'est passé
+    // (guess, members, typing, solved) — voir routes/mot.js.
+    es.addEventListener("mot", (e) => {
+      emit("mot", JSON.parse(e.data));
+    });
+
+    es.addEventListener("party", (e) => {
+      emit("party", JSON.parse(e.data));
+    });
+
     es.addEventListener("presence", (e) => {
-      const { userId, online: isOn } = JSON.parse(e.data);
+      const { userId, online: isOn, status } = JSON.parse(e.data);
       setOnline((prev) => {
         const next = new Set(prev);
         if (isOn) next.add(String(userId));
         else next.delete(String(userId));
         return next;
+      });
+      setStatuses((prev) => {
+        const key = String(userId);
+        if (!status) {
+          if (!prev[key]) return prev;
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        }
+        return { ...prev, [key]: status };
       });
     });
 
@@ -413,6 +457,7 @@ export function ChatProvider({ children }) {
     upsertConversation,
     unread,
     online,
+    statuses,
     typing,
     connected,
     refresh,
@@ -491,6 +536,7 @@ const EMPTY = {
   conversations: [],
   unread: 0,
   online: new Set(),
+  statuses: {},
   typing: {},
   connected: false,
   refresh: () => {},

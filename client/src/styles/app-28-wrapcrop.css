@@ -1,9 +1,11 @@
 /* ======================================================================
-   Alignement d'une jaquette dépliée (panneau Admin)
+   Mesure d'un boîtier à partir de sa jaquette (panneau Admin)
    ======================================================================
-   Le gabarit est aux proportions exactes du boîtier, et les deux traits de
-   pliage sont posés là où le découpage tombera vraiment. Tout le reste de
-   l'écran s'efface : on ne regarde que la tranche.
+   L'image est montrée ENTIÈRE, jamais recadrée : c'est le principe même de
+   l'écran, et donc la première règle de sa mise en page. Un seul objet se
+   manipule — le bandeau de la tranche — et tout le reste (panneaux assombris,
+   cotes, aperçu du solide) n'est là que pour dire ce qu'on est en train de
+   régler.
    ====================================================================== */
 
 .wrapcrop {
@@ -19,8 +21,8 @@
 
 .wrapcrop-sheet {
   margin: auto;
-  width: min(760px, 100%);
-  padding: 1rem;
+  width: min(900px, 100%);
+  padding: 1.1rem;
   border-radius: var(--radius-lg);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -29,33 +31,42 @@
 
 .wrapcrop-sheet header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.8rem;
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.9rem;
 }
 
 .wrapcrop-sheet h3 {
   font-family: var(--font-display);
-  font-size: 1rem;
+  font-size: 1.05rem;
   margin: 0;
 }
 
-.wrapcrop-help {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin: 0 0 0.7rem;
-  font-size: 0.8rem;
+.wrapcrop-sheet header p {
+  margin: 0.16rem 0 0;
+  font-size: 0.78rem;
   color: var(--text-soft);
 }
 
-.wrapcrop-help strong {
-  color: var(--text);
+.wrapcrop-help {
+  margin: 0.7rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-soft);
 }
 
-/* Le gabarit : fenêtre au rapport du boîtier, l'image se déplace derrière. */
-.wrapcrop-frame {
+/* ---------- la scène : la jaquette, et à côté l'objet qu'elle donne ---- */
+
+.wrapcrop-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 190px;
+  gap: 1rem;
+  align-items: start;
+}
+
+/* LA FENÊTRE : elle prend le rapport de l'image et DÉCOUPE. C'est elle qui
+   reste immobile pendant que le calque, dessous, coulisse et grossit. */
+.wrapcrop-view {
   position: relative;
   width: 100%;
   overflow: hidden;
@@ -67,21 +78,34 @@
     50% / 18px 18px;
   border: 1px solid var(--border-strong);
   touch-action: none;
+  cursor: crosshair;
+  user-select: none;
+}
+
+.wrapcrop-view.zoomed {
   cursor: var(--cursor-grab), grab;
 }
 
-.wrapcrop-frame:active {
+.wrapcrop-view.zoomed:active {
   cursor: var(--cursor-grabbing), grabbing;
 }
 
-.wrapcrop-frame img {
+/* LE CALQUE : l'image et tous les repères, d'un seul bloc. Une seule
+   transformation les emporte tous, donc rien à recalculer quand on zoome — et
+   les repères, placés en pourcentages, restent collés à leurs pixels. */
+.wrapcrop-frame {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  max-width: none;
+  inset: 0;
+  transform-origin: 0 0;
+}
+
+.wrapcrop-frame img {
+  display: block;
   width: 100%;
-  transform-origin: center;
+  height: 100%;
+  object-fit: fill; /* le cadre EST au rapport de l'image */
   user-select: none;
+  -webkit-user-drag: none;
 }
 
 .wrapcrop-load {
@@ -95,81 +119,550 @@
   padding: 1rem;
 }
 
-/* Traits de pliage : la tranche vit entre les deux. */
-.wrapcrop-fold {
+/* ---------- le cadre : la jaquette dans la page ---------- */
+
+/* L ombre portée démesurée assombrit TOUT ce qui entoure le cadre d un seul
+   trait, sans quatre rectangles à tenir à jour. Le parent est en overflow
+   hidden, elle ne déborde donc pas de l image. */
+.wrapcrop-crop {
+  position: absolute;
+  box-shadow:
+    0 0 0 calc(1px / var(--z, 1)) rgba(255, 255, 255, 0.9),
+    0 0 0 9999px rgba(6, 6, 10, 0.72);
+}
+
+/* Les quatre bords du cadre. La zone d attrape déborde de part et d autre :
+   sur un bord d un pixel, il n y a rien à viser. */
+.wrapcrop-edge {
+  position: absolute;
+  touch-action: none;
+}
+
+.wrapcrop-edge.l,
+.wrapcrop-edge.r {
+  top: 0;
+  bottom: 0;
+  width: calc(16px / var(--z, 1));
+  cursor: ew-resize;
+}
+
+.wrapcrop-edge.t,
+.wrapcrop-edge.b {
+  left: 0;
+  right: 0;
+  height: calc(16px / var(--z, 1));
+  cursor: ns-resize;
+}
+
+.wrapcrop-edge.l {
+  left: calc(-8px / var(--z, 1));
+}
+.wrapcrop-edge.r {
+  right: calc(-8px / var(--z, 1));
+}
+.wrapcrop-edge.t {
+  top: calc(-8px / var(--z, 1));
+}
+.wrapcrop-edge.b {
+  bottom: calc(-8px / var(--z, 1));
+}
+
+/* Un tiret clair au milieu de chaque bord : sans lui, on ne devine pas que le
+   cadre se tire. */
+.wrapcrop-edge::after {
+  content: "";
+  position: absolute;
+  border-radius: calc(3px / var(--z, 1));
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+.wrapcrop-edge.l::after,
+.wrapcrop-edge.r::after {
+  top: 50%;
+  left: 50%;
+  width: calc(4px / var(--z, 1));
+  height: calc(26px / var(--z, 1));
+  transform: translate(-50%, -50%);
+}
+
+.wrapcrop-edge.t::after,
+.wrapcrop-edge.b::after {
+  left: 50%;
+  top: 50%;
+  width: calc(26px / var(--z, 1));
+  height: calc(4px / var(--z, 1));
+  transform: translate(-50%, -50%);
+}
+
+.wrapcrop-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.76rem;
+  color: var(--accent-ink);
+}
+
+/* Les deux panneaux : à peine voilés. Assez pour que le bandeau se détache,
+   pas assez pour qu'on perde l'image de vue — c'est en la regardant qu'on
+   place la tranche. */
+.wrapcrop-panel {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 0;
-  border-left: 2px dashed rgba(255, 255, 255, 0.9);
-  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9));
   pointer-events: none;
+  background: rgba(8, 8, 14, 0.34);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 0.5rem;
 }
 
-.wrapcrop-spine {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  pointer-events: none;
-  background: color-mix(in srgb, var(--orange) 22%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--orange) 60%, transparent);
+.wrapcrop-panel.back {
+  left: 0;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.5);
 }
 
-.wrapcrop-tag {
-  position: absolute;
-  bottom: 0.5rem;
-  font-size: 0.62rem;
+.wrapcrop-panel.front {
+  right: 0;
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.5);
+}
+
+.wrapcrop-panel b {
+  /* Contre-mise à l'échelle : à ×8, une étiquette de 10 px deviendrait un
+     pavé qui masque ce qu'on essaie de viser. */
+  transform: scale(calc(1 / var(--z, 1)));
+  transform-origin: bottom center;
+  font-size: 0.6rem;
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  padding: 0.16rem 0.42rem;
+  padding: 0.16rem 0.44rem;
   border-radius: 4px;
   color: #fff;
-  background: rgba(8, 8, 14, 0.72);
-  pointer-events: none;
+  background: rgba(8, 8, 14, 0.7);
+  white-space: nowrap;
 }
 
-.wrapcrop-tag.back {
-  left: 0.5rem;
+/* Le bandeau de la tranche. Il n'est pas voilé : c'est la seule zone qu'on
+   veut voir telle qu'elle est imprimée. */
+.wrapcrop-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  cursor: var(--cursor-grab), grab;
+  box-shadow:
+    inset 0 0 0 calc(2px / var(--z, 1)) var(--orange),
+    0 0 0 calc(1px / var(--z, 1)) rgba(0, 0, 0, 0.5);
+  touch-action: none;
 }
 
-.wrapcrop-tag.front {
-  right: 0.5rem;
+.wrapcrop-band:active {
+  cursor: var(--cursor-grabbing), grabbing;
 }
 
-/* Réglages */
+/* Les poignées débordent du bandeau : une tranche fait 1 % de la largeur de
+   l'image, donc quelques pixels — sans zone d'attrape élargie, elle est
+   impossible à saisir. */
+.wrapcrop-grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: calc(15px / var(--z, 1));
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.wrapcrop-grip::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(5px / var(--z, 1));
+  height: calc(34px / var(--z, 1));
+  transform: translate(-50%, -50%);
+  border-radius: calc(3px / var(--z, 1));
+  background: var(--orange);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+}
+
+.wrapcrop-grip.left {
+  left: calc(-7px / var(--z, 1));
+}
+
+.wrapcrop-grip.right {
+  right: calc(-7px / var(--z, 1));
+}
+
+/* ---------- l'objet obtenu ---------- */
+
+.wrapcrop-out {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.wrapcrop-out-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+/* Deux rectangles À L'ÉCHELLE, posés côte à côte : la tranche et la
+   couverture. Les cotes sont en centimètres, converties ici en pixels par un
+   facteur unique — c'est ce qui rend l'épaisseur COMPARABLE d'un titre à
+   l'autre, et c'est tout l'intérêt de l'aperçu. */
+.wrapcrop-solid {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  min-height: 120px;
+  padding: 0.7rem;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.wrapcrop-solid-spine,
+.wrapcrop-solid-face {
+  --px: 5.6px; /* 1 cm à l'écran */
+  width: calc(var(--w) * var(--px));
+  height: calc(var(--h) * var(--px));
+  border-radius: 2px;
+}
+
+.wrapcrop-solid-spine {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--orange) 85%, #fff),
+    var(--orange)
+  );
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+  min-width: 2px;
+}
+
+.wrapcrop-solid-face {
+  background: linear-gradient(150deg, #ffffff, #d9d7d1);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.14),
+    2px 2px 8px rgba(0, 0, 0, 0.16);
+}
+
+.wrapcrop-specs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  margin: 0;
+}
+
+.wrapcrop-specs > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.wrapcrop-specs dt {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+.wrapcrop-specs dd {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.wrapcrop-lean {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: var(--text-soft);
+  padding: 0.4rem 0.5rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
+}
+
+/* ---------- réglages ---------- */
+
 .wrapcrop-controls {
   display: flex;
   align-items: flex-end;
   gap: 0.9rem;
-  margin-top: 0.8rem;
+  margin-top: 0.9rem;
   flex-wrap: wrap;
 }
 
-.wrapcrop-controls label {
-  flex: 1;
-  min-width: 150px;
+.wrapcrop-ctl {
   display: flex;
   flex-direction: column;
-  gap: 0.24rem;
+  gap: 0.3rem;
   font-size: 0.74rem;
   font-weight: 600;
   color: var(--text-soft);
 }
 
-.wrapcrop-controls input[type="range"] {
+.wrapcrop-ctl.grow {
+  flex: 1;
+  min-width: 160px;
+}
+
+.wrapcrop-ctl input[type="range"] {
   width: 100%;
   accent-color: var(--orange);
 }
 
-.wrapcrop-controls em {
-  font-style: normal;
-  font-variant-numeric: tabular-nums;
+.wrapcrop-heights {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.wrapcrop-std {
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 0.34rem 0.6rem;
+  border-radius: 8px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
   color: var(--text);
 }
 
-@media (max-width: 620px) {
-  .wrapcrop-controls label {
+.wrapcrop-std.on {
+  border-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 14%, transparent);
+}
+
+.wrapcrop-cm {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+}
+
+.wrapcrop-cm input {
+  width: 62px;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  padding: 0.3rem 0.4rem;
+  border-radius: 8px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.wrapcrop-cm input:focus {
+  outline: none;
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+@media (max-width: 720px) {
+  .wrapcrop-stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Sur téléphone, l'aperçu du solide passe en ligne sous la jaquette :
+     empilé, il repousserait les cotes hors de l'écran. */
+  .wrapcrop-out {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.9rem;
+  }
+
+  .wrapcrop-out-label {
+    display: none;
+  }
+
+  .wrapcrop-specs {
+    flex: 1;
+  }
+
+  .wrapcrop-ctl.grow {
     min-width: 100%;
   }
+}
+
+/* ======================================================================
+   Choix d'une page dans un PDF
+   ======================================================================
+   Même coquille que l'écran de mesure (il précède immédiatement), mais une
+   grille de planches-contact : la seule question posée ici est « laquelle de
+   ces pages est la jaquette ? », et on y répond de l'œil. */
+
+.wrapcrop-sheet.pdfpick {
+  width: min(1000px, 100%);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+
+.wrapcrop-sheet.pdfpick header p {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.pdfpick-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 180px;
+  font-size: 0.86rem;
+  color: var(--text-soft);
+}
+
+/* Les pages défilent, le pied ne bouge pas : un PDF d'impression peut en avoir
+   trente, et le bouton de validation ne doit pas partir avec elles. */
+.pdfpick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.7rem;
+  overflow-y: auto;
+  padding: 0.2rem;
+  margin: 0.2rem 0 0.9rem;
+}
+
+.pdfpick-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.45rem;
+  border-radius: 10px;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  text-align: center;
+  transition: border-color 0.15s ease;
+}
+
+.pdfpick-page:hover {
+  border-color: var(--border-strong);
+}
+
+.pdfpick-page.on {
+  border-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 8%, transparent);
+}
+
+/* Le rapport de CHAQUE page est posé en style inline : dans un même PDF, la
+   couverture dépliée et le livret n'ont pas la même forme, et les enfermer
+   dans une case carrée les déformerait — or c'est justement à sa forme qu'on
+   reconnaît la jaquette. */
+.pdfpick-shot {
+  display: block;
+  width: 100%;
+  border-radius: 5px;
+  overflow: hidden;
+  background: repeating-conic-gradient(
+      var(--surface-2) 0% 25%,
+      var(--surface) 0% 50%
+    )
+    50% / 12px 12px;
+  box-shadow: 0 1px 5px rgba(10, 10, 20, 0.18);
+}
+
+.pdfpick-shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.pdfpick-page em {
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.pdfpick-page.on em {
+  color: var(--accent-ink);
+}
+
+.pdfpick-check {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: #241a00;
+  background: var(--orange);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Les pages arrivent une à une : ce témoin garde la place de la suivante
+   plutôt que de laisser la grille sauter à chaque rendu. */
+.pdfpick-more {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  color: var(--text-soft);
+}
+
+.wrapcrop-sheet.pdfpick .adm-coll-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--border);
+}
+
+.wrapcrop-sheet.pdfpick .adm-coll-hint {
+  margin: 0;
+  text-align: left;
+  flex: 1 1 220px;
+}
+
+/* Les commandes de zoom, posées SUR la fenêtre : elles appartiennent à l'image
+   qu'on examine, pas à la barre de réglages du boîtier. */
+.wrapcrop-zoom {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.2rem;
+  border-radius: 9px;
+  background: rgba(10, 10, 16, 0.78);
+  backdrop-filter: blur(4px);
+}
+
+.wrapcrop-zoom button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.wrapcrop-zoom button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.wrapcrop-zoom button:disabled {
+  opacity: 0.35;
+}
+
+.wrapcrop-zoom b {
+  min-width: 3.1em;
+  text-align: center;
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.9);
 }

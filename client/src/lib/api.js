@@ -1,7 +1,14 @@
 // Petit wrapper autour de fetch pour parler à l'API MyPlayLog.
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
 
-export async function apiFetch(path, { method = "GET", body, token } = {}) {
+// `keepalive` : laisse la requête se terminer même si la page est en train de
+// disparaître (navigation, fermeture d'onglet). Indispensable pour les envois
+// d'adieu — typiquement « je ne joue plus » de lib/presence.js, qui part depuis
+// le nettoyage d'un effet et serait sinon annulé avec la page.
+export async function apiFetch(
+  path,
+  { method = "GET", body, token, keepalive = false } = {}
+) {
   const headers = { "Content-Type": "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
 
@@ -9,6 +16,7 @@ export async function apiFetch(path, { method = "GET", body, token } = {}) {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
+    keepalive,
   });
 
   let data = null;

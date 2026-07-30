@@ -1,4 +1,6 @@
 import {
+  Suspense,
+  lazy,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -9,12 +11,42 @@ import {
 import { createPortal } from "react-dom";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { RoundedBox } from "@react-three/drei";
-import { X, ArrowRight } from "lucide-react";
+import { X, ArrowRight, BookOpen, Gamepad2, MessageCircle } from "lucide-react";
 import { useScrollLock } from "../hooks/useScrollLock";
 import { useBackClose } from "../hooks/useBackClose";
+import { apiFetch } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 import { ShelfSkeleton } from "./CollectionSkeleton";
-import { BOX, paintCase, fmtYears } from "../lib/collection";
+import CollectionCommentsPanel from "./CollectionCommentsPanel";
+import {
+  BOX,
+  boxOf,
+  CONSOLE,
+  paintCase,
+  fmtYears,
+  isComic,
+  isGame,
+  isRtl,
+  KINDS,
+} from "../lib/collection";
+import {
+  paperGeometry,
+  shellGeometry,
+  bookCoverGeometry,
+  bookBlockGeometry,
+  pageEdgeTexture,
+  plankTextures,
+  shadeTexture,
+} from "../lib/caseGeometry";
+
+// Le volume ouvert est une scène à lui tout seul (déformation de page à chaque
+// image, textures de planches) : il ne descend qu'au moment où l'on ouvre un
+// titre de papier, pas avec le rayon.
+const BookReader3D = lazy(() => import("./BookReader3D"));
+
+// La console fait descendre l'émulateur (plusieurs mégaoctets de WebAssembly) :
+// elle n'arrive qu'au moment où l'on appuie sur « Jouer ».
+const GbaPlayer = lazy(() => import("./GbaPlayer"));
 
 // ======================================================================
 //  La planche de collection + la vitrine
@@ -49,11 +81,30 @@ const GAP = 0.016; // jeu entre deux boîtiers
 const EDGE = 0.22; // air laissé de chaque côté de la rangée dans le cadre
 const MIN_W = 1.3; // largeur cadrée minimale (deux titres = gros plan, pas nez à nez)
 const PER_PLANK = 20; // au-delà, une seconde planche flotte sous la première
-const PITCH = 1.66; // écart vertical entre deux planches
+// Ciel laissé au-dessus du plus grand boîtier d'une planche. L'écart vertical
+// entre deux planches n'est plus une constante : il se calcule à partir de la
+// rangée, puisque les boîtiers n'ont plus tous la même hauteur.
+const PLANK_AIR = 0.48;
 // Épaisseur : à l'échelle (1 unité ≈ 16 cm), 0,09 fait une planche d'environ
 // 1,5 cm — celle d'une vraie étagère.
 const THICK = 0.09;
-const DEPTH = 0.9; // profondeur : juste de quoi porter le boîtier
+const DEPTH = 0.94; // profondeur : juste de quoi porter le boîtier le plus profond
+// CE QUE LA PLANCHE AVANCE devant les tranches. Une tablette dépasse toujours un
+// peu de ce qu'elle porte, et cette avancée est ce qui laisse voir son DESSUS
+// alors que la caméra est presque à niveau — donc ce qui donne sa place à
+// l'ombre de contact, au pied des boîtiers.
+const NOSE = 0.05;
+// Le chant est un demi-cylindre couché, de rayon égal à la demi-épaisseur : il
+// fait tout le tour du chant, tangent au dessus et au dessous, sans laisser
+// réapparaître d'arête vive. Mais APLATI — laissé rond, il donne un tube de
+// plastique et non une tablette usinée.
+const NOSE_FLAT = 0.62;
+// Ce que la planche pose d'ombre sur la page, en hauteur (la force est dans
+// PLANK, elle dépend du thème).
+const SHADOW_H = 0.13;
+// Longueur d'un carreau de fibres, en unités de scène (≈ 25 cm). Au-delà, le
+// dessin s'étire et la planche redevient un aplat.
+const FIBRE_TILE = 1.6;
 
 // Le geste de survol : le boîtier s'avance, se soulève et se penche vers nous
 // en pivotant sur son arête du bas. Chiffré ici parce que DEUX endroits en
@@ -74,12 +125,31 @@ const ABOVE = 0.62;
 
 // La planche suit le thème de la page : claire sur fond blanc, sombre sur fond
 // sombre. Discrète dans les deux cas — c'est un support, pas un décor.
-// `lip` / `shade` : les deux filets qui courent sur le chant, en haut et en
-// bas. Sans eux, la planche est un ruban de couleur ; avec, elle a une
-// épaisseur et une arête — c'est tout ce qui la fait lire comme une planche.
+//
+// Trois teintes, une par pièce (voir `Plank`), parce qu'elles ne reçoivent pas
+// la même lumière : le `top` vient du plafond, le `nose` de la pièce (il est
+// donc le plus clair, comme une arête polie par les mains), le `body` ne se voit
+// que par son dessous. Et deux forces d'ombre, qui ne sont pas une couleur mais
+// ce que la planche pose de noir sur ce qu'il y a derrière.
 const PLANK = {
-  light: { body: "#dcd8d0", front: "#eeece5", lip: "#fbfaf6", shade: "#b6b1a6" },
-  dark: { body: "#23242c", front: "#32333d", lip: "#474956", shade: "#16171d" },
+  light: {
+    top: "#e7e3d9",
+    nose: "#eeeae1",
+    body: "#d0cbc0",
+    contact: 0.38,
+    shadow: 0.2,
+  },
+  dark: {
+    top: "#292a33",
+    nose: "#32333d",
+    body: "#1d1e25",
+    // Sur fond sombre, une ombre noire ne se voit presque plus. Elle compte
+    // encore au CONTACT (contre une tranche claire, elle se lit), mais sous la
+    // planche elle laisse la main à la lueur de bord posée par la page
+    // (voir app-26-collection.css).
+    contact: 0.5,
+    shadow: 0.26,
+  },
 };
 
 // ------------------------------------------------------------- lumières --
@@ -125,6 +195,10 @@ const CASE_RIG = {
 };
 
 const mix = (a, b, t) => a + (b - a) * t;
+// Un angle ramené au tour le plus proche, dans ]-π, π]. Le présentoir tourne en
+// continu : sans ça, un angle accumulé pendant une minute se transmettrait tel
+// quel, et l'objet ferait autant de tours qu'il en avait faits.
+const normalizeTurn = (a) => a - Math.round(a / (2 * Math.PI)) * 2 * Math.PI;
 const SCRATCH = new THREE.Color();
 
 // Vitrine : cadence de la rotation automatique, délai avant qu'elle reprenne
@@ -156,70 +230,131 @@ const BUBBLE_W = 268;
 
 // ------------------------------------------------------------- matériaux --
 
-// Les matériaux sont construits À LA MAIN plutôt que déclarés en JSX : un
-// matériau JSX qui passe de `color` à `map` garde sa couleur, et une texture
-// est MULTIPLIÉE par elle — boîtier noir, sans erreur. Ici la couleur est
-// toujours explicite.
-function useCaseMaterials(textures) {
+// Le matériau est construit À LA MAIN plutôt que déclaré en JSX : un matériau
+// JSX qui passe de `color` à `map` garde sa couleur, et une texture est
+// MULTIPLIÉE par elle — boîtier noir, sans erreur. Ici la couleur est toujours
+// explicite.
+function useCasePaper(art) {
   const paper = useMemo(() => {
+    if (!art?.sheet) return null;
     // Du PAPIER, pas du vernis : rugueux (0,82) et sans métal, donc sans lobe
     // spéculaire serré. Une jaquette de boîtier est imprimée sur du carton
     // mat ; à 0,36 elle renvoyait un éclat de plastique en plein milieu de
     // l'affiche, et c'est l'affiche qu'on vient voir.
-    const sheet = (map) =>
-      map &&
-      new THREE.MeshStandardMaterial({
-        map,
-        color: 0xffffff,
-        roughness: 0.82,
-        metalness: 0,
-      });
-    return {
-      sleeve: sheet(textures?.sleeve),
-      back: sheet(textures?.back),
-      spine: sheet(textures?.spine),
-    };
-  }, [textures]);
+    return new THREE.MeshStandardMaterial({
+      map: art.sheet,
+      color: 0xffffff,
+      roughness: 0.82,
+      metalness: 0,
+    });
+  }, [art]);
 
   // R3F ne détruit que ce qu'il a créé lui-même : à nous de libérer.
-  useEffect(() => () => Object.values(paper).forEach((m) => m?.dispose()), [paper]);
+  useEffect(() => () => paper?.dispose(), [paper]);
   return paper;
 }
 
 // ------------------------------------------------------------ le boîtier --
 
-// Le boîtier lui-même, sans interaction : partagé entre le rayon et la
-// vitrine. Deux fabrications, parce que ce ne sont pas les mêmes objets :
+// Le boîtier lui-même, sans interaction : partagé entre le rayon et la vitrine.
+// Deux pièces, et deux seulement :
 //
-//   • jaquette COMPOSÉE par nos soins (affiche + titre peints face par face) —
-//     une coque de plastique blanc aux arêtes arrondies, la jaquette glissée
-//     dessus en léger retrait, ce qui laisse voir le liseré de plastique tout
-//     autour, comme sur un boîtier de location ;
+//   • LA COQUE — le plastique. On n'en voit que le dessus, le dessous et le
+//     chant d'ouverture : tout le reste est sous le papier.
+//   • LA JAQUETTE — une feuille unique qui fait le tour en épousant les arêtes
+//     arrondies (voir `paperGeometry`). Qu'elle ait été fournie dépliée ou
+//     composée par nos soins ne change plus rien ici : elle arrive dans les
+//     deux cas en une seule image, cousue à la peinture (voir paintCase).
 //
-//   • jaquette FOURNIE, dépliée d'un seul tenant (`media.wrap`) — elle se plie
-//     autour du boîtier d'une arête à l'autre, exactement comme à l'impression.
-//     Elle est donc posée en TEXTURE DE FACE sur une boîte à arêtes vives : dos,
-//     tranche et couverture s'enchaînent SANS LE MOINDRE BORD BLANC. Un plan
-//     rapporté en retrait, lui, couperait le dessin à chaque pli.
-function CaseModel({ format = "dvd", paper, full = false }) {
-  const box = BOX[format] || BOX.dvd;
+// `box` arrive tout calculé (voir `boxOf`) : ce sont ses dimensions à LUI, pas
+// celles d'un gabarit. Un titre dont la jaquette a été mesurée est donc à sa
+// vraie taille sur l'étagère, à côté des autres.
+//
+// DEUX CARROSSERIES, ET UNE SEULE PORTE D'ENTRÉE. Un manga rangé à côté d'un
+// DVD ne doit pas être le même objet repeint : le boîtier a une coque de
+// plastique, une rainure d'ouverture et un dos plat ; le volume a un dos en
+// demi-lune et montre le chant de ses pages. C'est ici, et nulle part ailleurs,
+// que le choix se fait — tout le reste de la scène (survol, vol, vitrine) ne
+// sait pas de quel objet il s'occupe, et n'a pas à le savoir.
+function CaseModel({ media, box, paper, cuts }) {
+  if (isComic(media)) return <BookModel box={box} paper={paper} cuts={cuts} />;
+  return <DiscCase box={box} paper={paper} cuts={cuts} />;
+}
 
-  // La coque est la MÊME pour tous : plastique blanc, arêtes arrondies. Seule
-  // change la façon dont le papier est posé dessus.
-  //
-  //   • jaquette composée par nos soins → panneaux en léger retrait, le liseré
-  //     de plastique se voit tout autour, comme sur un boîtier de location ;
-  //   • jaquette FOURNIE d'un seul tenant (`media.wrap`) → elle se plie autour
-  //     du boîtier, donc ses trois panneaux se TOUCHENT aux arêtes : plus de
-  //     bord blanc entre la tranche et les faces, le dessin est continu. Seule
-  //     la hauteur garde un cheveu de plastique, comme sur l'objet réel.
-  const wide = full ? 1 : 0.955; // couverture et dos
-  const edge = full ? 1 : 0.86; // tranche
-  const high = full ? 0.985 : 0.972;
+// ------------------------------------------------------------- le volume --
+// Deux pièces, aucun plastique :
+//
+//   • LE BLOC — les pages. En retrait de la couverture sur les trois côtés
+//     ouverts (la « chasse »), et habillé du chant strié : c'est LUI qui fait
+//     lire l'objet comme du papier, avant même qu'on ait vu la couverture.
+//   • LA COUVERTURE — la même feuille unique que sur un boîtier, mais épousant
+//     un dos en demi-lune plutôt qu'un dos plat à arêtes vives.
+function BookModel({ box, paper, cuts }) {
+  const geo = useMemo(
+    () => ({ cover: bookCoverGeometry(box, cuts), block: bookBlockGeometry(box) }),
+    [box, cuts]
+  );
+  useEffect(
+    () => () => {
+      geo.cover.dispose();
+      geo.block.dispose();
+    },
+    [geo]
+  );
+
+  // Les six faces du bloc ne montrent pas la même chose : les trois CHANTS
+  // montrent la tranche des feuilles (striée), les deux faces collées aux plats
+  // et le dos montrent du papier uni — et personne ne les voit. Une seule
+  // matière pour les six étalerait le grain de la tranche partout.
+  const mats = useMemo(() => {
+    // Du papier lu cent fois : mat, sans le moindre éclat. Un chant de bloc qui
+    // brille, c'est du plastique, et on retombe sur le boîtier qu'on vient
+    // justement de quitter.
+    const edge = new THREE.MeshStandardMaterial({
+      map: pageEdgeTexture(),
+      color: "#f8f1e0",
+      roughness: 0.96,
+      metalness: 0,
+    });
+    const flat = new THREE.MeshStandardMaterial({
+      color: "#f7f1e3",
+      roughness: 0.97,
+      metalness: 0,
+    });
+    // Ordre des groupes d'une BoxGeometry : +X, -X, +Y, -Y, +Z, -Z. Rangé, le
+    // volume empile ses pages selon X : tête, pied et gouttière sont les chants.
+    return [flat, flat, edge, edge, flat, edge];
+  }, []);
+  useEffect(() => () => new Set(mats).forEach((m) => m.dispose()), [mats]);
 
   return (
     <group>
-      <RoundedBox args={[box.w, box.h, box.d]} radius={0.013} smoothness={4}>
+      <mesh geometry={geo.block} material={mats} />
+      {paper && <mesh geometry={geo.cover} material={paper} />}
+    </group>
+  );
+}
+
+// ------------------------------------------------------------ le boîtier --
+function DiscCase({ box, paper, cuts }) {
+  // Les deux géométries sont taillées sur mesure, donc refaites dès que les
+  // dimensions ou les traits de coupe changent — et libérées avec eux : R3F ne
+  // détruit que ce qu'il a créé lui-même.
+  const geo = useMemo(
+    () => ({ shell: shellGeometry(box), paper: paperGeometry(box, cuts) }),
+    [box, cuts]
+  );
+  useEffect(
+    () => () => {
+      geo.shell.dispose();
+      geo.paper.dispose();
+    },
+    [geo]
+  );
+
+  return (
+    <group>
+      <mesh geometry={geo.shell}>
         {/* clearcoat : le vernis du plastique, qui accroche un reflet — mais
             DOUX, et sur une coque à peine grise plutôt que blanche. Le liseré
             de plastique borde la jaquette : trop clair ou trop brillant, c'est
@@ -231,26 +366,9 @@ function CaseModel({ format = "dvd", paper, full = false }) {
           clearcoat={0.3}
           clearcoatRoughness={0.55}
         />
-      </RoundedBox>
+      </mesh>
 
-      {paper.sleeve && (
-        <mesh position={[box.w / 2 + 0.0016, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
-          <planeGeometry args={[box.d * wide, box.h * high]} />
-          <primitive object={paper.sleeve} attach="material" />
-        </mesh>
-      )}
-      {paper.back && (
-        <mesh position={[-box.w / 2 - 0.0016, 0, 0]} rotation={[0, -Math.PI / 2, 0]}>
-          <planeGeometry args={[box.d * wide, box.h * high]} />
-          <primitive object={paper.back} attach="material" />
-        </mesh>
-      )}
-      {paper.spine && (
-        <mesh position={[0, 0, box.d / 2 + 0.0016]}>
-          <planeGeometry args={[box.w * edge, box.h * high]} />
-          <primitive object={paper.spine} attach="material" />
-        </mesh>
-      )}
+      {paper && <mesh geometry={geo.paper} material={paper} />}
 
       {/* L'interstice d'ouverture : la fine rainure d'ombre entre les deux
           valves, sur le chant opposé à la tranche. Un TRAIT, pas un panneau —
@@ -265,10 +383,10 @@ function CaseModel({ format = "dvd", paper, full = false }) {
 
 // ------------------------------------------------------ le rayon (repos) --
 
-function ShelfCase({ media, x, baseY, textures, hovered, held, taken, onHover, onPick }) {
+function ShelfCase({ media, x, baseY, art, hovered, held, taken, onHover, onPick }) {
   const group = useRef(null);
-  const box = BOX[media.format] || BOX.dvd;
-  const paper = useCaseMaterials(textures);
+  const box = boxOf(media);
+  const paper = useCasePaper(art);
   const camera = useThree((s) => s.camera);
   const size = useThree((s) => s.size);
   // Alignés sur leur FACE AVANT (tranches affleurantes) : front au même plan =
@@ -334,35 +452,126 @@ function ShelfCase({ media, x, baseY, textures, hovered, held, taken, onHover, o
           vide derrière la vitrine, et plus rien ici ne répond au curseur. */}
       {!taken && (
         <group position={[0, box.h / 2, 0]}>
-          <CaseModel format={media.format} paper={paper} full={textures?.full} />
+          <CaseModel media={media} box={box} paper={paper} cuts={art?.cuts} />
         </group>
       )}
     </group>
   );
 }
 
+// UNE TABLETTE, ET NON PLUS UN RUBAN. La planche était un rectangle plat, ses
+// reliefs PEINTS dessus : un filet clair en haut, une ombre en bas, deux bandes
+// qui ne pouvaient être justes que pour une seule hauteur de rangée — dès qu'une
+// planche passait au-dessus du niveau de l'œil, la lumière y tombait du mauvais
+// côté, et de près les trois bandes se lisaient comme trois marches.
+//
+// Ici, ces deux filets sont devenus de la MATIÈRE : le chant est un vrai bec
+// arrondi, et c'est la lumière de la scène qui y trace le liseré clair et
+// l'ombre sous la planche — donc juste pour chaque rangée, où qu'elle se trouve
+// dans le cadre, et continu au lieu d'être en escalier.
+//
+// S'y ajoutent les deux ombres qui POSENT l'objet, et qu'aucune lampe ne donne
+// ici (la scène n'a pas d'ombres portées, et n'en a pas besoin pour trois
+// plans) : le liseré de contact au pied des boîtiers, et l'ombre que la tablette
+// laisse tomber sur la page. Le canvas est transparent — cette dernière
+// assombrit donc la PAGE elle-même, comme une vraie étagère posée dessus.
 function Plank({ width, y, skin }) {
-  // Caméra à niveau : on ne voit jamais le dessus, seulement le chant. À
-  // l'écran c'est un rectangle fin sous les boîtiers, rien d'autre.
+  // Le fil se répète le long de la planche : une tablette de plusieurs mètres ne
+  // peut pas porter un dessin unique de plusieurs mètres. Le nombre de carreaux
+  // dépend donc de SA largeur, d'où une copie par planche — les copies partagent
+  // l'image, seul le repère change.
+  const wood = useMemo(() => {
+    const base = plankTextures();
+    const top = base.top.clone();
+    const nose = base.nose.clone();
+    const tiles = Math.max(1, Math.round(width / FIBRE_TILE));
+    top.repeat.set(tiles, 1);
+    // Le chant a ses UV tournées d'un quart de tour : c'est la MÊME poignée qui
+    // étire le dessin sur la longueur (voir `plankTextures`).
+    nose.repeat.set(tiles, 1);
+    return { top, nose };
+  }, [width]);
+  useEffect(
+    () => () => {
+      wood.top.dispose();
+      wood.nose.dispose();
+    },
+    [wood]
+  );
+
+  // Repère : l'origine du groupe est le BEC de la planche, au niveau où posent
+  // les boîtiers. Tout se mesure vers l'arrière et vers le bas depuis là.
   return (
-    <group position={[0, y, -DEPTH / 2 + 0.02]}>
-      <mesh position={[0, -THICK / 2, 0]}>
+    <group position={[0, y, NOSE]}>
+      {/* LA MASSE. On ne la voit que par son dessous et ses côtés : le dessus et
+          le chant sont couverts par les deux pièces suivantes. */}
+      <mesh position={[0, -THICK / 2, -DEPTH / 2]}>
         <boxGeometry args={[width, THICK, DEPTH]} />
-        <meshStandardMaterial color={skin.body} roughness={0.62} metalness={0.05} />
+        <meshStandardMaterial color={skin.body} roughness={0.8} metalness={0.02} />
       </mesh>
-      <mesh position={[0, -THICK / 2, DEPTH / 2 + 0.002]}>
-        <boxGeometry args={[width, THICK, 0.004]} />
-        <meshStandardMaterial color={skin.front} roughness={0.5} metalness={0.05} />
+
+      {/* LE DESSUS. Presque rasant (la caméra est à peine au-dessus de la
+          rangée), donc réduit à un liseré de quelques pixels — mais c'est lui
+          qui dit que les boîtiers sont POSÉS sur quelque chose. Mat : une
+          tablette ne brille pas là où l'on pose les objets. */}
+      <mesh position={[0, 0.0005, -DEPTH / 2]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[width, DEPTH]} />
+        <meshStandardMaterial
+          map={wood.top}
+          color={skin.top}
+          roughness={0.88}
+          metalness={0.02}
+        />
       </mesh>
-      {/* Les deux arêtes du chant : un filet clair sous les boîtiers (le bord
-          que la lumière de la pièce accroche), une ombre sous la planche. */}
-      <mesh position={[0, -THICK * 0.08, DEPTH / 2 + 0.005]}>
-        <boxGeometry args={[width, THICK * 0.16, 0.004]} />
-        <meshStandardMaterial color={skin.lip} roughness={0.45} metalness={0.05} />
+
+      {/* LE BEC. Un demi-cylindre couché et aplati, tangent au dessus comme au
+          dessous. Un peu plus lisse que le reste — c'est le bord que les mains
+          polissent — pour que la lumière y trace un filet clair CONTINU sur
+          toute la longueur : c'est ce filet, et lui seul, qui donne son épaisseur
+          à la planche. */}
+      <mesh
+        position={[0, -THICK / 2, 0]}
+        rotation={[0, 0, Math.PI / 2]}
+        scale={[1, 1, NOSE_FLAT]}
+      >
+        <cylinderGeometry
+          args={[THICK / 2, THICK / 2, width, 24, 1, true, -Math.PI / 2, Math.PI]}
+        />
+        <meshStandardMaterial
+          map={wood.nose}
+          color={skin.nose}
+          roughness={0.46}
+          metalness={0.04}
+        />
       </mesh>
-      <mesh position={[0, -THICK * 0.89, DEPTH / 2 + 0.005]}>
-        <boxGeometry args={[width, THICK * 0.22, 0.004]} />
-        <meshStandardMaterial color={skin.shade} roughness={0.72} metalness={0.02} />
+
+      {/* LE CONTACT. Le liseré occupe exactement la bande de dessus laissée
+          libre par l'avancée de la planche : sombre contre les tranches, éteint
+          au bord. Sans lui, les boîtiers sont posés SUR UNE IMAGE de planche ;
+          avec, ils la touchent. */}
+      <mesh position={[0, 0.002, -NOSE / 2]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[width, NOSE]} />
+        <meshBasicMaterial
+          map={shadeTexture()}
+          color="#000000"
+          transparent
+          opacity={skin.contact}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* L'OMBRE SUR LA PAGE, devant le bec (sinon la planche la mange). C'est
+          ce qui donne son poids à la tablette — et, quand il y a plusieurs
+          rangées, ce qui décolle chacune de celle du dessous. */}
+      <mesh position={[0, -THICK - SHADOW_H / 2, (THICK / 2) * NOSE_FLAT + 0.004]}>
+        <planeGeometry args={[width, SHADOW_H]} />
+        <meshBasicMaterial
+          map={shadeTexture()}
+          color="#000000"
+          transparent
+          opacity={skin.shadow}
+          depthWrite={false}
+        />
       </mesh>
     </group>
   );
@@ -399,7 +608,7 @@ function useFraming({ width, height, centerY }) {
 
 function ShelfScene({
   media,
-  textures,
+  art,
   hovered,
   held,
   taken,
@@ -409,27 +618,38 @@ function ShelfScene({
   skin,
 }) {
   // Une rangée centrée par planche, les tranches presque jointives.
+  //
+  // Les boîtiers n'ont PAS tous la même taille : un Blu-ray est plus court
+  // qu'un DVD, un coffret plus épais. C'est voulu — c'est ce qui fait une
+  // étagère plutôt qu'un présentoir. Deux conséquences ici : l'écart entre
+  // deux planches se règle sur le PLUS GRAND des boîtiers (sinon la rangée du
+  // dessus mange celle du dessous), et le cadrage se mesure sur lui aussi.
+  //
+  // En revanche tout le monde POSE sur la planche : `baseY` est le pied du
+  // boîtier, jamais son centre, donc les hauteurs se mélangent d'elles-mêmes.
   const layout = useMemo(() => {
     const chunks = [];
     for (let i = 0; i < media.length; i += PER_PLANK)
       chunks.push(media.slice(i, i + PER_PLANK));
-    const widthOf = (row) =>
-      row.reduce((w, m) => w + (BOX[m.format] || BOX.dvd).w + GAP, 0) - GAP;
+    const widthOf = (row) => row.reduce((w, m) => w + boxOf(m).w + GAP, 0) - GAP;
     const width = Math.max(MIN_W, Math.max(...chunks.map(widthOf), 0) + EDGE * 2);
 
+    const tallest = Math.max(BOX.dvd.h, ...media.map((m) => boxOf(m).h));
+    const pitch = tallest + PLANK_AIR;
+
     const planks = chunks.map((row, r) => {
-      const y = ((chunks.length - 1) * PITCH) / 2 - r * PITCH - BOX.dvd.h / 2;
+      const y = ((chunks.length - 1) * pitch) / 2 - r * pitch - tallest / 2;
       let x = -widthOf(row) / 2;
       const items = row.map((m) => {
         const at = x;
-        x += (BOX[m.format] || BOX.dvd).w + GAP;
+        x += boxOf(m).w + GAP;
         return { media: m, x: at, baseY: y };
       });
       return { items, y };
     });
 
     const bottomY = planks[planks.length - 1].y - THICK;
-    const topY = planks[0].y + BOX.dvd.h;
+    const topY = planks[0].y + tallest;
     return {
       planks,
       width,
@@ -457,7 +677,7 @@ function ShelfScene({
       onAnchor(null);
       return;
     }
-    const box = BOX[item.media.format] || BOX.dvd;
+    const box = boxOf(item.media);
     camera.updateMatrixWorld();
     // On vise le boîtier PENCHÉ, pas celui qui dort au repos : on repasse par
     // le même pivot que l'animation (arête du bas, boîtier avancé et soulevé)
@@ -508,7 +728,7 @@ function ShelfScene({
               media={m}
               x={x}
               baseY={baseY}
-              textures={textures[m.slug]}
+              art={art[m.slug]}
               hovered={hovered === m.slug || held === m.slug}
               // Figé dès le clic, rendu à la vie une fois la vitrine refermée :
               // il reprend alors sa place en se recalant tout seul dans le rang.
@@ -530,12 +750,20 @@ function ShelfScene({
 // soit le format de la fenêtre (sur un écran étroit, c'est la largeur de la
 // couverture qui borne). Il doit être franchement PLUS GROS qu'au rayon :
 // c'est ce saut d'échelle qui fait lire « la jaquette sort et vient devant ».
-function caseFit(width, height) {
+// Ce que l'objet occupe de la hauteur visible, au repos. Nommé parce qu'il sert
+// AUSSI à passer la pose au lecteur de volumes : c'est le taux de change entre
+// les deux scènes, et deux valeurs qui divergeraient feraient sauter l'objet
+// d'échelle au moment du relais.
+const CASE_FIT = 1.32;
+
+function caseFit(width, height, box) {
   const aspect = Math.max(0.4, width / Math.max(1, height));
   const vTan = Math.tan((FOV * Math.PI) / 180 / 2);
+  // Sur les dimensions DE CE boîtier : cadrer un Blu-ray comme un DVD le
+  // laisserait flotter, et un coffret déborderait du cadre.
   const d = Math.max(
-    (BOX.dvd.h * 1.32) / (2 * vTan),
-    (BOX.dvd.d * 1.32) / (2 * vTan * aspect)
+    (box.h * CASE_FIT) / (2 * vTan),
+    (box.d * CASE_FIT) / (2 * vTan * aspect)
   );
   const visible = 2 * d * vTan;
   // La scène prend tout l'écran, mais le cartouche flotte en bas : on regarde
@@ -545,12 +773,12 @@ function caseFit(width, height) {
   return { d, vTan, visible, eye: -0.06 * visible };
 }
 
-function InspectorFit({ spin, from }) {
+function InspectorFit({ spin, from, box }) {
   const camera = useThree((s) => s.camera);
   const size = useThree((s) => s.size);
   const gl = useThree((s) => s.gl);
   useLayoutEffect(() => {
-    const { d, visible, eye } = caseFit(size.width, size.height);
+    const { d, visible, eye } = caseFit(size.width, size.height, box);
     camera.position.set(0, eye, d);
     camera.lookAt(0, eye, 0);
     camera.updateProjectionMatrix();
@@ -570,10 +798,10 @@ function InspectorFit({ spin, from }) {
       spin.current.fly = {
         x: (from.x - (rect.left + rect.width / 2)) * perPx,
         y: eye + (rect.top + rect.height / 2 - from.y) * perPx,
-        s: Math.max(0.05, (from.h * perPx) / BOX.dvd.h),
+        s: Math.max(0.05, (from.h * perPx) / box.h),
       };
     }
-  }, [camera, size, gl, spin, from]);
+  }, [camera, size, gl, spin, from, box]);
   return null;
 }
 
@@ -621,14 +849,14 @@ function InspectorLights({ spin }) {
   );
 }
 
-function SpinningCase({ media, textures, spin, drag, onOpen, onReady, onZoom }) {
+function SpinningCase({ media, art, spin, drag, onOpen, onReady, onZoom }) {
   const group = useRef(null);
   const close = useRef(false); // regarde-t-on le boîtier de près ?
   // Sans vol (tactile : pas de survol, donc pas de place d'origine connue), le
   // boîtier se contente de grandir un peu en arrivant.
   const pop = useRef(spin.current.intro < 1 ? 1 : 0.72);
   const told = useRef(false);
-  const paper = useCaseMaterials(textures);
+  const paper = useCasePaper(art);
 
   useFrame((_, raw) => {
     const g = group.current;
@@ -663,9 +891,15 @@ function SpinningCase({ media, textures, spin, drag, onOpen, onReady, onZoom }) 
       // Présentation : le boîtier SORT d'abord, encore de tranche comme on le
       // voyait rangé, et ne se retourne qu'ensuite. Les deux mouvements menés
       // ensemble donnaient une toupie, pas un objet qu'on nous présente.
+      //
+      // ET IL NE TOURNE PAS DU MÊME CÔTÉ SELON LE SENS DE LECTURE. Un volume
+      // rangé montre sa tranche ; sa couverture est de l'autre côté du dos
+      // selon qu'il s'ouvre à gauche ou à droite. Un manga se retourne donc
+      // dans l'autre sens pour se présenter — et c'est le geste qu'on ferait
+      // avec l'objet en main.
       s.intro = Math.min(1, s.intro + dt / (s.fly ? FLY_OUT : 0.75));
       const turn = s.fly ? Math.max(0, (s.intro - 0.3) / 0.7) : s.intro;
-      s.y = (Math.PI / 2) * (1 - easeOut(Math.min(1, turn)));
+      s.y = mix(Math.PI / 2, s.face, easeOut(Math.min(1, turn)));
       s.x = s.home + (-0.05 - s.home) * trip; // il se redresse en venant
       s.lastTouch = performance.now();
     } else if (performance.now() - s.lastTouch > IDLE_DELAY) {
@@ -722,7 +956,7 @@ function SpinningCase({ media, textures, spin, drag, onOpen, onReady, onZoom }) 
         if (mainButton(e) && !drag.current.moved) onOpen();
       }}
     >
-      <CaseModel format={media.format} paper={paper} full={textures?.full} />
+      <CaseModel media={media} box={boxOf(media)} paper={paper} cuts={art?.cuts} />
     </group>
   );
 }
@@ -733,8 +967,32 @@ function mainButton(e) {
   return (e?.nativeEvent?.button ?? e?.button ?? 0) === 0;
 }
 
-function CaseInspector({ media, textures, from, onClose, onOpen, onReady, onSettle }) {
+function CaseInspector({
+  media,
+  art,
+  from,
+  onClose,
+  onOpen,
+  onRead,
+  onPlay,
+  onReady,
+  onSettle,
+}) {
   useScrollLock(true);
+  const { token } = useAuth();
+  // La discussion du titre, glissée par la droite. L'objet reste en main et
+  // continue de tourner derrière : on ne quitte pas la vitrine pour lire ce
+  // qu'on dit de l'objet qu'on y tient.
+  const [commenting, setCommenting] = useState(false);
+
+  // QUELLE FACE EST LA COUVERTURE. Sur un volume qui se lit de droite à gauche,
+  // la couverture est de l'AUTRE CÔTÉ du dos : ce que la jaquette range en
+  // quatrième de couverture est, pour un manga, la première. On ne retourne
+  // donc pas l'objet — on le présente par son autre face, d'un demi-tour, et
+  // tout le reste (le vol, le présentoir, le rangement) suit sans rien savoir
+  // du sens de lecture. Le lecteur 3D fait déjà le même raisonnement de son
+  // côté (son miroir de scène) : les deux montrent enfin la même image.
+  const face = isRtl(media) ? Math.PI : 0;
 
   // Rotation, zoom et déplacement en ref, pas en state : ils bougent à chaque
   // frame et à chaque pixel de souris — un rendu React à ce rythme ferait
@@ -744,9 +1002,10 @@ function CaseInspector({ media, textures, from, onClose, onOpen, onReady, onSett
     // clic — et c'est là qu'il devra revenir pour se ranger.
     x: from ? from.tilt : -0.05,
     home: from ? from.tilt : HOVER.tilt,
+    face,
     // Venu de l'étagère, le boîtier arrive DE TRANCHE, exactement comme on le
     // voyait rangé ; sinon (tactile, pas de survol) il se présente de face.
-    y: from ? Math.PI / 2 : 0.35,
+    y: from ? Math.PI / 2 : face + 0.35,
     intro: from ? 0 : 1,
     fly: null, // point de départ du vol, posé par InspectorFit
     flyT: 0,
@@ -796,11 +1055,71 @@ function CaseInspector({ media, textures, from, onClose, onOpen, onReady, onSett
 
   useBackClose(close, "case");
 
+  // LA POSE, AU MOMENT PRÉCIS OÙ L'ON DEMANDE À OUVRIR. Le lecteur de volumes
+  // est une autre scène, avec sa caméra et son cadrage : lui passer des unités
+  // de celle-ci n'aurait aucun sens. On lui passe donc des FRACTIONS DE LA
+  // HAUTEUR VISIBLE, seul repère commun, et il repart exactement de là — même
+  // assiette, même taille à l'écran. Sans ça, le volume qu'on tenait disparaît
+  // et un autre surgit à sa place.
+  const poseNow = useCallback(() => {
+    const s = spin.current;
+    const box = boxOf(media);
+    const visible = box.h * CASE_FIT;
+    return {
+      // Ramené au tour le plus proche : le présentoir tourne en continu, `y`
+      // vaut donc n'importe quoi, et le volume ferait autant de tours qu'il en
+      // avait accumulés avant de se présenter.
+      //
+      // Et mesuré DEPUIS SA FACE DE PRÉSENTATION, pas depuis le zéro de cette
+      // scène-ci : ce qu'on transmet, c'est « de combien l'objet est tourné
+      // par rapport à nous », seule chose qui ait un sens dans une autre scène.
+      // Un manga présenté bien en face vaut donc zéro, comme n'importe quel
+      // volume — sinon le lecteur, qui a son propre repère, le prendrait pour
+      // un demi-tour à rattraper et le ferait pivoter en s'ouvrant.
+      spinY: normalizeTurn(s.y - s.face),
+      tilt: s.x,
+      height: s.zoomView / CASE_FIT,
+      panX: s.panViewX / visible,
+      panY: s.panViewY / visible,
+    };
+  }, [media]);
+
+  // ENTRÉE — ET L'ESPACE — FONT LA CHOSE ÉVIDENTE : la même que le clic sur
+  // l'objet. Un volume s'ouvre, un jeu se lance, un boîtier vidéo renvoie à sa
+  // fiche. Prendre un livre en main pour devoir aller chercher un bouton à la
+  // souris, c'est une marche de trop entre le rayon et la lecture.
+  //
+  // LES DEUX TOUCHES, parce que la main n'est pas au même endroit selon d'où
+  // l'on vient : le pouce tombe sur la barre, l'index sur Entrée, et hésiter
+  // entre les deux devant un livre qu'on tient déjà est absurde. L'espace
+  // continue d'ailleurs la lecture une fois le volume ouvert (il y allume la
+  // lecture guidée), donc c'est la même touche du début à la fin.
+  //
+  // ET LE CLAVIER PASSE LA MAIN quand la discussion est ouverte : on y écrit.
+  // Échap doit refermer le panneau (il s'en charge) et non reposer le boîtier
+  // sous le message en cours de frappe, et l'espace appartient au texte. Le
+  // garde-fou plus bas ne couvre que le champ lui-même — il suffirait à protéger
+  // la saisie, pas le reste du panneau, où une barre d'espace ouvrirait le
+  // volume derrière.
   useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && close();
+    if (commenting) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") return close();
+      if (e.key === "Enter" || e.key === " ") {
+        // Sauf si le clavier est POSÉ SUR un bouton (croix, « la fiche ») : là,
+        // la touche lui appartient, et ouvrir en même temps ferait deux gestes
+        // pour une seule frappe.
+        if (e.target?.closest?.("button, a, input, select, textarea")) return undefined;
+        // L'espace fait défiler la page par défaut — ici il n'y a rien à faire
+        // défiler, mais le navigateur ne le sait pas.
+        e.preventDefault();
+        return onRead ? onRead(poseNow()) : onPlay ? onPlay() : onOpen();
+      }
+      return undefined;
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [close]);
+  }, [close, onRead, onPlay, onOpen, poseNow, commenting]);
 
   function down(e) {
     // Bouton droit : on déplace l'objet dans le cadre. Bouton gauche : on le
@@ -892,14 +1211,17 @@ function CaseInspector({ media, textures, from, onClose, onOpen, onReady, onSett
             if (mainButton(e) && !drag.current.moved) close();
           }}
         >
-          <InspectorFit spin={spin} from={from} />
+          <InspectorFit spin={spin} from={from} box={boxOf(media)} />
           <InspectorLights spin={spin} />
           <SpinningCase
             media={media}
-            textures={textures}
+            art={art}
             spin={spin}
             drag={drag}
-            onOpen={onOpen}
+            // Cliquer l'objet fait la chose évidente : un volume s'ouvre, un
+            // jeu se lance, un boîtier vidéo renvoie à sa fiche (son contenu
+            // est ailleurs).
+            onOpen={() => (onRead ? onRead(poseNow()) : onPlay ? onPlay() : onOpen())}
             onZoom={setZoomed}
             onReady={() => {
               setVeiled(true);
@@ -917,21 +1239,80 @@ function CaseInspector({ media, textures, from, onClose, onOpen, onReady, onSett
             )}
             <strong>{media.title}</strong>
             <span className="coll-inspect-meta">
-              {media.kind === "series"
-                ? `Série · ${media.episodeCount} épisodes`
-                : "Film"}
+              {isComic(media)
+                ? `Volume${media.pageCount ? ` · ${media.pageCount} planches` : ""}`
+                : isGame(media)
+                  ? `${CONSOLE}${
+                      media.cartridge?.region ? ` · ${media.cartridge.region}` : ""
+                    }`
+                  : media.kind === "series"
+                    ? `Série · ${media.episodeCount} épisodes`
+                    : "Film"}
               {fmtYears(media) ? ` · ${fmtYears(media)}` : ""}
             </span>
           </div>
-          <button className="btn btn-primary clickable" onClick={onOpen}>
-            <ArrowRight size={16} /> Ouvrir la fiche
-          </button>
+          {/* Le papier et le jeu ont DEUX suites : la bonne (l'ouvrir, le
+              lancer — ce qu'on veut neuf fois sur dix) et sa fiche. Un boîtier
+              vidéo n'en a qu'une, son contenu vit ailleurs. Et TOUS ont la
+              discussion.
+
+              L'ORDRE DIT OÙ ÇA MÈNE. D'abord ce pour quoi on a pris l'objet,
+              puis la discussion — qui ne quitte pas la vitrine, elle glisse à
+              côté de l'objet resté en main — et en dernier la fiche, la seule
+              qui fasse vraiment sortir d'ici. On s'éloigne de l'objet en allant
+              vers la droite. */}
+          <div className="coll-inspect-acts">
+            {(onRead || onPlay) && (
+              <button
+                className="btn btn-primary clickable"
+                onClick={() => (onRead ? onRead(poseNow()) : onPlay())}
+              >
+                {onRead ? (
+                  <>
+                    <BookOpen size={16} /> Ouvrir
+                  </>
+                ) : (
+                  <>
+                    <Gamepad2 size={16} /> Jouer
+                  </>
+                )}
+              </button>
+            )}
+            <button
+              className="btn btn-ghost clickable coll-inspect-talk"
+              onClick={() => setCommenting(true)}
+              title="Ce qu'on dit de ce titre"
+            >
+              <MessageCircle size={16} /> <span>Commentaires</span>
+            </button>
+            {/* Sur un boîtier vidéo, la fiche est la SEULE suite : elle reprend
+                alors le premier rôle, et son libellé le dit. */}
+            <button
+              className={`btn clickable ${onRead || onPlay ? "btn-ghost" : "btn-primary"}`}
+              onClick={onOpen}
+            >
+              <ArrowRight size={16} /> {onRead || onPlay ? "La fiche" : "Ouvrir la fiche"}
+            </button>
+          </div>
         </div>
         <span className="coll-inspect-hint">
           Attrape-le pour le retourner · clic droit pour le déplacer · molette
-          pour zoomer · clique-le pour ouvrir · Échap pour le reposer
+          pour zoomer · clique-le ou Entrée pour{" "}
+          {onRead ? "l'ouvrir" : onPlay ? "y jouer" : "ouvrir"} · Échap pour le
+          reposer
         </span>
       </footer>
+
+      {/* Monté à part, sur le corps de la page : il ne peut pas vivre dans la
+          vitrine, qui capte le doigt pour faire pivoter le boîtier (voir le
+          commentaire du panneau). */}
+      {commenting && (
+        <CollectionCommentsPanel
+          media={media}
+          token={token}
+          onClose={() => setCommenting(false)}
+        />
+      )}
     </div>,
     document.body
   );
@@ -940,14 +1321,18 @@ function CaseInspector({ media, textures, from, onClose, onOpen, onReady, onSett
 // ------------------------------------------------------------------ page --
 
 export default function CollectionShelf({ media, onSelect, theme = "light" }) {
+  const { token } = useAuth();
   const [hovered, setHovered] = useState(null);
   const [anchor, setAnchor] = useState(null); // position écran du survolé
-  const [inspected, setInspected] = useState(null); // { media, from }
+  const [inspected, setInspected] = useState(null); // { media, from } — boîtier
+  const [reading, setReading] = useState(null); // { media, from } — volume
+  const [playing, setPlaying] = useState(null); // le jeu en cours, console allumée
   // Le boîtier retiré du rayon. Volontairement distinct de `inspected` : sa
   // place ne se vide qu'une fois que la vitrine a vraiment dessiné le sien,
   // et se remplit à nouveau juste avant qu'elle ne s'efface.
   const [taken, setTaken] = useState(null);
-  const [textures, setTextures] = useState({});
+  const [art, setTextures] = useState({});
+  const [pages, setPages] = useState({}); // planches déjà rapatriées, par slug
   const [missingArt, setMissingArt] = useState(0);
   const wrapRef = useRef(null);
   const skin = PLANK[theme] || PLANK.light;
@@ -966,21 +1351,18 @@ export default function CollectionShelf({ media, onSelect, theme = "light" }) {
         const painted = await paintCase(m);
         if (!alive) return;
         if (!painted.artwork) failures += 1;
-        const mk = (canvas) => {
-          const t = new THREE.CanvasTexture(canvas);
-          t.colorSpace = THREE.SRGBColorSpace;
-          t.anisotropy = 8;
-          return t;
-        };
+        // `Texture` et non `CanvasTexture` : la feuille peut être un canvas
+        // (jaquette composée) comme une image (jaquette fournie telle quelle,
+        // qu'on ne recopie plus dans un canvas pour rien).
+        const sheet = new THREE.Texture(painted.sheet);
+        sheet.colorSpace = THREE.SRGBColorSpace;
+        sheet.anisotropy = 8;
+        sheet.needsUpdate = true;
         setTextures((prev) => ({
           ...prev,
-          [m.slug]: {
-            spine: mk(painted.spine),
-            sleeve: mk(painted.sleeve),
-            back: mk(painted.back),
-            // Jaquette d'un seul tenant : le boîtier se monte sans liseré.
-            full: !!painted.full,
-          },
+          // `cuts` voyage avec la texture : c'est lui qui dit à la géométrie où
+          // placer les deux plis sur le contour du boîtier.
+          [m.slug]: { sheet, cuts: painted.cuts },
         }));
       }
       if (alive) setMissingArt(failures);
@@ -993,7 +1375,7 @@ export default function CollectionShelf({ media, onSelect, theme = "light" }) {
   // Libération au démontage — lues en ref, sinon le nettoyage ne verrait que
   // l'objet vide du premier rendu.
   const liveTextures = useRef({});
-  liveTextures.current = textures;
+  liveTextures.current = art;
   useEffect(
     () => () => {
       for (const set of Object.values(liveTextures.current)) {
@@ -1003,6 +1385,47 @@ export default function CollectionShelf({ media, onSelect, theme = "light" }) {
     []
   );
 
+  // LES PLANCHES SE CHERCHENT PENDANT QU'ON RETOURNE LE VOLUME. Elles ne partent
+  // pas avec la liste du rayon (une centaine d'URL par titre), et les demander
+  // au moment du clic sur « ouvrir » plaçait une seconde d'attente exactement là
+  // où l'on veut voir le volume s'ouvrir. La vitrine, elle, dure le temps qu'on
+  // veut : c'est le bon moment pour aller les chercher.
+  useEffect(() => {
+    const m = inspected?.media;
+    if (!m || !isComic(m) || pages[m.slug]) return undefined;
+    let alive = true;
+    apiFetch(`/collection/${m.slug}`, { token })
+      .then((d) => {
+        if (!alive) return;
+        const got = d.media?.pages || [];
+        setPages((p) => ({ ...p, [m.slug]: got }));
+        // Et on tire les deux premières dans le cache du navigateur : c'est
+        // elles qui décident si le volume s'ouvre tout de suite. `crossOrigin`
+        // est obligatoire — sans lui, le navigateur garde une entrée de cache
+        // SÉPARÉE de celle que réclamera la texture, et le préchargement n'aura
+        // servi à rien (voir `loadImage`).
+        for (const pg of got.slice(0, 2)) {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.src = pg.src;
+        }
+      })
+      .catch(() => {
+        /* pas grave : le lecteur ira les chercher lui-même */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [inspected, token, pages]);
+
+  // Le volume tel qu'on le passe au lecteur : le sien, plus ses planches si
+  // elles sont déjà arrivées.
+  const readMedia = useMemo(() => {
+    if (!reading) return null;
+    const got = pages[reading.media.slug];
+    return got ? { ...reading.media, pages: got } : reading.media;
+  }, [reading, pages]);
+
   // La bulle garde le dernier titre survolé le temps de sa disparition : la
   // vider dès la sortie du curseur ferait clignoter une carte vide.
   const held = useRef(null);
@@ -1011,7 +1434,7 @@ export default function CollectionShelf({ media, onSelect, theme = "light" }) {
     if (m) held.current = { media: m, anchor };
   }
   const tip = held.current;
-  const showTip = !!anchor && !inspected;
+  const showTip = !!anchor && !inspected && !reading;
 
   // Recadrage horizontal : la carte reste dans le canvas, la pointe reste sur
   // le boîtier — d'où le décalage `--tail` entre les deux.
@@ -1039,13 +1462,57 @@ export default function CollectionShelf({ media, onSelect, theme = "light" }) {
     setInspected({ media: m, from });
   }
 
+  // Le volume passe D'ABORD par la vitrine, comme un boîtier : on le retourne,
+  // on regarde ses deux plats, on lit son dos. C'est seulement quand on demande
+  // à l'ouvrir qu'il s'ouvre — un objet qu'on ne peut plus regarder sans
+  // déclencher sa lecture n'est plus un objet, c'est un bouton.
+  //
+  // Il ne repart PAS au rayon entre les deux, et il ne disparaît pas non plus le
+  // temps que l'autre scène s'allume : la vitrine RESTE MONTÉE jusqu'à ce que le
+  // lecteur ait dessiné le volume dans la même pose (`onLanded`). Les deux se
+  // superposent une poignée d'images, et le relais ne se voit pas — c'est déjà
+  // ce que font le rayon et la vitrine entre eux.
+  function read(m, pose) {
+    // LA PLACE SUR LA PLANCHE VOYAGE AVEC LE VOLUME. `pose` dit d'où il vient
+    // (la main, dans la vitrine) ; `from` dit où il RETOURNE — son emplacement
+    // exact dans le rayon, relevé au moment du clic. Sans elle, refermer un
+    // volume le faisait simplement disparaître de l'écran, là où un DVD, lui,
+    // repart se ranger. Les deux repères ne se contredisent pas : le lecteur
+    // se sert du premier pour arriver et du second pour repartir.
+    setReading({ media: m, from: inspected?.from || null, pose });
+  }
+
+  // LE JEU, LUI, RANGE LE BOÎTIER D'ABORD. Le volume garde sa vitrine le temps
+  // du relais parce que les deux scènes montrent le même objet et qu'on veut
+  // voir passer l'une dans l'autre ; ici la console n'a rien à voir avec un
+  // boîtier qui tourne — la laisser derrière, ce serait deux canvas WebGL et un
+  // émulateur à faire tourner en même temps, pour une scène que personne ne
+  // regarde.
+  function play(m) {
+    setInspected(null);
+    setTaken(null);
+    setPlaying(m);
+  }
+
+  // Le temps de jeu part directement d'ici : le rayon n'a pas d'état de
+  // progression à tenir à jour, il le relira à la prochaine visite.
+  function savePlayed(slug, seconds) {
+    apiFetch(`/collection/${slug}/played`, {
+      method: "POST",
+      token,
+      body: { seconds },
+    }).catch(() => {
+      /* un compteur de temps de jeu ne mérite pas d'alerte */
+    });
+  }
+
   // Les jaquettes se peignent en série : tant que la première n'est pas prête,
   // le rayon n'est qu'une rangée de coques blanches. On garde donc le squelette
   // par-dessus jusque-là, et la scène se révèle en fondu — l'étagère se garnit
   // au lieu d'apparaître nue puis de se remplir sous les yeux. Le squelette
   // reste monté le temps du fondu, sinon il disparaît d'un coup sur une scène
   // encore transparente.
-  const dressed = Object.keys(textures).length > 0;
+  const dressed = Object.keys(art).length > 0;
   const [skelGone, setSkelGone] = useState(false);
   useEffect(() => {
     if (!dressed) return undefined;
@@ -1065,7 +1532,7 @@ export default function CollectionShelf({ media, onSelect, theme = "light" }) {
     >
       {!skelGone && (
         <ShelfSkeleton
-          label="On garnit l'étagère…"
+          label="Chargement de l'étagère…"
           count={Math.min(14, media.length)}
         />
       )}
@@ -1085,9 +1552,9 @@ export default function CollectionShelf({ media, onSelect, theme = "light" }) {
       >
         <ShelfScene
           media={media}
-          textures={textures}
+          art={art}
           hovered={hovered}
-          held={inspected?.media.slug}
+          held={inspected?.media.slug || reading?.media.slug}
           taken={taken}
           onHover={setHovered}
           onPick={pick}
@@ -1126,11 +1593,15 @@ export default function CollectionShelf({ media, onSelect, theme = "light" }) {
               {tip.media.franchise && <em>{tip.media.franchise}</em>}
               <strong>{tip.media.title}</strong>
               <span className="coll-bubble-meta">
-                <b>{tip.media.kind === "series" ? "Série" : "Film"}</b>
+                <b>{isGame(tip.media) ? CONSOLE : KINDS[tip.media.kind]?.label || "Film"}</b>
                 {fmtYears(tip.media) ? ` · ${fmtYears(tip.media)}` : ""}
-                {tip.media.kind === "series" && tip.media.episodeCount
-                  ? ` · ${tip.media.episodeCount} ép.`
-                  : ""}
+                {isComic(tip.media) && tip.media.pageCount
+                  ? ` · ${tip.media.pageCount} planches`
+                  : isGame(tip.media) && tip.media.cartridge?.region
+                    ? ` · ${tip.media.cartridge.region}`
+                    : tip.media.kind === "series" && tip.media.episodeCount
+                      ? ` · ${tip.media.episodeCount} ép.`
+                      : ""}
               </span>
               {pct > 0 && (
                 <span className="coll-bubble-bar">
@@ -1150,13 +1621,42 @@ export default function CollectionShelf({ media, onSelect, theme = "light" }) {
       )}
 
       <span className="coll-shelf-hint" aria-hidden="true">
-        Survole un boîtier · clique pour le prendre en main
+        Survole un titre · clique pour le prendre en main — un volume s'ouvre et
+        se lit, un jeu se lance
       </span>
+
+      {/* Le volume ouvert descend à la demande : sa scène (une page déformée à
+          chaque image, les textures des planches) n'a rien à faire dans le
+          paquet du rayon. Le repli est vide — l'étagère reste sous les yeux, et
+          le volume, lui, ne quitte sa place qu'une fois le lecteur dessiné. */}
+      {reading && (
+        <Suspense fallback={null}>
+          <BookReader3D
+            media={readMedia}
+            art={art[reading.media.slug]}
+            from={reading.from}
+            pose={reading.pose}
+            onLanded={() => {
+              setTaken(reading.media.slug);
+              // Le volume est dessiné ici, dans la pose de la vitrine, et le
+              // lecteur pose son voile DANS LE MÊME RENDU : les deux scènes
+              // partagent le décor, il n'y a donc rien à attendre — et deux
+              // voiles empilés une seule image se verraient.
+              setInspected(null);
+            }}
+            onSettle={() => setTaken(null)}
+            onClose={() => {
+              setTaken(null);
+              setReading(null);
+            }}
+          />
+        </Suspense>
+      )}
 
       {inspected && (
         <CaseInspector
           media={inspected.media}
-          textures={textures[inspected.media.slug]}
+          art={art[inspected.media.slug]}
           from={inspected.from}
           onReady={() => setTaken(inspected.media.slug)}
           onSettle={() => setTaken(null)}
@@ -1165,7 +1665,31 @@ export default function CollectionShelf({ media, onSelect, theme = "light" }) {
             setInspected(null);
           }}
           onOpen={() => onSelect(inspected.media)}
+          // LA POSE VOYAGE. `poseNow()` dit où en est le volume dans la main —
+          // son assiette, son quart de tour, son zoom — et le lecteur reprend
+          // exactement là (voir `pose` dans BookReader3D). L'oublier, comme le
+          // faisait cette flèche qui avalait son argument, faisait surgir le
+          // volume à plat et à une autre échelle par-dessus celui qu'on tenait.
+          onRead={isComic(inspected.media) ? (pose) => read(inspected.media, pose) : null}
+          // Un boîtier de jeu sans cartouche déposée n'a rien à proposer :
+          // mieux vaut sa fiche, qui le dit, qu'un bouton qui échoue.
+          onPlay={
+            isGame(inspected.media) && inspected.media.cartridge?.rom
+              ? () => play(inspected.media)
+              : null
+          }
         />
+      )}
+
+      {playing && (
+        <Suspense fallback={null}>
+          <GbaPlayer
+            media={playing}
+            token={token}
+            onPlayed={(seconds) => savePlayed(playing.slug, seconds)}
+            onClose={() => setPlaying(null)}
+          />
+        </Suspense>
       )}
     </div>
   );

@@ -11,6 +11,10 @@ import {
   Info,
   RotateCw,
   Unplug,
+  BookOpen,
+  Gamepad2,
+  Power,
+  Clock3,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -18,7 +22,7 @@ import { useTheme } from "../context/ThemeContext";
 import useMediaQuery from "../hooks/useMediaQuery";
 import CollectionCase from "../components/CollectionCase";
 import { ShelfSkeleton, GridSkeleton } from "../components/CollectionSkeleton";
-import { KINDS, resumeLabel } from "../lib/collection";
+import { KINDS, isComic, resumeLabel, fmtDuration } from "../lib/collection";
 
 // L'étagère 3D (three.js + R3F) ne part que si on la demande : même politique
 // que Playtopia, le bundle principal ne doit pas la porter.
@@ -38,6 +42,8 @@ const KIND_FILTERS = [
   { value: "", label: "Tout" },
   { value: "series", label: "Séries" },
   { value: "film", label: "Films" },
+  { value: "comic", label: "Comics & mangas" },
+  { value: "game", label: "Jeux GBA" },
 ];
 
 export default function Collection() {
@@ -108,24 +114,46 @@ export default function Collection() {
     });
   }, [media, kind, query]);
 
-  // Rangée « Reprendre » : ce qui a été commencé, le plus récent d'abord.
-  const resuming = useMemo(
-    () =>
-      media
-        .filter((m) => m.progress && !m.progress.completed)
-        .sort(
-          (a, b) =>
-            new Date(b.progress.lastWatchedAt) - new Date(a.progress.lastWatchedAt)
-        )
+  // LES REPRISES, EN TROIS RAYONS SÉPARÉS. Une seule rangée mélangée mentait
+  // sur ce qu'elle proposait : « Reprendre » à côté d'un manga veut dire ouvrir
+  // un volume, à côté d'une cartouche rallumer une console, et les trois gestes
+  // n'ont ni la même unité de progression (minutes / planches / heures de jeu)
+  // ni la même promesse. Chaque support a donc sa section, sa formulation et
+  // son objet — et elles suivent le filtre du rayon, pour qu'un rayon « Séries »
+  // ne propose pas de reprendre une partie.
+  const resuming = useMemo(() => {
+    const started = shown
+      .filter((m) => m.progress && !m.progress.completed)
+      .sort(
+        (a, b) =>
+          new Date(b.progress.lastWatchedAt) - new Date(a.progress.lastWatchedAt)
+      );
+    return {
+      // `episodeCount` est ici une CONDITION, pas une décoration. Le rayon vidéo
+      // ne s'héberge pas lui-même : quand tous les hébergeurs d'un titre ont
+      // fermé, le vérificateur de liens retire les sources mortes (panneau
+      // d'admin) et il ne reste parfois plus rien à lire. Proposer « Reprendre »
+      // sur un boîtier vide, c'est promettre une séance qui s'ouvre sur du noir.
+      watch: started
+        .filter((m) => (m.kind === "series" || m.kind === "film") && m.episodeCount > 0)
         .slice(0, 4),
-    [media]
-  );
+      read: started.filter((m) => m.kind === "comic").slice(0, 4),
+      play: started.filter((m) => m.kind === "game").slice(0, 4),
+    };
+  }, [shown]);
 
   const counts = useMemo(
     () => ({
       series: media.filter((m) => m.kind === "series").length,
       film: media.filter((m) => m.kind === "film").length,
+      comic: media.filter((m) => m.kind === "comic").length,
+      game: media.filter((m) => m.kind === "game").length,
       episodes: media.reduce((n, m) => n + (m.episodeCount || 0), 0),
+      // Les planches sont comptées SUR LE PAPIER seulement. Un titre entré comme
+      // manga puis rebasculé en film garde ses planches dans sa fiche : elles ne
+      // s'affichent plus nulle part, mais elles gonflaient ce compteur-là — le
+      // rayon annonçait des centaines de planches pour des films.
+      pages: media.reduce((n, m) => n + (isComic(m) ? m.pageCount || 0 : 0), 0),
     }),
     [media]
   );
@@ -142,8 +170,8 @@ export default function Collection() {
             <span className="coll-head-over">Rayon vidéo</span>
             <h1 className="coll-head-title">Collection</h1>
             <p className="coll-head-sub">
-              Séries, films et animés tirés de nos jeux — libres d'accès, rangés
-              comme au vidéoclub.
+              Séries, films, animés, comics et boîtiers de jeu — rangés comme au
+              vidéoclub, et jouables sur place.
             </p>
           </div>
         </div>
@@ -166,8 +194,19 @@ export default function Collection() {
               <span>
                 <strong>{counts.film}</strong> film{counts.film > 1 ? "s" : ""}
               </span>
+              {counts.comic > 0 && (
+                <span>
+                  <strong>{counts.comic}</strong> comic{counts.comic > 1 ? "s" : ""}
+                </span>
+              )}
+              {counts.game > 0 && (
+                <span>
+                  <strong>{counts.game}</strong> jeu{counts.game > 1 ? "x" : ""} DS
+                </span>
+              )}
               <span>
                 <strong>{counts.episodes}</strong> épisodes
+                {counts.pages > 0 && ` · ${counts.pages} planches`}
               </span>
             </>
           )}
@@ -277,7 +316,7 @@ export default function Collection() {
       )}
 
       {status === "ready" && shown.length > 0 && effectiveView === "shelf" && (
-        <Suspense fallback={<ShelfSkeleton label="On monte l'étagère…" />}>
+        <Suspense fallback={<ShelfSkeleton label="Chargement de l'étagère…" />}>
           <CollectionShelf
             media={shown}
             theme={theme}
@@ -295,15 +334,21 @@ export default function Collection() {
       )}
 
       {/* ---------------- reprendre ----------------
-          Placée APRÈS la collection : on vient d'abord sur cette page pour voir
-          l'étagère. La reprise est un raccourci, pas l'entrée principale. */}
-      {resuming.length > 0 && (
+          Placées APRÈS la collection : on vient d'abord sur cette page pour
+          voir l'étagère. La reprise est un raccourci, pas l'entrée principale.
+          Et une section par support, de haut en bas : ce qui se regarde, ce qui
+          se lit, ce qui se joue. */}
+
+      {/* 1. L'ÉCRAN. Une vignette large, comme l'arrêt sur image d'une cassette
+             qu'on remet en marche : c'est le seul des trois qui reprend à la
+             SECONDE près, donc le seul qui porte une jauge de temps. */}
+      {resuming.watch.length > 0 && (
         <section className="coll-resume">
           <h2 className="coll-section-title">
-            <Play size={15} /> Reprendre
+            <Play size={15} /> Reprendre <em>Séries &amp; films</em>
           </h2>
           <div className="coll-resume-row">
-            {resuming.map((m) => {
+            {resuming.watch.map((m) => {
               const pct =
                 m.progress.durationSeconds > 0
                   ? Math.min(
@@ -337,13 +382,114 @@ export default function Collection() {
         </section>
       )}
 
+      {/* 2. LE PAPIER. Rien à voir avec une vignette d'écran : une fiche de
+             papier crème, la couverture debout à gauche, un ruban de
+             marque-page qui pend du haut. La progression se compte en PLANCHES,
+             jamais en minutes. */}
+      {resuming.read.length > 0 && (
+        <section className="coll-resume coll-read">
+          <h2 className="coll-section-title">
+            <BookOpen size={15} /> Marque-pages <em>Comics &amp; mangas</em>
+          </h2>
+          <div className="coll-read-row">
+            {resuming.read.map((m) => {
+              const page = (m.progress.page || 0) + 1;
+              const pct = m.pageCount
+                ? Math.min(100, (page / m.pageCount) * 100)
+                : 0;
+              return (
+                <Link
+                  key={m.slug}
+                  // `play=1` rouvre le volume à la planche enregistrée (voir la
+                  // reprise automatique dans CollectionDetail).
+                  to={`/collection/${m.slug}?play=1`}
+                  className="coll-read-card clickable"
+                  style={{ "--tint": m.color }}
+                >
+                  <span className="coll-read-cover">
+                    {m.poster ? (
+                      <img src={m.poster} alt="" loading="lazy" />
+                    ) : (
+                      <BookOpen size={18} />
+                    )}
+                  </span>
+                  <span className="coll-read-body">
+                    {m.franchise && (
+                      <span className="coll-read-saga">{m.franchise}</span>
+                    )}
+                    <strong>{m.title}</strong>
+                    <span className="coll-read-gauge" aria-hidden="true">
+                      <i style={{ width: `${pct}%` }} />
+                    </span>
+                    <em>
+                      Planche {page}
+                      {m.pageCount ? ` sur ${m.pageCount}` : ""}
+                    </em>
+                  </span>
+                  {/* Le ruban : la seule chose qui dépasse d'un livre fermé. */}
+                  <span className="coll-read-mark" aria-hidden="true" />
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* 3. LA CARTOUCHE. Ni vignette ni fiche : la carte de jeu elle-même,
+             coin biseauté et contacts dorés. On la RALLUME, et ce qu'on affiche
+             dessous est le temps déjà passé dessus — c'est lui qui SITUE la
+             cartouche dans la rangée, là où une barre de progression ne voudrait
+             rien dire. La partie, elle, est reprise par la console au démarrage
+             (voir GbaPlayer). */}
+      {resuming.play.length > 0 && (
+        <section className="coll-resume coll-play">
+          <h2 className="coll-section-title">
+            <Gamepad2 size={15} /> Console encore chaude <em>Jeux GBA</em>
+          </h2>
+          <div className="coll-play-row">
+            {resuming.play.map((m) => (
+              <Link
+                key={m.slug}
+                to={`/collection/${m.slug}?play=1`}
+                className="coll-play-card clickable"
+                style={{ "--tint": m.color }}
+              >
+                <span className="coll-play-cart" aria-hidden="true">
+                  <span className="coll-play-label">
+                    {m.poster ? (
+                      <img src={m.poster} alt="" loading="lazy" />
+                    ) : (
+                      <Gamepad2 size={16} />
+                    )}
+                  </span>
+                  <span className="coll-play-teeth" />
+                </span>
+                <span className="coll-play-body">
+                  <strong>{m.title}</strong>
+                  <em>
+                    <Clock3 size={11} />
+                    {m.progress.playSeconds > 60
+                      ? `${fmtDuration(m.progress.playSeconds)} de jeu`
+                      : "Partie entamée"}
+                  </em>
+                  <span className="coll-play-cta">
+                    <Power size={12} /> Rallumer
+                  </span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       {status === "ready" && media.length > 0 && (
         <p className="coll-note">
           <Info size={13} />
           Chaque titre est lu depuis sa source d'origine (chaîne officielle,
           diffusion promotionnelle, œuvre du domaine public) — rien n'est
           rehébergé ici. {KINDS.series.plural} et {KINDS.film.plural.toLowerCase()}{" "}
-          s'ouvrent dans le poste cathodique.
+          s'ouvrent dans le poste cathodique ; les {KINDS.game.plural.toLowerCase()}{" "}
+          se lancent dans une console émulée, directement dans le navigateur.
         </p>
       )}
     </div>

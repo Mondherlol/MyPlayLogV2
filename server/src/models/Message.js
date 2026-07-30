@@ -56,6 +56,36 @@ const ostCardSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// Carte « invitation à une watchparty » : le lien vers la salle, avec de quoi
+// donner envie d'y entrer (le titre et son affiche). C'est le SEUL morceau
+// d'une séance qui survit à la soirée — le fil de chat de la salle, lui, reste
+// dans la salle (voir models/WatchParty.js).
+const partyCardSchema = new mongoose.Schema(
+  {
+    code: { type: String, required: true },
+    title: { type: String, default: "" },
+    subtitle: { type: String, default: "" },
+    poster: { type: String, default: null },
+    hostName: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
+// Carte « rejoins ma partie du Mot du jour » : le code de la session, et de quoi
+// décider sans l'ouvrir (qui joue, combien d'essais déjà brûlés). Même logique
+// que la carte de watchparty ci-dessus — l'invitation survit à la partie, la
+// partie non.
+const motCardSchema = new mongoose.Schema(
+  {
+    code: { type: String, required: true },
+    date: { type: String, default: "" }, // le jour concerné : une invitation d'hier est morte
+    hostName: { type: String, default: "" },
+    players: { type: Number, default: 1 },
+    tries: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
 const messageSchema = new mongoose.Schema(
   {
     conversation: {
@@ -75,6 +105,8 @@ const messageSchema = new mongoose.Schema(
     // n'être QUE une carte (sans texte ni média).
     game: { type: gameCardSchema, default: null },
     ost: { type: ostCardSchema, default: null },
+    party: { type: partyCardSchema, default: null },
+    mot: { type: motCardSchema, default: null },
 
     // Message de service (« X a créé le groupe », « Y a rejoint »…) : rendu en
     // ligne centrée, sans bulle. `author` reste l'acteur, `systemData` porte

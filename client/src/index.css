@@ -5,7 +5,7 @@
    Dark  : sombre profond + grille discrète, accents orange/ambre.
    ====================================================================== */
 
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Fredoka:wght@500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Fredoka:wght@500;600&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap");
 
 :root {
   /* Accent doré (esprit TV Time).
@@ -32,6 +32,10 @@
   --font-display: "Space Grotesk", system-ui, sans-serif;
   --font-body: "Inter", system-ui, sans-serif;
   --font-fun: "Fredoka", system-ui, sans-serif;
+  /* Didone à fort contraste, réservée aux OBJETS de la collection (jaquettes
+     peintes au canvas, cartouche de la vitrine) : c'est elle qui fait lire un
+     boîtier comme une édition soignée plutôt que comme une carte de l'app. */
+  --font-serif: "Playfair Display", Georgia, "Times New Roman", serif;
 
   --radius: 14px;
   --radius-lg: 20px;

@@ -53,9 +53,12 @@ import {
   TrendingDown,
   ArrowRight,
   VenetianMask,
+  Tv,
+  Film,
+  BookOpen,
 } from "lucide-react";
 import { PackageOpen, Sparkles as SparklesIc, Copy as CopyIc } from "lucide-react";
-import { Globe2, MapPin } from "lucide-react";
+import { Globe2, MapPin, Thermometer, Target } from "lucide-react";
 import { rarityColor, rarityLabel } from "../lib/rarity";
 import RewardArt from "./RewardArt";
 import { apiFetch } from "../lib/api";
@@ -155,6 +158,7 @@ export function FeedCard(props) {
   if (item.type === "repost") return <RepostEvent {...props} />;
   if (item.type === "gamemediapost") return <GameMediaPostEvent {...props} />;
   if (item.type === "gamemediacomment") return <GameMediaCommentEvent {...props} />;
+  if (item.type === "collectioncomment") return <CollectionCommentEvent {...props} />;
   if (item.type === "video") return <VideoEvent {...props} />;
   if (item.type === "videoact") return <VideoActivityEvent {...props} />;
   if (item.type === "videoactgroup") return <VideoActivityGroupEvent {...props} />;
@@ -171,6 +175,7 @@ export function FeedCard(props) {
   if (item.type === "pixelgroup") return <PixelRushGroupEvent {...props} />;
   if (item.type === "geo") return <GeoEvent {...props} />;
   if (item.type === "geogroup") return <GeoGroupEvent {...props} />;
+  if (item.type === "mot") return <MotEvent {...props} />;
   if (item.type === "caseopen") return <CaseOpenEvent {...props} />;
   if (item.type === "caseopengroup") return <CaseOpenGroupEvent {...props} />;
   if (item.type === "trackermatch") return <TrackerMatchEvent {...props} />;
@@ -1460,6 +1465,109 @@ function GameMediaCommentEvent({ item, onComments }) {
           <MessageCircle size={13} />
           {p?.commentCount > 0 ? p.commentCount : ""}
         </span>
+      </div>
+    </article>
+  );
+}
+
+// ============================================================
+//  Discussion du rayon vidéo
+// ============================================================
+// LA CARTE MONTRE L'OBJET, PAS UN LIEN. Le rayon est fait de boîtiers qu'on
+// prend en main : sa carte de fil montre donc le boîtier — debout, tranche
+// teintée de la couleur du titre, exactement le repère qu'on suit sur
+// l'étagère. Un jeu commenté, une série, un tome de manga : on reconnaît de
+// quoi on parle avant d'avoir lu la ligne.
+//
+// Et il n'y a PAS de propriétaire à nommer, à la différence d'une liste ou d'un
+// avis : un titre du rayon n'appartient à personne. Un commentaire racine n'a
+// donc pas de « … de X » — la nature du titre prend cette place (« a commenté
+// un film »), et le boîtier dit lequel.
+
+const COLL_KIND = {
+  series: { label: "Série", one: "une série", Icon: Tv },
+  film: { label: "Film", one: "un film", Icon: Film },
+  comic: { label: "Comic / manga", one: "un comic", Icon: BookOpen },
+  game: { label: "Jeu GBA", one: "un jeu GBA", Icon: Gamepad2 },
+};
+
+const COLL_ACTION = {
+  collection_comment: { Icon: MessageCircle, verb: "a commenté" },
+  collection_comment_reply: { Icon: CornerDownRight, verb: "a répondu à" },
+  // `item.reply` distingue le like posé sur une réponse de celui posé sur un
+  // message racine — ce n'est pas le même geste, ça ne se dit pas pareil.
+  collection_comment_like: { Icon: Heart, verb: "a aimé un commentaire de" },
+};
+
+function CollectionCommentEvent({ item }) {
+  const navigate = useNavigate();
+  const m = item.media;
+  const act = COLL_ACTION[item.action];
+  if (!act || !m) return null;
+  const kind = COLL_KIND[m.kind] || COLL_KIND.film;
+  const target = item.target?.username;
+  const root = item.action === "collection_comment";
+  const verb =
+    item.action === "collection_comment_like" && item.reply
+      ? "a aimé une réponse de"
+      : act.verb;
+
+  return (
+    <article
+      className="hf-card hf-collcom clickable"
+      style={{ "--tint": m.color || "var(--orange)" }}
+      onClick={() => navigate(`/collection/${m.slug}`)}
+    >
+      <EventHead
+        user={item.user}
+        date={item.date}
+        badge={
+          <span className={`hf-int-badge act-${item.action}`}>
+            <act.Icon size={13} />
+          </span>
+        }
+      >
+        {verb}
+        {/* Racine : la nature du titre complète le verbe, faute de
+            propriétaire à nommer. Réponse et like : c'est l'auteur du message
+            visé qui vient là. */}
+        {root ? (
+          ` ${kind.one}`
+        ) : target ? (
+          <>
+            {" "}
+            <Link
+              to={`/u/${target}`}
+              className="hf-int-target clickable"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {target}
+            </Link>
+          </>
+        ) : null}
+      </EventHead>
+
+      {item.snippet && <p className="hf-int-quote">{item.snippet}</p>}
+
+      <div className="hf-collcom-src">
+        <span className="hf-collcom-case">
+          {m.poster ? (
+            <img src={m.poster} alt="" loading="lazy" draggable="false" />
+          ) : (
+            <kind.Icon size={16} />
+          )}
+          {/* La tranche : c'est elle qu'on lit sur l'étagère, elle qui porte la
+              couleur du titre. Sans elle, ce n'est qu'une vignette de plus. */}
+          <i className="hf-collcom-spine" aria-hidden="true" />
+        </span>
+        <span className="hf-collcom-txt">
+          {m.franchise && <em>{m.franchise}</em>}
+          <strong>{m.title}</strong>
+          <span className="hf-collcom-kind">
+            <kind.Icon size={11} /> {kind.label}
+          </span>
+        </span>
+        <ArrowRight size={15} className="hf-collcom-go" />
       </div>
     </article>
   );
@@ -2905,6 +3013,73 @@ function GeoEvent({ item }) {
                 : `${ch.username} garde la tête (${ch.score})`}
             </span>
           )}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+// ---------- Mot du jour : le mot trouvé ----------
+// LA CARTE NE DIT JAMAIS QUEL ÉTAIT LE MOT. C'est sa contrainte de conception :
+// tout le monde joue la même énigme le même jour, donc afficher la réponse
+// gâcherait la partie de tous ceux qui n'ont pas encore joué. Le serveur ne
+// l'envoie même pas (cf. le meta de routes/mot.js).
+//
+// Du coup, ce qu'on met en avant, c'est le NOMBRE D'ESSAIS : c'est le critère du
+// classement du jour, et c'est ce qui pique — « lui l'a eu en 7 ».
+//
+// Pas de variante groupée : une seule partie par joueur et par jour.
+function MotEvent({ item }) {
+  // Victoire à plusieurs : la carte est celle de L'ÉQUIPE, pas d'un joueur.
+  // Chaque membre a bien sa propre ligne d'activité (c'est son résultat, il a
+  // ses points), mais le fil n'en montre qu'une — routes/feed.js dédoublonne
+  // par session.
+  const team = (item.team || []).filter((t) => t?.username);
+  const mates = team.filter((t) => t.username !== item.user.username);
+  return (
+    <article className="hf-card hf-blindtest hf-mot">
+      <EventHead user={item.user} date={item.date}>
+        <Thermometer size={13} className="hf-inline-ic" /> a trouvé le mot du jour
+        {mates.length > 0 && (
+          <>
+            {" "}
+            avec{" "}
+            <b>
+              {mates.length === 1
+                ? mates[0].username
+                : `${mates[0].username} et ${mates.length - 1} autre${
+                    mates.length > 2 ? "s" : ""
+                  }`}
+            </b>
+          </>
+        )}
+      </EventHead>
+
+      <div className="hf-bt-body">
+        <div className="hf-bt-scorebox">
+          <span className="hf-bt-score-num">{item.tries}</span>
+          <span className="hf-bt-score-lbl">essai{item.tries > 1 ? "s" : ""}</span>
+        </div>
+        <div className="hf-bt-meta">
+          {team.length > 1 && (
+            <span className="hf-mot-team">
+              {team.slice(0, 5).map((t) =>
+                t.avatar ? (
+                  <img key={t.id} src={t.avatar} alt={t.username} title={t.username} />
+                ) : (
+                  <span key={t.id} className="hf-mot-face" title={t.username}>
+                    {t.username[0].toUpperCase()}
+                  </span>
+                )
+              )}
+            </span>
+          )}
+          <span className="hf-bt-stat">
+            <Target size={13} /> {Number(item.score || 0).toLocaleString("fr-FR")} points
+          </span>
+          <Link to="/mot" className="hf-mot-cta clickable">
+            Tenter le mot du jour
+          </Link>
         </div>
       </div>
     </article>

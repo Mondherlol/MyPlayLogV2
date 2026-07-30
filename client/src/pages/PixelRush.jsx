@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
+import { useLiveStatus } from "../lib/presence";
 import PixelCanvas from "../components/PixelCanvas";
 import ShotViewer from "../components/ShotViewer";
 import {
@@ -211,6 +212,12 @@ export default function PixelRush() {
 
   // Déroulé
   const [idx, setIdx] = useState(0);
+
+  // Annonce « Joue à … · manche 3/10 » dans la messagerie de ceux avec qui on
+  // discute (cf. lib/presence.js). Rien à nettoyer : le hook s'éteint seul.
+  useLiveStatus("pixel", rounds.length ? `manche ${idx + 1}/${rounds.length}` : "", {
+    token,
+  });
   const [score, setScore] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [zoom, setZoom] = useState(null); // index du cliché agrandi (null = grille)

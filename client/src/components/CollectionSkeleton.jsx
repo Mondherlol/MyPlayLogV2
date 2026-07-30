@@ -1,11 +1,12 @@
 // ======================================================================
 //  Squelettes de la collection
 // ======================================================================
-// Une page qui charge doit déjà avoir la FORME de ce qui arrive : ici, une
-// rangée de tranches debout sur leur planche, ou une grille de boîtiers. Un
-// rond qui tourne ne dit rien de ce qu'on attend, et l'étagère 3D met un temps
-// à se monter (chunk three.js + peinture des jaquettes) — c'est précisément le
-// moment où l'on doit reconnaître le rayon.
+// L'attente garde la FORME de ce qui arrive — une rangée de tranches debout
+// sur sa planche, une grille de boîtiers — mais rien de son DÉCOR. Pas de
+// capuchon sombre, pas d'étiquette de pied, pas d'ombre portée, pas de
+// balayage brillant : un squelette qui imite l'objet fini n'en est qu'une
+// mauvaise copie, et la copie saute aux yeux au moment où le vrai arrive.
+// Ici ce sont des aplats neutres qui respirent en vague, de gauche à droite.
 //
 // Tout est décoratif : `aria-hidden`, et l'attente est annoncée en toutes
 // lettres par le libellé passé à côté.
@@ -14,27 +15,17 @@
 // boîtiers alignés au millimètre font un graphique, pas une étagère.
 const SPINES = [98, 100, 96, 99, 94, 100, 97, 100, 95, 99, 93, 100, 96, 98];
 
-function Spine({ h, i }) {
-  return (
-    <span
-      className="coll-skel-spine"
-      style={{ "--h": `${h}%`, "--d": `${i * 55}ms` }}
-    >
-      <i className="coll-skel-cap" />
-      <i className="coll-skel-art" />
-      <i className="coll-skel-body" />
-      <i className="coll-skel-foot" />
-    </span>
-  );
-}
-
-// L'étagère en attente : les tranches poussent une à une depuis la planche.
-export function ShelfSkeleton({ label = "On dépoussière l'étagère…", count = 14 }) {
+// L'étagère en attente : la rangée respire d'un bout à l'autre.
+export function ShelfSkeleton({ label = "Chargement de la collection…", count = 14 }) {
   return (
     <div className="coll-shelf-skel" role="status" aria-label={label}>
       <div className="coll-shelf-skel-row" aria-hidden="true">
         {SPINES.slice(0, count).map((h, i) => (
-          <Spine key={i} h={h} i={i} />
+          <span
+            key={i}
+            className="coll-skel-spine"
+            style={{ "--h": `${h}%`, "--d": `${i * 90}ms` }}
+          />
         ))}
       </div>
       <span className="coll-shelf-skel-plank" aria-hidden="true" />
@@ -43,8 +34,7 @@ export function ShelfSkeleton({ label = "On dépoussière l'étagère…", count
   );
 }
 
-// La grille en attente : des boîtiers fermés, tranche à gauche et plaque de
-// titre en bas — la silhouette exacte de CollectionCase.
+// La grille en attente : la silhouette des boîtiers, et rien d'autre.
 export function GridSkeleton({ count = 10 }) {
   return (
     <div className="coll-grid" role="status" aria-label="Chargement de la collection">
@@ -52,12 +42,9 @@ export function GridSkeleton({ count = 10 }) {
         <span
           key={i}
           className="coll-skel-case"
-          style={{ "--d": `${i * 60}ms` }}
+          style={{ "--d": `${i * 90}ms` }}
           aria-hidden="true"
-        >
-          <i className="coll-skel-case-spine" />
-          <i className="coll-skel-case-art" />
-        </span>
+        />
       ))}
     </div>
   );

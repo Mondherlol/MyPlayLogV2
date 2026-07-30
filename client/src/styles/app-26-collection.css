@@ -130,14 +130,27 @@
 }
 
 /* ======================================================================
-   2. Rangée « Reprendre »
-   ====================================================================== */
+   2. Les reprises — trois rangées, trois objets
+   ======================================================================
+   Un même « Reprendre » ne pouvait pas couvrir les trois supports : on remet
+   une cassette en marche, on ROUVRE un volume, on RALLUME une console. Chaque
+   rangée porte donc la matière de son objet — vignette d'écran, papier crème,
+   plastique de cartouche — et jamais la carte générique des deux autres. */
 
 /* Placée sous la collection : un filet la sépare du rayon. */
 .coll-resume {
   margin-top: 2rem;
   padding-top: 1.4rem;
   border-top: 1px solid var(--border);
+}
+
+/* Un seul filet pour l'ensemble : trois sections empilées, chacune cerclée de
+   son trait, ça ferait une pile de formulaires. Les suivantes se détachent par
+   la marge — et par leur matière, qui suffit largement à les séparer. */
+.coll-resume + .coll-resume {
+  margin-top: 1.7rem;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .coll-resume-row {
@@ -236,6 +249,280 @@
   display: block;
   height: 100%;
   background: var(--tint, var(--orange));
+}
+
+/* ----------------------------------------------------------------------
+   2 bis. Les marque-pages — comics & mangas
+   ----------------------------------------------------------------------
+   Une fiche de papier, pas une vignette : crème constant (la matière de
+   l'objet ne dépend pas du thème de l'app), couverture debout à gauche, et le
+   ruban qui pend du haut — la seule chose qui dépasse d'un livre fermé. */
+
+.coll-read-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
+  gap: 0.85rem;
+}
+
+.coll-read-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  color: var(--coll-paper-ink);
+  background: linear-gradient(
+      105deg,
+      rgba(255, 255, 255, 0.55),
+      rgba(255, 255, 255, 0) 46%
+    ),
+    var(--coll-paper);
+  border: 1px solid rgba(38, 37, 31, 0.16);
+  /* Le liseré du bas fait l'épaisseur de la fiche : sans lui, le crème est un
+     rectangle posé à plat. */
+  box-shadow: 0 2px 0 rgba(38, 37, 31, 0.12), 0 6px 16px rgba(20, 20, 40, 0.1);
+  transition: transform 0.16s ease, box-shadow 0.2s ease;
+}
+
+.coll-read-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 2px 0 rgba(38, 37, 31, 0.12), 0 16px 30px rgba(20, 20, 40, 0.22);
+}
+
+.coll-read-cover {
+  position: relative;
+  flex: 0 0 auto;
+  width: 52px;
+  aspect-ratio: 2 / 3;
+  border-radius: 3px 5px 5px 3px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.9);
+  background: var(--tint, var(--orange));
+  box-shadow: 0 3px 10px rgba(38, 37, 31, 0.3);
+}
+
+.coll-read-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Le dos du volume : le pli qu'on voit toujours sur la tranche d'un livre
+   fermé, et qui suffit à le distinguer d'une image collée. */
+.coll-read-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.42),
+    rgba(255, 255, 255, 0.22) 62%,
+    rgba(0, 0, 0, 0.1)
+  );
+}
+
+.coll-read-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  /* De quoi laisser passer le ruban, qui tombe dans la marge droite. */
+  padding-right: 1.4rem;
+}
+
+.coll-read-saga {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(38, 37, 31, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-read-card strong {
+  font-family: var(--font-display);
+  font-size: 0.93rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-read-gauge {
+  display: block;
+  height: 3px;
+  margin: 0.5rem 0 0.32rem;
+  border-radius: 999px;
+  background: rgba(38, 37, 31, 0.15);
+  overflow: hidden;
+}
+
+.coll-read-gauge i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--tint, var(--orange));
+}
+
+.coll-read-card em {
+  font-style: normal;
+  font-size: 0.71rem;
+  color: rgba(38, 37, 31, 0.62);
+}
+
+/* Le ruban. Il DÉPASSE du haut de la fiche (c'est tout l'intérêt) et descend
+   d'un cran quand on survole — le geste de tirer sur le signet. */
+.coll-read-mark {
+  position: absolute;
+  top: -4px;
+  right: 1.05rem;
+  width: 13px;
+  height: 34px;
+  border-radius: 2px 2px 0 0;
+  background: var(--tint, var(--orange));
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 74%, 0 100%);
+  box-shadow: 0 3px 8px rgba(38, 37, 31, 0.32);
+  transition: height 0.18s ease;
+}
+
+.coll-read-card:hover .coll-read-mark {
+  height: 44px;
+}
+
+/* ----------------------------------------------------------------------
+   2 ter. La console encore chaude — jeux GBA
+   ----------------------------------------------------------------------
+   Ni vignette ni fiche : la carte de jeu elle-même. Coin biseauté, plastique
+   sombre, étiquette et contacts dorés — on la reconnaît avant d'avoir lu le
+   titre, et c'est exactement ce qu'on veut d'un raccourci. */
+
+.coll-play-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(244px, 1fr));
+  gap: 0.85rem;
+}
+
+.coll-play-card {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: radial-gradient(
+      130% 150% at 10% 0%,
+      color-mix(in srgb, var(--tint, var(--orange)) 14%, transparent),
+      transparent 62%
+    ),
+    var(--surface-2);
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.2s ease;
+}
+
+.coll-play-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--tint, var(--orange)) 45%, var(--border));
+  box-shadow: var(--shadow);
+}
+
+.coll-play-cart {
+  position: relative;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 48px; /* la carte DS : 33,4 × 35 mm, presque carrée */
+  border-radius: 5px;
+  padding: 5px 5px 10px;
+  /* LE coin biseauté : le seul détail qui fait « carte DS » plutôt que
+     « petit carré gris ». */
+  clip-path: polygon(0 0, 66% 0, 100% 26%, 100% 100%, 0 100%);
+  background: linear-gradient(158deg, #4c4f59, #23252c 60%, #35373f);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 5px 14px rgba(0, 0, 0, 0.34);
+}
+
+.coll-play-label {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 3px;
+  overflow: hidden;
+  color: #12130f;
+  background: var(--tint, var(--orange));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+}
+
+.coll-play-label img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Les contacts dorés, en bas de la carte. */
+.coll-play-teeth {
+  position: absolute;
+  left: 6px;
+  right: 8px;
+  bottom: 3px;
+  height: 4px;
+  border-radius: 1px;
+  opacity: 0.85;
+  background: repeating-linear-gradient(
+    90deg,
+    #d9b65e 0 3px,
+    rgba(0, 0, 0, 0.35) 3px 5px
+  );
+}
+
+.coll-play-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.16rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.coll-play-body strong {
+  font-family: var(--font-display);
+  font-size: 0.93rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-play-body em {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-style: normal;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+/* Pas de jauge ici, et c'est volontaire : la sauvegarde vit dans la console,
+   rien de notre côté ne sait où en est la partie. Une barre à zéro dirait le
+   contraire du temps de jeu affiché juste au-dessus. */
+.coll-play-cta {
+  align-self: flex-start;
+  margin-top: 0.34rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.22rem 0.52rem;
+  border-radius: 999px;
+  font-size: 0.63rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text);
+  background: color-mix(in srgb, var(--tint, var(--orange)) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tint, var(--orange)) 34%, transparent);
 }
 
 /* ======================================================================
@@ -431,10 +718,26 @@
    proportions, même place dans la page que le contenu réel — quand il arrive,
    rien ne saute.
 
-   L'animation `shimmer` est celle de tout le site (app-02-content.css) : les
-   squelettes de la collection ne doivent pas scintiller autrement que les
-   autres.
+   Mais la forme SEULE : pas de capuchon sombre, pas d'étiquette de pied, pas
+   d'ombre portée, pas de balayage brillant. Un squelette qui imite l'objet
+   fini n'en est qu'une mauvaise copie, et la copie se voit d'autant plus que
+   le vrai boîtier arrive juste après. Des aplats neutres cerclés d'un filet,
+   qui respirent doucement en vague de gauche à droite : on comprend qu'il se
+   passe quelque chose sans que rien ne clignote.
    ====================================================================== */
+
+/* La respiration commune à tous les gabarits de la page. Décalée d'un objet
+   au suivant par --d : la vague traverse la rangée au lieu de faire pulser
+   tout le bloc d'un seul coup, ce qui battrait comme un gyrophare. */
+@keyframes coll-skel-breathe {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
 
 .coll-shelf-skel {
   display: flex;
@@ -450,87 +753,33 @@
   flex: 0 0 auto;
   align-items: flex-end;
   justify-content: center;
-  gap: 4px;
+  gap: 7px;
   /* La part de hauteur que remplit la rangée : FILL, côté composant. */
   height: 74%;
-  /* Les boîtiers se rangent en montant de derrière la planche : le débord se
-     coupe à son arête. */
   overflow: hidden;
 }
 
-/* Une tranche de boîtier : capuchon sombre du support, fenêtre d'affiche,
-   corps, étiquette de pied — la partition exacte de paintSpine(). */
+/* Une tranche de boîtier, réduite à sa silhouette : un aplat, un filet, rien
+   d'imprimé dessus. */
 .coll-skel-spine {
-  display: flex;
-  flex-direction: column;
   flex: 0 0 auto;
-  width: clamp(22px, 3.2vw, 40px);
+  width: clamp(20px, 3vw, 36px);
   height: var(--h, 100%);
-  border-radius: 2px 3px 3px 2px;
-  overflow: hidden;
+  border-radius: 2px;
   background: var(--surface-2);
-  box-shadow: 0 2px 4px rgba(10, 10, 20, 0.2), 0 10px 20px rgba(10, 10, 20, 0.14),
-    0 0 0 1px rgba(10, 10, 20, 0.08);
-  transform-origin: bottom center;
-  animation: coll-skel-stand 0.5s cubic-bezier(0.2, 0.9, 0.25, 1) var(--d, 0ms)
-    backwards;
+  /* Filet à l'intérieur plutôt qu'une ombre portée : le gabarit reste à plat
+     dans la page, il ne prétend pas être un objet posé. */
+  box-shadow: inset 0 0 0 1px var(--border);
+  animation: coll-skel-breathe 2.4s ease-in-out var(--d, 0ms) infinite;
 }
 
-/* Les boîtiers se rangent un à un, de gauche à droite. */
-@keyframes coll-skel-stand {
-  from {
-    opacity: 0;
-    transform: translateY(14px) scaleY(0.92);
-  }
-}
-
-.coll-skel-spine i {
-  display: block;
-  flex: 0 0 auto;
-}
-
-.coll-skel-cap {
-  height: 7%;
-  background: color-mix(in srgb, var(--text) 55%, transparent);
-}
-
-.coll-skel-art {
-  height: 26%;
-  background: linear-gradient(
-    100deg,
-    var(--surface-2) 30%,
-    var(--border-strong) 50%,
-    var(--surface-2) 70%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.3s infinite linear;
-}
-
-/* Sélecteur descendant : `.coll-skel-spine i` fige les autres bandes, seul le
-   corps prend la place qui reste. */
-.coll-skel-spine .coll-skel-body {
-  flex: 1 1 auto;
-  background: linear-gradient(
-    100deg,
-    var(--surface-2) 30%,
-    var(--border) 50%,
-    var(--surface-2) 70%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.3s infinite linear;
-}
-
-.coll-skel-foot {
-  height: 12%;
-  background: color-mix(in srgb, var(--coll-paper) 55%, var(--surface-2));
-}
-
+/* La planche : un simple trait sous la rangée. */
 .coll-shelf-skel-plank {
   flex: 0 0 auto;
-  height: 9px;
-  border-radius: 2px;
-  background: linear-gradient(180deg, var(--border-strong), var(--border));
-  box-shadow: 0 10px 24px rgba(10, 10, 20, 0.16);
+  height: 2px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  opacity: 0.6;
 }
 
 .coll-shelf-skel-label {
@@ -540,59 +789,23 @@
   bottom: 0.2rem;
   text-align: center;
   font-size: 0.72rem;
-  font-weight: 600;
+  font-weight: 500;
+  letter-spacing: 0.01em;
   color: var(--text-soft);
-  opacity: 0.75;
+  opacity: 0.7;
 }
 
 /* ---------- la grille en attente ---------- */
 
+/* Le gabarit du boîtier : ses proportions et ses coins, sans sa jaquette ni
+   sa tranche imprimée. */
 .coll-skel-case {
-  position: relative;
-  display: flex;
+  display: block;
   aspect-ratio: 2 / 3;
   border-radius: 3px 7px 7px 3px;
-  overflow: hidden;
   background: var(--surface-2);
-  box-shadow: 0 2px 4px rgba(10, 10, 20, 0.22), 0 14px 28px rgba(10, 10, 20, 0.14),
-    0 0 0 1px rgba(10, 10, 20, 0.08);
-  animation: coll-skel-stand 0.5s cubic-bezier(0.2, 0.9, 0.25, 1) var(--d, 0ms)
-    backwards;
-}
-
-.coll-skel-case-spine {
-  flex: 0 0 auto;
-  width: 8px;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--text) 32%, transparent),
-    var(--border-strong)
-  );
-}
-
-.coll-skel-case-art {
-  flex: 1;
-  background: linear-gradient(
-    100deg,
-    var(--surface-2) 30%,
-    var(--border) 50%,
-    var(--surface-2) 70%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.3s infinite linear;
-}
-
-/* La plaque de titre, en bas de la jaquette — comme sur un vrai boîtier. */
-.coll-skel-case-art::after {
-  content: "";
-  position: absolute;
-  left: 0.5rem;
-  right: 0.5rem;
-  bottom: 0.5rem;
-  height: 22%;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--surface) 70%, transparent);
-  border-left: 3px solid var(--border-strong);
+  box-shadow: inset 0 0 0 1px var(--border);
+  animation: coll-skel-breathe 2.4s ease-in-out var(--d, 0ms) infinite;
 }
 
 /* Pastilles de compteurs, dans l'en-tête. Sélecteur assez fort pour battre
@@ -603,18 +816,32 @@
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: linear-gradient(
-    100deg,
-    var(--surface-2) 30%,
-    var(--border) 50%,
-    var(--surface-2) 70%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.3s infinite linear;
+  background: var(--surface-2);
+  animation: coll-skel-breathe 2.4s ease-in-out infinite;
+}
+
+/* Même vague que la rangée, à l'échelle de trois pastilles. */
+.coll-head-stats .coll-skel-pill:nth-child(2) {
+  animation-delay: 140ms;
+}
+
+.coll-head-stats .coll-skel-pill:nth-child(3) {
+  animation-delay: 280ms;
 }
 
 .coll-head-stats .coll-skel-pill.wide {
   width: 96px;
+}
+
+/* Un gabarit qui respire reste du mouvement décoratif : on le fige, en le
+   laissant lisible. */
+@media (prefers-reduced-motion: reduce) {
+  .coll-skel-spine,
+  .coll-skel-case,
+  .coll-head-stats .coll-skel-pill {
+    animation: none;
+    opacity: 0.7;
+  }
 }
 
 .coll-note {
@@ -1006,9 +1233,11 @@
 /* L'éclairage de la pièce, en CSS derrière le canvas transparent : une nappe
    chaude qui tombe sur la rangée, et une ombre de contact large sous la
    planche pour asseoir l'objet sur la page. Rien qui dessine un cadre — le
-   rayon reste POSÉ dans la page, il n'est pas dans une vitrine. */
-.coll-shelf3d::before,
-.coll-shelf-skel::before {
+   rayon reste POSÉ dans la page, il n'est pas dans une vitrine.
+
+   Ce halo appartient à la SCÈNE, pas au squelette : une nappe chaude derrière
+   une rangée de rectangles gris ne fait qu'habiller l'attente. */
+.coll-shelf3d::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -1025,8 +1254,7 @@
 
 /* Sur fond sombre, une ombre au sol ne se voit plus : c'est la LUEUR du bord
    de planche qui assied la rangée. */
-:root[data-theme="dark"] .coll-shelf3d::before,
-:root[data-theme="dark"] .coll-shelf-skel::before {
+:root[data-theme="dark"] .coll-shelf3d::before {
   background: radial-gradient(
       58% 54% at 50% 42%,
       color-mix(in srgb, var(--orange) 15%, transparent),
@@ -1071,10 +1299,6 @@
   transition: opacity 0.4s ease;
 }
 
-.coll-shelf3d .coll-shelf-skel::before {
-  display: none;
-}
-
 /* Fondu croisé : le squelette s'efface pendant que la scène monte. Il reste
    monté le temps de la transition (voir `skelGone` dans le composant). */
 .coll-shelf3d.is-dressed .coll-shelf-skel {
@@ -1084,10 +1308,10 @@
 /* ======================================================================
    La vitrine — un boîtier pris en main, plein écran
    ======================================================================
-   Portail au-dessus de toute l'app. LE FOND, C'EST LA PAGE : à peine floutée
-   derrière un voile du thème, elle reste reconnaissable — on n'a pas changé
-   de lieu, on s'est penché sur un objet. Pas de halo de couleur derrière le
-   boîtier : l'objet se suffit, et une aura teintée salissait le fond.
+   Portail au-dessus de toute l'app. LE FOND, C'EST LA PAGE : à peine visible
+   sous le voile, elle reste reconnaissable — on n'a pas changé de lieu, on
+   s'est penché sur un objet. Pas de halo de couleur derrière le boîtier :
+   l'objet se suffit, et une aura teintée salissait le fond.
 
    Le boîtier ne surgit pas du néant non plus : il décolle de sa place sur
    l'étagère et vient au centre. Ce vol se joue DANS la scène 3D (voir
@@ -1117,9 +1341,19 @@
 
 /* Et le voile n'arrive QU'UNE FOIS le boîtier de la vitrine dessiné : tant que
    celui du rayon est encore là, rien ne doit se poser par-dessus lui, pas même
-   un fond transparent — c'est ce qui trahissait le relais. */
+   un fond transparent — c'est ce qui trahissait le relais.
+
+   SOMBRE DANS LES DEUX THÈMES, et pas `var(--bg)`. Prendre un objet en main,
+   c'est éteindre la pièce autour : sur fond blanc, le voile clair laissait la
+   page entière lisible derrière la jaquette, qui n'en ressortait plus — et une
+   couverture sombre venait s'écraser sur du blanc. C'est aussi ce que font déjà
+   toutes les autres scènes de la collection (la console, la lecture à plat) :
+   le rayon n'avait plus que celle-ci pour le contredire.
+
+   Le ton est celui du fond sombre du site (#0c0d11) à deux points près : en
+   thème sombre, rien ne bouge — c'est le thème clair qu'on rattrape. */
 .coll-inspect.veiled {
-  background-color: color-mix(in srgb, var(--bg) 88%, transparent);
+  background-color: color-mix(in srgb, #0a0b10 88%, transparent);
 }
 
 /* On repose le boîtier. LE VOILE se retire pendant qu'il rentre chez lui, de
@@ -1258,8 +1492,9 @@
   }
 }
 
-/* Le texte est celui de la PAGE, pas d'un décor sombre : il suit le thème,
-   sinon du blanc sur un voile clair serait illisible. */
+/* Le texte du cartouche suit le THÈME et non le voile : il est écrit sur la
+   carte, qui est opaque (`var(--surface)`) et reste donc une carte de l'app
+   posée sur la scène. Le voile sombre derrière ne la traverse pas. */
 .coll-inspect-franchise {
   font-style: normal;
   font-size: 0.66rem;
@@ -1291,9 +1526,51 @@
   margin-left: auto;
 }
 
+/* Un volume a deux suites : l'ouvrir, ou aller voir sa fiche. Les deux boutons
+   restent groupés à droite, et le second s'efface là où la carte se resserre —
+   la fiche est aussi à un clic sur l'objet lui-même. */
+.coll-inspect-acts {
+  flex: 0 0 auto;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.coll-inspect-acts .btn {
+  margin-left: 0;
+}
+
+/* La discussion se distingue des deux autres : elle n'emmène nulle part, elle
+   fait venir. D'où la bulle plutôt qu'une flèche, et un filet de la teinte du
+   titre qui la relie au boîtier. */
+.coll-inspect-talk {
+  border-color: color-mix(in srgb, var(--tint) 45%, var(--border));
+}
+
+.coll-inspect-talk:hover {
+  border-color: var(--tint);
+}
+
+@media (max-width: 560px) {
+  /* « La fiche » s'efface (l'objet lui-même y mène d'un clic) mais PAS la
+     discussion : la vitrine est le seul endroit d'où elle s'ouvre. Elle se
+     réduit à sa bulle, qui dit déjà ce qu'elle fait. */
+  .coll-inspect-acts .btn-ghost:not(.coll-inspect-talk) {
+    display: none;
+  }
+
+  .coll-inspect-talk span {
+    display: none;
+  }
+}
+
+/* Seul texte du cartouche à ne PAS être posé sur la carte : il flotte à même
+   le voile, qui est sombre dans les deux thèmes — il est donc clair dans les
+   deux, là où le reste continue de suivre la page. */
 .coll-inspect-hint {
   font-size: 0.68rem;
-  color: var(--text-soft);
+  color: rgba(255, 255, 255, 0.72);
   opacity: 0.7;
   text-align: center;
 }
@@ -1301,6 +1578,236 @@
 @media (max-width: 640px) {
   .coll-inspect-hint {
     display: none;
+  }
+}
+
+/* ======================================================================
+   La discussion, glissée à côté de l'objet
+   ======================================================================
+   ON NE QUITTE PAS LA VITRINE POUR LIRE CE QU'ON DIT DE L'OBJET QU'ON TIENT.
+   Le fil entre par la droite et se pose à côté ; le boîtier reste en main,
+   continue de tourner, et le panneau repart par où il est venu. C'est la
+   différence entre « consulter les commentaires d'un titre » et « en parler
+   pendant qu'on le regarde ».
+
+   Le panneau est un objet de l'APP (surface, texte, filets du thème) posé sur
+   une scène sombre : tout ce qu'il contient — le fil, le composeur, les émojis —
+   est habillé pour la page, et le repeindre en sombre laisserait des dizaines
+   de règles à réécrire pour rien.
+   ====================================================================== */
+
+.ccp-layer {
+  position: fixed;
+  inset: 0;
+  /* Au-dessus de la vitrine (240), sous les calques du fil lui-même :
+     l'agrandissement d'une image et le sélecteur d'émoji (1000 et 2000)
+     doivent continuer de passer par-dessus. */
+  z-index: 250;
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+/* Le voile n'assombrit QUE le côté du panneau : le boîtier, à gauche, reste
+   pleinement visible — c'est lui qu'on est en train de regarder. */
+.ccp-scrim {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  pointer-events: auto;
+  cursor: default;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 38%,
+    rgba(6, 7, 12, 0.42) 100%
+  );
+  animation: ccp-scrim-in 0.42s ease both;
+}
+
+.ccp {
+  position: relative;
+  pointer-events: auto;
+  width: min(430px, 100%);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--border-strong);
+  box-shadow: -24px 0 60px rgba(4, 5, 10, 0.5);
+  /* Le doigt doit pouvoir faire défiler le fil : la vitrine, elle, bloque tout
+     geste tactile pour faire tourner le boîtier — d'où un panneau monté hors
+     d'elle (cf. CollectionCommentsPanel). */
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  /* Entrée et sortie en ANIMATION et non en transition : rien à basculer une
+     image après le montage, et la sortie se joue sur la classe `.closing`
+     posée avant le démontage. Une courbe qui décélère franchement — le panneau
+     arrive lancé et se pose, il ne glisse pas mollement. */
+  animation: ccp-in 0.42s cubic-bezier(0.16, 0.9, 0.24, 1) both;
+}
+
+@keyframes ccp-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes ccp-scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* La sortie : plus courte que l'entrée (on a déjà vu l'objet arriver, le
+   regarder partir n'apprend rien) et sans rebond. Sa durée est recopiée dans
+   SLIDE_OUT, côté composant : les deux doivent bouger ensemble. */
+.ccp-layer.closing .ccp {
+  animation: ccp-out 0.3s cubic-bezier(0.4, 0, 0.9, 0.3) both;
+}
+
+.ccp-layer.closing .ccp-scrim {
+  animation: ccp-scrim-in 0.26s ease both reverse;
+}
+
+@keyframes ccp-out {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* L'en-tête : la couverture en petit et le titre, pour qu'on sache de quoi on
+   parle sans revenir à l'objet. Le filet de la teinte le raccroche au boîtier
+   resté à gauche. */
+.ccp-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.85rem 0.9rem;
+  padding-top: calc(0.85rem + env(safe-area-inset-top));
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--tint) 12%, transparent),
+    transparent
+  );
+}
+
+.ccp-art {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 52px;
+  border-radius: 5px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: 0 3px 10px rgba(10, 10, 20, 0.22);
+}
+
+.ccp-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ccp-art i {
+  font-style: normal;
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: var(--text-soft);
+}
+
+.ccp-id {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.ccp-id em {
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+}
+
+.ccp-id strong {
+  font-family: var(--font-display);
+  font-size: 0.98rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ccp-close {
+  margin-left: auto;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.ccp-close:hover {
+  color: var(--text);
+  transform: rotate(90deg);
+}
+
+.ccp-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.9rem;
+  padding-bottom: calc(0.9rem + env(safe-area-inset-bottom));
+}
+
+/* Le fil arrive avec l'habillage qu'il porte dans une page (carte détachée,
+   marge haute). Ici, il EST le panneau : on lui retire son cadre. */
+.ccp-body .ld-comments {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+}
+
+/* Sur téléphone, le panneau prend tout l'écran : à 430 px de large sur 390 de
+   disponible, il n'y avait de toute façon plus de « à côté ». */
+@media (max-width: 560px) {
+  .ccp {
+    width: 100%;
+  }
+
+  /* Le voile n'a plus de côté à assombrir — mais il garde son rôle d'attrape-
+     clic pour le peu qui dépasse. */
+  .ccp-scrim {
+    background: rgba(6, 7, 12, 0.42);
+  }
+}
+
+/* Mouvement réduit : le panneau se pose et s'en va sans glisser — mais il
+   continue de PRENDRE le temps qu'il faut, la fermeture attendant toujours
+   SLIDE_OUT avant de démonter. Un fondu, donc, et `reverse` pour la sortie :
+   la même image jouée à l'envers, sinon le panneau réapparaîtrait en partant. */
+@media (prefers-reduced-motion: reduce) {
+  .ccp {
+    animation: ccp-scrim-in 0.2s ease both;
+  }
+
+  .ccp-layer.closing .ccp {
+    animation: ccp-scrim-in 0.26s ease both reverse;
   }
 }
 
@@ -1749,6 +2256,33 @@
   border-color: var(--tint);
 }
 
+/* « Vu » : la coche que la liste d'épisodes portait pour les séries, ramenée
+   dans le bandeau pour un film. Cochée, elle prend l'or du reste du site —
+   comme .coll-ep-check.on — pour se lire d'un coup d'œil et non comme un
+   troisième bouton d'action. */
+.coll-hero-actions .coll-hero-seen.on {
+  color: #1a1204;
+  background: var(--accent-grad);
+  border-color: transparent;
+}
+
+.coll-hero-actions .coll-hero-seen.on:hover {
+  border-color: transparent;
+  filter: brightness(1.06);
+}
+
+/* « Watchparty » : le rouge du direct, mais posé en LISERÉ seulement. C'est une
+   invitation, pas une alerte — et le bouton ne doit pas rivaliser avec le grand
+   « Regarder » à côté de lui. */
+.coll-hero-actions .coll-hero-party {
+  border-color: rgba(255, 77, 79, 0.45);
+}
+
+.coll-hero-actions .coll-hero-party:hover {
+  border-color: #ff4d4f;
+  background: rgba(255, 77, 79, 0.16);
+}
+
 .coll-hero-channel {
   display: inline-flex;
   align-items: center;
@@ -1992,6 +2526,35 @@
   background: var(--accent-grad);
 }
 
+/* ---------- discussion ---------- */
+
+/* Le fil est le DERNIER enfant de la grille, mais il appartient à la colonne
+   principale : sans cette ligne, l'auto-placement le glisserait sous la fiche
+   technique, dans les 300 px de la colonne latérale. `grid-row` le pousse à la
+   ligne suivante, sous le rayon d'épisodes (ou de planches). */
+.coll-comments {
+  grid-column: 1;
+  min-width: 0;
+}
+
+/* UN FILM N'A PAS DE RAYON D'ÉPISODES (voir CollectionDetail) : la colonne
+   principale s'ouvre alors sur du vide, la fiche technique seule à droite et la
+   discussion reléguée sous elle. `grid-row: 1` la fait remonter à la place
+   laissée libre — placement complet (ligne ET colonne), donc résolu avant
+   l'auto-placement : la colonne latérale se range d'elle-même à côté. */
+.coll-detail-body.no-eps .coll-comments {
+  grid-row: 1;
+}
+
+/* Le fil arrive déjà avec sa marge haute (.ld-comments) : sur cette page, le
+   gap de la grille la double. */
+.coll-comments .ld-comments {
+  margin-top: 0;
+}
+
+/* Rien à prévoir pour le téléphone : la grille passe à une seule colonne, où
+   « colonne 1 » est la seule qui existe. */
+
 /* ---------- colonne latérale ---------- */
 
 .coll-aside {
@@ -2116,897 +2679,19 @@
 }
 
 /* ======================================================================
-   8. Le poste cathodique
-   ======================================================================
-   Toujours sombre, quel que soit le thème : on éteint la lumière pour
-   regarder la télé. L'écran ne porte aucun bouton — tout est sur le
-   plastique, et c'est là tout l'intérêt.
-   ====================================================================== */
-
-.crt-room {
-  position: fixed;
-  inset: 0;
-  z-index: 240;
-  /* Centrage par `margin: auto` sur l'enfant, et non par `place-items` : un
-     poste plus haut que la fenêtre (téléphone en paysage) serait sinon rogné
-     par le haut, sans moyen de remonter. */
-  display: flex;
-  padding: clamp(0.8rem, 3vw, 2rem);
-  background: radial-gradient(120% 100% at 50% 40%, #14121c 0%, #06060a 62%, #030305 100%);
-  overflow: auto;
-  animation: crt-room-in 0.3s ease;
-}
-
-@keyframes crt-room-in {
-  from {
-    opacity: 0;
-  }
-}
-
-/* La lueur du tube qui bave sur les murs de la pièce. */
-.crt-room-glow {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(
-    50% 42% at 50% 42%,
-    color-mix(in srgb, var(--tint, #f2b70b) 22%, transparent),
-    transparent 72%
-  );
-  opacity: 0.55;
-  animation: crt-glow 5.5s ease-in-out infinite;
-}
-
-@keyframes crt-glow {
-  50% {
-    opacity: 0.72;
-  }
-}
-
-.crt-stage {
-  position: relative;
-  margin: auto;
-  width: min(1020px, 100%);
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
-}
-
-/* ---------- la carrosserie ---------- */
-
-.crt-set {
-  display: flex;
-  gap: clamp(0.6rem, 1.6vw, 1.1rem);
-  padding: clamp(0.7rem, 1.8vw, 1.15rem);
-  border-radius: 22px;
-  background: linear-gradient(168deg, #3a3b44 0%, #21222a 26%, #171820 72%, #0f1014 100%);
-  box-shadow: 0 40px 90px rgba(0, 0, 0, 0.7), inset 0 2px 0 rgba(255, 255, 255, 0.16),
-    inset 0 -3px 12px rgba(0, 0, 0, 0.7);
-  transform-origin: center;
-  transition: transform 0.5s cubic-bezier(0.3, 1.2, 0.4, 1);
-}
-
-/* Bandeau de ventilation moulé dans le haut de la coque. */
-.crt-set-top {
-  position: absolute;
-  top: 0.42rem;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 34%;
-  height: 5px;
-  border-radius: 999px;
-  background: repeating-linear-gradient(
-    90deg,
-    rgba(0, 0, 0, 0.35) 0 2px,
-    transparent 2px 6px
-  );
-  opacity: 0.7;
-}
-
-.crt-screen-wrap {
-  flex: 1;
-  min-width: 0;
-  padding: clamp(0.5rem, 1.4vw, 0.9rem);
-  border-radius: 18px;
-  background: linear-gradient(160deg, #0a0a0e, #16161d);
-  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-/* Le tube : 4/3, coins généreusement arrondis comme un vrai bombé. */
-.crt-screen {
-  position: relative;
-  aspect-ratio: 4 / 3;
-  border-radius: 5% / 6.6%;
-  overflow: hidden;
-  background: #040407;
-  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.95), inset 0 0 0 2px rgba(0, 0, 0, 0.8),
-    0 0 0 1px rgba(255, 255, 255, 0.06);
-  isolation: isolate;
-}
-
-.crt-tube {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  border-radius: inherit;
-  /* Le bombé du verre, approché : l'image est très légèrement gonflée au
-     centre par une mise à l'échelle, ce qui suffit avec les coins arrondis. */
-  transform: scale(1.012);
-}
-
-/* Cadre 16/9 dans lequel vit l'iframe. FORMAT = la façon de l'y poser. */
-.crt-frame {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  aspect-ratio: 16 / 9;
-}
-
-/* « LARGE » : l'image 16/9 entière, avec ses bandes noires en haut et en bas. */
-.crt-frame[data-fit="large"] {
-  width: 100%;
-}
-
-/* « PLEIN » : l'image remplit la hauteur du 4/3 et déborde sur les côtés —
-   exactement ce qu'il faut pour un épisode 4/3 mis en ligne dans une vidéo
-   16/9 (ses bandes latérales passent hors cadre). */
-.crt-frame[data-fit="plein"] {
-  height: 100%;
-}
-
-/* L'iframe déborde en haut et en bas : titre et barre YouTube hors champ. */
-.crt-crop {
-  position: absolute;
-  left: 0;
-  width: 100%;
-  pointer-events: none;
-}
-
-.crt-crop iframe {
-  width: 100%;
-  height: 100%;
-  border: 0;
-  display: block;
-}
-
-/* ---------- les deux autres lecteurs ---------- */
-
-/* Fichier vidéo servi en direct : on le pilote comme YouTube, donc il se pose
-   comme lui — plein cadre, sans commandes propres (les nôtres sont sur le
-   plastique). `object-fit: cover` pour que FORMAT ait le même effet. */
-.crt-video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  border: 0;
-  background: #000;
-  object-fit: cover;
-}
-
-/* Lecteur d'un site tiers : SURTOUT PAS de rognage — ses commandes vivent en
-   bas de son cadre et ce sont les seules qui pilotent cette image. Il capte
-   donc aussi les clics, contrairement à l'iframe YouTube. */
-.crt-embed {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  border: 0;
-  background: #000;
-  z-index: 2;
-}
-
-/* Le logo de chaîne du pauvre : d'où vient l'image, en petit dans un coin. */
-.crt-source-tag {
-  position: absolute;
-  right: 0.7rem;
-  top: 0.7rem;
-  z-index: 7;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.28rem;
-  padding: 0.2rem 0.45rem;
-  border-radius: 4px;
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.72);
-  background: rgba(6, 8, 12, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  pointer-events: none;
-}
-
-/* Surface de tap invisible : lecture/pause au clic sur l'image. */
-.crt-tap {
-  position: absolute;
-  inset: 0;
-  border: none;
-  background: none;
-  z-index: 3;
-}
-
-/* ---------- le verre ---------- */
-
-.crt-scanlines {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  pointer-events: none;
-  /* Lignes de balayage + masque de phosphores (grille d'ouverture). */
-  background-image: repeating-linear-gradient(
-      0deg,
-      rgba(0, 0, 0, 0.3) 0 1px,
-      transparent 1px 3px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 0, 60, 0.045) 0 1px,
-      rgba(0, 255, 120, 0.045) 1px 2px,
-      rgba(0, 90, 255, 0.045) 2px 3px
-    );
-  mix-blend-mode: overlay;
-  opacity: 0.85;
-}
-
-/* Bruit de piste : la bande blanche qui remonte quand le tracking est faux. */
-.crt-noise {
-  position: absolute;
-  inset: -20% 0;
-  z-index: 5;
-  pointer-events: none;
-  opacity: calc(var(--tracking, 0.1) * 2.4);
-  background: repeating-linear-gradient(
-    0deg,
-    rgba(255, 255, 255, 0.14) 0 2px,
-    rgba(255, 255, 255, 0) 2px 5px,
-    rgba(255, 255, 255, 0.07) 5px 6px,
-    rgba(255, 255, 255, 0) 6px 14px
-  );
-  animation: crt-roll 2.6s linear infinite;
-  mix-blend-mode: screen;
-}
-
-@keyframes crt-roll {
-  to {
-    transform: translateY(28%);
-  }
-}
-
-/* Reflet du verre : deux ovales de lumière en haut à gauche. */
-.crt-glare {
-  position: absolute;
-  inset: 0;
-  z-index: 6;
-  pointer-events: none;
-  background: radial-gradient(
-      42% 30% at 22% 12%,
-      rgba(255, 255, 255, 0.13),
-      transparent 70%
-    ),
-    radial-gradient(20% 12% at 78% 8%, rgba(255, 255, 255, 0.07), transparent 70%);
-}
-
-/* Assombrissement des bords : le tube n'éclaire jamais ses coins. */
-.crt-vignette {
-  position: absolute;
-  inset: 0;
-  z-index: 6;
-  pointer-events: none;
-  box-shadow: inset 0 0 70px 24px rgba(0, 0, 0, 0.72);
-  border-radius: inherit;
-}
-
-/* Chauffe : le flash blanc qui s'ouvre en ligne puis remplit l'écran. */
-.crt-warmup {
-  position: absolute;
-  inset: 0;
-  z-index: 8;
-  background: #fdfdff;
-  animation: crt-warmup 1.05s ease-out forwards;
-}
-
-@keyframes crt-warmup {
-  0% {
-    transform: scaleY(0.004);
-    opacity: 1;
-  }
-  22% {
-    transform: scaleY(0.02);
-    opacity: 1;
-  }
-  46% {
-    transform: scaleY(1);
-    opacity: 0.9;
-  }
-  100% {
-    transform: scaleY(1);
-    opacity: 0;
-  }
-}
-
-/* Extinction : l'image se rétracte en trait puis s'éteint. */
-.crt-room.phase-off .crt-screen {
-  animation: crt-off 0.6s ease-in forwards;
-}
-
-@keyframes crt-off {
-  40% {
-    filter: brightness(2.6);
-  }
-  70% {
-    transform: scaleY(0.012);
-    filter: brightness(3.4);
-  }
-  100% {
-    transform: scale(0.004);
-    opacity: 0;
-  }
-}
-
-.crt-room.phase-off .crt-set {
-  transform: scale(0.985);
-}
-
-.crt-paused {
-  position: absolute;
-  top: 0.8rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 7;
-  font-family: var(--font-display);
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.24em;
-  color: rgba(255, 255, 255, 0.85);
-  text-shadow: 0 0 12px rgba(120, 255, 190, 0.6);
-  animation: crt-blink 1.4s steps(1) infinite;
-}
-
-@keyframes crt-blink {
-  50% {
-    opacity: 0.15;
-  }
-}
-
-/* Affichage à l'écran : la typo verte des menus de télé. */
-.crt-osd {
-  position: absolute;
-  left: 6%;
-  bottom: 8%;
-  z-index: 7;
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.44rem 0.8rem;
-  border-radius: 4px;
-  background: rgba(4, 10, 6, 0.62);
-  border: 1px solid rgba(150, 255, 190, 0.28);
-  color: #b9ffd8;
-  font-family: var(--font-display);
-  font-size: clamp(0.62rem, 1.3vw, 0.82rem);
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  text-shadow: 0 0 10px rgba(120, 255, 190, 0.7);
-  max-width: 82%;
-  animation: crt-osd 1.6s ease forwards;
-}
-
-@keyframes crt-osd {
-  0% {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  12%,
-  76% {
-    opacity: 1;
-    transform: none;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-.crt-osd-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.crt-osd-bars {
-  display: flex;
-  gap: 2px;
-  flex: 0 0 auto;
-}
-
-.crt-osd-bars i {
-  width: 5px;
-  height: 12px;
-  background: rgba(185, 255, 216, 0.2);
-}
-
-.crt-osd-bars i.on {
-  background: #b9ffd8;
-  box-shadow: 0 0 6px rgba(120, 255, 190, 0.8);
-}
-
-/* ---------- panneau de commandes ---------- */
-
-.crt-panel {
-  flex: 0 0 clamp(150px, 17vw, 194px);
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
-  padding: 0.8rem 0.7rem;
-  border-radius: 14px;
-  background: linear-gradient(170deg, #e9e2d2 0%, #cfc7b6 46%, #b3ab9b 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 -2px 6px rgba(0, 0, 0, 0.22),
-    0 4px 12px rgba(0, 0, 0, 0.4);
-  color: #2a2822;
-}
-
-.crt-brand {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.3rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid rgba(42, 40, 34, 0.18);
-}
-
-.crt-brand-name {
-  font-family: var(--font-display);
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.crt-brand-model {
-  font-size: 0.58rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  opacity: 0.55;
-}
-
-/* Afficheur : les chiffres rouges d'un vieux tuner. */
-.crt-readout {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.4rem;
-  padding: 0.4rem 0.55rem;
-  border-radius: 6px;
-  background: #17110f;
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.8);
-  font-family: var(--font-display);
-  color: #ff6a4a;
-  text-shadow: 0 0 10px rgba(255, 90, 60, 0.75);
-  font-variant-numeric: tabular-nums;
-}
-
-.crt-readout-ch {
-  font-size: 0.98rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
-.crt-readout-time {
-  font-size: 0.74rem;
-  opacity: 0.8;
-}
-
-.crt-buttons {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.38rem;
-}
-
-.crt-btn {
-  aspect-ratio: 1;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-  border: none;
-  color: #f0ece2;
-  background: linear-gradient(180deg, #4a4b55 0%, #2e2f38 62%, #23242b 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 2px 0 rgba(0, 0, 0, 0.45),
-    0 3px 6px rgba(0, 0, 0, 0.32);
-  transition: transform 0.08s ease, box-shadow 0.12s ease, filter 0.14s ease;
-}
-
-.crt-btn:hover:not(:disabled) {
-  filter: brightness(1.18);
-}
-
-/* Une touche mécanique s'enfonce : elle descend et perd son ombre. */
-.crt-btn:active:not(:disabled) {
-  transform: translateY(2px);
-  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.6);
-}
-
-.crt-btn:disabled {
-  opacity: 0.34;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
-}
-
-.crt-btn.big {
-  grid-column: span 2;
-  aspect-ratio: 2 / 1;
-  background: linear-gradient(180deg, #5b5c68 0%, #383944 62%, #2a2b33 100%);
-}
-
-.crt-btn.power {
-  color: #ffd9d2;
-  background: linear-gradient(180deg, #a5382c 0%, #7e281f 62%, #611e17 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 2px 0 rgba(0, 0, 0, 0.45),
-    0 0 14px rgba(230, 70, 50, 0.34);
-}
-
-.crt-btn.active {
-  color: #10100c;
-  background: linear-gradient(180deg, #ffd24a, #e0a409);
-}
-
-.crt-knobs {
-  display: flex;
-  gap: 0.7rem;
-  justify-content: space-around;
-  padding-top: 0.2rem;
-}
-
-.crt-knob-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-/* Potentiomètre : un cylindre strié, avec un repère qui tourne. */
-.crt-knob {
-  position: relative;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 38% 30%, #55565f, #24252c 62%, #16171c 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 3px 7px rgba(0, 0, 0, 0.5);
-  transform: rotate(var(--angle, 0deg));
-  transition: transform 0.1s linear;
-  touch-action: none;
-}
-
-.crt-knob::after {
-  /* Stries de préhension */
-  content: "";
-  position: absolute;
-  inset: 4px;
-  border-radius: 50%;
-  background: repeating-conic-gradient(
-    from 0deg,
-    rgba(255, 255, 255, 0.06) 0deg 4deg,
-    transparent 4deg 10deg
-  );
-}
-
-.crt-knob-mark {
-  position: absolute;
-  top: 4px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 3px;
-  height: 12px;
-  border-radius: 2px;
-  background: var(--amber);
-  box-shadow: 0 0 6px rgba(255, 210, 74, 0.8);
-}
-
-.crt-knob:focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 3px;
-}
-
-.crt-knob-label {
-  font-size: 0.54rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  opacity: 0.6;
-}
-
-/* Grille du haut-parleur */
-.crt-grille {
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding-top: 0.5rem;
-}
-
-.crt-grille i {
-  height: 3px;
-  border-radius: 999px;
-  background: rgba(42, 40, 34, 0.22);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
-}
-
-/* ---------- le magnétoscope ---------- */
-
-.crt-deck {
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  padding: 0.7rem 0.9rem;
-  border-radius: 14px;
-  background: linear-gradient(172deg, #2c2d36 0%, #1a1b22 58%, #12131a 100%);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-}
-
-.crt-deck-slot {
-  position: relative;
-  flex: 0 0 auto;
-  width: 74px;
-  height: 34px;
-  border-radius: 4px;
-  background: #0a0b0e;
-  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.9);
-  overflow: hidden;
-}
-
-/* La cassette engagée dans la fente, teintée par le média. */
-.crt-deck-tape {
-  position: absolute;
-  inset: 5px 4px auto;
-  height: 22px;
-  border-radius: 2px;
-  background: linear-gradient(180deg, #33343d, #1b1c22);
-  border-top: 3px solid var(--tint, var(--orange));
-  animation: crt-tape-in 0.7s cubic-bezier(0.2, 0.9, 0.25, 1);
-}
-
-@keyframes crt-tape-in {
-  from {
-    transform: translateY(-26px);
-  }
-}
-
-.crt-deck-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.crt-deck-title {
-  font-family: var(--font-display);
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.86);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.crt-deck-bar {
-  position: relative;
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  touch-action: none;
-}
-
-.crt-deck-bar-cur {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  border-radius: 999px;
-  background: var(--tint, var(--orange));
-  box-shadow: 0 0 10px color-mix(in srgb, var(--tint, #f2b70b) 60%, transparent);
-}
-
-.crt-deck-bar-thumb {
-  position: absolute;
-  top: 50%;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #fff;
-  transform: translate(-50%, -50%);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-.crt-deck-bar:hover .crt-deck-bar-thumb {
-  opacity: 1;
-}
-
-.crt-deck-clock {
-  font-size: 0.68rem;
-  font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.6);
-}
-
-/* À la place de la barre, quand le lecteur ne nous dit rien : d'où vient
-   l'image, et la porte de sortie si l'hébergeur refuse d'être encadré. */
-.crt-deck-ext {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  flex-wrap: wrap;
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.55);
-}
-
-.crt-deck-ext em {
-  font-style: normal;
-  letter-spacing: 0.04em;
-}
-
-/* Les deux issues de secours du mode antenne : lever la bride du cadre, ou
-   ouvrir la source à part. Même traitement — ce sont des liens de dépannage,
-   pas des commandes du poste. */
-.crt-deck-open {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0;
-  border: none;
-  border-bottom: 1px solid transparent;
-  background: none;
-  font-family: inherit;
-  font-size: inherit;
-  font-weight: 700;
-  color: var(--tint, #f2b70b);
-}
-
-.crt-deck-open:hover {
-  border-color: currentColor;
-}
-
-.crt-deck-clock em {
-  font-style: normal;
-  opacity: 0.6;
-}
-
-.crt-deck-eject {
-  flex: 0 0 auto;
-  font-family: var(--font-display);
-  font-size: 0.66rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  padding: 0.5rem 0.8rem;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.78);
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.crt-deck-eject:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
-}
-
-/* ---------- sélecteur d'épisodes ---------- */
-
-.crt-list {
-  position: absolute;
-  top: clamp(0.8rem, 3vw, 2rem);
-  right: clamp(0.8rem, 3vw, 2rem);
-  width: min(320px, 84vw);
-  max-height: min(70vh, 560px);
-  display: flex;
-  flex-direction: column;
-  border-radius: 14px;
-  overflow: hidden;
-  background: rgba(12, 12, 18, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6);
-  animation: crt-list-in 0.22s ease;
-}
-
-@keyframes crt-list-in {
-  from {
-    opacity: 0;
-    transform: translateX(12px);
-  }
-}
-
-.crt-list header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
-  padding: 0.7rem 0.85rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  font-family: var(--font-display);
-  font-size: 0.84rem;
-  font-weight: 700;
-  color: #fff;
-}
-
-.crt-list header span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.crt-list header button {
-  flex: 0 0 auto;
-  border: none;
-  background: none;
-  font-size: 0.74rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.crt-list ul {
-  list-style: none;
-  margin: 0;
-  padding: 0.35rem;
-  overflow-y: auto;
-}
-
-.crt-list li button {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  padding: 0.44rem 0.5rem;
-  border: none;
-  border-radius: 8px;
-  background: none;
-  color: rgba(255, 255, 255, 0.78);
-  text-align: left;
-  font-size: 0.8rem;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-
-.crt-list li button:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
-}
-
-.crt-list li button.current {
-  background: color-mix(in srgb, var(--orange) 22%, transparent);
-  color: #fff;
-}
-
-.crt-list li button svg {
-  margin-left: auto;
-  color: #6ee7a8;
-  flex: 0 0 auto;
-}
-
-.crt-list-num {
-  flex: 0 0 auto;
-  font-family: var(--font-display);
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.42);
-  font-variant-numeric: tabular-nums;
-}
-
-.crt-list-title {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* ======================================================================
    9. Écrans étroits
    ====================================================================== */
 
 @media (max-width: 1000px) {
   .coll-detail-body {
     grid-template-columns: 1fr;
+  }
+
+  /* Une seule colonne : plus rien à combler à droite, et « remonter » le fil le
+     ferait passer DEVANT le casting et la fiche technique. On rend la place à
+     l'ordre du document — casting, fiche, puis la discussion. */
+  .coll-detail-body.no-eps .coll-comments {
+    grid-row: auto;
   }
 }
 
@@ -3052,59 +2737,5 @@
     width: 92px;
   }
 
-  /* Le poste passe en colonne : écran puis carrosserie, comme une télé
-     portative posée sur une table. */
-  .crt-set {
-    flex-direction: column;
-  }
-
-  .crt-panel {
-    flex: 0 0 auto;
-    flex-direction: row;
-    align-items: center;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-  }
-
-  .crt-brand,
-  .crt-grille {
-    display: none;
-  }
-
-  .crt-buttons {
-    flex: 1;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-  }
-
-  .crt-knobs {
-    padding-top: 0;
-  }
-
-  .crt-knob {
-    width: 36px;
-    height: 36px;
-  }
-
-  .crt-list {
-    left: clamp(0.8rem, 3vw, 2rem);
-    right: clamp(0.8rem, 3vw, 2rem);
-    width: auto;
-  }
-
-  .crt-deck-slot {
-    display: none;
-  }
 }
 
-/* Les lignes de balayage et le bruit de piste sont des animations plein
-   écran : coupées quand l'utilisateur demande moins de mouvement. */
-@media (prefers-reduced-motion: reduce) {
-  .crt-noise,
-  .crt-room-glow {
-    animation: none;
-  }
-
-  .crt-warmup {
-    display: none;
-  }
-}

@@ -5,7 +5,7 @@ import { X, Minus, Users, Maximize2, Loader2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useChat } from "../context/ChatContext";
 import { apiFetch } from "../lib/api";
-import { presenceText } from "../lib/presence";
+import { presenceText, isPlaying } from "../lib/presence";
 import ChatThread from "./ChatThread";
 
 // Fenêtres de discussion flottantes, façon Facebook : on répond depuis
@@ -13,10 +13,18 @@ import ChatThread from "./ChatThread";
 // Repliées, elles deviennent des pastilles rondes empilées à droite.
 export default function ChatDock() {
   const { token, user } = useAuth();
-  const { docks, closeDock, toggleDock, conversations, online } = useChat();
+  const { docks, closeDock, toggleDock, conversations, online, statuses } = useChat();
   const location = useLocation();
 
   // Sur /messages, tout est déjà à l'écran : les fenêtres feraient doublon.
+  //
+  // EN SÉANCE PARTAGÉE, ELLES RESTENT DISPONIBLES. Il a été tentant de les
+  // couper là aussi (la salle a son propre salon), mais ça enlevait une
+  // capacité pour un problème de ménage : on ne peut alors plus répondre à
+  // personne sans quitter le film. La séance se contente donc de REFERMER les
+  // fenêtres à l'arrivée — celle d'où l'on vient de cliquer « Rejoindre »
+  // comprise (voir WatchParty.jsx) — et rouvrir un fil pendant la séance reste
+  // un geste possible, puisque délibéré.
   if (!token || !user || location.pathname.startsWith("/messages") || !docks.length)
     return null;
 
@@ -32,6 +40,7 @@ export default function ChatDock() {
           token={token}
           conversations={conversations}
           online={online}
+          statuses={statuses}
           onMinimize={() => toggleDock(d.id)}
           onClose={() => closeDock(d.id)}
         />
@@ -91,7 +100,7 @@ function Avatar({ conv, online, className = "" }) {
   );
 }
 
-function DockWindow({ id, token, conversations, online, onMinimize, onClose }) {
+function DockWindow({ id, token, conversations, online, statuses, onMinimize, onClose }) {
   const { registerActive, markRead, typing, isWindowFocused } = useChat();
   const conv = useDockConversation(id, conversations, token);
 
@@ -108,7 +117,7 @@ function DockWindow({ id, token, conversations, online, onMinimize, onClose }) {
     ? "écrit…"
     : conv?.isGroup
     ? `${conv.participants?.length || 0} membres`
-    : presenceText(other, online);
+    : presenceText(other, online, statuses);
 
   return (
     <section className="chat-win">
@@ -122,7 +131,11 @@ function DockWindow({ id, token, conversations, online, onMinimize, onClose }) {
         )}
         <span className="chat-win-info">
           <strong>{conv?.title || "…"}</strong>
-          {sub && <span className="chat-win-sub">{sub}</span>}
+          {sub && (
+            <span className={`chat-win-sub ${isPlaying(other, statuses) ? "playing" : ""}`}>
+              {sub}
+            </span>
+          )}
         </span>
         <button
           type="button"

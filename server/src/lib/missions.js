@@ -3,6 +3,7 @@ import UserGame from "../models/UserGame.js";
 import List from "../models/List.js";
 import BlindTest from "../models/BlindTest.js";
 import PixelGame from "../models/PixelGame.js";
+import MotPlay from "../models/MotPlay.js";
 import GemDiscovery from "../models/GemDiscovery.js";
 import Repost from "../models/Repost.js";
 import Documentary from "../models/Documentary.js";
@@ -116,6 +117,17 @@ export const MISSIONS = [
     points: 250,
     target: 1,
     progress: (id) => PixelGame.countDocuments({ user: id }),
+  },
+  {
+    key: "mot",
+    title: "Le mot juste",
+    description: "Trouve le mot du jour.",
+    icon: "Thermometer",
+    tier: "bronze",
+    points: 250,
+    target: 1,
+    // Seules les parties GAGNÉES comptent : abandonner n'est pas trouver.
+    progress: (id) => MotPlay.countDocuments({ user: id, solved: true }),
   },
   {
     key: "discover-gem",

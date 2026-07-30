@@ -128,6 +128,17 @@ export async function downloadArtwork(url, name) {
   }
 }
 
+// Le même rangement, pour un visuel qu'on n'est pas allé CHERCHER mais qu'on a
+// FABRIQUÉ — l'icône extraite d'une cartouche DS, par exemple. Elle ne passe
+// par aucune URL : sans ce point d'entrée, il faudrait soit exposer le dossier
+// d'uploads à la moitié du serveur, soit réécrire le même writeFile ailleurs.
+export async function saveArtwork(buffer, name, ext = ".png") {
+  if (!buffer?.length || buffer.length > MAX_BYTES) return null;
+  const filename = `${name}-${Date.now().toString(36)}${ext}`;
+  await fs.promises.writeFile(path.join(UPLOAD_DIR, filename), buffer);
+  return `/uploads/collection/${filename}`;
+}
+
 // --------------------------------------------------------------- YouTube --
 
 export function extractVideoId(url) {
@@ -435,7 +446,12 @@ export async function tvmazeSearch(query) {
 }
 
 // Idem côté Wikipédia, pour les films (que TVmaze ne connaît pas).
-export async function wikiSearch(query, lang = "fr") {
+//
+// `cut` : la longueur du résumé rendu. 240 signes suffisent à une LIGNE DE
+// CHOIX — on lit trois mots et on reconnaît le titre. Le papier, lui, s'en sert
+// comme SYNOPSIS (Wikipédia FR est la seule source française d'un comic
+// américain) : il lui faut le paragraphe entier, d'où le réglage.
+export async function wikiSearch(query, lang = "fr", cut = 240) {
   const search = await getJson(
     `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
       query
@@ -457,7 +473,7 @@ export async function wikiSearch(query, lang = "fr") {
       title: p.title,
       year: null,
       poster: p.originalimage?.source || p.thumbnail?.source || null,
-      summary: tidySynopsis(p.extract).slice(0, 240),
+      summary: tidySynopsis(p.extract).slice(0, cut),
       url: p.content_urls?.desktop?.page || null,
       wikibaseId: p.wikibase_item || null,
     }));
@@ -837,6 +853,11 @@ export async function buildMedia(input) {
     kind,
     animated: input.animated ?? true,
     format: input.format || "dvd",
+    // La salle où le titre se regarde. « auto » suffit à l'immense majorité
+    // (film → cinéma, le reste → poste cathodique) : on ne pose une valeur que
+    // pour les exceptions, et un « rafraîchir » ne doit surtout pas l'effacer —
+    // d'où la relecture de ce qui est déjà en base.
+    theater: input.theater || "auto",
     licence: input.licence || "official",
     year: input.year || show?.year || facts?.year || null,
     endYear: input.endYear || show?.endYear || null,

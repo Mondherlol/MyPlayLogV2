@@ -22,6 +22,8 @@ import freeGamesRoutes from "./routes/freeGames.js";
 import blindtestRoutes from "./routes/blindtest.js";
 import pixelRoutes from "./routes/pixel.js";
 import geoRoutes from "./routes/geo.js";
+import motRoutes from "./routes/mot.js";
+import presenceRoutes from "./routes/presence.js";
 import arcadeRoutes from "./routes/arcade.js";
 import steamRoutes from "./routes/steam.js";
 import psnRoutes from "./routes/psn.js";
@@ -37,8 +39,10 @@ import trackerRoutes, { startTrackerAutoSync } from "./routes/trackers.js";
 import missionRoutes from "./routes/missions.js";
 import chatRoutes from "./routes/chat.js";
 import collectionRoutes from "./routes/collection.js";
+import watchPartyRoutes from "./routes/watchparty.js";
 import settingsRoutes from "./routes/settings.js";
 import { requireFeature } from "./lib/features.js";
+import { optionalAuth } from "./middleware/auth.js";
 import { avatarPrivacy } from "./middleware/avatarPrivacy.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -93,6 +97,8 @@ app.use("/api/free-games", freeGamesRoutes);
 app.use("/api/blindtest", blindtestRoutes);
 app.use("/api/pixel", pixelRoutes);
 app.use("/api/geo", geoRoutes);
+app.use("/api/mot", motRoutes);
+app.use("/api/presence", presenceRoutes);
 app.use("/api/arcade", arcadeRoutes);
 app.use("/api/steam", steamRoutes);
 app.use("/api/psn", psnRoutes);
@@ -108,7 +114,22 @@ app.use("/api/missions", missionRoutes);
 app.use("/api/settings", settingsRoutes);
 // Collection : séries / films / animés liés au jeu vidéo (l'étagère). Toute la
 // section est derrière son drapeau — éteinte, elle n'existe que pour l'admin.
-app.use("/api/collection", requireFeature("collection"), collectionRoutes);
+//
+// `optionalAuth` EN PREMIER, et ce n'est pas décoratif : le drapeau doit savoir
+// QUI demande pour laisser passer l'admin, or `requireAuth` ne s'exécute qu'à
+// l'intérieur du routeur, donc bien après ce point. Sans cette ligne, personne
+// n'est identifié ici et l'admin se prend son propre 404.
+app.use(
+  "/api/collection",
+  optionalAuth,
+  requireFeature("collection"),
+  collectionRoutes
+);
+// Les salles de projection à plusieurs (watchparty). Même drapeau que la
+// Collection — c'est une façon de la regarder — mais le barrage est POSÉ DANS le
+// routeur, après son `requireAuth` : il faut être identifié pour que l'admin
+// passe quand la section est éteinte (voir routes/watchparty.js).
+app.use("/api/watchparty", watchPartyRoutes);
 // Messagerie (DM + groupes). Contient le flux temps réel SSE /api/chat/stream.
 app.use("/api/chat", chatRoutes);
 // Remontée des crashs du front (voir routes/clientErrors.js).

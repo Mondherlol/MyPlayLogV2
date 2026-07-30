@@ -17,7 +17,7 @@ import { useAuth } from "../context/AuthContext";
 import { useChat } from "../context/ChatContext";
 import { apiFetch } from "../lib/api";
 import { timeAgo } from "../lib/lists";
-import { presenceText } from "../lib/presence";
+import { presenceText, isPlaying } from "../lib/presence";
 import ChatThread from "../components/ChatThread";
 import NewChatModal from "../components/NewChatModal";
 import ChatInfoModal from "../components/ChatInfoModal";
@@ -29,6 +29,7 @@ export default function Messages() {
     setConversations,
     upsertConversation,
     online,
+    statuses,
     typing,
     markRead,
     registerActive,
@@ -179,7 +180,7 @@ export default function Messages() {
     if (names.length)
       return names.length === 1 ? `${names[0]} écrit…` : "plusieurs personnes écrivent…";
     if (c.isGroup) return `${c.participants?.length || 0} membres`;
-    return presenceText(c.others?.[0], online);
+    return presenceText(c.others?.[0], online, statuses);
   }
 
   return (
@@ -387,7 +388,13 @@ export default function Messages() {
                 ) : (
                   <strong>{active.title}</strong>
                 )}
-                <span className="chat-head-sub">{headerSub(active)}</span>
+                <span
+                  className={`chat-head-sub ${
+                    !active.isGroup && isPlaying(active.others?.[0], statuses) ? "playing" : ""
+                  }`}
+                >
+                  {headerSub(active)}
+                </span>
               </div>
               {active.muted && <BellOff size={15} className="chat-head-muted" />}
               <button

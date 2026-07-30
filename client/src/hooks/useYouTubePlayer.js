@@ -6,9 +6,8 @@ import { loadYT } from "../lib/youtube";
 // ======================================================================
 // Tout ce qui est commun à nos lecteurs maison : créer le YT.Player, suivre
 // sa position, régler le son, le détruire proprement. L'HABILLAGE reste à
-// l'appelant — la barre dorée de GameVideoPlayer (components/YouTubePlayer)
-// ou les boutons du téléviseur cathodique de la Collection (CrtTv), qui
-// n'affiche AUCUN contrôle à l'écran puisqu'ils sont sur la carrosserie.
+// l'appelant — la barre dorée de GameVideoPlayer (components/YouTubePlayer) ou
+// celle de la visionneuse de la Collection (CollectionViewer).
 //
 // Piège respecté (le même que partout ailleurs dans l'app) : YT.Player n'est
 // jamais monté sur un nœud rendu par React — YouTube REMPLACE le nœud qu'on

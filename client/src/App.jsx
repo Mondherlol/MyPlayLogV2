@@ -9,6 +9,7 @@ import Welcome from "./pages/Welcome";
 import BlindTest from "./pages/BlindTest";
 import PixelRush from "./pages/PixelRush";
 import GeoGamer from "./pages/GeoGamer";
+import MotDuJour from "./pages/MotDuJour";
 import Arcade from "./pages/Arcade";
 import Playtopia from "./pages/Playtopia";
 import Explorer from "./pages/Explorer";
@@ -21,6 +22,7 @@ import Profile from "./pages/Profile";
 import Lists from "./pages/Lists";
 import Collection from "./pages/Collection";
 import CollectionDetail from "./pages/CollectionDetail";
+import WatchParty from "./pages/WatchParty";
 import Messages from "./pages/Messages";
 import ListDetail from "./pages/ListDetail";
 import Admin from "./pages/Admin";
@@ -147,6 +149,7 @@ export default function App() {
         <Route path="/blindtest" element={<BlindTest />} />
         <Route path="/pixel" element={<PixelRush />} />
         <Route path="/geo" element={<GeoGamer />} />
+        <Route path="/mot" element={<MotDuJour />} />
         <Route path="/playtopia" element={<Playtopia />} />
         <Route path="/explore" element={<Explorer />} />
         <Route path="/releases" element={<Releases />} />
@@ -163,6 +166,13 @@ export default function App() {
         <Route
           path="/collection/:slug"
           element={<FeatureRoute name="collection" element={<CollectionDetail />} />}
+        />
+        {/* Une salle de projection à plusieurs. Même drapeau que le rayon : c'est
+            une façon de le regarder. Le lien porte le code de la salle — qui l'a
+            peut entrer, comme une invitation Discord. */}
+        <Route
+          path="/watchparty/:code"
+          element={<FeatureRoute name="collection" element={<WatchParty />} />}
         />
         <Route path="/profile" element={<Profile />} />
         <Route path="/admin" element={<Admin />} />

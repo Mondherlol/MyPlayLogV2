@@ -22,6 +22,8 @@ import {
   Play,
   Pause,
   Music,
+  Popcorn,
+  Thermometer,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { renderMessage, extractYouTubeIds, YouTubeEmbed } from "./ListComments";
@@ -779,7 +781,9 @@ function MessageRow({
   const ytIds = m.deleted ? [] : extractYouTubeIds(m.text);
   // Message « que des emojis » (sans média ni carte) → rendu géant, sans bulle.
   const emojiLvl =
-    m.deleted || m.media?.length || m.game || m.ost ? 0 : emojiOnlyLevel(m.text);
+    m.deleted || m.media?.length || m.game || m.ost || m.party || m.mot
+      ? 0
+      : emojiOnlyLevel(m.text);
 
   // Le fil garde un annuaire id -> élément pour pouvoir sauter à un message cité.
   const register = useCallback(
@@ -867,7 +871,7 @@ function MessageRow({
 
         <div
           className={`chat-bubble ${m.deleted ? "is-deleted" : ""} ${
-            m.game || m.ost ? "has-card" : ""
+            m.game || m.ost || m.party || m.mot ? "has-card" : ""
           } ${emojiLvl ? `chat-emoji-only lvl-${emojiLvl}` : ""}`}
         >
           {m.deleted ? (
@@ -876,6 +880,8 @@ function MessageRow({
             <>
               {m.game && <GameCard game={m.game} />}
               {m.ost && <OstCard ost={m.ost} />}
+              {m.party && <PartyCard party={m.party} />}
+              {m.mot && <MotCard mot={m.mot} />}
               {m.text && <p>{renderMessage(m.text, m.mentions)}</p>}
               {m.media?.length > 0 && (
                 <div className={`chat-media n-${Math.min(m.media.length, 4)}`}>
@@ -1032,6 +1038,80 @@ function GameCard({ game }) {
         <span className="chat-card-title">{game.name}</span>
         <span className="chat-card-cta">Voir la fiche →</span>
       </span>
+    </Link>
+  );
+}
+
+// --- Carte « invitation à une watchparty » ---
+// UNE INVITATION EST PÉRISSABLE, et la carte doit le dire : elle porte l'affiche
+// (on décide en la voyant), le nom de l'hôte, et un bouton qui mène droit dans la
+// salle. Rien n'indique si la séance tourne encore — le savoir demanderait
+// d'interroger le serveur pour chaque carte d'un fil qu'on relit, et la salle
+// répond elle-même « cette séance n'existe plus » quand c'est le cas.
+function PartyCard({ party }) {
+  return (
+    <Link to={`/watchparty/${party.code}`} className="chat-card chat-card-party clickable">
+      <span className="chat-card-cover">
+        {party.poster ? <img src={party.poster} alt="" /> : <Popcorn size={22} />}
+      </span>
+      <span className="chat-card-body">
+        <span className="chat-card-kicker">
+          <Popcorn size={12} /> Watchparty
+          {party.hostName ? ` · ${party.hostName}` : ""}
+        </span>
+        <span className="chat-card-title">{party.title}</span>
+        {party.subtitle && <span className="chat-card-sub">{party.subtitle}</span>}
+        <span className="chat-card-cta">Rejoindre la séance →</span>
+      </span>
+    </Link>
+  );
+}
+
+// --- Carte « rejoins ma partie du Mot du jour » ---
+// Comme l'invitation de watchparty, c'est le seul morceau d'une partie qui
+// survit dans la messagerie. Elle est PÉRISSABLE : le mot change à minuit, donc
+// une carte d'hier n'ouvre plus rien — on le dit plutôt que de laisser cliquer
+// dans le vide.
+function MotCard({ mot }) {
+  const today = new Date().toLocaleDateString("fr-CA");
+  const stale = Boolean(mot.date && mot.date !== today);
+  const body = (
+    <span className="chat-card-body">
+      <span className="chat-card-kicker">
+        <Thermometer size={12} /> Mot du jour
+        {mot.hostName ? ` · ${mot.hostName}` : ""}
+      </span>
+      <span className="chat-card-title">
+        {stale ? "Partie terminée" : "Cherchons le mot ensemble"}
+      </span>
+      <span className="chat-card-sub">
+        {stale
+          ? "Le mot a changé depuis."
+          : `${mot.players || 1} joueur${(mot.players || 1) > 1 ? "s" : ""} · ${
+              mot.tries || 0
+            } essai${(mot.tries || 0) > 1 ? "s" : ""} déjà brûlé${
+              (mot.tries || 0) > 1 ? "s" : ""
+            }`}
+      </span>
+      {!stale && <span className="chat-card-cta">Rejoindre la partie →</span>}
+    </span>
+  );
+  if (stale) {
+    return (
+      <span className="chat-card chat-card-mot stale">
+        <span className="chat-card-cover">
+          <Thermometer size={22} />
+        </span>
+        {body}
+      </span>
+    );
+  }
+  return (
+    <Link to={`/mot?s=${mot.code}`} className="chat-card chat-card-mot clickable">
+      <span className="chat-card-cover">
+        <Thermometer size={22} />
+      </span>
+      {body}
     </Link>
   );
 }
