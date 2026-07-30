@@ -285,20 +285,35 @@
    une barre de session au-dessus, les auteurs sur les lignes, et la
    frappe des autres sous le champ. On reste chez soi. */
 
-/* La pastille d'un joueur, partout la même (barre, lignes, classement). */
+/* La pastille d'un joueur, partout la même (barre, lignes, classement).
+   Le repli sur --surface-2 n'est pas décoratif : les modales (invitation, fin
+   de partie, arrivée par lien) sont rendues en portail sur <body>, DEHORS de
+   .mdj-page — la palette du jeu n'y existe pas, et sans ce second terme la
+   pastille n'avait tout simplement aucun fond. */
 .mdj-face {
   flex: 0 0 auto;
   border-radius: 50%;
   object-fit: cover;
-  background: var(--mdj-panel-2);
+  background: var(--mdj-panel-2, var(--surface-2));
 }
 
+/* Sans photo : une vraie pastille, pas une lettre posée dans le vide. Fond
+   doré très dilué + un liseré, pour qu'elle tienne le même cercle qu'un
+   avatar au lieu de disparaître dans le fond de la ligne. */
 .mdj-face.letters {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--orange) 28%, var(--surface-2)),
+    var(--surface-2)
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--orange) 22%, var(--border));
   font-weight: 800;
-  color: var(--text-soft);
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--accent-ink);
 }
 
 /* Les têtes se chevauchent légèrement : c'est ce qui les lit comme UNE
@@ -310,7 +325,10 @@
 
 .mdj-sess-faces .mdj-face {
   margin-left: -8px;
-  border: 2px solid var(--mdj-panel);
+  /* Repli pour la même raison que le fond de .mdj-face : sans lui, un rendu
+     hors de .mdj-page perdrait la couleur et le liseré prendrait celle du
+     texte. */
+  border: 2px solid var(--mdj-panel, var(--surface));
 }
 
 .mdj-sess-faces .mdj-face:first-child {
@@ -935,7 +953,13 @@
   color: var(--text);
 }
 
-.mdj-inv-row span {
+/* Le pseudo prend la place restante. La classe est indispensable : en visant
+   `span` tout court, la règle attrapait AUSSI la pastille sans photo (un
+   <span>, contrairement à l'<img> d'un joueur qui en a une) et son `flex: 1`
+   l'étirait sur toute la ligne — la lettre se retrouvait flottante au milieu,
+   le pseudo poussé à droite. Les lignes changeaient de dessin selon que le
+   joueur avait une photo ou non. */
+.mdj-inv-name {
   flex: 1;
   min-width: 0;
   overflow: hidden;

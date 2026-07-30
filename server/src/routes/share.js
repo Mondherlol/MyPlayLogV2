@@ -4,7 +4,9 @@ import List from "../models/List.js";
 import User from "../models/User.js";
 import UserGame from "../models/UserGame.js";
 import GameMedia from "../models/GameMedia.js";
+import MotSession from "../models/MotSession.js";
 import { igdbQuery } from "../lib/igdb.js";
+import { gameDay } from "../lib/mots.js";
 
 // Rendu HTML "Open Graph" pour les aperçus de partage (WhatsApp, Facebook,
 // Twitter/X, Discord, Telegram, iMessage…). Ces robots ne lisent QUE le <head>
@@ -17,6 +19,10 @@ const router = express.Router();
 const SITE_NAME = "MyPlayLog";
 const SITE_URL = "https://myplaylog.cc";
 const DEFAULT_IMAGE = `${SITE_URL}/og-default.png`;
+// Discord (et Slack) colorent la barre latérale de l'aperçu avec `theme-color` :
+// c'est gratuit et ça suffit à ce qu'un lien du site se reconnaisse d'un coup
+// d'œil dans un salon. Le doré de l'app.
+const BRAND_COLOR = "#f2b70b";
 const DEFAULT_DESC =
   "Track, note et partage tes jeux vidéo. Le journal de tes parties.";
 const IMG_BASE = "https://images.igdb.com/igdb/image/upload";
@@ -64,6 +70,11 @@ function renderOgPage({
   type = "website",
   imageSize = null, // { w, h } pour l'image de repli (dimensions connues)
   video = null, // { url, type, w, h } : vidéo lisible dans l'embed (Discord…)
+  // Format de la carte. « summary » = vignette carrée à droite du texte : c'est
+  // ce qu'il faut quand l'image est un avatar, qu'un bandeau pleine largeur
+  // afficherait recadré et flou.
+  card = "summary_large_image",
+  color = BRAND_COLOR,
 }) {
   const t = escapeHtml(title);
   const d = escapeHtml(description);
@@ -92,6 +103,7 @@ function renderOgPage({
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${t}</title>
     <meta name="description" content="${d}" />
+    <meta name="theme-color" content="${escapeHtml(color)}" />
     <link rel="canonical" href="${u}" />
 
     <meta property="og:site_name" content="${SITE_NAME}" />
@@ -100,7 +112,7 @@ function renderOgPage({
     <meta property="og:description" content="${d}" />
     <meta property="og:url" content="${u}" />
     <meta property="og:image" content="${img}" />${sizeTags}${videoTags}
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:card" content="${escapeHtml(card)}" />
     <meta name="twitter:image" content="${img}" />
     <meta name="twitter:title" content="${t}" />
     <meta name="twitter:description" content="${d}" />
@@ -296,6 +308,89 @@ router.get("/clip/:id", async (req, res) => {
   } catch (err) {
     console.error("share clip og error:", err.message);
     sendHtml(res, genericPage(url));
+  }
+});
+
+// ============================================================
+//  Mot du jour — GET /mot   (invitation : /mot?s=CODE)
+// ============================================================
+// Un lien d'invitation collé dans Discord n'affichait que les méta génériques
+// de la SPA (« MyPlayLog — Ton journal de jeux vidéo ») : rien ne disait qu'on
+// invitait à une partie, ni qui invitait. On rend donc ici le contexte réel de
+// la session — l'hôte, le monde autour de la table, les essais déjà brûlés.
+
+const MOT_PITCH =
+  "Un mot, le même pour tout le monde jusqu'à minuit. Chaque proposition affiche sa température : plus tu chauffes, plus tu es près.";
+
+// L'aperçu du jeu lui-même : sert pour /mot nu, et de repli pour un code
+// inconnu ou périmé (on ne renvoie PAS la page générique du site — le lien
+// mène bien au Mot du jour, autant le dire).
+const motPage = (url, extra = {}) =>
+  renderOgPage({
+    title: `Mot du jour · ${SITE_NAME}`,
+    description: MOT_PITCH,
+    image: DEFAULT_IMAGE,
+    url,
+    imageSize: { w: 1200, h: 630 },
+    ...extra,
+  });
+
+router.get("/mot", async (req, res) => {
+  const code = String(req.query.s || "").toLowerCase().trim();
+  const url = code ? `${SITE_URL}/mot?s=${encodeURIComponent(code)}` : `${SITE_URL}/mot`;
+  // Aperçu volontairement court en cache : une invitation change vite (des gens
+  // rejoignent, la partie se résout) et Discord garde ce qu'on lui a donné.
+  res.set("Cache-Control", "public, max-age=120");
+  try {
+    if (!code) return sendHtml(res, motPage(url));
+
+    const s = await MotSession.findOne({ code })
+      .populate("host", "username avatar privacy")
+      .lean();
+    // Code inconnu, ou partie d'un jour passé : le lien ne mène plus à rien de
+    // précis, on retombe sur la présentation du jeu.
+    if (!s || s.date !== gameDay()) return sendHtml(res, motPage(url));
+
+    // Un compte privé ne voit pas son pseudo ni sa photo partir dans un salon
+    // Discord à cause d'un lien transféré : la partie reste rejoignable, elle
+    // devient juste anonyme.
+    const priv = !!s.host?.privacy?.isPrivate;
+    const host = !priv && s.host?.username ? `@${s.host.username}` : null;
+    const avatar = priv ? null : s.host?.avatar || null;
+    const players = (s.members || []).filter((m) => !m.leftAt).length || 1;
+    const tries = s.tries || 0;
+
+    const bits = [
+      `${players} joueur${players > 1 ? "s" : ""} sur la même énigme`,
+      tries ? `${tries} essai${tries > 1 ? "s" : ""} déjà brûlé${tries > 1 ? "s" : ""}` : null,
+    ].filter(Boolean);
+
+    const title = s.solved
+      ? `${host ? `${host} a trouvé` : "Le mot est trouvé"} · Mot du jour`
+      : host
+        ? `Rejoins la partie de ${host} · Mot du jour`
+        : `Rejoins la partie · Mot du jour`;
+
+    const description = s.solved
+      ? `Trouvé en ${tries} essai${tries > 1 ? "s" : ""}. Le prochain mot tombe à minuit — ${MOT_PITCH}`
+      : `${bits.join(" · ")}. ${MOT_PITCH} Vos essais se cumulent.`;
+
+    sendHtml(
+      res,
+      renderOgPage({
+        title,
+        description: clip(description, 300),
+        image: avatar || DEFAULT_IMAGE,
+        url,
+        // Avatar = vignette carrée (un bandeau le recadrerait salement) ;
+        // sans avatar, l'image du site reprend toute la largeur.
+        card: avatar ? "summary" : "summary_large_image",
+        imageSize: avatar ? null : { w: 1200, h: 630 },
+      })
+    );
+  } catch (err) {
+    console.error("share mot og error:", err.message);
+    sendHtml(res, motPage(url));
   }
 });
 

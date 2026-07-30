@@ -1357,7 +1357,7 @@ function InviteModal({ token, meId, session, onClose }) {
                     onClick={() => toggle(p.id)}
                   >
                     <Face user={p} size={30} />
-                    <span>{p.username}</span>
+                    <span className="mdj-inv-name">{p.username}</span>
                     {picked.has(p.id) && <Check size={16} />}
                   </button>
                 </li>
