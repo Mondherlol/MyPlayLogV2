@@ -163,6 +163,12 @@ export default function App() {
             page pendant qu'elle est cachée. Le serveur refuse de son côté :
             masquer une route n'a jamais protégé une API. */}
         <Route path="/collection" element={<FeatureRoute name="collection" element={<Collection />} />} />
+        {/* L'étagère de quelqu'un d'autre. Déclarée AVANT « /collection/:slug »,
+            sinon « u » passerait pour le slug d'un boîtier. */}
+        <Route
+          path="/collection/u/:username"
+          element={<FeatureRoute name="collection" element={<Collection />} />}
+        />
         <Route
           path="/collection/:slug"
           element={<FeatureRoute name="collection" element={<CollectionDetail />} />}

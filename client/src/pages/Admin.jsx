@@ -41,6 +41,7 @@ import {
   DownloadCloud,
   Globe2,
   CalendarDays,
+  ScrollText,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { applyGeoGlobe } from "../lib/geoGlobe";
@@ -53,6 +54,7 @@ import SystemPanel from "../components/AdminSystem";
 import MissionsPanel from "../components/AdminMissions";
 import EventsPanel from "../components/AdminEvents";
 import CollectionPanel from "../components/AdminCollection";
+import LogsPanel from "../components/AdminLogs";
 
 // ======================================================================
 //  Page Admin — shell à onglets verticaux (façon Discord).
@@ -66,6 +68,7 @@ const TAB_KEYS = [
   "events",
   "collection",
   "system",
+  "logs",
   "secrets",
   "patchnotes",
 ];
@@ -97,6 +100,7 @@ export default function Admin() {
     { key: "events", label: "Événements", Icon: CalendarDays },
     { key: "collection", label: "Collection", Icon: Library },
     { key: "system", label: "Système", Icon: Activity },
+    { key: "logs", label: "Logs", Icon: ScrollText },
     ...(isSuper ? [{ key: "secrets", label: "Secrets", Icon: KeyRound }] : []),
     { key: "patchnotes", label: "Patch notes", Icon: Sparkles },
   ];
@@ -169,6 +173,7 @@ export default function Admin() {
           {safeTab === "events" && <EventsPanel token={token} />}
           {safeTab === "collection" && <CollectionPanel token={token} />}
           {safeTab === "system" && <SystemPanel token={token} />}
+          {safeTab === "logs" && <LogsPanel token={token} isSuper={isSuper} />}
           {safeTab === "secrets" && isSuper && <SecretsPanel token={token} />}
           {safeTab === "patchnotes" && <PatchnoteManager token={token} />}
         </section>

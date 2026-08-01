@@ -1457,6 +1457,259 @@
   }
 }
 
+/* ======================================================================
+   La machine à capsules — la porte, pas la machine
+   ======================================================================
+   Elle est posée AU-DESSUS des caisses et doit se distinguer d'elles au
+   premier coup d'œil : une caisse donne un cosmétique, celle-ci donne un
+   objet qu'on range sur une étagère. D'où le rouge de gashapon plutôt que
+   le doré de l'arcade, et une jauge de complétion que les caisses n'ont pas
+   — c'est le seul lot de la salle qui se COMPLÈTE. */
+.arc-gacha {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1.1rem;
+  overflow: hidden;
+  margin-bottom: 0.9rem;
+  padding: 1.1rem 1.3rem;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background:
+    radial-gradient(120% 140% at 8% 0%, rgba(217, 67, 44, 0.14), transparent 58%),
+    var(--surface);
+  transition: 0.2s;
+}
+.arc-gacha:hover {
+  border-color: rgba(217, 67, 44, 0.4);
+  transform: translateY(-2px);
+}
+.arc-gacha.poor {
+  opacity: 0.82;
+}
+.arc-gacha.done {
+  background:
+    radial-gradient(120% 140% at 8% 0%, rgba(80, 200, 120, 0.14), transparent 58%),
+    var(--surface);
+}
+
+.arc-gacha-glow {
+  position: absolute;
+  left: -6%;
+  top: -60%;
+  width: 220px;
+  aspect-ratio: 1;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 157, 46, 0.22), transparent 68%);
+}
+.arc-gacha.done .arc-gacha-glow {
+  background: radial-gradient(circle, rgba(80, 200, 120, 0.22), transparent 68%);
+}
+
+/* Le dôme en miniature. Les boules sont posées sur deux couronnes par un
+   `nth-child` plutôt qu'en JS : c'est un décor, il n'a pas à coûter un
+   calcul de placement. */
+.arc-gacha-dome {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  border-radius: 50% 50% 44% 44%;
+  overflow: hidden;
+  background:
+    radial-gradient(70% 60% at 32% 24%, rgba(255, 255, 255, 0.35), transparent 55%),
+    linear-gradient(180deg, rgba(150, 175, 205, 0.24), rgba(90, 110, 140, 0.18));
+  box-shadow:
+    inset 0 0 18px rgba(0, 0, 0, 0.3),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.12);
+}
+.arc-gacha-pip {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  translate: -50% -50%;
+  /* Une couronne de six, puis une seconde plus serrée : douze boules
+     suffisent à faire un dôme plein. */
+  transform: rotate(calc(var(--i) * 62deg)) translateY(-22px);
+  background: linear-gradient(
+    150deg,
+    hsl(calc(var(--i) * 47deg) 88% 66%),
+    hsl(calc(var(--i) * 47deg) 74% 50%)
+  );
+  box-shadow: inset 0 -2px 3px rgba(0, 0, 0, 0.25);
+}
+.arc-gacha-pip:nth-child(n + 7) {
+  transform: rotate(calc(var(--i) * 62deg)) translateY(-9px);
+  width: 13px;
+  height: 13px;
+}
+.arc-gacha-pip.got {
+  filter: grayscale(1) brightness(0.6);
+  opacity: 0.45;
+}
+
+.arc-gacha-body {
+  min-width: 0;
+}
+.arc-gacha-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #d9432c;
+}
+.arc-gacha.done .arc-gacha-kicker {
+  color: #2f9e5d;
+}
+.arc-gacha-name {
+  margin: 0.15rem 0 0.1rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+.arc-gacha-pitch {
+  margin: 0 0 0.6rem;
+  font-size: 0.83rem;
+  color: var(--text-soft);
+}
+
+.arc-gacha-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.arc-gacha-gauge {
+  flex: 1 1 130px;
+  height: 6px;
+  min-width: 90px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--border);
+}
+.arc-gacha-gauge i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #ff9d2e, #d9432c);
+  transition: width 0.6s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.arc-gacha.done .arc-gacha-gauge i {
+  background: linear-gradient(90deg, #6fe3a0, #2f9e5d);
+}
+.arc-gacha-progress em {
+  font-style: normal;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+.arc-gacha-progress em strong {
+  color: var(--text);
+}
+
+/* Les jaquettes qui MANQUENT, en sourdine : c'est la vitrine du magasin
+   fermé, celle qui donne envie d'entrer. */
+.arc-gacha-teaser {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.7rem;
+}
+.arc-gacha-teaser span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  aspect-ratio: 3 / 4;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--border);
+  color: var(--text-soft);
+}
+.arc-gacha-teaser span img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: grayscale(1) brightness(0.6);
+}
+.arc-gacha-teaser span.got img {
+  filter: none;
+}
+.arc-gacha-more {
+  font-size: 0.72rem;
+  font-weight: 800;
+  font-style: normal;
+  color: var(--text-soft);
+}
+
+.arc-gacha-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+.arc-gacha-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.1rem;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff9d2e, #d9432c);
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(217, 67, 44, 0.28);
+  transition: 0.16s;
+}
+.arc-gacha-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(217, 67, 44, 0.36);
+}
+.arc-gacha.done .arc-gacha-btn {
+  background: linear-gradient(135deg, #6fe3a0, #2f9e5d);
+  box-shadow: 0 6px 18px rgba(47, 158, 93, 0.28);
+}
+.arc-gacha.poor .arc-gacha-btn {
+  box-shadow: none;
+  filter: saturate(0.55);
+}
+.arc-gacha-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22);
+  font-size: 0.74rem;
+}
+.arc-gacha-need {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #e0483f;
+}
+
+@media (max-width: 720px) {
+  .arc-gacha {
+    grid-template-columns: auto minmax(0, 1fr);
+    row-gap: 0.8rem;
+  }
+  .arc-gacha-action {
+    grid-column: 1 / -1;
+  }
+  .arc-gacha-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 /* ---------- Les caisses (pile de cartes horizontales) ---------- */
 .arc-crates {
   display: flex;
@@ -3203,6 +3456,91 @@
 .hf-dropg-chip.peek {
   box-shadow: 0 0 0 2px var(--drop-rarity);
 }
+/* ======================================================================
+   Variante « machine à capsules » de la carte de fil
+   ======================================================================
+   Même ossature que la caisse ouverte (elle en réutilise l'aura, l'info et
+   la liste de vignettes), mais l'objet gagné n'est pas un curseur de 32 px :
+   c'est un BOÎTIER, avec sa jaquette et sa tranche. D'où les deux seules
+   choses qui changent — les coquilles écartées autour de lui, et des images
+   qu'on ne pixellise surtout pas. */
+.hf-gacha .hf-drop-body {
+  padding-left: 1.2rem;
+}
+
+/* Les deux moitiés de la capsule, ouvertes autour du boîtier. Décoratives et
+   figées : le fil se lit en défilant, une animation par carte y serait du
+   bruit — la scène animée, c'est la modale qui la joue. */
+.hf-gacha-shell {
+  position: absolute;
+  left: 34px;
+  top: 50%;
+  width: 74px;
+  height: 74px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.hf-gacha-half {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--drop-rarity) 85%, #fff),
+    color-mix(in srgb, var(--drop-rarity) 60%, #111)
+  );
+  opacity: 0.55;
+}
+.hf-gacha-half.top {
+  top: -14px;
+  border-radius: 100% 100% 0 0 / 100% 100% 0 0;
+  rotate: -16deg;
+}
+.hf-gacha-half.bot {
+  bottom: -14px;
+  border-radius: 0 0 100% 100% / 0 0 100% 100%;
+  rotate: 16deg;
+}
+
+/* Le boîtier lui-même : debout, sa tranche teintée sur le bord gauche —
+   exactement le repère qu'on suit sur l'étagère. */
+.hf-gacha-case {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 62px;
+  flex: 0 0 46px;
+  border-radius: 3px 5px 5px 3px;
+  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+}
+.hf-gacha-case img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: auto;
+}
+
+/* Les vignettes de la fournée montrent des jaquettes, pas des curseurs : ni
+   pixellisation, ni fond visible. */
+.hf-gacha .hf-dropg-chip {
+  width: 34px;
+  height: 46px;
+  border-radius: 3px 5px 5px 3px;
+  overflow: hidden;
+}
+.hf-gacha .hf-dropg-chip img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: auto;
+}
+
 /* Pastille discrète en coin : ce lot était un doublon. */
 .hf-dropg-dup {
   position: absolute;

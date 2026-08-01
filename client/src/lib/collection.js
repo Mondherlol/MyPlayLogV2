@@ -287,7 +287,16 @@ function loadTag(src, cors) {
   return new Promise((resolve) => {
     const img = new Image();
     if (cors) img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
+    // Le décodage est demandé À PART, et hors du fil principal. Sans ça il a
+    // lieu au premier `drawImage`, donc en plein milieu de la peinture : une
+    // affiche de 1500 px décodée là, c'est une saccade, et quarante boîtiers
+    // font quarante saccades pendant que l'étagère se garnit.
+    img.decoding = "async";
+    img.onload = () => {
+      const done = () => resolve(img);
+      if (img.decode) img.decode().then(done, done);
+      else done();
+    };
     img.onerror = () => resolve(null);
     img.src = src;
   });

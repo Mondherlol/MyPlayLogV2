@@ -26,11 +26,15 @@ import {
   ChevronDown,
   ChevronUp,
   Unplug,
+  Lock,
+  Sparkles,
+  ArrowRight,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import CollectionViewer from "../components/CollectionViewer";
 import CollectionComments from "../components/CollectionComments";
+import GachaModal from "../components/GachaModal";
 
 // Le lecteur à plat embarque son carrousel (Swiper) : comme le volume 3D, il
 // ne descend qu'à l'ouverture d'un titre de papier — la fiche, elle, n'en a
@@ -84,6 +88,9 @@ export default function CollectionDetail() {
   const [openAt, setOpenAt] = useState(null); // planche demandée à l'ouverture
   const [season, setSeason] = useState(null);
   const [playing, setPlaying] = useState(false); // la console est allumée
+  // Ce que coûterait un tour de sphère, quand le boîtier n'est pas à nous.
+  const [price, setPrice] = useState(0);
+  const [showGacha, setShowGacha] = useState(false);
 
   // Reprise demandée par l'URL (rangée « Reprendre » de la page Collection).
   const askedEpisode = Number(params.get("ep"));
@@ -97,6 +104,7 @@ export default function CollectionDetail() {
       .then((d) => {
         if (!alive) return;
         setMedia(d.media);
+        setPrice(d.price || 0);
         setSeason(d.media.episodes?.[0]?.season ?? null);
         setStatus("ready");
       })
@@ -228,9 +236,12 @@ export default function CollectionDetail() {
     [dropPlayParam]
   );
 
-  // Lancement automatique quand on arrive depuis « Reprendre ».
+  // Lancement automatique quand on arrive depuis « Reprendre ». Jamais sur un
+  // boîtier qu'on ne possède pas : il n'y a rien à lancer (le serveur n'a
+  // envoyé ni épisode, ni planche, ni cartouche), et `?play=1` collé à un lien
+  // partagé ouvrirait un lecteur vide.
   useEffect(() => {
-    if (!media || autoStarted.current || !autoPlay) return;
+    if (!media || autoStarted.current || !autoPlay || media.owned === false) return;
     autoStarted.current = true;
     if (isGame(media)) {
       setPlaying(true);
@@ -284,6 +295,11 @@ export default function CollectionDetail() {
   const format = FORMATS[media.format] || FORMATS.dvd;
   const comic = isComic(media);
   const game = isGame(media);
+  // Le serveur ne renseigne `owned` que sur cette route ; `!== false` plutôt
+  // que `=== true` pour que rien ne se verrouille si le champ venait à manquer
+  // (client plus récent que serveur, réponse en cache) — dans le doute, on ne
+  // retire jamais l'accès à quelqu'un.
+  const owned = media.owned !== false;
   const played = media.progress?.playSeconds || 0;
   const isSeries =
     !comic && !game && media.kind === "series" && media.episodes.length > 1;
@@ -405,7 +421,27 @@ export default function CollectionDetail() {
             {media.synopsis && <p className="coll-hero-syn">{media.synopsis}</p>}
 
             <div className="coll-hero-actions">
-              {game ? (
+              {/* LE BOÎTIER N'EST PAS À NOUS. On laisse la fiche entière ouverte
+                  — jaquette, résumé, casting, tout ce qui donne envie — mais on
+                  ne promet pas de le lire : le serveur ne nous a d'ailleurs
+                  envoyé ni épisode, ni planche, ni cartouche (voir `lockSources`,
+                  routes/collection.js). À la place, la porte vers la machine.
+                  C'est le seul écran où l'on convoite un objet précis, donc le
+                  seul où l'appel à faire tourner la sphère est mérité. */}
+              {!owned ? (
+                <>
+                  <button
+                    className="btn btn-primary clickable"
+                    onClick={() => setShowGacha(true)}
+                  >
+                    <Sparkles size={17} /> Le débloquer
+                    {price > 0 && ` — ${price} points`}
+                  </button>
+                  <span className="coll-hero-channel" title="Il n'est pas encore sur ton étagère">
+                    <Lock size={15} /> Ce boîtier n'est pas dans ta collection
+                  </span>
+                </>
+              ) : game ? (
                 <>
                   <button
                     className="btn btn-primary clickable"
@@ -564,9 +600,58 @@ export default function CollectionDetail() {
         </div>
       </header>
 
-      <div className={`coll-detail-body ${soloFilm ? "no-eps" : ""}`}>
+      {/* `no-eps` remonte la discussion à la place de la liste d'épisodes — sur
+          un film, elle n'en a pas. Un boîtier verrouillé, LUI, a bien un bloc
+          en première colonne (le panneau ci-dessous) : appliquer la règle du
+          film ferait alors chevaucher les deux. */}
+      <div className={`coll-detail-body ${owned && soloFilm ? "no-eps" : ""}`}>
+        {/* ---------------- le boîtier verrouillé ----------------
+            À LA PLACE DU CONTENU, PAS PAR-DESSUS. Un titre qu'on ne possède pas
+            n'a ni liste d'épisodes, ni planches, ni cartouche — le serveur ne
+            les a pas envoyés. Afficher les sections vides donnerait « 0 épisode »
+            et « boîtier vide », c'est-à-dire un titre CASSÉ là où il est
+            simplement pas encore à nous. Ce panneau dit la vraie raison et
+            montre la sortie.
+
+            Tout le reste de la fiche demeure : résumé, casting, fiche technique,
+            discussion. C'est ce qui fait qu'on a envie de l'obtenir. */}
+        {!owned && (
+          <section className="coll-locked">
+            <span className="coll-locked-ic">
+              <Lock size={22} />
+            </span>
+            <h2>
+              {comic
+                ? "Ce volume n'est pas sur ton étagère"
+                : game
+                  ? "Cette cartouche n'est pas sur ton étagère"
+                  : "Ce boîtier n'est pas sur ton étagère"}
+            </h2>
+            <p>
+              {comic
+                ? `Les ${media.pageCount || 0} planches s'ouvriront dès qu'il sera à toi.`
+                : game
+                  ? "La console démarrera dès que la cartouche sera à toi."
+                  : media.episodeCount > 0
+                    ? `Les ${media.episodeCount} épisode${
+                        media.episodeCount > 1 ? "s" : ""
+                      } se lanceront dès qu'il sera à toi.`
+                    : "Il se lancera dès qu'il sera à toi."}{" "}
+              Un tour de sphère sort un boîtier au hasard parmi ceux qui te
+              manquent — celui-ci en fait partie.
+            </p>
+            <button className="btn btn-primary clickable" onClick={() => setShowGacha(true)}>
+              <Sparkles size={16} /> Tourner la sphère
+              {price > 0 && ` — ${price} points`}
+            </button>
+            <Link to="/collection" className="coll-locked-link clickable">
+              Voir mon étagère <ArrowRight size={14} />
+            </Link>
+          </section>
+        )}
+
         {/* ---------------- planches ---------------- */}
-        {comic && (
+        {owned && comic && (
           <section className="coll-eps">
             <div className="coll-eps-head">
               <h2 className="coll-section-title">
@@ -591,7 +676,7 @@ export default function CollectionDetail() {
         )}
 
         {/* ---------------- la cartouche ---------------- */}
-        {game && (
+        {owned && game && (
           <section className="coll-eps">
             <div className="coll-eps-head">
               <h2 className="coll-section-title">
@@ -640,7 +725,7 @@ export default function CollectionDetail() {
         )}
 
         {/* ---------------- épisodes ---------------- */}
-        {!comic && !game && !soloFilm && (
+        {owned && !comic && !game && !soloFilm && (
         <section className="coll-eps">
           <div className="coll-eps-head">
             <h2 className="coll-section-title">
@@ -868,6 +953,31 @@ export default function CollectionDetail() {
           startAt={watching.at}
           onClose={() => setWatching(null)}
           onProgress={saveProgress}
+        />
+      )}
+
+      {/* La machine depuis la fiche d'un boîtier qu'on convoite. Le tirage
+          reste ALÉATOIRE — on ne choisit pas ce qu'on obtient, c'est le principe
+          d'une machine à capsules — mais si c'est justement celui-ci qui sort,
+          la fiche se déverrouille sous nos yeux, sans rechargement. */}
+      {showGacha && (
+        <GachaModal
+          token={token}
+          onClose={() => setShowGacha(false)}
+          onDrawn={(res) => {
+            if (res.media?.slug !== slug) return;
+            setMedia((m) => (m ? { ...m, owned: true } : m));
+            // La fiche complète (épisodes, planches, cartouche) n'était pas dans
+            // la réponse du serveur : on la redemande maintenant qu'on y a droit.
+            apiFetch(`/collection/${slug}`, { token })
+              .then((d) => {
+                setMedia(d.media);
+                setSeason(d.media.episodes?.[0]?.season ?? null);
+              })
+              .catch(() => {
+                /* la fiche se remplira au prochain chargement */
+              });
+          }}
         />
       )}
     </div>

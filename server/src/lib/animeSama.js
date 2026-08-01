@@ -256,10 +256,10 @@ async function fetchSeason({ origin, slug, path }, langs) {
 
 // Qui héberge, et combien de fois. C'est le premier chiffre qu'on regarde sur
 // un import : un hébergeur qui n'apparaît que trois fois sur vingt épisodes
-// trahit une liste incomplète. Partagé par les deux imports — le panneau
+// trahit une liste incomplète. Partagé par TOUS les imports — le panneau
 // d'admin l'affiche sans savoir d'où vient le résultat, et une forme
 // manquante le faisait planter.
-function countHosts(episodes) {
+export function countHosts(episodes) {
   const tally = new Map();
   for (const url of episodes.flatMap((e) => e.urls)) {
     let host = "";
@@ -274,10 +274,11 @@ function countHosts(episodes) {
 }
 
 // La forme attendue par la zone de texte du panneau d'admin :
-// « S01E02 Titre — lien | miroir ». Partagée par les deux imports (le
-// téléchargé et le collé) : deux écritures divergeraient au premier réglage,
-// et c'est ce texte qui devient les épisodes en base.
-function toList(episodes) {
+// « S01E02 Titre — lien | miroir ». Partagée par TOUS les imports qui rendent
+// des épisodes — anime-sama, le collage, les fiches de série des sites de
+// streaming (lib/serieIndex.js) : deux écritures divergeraient au premier
+// réglage, et c'est ce texte qui devient les épisodes en base.
+export function toList(episodes) {
   return episodes
     .map(
       (e) =>

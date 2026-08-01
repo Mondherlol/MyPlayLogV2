@@ -14,6 +14,7 @@ import {
   Loader2,
   MessageSquareText,
   MessagesSquare,
+  Library,
   LayoutGrid,
   List,
   Music,
@@ -59,6 +60,12 @@ import ReframeCoverModal from "../components/ReframeCoverModal";
 import FollowListModal from "../components/FollowListModal";
 import { useClickOutside } from "../hooks/useClickOutside";
 import { useTabSwipe } from "../hooks/useTabSwipe";
+
+// Le bouton « Collection » de l'en-tête (l'étagère de la personne), masqué pour
+// l'instant — même geste que le bandeau de la machine à capsules dans
+// pages/Arcade.jsx. Rien n'est supprimé : la page /collection/u/:username
+// répond toujours, seul le raccourci disparaît.
+const SHOW_COLLECTION = false;
 
 // Ordre des onglets (pour le swipe gauche/droite et le recentrage de la nav).
 const TAB_ORDER = [
@@ -248,7 +255,7 @@ function LockedProfile({ profile, covers, signedIn, busy, onFollow }) {
 
 export default function Profile() {
   const { username: routeUsername } = useParams();
-  const { user, token, updateUser } = useAuth();
+  const { user, token, updateUser, hasFeature } = useAuth();
   // « Message » sous la bannière : ouvre (ou retrouve) le fil avec ce joueur.
   const { openWith } = useChat();
   const { map } = useLibrary();
@@ -1002,6 +1009,20 @@ export default function Profile() {
                 >
                   <MessagesSquare size={17} /> Message
                 </button>
+              )}
+              {/* SON ÉTAGÈRE. Une collection se regarde en comparant : c'est la
+                  moitié de ce qui donne envie de compléter la sienne. Un bouton
+                  et non un onglet — l'étagère est une PAGE (une scène 3D, ses
+                  vues, ses filtres), pas un panneau de profil, et la coincer
+                  dans une colonne d'onglet en ferait une vignette. */}
+              {SHOW_COLLECTION && user && hasFeature("collection") && (
+                <Link
+                  to={`/collection/u/${profile.username}`}
+                  className="follow-btn ghost clickable"
+                  title={`Voir la collection de ${profile.username}`}
+                >
+                  <Library size={17} /> Collection
+                </Link>
               )}
             </div>
           )}

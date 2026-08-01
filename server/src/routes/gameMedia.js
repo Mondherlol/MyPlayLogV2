@@ -7,7 +7,7 @@ import multer from "multer";
 import GameMedia from "../models/GameMedia.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { sanitizeMediaList, resolveMentions, toComment } from "../lib/commentThread.js";
-import { sanitizeEdit, renderEditedVideo } from "../lib/videoEdit.js";
+import { sanitizeEdit, renderEditedVideo, makeVideoPoster } from "../lib/videoEdit.js";
 import { notify } from "../lib/notify.js";
 import { recordActivity, removeActivity } from "../lib/activity.js";
 import { triggerMissionCheck } from "../lib/missions.js";
@@ -44,6 +44,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MEDIA_DIR = path.join(__dirname, "../../uploads/gamemedia");
 fs.mkdirSync(MEDIA_DIR, { recursive: true });
 
+// Vignette d'un clip : une image tirée du fichier lui-même, posée à côté de lui
+// et servie comme `thumbnail`. C'est elle que le fil affiche pendant que la
+// vidéo se charge — sans elle, la carte reste un rectangle vide.
+async function posterFor(videoName) {
+  const name = `${path.parse(videoName).name}-poster.jpg`;
+  try {
+    const made = await makeVideoPoster({
+      videoPath: path.join(MEDIA_DIR, videoName),
+      outPath: path.join(MEDIA_DIR, name),
+    });
+    return made ? name : null;
+  } catch {
+    return null; // une vignette manquante n'empêche pas de poster
+  }
+}
+
 const mediaUpload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => cb(null, MEDIA_DIR),
@@ -73,10 +89,14 @@ function sanitizePostMedia(raw) {
       const hosted = /\/uploads\/gamemedia\//.test(url);
       const giphy = kind === "gif" && /giphy\.com|\.gif(\?.*)?$/i.test(url);
       if (!hosted && !giphy) return null;
+      // La vignette d'un clip vient de chez nous (ffmpeg l'a tirée du fichier à
+      // l'envoi) : on refuse toute autre adresse, sinon n'importe quel client
+      // pourrait faire charger l'image de son choix à tous les lecteurs du fil.
+      const thumb = m.thumbnail ? String(m.thumbnail) : "";
       return {
         kind,
         url: url.slice(0, 1000),
-        thumbnail: m.thumbnail ? String(m.thumbnail).slice(0, 1000) : null,
+        thumbnail: /\/uploads\/gamemedia\//.test(thumb) ? thumb.slice(0, 1000) : null,
         width: m.width != null ? Number(m.width) || null : null,
         height: m.height != null ? Number(m.height) || null : null,
         spoiler: !!m.spoiler,
@@ -217,8 +237,15 @@ router.post(
         edit,
         outPath,
       });
-      const url = `${req.protocol}://${req.get("host")}/uploads/gamemedia/${outName}`;
-      res.status(201).json({ media: { kind: "video", url } });
+      const base = `${req.protocol}://${req.get("host")}/uploads/gamemedia`;
+      const poster = await posterFor(outName);
+      res.status(201).json({
+        media: {
+          kind: "video",
+          url: `${base}/${outName}`,
+          thumbnail: poster ? `${base}/${poster}` : null,
+        },
+      });
     } catch (err) {
       console.error("game media render error:", err.message);
       res.status(500).json({ error: "Le montage vidéo a échoué." });
@@ -242,15 +269,20 @@ function uploadSingleSafe(req, res, next) {
     });
   });
 }
-router.post("/upload", requireAuth, uploadSingleSafe, (req, res) => {
+router.post("/upload", requireAuth, uploadSingleSafe, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "Aucun fichier." });
-  const url = `${req.protocol}://${req.get("host")}/uploads/gamemedia/${req.file.filename}`;
+  const base = `${req.protocol}://${req.get("host")}/uploads/gamemedia`;
+  const url = `${base}/${req.file.filename}`;
   const kind = /^video\//.test(req.file.mimetype)
     ? "video"
     : /gif$/.test(req.file.mimetype)
       ? "gif"
       : "image";
-  res.status(201).json({ media: { kind, url } });
+  if (kind !== "video") return res.status(201).json({ media: { kind, url } });
+  const poster = await posterFor(req.file.filename);
+  res.status(201).json({
+    media: { kind, url, thumbnail: poster ? `${base}/${poster}` : null },
+  });
 });
 
 // GET /api/game-media/game/:gameId?sort=recent|top — le mur d'un jeu.

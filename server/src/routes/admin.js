@@ -22,6 +22,10 @@ import OstRename from "../models/OstRename.js";
 import GemSkip from "../models/GemSkip.js";
 import GemDiscovery from "../models/GemDiscovery.js";
 import Reward, { REWARD_TYPE_KEYS } from "../models/Reward.js";
+import ServerLog, { LOG_KINDS } from "../models/ServerLog.js";
+import Message from "../models/Message.js";
+import Conversation from "../models/Conversation.js";
+import { logEvent, forgetAdmins } from "../lib/audit.js";
 import { canUserDownload, isUserAdmin } from "../lib/admin.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { listEnv, setEnvVar, deleteEnvVar } from "../lib/envFile.js";
@@ -403,6 +407,9 @@ router.patch("/users/:id/admin", async (req, res) => {
       });
 
     await User.updateOne({ _id: id }, { $set: { isAdmin: makeAdmin } });
+    // Le flux du journal en direct est adressé aux admins : la liste vient
+    // d'être invalidée, sans quoi le nouveau promu attendrait une minute.
+    forgetAdmins();
     res.json({ ok: true, isAdmin: makeAdmin });
   } catch (err) {
     console.error("admin user role error:", err.message);
@@ -436,6 +443,7 @@ router.post("/users/:id/transfer-super", async (req, res) => {
       { $set: { isSuperAdmin: false, isAdmin: true } }
     );
     await User.updateOne({ _id: id }, { $set: { isSuperAdmin: true, isAdmin: false } });
+    forgetAdmins();
     res.json({ ok: true });
   } catch (err) {
     console.error("admin transfer super error:", err.message);
@@ -708,6 +716,455 @@ router.get("/system", async (req, res) => {
   } catch (err) {
     console.error("admin system error:", err.message);
     res.status(500).json({ error: "Erreur lors du relevé des stats système." });
+  }
+});
+
+// ======================================================================
+//  Journal du serveur — l'onglet « Logs »
+// ======================================================================
+// Ce qui s'est passé, par qui, quand. Les lignes sont écrites par
+// lib/audit.js ; ici on ne fait que les relire, les filtrer et les compter.
+//
+// Le direct ne passe PAS par ici : les nouvelles lignes arrivent par le flux
+// SSE de la messagerie (évènement `adminlog`), déjà ouvert dans chaque onglet.
+// Cette route sert au premier chargement, au filtrage et à la remontée dans le
+// temps — le reste tombe tout seul.
+
+// Fenêtre de temps : accepte une date ISO ou un raccourci (« 15m », « 24h »,
+// « 7d »). Le raccourci est ce qu'on tape en pratique quand on cherche « ce
+// qui s'est passé dans la dernière heure ».
+function parseSince(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  const rel = raw.match(/^(\d+)\s*(m|h|d)$/i);
+  if (rel) {
+    const n = Number(rel[1]);
+    const ms = { m: 60_000, h: 3_600_000, d: 86_400_000 }[rel[2].toLowerCase()];
+    return new Date(Date.now() - n * ms);
+  }
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+// Résout le filtre « par utilisateur » : un identifiant Mongo, ou un pseudo
+// (c'est ce qu'on a sous les yeux quand on lit le journal).
+async function resolveUserFilter(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  if (mongoose.isValidObjectId(raw)) return new mongoose.Types.ObjectId(raw);
+  const u = await User.findOne({ username: raw })
+    .collation({ locale: "fr", strength: 2 })
+    .select("_id")
+    .lean();
+  return u?._id || new mongoose.Types.ObjectId(); // introuvable → aucun résultat
+}
+
+const rx = (s) => new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+
+// GET /api/admin/logs — le journal, filtré.
+router.get("/logs", async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 120, 1), 300);
+    const filter = {};
+
+    const kinds = String(req.query.kind || "")
+      .split(",")
+      .map((k) => k.trim())
+      .filter((k) => LOG_KINDS.includes(k));
+    if (kinds.length) filter.kind = { $in: kinds };
+
+    const since = parseSince(req.query.since);
+    const until = parseSince(req.query.until);
+    // `before` est le curseur de pagination (remonter dans le temps), distinct
+    // de `until` qui est un filtre choisi par l'utilisateur.
+    const before = req.query.before ? new Date(String(req.query.before)) : null;
+    if (since || until || (before && !Number.isNaN(before.getTime()))) {
+      filter.at = {};
+      if (since) filter.at.$gte = since;
+      if (until) filter.at.$lte = until;
+      if (before && !Number.isNaN(before.getTime())) filter.at.$lt = before;
+    }
+
+    if (req.query.user) {
+      const id = await resolveUserFilter(req.query.user);
+      // Une personne concerne une ligne qu'elle en soit l'auteur OU la cible :
+      // filtrer sur « X » doit montrer les messages qu'il a reçus, pas
+      // seulement ceux qu'il a envoyés.
+      filter.$or = [{ actor: id }, { target: id }];
+    }
+
+    const q = String(req.query.q || "").trim();
+    if (q) {
+      const r = rx(q);
+      const text = [
+        { label: r },
+        { path: r },
+        { actorName: r },
+        { targetName: r },
+        { ip: r },
+      ];
+      // Les deux $or (personne + texte) ne peuvent pas cohabiter tels quels.
+      if (filter.$or) {
+        filter.$and = [{ $or: filter.$or }, { $or: text }];
+        delete filter.$or;
+      } else filter.$or = text;
+    }
+
+    // Le décompte par nature sert les pastilles de filtre : il se calcule sur
+    // les MÊMES critères, sauf celui des natures (sinon chaque pastille
+    // afficherait le total de la sélection courante).
+    const countFilter = { ...filter };
+    delete countFilter.kind;
+
+    const [rows, counts, total] = await Promise.all([
+      ServerLog.find(filter)
+        .sort({ at: -1 })
+        .limit(limit + 1)
+        .populate("actor", "username avatar")
+        .lean(),
+      ServerLog.aggregate([
+        { $match: countFilter },
+        { $group: { _id: "$kind", n: { $sum: 1 } } },
+      ]),
+      ServerLog.countDocuments(filter),
+    ]);
+
+    const hasMore = rows.length > limit;
+    const entries = rows.slice(0, limit).map((l) => ({
+      id: String(l._id),
+      at: l.at,
+      kind: l.kind,
+      label: l.label || "",
+      actor: l.actor
+        ? {
+            id: String(l.actor._id),
+            username: l.actor.username,
+            avatar: l.actor.avatar || null,
+          }
+        : null,
+      actorName: l.actorName || l.actor?.username || "",
+      target: l.target ? String(l.target) : null,
+      targetName: l.targetName || "",
+      method: l.method || "",
+      path: l.path || "",
+      status: l.status ?? null,
+      ms: l.ms ?? null,
+      ip: l.ip || "",
+      ua: l.ua || "",
+      meta: l.meta || null,
+    }));
+
+    res.json({
+      entries,
+      hasMore,
+      total,
+      counts: Object.fromEntries(counts.map((c) => [c._id, c.n])),
+      kinds: LOG_KINDS,
+      ttlDays: Math.max(1, Number(process.env.LOGS_TTL_DAYS) || 14),
+    });
+  } catch (err) {
+    console.error("admin logs error:", err.message);
+    res.status(500).json({ error: "Erreur lors de la lecture du journal." });
+  }
+});
+
+// DELETE /api/admin/logs — vider le journal (super-admin).
+// Le geste est tracé… dans le journal qu'on vient de vider : la ligne qui
+// suit est donc la première du nouveau, et elle dit qui a effacé le précédent.
+router.delete("/logs", async (req, res) => {
+  try {
+    if (!req.isSuperAdmin)
+      return res.status(403).json({ error: "Réservé au super-administrateur." });
+    const before = parseSince(req.query.before);
+    const { deletedCount } = await ServerLog.deleteMany(
+      before ? { at: { $lt: before } } : {}
+    );
+    logEvent({
+      kind: "admin",
+      label: "a vidé le journal du serveur",
+      actor: req.userId,
+      meta: { deleted: deletedCount, before: before || null },
+    });
+    res.json({ ok: true, deleted: deletedCount });
+  } catch (err) {
+    console.error("admin logs purge error:", err.message);
+    res.status(500).json({ error: "Impossible de vider le journal." });
+  }
+});
+
+// ======================================================================
+//  Surveillance des messages privés — RÉSERVÉ AU SUPER-ADMIN
+// ======================================================================
+// Lire les messages des autres n'est pas un geste anodin : c'est l'outil de
+// modération des situations graves (harcèlement, menaces, contenu illégal),
+// et rien d'autre. Trois garde-fous, tous volontaires :
+//   - super-admin uniquement, jamais un simple modérateur ;
+//   - CHAQUE consultation laisse sa propre ligne dans le journal, au même
+//     titre que n'importe quelle action — celui qui regarde est regardé ;
+//   - on ne renvoie jamais le mot de passe d'une conversation ni son contenu
+//     supprimé (un message effacé reste effacé).
+
+// Titre d'un fil du point de vue de personne : un groupe porte son nom, un DM
+// les deux pseudos. C'est ce qui s'affiche dans la colonne de gauche.
+function convCard(c, counts) {
+  const people = (c.participants || []).map((p) => ({
+    id: String(p._id),
+    username: p.username,
+    avatar: p.avatar || null,
+  }));
+  return {
+    id: String(c._id),
+    group: !!c.isGroup,
+    title: c.isGroup
+      ? c.name || people.map((p) => p.username).join(", ") || "Groupe"
+      : people.map((p) => p.username).join(" ↔ "),
+    people,
+    messages: counts?.get(String(c._id)) || 0,
+    lastMessage: c.lastMessage?.at
+      ? {
+          at: c.lastMessage.at,
+          text: c.lastMessage.text || "",
+          authorName: c.lastMessage.authorName || "",
+        }
+      : null,
+    lastMessageAt: c.lastMessageAt,
+  };
+}
+
+// Une bulle, telle qu'elle s'affichera dans le fil reconstitué.
+function adminBubble(m) {
+  const deleted = !!m.deletedAt;
+  return {
+    id: String(m._id),
+    at: m.createdAt,
+    author: m.author
+      ? {
+          id: String(m.author._id),
+          username: m.author.username,
+          avatar: m.author.avatar || null,
+        }
+      : null,
+    // Un message supprimé RESTE supprimé, même ici : la bulle garde sa place
+    // dans le fil (sans quoi on lirait une conversation à trous) mais son
+    // contenu ne revient pas d'entre les morts.
+    deleted,
+    text: deleted ? "" : m.text || "",
+    media: deleted ? [] : (m.media || []).map((x) => ({ kind: x.kind, url: x.url })),
+    card: m.game ? "jeu" : m.ost ? "OST" : m.party ? "séance" : m.mot ? "mot du jour" : null,
+    system: m.system || null,
+    edited: !!m.editedAt,
+    replyTo: m.replyTo
+      ? {
+          author: m.replyTo.author?.username || "",
+          text: m.replyTo.deletedAt ? "" : m.replyTo.text || "",
+        }
+      : null,
+  };
+}
+
+// GET /api/admin/conversations — la colonne de gauche : tous les fils.
+router.get("/conversations", async (req, res) => {
+  try {
+    if (!req.isSuperAdmin)
+      return res.status(403).json({ error: "Réservé au super-administrateur." });
+
+    const filter = {};
+    if (req.query.user) {
+      const id = await resolveUserFilter(req.query.user);
+      filter.participants = id;
+    }
+
+    let convs = await Conversation.find(filter)
+      .sort({ lastMessageAt: -1 })
+      .limit(200)
+      .populate("participants", "username avatar")
+      .lean();
+
+    // La recherche porte sur ce qu'on lit : les pseudos et le nom du groupe.
+    // Elle se fait ici plutôt qu'en base, parce que le nom d'un DM n'existe
+    // pas — il est composé des participants au moment de l'affichage.
+    const q = String(req.query.q || "").trim().toLowerCase();
+    if (q)
+      convs = convs.filter(
+        (c) =>
+          (c.name || "").toLowerCase().includes(q) ||
+          (c.participants || []).some((p) => (p.username || "").toLowerCase().includes(q))
+      );
+    convs = convs.slice(0, 80);
+
+    // Un fil jamais utilisé (ouvert puis abandonné) n'a rien à montrer.
+    const alive = convs.filter((c) => c.lastMessage?.at);
+
+    const counts = new Map(
+      (
+        await Message.aggregate([
+          { $match: { conversation: { $in: alive.map((c) => c._id) } } },
+          { $group: { _id: "$conversation", n: { $sum: 1 } } },
+        ])
+      ).map((r) => [String(r._id), r.n])
+    );
+
+    res.json({ conversations: alive.map((c) => convCard(c, counts)) });
+  } catch (err) {
+    console.error("admin conversations error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement des discussions." });
+  }
+});
+
+// GET /api/admin/conversations/:id — le fil, dans l'ordre où il s'est écrit.
+router.get("/conversations/:id", async (req, res) => {
+  try {
+    if (!req.isSuperAdmin)
+      return res.status(403).json({ error: "Réservé au super-administrateur." });
+    if (!mongoose.isValidObjectId(req.params.id))
+      return res.status(404).json({ error: "Discussion introuvable." });
+
+    const conv = await Conversation.findById(req.params.id)
+      .populate("participants", "username avatar")
+      .lean();
+    if (!conv) return res.status(404).json({ error: "Discussion introuvable." });
+
+    const limit = Math.min(Math.max(Number(req.query.limit) || 40, 1), 100);
+    const query = { conversation: conv._id };
+    const before = req.query.before ? new Date(String(req.query.before)) : null;
+    if (before && !Number.isNaN(before.getTime())) query.createdAt = { $lt: before };
+
+    const raw = await Message.find(query)
+      .sort({ createdAt: -1 })
+      .limit(limit + 1)
+      .populate("author", "username avatar")
+      .populate({ path: "replyTo", select: "text deletedAt author", populate: { path: "author", select: "username" } })
+      .lean();
+    const hasMore = raw.length > limit;
+
+    // La consultation ne se trace qu'à L'OUVERTURE du fil, pas à chaque page
+    // remontée : sinon lire une longue conversation produirait vingt lignes
+    // identiques dans le journal, et noierait le fait notable — quelqu'un est
+    // allé lire les messages de X.
+    if (!before) {
+      const names = (conv.participants || []).map((p) => p.username).join(", ");
+      logEvent({
+        kind: "admin",
+        label: "a ouvert une conversation privée",
+        actor: req.userId,
+        targetName: names,
+        meta: { conversation: String(conv._id), group: !!conv.isGroup, participants: names },
+      });
+    }
+
+    res.json({
+      conversation: convCard(conv, null),
+      messages: raw.slice(0, limit).reverse().map(adminBubble),
+      hasMore,
+    });
+  } catch (err) {
+    console.error("admin conversation error:", err.message);
+    res.status(500).json({ error: "Erreur lors de la lecture de la discussion." });
+  }
+});
+
+// GET /api/admin/messages — la RECHERCHE, tous fils confondus.
+// Elle répond à « qui a écrit ça ? » ; le fil complet, lui, s'ouvre ensuite.
+router.get("/messages", async (req, res) => {
+  try {
+    if (!req.isSuperAdmin)
+      return res.status(403).json({ error: "Réservé au super-administrateur." });
+
+    const limit = Math.min(Math.max(Number(req.query.limit) || 60, 1), 200);
+    const filter = { system: null, deletedAt: null };
+
+    const since = parseSince(req.query.since);
+    const before = req.query.before ? new Date(String(req.query.before)) : null;
+    if (since || (before && !Number.isNaN(before.getTime()))) {
+      filter.createdAt = {};
+      if (since) filter.createdAt.$gte = since;
+      if (before && !Number.isNaN(before.getTime())) filter.createdAt.$lt = before;
+    }
+
+    if (req.query.conversation && mongoose.isValidObjectId(req.query.conversation))
+      filter.conversation = new mongoose.Types.ObjectId(String(req.query.conversation));
+
+    // Filtrer par personne, c'est voir la conversation DES DEUX CÔTÉS : on
+    // prend donc tous les fils où elle est, pas seulement ce qu'elle a écrit.
+    let convOf = null;
+    if (req.query.user) {
+      const id = await resolveUserFilter(req.query.user);
+      const convs = await Conversation.find({ participants: id }).select("_id").lean();
+      convOf = convs.map((c) => c._id);
+      filter.conversation = filter.conversation
+        ? filter.conversation
+        : { $in: convOf };
+    }
+
+    const q = String(req.query.q || "").trim();
+    if (q) filter.text = rx(q);
+
+    const rows = await Message.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(limit + 1)
+      .populate("author", "username avatar")
+      .lean();
+    const hasMore = rows.length > limit;
+    const page = rows.slice(0, limit);
+
+    // Les fils concernés, pour donner un titre et des participants à chaque
+    // bulle (sans quoi on lit des phrases sans savoir qui les reçoit).
+    const convIds = [...new Set(page.map((m) => String(m.conversation)))];
+    const convs = await Conversation.find({ _id: { $in: convIds } })
+      .select("isGroup name participants")
+      .populate("participants", "username avatar")
+      .lean();
+    const convById = new Map(convs.map((c) => [String(c._id), c]));
+
+    logEvent({
+      kind: "admin",
+      label: "a consulté les messages privés",
+      actor: req.userId,
+      meta: {
+        user: req.query.user || null,
+        conversation: req.query.conversation || null,
+        q: q || null,
+        results: page.length,
+      },
+    });
+
+    res.json({
+      hasMore,
+      messages: page.map((m) => {
+        const c = convById.get(String(m.conversation));
+        const people = (c?.participants || []).map((p) => ({
+          id: String(p._id),
+          username: p.username,
+          avatar: p.avatar || null,
+        }));
+        return {
+          id: String(m._id),
+          at: m.createdAt,
+          text: m.text || "",
+          media: (m.media || []).length,
+          edited: !!m.editedAt,
+          card: m.game ? "jeu" : m.ost ? "OST" : m.party ? "séance" : m.mot ? "mot du jour" : null,
+          author: m.author
+            ? {
+                id: String(m.author._id),
+                username: m.author.username,
+                avatar: m.author.avatar || null,
+              }
+            : null,
+          conversation: {
+            id: String(m.conversation),
+            group: !!c?.isGroup,
+            title: c?.isGroup
+              ? c.name || "Groupe"
+              : people.map((p) => p.username).join(" ↔ "),
+            people,
+          },
+        };
+      }),
+    });
+  } catch (err) {
+    console.error("admin messages error:", err.message);
+    res.status(500).json({ error: "Erreur lors de la lecture des messages." });
   }
 });
 

@@ -81,6 +81,11 @@ const motSessionSchema = new mongoose.Schema(
     word: { type: String, required: true }, // dénormalisé (jamais envoyé au client)
 
     host: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    // L'équipe permanente derrière cette table, s'il y en a une (cf.
+    // models/MotTeam.js). C'est elle qui fait qu'on retrouve les mêmes joueurs
+    // le lendemain sans réinviter personne : la session change tous les jours,
+    // l'équipe reste.
+    team: { type: mongoose.Schema.Types.ObjectId, ref: "MotTeam", default: null },
     members: { type: [memberSchema], default: [] },
     guesses: { type: [sessionGuessSchema], default: [] },
 
@@ -100,5 +105,18 @@ const motSessionSchema = new mongoose.Schema(
 // Une session se retrouve par son code (lien, carte d'invitation), et on liste
 // celles du jour pour proposer « rejoindre la partie d'un ami ».
 motSessionSchema.index({ date: 1, solved: 1 });
+// La partie du jour d'une équipe donnée : c'est la question posée à chaque
+// ouverture de la page par un membre.
+//
+// UNIQUE, et c'est essentiel : deux coéquipiers qui cliquent « lancer » à la
+// même seconde ouvriraient deux tables pour la même équipe, et se retrouveraient
+// chacun sur la sienne à chercher le même mot sans se voir. L'index tranche la
+// course — le perdant reçoit une erreur de doublon et rejoint la table gagnante
+// (cf. openTeamSession dans routes/mot.js). Partiel, car les parties sans
+// équipe (la majorité) ont toutes `team: null`.
+motSessionSchema.index(
+  { team: 1, date: 1 },
+  { unique: true, partialFilterExpression: { team: { $type: "objectId" } } }
+);
 
 export default mongoose.model("MotSession", motSessionSchema);

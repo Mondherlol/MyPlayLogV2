@@ -12,10 +12,14 @@ import CollectionSave, {
 } from "../models/CollectionSave.js";
 import CollectionThread from "../models/CollectionThread.js";
 import User from "../models/User.js";
+import AppSetting from "../models/AppSetting.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { isUserAdmin } from "../lib/admin.js";
 import { notify } from "../lib/notify.js";
 import { recordActivity, removeActivity } from "../lib/activity.js";
+import { grantPoints, spendPoints } from "../lib/points.js";
+import { blockIfPrivate } from "../lib/privacy.js";
+import { triggerMissionCheck } from "../lib/missions.js";
 import { sanitizeMediaList, resolveMentions, toComment } from "../lib/commentThread.js";
 import {
   buildMedia,
@@ -34,11 +38,12 @@ import {
 } from "../lib/collection.js";
 import { checkEpisodes, purgeEpisodes, sourcesOf } from "../lib/collectionProbe.js";
 import { importFromUrl, importFromSource, parseUrl } from "../lib/animeSama.js";
+import { importFilmFromSource, looksLikeFilmPage } from "../lib/filmIndex.js";
 import {
-  importFilmFromUrl,
-  importFilmFromSource,
-  looksLikeFilmPage,
-} from "../lib/filmIndex.js";
+  importIndexFromUrl,
+  importSerieFromSource,
+  looksLikeSeriePage,
+} from "../lib/serieIndex.js";
 import { extractComic, dropComic } from "../lib/comicArchive.js";
 import { comicLookup } from "../lib/comicMeta.js";
 import { readGbaFile } from "../lib/gbaRom.js";
@@ -532,25 +537,471 @@ export function serializeFull(req, m, progress) {
   };
 }
 
-// GET /api/collection — l'étagère complète + ma progression.
+// Les essences de planche proposées par la scène 3D (voir SHELF_SKINS côté
+// client). Le serveur ne sait pas les dessiner, mais il refuse ce qu'il ne
+// connaît pas : une valeur inventée reviendrait à la page comme un réglage
+// valide, et l'étagère retomberait silencieusement sur le thème.
+const SHELF_SKINS = ["", "chene", "noyer", "laque"];
+
+// ======================================================================
+//  À QUI SONT LES BOÎTIERS
+// ======================================================================
+// LE CATALOGUE EST COMMUN, L'ÉTAGÈRE EST PERSONNELLE. Tout ce que l'admin pose
+// dans le rayon existe pour tout le monde — mais posséder un boîtier se gagne,
+// un par un, à la machine à capsules de l'arcade (voir plus bas). Une étagère
+// n'est donc plus la liste du catalogue : c'est ce que SON propriétaire en a
+// sorti, et c'est ce qui donne envie de la compléter.
+//
+// La possession vit dans `User.ownedCases` (des slugs). Trois conséquences
+// dans ce fichier :
+//   • `GET /` ne rend plus que MES boîtiers (le catalogue entier a sa route à
+//     lui, réservée à l'admin, qui en a besoin pour son panneau) ;
+//   • `GET /:slug` reste ouvert à tous — on doit pouvoir convoiter un boîtier —
+//     mais ce qui se REGARDE, SE LIT ou SE JOUE en est retiré tant qu'on ne le
+//     possède pas (voir `lockSources`) ;
+//   • rien n'est effacé au passage : la progression déjà enregistrée sur un
+//     titre reste en base et redevient valable au moment où on le débloque.
+const ownedSlugs = (user) => new Set((user?.ownedCases || []).map((c) => c.slug));
+
+// Retire d'une fiche tout ce qui permet de la CONSOMMER. Masquer n'est pas
+// protéger : les épisodes, les planches et le fichier de la cartouche ne
+// quittent pas le serveur tant que le boîtier n'est pas à celui qui demande.
+// Le reste de la fiche (jaquette, résumé, casting, nombre d'épisodes) part
+// intact : c'est précisément ce qui donne envie de l'obtenir.
+function lockSources(full) {
+  return {
+    ...full,
+    owned: false,
+    episodes: [],
+    pages: [],
+    sources: [],
+    source: null,
+    links: full.links || [],
+    cartridge: full.cartridge ? { ...full.cartridge, rom: null } : null,
+  };
+}
+
+// L'étagère de quelqu'un, prête à peindre. Facteur commun de ma page et de
+// celle d'un autre joueur : seule la progression change de main (on ne montre
+// jamais la sienne sur l'étagère d'autrui — c'est la mienne qui m'intéresse
+// chez moi, et personne d'autre n'a à connaître ses reprises en cours).
+async function shelfOf(req, owner, { withProgress }) {
+  const slugs = (owner.ownedCases || []).map((c) => c.slug);
+  const [media, progresses] = await Promise.all([
+    slugs.length
+      ? CollectionMedia.find({ slug: { $in: slugs } })
+          .select("-episodes.synopsis -cast")
+          .sort({ order: 1, createdAt: 1 })
+          .lean()
+      : [],
+    withProgress ? CollectionProgress.find({ user: owner._id }).lean() : [],
+  ]);
+  const byMedia = new Map(progresses.map((p) => [String(p.media), p]));
+  // Quand le boîtier est entré dans la collection : c'est la date de la
+  // machine, pas celle du catalogue. Elle sert au rangement « par ajout », qui
+  // doit parler de MON ajout à moi.
+  const gotAt = new Map((owner.ownedCases || []).map((c) => [c.slug, c.obtainedAt]));
+  return media.map((m) => ({
+    ...serializeCard(req, m, byMedia.get(String(m._id))),
+    obtainedAt: gotAt.get(m.slug) || null,
+  }));
+}
+
+// GET /api/collection — MON étagère + ma progression + MON rangement.
 router.get("/", requireAuth, async (req, res) => {
   try {
-    const [media, progresses] = await Promise.all([
-      CollectionMedia.find()
-        .select("-episodes.synopsis -cast")
-        .sort({ order: 1, createdAt: 1 })
+    const [me, total] = await Promise.all([
+      // Les réglages du meuble partent AVEC le rayon, et non par une seconde
+      // requête : l'ordre des boîtiers décide de la première image de la page —
+      // le demander à part, c'est une étagère qui se range sous les yeux juste
+      // après s'être affichée.
+      User.findById(req.userId)
+        .select("shelfOrder shelfSkin shelfPerPlank ownedCases")
         .lean(),
-      CollectionProgress.find({ user: req.userId }).lean(),
+      CollectionMedia.countDocuments(),
     ]);
-    const byMedia = new Map(progresses.map((p) => [String(p.media), p]));
+    if (!me) return res.status(404).json({ error: "Compte introuvable." });
     res.json({
-      media: media.map((m) => serializeCard(req, m, byMedia.get(String(m._id)))),
+      media: await shelfOf(req, me, { withProgress: true }),
+      shelf: {
+        order: me.shelfOrder || [],
+        skin: me.shelfSkin || "",
+        perPlank: me.shelfPerPlank || 0,
+      },
+      // Ce qu'il reste à débloquer : une étagère à moitié pleine doit le dire,
+      // et une étagère vide doit pouvoir annoncer ce qui l'attend.
+      gacha: {
+        owned: (me.ownedCases || []).length,
+        total,
+        price: await gachaPrice(),
+      },
     });
   } catch (err) {
     console.error("collection list error:", err.message);
     res.status(500).json({ error: "Impossible de charger la collection." });
   }
 });
+
+// GET /api/collection/u/:username — l'étagère de quelqu'un d'autre.
+//
+// Une collection se regarde en comparant : c'est la moitié du plaisir, et la
+// raison pour laquelle on veut la compléter. On respecte les comptes privés
+// (même garde que le profil) et on ne divulgue rien de plus que des boîtiers —
+// pas de progression, pas de solde.
+router.get("/u/:username", requireAuth, async (req, res) => {
+  try {
+    // Recherche EXACTE, comme partout ailleurs (routes/users.js) : une
+    // insensibilité à la casse ici et pas là donnerait deux profils pour un
+    // même pseudo selon la porte par laquelle on entre.
+    const owner = await User.findOne({ username: req.params.username })
+      .select("username avatar ownedCases shelfOrder shelfSkin shelfPerPlank privacy")
+      .lean();
+    if (!owner) return res.status(404).json({ error: "Joueur introuvable." });
+    if (await blockIfPrivate(res, owner, req.userId)) return;
+
+    const [media, total, me] = await Promise.all([
+      shelfOf(req, owner, { withProgress: false }),
+      CollectionMedia.countDocuments(),
+      User.findById(req.userId).select("ownedCases").lean(),
+    ]);
+    const mine = ownedSlugs(me);
+    res.json({
+      owner: {
+        username: owner.username,
+        avatar: owner.avatar || null,
+        isMe: String(owner._id) === String(req.userId),
+      },
+      // `mine` marque ce que J'AI DÉJÀ : sur l'étagère d'un autre, c'est le
+      // seul renseignement qui compte — il dit d'un coup d'œil ce qu'il a et
+      // que je n'ai pas.
+      media: media.map((m) => ({ ...m, mine: mine.has(m.slug) })),
+      shelf: {
+        order: owner.shelfOrder || [],
+        skin: owner.shelfSkin || "",
+        perPlank: owner.shelfPerPlank || 0,
+      },
+      gacha: { owned: (owner.ownedCases || []).length, total },
+    });
+  } catch (err) {
+    console.error("collection user shelf error:", err.message);
+    res.status(500).json({ error: "Impossible de charger cette collection." });
+  }
+});
+
+// GET /api/collection/catalog — LE CATALOGUE ENTIER (admin).
+//
+// C'est ce que rendait `GET /` avant que les étagères deviennent personnelles.
+// Le panneau d'admin en a toujours besoin : il travaille sur le rayon, pas sur
+// une collection. Route à part plutôt que branchement dans `/` — un admin qui
+// consulte SA collection doit voir la sienne, comme tout le monde.
+router.get("/catalog", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const media = await CollectionMedia.find()
+      .select("-episodes.synopsis -cast")
+      .sort({ order: 1, createdAt: 1 })
+      .lean();
+    res.json({ media: media.map((m) => serializeCard(req, m, null)) });
+  } catch (err) {
+    console.error("collection catalog error:", err.message);
+    res.status(500).json({ error: "Impossible de charger le catalogue." });
+  }
+});
+
+// PUT /api/collection/shelf — comment JE range mon étagère.
+//
+// Déclarée avant `/:slug`, sinon « shelf » passerait pour un slug de titre.
+// Rien ici ne touche à la collection elle-même : un utilisateur range SA vue,
+// il ne déplace pas les boîtiers des autres.
+router.put("/shelf", requireAuth, async (req, res) => {
+  try {
+    const patch = {};
+
+    if (Array.isArray(req.body.order)) {
+      // On ne garde que des slugs plausibles, et pas plus que ce que peut
+      // contenir la collection : un ordre est une liste de noms, pas un dépôt.
+      const seen = new Set();
+      patch.shelfOrder = req.body.order
+        .filter((s) => typeof s === "string" && s.length > 0 && s.length <= 200)
+        .filter((s) => !seen.has(s) && seen.add(s))
+        .slice(0, 2000);
+    }
+
+    if (typeof req.body.skin === "string") {
+      patch.shelfSkin = SHELF_SKINS.includes(req.body.skin) ? req.body.skin : "";
+    }
+
+    if (req.body.perPlank !== undefined) {
+      const n = Number(req.body.perPlank) || 0;
+      // 0 = « comme d'habitude ». Bornée des deux côtés : une planche d'un seul
+      // boîtier ou de mille ne donne plus une étagère.
+      patch.shelfPerPlank = n > 0 ? Math.max(4, Math.min(60, Math.round(n))) : 0;
+    }
+
+    if (!Object.keys(patch).length) return res.json({ ok: true });
+    await User.updateOne({ _id: req.userId }, { $set: patch });
+    res.json({ ok: true, shelf: patch });
+  } catch (err) {
+    console.error("collection shelf error:", err.message);
+    res.status(500).json({ error: "Impossible d'enregistrer le rangement." });
+  }
+});
+
+// ======================================================================
+//  La machine à capsules — comment un boîtier entre dans une collection
+// ======================================================================
+// Une boule par boîtier du catalogue, un prix en points, et une règle qui tient
+// en une phrase : ON NE TIRE QUE PARMI CEUX QU'ON N'A PAS.
+//
+// C'est le choix de conception central. Un tirage sur tout le catalogue aurait
+// demandé un système de doublons (remboursement, reconversion, compteur), comme
+// les caisses de curseurs — sauf qu'un boîtier n'est pas un curseur : on ne peut
+// pas en poser deux sur une étagère, et payer pour recevoir ce qu'on a déjà est
+// exactement ce qui fait abandonner une collection. Ici chaque tirage AVANCE, la
+// dernière boule est aussi certaine que la première, et la promesse « avoir la
+// collection complète » est tenable.
+//
+// Le tirage est INTÉGRALEMENT serveur (même règle que les caisses) : le client
+// reçoit un gagnant déjà décidé et n'a aucune prise dessus.
+
+const GACHA_PRICE_KEY = "collection.gachaPrice";
+const GACHA_DEFAULT_PRICE = 500;
+
+// Le prix se règle depuis le panneau d'admin : équilibrer une économie de
+// points demande de l'essayer, pas de redéployer. Mis en cache quelques
+// secondes — il est lu à chaque affichage de la machine.
+const PRICE_TTL = 10_000;
+let priceCache = { at: 0, value: null };
+
+async function gachaPrice() {
+  if (priceCache.value !== null && Date.now() - priceCache.at < PRICE_TTL)
+    return priceCache.value;
+  const row = await AppSetting.findOne({ key: GACHA_PRICE_KEY }).select("value").lean();
+  const n = Number(row?.value);
+  const value = Number.isFinite(n) && n >= 0 ? Math.round(n) : GACHA_DEFAULT_PRICE;
+  priceCache = { at: Date.now(), value };
+  return value;
+}
+
+export async function setGachaPrice(price, userId = null) {
+  const n = Math.round(Number(price));
+  if (!Number.isFinite(n) || n < 0 || n > 1_000_000)
+    throw new Error("Prix invalide.");
+  await AppSetting.findOneAndUpdate(
+    { key: GACHA_PRICE_KEY },
+    { value: n, updatedBy: userId },
+    { upsert: true }
+  );
+  priceCache = { at: 0, value: null }; // le prochain lecteur relit la vérité
+  return n;
+}
+
+// Ce qu'une boule montre AVANT le tirage : de quoi la reconnaître dans le dôme
+// et la retrouver sur l'étagère, pas la fiche entière — il y en a autant que de
+// boîtiers au catalogue, et elles partent toutes ensemble.
+const gachaBall = (req, m) => ({
+  slug: m.slug,
+  title: m.title,
+  kind: m.kind,
+  color: m.color || null,
+  franchise: m.franchise || "",
+  year: m.year || null,
+  poster: abs(req, coverOf(m)),
+});
+
+// Le catalogue tel que la machine le voit. Trié comme le rayon : deux joueurs
+// voient les mêmes boules dans le même ordre, ce qui rend la grille des
+// manquants comparable d'une collection à l'autre.
+function gachaPool() {
+  return CollectionMedia.find()
+    .select("slug title kind color franchise year artwork")
+    .slice("pages", 1)
+    .sort({ order: 1, createdAt: 1 })
+    .lean();
+}
+
+// GET /api/collection/gacha — le dôme : toutes les boules, celles que j'ai, le
+// prix, mon solde. Un seul aller-retour pour peindre la machine entière.
+router.get("/gacha", requireAuth, async (req, res) => {
+  try {
+    const [pool, me, price] = await Promise.all([
+      gachaPool(),
+      User.findById(req.userId).select("ownedCases points").lean(),
+      gachaPrice(),
+    ]);
+    if (!me) return res.status(404).json({ error: "Compte introuvable." });
+    const mine = ownedSlugs(me);
+    res.json({
+      price,
+      points: me.points || 0,
+      owned: mine.size,
+      total: pool.length,
+      balls: pool.map((m) => ({ ...gachaBall(req, m), owned: mine.has(m.slug) })),
+    });
+  } catch (err) {
+    console.error("collection gacha error:", err.message);
+    res.status(500).json({ error: "Impossible de charger la machine." });
+  }
+});
+
+// POST /api/collection/gacha/draw — on paie, on tourne la manivelle.
+//
+// L'ordre des opérations n'est pas négociable : on refuse D'ABORD ce qui ne peut
+// pas aboutir (catalogue vide, collection déjà complète), on débite ENSUITE, et
+// le boîtier n'est rangé qu'après. Un débit sans lot serait le seul bug
+// impardonnable de cette page.
+router.post("/gacha/draw", requireAuth, async (req, res) => {
+  let charged = 0;
+  let balance = null;
+  try {
+    const [pool, me, price] = await Promise.all([
+      gachaPool(),
+      User.findById(req.userId).select("ownedCases").lean(),
+      gachaPrice(),
+    ]);
+    if (!me) return res.status(404).json({ error: "Compte introuvable." });
+    if (!pool.length)
+      return res.status(422).json({ error: "La machine est vide pour le moment." });
+
+    const mine = ownedSlugs(me);
+    if (pool.every((m) => mine.has(m.slug)))
+      return res.status(422).json({
+        error: "Ta collection est complète — il n'y a plus rien à sortir de la machine.",
+        complete: true,
+      });
+
+    // 1. On paie (atomique) : pas de tirage gratuit si le solde manque. Un prix
+    //    à zéro (période d'ouverture, événement) ne passe pas par le
+    //    porte-monnaie du tout — `spendPoints` refuse les montants nuls, et une
+    //    ligne « −0 » dans le grand livre ne dirait rien à personne.
+    if (price > 0) {
+      try {
+        balance = await spendPoints(req.userId, price, "gacha", { price });
+        charged = price;
+      } catch (e) {
+        if (e.code === "INSUFFICIENT_POINTS")
+          return res.status(402).json({ error: "Tu n'as pas assez de points." });
+        throw e;
+      }
+    } else {
+      balance = (await User.findById(req.userId).select("points").lean())?.points || 0;
+    }
+
+    // 2. Le tirage, et son rangement dans le même geste. La condition
+    //    `$ne` sur le slug est ce qui rend l'opération sûre : deux tirages
+    //    lancés en même temps ne peuvent pas ranger deux fois le même boîtier
+    //    — le second n'écrit rien, et on retire une autre boule.
+    let won = null;
+    for (let tries = 0; tries < 4 && !won; tries++) {
+      const fresh = await User.findById(req.userId).select("ownedCases").lean();
+      const have = ownedSlugs(fresh);
+      const left = pool.filter((m) => !have.has(m.slug));
+      if (!left.length) break;
+      const pick = left[Math.floor(Math.random() * left.length)];
+      const r = await User.updateOne(
+        { _id: req.userId, "ownedCases.slug": { $ne: pick.slug } },
+        { $push: { ownedCases: { slug: pick.slug, obtainedAt: new Date() } } },
+        { timestamps: false }
+      );
+      if (r.modifiedCount) won = pick;
+    }
+
+    // 3. Rien n'est sorti : la collection s'est complétée entre-temps (deux
+    //    onglets, dernière boule). On rend les points — le contraire serait un
+    //    vol, si rare soit-il.
+    if (!won) {
+      balance = await refundGacha(req.userId, charged, balance);
+      charged = 0;
+      return res.status(409).json({
+        error: "Cette boule vient d'être prise — tes points t'ont été rendus.",
+        points: balance,
+      });
+    }
+
+    // Le boîtier tel que l'étagère le peint : la révélation montre le VRAI
+    // objet, jaquette comprise, pas une vignette de remplacement.
+    const media = await CollectionMedia.findOne({ slug: won.slug })
+      .select("-episodes.synopsis -cast")
+      .lean();
+
+    // Journal pour le fil des abonnés (best-effort : une panne ici ne doit pas
+    // priver le joueur de son boîtier, déjà acquis).
+    recordActivity({
+      actor: req.userId,
+      type: "collection_drop",
+      meta: { slug: won.slug, title: won.title || "" },
+    });
+    triggerMissionCheck(req.userId);
+
+    const owned = (me.ownedCases || []).length + 1;
+    res.json({
+      media: media ? { ...serializeCard(req, media, null), owned: true } : null,
+      points: balance,
+      price,
+      owned,
+      total: pool.length,
+      // Combien de boules restent dans le dôme : c'est ce chiffre qui décide si
+      // l'on repropose « Relancer » ou si l'on félicite.
+      left: pool.length - owned,
+    });
+  } catch (err) {
+    console.error("collection gacha draw error:", err.message);
+    // Le débit a eu lieu mais la suite a échoué : on rend les points plutôt que
+    // de laisser un joueur payer pour une erreur de serveur.
+    if (charged) await refundGacha(req.userId, charged, balance);
+    res.status(500).json({ error: "La machine s'est enrayée. Réessaie." });
+  }
+});
+
+// DELETE /api/collection/gacha/mine — VIDER SA PROPRE COLLECTION (admin).
+//
+// Un outil de mise au point, et rien d'autre : régler une machine à capsules
+// demande de la voir se remplir, or une fois le rayon complété il n'y a plus
+// rien à tirer et plus rien à regarder. Ça remet le compteur à zéro pour
+// recommencer.
+//
+// SA PROPRE COLLECTION, ET SEULEMENT ELLE. La route ne prend aucun paramètre
+// d'utilisateur : on ne peut vider que la sienne, jamais celle d'un autre. Un
+// bouton de débogage qui peut déposséder un joueur est une trappe, pas un
+// outil — et celui-ci finira par rester en place.
+//
+// Les points ne sont PAS rendus (ils ont été dépensés) et la progression sur
+// les titres n'est pas touchée : elle redeviendra valable au prochain tirage.
+router.delete("/gacha/mine", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const me = await User.findById(req.userId).select("ownedCases").lean();
+    const had = (me?.ownedCases || []).length;
+    await User.updateOne(
+      { _id: req.userId },
+      { $set: { ownedCases: [], shelfOrder: [] } },
+      { timestamps: false }
+    );
+    // Les cartes de fil qui célébraient ces boîtiers n'ont plus d'objet : les
+    // laisser afficherait des déblocages qu'on ne possède plus.
+    await removeActivity({ actor: req.userId, type: "collection_drop" });
+    res.json({ ok: true, removed: had });
+  } catch (err) {
+    console.error("collection gacha reset error:", err.message);
+    res.status(500).json({ error: "Impossible de vider la collection." });
+  }
+});
+
+// PUT /api/collection/gacha/price — ce que coûte un tour de manivelle (admin).
+// Déclarée avant `/:slug`, comme toutes les routes nommées du fichier.
+router.put("/gacha/price", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    res.json({ price: await setGachaPrice(req.body?.price, req.userId) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Rendre les points d'un tirage qui n'a rien donné. Sa propre ligne dans le
+// grand livre (`gacha`, montant positif) : un remboursement doit se lire dans
+// l'historique, pas disparaître dans un solde qui bouge tout seul.
+async function refundGacha(userId, amount, fallback) {
+  if (!amount) return fallback;
+  return (await grantPoints(userId, amount, "gacha", { refund: true })) ?? fallback;
+}
 
 // GET /api/collection/lookup?q=&kind= — cherche la fiche externe à laquelle
 // rattacher un boîtier (panneau d'admin). Déclarée AVANT /:slug, sinon
@@ -647,39 +1098,47 @@ router.post("/preview-list", requireAuth, requireAdmin, (req, res) => {
 // source que l'admin a copiée lui-même depuis son navigateur. C'est le recours
 // quand le site passe derrière un filtre anti-robots : le serveur ne va plus
 // rien chercher, il se contente de lire ce qu'on lui donne.
-router.post("/import/paste", requireAuth, requireAdmin, (req, res) => {
+router.post("/import/paste", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const text = String(req.body?.text || "");
-    // La FICHE D'UN FILM se reconnaît à ce qu'elle contient (des adresses
-    // d'hébergeurs, pas de listes d'épisodes) : voir looksLikeFilmPage, qui
-    // laisse toujours la priorité aux signatures anime-sama.
-    if (looksLikeFilmPage(text))
-      return res.json(importFilmFromSource(text, { pageUrl: req.body?.url || "" }));
-    res.json(
-      importFromSource(req.body.text, { season: req.body.season, label: req.body.label })
-    );
+    res.json(await readPastedSource(req.body || {}));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-// GET /api/collection/import/link?url=&lang= — UNE seule porte d'entrée pour
-// les deux répertoires. Le lien dit ce qu'il est : une fiche anime-sama a ses
-// saisons et ses `episodes.js`, tout le reste est lu comme la fiche d'un film,
-// c'est-à-dire un programme unique et ses lecteurs (lib/filmIndex.js).
+// Ce que le collage CONTIENT décide de sa lecture, et l'ordre compte :
 //
-// Un seul champ dans le panneau plutôt que deux : au moment de coller une
+//   • les signatures anime-sama d'abord (elles ont leur propre lecture) ;
+//   • une fiche de SÉRIE ensuite : elle porte AUSSI des adresses d'hébergeurs
+//     (le lecteur monté sur l'épisode en cours), et se serait donc laissé lire
+//     comme un film — un boîtier de vingt-trois épisodes réduit à une ligne ;
+//   • une fiche de FILM enfin, c'est-à-dire tout ce qui aligne des lecteurs
+//     sans lister d'épisodes.
+function readPastedSource({ text = "", url = "", lang, season, label }) {
+  const raw = String(text);
+  if (looksLikeSeriePage(raw))
+    return importSerieFromSource(raw, { pageUrl: url, lang });
+  if (looksLikeFilmPage(raw)) return importFilmFromSource(raw, { pageUrl: url });
+  return importFromSource(raw, { season, label });
+}
+
+// GET /api/collection/import/link?url=&lang= — UNE seule porte d'entrée pour
+// tous les répertoires. Le lien dit ce qu'il est : une fiche anime-sama a ses
+// saisons et ses `episodes.js` ; ailleurs, c'est la PAGE qui tranche entre une
+// fiche de série (ses épisodes, lib/serieIndex.js) et une fiche de film (son
+// programme unique et ses lecteurs, lib/filmIndex.js).
+//
+// Un seul champ dans le panneau plutôt que trois : au moment de coller une
 // adresse, on sait ce qu'on colle — l'application, elle, peut le déduire.
 router.get("/import/link", requireAuth, requireAdmin, async (req, res) => {
   const url = String(req.query.url || "").trim();
+  const lang = String(req.query.lang || "").toLowerCase() || undefined;
   try {
     if (parseUrl(url)) {
-      const data = await importFromUrl(url, {
-        lang: String(req.query.lang || "").toLowerCase() || undefined,
-      });
+      const data = await importFromUrl(url, { lang });
       return res.json({ kind: "series", ...data });
     }
-    res.json(await importFilmFromUrl(url));
+    res.json(await importIndexFromUrl(url, { lang }));
   } catch (err) {
     console.error("collection import error:", err.message);
     res.status(502).json({ error: err.message });
@@ -712,15 +1171,30 @@ router.get("/comic-lookup", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+// LA FICHE RESTE OUVERTE À TOUS, SON CONTENU NON. On doit pouvoir tomber sur un
+// boîtier qu'on n'a pas — depuis l'étagère d'un ami, un lien partagé, la grille
+// de la machine — et le regarder : c'est comme ça qu'on a envie de l'avoir. Ce
+// qui se consomme (épisodes, planches, cartouche) attend, lui, qu'on le
+// possède. L'admin voit tout : c'est lui qui garnit le rayon.
 router.get("/:slug", requireAuth, async (req, res) => {
   try {
     const media = await CollectionMedia.findOne({ slug: req.params.slug }).lean();
     if (!media) return res.status(404).json({ error: "Média introuvable." });
-    const progress = await CollectionProgress.findOne({
-      user: req.userId,
-      media: media._id,
-    }).lean();
-    res.json({ media: serializeFull(req, media, progress) });
+    const [progress, me] = await Promise.all([
+      CollectionProgress.findOne({ user: req.userId, media: media._id }).lean(),
+      User.findById(req.userId).select("ownedCases isAdmin isSuperAdmin").lean(),
+    ]);
+    const full = serializeFull(req, media, progress);
+    // La progression, elle, part dans les deux cas : elle est déjà là, elle est
+    // à lui, et la lui cacher reviendrait à la lui faire perdre le jour où il
+    // débloque le boîtier.
+    const owned = ownedSlugs(me).has(media.slug);
+    res.json({
+      media: owned || isUserAdmin(me) ? { ...full, owned } : lockSources(full),
+      // Ce qu'il en coûterait de le débloquer, pour que l'écran verrouillé
+      // puisse le dire sans un second aller-retour.
+      price: owned ? undefined : await gachaPrice(),
+    });
   } catch (err) {
     console.error("collection detail error:", err.message);
     res.status(500).json({ error: "Impossible de charger ce média." });
@@ -1167,6 +1641,31 @@ function filmUrlsOf(media) {
   return [main, ...(ep.mirrors || []).map((m) => m.url)].filter(Boolean);
 }
 
+// Deux listes d'épisodes en une, À REPÈRE ÉGAL LA NOUVELLE GAGNE. Un collage
+// COMPLÈTE la source en place — mais il rapporte parfois la saison entière (les
+// fiches de série livrent tous leurs épisodes d'un coup) : mis bout à bout, le
+// même S01E01 se serait retrouvé deux fois dans le boîtier.
+//
+// Le repère seul sert de clé, pas la ligne entière : c'est ce que l'app lit
+// pour ranger un épisode, et une ligne sans repère (rare, mais on n'en jette
+// aucune) reste simplement ajoutée à la suite.
+function mergeEpisodeLists(before, after) {
+  const at = new Map();
+  const out = [];
+  for (const raw of `${before}\n${after}`.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    const m = line.match(/^s\s*(\d{1,2})\s*[·.\-–]?\s*e\s*\.?\s*(\d{1,3})\b/i);
+    const key = m ? `${Number(m[1])}x${Number(m[2])}` : null;
+    if (key && at.has(key)) out[at.get(key)] = line;
+    else {
+      if (key) at.set(key, out.length);
+      out.push(line);
+    }
+  }
+  return out.join("\n");
+}
+
 // POST /api/collection/:slug/source/import — SCRAPER ET REMPLACER, en un geste.
 //
 // C'était le trou du tiroir d'édition : on pouvait changer l'adresse, mais les
@@ -1177,6 +1676,7 @@ function filmUrlsOf(media) {
 // Ici, une adresse suffit, quelle qu'elle soit :
 //
 //   • une fiche anime-sama  → ses saisons et leurs miroirs ;
+//   • une fiche de série    → ses épisodes (lib/serieIndex.js) ;
 //   • une fiche de film     → ses lecteurs (lib/filmIndex.js) ;
 //   • une URL YouTube       → la playlist re-scrapée, comme « rafraîchir ».
 //
@@ -1202,9 +1702,7 @@ router.post("/:slug/source/import", requireAuth, requireAdmin, async (req, res) 
     // --- 1. Ce que dit la source ------------------------------------------
     let imported;
     if (text) {
-      imported = looksLikeFilmPage(text)
-        ? importFilmFromSource(text, { pageUrl: url })
-        : importFromSource(text, { season: req.body?.season, label: req.body?.label });
+      imported = await readPastedSource({ ...req.body, text, url, lang });
     } else if (parseUrl(url)) {
       imported = { kind: "series", ...(await importFromUrl(url, { lang })) };
     } else if (extractVideoId(url) || extractPlaylistId(url)) {
@@ -1268,7 +1766,7 @@ router.post("/:slug/source/import", requireAuth, requireAdmin, async (req, res) 
         source: sourcePayload(media.toObject()),
       });
     } else {
-      imported = await importFilmFromUrl(url);
+      imported = await importIndexFromUrl(url, { lang });
     }
 
     // --- 2. La liste qui en découle ---------------------------------------
@@ -1289,9 +1787,9 @@ router.post("/:slug/source/import", requireAuth, requireAdmin, async (req, res) 
           "Cette source décrit la fiche mais ne contient aucun épisode : colle le " +
           "fichier episodes.js de chaque saison.",
       });
-    } else if (merge && imported.kind === "episodes") {
+    } else if (merge && (imported.kind === "episodes" || imported.kind === "series")) {
       const before = media.source?.list || episodesToLines(media.episodes || []);
-      list = [before.trim(), imported.list].filter(Boolean).join("\n");
+      list = mergeEpisodeLists(before, imported.list);
     } else {
       list = imported.list;
     }
@@ -1502,6 +2000,15 @@ router.delete("/:slug", requireAuth, requireAdmin, async (req, res) => {
     // s'accumuler pour un rayon qu'on ne reverra pas.
     await CollectionThread.deleteOne({ media: media._id });
     await removeActivity({ "meta.slug": media.slug, type: /^collection_/ });
+    // Le boîtier quitte AUSSI les étagères de ceux qui l'avaient sorti de la
+    // machine, et le rangement qui le nommait : un slug orphelin ne serait pas
+    // seulement une place vide, ce serait une case du compteur « 12 / 40 » que
+    // rien ne peut plus jamais remplir.
+    await User.updateMany(
+      { $or: [{ "ownedCases.slug": media.slug }, { shelfOrder: media.slug }] },
+      { $pull: { ownedCases: { slug: media.slug }, shelfOrder: media.slug } },
+      { timestamps: false }
+    );
     // Les planches, les cartouches et les parties sauvegardées vivent sur le
     // disque, pas en base : sans ce ménage, elles resteraient à occuper le VPS
     // pour un titre qui n'existe plus — et une ROM, c'est trente mégaoctets.

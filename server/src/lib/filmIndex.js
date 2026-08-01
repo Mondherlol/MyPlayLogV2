@@ -284,10 +284,17 @@ export function parseFilmPage(html, { pageUrl = "" } = {}) {
     strip(meta("og:title")) ||
     strip(html.match(/<title>([^<]*)<\/title>/i)?.[1]?.split(/[|–—]/)[0]);
 
-  // L'année : celle de la fiche technique, celle du <h1>, ou celle qui traîne
-  // dans l'adresse de la page (« …-12-hommes-en-colre-1957.html »).
+  // L'année : celle de la fiche technique, celle de la ligne de sous-titre
+  // (« -TV-14 - 2011 - Drame… », la seule que portent les fiches de série),
+  // celle du <h1>, ou celle qui traîne dans l'adresse de la page
+  // (« …-12-hommes-en-colre-1957.html »).
   const yearText =
-    facts["date de sortie"] || facts["année"] || facts.annee || strip(h1) || pageUrl;
+    facts["date de sortie"] ||
+    facts["année"] ||
+    facts.annee ||
+    strip(html.match(/class=["']release["'][^>]*>([^<]{0,40})</i)?.[1]) ||
+    strip(h1) ||
+    pageUrl;
   const year = Number(String(yearText).match(/\b(19|20)\d{2}\b/)?.[0]) || null;
 
   // Le résumé s'ouvre sur une ligne de référencement (« Résumé du film X en
@@ -302,12 +309,17 @@ export function parseFilmPage(html, { pageUrl = "" } = {}) {
     strip(meta("og:description")) ||
     "";
 
+  // Les genres sont tantôt des liens (« <a>Action</a><a>Drame</a> »), tantôt
+  // une simple énumération posée dans le bloc — et sur les fiches de série,
+  // toujours la seconde forme. On lit les liens s'il y en a, la ponctuation
+  // sinon ; à défaut de bloc, la fiche technique.
   const genreBlock = html.match(/class=["']genres["'][^>]*>([\s\S]{0,600}?)<\/span>/i)?.[1];
+  const tagged = genreBlock ? [...genreBlock.matchAll(/>([^<>]{2,30})</g)] : [];
   const genres = [
     ...new Set(
-      (genreBlock
-        ? [...genreBlock.matchAll(/>([^<>]{2,30})</g)].map((m) => strip(m[1]))
-        : String(facts.genre || facts.genres || "")
+      (tagged.length
+        ? tagged.map((m) => strip(m[1]))
+        : String(genreBlock || facts.genre || facts.genres || "")
             .split(/[,·|]/)
             .map((s) => strip(s))
       ).filter((g) => g && g.length > 1)
@@ -367,7 +379,7 @@ function shape(page, players, extra) {
 const PRIVATE_RE =
   /^(?:localhost|[^.]*\.local|0\.|10\.|127\.|169\.254\.|172\.(?:1[6-9]|2\d|3[01])\.|192\.168\.|\[?::1\]?|\[?f[cd][0-9a-f]{2}:)/i;
 
-function assertPublicUrl(raw) {
+export function assertPublicUrl(raw) {
   let u;
   try {
     u = new URL(String(raw).trim());
@@ -382,7 +394,10 @@ function assertPublicUrl(raw) {
   return u;
 }
 
-async function fetchPage(url) {
+// Exportée : la lecture des fiches de SÉRIE (lib/serieIndex.js) va chercher ses
+// pages sur les mêmes sites, avec les mêmes en-têtes et le même mur anti-robots
+// à reconnaître.
+export async function fetchIndexPage(url) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT);
   try {
@@ -414,7 +429,7 @@ async function fetchPage(url) {
   }
 }
 
-const BLOCKED_MSG =
+export const BLOCKED_MSG =
   "Ce site est passé derrière un filtre anti-robots : le serveur ne peut plus " +
   "lire la page, alors qu'elle s'ouvre normalement dans ton navigateur. Ouvre " +
   "la fiche, fais Ctrl+U puis Ctrl+A / Ctrl+C, et colle la source ici.";
@@ -439,7 +454,7 @@ async function fetchPlayerApi(pageUrl, html) {
     return null;
   }
   for (const path of API_PATHS) {
-    const body = await fetchPage(`${origin}${path.replace("{id}", id)}`).catch(() => null);
+    const body = await fetchIndexPage(`${origin}${path.replace("{id}", id)}`).catch(() => null);
     if (body && /https?:\/\//.test(body)) return body;
   }
   return null;
@@ -484,12 +499,16 @@ function playersFromApi(text, pageUrl) {
   return { players, names };
 }
 
-export async function importFilmFromUrl(rawUrl) {
+// `html` : la page DÉJÀ lue. L'aiguillage qui distingue une fiche de série
+// d'une fiche de film (lib/serieIndex.js) doit forcément l'avoir sous les yeux
+// pour trancher — la lui faire redemander serait un aller-retour de plus sur
+// chaque film, pour la même page.
+export async function importFilmFromUrl(rawUrl, { html: given } = {}) {
   const u = assertPublicUrl(rawUrl);
 
-  let html;
+  let html = given;
   try {
-    html = await fetchPage(u.href);
+    if (!html) html = await fetchIndexPage(u.href);
   } catch (err) {
     if (!err?.blocked) throw err;
     throw new Error(BLOCKED_MSG);

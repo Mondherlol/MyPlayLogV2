@@ -18607,3 +18607,1022 @@ b.hf-dl-src {
   font-size: 0.78rem;
   color: var(--text-soft);
 }
+
+/* ============================================================
+   Panel Admin — onglet Logs (journal du serveur)
+   ============================================================
+   Un journal se lit en diagonale : colonnes alignées, chiffres à
+   chasse fixe, une couleur par nature d'évènement posée en liseré
+   à gauche. Tout le reste reste gris, pour que l'anormal (une
+   erreur, une action d'admin) saute aux yeux. */
+
+.log-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+/* --- Les deux vues (journal / messages privés) --- */
+.log-views {
+  display: flex;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  padding: 0.22rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.log-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.42rem 0.8rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.log-view.on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+/* --- La barre de filtres --- */
+.log-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.log-search {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 1 1 230px;
+  min-width: 0;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.log-search.user {
+  flex: 0 1 210px;
+}
+
+.log-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.log-search input:focus {
+  outline: none;
+}
+
+.log-clear {
+  display: inline-flex;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+}
+
+.log-clear:hover {
+  color: var(--text);
+}
+
+.log-ranges {
+  display: flex;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.log-range {
+  padding: 0.35rem 0.6rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-soft);
+}
+
+.log-range.on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Le direct : vert quand ça coule, gris quand c'est en pause. */
+.log-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.log-live.on {
+  border-color: color-mix(in srgb, #22c55e 45%, transparent);
+  background: color-mix(in srgb, #22c55e 12%, transparent);
+  color: #16a34a;
+}
+
+.log-icbtn {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.log-icbtn:hover {
+  color: var(--text);
+}
+
+.log-icbtn.danger:hover {
+  border-color: color-mix(in srgb, #ef4444 50%, transparent);
+  color: #ef4444;
+}
+
+/* --- Les pastilles de nature, avec leur décompte --- */
+.log-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.log-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.34rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.log-kind em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.log-kind:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.log-kind.on {
+  border-color: currentColor;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+/* Une couleur par nature — les mêmes que les liserés des lignes. */
+.log-kind.k-auth.on,
+.log-kind.k-auth:hover {
+  color: #3b82f6;
+}
+.log-kind.k-presence.on,
+.log-kind.k-presence:hover {
+  color: #14b8a6;
+}
+.log-kind.k-action.on,
+.log-kind.k-action:hover {
+  color: var(--accent-ink);
+}
+.log-kind.k-message.on,
+.log-kind.k-message:hover {
+  color: #a855f7;
+}
+.log-kind.k-admin.on,
+.log-kind.k-admin:hover {
+  color: #f97316;
+}
+.log-kind.k-error.on,
+.log-kind.k-error:hover {
+  color: #ef4444;
+}
+.log-kind.k-system.on,
+.log-kind.k-system:hover {
+  color: #64748b;
+}
+
+.log-reset {
+  padding: 0.34rem 0.6rem;
+  border: none;
+  background: transparent;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+.log-total {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-soft);
+}
+
+/* --- Les lignes --- */
+.log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.log-row {
+  border-left: 3px solid transparent;
+  border-bottom: 1px solid var(--border);
+}
+
+.log-row:last-child {
+  border-bottom: none;
+}
+
+.log-row.k-auth {
+  border-left-color: #3b82f6;
+}
+.log-row.k-presence {
+  border-left-color: #14b8a6;
+}
+.log-row.k-action {
+  border-left-color: color-mix(in srgb, var(--orange) 60%, transparent);
+}
+.log-row.k-message {
+  border-left-color: #a855f7;
+}
+.log-row.k-admin {
+  border-left-color: #f97316;
+}
+.log-row.k-error {
+  border-left-color: #ef4444;
+}
+.log-row.k-system {
+  border-left-color: #64748b;
+}
+
+.log-row.failed {
+  background: color-mix(in srgb, #ef4444 6%, transparent);
+}
+
+.log-main {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.45rem 0.7rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 0.82rem;
+  color: var(--text);
+}
+
+.log-main:hover {
+  background: var(--surface-2);
+}
+
+.log-time {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  color: var(--text-soft);
+}
+
+.log-badge {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.log-badge.k-auth {
+  color: #3b82f6;
+}
+.log-badge.k-presence {
+  color: #14b8a6;
+}
+.log-badge.k-action {
+  color: var(--accent-ink);
+}
+.log-badge.k-message {
+  color: #a855f7;
+}
+.log-badge.k-admin {
+  color: #f97316;
+}
+.log-badge.k-error {
+  color: #ef4444;
+}
+.log-badge.k-system {
+  color: #64748b;
+}
+
+.log-who {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  max-width: 150px;
+  padding: 0;
+  overflow: hidden;
+  border: none;
+  background: transparent;
+  font-size: inherit;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: inherit;
+}
+
+.log-who img,
+.log-who i {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.log-who i {
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  font-size: 0.65rem;
+  font-style: normal;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.log-who.anon {
+  font-weight: 500;
+  color: var(--text-soft);
+}
+
+.log-who:hover:not(.anon) {
+  color: var(--accent-ink);
+}
+
+.log-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-soft);
+}
+
+.log-label b {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.log-status,
+.log-ms {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-soft);
+}
+
+.log-status {
+  padding: 0.1rem 0.35rem;
+  border-radius: 5px;
+  background: var(--surface-2);
+}
+
+.log-status.bad {
+  background: color-mix(in srgb, #ef4444 15%, transparent);
+  color: #ef4444;
+}
+
+/* --- Le détail déplié --- */
+.log-detail {
+  padding: 0.7rem 0.9rem 0.9rem 2.6rem;
+  background: var(--surface-2);
+  font-size: 0.8rem;
+}
+
+.log-detail code {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 0.76rem;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.log-detail dl {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 0.25rem 0.7rem;
+  margin: 0;
+}
+
+.log-detail dt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.log-detail dd {
+  margin: 0;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.log-detail pre {
+  margin: 0;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 0.74rem;
+  line-height: 1.45;
+  overflow-x: auto;
+}
+
+.log-ua {
+  font-size: 0.74rem;
+  color: var(--text-soft);
+}
+
+.log-dim {
+  font-style: normal;
+  color: var(--text-soft);
+}
+
+.log-more {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.log-more:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.log-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 160px;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+}
+
+.log-state.empty svg {
+  opacity: 0.45;
+}
+
+.log-state p {
+  margin: 0;
+}
+
+/* --- Messages privés --- */
+.log-warn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid color-mix(in srgb, #f97316 35%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, #f97316 9%, transparent);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.log-warn svg {
+  flex-shrink: 0;
+  color: #f97316;
+}
+
+/* --- Une vraie messagerie : les fils à gauche, la discussion à droite ---
+   Un empilement de lignes plates ne se lit pas : on ne sait ni qui répond à
+   qui, ni ce qui s'est dit entre deux phrases. C'est pourtant exactement ce
+   qu'on vient chercher quand on modère. */
+.logdm {
+  display: grid;
+  grid-template-columns: 270px minmax(0, 1fr);
+  gap: 0.8rem;
+  height: min(62vh, 620px);
+}
+
+.logdm-side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  padding-right: 0.2rem;
+}
+
+/* Le champ de recherche est partagé avec la barre du journal, où il vit dans
+   une rangée : son `flex: 1` y prend la largeur restante. Ici la colonne est
+   verticale, et ce même `flex: 1` lui faisait prendre toute la HAUTEUR — un
+   champ de saisie de 500 px de haut. Il ne grandit pas dans cette colonne. */
+.logdm-side .log-search {
+  flex: 0 0 auto;
+}
+
+.logdm-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+
+.logdm-sub {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.5rem 0 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.logdm-sub:first-child {
+  margin-top: 0;
+}
+
+.logdm-convs,
+.logdm-hits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.logdm-conv {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  text-align: left;
+}
+
+.logdm-conv:hover {
+  background: var(--surface-2);
+}
+
+.logdm-conv.on {
+  border-color: color-mix(in srgb, var(--orange) 45%, transparent);
+  background: color-mix(in srgb, var(--orange) 10%, transparent);
+}
+
+.logdm-faces {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.logdm-face {
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--surface);
+  background: var(--surface-2);
+  flex-shrink: 0;
+}
+
+.logdm-face.letters {
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.logdm-faces .logdm-face + .logdm-face {
+  margin-left: -10px;
+}
+
+.logdm-conv-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.logdm-conv-txt b {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  overflow: hidden;
+  font-size: 0.83rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.logdm-conv-txt em {
+  overflow: hidden;
+  font-size: 0.74rem;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-soft);
+}
+
+.logdm-conv-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+
+.logdm-conv-meta i {
+  font-style: normal;
+  font-size: 0.68rem;
+  color: var(--text-soft);
+}
+
+.logdm-conv-meta b {
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-soft);
+}
+
+/* Résultats de la recherche dans le contenu */
+.logdm-hit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  width: 100%;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  text-align: left;
+}
+
+.logdm-hit:hover {
+  border-color: var(--border-strong);
+}
+
+.logdm-hit-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+.logdm-hit-top b {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.logdm-hit-text {
+  overflow: hidden;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  color: var(--text);
+}
+
+.logdm-hit-conv {
+  overflow: hidden;
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--accent-ink);
+}
+
+.logdm-empty {
+  margin: 0.5rem 0;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+/* --- Le fil --- */
+.logdm-thread {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.logdm-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.logdm-head-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.logdm-head-txt b {
+  overflow: hidden;
+  font-size: 0.9rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logdm-head-txt em {
+  font-size: 0.73rem;
+  font-style: normal;
+  color: var(--text-soft);
+}
+
+/* Qui est de quel côté : dit une fois en haut, pour ne pas répéter les
+   pseudos à chaque bulle. */
+.logdm-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  color: var(--text-soft);
+}
+
+.logdm-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+}
+
+.logdm-legend i.left {
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+}
+
+.logdm-legend i.right {
+  background: color-mix(in srgb, var(--orange) 55%, transparent);
+  margin-left: 0.4rem;
+}
+
+.logdm-box {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.logdm-older {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.logdm-day {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.7rem 0 0.5rem;
+  color: var(--text-soft);
+  font-size: 0.72rem;
+}
+
+.logdm-day::before,
+.logdm-day::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.logdm-sys {
+  align-self: center;
+  margin: 0.3rem 0;
+  font-size: 0.73rem;
+  color: var(--text-soft);
+}
+
+.logdm-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.45rem;
+  max-width: 78%;
+}
+
+.logdm-row.right {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.logdm-row.grouped {
+  margin-top: -0.05rem;
+}
+
+.logdm-row-av {
+  width: 26px;
+  flex-shrink: 0;
+}
+
+.logdm-bubble-wrap {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.logdm-name {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.logdm-name i {
+  font-style: normal;
+  font-weight: 500;
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.logdm-row.right .logdm-name {
+  flex-direction: row-reverse;
+}
+
+.logdm-bubble {
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.logdm-row.right .logdm-bubble {
+  border-color: color-mix(in srgb, var(--orange) 35%, transparent);
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
+}
+
+.logdm-bubble p {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.logdm-bubble.gone {
+  background: transparent;
+  border-style: dashed;
+  color: var(--text-soft);
+}
+
+.logdm-quote {
+  display: block;
+  margin-bottom: 0.3rem;
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--border-strong);
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+
+.logdm-quote b {
+  margin-right: 0.3rem;
+  color: var(--text);
+}
+
+.logdm-media {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+}
+
+.logdm-media img {
+  width: 110px;
+  height: 110px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.logdm-card,
+.logdm-edited {
+  display: inline-block;
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  font-style: normal;
+  color: var(--text-soft);
+}
+
+.logdm-card {
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+@media (max-width: 720px) {
+  .log-search.user {
+    flex: 1 1 100%;
+  }
+  .log-total {
+    margin-left: 0;
+  }
+  /* Deux colonnes ne tiennent pas : la liste des fils passe au-dessus, en
+     hauteur réduite, et la discussion prend le reste. */
+  .logdm {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+  .logdm-scroll {
+    max-height: 220px;
+  }
+  .logdm-thread {
+    height: 60vh;
+  }
+  .logdm-row {
+    max-width: 90%;
+  }
+  /* Sur mobile, la ligne perd sa colonne d'auteur et sa durée : le
+     tapotement ouvre le détail, qui les contient déjà. */
+  .log-ms,
+  .log-who {
+    display: none;
+  }
+  .log-detail {
+    padding-left: 0.9rem;
+  }
+}

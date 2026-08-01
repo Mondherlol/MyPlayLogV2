@@ -1069,12 +1069,18 @@ function PartyCard({ party }) {
 
 // --- Carte « rejoins ma partie du Mot du jour » ---
 // Comme l'invitation de watchparty, c'est le seul morceau d'une partie qui
-// survit dans la messagerie. Elle est PÉRISSABLE : le mot change à minuit, donc
-// une carte d'hier n'ouvre plus rien — on le dit plutôt que de laisser cliquer
-// dans le vide.
+// survit dans la messagerie. Une carte de SESSION est périssable : le mot change
+// à minuit, donc celle d'hier n'ouvre plus rien — on le dit plutôt que de
+// laisser cliquer dans le vide.
+//
+// Une carte d'ÉQUIPE, elle, ne périme jamais : son code désigne la bande, pas la
+// partie, et le lien ouvre celle du jour quel que soit le jour où on clique.
+// C'est ce qui fait qu'on ne réinvite personne le lendemain.
 function MotCard({ mot }) {
   const today = new Date().toLocaleDateString("fr-CA");
-  const stale = Boolean(mot.date && mot.date !== today);
+  const team = mot.team || "";
+  const stale = Boolean(!team && mot.date && mot.date !== today);
+  const fresh = Boolean(mot.date && mot.date === today);
   const body = (
     <span className="chat-card-body">
       <span className="chat-card-kicker">
@@ -1082,18 +1088,30 @@ function MotCard({ mot }) {
         {mot.hostName ? ` · ${mot.hostName}` : ""}
       </span>
       <span className="chat-card-title">
-        {stale ? "Partie terminée" : "Cherchons le mot ensemble"}
+        {stale
+          ? "Partie terminée"
+          : mot.daily
+            ? `${mot.teamName || "Ton équipe"} cherche le mot`
+            : team
+              ? `Rejoins ${mot.teamName || "l'équipe"}`
+              : "Cherchons le mot ensemble"}
       </span>
       <span className="chat-card-sub">
         {stale
           ? "Le mot a changé depuis."
-          : `${mot.players || 1} joueur${(mot.players || 1) > 1 ? "s" : ""} · ${
-              mot.tries || 0
-            } essai${(mot.tries || 0) > 1 ? "s" : ""} déjà brûlé${
-              (mot.tries || 0) > 1 ? "s" : ""
-            }`}
+          : !fresh
+            ? "L'équipe reste : ce lien ouvre la partie du jour."
+            : `${mot.players || 1} joueur${(mot.players || 1) > 1 ? "s" : ""} · ${
+                mot.tries || 0
+              } essai${(mot.tries || 0) > 1 ? "s" : ""} déjà brûlé${
+                (mot.tries || 0) > 1 ? "s" : ""
+              }`}
       </span>
-      {!stale && <span className="chat-card-cta">Rejoindre la partie →</span>}
+      {!stale && (
+        <span className="chat-card-cta">
+          {team ? "Jouer avec l'équipe →" : "Rejoindre la partie →"}
+        </span>
+      )}
     </span>
   );
   if (stale) {
@@ -1107,7 +1125,10 @@ function MotCard({ mot }) {
     );
   }
   return (
-    <Link to={`/mot?s=${mot.code}`} className="chat-card chat-card-mot clickable">
+    <Link
+      to={team ? `/mot?t=${team}` : `/mot?s=${mot.code}`}
+      className="chat-card chat-card-mot clickable"
+    >
       <span className="chat-card-cover">
         <Thermometer size={22} />
       </span>

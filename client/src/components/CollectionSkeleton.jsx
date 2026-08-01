@@ -16,7 +16,17 @@
 const SPINES = [98, 100, 96, 99, 94, 100, 97, 100, 95, 99, 93, 100, 96, 98];
 
 // L'étagère en attente : la rangée respire d'un bout à l'autre.
-export function ShelfSkeleton({ label = "Chargement de la collection…", count = 14 }) {
+//
+// `progress` (0 → 1) n'est PAS décoratif : l'étagère ne se montre qu'une fois
+// toutes ses jaquettes peintes (voir CollectionShelf), donc l'attente peut durer
+// une seconde ou deux sur une grande collection encore froide. Sans jauge, elle
+// n'a pas de fin annoncée ; avec, on voit qu'elle avance. Nul = pas de jauge du
+// tout, plutôt qu'un rail vide qui ne bougera jamais.
+export function ShelfSkeleton({
+  label = "Chargement de la collection…",
+  count = 14,
+  progress = null,
+}) {
   return (
     <div className="coll-shelf-skel" role="status" aria-label={label}>
       <div className="coll-shelf-skel-row" aria-hidden="true">
@@ -29,7 +39,14 @@ export function ShelfSkeleton({ label = "Chargement de la collection…", count 
         ))}
       </div>
       <span className="coll-shelf-skel-plank" aria-hidden="true" />
-      <span className="coll-shelf-skel-label">{label}</span>
+      <span className="coll-shelf-skel-label">
+        {label}
+        {progress != null && (
+          <span className="coll-shelf-skel-gauge" aria-hidden="true">
+            <i style={{ width: `${Math.round(Math.min(1, progress) * 100)}%` }} />
+          </span>
+        )}
+      </span>
     </div>
   );
 }

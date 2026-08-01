@@ -30,6 +30,7 @@ import {
   Contrast,
   Users,
   Thermometer,
+  Library,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCosmetics } from "../context/CosmeticsContext";
@@ -40,6 +41,7 @@ import { rarityColor, rarityLabel, rarityRank } from "../lib/rarity";
 import RewardArt from "../components/RewardArt";
 import CaseOpeningModal from "../components/CaseOpeningModal";
 import FriendsCollectionModal from "../components/FriendsCollectionModal";
+import GachaModal from "../components/GachaModal";
 import PixelCanvas from "../components/PixelCanvas";
 
 // ======================================================================
@@ -126,6 +128,13 @@ const MODES = [
   { key: "total", label: "Total", pick: (e) => e.score ?? 0, hint: "Total cumulé de toutes les parties" },
 ];
 
+// La porte d'entrée de la machine à capsules, masquée pour l'instant.
+// RIEN N'EST SUPPRIMÉ : le bandeau, la modale et toute la mécanique serveur
+// restent en place — repasser cette constante à `true` les fait réapparaître
+// tels quels. C'est aussi ce drapeau qui évite d'aller interroger
+// /collection/gacha pour un bandeau qui ne s'affichera pas.
+const SHOW_GACHA = false;
+
 const fmt = (n) => Number(n || 0).toLocaleString("fr-FR");
 
 // --- Caches stale-while-revalidate (mémoire + localStorage) ---
@@ -141,7 +150,7 @@ const arcadeCache = makeCache("mpl_arcade_", 10 * 60 * 1000);
 const boardCache = makeCache("mpl_arcboard_", 5 * 60 * 1000);
 
 export default function Arcade() {
-  const { token, user, updateUser } = useAuth();
+  const { token, user, updateUser, hasFeature } = useAuth();
   const { setCosmetic, previewTheme, endPreview } = useCosmetics();
 
   // Clé de cache : le compte courant. `null` tant que /auth/me n'a pas répondu —
@@ -167,6 +176,8 @@ export default function Arcade() {
   const [openingBox, setOpeningBox] = useState(null);
   const [showCursors, setShowCursors] = useState(false);
   const [showFriends, setShowFriends] = useState(false);
+  const [gacha, setGacha] = useState(null); // état du dôme (bandeau + modale)
+  const [showGacha, setShowGacha] = useState(false);
   const [equipping, setEquipping] = useState(null);
   const [preview, setPreview] = useState(null); // thème essayé en direct (non équipé)
   const [err, setErr] = useState("");
@@ -225,6 +236,21 @@ export default function Arcade() {
       alive = false;
     };
   }, [token, meId, commitData]);
+
+  // L'état de la machine à capsules : combien de boîtiers j'ai, combien il en
+  // reste, ce que coûte un tour. Chargé à part du reste de l'arcade — c'est le
+  // rayon vidéo qui le sait, pas les caisses — et seulement si la section est
+  // ouverte (le drapeau d'admin, voir lib/features.js côté serveur).
+  const gachaOn = SHOW_GACHA && hasFeature("collection");
+  const loadGacha = useCallback(() => {
+    if (!token || !gachaOn) return;
+    apiFetch("/collection/gacha", { token })
+      .then(setGacha)
+      .catch(() => {
+        /* la machine ne s'affiche pas, le reste de l'arcade tourne */
+      });
+  }, [token, gachaOn]);
+  useEffect(loadGacha, [loadGacha]);
 
   function toggleHistory() {
     setShowHist((v) => !v);
@@ -410,6 +436,19 @@ export default function Arcade() {
           ))}
         </div>
 
+        {/* ---------- La machine à capsules ----------
+            AU-DESSUS DES CAISSES, et c'est délibéré : une caisse donne un
+            cosmétique, la machine donne un OBJET qu'on range sur une étagère.
+            C'est la plus grosse dépense de la salle et la seule qui se
+            collectionne — elle prend donc le haut de l'affiche. */}
+        {gachaOn && gacha?.total > 0 && (
+          <GachaBanner
+            gacha={gacha}
+            points={points}
+            onOpen={() => setShowGacha(true)}
+          />
+        )}
+
         {/* ---------- Les caisses ---------- */}
         {data?.cases?.length > 0 && (
           <div className="arc-crates">
@@ -547,6 +586,33 @@ export default function Arcade() {
           token={token}
           onClose={() => setOpeningBox(null)}
           onResult={applyResult}
+        />
+      )}
+
+      {showGacha && (
+        <GachaModal
+          token={token}
+          onClose={() => setShowGacha(false)}
+          // Le solde et le dôme se recalent sans refetch : la modale sait déjà
+          // tout ce qu'il faut, et voir le compteur du bandeau avancer derrière
+          // la modale fait partie du plaisir.
+          onDrawn={(res) => {
+            updateUser({ points: res.points });
+            commitData((d) => (d ? { ...d, points: res.points } : d));
+            setGacha((g) =>
+              g
+                ? {
+                    ...g,
+                    points: res.points,
+                    owned: res.owned,
+                    balls: g.balls.map((b) =>
+                      b.slug === res.media?.slug ? { ...b, owned: true } : b
+                    ),
+                  }
+                : g
+            );
+            setHistory(null); // l'historique des points a une ligne de plus
+          }}
         />
       )}
     </div>
@@ -946,6 +1012,101 @@ function CursorsModal({
       </div>
     </div>,
     document.body
+  );
+}
+
+// ---------- La machine à capsules, vue depuis l'arcade ----------
+// Une PORTE, pas la machine : la sphère de verre et son tas de bonbons
+// vivent dans la modale (GachaModal), qui prend tout l'écran parce que c'est un
+// moment. Ici on montre juste de quoi donner envie de pousser la porte — un
+// aperçu du dôme, où l'on doit voir d'un coup d'œil combien il reste de boules
+// colorées, et les dernières jaquettes qui manquent.
+function GachaBanner({ gacha, points, onOpen }) {
+  const { owned, total, price, balls = [] } = gacha;
+  const left = Math.max(0, total - owned);
+  const afford = points >= price;
+  const complete = left === 0;
+  // Les manquants d'abord : c'est eux qu'on vient chercher. À collection
+  // complète, on montre ce qu'on a — il n'y a plus rien à convoiter.
+  const teaser = (complete ? balls : balls.filter((b) => !b.owned)).slice(0, 5);
+
+  return (
+    <article className={`arc-gacha ${complete ? "done" : ""} ${afford ? "" : "poor"}`}>
+      <span className="arc-gacha-glow" aria-hidden="true" />
+
+      {/* Le dôme en miniature : les mêmes boules que dans la machine, éteintes
+          quand on les a. Douze au plus — au-delà ce n'est plus un aperçu. */}
+      <div className="arc-gacha-dome" aria-hidden="true">
+        {balls.slice(0, 12).map((b, i) => (
+          <i
+            key={b.slug}
+            className={`arc-gacha-pip ${b.owned ? "got" : ""}`}
+            style={{ "--i": i }}
+          />
+        ))}
+      </div>
+
+      <div className="arc-gacha-body">
+        <span className="arc-gacha-kicker">
+          <Library size={12} /> La collection
+        </span>
+        <h3 className="arc-gacha-name">Machine à capsules</h3>
+        <p className="arc-gacha-pitch">
+          {complete
+            ? "Tu as sorti tous les boîtiers du rayon. L'étagère est complète."
+            : "Une boule, un boîtier — série, film, comic ou cartouche. Jamais deux fois le même."}
+        </p>
+
+        <div className="arc-gacha-progress">
+          <span className="arc-gacha-gauge">
+            <i style={{ width: total ? `${(owned / total) * 100}%` : 0 }} />
+          </span>
+          <em>
+            <strong>{fmt(owned)}</strong> / {fmt(total)} boîtiers
+            {!complete && ` · ${fmt(left)} dans la machine`}
+          </em>
+        </div>
+
+        {teaser.length > 0 && (
+          <div className="arc-gacha-teaser">
+            {teaser.map((b) => (
+              <span
+                key={b.slug}
+                className={b.owned ? "got" : ""}
+                title={complete ? b.title : `${b.title} — pas encore dans ta collection`}
+              >
+                {b.poster ? <img src={b.poster} alt="" loading="lazy" /> : <Library size={14} />}
+              </span>
+            ))}
+            {!complete && left > teaser.length && (
+              <em className="arc-gacha-more">+{fmt(left - teaser.length)}</em>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="arc-gacha-action">
+        {complete ? (
+          <Link to="/collection" className="arc-gacha-btn clickable">
+            <Library size={15} /> Voir l'étagère
+          </Link>
+        ) : (
+          <>
+            {/* Solde insuffisant : on laisse cliquable (voir le contenu de la
+                machine a de l'intérêt) mais on ne le fait plus briller. */}
+            <button className="arc-gacha-btn clickable" onClick={onOpen}>
+              <Sparkles size={15} /> Tourner
+              <span className="arc-gacha-price">
+                <Coins size={12} /> {fmt(price)}
+              </span>
+            </button>
+            {!afford && (
+              <span className="arc-gacha-need">− {fmt(price - points)} points</span>
+            )}
+          </>
+        )}
+      </div>
+    </article>
   );
 }
 

@@ -6,6 +6,7 @@ import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { sendMail } from "../lib/mailer.js";
 import { readFeatures } from "../lib/features.js";
+import { logEvent, ipOf } from "../lib/audit.js";
 
 const router = express.Router();
 
@@ -67,6 +68,15 @@ router.post("/register", async (req, res) => {
     const user = await User.create({ email, username, passwordHash });
 
     const token = signToken(user.id, false);
+    logEvent({
+      kind: "auth",
+      label: "a créé son compte",
+      actor: user._id,
+      actorName: user.username,
+      ip: ipOf(req),
+      ua: req.headers["user-agent"] || "",
+      meta: { email },
+    });
     res.status(201).json({ token, user: user.toPublic() });
   } catch (err) {
     console.error("register error:", err);
@@ -91,16 +101,44 @@ router.post("/login", async (req, res) => {
       : { username: new RegExp(`^${escapeRegex(identifier)}$`, "i") };
     const user = await User.findOne(query);
 
+    // Les ÉCHECS de connexion sont journalisés, et c'est le plus important de
+    // tout ce fichier : trente refus d'affilée sur le même compte depuis la
+    // même adresse, c'est une attaque, et rien d'autre ne le dirait. On note
+    // l'identifiant tenté, jamais le mot de passe.
+    const refuse = (why) => {
+      logEvent({
+        kind: "auth",
+        label: "connexion refusée",
+        actor: user?._id || null,
+        actorName: user?.username || identifier.slice(0, 60),
+        status: 401,
+        ip: ipOf(req),
+        ua: req.headers["user-agent"] || "",
+        meta: { identifier: identifier.slice(0, 60), reason: why },
+      });
+    };
+
     if (!user) {
+      refuse("compte inconnu");
       return res.status(401).json({ error: "Identifiants incorrects." });
     }
 
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) {
+      refuse("mot de passe faux");
       return res.status(401).json({ error: "Identifiants incorrects." });
     }
 
     const token = signToken(user.id, !!remember);
+    logEvent({
+      kind: "auth",
+      label: "s'est connecté",
+      actor: user._id,
+      actorName: user.username,
+      ip: ipOf(req),
+      ua: req.headers["user-agent"] || "",
+      meta: { remember: !!remember },
+    });
     res.json({ token, user: user.toPublic() });
   } catch (err) {
     console.error("login error:", err);

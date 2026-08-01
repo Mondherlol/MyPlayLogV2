@@ -19,6 +19,10 @@ import {
   LogOut,
   Link2,
   Check,
+  Play,
+  MessagesSquare,
+  Pencil,
+  Hourglass,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useChat } from "../context/ChatContext";
@@ -46,6 +50,12 @@ import { playHeatTick, playRejectSound, playRewardSound } from "../lib/sfx";
 //   - on voit les autres taper, lettre à lettre.
 // Tout le direct passe par le flux SSE de la messagerie (évènement « mot »),
 // déjà ouvert pour le chat — aucun tunnel supplémentaire.
+//
+// ------------------------------------------------------------- les équipes
+// Une session meurt à minuit avec son mot ; une ÉQUIPE (models/MotTeam.js) est
+// la liste des gens avec qui on cherche, et elle, elle reste. Le rail affiche
+// donc « Tes équipes » avec un bouton unique : le premier qui clique ouvre la
+// partie du jour, les autres l'y rejoignent. Personne n'a rien à réinviter.
 //
 // La réponse n'est jamais envoyée au client avant d'être trouvée : tout le monde
 // joue la même énigme toute la journée.
@@ -120,6 +130,7 @@ export default function MotDuJour() {
   const [showInvite, setShowInvite] = useState(false);
   const [busy, setBusy] = useState(false); // création / entrée / sortie de partie
   const [invitation, setInvitation] = useState(null); // arrivée par un lien
+  const [teamInvite, setTeamInvite] = useState(null); // arrivée par un lien d'équipe
   const [typers, setTypers] = useState({}); // userId → { user, text, at }
   const [toasts, setToasts] = useState([]); // arrivées / départs, éphémères
 
@@ -155,12 +166,15 @@ export default function MotDuJour() {
     }
   }, [token]);
 
+  // Le classement du jour porte DEUX listes : ceux qui ont trouvé (`entries`,
+  // le classement proprement dit) et ceux qui cherchent encore (`searching`,
+  // avec leur compteur d'essais en direct).
   const loadBoard = useCallback(async () => {
     try {
       const d = await apiFetch("/mot/board", { token });
-      setBoard(d.entries || []);
+      setBoard({ entries: d.entries || [], searching: d.searching || [] });
     } catch {
-      setBoard([]);
+      setBoard({ entries: [], searching: [] });
     }
   }, [token]);
 
@@ -179,6 +193,18 @@ export default function MotDuJour() {
     loadBoard();
     loadOpenSessions();
   }, [token, loadToday, loadBoard, loadOpenSessions]);
+
+  // Le tableau respire : les compteurs de ceux qui cherchent encore n'ont
+  // d'intérêt qu'à jour. Une relève par minute suffit largement — c'est un jeu
+  // qui se joue sur la journée, pas à la seconde — et l'onglet en arrière-plan
+  // ne réveille personne.
+  useEffect(() => {
+    if (!token) return undefined;
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") loadBoard();
+    }, 60000);
+    return () => clearInterval(id);
+  }, [token, loadBoard]);
 
   // --- Arrivée par un lien d'invitation (/mot?s=CODE) ---
   // On NE REJOINT PAS tout seul : entrer dans une partie, c'est y verser ses
@@ -203,6 +229,29 @@ export default function MotDuJour() {
       alive = false;
     };
   }, [token, code, setParams, loadToday]);
+
+  // --- Arrivée par un lien d'ÉQUIPE (/mot?t=CODE) ---
+  // Contrairement au lien de session, celui-ci ne périme pas : il ouvre la
+  // partie du jour, quel que soit le jour où on clique. Entrer dans l'équipe ne
+  // coûte aucun essai — c'est le carnet d'adresses, pas la table — donc la
+  // modale est une présentation, pas un avertissement.
+  const teamCode = params.get("t");
+  useEffect(() => {
+    if (!token || !teamCode) return undefined;
+    let alive = true;
+    apiFetch(`/mot/team/${teamCode}`, { token })
+      .then((d) => {
+        if (!alive) return;
+        if (d.member) {
+          setParams({}, { replace: true });
+          loadToday();
+        } else setTeamInvite(d);
+      })
+      .catch((e) => alive && setErr(e.message));
+    return () => {
+      alive = false;
+    };
+  }, [token, teamCode, setParams, loadToday]);
 
   useEffect(() => {
     if (!deadlineRef.current) return undefined;
@@ -306,6 +355,25 @@ export default function MotDuJour() {
       }
     });
   }, [inSession, session?.code, subscribe, loadToday, loadBoard, toast, user?.id]);
+
+  // --- « Ton équipe vient de lancer la partie » ---
+  // Écouté HORS session, contrairement au reste du direct : c'est justement
+  // l'évènement qui fait entrer dans une partie qu'on n'a pas encore rejointe.
+  // Il ne porte pas de `code` de session, donc l'écouteur de table ci-dessus
+  // l'ignore de lui-même.
+  useEffect(() => {
+    if (!subscribe) return undefined;
+    return subscribe((event, data) => {
+      if (event !== "mot" || data?.kind !== "team") return;
+      toast({
+        kind: "team",
+        user: data.by,
+        teamName: data.teamName,
+        tries: data.tries,
+      });
+      loadToday();
+    });
+  }, [subscribe, loadToday, toast]);
 
   // Les indicateurs de frappe s'éteignent d'eux-mêmes : si un joueur ferme son
   // onglet en plein mot, personne ne doit rester avec son « CAR » à l'écran.
@@ -456,6 +524,76 @@ export default function MotDuJour() {
     } catch (e) {
       setErr(e.message);
       setInvitation(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // La partie du jour d'une équipe : UN SEUL geste pour deux situations. Si
+  // personne n'a encore lancé, on ouvre la table ; sinon on la rejoint. Le
+  // joueur n'a pas à savoir lequel des deux il déclenche.
+  async function playWithTeam(code) {
+    if (busy) return;
+    setBusy(true);
+    setErr("");
+    try {
+      const d = await apiFetch(`/mot/team/${code}/play`, { method: "POST", token });
+      setState((s) => (s ? { ...s, session: d.session } : s));
+      setTypers({});
+      loadToday();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function joinTeam(code, { play = false } = {}) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await apiFetch(`/mot/team/${code}/join`, { method: "POST", token });
+      setTeamInvite(null);
+      setParams({}, { replace: true });
+      if (play) {
+        setBusy(false);
+        await playWithTeam(code);
+        return;
+      }
+      await loadToday();
+    } catch (e) {
+      setErr(e.message);
+      setTeamInvite(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function renameTeam(code, current) {
+    const name = window.prompt("Nom de l'équipe :", current || "");
+    if (name === null) return;
+    try {
+      await apiFetch(`/mot/team/${code}`, { method: "PATCH", token, body: { name } });
+      loadToday();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+
+  async function leaveTeam(code) {
+    if (busy) return;
+    if (
+      !window.confirm(
+        "Quitter l'équipe ? Elle ne réapparaîtra plus dans ton rail les prochains jours."
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      await apiFetch(`/mot/team/${code}/leave`, { method: "POST", token });
+      await loadToday();
+    } catch (e) {
+      setErr(e.message);
     } finally {
       setBusy(false);
     }
@@ -627,6 +765,20 @@ export default function MotDuJour() {
           />
         )}
 
+        {/* Les équipes, juste sous la table du jour : c'est le raccourci de
+            demain matin. Elles restent visibles même en session — on peut
+            appartenir à deux bandes et changer d'avis. */}
+        {!done && (
+          <Teams
+            teams={state?.teams || []}
+            busy={busy}
+            currentCode={session?.code}
+            onPlay={playWithTeam}
+            onRename={renameTeam}
+            onLeave={leaveTeam}
+          />
+        )}
+
         <button className="mdj-archive-btn clickable" onClick={() => setShowArchive(true)}>
           <span className="mdj-archive-ic">
             <History size={17} />
@@ -654,7 +806,7 @@ export default function MotDuJour() {
             <div className="mdj-state" style={{ minHeight: 110 }}>
               <Loader2 size={18} className="spin" />
             </div>
-          ) : board.length === 0 ? (
+          ) : board.entries.length === 0 ? (
             <div className="mdj-board-empty">
               <span aria-hidden="true">👑</span>
               <p>Personne n'a encore trouvé.</p>
@@ -662,11 +814,21 @@ export default function MotDuJour() {
             </div>
           ) : (
             <ol className="mdj-board-list">
-              {board.map((e, i) => (
+              {board.entries.map((e, i) => (
                 <BoardRow key={`${e.user.id}-${i}`} entry={e} rank={i + 1} />
               ))}
             </ol>
           )}
+
+          {/* Ceux qui cherchent encore. C'est l'information qui manquait le
+              plus : jusqu'au soir le classement est vide, alors que la moitié
+              du cercle sue sur le même mot. Voir « Marine · 23 essais » quand
+              on en est à 12 change tout le sel de la journée — et un compteur
+              d'essais ne divulgue évidemment rien du mot. */}
+          {board?.searching?.length > 0 && (
+            <Searching rows={board.searching} />
+          )}
+
           <p className="mdj-board-note">
             Classé au nombre d'essais, le temps de partie départage. Une équipe compte
             pour une ligne&nbsp;: le total du groupe vaut pour chacun.
@@ -687,6 +849,18 @@ export default function MotDuJour() {
           onJoin={() => joinSession(invitation.session.code)}
           onDismiss={() => {
             setInvitation(null);
+            setParams({}, { replace: true });
+          }}
+        />
+      )}
+
+      {teamInvite && (
+        <TeamInvite
+          data={teamInvite}
+          busy={busy}
+          onJoin={(play) => joinTeam(teamInvite.team.code, { play })}
+          onDismiss={() => {
+            setTeamInvite(null);
             setParams({}, { replace: true });
           }}
         />
@@ -838,12 +1012,16 @@ function Toasts({ list }) {
                 a rejoint la partie
                 {t.tries != null && <> · {t.tries} essais en commun</>}
               </em>
+            ) : t.kind === "team" ? (
+              <em>
+                a lancé la partie{t.teamName ? ` de ${t.teamName}` : " de ton équipe"}
+              </em>
             ) : (
               <em>est reparti en solo</em>
             )}
           </span>
           <span className="mdj-toast-ic" aria-hidden="true">
-            {t.kind === "join" ? "👋" : "🚪"}
+            {t.kind === "join" ? "👋" : t.kind === "team" ? "🎯" : "🚪"}
           </span>
         </div>
       ))}
@@ -922,6 +1100,201 @@ function TeamUp({ busy, sessions, onOpen, onJoin }) {
         </ul>
       )}
     </section>
+  );
+}
+
+// ---------- Les équipes permanentes ----------
+// La liste des bandes avec qui on cherche. Une session meurt à minuit, une
+// équipe non : c'est ici qu'on retrouve les mêmes joueurs le lendemain, sans
+// avoir à réinviter personne (cf. models/MotTeam.js).
+function Teams({ teams, busy, currentCode, onPlay, onRename, onLeave }) {
+  if (!teams.length) return null;
+  return (
+    <section className="mdj-teams">
+      <header className="mdj-teams-head">
+        <span className="mdj-teamup-ic">
+          <Users size={17} />
+        </span>
+        <span className="mdj-teamup-txt">
+          <b>Tes équipes</b>
+          <em>Les mêmes joueurs chaque jour, rien à réinviter.</em>
+        </span>
+      </header>
+      <ul className="mdj-teams-list">
+        {teams.map((t) => (
+          <TeamRow
+            key={t.code}
+            team={t}
+            busy={busy}
+            here={t.session?.code && t.session.code === currentCode}
+            onPlay={() => onPlay(t.code)}
+            onRename={() => onRename(t.code, t.name)}
+            onLeave={() => onLeave(t.code)}
+          />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function TeamRow({ team, busy, here, onPlay, onRename, onLeave }) {
+  const [copied, setCopied] = useState(false);
+  const s = team.session;
+  const label =
+    team.name ||
+    team.members
+      .slice(0, 3)
+      .map((m) => m.username)
+      .join(", ") + (team.members.length > 3 ? ` +${team.members.length - 3}` : "");
+
+  async function copyLink() {
+    // LE LIEN DE L'ÉQUIPE, PAS CELUI DE LA PARTIE : il ouvrira encore la partie
+    // du jour dans une semaine, alors qu'un lien de session meurt à minuit.
+    const url = `${window.location.origin}/mot?t=${team.code}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      window.prompt("Copie ce lien :", url);
+    }
+  }
+
+  return (
+    <li className={`mdj-team ${here ? "here" : ""}`}>
+      <span className="mdj-sess-faces">
+        {team.members.slice(0, 4).map((m) => (
+          <Face key={m.id} user={m} size={26} />
+        ))}
+      </span>
+      <span className="mdj-team-txt">
+        <b>{label || "Ton équipe"}</b>
+        <em>
+          {s?.solved
+            ? "A trouvé le mot aujourd'hui"
+            : here
+              ? `Vous cherchez ensemble · ${s?.tries || 0} essais`
+              : s
+                ? `${s.players} en train de chercher · ${s.tries} essais`
+                : "Personne n'a encore lancé aujourd'hui"}
+        </em>
+      </span>
+      <span className="mdj-team-actions">
+        {!s?.solved && !here && (
+          <button className="mdj-team-play clickable" onClick={onPlay} disabled={busy}>
+            {busy ? (
+              <Loader2 size={13} className="spin" />
+            ) : s ? (
+              <Users size={13} />
+            ) : (
+              <Play size={13} />
+            )}
+            {s ? "Rejoindre" : "Lancer"}
+          </button>
+        )}
+        <button
+          className="mdj-team-ic clickable"
+          onClick={copyLink}
+          title="Copier le lien permanent de l'équipe"
+        >
+          {copied ? <Check size={14} /> : <Link2 size={14} />}
+        </button>
+        <button className="mdj-team-ic clickable" onClick={onRename} title="Renommer">
+          <Pencil size={14} />
+        </button>
+        <button
+          className="mdj-team-ic clickable"
+          onClick={onLeave}
+          disabled={busy}
+          title="Quitter l'équipe"
+        >
+          <LogOut size={14} />
+        </button>
+      </span>
+    </li>
+  );
+}
+
+// ---------- Arrivée par un lien d'équipe ----------
+// Rien à voir avec l'invitation à une session : entrer dans une équipe ne coûte
+// AUCUN essai (c'est le carnet d'adresses, pas la table). On présente donc la
+// bande, et on laisse le choix entre entrer simplement et jouer tout de suite.
+function TeamInvite({ data, busy, onJoin, onDismiss }) {
+  const t = data.team;
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => e.key === "Escape" && onDismiss();
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [onDismiss]);
+
+  const canPlay = !data.alreadySolved && !t.session?.solved;
+
+  return createPortal(
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => e.target === e.currentTarget && onDismiss()}
+    >
+      <div className="mdj-join">
+        <span className="mdj-join-glow" aria-hidden="true" />
+
+        <span className="mdj-join-faces">
+          {t.members.slice(0, 5).map((m) => (
+            <Face key={m.id} user={m} size={54} />
+          ))}
+        </span>
+
+        <h2 className="mdj-join-title">
+          Rejoins l'équipe
+          <br />
+          {t.name || t.members.map((m) => m.username).join(" & ")}
+        </h2>
+
+        <p className="mdj-join-sub">
+          Vous chercherez le mot ensemble <b>chaque jour</b>, sans avoir à vous
+          réinviter. Entrer dans l'équipe ne coûte aucun essai.
+        </p>
+
+        {t.session && !t.session.solved && (
+          <p className="mdj-join-warn">
+            La partie du jour est déjà lancée&nbsp;: {t.session.players} joueur
+            {t.session.players > 1 ? "s" : ""} et {t.session.tries} essai
+            {t.session.tries > 1 ? "s" : ""} en commun. Les rejoindre y versera tes{" "}
+            {data.myTries || 0} essais.
+          </p>
+        )}
+        {data.alreadySolved && (
+          <p className="mdj-join-sub">
+            Tu as déjà trouvé le mot aujourd'hui — l'équipe te servira dès demain.
+          </p>
+        )}
+
+        <div className="mdj-join-actions">
+          {canPlay && (
+            <button
+              className="mdj-join-yes clickable"
+              onClick={() => onJoin(true)}
+              disabled={busy}
+            >
+              {busy ? <Loader2 size={15} className="spin" /> : <Users size={15} />}
+              {t.session ? "Rejoindre la partie" : "Entrer et lancer la partie"}
+            </button>
+          )}
+          <button
+            className="mdj-join-no clickable"
+            onClick={() => onJoin(false)}
+            disabled={busy}
+          >
+            Entrer dans l'équipe seulement
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1253,12 +1626,73 @@ function BoardRow({ entry, rank }) {
   );
 }
 
+// ---------- Ceux qui cherchent encore ----------
+// Volontairement SOUS le classement et sans numéro : ce n'est pas un palmarès,
+// personne n'a fini. C'est l'état de la course, et son seul chiffre est le
+// nombre d'essais brûlés — qui ne dit rien du mot, seulement de la peine.
+function Searching({ rows }) {
+  return (
+    <div className="mdj-live">
+      <h3 className="mdj-live-head">
+        <Hourglass size={12} /> En train de chercher
+      </h3>
+      <ul className="mdj-live-list">
+        {rows.map((r, i) => {
+          const solo = (r.team || []).length <= 1;
+          return (
+            <li
+              className={`mdj-live-row ${r.isMe ? "me" : ""} ${r.gaveUp ? "out" : ""}`}
+              // Une table en cours n'a pas d'identifiant propre côté client :
+              // la première tête suffit à distinguer les lignes.
+              key={`${r.user.id}-${i}`}
+            >
+              {solo ? (
+                <Link to={`/u/${r.user.username}`} className="mdj-live-who clickable">
+                  <Face user={r.user} size={22} />
+                  <span>{r.user.username}</span>
+                </Link>
+              ) : (
+                <span className="mdj-live-who team">
+                  <span className="mdj-sess-faces">
+                    {r.team.slice(0, 3).map((u) => (
+                      <Face key={u.id} user={u} size={22} />
+                    ))}
+                  </span>
+                  <span>
+                    {r.team.length > 2
+                      ? `${r.team[0].username} +${r.team.length - 1}`
+                      : r.team.map((u) => u.username).join(" & ")}
+                  </span>
+                </span>
+              )}
+              <span className="mdj-live-tries">
+                {r.gaveUp ? "abandon" : `${r.tries} essai${r.tries > 1 ? "s" : ""}`}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 // ---------- Inviter des joueurs ----------
+// DEUX DESTINATIONS, un seul geste : des personnes (carte en message privé) et
+// des GROUPES de discussion (carte dans le fil commun). Inviter les cinq
+// personnes d'un groupe une par une, c'était cinq messages privés pour une
+// seule partie, et cinq endroits où répondre — alors que le groupe existe déjà.
+//
+// Inviter constitue aussi l'ÉQUIPE : les invités du jour sont les coéquipiers
+// de demain, et le lien affiché ici devient permanent dès qu'elle existe.
 function InviteModal({ token, meId, session, onClose }) {
   const [people, setPeople] = useState(null);
+  const [groups, setGroups] = useState([]);
+  // Une seule sélection pour les deux listes, préfixée : « u:<id> » pour une
+  // personne, « g:<id> » pour un groupe.
   const [picked, setPicked] = useState(() => new Set());
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState("");
+  const [team, setTeam] = useState(session.team || null);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -1277,17 +1711,25 @@ function InviteModal({ token, meId, session, onClose }) {
     apiFetch(`/users/${meId}/followers`, { token })
       .then((d) => setPeople((d.users || []).filter((u) => !already.has(u.id))))
       .catch(() => setPeople([]));
+    // Les groupes viennent de la messagerie : ce sont ceux où j'écris déjà.
+    // Les conversations « virtuelles » (un abonné sans fil ouvert) n'en sont
+    // pas, elles n'ont pas d'identifiant en base — d'où le filtre.
+    apiFetch("/chat/conversations", { token })
+      .then((d) =>
+        setGroups((d.conversations || []).filter((c) => c.isGroup && !c.virtual))
+      )
+      .catch(() => setGroups([]));
     return () => {
       document.body.style.overflow = "";
       document.removeEventListener("keydown", onKey);
     };
   }, [onClose, token, meId, session.members]);
 
-  function toggle(id) {
+  function toggle(key) {
     setPicked((p) => {
       const next = new Set(p);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   }
@@ -1296,14 +1738,25 @@ function InviteModal({ token, meId, session, onClose }) {
     if (!picked.size || sending) return;
     setSending(true);
     try {
+      const keys = [...picked];
       const d = await apiFetch(`/mot/session/${session.code}/invite`, {
         method: "POST",
         token,
-        body: { userIds: [...picked] },
+        body: {
+          userIds: keys.filter((k) => k.startsWith("u:")).map((k) => k.slice(2)),
+          conversationIds: keys.filter((k) => k.startsWith("g:")).map((k) => k.slice(2)),
+        },
       });
+      const bits = [];
+      if (d.sent.length) bits.push(`${d.sent.length} joueur${d.sent.length > 1 ? "s" : ""}`);
+      if (d.groups?.length)
+        bits.push(`${d.groups.length} groupe${d.groups.length > 1 ? "s" : ""}`);
       setDone(
-        `Invitation envoyée à ${d.sent.length} joueur${d.sent.length > 1 ? "s" : ""}.`
+        bits.length
+          ? `Invitation envoyée à ${bits.join(" et ")}.`
+          : "Personne n'a pu être prévenu — partage le lien."
       );
+      if (d.team) setTeam(d.team);
       setPicked(new Set());
     } catch (e) {
       setDone(e.message);
@@ -1312,7 +1765,11 @@ function InviteModal({ token, meId, session, onClose }) {
     }
   }
 
-  const link = `${window.location.origin}/mot?s=${session.code}`;
+  // Dès qu'une équipe existe, c'est SON lien qu'on partage : il ouvrira encore
+  // la partie du jour dans une semaine, là où un lien de session meurt à minuit.
+  const link = team
+    ? `${window.location.origin}/mot?t=${team.code}`
+    : `${window.location.origin}/mot?s=${session.code}`;
 
   return createPortal(
     <div
@@ -1331,14 +1788,62 @@ function InviteModal({ token, meId, session, onClose }) {
 
         <div className="mdj-inv-body">
           <label className="mdj-inv-link">
-            <span>Lien de la partie</span>
+            <span>{team ? "Lien permanent de l'équipe" : "Lien de la partie"}</span>
             <input value={link} readOnly onFocus={(e) => e.target.select()} />
           </label>
 
           <p className="mdj-inv-note">
-            L'invitation par message ne part qu'à tes abonnés. Pour les autres, le lien
-            suffit — il ouvre la partie après connexion.
+            {team
+              ? "Ce lien ne périme pas : il ouvre la partie du jour, aujourd'hui comme dans un mois."
+              : "L'invitation par message ne part qu'à tes abonnés. Pour les autres, le lien suffit — il ouvre la partie après connexion."}
           </p>
+
+          {groups.length > 0 && (
+            <>
+              <h3 className="mdj-inv-sub">
+                <MessagesSquare size={13} /> Tes groupes
+              </h3>
+              <ul className="mdj-inv-list">
+                {groups.map((g) => {
+                  const key = `g:${g.id}`;
+                  return (
+                    <li key={g.id}>
+                      <button
+                        className={`mdj-inv-row clickable ${picked.has(key) ? "on" : ""}`}
+                        onClick={() => toggle(key)}
+                      >
+                        {g.avatar ? (
+                          <img
+                            className="mdj-face"
+                            src={g.avatar}
+                            alt=""
+                            style={{ width: 30, height: 30 }}
+                            loading="lazy"
+                            draggable="false"
+                          />
+                        ) : (
+                          <span
+                            className="mdj-face letters"
+                            style={{ width: 30, height: 30, fontSize: 13 }}
+                          >
+                            <MessagesSquare size={14} />
+                          </span>
+                        )}
+                        <span className="mdj-inv-name">
+                          {g.title}
+                          <em>
+                            {g.participants.length} membre
+                            {g.participants.length > 1 ? "s" : ""}
+                          </em>
+                        </span>
+                        {picked.has(key) && <Check size={16} />}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
 
           {people === null ? (
             <div className="mdj-state" style={{ minHeight: 90 }}>
@@ -1349,26 +1854,39 @@ function InviteModal({ token, meId, session, onClose }) {
               Personne à qui écrire pour l'instant — partage le lien.
             </p>
           ) : (
-            <ul className="mdj-inv-list">
-              {people.map((p) => (
-                <li key={p.id}>
-                  <button
-                    className={`mdj-inv-row clickable ${picked.has(p.id) ? "on" : ""}`}
-                    onClick={() => toggle(p.id)}
-                  >
-                    <Face user={p} size={30} />
-                    <span className="mdj-inv-name">{p.username}</span>
-                    {picked.has(p.id) && <Check size={16} />}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <>
+              {groups.length > 0 && (
+                <h3 className="mdj-inv-sub">
+                  <Users size={13} /> Une par une
+                </h3>
+              )}
+              <ul className="mdj-inv-list">
+                {people.map((p) => {
+                  const key = `u:${p.id}`;
+                  return (
+                    <li key={p.id}>
+                      <button
+                        className={`mdj-inv-row clickable ${picked.has(key) ? "on" : ""}`}
+                        onClick={() => toggle(key)}
+                      >
+                        <Face user={p} size={30} />
+                        <span className="mdj-inv-name">{p.username}</span>
+                        {picked.has(key) && <Check size={16} />}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           )}
 
           {done && <p className="mdj-inv-done">{done}</p>}
         </div>
 
         <div className="mdj-inv-foot">
+          <span className="mdj-inv-foot-note">
+            Les invités deviennent ton équipe&nbsp;: demain, un clic suffira.
+          </span>
           <button
             className="mdj-win-btn clickable"
             onClick={send}

@@ -9,6 +9,7 @@ import {
   Minimize,
   RotateCcw,
   RotateCw,
+  Clapperboard,
 } from "lucide-react";
 
 // ======================================================================
@@ -46,6 +47,10 @@ export default function GameVideoPlayer({ src, poster, autoPlay = false, classNa
   const [fullscreen, setFullscreen] = useState(false);
   const [controlsShown, setControlsShown] = useState(true);
   const [ripple, setRipple] = useState(null); // { side: "left"|"right", id }
+  // Tant qu'il n'y a RIEN à montrer, on ne montre pas un trou noir : cf. le
+  // squelette plus bas. `false` au montage, vrai dès que la vignette est
+  // décodée ou que la vidéo tient sa première image.
+  const [painted, setPainted] = useState(false);
 
   // --- Synchro avec l'élément vidéo ---
   useEffect(() => {
@@ -60,6 +65,7 @@ export default function GameVideoPlayer({ src, poster, autoPlay = false, classNa
       }
     };
     const onMeta = () => setDuration(v.duration || 0);
+    const onData = () => setPainted(true);
     const onPlay = () => {
       setIsPlaying(true);
       // Pause les autres lecteurs du fil.
@@ -76,19 +82,36 @@ export default function GameVideoPlayer({ src, poster, autoPlay = false, classNa
     };
     v.addEventListener("timeupdate", onTime);
     v.addEventListener("loadedmetadata", onMeta);
+    v.addEventListener("loadeddata", onData);
     v.addEventListener("play", onPlay);
     v.addEventListener("pause", onPause);
     v.addEventListener("ended", onEnd);
     if (v.readyState >= 1) onMeta();
+    if (v.readyState >= 2) onData();
     return () => {
       v.removeEventListener("timeupdate", onTime);
       v.removeEventListener("loadedmetadata", onMeta);
+      v.removeEventListener("loadeddata", onData);
       v.removeEventListener("play", onPlay);
       v.removeEventListener("pause", onPause);
       v.removeEventListener("ended", onEnd);
       playing.delete(v);
     };
   }, []);
+
+  // La vignette, quand il y en a une : c'est ELLE qui lève le squelette, bien
+  // avant que la vidéo ait tiré de quoi décoder une image. Une image d'attente
+  // qu'on n'attend pas ne servirait à rien.
+  useEffect(() => {
+    if (!poster) return;
+    const img = new Image();
+    img.onload = () => setPainted(true);
+    img.src = poster;
+    if (img.complete) setPainted(true); // déjà en cache
+    return () => {
+      img.onload = null;
+    };
+  }, [poster]);
 
   // Plein écran : suit l'état réel (Échap natif compris).
   useEffect(() => {
@@ -228,7 +251,9 @@ export default function GameVideoPlayer({ src, poster, autoPlay = false, classNa
   return (
     <div
       ref={wrapRef}
-      className={`gvp ${controlsShown ? "show-ui" : ""} ${fullscreen ? "is-fs" : ""} ${className}`}
+      className={`gvp ${controlsShown ? "show-ui" : ""} ${fullscreen ? "is-fs" : ""} ${
+        painted ? "is-painted" : "is-loading"
+      } ${className}`}
       onPointerMove={poke}
     >
       <video
@@ -241,6 +266,22 @@ export default function GameVideoPlayer({ src, poster, autoPlay = false, classNa
         onClick={(e) => e.preventDefault()}
       />
 
+      {/* ============================================================
+          LE CLIP QUI N'EST PAS ENCORE LÀ
+          ============================================================
+          Un rectangle noir au milieu d'une carte du fil ne dit rien : ni qu'il
+          y a une vidéo, ni qu'elle arrive, ni combien de temps ça va prendre —
+          on croit à une carte cassée. Ce squelette dit les trois d'un coup : la
+          forme d'un clip (clap de cinéma), le balayage qui signale un chargement
+          en cours, et il s'efface DÈS que la vignette est décodée, donc presque
+          tout de suite. */}
+      {!painted && (
+        <div className="gvp-skel" aria-hidden="true">
+          <span className="gvp-skel-sheen" />
+          <Clapperboard size={22} />
+        </div>
+      )}
+
       {/* Surface de tap (play/pause + double-tap seek) */}
       <div className="gvp-surface" onPointerUp={onSurface} />
 
@@ -252,8 +293,9 @@ export default function GameVideoPlayer({ src, poster, autoPlay = false, classNa
         </span>
       )}
 
-      {/* Gros play central quand en pause */}
-      {!isPlaying && (
+      {/* Gros play central quand en pause — pas avant qu'il y ait une image
+          dessous : proposer de lancer un clip qu'on ne voit pas encore. */}
+      {!isPlaying && painted && (
         <span className="gvp-bigplay" aria-hidden="true">
           <Play size={26} fill="currentColor" />
         </span>

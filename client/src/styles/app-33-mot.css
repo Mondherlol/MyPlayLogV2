@@ -691,6 +691,117 @@
   color: var(--accent-ink);
 }
 
+/* --- Les équipes permanentes ---
+   Même dessin que le bloc « chercher à plusieurs » juste au-dessus, mais en
+   trait plein : une équipe n'est pas une proposition, elle existe déjà. */
+.mdj-teams {
+  padding: 13px 15px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--mdj-panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.mdj-teams-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mdj-teams-list {
+  list-style: none;
+  margin: 11px 0 0;
+  padding: 11px 0 0;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.mdj-team {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+}
+
+/* L'équipe dont on occupe la table : c'est la partie en cours, pas un
+   raccourci à cliquer. */
+.mdj-team.here {
+  padding: 8px 9px;
+  margin: -8px -9px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--orange) 9%, transparent);
+}
+
+.mdj-team-txt {
+  flex: 1;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+}
+
+.mdj-team-txt b {
+  overflow: hidden;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.mdj-team-txt em {
+  font-size: 0.73rem;
+  font-style: normal;
+  color: var(--text-soft);
+}
+
+.mdj-team-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.mdj-team-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #2a1d00;
+  transition: filter 0.15s ease;
+}
+
+.mdj-team-play:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.mdj-team-play:disabled {
+  opacity: 0.55;
+}
+
+.mdj-team-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-soft);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.mdj-team-ic:hover:not(:disabled) {
+  border-color: var(--orange);
+  color: var(--accent-ink);
+}
+
 /* --- L'invitation, à l'arrivée sur la page ---
    Une MODALE et pas un bandeau : accepter verse définitivement ses essais
    solo au pot commun. Une décision irréversible mérite qu'on s'arrête
@@ -967,6 +1078,29 @@
   white-space: nowrap;
 }
 
+/* Second niveau d'une ligne de groupe (« 5 membres ») : le nom garde sa
+   graisse, le décompte passe dessous en gris. */
+.mdj-inv-name em {
+  display: block;
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 500;
+  color: var(--text-soft);
+}
+
+/* Les deux familles de destinataires — les groupes, puis les personnes. */
+.mdj-inv-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 14px 0 6px;
+  font-size: 0.71rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
 .mdj-inv-row:hover {
   background: var(--surface-2);
 }
@@ -984,8 +1118,23 @@
 }
 
 .mdj-inv-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   padding: 14px 20px;
   border-top: 1px solid var(--border);
+}
+
+/* La promesse de l'invitation, au ras du bouton : ce qu'on envoie ne vaut pas
+   que pour aujourd'hui. */
+.mdj-inv-foot-note {
+  flex: 1;
+  min-width: 150px;
+  font-size: 0.73rem;
+  line-height: 1.4;
+  color: var(--text-soft);
 }
 
 /* --- Carte d'invitation dans la messagerie --- */
@@ -1821,6 +1970,95 @@
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--text);
+}
+
+/* --- Ceux qui cherchent encore ---
+   Sous le classement, sans numéro et en plus petit : ce n'est pas un palmarès,
+   personne n'a fini. Juste la course en cours, et ce qu'elle coûte. */
+.mdj-live {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px dashed var(--border-strong);
+}
+
+.mdj-live-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 7px;
+  font-size: 0.71rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.mdj-live-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.mdj-live-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 7px;
+  border-radius: 9px;
+}
+
+.mdj-live-row.me {
+  background: color-mix(in srgb, var(--orange) 9%, transparent);
+}
+
+.mdj-live-row.out {
+  opacity: 0.55;
+}
+
+.mdj-live-who {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-size: 0.81rem;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.mdj-live-who > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mdj-live-who.team {
+  cursor: default;
+}
+
+.mdj-live-who .mdj-sess-faces .mdj-face {
+  margin-left: -8px;
+  border-width: 2px;
+}
+
+.mdj-live-who .mdj-sess-faces .mdj-face:first-child {
+  margin-left: 0;
+}
+
+a.mdj-live-who:hover {
+  color: var(--accent-ink);
+}
+
+.mdj-live-tries {
+  flex: 0 0 auto;
+  font-size: 0.74rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-soft);
 }
 
 .mdj-board-note,

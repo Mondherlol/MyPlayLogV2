@@ -57,7 +57,12 @@ import {
   Film,
   BookOpen,
 } from "lucide-react";
-import { PackageOpen, Sparkles as SparklesIc, Copy as CopyIc } from "lucide-react";
+import {
+  PackageOpen,
+  Sparkles as SparklesIc,
+  Copy as CopyIc,
+  Library,
+} from "lucide-react";
 import { Globe2, MapPin, Thermometer, Target } from "lucide-react";
 import { rarityColor, rarityLabel } from "../lib/rarity";
 import RewardArt from "./RewardArt";
@@ -178,6 +183,8 @@ export function FeedCard(props) {
   if (item.type === "mot") return <MotEvent {...props} />;
   if (item.type === "caseopen") return <CaseOpenEvent {...props} />;
   if (item.type === "caseopengroup") return <CaseOpenGroupEvent {...props} />;
+  if (item.type === "collectiondrop") return <CollectionDropEvent {...props} />;
+  if (item.type === "collectiondropgroup") return <CollectionDropGroupEvent {...props} />;
   if (item.type === "trackermatch") return <TrackerMatchEvent {...props} />;
   if (item.type === "trackermatchgroup") return <TrackerMatchGroupEvent {...props} />;
   if (item.type === "rankchange") return <RankChangeEvent {...props} />;
@@ -1439,12 +1446,17 @@ function GameMediaCommentEvent({ item, onComments }) {
       <div className="hf-gmcom-src">
         {thumb ? (
           <span className="hf-gmcom-thumb">
-            <img
-              src={thumb.kind === "video" ? thumb.thumbnail || "" : thumb.url}
-              alt=""
-              loading="lazy"
-              draggable="false"
-            />
+            {/* Un clip d'avant les vignettes automatiques n'a pas d'image : on
+                laisse alors la pastille de lecture seule sur le fond, plutôt
+                qu'une balise `img` vide (donc cassée). */}
+            {(thumb.kind === "video" ? thumb.thumbnail : thumb.url) && (
+              <img
+                src={thumb.kind === "video" ? thumb.thumbnail : thumb.url}
+                alt=""
+                loading="lazy"
+                draggable="false"
+              />
+            )}
             {thumb.kind === "video" && (
               <span className="hf-gmcom-play">
                 <Play size={11} fill="currentColor" strokeWidth={0} />
@@ -1466,6 +1478,141 @@ function GameMediaCommentEvent({ item, onComments }) {
           {p?.commentCount > 0 ? p.commentCount : ""}
         </span>
       </div>
+    </article>
+  );
+}
+
+// ============================================================
+//  Boîtier sorti de la machine à capsules
+// ============================================================
+// C'EST UNE CAPSULE OUVERTE, PAS UNE VIGNETTE. Le fil raconte des gestes, et
+// celui-ci en est un très précis : quelqu'un a tourné une manivelle et un
+// boîtier en est tombé. La carte le rejoue en petit — les deux coquilles
+// écartées, l'objet au milieu, la teinte du titre partout — pour qu'on
+// reconnaisse la machine avant d'avoir lu la ligne, et qu'on ait envie d'aller
+// tourner la sienne.
+//
+// Aucune rareté ici, à la différence des caisses : tous les boîtiers se valent,
+// et ce qui compte n'est pas la chance qu'on a eue mais l'objet qu'on a. La
+// carte met donc en avant le TITRE, pas une étiquette de rareté.
+function CollectionDropEvent({ item }) {
+  const navigate = useNavigate();
+  const m = item.media;
+  if (!m) return null;
+  const kind = COLL_KIND[m.kind] || COLL_KIND.film;
+
+  return (
+    <article
+      className="hf-card hf-drop hf-gacha clickable"
+      style={{ "--drop-rarity": m.color || "var(--orange)" }}
+      onClick={() => navigate(`/collection/${m.slug}`)}
+    >
+      <EventHead user={item.user} date={item.date}>
+        <SparklesIc size={13} className="hf-inline-ic" /> a débloqué un boîtier
+      </EventHead>
+
+      <div className="hf-drop-body">
+        <span className="hf-drop-aura" aria-hidden="true" />
+        {/* Les deux moitiés de capsule, ouvertes autour de l'objet. */}
+        <span className="hf-gacha-shell" aria-hidden="true">
+          <i className="hf-gacha-half top" />
+          <i className="hf-gacha-half bot" />
+        </span>
+        <span className="hf-gacha-case">
+          {m.poster ? (
+            <img src={m.poster} alt="" loading="lazy" draggable="false" />
+          ) : (
+            <kind.Icon size={18} />
+          )}
+          <i className="hf-collcom-spine" aria-hidden="true" />
+        </span>
+        <span className="hf-drop-info">
+          <span className="hf-drop-rarity">
+            {m.franchise || kind.label}
+            {m.year ? ` · ${m.year}` : ""}
+          </span>
+          <strong className="hf-drop-name">{m.title}</strong>
+          <span className="hf-drop-new">
+            <Library size={11} /> ajouté à sa collection
+          </span>
+        </span>
+      </div>
+    </article>
+  );
+}
+
+// Plusieurs tours d'affilée → une seule carte. Le dernier sorti tient la
+// vedette (c'est celui qu'on vient de voir tomber), les autres défilent en
+// vignettes sous lui — et se donnent en vedette au survol, comme les caisses.
+function CollectionDropGroupEvent({ item }) {
+  const navigate = useNavigate();
+  const [peek, setPeek] = useState(null);
+  const shown = peek || item.best;
+  if (!shown) return null;
+  const kind = COLL_KIND[shown.kind] || COLL_KIND.film;
+
+  return (
+    <article
+      className="hf-card hf-drop hf-dropg hf-gacha"
+      style={{ "--drop-rarity": shown.color || "var(--orange)" }}
+    >
+      <EventHead user={item.user} date={item.date}>
+        <SparklesIc size={13} className="hf-inline-ic" /> a débloqué {item.count}{" "}
+        boîtiers
+      </EventHead>
+
+      <div
+        className="hf-drop-body clickable"
+        onClick={() => navigate(`/collection/${shown.slug}`)}
+      >
+        <span className="hf-drop-aura" aria-hidden="true" />
+        <span className="hf-gacha-shell" aria-hidden="true">
+          <i className="hf-gacha-half top" />
+          <i className="hf-gacha-half bot" />
+        </span>
+        <span className="hf-gacha-case">
+          {shown.poster ? (
+            <img src={shown.poster} alt="" loading="lazy" draggable="false" />
+          ) : (
+            <kind.Icon size={18} />
+          )}
+          <i className="hf-collcom-spine" aria-hidden="true" />
+        </span>
+        <span className="hf-drop-info">
+          <span className="hf-drop-rarity">
+            {shown.franchise || kind.label}
+            {shown === item.best && !peek && " · le dernier sorti"}
+          </span>
+          <strong className="hf-drop-name">{shown.title}</strong>
+          <span className="hf-drop-new">
+            <Library size={11} /> {item.count} boîtiers ajoutés à sa collection
+          </span>
+        </span>
+      </div>
+
+      <ul className="hf-dropg-list">
+        {item.drops.map((d) => (
+          <li key={d.id}>
+            <button
+              type="button"
+              className={`hf-dropg-chip clickable ${d.media === item.best ? "best" : ""} ${
+                d.media === peek ? "peek" : ""
+              }`}
+              style={{ "--drop-rarity": d.media.color || "var(--orange)" }}
+              title={d.media.title}
+              onMouseEnter={() => setPeek(d.media)}
+              onMouseLeave={() => setPeek(null)}
+              onClick={() => setPeek((p) => (p === d.media ? null : d.media))}
+            >
+              {d.media.poster ? (
+                <img src={d.media.poster} alt="" loading="lazy" draggable="false" />
+              ) : (
+                <Library size={14} />
+              )}
+            </button>
+          </li>
+        ))}
+      </ul>
     </article>
   );
 }

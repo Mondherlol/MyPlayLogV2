@@ -742,15 +742,24 @@ body.mpl-open .chat-page {
   aspect-ratio: 1 / 1;
 }
 
-/* La photo de l'auteur mène à son profil — au survol, on l'indique. */
+/* La photo de l'auteur mène à son profil — au survol, on l'indique.
+
+   Le lien est CENTREUR, pas un simple bloc : sans photo, la pastille ne
+   contient pas une image mais l'initiale du pseudo, et un `display: block`
+   la collait en haut à gauche du cercle (le centrage de `.chat-row-av` ne
+   s'applique qu'à son enfant direct — le lien — pas au texte à l'intérieur).
+   Une photo, elle, remplit de toute façon les 100 %. */
 .chat-row-av a {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   height: 100%;
   border-radius: 50%;
   overflow: hidden;
   color: inherit;
   text-decoration: none;
+  line-height: 1;
   transition: transform 0.14s ease, box-shadow 0.14s ease;
 }
 

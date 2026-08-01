@@ -1,5 +1,5 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Library,
   LayoutGrid,
@@ -15,12 +15,19 @@ import {
   Gamepad2,
   Power,
   Clock3,
+  Move,
+  Check,
+  Undo2,
+  ArrowLeft,
+  Lock,
+  PartyPopper,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import useMediaQuery from "../hooks/useMediaQuery";
 import CollectionCase from "../components/CollectionCase";
+import GachaModal from "../components/GachaModal";
 import { ShelfSkeleton, GridSkeleton } from "../components/CollectionSkeleton";
 import { KINDS, isComic, resumeLabel, fmtDuration } from "../lib/collection";
 
@@ -28,13 +35,75 @@ import { KINDS, isComic, resumeLabel, fmtDuration } from "../lib/collection";
 // que Playtopia, le bundle principal ne doit pas la porter.
 const CollectionShelf = lazy(() => import("../components/CollectionShelf"));
 
+// Les listes de réglages viennent de la scène elle-même — mais la scène est en
+// chargement paresseux, et la barre d'outils, elle, doit s'afficher tout de
+// suite. Elles sont donc recopiées ici, à la seule fin de dessiner les boutons ;
+// la valeur choisie n'a de sens que pour la scène (voir `plankSkin`).
+const SHELF_SKINS = [
+  { value: "", label: "Selon le thème" },
+  { value: "chene", label: "Chêne" },
+  { value: "noyer", label: "Noyer" },
+  { value: "laque", label: "Laqué" },
+];
+
+const SHELF_DENSITIES = [
+  { value: 10, label: "Large" },
+  { value: 20, label: "Normal" },
+  { value: 34, label: "Serré" },
+];
+
+// Quand un boîtier est entré dans MA collection. C'est cette date-là qui compte
+// pour ranger « par ajout », pas celle où l'admin l'a posé au catalogue : le
+// rayon est commun, l'étagère est à moi, et son histoire commence à la machine.
+const gotAt = (m) => new Date(m.obtainedAt || m.createdAt || 0);
+
+// RANGER D'UN COUP. Déplacer cent boîtiers à la main pour les mettre par ordre
+// alphabétique, personne ne le fera : ces quatre boutons écrivent l'ordre d'un
+// seul geste, et l'on retouche ensuite à la main ce qui doit l'être. Ce ne sont
+// donc PAS des « modes de tri » (il n'y en a qu'un, le sien) : ce sont des
+// coups de main, et leur résultat devient l'ordre personnel.
+const TIDY = [
+  {
+    value: "title",
+    label: "Titre",
+    cmp: (a, b) => (a.title || "").localeCompare(b.title || "", "fr"),
+  },
+  {
+    value: "saga",
+    label: "Saga",
+    // Les titres sans saga passent après, et se rangent entre eux par titre :
+    // sinon ils s'intercalent au hasard entre deux séries qu'ils coupent.
+    cmp: (a, b) =>
+      (a.franchise || "￿").localeCompare(b.franchise || "￿", "fr") ||
+      (a.year || 0) - (b.year || 0) ||
+      (a.title || "").localeCompare(b.title || "", "fr"),
+  },
+  {
+    value: "year",
+    label: "Année",
+    cmp: (a, b) => (a.year || 9999) - (b.year || 9999),
+  },
+  {
+    value: "added",
+    label: "Obtention",
+    cmp: (a, b) => gotAt(b) - gotAt(a),
+  },
+];
+
 // ======================================================================
-//  Collection — l'étagère des médias qui tournent autour du jeu vidéo
+//  Collection — MON étagère de boîtiers
 // ======================================================================
-// Séries, films, animés : ce qui se regarde librement et qui parle de nos
-// jeux. Deux vues du même rayon — l'étagère 3D (par défaut sur grand écran,
-// parce que c'est l'idée) et la grille de boîtiers (toujours disponible, et
-// vue par défaut sur téléphone).
+// LE RAYON EST COMMUN, L'ÉTAGÈRE EST À MOI. Le catalogue (séries, films,
+// animés, comics, cartouches) est garni par l'admin et il est le même pour
+// tout le monde — mais on ne le reçoit pas, on le GAGNE, boîtier par boîtier,
+// à la machine à capsules de l'arcade. Cette page ne montre donc que ce qu'on
+// possède, et le reste du catalogue est une promesse : c'est le compteur
+// « 12 / 40 » en tête de page, et le bouton qui mène à la sphère.
+//
+// La même page sert à regarder celle de quelqu'un d'autre (`/collection/u/:
+// pseudo`) : mêmes boîtiers, mêmes vues, mais en lecture seule — on ne range
+// pas le meuble d'un autre, et ses reprises en cours ne nous regardent pas.
+// Ce qu'on y voit en plus, c'est ce qu'IL a et qu'on n'a pas.
 
 const VIEW_KEY = "mpl_collection_view";
 
@@ -47,14 +116,36 @@ const KIND_FILTERS = [
 ];
 
 export default function Collection() {
-  const { token } = useAuth();
+  const { token, updateUser } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
   const compact = useMediaQuery("(max-width: 900px)");
 
+  // `/collection/u/:pseudo` : l'étagère de quelqu'un d'autre. Absent = la
+  // mienne. Un pseudo qui est le mien retombe sur la mienne (le serveur le dit
+  // dans `owner.isMe`), pour qu'un lien partagé à soi-même ne donne pas une
+  // page bridée.
+  const { username } = useParams();
+  const [owner, setOwner] = useState(null);
+  const visiting = !!username && !owner?.isMe;
+
   const [media, setMedia] = useState([]);
   const [status, setStatus] = useState("loading"); // loading | ready | error
   const [attempt, setAttempt] = useState(0); // « Réessayer » : relance la requête
+  // Combien de boîtiers on possède sur combien il en existe : la jauge de
+  // complétion, et la seule chose qui donne un sens à une étagère à moitié vide.
+  const [tally, setTally] = useState({ owned: 0, total: 0, price: 0 });
+  const [showGacha, setShowGacha] = useState(false);
+
+  // MON MEUBLE. L'ordre où j'ai rangé mes boîtiers, l'essence de la planche, le
+  // nombre de boîtiers par rangée. Ça arrive avec le rayon (même requête) et ça
+  // repart tout seul, sans bouton « enregistrer » : ranger une étagère, ça se
+  // fait en la rangeant.
+  const [shelf, setShelf] = useState({ order: [], skin: "", perPlank: 0 });
+  const [arranging, setArranging] = useState(false);
+  // Ce qui a été touché À LA MAIN : sans ce garde-fou, la première réponse du
+  // serveur se réenregistrerait aussitôt elle-même.
+  const tuned = useRef(false);
 
   const [params, setParams] = useSearchParams();
   const kind = params.get("kind") || "";
@@ -87,21 +178,110 @@ export default function Collection() {
   useEffect(() => {
     let alive = true;
     setStatus("loading");
-    apiFetch("/collection", { token })
+    // Changer d'étagère (la mienne → celle d'un ami) ne doit pas laisser un
+    // instant l'ancienne à l'écran sous le nouveau nom.
+    tuned.current = false;
+    setOwner(null);
+    apiFetch(username ? `/collection/u/${encodeURIComponent(username)}` : "/collection", {
+      token,
+    })
       .then((d) => {
         if (!alive) return;
         setMedia(d.media || []);
+        setOwner(d.owner || null);
+        if (d.gacha) setTally(d.gacha);
+        if (d.shelf)
+          setShelf({
+            order: d.shelf.order || [],
+            skin: d.shelf.skin || "",
+            perPlank: d.shelf.perPlank || 0,
+          });
         setStatus("ready");
       })
       .catch(() => alive && setStatus("error"));
     return () => {
       alive = false;
     };
-  }, [token, attempt]);
+  }, [token, username, attempt]);
+
+  // MON ORDRE D'ABORD, celui du rayon ensuite. Un boîtier que je n'ai jamais
+  // rangé (débloqué depuis) n'a pas de place à moi : il garde celle que lui
+  // donne le rayon, à la suite — rien à migrer, rien à réparer.
+  const ordered = useMemo(() => {
+    if (!shelf.order.length) return media;
+    const rank = new Map(shelf.order.map((slug, i) => [slug, i]));
+    // Deux titres non rangés se comparent à ÉGALITÉ, jamais par soustraction :
+    // `Infinity - Infinity` vaut NaN, et un comparateur qui répond NaN range la
+    // liste au hasard.
+    const at = (m) => rank.get(m.slug) ?? Infinity;
+    return media.slice().sort((a, b) => {
+      const [ra, rb] = [at(a), at(b)];
+      return ra === rb ? 0 : ra - rb;
+    });
+  }, [media, shelf.order]);
+
+  // Un réglage touché part au serveur, mais pas à chaque frémissement : on
+  // déplace un boîtier, puis un autre, puis on change de meuble — c'est une
+  // seule séance de rangement, pas dix enregistrements. (Jamais chez les
+  // autres : on ne range pas le meuble de quelqu'un d'autre.)
+  useEffect(() => {
+    if (!tuned.current || visiting) return undefined;
+    const t = setTimeout(() => {
+      apiFetch("/collection/shelf", { method: "PUT", token, body: shelf }).catch(
+        () => {
+          /* le rangement se perdra à la prochaine visite, rien de plus */
+        }
+      );
+    }, 700);
+    return () => clearTimeout(t);
+  }, [shelf, token, visiting]);
+
+  function tune(patch) {
+    tuned.current = true;
+    setShelf((s) => ({ ...s, ...patch }));
+  }
+
+  // On ne range que devant SA PROPRE étagère : passer en grille (ou réduire la
+  // fenêtre, ce qui revient au même, ou aller voir celle d'un ami) referme
+  // l'établi plutôt que de laisser un mode actif sans rien à quoi l'appliquer.
+  useEffect(() => {
+    if (effectiveView !== "shelf" || visiting) setArranging(false);
+  }, [effectiveView, visiting]);
+
+  // L'ORDRE VIENT DE CE QU'ON VOIT, ET IL DOIT REPARTIR SUR TOUT. Un filtre
+  // actif, c'est une étagère dont on ne déplace qu'une partie des boîtiers : les
+  // titres masqués n'ont pas bougé, ils gardent donc exactement les places
+  // qu'ils occupaient, et les visibles se redistribuent dans les places qui leur
+  // restaient. Sans ça, ranger trois séries pendant un filtre réécrirait tout le
+  // rayon en trois boîtiers.
+  const reorder = useCallback(
+    (visible) => {
+      tuned.current = true;
+      setShelf((s) => {
+        const full = ordered.map((m) => m.slug);
+        const moving = new Set(visible);
+        let i = 0;
+        const next = full.map((slug) =>
+          moving.has(slug) ? visible[i++] : slug
+        );
+        return { ...s, order: next };
+      });
+    },
+    [ordered]
+  );
+
+  // Un coup de rangement d'ensemble : on écrit l'ordre COMPLET, filtre ou pas.
+  // Ranger « par titre » en ne voyant que les films donnerait une étagère rangée
+  // par endroits, ce qui n'est pas ranger.
+  function tidy(kindOfSort) {
+    const rule = TIDY.find((t) => t.value === kindOfSort);
+    if (!rule) return;
+    tune({ order: ordered.slice().sort(rule.cmp).map((m) => m.slug) });
+  }
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return media.filter((m) => {
+    return ordered.filter((m) => {
       if (kind && m.kind !== kind) return false;
       if (
         q &&
@@ -112,7 +292,15 @@ export default function Collection() {
         return false;
       return true;
     });
-  }, [media, kind, query]);
+    // `ordered`, PAS `media` : c'est de lui que sort la liste. Avec `media` en
+    // dépendance, ce filtre gardait son résultat tant que la collection
+    // elle-même ne changeait pas — donc un rangement (glissé-déposé ou « ranger
+    // d'un coup ») mettait bien l'ordre à jour dans la page, mais l'étagère,
+    // elle, continuait de recevoir l'ancienne liste. D'où deux symptômes qui
+    // n'en font qu'un : les boutons de rangement « ne faisaient rien », et un
+    // déplacement ne tenait que dans l'aperçu de la scène — le premier rendu
+    // qui le lâchait faisait réapparaître l'ordre d'origine.
+  }, [ordered, kind, query]);
 
   // LES REPRISES, EN TROIS RAYONS SÉPARÉS. Une seule rangée mélangée mentait
   // sur ce qu'elle proposait : « Reprendre » à côté d'un manga veut dire ouvrir
@@ -154,24 +342,127 @@ export default function Collection() {
       // s'affichent plus nulle part, mais elles gonflaient ce compteur-là — le
       // rayon annonçait des centaines de planches pour des films.
       pages: media.reduce((n, m) => n + (isComic(m) ? m.pageCount || 0 : 0), 0),
+      // Sur l'étagère d'un autre : ce qu'il a et que je n'ai pas. C'est la seule
+      // chose qu'on vienne vraiment y chercher.
+      envy: media.filter((m) => m.mine === false).length,
     }),
     [media]
   );
 
+  const left = Math.max(0, (tally.total || 0) - (tally.owned || 0));
+  const complete = tally.total > 0 && left === 0;
+
+  // L'ÉTABLI PREND LA PLACE DE L'EN-TÊTE. Pendant qu'on range, la carte de
+  // visite du rayon (« Rayon vidéo », le titre, la phrase de présentation, les
+  // compteurs) n'a plus rien à dire : on sait où l'on est, on y travaille. Elle
+  // cède donc son bloc aux outils, au lieu de les faire tenir dans une bande de
+  // plus qui pousserait l'étagère hors de l'écran — et l'étagère est exactement
+  // ce qu'on regarde en rangeant.
+  const workbench =
+    arranging && !compact && effectiveView === "shelf" && shown.length > 0;
+
   return (
     <div className="coll-page">
       {/* ---------------- en-tête ---------------- */}
+      {workbench ? (
+        <header className="coll-head coll-arrange-head">
+          <div className="coll-head-main">
+            <span className="coll-head-icon">
+              <Move size={22} strokeWidth={2.4} />
+            </span>
+            <div>
+              <span className="coll-head-over">Mode rangement</span>
+              <h1 className="coll-head-title">Range ton étagère</h1>
+              <p className="coll-head-sub">
+                Attrape un boîtier et pose-le où tu veux — Échap repose celui que
+                tu tiens.
+              </p>
+            </div>
+          </div>
+
+          <div className="coll-arrange-tools">
+            <div className="coll-arrange-group">
+              <span className="coll-arrange-label">Ranger d'un coup</span>
+              <div className="coll-arrange-btns">
+                {TIDY.map((t) => (
+                  <button
+                    key={t.value}
+                    className="coll-chip clickable"
+                    onClick={() => tidy(t.value)}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="coll-arrange-group">
+              <span className="coll-arrange-label">Meuble</span>
+              <div className="coll-arrange-btns">
+                {SHELF_SKINS.map((s) => (
+                  <button
+                    key={s.value}
+                    className={`coll-chip clickable ${
+                      shelf.skin === s.value ? "active" : ""
+                    }`}
+                    onClick={() => tune({ skin: s.value })}
+                  >
+                    <i className={`coll-skin-dot is-${s.value || "auto"}`} />
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="coll-arrange-group">
+              <span className="coll-arrange-label">Par planche</span>
+              <div className="coll-arrange-btns">
+                {SHELF_DENSITIES.map((d) => (
+                  <button
+                    key={d.value}
+                    className={`coll-chip clickable ${
+                      (shelf.perPlank || 20) === d.value ? "active" : ""
+                    }`}
+                    onClick={() => tune({ perPlank: d.value })}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {shelf.order.length > 0 && (
+              <button
+                className="btn btn-ghost clickable coll-arrange-reset"
+                onClick={() => tune({ order: [] })}
+                title="Revenir à l'ordre du rayon"
+              >
+                <Undo2 size={14} /> Ordre d'origine
+              </button>
+            )}
+          </div>
+        </header>
+      ) : (
       <header className="coll-head">
         <div className="coll-head-main">
           <span className="coll-head-icon">
-            <Library size={22} strokeWidth={2.4} />
+            {visiting && owner?.avatar ? (
+              <img src={owner.avatar} alt="" className="coll-head-av" />
+            ) : (
+              <Library size={22} strokeWidth={2.4} />
+            )}
           </span>
           <div>
-            <span className="coll-head-over">Rayon vidéo</span>
-            <h1 className="coll-head-title">Collection</h1>
+            <span className="coll-head-over">
+              {visiting ? `Collection de ${owner?.username || username}` : "Ma collection"}
+            </span>
+            <h1 className="coll-head-title">
+              {visiting ? owner?.username || username : "Collection"}
+            </h1>
             <p className="coll-head-sub">
-              Séries, films, animés, comics et boîtiers de jeu — rangés comme au
-              vidéoclub, et jouables sur place.
+              {visiting
+                ? "Les boîtiers qu'il ou elle a sortis de la machine — séries, films, comics et cartouches."
+                : "Les boîtiers que tu as sortis de la machine à capsules, rangés comme au vidéoclub et jouables sur place."}
             </p>
           </div>
         </div>
@@ -188,12 +479,16 @@ export default function Collection() {
             </>
           ) : (
             <>
-              <span>
-                <strong>{counts.series}</strong> série{counts.series > 1 ? "s" : ""}
-              </span>
-              <span>
-                <strong>{counts.film}</strong> film{counts.film > 1 ? "s" : ""}
-              </span>
+              {counts.series > 0 && (
+                <span>
+                  <strong>{counts.series}</strong> série{counts.series > 1 ? "s" : ""}
+                </span>
+              )}
+              {counts.film > 0 && (
+                <span>
+                  <strong>{counts.film}</strong> film{counts.film > 1 ? "s" : ""}
+                </span>
+              )}
               {counts.comic > 0 && (
                 <span>
                   <strong>{counts.comic}</strong> comic{counts.comic > 1 ? "s" : ""}
@@ -201,30 +496,95 @@ export default function Collection() {
               )}
               {counts.game > 0 && (
                 <span>
-                  <strong>{counts.game}</strong> jeu{counts.game > 1 ? "x" : ""} DS
+                  <strong>{counts.game}</strong> jeu{counts.game > 1 ? "x" : ""} GBA
                 </span>
               )}
-              <span>
-                <strong>{counts.episodes}</strong> épisodes
-                {counts.pages > 0 && ` · ${counts.pages} planches`}
-              </span>
+              {/* CE QU'IL A ET QUE JE N'AI PAS. Sur l'étagère de quelqu'un
+                  d'autre, c'est LE chiffre — celui pour lequel on est venu. */}
+              {visiting && counts.envy > 0 && (
+                <span className="coll-head-envy">
+                  <Lock size={12} /> <strong>{counts.envy}</strong> qui te manque
+                  {counts.envy > 1 ? "nt" : ""}
+                </span>
+              )}
             </>
           )}
         </div>
       </header>
+      )}
+
+      {/* ---------------- la jauge de complétion ----------------
+          UNE COLLECTION SE MESURE. Sans ce bandeau, une étagère de douze
+          boîtiers est juste une étagère de douze boîtiers ; avec, c'est
+          « 12 sur 40 », et les vingt-huit qui manquent existent. C'est aussi
+          le seul chemin vers la machine depuis cette page — et il doit être
+          là, parce que c'est ici qu'on se rend compte qu'il manque quelque
+          chose. */}
+      {status === "ready" && tally.total > 0 && !workbench && (
+        <section className={`coll-quest ${complete ? "done" : ""}`}>
+          <div className="coll-quest-text">
+            <strong>
+              {complete ? (
+                <>
+                  <PartyPopper size={15} /> Collection complète
+                </>
+              ) : (
+                <>
+                  {tally.owned} boîtier{tally.owned > 1 ? "s" : ""} sur {tally.total}
+                </>
+              )}
+            </strong>
+            <span>
+              {complete
+                ? visiting
+                  ? "Tous les boîtiers du rayon sont sur cette étagère."
+                  : "Tu as sorti tous les boîtiers du rayon. Rien ne manque."
+                : visiting
+                  ? `Il lui reste ${left} boîtier${left > 1 ? "s" : ""} à débloquer.`
+                  : `Encore ${left} boîtier${left > 1 ? "s" : ""} dans la machine.`}
+            </span>
+          </div>
+          <span className="coll-quest-gauge" aria-hidden="true">
+            <i
+              style={{
+                width: tally.total ? `${(tally.owned / tally.total) * 100}%` : 0,
+              }}
+            />
+          </span>
+          {visiting ? (
+            <Link to="/collection" className="coll-quest-btn clickable">
+              <Library size={15} /> Mon étagère
+            </Link>
+          ) : (
+            !complete && (
+              <button className="coll-quest-btn clickable" onClick={() => setShowGacha(true)}>
+                <Sparkles size={15} /> Tourner la sphère
+                {tally.price > 0 && <em>{tally.price} pts</em>}
+              </button>
+            )
+          )}
+        </section>
+      )}
 
       {/* ---------------- filtres + bascule de vue ---------------- */}
       <div className="coll-toolbar">
+        {/* LES RAYONS NE SE FILTRENT PAS PENDANT QU'ON RANGE. Ranger, c'est
+            décider de l'ordre du meuble ENTIER : une rangée réduite à un genre
+            ne montre plus le voisinage qu'on est en train de composer, et
+            « Ranger d'un coup » écrit de toute façon l'ordre complet. Le bloc
+            reste, vide, pour que la barre garde sa géométrie et que la recherche
+            ne saute pas à gauche. */}
         <div className="coll-chips">
-          {KIND_FILTERS.map((f) => (
-            <button
-              key={f.value}
-              className={`coll-chip clickable ${kind === f.value ? "active" : ""}`}
-              onClick={() => setParam("kind", f.value)}
-            >
-              {f.label}
-            </button>
-          ))}
+          {!workbench &&
+            KIND_FILTERS.map((f) => (
+              <button
+                key={f.value}
+                className={`coll-chip clickable ${kind === f.value ? "active" : ""}`}
+                onClick={() => setParam("kind", f.value)}
+              >
+                {f.label}
+              </button>
+            ))}
           {/* Plus de filtre par support : tout est en boîtier DVD. */}
         </div>
 
@@ -266,6 +626,30 @@ export default function Collection() {
               </button>
             </div>
           )}
+
+          {/* RANGER N'EST PAS UN MODE D'AFFICHAGE, c'est un geste qu'on fait sur
+              celui-ci : le bouton est donc à côté de la bascule, pas dedans. Il
+              n'existe que devant SA PROPRE étagère — une grille CSS ne se range
+              pas à la main, sur téléphone on ne déplace pas un boîtier de 8 mm,
+              et on ne range pas le meuble de quelqu'un d'autre. */}
+          {!compact && !visiting && effectiveView === "shelf" && shown.length > 0 && (
+            <button
+              className={`btn btn-ghost clickable coll-arrange-toggle ${
+                arranging ? "active" : ""
+              }`}
+              onClick={() => {
+                // Entrer en rangement REND LE MEUBLE ENTIER : puisque les
+                // filtres de rayon disparaissent de la barre, un filtre resté
+                // actif serait un rayon amputé sans rien pour le dire.
+                if (!arranging && kind) setParam("kind", "");
+                setArranging((a) => !a);
+              }}
+              title="Déplacer les boîtiers sur l'étagère"
+            >
+              {arranging ? <Check size={15} /> : <Move size={15} />}
+              {arranging ? "Terminer" : "Ranger"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -280,8 +664,16 @@ export default function Collection() {
           <span className="coll-state-icon">
             <Unplug size={22} />
           </span>
-          <strong>La collection n'a pas voulu se charger.</strong>
-          <p>Le rayon est bien là — c'est la liaison qui a lâché.</p>
+          <strong>
+            {username
+              ? "Cette collection n'a pas voulu s'ouvrir."
+              : "La collection n'a pas voulu se charger."}
+          </strong>
+          <p>
+            {username
+              ? "Le compte est peut-être privé, ou le pseudo n'existe plus."
+              : "Le rayon est bien là — c'est la liaison qui a lâché."}
+          </p>
           <button
             className="btn btn-ghost clickable"
             onClick={() => setAttempt((n) => n + 1)}
@@ -291,19 +683,38 @@ export default function Collection() {
         </div>
       )}
 
+      {/* L'ÉTAGÈRE VIDE N'EST PAS UNE ERREUR, C'EST UN DÉPART. Elle ne dit pas
+          « rien ici » mais « voilà ce qu'il y a à prendre », et elle porte la
+          machine : c'est le seul écran où l'appel à jouer a vraiment sa
+          place. Chez quelqu'un d'autre, en revanche, il n'y a rien à proposer —
+          c'est son étagère, pas la nôtre. */}
       {status === "ready" && shown.length === 0 && (
         <div className="coll-state">
           <span className="coll-state-icon">
             <Sparkles size={22} />
           </span>
           <strong>
-            {media.length === 0 ? "L'étagère est encore vide" : "Rien sous ce filtre"}
+            {media.length === 0
+              ? visiting
+                ? "Cette étagère est encore vide"
+                : "Ton étagère est encore vide"
+              : "Rien sous ce filtre"}
           </strong>
           <p>
             {media.length === 0
-              ? "Les premiers titres arrivent bientôt."
+              ? visiting
+                ? `${owner?.username || username} n'a pas encore sorti de boîtier de la machine.`
+                : tally.total > 0
+                  ? `${tally.total} boîtiers attendent dans la machine à capsules. Fais-la tourner pour en sortir un premier.`
+                  : "Aucun boîtier n'a encore été posé au rayon."
               : "Aucun titre ne correspond à cette recherche."}
           </p>
+          {media.length === 0 && !visiting && tally.total > 0 && (
+            <button className="btn btn-primary clickable" onClick={() => setShowGacha(true)}>
+              <Sparkles size={15} /> Tourner la sphère
+              {tally.price > 0 && ` — ${tally.price} points`}
+            </button>
+          )}
           {media.length > 0 && (kind || query) && (
             <button
               className="btn btn-ghost clickable"
@@ -319,7 +730,17 @@ export default function Collection() {
         <Suspense fallback={<ShelfSkeleton label="Chargement de l'étagère…" />}>
           <CollectionShelf
             media={shown}
+            // TOUT le rayon, en plus de ce qu'on en montre : une fois l'étagère
+            // habillée, la scène va peindre au ralenti les titres que le filtre
+            // écarte, pour que les retirer n'attende plus rien. Elle seule peut
+            // s'en charger — la peinture vit dans le paquet de three.js, et la
+            // page n'a pas à le faire descendre pour une grille CSS.
+            all={ordered}
             theme={theme}
+            skin={shelf.skin}
+            perPlank={shelf.perPlank || undefined}
+            arranging={arranging}
+            onReorder={reorder}
             onSelect={(m) => navigate(`/collection/${m.slug}`)}
           />
         </Suspense>
@@ -337,12 +758,16 @@ export default function Collection() {
           Placées APRÈS la collection : on vient d'abord sur cette page pour
           voir l'étagère. La reprise est un raccourci, pas l'entrée principale.
           Et une section par support, de haut en bas : ce qui se regarde, ce qui
-          se lit, ce qui se joue. */}
+          se lit, ce qui se joue.
+
+          Jamais chez quelqu'un d'autre : là où il en est de sa lecture ne nous
+          regarde pas, et « Reprendre » n'aurait de toute façon rien à
+          reprendre. */}
 
       {/* 1. L'ÉCRAN. Une vignette large, comme l'arrêt sur image d'une cassette
              qu'on remet en marche : c'est le seul des trois qui reprend à la
              SECONDE près, donc le seul qui porte une jauge de temps. */}
-      {resuming.watch.length > 0 && (
+      {!visiting && resuming.watch.length > 0 && (
         <section className="coll-resume">
           <h2 className="coll-section-title">
             <Play size={15} /> Reprendre <em>Séries &amp; films</em>
@@ -386,7 +811,7 @@ export default function Collection() {
              papier crème, la couverture debout à gauche, un ruban de
              marque-page qui pend du haut. La progression se compte en PLANCHES,
              jamais en minutes. */}
-      {resuming.read.length > 0 && (
+      {!visiting && resuming.read.length > 0 && (
         <section className="coll-resume coll-read">
           <h2 className="coll-section-title">
             <BookOpen size={15} /> Marque-pages <em>Comics &amp; mangas</em>
@@ -441,7 +866,7 @@ export default function Collection() {
              cartouche dans la rangée, là où une barre de progression ne voudrait
              rien dire. La partie, elle, est reprise par la console au démarrage
              (voir GbaPlayer). */}
-      {resuming.play.length > 0 && (
+      {!visiting && resuming.play.length > 0 && (
         <section className="coll-resume coll-play">
           <h2 className="coll-section-title">
             <Gamepad2 size={15} /> Console encore chaude <em>Jeux GBA</em>
@@ -482,7 +907,15 @@ export default function Collection() {
         </section>
       )}
 
-      {status === "ready" && media.length > 0 && (
+      {visiting && (
+        <p className="coll-note">
+          <ArrowLeft size={13} />
+          <Link to="/collection">Revenir à ton étagère</Link> — les boîtiers se
+          débloquent un par un à la machine à capsules de l'arcade.
+        </p>
+      )}
+
+      {status === "ready" && !visiting && media.length > 0 && (
         <p className="coll-note">
           <Info size={13} />
           Chaque titre est lu depuis sa source d'origine (chaîne officielle,
@@ -491,6 +924,21 @@ export default function Collection() {
           s'ouvrent dans le poste cathodique ; les {KINDS.game.plural.toLowerCase()}{" "}
           se lancent dans une console émulée, directement dans le navigateur.
         </p>
+      )}
+
+      {/* La machine, depuis l'étagère : c'est ici qu'on se rend compte qu'il
+          manque quelque chose, donc ici qu'il faut pouvoir tourner. Le boîtier
+          gagné rejoint la page sans rechargement. */}
+      {showGacha && (
+        <GachaModal
+          token={token}
+          onClose={() => setShowGacha(false)}
+          onDrawn={(res) => {
+            if (res.media) setMedia((list) => [...list, res.media]);
+            setTally((t) => ({ ...t, owned: res.owned, total: res.total }));
+            updateUser({ points: res.points });
+          }}
+        />
       )}
     </div>
   );

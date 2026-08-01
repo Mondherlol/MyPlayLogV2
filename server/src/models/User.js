@@ -94,6 +94,42 @@ const userSchema = new mongoose.Schema(
     // une section absente reste en tri « récemment modifié » (par défaut).
     overviewGameOrder: { type: mongoose.Schema.Types.Mixed, default: {} },
 
+    // --- Ma collection de boîtiers (page /collection) ---
+    // CE QUE J'AI SORTI DE LA MACHINE, et rien d'autre. Le catalogue reste
+    // commun (CollectionMedia, garni par l'admin) ; cette liste dit lesquels de
+    // ses boîtiers sont À MOI — un seul exemplaire de chacun, jamais de
+    // doublon (la machine ne tire que parmi ceux qui manquent, voir
+    // routes/collection.js).
+    //
+    // Le SLUG et non l'identifiant : c'est la clé de toutes les routes du
+    // rayon, elle survit à un titre supprimé puis reposé, et lire une étagère
+    // ne demande alors aucun `populate`.
+    //
+    // PAS `collection` : Mongoose réserve ce nom (`Model.collection` est la
+    // poignée du pilote natif, dont lib/activity.js se sert ailleurs), et un
+    // champ qui le porte sabote cet accès en silence. Le mot du domaine est de
+    // toute façon « boîtier ».
+    ownedCases: {
+      type: [
+        {
+          slug: { type: String, required: true },
+          obtainedAt: { type: Date, default: Date.now },
+          _id: false,
+        },
+      ],
+      default: [],
+    },
+
+    // --- Mon étagère de collection (page /collection, vue 3D) ---
+    // LE MEUBLE EST À CELUI QUI LE REGARDE. Ce qui se règle ici n'est que la
+    // façon dont ma collection est présentée — l'ordre où j'ai rangé mes
+    // boîtiers, l'essence de la planche, le nombre de boîtiers par rangée. Un
+    // boîtier débloqué depuis se range à la fin sans rien casser (voir
+    // l'application de l'ordre côté page).
+    shelfOrder: { type: [String], default: [] },
+    shelfSkin: { type: String, default: "" },
+    shelfPerPlank: { type: Number, default: 0 }, // 0 = la densité par défaut
+
     // --- Connexion Steam (liaison OpenID « Sign in through Steam ») ---
     // On garde le SteamID64 + un instantané du profil public (pseudo, avatar).
     // La clé Steam Web API vit côté serveur ; aucun secret n'est stocké ici.

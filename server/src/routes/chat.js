@@ -17,6 +17,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { addClient, removeClient, emitTo, onlineAmong } from "../lib/realtime.js";
 import { statusOf, clearStatus } from "../lib/liveStatus.js";
 import { triggerMissionCheck } from "../lib/missions.js";
+import { logEvent, ipOf } from "../lib/audit.js";
 
 const router = express.Router();
 
@@ -455,6 +456,40 @@ export async function deliverCard({
   return { conv, msg, serialize: (viewerId) => serializeMessage(msg, viewerId) };
 }
 
+// La même chose, mais dans une conversation EXISTANTE (typiquement un groupe).
+//
+// Inviter un groupe de discussion à une partie, c'est écrire dans le fil qu'ils
+// ont déjà plutôt que d'ouvrir cinq messages privés : tout le monde voit la
+// même carte, et la discussion qui suit reste au même endroit. Il n'y a rien à
+// vérifier de plus que l'appartenance de l'expéditeur — être dans le groupe,
+// c'est le droit d'y écrire (c'est la règle de POST /messages).
+//
+// Renvoie `null` si la conversation n'existe pas ou si l'expéditeur n'en fait
+// pas partie : à l'appelant de le signaler, jamais de lever.
+export async function deliverCardToConversation({
+  fromId,
+  conversationId,
+  text = "",
+  game = null,
+  ost = null,
+  party = null,
+  mot = null,
+}) {
+  const conv = await loadConversation(conversationId, fromId);
+  if (!conv) return null;
+  const msg = await persistMessage(conv, fromId, {
+    author: fromId,
+    text: String(text || "").slice(0, MAX_TEXT),
+    game,
+    ost,
+    party,
+    mot,
+  });
+  broadcastMessage(conv, msg);
+  await broadcastConversation(conv._id);
+  return { conv, msg };
+}
+
 // ============================================================
 //  Flux temps réel (SSE)
 // ============================================================
@@ -478,7 +513,20 @@ router.get("/stream", async (req, res) => {
   res.write(`event: ready\ndata: ${JSON.stringify({ ok: true })}\n\n`);
 
   const first = addClient(userId, res) === 1;
-  if (first) notifyPresence(userId, true);
+  if (first) {
+    notifyPresence(userId, true);
+    // Le journal du serveur date ici les ARRIVÉES. C'est le seul signal fiable
+    // de présence : le jeton JWT vit un mois, donc « s'est connecté » ne se
+    // reproduit pas à chaque visite — alors que ce flux s'ouvre à chaque fois
+    // que l'app est chargée, et se ferme quand le dernier onglet part.
+    logEvent({
+      kind: "presence",
+      label: "est arrivé en ligne",
+      actor: userId,
+      ip: ipOf(req),
+      ua: req.headers["user-agent"] || "",
+    });
+  }
 
   // Battement de cœur : garde le tunnel ouvert (proxies, 3G, veille mobile).
   const ping = setInterval(() => {
@@ -489,10 +537,20 @@ router.get("/stream", async (req, res) => {
     }
   }, 25000);
 
+  const openedAt = Date.now();
   req.on("close", () => {
     clearInterval(ping);
     const left = removeClient(userId, res);
-    if (!left) notifyPresence(userId, false); // dernier onglet fermé
+    if (!left) {
+      notifyPresence(userId, false); // dernier onglet fermé
+      logEvent({
+        kind: "presence",
+        label: "est reparti hors ligne",
+        actor: userId,
+        ms: Date.now() - openedAt, // durée de la session, en clair
+        ip: ipOf(req),
+      });
+    }
   });
 });
 
@@ -1031,6 +1089,34 @@ router.post("/conversations/:id/messages", requireAuth, async (req, res) => {
 
     broadcastMessage(conv, msg);
     await broadcastConversation(conv._id);
+
+    // Journal : le message est tracé AVEC son destinataire et sa conversation,
+    // ce que le middleware générique ne saurait pas dire. Le texte, lui, n'est
+    // PAS recopié ici — il vit dans la collection Message, que l'onglet Logs
+    // relit à la demande. Un journal qui dupliquerait chaque conversation
+    // doublerait la base et survivrait aux suppressions de messages.
+    const others = participantIds(conv).filter((id) => id !== String(req.userId));
+    logEvent({
+      kind: "message",
+      label: conv.isGroup ? "a écrit dans un groupe" : "a envoyé un message privé",
+      actor: req.userId,
+      target: !conv.isGroup && others.length === 1 ? others[0] : null,
+      targetName: conv.isGroup
+        ? conv.name || "groupe"
+        : (conv.participants || []).find((p) => String(p._id) === others[0])?.username || "",
+      method: "POST",
+      path: `/api/chat/conversations/${conv._id}/messages`,
+      status: 201,
+      ip: ipOf(req),
+      meta: {
+        conversation: String(conv._id),
+        group: !!conv.isGroup,
+        chars: text.length,
+        media: media.length,
+        recipients: others.length,
+      },
+    });
+
     res.status(201).json({ message: serializeMessage(msg, req.userId) });
   } catch (err) {
     console.error("chat send error:", err.message);

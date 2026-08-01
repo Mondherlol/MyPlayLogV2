@@ -75,6 +75,10 @@ const partyCardSchema = new mongoose.Schema(
 // décider sans l'ouvrir (qui joue, combien d'essais déjà brûlés). Même logique
 // que la carte de watchparty ci-dessus — l'invitation survit à la partie, la
 // partie non.
+//
+// Quand la carte porte une ÉQUIPE (models/MotTeam.js), elle cesse justement
+// d'être périssable : le code d'équipe ouvre la partie du jour, quel que soit
+// le jour où on clique. C'est le même message qui sert d'invitation permanente.
 const motCardSchema = new mongoose.Schema(
   {
     code: { type: String, required: true },
@@ -82,6 +86,13 @@ const motCardSchema = new mongoose.Schema(
     hostName: { type: String, default: "" },
     players: { type: Number, default: 1 },
     tries: { type: Number, default: 0 },
+    // Code de l'équipe permanente, et son nom : présents, le lien ne périme
+    // plus et la carte parle de « ton équipe » plutôt que d'une partie.
+    team: { type: String, default: "" },
+    teamName: { type: String, default: "" },
+    // Rappel automatique du matin (« l'équipe cherche le mot du jour ») par
+    // opposition à une invitation envoyée à la main.
+    daily: { type: Boolean, default: false },
   },
   { _id: false }
 );

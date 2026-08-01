@@ -16,6 +16,7 @@ export const POINT_SOURCES = {
   geo: "GeoGamer",
   mot: "Mot du jour",
   case: "Ouverture de caisse",
+  gacha: "Machine à capsules",
   duplicate: "Doublon reconverti",
   admin: "Ajustement admin",
   // Rattrapage des parties jouées AVANT l'arcade (scripts/backfillArcadePoints.js).

@@ -3,12 +3,14 @@ import mongoose from "mongoose";
 import MotDuJour from "../models/MotDuJour.js";
 import MotPlay from "../models/MotPlay.js";
 import MotSession from "../models/MotSession.js";
+import MotTeam from "../models/MotTeam.js";
+import Conversation from "../models/Conversation.js";
 import User from "../models/User.js";
 // Le générateur de codes de la watchparty : même besoin (une adresse courte,
 // sans caractères ambigus, qui se dicte à voix haute), donc même outil.
 import { makeCode } from "../models/WatchParty.js";
 import { emitTo } from "../lib/realtime.js";
-import { deliverCard } from "./chat.js";
+import { deliverCard, deliverCardToConversation } from "./chat.js";
 import { requireAuth } from "../middleware/auth.js";
 import { recordActivity } from "../lib/activity.js";
 import { grantPoints } from "../lib/points.js";
@@ -350,6 +352,9 @@ router.get("/today", requireAuth, async (req, res) => {
     res.json({
       date,
       session,
+      // Les équipes permanentes, avec l'état de LEUR partie du jour : c'est ce
+      // qui évite de réinviter les mêmes personnes chaque matin (models/MotTeam.js).
+      teams: await teamsFor(req.userId, date),
       msUntilNext: msUntilNextDay(),
       // Le fuseau de référence accompagne le compte à rebours : le client peut
       // ainsi dire « minuit à Paris, 23 h chez toi » au lieu d'afficher une
@@ -578,6 +583,16 @@ router.post("/giveup", requireAuth, async (req, res) => {
 
 // GET /api/mot/board — le classement DU JOUR (moi + mes suivis).
 // C'est le vrai enjeu du jeu : tout le monde a eu la même énigme aujourd'hui.
+//
+// Le classement proprement dit ne contient que ceux qui ont TROUVÉ — c'est un
+// classement, il lui faut un résultat. Mais une deuxième liste l'accompagne :
+// CEUX QUI CHERCHENT ENCORE, avec leur nombre d'essais en direct.
+//
+// C'est l'information qui manquait le plus : jusqu'à 20 h, le tableau était
+// vide ou presque, alors que la moitié du cercle était en train de suer sur le
+// même mot. Voir « Marine · 23 essais » pendant qu'on en est à 12 change tout
+// le sel de la journée. Le compteur ne divulgue évidemment rien du mot — c'est
+// un nombre d'essais, pas un indice.
 router.get("/board", requireAuth, async (req, res) => {
   try {
     const date = String(req.query.date || gameDay()).slice(0, 10);
@@ -586,11 +601,17 @@ router.get("/board", requireAuth, async (req, res) => {
       new mongoose.Types.ObjectId(req.userId),
       ...(me?.following || []).map((id) => new mongoose.Types.ObjectId(id)),
     ];
-    const rows = await MotPlay.find({ date, user: { $in: ids }, solved: true })
-      .select("user tries timeMs score solvedAt wonWith")
+    // Une seule lecture pour les deux listes : les parties finies et celles en
+    // cours sont les mêmes documents, seul `solved` les sépare.
+    const plays = await MotPlay.find({ date, user: { $in: ids } })
+      .select("user tries timeMs score solvedAt updatedAt wonWith session solved gaveUp")
       .sort({ tries: 1, timeMs: 1 })
-      .limit(50)
+      .limit(120)
       .lean();
+    const rows = plays.filter((p) => p.solved);
+    // Un joueur sans le moindre essai n'est pas « en train de chercher » : il a
+    // ouvert la page, c'est tout. On ne l'annonce pas.
+    const live = plays.filter((p) => !p.solved && (p.tries || 0) > 0);
 
     // Une victoire à plusieurs ne fait qu'UNE ligne, avec toute l'équipe. Les
     // coéquipiers sont récupérés sans filtre de cercle : si j'ai joué avec
@@ -608,7 +629,7 @@ router.get("/board", requireAuth, async (req, res) => {
       teamOf.get(k).push(String(m.user));
     }
 
-    const everyone = new Set(rows.map((r) => String(r.user)));
+    const everyone = new Set(plays.map((r) => String(r.user)));
     for (const list of teamOf.values()) for (const u of list) everyone.add(u);
     const users = await User.find({ _id: { $in: [...everyone] } })
       .select("username avatar")
@@ -640,7 +661,60 @@ router.get("/board", requireAuth, async (req, res) => {
       });
     }
 
-    res.json({ date, entries });
+    // --- Ceux qui cherchent encore ---
+    // ATTENTION AU COMPTEUR : pour qui joue à plusieurs, `MotPlay.tries` est
+    // FIGÉ au moment où il a rejoint la table — la suite de la partie s'écrit
+    // dans le pot commun de la session. Afficher le champ du joueur donnerait
+    // « 2 essais » à quelqu'un qui vient d'en brûler trente avec son équipe. On
+    // va donc chercher les tables elles-mêmes, et c'est leur total qui compte.
+    const liveSessions = [
+      ...new Set(live.filter((p) => p.session).map((p) => String(p.session))),
+    ];
+    const sessionById = new Map(
+      (liveSessions.length
+        ? await MotSession.find({ _id: { $in: liveSessions }, solved: false })
+            .select("tries members updatedAt")
+            .populate({ path: "members.user", select: "username avatar" })
+            .lean()
+        : []
+      ).map((s) => [String(s._id), s])
+    );
+
+    // Une table ne sort qu'UNE fois, avec tous ses joueurs — y compris ceux que
+    // je ne suis pas, exactement comme pour une victoire d'équipe : ils sont sur
+    // la photo parce qu'ils jouent avec quelqu'un de mon cercle.
+    const liveSeen = new Set();
+    const searching = live
+      .map((p) => {
+        const s = p.session ? sessionById.get(String(p.session)) : null;
+        return { p, s, tries: s ? s.tries || 0 : p.tries || 0 };
+      })
+      .sort((a, b) => b.tries - a.tries)
+      .map(({ p, s, tries }) => {
+        if (s) {
+          const key = String(p.session);
+          if (liveSeen.has(key)) return null;
+          liveSeen.add(key);
+        }
+        const team = s
+          ? (s.members || [])
+              .filter((m) => !m.leftAt && m.user)
+              .map((m) => person(m.user))
+          : [byId.get(String(p.user))].filter(Boolean).map(person);
+        if (!team.length) return null;
+        return {
+          team,
+          user: team[0],
+          solo: !s,
+          tries,
+          gaveUp: !!p.gaveUp,
+          at: p.updatedAt || null,
+          isMe: team.some((u) => u.id === String(req.userId)),
+        };
+      })
+      .filter(Boolean);
+
+    res.json({ date, entries, searching: searching.slice(0, 12) });
   } catch (err) {
     console.error("mot board error:", err.message);
     res.status(500).json({ error: "Erreur lors du chargement du classement du jour." });
@@ -790,6 +864,12 @@ function publicSession(session, day, meId) {
     date: session.date,
     host: person(session.host),
     isHost: String(session.host?._id || session.host) === String(meId),
+    // L'équipe permanente derrière la table, si elle existe : c'est SON code
+    // qui sert de lien d'invitation, parce qu'il ouvrira encore la partie du
+    // jour dans une semaine (cf. models/MotTeam.js).
+    team: session.team?.code
+      ? { code: session.team.code, name: session.team.name || "" }
+      : null,
     joined: Boolean(me && !me.leftAt),
     members: (session.members || [])
       .filter((m) => m.user)
@@ -821,6 +901,7 @@ function publicSession(session, day, meId) {
 
 const SESSION_POPULATE = [
   { path: "host", select: "username avatar" },
+  { path: "team", select: "code name" },
   { path: "members.user", select: "username avatar" },
   { path: "guesses.by", select: "username avatar" },
   { path: "solvedBy", select: "username avatar" },
@@ -863,6 +944,33 @@ function absorbSession(play, session) {
     .map((g) => ({ w: g.w, sim: g.sim, temp: g.temp, rank: g.rank ?? null, at: g.at }));
 }
 
+// Ouvre une table à partir d'une partie solo. Extrait de POST /session pour
+// que l'ouverture « avec mon équipe » (POST /team/:code/play) suive exactement
+// le même chemin : l'hôte apporte ses essais ET ses mots, sans exception.
+async function createSession(userId, day, play, team = null) {
+  const session = await MotSession.create({
+    code: makeCode(),
+    date: day.date,
+    word: day.word,
+    host: userId,
+    team: team?._id || null,
+    tries: play.tries || 0,
+    members: [{ user: userId, broughtTries: play.tries || 0 }],
+    guesses: (play.guesses || []).map((g) => ({
+      w: g.w,
+      sim: g.sim,
+      temp: g.temp,
+      rank: g.rank ?? null,
+      by: userId,
+      at: g.at,
+    })),
+    startedAt: new Date(),
+  });
+  play.session = session._id;
+  await play.save();
+  return session;
+}
+
 // POST /api/mot/session — ouvrir une partie à plusieurs depuis sa partie solo.
 router.post("/session", requireAuth, async (req, res) => {
   try {
@@ -882,29 +990,21 @@ router.post("/session", requireAuth, async (req, res) => {
         return res.json({ session: publicSession(current, day, req.userId) });
     }
 
-    const session = await MotSession.create({
-      code: makeCode(),
-      date,
-      word: day.word,
-      host: req.userId,
-      // L'hôte apporte sa partie solo : ses essais ET ses mots ouvrent la table.
-      tries: play.tries || 0,
-      members: [{ user: req.userId, broughtTries: play.tries || 0 }],
-      guesses: (play.guesses || []).map((g) => ({
-        w: g.w,
-        sim: g.sim,
-        temp: g.temp,
-        rank: g.rank ?? null,
-        by: req.userId,
-        at: g.at,
-      })),
-      startedAt: new Date(),
-    });
-
-    play.session = session._id;
-    await play.save();
-
-    const full = await MotSession.findById(session._id).populate(SESSION_POPULATE);
+    // Une table ouverte « à la main » appartient quand même à l'équipe, sans
+    // quoi les coéquipiers ne la verraient pas dans leur rail et il faudrait
+    // les réinviter — exactement ce que l'équipe est censée éviter. On prévient
+    // les présents (SSE) mais SANS carte de messagerie : ce geste-ci n'est pas
+    // une convocation, juste une partie qui s'ouvre.
+    const team = await idleTeamFor(req.userId, date);
+    let full;
+    if (team) {
+      const out = await openTeamSession(req.userId, day, play, team);
+      full = out.session;
+      if (out.opened) await pingTeam(team, full, req.userId, date, { withCard: false });
+    } else {
+      const created = await createSession(req.userId, day, play);
+      full = await MotSession.findById(created._id).populate(SESSION_POPULATE);
+    }
     res.json({ session: publicSession(full, day, req.userId) });
   } catch (err) {
     console.error("mot session create error:", err.message);
@@ -939,6 +1039,54 @@ router.get("/session/:code", requireAuth, async (req, res) => {
   }
 });
 
+// L'entrée en table, à part de la route : l'invitation, le lien et l'équipe y
+// mènent tous les trois, et le cumul des essais ne doit avoir qu'UNE écriture.
+async function joinSessionDoc(session, userId, play) {
+  // On quitte proprement une éventuelle autre table avant d'entrer ici.
+  if (play.session && String(play.session) !== String(session._id)) {
+    const prev = await MotSession.findById(play.session).populate(SESSION_POPULATE);
+    if (prev) await leaveSession(prev, userId, play, { save: false });
+  }
+
+  const existing = memberOf(session, userId);
+  if (!existing || existing.leftAt) {
+    // Cumul des essais. Un nouvel arrivant apporte tout ; un revenant
+    // n'apporte que ce qu'il a joué depuis son départ (cf. `sharedTries`
+    // dans models/MotSession.js), sans quoi l'aller-retour compterait double.
+    const already = existing?.sharedTries || 0;
+    const brought = Math.max(0, (play.tries || 0) - already);
+    session.tries += brought;
+
+    // Les mots suivent les essais : sans ça, le groupe afficherait un total
+    // gonflé pour une liste vide, et retenterait des mots déjà éliminés.
+    const have = new Set(session.guesses.map((g) => g.w));
+    for (const g of play.guesses || []) {
+      if (have.has(g.w)) continue;
+      have.add(g.w);
+      session.guesses.push({
+        w: g.w,
+        sim: g.sim,
+        temp: g.temp,
+        rank: g.rank ?? null,
+        by: userId,
+        at: g.at,
+      });
+    }
+
+    if (existing) {
+      existing.leftAt = null;
+      existing.joinedAt = new Date();
+      existing.broughtTries = (existing.broughtTries || 0) + brought;
+    } else {
+      session.members.push({ user: userId, broughtTries: brought });
+    }
+    await session.save();
+  }
+
+  play.session = session._id;
+  await play.save();
+}
+
 // POST /api/mot/session/:code/join
 router.post("/session/:code/join", requireAuth, async (req, res) => {
   try {
@@ -961,49 +1109,7 @@ router.post("/session/:code/join", requireAuth, async (req, res) => {
         .status(409)
         .json({ error: "Tu as déjà trouvé le mot du jour, tu ne peux plus rejoindre de partie." });
 
-    // On quitte proprement une éventuelle autre table avant d'entrer ici.
-    if (play.session && String(play.session) !== String(session._id)) {
-      const prev = await MotSession.findById(play.session).populate(SESSION_POPULATE);
-      if (prev) await leaveSession(prev, req.userId, play, { save: false });
-    }
-
-    const existing = memberOf(session, req.userId);
-    if (!existing || existing.leftAt) {
-      // Cumul des essais. Un nouvel arrivant apporte tout ; un revenant
-      // n'apporte que ce qu'il a joué depuis son départ (cf. `sharedTries`
-      // dans models/MotSession.js), sans quoi l'aller-retour compterait double.
-      const already = existing?.sharedTries || 0;
-      const brought = Math.max(0, (play.tries || 0) - already);
-      session.tries += brought;
-
-      // Les mots suivent les essais : sans ça, le groupe afficherait un total
-      // gonflé pour une liste vide, et retenterait des mots déjà éliminés.
-      const have = new Set(session.guesses.map((g) => g.w));
-      for (const g of play.guesses || []) {
-        if (have.has(g.w)) continue;
-        have.add(g.w);
-        session.guesses.push({
-          w: g.w,
-          sim: g.sim,
-          temp: g.temp,
-          rank: g.rank ?? null,
-          by: req.userId,
-          at: g.at,
-        });
-      }
-
-      if (existing) {
-        existing.leftAt = null;
-        existing.joinedAt = new Date();
-        existing.broughtTries = (existing.broughtTries || 0) + brought;
-      } else {
-        session.members.push({ user: req.userId, broughtTries: brought });
-      }
-      await session.save();
-    }
-
-    play.session = session._id;
-    await play.save();
+    await joinSessionDoc(session, req.userId, play);
 
     const full = await MotSession.findById(session._id).populate(SESSION_POPULATE);
     const me = await User.findById(req.userId).select("username avatar").lean();
@@ -1275,9 +1381,20 @@ router.post("/session/:code/typing", requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/mot/session/:code/invite — carte d'invitation en message privé.
-// Même règle que la messagerie : on n'écrit qu'à qui est abonné à soi. Pour les
-// autres, il y a le lien (le code EST la clé).
+// POST /api/mot/session/:code/invite — les cartes d'invitation.
+//
+// DEUX DESTINATIONS, un seul geste : des personnes (carte en message privé) et
+// des GROUPES de discussion (carte dans le fil commun). Inviter les cinq
+// personnes d'un groupe une par une, c'est cinq messages privés pour une seule
+// partie, et cinq fils où répondre — alors que le groupe existe déjà.
+//
+// Règle de la messagerie pour les personnes : on n'écrit qu'à qui est abonné à
+// soi. Pour un groupe, être dedans suffit. Et pour tous les autres, il y a le
+// lien (le code EST la clé).
+//
+// Effet de bord ESSENTIEL : inviter constitue l'ÉQUIPE (models/MotTeam.js). Les
+// invités du jour sont les coéquipiers de demain — on ne réinvite personne le
+// lendemain, la partie du jour s'ouvre pour tout le monde d'un clic.
 router.post("/session/:code/invite", requireAuth, async (req, res) => {
   try {
     const session = await loadSession(req.params.code);
@@ -1288,13 +1405,44 @@ router.post("/session/:code/invite", requireAuth, async (req, res) => {
     if (!member || member.leftAt)
       return res.status(403).json({ error: "Rejoins la partie avant d'inviter." });
 
-    const ids = [...new Set((req.body?.userIds || []).map(String))].slice(0, 20);
-    if (!ids.length) return res.status(400).json({ error: "Personne à inviter." });
+    const ids = [...new Set((req.body?.userIds || []).map(String))]
+      .filter((id) => mongoose.isValidObjectId(id))
+      .slice(0, 20);
+    const convIds = [...new Set((req.body?.conversationIds || []).map(String))]
+      .filter((id) => mongoose.isValidObjectId(id))
+      .slice(0, 10);
+    if (!ids.length && !convIds.length)
+      return res.status(400).json({ error: "Personne à inviter." });
+
+    // Les groupes d'abord : ils fournissent des invités (leurs participants) et
+    // parfois le nom de l'équipe.
+    const groups = convIds.length
+      ? await Conversation.find({
+          _id: { $in: convIds },
+          participants: req.userId,
+          isGroup: true,
+        })
+          .select("name participants")
+          .lean()
+      : [];
 
     const [me, targets] = await Promise.all([
       User.findById(req.userId).select("username").lean(),
       User.find({ _id: { $in: ids } }).select("username following").lean(),
     ]);
+
+    // --- L'équipe permanente ---
+    const team = await ensureTeam(session, req.userId, {
+      // Un groupe invité donne son nom et son fil à l'équipe : c'est la même
+      // bande, autant qu'elle se reconnaisse.
+      name: groups[0]?.name || "",
+      conversation: groups[0]?._id || null,
+    });
+    const roster = [
+      ...ids,
+      ...groups.flatMap((g) => (g.participants || []).map(String)),
+    ];
+    if (roster.length) await addToTeam(team, roster, req.userId);
 
     const card = {
       code: session.code,
@@ -1302,7 +1450,10 @@ router.post("/session/:code/invite", requireAuth, async (req, res) => {
       hostName: me?.username || "",
       players: activeMembers(session).length,
       tries: session.tries || 0,
+      team: team.code,
+      teamName: team.name || "",
     };
+    const text = String(req.body?.text || "").slice(0, 300);
 
     const sent = [];
     const skipped = [];
@@ -1315,15 +1466,23 @@ router.post("/session/:code/invite", requireAuth, async (req, res) => {
         continue;
       }
       // eslint-disable-next-line no-await-in-loop
-      await deliverCard({
-        fromId: req.userId,
-        toId: target._id,
-        text: String(req.body?.text || "").slice(0, 300),
-        mot: card,
-      });
+      await deliverCard({ fromId: req.userId, toId: target._id, text, mot: card });
       sent.push({ id: String(target._id), username: target.username });
     }
-    res.json({ sent, skipped });
+
+    const groupsSent = [];
+    for (const g of groups) {
+      // eslint-disable-next-line no-await-in-loop
+      const ok = await deliverCardToConversation({
+        fromId: req.userId,
+        conversationId: g._id,
+        text,
+        mot: card,
+      });
+      if (ok) groupsSent.push({ id: String(g._id), name: g.name || "Groupe" });
+    }
+
+    res.json({ sent, skipped, groups: groupsSent, team: publicTeam(await populateTeam(team), { meId: req.userId }) });
   } catch (err) {
     console.error("mot session invite error:", err.message);
     res.status(500).json({ error: "Invitation non envoyée." });
@@ -1370,6 +1529,441 @@ router.get("/sessions", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("mot sessions error:", err.message);
     res.status(500).json({ error: "Impossible de lister les parties." });
+  }
+});
+
+// ======================================================================
+//  Les équipes — la table qui survit à minuit
+// ======================================================================
+// Une session meurt avec son mot ; une ÉQUIPE (models/MotTeam.js) est la liste
+// des gens avec qui on cherche, et elle n'a aucune raison de se dissoudre
+// chaque nuit. Elle se constitue toute seule : inviter quelqu'un à une partie,
+// c'est le mettre dans l'équipe.
+//
+// Le lendemain, le rail affiche « Ton équipe » avec un bouton unique. Le
+// premier qui clique ouvre la partie du jour, les autres l'y rejoignent — sans
+// que personne ait eu à réinviter qui que ce soit.
+//
+// Ce qu'une équipe N'EST PAS : un pot commun d'essais. Tant qu'on n'a pas
+// cliqué, les essais restent strictement personnels. La fusion reste l'affaire
+// de la session, avec son prix annoncé (cf. models/MotSession.js).
+
+const TEAM_POPULATE = [{ path: "members.user", select: "username avatar" }];
+const TEAM_MAX = 30;
+
+const teamMemberIds = (team) =>
+  (team.members || []).map((m) => String(m.user?._id || m.user));
+
+const isTeamMember = (team, userId) => teamMemberIds(team).includes(String(userId));
+
+const populateTeam = (team) => MotTeam.findById(team._id).populate(TEAM_POPULATE);
+
+// Un code d'équipe libre. Les collisions sont improbables mais pas impossibles
+// (le code est court, il se dicte à voix haute) : on retire plutôt que de faire
+// échouer une invitation sur un doublon.
+async function makeTeamCode() {
+  for (let i = 0; i < 6; i += 1) {
+    const code = makeCode();
+    // eslint-disable-next-line no-await-in-loop
+    if (!(await MotTeam.exists({ code }))) return code;
+  }
+  return `${makeCode()}${Date.now().toString(36).slice(-2)}`;
+}
+
+// Vue publique d'une équipe, avec l'état de SA partie du jour : c'est la seule
+// chose qui décide du bouton affiché (« lancer », « rejoindre », « en cours »).
+function publicTeam(team, { session = null, meId } = {}) {
+  const actives = session ? (session.members || []).filter((m) => !m.leftAt) : [];
+  return {
+    code: team.code,
+    name: team.name || "",
+    isOwner: String(team.owner?._id || team.owner) === String(meId),
+    members: (team.members || []).filter((m) => m.user).map((m) => person(m.user)),
+    lastDate: team.lastDate || "",
+    session: session
+      ? {
+          code: session.code,
+          tries: session.tries || 0,
+          players: actives.length,
+          solved: !!session.solved,
+          joined: actives.some((m) => String(m.user?._id || m.user) === String(meId)),
+        }
+      : null,
+  };
+}
+
+// L'équipe qui n'a PAS encore sa table du jour, la plus récemment jouée
+// d'abord. Sert à rattacher une partie ouverte à la main : le garde-fou « pas
+// déjà de session aujourd'hui » est ce qui garantit qu'une équipe n'a jamais
+// deux tables le même jour (sans quoi la moitié du groupe atterrirait sur
+// l'une, l'autre moitié sur l'autre).
+async function idleTeamFor(userId, date) {
+  const teams = await MotTeam.find({ "members.user": userId })
+    .sort({ lastDate: -1, updatedAt: -1 })
+    .limit(8)
+    .select("_id");
+  if (!teams.length) return null;
+  const busy = new Set(
+    (
+      await MotSession.find({ team: { $in: teams.map((t) => t._id) }, date })
+        .select("team")
+        .lean()
+    ).map((s) => String(s.team))
+  );
+  const free = teams.find((t) => !busy.has(String(t._id)));
+  return free ? MotTeam.findById(free._id) : null;
+}
+
+// Ouvre la table du jour d'une équipe — ou rejoint celle qui vient de naître.
+// L'index unique (team, date) tranche la course entre deux membres qui cliquent
+// à la même seconde : le perdant récupère la table de l'autre au lieu d'ouvrir
+// la sienne dans son coin.
+async function openTeamSession(userId, day, play, team) {
+  try {
+    const created = await createSession(userId, day, play, team);
+    return {
+      session: await MotSession.findById(created._id).populate(SESSION_POPULATE),
+      opened: true,
+    };
+  } catch (err) {
+    if (err?.code !== 11000) throw err;
+    const existing = await MotSession.findOne({ team: team._id, date: day.date }).populate(
+      SESSION_POPULATE
+    );
+    if (!existing) throw err;
+    await joinSessionDoc(existing, userId, play);
+    return {
+      session: await MotSession.findById(existing._id).populate(SESSION_POPULATE),
+      opened: false,
+    };
+  }
+}
+
+// Mes équipes + leur partie du jour, pour le rail.
+async function teamsFor(userId, date) {
+  const teams = await MotTeam.find({ "members.user": userId })
+    .sort({ lastDate: -1, updatedAt: -1 })
+    .limit(8)
+    .populate(TEAM_POPULATE);
+  if (!teams.length) return [];
+
+  const sessions = await MotSession.find({
+    team: { $in: teams.map((t) => t._id) },
+    date,
+  })
+    .select("code team tries members solved")
+    .lean();
+  const byTeam = new Map(sessions.map((s) => [String(s.team), s]));
+
+  return teams.map((t) =>
+    publicTeam(t, { session: byTeam.get(String(t._id)) || null, meId: userId })
+  );
+}
+
+// L'équipe d'une session, créée à la première invitation.
+//
+// LE PIÈGE À ÉVITER EST LA PROLIFÉRATION : inviter les mêmes personnes trois
+// jours de suite depuis trois parties différentes ne doit pas fabriquer trois
+// équipes identiques dans leur rail. On réutilise donc, dans l'ordre :
+//   1. l'équipe déjà attachée à cette table ;
+//   2. celle du groupe de discussion invité (une bande = un fil) ;
+//   3. l'équipe « libre » la plus récente de l'hôte, celle qui n'est liée à
+//      aucun groupe — sa bande par défaut.
+// On n'en crée une qu'en dernier recours. Dans tous les cas, les joueurs
+// présents à cette table en font partie d'office : ils jouent déjà ensemble.
+async function ensureTeam(session, userId, { name = "", conversation = null } = {}) {
+  let team = session.team ? await MotTeam.findById(session.team) : null;
+  if (!team && conversation) team = await MotTeam.findOne({ conversation });
+  if (!team && !conversation) {
+    team = await MotTeam.findOne({ "members.user": userId, conversation: null }).sort({
+      lastDate: -1,
+      updatedAt: -1,
+    });
+  }
+
+  if (!team) {
+    team = await MotTeam.create({
+      code: await makeTeamCode(),
+      name: String(name || "").slice(0, 60),
+      owner: userId,
+      conversation,
+      members: [],
+      lastDate: session.date,
+    });
+  } else {
+    if (!team.name && name) team.name = String(name).slice(0, 60);
+    if (!team.conversation && conversation) team.conversation = conversation;
+    if (team.lastDate !== session.date) team.lastDate = session.date;
+    await team.save();
+  }
+
+  // Les joueurs déjà assis à la table rejoignent le carnet d'adresses.
+  await addToTeam(
+    team,
+    activeMembers(session).map((m) => String(m.user?._id || m.user)),
+    userId
+  );
+
+  if (String(session.team || "") !== String(team._id)) {
+    session.team = team._id;
+    await session.save();
+  }
+  return team;
+}
+
+async function addToTeam(team, userIds, byId) {
+  const have = new Set(teamMemberIds(team));
+  let added = 0;
+  for (const id of userIds) {
+    if (!mongoose.isValidObjectId(id) || have.has(String(id))) continue;
+    if (have.size >= TEAM_MAX) break;
+    have.add(String(id));
+    team.members.push({ user: id, addedBy: byId });
+    added += 1;
+  }
+  if (added) await team.save();
+  return added;
+}
+
+// Le rappel du jour : « l'équipe cherche le mot ».
+//
+// Deux canaux, et ils ne font pas double emploi. Le temps réel (SSE) prévient
+// ceux qui ont la page ouverte — leur rail se met à jour tout seul. La carte
+// dans la messagerie, elle, est là pour les autres : c'est la notification
+// qu'on retrouve le soir. Elle ne part qu'UNE fois par jour, même si trois
+// personnes lancent la partie coup sur coup, et dans le fil de groupe quand
+// l'équipe en a un — un seul message pour tout le monde plutôt que cinq DM.
+async function pingTeam(team, session, actorId, date, { withCard = true } = {}) {
+  const others = teamMemberIds(team).filter((id) => id !== String(actorId));
+  if (!others.length) return;
+
+  const actor = await User.findById(actorId).select("username avatar following").lean();
+  emitTo(others, "mot", {
+    kind: "team",
+    team: team.code,
+    teamName: team.name || "",
+    session: session.code,
+    by: person(actor),
+    tries: session.tries || 0,
+  });
+
+  if (!withCard || team.pingedDate === date) return;
+  // Posé AVANT l'envoi : deux clics simultanés ne doivent pas produire deux
+  // cartes, et une messagerie en panne ne doit pas relancer l'envoi à chaque
+  // requête (même logique que le compteur de tentatives de l'anecdote).
+  team.pingedDate = date;
+  await team.save();
+
+  const card = {
+    code: session.code,
+    date,
+    hostName: actor?.username || "",
+    players: activeMembers(session).length,
+    tries: session.tries || 0,
+    team: team.code,
+    teamName: team.name || "",
+    daily: true,
+  };
+
+  try {
+    if (team.conversation) {
+      const ok = await deliverCardToConversation({
+        fromId: actorId,
+        conversationId: team.conversation,
+        mot: card,
+      });
+      if (ok) return;
+      // Groupe supprimé ou quitté : on retombe sur les messages privés.
+    }
+    const targets = await User.find({ _id: { $in: others } })
+      .select("username following")
+      .lean();
+    for (const t of targets) {
+      // Règle de la messagerie : on n'écrit qu'à qui est abonné à soi.
+      if (!(t.following || []).some((id) => String(id) === String(actorId))) continue;
+      // eslint-disable-next-line no-await-in-loop
+      await deliverCard({ fromId: actorId, toId: t._id, mot: card });
+    }
+  } catch (err) {
+    // Un rappel non distribué ne doit jamais empêcher la partie de s'ouvrir.
+    console.warn("mot team ping:", err.message);
+  }
+}
+
+// GET /api/mot/team/:code — la fiche d'une équipe (lien d'invitation compris).
+router.get("/team/:code", requireAuth, async (req, res) => {
+  try {
+    const team = await MotTeam.findOne({
+      code: String(req.params.code || "").toLowerCase().trim(),
+    }).populate(TEAM_POPULATE);
+    if (!team) return res.status(404).json({ error: "Cette équipe n'existe plus." });
+
+    const date = gameDay();
+    const session = await MotSession.findOne({ team: team._id, date })
+      .select("code team tries members solved")
+      .lean();
+    const play = await MotPlay.findOne({ user: req.userId, date }).select("solved tries").lean();
+
+    res.json({
+      team: publicTeam(team, { session, meId: req.userId }),
+      member: isTeamMember(team, req.userId),
+      alreadySolved: !!play?.solved,
+      myTries: play?.tries || 0,
+    });
+  } catch (err) {
+    console.error("mot team get error:", err.message);
+    res.status(500).json({ error: "Impossible de charger l'équipe." });
+  }
+});
+
+// POST /api/mot/team/:code/join — entrer dans l'équipe (le lien permanent).
+// Entrer dans l'équipe n'engage AUCUN essai : c'est le carnet d'adresses, pas
+// la table. Le jour où on veut vraiment jouer ensemble, /play s'en charge.
+router.post("/team/:code/join", requireAuth, async (req, res) => {
+  try {
+    const team = await MotTeam.findOne({
+      code: String(req.params.code || "").toLowerCase().trim(),
+    });
+    if (!team) return res.status(404).json({ error: "Cette équipe n'existe plus." });
+    if (!isTeamMember(team, req.userId)) {
+      if (teamMemberIds(team).length >= TEAM_MAX)
+        return res.status(409).json({ error: "Cette équipe est déjà au complet." });
+      team.members.push({ user: req.userId, addedBy: null });
+      await team.save();
+    }
+    const date = gameDay();
+    const session = await MotSession.findOne({ team: team._id, date })
+      .select("code team tries members solved")
+      .lean();
+    res.json({
+      team: publicTeam(await populateTeam(team), { session, meId: req.userId }),
+    });
+  } catch (err) {
+    console.error("mot team join error:", err.message);
+    res.status(500).json({ error: "Impossible de rejoindre l'équipe." });
+  }
+});
+
+// POST /api/mot/team/:code/play — la partie du jour de l'équipe.
+// UN SEUL BOUTON pour les deux cas : ouvrir la table si personne ne l'a encore
+// fait aujourd'hui, la rejoindre sinon. Le joueur n'a pas à savoir lequel des
+// deux il déclenche — c'est justement ce qui fait que l'équipe « reste » d'un
+// jour sur l'autre.
+router.post("/team/:code/play", requireAuth, async (req, res) => {
+  try {
+    if (!requireDict(res)) return;
+    const team = await MotTeam.findOne({
+      code: String(req.params.code || "").toLowerCase().trim(),
+    });
+    if (!team) return res.status(404).json({ error: "Cette équipe n'existe plus." });
+    if (!isTeamMember(team, req.userId))
+      return res.status(403).json({ error: "Tu ne fais pas partie de cette équipe." });
+
+    const date = gameDay();
+    const day = await dayFor(date);
+    const play = await playFor(req.userId, day);
+    if (play.solved)
+      return res.status(409).json({ error: "Tu as déjà trouvé le mot du jour." });
+
+    let session = await MotSession.findOne({ team: team._id, date }).populate(
+      SESSION_POPULATE
+    );
+    let opened = false;
+
+    if (session?.solved)
+      return res
+        .status(409)
+        .json({ error: "Ton équipe a déjà trouvé le mot aujourd'hui." });
+
+    if (!session) {
+      // On quitte proprement une autre table avant d'ouvrir celle de l'équipe.
+      if (play.session) {
+        const prev = await MotSession.findById(play.session).populate(SESSION_POPULATE);
+        if (prev) await leaveSession(prev, req.userId, play, { save: false });
+      }
+      ({ session, opened } = await openTeamSession(req.userId, day, play, team));
+    } else {
+      // Déjà assis à cette table (rechargement de page, second clic) : on ne
+      // refait pas les honneurs de l'arrivée.
+      const seated = memberOf(session, req.userId);
+      const isNew = !seated || seated.leftAt;
+      await joinSessionDoc(session, req.userId, play);
+      session = await MotSession.findById(session._id).populate(SESSION_POPULATE);
+      if (isNew) {
+        const me = await User.findById(req.userId).select("username avatar").lean();
+        broadcast(session, "members", { joined: person(me), tries: session.tries });
+      }
+    }
+
+    if (team.lastDate !== date) {
+      team.lastDate = date;
+      await team.save();
+    }
+    // Le rappel ne part que pour l'ouverture : rejoindre une table déjà ouverte
+    // n'a prévenu personne de neuf.
+    if (opened) await pingTeam(team, session, req.userId, date);
+
+    res.json({
+      session: publicSession(session, day, req.userId),
+      team: publicTeam(await populateTeam(team), { session, meId: req.userId }),
+      opened,
+    });
+  } catch (err) {
+    console.error("mot team play error:", err.message);
+    res.status(500).json({ error: "Impossible de lancer la partie de l'équipe." });
+  }
+});
+
+// PATCH /api/mot/team/:code — renommer (n'importe quel membre : c'est leur
+// bande, pas la propriété de celui qui a cliqué le premier).
+router.patch("/team/:code", requireAuth, async (req, res) => {
+  try {
+    const team = await MotTeam.findOne({
+      code: String(req.params.code || "").toLowerCase().trim(),
+    });
+    if (!team) return res.status(404).json({ error: "Cette équipe n'existe plus." });
+    if (!isTeamMember(team, req.userId))
+      return res.status(403).json({ error: "Tu ne fais pas partie de cette équipe." });
+    team.name = String(req.body?.name || "").trim().slice(0, 60);
+    await team.save();
+    res.json({ team: publicTeam(await populateTeam(team), { meId: req.userId }) });
+  } catch (err) {
+    console.error("mot team rename error:", err.message);
+    res.status(500).json({ error: "Impossible de renommer l'équipe." });
+  }
+});
+
+// POST /api/mot/team/:code/leave — ne plus faire partie de l'équipe.
+// C'est un geste PERMANENT, à ne pas confondre avec quitter la table du jour
+// (POST /session/:code/leave) : ici on sort du carnet d'adresses, et l'équipe
+// ne réapparaîtra plus demain matin. La partie en cours, elle, ne bouge pas —
+// les essais déjà mis en commun le restent.
+router.post("/team/:code/leave", requireAuth, async (req, res) => {
+  try {
+    const team = await MotTeam.findOne({
+      code: String(req.params.code || "").toLowerCase().trim(),
+    });
+    if (!team) return res.status(404).json({ error: "Cette équipe n'existe plus." });
+    const before = teamMemberIds(team).length;
+    team.members = (team.members || []).filter(
+      (m) => String(m.user?._id || m.user) !== String(req.userId)
+    );
+    if (teamMemberIds(team).length === before)
+      return res.status(409).json({ error: "Tu ne fais pas partie de cette équipe." });
+
+    // Plus personne : l'équipe n'a plus lieu d'être. Les sessions passées
+    // gardent leur référence morte, ce qui n'a aucune conséquence (le champ
+    // `team` ne sert qu'à retrouver la partie du jour d'une équipe vivante).
+    if (!team.members.length) await team.deleteOne();
+    else {
+      // L'équipe survit à son fondateur : le doyen des membres reprend la barre.
+      if (String(team.owner) === String(req.userId)) team.owner = team.members[0].user;
+      await team.save();
+    }
+    res.json({ left: true });
+  } catch (err) {
+    console.error("mot team leave error:", err.message);
+    res.status(500).json({ error: "Impossible de quitter l'équipe." });
   }
 });
 

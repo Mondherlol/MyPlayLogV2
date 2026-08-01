@@ -68,6 +68,7 @@ import useFollowingRail from "../hooks/useFollowingRail";
 import { useImageZoom } from "../hooks/useImageZoom";
 import { useScrollLock } from "../hooks/useScrollLock";
 import { useBackClose } from "../hooks/useBackClose";
+import useMediaQuery from "../hooks/useMediaQuery";
 
 const FRIEND_GROUPS = [
   { key: "played", label: "Y ont joué", match: (s) => s !== "wishlist" },
@@ -1923,15 +1924,31 @@ function InfosTab({ game, entry, onOpenImage, navigate }) {
 }
 
 // Galerie vidéos : un lecteur principal + les autres en miniatures à droite
+//
+// SUR MOBILE, LA BANDE-ANNONCE NE PART PAS TOUTE SEULE. Sur un grand écran le
+// lecteur est posé à côté du reste et se lance en fond de lecture, comme une
+// vitrine. Sur un téléphone il occupe l'écran entier : le trailer démarre en
+// plein milieu de la fiche qu'on faisait défiler, souvent en muet (les
+// navigateurs refusent le son sans geste), et il faut le couper avant de
+// pouvoir lire quoi que ce soit — sans compter la data dépensée sans l'avoir
+// demandé. On attend donc un vrai geste. Choisir une autre bande-annonce EN EST
+// un : à partir de là, la lecture repart d'elle-même.
 function VideoGallery({ videos }) {
   const [active, setActive] = useState(videos[0].videoId);
+  const [asked, setAsked] = useState(false);
+  const compact = useMediaQuery("(max-width: 760px)");
   const solo = videos.length === 1;
   return (
     <div className={`gp-videos ${solo ? "solo" : ""}`}>
       <div className="gp-video-main">
         {/* Notre lecteur plutôt que l'iframe nue : volume, ±10 s aux flèches ou
             en double-tapant une moitié, et pas d'habillage YouTube. */}
-        <YouTubePlayer key={active} videoId={active} title="Bande-annonce" />
+        <YouTubePlayer
+          key={active}
+          videoId={active}
+          autoPlay={!compact || asked}
+          title="Bande-annonce"
+        />
       </div>
       {videos.length > 1 && (
         <div className="gp-video-list">
@@ -1939,7 +1956,10 @@ function VideoGallery({ videos }) {
             <button
               key={v.videoId}
               className={`gp-video-thumb clickable ${active === v.videoId ? "active" : ""}`}
-              onClick={() => setActive(v.videoId)}
+              onClick={() => {
+                setActive(v.videoId);
+                setAsked(true);
+              }}
               title={v.name}
             >
               <div className="gp-video-thumb-img">

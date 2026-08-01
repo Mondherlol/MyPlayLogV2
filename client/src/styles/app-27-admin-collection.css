@@ -919,6 +919,109 @@
    bloc reste sobre (gris) ; allumé, il prend l'accent — l'état se lit d'un
    coup d'œil, sans avoir à trouver la position du curseur. */
 
+/* Le prix d'un tour de manivelle. Même gabarit que l'interrupteur de
+   visibilité juste au-dessus : ce sont les deux réglages du rayon, ils se
+   lisent dans le même bandeau. */
+.adm-coll-gacha {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.1rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.adm-coll-gacha-ic {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  color: var(--orange);
+}
+.adm-coll-gacha-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.adm-coll-gacha-text strong {
+  font-size: 0.92rem;
+}
+.adm-coll-gacha-text span {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+.adm-coll-gacha-field {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+}
+.adm-coll-gacha-field input {
+  width: 92px;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-align: right;
+}
+.adm-coll-gacha-field em {
+  font-style: normal;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+/* Remise à zéro de SA PROPRE étagère : un outil de mise au point. Traité comme
+   tel — bordure pointillée, ton d'alerte, jamais l'allure d'un bouton normal :
+   personne ne doit cliquer dessus par inadvertance en réglant le prix. */
+.adm-coll-wipe {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px dashed color-mix(in srgb, #e0483f 55%, transparent);
+  border-radius: 10px;
+  background: transparent;
+  color: #e0483f;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.adm-coll-wipe:hover:not(:disabled) {
+  background: color-mix(in srgb, #e0483f 12%, transparent);
+  border-color: #e0483f;
+}
+.adm-coll-wipe:disabled {
+  opacity: 0.55;
+}
+.adm-coll-wipe em {
+  font-style: normal;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #e0483f 18%, transparent);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 720px) {
+  .adm-coll-gacha {
+    flex-wrap: wrap;
+  }
+  .adm-coll-gacha-field {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
 .adm-coll-visib {
   display: flex;
   align-items: center;
@@ -1692,6 +1795,24 @@
   margin-top: 0.15rem;
 }
 
+/* Les autres pistes de la même fiche (une VOSTFR à côté de la VF importée).
+   Ni un avertissement ni un défaut : un renseignement, d'où le gris — mais un
+   renseignement qu'on ne retrouve plus une fois le boîtier posé. */
+.adm-coll-import-tracks {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--text-soft);
+}
+
+.adm-coll-import-tracks svg {
+  flex: 0 0 auto;
+  margin-top: 0.15rem;
+}
+
 /* ---------- l'état de la source, dans le tiroir d'édition ----------
    Ce qu'on lit AVANT de toucher à quoi que ce soit : chez qui ce titre est
    hébergé, combien d'épisodes tiennent encore, et par où il est arrivé. Le
@@ -1788,4 +1909,59 @@
 .adm-src-done-msg svg {
   flex: 0 0 auto;
   margin-top: 0.12rem;
+}
+
+/* ======================================================================
+   Thème sombre — les verdicts du panneau
+   ======================================================================
+   Vert, rouge et ambre étaient réglés à l'œil SUR FOND BLANC : des teintes
+   profondes, qui portent sur du papier et disparaissent sur une surface
+   sombre — le vert du « tout répond » et le rouge de l'avertissement
+   viraient à l'encre noire sur le gris anthracite des modales, donc à rien
+   du tout. Même verdict, même code couleur, mais éclairci de ce qu'il faut
+   pour rester lisible : c'est le contraste qui change, pas le sens.
+
+   Les fonds translucides (rgba / color-mix), eux, n'ont pas à bouger : ils
+   se posent sur ce qu'il y a dessous, clair ou sombre. */
+:root[data-theme="dark"] {
+  --adm-ok: #3ddc84;
+  --adm-bad: #ff7b72;
+  --adm-warn: #f5b544;
+}
+
+:root[data-theme="dark"] .adm-coll-picked,
+:root[data-theme="dark"] .adm-src-tally .ok,
+:root[data-theme="dark"] .adm-src-hosts em.ok,
+:root[data-theme="dark"] .adm-src-done-icon,
+:root[data-theme="dark"] .adm-src-done-msg {
+  color: var(--adm-ok);
+}
+
+:root[data-theme="dark"] .adm-coll-error,
+:root[data-theme="dark"] .adm-src-doom,
+:root[data-theme="dark"] .adm-src-tally .dead,
+:root[data-theme="dark"] .adm-src-hosts em.dead,
+:root[data-theme="dark"] .adm-src-title b,
+:root[data-theme="dark"] .adm-src-now-empty,
+:root[data-theme="dark"] .adm-coll-icon.danger:hover:not(:disabled) {
+  color: var(--adm-bad);
+}
+
+:root[data-theme="dark"] .adm-coll-icon.danger:hover:not(:disabled) {
+  border-color: var(--adm-bad);
+}
+
+:root[data-theme="dark"] .adm-src-tally .warn,
+:root[data-theme="dark"] .adm-src-hosts em.warn,
+:root[data-theme="dark"] .adm-coll-listprev-warn,
+:root[data-theme="dark"] .adm-coll-import-report li.empty,
+:root[data-theme="dark"] .adm-coll-import-missing,
+:root[data-theme="dark"] .adm-coll-pill.warn {
+  color: var(--adm-warn);
+}
+
+/* La pastille d'un boîtier reste blanche sur sa teinte, mais le liseré qui
+   la détachait du papier n'a plus de sens sur fond sombre : il l'écrase. */
+:root[data-theme="dark"] .adm-coll-tint {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
 }

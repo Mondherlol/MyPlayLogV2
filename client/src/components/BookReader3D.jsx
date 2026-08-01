@@ -20,14 +20,8 @@ import BookTutorial, { tutorialSeen } from "./BookTutorial";
 import { apiFetch } from "../lib/api";
 import { playBookOpenSound, playPageTurnSound, primePaperSounds } from "../lib/sfx";
 import { useAuth } from "../context/AuthContext";
-import {
-  boxOf,
-  isRtl,
-  loadImage,
-  pageRatio,
-  paintCase,
-  spreadTest,
-} from "../lib/collection";
+import { boxOf, isRtl, loadImage, pageRatio, spreadTest } from "../lib/collection";
+import { caseArt, HI_QUALITY } from "../lib/caseTextures";
 import {
   ribbonGeometry,
   ribbonUpdate,
@@ -1561,17 +1555,26 @@ export default function BookReader3D({
   // ---- la jaquette. Elle arrive peinte quand on vient de l'étagère (les deux
   //      scènes partagent la texture, three gardant son état GPU par renderer) ;
   //      ouvert depuis la fiche, on la peint ici.
+  // Et si l'étagère envoie MIEUX en cours de route — elle repeint en grand le
+  // volume qu'on tient pendant qu'il vole (voir HI_QUALITY côté rayon) —, la
+  // couverture se met à jour ici. Sans ça, le volume gardait la définition du
+  // rayon : suffisante sur une tranche de cent pixels, molle sur une couverture
+  // qui tient l'écran.
+  useEffect(() => {
+    if (art) setPaint(art);
+  }, [art]);
+
   useEffect(() => {
     if (art) return undefined;
     let alive = true;
-    paintCase(media).then((p) => {
-      if (!alive) return;
-      const sheet = new THREE.Texture(p.sheet);
-      sheet.colorSpace = THREE.SRGBColorSpace;
-      sheet.anisotropy = 8;
-      sheet.needsUpdate = true;
-      setPaint({ sheet, cuts: p.cuts });
-    });
+    // Par le magasin, et non par un exemplaire à soi : si l'étagère a déjà peint
+    // ce volume, il ne se repeint pas — et la texture, appartenant au magasin,
+    // n'est pas non plus abandonnée ici au démontage (elle l'était).
+    caseArt(media, HI_QUALITY)
+      .then((got) => alive && setPaint(got))
+      .catch(() => {
+        /* volume sans couverture : le lecteur ouvre quand même */
+      });
     return () => {
       alive = false;
     };

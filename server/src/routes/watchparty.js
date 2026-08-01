@@ -318,6 +318,25 @@ async function contentMedia(req, content) {
 router.post("/", async (req, res) => {
   try {
     const content = await resolveContent(req.body || {});
+    // ON N'OUVRE UNE SALLE QUE SUR SES PROPRES BOÎTIERS. Le rayon est commun
+    // mais les étagères sont personnelles (voir routes/collection.js) : sans ce
+    // contrôle, la watchparty serait la porte dérobée du verrouillage — il
+    // suffirait d'ouvrir une salle sur n'importe quel slug pour regarder ce
+    // qu'on n'a pas débloqué.
+    //
+    // REJOINDRE, en revanche, reste ouvert à qui a le code : c'est tout l'objet
+    // d'une séance partagée, et c'est l'hôte qui prête son boîtier le temps
+    // d'une soirée. (Les liens YouTube collés n'appartiennent à personne : ils
+    // ne passent pas par ici.)
+    if (content.slug) {
+      const me = await User.findById(req.userId).select("ownedCases").lean();
+      const owns = (me?.ownedCases || []).some((c) => c.slug === content.slug);
+      if (!owns)
+        return res.status(403).json({
+          error:
+            "Ce boîtier n'est pas dans ta collection — débloque-le à la machine à capsules pour ouvrir une séance dessus.",
+        });
+    }
     // Une collision sur dix caractères tirés au sort est théorique ; l'index
     // unique la rattraperait de toute façon. On boucle deux fois, sans drame.
     let party = null;

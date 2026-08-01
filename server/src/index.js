@@ -44,6 +44,7 @@ import settingsRoutes from "./routes/settings.js";
 import { requireFeature } from "./lib/features.js";
 import { optionalAuth } from "./middleware/auth.js";
 import { avatarPrivacy } from "./middleware/avatarPrivacy.js";
+import { auditLog, logEvent } from "./lib/audit.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -68,6 +69,12 @@ app.use(express.json({ limit: "25mb" }));
 
 // Fichiers uploadés (covers custom)
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
+// Journal du serveur (onglet « Logs » du panel admin). Posé ICI, avant toutes
+// les routes : il n'écrit rien à l'aller, il pose un écouteur sur la fin de la
+// réponse — moment où l'on connaît enfin l'auteur, le statut et la durée
+// (cf. lib/audit.js).
+app.use(auditLog);
 
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, service: "myplaylog", time: new Date().toISOString() });
@@ -195,6 +202,13 @@ async function start() {
     startTrackerAutoSync();
     const server = app.listen(PORT, () => {
       console.log(`🚀 API MyPlayLog sur http://localhost:${PORT}`);
+      // Une ligne dans le journal : un redémarrage explique souvent, à lui
+      // seul, un trou d'une minute dans les logs de la nuit.
+      logEvent({
+        kind: "system",
+        label: "Serveur démarré",
+        meta: { port: PORT, node: process.version, pid: process.pid },
+      });
     });
     server.on("error", (err) => {
       if (err.code === "EADDRINUSE") {

@@ -1,6 +1,7 @@
 import {
   Suspense,
   lazy,
+  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -22,7 +23,6 @@ import {
   BOX,
   boxOf,
   CONSOLE,
-  paintCase,
   fmtYears,
   isComic,
   isGame,
@@ -30,14 +30,19 @@ import {
   KINDS,
 } from "../lib/collection";
 import {
-  paperGeometry,
-  shellGeometry,
-  bookCoverGeometry,
-  bookBlockGeometry,
-  pageEdgeTexture,
-  plankTextures,
-  shadeTexture,
-} from "../lib/caseGeometry";
+  caseArt,
+  dressAll,
+  isReady,
+  prefetch,
+  readyArt,
+  trim,
+  HI_QUALITY,
+} from "../lib/caseTextures";
+import { plankTextures, shadeTexture } from "../lib/caseGeometry";
+// L'objet lui-même (coque, jaquette, bloc de pages) vit à part : la vitrine
+// d'ici et la machine à capsules de l'arcade doivent montrer EXACTEMENT le même
+// boîtier. Voir CaseObject.jsx.
+import { CaseModel, useCasePaper } from "./CaseObject";
 
 // Le volume ouvert est une scène à lui tout seul (déformation de page à chaque
 // image, textures de planches) : il ne descend qu'au moment où l'on ouvre un
@@ -112,6 +117,12 @@ const FIBRE_TILE = 1.6;
 // boîtier tel qu'on le voit vraiment (penché, il perd de la hauteur à l'écran).
 const HOVER = { lift: 0.015, out: 0.05, tilt: 0.22 };
 
+// Le geste du RANGEMENT, qui n'est pas celui du survol : là on ne présente pas
+// l'objet, on le porte. Il sort franchement de la rangée (assez pour passer
+// DEVANT ses voisins sans les traverser), se soulève de la planche, et se penche
+// à peine — juste ce qu'il faut pour qu'il ait l'air décollé et non posé.
+const CARRY = { lift: 0.05, out: 0.42, tilt: 0.1 };
+
 // Cadrage du rayon. FILL est la part de la hauteur visible que remplit la
 // rangée : plus il est haut, plus les boîtiers sont gros. ABOVE dit où passe
 // le vide restant.
@@ -150,7 +161,65 @@ const PLANK = {
     contact: 0.5,
     shadow: 0.26,
   },
+
+  // ---- LES BOIS, choisis à la main ----------------------------------------
+  // Les deux premières entrées SUIVENT LA PAGE : elles sont neutres parce
+  // qu'elles n'ont pas le droit d'avoir un avis, le thème décidant pour elles.
+  // Celles-ci sont un choix, donc elles ont le droit d'en être un — un vrai ton
+  // de bois, assez présent pour qu'on voie qu'on a changé de meuble. La texture
+  // de fibres (`plankTextures`) est peinte en gris clair puis TEINTÉE par ces
+  // couleurs : elle tient donc n'importe quelle essence sans être repeinte.
+  //
+  // Le dessus est toujours plus sombre que le bec : le premier reçoit la lumière
+  // du plafond en rasant, le second est l'arête que les mains polissent.
+  chene: {
+    top: "#d9bd8d",
+    nose: "#e8cfa4",
+    body: "#ab8757",
+    contact: 0.42,
+    shadow: 0.22,
+  },
+  noyer: {
+    top: "#7a5539",
+    nose: "#8d6444",
+    body: "#4d3222",
+    contact: 0.5,
+    shadow: 0.26,
+  },
+  // Le meuble de vidéoclub : stratifié noir, mat, celui qui disparaît derrière
+  // ce qu'il porte.
+  laque: {
+    top: "#26262c",
+    nose: "#33333c",
+    body: "#141418",
+    contact: 0.52,
+    shadow: 0.3,
+  },
 };
+
+// Ce que la barre d'outils propose. Ici et pas dans la page : la liste des
+// meubles disponibles est une propriété de la scène, la page ne fait que la
+// donner à choisir.
+export const SHELF_SKINS = [
+  { value: "", label: "Selon le thème" },
+  { value: "chene", label: "Chêne" },
+  { value: "noyer", label: "Noyer" },
+  { value: "laque", label: "Laqué" },
+];
+
+// Combien de boîtiers par planche. C'est le réglage qui change le plus l'allure
+// du rayon : peu par planche et l'on a de grosses tranches sur trois étages,
+// beaucoup et l'on a le mur du vidéoclub. `PER_PLANK` reste la valeur par
+// défaut, celle d'un rayon qu'on n'a pas réglé.
+export const SHELF_DENSITIES = [
+  { value: 10, label: "Large" },
+  { value: 20, label: "Normal" },
+  { value: 34, label: "Serré" },
+];
+
+export function plankSkin(name, theme) {
+  return PLANK[name] || PLANK[theme] || PLANK.light;
+}
 
 // ------------------------------------------------------------- lumières --
 //
@@ -228,162 +297,22 @@ const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 // le canvas quand le boîtier survolé est tout au bord.
 const BUBBLE_W = 268;
 
-// ------------------------------------------------------------- matériaux --
-
-// Le matériau est construit À LA MAIN plutôt que déclaré en JSX : un matériau
-// JSX qui passe de `color` à `map` garde sa couleur, et une texture est
-// MULTIPLIÉE par elle — boîtier noir, sans erreur. Ici la couleur est toujours
-// explicite.
-function useCasePaper(art) {
-  const paper = useMemo(() => {
-    if (!art?.sheet) return null;
-    // Du PAPIER, pas du vernis : rugueux (0,82) et sans métal, donc sans lobe
-    // spéculaire serré. Une jaquette de boîtier est imprimée sur du carton
-    // mat ; à 0,36 elle renvoyait un éclat de plastique en plein milieu de
-    // l'affiche, et c'est l'affiche qu'on vient voir.
-    return new THREE.MeshStandardMaterial({
-      map: art.sheet,
-      color: 0xffffff,
-      roughness: 0.82,
-      metalness: 0,
-    });
-  }, [art]);
-
-  // R3F ne détruit que ce qu'il a créé lui-même : à nous de libérer.
-  useEffect(() => () => paper?.dispose(), [paper]);
-  return paper;
-}
-
-// ------------------------------------------------------------ le boîtier --
-
-// Le boîtier lui-même, sans interaction : partagé entre le rayon et la vitrine.
-// Deux pièces, et deux seulement :
-//
-//   • LA COQUE — le plastique. On n'en voit que le dessus, le dessous et le
-//     chant d'ouverture : tout le reste est sous le papier.
-//   • LA JAQUETTE — une feuille unique qui fait le tour en épousant les arêtes
-//     arrondies (voir `paperGeometry`). Qu'elle ait été fournie dépliée ou
-//     composée par nos soins ne change plus rien ici : elle arrive dans les
-//     deux cas en une seule image, cousue à la peinture (voir paintCase).
-//
-// `box` arrive tout calculé (voir `boxOf`) : ce sont ses dimensions à LUI, pas
-// celles d'un gabarit. Un titre dont la jaquette a été mesurée est donc à sa
-// vraie taille sur l'étagère, à côté des autres.
-//
-// DEUX CARROSSERIES, ET UNE SEULE PORTE D'ENTRÉE. Un manga rangé à côté d'un
-// DVD ne doit pas être le même objet repeint : le boîtier a une coque de
-// plastique, une rainure d'ouverture et un dos plat ; le volume a un dos en
-// demi-lune et montre le chant de ses pages. C'est ici, et nulle part ailleurs,
-// que le choix se fait — tout le reste de la scène (survol, vol, vitrine) ne
-// sait pas de quel objet il s'occupe, et n'a pas à le savoir.
-function CaseModel({ media, box, paper, cuts }) {
-  if (isComic(media)) return <BookModel box={box} paper={paper} cuts={cuts} />;
-  return <DiscCase box={box} paper={paper} cuts={cuts} />;
-}
-
-// ------------------------------------------------------------- le volume --
-// Deux pièces, aucun plastique :
-//
-//   • LE BLOC — les pages. En retrait de la couverture sur les trois côtés
-//     ouverts (la « chasse »), et habillé du chant strié : c'est LUI qui fait
-//     lire l'objet comme du papier, avant même qu'on ait vu la couverture.
-//   • LA COUVERTURE — la même feuille unique que sur un boîtier, mais épousant
-//     un dos en demi-lune plutôt qu'un dos plat à arêtes vives.
-function BookModel({ box, paper, cuts }) {
-  const geo = useMemo(
-    () => ({ cover: bookCoverGeometry(box, cuts), block: bookBlockGeometry(box) }),
-    [box, cuts]
-  );
-  useEffect(
-    () => () => {
-      geo.cover.dispose();
-      geo.block.dispose();
-    },
-    [geo]
-  );
-
-  // Les six faces du bloc ne montrent pas la même chose : les trois CHANTS
-  // montrent la tranche des feuilles (striée), les deux faces collées aux plats
-  // et le dos montrent du papier uni — et personne ne les voit. Une seule
-  // matière pour les six étalerait le grain de la tranche partout.
-  const mats = useMemo(() => {
-    // Du papier lu cent fois : mat, sans le moindre éclat. Un chant de bloc qui
-    // brille, c'est du plastique, et on retombe sur le boîtier qu'on vient
-    // justement de quitter.
-    const edge = new THREE.MeshStandardMaterial({
-      map: pageEdgeTexture(),
-      color: "#f8f1e0",
-      roughness: 0.96,
-      metalness: 0,
-    });
-    const flat = new THREE.MeshStandardMaterial({
-      color: "#f7f1e3",
-      roughness: 0.97,
-      metalness: 0,
-    });
-    // Ordre des groupes d'une BoxGeometry : +X, -X, +Y, -Y, +Z, -Z. Rangé, le
-    // volume empile ses pages selon X : tête, pied et gouttière sont les chants.
-    return [flat, flat, edge, edge, flat, edge];
-  }, []);
-  useEffect(() => () => new Set(mats).forEach((m) => m.dispose()), [mats]);
-
-  return (
-    <group>
-      <mesh geometry={geo.block} material={mats} />
-      {paper && <mesh geometry={geo.cover} material={paper} />}
-    </group>
-  );
-}
-
-// ------------------------------------------------------------ le boîtier --
-function DiscCase({ box, paper, cuts }) {
-  // Les deux géométries sont taillées sur mesure, donc refaites dès que les
-  // dimensions ou les traits de coupe changent — et libérées avec eux : R3F ne
-  // détruit que ce qu'il a créé lui-même.
-  const geo = useMemo(
-    () => ({ shell: shellGeometry(box), paper: paperGeometry(box, cuts) }),
-    [box, cuts]
-  );
-  useEffect(
-    () => () => {
-      geo.shell.dispose();
-      geo.paper.dispose();
-    },
-    [geo]
-  );
-
-  return (
-    <group>
-      <mesh geometry={geo.shell}>
-        {/* clearcoat : le vernis du plastique, qui accroche un reflet — mais
-            DOUX, et sur une coque à peine grise plutôt que blanche. Le liseré
-            de plastique borde la jaquette : trop clair ou trop brillant, c'est
-            un cadre lumineux autour de l'image, et l'œil ne voit plus que lui. */}
-        <meshPhysicalMaterial
-          color="#e9e7e1"
-          roughness={0.55}
-          metalness={0}
-          clearcoat={0.3}
-          clearcoatRoughness={0.55}
-        />
-      </mesh>
-
-      {paper && <mesh geometry={geo.paper} material={paper} />}
-
-      {/* L'interstice d'ouverture : la fine rainure d'ombre entre les deux
-          valves, sur le chant opposé à la tranche. Un TRAIT, pas un panneau —
-          le reste de ce chant est du plastique blanc, comme sur l'objet réel. */}
-      <mesh position={[0, 0, -box.d / 2 - 0.001]} rotation={[0, Math.PI, 0]}>
-        <planeGeometry args={[box.w * 0.14, box.h * 0.9]} />
-        <meshStandardMaterial color="#4a4b52" roughness={0.85} />
-      </mesh>
-    </group>
-  );
-}
-
 // ------------------------------------------------------ le rayon (repos) --
 
-function ShelfCase({ media, x, baseY, art, hovered, held, taken, onHover, onPick }) {
+function ShelfCase({
+  media,
+  x,
+  baseY,
+  art,
+  hovered,
+  held,
+  taken,
+  arranging,
+  carry,
+  onHover,
+  onPick,
+  onGrab,
+}) {
   const group = useRef(null);
   const box = boxOf(media);
   const paper = useCasePaper(art);
@@ -392,6 +321,21 @@ function ShelfCase({ media, x, baseY, art, hovered, held, taken, onHover, onPick
   // Alignés sur leur FACE AVANT (tranches affleurantes) : front au même plan =
   // mêmes proportions à l'écran, et c'est comme ça qu'on range des boîtiers.
   const baseZ = -box.d / 2;
+  const homeX = x + box.w / 2;
+
+  // LA PLACE N'EST PLUS POSÉE SUR LE GROUPE, elle est REJOINTE. Tant que le
+  // rayon était figé, écrire `position` en JSX suffisait ; mais dès qu'on range
+  // (glisser un boîtier, trier la rangée), les voisins doivent s'écarter — et un
+  // `position` réécrit à chaque rendu les téléporte. Ici la position de départ
+  // est posée une fois au montage, et tout le reste est rattrapé image par image
+  // (voir `useFrame`) : changer l'ordre fait donc GLISSER la rangée, sans une
+  // ligne d'animation à écrire.
+  useLayoutEffect(() => {
+    group.current?.position.set(homeX, baseY, baseZ);
+    // Au montage seulement : un boîtier qui arrive (changement de filtre) se
+    // pose à sa place, il n'y vient pas depuis l'ancienne.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // La place EXACTE du boîtier à l'instant du clic — celle qu'il occupe pour de
   // vrai, pas celle qu'il aurait une fois son mouvement de survol terminé. On
@@ -427,26 +371,58 @@ function ShelfCase({ media, x, baseY, art, hovered, held, taken, onHover, onPick
     // rentrer dans l'étagère avant d'en sortir.
     if (!g || held) return;
     const k = Math.min(1, dt * 8);
-    g.position.z += (baseZ + (hovered ? HOVER.out : 0) - g.position.z) * k;
-    g.position.y += (baseY + (hovered ? HOVER.lift : 0) - g.position.y) * k;
+
+    // AU BOUT DES DOIGTS. Le boîtier qu'on déplace ne rejoint rien : il EST au
+    // curseur, sans amorti — un objet qu'on tient et qui traîne derrière la main
+    // ne se tient pas, il se remorque. Il monte aussi devant la rangée, sinon il
+    // disparaît derrière les tranches qu'il traverse.
+    if (carry) {
+      g.position.x = carry.x;
+      g.position.y = carry.y;
+      g.position.z += (baseZ + CARRY.out - g.position.z) * k;
+      g.rotation.x += (CARRY.tilt - g.rotation.x) * k;
+      return;
+    }
+
+    g.position.x += (homeX - g.position.x) * k;
+    g.position.z += (baseZ + (hovered && !arranging ? HOVER.out : 0) - g.position.z) * k;
+    g.position.y +=
+      (baseY + (hovered ? (arranging ? CARRY.lift : HOVER.lift) : 0) - g.position.y) * k;
     // Penché vers nous en pivotant sur son arête du bas — le geste du doigt
-    // qui accroche le haut de la tranche.
-    g.rotation.x += ((hovered ? HOVER.tilt : 0) - g.rotation.x) * k;
+    // qui accroche le haut de la tranche. En rangement, il ne se penche pas :
+    // là on ne regarde pas les boîtiers, on les déplace, et une rangée qui
+    // s'incline sous le curseur donne un rayon qui gigote.
+    g.rotation.x += ((hovered && !arranging ? HOVER.tilt : 0) - g.rotation.x) * k;
   });
 
   return (
     <group
       ref={group}
-      position={[x + box.w / 2, baseY, baseZ]}
       onPointerOver={(e) => {
         e.stopPropagation();
         onHover(media.slug);
       }}
       onPointerOut={() => onHover(null)}
-      onClick={(e) => {
-        e.stopPropagation();
-        onPick(media, snapshot());
-      }}
+      // En rangement, le boîtier ne s'ouvre plus : il se prend. Le geste part au
+      // DOIGT POSÉ et non au clic — attendre le relâchement pour commencer à
+      // déplacer, c'est un premier centimètre de glissement perdu, et l'objet
+      // qui saute pour rattraper la main.
+      onPointerDown={
+        arranging
+          ? (e) => {
+              e.stopPropagation();
+              onGrab(media, e);
+            }
+          : undefined
+      }
+      onClick={
+        arranging
+          ? undefined
+          : (e) => {
+              e.stopPropagation();
+              onPick(media, snapshot());
+            }
+      }
     >
       {/* Pris en main, le boîtier quitte VRAIMENT l'étagère : sa place reste
           vide derrière la vitrine, et plus rien ici ne répond au curseur. */}
@@ -606,17 +582,103 @@ function useFraming({ width, height, centerY }) {
   return 2 * d * vTan * aspect;
 }
 
-function ShelfScene({
+// LA PLACE VISÉE PAR LA MAIN. Où le boîtier porté veut-il être reposé, dans
+// l'ordre courant ? La question se règle en deux temps, dans l'ordre où l'œil la
+// pose : quelle PLANCHE (la plus proche en hauteur), puis quelle place dans
+// cette rangée (combien de tranches sont passées à gauche du curseur).
+//
+// Le boîtier porté est SORTI du compte : il occupe encore une place dans la
+// liste, mais plus dans la rangée — l'y compter ferait osciller la place visée
+// entre deux valeurs dès qu'il passe au-dessus de son propre trou.
+function slotAt(list, slug, px, py, layout, perPlank) {
+  const from = list.findIndex((m) => m.slug === slug);
+  if (from < 0) return null;
+
+  let r = 0;
+  let best = Infinity;
+  layout.planks.forEach((p, i) => {
+    const gap = Math.abs(py - (p.y + layout.tallest / 2));
+    if (gap < best) {
+      best = gap;
+      r = i;
+    }
+  });
+
+  let k = 0;
+  for (const it of layout.planks[r].items) {
+    if (it.media.slug === slug) continue;
+    if (it.x + boxOf(it.media).w / 2 < px) k += 1;
+  }
+
+  // La rangée commence à `r * perPlank` dans la liste — mais on compte dans la
+  // liste PRIVÉE du boîtier porté, puisque c'est là qu'on va le réinsérer.
+  const rowStart = r * perPlank - (from < r * perPlank ? 1 : 0);
+  const target = Math.max(0, Math.min(list.length - 1, rowStart + k));
+  if (target === from) return null;
+
+  const next = list.slice();
+  const [carried] = next.splice(from, 1);
+  next.splice(target, 0, carried);
+  return next;
+}
+
+// LA MONTÉE SUR LA CARTE GRAPHIQUE, ÉTALÉE. Une jaquette peinte n'est encore
+// qu'une image en mémoire vive : elle ne part sur le GPU qu'au premier rendu qui
+// s'en sert. Toutes les découvrir dans la même image — ce que fait forcément une
+// étagère qui s'habille d'un coup — c'est quarante envois de deux mégaoctets
+// dans la même frame, donc un accroc pile au moment du fondu.
+//
+// Alors on les envoie AU FUR ET À MESURE, deux par image, pendant que le rayon
+// est encore caché derrière son squelette : le temps de peinture est du temps
+// d'attente réseau, la carte graphique n'y fait rien. Quand l'étagère se montre,
+// tout est déjà en place et le fondu est lisse.
+//
+// La file est une `ref` remplie hors de React : personne n'a à se redessiner
+// parce qu'une texture vient d'être poussée sur le GPU.
+function Warmer({ queue }) {
+  const gl = useThree((s) => s.gl);
+  useFrame(() => {
+    for (let i = 0; i < 2 && queue.current.length; i += 1) {
+      const art = queue.current.shift();
+      try {
+        gl.initTexture(art.sheet);
+      } catch {
+        /* pas de contexte, ou une texture déjà libérée : le rendu la montera
+           lui-même le moment venu. */
+      }
+    }
+  });
+  return null;
+}
+
+// `memo` : pendant que les jaquettes se peignent, la page compte les boîtiers
+// prêts pour la jauge du squelette — une dizaine de rendus par seconde qui n'ont
+// RIEN à dire à la scène. Sans cette barrière, chacun redescendait jusqu'aux
+// boîtiers. Les fonctions qui arrivent d'en haut sont donc toutes stables
+// (`useCallback`), sinon la barrière ne tient pas.
+const ShelfScene = memo(function ShelfScene({
   media,
   art,
   hovered,
   held,
   taken,
+  arranging,
+  perPlank,
   onHover,
   onPick,
   onAnchor,
+  onReorder,
   skin,
 }) {
+  // L'ORDRE DE TRAVAIL. Pendant qu'on déplace un boîtier, la rangée affichée
+  // n'est plus celle de la page : c'est celle qu'on est en train de composer.
+  // Elle vit ici, au plus près de la scène (la page ne saurait rien en faire
+  // avant qu'on ait lâché), et s'efface dès que la page reprend la main avec
+  // l'ordre validé — d'où le retour à `null` sur tout changement de liste.
+  const [order, setOrder] = useState(null);
+  const items = order || media;
+  useEffect(() => setOrder(null), [media]);
+
   // Une rangée centrée par planche, les tranches presque jointives.
   //
   // Les boîtiers n'ont PAS tous la même taille : un Blu-ray est plus court
@@ -629,23 +691,23 @@ function ShelfScene({
   // boîtier, jamais son centre, donc les hauteurs se mélangent d'elles-mêmes.
   const layout = useMemo(() => {
     const chunks = [];
-    for (let i = 0; i < media.length; i += PER_PLANK)
-      chunks.push(media.slice(i, i + PER_PLANK));
+    for (let i = 0; i < items.length; i += perPlank)
+      chunks.push(items.slice(i, i + perPlank));
     const widthOf = (row) => row.reduce((w, m) => w + boxOf(m).w + GAP, 0) - GAP;
     const width = Math.max(MIN_W, Math.max(...chunks.map(widthOf), 0) + EDGE * 2);
 
-    const tallest = Math.max(BOX.dvd.h, ...media.map((m) => boxOf(m).h));
+    const tallest = Math.max(BOX.dvd.h, ...items.map((m) => boxOf(m).h));
     const pitch = tallest + PLANK_AIR;
 
     const planks = chunks.map((row, r) => {
       const y = ((chunks.length - 1) * pitch) / 2 - r * pitch - tallest / 2;
       let x = -widthOf(row) / 2;
-      const items = row.map((m) => {
+      const slots = row.map((m) => {
         const at = x;
         x += boxOf(m).w + GAP;
         return { media: m, x: at, baseY: y };
       });
-      return { items, y };
+      return { items: slots, y };
     });
 
     const bottomY = planks[planks.length - 1].y - THICK;
@@ -654,14 +716,18 @@ function ShelfScene({
       planks,
       width,
       topY,
+      // `tallest` ressort : c'est le repère qui dit à quelle hauteur se trouve
+      // le milieu d'une rangée, donc quelle planche vise la main qui range.
+      tallest,
       centerY: (bottomY + topY) / 2,
       height: topY - bottomY,
     };
-  }, [media]);
+  }, [items, perPlank]);
 
   const frameW = useFraming(layout);
   const camera = useThree((s) => s.camera);
   const size = useThree((s) => s.size);
+  const gl = useThree((s) => s.gl);
 
   // Où se trouve, EN PIXELS, le boîtier survolé ? On projette le haut et le
   // bas de sa tranche : la bulle s'accroche au premier, et le décollage vers
@@ -706,6 +772,130 @@ function ShelfScene({
     });
   }, [hovered, layout, camera, size, onAnchor]);
 
+  // ------------------------------------------------------- le rangement --
+  //
+  // DÉPLACER UN BOÎTIER, C'EST LE SUIVRE DU DOIGT. Pas de zone de dépôt, pas de
+  // silhouette fantôme : l'objet est au bout du curseur et la rangée s'ouvre
+  // devant lui. Trois pièces pour ça :
+  //
+  //   • un PLAN DE TRAVAIL — le plan des tranches (z = 0), sur lequel on projette
+  //     le curseur pour savoir où il est DANS LA SCÈNE, en unités du monde. Sans
+  //     lui, on ne saurait comparer des pixels qu'à des pixels, et la rangée est
+  //     en mètres ;
+  //   • une POSITION PORTÉE, tenue en `ref` et relue à chaque image par le
+  //     boîtier (voir `carry` dans ShelfCase) : la faire passer par un état
+  //     redessinerait toute la scène soixante fois par seconde ;
+  //   • l'ORDRE DE TRAVAIL, lui bien en état — c'est le seul des trois qui change
+  //     ce qu'on voit d'autre que le boîtier porté.
+  const dragPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), []);
+  const caster = useMemo(() => new THREE.Raycaster(), []);
+  const carried = useRef({ x: 0, y: 0 });
+  const gesture = useRef(null);
+  const [carrying, setCarrying] = useState(null);
+
+  // Les listeners du glissement vivent sur la fenêtre (on peut très bien sortir
+  // du canvas en déplaçant) : ils ne doivent PAS se réabonner à chaque image de
+  // la rangée. Ce que le geste a besoin de lire passe donc par des refs.
+  const live = useRef(null);
+  live.current = { items, layout, perPlank, onReorder };
+
+  const hitAt = useCallback(
+    (clientX, clientY) => {
+      const r = gl.domElement.getBoundingClientRect();
+      caster.setFromCamera(
+        new THREE.Vector2(
+          ((clientX - r.left) / r.width) * 2 - 1,
+          -((clientY - r.top) / r.height) * 2 + 1
+        ),
+        camera
+      );
+      const out = new THREE.Vector3();
+      return caster.ray.intersectPlane(dragPlane, out) ? out : null;
+    },
+    [camera, caster, dragPlane, gl]
+  );
+
+  // LE GESTE S'ARME AU DOIGT POSÉ, PAS AU RENDU SUIVANT. Poser ses écouteurs
+  // dans un effet, c'est les poser une image trop tard : un clic vif — appui et
+  // relâchement dans la même image — se relevait avant que le `pointerup` ne
+  // soit écouté. Le boîtier restait alors collé au curseur, et la rangée se
+  // recomposait au moindre mouvement de souris, sans qu'on ait rien demandé.
+  // Tout le geste vit donc ici, du premier contact au dépôt.
+  const onGrab = useCallback(
+    (m, e) => {
+      if (gesture.current) return; // un boîtier à la fois
+      const hit = hitAt(e.clientX, e.clientY);
+      const slot = live.current.layout.planks
+        .flatMap((p) => p.items)
+        .find((i) => i.media.slug === m.slug);
+      if (!hit || !slot) return;
+
+      // L'ÉCART ENTRE LE DOIGT ET L'OBJET EST CONSERVÉ : on a attrapé le boîtier
+      // quelque part, pas en son centre. Sans ça il saute sous le curseur à la
+      // première image, et le geste commence par une secousse.
+      const c = { x: slot.x + boxOf(m).w / 2, y: slot.baseY };
+      const off = { dx: hit.x - c.x, dy: hit.y - c.y };
+      carried.current.x = c.x;
+      carried.current.y = c.y;
+      let moved = false;
+
+      const move = (ev) => {
+        const at = hitAt(ev.clientX, ev.clientY);
+        if (!at) return;
+        carried.current.x = at.x - off.dx;
+        carried.current.y = at.y - off.dy;
+        const next = slotAt(
+          live.current.items,
+          m.slug,
+          carried.current.x,
+          carried.current.y,
+          live.current.layout,
+          live.current.perPlank
+        );
+        if (!next) return;
+        moved = true;
+        setOrder(next);
+      };
+
+      const end = (commit) => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", drop);
+        window.removeEventListener("pointercancel", cancel);
+        window.removeEventListener("keydown", key);
+        gesture.current = null;
+        setCarrying(null);
+        // UN CLIC N'EST PAS UN DÉPLACEMENT. Effleurer un boîtier sans le sortir
+        // de son rang ne doit RIEN écrire : sinon le moindre clic renvoyait un
+        // ordre à la page, qui le renvoyait à la scène, et toute la rangée
+        // repassait par ce circuit pour ne rien changer.
+        if (commit && moved)
+          live.current.onReorder?.(live.current.items.map((x) => x.slug));
+        // L'ordre de travail n'est lâché QUE si rien n'a été validé : quand on
+        // valide, c'est la page qui renvoie la rangée par le haut, et la rendre
+        // maintenant ferait réapparaître l'ancienne le temps d'un aller-retour.
+        else setOrder(null);
+      };
+
+      const drop = () => end(true);
+      const cancel = () => end(false);
+      // Échap RENONCE — et referme le geste : le doigt qui se relève ensuite ne
+      // doit pas valider ce qu'on vient d'annuler.
+      const key = (ev) => ev.key === "Escape" && end(false);
+
+      gesture.current = { end };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", drop);
+      window.addEventListener("pointercancel", cancel);
+      window.addEventListener("keydown", key);
+      setCarrying(m.slug);
+    },
+    [hitAt]
+  );
+
+  // Un geste encore en cours quand la scène s'en va (on quitte la page un
+  // boîtier en main) laisserait ses écouteurs sur la fenêtre.
+  useEffect(() => () => gesture.current?.end(false), []);
+
   // La planche TRAVERSE le cadre : une planche entièrement visible se lit
   // comme un petit objet flottant, une planche qui déborde comme une étagère.
   const plankW = Math.max(layout.width + 0.6, frameW * 1.35);
@@ -720,29 +910,42 @@ function ShelfScene({
       ))}
 
       {layout.planks.map((plank, r) => (
-        <group key={r}>
-          <Plank width={plankW} y={plank.y} skin={skin} />
-          {plank.items.map(({ media: m, x, baseY }) => (
-            <ShelfCase
-              key={m.slug}
-              media={m}
-              x={x}
-              baseY={baseY}
-              art={art[m.slug]}
-              hovered={hovered === m.slug || held === m.slug}
-              // Figé dès le clic, rendu à la vie une fois la vitrine refermée :
-              // il reprend alors sa place en se recalant tout seul dans le rang.
-              held={held === m.slug}
-              taken={taken === m.slug}
-              onHover={onHover}
-              onPick={onPick}
-            />
-          ))}
-        </group>
+        <Plank key={r} width={plankW} y={plank.y} skin={skin} />
       ))}
+
+      {/* LES BOÎTIERS NE SONT PAS RANGÉS SOUS LEUR PLANCHE, mais tous à plat, à
+          côté d'elles. Leur place est de toute façon en coordonnées du monde
+          (une planche n'est pas un repère, c'est un objet posé comme un autre) —
+          et surtout : monté sous sa planche, un boîtier qui change de rangée
+          change de PARENT, donc React le démonte et le remonte. Il repartait
+          alors de zéro en plein déplacement — matériau recréé, position reposée
+          — au moment précis où on le tenait à la main. */}
+      {layout.planks
+        .flatMap((p) => p.items)
+        .map(({ media: m, x, baseY }) => (
+          <ShelfCase
+            key={m.slug}
+            media={m}
+            x={x}
+            baseY={baseY}
+            art={art[m.slug]}
+            hovered={hovered === m.slug || held === m.slug}
+            // Figé dès le clic, rendu à la vie une fois la vitrine refermée :
+            // il reprend alors sa place en se recalant tout seul dans le rang.
+            held={held === m.slug}
+            taken={taken === m.slug}
+            arranging={arranging}
+            // Le même objet à chaque rendu, et muté hors de React : c'est ce
+            // qui permet au boîtier de suivre le curseur sans rendu.
+            carry={carrying === m.slug ? carried.current : null}
+            onHover={onHover}
+            onPick={onPick}
+            onGrab={onGrab}
+          />
+        ))}
     </>
   );
-}
+});
 
 // -------------------------------------------------- la vitrine (en main) --
 
@@ -1320,7 +1523,21 @@ function CaseInspector({
 
 // ------------------------------------------------------------------ page --
 
-export default function CollectionShelf({ media, onSelect, theme = "light" }) {
+export default function CollectionShelf({
+  media,
+  // La collection entière, filtre compris — `media` n'en est que la part
+  // visible. Elle ne sert qu'au préchargement des jaquettes masquées.
+  all,
+  onSelect,
+  theme = "light",
+  // Le rayon RÉGLÉ : le meuble, la densité, et le mode rangement. Trois réglages
+  // qui appartiennent au lecteur, pas à la collection — c'est la page qui les
+  // tient et les enregistre (voir Collection.jsx).
+  skin: skinName = "",
+  perPlank = PER_PLANK,
+  arranging = false,
+  onReorder,
+}) {
   const { token } = useAuth();
   const [hovered, setHovered] = useState(null);
   const [anchor, setAnchor] = useState(null); // position écran du survolé
@@ -1331,59 +1548,98 @@ export default function CollectionShelf({ media, onSelect, theme = "light" }) {
   // place ne se vide qu'une fois que la vitrine a vraiment dessiné le sien,
   // et se remplit à nouveau juste avant qu'elle ne s'efface.
   const [taken, setTaken] = useState(null);
-  const [art, setTextures] = useState({});
   const [pages, setPages] = useState({}); // planches déjà rapatriées, par slug
   const [missingArt, setMissingArt] = useState(0);
   const wrapRef = useRef(null);
-  const skin = PLANK[theme] || PLANK.light;
+  const skin = plankSkin(skinName, theme);
 
   // Stable : la scène la garde en dépendance d'effet, une nouvelle identité à
   // chaque rendu la ferait tourner en boucle.
   const onAnchor = useCallback((a) => setAnchor(a), []);
 
-  // Peinture des boîtiers, au niveau page : les textures servent aux DEUX
-  // canvas (rayon + vitrine), en série pour ne pas figer l'image.
+  // ------------------------------------------------------ les jaquettes --
+  //
+  // TOUT ARRIVE ENSEMBLE, OU RIEN N'ARRIVE. L'ancienne peinture partait boîtier
+  // par boîtier, chacun attendant que le précédent ait fini son aller-retour
+  // réseau, et poussait sa texture dans l'état dès qu'elle était prête : on
+  // voyait donc le squelette, puis une rangée de coques BLANCHES (la scène se
+  // dévoilait à la première jaquette venue), puis les visuels se poser un par
+  // un pendant plusieurs secondes. Trois attentes à la suite, dont deux qui
+  // montraient un objet inachevé.
+  //
+  // Désormais : les jaquettes partent par front de six, le magasin les garde
+  // d'une visite à l'autre (voir lib/caseTextures.js), et l'étagère ne se montre
+  // qu'une fois HABILLÉE. Ce qui reste à l'écran pendant ce temps, c'est le
+  // squelette — avec sa jauge, puisque l'attente est maintenant bornée et connue.
+  //
+  // `art` démarre sur ce que le magasin a déjà : revenir sur la page, changer de
+  // filtre ou de tri n'attend plus rien du tout.
+  const [art, setArt] = useState(() => readyArt(media));
+  const [dressed, setDressed] = useState(() => isReady(media));
+  const [done, setDone] = useState(0);
+  // Les jaquettes peintes qui attendent leur montée sur le GPU (voir `Warmer`).
+  const warm = useRef([]);
+
+  // LE RESTE DU RAYON, PENDANT QU'ON REGARDE CELUI-CI. Une fois l'étagère
+  // habillée, les titres que le filtre écarte se peignent au ralenti, quand le
+  // navigateur n'a rien de mieux à faire : retirer un filtre ne fait alors plus
+  // attendre. Jamais AVANT, sinon ce travail-là dispute le réseau à ce qu'on est
+  // en train de regarder.
+  const rest = useRef(null);
+  rest.current = all;
+  const fillIn = useCallback(() => {
+    if (rest.current?.length) prefetch(rest.current);
+  }, []);
+
   useEffect(() => {
+    // Déjà peint : on ne repasse même pas par un rendu d'attente.
+    if (isReady(media)) {
+      const got = readyArt(media);
+      setArt(got);
+      setDressed(true);
+      setMissingArt(Object.values(got).filter((a) => !a.artwork).length);
+      fillIn();
+      return undefined;
+    }
+
     let alive = true;
-    (async () => {
-      let failures = 0;
-      for (const m of media) {
-        const painted = await paintCase(m);
-        if (!alive) return;
-        if (!painted.artwork) failures += 1;
-        // `Texture` et non `CanvasTexture` : la feuille peut être un canvas
-        // (jaquette composée) comme une image (jaquette fournie telle quelle,
-        // qu'on ne recopie plus dans un canvas pour rien).
-        const sheet = new THREE.Texture(painted.sheet);
-        sheet.colorSpace = THREE.SRGBColorSpace;
-        sheet.anisotropy = 8;
-        sheet.needsUpdate = true;
-        setTextures((prev) => ({
-          ...prev,
-          // `cuts` voyage avec la texture : c'est lui qui dit à la géométrie où
-          // placer les deux plis sur le contour du boîtier.
-          [m.slug]: { sheet, cuts: painted.cuts },
-        }));
-      }
-      if (alive) setMissingArt(failures);
-    })();
+    setDressed(false);
+    setDone(0);
+
+    // LE FILET. Une image qui ne répond ni par sa charge ni par son erreur (un
+    // hébergeur qui laisse la connexion ouverte) garderait l'étagère cachée
+    // pour toujours. Passé ce délai, on montre ce qui est prêt : mieux vaut un
+    // boîtier nu qu'un rayon qui n'arrive jamais.
+    const bail = setTimeout(() => alive && setDressed(true), 12000);
+
+    dressAll(media, {
+      onProgress: (n) => alive && setDone(n),
+      // Chaque jaquette prête part dans la file du GPU : elle y sera montée
+      // pendant qu'on peint les suivantes (voir `Warmer`).
+      onPainted: (a) => warm.current.push(a),
+      alive: () => alive,
+    }).then((got) => {
+      if (!alive) return;
+      clearTimeout(bail);
+      setArt((prev) => ({ ...prev, ...got }));
+      setDressed(true);
+      setMissingArt(Object.values(got).filter((a) => !a.artwork).length);
+      fillIn();
+    });
+
     return () => {
       alive = false;
+      clearTimeout(bail);
     };
-  }, [media]);
+  }, [media, fillIn]);
 
-  // Libération au démontage — lues en ref, sinon le nettoyage ne verrait que
-  // l'objet vide du premier rendu.
-  const liveTextures = useRef({});
-  liveTextures.current = art;
-  useEffect(
-    () => () => {
-      for (const set of Object.values(liveTextures.current)) {
-        for (const t of Object.values(set)) t?.dispose?.();
-      }
-    },
-    []
-  );
+  // Le magasin ne se vide pas au démontage — c'est tout l'intérêt — mais il se
+  // borne : au retour, ce qu'on ne regarde plus laisse la place. Les jaquettes
+  // à l'écran sont épargnées, lues en ref (le nettoyage ne verrait sinon que
+  // l'objet vide du premier rendu).
+  const liveArt = useRef({});
+  liveArt.current = art;
+  useEffect(() => () => trim(Object.values(liveArt.current)), []);
 
   // LES PLANCHES SE CHERCHENT PENDANT QU'ON RETOURNE LE VOLUME. Elles ne partent
   // pas avec la liste du rayon (une centaine d'URL par titre), et les demander
@@ -1426,6 +1682,29 @@ export default function CollectionShelf({ media, onSelect, theme = "light" }) {
     return got ? { ...reading.media, pages: got } : reading.media;
   }, [reading, pages]);
 
+  // LA HAUTE DÉFINITION N'EST PAS POUR LE RAYON. Une tranche fait cent pixels
+  // de large à l'écran : la peindre en 1024 remplissait la mémoire vidéo d'une
+  // finesse que personne ne pouvait voir, et coûtait la moitié du temps de
+  // chargement. Le rayon se contente donc du nécessaire (SHELF_QUALITY) — et
+  // c'est le boîtier PRIS EN MAIN, lui seul, qui se fait repeindre en grand
+  // pendant qu'il vole vers la vitrine, où il tient tout l'écran et se laisse
+  // zoomer. Le relais est invisible : même dessin, même feuille, même pliure.
+  const [hi, setHi] = useState(null);
+  useEffect(() => {
+    const m = inspected?.media || reading?.media;
+    if (!m) return undefined;
+    let alive = true;
+    caseArt(m, HI_QUALITY)
+      .then((got) => alive && setHi({ slug: m.slug, art: got }))
+      .catch(() => {
+        /* la définition du rayon fait très bien l'affaire */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [inspected, reading]);
+  const bestArt = (m) => (hi?.slug === m.slug ? hi.art : art[m.slug]);
+
   // La bulle garde le dernier titre survolé le temps de sa disparition : la
   // vider dès la sortie du curseur ferait clignoter une carte vide.
   const held = useRef(null);
@@ -1434,7 +1713,9 @@ export default function CollectionShelf({ media, onSelect, theme = "light" }) {
     if (m) held.current = { media: m, anchor };
   }
   const tip = held.current;
-  const showTip = !!anchor && !inspected && !reading;
+  // Pas de bulle quand on range : à ce moment-là on ne lit pas les titres, on
+  // déplace des objets — et une carte qui suit le curseur masque la rangée.
+  const showTip = !!anchor && !inspected && !reading && !arranging;
 
   // Recadrage horizontal : la carte reste dans le canvas, la pointe reste sur
   // le boîtier — d'où le décalage `--tail` entre les deux.
@@ -1449,7 +1730,9 @@ export default function CollectionShelf({ media, onSelect, theme = "light" }) {
       ? Math.min(100, (prog.positionSeconds / prog.durationSeconds) * 100)
       : 0;
 
-  function pick(m, origin) {
+  // `useCallback` : la scène est mémoïsée, une fonction neuve à chaque rendu
+  // ferait tomber la barrière (voir `memo` sur ShelfScene).
+  const pick = useCallback((m, origin) => {
     // La vitrine s'ouvrira DEPUIS la place du boîtier sur l'étagère, et non
     // d'un point de fuite abstrait. `origin` est relevé dans la scène au moment
     // même du clic ; on le passe en repères de la fenêtre, seuls communs aux
@@ -1460,7 +1743,7 @@ export default function CollectionShelf({ media, onSelect, theme = "light" }) {
         ? { x: rect.left + origin.x, y: rect.top + origin.y, h: origin.h, tilt: origin.tilt }
         : null;
     setInspected({ media: m, from });
-  }
+  }, []);
 
   // Le volume passe D'ABORD par la vitrine, comme un boîtier : on le retourne,
   // on regarde ses deux plats, on lit son dos. C'est seulement quand on demande
@@ -1506,16 +1789,15 @@ export default function CollectionShelf({ media, onSelect, theme = "light" }) {
     });
   }
 
-  // Les jaquettes se peignent en série : tant que la première n'est pas prête,
-  // le rayon n'est qu'une rangée de coques blanches. On garde donc le squelette
-  // par-dessus jusque-là, et la scène se révèle en fondu — l'étagère se garnit
-  // au lieu d'apparaître nue puis de se remplir sous les yeux. Le squelette
-  // reste monté le temps du fondu, sinon il disparaît d'un coup sur une scène
-  // encore transparente.
-  const dressed = Object.keys(art).length > 0;
-  const [skelGone, setSkelGone] = useState(false);
+  // Le squelette tient jusqu'à ce que le rayon soit HABILLÉ, puis s'efface en
+  // fondu par-dessus la scène qui monte. Il reste monté le temps du fondu, sinon
+  // il disparaît d'un coup sur une scène encore transparente.
+  const [skelGone, setSkelGone] = useState(dressed);
   useEffect(() => {
-    if (!dressed) return undefined;
+    if (!dressed) {
+      setSkelGone(false);
+      return undefined;
+    }
     const t = setTimeout(() => setSkelGone(true), 500);
     return () => clearTimeout(t);
   }, [dressed]);
@@ -1527,13 +1809,16 @@ export default function CollectionShelf({ media, onSelect, theme = "light" }) {
       ref={wrapRef}
       className={`coll-shelf3d ${hovered ? "is-hover" : ""} ${
         dressed ? "is-dressed" : ""
-      }`}
+      } ${arranging ? "is-arranging" : ""}`}
       style={{ "--slots": media.length }}
     >
       {!skelGone && (
         <ShelfSkeleton
           label="Chargement de l'étagère…"
           count={Math.min(14, media.length)}
+          // L'attente a une fin, et elle se voit avancer : sans jauge, deux
+          // secondes de rangée grise se lisent comme une page qui a lâché.
+          progress={media.length ? done / media.length : 1}
         />
       )}
 
@@ -1550,15 +1835,19 @@ export default function CollectionShelf({ media, onSelect, theme = "light" }) {
         camera={{ position: [0, 0, 2.6], fov: 36 }}
         onPointerMissed={() => setHovered(null)}
       >
+        <Warmer queue={warm} />
         <ShelfScene
           media={media}
           art={art}
           hovered={hovered}
           held={inspected?.media.slug || reading?.media.slug}
           taken={taken}
+          arranging={arranging}
+          perPlank={perPlank}
           onHover={setHovered}
           onPick={pick}
           onAnchor={onAnchor}
+          onReorder={onReorder}
           skin={skin}
         />
       </Canvas>
@@ -1620,9 +1909,12 @@ export default function CollectionShelf({ media, onSelect, theme = "light" }) {
         </p>
       )}
 
+      {/* La consigne suit le mode : en rangement, prendre un boîtier ne l'ouvre
+          plus, et le dire vaut mieux que de laisser essayer. */}
       <span className="coll-shelf-hint" aria-hidden="true">
-        Survole un titre · clique pour le prendre en main — un volume s'ouvre et
-        se lit, un jeu se lance
+        {arranging
+          ? "Attrape un boîtier et pose-le où tu veux — Échap pour renoncer au déplacement en cours"
+          : "Survole un titre · clique pour le prendre en main — un volume s'ouvre et se lit, un jeu se lance"}
       </span>
 
       {/* Le volume ouvert descend à la demande : sa scène (une page déformée à
@@ -1633,7 +1925,7 @@ export default function CollectionShelf({ media, onSelect, theme = "light" }) {
         <Suspense fallback={null}>
           <BookReader3D
             media={readMedia}
-            art={art[reading.media.slug]}
+            art={bestArt(reading.media)}
             from={reading.from}
             pose={reading.pose}
             onLanded={() => {
@@ -1656,7 +1948,7 @@ export default function CollectionShelf({ media, onSelect, theme = "light" }) {
       {inspected && (
         <CaseInspector
           media={inspected.media}
-          art={art[inspected.media.slug]}
+          art={bestArt(inspected.media)}
           from={inspected.from}
           onReady={() => setTaken(inspected.media.slug)}
           onSettle={() => setTaken(null)}

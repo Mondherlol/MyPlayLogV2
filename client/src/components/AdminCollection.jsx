@@ -27,10 +27,12 @@ import {
   BookOpen,
   Gamepad2,
   ClipboardPaste,
+  Languages,
   Radar,
   Link2Off,
   CircleSlash2,
   Unplug,
+  Coins,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -376,6 +378,129 @@ function VisibilitySwitch({ token }) {
   );
 }
 
+// Le prix d'un tour de manivelle. RÉGLABLE DEPUIS ICI, et pas une constante du
+// serveur : équilibrer une économie de points demande de l'essayer — un prix
+// trop haut et personne ne joue, trop bas et la collection se complète en une
+// soirée. Le bon chiffre se trouve en le bougeant, pas en le décidant.
+function GachaPrice({ token }) {
+  const [price, setPrice] = useState(null); // null = pas encore lu
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  // Combien de boîtiers J'AI, pour que le bouton de remise à zéro dise ce
+  // qu'il va effacer — et disparaisse quand il n'y a rien à effacer.
+  const [mine, setMine] = useState(0);
+  const [wiping, setWiping] = useState(false);
+
+  useEffect(() => {
+    apiFetch("/collection/gacha", { token })
+      .then((d) => {
+        setPrice(d.price);
+        setDraft(String(d.price));
+        setMine(d.owned || 0);
+      })
+      .catch(() => setPrice(0));
+  }, [token]);
+
+  // VIDER SA PROPRE ÉTAGÈRE. Un outil de mise au point : régler une machine à
+  // capsules demande de la voir se remplir, et une fois le rayon complété il
+  // n'y a plus rien à tirer ni à regarder. Le serveur ne vide QUE l'étagère de
+  // celui qui demande — il n'y a pas de paramètre d'utilisateur, donc pas de
+  // façon de déposséder quelqu'un d'autre avec ce bouton.
+  async function wipe() {
+    if (
+      !confirm(
+        `Vider ta collection ?\n\n${mine} boîtier${mine > 1 ? "s" : ""} retourneront dans la machine.\n` +
+          "Tes points ne sont PAS rendus, et ta progression sur les titres est conservée."
+      )
+    )
+      return;
+    setWiping(true);
+    try {
+      await apiFetch("/collection/gacha/mine", { method: "DELETE", token });
+      setMine(0);
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setWiping(false);
+    }
+  }
+
+  async function save() {
+    const n = Number(draft);
+    if (!Number.isFinite(n) || n < 0) return;
+    setBusy(true);
+    try {
+      const d = await apiFetch("/collection/gacha/price", {
+        method: "PUT",
+        token,
+        body: { price: n },
+      });
+      setPrice(d.price);
+      setDraft(String(d.price));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1800);
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const dirty = price !== null && String(price) !== draft.trim();
+
+  return (
+    <div className="adm-coll-gacha">
+      <span className="adm-coll-gacha-ic">
+        <Coins size={17} />
+      </span>
+      <div className="adm-coll-gacha-text">
+        <strong>Machine à capsules</strong>
+        <span>
+          Ce que coûte un tour de manivelle. Chaque tour sort un boîtier que le
+          joueur n'a pas encore — jamais de doublon, donc il faut exactement
+          autant de tours que de boîtiers au rayon pour tout débloquer.
+        </span>
+      </div>
+      <div className="adm-coll-gacha-field">
+        <input
+          type="number"
+          min="0"
+          step="10"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && dirty && !busy && save()}
+          aria-label="Prix d'un tirage, en points"
+          disabled={price === null}
+        />
+        <em>points</em>
+        <button
+          className="btn btn-primary clickable"
+          onClick={save}
+          disabled={!dirty || busy}
+        >
+          {busy ? <Loader2 size={15} className="spin" /> : saved ? <Check size={15} /> : <Save size={15} />}
+          {saved ? "Enregistré" : "Enregistrer"}
+        </button>
+        {/* Mise au point : remettre SA propre étagère à zéro pour rejouer la
+            machine. Rien à afficher quand elle est déjà vide. */}
+        {mine > 0 && (
+          <button
+            className="adm-coll-wipe clickable"
+            onClick={wipe}
+            disabled={wiping}
+            title={`Vider ta collection (${mine} boîtier${mine > 1 ? "s" : ""}) pour retester la machine`}
+          >
+            {wiping ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />}
+            Vider ma collection
+            <em>{mine}</em>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function CollectionPanel({ token }) {
   const [media, setMedia] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -393,9 +518,13 @@ export default function CollectionPanel({ token }) {
   const [sort, setSort] = useState("recent");
   const filtering = !!(q.trim() || kind || flaw);
 
+  // LE CATALOGUE ENTIER, pas une collection. Depuis que les étagères sont
+  // personnelles, « /collection » ne rend que les boîtiers du demandeur : ce
+  // panneau travaille sur le RAYON, il a donc sa route à lui (réservée à
+  // l'admin, voir routes/collection.js).
   function load() {
     setLoading(true);
-    apiFetch("/collection", { token })
+    apiFetch("/collection/catalog", { token })
       .then((d) => setMedia(d.media || []))
       .catch(() => setMedia([]))
       .finally(() => setLoading(false));
@@ -442,6 +571,7 @@ export default function CollectionPanel({ token }) {
   return (
     <div className="adm-coll">
       <VisibilitySwitch token={token} />
+      <GachaPrice token={token} />
 
       <header className="adm-coll-head">
         <div>
@@ -1400,10 +1530,11 @@ function CreateModal({ token, onClose, onDone }) {
 //
 // SÉRIES ET FILMS PAR LA MÊME PORTE. Une fiche de film n'a ni saisons ni
 // épisodes : elle a un programme et cinq boutons de lecteur, qui sont
-// exactement ce que notre poste appelle des miroirs. Le geste de l'admin étant
+// exactement ce que notre poste appelle des miroirs. Une fiche de série du même
+// site, elle, rend ses épisodes (lib/serieIndex.js). Le geste de l'admin étant
 // le même (coller une adresse), le champ l'est aussi — c'est le serveur qui
-// reconnaît ce qu'on lui donne (voir lib/filmIndex.js), et le rapport ci-dessous
-// qui change de forme selon ce qui en revient.
+// reconnaît ce qu'on lui donne, et le rapport ci-dessous qui change de forme
+// selon ce qui en revient.
 
 const IMPORT_LANGS = [
   { value: "vf", label: "VF" },
@@ -1436,7 +1567,10 @@ function ListImport({ token, slug, onImported, onApplied }) {
       // L'adresse du champ du dessus part avec le collage quand elle est là :
       // c'est elle qui dit au lecteur quel hôte est LE SITE, donc lequel ne
       // peut pas être un lecteur (ses propres pages, ses images, ses scripts).
-      const body = { text: source, season: pasteSeason, url: url.trim() };
+      // `lang` sert aux fiches de série des sites de streaming : une source
+      // collée porte TOUTES leurs versions, et c'est ce sélecteur qui dit
+      // laquelle on veut (le collage d'un `episodes.js`, lui, l'ignore).
+      const body = { text: source, season: pasteSeason, url: url.trim(), lang };
       // En édition, un collage COMPLÈTE la source en place : il n'apporte qu'un
       // lecteur (celui affiché au moment de la copie) ou qu'une saison.
       const d = slug
@@ -1455,10 +1589,12 @@ function ListImport({ token, slug, onImported, onApplied }) {
       // `appendList` plutôt que `list` : on colle une saison à la fois, et
       // chacune doit S'AJOUTER aux précédentes. Passer par `list` aurait
       // remplacé la zone de texte, donc effacé la saison d'avant.
-      onImported(
-        d.kind === "episodes" ? { ...d, list: "", appendList: d.list } : { ...d, list: "" }
-      );
-      if (d.kind === "episodes") {
+      // Une fiche de SÉRIE collée apporte elle aussi des épisodes (toute sa
+      // saison d'un coup) : elle s'ajoute de la même façon. Ne restent à part
+      // que les collages qui ne décrivent QUE la fiche, sans un lien.
+      const brings = d.kind === "episodes" || d.kind === "series";
+      onImported(brings ? { ...d, list: "", appendList: d.list } : { ...d, list: "" });
+      if (brings) {
         setSource("");
         setPasteSeason((n) => n + 1); // la prochaine, la plus probable
       }
@@ -1504,6 +1640,12 @@ function ListImport({ token, slug, onImported, onApplied }) {
   const seasons = report?.seasons || [];
   const hosts = report?.hosts || [];
   const filled = seasons.filter((x) => x.count).length;
+  // Les autres pistes de la fiche : DITES, jamais importées en douce. Une même
+  // liste ne tient qu'une version (un épisode, une ligne), et découvrir six
+  // mois plus tard qu'une VOSTFR existait vaut bien cette ligne.
+  const others = (report?.tracks || []).filter(
+    (t) => !(report?.langs || []).includes(t.lang)
+  );
 
   return (
     <div className="adm-coll-import">
@@ -1512,13 +1654,13 @@ function ListImport({ token, slug, onImported, onApplied }) {
           <Download size={13} />{" "}
           {slug
             ? "Remplacer la source — colle l'adresse d'une fiche (série, film) ou d'une playlist YouTube"
-            : "Importer depuis une fiche — série (anime-sama) ou film (site de streaming) : remplit la liste ci-dessous"}
+            : "Importer depuis une fiche — série (anime-sama, site de streaming) ou film : remplit la liste ci-dessous"}
         </span>
         <div className="adm-coll-inline">
           <input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://anime-sama.xx/catalogue/… ou https://site-de-films/le-film.html"
+            placeholder="https://anime-sama.xx/catalogue/… ou https://site-de-streaming/la-serie-saison-1.html"
             onKeyDown={(e) => e.key === "Enter" && url && !busy && run()}
           />
           <select
@@ -1526,7 +1668,7 @@ function ListImport({ token, slug, onImported, onApplied }) {
             value={lang}
             onChange={(e) => setLang(e.target.value)}
             aria-label="Langue préférée"
-            title="Ne concerne que les séries d'anime-sama : un film n'a que la ou les pistes que sa fiche annonce."
+            title="La piste qu'on importe quand la fiche en propose plusieurs (séries). Un film n'a que la ou les pistes que sa fiche annonce."
           >
             {IMPORT_LANGS.map((l) => (
               <option key={l.value} value={l.value}>
@@ -1577,11 +1719,12 @@ function ListImport({ token, slug, onImported, onApplied }) {
         <div className="adm-coll-field">
           <span>
             <ClipboardPaste size={13} /> Ouvre la page dans ton navigateur, fais
-            Ctrl+U puis Ctrl+A / Ctrl+C, et colle ici. Pour une série, recommence
-            avec chaque <code>episodes.js</code> de saison ; pour un film, choisis
-            un lecteur puis recopie la page — dans les deux cas ce qui arrive
-            S'AJOUTE {slug ? "à la source en place" : "à la liste"} au lieu de
-            l'effacer.
+            Ctrl+U puis Ctrl+A / Ctrl+C, et colle ici. Pour une série anime-sama,
+            recommence avec chaque <code>episodes.js</code> de saison ; pour un
+            film, choisis un lecteur puis recopie la page. La fiche d'une série
+            de site de streaming, elle, rend sa saison entière. Dans tous les cas
+            ce qui arrive S'AJOUTE {slug ? "à la source en place" : "à la liste"}{" "}
+            au lieu de l'effacer.
           </span>
           <textarea
             className="adm-coll-list"
@@ -1640,6 +1783,15 @@ function ListImport({ token, slug, onImported, onApplied }) {
                 </li>
               ))}
             </ul>
+            {others.length > 0 && (
+              <span className="adm-coll-import-tracks">
+                <Languages size={12} /> Cette fiche a aussi{" "}
+                {others
+                  .map((t) => `${t.lang.toUpperCase()} (${t.count} ép.)`)
+                  .join(", ")}{" "}
+                — relance l'import avec cette langue pour la prendre à la place.
+              </span>
+            )}
             <span className="adm-coll-import-hosts">
               {hosts.slice(0, 6).map((h) => (
                 <em key={h.host}>

@@ -141,6 +141,33 @@ function note(ac, { freq, start, dur, gain = 0.16, type = "triangle" }) {
   osc.stop(start + dur + 0.02);
 }
 
+// UN SOUFFLE. Ce qui manque aux oscillateurs pour faire autre chose que des
+// notes : du plastique qui claque, de l'air qui s'échappe, un roulement. Bruit
+// blanc engendré à la volée, passé dans un filtre et enveloppé — une seconde de
+// bruit à 48 kHz coûte moins qu'une image, et rien ne se télécharge.
+function noise(ac, { start, dur, gain = 0.1, freq = 2000, q = 1, type = "bandpass", sweep }) {
+  const n = Math.max(1, Math.round(ac.sampleRate * dur));
+  const buf = ac.createBuffer(1, n, ac.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) data[i] = Math.random() * 2 - 1;
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  const filter = ac.createBiquadFilter();
+  filter.type = type;
+  filter.frequency.setValueAtTime(freq, start);
+  // Un balayage transforme le même bruit en objet différent : montant c'est de
+  // l'air qui s'échappe, descendant c'est quelque chose qui retombe.
+  if (sweep) filter.frequency.exponentialRampToValueAtTime(sweep, start + dur);
+  filter.Q.value = q;
+  const env = ac.createGain();
+  env.gain.setValueAtTime(0, start);
+  env.gain.linearRampToValueAtTime(gain, start + Math.min(0.012, dur * 0.25));
+  env.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+  src.connect(filter).connect(env).connect(ac.destination);
+  src.start(start);
+  src.stop(start + dur + 0.02);
+}
+
 // Message reçu : deux notes claires qui montent (une tierce), courtes et
 // discrètes — le « toc-ding » d'une messagerie, pas une fanfare.
 export function playMessageSound() {
@@ -379,6 +406,297 @@ export function playRejectSound() {
     const t = ac.currentTime + 0.005;
     note(ac, { freq: 150, start: t, dur: 0.09, gain: 0.07, type: "square" });
     note(ac, { freq: 96, start: t + 0.015, dur: 0.11, gain: 0.05, type: "triangle" });
+  } catch {
+    /* idem */
+  }
+}
+
+// ------------------------------------------- la machine à capsules (gacha) --
+//
+// UN GASHAPON EST UNE MACHINE À SONS AVANT D'ÊTRE UNE MACHINE À JOUETS. Le
+// plaisir tient tout entier dans la séquence — la pièce qui tombe, le cran de
+// la manivelle, la boule qui dégringole dans le conduit, le choc mat dans le
+// bac, le « clac » des deux coquilles — et cette séquence se joue LES YEUX
+// FERMÉS. Chaque étape de la modale déclenche donc la sienne, et leurs durées
+// sont accordées sur celles des animations (voir GachaModal).
+//
+// Rien n'est enregistré : du métal, du plastique et de l'air, c'est-à-dire des
+// partiels aigus, des impacts secs et du bruit filtré.
+
+// LA PIÈCE. Deux partiels non harmoniques (le propre du métal : une cloche ne
+// sonne pas juste), puis deux rebonds de plus en plus serrés et plus aigus —
+// c'est le rebond qui fait entendre une pièce plutôt qu'un carillon.
+export function playCoinDrop() {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    const t = ac.currentTime + 0.01;
+    const ping = (at, gain, mul = 1) => {
+      note(ac, { freq: 2100 * mul, start: at, dur: 0.16, gain, type: "sine" });
+      note(ac, { freq: 3170 * mul, start: at, dur: 0.11, gain: gain * 0.55, type: "sine" });
+      noise(ac, { start: at, dur: 0.03, gain: gain * 0.5, freq: 5200, q: 1.4 });
+    };
+    ping(t, 0.09);
+    ping(t + 0.13, 0.05, 1.06);
+    ping(t + 0.21, 0.028, 1.13);
+    // Le fond du monnayeur : le seul son grave de la séquence, et c'est lui qui
+    // dit que la pièce est AVALÉE — donc que le tour est payé.
+    note(ac, { freq: 128, start: t + 0.27, dur: 0.13, gain: 0.05, type: "triangle" });
+  } catch {
+    /* le son est un bonus : jamais bloquant */
+  }
+}
+
+// LA MANIVELLE. Un rochet, c'est-à-dire une SUITE de crans — et ils
+// ralentissent, parce qu'une manivelle se tourne à la main et que la main
+// fatigue en fin de course. Le ralentissement est ce qui empêche d'entendre une
+// boucle mécanique.
+export function playCrankSound() {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    const t = ac.currentTime + 0.01;
+    const CLICKS = 11;
+    let at = 0;
+    for (let i = 0; i < CLICKS; i++) {
+      const p = i / (CLICKS - 1);
+      noise(ac, { start: t + at, dur: 0.028, gain: 0.075, freq: 2600 - p * 900, q: 2.2 });
+      note(ac, {
+        freq: 210 - p * 45,
+        start: t + at,
+        dur: 0.035,
+        gain: 0.035,
+        type: "square",
+      });
+      at += 0.052 + p * 0.038; // les crans s'espacent : la manivelle force
+    }
+    // Le déclic de fin de course, plus franc : le mécanisme a lâché sa boule.
+    noise(ac, { start: t + at, dur: 0.06, gain: 0.1, freq: 1500, q: 1.2 });
+    note(ac, { freq: 96, start: t + at, dur: 0.12, gain: 0.06, type: "triangle" });
+  } catch {
+    /* idem */
+  }
+}
+
+// UN SEUL CRAN DE ROCHET — celui qu'on entend quand on tourne la manivelle SOI-
+// MÊME, un par encoche franchie. C'est le son qui porte tout le plaisir du
+// geste : sec, court, métallique, et jamais deux fois exactement le même (la
+// hauteur bouge de quelques pour cent, sinon on entend un échantillon en boucle
+// au bout de trois crans).
+//
+// `p` (0 → 1) est l'avancement du tour : le rochet DURCIT en fin de course,
+// comme un vrai mécanisme qui arme un ressort.
+export function playCrankNotch(p = 0) {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    const t = ac.currentTime + 0.004;
+    const jit = 0.94 + Math.random() * 0.12;
+    const load = 1 + p * 0.35; // ça force à mesure qu'on avance
+    noise(ac, { start: t, dur: 0.03, gain: 0.085 * load, freq: 2700 * jit, q: 2.4 });
+    note(ac, {
+      freq: 190 * jit * (1 + p * 0.12),
+      start: t,
+      dur: 0.04,
+      gain: 0.05 * load,
+      type: "square",
+    });
+    note(ac, { freq: 95 * jit, start: t, dur: 0.055, gain: 0.03 * load, type: "triangle" });
+  } catch {
+    /* le son est un bonus : jamais bloquant */
+  }
+}
+
+// Le déclic de fin de course : le mécanisme lâche sa boule. Plus grave et plus
+// franc que les crans — c'est le moment où le ressort se détend.
+export function playCrankRelease() {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    const t = ac.currentTime + 0.005;
+    noise(ac, { start: t, dur: 0.075, gain: 0.13, freq: 1700, sweep: 500, q: 1.1 });
+    note(ac, { freq: 132, start: t, dur: 0.15, gain: 0.08, type: "square" });
+    note(ac, { freq: 66, start: t + 0.01, dur: 0.2, gain: 0.055, type: "triangle" });
+  } catch {
+    /* idem */
+  }
+}
+
+// LA DÉGRINGOLADE. La boule tombe dans le conduit et cogne les parois : cinq à
+// six chocs mats, irréguliers (une chute n'a pas de tempo) et de plus en plus
+// rapprochés, comme tout ce qui accélère en tombant.
+export function playCapsuleRoll() {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    const t = ac.currentTime + 0.01;
+    let at = 0;
+    let gap = 0.16;
+    for (let i = 0; i < 6; i++) {
+      const f = 420 + Math.random() * 260;
+      // Du plastique creux : une note très courte et très basse, doublée d'un
+      // grain de bruit. Sans le bruit, c'est un bloc de bois.
+      note(ac, { freq: f, start: t + at, dur: 0.05, gain: 0.045, type: "triangle" });
+      note(ac, { freq: f / 2, start: t + at, dur: 0.07, gain: 0.03, type: "sine" });
+      noise(ac, { start: t + at, dur: 0.035, gain: 0.04, freq: 1800, q: 0.9 });
+      at += gap * (0.8 + Math.random() * 0.4);
+      gap *= 0.82; // elle accélère
+    }
+  } catch {
+    /* idem */
+  }
+}
+
+// LE BAC. Le choc final, plus lourd et plus long que les autres, suivi de deux
+// balancements très courts : la boule roule sur elle-même avant de s'arrêter.
+export function playCapsuleLand() {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    const t = ac.currentTime + 0.01;
+    note(ac, { freq: 190, start: t, dur: 0.14, gain: 0.09, type: "triangle" });
+    note(ac, { freq: 88, start: t + 0.005, dur: 0.2, gain: 0.07, type: "sine" });
+    noise(ac, { start: t, dur: 0.09, gain: 0.07, freq: 1300, sweep: 380, q: 0.8 });
+    note(ac, { freq: 340, start: t + 0.17, dur: 0.05, gain: 0.028, type: "triangle" });
+    note(ac, { freq: 300, start: t + 0.28, dur: 0.05, gain: 0.016, type: "triangle" });
+  } catch {
+    /* idem */
+  }
+}
+
+// CE QUE LA BOULE CONTIENT, À L'OREILLE.
+//
+// On secoue la capsule pour l'ouvrir, et pendant qu'on la secoue on ENTEND ce
+// qu'il y a dedans — c'est le seul indice donné avant la révélation, et il est
+// juste : un boîtier de DVD claque sec et creux, un volume de papier froisse,
+// une cartouche cogne mat avec un rien de métal aux contacts. Trois matières,
+// trois bruits, et on devine avant de voir.
+//
+// `force` (0 → 1) suit l'énergie du geste : secouer mollement fait un petit
+// bruit, secouer fort réveille tout ce qu'il y a dedans.
+export function playRattle(kind = "film", force = 0.5) {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    const t = ac.currentTime + 0.005;
+    const f = Math.max(0.15, Math.min(1, force));
+    const jitter = () => 0.9 + Math.random() * 0.2;
+
+    if (kind === "comic") {
+      // LE PAPIER. Les prises enregistrées (les mêmes que le lecteur de
+      // volumes), accélérées et très en retrait : ce n'est pas une page qu'on
+      // tourne, c'est un bloc qui bouge dans sa boîte.
+      primePaperSounds();
+      const buf = draw();
+      if (buf) shot(ac, buf, { rate: 1.5 * jitter(), gain: 0.16 * f });
+      // Le plat de la couverture qui tape le fond, très sourd.
+      note(ac, { freq: 128 * jitter(), start: t, dur: 0.06, gain: 0.028 * f, type: "sine" });
+      return;
+    }
+
+    if (kind === "game") {
+      // LA CARTOUCHE. Un bloc de plastique dur, court et mat — puis le
+      // frottement des contacts, minuscule et aigu. C'est ce détail-là qui
+      // fait entendre une cartouche plutôt qu'un caillou.
+      const base = 330 * jitter();
+      note(ac, { freq: base, start: t, dur: 0.045, gain: 0.06 * f, type: "square" });
+      note(ac, { freq: base / 2, start: t, dur: 0.06, gain: 0.04 * f, type: "triangle" });
+      noise(ac, { start: t, dur: 0.028, gain: 0.045 * f, freq: 2400, q: 1.6 });
+      if (Math.random() < 0.5)
+        noise(ac, { start: t + 0.02, dur: 0.022, gain: 0.022 * f, freq: 6800, q: 3 });
+      return;
+    }
+
+    // LE BOÎTIER (série, film). Du polypropylène creux : deux claquements
+    // clairs et brefs, très haut, avec la résonance de la coque derrière.
+    const base = 900 * jitter();
+    note(ac, { freq: base, start: t, dur: 0.035, gain: 0.05 * f, type: "square" });
+    note(ac, { freq: base * 1.48, start: t + 0.006, dur: 0.03, gain: 0.03 * f, type: "square" });
+    noise(ac, { start: t, dur: 0.035, gain: 0.05 * f, freq: 4200, sweep: 1800, q: 0.9 });
+    // Le vide de la boîte : une basse très courte qui donne le volume.
+    note(ac, { freq: 190 * jitter(), start: t + 0.008, dur: 0.08, gain: 0.03 * f, type: "sine" });
+  } catch {
+    /* le son est un bonus : jamais bloquant */
+  }
+}
+
+// L'OUVERTURE. Le « crac » des deux coquilles qui cèdent — plus ample que dans
+// la première version : il vient récompenser un geste (on a secoué pour en
+// arriver là), donc il doit avoir du corps. Trois couches : la rupture sèche,
+// le souffle de l'écartement, et une lueur tenue qui accompagne la lumière.
+export function playCapsuleCrack() {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    const t = ac.currentTime + 0.01;
+    // 1. La rupture : très bref, très large en fréquence.
+    noise(ac, { start: t, dur: 0.055, gain: 0.17, freq: 3800, sweep: 900, q: 0.55 });
+    note(ac, { freq: 1560, start: t, dur: 0.05, gain: 0.055, type: "square" });
+    note(ac, { freq: 210, start: t + 0.004, dur: 0.14, gain: 0.07, type: "triangle" });
+    // 2. Les deux moitiés qui s'écartent, et l'air entre elles.
+    noise(ac, { start: t + 0.05, dur: 0.5, gain: 0.06, freq: 600, sweep: 6400, q: 0.7 });
+    // 3. La lueur : une quinte tenue, très douce, qui monte sous l'éclat. Elle
+    //    ne se remarque pas ; c'est elle qui fait que l'ouverture « ouvre »
+    //    au lieu de simplement claquer.
+    note(ac, { freq: 392, start: t + 0.04, dur: 0.85, gain: 0.045, type: "sine" });
+    note(ac, { freq: 587.33, start: t + 0.08, dur: 0.8, gain: 0.035, type: "sine" });
+  } catch {
+    /* idem */
+  }
+}
+
+// LA RÉVÉLATION. Un accord majeur qui s'ouvre par le bas et monte, tenu par une
+// octave brillante : c'est la fanfare des caisses, mais plus RONDE — on ne
+// gagne pas une rareté ici, on gagne un OBJET, et la joie est celle de la
+// possession, pas de la chance.
+export function playGachaReveal() {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    const t = ac.currentTime + 0.01;
+    // Do5 → Mi5 → Sol5 → Do6 → Mi6
+    const chord = [523.25, 659.25, 783.99, 1046.5, 1318.51];
+    chord.forEach((f, i) =>
+      note(ac, { freq: f, start: t + i * 0.062, dur: 0.42, gain: 0.1, type: "triangle" })
+    );
+    // La quinte tenue en dessous : c'est elle qui donne le « poids » de l'objet.
+    note(ac, { freq: 261.63, start: t, dur: 0.7, gain: 0.05, type: "sine" });
+    note(ac, { freq: 392, start: t + 0.02, dur: 0.66, gain: 0.04, type: "sine" });
+    // Une pointe de brillance, comme un éclat sur du plastique neuf.
+    note(ac, { freq: 2093, start: t + 0.3, dur: 0.5, gain: 0.028, type: "sine" });
+  } catch {
+    /* idem */
+  }
+}
+
+// COLLECTION COMPLÈTE. Le seul son de tout le fichier qu'on n'entend qu'une
+// fois : une gamme entière qui monte, puis l'accord au complet. Il doit être
+// franchement plus long et plus haut que la révélation — sinon la dernière
+// boule sonne comme les précédentes, et ce n'est pas ce qui vient de se passer.
+export function playGachaComplete() {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    const t = ac.currentTime + 0.01;
+    const scale = [523.25, 587.33, 659.25, 698.46, 783.99, 880, 987.77, 1046.5];
+    scale.forEach((f, i) =>
+      note(ac, { freq: f, start: t + i * 0.075, dur: 0.2, gain: 0.075, type: "triangle" })
+    );
+    const at = t + scale.length * 0.075;
+    [523.25, 659.25, 783.99, 1046.5, 1567.98].forEach((f, i) =>
+      note(ac, { freq: f, start: at + i * 0.01, dur: 1.1, gain: 0.075, type: "triangle" })
+    );
+    note(ac, { freq: 130.81, start: at, dur: 1.3, gain: 0.06, type: "sine" });
   } catch {
     /* idem */
   }

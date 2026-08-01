@@ -267,6 +267,7 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
   const pixels = []; // idem pour Pixel Rush
   const geos = []; // idem pour GeoGamer
   const caseopens = []; // idem : ouvrir plusieurs caisses d'affilée est la norme
+  const drops = []; // boîtiers sortis de la machine à capsules (idem, en rafale)
   // Victoires collectives au Mot du jour déjà sorties : chaque membre de
   // l'équipe a SA ligne d'activité (c'est son résultat, il a ses points), mais
   // le fil n'en montre qu'une — elle nomme déjà toute l'équipe.
@@ -339,8 +340,16 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
   // recopié dans l'activité — une jaquette remplacée apparaît alors sur les
   // vieilles cartes, et un titre retiré de l'étagère les fait disparaître au
   // lieu de laisser un lien mort.
+  // Les boîtiers sortis de la machine à capsules passent par LA MÊME
+  // résolution : ce sont les mêmes objets, montrés de la même façon, et le
+  // même raisonnement s'applique — un boîtier retiré du catalogue fait
+  // disparaître les cartes qui le célébraient plutôt que de laisser un lien
+  // mort.
   const collActs = acts.filter(
-    (a) => COLLECTION_TYPES.includes(a.type) && a.actor && a.meta?.slug
+    (a) =>
+      (COLLECTION_TYPES.includes(a.type) || a.type === "collection_drop") &&
+      a.actor &&
+      a.meta?.slug
   );
   let collBySlug = new Map();
   if (collActs.length) {
@@ -349,11 +358,36 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
       // `pages` tranché à la première : c'est la couverture d'un titre de
       // papier (voir `coverOf` dans routes/collection.js), et un tome relié en
       // porte trois cents dont on n'a que faire ici.
-      .select({ slug: 1, title: 1, kind: 1, color: 1, franchise: 1, artwork: 1 })
+      .select({
+        slug: 1,
+        title: 1,
+        kind: 1,
+        color: 1,
+        franchise: 1,
+        year: 1,
+        artwork: 1,
+      })
       .slice("pages", 1)
       .lean();
     collBySlug = new Map(rows.map((m) => [m.slug, m]));
   }
+
+  // Un boîtier tel qu'une carte de fil le montre. Deux cartes s'en servent (la
+  // discussion et le déblocage) et elles doivent montrer le MÊME objet.
+  const collMini = (r, m) => ({
+    slug: m.slug,
+    title: m.title,
+    kind: m.kind,
+    color: m.color || null,
+    franchise: m.franchise || "",
+    year: m.year || null,
+    // La couverture d'un titre de papier est sa première planche ; pour tout
+    // le reste, c'est l'affiche (même règle que la fiche).
+    poster: absUpload(
+      r,
+      m.kind === "comic" && m.pages?.length ? m.pages[0].file : m.artwork?.poster
+    ),
+  });
 
   const gameEvents = [];
   for (const a of gameActs) {
@@ -646,6 +680,23 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
       continue;
     }
 
+    // Un boîtier sorti de la machine à capsules. Volontairement mis en
+    // rafale (`drops`) plutôt que poussé tel quel : on ne tourne presque
+    // jamais la manivelle une seule fois, et trois cartes d'affilée pour le
+    // même joueur noieraient le fil — voir le regroupement plus bas.
+    if (a.type === "collection_drop") {
+      const m = collBySlug.get(a.meta?.slug || "");
+      if (!m) continue;
+      drops.push({
+        type: "collectiondrop",
+        id: `a-${a._id}`,
+        date: a.createdAt,
+        user: person(a.actor),
+        media: collMini(req, m),
+      });
+      continue;
+    }
+
     // Discussion sur un titre du rayon : commentaire, réponse ou like.
     if (COLLECTION_TYPES.includes(a.type)) {
       const m = collBySlug.get(a.meta?.slug || "");
@@ -664,19 +715,7 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
         // Like posé sur une réponse plutôt que sur un message racine : la carte
         // le dit (« a aimé une réponse de … »).
         reply: !!a.meta?.reply,
-        media: {
-          slug: m.slug,
-          title: m.title,
-          kind: m.kind,
-          color: m.color || null,
-          franchise: m.franchise || "",
-          // La couverture d'un titre de papier est sa première planche ; pour
-          // tout le reste, c'est l'affiche (même règle que la fiche).
-          poster: absUpload(
-            req,
-            m.kind === "comic" && m.pages?.length ? m.pages[0].file : m.artwork?.poster
-          ),
-        },
+        media: collMini(req, m),
       });
       continue;
     }
@@ -1112,6 +1151,47 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
           caseName: c.members[0].caseName,
           best,
           drops: c.members,
+        });
+      } else {
+        events.push(c.members[0]);
+      }
+    }
+  }
+
+  // --- Boîtiers sortis de la machine à capsules : on enchaîne les tours tant
+  //     qu'il reste des points, donc les tirages rapprochés d'un même joueur
+  //     donnent UNE carte « a débloqué N boîtiers ». Le dernier sorti tient la
+  //     vedette (c'est celui qu'on vient de voir tomber), les autres défilent
+  //     en vignettes — pas de « plus belle prise » ici : sans rareté, aucun
+  //     boîtier ne vaut plus qu'un autre, et c'est très bien comme ça. ---
+  if (drops.length) {
+    drops.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const clusters = [];
+    for (const d of drops) {
+      const last = clusters[clusters.length - 1];
+      if (
+        last &&
+        last.user.id === d.user.id &&
+        new Date(last.lastDate) - new Date(d.date) <= GROUP_GAP
+      ) {
+        last.members.push(d);
+        last.lastDate = d.date;
+      } else {
+        clusters.push({ user: d.user, date: d.date, lastDate: d.date, members: [d] });
+      }
+    }
+    for (const c of clusters) {
+      if (c.members.length >= 2) {
+        events.push({
+          type: "collectiondropgroup",
+          id: `cd-g-${c.members[0].id}`,
+          date: c.date,
+          user: c.user,
+          count: c.members.length,
+          // `members` est trié du plus récent au plus ancien : le premier est
+          // le dernier tiré.
+          best: c.members[0].media,
+          drops: c.members.map((m) => ({ id: m.id, date: m.date, media: m.media })),
         });
       } else {
         events.push(c.members[0]);

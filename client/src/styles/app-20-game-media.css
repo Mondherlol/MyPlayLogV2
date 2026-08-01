@@ -2122,6 +2122,71 @@
   cursor: var(--cursor-pointer), pointer;
   touch-action: manipulation;
 }
+
+/* ---------- le clip en cours d'arrivée ----------
+   Le fil affichait un carré noir tant que le navigateur n'avait pas décodé la
+   première image — indistinguable d'une carte cassée. On pose donc un
+   squelette : la teinte des surfaces de l'app (pas du noir), un clap au centre
+   pour dire « c'est une vidéo », et un balayage lent pour dire « ça arrive ».
+   Il disparaît dès que la vignette tirée à l'envoi est décodée, ce qui, elle,
+   ne demande que quelques dizaines de kilo-octets. */
+.gvp-skel {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.42);
+  background: linear-gradient(150deg, #1c1f27 0%, #14161c 55%, #1c1f27 100%);
+}
+
+.gvp-skel-sheen {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.07) 45%,
+    rgba(242, 183, 11, 0.1) 50%,
+    rgba(255, 255, 255, 0.07) 55%,
+    transparent 80%
+  );
+  transform: translateX(-100%);
+  animation: gvp-sheen 1.5s ease-in-out infinite;
+}
+
+.gvp-skel svg {
+  position: relative;
+  animation: gvp-skel-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes gvp-sheen {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes gvp-skel-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Rien à commander tant qu'il n'y a rien à voir. Le `.show-ui` en trop n'est
+   pas décoratif : c'est lui qui rallume la barre plus bas dans le fichier, il
+   faut donc le battre en spécificité pour la garder éteinte. */
+.gvp.is-loading.show-ui .gvp-ui {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gvp-skel-sheen,
+  .gvp-skel svg {
+    animation: none;
+  }
+}
 .gvp-bigplay {
   position: absolute;
   inset: 0;

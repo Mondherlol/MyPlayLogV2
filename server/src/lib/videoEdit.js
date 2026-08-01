@@ -1,4 +1,5 @@
 import { spawn } from "child_process";
+import fs from "fs";
 import ffmpegStatic from "ffmpeg-static";
 
 // Chemin du binaire ffmpeg : en prod (Docker alpine) on utilise le ffmpeg
@@ -151,4 +152,54 @@ export async function renderEditedVideo({ videoPath, musicPath, edit, outPath })
   const args = buildArgs(edit, { videoPath, musicPath, hasAudio, outPath });
   await runFfmpeg(args);
   return outPath;
+}
+
+// ======================================================================
+//  L'IMAGE D'ATTENTE D'UN CLIP
+// ======================================================================
+// Un clip du fil sans vignette n'affiche RIEN tant que le navigateur n'a pas
+// tiré assez d'octets pour décoder sa première image — un rectangle noir au
+// milieu de la carte, souvent plusieurs secondes sur mobile. On extrait donc
+// une image à l'envoi, une bonne fois pour toutes : elle pèse quelques dizaines
+// de kilo-octets, se charge comme une photo, et le fil montre le clip AVANT de
+// pouvoir le lire.
+//
+// Best-effort de bout en bout : un ffmpeg absent ou une vidéo exotique ne doit
+// jamais faire échouer l'envoi — on renvoie simplement `null` et le lecteur
+// retombe sur son squelette.
+const POSTER_AT = 1; // seconde piochée : la 0 est souvent noire (fondu d'ouverture)
+
+export async function makeVideoPoster({ videoPath, outPath }) {
+  // ON NE CROIT PAS LE CODE DE SORTIE. Un `-ss` posé au-delà de la fin ne fait
+  // pas échouer ffmpeg : il ne trouve rien à écrire, ne crée aucun fichier et
+  // sort tranquillement avec 0. C'est le cas de tous les clips plus courts
+  // qu'une seconde. Seule l'existence d'une image sur le disque prouve qu'on a
+  // une vignette — sinon on repart à la toute première image.
+  const attempt = async (seek) => {
+    try {
+      await runFfmpeg(
+        [
+          "-y",
+          "-ss", String(seek),
+          "-i", videoPath,
+          "-frames:v", "1",
+          // 720 px de large au plus : c'est une image d'attente, pas une photo.
+          "-vf", "scale='min(720,iw)':-2:flags=bicubic",
+          "-q:v", "4",
+          outPath,
+        ],
+        20_000
+      );
+    } catch {
+      return false;
+    }
+    try {
+      return (await fs.promises.stat(outPath)).size > 0;
+    } catch {
+      return false;
+    }
+  };
+  if (await attempt(POSTER_AT)) return outPath;
+  if (await attempt(0)) return outPath;
+  return null;
 }

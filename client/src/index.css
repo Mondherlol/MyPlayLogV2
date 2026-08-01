@@ -17,6 +17,15 @@
   --brand-grad: linear-gradient(100deg, #b07d08 0%, #d29e06 100%);
 
   /* THEME CLAIR */
+  /* On DÉCLARE le thème au navigateur, on ne fait pas que le peindre. Tout ce
+     qu'il dessine lui-même — la liste déroulante d'un `select`, les flèches
+     d'un champ numérique, le sélecteur de couleur, le bouton « Parcourir »
+     d'un champ fichier, les barres de défilement, le remplissage automatique —
+     ignore nos variables et suit CE réglage. Sans lui, le thème sombre gardait
+     des menus et des textes noir-sur-blanc collés au milieu des panneaux
+     sombres (les modales de l'admin Collection en étaient pleines). */
+  color-scheme: light;
+
   --bg: #ffffff;
   --grid-line: rgba(20, 20, 40, 0.045);
   --surface: #ffffff;
@@ -67,6 +76,8 @@
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
+
   /* Sur fond sombre, le doré vif ressort : l'encre d'accent redevient vive */
   --accent-ink: #ffd24a;
   --brand-grad: linear-gradient(100deg, #f0b012 0%, #ffd23f 100%);

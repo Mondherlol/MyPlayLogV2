@@ -107,6 +107,195 @@
   font-family: var(--font-display);
 }
 
+/* Sur l'étagère de quelqu'un d'autre : ce qu'il a et que je n'ai pas. La seule
+   pastille en couleur — c'est le chiffre pour lequel on est venu. */
+.coll-head-stats .coll-head-envy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-color: color-mix(in srgb, var(--orange) 45%, var(--border));
+  background: color-mix(in srgb, var(--orange) 12%, var(--surface-2));
+  color: var(--orange);
+}
+.coll-head-stats .coll-head-envy strong {
+  color: var(--orange);
+}
+
+/* L'avatar prend la place de l'icône quand on regarde chez quelqu'un. */
+.coll-head-av {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
+/* ======================================================================
+   La jauge de complétion — ce qui fait d'une étagère une COLLECTION
+   ======================================================================
+   Douze boîtiers, c'est douze boîtiers. « 12 sur 40 », c'est vingt-huit qui
+   manquent — et c'est très exactement la différence entre une page et un jeu.
+   D'où ce bandeau, posé entre l'en-tête et la barre d'outils, avec le seul
+   chemin vers la manivelle qu'il y ait depuis cette page. */
+.coll-quest {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 260px) auto;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.85rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 200% at 0% 0%, color-mix(in srgb, var(--orange) 10%, transparent), transparent 60%),
+    var(--surface);
+}
+.coll-quest.done {
+  background:
+    radial-gradient(120% 200% at 0% 0%, rgba(80, 200, 120, 0.14), transparent 60%),
+    var(--surface);
+  border-color: rgba(80, 200, 120, 0.35);
+}
+
+.coll-quest-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.coll-quest-text strong {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-display);
+  font-size: 0.98rem;
+}
+.coll-quest.done .coll-quest-text strong {
+  color: #2f9e5d;
+}
+.coll-quest-text span {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+.coll-quest-gauge {
+  display: block;
+  height: 7px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface-2);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+.coll-quest-gauge i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #ffc247, var(--orange));
+  transition: width 0.7s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.coll-quest.done .coll-quest-gauge i {
+  background: linear-gradient(90deg, #6fe3a0, #2f9e5d);
+}
+
+.coll-quest-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1rem;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff9d2e, #d9432c);
+  color: #fff;
+  font-size: 0.84rem;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 5px 16px rgba(217, 67, 44, 0.26);
+  transition: 0.16s;
+}
+.coll-quest-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 9px 22px rgba(217, 67, 44, 0.34);
+}
+.coll-quest-btn em {
+  font-style: normal;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.2);
+  font-size: 0.72rem;
+}
+.coll-quest.done .coll-quest-btn {
+  background: linear-gradient(135deg, #6fe3a0, #2f9e5d);
+  box-shadow: 0 5px 16px rgba(47, 158, 93, 0.26);
+}
+
+@media (max-width: 760px) {
+  .coll-quest {
+    grid-template-columns: 1fr;
+    gap: 0.7rem;
+  }
+  .coll-quest-btn {
+    justify-content: center;
+  }
+}
+
+/* ======================================================================
+   Le boîtier verrouillé — une fiche qu'on peut lire, un objet qu'on n'a pas
+   ======================================================================
+   Il prend la place des épisodes / planches / cartouche : ce sont ces
+   trois-là que le serveur retient tant que le boîtier n'est pas à nous. Tout
+   le reste de la fiche (résumé, casting, discussion) demeure — c'est
+   précisément ce qui doit donner envie de le débloquer. */
+.coll-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 2.4rem 1.5rem;
+  border: 1px dashed var(--border);
+  border-radius: 18px;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, var(--tint, var(--orange)) 4%, transparent) 0 9px,
+      transparent 9px 18px
+    ),
+    var(--surface);
+  text-align: center;
+}
+.coll-locked-ic {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--tint, var(--orange)) 16%, var(--surface-2));
+  color: var(--tint, var(--orange));
+}
+.coll-locked h2 {
+  margin: 0.3rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+}
+.coll-locked p {
+  max-width: 46ch;
+  margin: 0 0 0.5rem;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--text-soft);
+}
+.coll-locked-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  text-decoration: none;
+}
+.coll-locked-link:hover {
+  color: var(--orange);
+}
+
 .coll-section-title {
   display: flex;
   align-items: center;
@@ -651,6 +840,111 @@
   color: var(--text);
 }
 
+/* ---------------------------------------------------------- le rangement --
+   « Ranger » est un INTERRUPTEUR, pas une action : allumé, il reste allumé et
+   il se voit — sinon on ne comprend pas pourquoi les boîtiers ne s'ouvrent
+   plus. D'où l'état plein, qui reprend l'accent de la page. */
+.coll-arrange-toggle {
+  gap: 0.36rem;
+  font-size: 0.8rem;
+  padding: 0.44rem 0.8rem;
+}
+
+.coll-arrange-toggle.active {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #1b1405;
+}
+
+/* L'ÉTABLI — QUI PREND LA PLACE DE L'EN-TÊTE, et n'est donc pas une bande de
+   plus. Même bloc, même gabarit, même pastille à gauche : seul le CONTENU
+   change de métier (le nom du rayon et ses compteurs cèdent aux outils). C'est
+   ce qui fait que la page ne saute pas en entrant dans le mode, et que
+   l'étagère — la seule chose qui compte quand on range — ne descend pas d'un
+   centimètre sous la ligne de flottaison. */
+.coll-arrange-head {
+  align-items: center;
+}
+
+/* La pastille passe à l'accent PLEIN, comme l'interrupteur « Ranger » : les
+   deux marques du mode se répondent d'un bout à l'autre de la page. */
+.coll-arrange-head .coll-head-icon {
+  background: var(--orange);
+  box-shadow: 0 8px 22px rgba(242, 183, 11, 0.28);
+}
+
+/* Les réglages, en colonne et alignés à droite : trois lignes courtes se lisent
+   d'un coup d'œil là où une seule ligne de onze pastilles fait un ruban. */
+.coll-arrange-tools {
+  display: grid;
+  gap: 0.42rem;
+  justify-items: end;
+}
+
+.coll-arrange-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.coll-arrange-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+  opacity: 0.75;
+}
+
+.coll-arrange-btns {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.coll-arrange-tools .coll-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34rem;
+  font-size: 0.76rem;
+  padding: 0.3rem 0.62rem;
+}
+
+/* L'échantillon d'essence. Un rond de la couleur du DESSUS de la planche (voir
+   PLANK côté scène) : choisir un meuble à son nom seul, c'est choisir à
+   l'aveugle. « Selon le thème » n'a pas de couleur à montrer — il en prend
+   deux, coupées en diagonale. */
+.coll-skin-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28);
+}
+
+.coll-skin-dot.is-auto {
+  background: linear-gradient(135deg, #e7e3d9 50%, #292a33 50%);
+}
+.coll-skin-dot.is-chene {
+  background: #d9bd8d;
+}
+.coll-skin-dot.is-noyer {
+  background: #7a5539;
+}
+.coll-skin-dot.is-laque {
+  background: #26262c;
+}
+
+/* Le retour en arrière ne se range PAS avec les réglages : c'est le seul bouton
+   de l'établi qui défait quelque chose, et il se tient à distance des trois
+   rangées qu'il annule. */
+.coll-arrange-reset {
+  margin-top: 0.18rem;
+  gap: 0.34rem;
+  font-size: 0.76rem;
+  padding: 0.36rem 0.7rem;
+}
+
 /* ======================================================================
    4. États
    ====================================================================== */
@@ -787,12 +1081,40 @@
   left: 0;
   right: 0;
   bottom: 0.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
   text-align: center;
   font-size: 0.72rem;
   font-weight: 500;
   letter-spacing: 0.01em;
   color: var(--text-soft);
   opacity: 0.7;
+}
+
+/* La jauge des jaquettes. Un rail COURT et discret : il ne raconte pas un
+   téléchargement, il dit seulement que l'attente est finie dans une seconde et
+   qu'elle avance. Le remplissage est piloté par le composant (voir
+   `progress` dans ShelfSkeleton). */
+.coll-shelf-skel-gauge {
+  width: 132px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+  overflow: hidden;
+}
+
+.coll-shelf-skel-gauge i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--orange);
+  opacity: 0.75;
+  /* Elle avance par bonds (six jaquettes de front) : sans ce lissage, le rail
+     saute de six pour cent en six pour cent. */
+  transition: width 0.35s ease;
 }
 
 /* ---------- la grille en attente ---------- */
@@ -1284,6 +1606,26 @@
 
 .coll-shelf3d.is-hover canvas {
   cursor: var(--cursor-pointer), pointer;
+}
+
+/* ---------------------------------------------------------- le rangement --
+   Le curseur dit ce que fait le clic, et il le dit AVANT : main ouverte sur
+   l'étagère qu'on range, main fermée pendant qu'on porte. C'est la seule
+   indication permanente du mode — le reste (bulle, penché au survol, ouverture
+   du boîtier) est justement ce qu'on a retiré. */
+.coll-shelf3d.is-arranging canvas,
+.coll-shelf3d.is-arranging.is-hover canvas {
+  cursor: grab;
+}
+
+.coll-shelf3d.is-arranging canvas:active {
+  cursor: grabbing;
+}
+
+/* Le halo se réveille : pendant le rangement, l'étagère est l'objet de travail
+   de la page, pas une vitrine qu'on regarde de loin. */
+.coll-shelf3d.is-arranging::before {
+  opacity: 1;
 }
 
 /* Le squelette qui attend derrière la scène le temps qu'elle se garnisse : il
