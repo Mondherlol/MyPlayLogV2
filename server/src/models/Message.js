@@ -97,6 +97,51 @@ const motCardSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// Carte « rejoins mon versus » : le code du salon, et de quoi décider sans
+// l'ouvrir (quel jeu, quel mode, combien de places restent). Même famille que
+// les deux cartes ci-dessus — l'invitation survit au salon, le salon non (les
+// deux modèles de salon s'effacent deux heures après la dernière manche).
+//
+// UNE SEULE carte pour GeoGamer ET le blind test, distinguée par `kind` : les
+// deux invitations disent exactement la même chose et mènent au même genre de
+// page, en faire deux schémas aurait dupliqué le rendu côté messagerie.
+const versusCardSchema = new mongoose.Schema(
+  {
+    kind: { type: String, enum: ["geo", "blindtest"], default: "geo" },
+    code: { type: String, required: true },
+    mode: { type: String, default: "classic" }, // GeoGamer : classic | buzzer
+    hostName: { type: String, default: "" },
+    players: { type: Number, default: 1 },
+    maxPlayers: { type: Number, default: 5 },
+    rounds: { type: Number, default: 8 },
+  },
+  { _id: false }
+);
+
+// Carte « regarde cette planche » : une capture prise DANS le volume ouvert
+// (lecture guidée), le titre d'où elle sort et la planche exacte. C'est la
+// seule carte qui porte une image faite sur place plutôt qu'une jaquette de
+// catalogue — d'où `shot`, servi depuis /uploads/chat comme n'importe quelle
+// image de message.
+//
+// ELLE N'EST PAS PÉRISSABLE, à l'inverse des invitations (watchparty, versus,
+// mot du jour) : un passage de bouquin s'ouvre aussi bien six mois plus tard, à
+// la planche indiquée ou depuis le début. C'est ce qui justifie de garder le
+// slug et le numéro de planche plutôt qu'un simple lien.
+const bookCardSchema = new mongoose.Schema(
+  {
+    slug: { type: String, required: true },
+    title: { type: String, default: "" },
+    franchise: { type: String, default: "" },
+    // La planche capturée, dans la numérotation du volume (0 = la première).
+    page: { type: Number, default: 0 },
+    pages: { type: Number, default: 0 },
+    shot: { type: String, default: null },
+    color: { type: String, default: null },
+  },
+  { _id: false }
+);
+
 const messageSchema = new mongoose.Schema(
   {
     conversation: {
@@ -118,6 +163,8 @@ const messageSchema = new mongoose.Schema(
     ost: { type: ostCardSchema, default: null },
     party: { type: partyCardSchema, default: null },
     mot: { type: motCardSchema, default: null },
+    versus: { type: versusCardSchema, default: null },
+    book: { type: bookCardSchema, default: null },
 
     // Message de service (« X a créé le groupe », « Y a rejoint »…) : rendu en
     // ligne centrée, sans bulle. `author` reste l'acteur, `systemData` porte

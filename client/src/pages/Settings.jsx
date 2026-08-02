@@ -29,6 +29,22 @@ import {
   UserCheck,
   UserX,
   Inbox,
+  Newspaper,
+  Users,
+  ListMusic,
+  Image,
+  Repeat2,
+  Music,
+  Zap,
+  SpellCheck,
+  PackageOpen,
+  Boxes,
+  Library,
+  Video,
+  Sparkles,
+  Send,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { apiFetch, API_BASE } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -51,13 +67,22 @@ import {
   LeagueLinkForm,
 } from "../components/TrackerLink";
 
-const TAB_KEYS = ["imports", "tracking", "account", "appearance", "notifications", "privacy"];
+const TAB_KEYS = [
+  "imports",
+  "tracking",
+  "feed",
+  "account",
+  "appearance",
+  "notifications",
+  "privacy",
+];
 
 // Onglets de la page Paramètres (façon Discord / Steam). Les onglets marqués
 // `soon` sont là pour montrer la structure et restent désactivés.
 const TABS = [
   { key: "imports", label: "Imports", Icon: DownloadCloud },
   { key: "tracking", label: "Tracking", Icon: Swords },
+  { key: "feed", label: "Fil d'accueil", Icon: Newspaper },
   { key: "privacy", label: "Confidentialité", Icon: ShieldCheck },
   { key: "account", label: "Compte", Icon: UserCog, soon: true },
   { key: "appearance", label: "Apparence", Icon: Palette, soon: true },
@@ -129,6 +154,7 @@ export default function Settings() {
         <section className="settings-panel">
           {tab === "imports" && <ImportsPanel />}
           {tab === "tracking" && <TrackingPanel />}
+          {tab === "feed" && <FeedPanel />}
           {tab === "privacy" && <PrivacyPanel onCount={setRequestCount} />}
         </section>
       </div>
@@ -154,7 +180,8 @@ function ImportsPanel() {
   );
 }
 
-// Interrupteur (façon iOS) réutilisé par tout l'onglet Confidentialité.
+// Interrupteur (façon iOS) réutilisé par les onglets Confidentialité et Fil
+// d'accueil.
 function PrivacySwitch({ Icon, title, desc, checked, disabled, busy, onChange }) {
   return (
     <label className={`pv-row ${disabled ? "off" : ""} ${checked ? "on" : ""}`}>
@@ -176,6 +203,360 @@ function PrivacySwitch({ Icon, title, desc, checked, disabled, busy, onChange })
         <span className="pv-switch-track" />
       </span>
     </label>
+  );
+}
+
+// Le fil d'accueil vu par le joueur : des DOMAINES (ce qu'il coupe d'un geste,
+// « je ne veux plus rien de l'arcade ») qui se déplient sur leurs familles
+// fines (« … sauf les caisses »). Les clés des feuilles doivent correspondre à
+// FEED_CATEGORIES (server/src/lib/feedCategories.js) : c'est le serveur qui
+// coupe, ici on ne fait que nommer, illustrer et regrouper. Un domaine n'est
+// jamais enregistré tel quel — le couper masque toutes ses feuilles, ce qui
+// évite d'avoir deux réglages qui se contredisent.
+const FEED_GROUPS = [
+  {
+    key: "library",
+    Icon: Gamepad2,
+    title: "Bibliothèque & avis",
+    desc: "Ce que les autres jouent, notent et racontent.",
+    items: [
+      {
+        key: "games",
+        Icon: Gamepad2,
+        title: "Jeux & avis",
+        desc: "Statuts, notes, reviews et heures de jeu.",
+      },
+      {
+        key: "lists",
+        Icon: ListMusic,
+        title: "Listes & playlists",
+        desc: "Listes créées ou complétées, likes et commentaires dessus.",
+      },
+      {
+        key: "trackers",
+        Icon: Swords,
+        title: "Parties & rangs classés",
+        desc: "Sessions des jeux suivis (Marvel Rivals, League of Legends) et montées de rang.",
+      },
+    ],
+  },
+  {
+    key: "social",
+    Icon: Users,
+    title: "Social",
+    desc: "Abonnements, réactions et recommandations entre joueurs.",
+    items: [
+      {
+        key: "follows",
+        Icon: UserPlus,
+        title: "Abonnements",
+        desc: "« X s'est abonné à Y ».",
+      },
+      {
+        key: "reactions",
+        Icon: MessageSquareText,
+        title: "Réactions & commentaires d'avis",
+        desc: "Cœurs, bravos et discussions sous les reviews.",
+      },
+      {
+        key: "recos",
+        Icon: Send,
+        title: "Recommandations",
+        desc: "Jeux recommandés à quelqu'un, +1 et commentaires dessus.",
+      },
+    ],
+  },
+  {
+    key: "gamepages",
+    Icon: Image,
+    title: "Pages de jeux",
+    desc: "Ce qui se publie sur les fiches : mur média, fan arts, patchs.",
+    items: [
+      {
+        key: "media",
+        Icon: Image,
+        title: "Mur média",
+        desc: "Posts et commentaires publiés sur le mur d'une fiche de jeu.",
+      },
+      {
+        key: "fanarts",
+        Icon: Repeat2,
+        title: "Fan arts republiés",
+        desc: "Les images repartagées depuis l'onglet Feed d'un jeu.",
+      },
+      {
+        key: "downloads",
+        Icon: DownloadCloud,
+        title: "Téléchargements",
+        desc: "Les cartes « avis de recherche » qui moquent les téléchargements.",
+      },
+    ],
+  },
+  {
+    key: "minigames",
+    Icon: Trophy,
+    title: "Mini-jeux",
+    desc: "Résultats de parties, défis et versus.",
+    items: [
+      {
+        key: "blindtest",
+        Icon: Music,
+        title: "Blind test",
+        desc: "Parties, défis et versus de blind test musical.",
+      },
+      {
+        key: "pixel",
+        Icon: Zap,
+        title: "Pixel Rush",
+        desc: "Parties et défis de Pixel Rush.",
+      },
+      {
+        key: "geo",
+        Icon: Globe,
+        title: "GeoGamer",
+        desc: "Parties et versus de GeoGamer.",
+      },
+      {
+        key: "mot",
+        Icon: SpellCheck,
+        title: "Mot du jour",
+        desc: "Résultats quotidiens, en solo comme en équipe.",
+      },
+    ],
+  },
+  {
+    key: "arcade",
+    Icon: PackageOpen,
+    title: "Arcade",
+    desc: "Tout ce qui sort des machines : caisses et capsules.",
+    items: [
+      {
+        key: "cases",
+        Icon: PackageOpen,
+        title: "Caisses ouvertes",
+        desc: "Les lots décrochés en dépensant ses points.",
+      },
+      {
+        key: "drops",
+        Icon: Boxes,
+        title: "Machine à capsules",
+        desc: "Les boîtiers tirés au sort pour la collection.",
+      },
+    ],
+  },
+  {
+    key: "collection",
+    Icon: Library,
+    title: "Collection",
+    desc: "Ce qui se dit dans les rayons.",
+    items: [
+      {
+        key: "collectiontalk",
+        Icon: Library,
+        title: "Discussions du rayon",
+        desc: "Commentaires laissés sur un film, une série, un comics.",
+      },
+    ],
+  },
+  {
+    key: "discovery",
+    Icon: Sparkles,
+    title: "Découverte",
+    desc: "Ce que les autres dénichent pour toi.",
+    items: [
+      {
+        key: "videos",
+        Icon: Video,
+        title: "Vidéos & documentaires",
+        desc: "Documentaires recommandés, regardés, aimés ou commentés.",
+      },
+      {
+        key: "gems",
+        Icon: Sparkles,
+        title: "Pépites",
+        desc: "Les jeux dénichés par les autres dans le module de pépites.",
+      },
+    ],
+  },
+];
+
+const FEED_KEYS = FEED_GROUPS.flatMap((g) => g.items.map((i) => i.key));
+
+// Un domaine : interrupteur maître + repli sur ses familles. L'interrupteur
+// maître ne connaît que trois états — tout, rien, ou « en partie » (le
+// navigateur dessine alors une case indéterminée). Un domaine réglé en partie
+// s'ouvre tout seul : sinon on lirait « en partie » sans voir sur quoi.
+function FeedGroup({ group, hidden, busyKey, onGroup, onLeaf }) {
+  const on = group.items.filter((i) => !hidden.includes(i.key)).length;
+  const total = group.items.length;
+  const partial = on > 0 && on < total;
+  const [open, setOpen] = useState(partial);
+  const Chevron = open ? ChevronDown : ChevronRight;
+  // Un enregistrement en vol fige les autres interrupteurs : deux bascules
+  // simultanées enverraient deux listes complètes concurrentes.
+  const busy = busyKey === group.key || busyKey === "*";
+  const frozen = !!busyKey;
+
+  return (
+    <div className={`fg ${on === 0 ? "off" : ""}`}>
+      <div className="fg-head">
+        <button
+          className="fg-open clickable"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+        >
+          <span className="pv-row-icon">
+            <group.Icon size={18} />
+          </span>
+          <span className="pv-row-txt">
+            <strong>{group.title}</strong>
+            <span>
+              {on === 0
+                ? "Masqué de ton fil."
+                : partial
+                  ? `${on} famille${on > 1 ? "s" : ""} sur ${total} · ${group.desc}`
+                  : group.desc}
+            </span>
+          </span>
+          {total > 1 && (
+            <span className="fg-chev">
+              {open ? "Réduire" : "Détailler"} <Chevron size={16} />
+            </span>
+          )}
+        </button>
+        <label className="pv-switch fg-switch">
+          {busy && <Loader2 className="spin pv-row-busy" size={14} />}
+          <input
+            type="checkbox"
+            checked={on > 0}
+            disabled={frozen}
+            // Trois états sur une seule case : le « en partie » n'existe qu'en
+            // JS, d'où la ref plutôt qu'un attribut.
+            ref={(el) => {
+              if (el) el.indeterminate = partial;
+            }}
+            onChange={(e) => onGroup(group, e.target.checked)}
+            aria-label={`Tout ${on > 0 ? "masquer" : "afficher"} : ${group.title}`}
+          />
+          <span className="pv-switch-track" />
+        </label>
+      </div>
+
+      {open && total > 1 && (
+        <div className="fg-kids">
+          {group.items.map((it) => (
+            <PrivacySwitch
+              key={it.key}
+              Icon={it.Icon}
+              title={it.title}
+              desc={it.desc}
+              checked={!hidden.includes(it.key)}
+              busy={busyKey === it.key || busy}
+              disabled={frozen}
+              onChange={(v) => onLeaf(it.key, v)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Onglet « Fil d'accueil » : quelles familles de cartes apparaissent dans le
+// fil. On envoie au serveur la liste COMPLÈTE de ce qui est masqué (c'est ce
+// qu'il stocke) et chaque bascule est enregistrée aussitôt — pas de bouton
+// « Enregistrer », comme l'onglet Confidentialité.
+function FeedPanel() {
+  const { token, user, updateUser } = useAuth();
+  const [hidden, setHidden] = useState(() => user?.feedHidden || []);
+  const [busyKey, setBusyKey] = useState(null); // clé de feuille, de domaine, ou "*"
+
+  async function save(next, key) {
+    const before = hidden;
+    setHidden(next);
+    setBusyKey(key);
+    try {
+      const d = await apiFetch("/users/me/feed-prefs", {
+        method: "PUT",
+        token,
+        body: { hidden: next },
+      });
+      const saved = d.user.feedHidden || [];
+      setHidden(saved);
+      updateUser({ feedHidden: saved });
+    } catch {
+      setHidden(before); // échec : on remet l'interrupteur comme avant
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  const toggleLeaf = (key, visible) =>
+    save(visible ? hidden.filter((k) => k !== key) : [...hidden, key], key);
+
+  // Couper un domaine masque toutes ses familles d'un coup ; le rallumer les
+  // rend toutes, même celles qui avaient été décochées une à une avant.
+  const toggleGroup = (group, visible) => {
+    const keys = group.items.map((i) => i.key);
+    const rest = hidden.filter((k) => !keys.includes(k));
+    save(visible ? rest : [...rest, ...keys], group.key);
+  };
+
+  const off = hidden.filter((k) => FEED_KEYS.includes(k)).length;
+  const allOff = off === FEED_KEYS.length;
+
+  return (
+    <div className="settings-section">
+      <h2 className="settings-section-title">
+        <Newspaper size={20} /> Fil d'accueil
+      </h2>
+      <p className="settings-section-sub">
+        Choisis ce que ton fil te raconte. Coupe un domaine entier d'un geste, ou
+        déplie-le pour trier dans le détail. Ce que tu masques ne disparaît que de
+        TON fil : les autres continuent de le voir, et l'onglet Feed des profils
+        n'y touche pas.
+      </p>
+
+      <div className="fp-bar">
+        <span>
+          {off === 0
+            ? "Tu vois tout ce qui se passe."
+            : `${off} famille${off > 1 ? "s" : ""} masquée${off > 1 ? "s" : ""} sur ${FEED_KEYS.length}.`}
+        </span>
+        {off > 0 && (
+          <button
+            className="fp-reset clickable"
+            onClick={() => save([], "*")}
+            disabled={busyKey === "*"}
+          >
+            {busyKey === "*" ? (
+              <Loader2 className="spin" size={14} />
+            ) : (
+              <RotateCcw size={14} />
+            )}
+            Tout réafficher
+          </button>
+        )}
+      </div>
+
+      {allOff && (
+        <p className="fp-warn">
+          <AlertTriangle size={15} /> Tout est coupé : ton fil d'accueil sera
+          vide.
+        </p>
+      )}
+
+      {FEED_GROUPS.map((g) => (
+        <FeedGroup
+          key={g.key}
+          group={g}
+          hidden={hidden}
+          busyKey={busyKey}
+          onGroup={toggleGroup}
+          onLeaf={toggleLeaf}
+        />
+      ))}
+    </div>
   );
 }
 

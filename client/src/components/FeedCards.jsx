@@ -63,7 +63,7 @@ import {
   Copy as CopyIc,
   Library,
 } from "lucide-react";
-import { Globe2, MapPin, Thermometer, Target } from "lucide-react";
+import { Globe2, MapPin, Thermometer, Target, Crown, Users, Zap } from "lucide-react";
 import { rarityColor, rarityLabel } from "../lib/rarity";
 import RewardArt from "./RewardArt";
 import { apiFetch } from "../lib/api";
@@ -180,6 +180,8 @@ export function FeedCard(props) {
   if (item.type === "pixelgroup") return <PixelRushGroupEvent {...props} />;
   if (item.type === "geo") return <GeoEvent {...props} />;
   if (item.type === "geogroup") return <GeoGroupEvent {...props} />;
+  if (item.type === "geoversus" || item.type === "btversus")
+    return <VersusEvent {...props} />;
   if (item.type === "mot") return <MotEvent {...props} />;
   if (item.type === "caseopen") return <CaseOpenEvent {...props} />;
   if (item.type === "caseopengroup") return <CaseOpenGroupEvent {...props} />;
@@ -3162,6 +3164,83 @@ function GeoEvent({ item }) {
           )}
         </div>
       </div>
+    </article>
+  );
+}
+
+// ---------- GeoGamer versus : la partie à plusieurs ----------
+// UNE PARTIE, UNE CARTE, même si chaque joueur a sa ligne d'activité (le fil
+// dédoublonne par versusId, cf. routes/feed.js). D'où un gabarit différent des
+// autres cartes de mini-jeu : ici l'information n'est pas un score dans le vide
+// mais un CLASSEMENT — qui a battu qui, et de combien. Le podium remplace donc
+// le gros chiffre habituel.
+function VersusEvent({ item }) {
+  const bt = item.type === "btversus";
+  const table = [...(item.players || [])].sort((a, b) => a.rank - b.rank);
+  const champ = table[0];
+  const beaten = table.slice(1);
+  const buzzer = !bt && item.mode === "buzzer";
+  // L'écart avec le deuxième : c'est le chiffre qui fait parler (« il l'a eu
+  // pour 40 points »), bien plus que le total.
+  const gap = table.length > 1 ? champ.score - table[1].score : 0;
+
+  return (
+    <article className="hf-card hf-blindtest hf-geo hf-gv">
+      <EventHead user={item.user} date={item.date}>
+        <Swords size={13} className="hf-inline-ic" /> a gagné un versus{" "}
+        {bt ? "Blind Test" : "GeoGamer"}
+        {beaten.length > 0 && (
+          <>
+            {" "}
+            contre{" "}
+            <b>
+              {beaten.length === 1
+                ? beaten[0].username
+                : `${beaten[0].username} et ${beaten.length - 1} autre${
+                    beaten.length > 2 ? "s" : ""
+                  }`}
+            </b>
+          </>
+        )}
+      </EventHead>
+
+      <div className="hf-gv-meta">
+        <span className={`hf-gv-mode ${buzzer ? "buzzer" : ""}`}>
+          {bt ? <Music2 size={12} /> : buzzer ? <Zap size={12} /> : <Users size={12} />}
+          {bt ? "Blind test" : buzzer ? "Buzzer" : "Classique"}
+        </span>
+        <span className="hf-bt-stat">
+          {bt ? <Music2 size={13} /> : <MapPin size={13} />} {item.total} manches
+        </span>
+        {gap > 0 && (
+          <span className="hf-gv-gap">
+            {gap} pt{gap > 1 ? "s" : ""} d'avance
+          </span>
+        )}
+      </div>
+
+      <ol className="hf-gv-board">
+        {table.map((p) => (
+          <li key={p.id} className={`hf-gv-row r${p.rank}`}>
+            <span className="hf-gv-rank">
+              {p.rank === 1 ? <Crown size={13} /> : p.rank}
+            </span>
+            {p.avatar ? (
+              <img src={p.avatar} alt="" loading="lazy" draggable="false" />
+            ) : (
+              <span className="hf-gv-face">{(p.username || "?")[0].toUpperCase()}</span>
+            )}
+            <Link to={`/u/${p.username}`} className="hf-gv-name clickable">
+              {p.username}
+            </Link>
+            <span className="hf-gv-score">{p.score}</span>
+          </li>
+        ))}
+      </ol>
+
+      <Link to={bt ? "/blindtest" : "/geo"} className="hf-mot-cta clickable">
+        Lancer un versus
+      </Link>
     </article>
   );
 }

@@ -20,8 +20,10 @@ import videoRoutes from "./routes/videos.js";
 import feedRoutes from "./routes/feed.js";
 import freeGamesRoutes from "./routes/freeGames.js";
 import blindtestRoutes from "./routes/blindtest.js";
+import blindtestVersusRoutes from "./routes/blindtestVersus.js";
 import pixelRoutes from "./routes/pixel.js";
 import geoRoutes from "./routes/geo.js";
+import geoVersusRoutes from "./routes/geoVersus.js";
 import motRoutes from "./routes/mot.js";
 import presenceRoutes from "./routes/presence.js";
 import arcadeRoutes from "./routes/arcade.js";
@@ -101,8 +103,14 @@ app.use("/api/reposts", repostRoutes);
 app.use("/api/videos", videoRoutes);
 app.use("/api/feed", feedRoutes);
 app.use("/api/free-games", freeGamesRoutes);
+// Même précaution que pour /api/geo/versus : monté AVANT le routeur solo.
+app.use("/api/blindtest/versus", blindtestVersusRoutes);
 app.use("/api/blindtest", blindtestRoutes);
 app.use("/api/pixel", pixelRoutes);
+// AVANT /api/geo, et ce n'est pas cosmétique : le routeur solo porte un
+// `GET /:id/results` qui happerait les chemins à deux segments. Monter le
+// versus d'abord lève toute ambiguïté.
+app.use("/api/geo/versus", geoVersusRoutes);
 app.use("/api/geo", geoRoutes);
 app.use("/api/mot", motRoutes);
 app.use("/api/presence", presenceRoutes);

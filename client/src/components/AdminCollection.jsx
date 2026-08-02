@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Library,
   Plus,
@@ -33,6 +41,7 @@ import {
   CircleSlash2,
   Unplug,
   Coins,
+  Hand,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -48,23 +57,90 @@ import ComicModal, {
 import GameModal from "./AdminGameModal";
 import { shrinkImageFile, fmtBytes } from "../lib/imageFile";
 
-// Les deux façons d'alimenter un boîtier. YouTube se scrape (une URL suffit,
-// les épisodes suivent) ; tout le reste se colle à la main, ligne par ligne —
-// c'est la contrepartie d'un lecteur qu'on ne pilote pas.
-const SOURCE_MODES = [
+// L'essai d'un boîtier (bouton « Tester » de la liste). Chargé à la demande :
+// il traîne derrière lui toute la scène 3D du rayon.
+const CasePreview = lazy(() => import("./AdminCasePreview"));
+
+// ------------------------------------------------ d'où vient une adresse ----
+//
+// UN SEUL CHAMP, ET C'EST L'ADRESSE QUI DIT CE QU'ELLE EST. Il a fallu, un
+// temps, choisir « YouTube » ou « Autre lecteur » sur deux grandes cartes AVANT
+// de coller quoi que ce soit : une question posée à l'admin alors que le lien
+// qu'il avait déjà dans le presse-papier portait la réponse. Le serveur, lui,
+// ne l'a jamais posée — `/import/link` reconnaît la fiche à son adresse, et
+// c'est exactement ce qu'on fait ici.
+//
+// Restent ces trois pastilles, qui ne se choisissent plus : elles DISENT CE QUI
+// EST COMPATIBLE (la question qu'on se pose vraiment devant un champ vide :
+// « qu'est-ce que je peux lui donner ? »), s'allument quand l'adresse collée
+// leur correspond, et mènent au site quand on les clique — c'est de là qu'on
+// revient avec le lien.
+const SOURCE_SITES = [
   {
     value: "youtube",
     label: "YouTube",
-    hint: "Une vidéo ou une playlist — les épisodes sont récupérés tout seuls",
     Icon: CirclePlay,
+    href: "https://www.youtube.com",
+    hint: "Une vidéo ou une playlist : les épisodes suivent tout seuls, et la progression se suit à la seconde.",
+    test: (u) => /(?:youtube\.com|youtu\.be|youtube-nocookie\.com)/i.test(u),
   },
   {
-    value: "embed",
-    label: "Autre lecteur",
-    hint: "Une liste de liens : cadre du site d'origine, ou fichier vidéo direct",
+    value: "animesama",
+    label: "Anime-Sama",
+    Icon: ListVideo,
+    href: "https://anime-sama.fr",
+    hint: "La fiche d'un animé : toutes ses saisons et leurs épisodes d'un coup, VF ou VOSTFR.",
+    test: (u) => /\/\/(?:[a-z0-9-]+\.)*anime-sama\.[a-z]{2,6}(?:[/:?#]|$)/i.test(u),
+  },
+  {
+    value: "stream",
+    label: "Site de streaming",
     Icon: MonitorPlay,
+    // Le domaine de ces sites change tous les six mois : le lien est une piste,
+    // pas une adresse gravée. La reconnaissance, elle, ne dépend d'aucun nom de
+    // site (voir lib/filmIndex.js côté serveur) — n'importe quelle fiche de film
+    // ou de série passe par là.
+    href: "https://french-stream.one",
+    hint: "French Stream & compagnie : la fiche d'un film ou d'une série, dont on relève les lecteurs.",
+    test: (u) => /^https?:\/\//i.test(u),
   },
 ];
+
+// Laquelle de ces familles ? `null` tant qu'on n'a rien de reconnaissable —
+// l'ordre compte, la dernière attrape tout ce qui ressemble à une adresse.
+function detectSource(url) {
+  const u = String(url || "").trim();
+  return (u && SOURCE_SITES.find((s) => s.test(u))) || null;
+}
+
+// YouTube décide du LECTEUR (`provider`), donc de la forme du reste du
+// formulaire : une playlist qu'on pilote d'un côté, une liste de liens vers des
+// hébergeurs tiers de l'autre.
+const isYoutubeUrl = (u) => detectSource(u)?.value === "youtube";
+
+// Les pastilles de compatibilité, au-dessus du champ. Purement indicatives —
+// rien ici ne se « sélectionne », l'adresse tranche toute seule.
+function SourceSites({ url }) {
+  const on = detectSource(url)?.value;
+  return (
+    <div className="adm-coll-sites">
+      {SOURCE_SITES.map((s) => (
+        <a
+          key={s.value}
+          className={`adm-coll-site clickable ${on === s.value ? "on" : ""}`}
+          href={s.href}
+          target="_blank"
+          rel="noreferrer"
+          title={`${s.hint}\n\nOuvrir le site pour y chercher le titre.`}
+        >
+          <s.Icon size={14} />
+          {s.label}
+          <ExternalLink size={11} className="adm-coll-site-out" />
+        </a>
+      ))}
+    </div>
+  );
+}
 
 // ======================================================================
 //  Onglet Collection — gestion des boîtiers (séries, films, animés)
@@ -268,7 +344,11 @@ const EMPTY_DRAFT = {
   // `provider` décide de la façon d'alimenter le boîtier : une URL YouTube qu'on
   // scrape, ou une LISTE de liens qu'on colle (une ligne par épisode). Voir
   // lib/collection.js côté serveur.
-  provider: "youtube",
+  //
+  // Il ne se choisit plus : l'adresse collée le pose (voir `detectSource`). Au
+  // départ, c'est donc la liste qui est ouverte — un formulaire vierge doit
+  // laisser la possibilité de tout écrire à la main, sans rien avoir à coller.
+  provider: "embed",
   url: "",
   episodesText: "",
   poster: "", // affiche rapatriée à l'enregistrement (import d'un répertoire)
@@ -319,7 +399,7 @@ function mergeFilmLine(text, title, urls) {
 
 // Ce qu'on écrit dans la zone de liste quand elle est vide : le format y est
 // plus clair qu'en le décrivant.
-const LIST_PLACEHOLDER = `S01E01 Le premier épisode — https://hebergeur/embed/aaa | https://miroir/embed/aaa
+const LIST_PLACEHOLDER = `S01E01 Le premier épisode — vf@https://hebergeur/embed/aaa | vostfr@https://autre/embed/aaa
 S01E02 — https://hebergeur/embed/bbb
 https://hebergeur/embed/ccc`;
 
@@ -764,6 +844,9 @@ export default function CollectionPanel({ token }) {
 function Row({ media, token, onEdit, onChanged }) {
   const [busy, setBusy] = useState(null); // "refresh" | "delete"
   const [checking, setChecking] = useState(false); // le vérificateur de liens
+  // L'ESSAI. Le boîtier pris en main, exactement comme sur l'étagère — la seule
+  // façon de voir ce qu'on vient de poser (voir AdminCasePreview).
+  const [trying, setTrying] = useState(false);
   // Un titre qui se regarde et qui a quelque chose à regarder : sans épisode,
   // il n'y a aucune porte à laquelle frapper.
   const watchable = WATCHABLE.includes(media.kind) && media.episodeCount > 0;
@@ -876,6 +959,17 @@ function Row({ media, token, onEdit, onChanged }) {
       </div>
 
       <div className="adm-coll-actions">
+        {/* TESTER — prendre le boîtier en main, sans quitter le panneau et sans
+            avoir à le posséder. C'est le seul endroit où l'on voit ce qu'on
+            vient de faire : la jaquette pliée sur ses trois faces, la tranche
+            là où on l'a mise, le titre lisible ou non sur le dos. */}
+        <button
+          className="adm-coll-icon clickable"
+          onClick={() => setTrying(true)}
+          title="Tester — prendre le boîtier en main, comme sur l'étagère"
+        >
+          <Hand size={15} />
+        </button>
         <a
           className="adm-coll-icon clickable"
           href={`/collection/${media.slug}`}
@@ -943,6 +1037,14 @@ function Row({ media, token, onEdit, onChanged }) {
           onClose={() => setChecking(false)}
           onChanged={onChanged}
         />
+      )}
+
+      {/* La vitrine 3D descend à la demande : la scène, three.js et le lecteur
+          de volumes n'ont rien à faire dans le paquet d'un panneau d'admin. */}
+      {trying && (
+        <Suspense fallback={null}>
+          <CasePreview media={media} token={token} onClose={() => setTrying(false)} />
+        </Suspense>
       )}
     </li>
   );
@@ -1220,25 +1322,25 @@ function CreateModal({ token, onClose, onDone }) {
 
   // Aperçu de l'URL : on vérifie AVANT d'enregistrer que le lien pointe bien
   // sur ce qu'on croit (une playlist de 78 épisodes, pas une seule vidéo).
-  async function check() {
-    setChecking(true);
-    setError(null);
-    try {
-      const d = await apiFetch(`/collection/preview?url=${encodeURIComponent(draft.url)}`, {
-        token,
-      });
-      setPreview(d);
-      setDraft((prev) => ({
-        ...prev,
-        title: prev.title || d.playlistTitle || d.title,
-        kind: d.playlistId ? "series" : "film",
-      }));
-    } catch (e) {
-      setError(e.message);
-      setPreview(null);
-    } finally {
-      setChecking(false);
-    }
+  //
+  // Elle LÈVE plutôt que d'attraper : c'est le champ d'adresse qui l'appelle
+  // (voir ListImport), et c'est donc lui qui montre l'attente et l'échec, au
+  // même endroit que pour un scrape. Deux gestionnaires d'erreur pour un seul
+  // bouton, c'était l'erreur affichée deux fois — ou pas du tout.
+  async function checkYoutube(url) {
+    const d = await apiFetch(`/collection/preview?url=${encodeURIComponent(url)}`, {
+      token,
+    });
+    setPreview(d);
+    setDraft((prev) => ({
+      ...prev,
+      // Le lecteur est ARRÊTÉ ICI, et non déduit de ce qui traîne dans le champ :
+      // c'est la réponse de YouTube qui prouve qu'on a bien affaire à YouTube.
+      provider: "youtube",
+      url,
+      title: prev.title || d.playlistTitle || d.title,
+      kind: d.playlistId ? "series" : "film",
+    }));
   }
 
   // Même geste pour une liste collée : on la relit et on montre ce qui en sort
@@ -1317,162 +1419,135 @@ function CreateModal({ token, onClose, onDone }) {
       <Section
         step={1}
         title="La source"
-        hint="D'où vient la vidéo. Tout le reste du formulaire en découle."
+        hint="Colle une adresse : ce qu'elle est se reconnaît tout seul, et le reste du formulaire suit."
       >
-      <div className="adm-coll-field">
-        <span>Lecteur</span>
-        <div className="adm-coll-sources">
-          {SOURCE_MODES.map((m) => (
-            <button
-              key={m.value}
-              type="button"
-              className={`adm-coll-source clickable ${
-                draft.provider === m.value ? "on" : ""
-              }`}
-              onClick={() => {
-                set("provider")(m.value);
-                setPreview(null);
-              }}
-            >
-              <m.Icon size={16} />
-              <strong>{m.label}</strong>
-              <em>{m.hint}</em>
-            </button>
-          ))}
-        </div>
-      </div>
+        <SourceSites url={draft.url} />
 
-      {!manual ? (
-        <label className="adm-coll-field">
-          <span>Lien de streaming (YouTube — vidéo ou playlist)</span>
-          <div className="adm-coll-inline">
-            <input
-              value={draft.url}
-              onChange={(e) => set("url")(e.target.value)}
-              placeholder="https://www.youtube.com/watch?v=…&list=…"
-            />
-            <button
-              className="btn btn-ghost clickable"
-              onClick={check}
-              disabled={!draft.url || checking}
-            >
-              {checking ? <Loader2 size={15} className="spin" /> : <Link2 size={15} />}
-              Vérifier
-            </button>
+        <ListImport
+          token={token}
+          // Le lecteur SUIT L'ADRESSE, à la frappe : il n'y a plus personne à
+          // qui poser la question, et le formulaire doit changer de forme
+          // pendant qu'on colle, pas après.
+          onUrl={(u) =>
+            setDraft((d) => ({
+              ...d,
+              url: u,
+              provider: isYoutubeUrl(u) ? "youtube" : "embed",
+            }))
+          }
+          onYoutube={checkYoutube}
+          onImported={(d) => {
+            // L'import REMPLIT le formulaire, il ne l'enregistre pas : tout
+            // reste relisible (et corrigeable) avant de poser le boîtier.
+            const film = d.kind === "film";
+            setDraft((prev) => ({
+              ...prev,
+              // Ce qui revient d'un scrape est une LISTE de liens vers des
+              // hébergeurs tiers : le lecteur ne peut plus être YouTube, quoi
+              // qu'il reste écrit dans le champ d'adresse.
+              provider: "embed",
+              url: d.sourceUrl || prev.url,
+              title: prev.title || d.title || "",
+              // UN FILM CHANGE LA NATURE DU BOÎTIER. C'est le seul champ que
+              // l'import impose : tout le formulaire en dépend (le lecteur, la
+              // fiche externe interrogée, la forme de la liste), et laisser
+              // « Série » sur un long métrage se paie à l'enregistrement.
+              kind: film ? "film" : prev.kind,
+              // Un import téléchargé REMPLACE (il apporte tout le titre) ;
+              // une source collée S'AJOUTE (elle n'apporte qu'une saison).
+              // Un film, lui, tient sur UNE ligne dont les adresses se
+              // cumulent : c'est ainsi qu'on rattrape les lecteurs qu'une
+              // fiche ne monte qu'au clic (voir mergeFilmLine).
+              episodesText: film
+                ? mergeFilmLine(
+                    prev.episodesText,
+                    prev.title || d.title,
+                    (d.players || []).map((p) => p.url)
+                  )
+                : d.appendList
+                  ? [prev.episodesText.trim(), d.appendList].filter(Boolean).join("\n")
+                  : d.list || prev.episodesText,
+              poster: d.cover || prev.poster,
+              backdrop: d.backdrop || prev.backdrop,
+              synopsis: d.synopsis || prev.synopsis,
+              genres: d.genres?.length ? d.genres : prev.genres,
+              year: d.year || prev.year,
+              // Les pistes réellement trouvées : elles s'impriment au dos du
+              // boîtier, on ne les invente donc pas. Une fiche de film les
+              // annonce en clair (« TrueFrench »), une fiche de série les
+              // porte saison par saison.
+              langs: d.langs?.length
+                ? d.langs
+                : [...new Set((d.seasons || []).map((s) => s.lang).filter(Boolean))],
+              tvmazeQuery: film ? prev.tvmazeQuery : prev.tvmazeQuery || d.title || "",
+            }));
+            setPreview(null);
+          }}
+        />
+
+        {/* LA LISTE NE S'OUVRE QUE POUR CE QUI EN A UNE. Une playlist YouTube se
+            pilote, ses épisodes sont là-bas et n'ont rien à faire dans une zone
+            de texte ; tout le reste — un scrape qu'on relit, des liens trouvés
+            à la main — passe forcément par ici. Elle est donc là par défaut :
+            c'est le champ vide, avant toute adresse, qui laisse encore le choix
+            de tout coller soi-même. */}
+        {manual && (
+          <>
+            <label className="adm-coll-field">
+              <span>
+                Épisodes — une ligne par épisode : <code>S01E02 Titre — lien</code>, et
+                les liens suivants sur la même ligne sont des miroirs. Un lien peut
+                dire sa version : <code>vostfr@https://…</code>
+              </span>
+              <textarea
+                className="adm-coll-list"
+                rows={9}
+                spellCheck={false}
+                value={draft.episodesText}
+                onChange={(e) => set("episodesText")(e.target.value)}
+                placeholder={LIST_PLACEHOLDER}
+              />
+            </label>
+            <div className="adm-coll-inline">
+              <button
+                className="btn btn-ghost clickable"
+                onClick={checkList}
+                disabled={!draft.episodesText.trim() || checking}
+              >
+                {checking ? <Loader2 size={15} className="spin" /> : <ListVideo size={15} />}
+                Relire la liste
+              </button>
+              <span className="adm-coll-hint">
+                Un lien direct (.mp4, .m3u8) est lu par le poste comme YouTube ;
+                tout autre lien s'affiche dans le cadre du site d'origine, sans
+                progression suivie.
+              </span>
+            </div>
+          </>
+        )}
+
+        {preview && !preview.list && (
+          <div className="adm-coll-preview">
+            {preview.thumb && <img src={preview.thumb} alt="" />}
+            <div>
+              <strong>{preview.playlistTitle || preview.title}</strong>
+              <span>
+                {preview.channel && `${preview.channel} · `}
+                {preview.count} vidéo{preview.count > 1 ? "s" : ""}
+                {preview.playlistId ? " (playlist)" : " (vidéo seule)"}
+              </span>
+              {preview.episodes.length > 0 && (
+                <ul>
+                  {preview.episodes.map((t, i) => (
+                    <li key={i}>{t}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
-        </label>
-      ) : (
-        <>
-          <ListImport
-            token={token}
-            onImported={(d) => {
-              // L'import REMPLIT le formulaire, il ne l'enregistre pas : tout
-              // reste relisible (et corrigeable) avant de poser le boîtier.
-              const film = d.kind === "film";
-              setDraft((prev) => ({
-                ...prev,
-                url: d.sourceUrl || prev.url,
-                title: prev.title || d.title || "",
-                // UN FILM CHANGE LA NATURE DU BOÎTIER. C'est le seul champ que
-                // l'import impose : tout le formulaire en dépend (le lecteur, la
-                // fiche externe interrogée, la forme de la liste), et laisser
-                // « Série » sur un long métrage se paie à l'enregistrement.
-                kind: film ? "film" : prev.kind,
-                // Un import téléchargé REMPLACE (il apporte tout le titre) ;
-                // une source collée S'AJOUTE (elle n'apporte qu'une saison).
-                // Un film, lui, tient sur UNE ligne dont les adresses se
-                // cumulent : c'est ainsi qu'on rattrape les lecteurs qu'une
-                // fiche ne monte qu'au clic (voir mergeFilmLine).
-                episodesText: film
-                  ? mergeFilmLine(
-                      prev.episodesText,
-                      prev.title || d.title,
-                      (d.players || []).map((p) => p.url)
-                    )
-                  : d.appendList
-                    ? [prev.episodesText.trim(), d.appendList].filter(Boolean).join("\n")
-                    : d.list || prev.episodesText,
-                poster: d.cover || prev.poster,
-                backdrop: d.backdrop || prev.backdrop,
-                synopsis: d.synopsis || prev.synopsis,
-                genres: d.genres?.length ? d.genres : prev.genres,
-                year: d.year || prev.year,
-                // Les pistes réellement trouvées : elles s'impriment au dos du
-                // boîtier, on ne les invente donc pas. Une fiche de film les
-                // annonce en clair (« TrueFrench »), une fiche de série les
-                // porte saison par saison.
-                langs: d.langs?.length
-                  ? d.langs
-                  : [...new Set((d.seasons || []).map((s) => s.lang).filter(Boolean))],
-                tvmazeQuery: film ? prev.tvmazeQuery : prev.tvmazeQuery || d.title || "",
-              }));
-              setPreview(null);
-            }}
-          />
+        )}
 
-          <label className="adm-coll-field">
-            <span>Page d'origine (facultatif — affichée sur la fiche)</span>
-            <input
-              value={draft.url}
-              onChange={(e) => set("url")(e.target.value)}
-              placeholder="https://site-d-origine/la-serie"
-            />
-          </label>
-
-          <label className="adm-coll-field">
-            <span>
-              Épisodes — une ligne par épisode : <code>S01E02 Titre — lien</code>, et
-              les liens suivants sur la même ligne sont des miroirs
-            </span>
-            <textarea
-              className="adm-coll-list"
-              rows={9}
-              spellCheck={false}
-              value={draft.episodesText}
-              onChange={(e) => set("episodesText")(e.target.value)}
-              placeholder={LIST_PLACEHOLDER}
-            />
-          </label>
-          <div className="adm-coll-inline">
-            <button
-              className="btn btn-ghost clickable"
-              onClick={checkList}
-              disabled={!draft.episodesText.trim() || checking}
-            >
-              {checking ? <Loader2 size={15} className="spin" /> : <ListVideo size={15} />}
-              Relire la liste
-            </button>
-            <span className="adm-coll-hint">
-              Un lien direct (.mp4, .m3u8) est lu par le poste comme YouTube ;
-              tout autre lien s'affiche dans le cadre du site d'origine, sans
-              progression suivie.
-            </span>
-          </div>
-        </>
-      )}
-
-      {preview && !preview.list && (
-        <div className="adm-coll-preview">
-          {preview.thumb && <img src={preview.thumb} alt="" />}
-          <div>
-            <strong>{preview.playlistTitle || preview.title}</strong>
-            <span>
-              {preview.channel && `${preview.channel} · `}
-              {preview.count} vidéo{preview.count > 1 ? "s" : ""}
-              {preview.playlistId ? " (playlist)" : " (vidéo seule)"}
-            </span>
-            {preview.episodes.length > 0 && (
-              <ul>
-                {preview.episodes.map((t, i) => (
-                  <li key={i}>{t}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      )}
-
-      {preview?.list && <ListPreview preview={preview} />}
+        {preview?.list && <ListPreview preview={preview} />}
       </Section>
 
       <Section
@@ -1536,19 +1611,31 @@ function CreateModal({ token, onClose, onDone }) {
 // reconnaît ce qu'on lui donne, et le rapport ci-dessous qui change de forme
 // selon ce qui en revient.
 
-const IMPORT_LANGS = [
-  { value: "vf", label: "VF" },
-  { value: "vostfr", label: "VOSTFR" },
-];
+// PLUS DE CHOIX DE LANGUE À L'IMPORT, et c'est un soulagement : il fallait
+// trancher VF ou VOSTFR AVANT de savoir ce que la fiche avait, et l'autre
+// version était perdue — la récupérer demandait de tout réimporter, ce qui
+// effaçait la première. L'import prend maintenant TOUT ce qui existe, chaque
+// adresse étiquetée de sa piste (« vostfr@https://… » dans la liste), et le
+// choix revient à celui qui regarde, sur la fiche du titre.
+//
+// `vf` reste envoyé comme PRÉFÉRENCE : elle ne filtre plus rien, elle décide
+// seulement de la version qui se branche en premier.
+const IMPORT_LANG = "vf";
 
 // `slug` change tout : sans lui, l'import REMPLIT le formulaire d'ajout (rien
 // n'est enregistré, l'admin relit) ; avec lui, il SCRAPE ET REMPLACE la source
 // du titre, d'un seul geste. C'est la différence entre poser un boîtier — où
 // tout reste à décider — et réparer celui qui est déjà sur l'étagère, où l'on
 // sait exactement ce qu'on veut : que ça rejoue.
-function ListImport({ token, slug, onImported, onApplied }) {
+//
+// ET YOUTUBE PASSE PAR LE MÊME CHAMP. En édition c'était déjà le cas — le
+// serveur reconnaît la playlist à son adresse et remplace les épisodes
+// (routes/collection.js) — mais à l'ajout, il fallait d'abord annoncer son
+// lecteur sur deux grandes cartes pour voir apparaître le bon champ. À l'ajout,
+// c'est `onYoutube` qui prend le relais : la playlist ne se scrape pas comme
+// une fiche, elle se VÉRIFIE (aperçu), et le formulaire s'en trouve changé.
+function ListImport({ token, slug, onImported, onApplied, onUrl, onYoutube }) {
   const [url, setUrl] = useState("");
-  const [lang, setLang] = useState("vf");
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState(null);
   const [error, setError] = useState(null);
@@ -1559,6 +1646,19 @@ function ListImport({ token, slug, onImported, onApplied }) {
   const [source, setSource] = useState("");
   const [pasteSeason, setPasteSeason] = useState(1);
   const blocked = /anti-robots/i.test(error || "");
+  // Ce que l'adresse dit d'elle-même, relu à chaque frappe : c'est lui qui
+  // décide du libellé, du bouton, et de la présence du sélecteur de langue.
+  const site = detectSource(url);
+  // Une playlist ne se scrape pas : elle se vérifie. Uniquement à l'ajout —
+  // sur un titre déjà posé, le serveur sait la reconnaître et la remplacer
+  // lui-même, c'est donc le même bouton que pour une fiche.
+  const yt = !slug && !!onYoutube && site?.value === "youtube";
+
+  // Ce qu'on tape remonte au formulaire : c'est lui qui en déduit le lecteur.
+  function typed(v) {
+    setUrl(v);
+    onUrl?.(v);
+  }
 
   async function runPaste() {
     setBusy(true);
@@ -1567,10 +1667,10 @@ function ListImport({ token, slug, onImported, onApplied }) {
       // L'adresse du champ du dessus part avec le collage quand elle est là :
       // c'est elle qui dit au lecteur quel hôte est LE SITE, donc lequel ne
       // peut pas être un lecteur (ses propres pages, ses images, ses scripts).
-      // `lang` sert aux fiches de série des sites de streaming : une source
-      // collée porte TOUTES leurs versions, et c'est ce sélecteur qui dit
-      // laquelle on veut (le collage d'un `episodes.js`, lui, l'ignore).
-      const body = { text: source, season: pasteSeason, url: url.trim(), lang };
+      // `lang` ne choisit plus rien : une source collée porte TOUTES les
+      // versions de la fiche, et elles sont désormais toutes reprises. Il ne
+      // reste qu'une préférence — celle qui se branchera en premier.
+      const body = { text: source, season: pasteSeason, url: url.trim(), lang: IMPORT_LANG };
       // En édition, un collage COMPLÈTE la source en place : il n'apporte qu'un
       // lecteur (celui affiché au moment de la copie) ou qu'une saison.
       const d = slug
@@ -1610,6 +1710,15 @@ function ListImport({ token, slug, onImported, onApplied }) {
     setError(null);
     setReport(null);
     try {
+      // La playlist se VÉRIFIE : ce qui en revient (le nombre de vidéos, les
+      // premiers titres) s'affiche dans l'aperçu du formulaire, pas dans le
+      // rapport d'import ci-dessous — il n'y a ni saison ni hébergeur à
+      // dénombrer. L'attente et l'échec, eux, restent ici : c'est ce bouton
+      // qu'on a pressé.
+      if (yt) {
+        await onYoutube(url.trim());
+        return;
+      }
       const d = slug
         ? await apiFetch(`/collection/${slug}/source/import`, {
             method: "POST",
@@ -1617,10 +1726,10 @@ function ListImport({ token, slug, onImported, onApplied }) {
             // Un lien REMPLACE : il apporte la fiche entière, donc tous ses
             // lecteurs. C'est le geste qu'on attend d'un bouton qui dit
             // « remplacer ».
-            body: { url: url.trim(), lang, merge: false },
+            body: { url: url.trim(), lang: IMPORT_LANG, merge: false },
           })
         : await apiFetch(
-            `/collection/import/link?url=${encodeURIComponent(url)}&lang=${lang}`,
+            `/collection/import/link?url=${encodeURIComponent(url)}&lang=${IMPORT_LANG}`,
             { token }
           );
       setReport(d.report || d);
@@ -1640,42 +1749,35 @@ function ListImport({ token, slug, onImported, onApplied }) {
   const seasons = report?.seasons || [];
   const hosts = report?.hosts || [];
   const filled = seasons.filter((x) => x.count).length;
-  // Les autres pistes de la fiche : DITES, jamais importées en douce. Une même
-  // liste ne tient qu'une version (un épisode, une ligne), et découvrir six
-  // mois plus tard qu'une VOSTFR existait vaut bien cette ligne.
-  const others = (report?.tracks || []).filter(
-    (t) => !(report?.langs || []).includes(t.lang)
-  );
+  // LES PISTES RAPPORTÉES, et elles le sont toutes. Cette ligne disait avant ce
+  // qu'on N'AVAIT PAS pris (« cette fiche a aussi une VOSTFR — relance l'import
+  // avec cette langue pour la prendre à la place ») : il n'y a plus rien à
+  // relancer, tout est dans le boîtier et c'est le spectateur qui choisit sur la
+  // fiche. Elle dit donc maintenant ce qu'on RAPPORTE.
+  const tracks = report?.tracks?.length
+    ? report.tracks
+    : (report?.langs || []).map((lang) => ({ lang, count: 0 }));
 
   return (
     <div className="adm-coll-import">
       <div className="adm-coll-field">
         <span>
-          <Download size={13} />{" "}
+          {yt ? <CirclePlay size={13} /> : <Download size={13} />}{" "}
           {slug
             ? "Remplacer la source — colle l'adresse d'une fiche (série, film) ou d'une playlist YouTube"
-            : "Importer depuis une fiche — série (anime-sama, site de streaming) ou film : remplit la liste ci-dessous"}
+            : yt
+              ? "Playlist ou vidéo YouTube — vérifie-la, les épisodes suivront à l'enregistrement"
+              : site
+                ? "Fiche à récupérer — ses épisodes (ou ses lecteurs) remplissent la liste ci-dessous"
+                : "L'adresse de la source — YouTube, anime-sama, ou la fiche d'un site de streaming"}
         </span>
         <div className="adm-coll-inline">
           <input
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://anime-sama.xx/catalogue/… ou https://site-de-streaming/la-serie-saison-1.html"
-            onKeyDown={(e) => e.key === "Enter" && url && !busy && run()}
+            onChange={(e) => typed(e.target.value)}
+            placeholder="https://www.youtube.com/…&list=… · https://anime-sama.xx/catalogue/… · https://site-de-streaming/le-film"
+            onKeyDown={(e) => e.key === "Enter" && url.trim() && !busy && run()}
           />
-          <select
-            className="adm-coll-lang"
-            value={lang}
-            onChange={(e) => setLang(e.target.value)}
-            aria-label="Langue préférée"
-            title="La piste qu'on importe quand la fiche en propose plusieurs (séries). Un film n'a que la ou les pistes que sa fiche annonce."
-          >
-            {IMPORT_LANGS.map((l) => (
-              <option key={l.value} value={l.value}>
-                {l.label}
-              </option>
-            ))}
-          </select>
           <button
             className={`btn clickable ${slug ? "btn-primary" : "btn-ghost"}`}
             onClick={run}
@@ -1683,11 +1785,19 @@ function ListImport({ token, slug, onImported, onApplied }) {
             title={
               slug
                 ? "Scrape la fiche et remplace la source de ce titre, tout de suite"
-                : undefined
+                : yt
+                  ? "Lit la playlist chez YouTube : bon titre ? bon nombre d'épisodes ?"
+                  : undefined
             }
           >
-            {busy ? <Loader2 size={15} className="spin" /> : <Download size={15} />}
-            {slug ? "Scraper et remplacer" : "Récupérer"}
+            {busy ? (
+              <Loader2 size={15} className="spin" />
+            ) : yt ? (
+              <Link2 size={15} />
+            ) : (
+              <Download size={15} />
+            )}
+            {slug ? "Scraper et remplacer" : yt ? "Vérifier" : "Récupérer"}
           </button>
         </div>
       </div>
@@ -1705,7 +1815,9 @@ function ListImport({ token, slug, onImported, onApplied }) {
           recours seulement après s'être pris l'erreur fait perdre un aller-
           retour à chaque fois. Le bouton se met simplement en avant quand
           l'échec ressemble à un blocage. */}
-      {!pasting && (
+      {/* Rien à contourner du côté de YouTube : il répond toujours, et sa page
+          ne contient de toute façon aucune liste à lire. */}
+      {!pasting && !yt && (
         <button
           className={`adm-coll-upload clickable ${blocked ? "urge" : ""}`}
           onClick={() => setPasting(true)}
@@ -1715,7 +1827,7 @@ function ListImport({ token, slug, onImported, onApplied }) {
         </button>
       )}
 
-      {pasting && (
+      {pasting && !yt && (
         <div className="adm-coll-field">
           <span>
             <ClipboardPaste size={13} /> Ouvre la page dans ton navigateur, fais
@@ -1776,20 +1888,31 @@ function ListImport({ token, slug, onImported, onApplied }) {
               {seasons.map((s, i) => (
                 <li key={s.path || i} className={s.count ? "" : "empty"}>
                   {s.label}
-                  {s.lang ? ` · ${s.lang.toUpperCase()}` : ""} —{" "}
+                  {/* Les pistes trouvées POUR CETTE SAISON : une série a souvent
+                      ses premières saisons en VF et les dernières en VOSTFR
+                      seulement, et ça se voit ici saison par saison. */}
+                  {s.langs?.length
+                    ? ` · ${s.langs.map((l) => l.toUpperCase()).join(" + ")}`
+                    : s.lang
+                      ? ` · ${s.lang.toUpperCase()}`
+                      : ""}{" "}
+                  —{" "}
                   {s.count
                     ? `${s.count} épisode${s.count > 1 ? "s" : ""}`
-                    : "rien trouvé dans cette langue"}
+                    : "rien trouvé"}
                 </li>
               ))}
             </ul>
-            {others.length > 0 && (
+            {tracks.length > 0 && (
               <span className="adm-coll-import-tracks">
-                <Languages size={12} /> Cette fiche a aussi{" "}
-                {others
-                  .map((t) => `${t.lang.toUpperCase()} (${t.count} ép.)`)
+                <Languages size={12} /> Pistes rapportées :{" "}
+                {tracks
+                  .map(
+                    (t) =>
+                      `${t.lang.toUpperCase()}${t.count ? ` (${t.count} ép.)` : ""}`
+                  )
                   .join(", ")}{" "}
-                — relance l'import avec cette langue pour la prendre à la place.
+                — toutes enregistrées, le choix se fait sur la fiche du titre.
               </span>
             )}
             <span className="adm-coll-import-hosts">
@@ -2007,116 +2130,128 @@ function EditDrawer({ media, token, onClose, onChanged }) {
         </>
       }
     >
-      {/* Les visuels et l'objet À DROITE, sur toute la hauteur : c'est ce qu'on
-          vient regarder pendant qu'on corrige la fiche, et les faire défiler
-          avec le formulaire obligeait à remonter pour vérifier. */}
-      <div className="adm-coll-split">
-        <div className="adm-coll-main">
-          <Section step={1} title="La fiche" hint="Ce qui s'imprime sur le boîtier.">
-            <Fields draft={draft} set={set} withYears withSynopsis />
-          </Section>
+      {/* LA MÊME MODALE QUE « AJOUTER », et ce n'est pas une coquetterie : on
+          corrige un boîtier bien plus souvent qu'on n'en pose, et les deux
+          écrans ne se ressemblaient en rien — colonnes contre pleine largeur,
+          champs aux mêmes noms rangés autrement. Une seule forme, donc : des
+          sections numérotées, pleine largeur, dans l'ordre où l'on s'en sert.
+          Les visuels ferment la marche (section 3) : ils ne se touchent qu'une
+          fois, et ils prenaient une colonne entière à l'écran pour ça. */}
+      <Section step={1} title="La fiche" hint="Ce qui s'imprime sur le boîtier.">
+        <Fields draft={draft} set={set} withYears withSynopsis />
+      </Section>
 
-          {game ? (
-            <Section
-              step={2}
-              title="La cartouche"
-              hint="Le fichier qui se joue, et les deux mentions qu'aucun en-tête ne porte."
-            >
-              <CartridgeEditor
-                media={media}
-                token={token}
-                draft={draft}
-                set={set}
-                onChanged={onChanged}
+      {game ? (
+        <Section
+          step={2}
+          title="La cartouche"
+          hint="Le fichier qui se joue, et les deux mentions qu'aucun en-tête ne porte."
+        >
+          <CartridgeEditor
+            media={media}
+            token={token}
+            draft={draft}
+            set={set}
+            onChanged={onChanged}
+          />
+        </Section>
+      ) : comic ? (
+        /* LE PAPIER N'A PAS DE LIEN DE STREAMING — il avait pourtant le
+           champ, et pas l'ombre d'un moyen de corriger son éditeur, ses
+           auteurs ou son sens de lecture. Il a maintenant les siens, et
+           surtout la RECHERCHE : c'est ici qu'on vient rattraper une fiche
+           posée à la va-vite, ou remplacer un synopsis anglais par le
+           français que MangaDex vient de publier. */
+        <Section
+          step={2}
+          title="Le papier"
+          hint="Ce qui ne se corrige nulle part ailleurs — et de quoi aller rechercher la fiche."
+        >
+          <ReadDirection
+            value={draft.readDirection}
+            onChange={set("readDirection")}
+          />
+
+          <div className="adm-coll-grid">
+            <label className="adm-coll-field">
+              <span>Titre original</span>
+              <input
+                value={draft.originalTitle}
+                onChange={(e) => set("originalTitle")(e.target.value)}
+                placeholder="ルックバック"
               />
-            </Section>
-          ) : comic ? (
-            /* LE PAPIER N'A PAS DE LIEN DE STREAMING — il avait pourtant le
-               champ, et pas l'ombre d'un moyen de corriger son éditeur, ses
-               auteurs ou son sens de lecture. Il a maintenant les siens, et
-               surtout la RECHERCHE : c'est ici qu'on vient rattraper une fiche
-               posée à la va-vite, ou remplacer un synopsis anglais par le
-               français que MangaDex vient de publier. */
-            <Section
-              step={2}
-              title="Le papier"
-              hint="Ce qui ne se corrige nulle part ailleurs — et de quoi aller rechercher la fiche."
-            >
-              <ReadDirection
-                value={draft.readDirection}
-                onChange={set("readDirection")}
+            </label>
+            <label className="adm-coll-field">
+              <span>Éditeur</span>
+              <input
+                value={draft.publisher}
+                onChange={(e) => set("publisher")(e.target.value)}
+                placeholder="Kana, Glénat, Marvel…"
               />
-
-              <div className="adm-coll-grid">
-                <label className="adm-coll-field">
-                  <span>Titre original</span>
-                  <input
-                    value={draft.originalTitle}
-                    onChange={(e) => set("originalTitle")(e.target.value)}
-                    placeholder="ルックバック"
-                  />
-                </label>
-                <label className="adm-coll-field">
-                  <span>Éditeur</span>
-                  <input
-                    value={draft.publisher}
-                    onChange={(e) => set("publisher")(e.target.value)}
-                    placeholder="Kana, Glénat, Marvel…"
-                  />
-                </label>
-                <label className="adm-coll-field">
-                  <span>Auteurs (séparés par des virgules)</span>
-                  <input
-                    value={draft.authors}
-                    onChange={(e) => set("authors")(e.target.value)}
-                    placeholder="Scénario, dessin"
-                  />
-                </label>
-                <label className="adm-coll-field">
-                  <span>Genres (séparés par des virgules)</span>
-                  <input
-                    value={(draft.genres || []).join(", ")}
-                    onChange={(e) =>
-                      set("genres")(
-                        e.target.value
-                          .split(",")
-                          .map((g) => g.trim())
-                          .filter(Boolean)
-                      )
-                    }
-                    placeholder="Drame, Tranche de vie"
-                  />
-                </label>
-              </div>
-
-              <ComicLookup
-                token={token}
-                query={draft.title}
-                // ON ÉCRASE, ICI. À la création, la saisie à la main l'emporte
-                // sur la fiche trouvée ; en correction on vient justement
-                // chercher de quoi REMPLACER ce qui est là. Rien ne part en
-                // base tant qu'on n'a pas enregistré.
-                onPick={(r) => setDraft((d) => applyComicPick(d, r, { overwrite: true }))}
+            </label>
+            <label className="adm-coll-field">
+              <span>Auteurs (séparés par des virgules)</span>
+              <input
+                value={draft.authors}
+                onChange={(e) => set("authors")(e.target.value)}
+                placeholder="Scénario, dessin"
               />
-            </Section>
-          ) : (
-            <Section
-              step={2}
-              title="La source"
-              hint="Ce qui sert ce titre aujourd'hui. Colle l'adresse d'une fiche : le scrape remplace la source sur-le-champ, épisodes compris."
-            >
-              <SourceSection media={media} token={token} onChanged={onChanged} />
-            </Section>
-          )}
-        </div>
+            </label>
+            <label className="adm-coll-field">
+              <span>Genres (séparés par des virgules)</span>
+              <input
+                value={(draft.genres || []).join(", ")}
+                onChange={(e) =>
+                  set("genres")(
+                    e.target.value
+                      .split(",")
+                      .map((g) => g.trim())
+                      .filter(Boolean)
+                  )
+                }
+                placeholder="Drame, Tranche de vie"
+              />
+            </label>
+          </div>
 
-        <div className="adm-coll-aside">
-          <BoxPreview media={{ ...media, ...draft }} />
+          <ComicLookup
+            token={token}
+            query={draft.title}
+            // ON ÉCRASE, ICI. À la création, la saisie à la main l'emporte
+            // sur la fiche trouvée ; en correction on vient justement
+            // chercher de quoi REMPLACER ce qui est là. Rien ne part en
+            // base tant qu'on n'a pas enregistré.
+            onPick={(r) => setDraft((d) => applyComicPick(d, r, { overwrite: true }))}
+          />
+        </Section>
+      ) : (
+        <Section
+          step={2}
+          title="La source"
+          hint="Ce qui sert ce titre aujourd'hui. Colle l'adresse d'une fiche : le scrape remplace la source sur-le-champ, épisodes compris."
+        >
+          <SourceSection media={media} token={token} onChanged={onChanged} />
+        </Section>
+      )}
+
+      {/* LES TROIS IMAGES, ET RIEN D'AUTRE. La colonne portait aussi un aperçu
+          de la tranche avec ses cotes au millimètre — une vignette qui répétait
+          le titre et l'année déjà écrits deux fois au-dessus, pour une mesure
+          qu'on ne prend pas ici mais dans le mesureur de jaquette. Ce qu'on
+          vient vraiment faire, c'est remplacer une jaquette, une affiche ou un
+          bandeau : le bouton « Tester » de la liste montre l'objet fini bien
+          mieux qu'un rectangle de CSS. */}
+      <Section
+        step={3}
+        title="Les visuels"
+        hint="La jaquette dépliée habille le boîtier 3D ; l'affiche et le bandeau servent la fiche et les grilles."
+      >
+        <div className="adm-coll-arts">
           <Artwork media={media} token={token} which="wrap" onChanged={onChanged} />
           <Artwork media={media} token={token} which="poster" onChanged={onChanged} />
           <Artwork media={media} token={token} which="backdrop" onChanged={onChanged} />
         </div>
-      </div>
+      </Section>
     </Modal>
   );
 }
@@ -2352,7 +2487,8 @@ function SourceSection({ media, token, onChanged }) {
       <div className="adm-coll-field">
         <span>
           <ListVideo size={13} /> {media.kind === "film" ? "Lecteurs" : "Épisodes"} — une
-          ligne par {media.kind === "film" ? "film" : "épisode"}, miroirs séparés par « | »
+          ligne par {media.kind === "film" ? "film" : "épisode"}, miroirs séparés par
+          « | », version en tête d'adresse (<code>vf@https://…</code>)
         </span>
         {text === null ? (
           <div className="adm-coll-state">
@@ -2930,42 +3066,6 @@ function Artwork({ media, token, which, onChanged }) {
           onApply={applyBox}
         />
       )}
-    </div>
-  );
-}
-
-// Aperçu de la tranche telle qu'elle sera sur l'étagère : la teinte et les
-// proportions se jugent sur l'objet, pas dans un sélecteur.
-//
-// La vignette est AUX MESURES DU BOÎTIER : hauteur et épaisseur viennent de
-// `boxOf`, donc un Blu-ray mesuré sur sa jaquette apparaît ici plus court et
-// plus fin qu'un DVD. C'est le seul endroit du panneau où l'on voit d'un coup
-// d'œil que les dimensions ont bien été prises.
-function BoxPreview({ media }) {
-  const box = boxOf(media);
-  const custom = !!media.box?.w;
-  // 1 unité du monde ≈ 16 cm ; ici 1 cm ≈ 9 px, ce qui met un DVD à 171 px de
-  // haut — la hauteur que la colonne peut donner sans pousser le reste.
-  const px = 9 * CM;
-  return (
-    <div className="adm-coll-boxprev">
-      <span className="adm-coll-art-label">
-        L'objet {custom ? "— mesuré sur sa jaquette" : "— gabarit DVD"}
-      </span>
-      <span
-        className="adm-coll-spine-prev"
-        style={{
-          "--tint": media.color,
-          width: `${Math.max(6, box.w * px)}px`,
-          height: `${box.h * px}px`,
-        }}
-      >
-        <b>{media.title}</b>
-        <i className="foot">{media.year || ""}</i>
-      </span>
-      <span className="adm-coll-boxdims">
-        {fmtCm(box.h)} × {fmtCm(box.d)} cm · tranche {Math.round(box.w * CM * 10)} mm
-      </span>
     </div>
   );
 }

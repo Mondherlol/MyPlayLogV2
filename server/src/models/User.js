@@ -239,6 +239,14 @@ const userSchema = new mongoose.Schema(
       hideReviews: { type: Boolean, default: false }, // reviews hors des pages de jeux
     },
 
+    // --- Personnalisation du fil d'accueil ---
+    // Familles de cartes que ce joueur ne veut PAS voir dans son fil (clés de
+    // FEED_CATEGORIES, cf. lib/feedCategories.js). On garde la liste des
+    // familles coupées et non celle des familles gardées : rien à migrer sur
+    // les comptes existants, et une famille ajoutée plus tard s'affiche
+    // d'office chez tout le monde.
+    feedHidden: { type: [String], default: [] },
+
     // Demandes d'abonnement REÇUES et encore en attente (comptes privés).
     // Acceptée → le demandeur passe dans SON `following` ; refusée → oubliée.
     followRequests: {
@@ -348,6 +356,7 @@ userSchema.methods.toPublic = function () {
     },
     // Pastille « demandes d'abonnement en attente » (compte privé).
     followRequestCount: (this.followRequests || []).length,
+    feedHidden: this.feedHidden || [],
     createdAt: this.createdAt,
   };
 };

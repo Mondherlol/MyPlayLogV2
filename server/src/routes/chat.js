@@ -74,7 +74,11 @@ function quoteOf(m) {
             ? `📺 ${m.party.title}`
             : m.mot
               ? "🌡️ Mot du jour"
-              : "");
+              : m.versus
+                ? "⚔️ Versus"
+                : m.book
+                  ? `📖 ${m.book.title}`
+                  : "");
   return {
     id: m._id,
     author: userCard(m.author),
@@ -87,9 +91,13 @@ function quoteOf(m) {
           ? "party"
           : m.mot
             ? "mot"
-            : m.media?.length
-            ? m.media[0].kind
-            : "text",
+            : m.versus
+              ? "versus"
+              : m.book
+                ? "book"
+                : m.media?.length
+              ? m.media[0].kind
+              : "text",
     deleted: !!m.deletedAt,
   };
 }
@@ -123,6 +131,8 @@ function serializeMessage(m, meId) {
     ost: deleted ? null : m.ost || null,
     party: deleted ? null : m.party || null,
     mot: deleted ? null : m.mot || null,
+    versus: deleted ? null : m.versus || null,
+    book: deleted ? null : m.book || null,
     system: m.system || null,
     systemData: m.systemData || null,
     edited: !!m.editedAt,
@@ -183,7 +193,7 @@ const POPULATE_MESSAGE = [
   { path: "author", select: "username avatar" },
   {
     path: "replyTo",
-    select: "text author media deletedAt game ost party mot",
+    select: "text author media deletedAt game ost party mot versus book",
     populate: { path: "author", select: "username avatar" },
   },
 ];
@@ -296,6 +306,9 @@ function previewText(msg) {
   if (msg.ost) return msg.text || `OST : ${msg.ost.name}`;
   if (msg.party) return msg.text || `Watchparty : ${msg.party.title}`;
   if (msg.mot) return msg.text || "Mot du jour : rejoins la partie";
+  if (msg.versus) return msg.text || "Versus : rejoins le salon";
+  if (msg.book)
+    return msg.text || `Planche ${(msg.book.page || 0) + 1} — ${msg.book.title}`;
   if (msg.text) return msg.text.slice(0, 120);
   if (msg.media?.length) return msg.media[0].kind === "gif" ? "GIF" : "Photo";
   return "";
@@ -308,6 +321,8 @@ function previewKind(msg) {
   if (msg.ost) return "ost";
   if (msg.party) return "party";
   if (msg.mot) return "mot";
+  if (msg.versus) return "versus";
+  if (msg.book) return "book";
   if (msg.media?.length) return msg.media[0].kind;
   return "text";
 }
@@ -441,6 +456,8 @@ export async function deliverCard({
   ost = null,
   party = null,
   mot = null,
+  versus = null,
+  book = null,
 }) {
   const conv = await getOrCreateDm(fromId, toId);
   const msg = await persistMessage(conv, fromId, {
@@ -450,6 +467,8 @@ export async function deliverCard({
     ost,
     party,
     mot,
+    versus,
+    book,
   });
   broadcastMessage(conv, msg);
   await broadcastConversation(conv._id);
@@ -474,6 +493,8 @@ export async function deliverCardToConversation({
   ost = null,
   party = null,
   mot = null,
+  versus = null,
+  book = null,
 }) {
   const conv = await loadConversation(conversationId, fromId);
   if (!conv) return null;
@@ -484,6 +505,8 @@ export async function deliverCardToConversation({
     ost,
     party,
     mot,
+    versus,
+    book,
   });
   broadcastMessage(conv, msg);
   await broadcastConversation(conv._id);
@@ -1331,6 +1354,87 @@ router.post("/share", requireAuth, async (req, res) => {
     res.status(201).json({ ok: true });
   } catch (err) {
     console.error("chat share error:", err.message);
+    res.status(500).json({ error: "Partage impossible." });
+  }
+});
+
+// POST /api/chat/share-book — « regarde cette planche ».
+// { userIds[], conversationIds[], message?, book: { slug, page, shot, … } }
+//
+// La capture est DÉJÀ chez nous : le lecteur l'envoie d'abord par /chat/media
+// (le même envoi que n'importe quelle image de message), et ne passe ici que
+// l'URL qu'on lui a rendue. On la revalide quand même — une carte est du
+// contenu que d'autres vont afficher, et rien ne garantit que l'URL reçue
+// vienne bien de notre propre réponse.
+//
+// Deux destinations d'un seul geste, comme les invitations de versus : des
+// personnes (carte en message privé) et des groupes de discussion (carte dans
+// le fil commun). On ne peut écrire qu'à ses abonnés, c'est la règle de la
+// messagerie, et l'appartenance au groupe suffit pour le reste.
+router.post("/share-book", requireAuth, async (req, res) => {
+  try {
+    const raw = req.body?.book || {};
+    const slug = String(raw.slug || "").slice(0, 200);
+    if (!slug) return res.status(400).json({ error: "Volume inconnu." });
+
+    // La capture doit être une image servie par NOUS, dans le dossier du chat :
+    // une URL quelconque ferait de la carte un cadre à charger n'importe où.
+    const host = req.get("host");
+    const shot = String(raw.shot || "");
+    const ours =
+      /^https?:\/\//.test(shot) && host && shot.includes(host) &&
+      shot.includes("/uploads/chat/");
+    if (shot && !ours)
+      return res.status(400).json({ error: "Capture invalide." });
+
+    const page = Math.max(0, Math.min(9999, Math.round(Number(raw.page) || 0)));
+    const card = {
+      slug,
+      title: String(raw.title || "").slice(0, 200),
+      franchise: String(raw.franchise || "").slice(0, 200),
+      page,
+      pages: Math.max(0, Math.min(9999, Math.round(Number(raw.pages) || 0))),
+      shot: shot || null,
+      color: raw.color ? String(raw.color).slice(0, 32) : null,
+    };
+    const text = req.body?.message ? String(req.body.message).slice(0, 500) : "";
+
+    const userIds = [...new Set((req.body?.userIds || []).map(String))].slice(0, 10);
+    const conversationIds = [
+      ...new Set((req.body?.conversationIds || []).map(String)),
+    ].slice(0, 10);
+    if (!userIds.length && !conversationIds.length)
+      return res.status(400).json({ error: "Choisis au moins un destinataire." });
+
+    const me = await User.findById(req.userId).select("following").lean();
+    const sent = [];
+    const groups = [];
+
+    for (const id of userIds) {
+      if (!mongoose.isValidObjectId(id) || String(id) === String(req.userId)) continue;
+      const target = await User.findById(id).select("username following").lean();
+      // Un destinataire qui ne peut pas recevoir de message est SAUTÉ, pas une
+      // erreur : on en a choisi cinq, quatre passent, et la réponse dit
+      // lesquels — refuser le lot entier pour un abonnement défait serait
+      // absurde.
+      if (!target || !canMessage(me, target)) continue;
+      await deliverCard({ fromId: req.userId, toId: id, text, book: card });
+      sent.push(String(id));
+    }
+
+    for (const cid of conversationIds) {
+      const out = await deliverCardToConversation({
+        fromId: req.userId,
+        conversationId: cid,
+        text,
+        book: card,
+      });
+      if (out) groups.push(String(cid));
+    }
+
+    res.status(201).json({ ok: true, sent, groups });
+  } catch (err) {
+    console.error("chat share book error:", err.message);
     res.status(500).json({ error: "Partage impossible." });
   }
 });

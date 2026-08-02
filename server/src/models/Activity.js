@@ -50,6 +50,13 @@ const activitySchema = new mongoose.Schema(
         "blindtest", // a terminé un blind test musical (meta = score/manches/défi)
         "pixel", // a terminé une partie de Pixel Rush (meta = score/manches/défi)
         "geo", // a terminé une partie de GeoGamer (meta = score/manches/défi)
+        "btversus", // a disputé un versus de blind test (même forme que
+        // geoversus : une entrée par joueur, dédoublonnée par meta.versusId)
+        "geoversus", // a disputé un versus GeoGamer (meta = mode/rang/score +
+        // la table complète). Une entrée PAR JOUEUR (chacun a son résultat et
+        // ses points), mais le fil n'en montre qu'une : routes/feed.js
+        // dédoublonne par meta.versusId, comme il le fait pour les sessions du
+        // mot du jour.
         "mot", // a trouvé le mot du jour (meta = score/essais/temps — JAMAIS le
         // mot lui-même : la carte ne doit rien divulguer aux amis qui n'ont pas
         // encore joué)

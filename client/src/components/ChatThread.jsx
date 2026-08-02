@@ -24,6 +24,11 @@ import {
   Music,
   Popcorn,
   Thermometer,
+  Globe2,
+  Swords,
+  Zap,
+  BookOpen,
+  BookMarked,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { renderMessage, extractYouTubeIds, YouTubeEmbed } from "./ListComments";
@@ -781,7 +786,14 @@ function MessageRow({
   const ytIds = m.deleted ? [] : extractYouTubeIds(m.text);
   // Message « que des emojis » (sans média ni carte) → rendu géant, sans bulle.
   const emojiLvl =
-    m.deleted || m.media?.length || m.game || m.ost || m.party || m.mot
+    m.deleted ||
+    m.media?.length ||
+    m.game ||
+    m.ost ||
+    m.party ||
+    m.mot ||
+    m.versus ||
+    m.book
       ? 0
       : emojiOnlyLevel(m.text);
 
@@ -871,7 +883,7 @@ function MessageRow({
 
         <div
           className={`chat-bubble ${m.deleted ? "is-deleted" : ""} ${
-            m.game || m.ost || m.party || m.mot ? "has-card" : ""
+            m.game || m.ost || m.party || m.mot || m.versus || m.book ? "has-card" : ""
           } ${emojiLvl ? `chat-emoji-only lvl-${emojiLvl}` : ""}`}
         >
           {m.deleted ? (
@@ -882,6 +894,8 @@ function MessageRow({
               {m.ost && <OstCard ost={m.ost} />}
               {m.party && <PartyCard party={m.party} />}
               {m.mot && <MotCard mot={m.mot} />}
+              {m.versus && <VersusCard versus={m.versus} />}
+              {m.book && <BookCard book={m.book} />}
               {m.text && <p>{renderMessage(m.text, m.mentions)}</p>}
               {m.media?.length > 0 && (
                 <div className={`chat-media n-${Math.min(m.media.length, 4)}`}>
@@ -1062,6 +1076,101 @@ function PartyCard({ party }) {
         <span className="chat-card-title">{party.title}</span>
         {party.subtitle && <span className="chat-card-sub">{party.subtitle}</span>}
         <span className="chat-card-cta">Rejoindre la séance →</span>
+      </span>
+    </Link>
+  );
+}
+
+// --- Carte « regarde cette planche » ---
+//
+// LA SEULE CARTE DU FIL QUI MONTRE UNE IMAGE FAITE À LA MAIN. Les autres
+// portent une jaquette de catalogue ; celle-ci porte la CAPTURE prise dans le
+// volume ouvert, à la case près — c'est elle le message, le reste n'est que le
+// moyen d'y retourner. Elle est donc bâtie à l'envers des autres : l'image en
+// grand d'abord, le titre dessous.
+//
+// ELLE NE PÉRIME PAS. Une invitation de watchparty meurt avec la séance ; un
+// passage de bouquin s'ouvre aussi bien six mois plus tard. D'où les deux
+// portes plutôt qu'un lien : à la planche qu'on me montre, ou depuis le début
+// si ça m'a donné envie de lire le tome.
+//
+// Deux liens dans une carte, donc pas de carte-lien : imbriquer des ancres
+// n'est pas valide, et « ouvrir » ne doit pas se déclencher parce qu'on a
+// cliqué à côté de l'image.
+function BookCard({ book }) {
+  const at = (book.page || 0) + 1;
+  return (
+    <div className="chat-card chat-card-book">
+      {book.shot && (
+        <Link
+          to={`/collection/${book.slug}?play=1&page=${book.page || 0}`}
+          className="chat-book-shot clickable"
+          title={`Ouvrir à la planche ${at}`}
+        >
+          <img src={book.shot} alt="" loading="lazy" />
+        </Link>
+      )}
+      <span className="chat-card-kicker">
+        <BookOpen size={12} /> Planche {at}
+        {book.pages ? ` / ${book.pages}` : ""}
+      </span>
+      <span className="chat-card-title">{book.title}</span>
+      {book.franchise && <span className="chat-card-sub">{book.franchise}</span>}
+      <span className="chat-book-acts">
+        <Link
+          to={`/collection/${book.slug}?play=1&page=${book.page || 0}`}
+          className="chat-book-btn primary clickable"
+        >
+          <BookMarked size={13} /> Ouvrir à cette planche
+        </Link>
+        <Link
+          to={`/collection/${book.slug}?play=1&page=0`}
+          className="chat-book-btn clickable"
+        >
+          Depuis le début
+        </Link>
+      </span>
+    </div>
+  );
+}
+
+// --- Carte « rejoins mon versus » (GeoGamer ou blind test) ---
+// Périssable comme celle de watchparty : un salon s'efface deux heures après la
+// dernière manche, et il se ferme dès que la partie est lancée. On ne cherche
+// pas à savoir s'il tourne encore — ce serait une requête par carte à chaque
+// relecture du fil — c'est le salon qui répond « ce salon n'existe plus ».
+function VersusCard({ versus }) {
+  const bt = versus.kind === "blindtest";
+  const buzzer = !bt && versus.mode === "buzzer";
+  return (
+    <Link
+      to={bt ? `/blindtest/versus/${versus.code}` : `/geo/versus/${versus.code}`}
+      className="chat-card chat-card-geo clickable"
+    >
+      {/* Surtout PAS `geo` comme nom de variante : cette classe-là est celle
+          de la PAGE GeoGamer (app-25-geo.css), qui impose un `min-height`
+          plein écran — la vignette de 54 px devenait une colonne noire d'un
+          écran de haut au milieu du fil. */}
+      <span className={`chat-card-cover gv-card-art ${bt ? "bt" : ""}`}>
+        {bt ? <Music size={22} /> : buzzer ? <Zap size={22} /> : <Globe2 size={22} />}
+      </span>
+      <span className="chat-card-body">
+        <span className="chat-card-kicker">
+          <Swords size={12} /> {bt ? "Blind test versus" : "GeoGamer versus"}
+          {versus.hostName ? ` · ${versus.hostName}` : ""}
+        </span>
+        <span className="chat-card-title">
+          {bt
+            ? "Le même extrait pour tout le monde"
+            : buzzer
+              ? "Buzzer — le premier qui trouve"
+              : "Classique — chacun son score"}
+        </span>
+        <span className="chat-card-sub">
+          {versus.players || 1}/{versus.maxPlayers || 5} joueur
+          {(versus.players || 1) > 1 ? "s" : ""} · {versus.rounds || 8} manches
+        </span>
+        <span className="chat-card-cta">Rejoindre le salon →</span>
       </span>
     </Link>
   );

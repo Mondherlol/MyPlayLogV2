@@ -22,6 +22,7 @@ import { isUserAdmin } from "../lib/admin.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { summarizeReactions, reviewComment } from "../lib/reviewSerialize.js";
 import { recordActivity, removeActivity } from "../lib/activity.js";
+import { FEED_KEYS } from "../lib/feedCategories.js";
 import { evaluateMissions, countBadges, triggerMissionCheck } from "../lib/missions.js";
 import { notify } from "../lib/notify.js";
 import {
@@ -544,6 +545,28 @@ router.put("/me/privacy", requireAuth, async (req, res) => {
     res.json({ user: user.toPublic() });
   } catch (err) {
     console.error("privacy update error:", err.message);
+    res.status(500).json({ error: "Erreur lors de l'enregistrement." });
+  }
+});
+
+// --- Personnalisation du fil d'accueil (Paramètres > Fil d'accueil) ---
+// Le client envoie la liste COMPLÈTE des familles masquées : le réglage est
+// idempotent, et une clé inconnue (client et serveur de versions différentes)
+// est simplement ignorée plutôt que de faire échouer l'enregistrement.
+router.put("/me/feed-prefs", requireAuth, async (req, res) => {
+  try {
+    if (!Array.isArray(req.body?.hidden))
+      return res.status(400).json({ error: "Liste des familles masquées attendue." });
+    const hidden = [...new Set(req.body.hidden.filter((k) => FEED_KEYS.includes(k)))];
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      { feedHidden: hidden },
+      { new: true }
+    );
+    if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
+    res.json({ user: user.toPublic() });
+  } catch (err) {
+    console.error("feed prefs error:", err.message);
     res.status(500).json({ error: "Erreur lors de l'enregistrement." });
   }
 });

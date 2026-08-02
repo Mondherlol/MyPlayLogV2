@@ -6,6 +6,7 @@ import UserGame from "../models/UserGame.js";
 import User from "../models/User.js";
 import CustomOst from "../models/CustomOst.js";
 import { ensureScraped } from "../lib/ostScrape.js";
+import { climaxFor, warmClimax } from "../lib/ostClimax.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { requireAuth } from "../middleware/auth.js";
 import { recordActivity } from "../lib/activity.js";
@@ -145,13 +146,18 @@ export async function keepRealGames(games) {
 async function tracksForGames(gameIds) {
   if (!gameIds.length) return new Map();
   const rows = await CustomOst.find({ gameId: { $in: gameIds } })
-    .select("gameId name videoId")
+    .select("gameId name videoId views durationSec")
     .lean();
   const map = new Map();
   for (const r of rows) {
     if (!r.videoId) continue;
     if (!map.has(r.gameId)) map.set(r.gameId, []);
-    map.get(r.gameId).push({ videoId: r.videoId, name: r.name });
+    map.get(r.gameId).push({
+      videoId: r.videoId,
+      name: r.name,
+      views: r.views ?? null,
+      durationSec: r.durationSec ?? null,
+    });
   }
   return map;
 }
@@ -164,7 +170,12 @@ function scrapeWithBudget(gameId, name, ms = 5000) {
       .then((list) =>
         (list || [])
           .filter((c) => c.videoId)
-          .map((c) => ({ videoId: c.videoId, name: c.name }))
+          .map((c) => ({
+            videoId: c.videoId,
+            name: c.name,
+            views: c.views ?? null,
+            durationSec: c.durationSec ?? null,
+          }))
       )
       .catch(() => []),
     new Promise((r) => setTimeout(() => r([]), ms)),
@@ -242,6 +253,44 @@ export async function attachAltNames(candidates) {
   return candidates;
 }
 
+// ---------------------------------------------------------------- le morceau
+// TIRÉ DANS LE TOP 3 DES PLUS ÉCOUTÉS, pas dans toute la playlist. Une OST de
+// jeu compte souvent 60 à 200 pistes, dont l'écrasante majorité sont des
+// ambiances de menu, des jingles de dix secondes ou des variations que
+// personne n'a jamais remarquées. Tirer là-dedans au hasard, c'est fabriquer
+// un blind test injouable — pas difficile, injouable : même en connaissant le
+// jeu par cœur on ne peut pas reconnaître un fond sonore de boutique.
+//
+// Le nombre de vues de la vidéo est le meilleur juge disponible de « ce que les
+// gens écoutent vraiment », et il arrive gratuitement avec le scraping de la
+// playlist (cf. lib/ostScrape.js). On garde donc les trois plus écoutés, et on
+// tire parmi eux — trois et pas un, sinon le même jeu ressortirait toujours
+// avec le même morceau.
+//
+// Repli : les pistes scrapées avant l'ajout du champ `views` (et celles
+// ajoutées à la main) n'en ont pas. Quand AUCUNE piste du jeu n'est chiffrée,
+// on retombe sur l'ancien tirage au hasard plutôt que de privilégier
+// arbitrairement l'ordre de la playlist. `npm run backfill:ost-stats` comble
+// le retard.
+const TOP_TRACKS = 3;
+
+export function pickTrack(tracks) {
+  const rated = tracks.filter((t) => t.views != null);
+  if (!rated.length) return sample(tracks);
+  const top = [...rated].sort((a, b) => b.views - a.views).slice(0, TOP_TRACKS);
+  return sample(top);
+}
+
+// ----------------------------------------------------------------- l'extrait
+// Où commencer dans le morceau. Sans mesure, on visait au hasard entre 5 % et
+// 50 % — c'est-à-dire très souvent dans l'intro. Avec la mesure (le climax
+// détecté par analyse de volume perçu, cf. lib/ostClimax.js), on tombe droit
+// sur le passage le plus plein.
+//
+// Ici on ne pose qu'une ESTIMATION : 35–55 %, là où le thème d'une OST se
+// trouve bien plus souvent qu'au tout début. Le vrai recalage sur le climax
+// mesuré se fait en fin de buildRounds, en une seule requête — les videoId ne
+// sont connus qu'une fois toutes les manches choisies.
 function mkRound(g, track, owned) {
   return {
     gameId: g.gameId,
@@ -249,9 +298,9 @@ function mkRound(g, track, owned) {
     cover: g.cover || null,
     videoId: track.videoId,
     ostName: track.name || "",
-    // Démarre l'extrait entre 5 % et 50 % de la piste (pas toujours l'intro,
-    // souvent la plus iconique) — le client re-cale si la piste est courte.
-    startFrac: Math.random() * 0.45 + 0.05,
+    startFrac: Math.random() * 0.2 + 0.35,
+    // Passe à vrai si l'extrait tombe sur un climax MESURÉ (et non estimé).
+    climaxed: false,
     owned,
     playtimeHours: g.playtimeHours ?? null,
     rating: g.rating ?? null,
@@ -270,7 +319,7 @@ async function scrapeFill(games, need, owned, usedVideo) {
     if (out.length >= need) break;
     const avail = tracks.filter((t) => !usedVideo.has(t.videoId));
     if (!avail.length) continue;
-    const t = sample(avail);
+    const t = pickTrack(avail);
     usedVideo.add(t.videoId);
     out.push(mkRound(g, t, owned));
   }
@@ -314,7 +363,7 @@ async function buildRounds(userId, count) {
       (t) => !usedVideo.has(t.videoId)
     );
     if (!tracks.length) continue;
-    const t = sample(tracks);
+    const t = pickTrack(tracks);
     usedVideo.add(t.videoId);
     ownedRounds.push(mkRound(g, t, true));
   }
@@ -347,7 +396,7 @@ async function buildRounds(userId, count) {
       (t) => !usedVideo.has(t.videoId)
     );
     if (!tracks.length) continue;
-    const t = sample(tracks);
+    const t = pickTrack(tracks);
     usedVideo.add(t.videoId);
     foreignRounds.push(mkRound(g, t, false));
   }
@@ -369,6 +418,31 @@ async function buildRounds(userId, count) {
   }
   rounds = shuffle(rounds).slice(0, count);
 
+  // --- Recaler chaque extrait sur le climax du morceau ---
+  // Une seule requête, une fois les manches arrêtées : on ne connaît les
+  // videoId qu'ici. Ce qui n'a pas encore été analysé garde l'estimation posée
+  // par mkRound (35–55 %) et part en analyse EN TÂCHE DE FOND — la partie en
+  // cours n'en profite pas, les suivantes oui.
+  //
+  // Le rattrapage converge vite parce que le tirage est borné au top 3 des
+  // morceaux les plus écoutés de chaque jeu : l'ensemble des pistes atteignables
+  // est petit et stable, contrairement aux 200 pistes d'une playlist complète.
+  try {
+    const ids = rounds.map((r) => r.videoId).filter(Boolean);
+    const climax = await climaxFor(ids);
+    for (const r of rounds) {
+      const c = climax.get(r.videoId);
+      if (c?.startSec != null && c.durationSec > 0) {
+        r.startFrac = Math.min(0.95, Math.max(0, c.startSec / c.durationSec));
+        r.climaxed = true;
+      }
+    }
+    warmClimax(ids, CLIP_SEC);
+  } catch (err) {
+    // Le climax est un confort : une partie se joue très bien sans.
+    console.error("blindtest climax error:", err.message);
+  }
+
   // 4. Liste proposable à la recherche : toutes les réponses possibles + décors.
   const candMap = new Map();
   const addCand = (id, name, cover) => {
@@ -381,6 +455,145 @@ async function buildRounds(userId, count) {
   const candidates = await attachAltNames([...candMap.values()]);
 
   return { rounds, candidates };
+}
+
+// ======================================================================
+//  Le versus : tirer pour UNE TABLE et non pour un joueur
+// ======================================================================
+// Le solo tire ~80 % de ses manches dans la bibliothèque du joueur, pondérées
+// par ses heures de jeu : c'est ce qui fait qu'on reconnaît les morceaux.
+//
+// À plusieurs, cette idée ne se transpose pas telle quelle — favoriser la
+// bibliothèque d'UN joueur, ce serait lui offrir la partie. On réunit donc les
+// bibliothèques de TOUS les participants et on tire dedans à égalité : un jeu
+// que trois personnes sur cinq ont joué fait une bonne manche, un jeu que
+// personne n'a touché reste un piège, et personne n'est chez lui.
+//
+// Pas de pondération par le temps de jeu non plus, pour la même raison : elle
+// n'aurait de sens que rapportée à un joueur.
+export async function buildVersusRounds(userIds, count) {
+  const played = await UserGame.find({
+    user: { $in: userIds },
+    status: { $ne: "wishlist" },
+  })
+    .select("gameId name cover")
+    .lean();
+
+  const byId = new Map();
+  for (const g of played) {
+    if (!g.gameId || byId.has(g.gameId)) continue;
+    byId.set(g.gameId, { gameId: g.gameId, name: g.name, cover: g.cover || null });
+  }
+  const sharedGames = await keepRealGames([...byId.values()]);
+  const ownedIds = sharedGames.map((g) => g.gameId);
+
+  const foreignTarget = ownedIds.length ? Math.max(1, Math.round(count * 0.25)) : count;
+  const ownedTarget = count - foreignTarget;
+  const usedVideo = new Set();
+
+  // 1. Les jeux de la table qui ont déjà une OST en base.
+  const ownedTrackMap = await tracksForGames(ownedIds);
+  const rounds = [];
+  for (const g of shuffle([...sharedGames])) {
+    if (rounds.length >= ownedTarget) break;
+    const tracks = (ownedTrackMap.get(g.gameId) || []).filter((t) => !usedVideo.has(t.videoId));
+    if (!tracks.length) continue;
+    const t = pickTrack(tracks);
+    usedVideo.add(t.videoId);
+    rounds.push(mkRound(g, t, true));
+  }
+  if (rounds.length < ownedTarget) {
+    const missing = shuffle(
+      sharedGames.filter((g) => !(ownedTrackMap.get(g.gameId) || []).length)
+    );
+    rounds.push(...(await scrapeFill(missing, ownedTarget - rounds.length, true, usedVideo)));
+  }
+
+  // 2. Les pièges : gros jeux que personne à la table n'a joués.
+  const famous = await getFamousPool();
+  const ownedSet = new Set(ownedIds);
+  const foreignPool = shuffle(famous.filter((g) => !ownedSet.has(g.id))).map((g) => ({
+    gameId: g.id,
+    name: g.name,
+    cover: g.cover,
+  }));
+  const foreignTrackMap = await tracksForGames(foreignPool.map((g) => g.gameId));
+  const foreign = [];
+  for (const g of foreignPool) {
+    if (foreign.length >= foreignTarget) break;
+    const tracks = (foreignTrackMap.get(g.gameId) || []).filter((t) => !usedVideo.has(t.videoId));
+    if (!tracks.length) continue;
+    const t = pickTrack(tracks);
+    usedVideo.add(t.videoId);
+    foreign.push(mkRound(g, t, false));
+  }
+  if (foreign.length < foreignTarget) {
+    const missing = foreignPool.filter((g) => !(foreignTrackMap.get(g.gameId) || []).length);
+    foreign.push(
+      ...(await scrapeFill(missing, foreignTarget - foreign.length, false, usedVideo))
+    );
+  }
+
+  let out = shuffle([...rounds, ...foreign]);
+  // Une catégorie a manqué de matière : on complète avec l'autre.
+  if (out.length < count) {
+    const usedGames = new Set(out.map((r) => r.gameId));
+    out.push(
+      ...(await scrapeFill(
+        foreignPool.filter((g) => !usedGames.has(g.gameId)),
+        count - out.length,
+        false,
+        usedVideo
+      ))
+    );
+  }
+  out = out.slice(0, count);
+
+  // Climax + indices, comme en solo.
+  try {
+    const climax = await climaxFor(out.map((r) => r.videoId).filter(Boolean));
+    for (const r of out) {
+      const c = climax.get(r.videoId);
+      if (c?.startSec != null && c.durationSec > 0) {
+        r.startFrac = Math.min(0.95, Math.max(0, c.startSec / c.durationSec));
+        r.climaxed = true;
+      }
+    }
+    warmClimax(out.map((r) => r.videoId).filter(Boolean), CLIP_SEC);
+  } catch {
+    /* le climax est un confort */
+  }
+  try {
+    const hints = await hintsForGames(out.map((r) => r.gameId));
+    for (const r of out) r.hints = hints.get(r.gameId) || null;
+  } catch {
+    /* une manche se joue très bien sans indices */
+  }
+  return out;
+}
+
+// La liste proposable à la recherche, IDENTIQUE POUR TOUTE LA TABLE — exigence
+// d'équité : un joueur dont la liste contiendrait un titre absent chez les
+// autres le taperait plus vite. Elle réunit donc les bibliothèques de tous, les
+// gros jeux comme leurres, et (filet de sécurité) les réponses de la partie.
+export async function versusCandidates(userIds = [], rounds = []) {
+  const [played, famous] = await Promise.all([
+    userIds.length
+      ? UserGame.find({ user: { $in: userIds }, status: { $ne: "wishlist" } })
+          .select("gameId name cover")
+          .lean()
+      : [],
+    getFamousPool(),
+  ]);
+  const candMap = new Map();
+  const addCand = (id, name, cover) => {
+    if (!id || candMap.has(id)) return;
+    candMap.set(id, { id, name, cover: cover || null });
+  };
+  for (const g of played) addCand(g.gameId, g.name, g.cover || null);
+  for (const g of famous) addCand(g.id, g.name, g.cover);
+  for (const r of rounds) addCand(r.gameId, r.gameName, r.cover);
+  return attachAltNames([...candMap.values()]);
 }
 
 // Score d'une manche (serveur). Rapide = plus de points ; un jeu piège deviné

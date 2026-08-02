@@ -113,6 +113,32 @@ export function pickBestPlaylist(candidates, gameName) {
 }
 
 // --- Extrait les pistes d'une playlist YouTube (scraping de la page) ---
+// « 3.3M views » → 3300000. La page est demandée en `Accept-Language: en`
+// (cf. fetchYtInitialData), donc les suffixes sont toujours K/M/B et le
+// séparateur décimal toujours le point — pas de localisation à gérer.
+export function parseViews(text) {
+  const m = String(text || "").match(/([\d.,]+)\s*([KMB])?\s*views?/i);
+  if (!m) return null;
+  const n = Number(m[1].replace(/,/g, ""));
+  if (!Number.isFinite(n)) return null;
+  const mult = { K: 1e3, M: 1e6, B: 1e9 }[(m[2] || "").toUpperCase()] || 1;
+  return Math.round(n * mult);
+}
+
+// « 2:46 » ou « 1:02:03 » → secondes.
+export function parseDuration(text) {
+  const parts = String(text || "").trim().split(":");
+  if (parts.length < 2 || parts.length > 3) return null;
+  const nums = parts.map((p) => Number(p));
+  if (nums.some((n) => !Number.isFinite(n))) return null;
+  return nums.reduce((acc, n) => acc * 60 + n, 0);
+}
+
+// Les pistes d'une playlist. On ne se contente plus du titre : la page porte
+// aussi LE NOMBRE DE VUES et LA DURÉE de chaque vidéo, et les deux valent de
+// l'or pour le blind test — les vues disent quels morceaux sont réellement
+// écoutés (donc reconnaissables), la durée permet de viser un instant précis
+// dans le morceau sans avoir à le télécharger d'abord.
 export async function ytPlaylistTracks(playlistId) {
   const data = await fetchYtInitialData(
     `https://www.youtube.com/playlist?list=${playlistId}`
@@ -128,7 +154,28 @@ export async function ytPlaylistTracks(playlistId) {
       const title = lm.metadata?.lockupMetadataViewModel?.title?.content;
       if (id && title && !seen.has(id)) {
         seen.add(id);
-        out.push({ videoId: id, title });
+        // Les lignes de métadonnées : ["<chaîne>", "3.3M views | 9 years ago"].
+        const rows =
+          lm.metadata?.lockupMetadataViewModel?.metadata?.contentMetadataViewModel
+            ?.metadataRows || [];
+        const flat = rows
+          .flatMap((r) => (r.metadataParts || []).map((p) => p.text?.content))
+          .filter(Boolean)
+          .join(" | ");
+        // La durée vit dans un badge posé sur la vignette.
+        let dur = null;
+        (function badge(n) {
+          if (!n || typeof n !== "object" || dur) return;
+          const t = n.thumbnailBadgeViewModel?.text;
+          if (t && /^\d+:\d{2}/.test(t)) dur = t;
+          for (const k in n) badge(n[k]);
+        })(lm);
+        out.push({
+          videoId: id,
+          title,
+          views: parseViews(flat),
+          durationSec: parseDuration(dur),
+        });
       }
     }
     for (const k in o) walk(o[k]);
@@ -261,6 +308,8 @@ export async function ensureScraped(gameId, gameName) {
           artwork: `https://img.youtube.com/vi/${it.videoId}/mqdefault.jpg`,
           source: "auto",
           order: i,
+          views: it.views ?? null,
+          durationSec: it.durationSec ?? null,
           playlistId: playlist?.playlistId || null,
         })),
         { ordered: false }

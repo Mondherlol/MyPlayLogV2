@@ -94,6 +94,11 @@ export function sourcesOf(ep) {
       provider,
       videoId: ep.videoId || (provider === "youtube" ? extractVideoId(url) : null),
       url,
+      // La piste suit l'adresse partout où celle-ci va : le vérificateur de
+      // liens et la suppression d'un hébergeur RECONSTRUISENT les épisodes à
+      // partir d'ici, et une source qui perd son étiquette en chemin sort du
+      // sélecteur de langue sans que rien ne le dise.
+      lang: ep.lang || "",
       label: synthetic ? "YouTube" : hostLabel(url),
     },
   ];
@@ -108,6 +113,7 @@ export function sourcesOf(ep) {
       provider: p,
       videoId: p === "youtube" ? extractVideoId(m.url) : null,
       url: m.url,
+      lang: m.lang || "",
       label: m.label || hostLabel(m.url),
     });
   }
@@ -399,7 +405,12 @@ export function purgeEpisodes(episodes = [], report) {
       // L'adresse reconstruite d'un épisode YouTube ne s'écrit pas dans la
       // fiche : elle n'a jamais existé ailleurs qu'ici, le temps de la sonde.
       url: main.synthetic ? "" : main.url,
-      mirrors: mirrors.map((m) => ({ label: m.label || hostLabel(m.url), url: m.url })),
+      lang: main.lang || "",
+      mirrors: mirrors.map((m) => ({
+        label: m.label || hostLabel(m.url),
+        url: m.url,
+        lang: m.lang || "",
+      })),
     });
   });
 

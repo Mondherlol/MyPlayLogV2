@@ -206,31 +206,9 @@
   }
 }
 
-/* L'invite de la manivelle : la même ossature que celle du secouage (même
-   place, même graisse) — ce sont les deux gestes de la séance, ils doivent se
-   présenter pareil. L'icône tourne lentement : elle DIT le geste. */
-.gch-turn-ic {
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  margin-bottom: 0.35rem;
-  border: 1px solid rgba(255, 209, 102, 0.35);
-  border-radius: 50%;
-  background: rgba(255, 209, 102, 0.12);
-  color: #ffd166;
-  animation: gch-turn-hint 2.6s cubic-bezier(0.6, 0, 0.3, 1) infinite;
-}
-@keyframes gch-turn-hint {
-  0%,
-  22% {
-    transform: rotate(0deg);
-  }
-  62%,
-  100% {
-    transform: rotate(-360deg);
-  }
-}
+/* L'invite de la manivelle a disparu avec le geste : on ne tourne plus la
+   sphère, on paie et le mécanisme sert. Il ne reste qu'une épreuve dans la
+   séance — secouer la capsule — et c'est celle-ci qui suit. */
 
 .gch-shake-ring {
   position: relative;

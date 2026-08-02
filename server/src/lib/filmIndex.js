@@ -352,6 +352,18 @@ export function parseFilmPage(html, { pageUrl = "" } = {}) {
 const toLine = (title, urls) =>
   urls.length ? `${title ? `${title} — ` : ""}${urls.join(" | ")}` : "";
 
+// LA PISTE D'UN FILM NE SE DEVINE QUE SI LA PAGE EN ANNONCE UNE SEULE. Ces
+// fiches donnent une version par page (« … en TrueFrench », « … VOSTFR ») et
+// leurs lecteurs sont ceux de celle-là : on peut donc étiqueter les adresses,
+// et deux imports successifs (la page VF, puis la page VOSTFR) remplissent le
+// même boîtier avec deux pistes distinctes — c'est exactement ce que fait
+// `mergeFilmLine` côté panneau.
+//
+// Quand la page en annonce deux, on ne sait pas laquelle sert quel lecteur : on
+// n'étiquette rien plutôt que de mentir, et les adresses restent visibles dans
+// toutes les langues.
+const tagFilm = (url, langs) => (langs?.length === 1 ? `${langs[0]}@${url}` : url);
+
 function shape(page, players, extra) {
   return {
     kind: "film",
@@ -361,7 +373,10 @@ function shape(page, players, extra) {
     missing: players.missing,
     hosts: players.players.map((p) => ({ host: p.host, count: 1 })),
     count: players.players.length,
-    list: toLine(page.title, players.players.map((p) => p.url)),
+    list: toLine(
+      page.title,
+      players.players.map((p) => tagFilm(p.url, page.langs))
+    ),
     // Le rapport du panneau d'admin est commun aux deux imports : un champ
     // absent y devient une erreur de rendu (voir AdminCollection).
     seasons: [],

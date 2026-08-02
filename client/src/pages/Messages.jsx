@@ -11,6 +11,7 @@ import {
   Image as ImageIcon,
   Gamepad2,
   Music,
+  BookOpen,
   Loader2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -300,6 +301,10 @@ export default function Messages() {
                         ) : c.lastMessage.kind === "ost" ? (
                           <>
                             <Music size={13} /> {c.lastMessage.text}
+                          </>
+                        ) : c.lastMessage.kind === "book" ? (
+                          <>
+                            <BookOpen size={13} /> {c.lastMessage.text}
                           </>
                         ) : (
                           c.lastMessage.text

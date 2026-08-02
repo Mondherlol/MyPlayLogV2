@@ -758,73 +758,83 @@ export default function GamePage() {
               </div>
             )}
 
-            {/* Temps moyen pour finir */}
-            <div className="gp-left-card">
-              <h3 className="gp-h3">
-                <Clock size={14} /> Temps de jeu
-              </h3>
-              {isPlayed && (
-                <InlinePlaytime
-                  value={fav?.playtimeHours}
-                  onSave={(n) => patchEntry({ playtimeHours: n })}
-                />
-              )}
-              {hasTtb ? (
-                <div className="gp-ttb">
-                  {ttbChips.map((c) => (
-                    <div className={`gp-ttb-chip ${!c.v ? "empty" : ""}`} key={c.label}>
-                      <span className="gp-ttb-label">{c.label}</span>
-                      <span className="gp-ttb-val">{c.v ? `${c.v} h` : "—"}</span>
+            {/* Temps moyen pour finir — masqué tant que le jeu n'est pas sorti
+                (aucun temps de complétion à annoncer, et « Indisponible pour
+                l'instant » n'a pas de sens avant la sortie). */}
+            {(hasTtb || !(upcoming || tbd)) && (
+              <div className="gp-left-card">
+                <h3 className="gp-h3">
+                  <Clock size={14} /> Temps de jeu
+                </h3>
+                {isPlayed && (
+                  <InlinePlaytime
+                    value={fav?.playtimeHours}
+                    onSave={(n) => patchEntry({ playtimeHours: n })}
+                  />
+                )}
+                {hasTtb ? (
+                  <div className="gp-ttb">
+                    {ttbChips.map((c) => (
+                      <div className={`gp-ttb-chip ${!c.v ? "empty" : ""}`} key={c.label}>
+                        <span className="gp-ttb-label">{c.label}</span>
+                        <span className="gp-ttb-val">{c.v ? `${c.v} h` : "—"}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="gp-muted">Indisponible pour l'instant.</p>
+                )}
+              </div>
+            )}
+
+            {/* Favoris (OST, personnage) : réservés aux jeux marqués comme joués
+                — sans y avoir joué, il n'y a rien à choisir. */}
+            {isPlayed && (
+              <>
+                {/* OST favori — mène à l'onglet OST */}
+                <FavCard
+                  Icon={Music}
+                  title="OST favori"
+                  onAdd={() => setTab("ost")}
+                  filled={!!fav?.favoriteOst}
+                >
+                  {fav?.favoriteOst && (
+                    <div className="gp-fav">
+                      {fav.favoriteOst.artwork && (
+                        <img src={fav.favoriteOst.artwork} alt="" className="gp-fav-art" />
+                      )}
+                      <div className="gp-fav-txt">
+                        <b>{fav.favoriteOst.name}</b>
+                        {fav.favoriteOst.artist && <small>{fav.favoriteOst.artist}</small>}
+                      </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="gp-muted">Indisponible pour l'instant.</p>
-              )}
-            </div>
-
-            {/* OST favori — mène à l'onglet OST */}
-            <FavCard
-              Icon={Music}
-              title="OST favori"
-              onAdd={() => setTab("ost")}
-              filled={!!fav?.favoriteOst}
-            >
-              {fav?.favoriteOst && (
-                <div className="gp-fav">
-                  {fav.favoriteOst.artwork && (
-                    <img src={fav.favoriteOst.artwork} alt="" className="gp-fav-art" />
                   )}
-                  <div className="gp-fav-txt">
-                    <b>{fav.favoriteOst.name}</b>
-                    {fav.favoriteOst.artist && <small>{fav.favoriteOst.artist}</small>}
-                  </div>
-                </div>
-              )}
-            </FavCard>
+                </FavCard>
 
-            {/* Personnage favori — mène à l'onglet Personnages */}
-            <FavCard
-              Icon={Users}
-              title="Personnage favori"
-              onAdd={() => setTab("characters")}
-              filled={!!fav?.favoriteCharacter}
-            >
-              {fav?.favoriteCharacter && (
-                <div className="gp-fav">
-                  {fav.favoriteCharacter.image && (
-                    <img
-                      src={fav.favoriteCharacter.image}
-                      alt=""
-                      className="gp-fav-art round"
-                    />
+                {/* Personnage favori — mène à l'onglet Personnages */}
+                <FavCard
+                  Icon={Users}
+                  title="Personnage favori"
+                  onAdd={() => setTab("characters")}
+                  filled={!!fav?.favoriteCharacter}
+                >
+                  {fav?.favoriteCharacter && (
+                    <div className="gp-fav">
+                      {fav.favoriteCharacter.image && (
+                        <img
+                          src={fav.favoriteCharacter.image}
+                          alt=""
+                          className="gp-fav-art round"
+                        />
+                      )}
+                      <div className="gp-fav-txt">
+                        <b>{fav.favoriteCharacter.name}</b>
+                      </div>
+                    </div>
                   )}
-                  <div className="gp-fav-txt">
-                    <b>{fav.favoriteCharacter.name}</b>
-                  </div>
-                </div>
-              )}
-            </FavCard>
+                </FavCard>
+              </>
+            )}
           </aside>
 
           {/* ---------------- Colonne droite (contenu) ---------------- */}

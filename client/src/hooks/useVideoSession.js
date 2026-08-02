@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useYouTubePlayer } from "./useYouTubePlayer";
 import { useFilePlayer } from "./useFilePlayer";
 import { useScrollLock } from "./useScrollLock";
-import { episodeSources, PROVIDERS } from "../lib/collection";
+import { episodeSources, sourcesInLang, PROVIDERS } from "../lib/collection";
 
 // ======================================================================
 //  Une séance — la mécanique commune aux deux lecteurs
@@ -80,6 +80,12 @@ export function useVideoSession({
   // `source.defaultHost`). Il décide de la source branchée à l'ouverture et à
   // chaque changement d'épisode.
   defaultHost = "",
+  // LA PISTE QU'ON VEUT ENTENDRE (« vf », « vostfr »), choisie sur la fiche.
+  // Un titre importé porte maintenant toutes ses versions, chaque adresse
+  // étiquetée de la sienne : ce réglage ne change donc RIEN à la liste des
+  // épisodes, il ne fait que réduire les sources de chacun. Vide = tout, ce qui
+  // est le cas de tous les titres dont personne n'a étiqueté les adresses.
+  lang = "",
   // La séance à deux, quand elle existera. Voir l'en-tête.
   sync = null,
   // LA LECTURE APPARTIENT-ELLE À CELUI QUI REGARDE ? Faux dans une séance
@@ -130,7 +136,16 @@ export function useVideoSession({
   // marche est le même du début à la fin, et sans ça on rejouait la recherche
   // à chaque changement d'épisode. À défaut, la source de référence — la
   // première de la liste.
-  const sources = useMemo(() => episodeSources(episode), [episode]);
+  //
+  // LA PISTE PASSE AVANT L'HÉBERGEUR. Elles ne se contredisent pas : la langue
+  // dit ce qu'on veut ENTENDRE, l'étoile chez QUI aller le chercher. On réduit
+  // donc d'abord aux sources de la bonne piste, puis on cherche l'hébergeur
+  // retenu là-dedans — l'inverse aurait rebranché la VF dès que l'étoile
+  // pointait un hôte qui n'a que celle-là.
+  const sources = useMemo(
+    () => sourcesInLang(episodeSources(episode), lang),
+    [episode, lang]
+  );
   const preferredAt = useMemo(() => {
     if (!defaultHost) return 0;
     const at = sources.findIndex((s) => hostOfUrl(s.url) === defaultHost);

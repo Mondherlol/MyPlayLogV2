@@ -364,25 +364,50 @@ function cleanLabelTail(s) {
 // les URL suivantes sur la même ligne sont des MIROIRS du même épisode. Tout
 // est optionnel : une liste d'URL nues donne des épisodes numérotés dans
 // l'ordre. Les lignes vides et les commentaires (#) sont ignorés.
+// LA PISTE SE COLLE À L'ADRESSE : « vf@https://… ». Elle ne pouvait pas être
+// posée en tête de ligne — depuis qu'on importe TOUTES les versions d'un coup,
+// une même ligne porte la VF et la VOSTFR du même épisode — ni déduite du lien,
+// qui ne dit rien de ce qu'on va entendre. Elle voyage donc avec chaque adresse,
+// et le marqueur survit à l'aller-retour texte → base → texte du panneau
+// d'admin (voir `episodesToLines`).
+//
+// Sans marqueur, la source reste « de langue inconnue » et se montre toujours :
+// c'est le cas de toutes les listes écrites à la main, et il ne doit rien
+// coûter.
+const TAGGED_URL = /(?:[a-z]{2,6}@)?https?:\/\//i;
+const SPLIT_URLS = new RegExp(
+  `[|;,]\\s*(?=${TAGGED_URL.source})|\\s+(?=${TAGGED_URL.source})`,
+  "i"
+);
+
+// « vostfr@https://hote/x » → { lang: "vostfr", url: "https://hote/x" }
+function untag(raw) {
+  const m = String(raw).match(/^([a-z]{2,6})@(?=https?:\/\/)/i);
+  return m
+    ? { lang: m[1].toLowerCase(), url: raw.slice(m[0].length) }
+    : { lang: "", url: raw };
+}
+
 export function parseEpisodeLines(text) {
   const out = [];
   for (const rawLine of String(text || "").split(/\r?\n/)) {
     const line = rawLine.trim();
     if (!line || line.startsWith("#")) continue;
-    const at = line.search(/https?:\/\//i);
+    const at = line.search(TAGGED_URL);
     if (at < 0) continue; // une ligne sans lien n'est pas un épisode
     const { season, number, title } = parseLabel(line.slice(0, at));
     const urls = line
       .slice(at)
-      .split(/[|;,]\s*(?=https?:\/\/)|\s+(?=https?:\/\/)/i)
+      .split(SPLIT_URLS)
       .map((u) => u.trim())
       .filter(Boolean);
 
     const sources = [];
-    for (const url of urls) {
+    for (const raw of urls) {
+      const { lang, url } = untag(raw);
       const provider = detectProvider(url);
       if (!provider) continue;
-      sources.push({ provider, url, label: hostLabel(url) });
+      sources.push({ provider, url, lang, label: hostLabel(url) });
     }
     if (!sources.length) continue;
 
@@ -393,17 +418,31 @@ export function parseEpisodeLines(text) {
       title,
       provider: main.provider,
       url: main.url,
+      lang: main.lang,
       videoId: main.provider === "youtube" ? extractVideoId(main.url) : null,
-      mirrors: mirrors.map(({ label, url }) => ({ label, url })),
+      mirrors: mirrors.map(({ label, url, lang }) => ({ label, url, lang })),
     });
   }
   return out;
+}
+
+// Les pistes qu'une liste d'épisodes porte VRAIMENT, dans l'ordre où on les
+// rencontre. C'est ce qui s'imprime au dos du boîtier et ce qui remplit le
+// sélecteur de la fiche : jamais ce qu'une page promet, toujours ce dont on a
+// l'adresse.
+export function langsOfEpisodes(episodes = []) {
+  const seen = [];
+  for (const e of episodes)
+    for (const s of [e, ...(e.mirrors || [])])
+      if (s?.lang && !seen.includes(s.lang)) seen.push(s.lang);
+  return seen;
 }
 
 // Le chemin inverse : une liste d'épisodes redevient le texte qui l'a produite.
 // Sert au panneau d'admin, qui rouvre la liste pour la corriger — et à qui on
 // ne veut pas faire retaper 78 lignes pour changer un lien mort.
 export function episodesToLines(episodes = []) {
+  const tag = (url, lang) => (url && lang ? `${lang}@${url}` : url);
   return episodes
     .map((e) => {
       const label = `S${String(e.season || 1).padStart(2, "0")}E${String(
@@ -411,10 +450,13 @@ export function episodesToLines(episodes = []) {
       ).padStart(2, "0")}`;
       const title = e.title ? ` ${e.title}` : "";
       const urls = [
-        e.provider === "youtube" && e.videoId
-          ? `https://www.youtube.com/watch?v=${e.videoId}`
-          : e.url,
-        ...(e.mirrors || []).map((m) => m.url),
+        tag(
+          e.provider === "youtube" && e.videoId
+            ? `https://www.youtube.com/watch?v=${e.videoId}`
+            : e.url,
+          e.lang
+        ),
+        ...(e.mirrors || []).map((m) => tag(m.url, m.lang)),
       ].filter(Boolean);
       return `${label}${title} — ${urls.join(" | ")}`;
     })
@@ -707,6 +749,7 @@ export async function buildMedia(input) {
           title: e.title || "",
           provider: e.provider || "embed",
           url: e.url || "",
+          lang: e.lang || "",
           videoId: e.videoId || null,
           mirrors: e.mirrors || [],
           duration: e.duration || null,
@@ -809,6 +852,7 @@ export async function buildMedia(input) {
       provider: item.provider || "youtube",
       videoId: item.videoId || null,
       url: item.url || "",
+      lang: item.lang || "",
       mirrors: item.mirrors || [],
       // Pas de vignette servie par un lecteur tiers : on retombe sur celle de
       // l'épisode chez TVmaze, et à défaut la fiche affichera l'affiche.
@@ -885,7 +929,16 @@ export async function buildMedia(input) {
       // La liste telle qu'elle a été écrite : c'est elle qu'on rouvrira pour
       // corriger un lien mort, pas une version reconstruite par nos soins.
       list: manual ? listText.trim() || episodesToLines(episodes) : "",
-      langs: input.langs?.length ? input.langs : input.source?.langs || [],
+      // CE QU'ON A VRAIMENT SOUS LA MAIN passe devant ce que la fiche annonce :
+      // les pistes se lisent maintenant sur les adresses elles-mêmes (une par
+      // source), et c'est cette liste-là qui remplit le sélecteur de la fiche.
+      // Une page qui promet une VOSTFR dont pas un lien n'a été trouvé ne doit
+      // pas allumer un bouton qui ne joue rien.
+      langs: langsOfEpisodes(episodes).length
+        ? langsOfEpisodes(episodes)
+        : input.langs?.length
+          ? input.langs
+          : input.source?.langs || [],
     },
     episodes,
     cast: input.cast?.length ? input.cast : show?.cast || [],

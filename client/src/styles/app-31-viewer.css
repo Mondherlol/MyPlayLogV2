@@ -564,6 +564,28 @@
   white-space: nowrap;
 }
 
+/* La piste que sert CETTE adresse. Une mention, pas un bouton : le choix de la
+   version se prend sur la fiche, où l'on voit ce qui existe. Ici, elle explique
+   seulement pourquoi deux lecteurs du même épisode ne disent pas la même
+   chose. */
+.vw-src-lang {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 0.1rem 0.34rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.09);
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.vw-src-row.current .vw-src-lang {
+  background: color-mix(in srgb, var(--orange) 22%, transparent);
+  color: var(--orange);
+}
+
 /* La pastille dit lequel joue, sans avoir à lire. */
 .vw-src-dot {
   flex: 0 0 auto;

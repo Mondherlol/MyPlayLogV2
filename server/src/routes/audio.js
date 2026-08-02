@@ -28,13 +28,16 @@ const MAX_CACHE_BYTES =
 
 const VIDEO_ID = /^[\w-]{11}$/;
 
-const fileFor = (id) => path.join(CACHE_DIR, `${id}.m4a`);
+export const fileFor = (id) => path.join(CACHE_DIR, `${id}.m4a`);
 
 // Téléchargements en cours, dédupliqués par videoId (si deux clients demandent
 // la même piste, un seul yt-dlp tourne et les deux attendent la même promesse).
 const inflight = new Map();
 
-function download(id) {
+// Exporté pour l'analyse de climax du blind test (lib/ostClimax.js) : elle a
+// besoin du MÊME fichier local, et surtout du même cache — analyser une piste
+// la met du coup à disposition du mini-lecteur, et inversement.
+export function download(id) {
   if (inflight.has(id)) return inflight.get(id);
   const tmp = path.join(CACHE_DIR, `${id}.dl`);
   const p = new Promise((resolve, reject) => {

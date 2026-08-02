@@ -2678,9 +2678,65 @@
   flex-wrap: wrap;
 }
 
+/* Les deux réglages de la même liste — la version et la saison — se lisent
+   côte à côte, à droite du titre de section. */
+.coll-eps-picks {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .coll-seasons {
   display: flex;
   gap: 0.3rem;
+}
+
+/* ---------- la version (VF / VOSTFR) ----------
+   UN INTERRUPTEUR, PAS UN FILTRE : la liste d'épisodes ne bouge pas, les coches
+   restent, seule change l'adresse qu'on branchera. D'où ce bloc soudé (les
+   pastilles se touchent) plutôt que des puces séparées comme les saisons — on
+   choisit UNE version parmi deux, on ne coche pas des rayons.
+
+   Il n'apparaît que sur les titres qui ont vraiment plusieurs pistes : voir
+   LangPicker, qui ne rend rien en dessous de deux. */
+.coll-langs {
+  display: inline-flex;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.coll-langs button {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 0.3rem 0.68rem;
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.coll-langs button + button {
+  border-left: 1px solid var(--border);
+}
+
+.coll-langs button:hover {
+  color: var(--text);
+}
+
+.coll-langs button.active {
+  background: var(--orange);
+  color: #17140c;
+}
+
+/* Dans le bandeau du film, il se pose entre deux boutons hauts : il prend leur
+   hauteur pour ne pas flotter au milieu de la ligne. */
+.coll-hero-actions .coll-langs {
+  align-self: stretch;
+  align-items: center;
 }
 
 .coll-seasons button {
@@ -3081,3 +3137,108 @@
 
 }
 
+
+/* ======================================================================
+   L'établi de mise au point (admin)
+   ======================================================================
+   IL NE DOIT PAS AVOIR L'AIR DE LA PAGE. C'est un outil, pas un rayon : fond
+   rayé façon ruban de chantier, liseré violet — la seule couleur de toute la
+   page qui ne soit ni le doré de l'app ni la teinte d'un titre. On doit voir
+   au premier coup d'œil qu'on est en train de tricher, et ne jamais confondre
+   « débloquer d'un clic » avec « tourner la manivelle ». */
+.coll-debug-toggle {
+  gap: 0.36rem;
+  font-size: 0.8rem;
+  padding: 0.44rem 0.8rem;
+}
+
+.coll-debug-toggle.active {
+  background: #7c5cff;
+  border-color: #7c5cff;
+  color: #fff;
+}
+
+.coll-debug {
+  margin: -0.4rem 0 1.1rem;
+  padding: 0.85rem 1rem;
+  border: 1px dashed color-mix(in srgb, #7c5cff 55%, var(--border));
+  border-radius: 14px;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, #7c5cff 7%, transparent) 0 10px,
+      transparent 10px 20px
+    ),
+    var(--surface);
+}
+
+.coll-debug > header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.7rem;
+}
+
+.coll-debug-ic {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(135deg, #9b7bff, #6742e8);
+}
+
+.coll-debug > header strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+}
+
+.coll-debug > header span {
+  font-size: 0.75rem;
+  color: var(--text-soft);
+}
+
+.coll-debug-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+/* Les mêmes pastilles que la barre d'outils, mais elles portent une icône :
+   sans `inline-flex`, elle retomberait sur la ligne de base du texte. */
+.coll-debug-btns .coll-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.coll-debug-btns .coll-chip:hover {
+  border-color: #7c5cff;
+}
+
+/* Celui qui DÉTRUIT. Il ne se distingue pas des autres par sa place mais par
+   sa couleur : vider une étagère ne se rattrape pas. */
+.coll-debug-btns .coll-chip.danger {
+  color: #d9432c;
+  border-color: color-mix(in srgb, #d9432c 40%, var(--border-strong));
+}
+
+.coll-debug-btns .coll-chip.danger:hover {
+  border-color: #d9432c;
+  background: color-mix(in srgb, #d9432c 10%, var(--surface));
+}
+
+.coll-debug-btns .coll-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.coll-debug-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+  font-family: var(--font-mono, monospace);
+}

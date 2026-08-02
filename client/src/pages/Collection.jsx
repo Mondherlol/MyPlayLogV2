@@ -21,6 +21,12 @@ import {
   ArrowLeft,
   Lock,
   PartyPopper,
+  Bug,
+  PackagePlus,
+  Dices,
+  Trash2,
+  Coins,
+  Loader2,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -116,7 +122,7 @@ const KIND_FILTERS = [
 ];
 
 export default function Collection() {
-  const { token, updateUser } = useAuth();
+  const { token, user, updateUser } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
   const compact = useMediaQuery("(max-width: 900px)");
@@ -136,6 +142,9 @@ export default function Collection() {
   // complétion, et la seule chose qui donne un sens à une étagère à moitié vide.
   const [tally, setTally] = useState({ owned: 0, total: 0, price: 0 });
   const [showGacha, setShowGacha] = useState(false);
+  // L'établi de mise au point (admin) : replié par défaut, il n'a rien à faire
+  // dans la page tant qu'on ne le demande pas.
+  const [debug, setDebug] = useState(false);
 
   // MON MEUBLE. L'ordre où j'ai rangé mes boîtiers, l'essence de la planche, le
   // nombre de boîtiers par rangée. Ça arrive avec le rayon (même requête) et ça
@@ -650,8 +659,32 @@ export default function Collection() {
               {arranging ? "Terminer" : "Ranger"}
             </button>
           )}
+
+          {/* L'ÉTABLI DE MISE AU POINT. Devant sa propre étagère et pour un
+              admin seulement : c'est ici qu'on pose l'état de collection qu'on
+              veut essayer, plutôt que de tourner quarante fois la manivelle. */}
+          {!visiting && user?.isAdmin && (
+            <button
+              className={`btn btn-ghost clickable coll-debug-toggle ${
+                debug ? "active" : ""
+              }`}
+              onClick={() => setDebug((d) => !d)}
+              title="Outils de mise au point"
+            >
+              <Bug size={15} /> Debug
+            </button>
+          )}
         </div>
       </div>
+
+      {debug && !visiting && user?.isAdmin && (
+        <CollectionDebug
+          owned={tally.owned}
+          total={tally.total}
+          onReload={() => setAttempt((n) => n + 1)}
+          onResetShelf={() => tune({ order: [], skin: "", perPlank: 0 })}
+        />
+      )}
 
       {/* ---------------- le rayon ----------------
           L'attente a la forme de ce qu'on attend : la rangée de tranches si
@@ -941,5 +974,178 @@ export default function Collection() {
         />
       )}
     </div>
+  );
+}
+
+// ======================================================================
+//  L'établi de mise au point — poser un état de collection (admin)
+// ======================================================================
+// UNE ÉTAGÈRE NE SE MET PAS AU POINT EN Y JOUANT. Tout ce que cette page
+// raconte — la jauge qui progresse, les rangées de reprise, un meuble plein
+// qu'on range à la main, une machine qui n'a plus rien à sortir — demande un
+// ÉTAT PRÉCIS de la collection ; et l'obtenir pour de vrai, c'est quarante tours
+// de manivelle à cinq cents points pièce, puis plus aucun moyen de revenir en
+// arrière. Ces boutons posent l'état directement, dans les deux sens.
+//
+// LE SERVEUR NE CONNAÎT QUE LE DEMANDEUR. Aucune de ces routes ne prend
+// d'utilisateur en paramètre : on ne garnit et on ne vide que SA PROPRE
+// étagère, jamais celle de quelqu'un d'autre (voir routes/collection.js). Un
+// outil de débogage qui peut déposséder un joueur est une trappe — et celui-ci
+// finira par rester en place.
+const DEBUG_POINTS = 10_000;
+const DEBUG_SAMPLE = 10;
+
+function CollectionDebug({ owned, total, onReload, onResetShelf }) {
+  const { token, user, updateUser } = useAuth();
+  // Le bouton qui travaille, pour n'en désactiver qu'un seul — et le compte
+  // rendu de la dernière action, parce qu'un outil qui agit sans rien dire
+  // laisse toujours douter qu'il ait agi.
+  const [busy, setBusy] = useState("");
+  const [note, setNote] = useState("");
+
+  const left = Math.max(0, (total || 0) - (owned || 0));
+
+  // Un seul chemin pour toutes les actions : ce qui les distingue tient dans
+  // l'appel, le reste (le bouton qui tourne, le mot de fin, le rayon qu'on
+  // relit) est rigoureusement identique.
+  async function run(id, call, say) {
+    if (busy) return;
+    setBusy(id);
+    setNote("");
+    try {
+      const d = await call();
+      setNote(say(d));
+      onReload();
+    } catch (e) {
+      setNote(e.message || "Raté.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  const fill = (count) =>
+    run(
+      count ? "sample" : "all",
+      () =>
+        apiFetch("/collection/gacha/mine/fill", {
+          method: "POST",
+          token,
+          body: count ? { count } : {},
+        }),
+      (d) =>
+        d.added
+          ? `${d.added} boîtier${d.added > 1 ? "s" : ""} posé${d.added > 1 ? "s" : ""} — ${d.owned}/${d.total}.`
+          : "Rien à poser : tout est déjà là."
+    );
+
+  function wipe() {
+    if (
+      !confirm(
+        `Vider ton étagère ?\n\n${owned} boîtier${owned > 1 ? "s" : ""} retourneront dans la machine.\n` +
+          "Tes points ne sont PAS rendus, et ta progression sur les titres est conservée."
+      )
+    )
+      return;
+    run(
+      "wipe",
+      () => apiFetch("/collection/gacha/mine", { method: "DELETE", token }),
+      (d) => `Étagère vidée (${d.removed || 0}).`
+    );
+  }
+
+  const credit = () =>
+    run(
+      "points",
+      async () => {
+        const d = await apiFetch("/collection/gacha/mine/points", {
+          method: "POST",
+          token,
+          body: { amount: DEBUG_POINTS },
+        });
+        // Le solde affiché partout ailleurs (barre du haut, prix du tirage)
+        // vient du contexte : sans ce report, la machine continuerait d'annoncer
+        // qu'il manque des points qui sont déjà là.
+        updateUser({ points: d.points });
+        return d;
+      },
+      (d) => `Solde : ${Number(d.points || 0).toLocaleString("fr-FR")} points.`
+    );
+
+  // Une fonction, pas un composant : déclaré dans le corps de celui-ci, il
+  // changerait d'identité à chaque rendu et se remonterait pour rien.
+  const spin = (id) => (busy === id ? <Loader2 size={14} className="spin" /> : null);
+
+  return (
+    <section className="coll-debug">
+      <header>
+        <span className="coll-debug-ic">
+          <Bug size={15} />
+        </span>
+        <div>
+          <strong>Mise au point</strong>
+          <span>
+            Ces boutons n'agissent que sur TON étagère. {owned}/{total} boîtiers
+            {left > 0 ? `, ${left} encore dans la machine` : ", collection complète"} ·{" "}
+            {Number(user?.points || 0).toLocaleString("fr-FR")} points.
+          </span>
+        </div>
+      </header>
+
+      <div className="coll-debug-btns">
+        <button
+          className="coll-chip clickable"
+          onClick={() => fill(0)}
+          disabled={!!busy || left === 0}
+          title="Débloquer tout le catalogue d'un coup"
+        >
+          {spin("all")}
+          <PackagePlus size={14} /> Tout débloquer
+        </button>
+
+        <button
+          className="coll-chip clickable"
+          onClick={() => fill(DEBUG_SAMPLE)}
+          disabled={!!busy || left === 0}
+          title="L'état le plus utile : une collection à moitié pleine"
+        >
+          {spin("sample")}
+          <Dices size={14} /> {DEBUG_SAMPLE} au hasard
+        </button>
+
+        <button
+          className="coll-chip clickable danger"
+          onClick={wipe}
+          disabled={!!busy || owned === 0}
+          title="Tout renvoyer dans la machine"
+        >
+          {spin("wipe")}
+          <Trash2 size={14} /> Vider l'étagère
+        </button>
+
+        <button
+          className="coll-chip clickable"
+          onClick={() => {
+            onResetShelf();
+            setNote("Rangement oublié : le rayon reprend son ordre d'origine.");
+          }}
+          disabled={!!busy}
+          title="Oublier l'ordre personnel, l'essence et la densité"
+        >
+          <Undo2 size={14} /> Rangement à zéro
+        </button>
+
+        <button
+          className="coll-chip clickable"
+          onClick={credit}
+          disabled={!!busy}
+          title="De quoi faire tourner la machine"
+        >
+          {spin("points")}
+          <Coins size={14} /> +{DEBUG_POINTS.toLocaleString("fr-FR")} points
+        </button>
+      </div>
+
+      {note && <p className="coll-debug-note">{note}</p>}
+    </section>
   );
 }

@@ -34,6 +34,7 @@ import {
   slugify,
   parseEpisodeLines,
   episodesToLines,
+  langsOfEpisodes,
   hostLabel,
 } from "../lib/collection.js";
 import { checkEpisodes, purgeEpisodes, sourcesOf } from "../lib/collectionProbe.js";
@@ -526,10 +527,17 @@ export function serializeFull(req, m, progress) {
       synopsis: e.synopsis,
       // Le lecteur à employer, et de quoi le nourrir. Les miroirs partent avec :
       // c'est le poste qui bascule d'un hébergeur à l'autre, pas le serveur.
+      // Chaque adresse porte SA PISTE (« vf », « vostfr ») : c'est le lecteur
+      // qui filtre selon ce que le spectateur a choisi sur la fiche.
       provider: e.provider || "youtube",
       videoId: e.videoId,
       url: e.url || "",
-      mirrors: e.mirrors || [],
+      lang: e.lang || "",
+      mirrors: (e.mirrors || []).map((m) => ({
+        label: m.label || "",
+        url: m.url,
+        lang: m.lang || "",
+      })),
       thumb: e.thumb,
       duration: e.duration,
       airDate: e.airDate,
@@ -985,6 +993,88 @@ router.delete("/gacha/mine", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+// POST /api/collection/gacha/mine/fill — SE REMPLIR L'ÉTAGÈRE (admin).
+//
+// L'exact pendant de la remise à zéro ci-dessus, et le même esprit : personne ne
+// réglera l'étagère, ses rangées, ses reprises et sa jauge en tournant quarante
+// fois la manivelle. Ça pose d'un coup tout ce qui manque — ou seulement
+// `count` boîtiers tirés au hasard, ce qui est le cas le plus utile : une
+// collection À MOITIÉ pleine est le seul état où la page a vraiment quelque
+// chose à raconter (une jauge qui progresse, des manquants, une machine qui
+// promet encore).
+//
+// SA PROPRE ÉTAGÈRE, ELLE SEULE. Aucun paramètre d'utilisateur, comme pour la
+// remise à zéro : un outil de mise au point qui peut garnir — ou vider — le
+// compte de quelqu'un d'autre est une trappe, pas un outil.
+//
+// Rien ne part au fil des abonnés : quarante cartes « a débloqué un boîtier »
+// d'un seul coup, ce serait le fil de tout le monde pour un essai.
+router.post("/gacha/mine/fill", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const [pool, me] = await Promise.all([
+      CollectionMedia.find().select("slug").sort({ order: 1, createdAt: 1 }).lean(),
+      User.findById(req.userId).select("ownedCases").lean(),
+    ]);
+    if (!me) return res.status(404).json({ error: "Compte introuvable." });
+
+    const have = ownedSlugs(me);
+    let missing = pool.filter((m) => !have.has(m.slug)).map((m) => m.slug);
+
+    // Un nombre = un échantillon, tiré comme la machine le ferait. Mélange de
+    // Fisher-Yates, et non `sort(() => Math.random() - 0.5)` : ce dernier
+    // favorise lourdement le début de la liste, et « au hasard » rendrait donc
+    // toujours à peu près les mêmes titres — c'est-à-dire jamais un cas de test.
+    const n = Math.round(Number(req.body?.count));
+    if (Number.isFinite(n) && n > 0 && n < missing.length) {
+      for (let i = missing.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [missing[i], missing[j]] = [missing[j], missing[i]];
+      }
+      missing = missing.slice(0, n);
+    }
+
+    if (missing.length) {
+      const now = new Date();
+      await User.updateOne(
+        { _id: req.userId },
+        {
+          $push: {
+            ownedCases: { $each: missing.map((slug) => ({ slug, obtainedAt: now })) },
+          },
+        },
+        { timestamps: false }
+      );
+    }
+
+    res.json({
+      ok: true,
+      added: missing.length,
+      owned: have.size + missing.length,
+      total: pool.length,
+    });
+  } catch (err) {
+    console.error("collection gacha fill error:", err.message);
+    res.status(500).json({ error: "Impossible de remplir la collection." });
+  }
+});
+
+// POST /api/collection/gacha/mine/points — de quoi tourner (admin).
+//
+// Essayer la machine coûte des points, et un compte de mise au point n'en a
+// jamais : sans ce crédit, régler la sphère demanderait d'aller gagner cinq
+// mille points au blind test avant chaque essai. Le montant passe par le
+// porte-monnaie normal (`grantPoints`, source « admin ») : il se lit donc dans
+// le grand livre comme ce qu'il est — un ajustement, pas une partie gagnée.
+router.post("/gacha/mine/points", requireAuth, requireAdmin, async (req, res) => {
+  const amount = Math.round(Number(req.body?.amount));
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 1_000_000)
+    return res.status(400).json({ error: "Montant invalide." });
+  const points = await grantPoints(req.userId, amount, "admin", { debug: "gacha" });
+  if (points === null)
+    return res.status(500).json({ error: "Impossible de créditer les points." });
+  res.json({ ok: true, points });
+});
+
 // PUT /api/collection/gacha/price — ce que coûte un tour de manivelle (admin).
 // Déclarée avant `/:slug`, comme toutes les routes nommées du fichier.
 router.put("/gacha/price", requireAuth, requireAdmin, async (req, res) => {
@@ -1323,7 +1413,12 @@ router.delete("/:slug/sources/:host", requireAuth, requireAdmin, async (req, res
         provider: main.provider,
         videoId: main.provider === "youtube" ? main.videoId : null,
         url: main.synthetic ? "" : main.url,
-        mirrors: mirrors.map((m) => ({ label: m.label || hostLabel(m.url), url: m.url })),
+        lang: main.lang || "",
+        mirrors: mirrors.map((m) => ({
+          label: m.label || hostLabel(m.url),
+          url: m.url,
+          lang: m.lang || "",
+        })),
       });
     });
 
@@ -1336,6 +1431,9 @@ router.delete("/:slug/sources/:host", requireAuth, requireAdmin, async (req, res
     // qu'on vient d'écarter, et le premier enregistrement les ramènerait.
     if ((media.source?.provider || "youtube") !== "youtube")
       media.source.list = episodesToLines(out);
+    // Retirer un hébergeur peut emporter la dernière adresse d'une piste : le
+    // boîtier ne doit plus l'annoncer.
+    media.source.langs = langsOfEpisodes(out);
     // L'hébergeur par défaut ne peut pas être celui qu'on vient de retirer.
     if (media.source.defaultHost === host) media.source.defaultHost = "";
     await media.save();
@@ -1553,6 +1651,7 @@ function applyEpisodeList(media, text) {
       provider: item.provider,
       videoId: item.videoId || null,
       url: item.url,
+      lang: item.lang || "",
       mirrors: item.mirrors,
       thumb: old?.thumb || null,
       duration: old?.duration || null,
@@ -1561,6 +1660,9 @@ function applyEpisodeList(media, text) {
   });
   media.source.provider = parsed[0].provider;
   media.source.list = String(text || "").trim();
+  // Les pistes du boîtier se relisent sur la liste qu'on vient de poser : c'est
+  // elle qui fait foi, y compris quand elle en retire une.
+  media.source.langs = langsOfEpisodes(media.episodes);
   // La progression des joueurs pointe des POSITIONS : si la liste a changé de
   // longueur, leurs coches ne désignent plus les mêmes épisodes.
   return { shifted: before.size !== media.episodes.length };
@@ -1612,7 +1714,9 @@ function sourcePayload(media) {
     channelUrl: media.source?.channelUrl || "",
     playlistId: media.source?.playlistId || null,
     videoId: media.source?.videoId || null,
-    langs: media.source?.langs || [],
+    // Les pistes LUES SUR LES ADRESSES, jamais celles qu'une fiche a promises :
+    // c'est la seule liste dont chaque entrée a un lien derrière elle.
+    langs: langsOfEpisodes(media.episodes || []),
     count: media.episodes?.length || 0,
     hosts: [...tally.entries()]
       .map(([host, count]) => ({ host, count }))
@@ -1633,12 +1737,20 @@ router.get("/:slug/source", requireAuth, requireAdmin, async (req, res) => {
 // film, TOUS ses lecteurs. Sert au collage : une fiche qui ne monte ses lecteurs
 // qu'au clic ne se laisse lire qu'un lecteur à la fois, et chaque passage doit
 // AJOUTER le sien aux autres au lieu de les balayer.
+// Les adresses gardent leur ÉTIQUETTE DE PISTE (« vf@https://… ») : c'est ce
+// qui permet à deux imports successifs — la page VF, puis la page VOSTFR du même
+// film — de remplir un seul boîtier à deux versions. Les rendre nues ici
+// effacerait la première à chaque fois qu'on ajoute la seconde.
 function filmUrlsOf(media) {
   const ep = media.episodes?.[0];
   if (!ep) return [];
+  const tag = (url, lang) => (url && lang ? `${lang}@${url}` : url);
   const main =
     ep.url || (ep.videoId ? `https://www.youtube.com/watch?v=${ep.videoId}` : "");
-  return [main, ...(ep.mirrors || []).map((m) => m.url)].filter(Boolean);
+  return [
+    tag(main, ep.lang),
+    ...(ep.mirrors || []).map((m) => tag(m.url, m.lang)),
+  ].filter(Boolean);
 }
 
 // Deux listes d'épisodes en une, À REPÈRE ÉGAL LA NOUVELLE GAGNE. Un collage
@@ -1772,7 +1884,11 @@ router.post("/:slug/source/import", requireAuth, requireAdmin, async (req, res) 
     // --- 2. La liste qui en découle ---------------------------------------
     let list;
     if (imported.kind === "film") {
-      const found = (imported.players || []).map((p) => p.url);
+      // Étiquetées de la piste que la page annonce, quand elle n'en annonce
+      // qu'une : c'est ainsi qu'un film finit par porter sa VF ET sa VOSTFR,
+      // une page après l'autre (voir `tagFilm`, lib/filmIndex.js).
+      const tag = imported.langs?.length === 1 ? `${imported.langs[0]}@` : "";
+      const found = (imported.players || []).map((p) => `${tag}${p.url}`);
       const all = merge ? [...new Set([...filmUrlsOf(media), ...found])] : found;
       if (!all.length)
         return res.status(400).json({
@@ -1805,7 +1921,13 @@ router.post("/:slug/source/import", requireAuth, requireAdmin, async (req, res) 
     media.source.channel = "";
     media.source.channelUrl = "";
     if (imported.sourceUrl || url) media.source.url = imported.sourceUrl || url;
-    if (imported.langs?.length) media.source.langs = imported.langs;
+    // Les pistes sont déjà relevées SUR LA LISTE par `applyEpisodeList` — c'est
+    // la seule liste dont chaque entrée a une adresse derrière elle. Celles que
+    // la fiche annonce ne servent plus qu'à combler un import qui n'a rien su
+    // étiqueter (un film dont la page promet « VF & VOSTFR » sans dire quel
+    // lecteur sert quoi).
+    if (!media.source.langs?.length && imported.langs?.length)
+      media.source.langs = imported.langs;
     await media.save();
 
     res.json({
@@ -1963,6 +2085,9 @@ router.post("/:slug/sources/purge", requireAuth, requireAdmin, async (req, res) 
       // change pas la nature du boîtier.
       if ((media.source?.provider || "youtube") !== "youtube")
         media.source.list = episodesToLines(episodes);
+      // Une purge peut emporter la dernière adresse d'une piste : le sélecteur
+      // de la fiche ne doit plus la proposer.
+      media.source.langs = langsOfEpisodes(episodes);
     }
     media.sourceCheck = {
       at: new Date(),

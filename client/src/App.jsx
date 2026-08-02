@@ -9,6 +9,8 @@ import Welcome from "./pages/Welcome";
 import BlindTest from "./pages/BlindTest";
 import PixelRush from "./pages/PixelRush";
 import GeoGamer from "./pages/GeoGamer";
+import GeoVersus from "./pages/GeoVersus";
+import BlindTestVersus from "./pages/BlindTestVersus";
 import MotDuJour from "./pages/MotDuJour";
 import Arcade from "./pages/Arcade";
 import Playtopia from "./pages/Playtopia";
@@ -147,8 +149,13 @@ export default function App() {
         <Route path="/app" element={<Welcome />} />
         <Route path="/arcade" element={<Arcade />} />
         <Route path="/blindtest" element={<BlindTest />} />
+        {/* Salon de versus musical : adresse des liens d'invitation. */}
+        <Route path="/blindtest/versus/:code" element={<BlindTestVersus />} />
         <Route path="/pixel" element={<PixelRush />} />
         <Route path="/geo" element={<GeoGamer />} />
+        {/* Le salon de versus : c'est aussi l'adresse des liens d'invitation
+            et des cartes envoyées en message privé. */}
+        <Route path="/geo/versus/:code" element={<GeoVersus />} />
         <Route path="/mot" element={<MotDuJour />} />
         <Route path="/playtopia" element={<Playtopia />} />
         <Route path="/explore" element={<Explorer />} />

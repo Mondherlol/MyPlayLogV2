@@ -32,6 +32,7 @@ import {
   Timer,
   Home,
   Coins,
+  Users,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { usePlayer } from "../context/PlayerContext";
@@ -355,6 +356,26 @@ export default function BlindTest() {
       /* ignore */
     }
   }, []);
+
+  // --- Ouverture d'un salon de versus ---
+  // Le salon est créé ICI plutôt que sur la page d'à côté : le joueur doit
+  // arriver sur un salon qui existe déjà, avec un lien à copier tout de suite.
+  const [opening, setOpening] = useState(false);
+  async function openVersus() {
+    if (opening) return;
+    setOpening(true);
+    sfx.resume();
+    player?.pause?.();
+    try {
+      const d = await apiFetch("/blindtest/versus", { method: "POST", token, body: {} });
+      navigate(`/blindtest/versus/${d.room.code}`);
+    } catch (e) {
+      setError(e.message || "Impossible d'ouvrir un salon.");
+      setPhase("error");
+    } finally {
+      setOpening(false);
+    }
+  }
 
   // --- Démarrage d'une partie ---
   async function startGame() {
@@ -807,7 +828,20 @@ export default function BlindTest() {
               ou appuie sur <kbd>Entrée</kbd>
             </span>
 
-      
+            {/* La porte du mode à plusieurs, en second rang : le solo reste
+                l'entrée par défaut (on y joue seul, à toute heure), le versus
+                demande d'avoir du monde sous la main. */}
+            {!challengeId && (
+              <button
+                className="geo-versus-cta clickable"
+                onClick={openVersus}
+                disabled={opening}
+              >
+                {opening ? <Loader2 size={16} className="spin" /> : <Users size={16} />}
+                Jouer en versus
+                <em>jusqu'à 5 joueurs</em>
+              </button>
+            )}
           </div>
         )}
 

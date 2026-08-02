@@ -18,10 +18,6 @@ import {
   Home,
   Coins,
   MapPin,
-  Plus,
-  Minus,
-  Maximize2,
-  Ruler,
   Heart,
   Users,
 } from "lucide-react";
@@ -33,11 +29,13 @@ import {
   dedupeCandidates,
   estimateGeoPoints,
   estimateMapPoints,
-  MAP_MAX_POINTS,
   sameGame,
   searchCandidates,
 } from "../lib/guessGame";
 import { useGameSfx } from "../lib/useGameSfx";
+// La manche carte et le chrono sont partagés avec le mode versus
+// (pages/GeoVersus.jsx) — une seule implémentation du pointage.
+import MapRound, { TimerRing } from "../components/GeoMapRound";
 
 // ============================================================
 //  GeoGamer — devine le jeu depuis un panorama 360°
@@ -69,329 +67,6 @@ const HOT_SEC = 10;
 // réponse coûte un cœur mais ne verrouille pas — on continue à chercher tant
 // qu'il reste un cœur ET du temps.
 const LIVES = 3;
-
-// ============================================================
-//  Le chrono — l'objet le plus regardé de l'écran
-// ============================================================
-// Un anneau SVG qui se vide, le nombre de secondes au centre. Rien d'autre en
-// haut de l'écran ne doit lui disputer l'attention : c'est la seule information
-// qui change en continu et qui coûte des points.
-const RING_R = 30;
-const RING_C = 2 * Math.PI * RING_R;
-
-function TimerRing({ seconds, progress, hot, idle }) {
-  return (
-    <div className={`geo-timer ${hot ? "hot" : ""} ${idle ? "idle" : ""}`}>
-      <svg viewBox="0 0 72 72" aria-hidden="true">
-        <circle className="geo-timer-track" cx="36" cy="36" r={RING_R} />
-        <circle
-          className="geo-timer-fill"
-          cx="36"
-          cy="36"
-          r={RING_R}
-          strokeDasharray={RING_C}
-          // On décompte : l'anneau est plein au départ et se vide.
-          strokeDashoffset={RING_C * progress}
-        />
-      </svg>
-      <span className="geo-timer-num">{idle ? "—" : seconds}</span>
-    </div>
-  );
-}
-
-// ============================================================
-//  La manche bonus — « où sur la carte ? »
-// ============================================================
-// 712 lieux du catalogue savent aussi OÙ ils se situent sur une carte du jeu.
-// On ne la propose QUE si le jeu a été trouvé : c'est une récompense pour ceux
-// qui le connaissent vraiment, pas une seconde chance.
-//
-// Toutes les coordonnées circulent dans le repère de la carte D'ORIGINE (celui
-// du point de réponse). L'affichage n'est qu'une mise à l'échelle : le
-// conteneur porte le `aspect-ratio` exact de l'image, donc un pourcentage de
-// largeur correspond au même pourcentage de pixels, et la conversion tient en
-// une règle de trois — quelle que soit la taille de l'écran.
-const MAP_SEC = 25;
-const ZOOM_MIN = 1;
-const ZOOM_MAX = 8;
-
-// Contraint la translation pour que la carte couvre toujours le cadre : on ne
-// doit jamais pouvoir la faire sortir et se retrouver devant du vide.
-function clampView(v, box) {
-  const w = box.width * v.z;
-  const h = box.height * v.z;
-  return {
-    z: v.z,
-    x: w <= box.width ? (box.width - w) / 2 : Math.min(0, Math.max(box.width - w, v.x)),
-    y: h <= box.height ? (box.height - h) / 2 : Math.min(0, Math.max(box.height - h, v.y)),
-  };
-}
-
-function MapRound({ map, gameName, onDone, sfx }) {
-  const [pin, setPin] = useState(null);
-  const [result, setResult] = useState(null);
-  const [left, setLeft] = useState(MAP_SEC);
-  // Filet de sécurité : si la carte ne se charge pas, on ne bloque pas le
-  // joueur sur un cadre vide — on lui offre une sortie propre.
-  const [imgError, setImgError] = useState(false);
-  // Vue courante : facteur de zoom + translation EN PIXELS du cadre.
-  const [view, setView] = useState({ z: 1, x: 0, y: 0 });
-
-  const boxRef = useRef(null);
-  const pinRef = useRef(null);
-  pinRef.current = pin;
-  const viewRef = useRef(view);
-  viewRef.current = view;
-  const dragRef = useRef(null);
-  const validateRef = useRef(() => {});
-
-  const validate = useCallback(() => {
-    if (result) return;
-    const p = pinRef.current;
-    const r = estimateMapPoints(map, p);
-    setResult({ ...r, guess: p });
-    sfx.play(r.points > MAP_MAX_POINTS * 0.5 ? "correct" : "wrong");
-  }, [map, result, sfx]);
-  validateRef.current = validate;
-
-  // Chrono : sans épingle posée à zéro, la manche vaut zéro. On ne bloque pas
-  // le joueur indéfiniment sur une carte qu'il ne reconnaît pas.
-  useEffect(() => {
-    if (result) return;
-    const end = Date.now() + MAP_SEC * 1000;
-    const iv = setInterval(() => {
-      const s = Math.ceil((end - Date.now()) / 1000);
-      setLeft(Math.max(0, s));
-      if (s <= 0) {
-        clearInterval(iv);
-        validateRef.current();
-      }
-    }, 200);
-    return () => clearInterval(iv);
-  }, [result]);
-
-  // Une fois le résultat affiché, on recadre sur les deux points pour que le
-  // joueur voie son erreur en entier plutôt qu'un zoom sur son seul clic.
-  useEffect(() => {
-    if (result) setView({ z: 1, x: 0, y: 0 });
-  }, [result]);
-
-  const applyZoom = useCallback((factor, cx, cy) => {
-    const box = boxRef.current?.getBoundingClientRect();
-    if (!box) return;
-    setView((v) => {
-      const z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, v.z * factor));
-      const k = z / v.z;
-      // Point d'ancrage : ce qui est sous le curseur ne doit pas bouger.
-      const ax = cx ?? box.width / 2;
-      const ay = cy ?? box.height / 2;
-      return clampView({ z, x: ax - k * (ax - v.x), y: ay - k * (ay - v.y) }, box);
-    });
-  }, []);
-
-  function onWheel(e) {
-    if (result) return;
-    const box = boxRef.current.getBoundingClientRect();
-    applyZoom(e.deltaY < 0 ? 1.25 : 1 / 1.25, e.clientX - box.left, e.clientY - box.top);
-  }
-
-  // Un même geste sert à déplacer ET à pointer : on ne tranche qu'au relâché,
-  // selon la distance parcourue. En dessous du seuil c'est un clic, au-dessus
-  // c'était un déplacement — sinon poser une épingle deviendrait impossible
-  // dès qu'on bouge d'un pixel.
-  function onPointerDown(e) {
-    if (result) return;
-    e.currentTarget.setPointerCapture?.(e.pointerId);
-    dragRef.current = {
-      sx: e.clientX,
-      sy: e.clientY,
-      ox: viewRef.current.x,
-      oy: viewRef.current.y,
-      moved: 0,
-    };
-  }
-
-  function onPointerMove(e) {
-    const d = dragRef.current;
-    if (!d) return;
-    const dx = e.clientX - d.sx;
-    const dy = e.clientY - d.sy;
-    d.moved = Math.max(d.moved, Math.hypot(dx, dy));
-    if (d.moved < 4) return;
-    const box = boxRef.current.getBoundingClientRect();
-    setView((v) => clampView({ ...v, x: d.ox + dx, y: d.oy + dy }, box));
-  }
-
-  function onPointerUp(e) {
-    const d = dragRef.current;
-    dragRef.current = null;
-    e.currentTarget.releasePointerCapture?.(e.pointerId);
-    if (!d || d.moved >= 4 || result) return;
-    // Clic franc : on convertit en FRACTION de la carte, en défaisant la vue
-    // courante. C'est le repère dans lequel le point de réponse est stocké, et
-    // le seul qui survive à un zoom ou à un changement d'écran.
-    const box = boxRef.current.getBoundingClientRect();
-    const v = viewRef.current;
-    const x = (e.clientX - box.left - v.x) / (box.width * v.z);
-    const y = (e.clientY - box.top - v.y) / (box.height * v.z);
-    if (x < 0 || x > 1 || y < 0 || y > 1) return;
-    setPin({ x, y });
-    sfx.play("pin");
-  }
-
-  const shown = result?.guess || pin;
-  const at = (p) => ({ left: `${p.x * 100}%`, top: `${p.y * 100}%` });
-  // Les épingles gardent leur taille à l'écran : on annule le zoom du calque.
-  const pinScale = { transform: `translate(-50%, -100%) scale(${1 / view.z})` };
-
-  return (
-    <div className="geo-map">
-      <div className="geo-map-head">
-        <span className="geo-map-title">
-          <MapPin size={15} />
-          Où étais-tu dans <b>{gameName}</b> ?
-        </span>
-        {!result ? (
-          <span className={`geo-map-timer ${left <= 8 ? "hot" : ""}`}>{left}s</span>
-        ) : (
-          <span className="geo-map-score">
-            +{result.points}
-            <em>pts</em>
-          </span>
-        )}
-      </div>
-
-      <div
-        className={`geo-map-stage ${result ? "done" : ""} ${view.z > 1 ? "zoomed" : ""}`}
-        ref={boxRef}
-        onWheel={onWheel}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-      >
-        <div
-          className="geo-map-layer"
-          style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }}
-        >
-          <img
-            src={map.image}
-            alt=""
-            draggable="false"
-            onError={() => setImgError(true)}
-          />
-
-          {/* Le trait entre le clic et la vérité : c'est lui qui fait
-              comprendre l'erreur d'un coup d'œil. Le viewBox est en centièmes
-              et `preserveAspectRatio: none` le fait s'étirer exactement comme
-              l'image. */}
-          {result?.guess && (
-            <svg
-              className="geo-map-link"
-              viewBox="0 0 100 100"
-              preserveAspectRatio="none"
-              aria-hidden="true"
-            >
-              <line
-                x1={result.guess.x * 100}
-                y1={result.guess.y * 100}
-                x2={map.answer.x * 100}
-                y2={map.answer.y * 100}
-              />
-            </svg>
-          )}
-
-          {result && (
-            <span className="geo-map-pin truth" style={{ ...at(map.answer), ...pinScale }}>
-              <i className="geo-map-halo" />
-              <MapPin size={26} />
-            </span>
-          )}
-          {shown && (
-            <span className="geo-map-pin mine" style={{ ...at(shown), ...pinScale }}>
-              <MapPin size={26} />
-            </span>
-          )}
-        </div>
-
-        {/* Commandes de vue, posées sur le cadre. */}
-        <div className="geo-map-zoom">
-          <button
-            className="clickable"
-            onClick={(e) => {
-              e.stopPropagation();
-              applyZoom(1.4);
-            }}
-            title="Zoomer"
-          >
-            <Plus size={15} />
-          </button>
-          <button
-            className="clickable"
-            onClick={(e) => {
-              e.stopPropagation();
-              applyZoom(1 / 1.4);
-            }}
-            title="Dézoomer"
-          >
-            <Minus size={15} />
-          </button>
-          <button
-            className="clickable"
-            onClick={(e) => {
-              e.stopPropagation();
-              setView({ z: 1, x: 0, y: 0 });
-            }}
-            title="Recadrer"
-            disabled={view.z === 1}
-          >
-            <Maximize2 size={14} />
-          </button>
-        </div>
-
-        {/* Carte illisible : plutôt qu'un cadre noir muet, une sortie claire. */}
-        {imgError && (
-          <div className="geo-map-broken">
-            <MapPin size={26} />
-            <span>Carte indisponible</span>
-            <button className="geo-rv-next clickable" onClick={() => onDone(null)}>
-              Continuer
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="geo-map-foot">
-        {result ? (
-          <>
-            <span className="geo-map-verdict">
-              {result.guess ? (
-                <>
-                  <Ruler size={14} /> à <b>{Math.round(result.distance * 100)}%</b> de la carte
-                </>
-              ) : (
-                <>Aucune réponse</>
-              )}
-            </span>
-            <button className="geo-rv-next clickable" onClick={() => onDone(result)}>
-              Continuer
-            </button>
-          </>
-        ) : (
-          <>
-            <span className="geo-map-help">
-              {pin ? "Déplace ton épingle ou valide" : "Clique pour te situer"}
-              <em>molette pour zoomer · glisser pour déplacer</em>
-            </span>
-            <button className="geo-rv-next clickable" onClick={validate} disabled={!pin}>
-              Valider
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // ============================================================
 //  L'écran d'accueil — tout se passe DANS le globe
@@ -561,6 +236,25 @@ export default function GeoGamer() {
   const timeLeftMs = Math.max(0, durationMs - elapsedMs);
   const secondsLeft = Math.ceil(timeLeftMs / 1000);
   const hot = panoReady && secondsLeft <= HOT_SEC;
+
+  // --- Ouverture d'un salon de versus ---
+  // On crée le salon ICI plutôt que sur la page d'à côté : le joueur doit
+  // arriver sur un salon qui existe déjà, avec un lien à copier tout de suite.
+  const [opening, setOpening] = useState(false);
+  async function openVersus() {
+    if (opening) return;
+    setOpening(true);
+    sfx.resume();
+    try {
+      const d = await apiFetch("/geo/versus", { method: "POST", token, body: {} });
+      navigate(`/geo/versus/${d.room.code}`);
+    } catch (e) {
+      setError(e.message || "Impossible d'ouvrir un salon.");
+      setPhase("error");
+    } finally {
+      setOpening(false);
+    }
+  }
 
   // --- Démarrage d'une partie ---
   async function startGame() {
@@ -994,6 +688,18 @@ export default function GeoGamer() {
           <span className="geo-kbd-hint">
             ou <kbd>Entrée</kbd>
           </span>
+
+          {/* La porte du mode à plusieurs. Volontairement SOUS le bouton
+              principal et en second rang : le solo reste l'entrée par défaut
+              (on peut y jouer seul, à toute heure), le versus demande d'avoir
+              du monde sous la main. */}
+          {!challengeId && (
+            <button className="geo-versus-cta clickable" onClick={openVersus} disabled={opening}>
+              {opening ? <Loader2 size={16} className="spin" /> : <Users size={16} />}
+              Jouer en versus
+              <em>jusqu'à 5 joueurs</em>
+            </button>
+          )}
         </GlobeMenu>
       )}
 

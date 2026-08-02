@@ -30,10 +30,20 @@ import mongoose from "mongoose";
 // deux hébergeurs) : quand l'un tombe, le bouton SOURCE du poste passe au
 // suivant sans quitter la lecture.
 
+// LA PISTE VIT SUR LA SOURCE, PAS SUR LE TITRE. Un même épisode existe en VF
+// chez deux hébergeurs et en VOSTFR chez trois autres : ce ne sont pas deux
+// titres, ni deux listes, ce sont CINQ ADRESSES DU MÊME ÉPISODE dont chacune
+// sait dans quelle langue elle parle. D'où ce champ ici, au plus près de
+// l'adresse — et nulle part ailleurs.
+//
+// Vide = on ne sait pas (une liste écrite à la main, un import d'avant). Ce
+// n'est pas une erreur : le lecteur montre alors toutes les sources, comme il
+// l'a toujours fait. Rien à migrer.
 const mirrorSchema = new mongoose.Schema(
   {
     label: { type: String, default: "" }, // nom d'hôte, affiché sur le poste
     url: { type: String, required: true },
+    lang: { type: String, default: "" }, // « vf », « vostfr », « vo »…
   },
   { _id: false }
 );
@@ -49,6 +59,9 @@ const episodeSchema = new mongoose.Schema(
     provider: { type: String, enum: ["youtube", "embed", "file"], default: "youtube" },
     videoId: { type: String, default: null }, // youtube
     url: { type: String, default: "" }, // embed / file
+    // La piste de la source principale (les miroirs portent la leur). Vide =
+    // inconnue, voir mirrorSchema.
+    lang: { type: String, default: "" },
     mirrors: { type: [mirrorSchema], default: [] },
 
     thumb: { type: String, default: null },

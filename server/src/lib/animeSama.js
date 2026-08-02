@@ -184,22 +184,34 @@ export function parseCatalogue(html) {
 // écrits dans un <script> (le site les rend en JS, il n'y a pas de liste HTML
 // à lire côté serveur). On lit aussi les ancres, au cas où la page changerait
 // de méthode — et on déduplique sur le chemin.
+// UNE SAISON, PLUSIEURS PISTES. La page déclare `saison1/vf` ET `saison1/vostfr`
+// comme deux entrées distinctes : les ranger par chemin en ne gardant qu'une
+// langue (ce que faisait `found.set(path, …)`) effaçait l'autre avant même
+// qu'on ait su qu'elle existait. Chaque chemin porte donc la LISTE de ses
+// langues, et l'import ira les chercher toutes.
 export function parseSeasons(html) {
   const js = uncomment(html);
   const found = new Map();
+
+  const note = (path, label, lang) => {
+    if (!path) return;
+    const at = found.get(path) || { label: label || path, path, langs: [] };
+    if (label && at.label === path) at.label = label;
+    if (lang && !at.langs.includes(lang)) at.langs.push(lang);
+    found.set(path, at);
+  };
 
   for (const m of js.matchAll(
     /panneauAnime\s*\(\s*"([^"]*)"\s*,\s*"([^"]*)"\s*\)/gi
   )) {
     const [path, lang] = m[2].split("/").filter(Boolean);
-    if (path) found.set(path, { label: strip(m[1]) || path, path, lang: lang || null });
+    note(path, strip(m[1]), lang || null);
   }
 
   for (const m of html.matchAll(
     /href="(?:\.\/)?((?:saison[^"/\s]*|film|oav|special|hors-serie)[^"/\s]*)\/([a-z0-9]+)\/?"/gi
   )) {
-    const path = m[1];
-    if (!found.has(path)) found.set(path, { label: path, path, lang: m[2] });
+    note(m[1], "", m[2]);
   }
 
   // Les vraies saisons d'abord, dans l'ordre ; les à-côtés (film, OAV) ensuite.
@@ -240,18 +252,51 @@ export function parseEpisodesJs(js) {
   return episodes;
 }
 
-// Une saison, dans la langue demandée. On essaie les langues dans l'ordre et on
-// garde la PREMIÈRE qui donne des épisodes : une saison peut n'exister qu'en
-// VOSTFR alors qu'on demandait la VF, et rien ne le dit avant d'avoir regardé.
+// UNE SAISON, TOUTES SES PISTES. On s'arrêtait à la première langue qui
+// répondait — donc il fallait choisir VF ou VOSTFR avant de savoir ce que la
+// fiche avait, réimporter pour l'autre, et de toute façon la liste n'en gardait
+// qu'une. On les demande maintenant TOUTES, et chaque adresse repart avec le
+// nom de la sienne : c'est le spectateur qui choisira, sur la fiche, parmi ce
+// qui existe vraiment.
+//
+// Le coût est une requête par langue et par saison (deux ou trois en pratique,
+// les langues exotiques n'étant demandées que si la page les déclare). Les
+// langues qui ne répondent pas ne coûtent qu'un aller-retour à vide.
 async function fetchSeason({ origin, slug, path }, langs) {
+  const tracks = [];
   for (const lang of langs) {
     const base = `${origin}/catalogue/${slug}/${path}/${lang}`;
     const js = await fetchText(`${base}/episodes.js`);
     if (!js) continue;
     const episodes = parseEpisodesJs(js);
-    if (episodes.length) return { lang, url: `${base}/`, episodes };
+    if (episodes.length) tracks.push({ lang, url: `${base}/`, episodes });
   }
-  return null;
+  if (!tracks.length) return null;
+
+  // LES PISTES SE RECROISENT PAR NUMÉRO D'ÉPISODE : l'épisode 4 en VF et
+  // l'épisode 4 en VOSTFR sont le MÊME épisode à deux endroits, pas deux
+  // entrées de la liste. Ses adresses se suivent donc sur une seule ligne, la
+  // piste préférée en tête (c'est elle qu'on branche par défaut).
+  const byNumber = new Map();
+  for (const track of tracks) {
+    for (const ep of track.episodes) {
+      const at = byNumber.get(ep.number) || [];
+      for (const url of ep.urls)
+        if (!at.some((s) => s.url === url)) at.push({ url, lang: track.lang });
+      byNumber.set(ep.number, at);
+    }
+  }
+
+  return {
+    // La piste principale : celle qu'on a demandée si elle a répondu, sinon la
+    // première qui l'a fait. Elle ne masque plus les autres — elle passe devant.
+    lang: tracks[0].lang,
+    langs: tracks.map((t) => t.lang),
+    url: tracks[0].url,
+    episodes: [...byNumber.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([number, urls]) => ({ number, urls })),
+  };
 }
 
 // Qui héberge, et combien de fois. C'est le premier chiffre qu'on regarde sur
@@ -259,12 +304,20 @@ async function fetchSeason({ origin, slug, path }, langs) {
 // trahit une liste incomplète. Partagé par TOUS les imports — le panneau
 // d'admin l'affiche sans savoir d'où vient le résultat, et une forme
 // manquante le faisait planter.
+// Une adresse d'épisode s'écrit de deux façons selon d'où elle vient : une
+// chaîne nue (un collage, une fiche de film) ou une adresse ÉTIQUETÉE de sa
+// piste (`{ url, lang }`, depuis que l'import prend toutes les langues). Tout ce
+// qui manipule des adresses passe par ici plutôt que de connaître les deux —
+// c'était le genre de détail qui finit par faire écrire « [object Object] »
+// dans une liste d'épisodes.
+const srcOf = (u) => (typeof u === "string" ? { url: u, lang: "" } : u || { url: "", lang: "" });
+
 export function countHosts(episodes) {
   const tally = new Map();
-  for (const url of episodes.flatMap((e) => e.urls)) {
+  for (const raw of episodes.flatMap((e) => e.urls)) {
     let host = "";
     try {
-      host = new URL(url).hostname.replace(/^www\./, "");
+      host = new URL(srcOf(raw).url).hostname.replace(/^www\./, "");
     } catch {
       continue;
     }
@@ -278,13 +331,21 @@ export function countHosts(episodes) {
 // des épisodes — anime-sama, le collage, les fiches de série des sites de
 // streaming (lib/serieIndex.js) : deux écritures divergeraient au premier
 // réglage, et c'est ce texte qui devient les épisodes en base.
+// La piste voyage COLLÉE À L'ADRESSE (« vostfr@https://… ») : une même ligne
+// porte désormais les deux versions du même épisode, il n'y avait donc pas de
+// place pour un marqueur de ligne. Voir `parseEpisodeLines` (lib/collection.js),
+// qui la relit — les deux formats ne doivent jamais diverger.
 export function toList(episodes) {
   return episodes
-    .map(
-      (e) =>
+    .map((e) => {
+      const urls = e.urls
+        .map(srcOf)
+        .map(({ url, lang }) => (lang ? `${lang}@${url}` : url));
+      return (
         `S${String(e.season).padStart(2, "0")}E${String(e.number).padStart(2, "0")}` +
-        `${e.title ? ` ${e.title}` : ""} — ${e.urls.join(" | ")}`
-    )
+        `${e.title ? ` ${e.title}` : ""} — ${urls.join(" | ")}`
+      );
+    })
     .join("\n");
 }
 
@@ -314,25 +375,30 @@ export async function importFromUrl(rawUrl, { lang } = {}) {
 
   // Page de saison collée directement : on s'en tient à celle-là.
   const seasons = ref.season
-    ? [{ label: ref.season, path: ref.season, lang: ref.lang }]
+    ? [{ label: ref.season, path: ref.season, langs: [ref.lang].filter(Boolean) }]
     : parseSeasons(html);
   if (!seasons.length) throw new Error("Aucune saison trouvée sur cette fiche.");
 
-  // Ordre d'essai des langues : celle demandée, celle du lien, puis le reste.
+  // TOUTES LES LANGUES SONT DEMANDÉES, `lang` ne décide plus que de l'ORDRE —
+  // c'est-à-dire de celle qu'on branchera par défaut. Les langues déclarées par
+  // la fiche passent devant le catalogue complet : inutile d'aller frapper à la
+  // porte d'une piste coréenne que la page n'annonce pas.
   const order = (s) => [
-    ...new Set([lang, s.lang, ref.lang, ...LANGS].filter(Boolean)),
+    ...new Set([lang, ...(s.langs || []), ref.lang, ...LANGS].filter(Boolean)),
   ];
 
   const out = [];
   const report = [];
   let extra = seasons.filter((s) => seasonRank(s.path) != null).length;
 
+  const tracks = [];
   for (const season of seasons) {
     const got = await fetchSeason({ ...ref, path: season.path }, order(season));
     if (!got) {
       report.push({ ...season, count: 0, lang: null });
       continue;
     }
+    for (const l of got.langs) if (!tracks.includes(l)) tracks.push(l);
     // Les à-côtés (film, OAV) n'ont pas de rang : ils prennent la suite plutôt
     // que d'écraser la saison 1.
     const rank = seasonRank(season.path) ?? ++extra;
@@ -346,18 +412,31 @@ export async function importFromUrl(rawUrl, { lang } = {}) {
         urls: ep.urls,
       });
     }
-    report.push({ ...season, rank, lang: got.lang, count: got.episodes.length, url: got.url });
+    report.push({
+      ...season,
+      rank,
+      // La saison a maintenant DES pistes : le rapport les montre toutes
+      // (« VF · VOSTFR »), `lang` restant la principale pour l'affichage des
+      // panneaux qui n'en attendent qu'une.
+      lang: got.lang,
+      langs: got.langs,
+      count: got.episodes.length,
+      url: got.url,
+    });
   }
 
   if (!out.length)
     throw new Error(
-      "Aucun épisode lisible — la fiche existe mais ses listes sont vides dans cette langue."
+      "Aucun épisode lisible — la fiche existe mais ses listes sont vides."
     );
 
   const list = toList(out);
 
   return {
     slug: ref.slug,
+    // Les pistes réellement rapportées, toutes saisons confondues : c'est ce
+    // qui remplira le sélecteur de la fiche, et le rapport d'import.
+    langs: tracks,
     sourceUrl: `${ref.origin}/catalogue/${ref.slug}/`,
     title: info.title || ref.slug,
     altTitles: info.altTitles,

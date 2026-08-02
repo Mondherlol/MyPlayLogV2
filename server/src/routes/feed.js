@@ -25,6 +25,7 @@ import { ensureGameMeta } from "../lib/gameMeta.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { geminiJson, isGeminiConfigured } from "../lib/gemini.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
+import { feedFilters } from "../lib/feedCategories.js";
 import { summarizeReactions } from "../lib/reviewSerialize.js";
 import { triggerMissionCheck } from "../lib/missions.js";
 import { buildRepostStats } from "./reposts.js";
@@ -128,10 +129,18 @@ function listMini(l) {
 // évènements les plus récents toutes sources confondues.
 // `only: "media"` restreint la timeline aux fan arts republiés (onglet
 // « Médias » du feed de profil, et bento indépendant du fil).
-async function buildTimeline(req, { userScope, actorScope, before, limit, only = null }) {
+async function buildTimeline(
+  req,
+  { userScope, actorScope, before, limit, only = null, hidden = [] }
+) {
   const hasBefore = before && !Number.isNaN(before.getTime());
   const lt = (field) => (hasBefore ? { [field]: { $lt: before } } : {});
   const wantAll = only !== "media";
+  // Familles de cartes coupées par le joueur (Paramètres > Fil d'accueil) :
+  // on écarte AVANT d'interroger, pour que la page reste pleine (cf.
+  // lib/feedCategories.js). Vide partout ailleurs que sur /home.
+  const { activityOff, sourceOff, cardOff } = feedFilters(hidden);
+  const wants = (source) => !sourceOff.has(source);
   // limit + 1 : s'il reste au moins un évènement au-delà de la page, le total
   // dépasse `limit` et le curseur de pagination est renvoyé — indispensable
   // quand une seule source remplit exactement la page (ex. onglet Médias).
@@ -150,12 +159,14 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
     rankChanges,
     mediaPosts,
   ] = await Promise.all([
-    Repost.find({ user: userScope, ...lt("createdAt") })
-      .sort({ createdAt: -1 })
-      .limit(cap)
-      .populate("user", "username avatar")
-      .lean(),
-    !wantAll
+    !wants("repost")
+      ? Promise.resolve([])
+      : Repost.find({ user: userScope, ...lt("createdAt") })
+          .sort({ createdAt: -1 })
+          .limit(cap)
+          .populate("user", "username avatar")
+          .lean(),
+    !wantAll || !wants("documentary")
       ? Promise.resolve([])
       : Documentary.find({
           user: userScope,
@@ -167,7 +178,7 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
           .populate("user", "username avatar")
           .lean(),
     // Vidéos réellement regardées (seuil franchi) → évènement « a regardé ».
-    !wantAll
+    !wantAll || !wants("documentary")
       ? Promise.resolve([])
       : Documentary.find({
           user: userScope,
@@ -179,7 +190,7 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
           .populate("user", "username avatar")
           .lean(),
     // Vidéos aimées → évènement « a aimé une vidéo ».
-    !wantAll
+    !wantAll || !wants("documentary")
       ? Promise.resolve([])
       : Documentary.find({
           user: userScope,
@@ -191,7 +202,7 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
           .populate("user", "username avatar")
           .lean(),
     // Vidéos commentées → évènement « a commenté une vidéo ».
-    !wantAll
+    !wantAll || !wants("documentary")
       ? Promise.resolve([])
       : Documentary.find({
           user: userScope,
@@ -206,14 +217,18 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
     // (une file d'attente), pas une action à raconter au fil.
     !wantAll
       ? Promise.resolve([])
-      : Activity.find({ actor: actorScope, ...lt("createdAt") })
+      : Activity.find({
+          actor: actorScope,
+          ...(activityOff.length ? { type: { $nin: activityOff } } : {}),
+          ...lt("createdAt"),
+        })
           .sort({ createdAt: -1 })
           .limit(limit * 2) // les activités portent plusieurs types d'évènements
           .populate("actor", "username avatar")
           .populate("target", "username avatar")
           .populate("list", "title type cover visibility items likes comments")
           .lean(),
-    !wantAll
+    !wantAll || !wants("gem")
       ? Promise.resolve([])
       : GemDiscovery.find({ user: userScope, ...lt("updatedAt") })
           .sort({ updatedAt: -1 })
@@ -221,7 +236,7 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
           .populate("user", "username avatar")
           .lean(),
     // Délits de téléchargement (cf. models/Download.js) — card moqueuse du fil.
-    !wantAll
+    !wantAll || !wants("download")
       ? Promise.resolve([])
       : Download.find({ user: userScope, ...lt("createdAt") })
           .sort({ createdAt: -1 })
@@ -230,7 +245,7 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
           .lean(),
     // Parties de jeux trackés (Marvel Rivals…) — datées par `playedAt` (heure
     // réelle de la partie), regroupées en « a enchaîné N parties sur … ».
-    !wantAll
+    !wantAll || !wants("tracker")
       ? Promise.resolve([])
       : TrackerMatch.find({
           user: userScope,
@@ -241,7 +256,7 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
           .populate("user", "username avatar")
           .lean(),
     // Montées / descentes de rang classé (session) → card « X est passé … ».
-    !wantAll
+    !wantAll || !wants("tracker")
       ? Promise.resolve([])
       : RankChange.find({
           user: userScope,
@@ -252,7 +267,7 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
           .populate("user", "username avatar")
           .lean(),
     // Posts du mur média des jeux → carte « X a posté sur … ».
-    !wantAll
+    !wantAll || !wants("gamemedia")
       ? Promise.resolve([])
       : GameMedia.find({ user: userScope, ...lt("createdAt") })
           .sort({ createdAt: -1 })
@@ -272,6 +287,9 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
   // l'équipe a SA ligne d'activité (c'est son résultat, il a ses points), mais
   // le fil n'en montre qu'une — elle nomme déjà toute l'équipe.
   const motSessionsSeen = new Set();
+  // Même raison pour les versus GeoGamer : cinq joueurs, cinq lignes
+  // d'activité, une seule carte (elle montre le classement complet).
+  const versusSeen = new Set();
 
   // --- Actions de bibliothèque (game_update) : on complète la carte avec
   // l'état ACTUEL de l'entrée (review, note, réactions…) pour pouvoir y
@@ -609,6 +627,33 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
         correct: a.meta.correct || 0,
         total: a.meta.total || 0,
         challenge: a.meta.challenge || null,
+      });
+      continue;
+    }
+
+    // --- Versus (GeoGamer ou blind test) ---
+    // Chaque joueur a son entrée (son rang, ses points), mais la partie n'est
+    // qu'UN évènement : on ne garde que la première rencontrée et la carte
+    // affiche la table entière. Même dédoublonnage que les sessions du mot du
+    // jour — sans lui, un versus à cinq inonderait le fil de cinq cartes
+    // racontant la même chose.
+    if (a.type === "geoversus" || a.type === "btversus") {
+      if (!a.meta?.versusId) continue;
+      if (versusSeen.has(a.meta.versusId)) continue;
+      versusSeen.add(a.meta.versusId);
+      const table = Array.isArray(a.meta.players) ? a.meta.players : [];
+      events.push({
+        type: a.type,
+        id: `a-${a._id}`,
+        date: a.createdAt,
+        // L'auteur de la carte est le VAINQUEUR, pas celui dont l'activité a
+        // été lue en premier : « X a gagné un versus » est l'information, et
+        // elle doit être la même pour tout le monde qui voit passer la carte.
+        user: table.find((p) => p.rank === 1) || person(a.actor),
+        versusId: a.meta.versusId,
+        mode: a.meta.mode || "classic",
+        total: a.meta.total || 0,
+        players: table,
       });
       continue;
     }
@@ -1409,7 +1454,9 @@ async function buildTimeline(req, { userScope, actorScope, before, limit, only =
   }
 
   events.sort((a, b) => new Date(b.date) - new Date(a.date));
-  return events;
+  // Dernier passage : les sources coupées plus haut ne produisent déjà plus
+  // rien, mais une carte reste une carte — on vérifie sur le type final.
+  return cardOff.size ? events.filter((e) => !cardOff.has(e.type)) : events;
 }
 
 // ============================================================
@@ -1432,7 +1479,7 @@ router.get("/home", requireAuth, async (req, res) => {
       if (await blockIfPrivate(res, target, req.userId)) return;
     }
 
-    const me = await User.findById(req.userId).select("following");
+    const me = await User.findById(req.userId).select("following feedHidden");
     const followed = (me?.following || []).map(String);
     // Personne à suivre encore : on ouvre le feed à toute la communauté pour
     // que la page ne soit jamais vide (petite appli entre amis). Dans tous
@@ -1455,6 +1502,10 @@ router.get("/home", requireAuth, async (req, res) => {
       actorScope: userScope,
       before,
       limit,
+      // Personnalisation du fil : seul l'ACCUEIL la respecte. L'onglet Feed
+      // d'un profil raconte tout ce qu'a fait ce joueur — le filtre n'y a
+      // pas de sens.
+      hidden: me?.feedHidden || [],
     });
 
     const page = events.slice(0, limit);

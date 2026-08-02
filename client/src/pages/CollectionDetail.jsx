@@ -51,13 +51,21 @@ import {
   FORMATS,
   LICENCES,
   PROVIDERS,
+  episodeSources,
   fmtDuration,
   fmtYears,
   hostOf,
   isComic,
   isGame,
   isRtl,
+  langLabel,
+  langsOf,
+  sourcesInLang,
 } from "../lib/collection";
+
+// Où l'on garde « je regarde en VF ». Une préférence de spectateur, pas un
+// réglage du titre : elle traverse les fiches (voir le sélecteur de piste).
+const LANG_KEY = "mpl_coll_lang";
 
 // ======================================================================
 //  Fiche d'un média de la collection
@@ -95,6 +103,12 @@ export default function CollectionDetail() {
   // Reprise demandée par l'URL (rangée « Reprendre » de la page Collection).
   const askedEpisode = Number(params.get("ep"));
   const autoPlay = params.get("play") === "1";
+  // LA PLANCHE DEMANDÉE. C'est par là qu'arrive un passage partagé en message
+  // (« regarde la planche 42 ») : le volume s'ouvre PILE LÀ plutôt qu'au
+  // marque-page de celui qui reçoit. `0` est une valeur légitime — la carte
+  // propose aussi « depuis le début » — d'où le test sur la présence du
+  // paramètre et non sur sa valeur.
+  const askedPage = params.has("page") ? Number(params.get("page")) : null;
   const autoStarted = useRef(false);
 
   useEffect(() => {
@@ -222,9 +236,13 @@ export default function CollectionDetail() {
   // L'URL ne garde pas « play » : revenir en arrière ne doit rallumer ni le
   // poste ni la console tout seuls.
   const dropPlayParam = useCallback(() => {
-    if (!params.has("play")) return;
+    if (!params.has("play") && !params.has("page")) return;
     const next = new URLSearchParams(params);
     next.delete("play");
+    // La planche demandée s'efface avec : elle a servi à l'ouverture, et la
+    // garder rouvrirait toujours au même endroit au lieu de reprendre là où
+    // l'on en est vraiment.
+    next.delete("page");
     setParams(next, { replace: true });
   }, [params, setParams]);
 
@@ -252,19 +270,55 @@ export default function CollectionDetail() {
     // marque-page est resté. Sans cette branche, une reprise de lecture montait
     // le téléviseur sur un titre sans le moindre épisode — un écran noir.
     if (isComic(media)) {
-      setOpenAt(media.progress?.page || 0);
+      setOpenAt(
+        Number.isFinite(askedPage) && askedPage >= 0
+          ? askedPage
+          : media.progress?.page || 0
+      );
       setReading("volume");
       dropPlayParam();
       return;
     }
     const index = Number.isFinite(askedEpisode) ? askedEpisode : 0;
     watch(index, media.progress?.positionSeconds || 0);
-  }, [media, autoPlay, askedEpisode, watch, dropPlayParam]);
+  }, [media, autoPlay, askedEpisode, askedPage, watch, dropPlayParam]);
 
   const seasons = useMemo(() => {
     const set = [...new Set((media?.episodes || []).map((e) => e.season || 1))];
     return set.length > 1 ? set : [];
   }, [media]);
+
+  // ------------------------------------------------------------ la piste --
+  //
+  // VF OU VOSTFR, ET C'EST ICI QUE ÇA SE DÉCIDE. Le choix se faisait à l'IMPORT,
+  // dans le panneau d'admin : une seule version entrait dans le boîtier, et
+  // vouloir l'autre demandait de tout réimporter — en perdant la première.
+  // L'import prend maintenant tout ce que la fiche d'origine propose, chaque
+  // adresse étiquetée de sa piste, et le choix revient à celui qui regarde.
+  //
+  // Ce n'est PAS un réglage du titre : c'est une préférence de spectateur, elle
+  // vit donc dans le navigateur et vaut pour tous les titres. Celui qui regarde
+  // ses animes en VOSTFR n'a pas à le redire à chaque série.
+  const tracks = useMemo(() => langsOf(media), [media]);
+  const [lang, setLang] = useState(() => {
+    try {
+      return localStorage.getItem(LANG_KEY) || "";
+    } catch {
+      return "";
+    }
+  });
+  // La préférence ne s'applique QUE si le titre l'a : sur une série qui n'existe
+  // qu'en VOSTFR, un « je regarde en VF » enregistré ailleurs ne doit pas
+  // écarter les seules sources qui existent. Sinon, la première piste du titre.
+  const track = tracks.includes(lang) ? lang : tracks[0] || "";
+  function pickLang(l) {
+    setLang(l);
+    try {
+      localStorage.setItem(LANG_KEY, l);
+    } catch {
+      /* navigation privée : la préférence n'est pas vitale */
+    }
+  }
 
   const episodes = useMemo(() => {
     if (!media) return [];
@@ -526,6 +580,13 @@ export default function CollectionDetail() {
                       Repartir du début
                     </button>
                   )}
+                  {/* UN FILM N'A PAS DE LISTE D'ÉPISODES, donc pas d'en-tête où
+                      poser le choix de la version : il vient à côté du bouton
+                      qui lance la séance. Sur une série, il est là-bas, avec
+                      les saisons — les deux réglages de la même liste. */}
+                  {playable && soloFilm && (
+                    <LangPicker tracks={tracks} value={track} onPick={pickLang} />
+                  )}
                   {soloFilm && (
                     <button
                       className={`btn btn-ghost clickable coll-hero-seen ${filmSeen ? "on" : ""}`}
@@ -736,24 +797,30 @@ export default function CollectionDetail() {
                 </em>
               )}
             </h2>
-            {seasons.length > 1 && (
-              <div className="coll-seasons">
-                {seasons.map((s) => (
-                  <button
-                    key={s}
-                    className={`clickable ${season === s ? "active" : ""}`}
-                    onClick={() => setSeason(s)}
-                  >
-                    Saison {s}
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className="coll-eps-picks">
+              <LangPicker tracks={tracks} value={track} onPick={pickLang} />
+              {seasons.length > 1 && (
+                <div className="coll-seasons">
+                  {seasons.map((s) => (
+                    <button
+                      key={s}
+                      className={`clickable ${season === s ? "active" : ""}`}
+                      onClick={() => setSeason(s)}
+                    >
+                      Saison {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <ul className="coll-eps-list">
             {episodes.map((ep) => {
               const isWatched = watched.has(ep.index);
+              // Ce que CET épisode a dans la piste choisie : l'hébergeur affiché
+              // doit être celui qu'on va brancher, pas le premier de la liste.
+              const srcs = sourcesInLang(episodeSources(ep), track);
               return (
                 <li
                   key={ep.index}
@@ -781,8 +848,12 @@ export default function CollectionDetail() {
                       )}
                       {ep.provider && ep.provider !== "youtube" && (
                         <em className="coll-ep-src" title={PROVIDERS[ep.provider]?.hint}>
-                          {hostOf(ep.url)}
-                          {ep.mirrors?.length > 0 ? ` +${ep.mirrors.length}` : ""}
+                          {/* L'hébergeur qu'on branchera VRAIMENT, piste
+                              choisie comprise : afficher celui de `ep.url`
+                              annonçait le lecteur de la VF sous un épisode
+                              qu'on allait regarder en VOSTFR. */}
+                          {hostOf(srcs[0]?.url || ep.url)}
+                          {srcs.length > 1 ? ` +${srcs.length - 1}` : ""}
                         </em>
                       )}
                     </span>
@@ -951,6 +1022,7 @@ export default function CollectionDetail() {
           media={media}
           startIndex={watching.index}
           startAt={watching.at}
+          lang={track}
           onClose={() => setWatching(null)}
           onProgress={saveProgress}
         />
@@ -980,6 +1052,36 @@ export default function CollectionDetail() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+// ======================================================================
+//  Le sélecteur de piste — VF, VOSTFR, ce que le titre a
+// ======================================================================
+// IL NE MONTRE QUE CE QUI EXISTE, et il disparaît quand il n'y a rien à
+// choisir : un titre à une seule piste (ou dont personne n'a étiqueté les
+// adresses, ce qui est le cas de tout ce qui a été importé avant) n'a pas de
+// question à poser. C'est la règle de tout cet écran — on ne fait pas choisir
+// entre une option et le vide.
+//
+// Ce n'est PAS un filtre sur les épisodes : la liste ne bouge pas, les coches
+// restent, la progression suit. Seules changent les adresses qu'on branchera.
+function LangPicker({ tracks, value, onPick }) {
+  if (tracks.length < 2) return null;
+  return (
+    <div className="coll-langs" role="group" aria-label="Version">
+      {tracks.map((l) => (
+        <button
+          key={l}
+          className={`clickable ${value === l ? "active" : ""}`}
+          onClick={() => onPick(l)}
+          title={`Regarder en ${langLabel(l)}`}
+          aria-pressed={value === l}
+        >
+          {langLabel(l)}
+        </button>
+      ))}
     </div>
   );
 }

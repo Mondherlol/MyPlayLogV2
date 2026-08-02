@@ -146,11 +146,69 @@ export const PROVIDERS = {
 // Les sources d'un épisode, dans l'ordre : la principale puis ses miroirs.
 // Un épisode d'avant les lecteurs multiples n'a qu'un videoId — il reste
 // lisible sans migration.
+// ------------------------------------------------------------ les pistes --
+//
+// UN ÉPISODE, PLUSIEURS LANGUES, UNE SEULE LISTE. Les imports rapportent
+// désormais TOUTES les versions d'un titre (VF, VOSTFR…) : ce ne sont pas deux
+// boîtiers ni deux listes d'épisodes, mais les mêmes épisodes avec, sur chaque
+// adresse, le nom de la piste qu'elle sert. Choisir sa langue revient donc à
+// FILTRER les sources — et rien d'autre ne bouge : ni la liste des épisodes, ni
+// la progression, ni les coches.
+//
+// Une source sans étiquette (liste écrite à la main, import d'avant) est de
+// langue INCONNUE : elle reste visible quelle que soit la piste choisie. C'est
+// ce qui rend le sélecteur rétrocompatible sans une ligne de migration — un
+// titre dont aucune source n'est étiquetée n'a simplement pas de sélecteur.
+// Le nom COURT d'une piste, celui d'un bouton. À ne pas confondre avec
+// `LANG_LABELS` plus bas, qui écrit la langue en toutes lettres au dos du
+// boîtier (« VO · ST français ») : ici c'est une pastille de deux syllabes
+// qu'on clique, là-bas une mention imprimée qu'on lit.
+const TRACK_LABELS = {
+  vf: "VF",
+  vff: "VF",
+  vostfr: "VOSTFR",
+  vost: "VOSTFR",
+  vo: "VO",
+  va: "VA",
+  vqc: "VQC",
+  vkr: "VKR",
+  vcn: "VCN",
+};
+
+export const langLabel = (l) => TRACK_LABELS[l] || String(l || "").toUpperCase();
+
+// Les pistes d'un titre, dans l'ordre où on les rencontre. Lues sur les
+// épisodes eux-mêmes : `source.langs` dit ce que la fiche d'origine ANNONÇAIT,
+// ce qui n'est pas la même chose que ce dont on a l'adresse.
+export function langsOf(media) {
+  const seen = [];
+  for (const ep of media?.episodes || [])
+    for (const s of episodeSources(ep))
+      if (s.lang && !seen.includes(s.lang)) seen.push(s.lang);
+  return seen;
+}
+
+// Les sources d'un épisode dans la langue voulue. Le tri plutôt que le filtre :
+// une source sans étiquette peut très bien être dans la bonne langue (personne
+// ne l'a dit), et la jeter priverait d'un lecteur qui marche. On met donc
+// devant ce qui est sûr, on garde le reste derrière — et on n'écarte QUE ce qui
+// est explicitement d'une autre langue.
+export function sourcesInLang(sources, lang) {
+  if (!lang) return sources;
+  const mine = sources.filter((s) => s.lang === lang);
+  const mute = sources.filter((s) => !s.lang);
+  // Aucune source de cette piste ET aucune muette : le choix ne s'applique pas
+  // à cet épisode (une saison qui n'existe qu'en VOSTFR sur un titre importé en
+  // VF). On rend tout plutôt qu'un écran noir.
+  return mine.length || mute.length ? [...mine, ...mute] : sources;
+}
+
 export function episodeSources(ep) {
   if (!ep) return [];
   const provider = ep.provider || (ep.videoId ? "youtube" : "embed");
   const main = {
     provider,
+    lang: ep.lang || "",
     videoId: ep.videoId || null,
     // UNE SOURCE A TOUJOURS UNE ADRESSE, même une vidéo YouTube qui n'est
     // enregistrée que par son identifiant : c'est elle qui donne le NOM D'HÔTE,
@@ -171,6 +229,7 @@ export function episodeSources(ep) {
     main,
     ...(ep.mirrors || []).map((m) => ({
       provider: "embed",
+      lang: m.lang || "",
       videoId: null,
       url: m.url,
       label: m.label || hostOf(m.url),

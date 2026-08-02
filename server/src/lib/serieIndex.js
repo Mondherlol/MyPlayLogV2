@@ -223,16 +223,38 @@ async function readSerie(html, { pageUrl = "", origin = "", lang } = {}) {
   const page = parseFilmPage(html, { pageUrl });
   const season = seasonOf(page.title, pageUrl);
 
-  // Toutes les versions que la page porte, dans l'ordre naturel : c'est ce
-  // qu'on affichera. Le CHOIX, lui, suit la langue demandée.
+  // Toutes les versions que la page porte, dans l'ordre naturel.
   const tracks = VERSIONS.map((version) => ({
     lang: version,
     episodes: episodesOf(data[version], data.info, season),
   })).filter((t) => t.episodes.length);
+  if (!tracks.length) return null;
 
+  // ON LES PREND TOUTES. Le bloc de données porte les trois versions côte à
+  // côte — on en choisissait une et on jetait les autres, si bien qu'obtenir la
+  // VOSTFR d'une série déjà importée en VF demandait de tout réimporter... pour
+  // perdre la VF. Elles sont maintenant fusionnées PAR ÉPISODE, chaque adresse
+  // étiquetée de sa piste, et c'est le spectateur qui choisit sur la fiche.
+  //
+  // `lang` ne filtre plus, il ORDONNE : la version demandée (VF par défaut)
+  // passe en tête de chaque ligne, donc c'est elle qui se branche toute seule.
   const wanted = [...new Set([String(lang || "").toLowerCase(), ...VERSIONS])];
-  const picked = wanted.map((v) => tracks.find((t) => t.lang === v)).find(Boolean);
-  if (!picked) return null;
+  const ordered = wanted.map((v) => tracks.find((t) => t.lang === v)).filter(Boolean);
+  const picked = ordered[0];
+
+  const byNumber = new Map();
+  for (const track of ordered) {
+    for (const ep of track.episodes) {
+      const at = byNumber.get(ep.number) || { ...ep, urls: [] };
+      // Le titre vient de la première piste qui en porte un : `data.info` est
+      // commun aux versions, mais rien ne l'impose.
+      if (!at.title && ep.title) at.title = ep.title;
+      for (const url of ep.urls)
+        if (!at.urls.some((s) => s.url === url)) at.urls.push({ url, lang: track.lang });
+      byNumber.set(ep.number, at);
+    }
+  }
+  const episodes = [...byNumber.values()].sort((a, b) => a.number - b.number);
 
   return {
     kind: "series",
@@ -245,26 +267,25 @@ async function readSerie(html, { pageUrl = "", origin = "", lang } = {}) {
     backdrop: page.backdrop,
     runtime: page.runtime,
     director: page.director,
-    // Ce qui s'imprimera au dos du boîtier : la piste qu'on vient d'importer,
-    // et elle seule. Annoncer aussi les autres versions de la page promettrait
-    // une VOSTFR dont pas un lien n'est ici.
-    langs: [picked.lang],
+    // Ce qui s'imprimera au dos du boîtier — et ce que proposera le sélecteur
+    // de la fiche : toutes les pistes dont on rapporte au moins une adresse.
+    langs: ordered.map((t) => t.lang),
     seasons: [
       {
         label: `Saison ${season}`,
         path: `saison-${season}`,
         rank: season,
         lang: picked.lang,
-        count: picked.episodes.length,
+        langs: ordered.map((t) => t.lang),
+        count: episodes.length,
         url: pageUrl,
       },
     ],
-    // Les autres versions disponibles : dites, jamais importées en douce. C'est
-    // au sélecteur de langue du panneau qu'on va les chercher.
-    tracks: tracks.map((t) => ({ lang: t.lang, count: t.episodes.length })),
-    hosts: countHosts(picked.episodes),
-    count: picked.episodes.length,
-    list: toList(picked.episodes),
+    // Le détail par piste, pour le rapport d'import : « VF 24 ép. · VOSTFR 24 ».
+    tracks: ordered.map((t) => ({ lang: t.lang, count: t.episodes.length })),
+    hosts: countHosts(episodes),
+    count: episodes.length,
+    list: toList(episodes),
   };
 }
 
@@ -327,7 +348,18 @@ function currentEpisodeFromSource(html, { pageUrl = "" } = {}) {
   const version = row.match(/data-type\s*=\s*["'](vf|vostfr|vo)["']/i)?.[1] || null;
   const page = parseFilmPage(html, { pageUrl });
   const season = seasonOf(page.title, pageUrl);
-  const episodes = [{ season, number, title: "", urls: players.map((p) => p.url) }];
+  // Les lecteurs montés dans la page sont ceux de la version affichée : elle est
+  // écrite sur la ligne active (`data-type`), et c'est la seule chose qui dise
+  // ce qu'on va entendre. Sans elle, l'adresse reste sans piste — donc visible
+  // quelle que soit la langue choisie, ce qui est le comportement d'avant.
+  const episodes = [
+    {
+      season,
+      number,
+      title: "",
+      urls: players.map((p) => ({ url: p.url, lang: version || "" })),
+    },
+  ];
 
   return {
     // « episodes » et non « series » : ce collage n'apporte qu'une ligne, il

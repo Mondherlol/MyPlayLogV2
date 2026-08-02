@@ -414,31 +414,17 @@
   color: var(--text-soft);
 }
 
-.adm-coll-split {
+/* LES VISUELS EN RANG, EN BAS DU FORMULAIRE. Ils tenaient une colonne collée à
+   droite pendant toute l'édition — une bande de 240 px réservée à trois images
+   qu'on ne touche presque jamais, et un écran de correction qui ne ressemblait
+   en rien à celui d'ajout. Ils forment maintenant la dernière section, à plat :
+   la modale a la même forme dans les deux cas, et les trois cadres sont côte à
+   côte, donc comparables d'un coup d'œil. */
+.adm-coll-arts {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 240px;
-  gap: 1.2rem;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1rem;
   align-items: start;
-}
-
-/* Dans la modale de modification, la colonne des visuels reste sous les yeux
-   pendant qu'on corrige la fiche : c'est elle qu'on vérifie en éditant. */
-.adm-coll-aside {
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
-  position: sticky;
-  top: 0;
-}
-
-@media (max-width: 780px) {
-  .adm-coll-split {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .adm-coll-aside {
-    position: static;
-  }
 }
 
 /* ---------- champs ---------- */
@@ -776,80 +762,65 @@
   color: var(--text);
 }
 
-/* ---------- aperçu de la tranche ---------- */
+/* ======================================================================
+   Ce qu'on peut donner à manger au champ d'adresse
+   ======================================================================
+   Trois pastilles, et elles ne se choisissent PAS : le lecteur se déduit de
+   l'adresse collée (voir `detectSource`). Elles répondent à la seule question
+   qu'on se pose devant un champ vide — « qu'est-ce qu'il accepte ? » — et
+   mènent au site d'un clic, puisque c'est de là qu'on revient avec le lien.
+   Celle qui correspond à ce qui est collé s'allume : c'est l'accusé de
+   réception de la reconnaissance, sans un mot de plus. */
 
-.adm-coll-boxprev {
+.adm-coll-sites {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 0.4rem;
-  align-items: flex-start;
+  margin-bottom: 0.75rem;
 }
 
-/* La largeur ET la hauteur arrivent en style inline, calculées depuis les
-   mesures du boîtier : plus de taille écrite en dur, sinon tous les objets se
-   ressembleraient précisément là où l on veut voir qu ils diffèrent. */
-.adm-coll-spine-prev {
-  position: relative;
-  border-radius: 2px;
-  background: var(--tint, var(--orange));
-  display: flex;
-  flex-direction: column;
+.adm-coll-site {
+  display: inline-flex;
   align-items: center;
-  overflow: hidden;
-  box-shadow: 0 6px 16px rgba(10, 10, 20, 0.3),
-    inset 3px 0 6px rgba(0, 0, 0, 0.28), inset -3px 0 6px rgba(0, 0, 0, 0.28);
-}
-
-.adm-coll-boxdims {
-  font-size: 0.7rem;
-  font-variant-numeric: tabular-nums;
+  gap: 0.35rem;
+  padding: 0.34rem 0.62rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
   color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 
-.adm-coll-spine-prev .cap,
-.adm-coll-spine-prev .foot {
-  flex: 0 0 auto;
-  width: 100%;
-  font-style: normal;
-  font-size: 0.5rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-align: center;
-  padding: 0.2rem 0;
+.adm-coll-site:hover {
+  color: var(--text);
+  border-color: var(--orange);
 }
 
-.adm-coll-spine-prev .cap {
-  background: #101118;
-  color: #fff;
+/* Reconnue : c'est celle-là qui va traiter l'adresse collée. */
+.adm-coll-site.on {
+  color: var(--accent-ink);
+  border-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 14%, transparent);
 }
 
-.adm-coll-spine-prev .foot {
-  margin-top: auto;
-  background: #f2ecdd;
-  color: #26251f;
+/* La flèche de sortie reste discrète : la pastille est d'abord une étiquette,
+   le lien n'est qu'un service rendu. */
+.adm-coll-site-out {
+  opacity: 0.45;
 }
 
-/* Le titre court à la verticale, comme sur la vraie tranche. */
-.adm-coll-spine-prev b {
-  flex: 1;
-  display: grid;
-  place-items: center;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  font-family: var(--font-display);
-  font-size: 0.7rem;
-  color: #fff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-  padding: 0.3rem 0;
-  overflow: hidden;
-  white-space: nowrap;
+.adm-coll-site:hover .adm-coll-site-out {
+  opacity: 0.9;
 }
 
 /* ======================================================================
-   Choix du lecteur + liste d'épisodes collée
+   Choix du sens de lecture (papier) + liste d'épisodes collée
    ======================================================================
-   Deux façons d'alimenter un boîtier, donc deux cartes à choisir AVANT tout le
-   reste : la modale change de forme selon la réponse. */
+   Deux cartes à choisir, façon boutons radio en grand — c'est ce qui reste du
+   choix de lecteur, désormais réservé au papier (voir AdminComicModal). */
 
 .adm-coll-sources {
   display: grid;
@@ -1343,10 +1314,6 @@
 }
 
 @media (max-width: 720px) {
-  .adm-coll-split {
-    grid-template-columns: 1fr;
-  }
-
   .adm-coll-art-box.poster {
     max-height: 260px;
   }
@@ -1964,4 +1931,28 @@
    la détachait du papier n'a plus de sens sur fond sombre : il l'écrase. */
 :root[data-theme="dark"] .adm-coll-tint {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+/* ======================================================================
+   L'essai d'un boîtier (bouton « Tester »)
+   ======================================================================
+   La vitrine elle-même est celle du rayon, importée telle quelle (voir
+   AdminCasePreview) : rien à habiller ici. Reste le temps de peindre la
+   jaquette en haute définition, qui ne doit pas se passer sur un écran vide —
+   ni, surtout, sur une coque blanche qui se peindrait ensuite sous les yeux :
+   c'est exactement le défaut qu'on vient vérifier. */
+
+.adm-coll-try-wait {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  background: rgba(8, 8, 14, 0.72);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-size: 0.86rem;
 }

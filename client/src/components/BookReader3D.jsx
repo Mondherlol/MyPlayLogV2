@@ -12,11 +12,13 @@ import {
   Loader2,
   ArrowRight,
   Glasses,
+  Camera,
 } from "lucide-react";
 import { useScrollLock } from "../hooks/useScrollLock";
 import { useBackClose } from "../hooks/useBackClose";
 import useMediaQuery from "../hooks/useMediaQuery";
 import BookTutorial, { tutorialSeen } from "./BookTutorial";
+import ShareBookShot from "./ShareBookShot";
 import { apiFetch } from "../lib/api";
 import { playBookOpenSound, playPageTurnSound, primePaperSounds } from "../lib/sfx";
 import { useAuth } from "../context/AuthContext";
@@ -242,14 +244,56 @@ const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) 
 // contrairement à la lecture à plat, elle ne reste pas pour autant sur une
 // seule moitié du volume — elle s'étale sur les deux, chacune n'en montrant que
 // sa part (voir `Half`).
+// LA PAGE BLANCHE — le papier vierge qui comble une moitié de volume sans
+// planche (voir `buildSpreads`). Elle n'a pas d'image et ne compte pour aucune
+// planche : son index est négatif, donc elle ne peut être confondue avec aucune
+// vraie page — ni au cartouche, ni au marque-page, ni au partage, ni comme
+// station de lecture guidée. Le volume la traite comme n'importe quelle feuille
+// pour tout le reste : elle se tourne, elle plonge dans la gouttière, elle porte
+// l'ombre de la reliure.
+const BLANK_PAGE = -1;
+const BLANK_LEAF = { index: BLANK_PAGE, src: null, blank: true };
+
+// Son papier, peint une fois pour toute l'application : un blanc cassé, à peine
+// plus clair que la tranche. Un blanc pur ferait un rectangle de lumière à côté
+// d'un scan, ce qui se remarquerait plus que la page qu'on cherche à cacher.
+let blankPaper = null;
+function blankSheet() {
+  if (blankPaper) return blankPaper;
+  const c = document.createElement("canvas");
+  c.width = c.height = 8;
+  const g = c.getContext("2d");
+  g.fillStyle = "#f6f2e8";
+  g.fillRect(0, 0, 8, 8);
+  blankPaper = c;
+  return blankPaper;
+}
+
+// UNE DOUBLE PAGE A TOUJOURS DEUX MOITIÉS. C'était le trou : une planche sans
+// voisine (la dernière d'un bloc impair, ou celle qui précède une planche
+// double, qui monopolise la double suivante à elle seule) occupait la moitié
+// gauche et laissait la droite VIDE. Dans une grille à plat, une page seule est
+// simplement centrée ; dans un volume, c'est un trou dans l'objet — on voit à
+// travers le livre à côté de la planche qu'on lit.
+//
+// La moitié qui manque reçoit donc une PAGE BLANCHE, ce qu'un imprimeur fait
+// exactement pour la même raison : un cahier se remplit par paires, et ce qui
+// reste est du papier vierge. Rien d'autre ne change — appariement, pagination
+// et numéros restent ceux d'avant.
+//
+// Une planche double, elle, ne se complète PAS : elle est déjà deux pages et
+// s'étale sur les deux plats (voir `Half`).
 function buildSpreads(pages, wide) {
   const out = [];
   let i = 0;
   while (i < pages.length) {
     const a = pages[i];
     const b = pages[i + 1];
-    if (wide(a) || !b || wide(b)) {
+    if (wide(a)) {
       out.push([a]);
+      i += 1;
+    } else if (!b || wide(b)) {
+      out.push([a, BLANK_LEAF]);
       i += 1;
     } else {
       out.push([a, b]);
@@ -1100,7 +1144,12 @@ function Volume({
       // dernière d'un volume impair) ramène la station sur la première. Le
       // clavier le sait déjà, mais lui seul — un saut à la règle, lui, peut
       // tomber ici sans prévenir.
-      if (s.guide.step === 1 && !restWide && !restSpread?.[1]) s.guide.step = 0;
+      //
+      // Une page BLANCHE ne compte pas comme une seconde planche : elle bouche
+      // un trou, elle ne se lit pas. Sans ce `index >= 0`, la lecture guidée
+      // s'installait dessus et demandait de lire du papier.
+      if (s.guide.step === 1 && !restWide && !(restSpread?.[1]?.index >= 0))
+        s.guide.step = 0;
       // DEUX CADRAGES POSSIBLES, ON PREND LE PLUS LARGE DES DEUX : la page en
       // pleine largeur, ou la page en deux bandes. Sur une planche haute, c'est
       // le second qui l'emporte — mieux vaut un peu de marge sur les côtés
@@ -1306,6 +1355,52 @@ function Lights() {
   );
 }
 
+// ---------------------------------------------------------- l'instantané --
+//
+// PRENDRE LA PAGE TELLE QU'ON LA LIT. Ni un lien vers une planche, ni la
+// planche entière rechargée à part : L'IMAGE QU'ON A SOUS LES YEUX, cadrée par
+// la lecture guidée sur la case dont on veut parler. C'est toute la différence
+// entre « tiens, lis ce tome » et « regarde ÇA ».
+//
+// LE TAMPON DE DESSIN EST VIDÉ À CHAQUE COMPOSITION : on ne peut pas relire le
+// canevas quand on veut. `preserveDrawingBuffer` le garderait, mais au prix
+// d'une copie par image pendant toute la séance, pour une capture par heure. On
+// redessine donc la scène et on la relit DANS LE MÊME SOUFFLE, à l'intérieur
+// d'une image — le seul instant où le tampon est encore plein.
+const SHOT_MAX = 1400; // la capture part en message : inutile d'envoyer du 4K
+
+function Shot({ ask }) {
+  const { gl, scene, camera } = useThree();
+  useFrame(() => {
+    const req = ask.current;
+    if (!req) return;
+    ask.current = null;
+    let url = "";
+    try {
+      gl.render(scene, camera);
+      const src = gl.domElement;
+      const scale = Math.min(1, SHOT_MAX / (src.width || 1));
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(src.width * scale));
+      c.height = Math.max(1, Math.round(src.height * scale));
+      const g = c.getContext("2d");
+      // LE CANEVAS EST TRANSPARENT (le voile de la salle se voit à travers).
+      // Sans ce fond, le JPEG rendrait le vide en noir pur, là où le lecteur
+      // voit une pièce sombre : on repeint donc le voile sous la planche.
+      g.fillStyle = "#0b0a10";
+      g.fillRect(0, 0, c.width, c.height);
+      g.drawImage(src, 0, 0, c.width, c.height);
+      url = c.toDataURL("image/jpeg", 0.88);
+    } catch {
+      // Un canevas qu'on n'a pas le droit de relire (planche servie sans CORS).
+      // Rien à rattraper ici : l'appelant le dira.
+      url = "";
+    }
+    req(url);
+  });
+  return null;
+}
+
 // ================================================================= page ==
 
 export default function BookReader3D({
@@ -1419,6 +1514,10 @@ export default function BookReader3D({
   //
   // Un volume d'une seule planche garde la sienne : mieux vaut la voir deux
   // fois que pas du tout.
+  //
+  // (Ce qui ressemblait à une planche « disparue » n'en était pas une : c'était
+  // la moitié VIDE d'une double page à qui il manquait une voisine. Elle se
+  // comble maintenant d'une page blanche — voir `buildSpreads`.)
   const leaves = useMemo(() => (pages.length > 1 ? pages.slice(1) : pages), [pages]);
   const views = useMemo(() => buildSpreads(leaves, wide), [leaves, wide]);
 
@@ -1639,7 +1738,10 @@ export default function BookReader3D({
     const fetchOne = async (p) => {
       if (texRef.current[p.index] !== undefined) return;
       texRef.current[p.index] = null; // réservé : jamais deux fois la même
-      const img = await loadImage(p.src);
+      // Le contreplat n'a rien à télécharger : son papier est peint sur place.
+      // Il passe par le MÊME chemin que les autres — sans quoi le volume
+      // attendrait une image qui n'existe pas et ne s'ouvrirait jamais.
+      const img = p.blank ? blankSheet() : await loadImage(p.src);
       // UNE RÉSERVATION NE SURVIT JAMAIS À LA PASSE QUI L'A POSÉE. `alive` ne
       // dit pas « ça n'a plus d'intérêt », il dit « une autre passe a pris la
       // suite » — et celle-là voit la réservation, donc elle ne redemandera
@@ -1711,7 +1813,9 @@ export default function BookReader3D({
   //      affiché (« lu jusqu'à la 12 »), et deux écritures concurrentes le
   //      laisseraient en retard d'une page.
   const save = useRef(null);
-  const page = here?.[0]?.index ?? 0;
+  // La première VRAIE planche de la double page : le contreplat (page blanche)
+  // ne compte pour rien — ni marque-page, ni numéro, ni partage.
+  const page = here?.find((p) => p.index >= 0)?.index ?? 0;
   // La planche courante, lisible depuis la fermeture — qui ne se refait pas à
   // chaque page tournée et ne verrait donc qu'une position périmée.
   const pageRef = useRef(page);
@@ -1796,8 +1900,11 @@ export default function BookReader3D({
 
   // La double page courante montre-t-elle DEUX pages ? Deux planches côte à
   // côte, oui ; une planche double étalée sur les deux plats, oui aussi (c'est
-  // le même geste de lecture) ; une planche seule en fin de volume, non.
-  const twoUp = !!here && (here.length > 1 || wide(here[0]));
+  // le même geste de lecture) ; une planche seule en fin de volume, non — et
+  // une planche accompagnée d'une PAGE BLANCHE non plus : le papier vierge
+  // bouche un trou dans l'objet, il n'ajoute rien à lire.
+  const twoUp =
+    !!here && ((here.length > 1 && here[1].index >= 0) || wide(here[0]));
 
   // ---- la lecture guidée ---------------------------------------------------
   // Trois gestes, et ils suffisent à lire un volume entier :
@@ -1928,6 +2035,42 @@ export default function BookReader3D({
     clearTimeout(holdT.current);
     guideStop();
   }, [guideStop]);
+
+  // ---- « regarde ça » ------------------------------------------------------
+  //
+  // On lit une planche, il s'y passe quelque chose, on veut le MONTRER. Le
+  // bouton prend l'écran tel qu'il est — donc la case cadrée par la lecture
+  // guidée, pas la double page entière — et ouvre la fenêtre d'envoi. Le
+  // destinataire recevra l'image ET de quoi ouvrir le volume à cette planche.
+  const shotAsk = useRef(null);
+  const [shot, setShot] = useState(null); // { url, page } | null
+  const [shooting, setShooting] = useState(false);
+  const [shotFail, setShotFail] = useState(false);
+  // Lu par le clavier, qui ne se réabonne pas à chaque ouverture de fenêtre.
+  const shotOpen = useRef(false);
+  shotOpen.current = !!shot;
+
+  const capture = useCallback(() => {
+    if (shooting || !ctl.current.ready) return;
+    setShooting(true);
+    setShotFail(false);
+    // LA PLANCHE VISÉE, et non la première de la double page : en lecture
+    // guidée on cadre une page à la fois, et c'est celle-là dont on parle.
+    const framed = here?.[ctl.current.guide?.step ?? 0] ?? here?.[0];
+    const at = framed && framed.index >= 0 ? framed.index : page;
+    shotAsk.current = (url) => {
+      setShooting(false);
+      if (!url) return setShotFail(true);
+      setShot({ url, page: at });
+    };
+  }, [shooting, here, page]);
+
+  // Le message d'échec ne reste pas en travers de la planche.
+  useEffect(() => {
+    if (!shotFail) return undefined;
+    const t = setTimeout(() => setShotFail(false), 3200);
+    return () => clearTimeout(t);
+  }, [shotFail]);
 
   // Entrer, c'est cadrer la première page ; sortir, c'est reposer le volume à
   // plat comme on l'avait trouvé.
@@ -2078,6 +2221,9 @@ export default function BookReader3D({
   useEffect(() => {
     const onKey = (e) => {
       const s = ctl.current;
+      // La fenêtre d'envoi est posée par-dessus le volume : tant qu'elle est
+      // ouverte, elle a le clavier (et c'est ELLE qu'Échap referme).
+      if (shotOpen.current) return undefined;
       if (e.key === "Escape") {
         if (!allow("escape")) return undefined;
         // ÉCHAP SORT, IL NE RECULE PAS D'UN CRAN. Il défaisait la vue
@@ -2513,10 +2659,13 @@ export default function BookReader3D({
 
   // ---------------------------------------------------------- l'écran ----
   const total = pages.length;
-  const shown = here
-    ? here.length > 1
-      ? `${here[0].index + 1}–${here[1].index + 1}`
-      : `${here[0].index + 1}`
+  // Le contreplat n'a pas de numéro : « planches 1–2 » sur une double dont la
+  // gauche est blanche annoncerait une planche qui n'y est pas.
+  const numbered = here?.filter((p) => p.index >= 0) || [];
+  const shown = numbered.length
+    ? numbered.length > 1
+      ? `${numbered[0].index + 1}–${numbered[1].index + 1}`
+      : `${numbered[0].index + 1}`
     : "—";
   const pct = total > 1 ? ((page + 1) / total) * 100 : 0;
   const atFirst = index <= 0;
@@ -2569,6 +2718,7 @@ export default function BookReader3D({
           camera={{ fov: FOV, position: [0, 0, 3] }}
         >
           <Lights />
+          <Shot ask={shotAsk} />
           {paint && (
             <Volume
               box={box}
@@ -2631,6 +2781,26 @@ export default function BookReader3D({
             il n'y a plus rien à faire défiler. */}
         {guided && !filled && (
           <div className="b3d-guide" aria-label="Lecture guidée">
+            {/* PRENDRE LA PAGE. Détaché des deux chevrons par un filet : ce
+                n'est pas un troisième bouton de défilement, c'est le seul de
+                la scène qui SORTE quelque chose du volume. */}
+            <button
+              className="b3d-shot clickable"
+              // La scène écoute les pointeurs du plateau entier : sans ça, la
+              // prise de vue commencerait aussi par empoigner le volume.
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={capture}
+              disabled={shooting}
+              aria-label="Partager ce passage"
+              title="Prendre ce passage en photo et l'envoyer"
+            >
+              {shooting ? (
+                <Loader2 size={17} className="coll-spin" />
+              ) : (
+                <Camera size={18} />
+              )}
+            </button>
+            <span className="b3d-guide-sep" aria-hidden="true" />
             <button
               className="clickable"
               onPointerDown={holdOn(-1)}
@@ -2658,6 +2828,12 @@ export default function BookReader3D({
           <div className="b3d-wait">
             <Loader2 size={20} className="coll-spin" />
             <span>{total ? "On charge les planches…" : "On sort le volume…"}</span>
+          </div>
+        )}
+
+        {shotFail && (
+          <div className="b3d-wait b3d-shot-fail">
+            <span>La capture n'a pas pu être prise.</span>
           </div>
         )}
 
@@ -2754,6 +2930,18 @@ export default function BookReader3D({
           </div>
         </div>
       </footer>
+
+      {/* La fenêtre d'envoi, POSÉE SUR LE VOLUME et non à sa place : on ne
+          quitte pas sa page pour envoyer ce qu'on est en train d'y lire, et on
+          la retrouve exactement où on l'avait laissée en refermant. */}
+      {shot && (
+        <ShareBookShot
+          media={media}
+          shot={shot.url}
+          page={shot.page}
+          onClose={() => setShot(null)}
+        />
+      )}
     </div>,
     document.body
   );

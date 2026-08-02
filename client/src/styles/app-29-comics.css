@@ -1226,3 +1226,280 @@
   background: rgba(8, 8, 12, 0.78);
   color: #fff;
 }
+
+/* ---------- prendre la page en photo ----------
+   DÉTACHÉ DES DEUX CHEVRONS par un filet : ce n'est pas un troisième bouton de
+   défilement, c'est le seul de la scène qui SORTE quelque chose du volume.
+   Même gabarit que ses voisins (la main tombe au même endroit), mais teinté :
+   il agit sur autre chose que la caméra. */
+.b3d-shot {
+  color: #ffd9a3 !important;
+  border-color: rgba(255, 193, 122, 0.34) !important;
+}
+
+.b3d-shot:hover:not(:disabled) {
+  background: rgba(255, 168, 76, 0.28) !important;
+  color: #fff !important;
+}
+
+.b3d-shot:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.b3d-guide-sep {
+  height: 1px;
+  margin: 0.15rem 0.35rem;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* L'échec de capture prend la place du message de chargement — jamais les deux
+   à la fois, et il s'efface tout seul (voir BookReader3D). */
+.b3d-shot-fail {
+  color: #ffb4a8;
+}
+
+/* ======================================================================
+   « Regarde ça » — la fenêtre d'envoi d'un passage
+   ======================================================================
+   POSÉE SUR LE VOLUME, dans la même pièce sombre : on n'est pas sorti du
+   bouquin, on montre la page qu'on est en train de lire. D'où le fond de la
+   salle de lecture plutôt que la surface claire des modales de l'app — une
+   fenêtre blanche en plein écran noir, c'est un projecteur dans les yeux au
+   milieu d'un chapitre. */
+.bshot-overlay {
+  z-index: 12000; /* au-dessus du lecteur, qui est déjà un portail plein écran */
+}
+
+.bshot {
+  position: relative;
+  width: min(520px, 94vw);
+  max-height: min(88vh, 900px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #14131a;
+  color: #f3f0ea;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+
+.bshot-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.bshot-head b {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1rem;
+}
+
+.bshot-head em {
+  font-style: normal;
+  font-size: 0.76rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.bshot-x {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.bshot-x:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+/* La capture, en grand et telle qu'elle partira. */
+.bshot-shot {
+  position: relative;
+  margin: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0b0a10;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.bshot-shot img {
+  display: block;
+  width: 100%;
+  max-height: 34vh;
+  object-fit: contain;
+}
+
+.bshot-shot figcaption {
+  position: absolute;
+  left: 0.5rem;
+  bottom: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.24rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.bshot-shot figcaption.bad {
+  background: rgba(180, 40, 30, 0.75);
+  color: #fff;
+}
+
+.bshot-msg {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  font: inherit;
+  font-size: 0.85rem;
+  resize: none;
+}
+
+.bshot-msg::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.bshot-msg:focus {
+  outline: none;
+  border-color: rgba(255, 193, 122, 0.5);
+}
+
+.bshot-list {
+  flex: 1;
+  min-height: 90px;
+  overflow-y: auto;
+  margin: 0 -0.25rem;
+  padding: 0 0.25rem;
+}
+
+.bshot-list h3 {
+  margin: 0.5rem 0 0.3rem;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.bshot-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.bshot-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.bshot-row:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.bshot-row.on {
+  border-color: rgba(255, 193, 122, 0.45);
+  background: rgba(255, 168, 76, 0.14);
+  color: #ffd9a3;
+}
+
+.bshot-av {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.bshot-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bshot-av.group {
+  border-radius: 9px;
+}
+
+.bshot-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.86rem;
+}
+
+.bshot-wait,
+.bshot-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 70px;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.45);
+  text-align: center;
+}
+
+.bshot-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.bshot-done {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.76rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.bshot-foot .btn em {
+  font-style: normal;
+  opacity: 0.75;
+}
+
+.bshot-note {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+@media (max-width: 560px) {
+  .bshot-shot img {
+    max-height: 26vh;
+  }
+}

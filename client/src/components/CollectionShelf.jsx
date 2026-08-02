@@ -1170,7 +1170,12 @@ function mainButton(e) {
   return (e?.nativeEvent?.button ?? e?.button ?? 0) === 0;
 }
 
-function CaseInspector({
+// Exportée : le panneau d'administration s'en sert pour ESSAYER un boîtier qu'on
+// vient de poser (voir AdminCasePreview). Une jaquette ne se juge pas sur une
+// vignette de formulaire — elle se juge sur l'objet, retourné dans la main,
+// exactement comme le verra celui qui l'aura. Un seul exemplaire de cette
+// vitrine, donc, sinon l'essai finirait par montrer autre chose que le rayon.
+export function CaseInspector({
   media,
   art,
   from,
@@ -1252,7 +1257,9 @@ function CaseInspector({
     // Le boîtier du rayon se rallume juste AVANT qu'on démonte celui-ci : ils
     // se superposent une poignée d'images, dans la même pose, et le relais ne
     // se voit pas. Démonter d'abord laisserait le même trou qu'à l'ouverture.
-    setTimeout(onSettle, Math.max(0, trip - 60));
+    // `onSettle` est facultatif : hors du rayon (l'essai du panneau d'admin), il
+    // n'y a aucune place à rallumer derrière la vitrine.
+    setTimeout(() => onSettle?.(), Math.max(0, trip - 60));
     setTimeout(onClose, trip);
   }, [onClose, onSettle]);
 

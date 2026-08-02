@@ -45,7 +45,7 @@ const router = express.Router();
 // Une manche dure plus longtemps qu'à Pixel Rush : il faut le temps de charger
 // une image lourde PUIS de faire un tour d'horizon complet. En dessous de ~40 s
 // on ne joue plus, on subit.
-const ROUND_SEC = 45;
+export const ROUND_SEC = 45;
 const DEFAULT_ROUNDS = 10;
 
 // Part de manches tirées dans les jeux que le joueur possède. Comme le
@@ -62,8 +62,8 @@ const OWNED_SHARE = 0.6;
 //
 // Le chemin relatif reste la valeur STOCKÉE, en base comme dans les parties
 // enregistrées : changer de domaine ne doit pas périmer le catalogue.
-const baseOf = (req) => `${req.protocol}://${req.get("host")}`;
-const absolutize = (base, url) =>
+export const baseOf = (req) => `${req.protocol}://${req.get("host")}`;
+export const absolutize = (base, url) =>
   url && url.startsWith("/uploads/") ? `${base}${url}` : url;
 
 // ---------------------------------------------------------------------------
@@ -128,7 +128,7 @@ function difficultyOrder(list) {
 // La manche bonus n'est proposée que si TOUT est là : l'image, son point de
 // réponse normalisé, et ses dimensions — ces dernières uniquement pour donner
 // au conteneur d'affichage le bon ratio (cf. models/Panorama.js).
-function mapOf(pano) {
+export function mapOf(pano) {
   if (!pano.mapImage || pano.mapAnswerX == null || pano.mapAnswerY == null) return null;
   if (!pano.mapWidth || !pano.mapHeight) return null;
   return {
@@ -175,7 +175,7 @@ function mapCurve(d) {
   return Math.max(0, Math.round(15 - 0.015 * (d - 800)));
 }
 
-function scoreMapGuess(map, guess) {
+export function scoreMapGuess(map, guess) {
   if (!map || !guess) return { points: 0, distance: null };
   // 0 = pile dessus, ~1,41 = d'un coin à l'autre.
   const distance = Math.hypot(guess.x - map.answer.x, guess.y - map.answer.y);
@@ -183,7 +183,7 @@ function scoreMapGuess(map, guess) {
 }
 
 // Nettoie le clic reçu du client : une fraction, donc forcément dans [0,1].
-function sanitizeMapGuess(map, raw) {
+export function sanitizeMapGuess(map, raw) {
   if (!map || !raw) return null;
   const x = Number(raw.x);
   const y = Number(raw.y);

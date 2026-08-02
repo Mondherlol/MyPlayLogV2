@@ -13,6 +13,15 @@ const customOstSchema = new mongoose.Schema(
     artwork: { type: String, default: null },
     source: { type: String, enum: ["auto", "user"], default: "user" },
     order: { type: Number, default: 0 }, // ordre dans la playlist (pistes auto)
+    // Relevés au scraping de la playlist (cf. lib/ostScrape.js). `null` pour
+    // les pistes ajoutées à la main et pour celles scrapées avant l'ajout de
+    // ces champs — d'où `npm run backfill:ost-stats`.
+    //
+    // Les VUES sont ce qui permet au blind test de ne pas tirer au hasard dans
+    // 200 pistes dont personne n'a jamais entendu la moitié : un morceau à 3 M
+    // de vues est un morceau que les joueurs reconnaissent.
+    views: { type: Number, default: null },
+    durationSec: { type: Number, default: null },
     playlistId: { type: String, default: null },
     addedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   },

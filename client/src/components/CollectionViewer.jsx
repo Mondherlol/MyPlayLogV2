@@ -23,7 +23,7 @@ import { useVideoSession, SANDBOX, hostOfUrl } from "../hooks/useVideoSession";
 import { useBackClose } from "../hooks/useBackClose";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
-import { fmtClock } from "../lib/collection";
+import { fmtClock, langLabel } from "../lib/collection";
 
 // ======================================================================
 //  La visionneuse — l'image, et le strict nécessaire autour
@@ -58,6 +58,10 @@ export default function CollectionViewer({
   media,
   startIndex = 0,
   startAt = 0,
+  // La piste choisie sur la fiche (« vf », « vostfr »). La séance ne fait que
+  // l'honorer : le choix se prend là où l'on voit ce qui existe, pas au milieu
+  // d'un film.
+  lang = "",
   onClose,
   onProgress,
 }) {
@@ -76,6 +80,7 @@ export default function CollectionViewer({
     onClose,
     onProgress,
     defaultHost: live.defaultHost || "",
+    lang,
     // Rien à ouvrir : on n'allume plus un poste, on lance une vidéo.
     warmupMs: 0,
     outroMs: 180,
@@ -531,6 +536,10 @@ function SourcePicker({ session: s, defaultHost, onStar, onDrop, busyHost }) {
                 >
                   <span className="vw-src-dot" aria-hidden="true" />
                   <span className="vw-src-label">{src.label}</span>
+                  {/* La piste de CETTE adresse. Elle n'est pas un choix ici —
+                      il se prend sur la fiche — mais elle dit pourquoi deux
+                      lecteurs du même épisode ne donnent pas la même chose. */}
+                  {src.lang && <em className="vw-src-lang">{langLabel(src.lang)}</em>}
                 </button>
 
                 <button

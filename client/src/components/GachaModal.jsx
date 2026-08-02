@@ -7,7 +7,6 @@ import { useScrollLock } from "../hooks/useScrollLock";
 import { useBackClose } from "../hooks/useBackClose";
 import {
   playCoinDrop,
-  playCrankNotch,
   playCrankRelease,
   playCapsuleRoll,
   playCapsuleLand,
@@ -29,6 +28,12 @@ const GachaScene = lazy(() => import("./GachaScene"));
 // et trois éléments d'interface — le bouton qui lance, l'invite à secouer, et
 // le nom de ce qu'on a sorti.
 //
+// UN SEUL GESTE, ET C'EST LE BON. La sphère se tournait à la main avant de
+// lâcher sa boule : deux épreuves à la suite pour un seul tirage, et la
+// première n'était que du protocole — on paie, donc la machine doit servir.
+// Elle sert donc toute seule : on paie, ça clique, la capsule sort et roule
+// jusqu'à la main. Le joueur n'a plus qu'une chose à faire, mais elle compte.
+//
 // LA BOULE NE S'OUVRE PAS TOUTE SEULE. Elle arrive dans la main, fermée, et
 // c'est le joueur qui la SECOUE pour la faire céder : la souris qu'on agite, le
 // téléphone qu'on remue, ou des clics répétés. Pendant qu'on secoue on entend
@@ -36,14 +41,12 @@ const GachaScene = lazy(() => import("./GachaScene"));
 // cogne — et la couture s'allume à mesure qu'on approche. C'est le seul moment
 // où le joueur FAIT quelque chose, et c'est celui qu'on retient.
 
-const T = { fall: 1250, rise: 700, crack: 900 };
-
-// LA SPHÈRE NE TOURNE PAS TOUTE SEULE — mais elle ne doit jamais coincer la
-// séance non plus. Passé ce délai sans qu'on y touche, le mécanisme se
-// débloque de lui-même : le boîtier est déjà payé et acquis côté serveur, et
-// laisser quelqu'un devant une machine qui ne répond pas (souris capricieuse,
-// clavier seulement, geste pas compris) serait le pire des dénouements.
-const CRANK_PATIENCE = 7000;
+// `arm` : le temps que le mécanisme se mette en place avant de lâcher la boule.
+// Ce n'est pas une pause décorative — la capsule sort par un trajet FIXE, donc
+// la bouche de la sphère doit s'être remise face au spectateur avant qu'elle ne
+// s'y engage (voir la remise en place, côté scène). C'est aussi ce qui donne au
+// déclic le temps de s'entendre.
+const T = { arm: 340, fall: 1250, rise: 700, crack: 900 };
 
 // Ce qu'un geste ajoute à la jauge de secouage — et donc LA DURÉE DE
 // L'ÉPREUVE, qui se lit sur la différence entre ce gain et la fuite de 0,30/s
@@ -71,7 +74,6 @@ const prefersReducedMotion = () =>
 // image : le passer par React ferait ramer la 3D, et empêcherait surtout les
 // mouvements de se chevaucher (voir `Clock`, côté scène).
 const freshAnim = () => ({
-  crank: 0,
   shake: 0,
   capsule: 0,
   fall: 0,
@@ -91,7 +93,7 @@ export default function GachaModal({ token, onClose, onDrawn }) {
   useScrollLock(true);
   const navigate = useNavigate();
 
-  // idle | cranking | falling | rising | waiting | cracking | revealed
+  // idle | arming | falling | rising | waiting | cracking | revealed
   const [phase, setPhase] = useState("idle");
   const [data, setData] = useState(null);
   const [result, setResult] = useState(null);
@@ -259,37 +261,6 @@ export default function GachaModal({ token, onClose, onDrawn }) {
     return () => window.removeEventListener("devicemotion", onMotion);
   }, [waiting, bump]);
 
-  // ------------------------------------------------- tourner la manivelle --
-
-  // Un cran franchi : le rochet claque, et il durcit vers la fin du tour.
-  const notch = useCallback((p) => playCrankNotch(p), []);
-
-  // LE TOUR EST FAIT — le mécanisme lâche sa boule, et la suite s'enchaîne.
-  // Appelé par la manivelle quand on l'a tournée en entier, ou par le filet de
-  // sécurité si personne ne l'a touchée.
-  const release = useCallback(() => {
-    if (phaseRef.current !== "cranking") return;
-    clearTimers();
-    const a = anim.current;
-    a.crank = 1;
-    a.shake = 1; // la machine encaisse le déclic
-    playCrankRelease();
-
-    if (prefersReducedMotion()) {
-      a.fall = 1;
-      a.rise = 1;
-      a.back = 1;
-      setPhase("waiting");
-      return;
-    }
-    setPhase("falling");
-    after(120, playCapsuleRoll);
-    after(T.fall - 150, playCapsuleLand);
-    after(T.fall, () => setPhase("rising"));
-    after(T.fall + T.rise, () => setPhase("waiting"));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // ------------------------------------------------------------ tirer --
 
   async function draw() {
@@ -309,18 +280,37 @@ export default function GachaModal({ token, onClose, onDrawn }) {
     anim.current = freshAnim();
 
     // LA SCÈNE PART TOUT DE SUITE, la requête aussi : elles courent ensemble.
-    // Attendre la réponse pour tourner la manivelle mettrait un temps mort pile
-    // là où le geste doit répondre au doigt — et le serveur a largement le
-    // temps de répondre avant que la boule arrive dans la main.
-    setPhase("cranking");
+    // Attendre la réponse pour lâcher la boule mettrait un temps mort pile là
+    // où la machine doit répondre au clic — et le serveur a largement le temps
+    // de répondre avant que la capsule arrive dans la main.
+    setPhase("arming");
     playCoinDrop();
 
     const skipAll = prefersReducedMotion();
-    // La suite n'est PAS lancée ici : c'est la manivelle qui la déclenche
-    // (`release`). On n'arme que le filet de sécurité — et en mouvement réduit,
-    // où l'on ne demande aucun geste, on la tourne pour l'utilisateur.
-    if (skipAll) after(0, release);
-    else after(CRANK_PATIENCE, release);
+    if (skipAll) {
+      // Aucun trajet à regarder : la boule est dans la main, il ne reste que le
+      // secouage (et lui aussi sera abrégé plus bas, dès que la réponse est là).
+      // Le déclic, lui, se joue quand même — c'est le mouvement qu'on a coupé,
+      // pas le son.
+      const a = anim.current;
+      a.fall = 1;
+      a.rise = 1;
+      a.back = 1;
+      playCrankRelease();
+      setPhase("waiting");
+    } else {
+      // LE MÉCANISME SERT TOUT SEUL. Plus rien à tourner : le déclic, la
+      // capsule qui roule, la chute, la montée vers l'œil — et la main.
+      after(T.arm, () => {
+        anim.current.shake = 1; // la machine encaisse le déclic
+        playCrankRelease();
+        setPhase("falling");
+      });
+      after(T.arm + 120, playCapsuleRoll);
+      after(T.arm + T.fall - 150, playCapsuleLand);
+      after(T.arm + T.fall, () => setPhase("rising"));
+      after(T.arm + T.fall + T.rise, () => setPhase("waiting"));
+    }
 
     try {
       const d = await apiFetch("/collection/gacha/draw", { method: "POST", token });
@@ -341,14 +331,17 @@ export default function GachaModal({ token, onClose, onDrawn }) {
 
   // SAUTER LA MISE EN SCÈNE. Au vingtième tour, ce qu'on adorait la première
   // fois devient une attente : un clic pose la boule dans la main tout de
-  // suite. On ne saute NI la manivelle NI l'ouverture — ce sont les deux gestes
-  // du joueur, et c'est ce qu'il est venu faire ; seule la chute, qu'il ne fait
-  // que regarder, s'abrège.
+  // suite. On ne saute PAS l'ouverture — c'est le geste du joueur, et c'est ce
+  // qu'il est venu faire ; seul le trajet de la capsule, qu'il ne fait que
+  // regarder, s'abrège.
+  //
+  // Pas pendant l'armement : ces trois dixièmes de seconde sont ceux du double
+  // clic sur « Lancer », et on ne saute pas la mise en scène en demandant à la
+  // lancer.
   function toHand() {
-    if (!busy || waiting || phase === "cranking") return;
+    if (!busy || waiting || phase === "arming") return;
     clearTimers();
     const a = anim.current;
-    a.crank = 1;
     a.fall = 1;
     a.rise = 1;
     a.back = 1;
@@ -398,8 +391,6 @@ export default function GachaModal({ token, onClose, onDrawn }) {
             won={won}
             hue={hue}
             anim={anim}
-            onNotch={notch}
-            onRelease={release}
             onSettled={() => setPosed(true)}
           />
         )}
@@ -440,21 +431,6 @@ export default function GachaModal({ token, onClose, onDrawn }) {
               <Coins size={12} /> {fmt(points)}
             </span>
           )}
-        </div>
-      )}
-
-      {/* ---------------- TOURNE ----------------
-          La machine est payée et armée : plus rien ne se passe tant qu'on n'a
-          pas tourné. L'anneau d'or qui bat autour de la sphère est l'invite,
-          ces deux lignes sont la confirmation qu'on ne s'est pas trompé
-          d'écran. */}
-      {phase === "cranking" && (
-        <div className="gch-shake">
-          <span className="gch-turn-ic" aria-hidden="true">
-            <RotateCcw size={22} />
-          </span>
-          <b>Fais tourner la sphère</b>
-          <em>attrape-la et fais-lui faire un tour complet</em>
         </div>
       )}
 

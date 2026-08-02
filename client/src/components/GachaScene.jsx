@@ -308,7 +308,7 @@ const GLASS = "#eef8ff"; // le verre, à peine bleuté
 const HALO = "#ffc7e6"; // le rose qui l'auréole par-derrière
 const LIGHT = "#fff0c4"; // la lumière qui borde la bouche et flaque au sol
 
-function Machine({ balls, anim, onNotch, onRelease, armed }) {
+function Machine({ balls, anim }) {
   const group = useRef(null);
   // De quel calme la sphère est gagnée. `a.capsule` bascule de 0 à 1 D'UN COUP
   // au moment où l'on paie ; couper la dérive dessus la ferait sauter de son
@@ -362,9 +362,9 @@ function Machine({ balls, anim, onNotch, onRelease, armed }) {
           sera pas pour une modale), juste une grande tache de lumière posée en
           arrière de la bulle. C'est LUI qui fait que le verre a l'air d'émettre
           au lieu d'être découpé sur du noir. */}
-      <Bloom anim={anim} armed={armed} />
+      <Bloom anim={anim} />
 
-      <Orb balls={balls} anim={anim} armed={armed} onNotch={onNotch} onRelease={onRelease} />
+      <Orb balls={balls} anim={anim} />
 
       {/* LES ÉTINCELLES. Rien ne dit « gachapon » aussi vite qu'une poussière
           qui scintille autour de la bulle — et c'est trente lignes de shader
@@ -394,25 +394,22 @@ function Machine({ balls, anim, onNotch, onRelease, armed }) {
 // cœur. Toutes deux en additif, donc sans contour possible — et c'est ce qu'on
 // veut : ce n'est pas une pièce de la machine, c'est de la lumière.
 //
-// Elles s'intensifient quand la sphère devient manœuvrable : l'objet s'allume
-// au moment où il attend un geste, ce qui vaut mieux que n'importe quelle
-// flèche clignotante.
-function Bloom({ anim, armed }) {
+// Elles respirent, lentement, et s'éteignent quand la machine recule : la
+// sphère n'a plus de geste à réclamer (on ne la tourne plus), elle n'a donc
+// plus qu'à rayonner comme l'objet qu'elle est.
+function Bloom({ anim }) {
   const wide = useRef(null);
   const core = useRef(null);
   const glow = useGlow();
 
   useFrame((state) => {
     const back = easeInOut(anim.current.back);
-    const t = state.clock.elapsedTime;
-    const call = armed ? 1 : 0;
-    // Une respiration lente, plus ample quand on attend le geste.
-    const beat = 0.85 + Math.sin(t * (armed ? 1.9 : 0.8)) * (armed ? 0.15 : 0.09);
+    const beat = 0.85 + Math.sin(state.clock.elapsedTime * 0.8) * 0.09;
     if (wide.current) {
-      wide.current.material.opacity = (0.34 + call * 0.16) * beat * (1 - back);
+      wide.current.material.opacity = 0.34 * beat * (1 - back);
     }
     if (core.current) {
-      core.current.material.opacity = (0.2 + call * 0.14) * beat * (1 - back);
+      core.current.material.opacity = 0.2 * beat * (1 - back);
     }
   });
 
@@ -517,34 +514,31 @@ function Floor({ anim }) {
 // juste un liseré qui rougeoie autour de l'ouverture. C'est ce que ferait un
 // jeu, et c'est ce qui rend le trou lisible d'un coup d'œil.
 //
-// ON LA TOURNE À LA MAIN, TOUT LE TEMPS. Elle se manipule dès qu'elle est à
-// l'écran : on l'attrape, on la fait rouler, on la lâche et elle continue sur
-// son erre. Ce n'est pas un ornement — c'est ce qui transforme une image en
-// objet, et c'est aussi le geste de la partie : quand la machine est armée, ce
-// même roulement compte, et UN TOUR COMPLET ramène la bouche face à soi et lâche
-// la capsule. La fin du geste se lit sur l'objet, sans aucune jauge.
-const NOTCHES = 12; // crans par tour : assez pour que ça craque, pas pour râper
+// ON LA TOURNE À LA MAIN, MAIS ÇA NE COMPTE PAS. Elle se manipule tant qu'elle
+// n'a pas lâché sa boule : on l'attrape, on la fait rouler, on la lâche et elle
+// continue sur son erre. Ce n'est pas un ornement — c'est ce qui transforme une
+// image en objet — mais ce n'est PLUS le geste de la partie : le tirage se paie
+// au bouton, le mécanisme sert tout seul, et le seul geste demandé au joueur est
+// de secouer la capsule une fois qu'il l'a en main (voir GachaModal). Une
+// épreuve avant l'épreuve, ça ne faisait que retarder la seule qui compte.
 const SPIN_PX = 560; // pixels de glissé pour un tour complet
 const TAU = Math.PI * 2;
 
-function Orb({ balls, anim, armed, onNotch, onRelease }) {
+function Orb({ balls, anim }) {
   const shell = useRef(null);
   const lip = useRef(null);
-  const notch = useRef(0);
   const [hot, setHot] = useState(false);
   const ring = useRingGlow();
 
   // LE ROULEMENT LIBRE, en un seul endroit. `free` est l'angle où le joueur a
   // laissé la sphère, `spin` sa vitesse résiduelle, `tilt` le basculement.
-  // `way` est le sens du tour en cours (voir plus bas).
-  const turn = useRef({ free: 0, spin: 0, tilt: 0, way: 0, at: null });
+  const turn = useRef({ free: 0, spin: 0, tilt: 0, at: null });
 
-  // On ne peut attraper la sphère qu'à deux moments : AVANT le tirage (elle
-  // n'est qu'un objet, on la regarde) et PENDANT l'armement (elle est le
-  // geste). Entre les deux — la chute, la montée, le secouage, l'ouverture —
-  // le pointeur appartient à la capsule, et lui disputer le glissé casserait le
-  // secouage, qui est le seul vrai moment de jeu.
-  const holdable = () => armed || anim.current.capsule < 0.5;
+  // On ne peut attraper la sphère qu'AVANT le tirage : elle n'est alors qu'un
+  // objet, et on la regarde. Une fois la machine payée — la chute, la montée, le
+  // secouage, l'ouverture — le pointeur appartient à la capsule, et lui disputer
+  // le glissé casserait le secouage, qui est le seul vrai moment de jeu.
+  const holdable = () => anim.current.capsule < 0.5;
 
   // Le curseur dit que ça se tourne. Nettoyé au démontage : une modale fermée
   // en plein survol laisserait la page entière en « grab ».
@@ -556,15 +550,10 @@ function Orb({ balls, anim, armed, onNotch, onRelease }) {
   }, [hot]);
 
   function down(e) {
-    if (!holdable() || anim.current.crank >= 1) return;
+    if (!holdable()) return;
     e.stopPropagation();
     e.target.setPointerCapture?.(e.pointerId);
     const t = turn.current;
-    // Le sens ne se reprend qu'au DÉPART d'un tour. Relâcher au milieu et
-    // ressaisir doit continuer le même mouvement, pas rouvrir le choix : sinon
-    // il suffit de lâcher et de reprendre pour avancer dans les deux sens, et
-    // le garde-fou ne garde plus rien.
-    if (anim.current.crank <= 0) t.way = 0;
     t.at = { x: e.clientX, y: e.clientY };
     t.spin = 0;
     document.body.style.cursor = "grabbing";
@@ -583,37 +572,8 @@ function Orb({ balls, anim, armed, onNotch, onRelease }) {
     t.tilt = Math.max(-0.34, Math.min(0.34, t.tilt + dy * 0.005));
     // La vitesse résiduelle, pour que le lâcher ait une suite.
     t.spin = (dx / SPIN_PX) * TAU * 9;
-
-    if (!armed) {
-      // Hors partie, elle roule pour le plaisir : rien à compter.
-      t.free += (dx / SPIN_PX) * TAU;
-      return;
-    }
-
-    if (!t.way) {
-      // Le premier mouvement franc décide du sens. Un pixel ne suffit pas : un
-      // doigt qui se pose tremble toujours un peu, et il choisirait à notre
-      // place. UN SEUL SENS ensuite — revenir en arrière défait le tour au lieu
-      // de l'avancer, sans quoi secouer la souris de gauche à droite suffirait
-      // à ouvrir la machine, ce qui n'est pas un geste mais une triche.
-      if (Math.abs(dx) < 2) return;
-      t.way = Math.sign(dx);
-    }
-
-    const a = anim.current;
-    a.crank = clamp01(a.crank + (dx * t.way) / SPIN_PX);
-
-    const n = Math.floor(a.crank * NOTCHES);
-    if (n !== notch.current) {
-      notch.current = n;
-      onNotch?.(a.crank);
-    }
-    if (a.crank >= 1) {
-      t.at = null;
-      t.spin = 0;
-      document.body.style.cursor = "";
-      onRelease?.();
-    }
+    // Elle roule pour le plaisir : il n'y a rien à compter.
+    t.free += (dx / SPIN_PX) * TAU;
   }
 
   const up = () => {
@@ -623,70 +583,65 @@ function Orb({ balls, anim, armed, onNotch, onRelease }) {
     document.body.style.cursor = hot ? "grab" : "";
   };
 
-  useFrame((state, raw) => {
+  useFrame((_, raw) => {
     const dt = Math.min(raw, 0.05);
     const a = anim.current;
     const t = turn.current;
+
+    // LA MACHINE EST PAYÉE : la sphère n'est plus à nous. On lâche ce qu'on
+    // tenait (le pointeur revient à la capsule) et la bouche se remet en place.
+    const armed = a.capsule > 0.5;
+    if (armed && t.at) {
+      t.at = null;
+      t.spin = 0;
+      document.body.style.cursor = "";
+    }
+    // Le curseur « main ouverte » avec : la sphère ne s'attrape plus, et rien
+    // n'est plus déroutant qu'un objet qui se dit saisissable et ne l'est pas.
+    if (armed && hot) setHot(false);
 
     if (!t.at) {
       // L'ERRE. On lâche, elle continue et s'éteint — c'est ce qui donne du
       // poids à un objet qu'on ne peut pas toucher. Amortissement exponentiel
       // (et non linéaire) : le même freinage quel que soit le nombre d'images.
-      //
-      // Elle ne pousse PAS le même compteur selon le moment. Hors partie elle
-      // fait tourner l'angle libre ; pendant l'armement elle pousse le TOUR,
-      // sans quoi les deux se disputeraient le même angle (l'erre pousse dans
-      // un sens, la remise en place tire dans l'autre, la sphère vibre). Et
-      // c'est bien mieux ainsi : un lancer franc termine le tour tout seul.
-      if (armed) {
-        if (t.way && Math.sign(t.spin) === t.way && a.crank > 0 && a.crank < 1) {
-          a.crank = clamp01(a.crank + (Math.abs(t.spin) * dt) / TAU);
-          const n = Math.floor(a.crank * NOTCHES);
-          if (n !== notch.current) {
-            notch.current = n;
-            onNotch?.(a.crank);
-          }
-          if (a.crank >= 1) onRelease?.();
-        }
-      } else {
-        t.free += t.spin * dt;
-      }
+      t.free += t.spin * dt;
       t.spin *= Math.pow(0.1, dt);
       if (Math.abs(t.spin) < 1e-3) t.spin = 0;
       // Elle se redresse toute seule, doucement.
       t.tilt += (0 - t.tilt) * Math.min(1, dt * 1.4);
       // Et elle dérive, tant qu'on ne lui demande rien : une sphère
       // parfaitement immobile est une maquette.
-      if (!armed && a.capsule < 0.5 && !t.spin) t.free += dt * 0.14;
+      if (!armed && !t.spin) t.free += dt * 0.14;
     }
 
     // LA REMISE EN PLACE. La capsule sort par un trajet FIXE dans l'espace de la
     // machine (voir FALL_PATH) : au moment où elle passe, la bouche doit donc
-    // être là où ce trajet l'attend. Dès que la sphère est armée, l'angle libre
+    // être là où ce trajet l'attend. Dès que la machine est payée, l'angle libre
     // revient au tour entier le plus proche — ce qui, à un tour près, est
-    // exactement « bouche devant ». Le tour du joueur s'ajoute par-dessus, et
-    // comme il vaut 2π pile, il l'y ramène.
+    // exactement « bouche devant ».
+    //
+    // C'EST CE QUI PAIE LE TEMPS D'ARMEMENT. La sphère dérive en permanence :
+    // au moment du clic, sa bouche regarde n'importe où, et la capsule ne
+    // s'engage qu'une fois qu'elle est revenue (voir `T.arm`, côté modale). Un
+    // rappel brutal ferait sauter le tas de bonbons d'un demi-tour sur une
+    // image ; celui-ci met deux dixièmes, la boule en attend trois.
     if (armed) {
       const home = Math.round(t.free / TAU) * TAU;
-      t.free += (home - t.free) * Math.min(1, dt * 5);
+      t.free += (home - t.free) * Math.min(1, dt * 14);
     }
 
     if (shell.current) {
       // Elle suit la main, dans le sens de la main : tirer à gauche et voir
       // l'objet partir à droite est la façon la plus sûre de casser un geste.
-      shell.current.rotation.y = t.free + (t.way || 1) * a.crank * TAU;
+      shell.current.rotation.y = t.free;
       shell.current.rotation.x = t.tilt;
     }
 
-    // LE LISERÉ DE LA BOUCHE. C'est la seule invite de tout l'écran : il
-    // rougeoie doucement en permanence (le trou doit se voir), et il BAT quand
-    // la sphère attend un tour.
+    // LE LISERÉ DE LA BOUCHE. Le trou doit se voir : il rougeoie doucement, un
+    // peu plus quand la main passe dessus, et s'éteint avec la machine qui
+    // recule. Il ne bat plus — il n'appelle plus aucun geste.
     if (lip.current) {
-      const call = armed && a.crank < 1 ? 1 : 0;
-      const beat = 0.5 + Math.sin(state.clock.elapsedTime * 2.4) * 0.5;
-      lip.current.material.opacity =
-        (0.42 + call * (0.2 + beat * 0.38) + (hot ? 0.18 : 0)) *
-        (1 - easeInOut(a.back));
+      lip.current.material.opacity = (0.42 + (hot ? 0.18 : 0)) * (1 - easeInOut(a.back));
     }
   });
 
@@ -1399,7 +1354,7 @@ function Prize({ media, anim, onSettled }) {
 // avancements se CHEVAUCHENT volontairement (la machine recule pendant que la
 // boule monte, l'objet grandit pendant que les coquilles s'écartent) : c'est
 // ce recouvrement qui fait une scène plutôt qu'un diaporama.
-const PHASES = ["idle", "cranking", "falling", "rising", "waiting", "cracking", "revealed"];
+const PHASES = ["idle", "arming", "falling", "rising", "waiting", "cracking", "revealed"];
 
 function Clock({ phase, anim }) {
   useFrame((_, raw) => {
@@ -1409,13 +1364,12 @@ function Clock({ phase, anim }) {
       target > v ? Math.min(target, v + dt / secs) : Math.max(target, v - dt / secs);
     const after = (p) => PHASES.indexOf(phase) >= PHASES.indexOf(p);
 
-    // `crank` n'est PLUS piloté par le temps : c'est la main qui le fait
-    // avancer (voir `Orb`). L'horloge se contente de le remettre à zéro quand
-    // la sphère n'est pas manœuvrable.
-    if (!after("cranking")) a.crank = 0;
     // La secousse ne dure qu'un instant, au moment où le rochet lâche.
     a.shake = Math.max(0, a.shake - dt * 3.2);
-    a.capsule = after("cranking") ? 1 : 0;
+    // `capsule` bascule DÈS L'ARMEMENT, avant même que la boule bouge : c'est
+    // lui qui dit à la sphère qu'elle ne s'attrape plus et qu'elle doit remettre
+    // sa bouche en place (voir `Orb`).
+    a.capsule = after("arming") ? 1 : 0;
     a.fall = after("falling") ? to(a.fall, 1, 1.25) : 0;
     a.rise = after("rising") ? to(a.rise, 1, 0.7) : 0;
     // La machine commence à reculer DÈS que la boule monte : les deux gestes
@@ -1569,16 +1523,7 @@ function Fit() {
   return null;
 }
 
-export default function GachaScene({
-  phase,
-  balls,
-  won,
-  hue,
-  onSettled,
-  onNotch,
-  onRelease,
-  anim,
-}) {
+export default function GachaScene({ phase, balls, won, hue, onSettled, anim }) {
   const drag = useRef({ down: false, x: 0, y: 0 });
   // L'éclat prend la couleur du BOÎTIER (c'est lui qu'on célèbre) ; la capsule,
   // elle, a sa propre teinte tirée au sort — elle ne doit rien annoncer.
@@ -1630,13 +1575,7 @@ export default function GachaScene({
       <Clock phase={phase} anim={anim} />
       <Rig />
 
-      <Machine
-        balls={balls}
-        anim={anim}
-        armed={phase === "cranking"}
-        onNotch={onNotch}
-        onRelease={onRelease}
-      />
+      <Machine balls={balls} anim={anim} />
       <Capsule hue={hue} anim={anim} />
       <RevealLight anim={anim} tint={tint} />
       <Burst tint={tint} anim={anim} />
