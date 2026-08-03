@@ -128,6 +128,21 @@ const bases = makeBaseStore();
 const baseFor = (code) => bases.get(code);
 
 // ============================================================
+//  « Suivant » — couper court à la révélation
+// ============================================================
+// Personne ne peut décider pour les autres : la manche suivante ne démarre en
+// avance que si TOUT LE MONDE a cliqué. C'est un vote, pas un bouton — sans
+// quoi le premier joueur à s'ennuyer escamoterait la révélation de ceux qui
+// sont encore en train de lire le nom du jeu.
+//
+// En mémoire du process, comme le chrono des salons : ça ne survit pas à un
+// redémarrage, et ça n'a aucune raison d'y survivre (le décompte reprend la
+// main, la partie continue).
+const skips = new Map(); // code -> Set<userId>
+const skipsOf = (code) => skips.get(code) || new Set();
+const clearSkips = (code) => skips.delete(code);
+
+// ============================================================
 //  Sérialisation
 // ============================================================
 
@@ -147,6 +162,23 @@ function isSettled(round, userId) {
   if (!round) return false;
   const mine = round.attempts.filter((a) => String(a.user) === String(userId));
   return mine.some((a) => a.correct) || mine.filter((a) => !a.correct).length >= LIVES;
+}
+
+// ------------------------------------------------------------ les spectateurs
+// QUI A LE DROIT DE REGARDER LES AUTRES. Un joueur qui a fini sa manche —
+// trouvé, ou à court de vies — n'a plus rien à gagner sur ce lieu : il peut
+// donc voir les écrans des autres sans que ça change quoi que ce soit au
+// classement. Un joueur ENCORE EN COURSE, lui, n'y a jamais droit : voir où un
+// adversaire pointe sa caméra ou ce qu'il tape serait l'indice le plus fort du
+// jeu, et c'est exactement ce que le mode classique refuse.
+//
+// C'est la seule règle derrière la grille d'écrans (« ils cherchent encore »)
+// et elle se vérifie ICI, jamais côté client : le serveur n'envoie rien à ceux
+// qui n'y ont pas droit, plutôt que de leur demander de ne pas regarder.
+function watcherIds(room, round, exceptId) {
+  return playerIds(room).filter(
+    (id) => id !== String(exceptId ?? "") && isSettled(round, id)
+  );
 }
 
 function mapPayload(base, round) {
@@ -176,7 +208,14 @@ function roundView(room, meId) {
   // dans ce jeu ? » n'a aucun sens si on ne dit pas lequel. Le POINT DE RÉPONSE
   // de la carte, lui, reste au serveur jusqu'à la révélation — c'est encore un
   // score en jeu.
-  const named = revealed || room.phase === "map";
+  //
+  // …et il tombe aussi, en pleine manche, POUR QUI VIENT DE LE TROUVER : en
+  // classique sa carte se joue tout de suite, et l'en-tête sans titre serait
+  // absurde. Ça ne lui apprend rien — c'est le mot qu'il vient de taper.
+  const iFound = round.attempts.some(
+    (a) => a.correct && String(a.user) === String(meId)
+  );
+  const named = revealed || room.phase === "map" || iFound;
 
   const found = round.attempts
     .filter((a) => a.correct)
@@ -209,10 +248,12 @@ function roundView(room, meId) {
     // Qui a déjà posé son épingle (phase carte) : on montre l'avancement sans
     // rien dire de l'endroit choisi.
     pinned: round.results.filter((r) => r.mapX != null).map((r) => String(r.user)),
-    // Buzzer : le fil des tentatives de tout le monde. Classique : seulement
-    // les miennes (pour réafficher mes propres ratés au rechargement).
+    // Buzzer : le fil des tentatives de tout le monde. Classique : les miennes
+    // (pour réafficher mes propres ratés au rechargement) — plus celles des
+    // autres UNE FOIS MA MANCHE FINIE, sinon un rechargement de page en plein
+    // spectacle viderait les fausses pistes de la grille d'écrans.
     attempts:
-      room.mode === "buzzer"
+      room.mode === "buzzer" || isSettled(round, meId)
         ? round.attempts.map((a) => ({
             userId: String(a.user),
             name: a.name,
@@ -416,6 +457,12 @@ async function endRound(room) {
 
   const players = activePlayers(room);
   const winners = round.attempts.filter((a) => a.correct);
+  // Les épingles déjà posées PENDANT la manche (classique). `results` est
+  // entièrement reconstruit juste en dessous : sans cette copie, le travail des
+  // joueurs qui ont trouvé tôt et se sont situés dans la foulée serait effacé.
+  const early = new Map(
+    round.results.filter((r) => r.mapX != null).map((r) => [String(r.user), r])
+  );
 
   round.results = players.map((p) => {
     const uid = String(p.user?._id || p.user);
@@ -439,8 +486,8 @@ async function endRound(room) {
       misses,
       order,
       points,
-      mapX: null,
-      mapY: null,
+      mapX: early.get(uid)?.mapX ?? null,
+      mapY: early.get(uid)?.mapY ?? null,
       mapDistance: null,
       mapRank: null,
       mapPoints: 0,
@@ -450,37 +497,58 @@ async function endRound(room) {
   if (room.mode === "buzzer" && winners.length)
     round.winner = winners[0].user;
 
-  // La manche carte a lieu dans LES DEUX MODES, mais pas pour les mêmes gens :
-  //   classique  ceux qui ont trouvé le jeu (récompense, barème absolu) ;
-  //   buzzer     tout le monde, y compris les battus — c'est leur revanche, et
-  //              c'est le classement des distances qui paie.
-  const eligible = mapEligible(room, round);
-  if (round.mapImage && round.mapAnswerX != null && eligible.length) {
-    room.phase = "map";
-    room.phaseStartsAt = Date.now();
-    room.phaseEndsAt = room.phaseStartsAt + MAP_MS;
-    touch(room);
-    await room.save();
-    await room.populate(POPULATE);
-    toEachRoom(room, "map", { eligible });
-    schedule(room.code, room.phaseEndsAt, () => withRoom(room.code, endMap));
-    return room;
+  // ------------------------------------------------------ où se joue la carte
+  // BUZZER : phase commune, après la manche. Tout le monde y va, y compris les
+  // battus — c'est leur revanche, et c'est le classement des distances qui
+  // paie. Un temps à part se justifie parce que TOUT LE MONDE joue.
+  //
+  // CLASSIQUE : plus de phase du tout. La carte se joue PENDANT la manche, dès
+  // qu'on a trouvé le jeu, sur son propre temps restant (cf. POST /:code/map).
+  // C'était l'anomalie : seuls ceux qui avaient trouvé y avaient droit, mais
+  // TOUT LE MONDE attendait leurs 25 secondes — et celui qui trouvait en dix
+  // secondes se retrouvait à patienter deux fois. Trouver vite doit acheter du
+  // temps de carte, pas du temps d'attente. Qui ne s'est pas situé avant la fin
+  // de la manche n'a pas de points de carte : tant pis, c'était son temps.
+  if (room.mode === "buzzer") {
+    const eligible = mapEligible(room, round);
+    if (round.mapImage && round.mapAnswerX != null && eligible.length) {
+      room.phase = "map";
+      room.phaseStartsAt = Date.now();
+      room.phaseEndsAt = room.phaseStartsAt + MAP_MS;
+      touch(room);
+      await room.save();
+      await room.populate(POPULATE);
+      toEachRoom(room, "map", { eligible });
+      schedule(room.code, room.phaseEndsAt, () => withRoom(room.code, endMap));
+      return room;
+    }
+  } else {
+    scoreMapPins(room, round);
   }
   return startReveal(room);
 }
 
 // Qui a le droit de planter une épingle sur cette manche.
+//
+// On lit les TENTATIVES et non les résultats : en classique la carte se joue
+// pendant la manche, à un moment où `round.results` n'existe pas encore (il
+// n'est construit qu'à `endRound`). Les deux sources disent la même chose une
+// fois la manche close — « avoir une tentative correcte » et « avoir
+// `correct: true` dans les résultats » sont le même fait.
 function mapEligible(room, round) {
   const players = activePlayers(room).map((p) => String(p.user?._id || p.user));
   if (room.mode === "buzzer") return players;
-  return round.results.filter((r) => r.correct).map((r) => String(r.user));
+  const finders = new Set(
+    round.attempts.filter((a) => a.correct).map((a) => String(a.user))
+  );
+  return players.filter((id) => finders.has(id));
 }
 
-async function endMap(room) {
-  if (room.phase !== "map") return room;
-  const round = curRound(room);
-  if (!round) return finishGame(room);
-
+// Le pointage des épingles, quel que soit le chemin par lequel on y arrive :
+// la phase carte commune du buzzer, ou les épingles posées en cours de manche
+// en classique.
+function scoreMapPins(room, round) {
+  if (!round.mapImage || round.mapAnswerX == null) return;
   const answer = { x: round.mapAnswerX, y: round.mapAnswerY };
   const pinned = round.results.filter((r) => r.mapX != null);
   for (const r of pinned) {
@@ -503,6 +571,13 @@ async function endMap(room) {
       r.mapPoints = points;
     }
   }
+}
+
+async function endMap(room) {
+  if (room.phase !== "map") return room;
+  const round = curRound(room);
+  if (!round) return finishGame(room);
+  scoreMapPins(room, round);
   return startReveal(room);
 }
 
@@ -520,19 +595,24 @@ async function startReveal(room) {
   room.phase = "reveal";
   room.phaseStartsAt = Date.now();
   room.phaseEndsAt = room.phaseStartsAt + REVEAL_MS;
+  // Chaque révélation repart avec un vote vierge.
+  clearSkips(room.code);
   touch(room);
   await room.save();
   await room.populate(POPULATE);
   toEachRoom(room, "reveal");
 
-  schedule(room.code, room.phaseEndsAt, () =>
-    withRoom(room.code, async (r) => {
-      if (r.phase !== "reveal") return r;
-      if (r.index + 1 < r.rounds.length) return startCue(r, r.index + 1);
-      return finishGame(r);
-    })
-  );
+  schedule(room.code, room.phaseEndsAt, () => withRoom(room.code, leaveReveal));
   return room;
+}
+
+// La sortie de révélation : manche suivante, ou fin de partie. Deux chemins y
+// mènent — le décompte, et le vote unanime de « suivant ».
+async function leaveReveal(room) {
+  if (room.phase !== "reveal") return room;
+  clearSkips(room.code);
+  if (room.index + 1 < room.rounds.length) return startCue(room, room.index + 1);
+  return finishGame(room);
 }
 
 // ============================================================
@@ -541,6 +621,7 @@ async function startReveal(room) {
 async function finishGame(room) {
   if (room.phase === "done") return room;
   stopClock(room.code);
+  clearSkips(room.code);
   room.phase = "done";
   room.endedAt = new Date();
   room.phaseStartsAt = Date.now();
@@ -608,7 +689,18 @@ function shouldEndEarly(room, round) {
   const players = activePlayers(room).map((p) => String(p.user?._id || p.user));
   if (!players.length) return true;
   if (room.mode === "buzzer" && round.attempts.some((a) => a.correct)) return true;
-  return players.every((id) => isSettled(round, id));
+  if (!players.every((id) => isSettled(round, id))) return false;
+  // CLASSIQUE : la carte se joue dans le temps de la manche. Tant qu'un joueur
+  // qui a trouvé n'a pas posé son épingle, il lui reste quelque chose à faire —
+  // refermer la manche sur lui reviendrait à lui voler la moitié qu'il vient
+  // justement de gagner en trouvant vite.
+  if (room.mode === "classic" && round.mapImage && round.mapAnswerX != null) {
+    const pinned = new Set(
+      round.results.filter((r) => r.mapX != null).map((r) => String(r.user))
+    );
+    if (mapEligible(room, round).some((id) => !pinned.has(id))) return false;
+  }
+  return true;
 }
 
 // Idem pour la carte : quand tous les ayants droit ont planté leur épingle, on
@@ -761,11 +853,17 @@ router.post("/:code/leave", async (req, res) => {
       await room.save();
       await room.populate(POPULATE);
       toEachRoom(room, "lobby");
-      // La manche courante n'attend plus un joueur qui vient de partir.
+      // La manche courante n'attend plus un joueur qui vient de partir — ni la
+      // révélation, dont il retenait peut-être le seul vote manquant.
       const round = curRound(room);
       if (room.phase === "round" && round && shouldEndEarly(room, round))
         return endRound(room);
       if (room.phase === "map" && round && allPinned(room, round)) return endMap(room);
+      if (room.phase === "reveal") {
+        const set = skipsOf(room.code);
+        const ids = playerIds(room);
+        if (ids.length && ids.every((id) => set.has(id))) return leaveReveal(room);
+      }
       return room;
     });
     res.json({ ok: true });
@@ -894,11 +992,10 @@ router.post("/:code/guess", async (req, res) => {
       const found = round.attempts
         .filter((a) => a.correct)
         .map((a, i) => ({ userId: String(a.user), order: i + 1, atMs: a.atMs }));
-      toRoom(room, "guess", {
+      const common = {
         by: String(req.userId),
         correct,
         lives,
-        name: room.mode === "buzzer" ? name : null,
         found,
         livesById: Object.fromEntries(
           activePlayers(room).map((p) => {
@@ -909,7 +1006,19 @@ router.post("/:code/guess", async (req, res) => {
         out: activePlayers(room)
           .map((p) => String(p.user?._id || p.user))
           .filter((id) => isSettled(round, id) && !found.some((f) => f.userId === id)),
-      });
+      };
+      if (room.mode === "buzzer") {
+        toRoom(room, "guess", { ...common, name });
+      } else {
+        // Classique : le TITRE proposé ne part qu'aux spectateurs (cf.
+        // watcherIds). Les autres reçoivent le même évènement sans le nom —
+        // ils voient un cœur tomber, pas la fausse piste qui l'a coûté.
+        const eyes = watcherIds(room, round, null);
+        const blind = playerIds(room).filter((id) => !eyes.includes(id));
+        const env = { code: room.code, kind: "guess" };
+        emitTo(eyes, "geoversus", { ...env, ...common, name });
+        emitTo(blind, "geoversus", { ...env, ...common, name: null });
+      }
 
       if (shouldEndEarly(room, round)) await endRound(room);
       return { correct, lives, settled: isSettled(round, req.userId) };
@@ -923,33 +1032,86 @@ router.post("/:code/guess", async (req, res) => {
   }
 });
 
+// POST /:code/next — « suivant », pendant la révélation.
+// ---------------------------------------------------------------------------
+// C'EST UN VOTE, PAS UN BOUTON. Le premier joueur à s'ennuyer n'a pas à
+// escamoter la révélation de celui qui est encore en train de lire le nom du
+// jeu : la manche suivante ne part en avance que quand TOUT LE MONDE a cliqué.
+// À deux, c'est presque instantané ; à cinq, le décompte reste le filet.
+router.post("/:code/next", async (req, res) => {
+  try {
+    const out = await withRoom(String(req.params.code), async (room) => {
+      if (room.phase !== "reveal") return { error: "Ce n'est pas le moment.", status: 409 };
+      const me = String(req.userId);
+      const ids = playerIds(room);
+      if (!ids.includes(me)) return { error: "Tu ne joues pas ici.", status: 403 };
+
+      const set = skipsOf(room.code);
+      set.add(me);
+      skips.set(room.code, set);
+      const ready = ids.filter((id) => set.has(id));
+      toRoom(room, "skip", { ready, total: ids.length });
+
+      if (ready.length >= ids.length) return { room: await leaveReveal(room) };
+      return { ok: true, ready: ready.length, total: ids.length };
+    });
+    if (!out) return res.status(404).json({ error: "Ce salon n'existe plus." });
+    if (out.error) return res.status(out.status || 400).json({ error: out.error });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("geoversus next error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
 // POST /:code/map — je plante mon épingle. La vérité n'est renvoyée qu'à la
 // révélation : répondre « à 4 % » tout de suite laisserait deviner la zone.
 router.post("/:code/map", async (req, res) => {
   try {
     const out = await withRoom(String(req.params.code), async (room) => {
-      if (room.phase !== "map") return { error: "Ce n'est pas le moment.", status: 409 };
       const round = curRound(room);
       if (!round) return { error: "Manche introuvable.", status: 409 };
+      // Deux moments légitimes : la phase carte commune du buzzer, et — en
+      // classique — la manche elle-même, une fois le jeu trouvé.
+      const inline = room.mode === "classic" && room.phase === "round";
+      if (room.phase !== "map" && !inline)
+        return { error: "Ce n'est pas le moment.", status: 409 };
+      if (!round.mapImage || round.mapAnswerX == null)
+        return { error: "Pas de carte sur cette manche.", status: 409 };
       if (!mapEligible(room, round).includes(String(req.userId)))
         return { error: "Pas sur cette manche.", status: 403 };
 
       const pin = clampPin(req.body);
       if (!pin) return { error: "Épingle invalide.", status: 400 };
-      const mine = round.results.find((r) => String(r.user) === String(req.userId));
-      if (!mine) return { error: "Manche introuvable.", status: 409 };
-      if (mine.mapX != null) return { error: "Épingle déjà posée.", status: 409 };
-      mine.mapX = pin.x;
-      mine.mapY = pin.y;
+      const me = String(req.userId);
+      let mine = round.results.find((r) => String(r.user) === me);
+      if (mine) {
+        if (mine.mapX != null) return { error: "Épingle déjà posée.", status: 409 };
+        mine.mapX = pin.x;
+        mine.mapY = pin.y;
+      } else {
+        if (!inline) return { error: "Manche introuvable.", status: 409 };
+        // En pleine manche, les résultats n'existent pas encore : on ouvre la
+        // ligne du joueur juste pour y ranger l'épingle. `endRound` la
+        // complétera (et prend soin de ne pas l'écraser, cf. `early`).
+        // Tout le reste a une valeur par défaut au schéma : on n'écrit que ce
+        // qu'on sait, pour ne pas figer ici des champs qu'`endRound` calcule.
+        round.results.push({ user: req.userId, mapX: pin.x, mapY: pin.y });
+        mine = round.results[round.results.length - 1];
+      }
       touch(room);
       await room.save();
       await room.populate(POPULATE);
 
       toRoom(room, "pin", {
-        by: String(req.userId),
+        by: me,
         pinned: round.results.filter((r) => r.mapX != null).map((r) => String(r.user)),
       });
-      if (allPinned(room, round)) await endMap(room);
+      // Poser sa dernière épingle peut refermer la manche : en classique elle
+      // était peut-être la seule chose qu'on attendait encore.
+      if (inline) {
+        if (shouldEndEarly(room, round)) await endRound(room);
+      } else if (allPinned(room, round)) await endMap(room);
       return { ok: true };
     });
     if (!out) return res.status(404).json({ error: "Ce salon n'existe plus." });
@@ -961,32 +1123,46 @@ router.post("/:code/map", async (req, res) => {
   }
 });
 
-// POST /:code/typing — ce que je suis en train de taper. BUZZER UNIQUEMENT :
-// en classique, voir les autres chercher trahirait des pistes, et le mode
-// repose justement sur le fait qu'on est seul dans sa tête.
+// POST /:code/typing — ce que je suis en train de taper.
+//
+// BUZZER : tout le monde le voit, c'est le sel du mode — on sent une piste se
+// former en face et on accélère.
+// CLASSIQUE : les SPECTATEURS seulement (cf. watcherIds). Le mode repose sur le
+// fait qu'on est seul dans sa tête tant qu'on cherche ; une fois sa manche
+// finie, on rejoint le public et on a le droit de voir les autres ramer.
 //
 // Rien n'est écrit en base : c'est un geste, pas une donnée (même parti pris
 // que le `burst` de la watchparty).
 router.post("/:code/typing", async (req, res) => {
   try {
     const room = await loadRoom(req.params.code);
-    if (!room || room.mode !== "buzzer" || room.phase !== "round") return res.json({ ok: true });
-    if (!playerIds(room).includes(String(req.userId))) return res.json({ ok: true });
-    emitTo(
-      playerIds(room).filter((id) => id !== String(req.userId)),
-      "geoversus",
-      {
-        code: room.code,
-        kind: "typing",
-        by: String(req.userId),
-        text: String(req.body?.text || "").slice(0, 60),
-      }
-    );
+    if (!room || room.phase !== "round") return res.json({ ok: true });
+    const me = String(req.userId);
+    if (!playerIds(room).includes(me)) return res.json({ ok: true });
+    const to =
+      room.mode === "buzzer"
+        ? playerIds(room).filter((id) => id !== me)
+        : watcherIds(room, curRound(room), me);
+    if (!to.length) return res.json({ ok: true });
+    emitTo(to, "geoversus", {
+      code: room.code,
+      kind: "typing",
+      by: me,
+      text: String(req.body?.text || "").slice(0, 60),
+    });
     res.json({ ok: true });
   } catch {
     res.json({ ok: true });
   }
 });
+
+// NOTE — il a existé ici un POST /:code/look qui diffusait l'orientation de la
+// caméra de chacun, pour reconstituer « l'écran » des joueurs encore en course
+// chez les spectateurs. L'idée tenait techniquement (le panorama étant commun,
+// trois angles suffisaient à recadrer une vignette locale) mais elle saccadait :
+// quatre annonces par seconde et par joueur, chacune redessinant un fond
+// d'image, pour un décor qui n'apprend rien à personne. On a gardé le seul
+// morceau qui se regardait vraiment — CE QU'ILS TAPENT — et supprimé le reste.
 
 // POST /:code/again — l'hôte relance une manche… pardon, une PARTIE, avec les
 // mêmes joueurs. On remet le salon à zéro plutôt que d'en ouvrir un autre :
@@ -1090,6 +1266,53 @@ router.post("/:code/invite", async (req, res) => {
   } catch (err) {
     console.error("geoversus invite error:", err.message);
     res.status(500).json({ error: "Invitation non envoyée." });
+  }
+});
+
+// GET /:code/card — l'état d'un salon en trois lignes, pour la carte
+// d'invitation de la messagerie.
+// ---------------------------------------------------------------------------
+// Volontairement SÉPARÉ de `GET /:code` : cette carte est relue à chaque
+// ouverture du fil, par des gens qui pour la plupart ne jouent pas ici, et
+// `GET /:code` répondrait la manche en cours (l'image du panorama !) plus la
+// liste de recherche complète. Ici on ne dit que ce qu'une invitation a besoin
+// de dire — qui attend, et si ça vaut encore le coup de cliquer.
+//
+// Un salon disparu n'est PAS une erreur : c'est l'issue normale d'une carte
+// qu'on relit trois jours plus tard. On répond « gone » avec un 200 pour que le
+// client l'affiche au lieu de le traiter comme une panne.
+router.get("/:code/card", async (req, res) => {
+  try {
+    const room = await loadRoom(req.params.code);
+    if (!room) return res.json({ state: "gone" });
+    const active = activePlayers(room);
+    const done = room.phase === "done" || !!room.endedAt;
+    const champ = done
+      ? [...room.players]
+          .filter((p) => !p.leftAt)
+          .sort(
+            (a, b) =>
+              (b.score || 0) - (a.score || 0) || (b.correctCount || 0) - (a.correctCount || 0)
+          )[0]
+      : null;
+    res.json({
+      state: done ? "done" : room.startedAt ? "live" : "lobby",
+      mode: room.mode,
+      players: active.map((p) => person(p.user)),
+      count: active.length,
+      max: MAX_PLAYERS,
+      rounds: room.roundCount,
+      // La manche en cours, pour « manche 3/8 ». Le NUMÉRO ne dit rien du lieu :
+      // aucun risque de renseigner quelqu'un qui joue en parallèle.
+      index: room.index,
+      // Déjà dans le salon : la carte redevient une porte d'entrée (le serveur
+      // laisse revenir un joueur déjà inscrit, même partie lancée).
+      mine: allIds(room).includes(String(req.userId)),
+      winner: champ ? person(champ.user)?.username || null : null,
+    });
+  } catch (err) {
+    console.error("geoversus card error:", err.message);
+    res.json({ state: "gone" });
   }
 });
 

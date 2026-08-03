@@ -65,6 +65,33 @@ body.geo-immersive .app-shell {
   --app-sidebar-w: 0px;
 }
 
+/* ---------- Bord à bord, même hors partie ----------
+   Le voile du menu doit mourir sur les bords de la FENÊTRE, pas sur un liseré
+   de fond de site : un globe posé au milieu d'un cadre clair redevient une
+   illustration dans une page, exactement ce que cet écran refuse d'être. On
+   annule donc le padding de .app-content par des marges négatives — le motif
+   des autres pages plein écran du projet (cf. .pt-page, .bt-page).
+
+   `body:not(.geo-immersive)` et surtout PAS `.geo:not(.in-game)` : en partie
+   c'est .app-content lui-même qui passe à `padding: 0`, et la marge négative
+   décalerait alors le panorama hors de l'écran. Rien ne vient toucher le bord
+   pour autant : chaque écran intérieur (menu, attente, tableau final, salon de
+   versus) porte déjà son propre padding. */
+body:not(.geo-immersive) .geo {
+  margin: calc(-1 * var(--content-pad, 1.2rem));
+}
+
+@media (max-width: 760px) {
+  /* En bas, .app-content réserve la hauteur de la barre de navigation : une
+     marge négative uniforme n'en annulerait qu'une partie et laisserait une
+     bande claire sous le globe. Même formule qu'app-01. */
+  body:not(.geo-immersive) .geo {
+    margin-bottom: calc(
+      -1 * (var(--bottom-bar-h, 0px) + env(safe-area-inset-bottom) + 1.6rem)
+    );
+  }
+}
+
 /* En partie, la page occupe exactement la hauteur disponible : le panorama
    doit remplir, et rien ne doit défiler. */
 .geo.in-game {
@@ -1139,6 +1166,25 @@ body.geo-immersive .app-shell {
   }
 }
 
+/* ---------- La barre d'attrape ----------
+   Sur le bureau, ce n'est que l'en-tête. Sur téléphone, c'est la poignée de la
+   feuille : elle capte le glissement qui la fait monter et descendre, d'où le
+   `touch-action: none` (sinon le navigateur préempte le geste pour défiler). */
+.geo-map-grab {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  touch-action: none;
+}
+
+.geo-map-grip {
+  display: none;
+}
+
+.geo-map-pull {
+  display: none;
+}
+
 .geo-map-head {
   display: flex;
   align-items: center;
@@ -1434,31 +1480,104 @@ body.geo-immersive .app-shell {
   background: rgba(34, 211, 238, 0.14);
 }
 
+/* ======================================================================
+   Téléphone : la carte devient une FEUILLE qui monte du bas
+   ======================================================================
+   Le panneau posé dans un coin est une idée de grand écran. Sur téléphone il
+   mangeait d'emblée la moitié de la hauteur, alors que la première chose à
+   faire sur une manche carte est de TOURNER LA TÊTE dans le panorama pour
+   reconnaître l'endroit. Il fallait choisir entre regarder et se situer.
+
+   La feuille démarre donc repliée : poignée, titre et chrono seulement, le
+   décor reste entier et manipulable derrière. On la tire vers le haut quand on
+   sait où on est. Elle s'ouvre aussi toute seule à la révélation — la réponse
+   est ce qu'on est venu voir, pas la peine de demander un geste de plus. */
 @media (max-width: 760px) {
-
-  /* Sur téléphone, 46vw serait illisible : le dock reprend toute la largeur en
-     bas de l'écran (le haut reste au panorama pour se repérer). */
   .geo-map-dock {
-    left: 0.6rem;
-    right: 0.6rem;
-    bottom: 0.6rem;
+    left: 0;
+    right: 0;
+    bottom: 0;
     max-width: none;
+    /* La feuille repliée déborde sous l'écran ; .geo-game est en overflow
+       hidden, elle y est proprement coupée. */
+    overflow: visible;
   }
 
-  .geo-map {
-    padding: 0.6rem;
-    border-radius: 18px;
+  .geo-map.sheet {
+    padding: 0 0.7rem 0.7rem;
+    border-radius: 20px 20px 0 0;
+    max-height: 88vh;
+    /* Repliée : on ne laisse dépasser que SHEET_PEEK (100 px côté JS). */
+    transform: translateY(calc(100% - 100px));
+    transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
+  .geo-map.sheet.open {
+    transform: translateY(0);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .geo-map.sheet {
+      transition: none;
+    }
+  }
+
+  /* La barre d'attrape occupe toute la largeur et respire : c'est une cible au
+     doigt, pas un trait décoratif. */
+  .geo-map-grab {
+    padding: 0.55rem 0 0.15rem;
+    margin: 0 -0.7rem;
+    padding-inline: 0.7rem;
+    cursor: grab;
+  }
+
+  .geo-map-grab:active {
+    cursor: grabbing;
+  }
+
+  .geo-map-grip {
+    display: block;
+    width: 40px;
+    height: 4px;
+    margin: 0 auto 0.15rem;
+    border-radius: 999px;
+    background: var(--g-line-2);
+  }
+
+  .geo-map.sheet:not(.open) .geo-map-pull {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    padding-bottom: 0.15rem;
+    font-size: 0.74rem;
+    color: var(--g-acc-2);
+    animation: geo-map-pull 1.9s ease-in-out infinite;
+  }
+
+  @keyframes geo-map-pull {
+    50% {
+      opacity: 0.5;
+      transform: translateY(-2px);
+    }
+  }
+
+  /* Ouverte, la carte prend vraiment de la place : c'est le moment où on
+     l'examine, on zoome, on cherche le bon recoin. */
   .geo-map-stage {
     /* `min-height`, comme sur desktop : `height` se ferait écraser par flex
-       et la carte disparaîtrait sur écran court. On la garde modérée pour
-       laisser voir le décor au-dessus du dock. */
-    min-height: 34vh;
+       et la carte disparaîtrait sur écran court. */
+    min-height: 48vh;
   }
 
   .geo-map-title {
     font-size: 0.82rem;
+  }
+
+  /* Des cibles au doigt, pas à la souris. */
+  .geo-map-zoom button {
+    width: 36px;
+    height: 36px;
   }
 
   .geo-map-foot {
@@ -1468,6 +1587,7 @@ body.geo-immersive .app-shell {
   .geo-map-foot .geo-rv-next {
     width: 100%;
     justify-content: center;
+    padding-block: 0.6rem;
   }
 }
 

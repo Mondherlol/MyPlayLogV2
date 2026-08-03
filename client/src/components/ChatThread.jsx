@@ -27,6 +27,7 @@ import {
   Globe2,
   Swords,
   Zap,
+  Crown,
   BookOpen,
   BookMarked,
 } from "lucide-react";
@@ -36,7 +37,11 @@ import EmojiPanel from "./EmojiPanel";
 import ChatComposer from "./ChatComposer";
 import ChatLightbox from "./ChatLightbox";
 import { useChat } from "../context/ChatContext";
+import { useAuth } from "../context/AuthContext";
 import { usePlayer } from "../context/PlayerContext";
+// Les têtes des joueurs, exactement celles du salon : une invitation doit
+// montrer la même bande que la page qu'elle ouvre.
+import { VersusFace, hueOf } from "./VersusRoom";
 import { playSentSound } from "../lib/sfx";
 import { useClickOutside } from "../hooks/useClickOutside";
 
@@ -1134,19 +1139,154 @@ function BookCard({ book }) {
   );
 }
 
-// --- Carte « rejoins mon versus » (GeoGamer ou blind test) ---
-// Périssable comme celle de watchparty : un salon s'efface deux heures après la
-// dernière manche, et il se ferme dès que la partie est lancée. On ne cherche
-// pas à savoir s'il tourne encore — ce serait une requête par carte à chaque
-// relecture du fil — c'est le salon qui répond « ce salon n'existe plus ».
+// ============================================================
+//  Carte « rejoins mon versus » (GeoGamer ou blind test)
+// ============================================================
+// UN SALON VIT. Il se remplit, il se lance, il se termine, puis il s'efface
+// deux heures plus tard. La carte figée sur l'état du jour de l'envoi mentait
+// donc trois fois sur quatre — et pire, elle restait une porte ouverte vers un
+// salon qui allait répondre « la partie a déjà commencé » une fois la page
+// chargée. Elle demande maintenant au salon où il en est, et n'ouvre une porte
+// que quand il y en a vraiment une.
+//
+// Ce qu'elle dit tient en trois lignes : de quel jeu il s'agit, QUI est déjà
+// assis (des têtes, pas une phrase), et ce qu'il reste à faire. Le reste — le
+// pitch du mode, le nom de l'hôte déjà écrit juste au-dessus dans le fil —
+// n'apportait rien qu'une ligne de plus à lire.
+
+// Le salon interrogé, mutualisé entre les cartes : rouvrir une discussion qui
+// contient trois invitations au même salon ne doit pas faire trois requêtes.
+const versusCache = new Map(); // code -> { at, data }
+// Les requêtes en cours, pour que deux cartes du même salon (ou la même carte
+// remontée deux fois par le fil) n'en fassent qu'une.
+const versusInflight = new Map(); // code -> Promise
+const VERSUS_TTL = 8000;
+// On revient voir le salon tant qu'il peut encore bouger. Ni trop souvent (une
+// carte n'est pas un tableau de bord), ni dans un onglet caché.
+const VERSUS_POLL = 20000;
+
+function fetchVersusCard(code, path, token) {
+  const hit = versusCache.get(code);
+  if (hit && Date.now() - hit.at < VERSUS_TTL) return Promise.resolve(hit.data);
+  const running = versusInflight.get(code);
+  if (running) return running;
+  const p = apiFetch(path, { token })
+    .then((d) => {
+      versusCache.set(code, { at: Date.now(), data: d });
+      return d;
+    })
+    .finally(() => versusInflight.delete(code));
+  versusInflight.set(code, p);
+  return p;
+}
+
+function useVersusRoom(code, bt, token) {
+  const [live, setLive] = useState(() => {
+    const hit = versusCache.get(code);
+    return hit && Date.now() - hit.at < VERSUS_TTL ? hit.data : null;
+  });
+  const stateRef = useRef(null);
+
+  useEffect(() => {
+    if (!code || !token) return undefined;
+    let alive = true;
+    const path = bt
+      ? `/blindtest/versus/${code}/card`
+      : `/geo/versus/${code}/card`;
+
+    async function pull() {
+      try {
+        const d = await fetchVersusCard(code, path, token);
+        stateRef.current = d?.state || null;
+        if (alive) setLive(d);
+      } catch {
+        // Serveur injoignable : on ne CONDAMNE pas la carte pour autant. Elle
+        // repart sur ce que porte le message et reste cliquable — c'est notre
+        // réseau qui a lâché, pas forcément le salon.
+        if (alive) setLive((prev) => prev || { state: "unknown" });
+      }
+    }
+
+    pull();
+
+    // « done » et « gone » ne se déferont pas : une fois là, on arrête de
+    // demander. C'est ce qui empêche un vieux fil rempli d'invitations de
+    // sonner le serveur toutes les vingt secondes pour rien.
+    const settled = () => stateRef.current === "done" || stateRef.current === "gone";
+    const iv = setInterval(() => {
+      if (settled() || document.visibilityState !== "visible") return;
+      versusCache.delete(code);
+      pull();
+    }, VERSUS_POLL);
+
+    // Retour sur l'onglet : la partie a pu se lancer pendant qu'on regardait
+    // ailleurs, et c'est exactement le moment où on relit la carte.
+    const onVis = () => {
+      if (document.visibilityState !== "visible" || settled()) return;
+      const hit = versusCache.get(code);
+      if (hit && Date.now() - hit.at < VERSUS_TTL) return;
+      versusCache.delete(code);
+      pull();
+    };
+    document.addEventListener("visibilitychange", onVis);
+
+    return () => {
+      alive = false;
+      clearInterval(iv);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [code, bt, token]);
+
+  return live;
+}
+
 function VersusCard({ versus }) {
+  const { token } = useAuth();
   const bt = versus.kind === "blindtest";
-  const buzzer = !bt && versus.mode === "buzzer";
-  return (
-    <Link
-      to={bt ? `/blindtest/versus/${versus.code}` : `/geo/versus/${versus.code}`}
-      className="chat-card chat-card-geo clickable"
-    >
+  const live = useVersusRoom(versus.code, bt, token);
+
+  // Trois sources, dans cet ordre : le salon s'il a répondu, sinon ce que porte
+  // le message (périmé mais parlant), sinon les valeurs par défaut.
+  const known = !!live && live.state !== "unknown";
+  const state = known ? live.state : "lobby";
+  const count = known ? live.count : versus.players || 1;
+  const max = known ? live.max : versus.maxPlayers || 5;
+  const rounds = known ? live.rounds : versus.rounds || 8;
+  const faces = known ? live.players || [] : [];
+  const buzzer = !bt && (known ? live.mode : versus.mode) === "buzzer";
+  const mine = !!live?.mine;
+
+  // Une porte n'est ouverte que si le serveur laisserait vraiment entrer : le
+  // salon accepte un joueur DÉJÀ inscrit même partie lancée, mais personne
+  // d'autre (cf. POST /:code/join).
+  const joinable =
+    live !== null &&
+    ((state === "lobby" && (count < max || mine)) || (state === "live" && mine));
+
+  const status =
+    live === null
+      ? { tone: "wait", label: "Salon…" }
+      : state === "gone"
+        ? { tone: "off", label: "Salon fermé" }
+        : state === "done"
+          ? {
+              tone: "off",
+              label: live.winner ? `Terminé · ${live.winner} gagne` : "Partie terminée",
+              crown: true,
+            }
+          : state === "live"
+            ? {
+                tone: "live",
+                label: mine
+                  ? "Reprendre la partie"
+                  : `En cours · manche ${(live.index || 0) + 1}/${rounds}`,
+              }
+            : joinable
+              ? { tone: "open", label: mine ? "Retourner au salon" : "Rejoindre le salon" }
+              : { tone: "off", label: "Salon complet" };
+
+  const body = (
+    <>
       {/* Surtout PAS `geo` comme nom de variante : cette classe-là est celle
           de la PAGE GeoGamer (app-25-geo.css), qui impose un `min-height`
           plein écran — la vignette de 54 px devenait une colonne noire d'un
@@ -1156,23 +1296,46 @@ function VersusCard({ versus }) {
       </span>
       <span className="chat-card-body">
         <span className="chat-card-kicker">
-          <Swords size={12} /> {bt ? "Blind test versus" : "GeoGamer versus"}
-          {versus.hostName ? ` · ${versus.hostName}` : ""}
+          <Swords size={12} /> {bt ? "Blind test" : "GeoGamer"}
+          <i className="gv-card-mode">{bt ? "versus" : buzzer ? "buzzer" : "classique"}</i>
         </span>
-        <span className="chat-card-title">
-          {bt
-            ? "Le même extrait pour tout le monde"
-            : buzzer
-              ? "Buzzer — le premier qui trouve"
-              : "Classique — chacun son score"}
+
+        {/* Les têtes plutôt qu'un décompte écrit : on reconnaît sa bande d'un
+            coup d'œil, et « 3/5 » n'a jamais donné envie d'entrer. */}
+        <span className="gv-card-seats">
+          {faces.length > 0 && (
+            <span className="gv-card-faces">
+              {faces.slice(0, 5).map((p, i) => (
+                <VersusFace key={p.id} user={p} size={20} hue={hueOf(i)} />
+              ))}
+            </span>
+          )}
+          <b>
+            {count}/{max}
+          </b>
+          <em>{rounds} manches</em>
         </span>
-        <span className="chat-card-sub">
-          {versus.players || 1}/{versus.maxPlayers || 5} joueur
-          {(versus.players || 1) > 1 ? "s" : ""} · {versus.rounds || 8} manches
+
+        <span className={`gv-card-state ${status.tone}`}>
+          {status.tone === "live" && <i className="gv-card-dot" aria-hidden="true" />}
+          {status.crown && <Crown size={12} />}
+          {status.label}
+          {joinable && <b aria-hidden="true">→</b>}
         </span>
-        <span className="chat-card-cta">Rejoindre le salon →</span>
       </span>
+    </>
+  );
+
+  const cls = `chat-card chat-card-vs ${status.tone}`;
+  return joinable ? (
+    <Link
+      to={bt ? `/blindtest/versus/${versus.code}` : `/geo/versus/${versus.code}`}
+      className={`${cls} clickable`}
+    >
+      {body}
     </Link>
+  ) : (
+    <span className={cls}>{body}</span>
   );
 }
 

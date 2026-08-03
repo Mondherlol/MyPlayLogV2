@@ -86,6 +86,12 @@ const resultSchema = new mongoose.Schema(
     // Manche carte. En classique elle récompense qui a trouvé le jeu (barème
     // absolu, comme en solo) ; en buzzer TOUT LE MONDE y participe et c'est le
     // classement des distances qui paie — d'où `mapRank`, sans équivalent solo.
+    //
+    // QUAND elle se joue diffère aussi, et c'est ce qui explique qu'une ligne
+    // de résultat puisse exister avant la fin d'une manche : en buzzer c'est
+    // une phase commune qui suit la manche, en classique ça se passe PENDANT,
+    // sur le temps restant de celui qui vient de trouver (routes/geoVersus.js,
+    // en-tête d'`endRound`).
     mapX: { type: Number, default: null },
     mapY: { type: Number, default: null },
     mapDistance: { type: Number, default: null },

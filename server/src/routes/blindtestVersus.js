@@ -845,4 +845,38 @@ router.post("/:code/invite", async (req, res) => {
   }
 });
 
+// GET /:code/card — l'état du salon pour la carte d'invitation de la
+// messagerie. Strictement le pendant de celui de GeoGamer (routes/geoVersus.js,
+// même en-tête) : la carte du chat est un composant unique, les deux jeux
+// doivent lui répondre la même forme.
+router.get("/:code/card", async (req, res) => {
+  try {
+    const room = await loadRoom(req.params.code);
+    if (!room) return res.json({ state: "gone" });
+    const active = activePlayers(room);
+    const done = room.phase === "done" || !!room.endedAt;
+    const champ = done
+      ? [...room.players]
+          .filter((p) => !p.leftAt)
+          .sort(
+            (a, b) =>
+              (b.score || 0) - (a.score || 0) || (b.correctCount || 0) - (a.correctCount || 0)
+          )[0]
+      : null;
+    res.json({
+      state: done ? "done" : room.startedAt ? "live" : "lobby",
+      players: active.map((p) => person(p.user)),
+      count: active.length,
+      max: MAX_PLAYERS,
+      rounds: room.roundCount,
+      index: room.index,
+      mine: allIds(room).includes(String(req.userId)),
+      winner: champ ? person(champ.user)?.username || null : null,
+    });
+  } catch (err) {
+    console.error("btversus card error:", err.message);
+    res.json({ state: "gone" });
+  }
+});
+
 export default router;

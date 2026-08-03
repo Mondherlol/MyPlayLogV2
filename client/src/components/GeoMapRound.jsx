@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MapPin, Plus, Minus, Maximize2, Ruler, Check, Loader2, Crown } from "lucide-react";
+import {
+  MapPin,
+  Plus,
+  Minus,
+  Maximize2,
+  Ruler,
+  Check,
+  Loader2,
+  Crown,
+  ChevronUp,
+} from "lucide-react";
 import { estimateMapPoints, MAP_MAX_POINTS } from "../lib/guessGame";
 
 // ============================================================
@@ -27,6 +37,19 @@ import { estimateMapPoints, MAP_MAX_POINTS } from "../lib/guessGame";
 export const MAP_SEC = 25;
 const ZOOM_MIN = 1;
 const ZOOM_MAX = 8;
+
+// ------------------------------------------------------------ la feuille mobile
+// Sur téléphone, la carte n'est pas un panneau posé dans un coin : c'est une
+// FEUILLE qui monte du bas, façon Instagram. Elle démarre repliée, et c'est tout
+// l'intérêt — la première chose à faire sur une manche carte, c'est de tourner
+// la tête dans le panorama pour reconnaître l'endroit. Un panneau qui mange
+// d'emblée la moitié de l'écran oblige à choisir entre regarder et se situer.
+//
+// Repliée, il ne reste que la poignée, le titre et le chrono : 100 px environ,
+// et le décor reste entièrement manipulable derrière.
+const SHEET_PEEK = 100;
+// Au-delà de ce déplacement, le geste est un glissement et non une tape.
+const SHEET_TAP = 7;
 
 // Les couleurs des épingles rivales, dans l'ordre des joueurs. La mienne garde
 // toujours la couleur d'accent du jeu : sur une carte constellée de cinq
@@ -106,12 +129,21 @@ export default function MapRound({
   // Vue courante : facteur de zoom + translation EN PIXELS du cadre.
   const [view, setView] = useState({ z: 1, x: 0, y: 0 });
 
+  // Feuille mobile : repliée au départ (cf. SHEET_PEEK). `dragY` n'est posé que
+  // PENDANT un glissement — au repos c'est la classe CSS qui place la feuille,
+  // pour que la transition d'ouverture soit gérée par le navigateur.
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [dragY, setDragY] = useState(null);
+
   const boxRef = useRef(null);
+  const sheetRef = useRef(null);
+  const sheetDrag = useRef(null);
   const pinRef = useRef(null);
   pinRef.current = pin;
   const viewRef = useRef(view);
   viewRef.current = view;
   const dragRef = useRef(null);
+  const pinchRef = useRef(null);
   const validateRef = useRef(() => {});
   const sentRef = useRef(false);
 
@@ -159,10 +191,57 @@ export default function MapRound({
   }, [reveal, deadline, versus]);
 
   // Une fois le résultat affiché, on recadre sur l'ensemble pour que le joueur
-  // voie son erreur en entier plutôt qu'un zoom sur son seul clic.
+  // voie son erreur en entier plutôt qu'un zoom sur son seul clic — et la
+  // feuille s'ouvre d'elle-même : la réponse est ce qu'on est venu voir, on ne
+  // va pas demander un geste de plus pour la découvrir.
   useEffect(() => {
-    if (result || reveal) setView({ z: 1, x: 0, y: 0 });
+    if (result || reveal) {
+      setView({ z: 1, x: 0, y: 0 });
+      setSheetOpen(true);
+    }
   }, [result, reveal]);
+
+  // ---------- La feuille : glisser pour ouvrir / replier ----------
+  // Ce qui reste caché quand elle est repliée. Mesuré à chaud plutôt que figé :
+  // la hauteur du panneau dépend du contenu (podium de fin de manche, message
+  // d'attente…) et d'un écran à l'autre.
+  const hiddenPx = useCallback(
+    () => Math.max(0, (sheetRef.current?.offsetHeight || 0) - SHEET_PEEK),
+    []
+  );
+
+  function sheetDown(e) {
+    // Un bouton dans la poignée (aucun aujourd'hui, mais la zone est large)
+    // ne doit pas démarrer un glissement.
+    if (e.target.closest("button")) return;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    sheetDrag.current = {
+      y: e.clientY,
+      base: sheetOpen ? 0 : hiddenPx(),
+      moved: 0,
+      last: sheetOpen ? 0 : hiddenPx(),
+    };
+  }
+
+  function sheetMove(e) {
+    const d = sheetDrag.current;
+    if (!d) return;
+    const dy = e.clientY - d.y;
+    d.moved = Math.max(d.moved, Math.abs(dy));
+    d.last = Math.min(hiddenPx(), Math.max(0, d.base + dy));
+    setDragY(d.last);
+  }
+
+  function sheetUp(e) {
+    const d = sheetDrag.current;
+    sheetDrag.current = null;
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+    setDragY(null);
+    if (!d) return;
+    // Tape franche : bascule. Glissement : on va là où on penche.
+    if (d.moved < SHEET_TAP) setSheetOpen((o) => !o);
+    else setSheetOpen(d.last < hiddenPx() / 2);
+  }
 
   const applyZoom = useCallback((factor, cx, cy) => {
     const box = boxRef.current?.getBoundingClientRect();
@@ -210,6 +289,34 @@ export default function MapRound({
     setView((v) => clampView({ ...v, x: d.ox + dx, y: d.oy + dy }, box));
   }
 
+  // Pincement à deux doigts = zoom. IL MANQUAIT PUREMENT ET SIMPLEMENT : la
+  // molette est le seul zoom du bureau, et sur téléphone il n'y en avait aucun
+  // — on ne pouvait donc pas s'approcher pour situer un point précis, ce qui
+  // est pourtant tout le geste de cette manche. Les pointer events ne
+  // fournissent pas le geste tout fait, on suit les deux touches nous-mêmes
+  // (même approche que PanoViewer).
+  function onTouchMove(e) {
+    if (reveal || e.touches.length !== 2) return;
+    const [a, b] = e.touches;
+    const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    const box = boxRef.current?.getBoundingClientRect();
+    if (box && pinchRef.current) {
+      applyZoom(
+        dist / pinchRef.current,
+        (a.clientX + b.clientX) / 2 - box.left,
+        (a.clientY + b.clientY) / 2 - box.top
+      );
+    }
+    pinchRef.current = dist;
+    // Un pincement n'est pas un pointage : on disqualifie le geste en cours
+    // pour qu'un relâché ne pose pas d'épingle au milieu de l'écran.
+    if (dragRef.current) dragRef.current.moved = Infinity;
+  }
+
+  const endPinch = useCallback(() => {
+    pinchRef.current = null;
+  }, []);
+
   function onPointerUp(e) {
     const d = dragRef.current;
     dragRef.current = null;
@@ -245,37 +352,59 @@ export default function MapRound({
   const pinScale = { transform: `translate(-50%, -100%) scale(${1 / view.z})` };
 
   return (
-    <div className={`geo-map ${versus ? "versus" : ""}`}>
-      <div className="geo-map-head">
-        <span className="geo-map-title">
-          <MapPin size={15} />
-          {gameName ? (
-            <>
-              Où étais-tu dans <b>{gameName}</b> ?
-            </>
-          ) : (
-            <>Où était-ce ?</>
-          )}
-        </span>
-        {reveal ? (
-          <span className="geo-map-score">
-            {mine ? (
+    <div
+      className={`geo-map ${versus ? "versus" : ""} sheet ${sheetOpen ? "open" : ""}`}
+      ref={sheetRef}
+      // Le style en ligne n'existe QUE pendant le glissement : au repos, c'est
+      // la classe `open` qui place la feuille, avec sa transition.
+      style={dragY != null ? { transform: `translateY(${dragY}px)`, transition: "none" } : undefined}
+    >
+      {/* La zone d'attrape : la poignée ET l'en-tête. Attraper un trait de
+          4 px au doigt est une épreuve ; toute la barre du haut répond. */}
+      <div
+        className="geo-map-grab"
+        onPointerDown={sheetDown}
+        onPointerMove={sheetMove}
+        onPointerUp={sheetUp}
+        onPointerCancel={sheetUp}
+      >
+        <span className="geo-map-grip" aria-hidden="true" />
+        <div className="geo-map-head">
+          <span className="geo-map-title">
+            <MapPin size={15} />
+            {gameName ? (
               <>
-                +{mine.points}
-                <em>pts</em>
+                Où étais-tu dans <b>{gameName}</b> ?
               </>
             ) : (
-              <em>aucune épingle</em>
+              <>Où était-ce ?</>
             )}
           </span>
-        ) : result ? (
-          <span className="geo-map-score">
-            +{result.points}
-            <em>pts</em>
-          </span>
-        ) : (
-          <span className={`geo-map-timer ${left <= 8 ? "hot" : ""}`}>{left}s</span>
-        )}
+          {reveal ? (
+            <span className="geo-map-score">
+              {mine ? (
+                <>
+                  +{mine.points}
+                  <em>pts</em>
+                </>
+              ) : (
+                <em>aucune épingle</em>
+              )}
+            </span>
+          ) : result ? (
+            <span className="geo-map-score">
+              +{result.points}
+              <em>pts</em>
+            </span>
+          ) : (
+            <span className={`geo-map-timer ${left <= 8 ? "hot" : ""}`}>{left}s</span>
+          )}
+        </div>
+        {/* Visible seulement quand la feuille est repliée (CSS) : sans elle,
+            rien ne dit que ce bandeau se tire vers le haut. */}
+        <span className="geo-map-pull">
+          <ChevronUp size={14} /> Glisse pour ouvrir la carte
+        </span>
       </div>
 
       <div
@@ -288,6 +417,9 @@ export default function MapRound({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        onTouchMove={onTouchMove}
+        onTouchEnd={endPinch}
+        onTouchCancel={endPinch}
       >
         <div
           className="geo-map-layer"
@@ -432,8 +564,8 @@ export default function MapRound({
         ) : (
           <>
             <span className="geo-map-help">
-              {pin ? "Déplace ton épingle ou valide" : "Clique pour te situer"}
-              <em>{hint || "molette pour zoomer · glisser pour déplacer"}</em>
+              {pin ? "Déplace ton épingle ou valide" : "Touche la carte pour te situer"}
+              <em>{hint || "molette ou pincement pour zoomer · glisser pour déplacer"}</em>
             </span>
             <button className="geo-rv-next clickable" onClick={validate} disabled={!pin}>
               Valider

@@ -5,6 +5,7 @@ import {
   Check,
   Copy,
   Crown,
+  Eye,
   Gamepad2,
   Globe2,
   Heart,
@@ -14,6 +15,7 @@ import {
   Play,
   RotateCcw,
   Search,
+  SkipForward,
   Swords,
   Timer,
   UserPlus,
@@ -108,6 +110,8 @@ export default function GeoVersus() {
   const [panoReady, setPanoReady] = useState(false);
   const [tick, setTick] = useState(0); // bat la seconde pour les chronos
   const [ranking, setRanking] = useState(null);
+  // Vote « manche suivante » de la révélation : qui a déjà cliqué.
+  const [skip, setSkip] = useState({ ready: [], total: 0 });
 
   const inputRef = useRef(null);
   const suggestRef = useRef(null);
@@ -160,6 +164,28 @@ export default function GeoVersus() {
   useEffect(() => {
     if (token && code) load();
   }, [token, code, load]);
+
+  // ---------- La liste de recherche des INVITÉS ----------
+  // Elle ne voyage QUE dans la réponse à `/start`… que seul l'hôte reçoit. Les
+  // autres joueurs partaient donc en manche avec une liste vide : taper ne
+  // proposait rien, et il fallait recharger la page pour que le GET du salon
+  // la rapporte. Elle est trop grosse pour être diffusée en SSE à chaque
+  // manche — chacun va donc la chercher une fois, au lancement.
+  useEffect(() => {
+    if (!token || !code) return undefined;
+    if (!room?.started || phase === "done" || candidates.length) return undefined;
+    let alive = true;
+    apiFetch(`/geo/versus/${code}`, { token })
+      .then((d) => {
+        if (alive && d.candidates?.length) setCandidates(d.candidates);
+      })
+      .catch(() => {
+        /* on réessaiera au prochain changement de phase */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [token, code, room?.started, phase, candidates.length]);
 
   // ---------- Le direct ----------
   useEffect(() => {
@@ -245,11 +271,15 @@ export default function GeoVersus() {
           sfx.play("map-open");
           break;
         case "reveal":
+          setSkip({ ready: [], total: 0 });
           sfx.play(
             data.room?.round?.results?.find((x) => x.userId === meId)?.correct
               ? "correct"
               : "wrong"
           );
+          break;
+        case "skip":
+          setSkip({ ready: data.ready || [], total: data.total || 0 });
           break;
         case "done":
           setRanking(data.ranking || null);
@@ -414,8 +444,16 @@ export default function GeoVersus() {
   }
 
   // Diffusion de ce que je tape (buzzer uniquement), à cadence bornée.
+  // Diffusion de ce que je tape. DEUX RAISONS DE L'ENVOYER, et il a longtemps
+  // manqué la seconde :
+  //   buzzer     tout le monde voit tout, c'est le spectacle du mode ;
+  //   classique  les SPECTATEURS voient les autres chercher (cf. watcherIds
+  //              côté serveur, qui filtre les destinataires).
+  // Sans le `hasAudience`, on posterait dans le vide tant que personne n'a fini
+  // sa manche — c'est-à-dire la plupart du temps.
   function pushTyping(text) {
-    if (mode !== "buzzer" || phase !== "round") return;
+    if (phase !== "round") return;
+    if (mode !== "buzzer" && !hasAudience) return;
     const now = Date.now();
     const t = typingRef.current;
     clearTimeout(t.timer);
@@ -429,6 +467,50 @@ export default function GeoVersus() {
 
   const settled = !!round?.settled;
   const lives = round?.lives ?? LIVES;
+
+  // ---------- Qui cherche encore, qui regarde ----------
+  // Une manche « réglée » (trouvée ou sans vie) sort son joueur de la course :
+  // il devient spectateur. C'est la même définition que côté serveur — elle
+  // décide à la fois de ce qu'on a le droit de recevoir et de ce qu'on affiche.
+  const settledIds = useMemo(() => {
+    const s = new Set(round?.out || []);
+    for (const f of round?.found || []) s.add(f.userId);
+    return s;
+  }, [round]);
+
+  const searchers = useMemo(
+    () => players.filter((p) => !p.left && !settledIds.has(p.id)),
+    [players, settledIds]
+  );
+
+  // Y a-t-il seulement quelqu'un pour me regarder ? Sans public, on n'envoie
+  // pas une seule requête : le cas le plus courant (tout le monde cherche
+  // encore) ne coûte donc rien du tout.
+  const hasAudience = useMemo(
+    () => players.some((p) => !p.left && p.id !== meId && settledIds.has(p.id)),
+    [players, settledIds, meId]
+  );
+
+  // Je regarde les autres : ma manche est finie, la leur non.
+  //
+  // CLASSIQUE UNIQUEMENT. En buzzer la manche s'arrête au premier bon jeu :
+  // l'attente qu'on cherchait à meubler n'existe pas, et le mode montre déjà
+  // tout en direct sous le champ de saisie. Y ajouter des lucarnes serait un
+  // deuxième spectacle par-dessus le premier.
+  // ---------- La carte, en classique, se joue DANS la manche ----------
+  // Dès qu'on a trouvé le jeu : plus de phase commune, plus d'attente. Le
+  // chrono qui reste est celui de la manche — trouver vite achète du temps de
+  // carte. Voir l'en-tête d'`endRound` côté serveur.
+  const iFound = !!round?.found?.some((f) => f.userId === meId);
+  const iPinned = !!round?.pinned?.includes(meId);
+  const inlineMap =
+    mode === "classic" && phase === "round" && iFound && !!round?.map && !iPinned;
+
+  const watchable = mode === "classic";
+  // On ne regarde les autres qu'une fois SA propre carte réglée : elle est
+  // chronométrée, elle passe devant.
+  const spectating =
+    watchable && phase === "round" && settled && !inlineMap && searchers.length > 0;
 
   async function submitGuess(cand) {
     if (!cand || settled || phase !== "round") return;
@@ -678,7 +760,20 @@ export default function GeoVersus() {
           )}
 
           {/* ---- Recherche ---- */}
-          {phase === "round" && (
+          {phase === "round" && spectating && (
+            <SpectatorGrid
+              searchers={searchers}
+              typers={typers}
+              attempts={round.attempts}
+              livesById={round.livesById}
+              hueById={hueById}
+              found={round.found}
+              meId={meId}
+              won={!!round.found?.some((f) => f.userId === meId)}
+            />
+          )}
+
+          {phase === "round" && !spectating && !inlineMap && (
             <div className="geo-hud-bottom">
               {/* En buzzer, ce que tapent les autres. C'est LE spectacle du
                   mode : on voit une piste se former en face et on accélère. */}
@@ -761,24 +856,25 @@ export default function GeoVersus() {
               Elle reste à l'écran PENDANT la révélation quand il y avait une
               carte : sans ça, on ne verrait jamais où les autres s'étaient
               placés — c'est-à-dire tout l'intérêt de la manche. */}
-          {(phase === "map" || mapReveal) && round.map && (
+          {(phase === "map" || mapReveal || inlineMap) && round.map && (
             <div className="geo-map-dock">
               <MapRound
                 map={round.map}
                 gameName={round.gameName}
                 sfx={sfx}
                 reveal={mapReveal}
+                // En classique la borne est celle de la MANCHE, en buzzer celle
+                // de la phase carte : dans les deux cas `phaseEndsAt`, mais ça
+                // ne veut pas dire la même chose — et c'est tout le changement.
                 deadline={room.phaseEndsAt - offsetRef.current}
-                eligible={
-                  mode === "buzzer"
-                    ? true
-                    : !!round.found?.some((f) => f.userId === meId)
-                }
-                waiting={round.pinned?.includes(meId)}
+                eligible={mode === "buzzer" ? true : iFound}
+                waiting={iPinned}
                 hint={
                   mode === "buzzer"
                     ? "tout le monde joue · le plus proche rafle les points"
-                    : "molette pour zoomer · glisser pour déplacer"
+                    : inlineMap
+                      ? "sur le temps de ta manche · situe-toi avant la fin"
+                      : "molette pour zoomer · glisser pour déplacer"
                 }
                 onPin={(p) => {
                   if (pinSentRef.current) return;
@@ -800,6 +896,20 @@ export default function GeoVersus() {
               secondsLeft={secondsLeft}
               last={(room.index || 0) + 1 >= room.roundCount}
               sided={!!mapReveal}
+              // La barre de décompte doit durer CE que dure la révélation, et
+              // repartir au bon endroit si on arrive en cours de route (page
+              // rechargée) — d'où la durée et l'écoulé, pris du serveur.
+              totalMs={Math.max(0, (room.phaseEndsAt || 0) - (room.phaseStartsAt || 0))}
+              elapsedMs={Math.max(0, now - (room.phaseStartsAt || 0))}
+              skip={skip}
+              onNext={() => {
+                // Optimiste : on se compte soi-même tout de suite, l'aller-
+                // retour ne doit pas donner l'impression que le clic est perdu.
+                setSkip((s) =>
+                  s.ready.includes(meId) ? s : { ...s, ready: [...s.ready, meId] }
+                );
+                post("/next").catch(() => {});
+              }}
             />
           )}
         </section>
@@ -840,6 +950,132 @@ export default function GeoVersus() {
   );
 }
 
+// ======================================================================
+//  La régie — regarder les autres chercher
+// ======================================================================
+// LE PROBLÈME QU'ELLE RÈGLE : trouver vite était PUNI. On rendait sa copie en
+// douze secondes, puis on regardait un champ grisé pendant trente. Le mode
+// récompensait la vitesse au score et la sanctionnait au plaisir — et c'est
+// évidemment le bon joueur qui attendait le plus longtemps.
+//
+// CE QU'ELLE MONTRE, ET RIEN D'AUTRE : ce que les autres TAPENT. Lettre à
+// lettre, avec leurs fausses pistes qui s'empilent à côté. On voit une piste se
+// former, hésiter, se tromper — c'est le seul morceau de leur partie qui
+// raconte quelque chose.
+//
+// Il a existé ici une reconstitution de leur PANORAMA (leur cadrage rejoué en
+// direct à partir de trois angles). Techniquement élégante, visuellement
+// saccadée, et surtout muette : regarder quelqu'un balayer un décor n'apprend
+// rien tant qu'on ne sait pas ce qu'il y cherche. Supprimée — la frappe seule
+// dit tout, et elle ne coûte qu'un message quand une touche est enfoncée.
+//
+// Le droit de regarder se vérifie CÔTÉ SERVEUR, jamais ici : on ne reçoit ces
+// évènements qu'une fois sa propre manche finie (watcherIds, routes/geoVersus.js).
+// Cette page ne peut donc pas devenir une antisèche, même en trafiquant le client.
+
+// On garde les trois derniers ratés : au-delà, la carte s'allonge sans rien
+// apprendre de plus — ce qui compte, c'est de quel côté il cherche EN CE MOMENT.
+const MISS_SHOWN = 3;
+
+function SpectatorGrid({ searchers, typers, attempts, livesById, hueById, found, meId, won }) {
+  const mineOrder = found?.find((f) => f.userId === meId)?.order;
+
+  return (
+    // Plein écran, centré, sur fond assombri et flouté : quand on regarde, on
+    // REGARDE. Un bandeau en bas de son propre panorama laissait croire qu'on
+    // jouait encore. Le calque reste SOUS le HUD haut (z-index) : le chrono et
+    // le rail restent nets, ce sont les deux choses qu'on veut encore lire.
+    <div className="gv-watch">
+      <div className="gv-watch-in">
+        <header className="gv-watch-head">
+          <span className={`gv-watch-verdict ${won ? "ok" : "ko"}`}>
+            {won ? <Check size={13} /> : <X size={13} />}
+            {won ? (mineOrder ? `Trouvé · ${mineOrder}ᵉ` : "Trouvé") : "Plus de vies"}
+          </span>
+          <h2 className="gv-watch-title">
+            <i className="gv-watch-live" aria-hidden="true" />
+            {searchers.length > 1
+              ? `${searchers.length} joueurs cherchent encore`
+              : `${searchers[0]?.username || "Un joueur"} cherche encore`}
+          </h2>
+          <p className="gv-watch-sub">
+            <Eye size={12} /> Tu vois ce qu'ils tapent, en direct.
+          </p>
+        </header>
+
+        <ul className="gv-watch-list">
+          {searchers.slice(0, 4).map((p) => (
+            <SpectatorRow
+              key={p.id}
+              player={p}
+              typing={typers[p.id]?.text || ""}
+              misses={(attempts || [])
+                .filter((a) => a.userId === p.id && !a.correct && a.name)
+                .map((a) => a.name)}
+              lives={livesById?.[p.id] ?? LIVES}
+              hue={hueById.get(p.id)}
+            />
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function SpectatorRow({ player, typing, misses, lives, hue }) {
+  const shown = misses.slice(-MISS_SHOWN);
+  return (
+    <li
+      className={`gv-spy ${typing ? "live" : ""} ${lives <= 1 ? "hot" : ""}`}
+      style={{ "--hue": hue }}
+    >
+      <VersusFace user={player} size={38} hue={hue} />
+
+      <div className="gv-spy-body">
+        <span className="gv-spy-top">
+          <b>{player.username}</b>
+          <span className="gv-spy-lives" aria-label={`${lives} vies restantes`}>
+            {Array.from({ length: LIVES }).map((_, i) => (
+              <Heart
+                key={i}
+                size={12}
+                className={i < lives ? "on" : "off"}
+                fill={i < lives ? "currentColor" : "none"}
+              />
+            ))}
+          </span>
+        </span>
+
+        {/* LA LIGNE QU'ON EST VENU VOIR. Elle garde sa hauteur même vide :
+            sinon chaque frappe ferait sauter toute la pile de cartes. */}
+        <span className="gv-spy-type">
+          {typing ? (
+            <>
+              <span className="gv-spy-word">{typing}</span>
+              <i className="gv-caret" aria-hidden="true" />
+            </>
+          ) : (
+            <em>cherche…</em>
+          )}
+        </span>
+
+        {shown.length > 0 && (
+          <span className="gv-spy-misses">
+            {shown.map((m, i) => (
+              // La clé porte le rang : deux fois la même fausse piste ne doit
+              // pas se fondre en une seule pastille.
+              <i key={`${m}-${i}`}>
+                <X size={10} />
+                {m}
+              </i>
+            ))}
+          </span>
+        )}
+      </div>
+    </li>
+  );
+}
+
 // ---------- « X est en train de taper HOLL… » (buzzer) ----------
 function Typers({ typers, players, hueById }) {
   const list = Object.entries(typers)
@@ -866,40 +1102,81 @@ function Typers({ typers, players, hueById }) {
 // ============================================================
 // Posée en bas comme en solo, pas en modale : le panorama reste visible
 // derrière, et c'est le moment où l'on comprend le détail qu'on avait sous les
-// yeux. La nouveauté, c'est la colonne de droite — qui a marqué quoi.
-function Reveal({ round, players, mode, meId, hueById, secondsLeft, last, sided }) {
+// yeux.
+//
+// ELLE N'EMPRUNTE PLUS LA COQUILLE DU SOLO. Celle-ci est une RANGÉE (badge,
+// jaquette, texte, bouton) et il y avait cinq lignes de classement à y glisser :
+// le tableau, en `width: 100%` dans une rangée flex, se posait par-dessus le nom
+// du jeu — c'est le chevauchement qu'on voyait à l'écran. Ici la structure est
+// une grille explicite en deux colonnes : à gauche CE QU'IL FALLAIT TROUVER, à
+// droite CE QUE ÇA A RAPPORTÉ À QUI. Rien ne se superpose parce que rien ne
+// partage plus la même cellule.
+function Reveal({
+  round,
+  players,
+  mode,
+  meId,
+  hueById,
+  secondsLeft,
+  last,
+  sided,
+  totalMs,
+  elapsedMs,
+  skip,
+  onNext,
+}) {
   const results = round.results || [];
   const mine = results.find((r) => r.userId === meId);
+  const gain = (mine?.points || 0) + (mine?.mapPoints || 0);
+  const voted = !!skip?.ready?.includes(meId);
+  const alive = players.filter((p) => !p.left).length;
+  const waitingFor = Math.max(0, (skip?.total || alive) - (skip?.ready?.length || 0));
   const rows = players
     .filter((p) => !p.left)
     .map((p) => ({ p, r: results.find((x) => x.userId === p.id) }))
-    .sort((a, b) => (b.r?.points || 0) + (b.r?.mapPoints || 0) - ((a.r?.points || 0) + (a.r?.mapPoints || 0)));
+    .sort(
+      (a, b) =>
+        (b.r?.points || 0) + (b.r?.mapPoints || 0) - ((a.r?.points || 0) + (a.r?.mapPoints || 0))
+    );
 
   return (
     // `sided` : la carte de la manche bonus occupe le coin droit, la
     // révélation se décale pour ne pas lui passer dessus.
-    <div className={`geo-reveal gv-reveal ${mine?.correct ? "good" : "bad"} ${sided ? "sided" : ""}`}>
-      <i className="geo-rv-bar" aria-hidden="true" />
-      <span className="geo-rv-badge">
-        {mine?.correct ? <Check size={19} /> : <X size={19} />}
-      </span>
-      {round.cover && (
-        <img className="geo-rv-cover" src={round.cover} alt="" draggable="false" />
-      )}
-      <div className="geo-rv-txt">
-        <span className="geo-rv-verdict">
-          {mine?.correct ? "Trouvé" : "Raté"}
-          <b className="up">
-            +{(mine?.points || 0) + (mine?.mapPoints || 0)}
-          </b>
+    <div className={`gv-reveal ${mine?.correct ? "good" : "bad"} ${sided ? "sided" : ""}`}>
+      <i
+        className="gv-rv-bar"
+        aria-hidden="true"
+        // Durée réelle de la phase, et départ recalé sur le temps déjà écoulé :
+        // la barre du solo était figée à 5 s alors que la révélation à plusieurs
+        // en dure 7, elle se vidait donc deux secondes trop tôt.
+        style={
+          totalMs
+            ? { animationDuration: `${totalMs}ms`, animationDelay: `${-elapsedMs}ms` }
+            : undefined
+        }
+      />
+
+      <div className="gv-rv-head">
+        <span className="gv-rv-badge">
+          {mine?.correct ? <Check size={17} /> : <X size={17} />}
         </span>
-        <b className="geo-rv-name">{round.gameName}</b>
-        {mode === "buzzer" && round.winner && (
-          <em>
-            <Zap size={11} /> buzz de{" "}
-            {players.find((p) => p.id === round.winner)?.username || "?"}
-          </em>
+        {round.cover && (
+          <img className="gv-rv-cover" src={round.cover} alt="" draggable="false" />
         )}
+        <span className="gv-rv-id">
+          <em className="gv-rv-verdict">{mine?.correct ? "Trouvé" : "Raté"}</em>
+          <b className="gv-rv-game">{round.gameName}</b>
+          {mode === "buzzer" && round.winner && (
+            <em className="gv-rv-buzz">
+              <Zap size={11} /> buzz de{" "}
+              {players.find((p) => p.id === round.winner)?.username || "?"}
+            </em>
+          )}
+        </span>
+        <span className={`gv-rv-gain ${gain > 0 ? "up" : ""}`}>
+          +{gain}
+          <em>pts</em>
+        </span>
       </div>
 
       {/* Le décompte des points de la manche, joueur par joueur. */}
@@ -917,18 +1194,31 @@ function Reveal({ round, players, mode, meId, hueById, secondsLeft, last, sided 
                 <MapPin size={10} />
               </span>
             )}
-            <span className="gv-rv-pts">
-              +{(r?.points || 0) + (r?.mapPoints || 0)}
-            </span>
+            <span className="gv-rv-pts">+{(r?.points || 0) + (r?.mapPoints || 0)}</span>
             <span className="gv-rv-total">{p.score}</span>
           </li>
         ))}
       </ul>
 
-      <span className="geo-rv-next static">
-        {last ? "Tableau final" : "Manche suivante"}
-        <span>{Math.max(0, secondsLeft)}</span>
-      </span>
+      {/* On peut couper court, mais PAS tout seul : la suite ne part en avance
+          que si tout le monde a cliqué (routes/geoVersus.js → POST /next). Le
+          compteur « 1/3 » est là pour ça — sans lui, un clic sans effet visible
+          passerait pour un bouton cassé. */}
+      <button
+        className={`gv-rv-next clickable ${voted ? "voted" : ""}`}
+        onClick={onNext}
+        disabled={voted}
+      >
+        {voted ? <Check size={14} /> : <SkipForward size={14} />}
+        {voted
+          ? waitingFor > 0
+            ? `On attend ${waitingFor} joueur${waitingFor > 1 ? "s" : ""}`
+            : "C'est parti"
+          : last
+            ? "Tableau final"
+            : "Manche suivante"}
+        <b>{Math.max(0, secondsLeft)}</b>
+      </button>
     </div>
   );
 }
@@ -1132,7 +1422,7 @@ function Podium({ room, ranking, hueById, isHost, busy, onAgain }) {
               <span className="gv-podium-rank">
                 {i === 0 ? <Crown size={15} /> : i === 1 || i === 2 ? <Medal size={14} /> : i + 1}
               </span>
-              <VersusFace user={u} size={38} hue={hueById.get(id)} />
+              <VersusFace user={u} size={42} hue={hueById.get(id)} />
               <span className="gv-podium-id">
                 <b>{u.username}</b>
                 <em>

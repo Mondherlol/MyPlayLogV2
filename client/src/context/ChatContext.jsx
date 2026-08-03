@@ -29,6 +29,8 @@ function previewOf(m) {
   if (m.ost) return m.text || `OST : ${m.ost.name}`;
   if (m.party) return m.text || `Watchparty : ${m.party.title}`;
   if (m.mot) return m.text || "Mot du jour : rejoins la partie";
+  if (m.versus) return m.text || "Versus : rejoins le salon";
+  if (m.book) return m.text || `Planche ${(m.book.page || 0) + 1} — ${m.book.title}`;
   if (m.text) return m.text;
   if (m.media?.length) return m.media[0].kind === "gif" ? "GIF" : "Photo";
   return "";
@@ -38,6 +40,8 @@ function kindOf(m) {
   if (m.ost) return "ost";
   if (m.party) return "party";
   if (m.mot) return "mot";
+  if (m.versus) return "versus";
+  if (m.book) return "book";
   if (m.media?.length) return m.media[0].kind;
   return "text";
 }
@@ -49,6 +53,12 @@ function toastTextOf(m) {
   // pop-up est souvent le seul endroit où elle sera lue à temps.
   if (m.party) return m.text || `t'invite à regarder « ${m.party.title} »`;
   if (m.mot) return m.text || "t'invite à chercher le mot du jour";
+  // Aussi périssable qu'une invitation de séance : un salon se ferme dès que
+  // l'hôte lance, et la pop-up est souvent le seul endroit où elle sera lue à
+  // temps pour y être.
+  if (m.versus)
+    return m.text || `t'invite à un versus ${m.versus.kind === "blindtest" ? "blind test" : "GeoGamer"}`;
+  if (m.book) return m.text || `t'a partagé une planche de « ${m.book.title} »`;
   if (m.text) return m.text;
   if (m.media?.length)
     return m.media[0].kind === "gif" ? "a envoyé un GIF" : "a envoyé une photo";
@@ -315,6 +325,24 @@ export function ChatProvider({ children }) {
 
     es.addEventListener("party", (e) => {
       emit("party", JSON.parse(e.data));
+    });
+
+    // Salons « versus » — GeoGamer (routes/geoVersus.js) et blind test
+    // (routes/blindtestVersus.js). Même économie que la watchparty : un seul
+    // nom d'évènement par jeu, le `kind` de la charge dit ce qui s'est passé
+    // (lobby, cue, go, guess, reveal, done…) et la page du salon trie.
+    //
+    // CES DEUX LIGNES NE SONT PAS OPTIONNELLES : `EventSource` ne remet un
+    // évènement nommé qu'aux écouteurs de CE nom. Sans elles le serveur diffuse
+    // dans le vide — une arrivée dans le salon ne se voyait qu'en actualisant,
+    // et le « 3, 2, 1 » du départ restait bloqué sur « ! » puisque le top
+    // (`go`) n'arrivait jamais.
+    es.addEventListener("geoversus", (e) => {
+      emit("geoversus", JSON.parse(e.data));
+    });
+
+    es.addEventListener("btversus", (e) => {
+      emit("btversus", JSON.parse(e.data));
     });
 
     // Journal du serveur, en direct — n'arrive qu'aux administrateurs (le

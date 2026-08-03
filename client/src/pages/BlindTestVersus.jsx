@@ -136,6 +136,27 @@ export default function BlindTestVersus() {
     if (token && code) load();
   }, [token, code, load]);
 
+  // ---------- La liste de recherche des INVITÉS ----------
+  // Même défaut qu'à GeoGamer (pages/GeoVersus.jsx, même en-tête) : elle ne
+  // voyage que dans la réponse à `/start`, que seul l'hôte reçoit. Les invités
+  // partaient donc en manche sans aucune suggestion jusqu'à ce qu'ils
+  // rechargent la page.
+  useEffect(() => {
+    if (!token || !code) return undefined;
+    if (!room?.started || phase === "done" || candidates.length) return undefined;
+    let alive = true;
+    apiFetch(`/blindtest/versus/${code}`, { token })
+      .then((d) => {
+        if (alive && d.candidates?.length) setCandidates(d.candidates);
+      })
+      .catch(() => {
+        /* on réessaiera au prochain changement de phase */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [token, code, room?.started, phase, candidates.length]);
+
   // Le mini-lecteur global se tait pendant une partie.
   useEffect(() => {
     player?.pause?.();
