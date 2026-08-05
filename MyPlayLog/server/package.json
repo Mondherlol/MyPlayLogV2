@@ -1,0 +1,49 @@
+{
+  "name": "myplaylog-server",
+  "version": "0.1.0",
+  "description": "MyPlayLog backend - Express + MongoDB",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "seed:patch11": "node src/scripts/seedPatchnoteV11.js",
+    "seed:arcade": "node src/scripts/seedArcade.js",
+    "sync:events": "node src/scripts/syncEventLists.js",
+    "seed:collection": "node src/scripts/seedCollection.js",
+    "build:mots": "node src/scripts/buildMotsDict.js",
+    "import:geo": "node src/scripts/importGeoPanoramas.js",
+    "geo:export": "node src/scripts/geoCatalog.js --export",
+    "geo:import": "node src/scripts/geoCatalog.js --import",
+    "backfill:arcade": "node src/scripts/backfillArcadePoints.js",
+    "migrate:ost-youtube": "node src/scripts/migrateItunesOst.js",
+    "migrate:video-social": "node src/scripts/migrateVideoSocial.js",
+    "backfill:feed": "node src/scripts/backfillFeedActivities.js",
+    "backfill:wishlisted": "node src/scripts/backfillWishlisted.js",
+    "backfill:owned-cases": "node src/scripts/backfillOwnedCases.js",
+    "backfill:comic-thumbs": "node src/scripts/backfillComicThumbs.js",
+    "backfill:clip-posters": "node src/scripts/backfillClipPosters.js",
+    "backfill:ost-stats": "node src/scripts/backfillOstStats.js",
+    "warm:ost-climax": "node src/scripts/warmOstClimax.js",
+    "reset:mission-claims": "node src/scripts/resetMissionClaims.js",
+    "purge:ds": "node src/scripts/purgeDsGames.js"
+  },
+  "dependencies": {
+    "adm-zip": "^0.6.0",
+    "bcryptjs": "^2.4.3",
+    "cheerio": "^1.2.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "ffmpeg-static": "^5.3.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.5.1",
+    "multer": "^2.2.0",
+    "node-unrar-js": "^2.0.2",
+    "nodemailer": "^9.0.3",
+    "psn-api": "^2.18.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}

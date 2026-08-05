@@ -1,0 +1,357 @@
+/* ======================================================================
+   MyPlayLog — Design system (v2)
+   Épuré, moderne, nostalgique-sexy. Inspiré TV Time.
+   Light : blanc + grille "bloc-note" discrète.
+   Dark  : sombre profond + grille discrète, accents orange/ambre.
+   ====================================================================== */
+
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Fredoka:wght@500;600&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap");
+
+:root {
+  /* Accent doré (esprit TV Time).
+     --orange garde son nom (alias historique) mais vaut désormais un doré vif. */
+  --orange: #f2b70b;
+  --amber: #ffd24a;
+  --accent-grad: linear-gradient(100deg, #eaa908 0%, #ffcf3a 100%);
+  --accent-ink: #97680a; /* doré profond : lisible en TEXTE sur fond clair */
+  --brand-grad: linear-gradient(100deg, #b07d08 0%, #d29e06 100%);
+
+  /* THEME CLAIR */
+  /* On DÉCLARE le thème au navigateur, on ne fait pas que le peindre. Tout ce
+     qu'il dessine lui-même — la liste déroulante d'un `select`, les flèches
+     d'un champ numérique, le sélecteur de couleur, le bouton « Parcourir »
+     d'un champ fichier, les barres de défilement, le remplissage automatique —
+     ignore nos variables et suit CE réglage. Sans lui, le thème sombre gardait
+     des menus et des textes noir-sur-blanc collés au milieu des panneaux
+     sombres (les modales de l'admin Collection en étaient pleines). */
+  color-scheme: light;
+
+  --bg: #ffffff;
+  --grid-line: rgba(20, 20, 40, 0.045);
+  --surface: #ffffff;
+  --surface-2: #f6f6f8;
+  --border: #ececef;
+  --border-strong: #e0e0e5;
+  --text: #14151a;
+  --text-soft: #6b6c76;
+  --shadow-sm: 0 1px 2px rgba(20, 20, 40, 0.05);
+  --shadow: 0 8px 30px rgba(20, 20, 40, 0.08);
+  --ring: rgba(242, 183, 11, 0.32);
+
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-fun: "Fredoka", system-ui, sans-serif;
+  /* Didone à fort contraste, réservée aux OBJETS de la collection (jaquettes
+     peintes au canvas, cartouche de la vitrine) : c'est elle qui fait lire un
+     boîtier comme une édition soignée plutôt que comme une carte de l'app. */
+  --font-serif: "Playfair Display", Georgia, "Times New Roman", serif;
+
+  --radius: 14px;
+  --radius-lg: 20px;
+
+  /* Fond de page + halo, exposés en variables pour qu'un THÈME gagné à l'arcade
+     puisse les remplacer (motif à carreaux → dégradé, cœurs, étoiles…). Le motif
+     par défaut référence --grid-line, donc il suit le thème clair/sombre tout
+     seul. CosmeticsContext surcharge ces variables en inline sur <html>. */
+  --app-bg-image: linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  --app-bg-size: 28px 28px;
+  --app-halo: radial-gradient(
+    900px 420px at 70% -15%,
+    rgba(242, 183, 11, 0.12),
+    transparent 65%
+  );
+
+  /* Curseur : valeurs PAR DÉFAUT, surchargées sur <html> par CosmeticsContext
+     quand un thème gagné à l'arcade est équipé (un rôle par variable).
+     Format des rôles avec image : `url("…") <hotspotX> <hotspotY>`.
+     default/pointer laissent leur repli (`, auto` / `, pointer`) dans les
+     règles ci-dessous ; text/grab/grabbing partent d'un mot-clé système et
+     le JS intègre le repli dans la variable quand une image est posée. */
+  --cursor-default: url("/cursor.svg") 2 2;
+  --cursor-pointer: url("/cursor.svg") 2 2;
+  --cursor-text: text;
+  --cursor-grab: grab;
+  --cursor-grabbing: grabbing;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Sur fond sombre, le doré vif ressort : l'encre d'accent redevient vive */
+  --accent-ink: #ffd24a;
+  --brand-grad: linear-gradient(100deg, #f0b012 0%, #ffd23f 100%);
+
+  --bg: #0c0d11;
+  --grid-line: rgba(255, 255, 255, 0.035);
+  --surface: #14161c;
+  --surface-2: #1b1e26;
+  --border: #23262f;
+  --border-strong: #2d313c;
+  --text: #f2f3f6;
+  --text-soft: #9a9dab;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
+  --ring: rgba(255, 210, 74, 0.4);
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg);
+  /* Motif de fond : grille bloc-note par défaut, remplaçable par un thème. */
+  background-image: var(--app-bg-image);
+  background-size: var(--app-bg-size);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Halo d'accent discret en haut (remplaçable par un thème). */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--app-halo);
+  pointer-events: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.025em;
+  line-height: 1.06;
+  margin: 0;
+  font-weight: 700;
+}
+
+/* ---------- Curseur pixel-art (ou celui équipé à l'arcade) ---------- */
+@media (pointer: fine) {
+  html,
+  body {
+    cursor: var(--cursor-default), auto;
+  }
+  a,
+  button,
+  [role="button"],
+  .clickable,
+  label {
+    cursor: var(--cursor-pointer), pointer;
+  }
+  input,
+  textarea,
+  select {
+    cursor: var(--cursor-text);
+  }
+  /* Rôles « saisir / glisser » : au repos les éléments déplaçables prennent la
+     main ouverte, et la main fermée pendant le glisser (défaut système, ou le
+     thème équipé). Les vraies poignées drag&drop (dnd-kit) posent souvent leur
+     propre `cursor:grabbing` inline — on ne l'écrase pas. */
+  [draggable="true"] {
+    cursor: var(--cursor-grab);
+  }
+  [draggable="true"]:active {
+    cursor: var(--cursor-grabbing);
+  }
+}
+
+/* ---------- Typo utilitaires ---------- */
+.font-fun {
+  font-family: var(--font-fun);
+}
+.grad-text {
+  background: var(--brand-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---------- Boutons ---------- */
+.btn {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.72rem 1.25rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: transform 0.12s ease, box-shadow 0.2s ease, filter 0.2s ease,
+    background 0.2s ease, border-color 0.2s ease;
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn:disabled {
+  opacity: 0.45;
+  filter: grayscale(0.4);
+  box-shadow: none;
+  transform: none;
+  cursor: not-allowed;
+}
+.btn:disabled:hover {
+  filter: grayscale(0.4);
+  box-shadow: none;
+}
+.btn svg {
+  width: 18px;
+  height: 18px;
+}
+.btn-primary {
+  background: var(--accent-grad);
+  color: #1a1204;
+  box-shadow: 0 6px 18px rgba(242, 183, 11, 0.35);
+}
+.btn-primary:hover {
+  filter: brightness(1.05);
+  box-shadow: 0 8px 24px rgba(242, 183, 11, 0.5);
+}
+.btn-ghost {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+}
+.btn-ghost:hover {
+  border-color: var(--orange);
+}
+.btn-block {
+  width: 100%;
+  justify-content: center;
+}
+
+/* ---------- Champs ---------- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+.field label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+.field input {
+  font-family: var(--font-body);
+  font-size: 0.98rem;
+  padding: 0.78rem 0.95rem;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.field input::placeholder {
+  color: var(--text-soft);
+  opacity: 0.6;
+}
+.field input:focus {
+  outline: none;
+  border-color: var(--orange);
+  box-shadow: 0 0 0 4px var(--ring);
+}
+
+/* ---------- Cartes ---------- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---------- Alertes ---------- */
+.alert {
+  padding: 0.7rem 0.95rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+.alert-error {
+  background: rgba(230, 60, 60, 0.1);
+  color: #e0483f;
+  border: 1px solid rgba(230, 60, 60, 0.28);
+}
+
+.center-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+/* Écran de secours de l'Error Boundary : affiché à la place du vide quand un
+   composant lève une erreur (cf. components/ErrorBoundary.jsx). */
+.app-crash {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  background: var(--bg);
+}
+.app-crash-card {
+  max-width: 460px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+.app-crash-card h1 {
+  font-size: 1.4rem;
+}
+.app-crash-detail {
+  margin-top: 0.5rem;
+  max-width: 100%;
+  overflow: auto;
+  text-align: left;
+  font-size: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: rgba(127, 127, 127, 0.12);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ===== PWA / mode installé (standalone) =====
+   Quand l'app est lancée depuis l'icône de l'écran d'accueil (pas dans un
+   onglet de navigateur), on retire le header marketing (Navbar) et le footer
+   pour un rendu « comme une appli ». La Topbar interne (recherche / notifs /
+   profil) reste, c'est la navigation principale sur mobile. */
+@media (display-mode: standalone) {
+  .navbar,
+  .footer {
+    display: none !important;
+  }
+
+  /* Respecte l'encoche / la barre d'état des mobiles (viewport-fit=cover). */
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}

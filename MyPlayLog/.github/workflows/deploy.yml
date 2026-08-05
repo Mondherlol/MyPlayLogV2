@@ -1,0 +1,25 @@
+name: Deploy to VPS
+
+# Se déclenche à chaque push sur main (ou manuellement depuis l'onglet Actions).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Déploiement SSH sur le VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -e
+            cd ~/myplaylog
+            git pull origin main
+            docker compose up -d --build
+            docker image prune -f

@@ -1,0 +1,151 @@
+import { createContext, useContext, useEffect, useState } from "react";
+import { apiFetch } from "../lib/api";
+import { safeSetItem } from "../lib/storage";
+
+const AuthContext = createContext();
+
+// Le token peut vivre dans localStorage (se souvenir de moi) ou sessionStorage.
+function readStoredToken() {
+  return (
+    localStorage.getItem("mpl_token") ||
+    sessionStorage.getItem("mpl_token") ||
+    null
+  );
+}
+
+export function AuthProvider({ children }) {
+  const [token, setToken] = useState(readStoredToken);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(!!token);
+  // Les sections allumées ou éteintes depuis le panneau d'admin. Elles arrivent
+  // avec le bootstrap (/auth/me) pour que la barre latérale sache dès le
+  // premier rendu ce qu'elle affiche — un lien qui apparaît puis disparaît est
+  // pire que pas de lien du tout.
+  const [features, setFeatures] = useState({});
+
+  // Au chargement, si on a un token, on récupère l'utilisateur.
+  useEffect(() => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+    apiFetch("/auth/me", { token })
+      .then((data) => {
+        setUser(data.user);
+        setFeatures(data.features || {});
+      })
+      .catch(() => logout())
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function persistToken(newToken, remember) {
+    setToken(newToken);
+    // Écritures résilientes : si le localStorage est saturé par les caches, on
+    // purge et on retente — la connexion ne doit jamais échouer pour un quota.
+    if (remember) {
+      safeSetItem("mpl_token", newToken);
+      try {
+        sessionStorage.removeItem("mpl_token");
+      } catch {
+        /* ignore */
+      }
+    } else {
+      let inSession = false;
+      try {
+        sessionStorage.setItem("mpl_token", newToken);
+        inSession = true;
+      } catch {
+        /* sessionStorage plein : repli sur localStorage juste en dessous */
+      }
+      if (inSession) {
+        try {
+          localStorage.removeItem("mpl_token");
+        } catch {
+          /* ignore */
+        }
+      } else {
+        // Repli résilient : le token vit dans localStorage (purge + retry).
+        safeSetItem("mpl_token", newToken);
+      }
+    }
+  }
+
+  async function login(identifier, password, remember) {
+    const data = await apiFetch("/auth/login", {
+      method: "POST",
+      body: { identifier, password, remember },
+    });
+    persistToken(data.token, remember);
+    setUser(data.user);
+    return data.user;
+  }
+
+  async function register(email, username, password) {
+    const data = await apiFetch("/auth/register", {
+      method: "POST",
+      body: { email, username, password },
+    });
+    persistToken(data.token, true);
+    setUser(data.user);
+    return data.user;
+  }
+
+  // Réinitialisation via lien email : le backend renvoie un token → on connecte.
+  async function resetPassword(resetToken, password) {
+    const data = await apiFetch("/auth/reset-password", {
+      method: "POST",
+      body: { token: resetToken, password },
+    });
+    persistToken(data.token, false);
+    setUser(data.user);
+    return data.user;
+  }
+
+  function logout() {
+    setToken(null);
+    setUser(null);
+    localStorage.removeItem("mpl_token");
+    sessionStorage.removeItem("mpl_token");
+  }
+
+  // Met à jour l'utilisateur courant (après édition de profil).
+  function updateUser(patch) {
+    setUser((prev) => (prev ? { ...prev, ...patch } : prev));
+  }
+
+  // Une section vient d'être allumée ou éteinte depuis le panneau d'admin : la
+  // barre latérale doit suivre sans rechargement.
+  function updateFeatures(next) {
+    setFeatures((prev) => ({ ...prev, ...next }));
+  }
+
+  // Une section est visible si elle est allumée — ou si l'on est admin, car
+  // c'est lui qui la prépare pendant qu'elle est éteinte. Même règle que côté
+  // serveur (lib/features.js), et il ne doit jamais y en avoir deux.
+  function hasFeature(name) {
+    return !!features[name] || !!user?.isAdmin;
+  }
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        loading,
+        features,
+        hasFeature,
+        updateFeatures,
+        login,
+        register,
+        resetPassword,
+        logout,
+        updateUser,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export const useAuth = () => useContext(AuthContext);

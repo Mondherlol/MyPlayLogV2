@@ -1,0 +1,1591 @@
+
+> myplaylog@0.1.0 dev
+> concurrently -n SERVER,CLIENT -c yellow,magenta "npm --prefix server run dev" "npm --prefix client run dev"
+
+[CLIENT] 
+[CLIENT] > client@0.0.0 dev
+[CLIENT] > vite
+[CLIENT] 
+[SERVER] 
+[SERVER] > myplaylog-server@0.1.0 dev
+[SERVER] > nodemon src/index.js
+[SERVER] 
+[CLIENT] 
+[CLIENT]   [32m[1mVITE[22m v8.1.3[39m  [2mready in [0m[1m229[22m[2m[0m ms[22m
+[CLIENT] 
+[CLIENT]   [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
+[CLIENT] [2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
+[SERVER] [33m[nodemon] 3.1.14[39m
+[SERVER] [33m[nodemon] to restart at any time, enter `rs`[39m
+[SERVER] [33m[nodemon] watching path(s): *.*[39m
+[SERVER] [33m[nodemon] watching extensions: js,mjs,cjs,json[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[CLIENT] npm --prefix client run dev exited with code 1
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] file:///C:/Users/mondh/OneDrive/Desktop/MyPlayLog/server/src/routes/games.js:336
+[SERVER] function youtubeId(url) {
+[SERVER] ^
+[SERVER] 
+[SERVER] SyntaxError: Identifier 'youtubeId' has already been declared
+[SERVER]     at compileSourceTextModule (node:internal/modules/esm/utils:346:16)
+[SERVER]     at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:110:18)
+[SERVER]     at #translate (node:internal/modules/esm/loader:559:20)
+[SERVER]     at afterLoad (node:internal/modules/esm/loader:612:29)
+[SERVER]     at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:617:12)
+[SERVER]     at #createModuleJob (node:internal/modules/esm/loader:640:36)
+[SERVER]     at #getJobFromResolveResult (node:internal/modules/esm/loader:353:34)
+[SERVER]     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:321:41)
+[SERVER]     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[SERVER] 
+[SERVER] Node.js v22.22.3
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] file:///C:/Users/mondh/OneDrive/Desktop/MyPlayLog/server/src/routes/games.js:1130
+[SERVER] function summarizeReactions(reactions, meId) {
+[SERVER] ^
+[SERVER] 
+[SERVER] SyntaxError: Identifier 'summarizeReactions' has already been declared
+[SERVER]     at compileSourceTextModule (node:internal/modules/esm/utils:346:16)
+[SERVER]     at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:110:18)
+[SERVER]     at #translate (node:internal/modules/esm/loader:559:20)
+[SERVER]     at afterLoad (node:internal/modules/esm/loader:612:29)
+[SERVER]     at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:617:12)
+[SERVER]     at #createModuleJob (node:internal/modules/esm/loader:640:36)
+[SERVER]     at #getJobFromResolveResult (node:internal/modules/esm/loader:353:34)
+[SERVER]     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:321:41)
+[SERVER]     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[SERVER] 
+[SERVER] Node.js v22.22.3
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] file:///C:/Users/mondh/OneDrive/Desktop/MyPlayLog/server/src/routes/games.js:1160
+[SERVER] function reviewComment(c, all, meId) {
+[SERVER] ^
+[SERVER] 
+[SERVER] SyntaxError: Identifier 'reviewComment' has already been declared
+[SERVER]     at compileSourceTextModule (node:internal/modules/esm/utils:346:16)
+[SERVER]     at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:110:18)
+[SERVER]     at #translate (node:internal/modules/esm/loader:559:20)
+[SERVER]     at afterLoad (node:internal/modules/esm/loader:612:29)
+[SERVER]     at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:617:12)
+[SERVER]     at #createModuleJob (node:internal/modules/esm/loader:640:36)
+[SERVER]     at #getJobFromResolveResult (node:internal/modules/esm/loader:353:34)
+[SERVER]     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:321:41)
+[SERVER]     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[SERVER] 
+[SERVER] Node.js v22.22.3
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] file:///C:/Users/mondh/OneDrive/Desktop/MyPlayLog/server/src/routes/games.js:1074
+[SERVER] function normName(s) {
+[SERVER] ^
+[SERVER] 
+[SERVER] SyntaxError: Identifier 'normName' has already been declared
+[SERVER]     at compileSourceTextModule (node:internal/modules/esm/utils:346:16)
+[SERVER]     at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:110:18)
+[SERVER]     at #translate (node:internal/modules/esm/loader:559:20)
+[SERVER]     at afterLoad (node:internal/modules/esm/loader:612:29)
+[SERVER]     at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:617:12)
+[SERVER]     at #createModuleJob (node:internal/modules/esm/loader:640:36)
+[SERVER]     at #getJobFromResolveResult (node:internal/modules/esm/loader:353:34)
+[SERVER]     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:321:41)
+[SERVER]     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[SERVER] 
+[SERVER] Node.js v22.22.3
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] file:///C:/Users/mondh/OneDrive/Desktop/MyPlayLog/server/src/routes/games.js:1074
+[SERVER] function normName(s) {
+[SERVER] ^
+[SERVER] 
+[SERVER] SyntaxError: Identifier 'normName' has already been declared
+[SERVER]     at compileSourceTextModule (node:internal/modules/esm/utils:346:16)
+[SERVER]     at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:110:18)
+[SERVER]     at #translate (node:internal/modules/esm/loader:559:20)
+[SERVER]     at afterLoad (node:internal/modules/esm/loader:612:29)
+[SERVER]     at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:617:12)
+[SERVER]     at #createModuleJob (node:internal/modules/esm/loader:640:36)
+[SERVER]     at #getJobFromResolveResult (node:internal/modules/esm/loader:353:34)
+[SERVER]     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:321:41)
+[SERVER]     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[SERVER] 
+[SERVER] Node.js v22.22.3
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] file:///C:/Users/mondh/OneDrive/Desktop/MyPlayLog/server/src/routes/games.js:1093
+[SERVER] function normName(s) {
+[SERVER] ^
+[SERVER] 
+[SERVER] SyntaxError: Identifier 'normName' has already been declared
+[SERVER]     at compileSourceTextModule (node:internal/modules/esm/utils:346:16)
+[SERVER]     at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:110:18)
+[SERVER]     at #translate (node:internal/modules/esm/loader:559:20)
+[SERVER]     at afterLoad (node:internal/modules/esm/loader:612:29)
+[SERVER]     at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:617:12)
+[SERVER]     at #createModuleJob (node:internal/modules/esm/loader:640:36)
+[SERVER]     at #getJobFromResolveResult (node:internal/modules/esm/loader:353:34)
+[SERVER]     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:321:41)
+[SERVER]     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[SERVER] 
+[SERVER] Node.js v22.22.3
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] file:///C:/Users/mondh/OneDrive/Desktop/MyPlayLog/server/src/routes/lists.js:38
+[SERVER] function sanitizeMediaList(raw) {
+[SERVER] ^
+[SERVER] 
+[SERVER] SyntaxError: Identifier 'sanitizeMediaList' has already been declared
+[SERVER]     at compileSourceTextModule (node:internal/modules/esm/utils:346:16)
+[SERVER]     at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:110:18)
+[SERVER]     at #translate (node:internal/modules/esm/loader:559:20)
+[SERVER]     at afterLoad (node:internal/modules/esm/loader:612:29)
+[SERVER]     at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:617:12)
+[SERVER]     at #createModuleJob (node:internal/modules/esm/loader:640:36)
+[SERVER]     at #getJobFromResolveResult (node:internal/modules/esm/loader:353:34)
+[SERVER]     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:321:41)
+[SERVER]     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[SERVER] 
+[SERVER] Node.js v22.22.3
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] ❌ Le port 4000 est déjà utilisé. Un autre serveur tourne peut-être déjà.
+[SERVER]    Ferme-le, ou change PORT dans server/.env.
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m
+[SERVER] [32m[nodemon] restarting due to changes...[39m
+[SERVER] [32m[nodemon] starting `node src/index.js`[39m
+[SERVER] ✅ Connecté à MongoDB
+[SERVER] 🚀 API MyPlayLog sur http://localhost:4000
+[SERVER] [31m[nodemon] app crashed - waiting for file changes before starting...[39m

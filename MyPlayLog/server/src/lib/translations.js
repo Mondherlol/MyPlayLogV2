@@ -1,0 +1,100 @@
+// Traductions FR des énumérations IGDB (genres, modes, thèmes).
+// Les plateformes ne sont pas traduites (noms propres).
+
+export const GENRES_FR = {
+  Adventure: "Aventure",
+  Arcade: "Arcade",
+  "Card & Board Game": "Cartes & plateau",
+  Fighting: "Combat",
+  "Hack and slash/Beat 'em up": "Hack'n'slash / Beat'em up",
+  Indie: "Indé",
+  MOBA: "MOBA",
+  Music: "Musique",
+  Pinball: "Flipper",
+  Platform: "Plateforme",
+  "Point-and-click": "Point-and-click",
+  Puzzle: "Puzzle / Réflexion",
+  "Quiz/Trivia": "Quiz",
+  Racing: "Course",
+  "Real Time Strategy (RTS)": "Stratégie temps réel (RTS)",
+  "Role-playing (RPG)": "Jeu de rôle (RPG)",
+  Shooter: "Tir / Shooter",
+  Simulator: "Simulation",
+  Sport: "Sport",
+  Strategy: "Stratégie",
+  Tactical: "Tactique",
+  "Turn-based strategy (TBS)": "Stratégie tour par tour (TBS)",
+  "Visual Novel": "Visual Novel",
+};
+
+export const MODES_FR = {
+  "Battle Royale": "Battle Royale",
+  "Co-operative": "Coopération",
+  "Massively Multiplayer Online (MMO)": "MMO",
+  Multiplayer: "Multijoueur",
+  "Single player": "Solo",
+  "Split screen": "Écran partagé",
+};
+
+export const THEMES_FR = {
+  "4X (explore, expand, exploit, and exterminate)": "4X",
+  Action: "Action",
+  Business: "Gestion / Business",
+  Comedy: "Comédie",
+  Drama: "Drame",
+  Educational: "Éducatif",
+  Erotic: "Érotique",
+  Fantasy: "Fantasy",
+  Historical: "Historique",
+  Horror: "Horreur",
+  Kids: "Enfants",
+  Mystery: "Mystère",
+  "Non-fiction": "Non-fiction",
+  "Open world": "Monde ouvert",
+  Party: "Party",
+  Romance: "Romance",
+  Sandbox: "Bac à sable",
+  "Science fiction": "Science-fiction",
+  Stealth: "Infiltration",
+  Survival: "Survie",
+  Thriller: "Thriller",
+  Warfare: "Guerre",
+};
+
+// Langues (IGDB `languages`) — noms anglais -> français
+export const LANGUAGES_FR = {
+  Arabic: "Arabe",
+  "Chinese (Simplified)": "Chinois (simplifié)",
+  "Chinese (Traditional)": "Chinois (traditionnel)",
+  Czech: "Tchèque",
+  Danish: "Danois",
+  Dutch: "Néerlandais",
+  English: "Anglais",
+  Finnish: "Finnois",
+  French: "Français",
+  German: "Allemand",
+  Greek: "Grec",
+  Hebrew: "Hébreu",
+  Hungarian: "Hongrois",
+  Italian: "Italien",
+  Japanese: "Japonais",
+  Korean: "Coréen",
+  Norwegian: "Norvégien",
+  Polish: "Polonais",
+  Portuguese: "Portugais",
+  "Portuguese (Brazil)": "Portugais (Brésil)",
+  Romanian: "Roumain",
+  Russian: "Russe",
+  "Spanish (Spain)": "Espagnol (Espagne)",
+  "Spanish (Mexico)": "Espagnol (Mexique)",
+  Spanish: "Espagnol",
+  Swedish: "Suédois",
+  Thai: "Thaï",
+  Turkish: "Turc",
+  Ukrainian: "Ukrainien",
+  Vietnamese: "Vietnamien",
+};
+
+export function frName(map, name) {
+  return map[name] || name;
+}

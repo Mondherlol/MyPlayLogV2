@@ -1,0 +1,3244 @@
+/* ======================================================================
+   Collection — l'étagère de médias (séries, films, animés)
+   ======================================================================
+   PARTI PRIS : la page reste une page de l'app (fond du thème, accent doré,
+   typo maison) — c'est un rayon de vidéoclub POSÉ dans MyPlayLog, pas un
+   univers parallèle. Ce qui bascule dans le sombre, ce sont les deux scènes
+   où l'on entre vraiment : l'étagère 3D (une pièce éclairée à la lampe) et le
+   poste cathodique (plein écran, lumières éteintes).
+
+   Le vocabulaire d'objet est constant : plastique sombre pour la coque,
+   papier crème pour les étiquettes, et la teinte propre de chaque titre
+   (--tint, servie par l'API) pour les liserés. Un boîtier n'est jamais
+   « une carte avec une image » : il a une tranche, une étiquette, un
+   film plastique, et la cassette qui glisse dehors quand on le survole.
+   ====================================================================== */
+
+.coll-page,
+.coll-detail {
+  --coll-plastic: #191a20;
+  --coll-plastic-2: #2a2c35;
+  --coll-paper: #f2ecdd;
+  --coll-paper-ink: #26251f;
+  --coll-tint: var(--orange);
+  --coll-room: #0b0a10;
+}
+
+/* ======================================================================
+   1. En-tête
+   ====================================================================== */
+
+.coll-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.coll-head-main {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.coll-head-icon {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  color: #1a1204;
+  background: var(--accent-grad);
+  box-shadow: 0 8px 22px rgba(242, 183, 11, 0.32);
+}
+
+/* Surtitre : la petite étiquette de rayon, façon casier de vidéoclub. */
+.coll-head-over {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  margin-bottom: 0.28rem;
+}
+
+.coll-head-over::after {
+  content: "";
+  width: 26px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--accent-grad);
+}
+
+.coll-head-title {
+  font-size: clamp(1.7rem, 4.4vw, 2.35rem);
+}
+
+.coll-head-sub {
+  margin: 0.3rem 0 0;
+  font-size: 0.88rem;
+  color: var(--text-soft);
+  max-width: 46ch;
+}
+
+.coll-head-stats {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.coll-head-stats span {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.34rem 0.7rem;
+}
+
+.coll-head-stats strong {
+  color: var(--text);
+  font-family: var(--font-display);
+}
+
+/* Sur l'étagère de quelqu'un d'autre : ce qu'il a et que je n'ai pas. La seule
+   pastille en couleur — c'est le chiffre pour lequel on est venu. */
+.coll-head-stats .coll-head-envy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-color: color-mix(in srgb, var(--orange) 45%, var(--border));
+  background: color-mix(in srgb, var(--orange) 12%, var(--surface-2));
+  color: var(--orange);
+}
+.coll-head-stats .coll-head-envy strong {
+  color: var(--orange);
+}
+
+/* L'avatar prend la place de l'icône quand on regarde chez quelqu'un. */
+.coll-head-av {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
+/* ======================================================================
+   La jauge de complétion — ce qui fait d'une étagère une COLLECTION
+   ======================================================================
+   Douze boîtiers, c'est douze boîtiers. « 12 sur 40 », c'est vingt-huit qui
+   manquent — et c'est très exactement la différence entre une page et un jeu.
+   D'où ce bandeau, posé entre l'en-tête et la barre d'outils, avec le seul
+   chemin vers la manivelle qu'il y ait depuis cette page. */
+.coll-quest {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 260px) auto;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.85rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 200% at 0% 0%, color-mix(in srgb, var(--orange) 10%, transparent), transparent 60%),
+    var(--surface);
+}
+.coll-quest.done {
+  background:
+    radial-gradient(120% 200% at 0% 0%, rgba(80, 200, 120, 0.14), transparent 60%),
+    var(--surface);
+  border-color: rgba(80, 200, 120, 0.35);
+}
+
+.coll-quest-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.coll-quest-text strong {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-display);
+  font-size: 0.98rem;
+}
+.coll-quest.done .coll-quest-text strong {
+  color: #2f9e5d;
+}
+.coll-quest-text span {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+.coll-quest-gauge {
+  display: block;
+  height: 7px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface-2);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+.coll-quest-gauge i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #ffc247, var(--orange));
+  transition: width 0.7s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.coll-quest.done .coll-quest-gauge i {
+  background: linear-gradient(90deg, #6fe3a0, #2f9e5d);
+}
+
+.coll-quest-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1rem;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff9d2e, #d9432c);
+  color: #fff;
+  font-size: 0.84rem;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 5px 16px rgba(217, 67, 44, 0.26);
+  transition: 0.16s;
+}
+.coll-quest-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 9px 22px rgba(217, 67, 44, 0.34);
+}
+.coll-quest-btn em {
+  font-style: normal;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.2);
+  font-size: 0.72rem;
+}
+.coll-quest.done .coll-quest-btn {
+  background: linear-gradient(135deg, #6fe3a0, #2f9e5d);
+  box-shadow: 0 5px 16px rgba(47, 158, 93, 0.26);
+}
+
+@media (max-width: 760px) {
+  .coll-quest {
+    grid-template-columns: 1fr;
+    gap: 0.7rem;
+  }
+  .coll-quest-btn {
+    justify-content: center;
+  }
+}
+
+/* ======================================================================
+   Le boîtier verrouillé — une fiche qu'on peut lire, un objet qu'on n'a pas
+   ======================================================================
+   Il prend la place des épisodes / planches / cartouche : ce sont ces
+   trois-là que le serveur retient tant que le boîtier n'est pas à nous. Tout
+   le reste de la fiche (résumé, casting, discussion) demeure — c'est
+   précisément ce qui doit donner envie de le débloquer. */
+.coll-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 2.4rem 1.5rem;
+  border: 1px dashed var(--border);
+  border-radius: 18px;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, var(--tint, var(--orange)) 4%, transparent) 0 9px,
+      transparent 9px 18px
+    ),
+    var(--surface);
+  text-align: center;
+}
+.coll-locked-ic {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--tint, var(--orange)) 16%, var(--surface-2));
+  color: var(--tint, var(--orange));
+}
+.coll-locked h2 {
+  margin: 0.3rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+}
+.coll-locked p {
+  max-width: 46ch;
+  margin: 0 0 0.5rem;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--text-soft);
+}
+.coll-locked-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  text-decoration: none;
+}
+.coll-locked-link:hover {
+  color: var(--orange);
+}
+
+.coll-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+}
+
+.coll-section-title svg {
+  color: var(--accent-ink);
+}
+
+.coll-section-title em {
+  font-style: normal;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  margin-left: 0.2rem;
+}
+
+/* ======================================================================
+   2. Les reprises — trois rangées, trois objets
+   ======================================================================
+   Un même « Reprendre » ne pouvait pas couvrir les trois supports : on remet
+   une cassette en marche, on ROUVRE un volume, on RALLUME une console. Chaque
+   rangée porte donc la matière de son objet — vignette d'écran, papier crème,
+   plastique de cartouche — et jamais la carte générique des deux autres. */
+
+/* Placée sous la collection : un filet la sépare du rayon. */
+.coll-resume {
+  margin-top: 2rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--border);
+}
+
+/* Un seul filet pour l'ensemble : trois sections empilées, chacune cerclée de
+   son trait, ça ferait une pile de formulaires. Les suivantes se détachent par
+   la marge — et par leur matière, qui suffit largement à les séparer. */
+.coll-resume + .coll-resume {
+  margin-top: 1.7rem;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.coll-resume-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0.85rem;
+}
+
+.coll-resume-card {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 7;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--coll-plastic);
+  border: 1px solid var(--border);
+  transition: transform 0.16s ease, box-shadow 0.2s ease;
+}
+
+.coll-resume-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.26);
+}
+
+.coll-resume-card img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(1.05);
+}
+
+.coll-resume-grad {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    rgba(8, 8, 12, 0.9) 8%,
+    rgba(8, 8, 12, 0.35) 62%,
+    rgba(8, 8, 12, 0.08)
+  );
+}
+
+.coll-resume-play {
+  position: absolute;
+  top: 50%;
+  right: 0.9rem;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #10100c;
+  background: var(--tint, var(--orange));
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.coll-resume-info {
+  position: absolute;
+  left: 0.9rem;
+  bottom: 0.85rem;
+  right: 3.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  color: #fff;
+}
+
+.coll-resume-info strong {
+  font-family: var(--font-display);
+  font-size: 0.94rem;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-resume-info em {
+  font-style: normal;
+  font-size: 0.74rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.coll-resume-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.coll-resume-bar i {
+  display: block;
+  height: 100%;
+  background: var(--tint, var(--orange));
+}
+
+/* ----------------------------------------------------------------------
+   2 bis. Les marque-pages — comics & mangas
+   ----------------------------------------------------------------------
+   Une fiche de papier, pas une vignette : crème constant (la matière de
+   l'objet ne dépend pas du thème de l'app), couverture debout à gauche, et le
+   ruban qui pend du haut — la seule chose qui dépasse d'un livre fermé. */
+
+.coll-read-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
+  gap: 0.85rem;
+}
+
+.coll-read-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  color: var(--coll-paper-ink);
+  background: linear-gradient(
+      105deg,
+      rgba(255, 255, 255, 0.55),
+      rgba(255, 255, 255, 0) 46%
+    ),
+    var(--coll-paper);
+  border: 1px solid rgba(38, 37, 31, 0.16);
+  /* Le liseré du bas fait l'épaisseur de la fiche : sans lui, le crème est un
+     rectangle posé à plat. */
+  box-shadow: 0 2px 0 rgba(38, 37, 31, 0.12), 0 6px 16px rgba(20, 20, 40, 0.1);
+  transition: transform 0.16s ease, box-shadow 0.2s ease;
+}
+
+.coll-read-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 2px 0 rgba(38, 37, 31, 0.12), 0 16px 30px rgba(20, 20, 40, 0.22);
+}
+
+.coll-read-cover {
+  position: relative;
+  flex: 0 0 auto;
+  width: 52px;
+  aspect-ratio: 2 / 3;
+  border-radius: 3px 5px 5px 3px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.9);
+  background: var(--tint, var(--orange));
+  box-shadow: 0 3px 10px rgba(38, 37, 31, 0.3);
+}
+
+.coll-read-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Le dos du volume : le pli qu'on voit toujours sur la tranche d'un livre
+   fermé, et qui suffit à le distinguer d'une image collée. */
+.coll-read-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.42),
+    rgba(255, 255, 255, 0.22) 62%,
+    rgba(0, 0, 0, 0.1)
+  );
+}
+
+.coll-read-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  /* De quoi laisser passer le ruban, qui tombe dans la marge droite. */
+  padding-right: 1.4rem;
+}
+
+.coll-read-saga {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(38, 37, 31, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-read-card strong {
+  font-family: var(--font-display);
+  font-size: 0.93rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-read-gauge {
+  display: block;
+  height: 3px;
+  margin: 0.5rem 0 0.32rem;
+  border-radius: 999px;
+  background: rgba(38, 37, 31, 0.15);
+  overflow: hidden;
+}
+
+.coll-read-gauge i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--tint, var(--orange));
+}
+
+.coll-read-card em {
+  font-style: normal;
+  font-size: 0.71rem;
+  color: rgba(38, 37, 31, 0.62);
+}
+
+/* Le ruban. Il DÉPASSE du haut de la fiche (c'est tout l'intérêt) et descend
+   d'un cran quand on survole — le geste de tirer sur le signet. */
+.coll-read-mark {
+  position: absolute;
+  top: -4px;
+  right: 1.05rem;
+  width: 13px;
+  height: 34px;
+  border-radius: 2px 2px 0 0;
+  background: var(--tint, var(--orange));
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 74%, 0 100%);
+  box-shadow: 0 3px 8px rgba(38, 37, 31, 0.32);
+  transition: height 0.18s ease;
+}
+
+.coll-read-card:hover .coll-read-mark {
+  height: 44px;
+}
+
+/* ----------------------------------------------------------------------
+   2 ter. La console encore chaude — jeux GBA
+   ----------------------------------------------------------------------
+   Ni vignette ni fiche : la carte de jeu elle-même. Coin biseauté, plastique
+   sombre, étiquette et contacts dorés — on la reconnaît avant d'avoir lu le
+   titre, et c'est exactement ce qu'on veut d'un raccourci. */
+
+.coll-play-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(244px, 1fr));
+  gap: 0.85rem;
+}
+
+.coll-play-card {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: radial-gradient(
+      130% 150% at 10% 0%,
+      color-mix(in srgb, var(--tint, var(--orange)) 14%, transparent),
+      transparent 62%
+    ),
+    var(--surface-2);
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.2s ease;
+}
+
+.coll-play-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--tint, var(--orange)) 45%, var(--border));
+  box-shadow: var(--shadow);
+}
+
+.coll-play-cart {
+  position: relative;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 48px; /* la carte DS : 33,4 × 35 mm, presque carrée */
+  border-radius: 5px;
+  padding: 5px 5px 10px;
+  /* LE coin biseauté : le seul détail qui fait « carte DS » plutôt que
+     « petit carré gris ». */
+  clip-path: polygon(0 0, 66% 0, 100% 26%, 100% 100%, 0 100%);
+  background: linear-gradient(158deg, #4c4f59, #23252c 60%, #35373f);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 5px 14px rgba(0, 0, 0, 0.34);
+}
+
+.coll-play-label {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 3px;
+  overflow: hidden;
+  color: #12130f;
+  background: var(--tint, var(--orange));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+}
+
+.coll-play-label img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Les contacts dorés, en bas de la carte. */
+.coll-play-teeth {
+  position: absolute;
+  left: 6px;
+  right: 8px;
+  bottom: 3px;
+  height: 4px;
+  border-radius: 1px;
+  opacity: 0.85;
+  background: repeating-linear-gradient(
+    90deg,
+    #d9b65e 0 3px,
+    rgba(0, 0, 0, 0.35) 3px 5px
+  );
+}
+
+.coll-play-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.16rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.coll-play-body strong {
+  font-family: var(--font-display);
+  font-size: 0.93rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-play-body em {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-style: normal;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+/* Pas de jauge ici, et c'est volontaire : la sauvegarde vit dans la console,
+   rien de notre côté ne sait où en est la partie. Une barre à zéro dirait le
+   contraire du temps de jeu affiché juste au-dessus. */
+.coll-play-cta {
+  align-self: flex-start;
+  margin-top: 0.34rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.22rem 0.52rem;
+  border-radius: 999px;
+  font-size: 0.63rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text);
+  background: color-mix(in srgb, var(--tint, var(--orange)) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tint, var(--orange)) 34%, transparent);
+}
+
+/* ======================================================================
+   3. Barre d'outils
+   ====================================================================== */
+
+.coll-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.1rem;
+}
+
+.coll-chips,
+.coll-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.coll-chip {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.42rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.coll-chip:hover {
+  border-color: var(--orange);
+  color: var(--text);
+}
+
+.coll-chip.active {
+  background: var(--accent-grad);
+  border-color: transparent;
+  color: #1a1204;
+}
+
+/* Les pastilles de FORMAT gardent la typo mécanique d'une étiquette. */
+.coll-chip.fmt {
+  font-family: var(--font-body);
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+}
+
+.coll-chips-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border-strong);
+  margin: 0 0.25rem;
+}
+
+.coll-search {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.42rem 0.7rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.coll-search:focus-within {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 4px var(--ring);
+}
+
+.coll-search svg {
+  color: var(--text-soft);
+  flex: 0 0 auto;
+}
+
+.coll-search input {
+  border: none;
+  background: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.86rem;
+  width: 190px;
+  max-width: 42vw;
+}
+
+.coll-search button {
+  border: none;
+  background: none;
+  color: var(--text-soft);
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.coll-views {
+  display: flex;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.coll-views button {
+  display: flex;
+  align-items: center;
+  gap: 0.34rem;
+  border: none;
+  background: none;
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.44rem 0.8rem;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.coll-views button.active {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* ---------------------------------------------------------- le rangement --
+   « Ranger » est un INTERRUPTEUR, pas une action : allumé, il reste allumé et
+   il se voit — sinon on ne comprend pas pourquoi les boîtiers ne s'ouvrent
+   plus. D'où l'état plein, qui reprend l'accent de la page. */
+.coll-arrange-toggle {
+  gap: 0.36rem;
+  font-size: 0.8rem;
+  padding: 0.44rem 0.8rem;
+}
+
+.coll-arrange-toggle.active {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #1b1405;
+}
+
+/* L'ÉTABLI — QUI PREND LA PLACE DE L'EN-TÊTE, et n'est donc pas une bande de
+   plus. Même bloc, même gabarit, même pastille à gauche : seul le CONTENU
+   change de métier (le nom du rayon et ses compteurs cèdent aux outils). C'est
+   ce qui fait que la page ne saute pas en entrant dans le mode, et que
+   l'étagère — la seule chose qui compte quand on range — ne descend pas d'un
+   centimètre sous la ligne de flottaison. */
+.coll-arrange-head {
+  align-items: center;
+}
+
+/* La pastille passe à l'accent PLEIN, comme l'interrupteur « Ranger » : les
+   deux marques du mode se répondent d'un bout à l'autre de la page. */
+.coll-arrange-head .coll-head-icon {
+  background: var(--orange);
+  box-shadow: 0 8px 22px rgba(242, 183, 11, 0.28);
+}
+
+/* Les réglages, en colonne et alignés à droite : trois lignes courtes se lisent
+   d'un coup d'œil là où une seule ligne de onze pastilles fait un ruban. */
+.coll-arrange-tools {
+  display: grid;
+  gap: 0.42rem;
+  justify-items: end;
+}
+
+.coll-arrange-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.coll-arrange-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+  opacity: 0.75;
+}
+
+.coll-arrange-btns {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.coll-arrange-tools .coll-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34rem;
+  font-size: 0.76rem;
+  padding: 0.3rem 0.62rem;
+}
+
+/* L'échantillon d'essence. Un rond de la couleur du DESSUS de la planche (voir
+   PLANK côté scène) : choisir un meuble à son nom seul, c'est choisir à
+   l'aveugle. « Selon le thème » n'a pas de couleur à montrer — il en prend
+   deux, coupées en diagonale. */
+.coll-skin-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28);
+}
+
+.coll-skin-dot.is-auto {
+  background: linear-gradient(135deg, #e7e3d9 50%, #292a33 50%);
+}
+.coll-skin-dot.is-chene {
+  background: #d9bd8d;
+}
+.coll-skin-dot.is-noyer {
+  background: #7a5539;
+}
+.coll-skin-dot.is-laque {
+  background: #26262c;
+}
+
+/* Le retour en arrière ne se range PAS avec les réglages : c'est le seul bouton
+   de l'établi qui défait quelque chose, et il se tient à distance des trois
+   rangées qu'il annule. */
+.coll-arrange-reset {
+  margin-top: 0.18rem;
+  gap: 0.34rem;
+  font-size: 0.76rem;
+  padding: 0.36rem 0.7rem;
+}
+
+/* ======================================================================
+   4. États
+   ====================================================================== */
+
+.coll-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 300px;
+  color: var(--text-soft);
+  text-align: center;
+}
+
+.coll-state svg {
+  color: var(--accent-ink);
+}
+
+/* L'icône dans sa pastille : le même objet que l'en-tête, en creux — un état
+   vide reste une page de l'app, pas un message d'erreur brut. */
+.coll-state-icon {
+  width: 54px;
+  height: 54px;
+  margin-bottom: 0.35rem;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.coll-state strong {
+  font-family: var(--font-display);
+  font-size: 1.06rem;
+  color: var(--text);
+}
+
+.coll-state p {
+  margin: 0;
+  font-size: 0.86rem;
+  max-width: 42ch;
+}
+
+.coll-state .btn {
+  margin-top: 0.6rem;
+}
+
+.coll-spin {
+  animation: coll-spin 1s linear infinite;
+}
+
+@keyframes coll-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ======================================================================
+   4 bis. Squelettes de chargement
+   ======================================================================
+   L'attente a la FORME de ce qui arrive : une rangée de tranches debout sur
+   sa planche, ou une grille de boîtiers fermés. Même gabarit, mêmes
+   proportions, même place dans la page que le contenu réel — quand il arrive,
+   rien ne saute.
+
+   Mais la forme SEULE : pas de capuchon sombre, pas d'étiquette de pied, pas
+   d'ombre portée, pas de balayage brillant. Un squelette qui imite l'objet
+   fini n'en est qu'une mauvaise copie, et la copie se voit d'autant plus que
+   le vrai boîtier arrive juste après. Des aplats neutres cerclés d'un filet,
+   qui respirent doucement en vague de gauche à droite : on comprend qu'il se
+   passe quelque chose sans que rien ne clignote.
+   ====================================================================== */
+
+/* La respiration commune à tous les gabarits de la page. Décalée d'un objet
+   au suivant par --d : la vague traverse la rangée au lieu de faire pulser
+   tout le bloc d'un seul coup, ce qui battrait comme un gyrophare. */
+@keyframes coll-skel-breathe {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+.coll-shelf-skel {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  /* Le vide sous la planche, calé sur le cadrage de la scène 3D. En pixels et
+     non en % : un padding en pourcentage se mesure sur la LARGEUR. */
+  padding-bottom: clamp(28px, 6vh, 54px);
+}
+
+.coll-shelf-skel-row {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 7px;
+  /* La part de hauteur que remplit la rangée : FILL, côté composant. */
+  height: 74%;
+  overflow: hidden;
+}
+
+/* Une tranche de boîtier, réduite à sa silhouette : un aplat, un filet, rien
+   d'imprimé dessus. */
+.coll-skel-spine {
+  flex: 0 0 auto;
+  width: clamp(20px, 3vw, 36px);
+  height: var(--h, 100%);
+  border-radius: 2px;
+  background: var(--surface-2);
+  /* Filet à l'intérieur plutôt qu'une ombre portée : le gabarit reste à plat
+     dans la page, il ne prétend pas être un objet posé. */
+  box-shadow: inset 0 0 0 1px var(--border);
+  animation: coll-skel-breathe 2.4s ease-in-out var(--d, 0ms) infinite;
+}
+
+/* La planche : un simple trait sous la rangée. */
+.coll-shelf-skel-plank {
+  flex: 0 0 auto;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  opacity: 0.6;
+}
+
+.coll-shelf-skel-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--text-soft);
+  opacity: 0.7;
+}
+
+/* La jauge des jaquettes. Un rail COURT et discret : il ne raconte pas un
+   téléchargement, il dit seulement que l'attente est finie dans une seconde et
+   qu'elle avance. Le remplissage est piloté par le composant (voir
+   `progress` dans ShelfSkeleton). */
+.coll-shelf-skel-gauge {
+  width: 132px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+  overflow: hidden;
+}
+
+.coll-shelf-skel-gauge i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--orange);
+  opacity: 0.75;
+  /* Elle avance par bonds (six jaquettes de front) : sans ce lissage, le rail
+     saute de six pour cent en six pour cent. */
+  transition: width 0.35s ease;
+}
+
+/* ---------- la grille en attente ---------- */
+
+/* Le gabarit du boîtier : ses proportions et ses coins, sans sa jaquette ni
+   sa tranche imprimée. */
+.coll-skel-case {
+  display: block;
+  aspect-ratio: 2 / 3;
+  border-radius: 3px 7px 7px 3px;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+  animation: coll-skel-breathe 2.4s ease-in-out var(--d, 0ms) infinite;
+}
+
+/* Pastilles de compteurs, dans l'en-tête. Sélecteur assez fort pour battre
+   `.coll-head-stats span`, qui leur donnerait sinon le fond des vraies. */
+.coll-head-stats .coll-skel-pill {
+  width: 74px;
+  height: 31px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  animation: coll-skel-breathe 2.4s ease-in-out infinite;
+}
+
+/* Même vague que la rangée, à l'échelle de trois pastilles. */
+.coll-head-stats .coll-skel-pill:nth-child(2) {
+  animation-delay: 140ms;
+}
+
+.coll-head-stats .coll-skel-pill:nth-child(3) {
+  animation-delay: 280ms;
+}
+
+.coll-head-stats .coll-skel-pill.wide {
+  width: 96px;
+}
+
+/* Un gabarit qui respire reste du mouvement décoratif : on le fige, en le
+   laissant lisible. */
+@media (prefers-reduced-motion: reduce) {
+  .coll-skel-spine,
+  .coll-skel-case,
+  .coll-head-stats .coll-skel-pill {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
+.coll-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin: 1.6rem 0 0;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: var(--text-soft);
+  max-width: 74ch;
+}
+
+.coll-note svg {
+  flex: 0 0 auto;
+  margin-top: 0.2rem;
+}
+
+/* ======================================================================
+   5. Boîtiers 2D (vue grille)
+   ====================================================================== */
+
+.coll-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 1.5rem 1.3rem;
+  perspective: 1400px;
+}
+
+.coll-case {
+  display: block;
+  color: inherit;
+}
+
+/* La coque : c'est elle qui bascule sous le curseur, pas l'image. */
+.coll-case-body {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  border-radius: 3px 7px 7px 3px;
+  background: var(--coll-plastic);
+  /* Volontairement PAS de preserve-3d : la cassette et le disque sont placés
+     derrière la jaquette par z-index, et preserve-3d trierait les enfants par
+     leur profondeur 3D en ignorant cet ordre. La perspective de .coll-grid
+     suffit à la bascule. */
+  transition: transform 0.34s cubic-bezier(0.2, 0.9, 0.25, 1),
+    box-shadow 0.34s ease;
+  /* Un objet posé : ombre de contact serrée + ombre portée large. */
+  box-shadow: 0 2px 4px rgba(10, 10, 20, 0.34), 0 14px 28px rgba(10, 10, 20, 0.26),
+    0 0 0 1px rgba(10, 10, 20, 0.1);
+}
+
+.coll-case:hover .coll-case-body {
+  transform: rotateY(-15deg) translateZ(22px) translateY(-8px);
+  box-shadow: 4px 6px 10px rgba(10, 10, 20, 0.3),
+    26px 30px 52px rgba(10, 10, 20, 0.38), 0 0 0 1px rgba(10, 10, 20, 0.12);
+}
+
+/* Tranche : un bord épais à gauche, avec le titre imprimé dessus. Sur un DVD
+   elle est fine, sur une VHS elle est franche — c'est le seul repère qui
+   distingue les deux supports au premier coup d'œil. */
+.coll-case-spine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 13px;
+  border-radius: 3px 0 0 3px;
+  background: linear-gradient(
+    90deg,
+    #0d0e12 0%,
+    #24262e 45%,
+    var(--coll-plastic) 100%
+  );
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.coll-case.fmt-dvd .coll-case-spine {
+  width: 8px;
+}
+
+.coll-case-spine-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 0.42rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+  white-space: nowrap;
+  overflow: hidden;
+  max-height: 92%;
+}
+
+/* La jaquette */
+.coll-case-art {
+  position: absolute;
+  inset: 0 0 0 13px;
+  border-radius: 0 7px 7px 0;
+  overflow: hidden;
+  background: linear-gradient(150deg, var(--tint) 0%, #101118 78%);
+}
+
+.coll-case.fmt-dvd .coll-case-art {
+  inset: 0 0 0 8px;
+}
+
+.coll-case-art img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease, filter 0.3s ease;
+}
+
+.coll-case:hover .coll-case-art img {
+  transform: scale(1.05);
+}
+
+.coll-case-noart {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Film plastique : le reflet oblique du blister. DISCRET — c'est la jaquette
+   qu'on regarde, pas le reflet ; un éclat trop franc lave l'affiche en son
+   milieu et on ne lit plus l'image dessous. */
+.coll-case-shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    108deg,
+    rgba(255, 255, 255, 0) 32%,
+    rgba(255, 255, 255, 0.07) 45%,
+    rgba(255, 255, 255, 0.015) 52%,
+    rgba(255, 255, 255, 0) 60%
+  );
+  opacity: 0.6;
+  transition: transform 0.5s ease, opacity 0.3s ease;
+  pointer-events: none;
+}
+
+/* Au survol, le reflet glisse — et s'efface encore un peu : on se penche sur
+   l'objet, donc on veut voir l'image, pas le plastique. */
+.coll-case:hover .coll-case-shine {
+  opacity: 0.35;
+}
+
+.coll-case:hover .coll-case-shine {
+  transform: translateX(12%);
+}
+
+/* Pastille de support, en haut à gauche */
+.coll-case-fmt {
+  position: absolute;
+  top: 0.55rem;
+  left: 0.55rem;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  padding: 0.18rem 0.42rem;
+  border-radius: 3px;
+  color: #100f0a;
+  background: var(--tint);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+/* Provenance, en haut à droite : discrète mais toujours lisible. */
+.coll-case-lic {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.18rem 0.4rem;
+  border-radius: 3px;
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(10, 10, 16, 0.68);
+  backdrop-filter: blur(3px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.coll-case-lic.lic-public-domain {
+  color: #b8f5cf;
+  border-color: rgba(52, 211, 153, 0.4);
+}
+
+.coll-case-lic.lic-fan {
+  color: #ffd7a8;
+  border-color: rgba(251, 146, 60, 0.4);
+}
+
+/* Bouton de lecture : n'apparaît qu'au survol, au centre de l'affiche. */
+.coll-case-play {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.7);
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #100f0a;
+  background: var(--tint);
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.24s cubic-bezier(0.2, 1.4, 0.4, 1);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+}
+
+.coll-case:hover .coll-case-play {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* Étiquette du bas : papier crème pour la VHS, plaque laquée pour le DVD. */
+.coll-case-plate {
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  padding: 0.5rem 0.6rem 0.55rem;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.16rem;
+  background: var(--coll-paper);
+  color: var(--coll-paper-ink);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  border-top: 3px solid var(--tint);
+}
+
+.coll-case.fmt-dvd .coll-case-plate {
+  background: rgba(12, 12, 18, 0.82);
+  color: #fff;
+  backdrop-filter: blur(6px);
+  border-top: none;
+  border-left: 3px solid var(--tint);
+}
+
+.coll-case-franchise {
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.coll-case-title {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  line-height: 1.14;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.coll-case-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  opacity: 0.66;
+}
+
+.coll-case-meta em {
+  font-style: normal;
+}
+
+/* Le boîtier laisse dépasser son disque sur le côté au survol. */
+.coll-case.fmt-dvd .coll-case-body::after {
+  content: "";
+  position: absolute;
+  top: 22%;
+  right: 4px;
+  width: 62%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: conic-gradient(
+      from 210deg,
+      rgba(255, 255, 255, 0.5),
+      rgba(140, 200, 255, 0.35) 18%,
+      rgba(255, 220, 160, 0.4) 38%,
+      rgba(180, 255, 210, 0.32) 58%,
+      rgba(255, 255, 255, 0.45) 80%,
+      rgba(255, 255, 255, 0.5)
+    ),
+    #b9bec9;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5), 0 6px 16px rgba(0, 0, 0, 0.4);
+  transform: translateX(-8%) scale(0.9);
+  opacity: 0;
+  transition: transform 0.36s cubic-bezier(0.2, 0.9, 0.25, 1), opacity 0.22s ease;
+  z-index: -1;
+}
+
+.coll-case.fmt-dvd .coll-case-body::before {
+  /* Le trou central du disque. */
+  content: "";
+  position: absolute;
+  top: 22%;
+  right: 4px;
+  width: 62%;
+  aspect-ratio: 1;
+  z-index: -1;
+  background: radial-gradient(
+    circle,
+    var(--coll-room) 0 11%,
+    rgba(255, 255, 255, 0.6) 11% 13%,
+    transparent 13%
+  );
+  transform: translateX(-8%) scale(0.9);
+  opacity: 0;
+  transition: transform 0.36s cubic-bezier(0.2, 0.9, 0.25, 1), opacity 0.22s ease;
+}
+
+.coll-case.fmt-dvd:hover .coll-case-body::after,
+.coll-case.fmt-dvd:hover .coll-case-body::before {
+  transform: translateX(34%) scale(0.9) rotate(22deg);
+  opacity: 1;
+}
+
+.coll-case-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.coll-case-progress-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.coll-case-progress-bar span {
+  display: block;
+  height: 100%;
+  background: var(--tint, var(--orange));
+}
+
+.coll-case-progress-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+/* ======================================================================
+   6. Étagère 3D
+   ====================================================================== */
+
+/* Pas de cadre, pas de boîte : la scène est POSÉE dans la page. Le canvas est
+   transparent (gl alpha), donc le seul décor est un halo d'accent très diffus
+   derrière la planche — de quoi la détacher du blanc sans dessiner de fenêtre
+   autour d'elle. */
+.coll-shelf3d,
+.coll-shelf-skel {
+  position: relative;
+  /* Le rayon prend de la hauteur : c'est elle qui fait la taille des boîtiers
+     (la caméra cadre la rangée dans la hauteur disponible). Le composant range
+     la planche dans le BAS du cadre, mais SANS ciel démesuré au-dessus : la
+     rangée doit toucher le haut du bloc, sinon l'étagère a l'air posée par
+     terre au milieu d'une page vide. (Voir FILL / ABOVE côté composant.) */
+  height: min(64vh, 580px);
+  min-height: 340px;
+  /* Largeur pilotée par le nombre d'objets (--slots, posé par le composant) :
+     deux boîtiers dans un cadre pleine largeur seraient minuscules et perdus.
+     La colonne s'élargit avec la collection, jusqu'à toute la place. */
+  width: 100%;
+  max-width: min(100%, calc(var(--slots, 8) * 120px + 300px));
+  margin-inline: auto;
+}
+
+/* L'éclairage de la pièce, en CSS derrière le canvas transparent : une nappe
+   chaude qui tombe sur la rangée, et une ombre de contact large sous la
+   planche pour asseoir l'objet sur la page. Rien qui dessine un cadre — le
+   rayon reste POSÉ dans la page, il n'est pas dans une vitrine.
+
+   Ce halo appartient à la SCÈNE, pas au squelette : une nappe chaude derrière
+   une rangée de rectangles gris ne fait qu'habiller l'attente. */
+.coll-shelf3d::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+      58% 54% at 50% 42%,
+      color-mix(in srgb, var(--orange) 13%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(70% 20% at 50% 91%, rgba(10, 10, 20, 0.16), transparent 74%);
+  opacity: 0.9;
+  transition: opacity 0.3s ease;
+}
+
+/* Sur fond sombre, une ombre au sol ne se voit plus : c'est la LUEUR du bord
+   de planche qui assied la rangée. */
+:root[data-theme="dark"] .coll-shelf3d::before {
+  background: radial-gradient(
+      58% 54% at 50% 42%,
+      color-mix(in srgb, var(--orange) 15%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(60% 16% at 50% 90%, rgba(255, 255, 255, 0.07), transparent 76%);
+}
+
+.coll-shelf3d.is-hover::before {
+  opacity: 1;
+}
+
+.coll-shelf3d canvas {
+  display: block;
+  position: relative;
+  z-index: 1;
+  cursor: var(--cursor-default), auto;
+  /* La scène se révèle une fois les premières jaquettes peintes : voir
+     `dressed` dans CollectionShelf. */
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+
+.coll-shelf3d.is-dressed canvas {
+  opacity: 1;
+}
+
+.coll-shelf3d.is-hover canvas {
+  cursor: var(--cursor-pointer), pointer;
+}
+
+/* ---------------------------------------------------------- le rangement --
+   Le curseur dit ce que fait le clic, et il le dit AVANT : main ouverte sur
+   l'étagère qu'on range, main fermée pendant qu'on porte. C'est la seule
+   indication permanente du mode — le reste (bulle, penché au survol, ouverture
+   du boîtier) est justement ce qu'on a retiré. */
+.coll-shelf3d.is-arranging canvas,
+.coll-shelf3d.is-arranging.is-hover canvas {
+  cursor: grab;
+}
+
+.coll-shelf3d.is-arranging canvas:active {
+  cursor: grabbing;
+}
+
+/* Le halo se réveille : pendant le rangement, l'étagère est l'objet de travail
+   de la page, pas une vitrine qu'on regarde de loin. */
+.coll-shelf3d.is-arranging::before {
+  opacity: 1;
+}
+
+/* Le squelette qui attend derrière la scène le temps qu'elle se garnisse : il
+   occupe exactement la place du canvas, sans imposer sa propre hauteur. */
+.coll-shelf3d .coll-shelf-skel {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  height: auto;
+  min-height: 0;
+  max-width: none;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+
+/* Fondu croisé : le squelette s'efface pendant que la scène monte. Il reste
+   monté le temps de la transition (voir `skelGone` dans le composant). */
+.coll-shelf3d.is-dressed .coll-shelf-skel {
+  opacity: 0;
+}
+
+/* ======================================================================
+   La vitrine — un boîtier pris en main, plein écran
+   ======================================================================
+   Portail au-dessus de toute l'app. LE FOND, C'EST LA PAGE : à peine visible
+   sous le voile, elle reste reconnaissable — on n'a pas changé de lieu, on
+   s'est penché sur un objet. Pas de halo de couleur derrière le boîtier :
+   l'objet se suffit, et une aura teintée salissait le fond.
+
+   Le boîtier ne surgit pas du néant non plus : il décolle de sa place sur
+   l'étagère et vient au centre. Ce vol se joue DANS la scène 3D (voir
+   CollectionShelf.jsx) — transformer le canvas en CSS faussait la mesure que
+   R3F en fait, et la scène partait de travers.
+   ====================================================================== */
+
+.coll-inspect {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+  display: flex;
+  flex-direction: column;
+  /* PAS de backdrop-filter. Il oblige le navigateur à re-capturer et re-flouter
+     tout ce qui est derrière à CHAQUE image — et derrière, il y a un canvas
+     WebGL qui redessine en continu. C'était la source du saut visuel au moment
+     où l'on prend un boîtier en main. Un simple voile fait le même travail
+     pour rien du tout. */
+  background-color: transparent;
+  /* Ces durées suivent le vol du boîtier (FLY_OUT / FLY_BACK dans
+     CollectionShelf.jsx) : le voile monte pendant qu'il sort, se retire
+     pendant qu'il rentre. Changer l'une sans l'autre décale le relais. */
+  transition: background-color 0.4s ease;
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+
+/* Et le voile n'arrive QU'UNE FOIS le boîtier de la vitrine dessiné : tant que
+   celui du rayon est encore là, rien ne doit se poser par-dessus lui, pas même
+   un fond transparent — c'est ce qui trahissait le relais.
+
+   SOMBRE DANS LES DEUX THÈMES, et pas `var(--bg)`. Prendre un objet en main,
+   c'est éteindre la pièce autour : sur fond blanc, le voile clair laissait la
+   page entière lisible derrière la jaquette, qui n'en ressortait plus — et une
+   couverture sombre venait s'écraser sur du blanc. C'est aussi ce que font déjà
+   toutes les autres scènes de la collection (la console, la lecture à plat) :
+   le rayon n'avait plus que celle-ci pour le contredire.
+
+   Le ton est celui du fond sombre du site (#0c0d11) à deux points près : en
+   thème sombre, rien ne bouge — c'est le thème clair qu'on rattrape. */
+.coll-inspect.veiled {
+  background-color: color-mix(in srgb, #0a0b10 88%, transparent);
+}
+
+/* On repose le boîtier. LE VOILE se retire pendant qu'il rentre chez lui, de
+   sorte que la page soit redevenue nette au moment où il se pose. */
+.coll-inspect.leaving {
+  pointer-events: none;
+  background-color: transparent;
+  transition: background-color 0.24s ease 0.08s;
+}
+
+/* Mais LUI ne s'efface jamais : il rentre à pleine opacité et n'est démonté
+   qu'une fois celui du rayon rallumé dessous. Le faire fondre pendant son
+   retour, c'était la demi-seconde où il n'existait nulle part. Seuls les
+   habillages s'en vont. */
+.coll-inspect.leaving .coll-inspect-info,
+.coll-inspect.leaving .coll-inspect-close {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+/* Fermé sans place d'origine (tactile : pas de survol, donc pas de rangement à
+   montrer) — là, un fondu court suffit. */
+.coll-inspect.leaving.fast {
+  opacity: 0;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+}
+
+@keyframes coll-inspect-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.coll-inspect-close {
+  position: absolute;
+  top: calc(1rem + env(safe-area-inset-top));
+  right: 1.1rem;
+  z-index: 3;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 6px 18px rgba(10, 10, 20, 0.18);
+  transition: background 0.15s ease, transform 0.15s ease;
+  /* `backwards` et non `both` : une fois posée, la croix rend la main à sa
+     propre feuille de style — sinon plus aucun état ne pourrait la modifier. */
+  animation: coll-inspect-fade 0.28s ease 0.3s backwards;
+}
+
+.coll-inspect-close:hover {
+  background: var(--surface-2);
+  transform: rotate(90deg);
+}
+
+.coll-inspect-stage {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+  cursor: var(--cursor-grab), grab;
+}
+
+.coll-inspect-stage:active {
+  cursor: var(--cursor-grabbing), grabbing;
+}
+
+/* Le cartouche est POSÉ SUR la scène, pas empilé dessous : en occupant une
+   bande du flux, il rognait d'autant la place du boîtier, qui se retrouvait
+   coupé par le bas dès qu'on zoomait. Il flotte donc au-dessus, et s'écarte
+   dès qu'on zoome — on examine, on ne lit plus. */
+.coll-inspect-info {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 1rem calc(1.15rem + env(safe-area-inset-bottom));
+  color: var(--text);
+  /* Le bandeau lui-même ne capte rien : on attrape le boîtier au travers. */
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.3, 0.9, 0.3, 1);
+  /* Il arrive APRÈS le boîtier : on regarde l'objet venir, puis on lit ce
+     qu'il est. Tout ensemble, ça faisait une page qui s'ouvre. */
+  animation: coll-inspect-up 0.38s cubic-bezier(0.2, 0.9, 0.25, 1) 0.28s backwards;
+}
+
+.coll-inspect.zoomed .coll-inspect-info {
+  opacity: 0;
+  transform: translateY(18px);
+}
+
+/* La carte : un objet posé sur la scène, aux codes de l'app — surface, filet,
+   ombre portée — avec le liseré de la teinte du titre sur la tranche gauche. */
+.coll-inspect-card {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: clamp(0.9rem, 3vw, 1.8rem);
+  max-width: min(660px, 100%);
+  padding: 0.72rem 0.8rem 0.72rem 0.9rem;
+  border-radius: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 46px rgba(10, 10, 20, 0.22), 0 2px 8px rgba(10, 10, 20, 0.12);
+}
+
+.coll-inspect-card::before {
+  content: "";
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--tint);
+}
+
+.coll-inspect-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.14rem;
+  text-align: left;
+}
+
+@keyframes coll-inspect-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+/* Le texte du cartouche suit le THÈME et non le voile : il est écrit sur la
+   carte, qui est opaque (`var(--surface)`) et reste donc une carte de l'app
+   posée sur la scène. Le voile sombre derrière ne la traverse pas. */
+.coll-inspect-franchise {
+  font-style: normal;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+}
+
+.coll-inspect-info strong {
+  font-family: var(--font-display);
+  font-size: clamp(1.02rem, 2.2vw, 1.32rem);
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-inspect-meta {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-inspect-card .btn {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+/* Un volume a deux suites : l'ouvrir, ou aller voir sa fiche. Les deux boutons
+   restent groupés à droite, et le second s'efface là où la carte se resserre —
+   la fiche est aussi à un clic sur l'objet lui-même. */
+.coll-inspect-acts {
+  flex: 0 0 auto;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.coll-inspect-acts .btn {
+  margin-left: 0;
+}
+
+/* La discussion se distingue des deux autres : elle n'emmène nulle part, elle
+   fait venir. D'où la bulle plutôt qu'une flèche, et un filet de la teinte du
+   titre qui la relie au boîtier. */
+.coll-inspect-talk {
+  border-color: color-mix(in srgb, var(--tint) 45%, var(--border));
+}
+
+.coll-inspect-talk:hover {
+  border-color: var(--tint);
+}
+
+@media (max-width: 560px) {
+  /* « La fiche » s'efface (l'objet lui-même y mène d'un clic) mais PAS la
+     discussion : la vitrine est le seul endroit d'où elle s'ouvre. Elle se
+     réduit à sa bulle, qui dit déjà ce qu'elle fait. */
+  .coll-inspect-acts .btn-ghost:not(.coll-inspect-talk) {
+    display: none;
+  }
+
+  .coll-inspect-talk span {
+    display: none;
+  }
+}
+
+/* Seul texte du cartouche à ne PAS être posé sur la carte : il flotte à même
+   le voile, qui est sombre dans les deux thèmes — il est donc clair dans les
+   deux, là où le reste continue de suivre la page. */
+.coll-inspect-hint {
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.72);
+  opacity: 0.7;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .coll-inspect-hint {
+    display: none;
+  }
+}
+
+/* ======================================================================
+   La discussion, glissée à côté de l'objet
+   ======================================================================
+   ON NE QUITTE PAS LA VITRINE POUR LIRE CE QU'ON DIT DE L'OBJET QU'ON TIENT.
+   Le fil entre par la droite et se pose à côté ; le boîtier reste en main,
+   continue de tourner, et le panneau repart par où il est venu. C'est la
+   différence entre « consulter les commentaires d'un titre » et « en parler
+   pendant qu'on le regarde ».
+
+   Le panneau est un objet de l'APP (surface, texte, filets du thème) posé sur
+   une scène sombre : tout ce qu'il contient — le fil, le composeur, les émojis —
+   est habillé pour la page, et le repeindre en sombre laisserait des dizaines
+   de règles à réécrire pour rien.
+   ====================================================================== */
+
+.ccp-layer {
+  position: fixed;
+  inset: 0;
+  /* Au-dessus de la vitrine (240), sous les calques du fil lui-même :
+     l'agrandissement d'une image et le sélecteur d'émoji (1000 et 2000)
+     doivent continuer de passer par-dessus. */
+  z-index: 250;
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+/* Le voile n'assombrit QUE le côté du panneau : le boîtier, à gauche, reste
+   pleinement visible — c'est lui qu'on est en train de regarder. */
+.ccp-scrim {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  pointer-events: auto;
+  cursor: default;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 38%,
+    rgba(6, 7, 12, 0.42) 100%
+  );
+  animation: ccp-scrim-in 0.42s ease both;
+}
+
+.ccp {
+  position: relative;
+  pointer-events: auto;
+  width: min(430px, 100%);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--border-strong);
+  box-shadow: -24px 0 60px rgba(4, 5, 10, 0.5);
+  /* Le doigt doit pouvoir faire défiler le fil : la vitrine, elle, bloque tout
+     geste tactile pour faire tourner le boîtier — d'où un panneau monté hors
+     d'elle (cf. CollectionCommentsPanel). */
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  /* Entrée et sortie en ANIMATION et non en transition : rien à basculer une
+     image après le montage, et la sortie se joue sur la classe `.closing`
+     posée avant le démontage. Une courbe qui décélère franchement — le panneau
+     arrive lancé et se pose, il ne glisse pas mollement. */
+  animation: ccp-in 0.42s cubic-bezier(0.16, 0.9, 0.24, 1) both;
+}
+
+@keyframes ccp-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes ccp-scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* La sortie : plus courte que l'entrée (on a déjà vu l'objet arriver, le
+   regarder partir n'apprend rien) et sans rebond. Sa durée est recopiée dans
+   SLIDE_OUT, côté composant : les deux doivent bouger ensemble. */
+.ccp-layer.closing .ccp {
+  animation: ccp-out 0.3s cubic-bezier(0.4, 0, 0.9, 0.3) both;
+}
+
+.ccp-layer.closing .ccp-scrim {
+  animation: ccp-scrim-in 0.26s ease both reverse;
+}
+
+@keyframes ccp-out {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* L'en-tête : la couverture en petit et le titre, pour qu'on sache de quoi on
+   parle sans revenir à l'objet. Le filet de la teinte le raccroche au boîtier
+   resté à gauche. */
+.ccp-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.85rem 0.9rem;
+  padding-top: calc(0.85rem + env(safe-area-inset-top));
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--tint) 12%, transparent),
+    transparent
+  );
+}
+
+.ccp-art {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 52px;
+  border-radius: 5px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: 0 3px 10px rgba(10, 10, 20, 0.22);
+}
+
+.ccp-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ccp-art i {
+  font-style: normal;
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: var(--text-soft);
+}
+
+.ccp-id {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.ccp-id em {
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+}
+
+.ccp-id strong {
+  font-family: var(--font-display);
+  font-size: 0.98rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ccp-close {
+  margin-left: auto;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.ccp-close:hover {
+  color: var(--text);
+  transform: rotate(90deg);
+}
+
+.ccp-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.9rem;
+  padding-bottom: calc(0.9rem + env(safe-area-inset-bottom));
+}
+
+/* Le fil arrive avec l'habillage qu'il porte dans une page (carte détachée,
+   marge haute). Ici, il EST le panneau : on lui retire son cadre. */
+.ccp-body .ld-comments {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+}
+
+/* Sur téléphone, le panneau prend tout l'écran : à 430 px de large sur 390 de
+   disponible, il n'y avait de toute façon plus de « à côté ». */
+@media (max-width: 560px) {
+  .ccp {
+    width: 100%;
+  }
+
+  /* Le voile n'a plus de côté à assombrir — mais il garde son rôle d'attrape-
+     clic pour le peu qui dépasse. */
+  .ccp-scrim {
+    background: rgba(6, 7, 12, 0.42);
+  }
+}
+
+/* Mouvement réduit : le panneau se pose et s'en va sans glisser — mais il
+   continue de PRENDRE le temps qu'il faut, la fermeture attendant toujours
+   SLIDE_OUT avant de démonter. Un fondu, donc, et `reverse` pour la sortie :
+   la même image jouée à l'envers, sinon le panneau réapparaîtrait en partant. */
+@media (prefers-reduced-motion: reduce) {
+  .ccp {
+    animation: ccp-scrim-in 0.2s ease both;
+  }
+
+  .ccp-layer.closing .ccp {
+    animation: ccp-scrim-in 0.26s ease both reverse;
+  }
+}
+
+/* Rappel du geste : discret, en bas à gauche, aux couleurs du thème (la scène
+   n'a plus de fond sombre sur lequel du texte blanc se lirait). */
+.coll-shelf-hint {
+  position: absolute;
+  left: 0.2rem;
+  bottom: 0.2rem;
+  z-index: 3;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+  opacity: 0.6;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+/* Tant que le rayon se garnit, le squelette parle à sa place : deux textes en
+   bas du même cadre se marcheraient dessus. */
+.coll-shelf3d:not(.is-dressed) .coll-shelf-hint {
+  opacity: 0;
+}
+
+/* Visuel manquant : signalé, jamais silencieux. */
+.coll-shelf-warn {
+  position: absolute;
+  right: 0.2rem;
+  bottom: 0.2rem;
+  z-index: 3;
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #d97706;
+}
+
+/* ----------------------------------------------------------------------
+   La bulle du boîtier survolé
+   ----------------------------------------------------------------------
+   Une bulle de bande dessinée : elle sort AU-DESSUS du boîtier, une pointe
+   la relie à lui, et elle grandit depuis cette pointe — c'est l'objet qui
+   parle. Sa position (`left`/`top`) et le décalage de la pointe (`--tail`,
+   pour les boîtiers de bord, quand la carte doit se recadrer) sont posés en
+   pixels par le composant, qui projette la 3D à l'écran.
+   ---------------------------------------------------------------------- */
+/* Compacte à dessein : la rangée est remontée dans la page (voir ABOVE côté
+   composant), donc le ciel au-dessus des boîtiers est court. Une bulle plus
+   haute mordrait sur la barre d'outils au lieu de flotter au-dessus du rayon. */
+.coll-shelf-bubble {
+  position: absolute;
+  z-index: 6;
+  width: 268px;
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.5rem;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 20px 42px rgba(10, 10, 20, 0.24), 0 3px 10px rgba(10, 10, 20, 0.14);
+  color: var(--text);
+  text-align: left;
+  pointer-events: none;
+  /* L'ancre est le HAUT de la tranche : la bulle remonte de toute sa hauteur,
+     et grandit depuis sa pointe — comme si le boîtier la soufflait. */
+  transform-origin: bottom center;
+  transform: translate(-50%, calc(-100% - 10px)) scale(0.92);
+  opacity: 0;
+  transition: opacity 0.16s ease, transform 0.24s cubic-bezier(0.2, 1.25, 0.4, 1);
+}
+
+.coll-shelf-bubble.show {
+  opacity: 1;
+  transform: translate(-50%, calc(-100% - 24px)) scale(1);
+}
+
+/* La tige : la bulle flotte haut au-dessus du boîtier, il faut donc un fil qui
+   redescende jusqu'à lui — sinon elle a l'air de flotter pour elle-même. Il
+   s'éteint dans la teinte du titre en arrivant sur la tranche. */
+.coll-shelf-bubble::before {
+  content: "";
+  position: absolute;
+  bottom: -24px;
+  left: calc(50% + var(--tail, 0px));
+  width: 2px;
+  height: 24px;
+  margin-left: -1px;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    var(--border-strong),
+    color-mix(in srgb, var(--tint) 70%, transparent)
+  );
+}
+
+/* La pointe : un carré tourné, posé sous la bulle, décalé jusqu'au boîtier. */
+.coll-shelf-bubble::after {
+  content: "";
+  position: absolute;
+  bottom: -7px;
+  left: calc(50% + var(--tail, 0px));
+  width: 13px;
+  height: 13px;
+  margin-left: -7px;
+  border-radius: 0 0 3px 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+  transform: rotate(45deg);
+}
+
+.coll-bubble-shot {
+  position: relative;
+  flex: 0 0 auto;
+  width: 46px;
+  aspect-ratio: 2 / 3;
+  border-radius: 7px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(150deg, var(--tint) 0%, #101118 82%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tint) 45%, transparent),
+    0 4px 12px rgba(10, 10, 20, 0.28);
+}
+
+.coll-bubble-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.coll-bubble-shot i {
+  font-style: normal;
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.coll-bubble-text {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.16rem;
+}
+
+.coll-bubble-text em {
+  font-style: normal;
+  font-size: 0.54rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-bubble-text strong {
+  font-family: var(--font-display);
+  font-size: 0.94rem;
+  line-height: 1.16;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.coll-bubble-meta {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-bubble-meta b {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.coll-bubble-bar {
+  margin-top: 0.18rem;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.coll-bubble-bar i {
+  display: block;
+  height: 100%;
+  background: var(--tint, var(--orange));
+}
+
+/* ======================================================================
+   7. Fiche d'un média
+   ====================================================================== */
+
+.coll-detail {
+  /* Le bandeau sort du padding de .app-content pour toucher les bords. */
+  margin: calc(var(--content-pad) * -1) calc(var(--content-pad) * -1) 0;
+}
+
+.coll-hero {
+  position: relative;
+  padding: clamp(1.4rem, 4vw, 2.6rem) var(--content-pad) clamp(1.6rem, 4vw, 2.4rem);
+  overflow: hidden;
+  background: var(--coll-room);
+  isolation: isolate;
+}
+
+.coll-hero-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(1.1) blur(2px);
+  transform: scale(1.06);
+  z-index: -2;
+}
+
+.coll-hero-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+      180deg,
+      rgba(8, 8, 12, 0.62) 0%,
+      rgba(8, 8, 12, 0.82) 55%,
+      var(--bg) 100%
+    ),
+    radial-gradient(
+      70% 100% at 18% 40%,
+      color-mix(in srgb, var(--tint) 26%, transparent),
+      transparent 70%
+    );
+}
+
+/* Grain d'image analogique sur tout le bandeau. */
+.coll-hero-grain {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.16;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.05) 0 1px,
+      transparent 1px 3px
+    ),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.06) 0 1px, transparent 1px 4px);
+}
+
+.coll-hero-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+  margin-bottom: 1.2rem;
+  transition: color 0.15s ease;
+}
+
+.coll-hero-back:hover {
+  color: #fff;
+}
+
+.coll-hero-body {
+  display: flex;
+  gap: clamp(1.2rem, 3vw, 2.2rem);
+  align-items: flex-end;
+  max-width: 1180px;
+}
+
+.coll-hero-poster {
+  position: relative;
+  flex: 0 0 auto;
+  width: clamp(120px, 18vw, 186px);
+  aspect-ratio: 2 / 3;
+  border-radius: 4px 10px 10px 4px;
+  overflow: hidden;
+  background: var(--coll-plastic);
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  /* Un vrai boîtier debout : un rien de perspective. */
+  transform: perspective(900px) rotateY(-7deg);
+}
+
+.coll-hero-poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.coll-hero-fmt {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  padding: 0.16rem 0.4rem;
+  border-radius: 3px;
+  color: #100f0a;
+  background: var(--tint);
+}
+
+.coll-hero-info {
+  min-width: 0;
+  color: #fff;
+}
+
+.coll-hero-franchise {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--tint);
+  margin-bottom: 0.35rem;
+}
+
+.coll-hero-info h1 {
+  font-size: clamp(1.5rem, 4.4vw, 2.6rem);
+  color: #fff;
+  text-shadow: 0 3px 24px rgba(0, 0, 0, 0.5);
+}
+
+.coll-hero-original {
+  margin: 0.3rem 0 0;
+  font-size: 0.82rem;
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.56);
+}
+
+.coll-hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.7rem;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.coll-hero-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.coll-hero-meta > span + span::before {
+  content: "·";
+  margin-right: 0.34rem;
+  opacity: 0.5;
+}
+
+.coll-hero-kind {
+  font-weight: 700;
+  color: #fff;
+}
+
+.coll-hero-rating {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--amber);
+}
+
+.coll-lic {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.46rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.coll-lic.lic-public-domain {
+  color: #b8f5cf;
+  border-color: rgba(52, 211, 153, 0.45);
+}
+
+.coll-lic.lic-fan {
+  color: #ffd7a8;
+  border-color: rgba(251, 146, 60, 0.45);
+}
+
+/* La pastille de provenance ne prend pas le séparateur « · ». */
+.coll-hero-meta > span.coll-lic + span::before,
+.coll-hero-meta > .coll-lic::before {
+  content: none;
+}
+
+.coll-hero-genres {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-top: 0.7rem;
+}
+
+.coll-hero-genres span {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  text-transform: capitalize;
+}
+
+.coll-hero-syn {
+  margin: 0.9rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.8);
+  max-width: 68ch;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.coll-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 1.2rem;
+}
+
+.coll-hero-actions .btn-ghost {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.24);
+  color: #fff;
+}
+
+.coll-hero-actions .btn-ghost:hover {
+  border-color: var(--tint);
+}
+
+/* « Vu » : la coche que la liste d'épisodes portait pour les séries, ramenée
+   dans le bandeau pour un film. Cochée, elle prend l'or du reste du site —
+   comme .coll-ep-check.on — pour se lire d'un coup d'œil et non comme un
+   troisième bouton d'action. */
+.coll-hero-actions .coll-hero-seen.on {
+  color: #1a1204;
+  background: var(--accent-grad);
+  border-color: transparent;
+}
+
+.coll-hero-actions .coll-hero-seen.on:hover {
+  border-color: transparent;
+  filter: brightness(1.06);
+}
+
+/* « Watchparty » : le rouge du direct, mais posé en LISERÉ seulement. C'est une
+   invitation, pas une alerte — et le bouton ne doit pas rivaliser avec le grand
+   « Regarder » à côté de lui. */
+.coll-hero-actions .coll-hero-party {
+  border-color: rgba(255, 77, 79, 0.45);
+}
+
+.coll-hero-actions .coll-hero-party:hover {
+  border-color: #ff4d4f;
+  background: rgba(255, 77, 79, 0.16);
+}
+
+.coll-hero-channel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.62);
+  transition: color 0.15s ease;
+}
+
+.coll-hero-channel:hover {
+  color: #fff;
+}
+
+.coll-hero-games {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin-top: 0.9rem;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.coll-hero-games a {
+  font-weight: 700;
+  color: var(--tint);
+  border-bottom: 1px solid transparent;
+}
+
+.coll-hero-games a:hover {
+  border-color: currentColor;
+}
+
+/* ---------- corps de la fiche ---------- */
+
+.coll-detail-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: clamp(1.2rem, 3vw, 2.2rem);
+  max-width: 1180px;
+  padding: clamp(1.4rem, 4vw, 2.2rem) var(--content-pad)
+    calc(var(--bottom-bar-h, 0px) + 2rem);
+}
+
+.coll-eps-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+/* Les deux réglages de la même liste — la version et la saison — se lisent
+   côte à côte, à droite du titre de section. */
+.coll-eps-picks {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.coll-seasons {
+  display: flex;
+  gap: 0.3rem;
+}
+
+/* ---------- la version (VF / VOSTFR) ----------
+   UN INTERRUPTEUR, PAS UN FILTRE : la liste d'épisodes ne bouge pas, les coches
+   restent, seule change l'adresse qu'on branchera. D'où ce bloc soudé (les
+   pastilles se touchent) plutôt que des puces séparées comme les saisons — on
+   choisit UNE version parmi deux, on ne coche pas des rayons.
+
+   Il n'apparaît que sur les titres qui ont vraiment plusieurs pistes : voir
+   LangPicker, qui ne rend rien en dessous de deux. */
+.coll-langs {
+  display: inline-flex;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.coll-langs button {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 0.3rem 0.68rem;
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.coll-langs button + button {
+  border-left: 1px solid var(--border);
+}
+
+.coll-langs button:hover {
+  color: var(--text);
+}
+
+.coll-langs button.active {
+  background: var(--orange);
+  color: #17140c;
+}
+
+/* Dans le bandeau du film, il se pose entre deux boutons hauts : il prend leur
+   hauteur pour ne pas flotter au milieu de la ligne. */
+.coll-hero-actions .coll-langs {
+  align-self: stretch;
+  align-items: center;
+}
+
+.coll-seasons button {
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+}
+
+.coll-seasons button.active {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--orange);
+}
+
+.coll-eps-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.coll-ep {
+  display: flex;
+  align-items: stretch;
+  gap: 0.4rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.coll-ep:hover {
+  border-color: var(--orange);
+  transform: translateX(2px);
+}
+
+.coll-ep.current {
+  border-color: var(--tint);
+  box-shadow: inset 3px 0 0 var(--tint);
+}
+
+.coll-ep.seen .coll-ep-thumb img {
+  filter: grayscale(0.5) brightness(0.72);
+}
+
+.coll-ep-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
+  padding: 0.5rem;
+}
+
+.coll-ep-thumb {
+  position: relative;
+  flex: 0 0 auto;
+  width: 116px;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--coll-plastic);
+}
+
+.coll-ep-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: filter 0.2s ease;
+}
+
+.coll-ep-thumb-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(8, 8, 12, 0.42);
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+.coll-ep:hover .coll-ep-thumb-play {
+  opacity: 1;
+}
+
+.coll-ep-dur {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  font-style: normal;
+  padding: 0.08rem 0.28rem;
+  border-radius: 3px;
+  color: #fff;
+  background: rgba(8, 8, 12, 0.8);
+}
+
+/* Épisode servi ailleurs : l'hébergeur est affiché sur la vignette (et le
+   nombre de sources quand il y a des miroirs). On ne cache pas d'où ça vient. */
+.coll-ep-src {
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  max-width: calc(100% - 6px);
+  font-size: 0.56rem;
+  font-weight: 700;
+  font-style: normal;
+  letter-spacing: 0.04em;
+  padding: 0.08rem 0.28rem;
+  border-radius: 3px;
+  color: rgba(255, 255, 255, 0.86);
+  background: rgba(8, 8, 12, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-ep-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+}
+
+.coll-ep-text strong {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+
+.coll-ep-num {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+
+.coll-ep-text > span {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-soft);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.coll-ep-check {
+  flex: 0 0 auto;
+  width: 42px;
+  border: none;
+  border-left: 1px solid var(--border);
+  background: none;
+  color: var(--border-strong);
+  display: grid;
+  place-items: center;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.coll-ep-check:hover {
+  color: var(--text-soft);
+  background: var(--surface-2);
+}
+
+.coll-ep-check.on {
+  color: #1a1204;
+  background: var(--accent-grad);
+}
+
+/* ---------- discussion ---------- */
+
+/* Le fil est le DERNIER enfant de la grille, mais il appartient à la colonne
+   principale : sans cette ligne, l'auto-placement le glisserait sous la fiche
+   technique, dans les 300 px de la colonne latérale. `grid-row` le pousse à la
+   ligne suivante, sous le rayon d'épisodes (ou de planches). */
+.coll-comments {
+  grid-column: 1;
+  min-width: 0;
+}
+
+/* UN FILM N'A PAS DE RAYON D'ÉPISODES (voir CollectionDetail) : la colonne
+   principale s'ouvre alors sur du vide, la fiche technique seule à droite et la
+   discussion reléguée sous elle. `grid-row: 1` la fait remonter à la place
+   laissée libre — placement complet (ligne ET colonne), donc résolu avant
+   l'auto-placement : la colonne latérale se range d'elle-même à côté. */
+.coll-detail-body.no-eps .coll-comments {
+  grid-row: 1;
+}
+
+/* Le fil arrive déjà avec sa marge haute (.ld-comments) : sur cette page, le
+   gap de la grille la double. */
+.coll-comments .ld-comments {
+  margin-top: 0;
+}
+
+/* Rien à prévoir pour le téléphone : la grille passe à une seule colonne, où
+   « colonne 1 » est la seule qui existe. */
+
+/* ---------- colonne latérale ---------- */
+
+.coll-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.coll-aside section {
+  padding: 0.95rem 1rem 1.05rem;
+}
+
+.coll-aside h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-weight: 700;
+  margin: 0 0 0.7rem;
+}
+
+.coll-aside h3 svg {
+  color: var(--accent-ink);
+}
+
+.coll-cast ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.coll-cast li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.coll-cast-face {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+}
+
+.coll-cast-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.coll-cast-face i {
+  font-style: normal;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.coll-cast-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.coll-cast-text strong {
+  font-size: 0.84rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-cast-text em {
+  font-style: normal;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coll-facts dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 0.7rem;
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.coll-facts dt {
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
+.coll-facts dd {
+  margin: 0;
+  text-align: right;
+}
+
+.coll-sources {
+  margin: 0.9rem 0 0;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+
+.coll-sources a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  margin-left: 0.4rem;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+
+/* ======================================================================
+   9. Écrans étroits
+   ====================================================================== */
+
+@media (max-width: 1000px) {
+  .coll-detail-body {
+    grid-template-columns: 1fr;
+  }
+
+  /* Une seule colonne : plus rien à combler à droite, et « remonter » le fil le
+     ferait passer DEVANT le casting et la fiche technique. On rend la place à
+     l'ordre du document — casting, fiche, puis la discussion. */
+  .coll-detail-body.no-eps .coll-comments {
+    grid-row: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .coll-head-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .coll-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 1.2rem 0.9rem;
+  }
+
+  /* Sur écran tactile, le survol n'existe pas : on garde les boîtiers droits
+     et on montre l'essentiel tout de suite. */
+  .coll-case:hover .coll-case-body {
+    transform: none;
+  }
+
+  .coll-case-play,
+  .coll-case.fmt-dvd .coll-case-body::after,
+  .coll-case.fmt-dvd .coll-case-body::before {
+    display: none;
+  }
+
+  .coll-case-title {
+    font-size: 0.8rem;
+  }
+
+  .coll-hero-body {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .coll-hero-poster {
+    width: 118px;
+    transform: none;
+  }
+
+  .coll-ep-thumb {
+    width: 92px;
+  }
+
+}
+
+
+/* ======================================================================
+   L'établi de mise au point (admin)
+   ======================================================================
+   IL NE DOIT PAS AVOIR L'AIR DE LA PAGE. C'est un outil, pas un rayon : fond
+   rayé façon ruban de chantier, liseré violet — la seule couleur de toute la
+   page qui ne soit ni le doré de l'app ni la teinte d'un titre. On doit voir
+   au premier coup d'œil qu'on est en train de tricher, et ne jamais confondre
+   « débloquer d'un clic » avec « tourner la manivelle ». */
+.coll-debug-toggle {
+  gap: 0.36rem;
+  font-size: 0.8rem;
+  padding: 0.44rem 0.8rem;
+}
+
+.coll-debug-toggle.active {
+  background: #7c5cff;
+  border-color: #7c5cff;
+  color: #fff;
+}
+
+.coll-debug {
+  margin: -0.4rem 0 1.1rem;
+  padding: 0.85rem 1rem;
+  border: 1px dashed color-mix(in srgb, #7c5cff 55%, var(--border));
+  border-radius: 14px;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, #7c5cff 7%, transparent) 0 10px,
+      transparent 10px 20px
+    ),
+    var(--surface);
+}
+
+.coll-debug > header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.7rem;
+}
+
+.coll-debug-ic {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(135deg, #9b7bff, #6742e8);
+}
+
+.coll-debug > header strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+}
+
+.coll-debug > header span {
+  font-size: 0.75rem;
+  color: var(--text-soft);
+}
+
+.coll-debug-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+/* Les mêmes pastilles que la barre d'outils, mais elles portent une icône :
+   sans `inline-flex`, elle retomberait sur la ligne de base du texte. */
+.coll-debug-btns .coll-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.coll-debug-btns .coll-chip:hover {
+  border-color: #7c5cff;
+}
+
+/* Celui qui DÉTRUIT. Il ne se distingue pas des autres par sa place mais par
+   sa couleur : vider une étagère ne se rattrape pas. */
+.coll-debug-btns .coll-chip.danger {
+  color: #d9432c;
+  border-color: color-mix(in srgb, #d9432c 40%, var(--border-strong));
+}
+
+.coll-debug-btns .coll-chip.danger:hover {
+  border-color: #d9432c;
+  background: color-mix(in srgb, #d9432c 10%, var(--surface));
+}
+
+.coll-debug-btns .coll-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.coll-debug-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+  font-family: var(--font-mono, monospace);
+}

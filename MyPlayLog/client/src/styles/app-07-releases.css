@@ -1,0 +1,1330 @@
+﻿/* ======================================================================
+   Calendrier des sorties (/releases)
+   ====================================================================== */
+
+.releases {
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+/* ---------- En-tête ---------- */
+.rel-hero {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.rel-hero-icon {
+  flex: none;
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  color: #1a1204;
+  background: var(--accent-grad);
+  box-shadow: 0 8px 22px rgba(242, 183, 11, 0.4);
+}
+.rel-title {
+  font-size: clamp(1.7rem, 5vw, 2.3rem);
+}
+.rel-sub {
+  color: var(--text-soft);
+  margin: 0.35rem 0 0;
+  font-size: 0.98rem;
+}
+
+/* ---------- Barre d'outils : périodes + wishlist ---------- */
+.rel-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 1.8rem;
+  position: sticky;
+  top: calc(var(--topbar-h, 64px) + 0.4rem);
+  /* Au-dessus des cartes (le "+" des cards monte à z-index 15/20) */
+  z-index: 30;
+}
+
+/* Toggle « Gros jeux » (grosses sorties uniquement) */
+.rel-big {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 11px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.rel-big:hover {
+  border-color: var(--orange);
+}
+.rel-big.active {
+  border-color: transparent;
+  background: linear-gradient(135deg, #ff7a3c, #e0483f);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(224, 92, 63, 0.4);
+}
+
+.rel-wish {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.55rem 1rem;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.rel-wish:hover {
+  border-color: var(--orange);
+}
+.rel-wish.active {
+  border-color: transparent;
+  background: var(--accent-grad);
+  color: #1a1204;
+  box-shadow: 0 4px 14px rgba(242, 183, 11, 0.35);
+}
+
+/* ---------- Groupe d'actions à droite (wishlist + filtres) ---------- */
+.rel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.rel-dd {
+  position: relative;
+}
+.rel-dd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 11px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.rel-dd-btn:hover {
+  border-color: var(--orange);
+}
+.rel-dd-btn.active {
+  border-color: var(--orange);
+  background: var(--surface);
+  color: var(--accent-ink);
+}
+.rel-dd-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  background: var(--accent-grad);
+  color: #1a1204;
+}
+.rel-dd-caret {
+  transition: transform 0.15s ease;
+  color: var(--text-soft);
+}
+.rel-dd-caret.up {
+  transform: rotate(180deg);
+}
+
+.rel-dd-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  width: 250px;
+  max-width: 80vw;
+  padding: 0.4rem;
+  box-shadow: var(--shadow);
+}
+
+/* Barre de recherche dans le menu */
+.rel-dd-search {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.55rem;
+  margin-bottom: 0.35rem;
+  border-radius: 9px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.rel-dd-search svg {
+  flex: none;
+  color: var(--text-soft);
+}
+.rel-dd-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  outline: none;
+}
+.rel-dd-search-clear {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  border-radius: 6px;
+}
+.rel-dd-search-clear:hover {
+  color: var(--text);
+}
+
+.rel-dd-list {
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.rel-dd-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.55rem;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.9rem;
+  border-radius: 9px;
+  transition: background 0.12s ease;
+}
+.rel-dd-item:hover {
+  background: var(--surface-2);
+}
+.rel-dd-box {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  border: 1.5px solid var(--border-strong);
+  color: #1a1204;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+/* Inclus : case dorée */
+.rel-dd-item.include .rel-dd-box {
+  background: var(--accent-grad);
+  border-color: transparent;
+}
+.rel-dd-item.include {
+  color: var(--text);
+  font-weight: 600;
+}
+/* Exclu : case rouge */
+.rel-dd-item.exclude .rel-dd-box {
+  background: #e0483f;
+  border-color: transparent;
+  color: #fff;
+}
+.rel-dd-item.exclude {
+  color: var(--text-soft);
+  font-weight: 600;
+}
+.rel-dd-empty {
+  padding: 0.7rem;
+  text-align: center;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+}
+.rel-dd-clear {
+  width: 100%;
+  margin-top: 0.3rem;
+  padding: 0.45rem;
+  border: none;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--accent-ink);
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+.rel-dd-clear:hover {
+  color: var(--orange);
+}
+
+/* Bouton case à cocher « Exclure le contenu IA » */
+.rel-ai-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 11px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.rel-ai-toggle:hover {
+  border-color: var(--orange);
+}
+.rel-ai-toggle.active {
+  border-color: transparent;
+  background: var(--accent-grad);
+  color: #1a1204;
+  box-shadow: 0 4px 14px rgba(242, 183, 11, 0.35);
+}
+.rel-ai-box {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  border: 1.5px solid var(--border-strong);
+  color: #1a1204;
+}
+/* Case sombre sur fond doré (opaque et bien lisible) */
+.rel-ai-toggle.active .rel-ai-box {
+  background: #1a1204;
+  border-color: transparent;
+  color: var(--amber);
+}
+
+.rel-filter-clear {
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 9px;
+}
+.rel-filter-clear:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+/* Badge « IA » sur les cartes utilisant du contenu généré */
+.rel-ai-tag {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #fff;
+  background: rgba(20, 20, 30, 0.72);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+/* ---------- Timeline groupée par jour ---------- */
+.rel-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 2.2rem;
+  /* Les jours passés s'insèrent EN HAUT du feed. On compense nous-mêmes le
+     décalage (voir loadPast/useLayoutEffect) : l'ancrage automatique du
+     navigateur ferait une seconde correction par-dessus, et on atterrissait à
+     côté du jour visé. */
+  overflow-anchor: none;
+}
+
+.rel-day {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 1.4rem;
+  align-items: start;
+}
+
+/* ---------- Repère « aujourd'hui » ---------- */
+/* Toujours présent entre le dernier jour passé et le premier jour à venir,
+   même si rien ne sort aujourd'hui : c'est la cible du calage initial. */
+.rel-now {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  /* Compense la gouttière du flex parent pour rester serré contre les jours. */
+  margin: -0.8rem 0;
+}
+
+.rel-now-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--orange);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--orange) 25%, transparent);
+}
+
+.rel-now-label {
+  flex: 0 0 auto;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #1a1204;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+}
+
+.rel-now-line {
+  flex: 1 1 auto;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--orange) 60%, transparent),
+    transparent
+  );
+}
+
+/* ---------- Bouton flottant « Aujourd'hui » ---------- */
+/* Apparaît dès que le repère sort de l'écran : le feed est infini dans les
+   deux sens, il faut toujours pouvoir rentrer chez soi. */
+.rel-jump {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: calc(1.2rem + env(safe-area-inset-bottom));
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #1a1204;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  box-shadow: 0 10px 26px -8px rgba(0, 0, 0, 0.55);
+  animation: rel-jump-in 0.18s ease-out;
+}
+
+.rel-jump:hover {
+  filter: brightness(1.06);
+}
+
+@keyframes rel-jump-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.rel-day-badge {
+  position: sticky;
+  top: calc(var(--topbar-h, 64px) + 4.5rem);
+  /* Au-dessus des cartes du jour d'à côté : le « + » d'ajout rapide monte à
+     15 (20 quand son éventail est ouvert), et le bandeau collant lui passait
+     derrière en défilant. Reste sous la barre d'outils collante (30). */
+  z-index: 22;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0.7rem 0.4rem 0.6rem;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+.rel-weekday {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+}
+.rel-daynum {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 2rem;
+  line-height: 1.05;
+  color: var(--text);
+}
+.rel-month {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-soft);
+}
+.rel-count {
+  margin-top: 0.55rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  padding: 0.22rem 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+/* Journée du jour : accent doré */
+.rel-day-badge.today {
+  border-color: transparent;
+  background: linear-gradient(160deg, rgba(242, 183, 11, 0.16), rgba(242, 183, 11, 0.05));
+  box-shadow: 0 0 0 1.5px var(--orange) inset;
+}
+.rel-day-badge.today .rel-daynum {
+  color: var(--accent-ink);
+}
+.rel-day-badge.today .rel-count {
+  background: var(--accent-grad);
+  color: #1a1204;
+}
+
+.rel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1.1rem;
+}
+
+/* Jour passé : badge atténué */
+.rel-day-badge.past {
+  opacity: 0.72;
+}
+.rel-day-badge.past .rel-daynum {
+  color: var(--text-soft);
+}
+
+/* Haut du feed : sentinelle + indications de remontée dans le passé */
+.rel-past-top {
+  height: 1px;
+}
+.rel-past-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+.rel-past-end {
+  text-align: center;
+  padding: 0.4rem;
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
+/* Jour hors focus du scroll : grisé pour bien marquer les transitions de
+   jours — le jour sous la ligne de lecture reste net (cf. activeDay). */
+.rel-day.dim .relc-cover {
+  filter: grayscale(0.8) brightness(0.9);
+  opacity: 0.55;
+}
+.rel-day.dim .relc-name,
+.rel-day.dim .relc-plats {
+  opacity: 0.5;
+}
+.rel-day.dim .rel-day-badge {
+  opacity: 0.5;
+}
+/* Survoler un jour grisé le réveille (on peut cliquer sans scroller) */
+.rel-day.dim:hover .relc-cover,
+.rel-day.dim:hover .relc-name,
+.rel-day.dim:hover .relc-plats,
+.rel-day.dim:hover .rel-day-badge {
+  filter: none;
+  opacity: 1;
+}
+.rel-day-badge,
+.relc-name,
+.relc-plats {
+  transition: opacity 0.25s ease;
+}
+
+/* ---------- Carte de jeu du feed (ouvre la modale de découverte) ---------- */
+.relc {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  min-width: 0;
+}
+.relc-cover {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.25s ease,
+    opacity 0.25s ease;
+}
+.relc:hover .relc-cover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow);
+}
+/* Le « + » radial (GameAddFan) n'apparaît qu'au survol de la carte */
+.relc:hover .add-fan.hover-only {
+  opacity: 1;
+  pointer-events: auto;
+}
+/* Le coin haut droit est réservé au « + » : le badge IA descend en bas */
+.relc .rel-ai-tag {
+  top: auto;
+  bottom: 6px;
+  right: 6px;
+}
+.relc-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.relc-ph {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+/* Jeu de la wishlist : liseré doré + marque-page */
+.relc.is-wish .relc-cover {
+  border-color: var(--orange);
+  box-shadow: 0 0 14px rgba(242, 183, 11, 0.25);
+}
+.relc-wishtag {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--accent-grad);
+  color: #1a1204;
+}
+/* Flamme de hype (gros jeux) */
+.relc-hype {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #ffd9a8;
+  background: rgba(20, 14, 8, 0.78);
+  backdrop-filter: blur(4px);
+}
+.relc-hype svg {
+  color: #ff8a3c;
+}
+.relc-name {
+  font-weight: 700;
+  font-size: 0.86rem;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.relc-plats {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- États (chargement / vide / erreur) ---------- */
+.rel-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  text-align: center;
+  color: var(--text-soft);
+  padding: 4rem 1rem;
+}
+.rel-state h3 {
+  color: var(--text);
+  font-size: 1.2rem;
+}
+.rel-state svg {
+  color: var(--accent-ink);
+}
+.rel-empty p {
+  margin: 0;
+}
+.rel-error {
+  padding: 2.5rem 1.5rem;
+}
+.rel-error svg {
+  color: #e0483f;
+}
+
+/* ======================================================================
+   Modale de découverte d'un jeu (clic sur une carte du feed)
+   ====================================================================== */
+.relm-overlay {
+  z-index: 200;
+}
+.relm {
+  position: relative;
+  width: min(600px, 94vw);
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 0;
+  border-radius: 20px;
+}
+
+/* --- Bandeau : backdrop plein cadre + jaquette + titre --- */
+.relm-hero {
+  position: relative;
+  min-height: 190px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  border-radius: 20px 20px 0 0;
+}
+.relm-hero.plain {
+  min-height: 0;
+  background: linear-gradient(160deg, rgba(242, 183, 11, 0.14), transparent 65%);
+}
+.relm-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.relm-hero-veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(12, 10, 16, 0.15) 0%,
+    rgba(12, 10, 16, 0.55) 55%,
+    var(--surface) 100%
+  );
+}
+.relm-hero-row {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  width: 100%;
+  padding: 2.4rem 1.4rem 1rem;
+}
+.relm-cover {
+  flex-shrink: 0;
+  width: 96px;
+  aspect-ratio: 3 / 4;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 2px solid var(--surface);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+}
+.relm-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.relm-cover-ph {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+.relm-headings {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding-bottom: 0.2rem;
+}
+.relm-title {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.15;
+  /* Toujours lisible sur backdrop sombre comme sur fond clair (veil → surface) */
+  color: var(--text);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.25);
+}
+.relm-datebits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.relm-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.26rem 0.6rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 75%, transparent);
+  backdrop-filter: blur(4px);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.relm-hypechip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.26rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(224, 92, 63, 0.18);
+  color: #ff9a5c;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+/* Compte à rebours en segments (J / h / min / s) */
+.relm-cd {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+.relm-cd-seg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 44px;
+  padding: 0.32rem 0.45rem 0.28rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--orange) 35%, var(--border));
+  backdrop-filter: blur(4px);
+}
+.relm-cd-seg b {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  line-height: 1;
+  color: var(--accent-ink);
+  font-variant-numeric: tabular-nums;
+}
+.relm-cd-seg i {
+  font-style: normal;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+}
+
+/* --- Corps --- */
+.relm-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem 1.4rem 1.3rem;
+}
+.relm-skel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.relm-err {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+.relm-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.relm-chip {
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  color: var(--accent-ink);
+}
+.relm-chip.soft {
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+.relm-ratings {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+.relm-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--accent-ink);
+}
+.relm-rating.critic {
+  color: #7ec4ff;
+}
+.relm-rating i {
+  font-style: normal;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+.relm-dev {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+.relm-summary {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--text-soft);
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* --- Bandeau d'images (captures & artworks), scrollbar dorée --- */
+.relm-shots {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.45rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--orange) var(--surface-2);
+}
+.relm-shots::-webkit-scrollbar {
+  height: 7px;
+}
+.relm-shots::-webkit-scrollbar-track {
+  background: var(--surface-2);
+  border-radius: 999px;
+}
+.relm-shots::-webkit-scrollbar-thumb {
+  background: var(--accent-grad);
+  border-radius: 999px;
+}
+.relm-shot {
+  flex: 0 0 auto;
+  width: 148px;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-2);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.relm-shot:hover {
+  transform: translateY(-2px);
+  border-color: var(--orange);
+}
+.relm-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* (La visionneuse plein écran vit dans components/MediaLightbox.jsx —
+   app-24-lightbox.css. Elle était auparavant posée en `absolute` DANS cette
+   modale, donc bornée à la carte : d'où un « plein écran » de la taille d'une
+   fenêtre, sans navigation ni swipe.) */
+
+/* --- Langues disponibles --- */
+.relm-langs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+.relm-langs-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-right: 0.2rem;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-soft);
+}
+.relm-langs-label svg {
+  color: var(--accent-ink);
+}
+.relm-lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.24rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  background: var(--surface-2);
+  color: var(--text);
+}
+.relm-lang img {
+  border-radius: 2px;
+}
+.relm-lang.more {
+  color: var(--text-soft);
+}
+
+/* --- Actions --- */
+.relm-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border);
+}
+.relm-wish {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.95rem;
+  border-radius: 11px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.88rem;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.relm-wish:hover:not(:disabled) {
+  border-color: var(--orange);
+}
+.relm-wish.on {
+  border-color: transparent;
+  background: var(--accent-grad);
+  color: #1a1204;
+}
+.relm-wish:disabled {
+  opacity: 0.75;
+}
+.relm-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  padding: 0.55rem 0.9rem;
+  border-radius: 11px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--accent-ink);
+  transition: background 0.15s ease;
+}
+.relm-go:hover {
+  background: color-mix(in srgb, var(--orange) 10%, transparent);
+}
+
+/* ======================================================================
+   Responsive
+   ====================================================================== */
+
+/* --- Tablette : la colonne de dates se resserre --- */
+@media (max-width: 1000px) {
+  .rel-day {
+    grid-template-columns: 78px 1fr;
+    gap: 1rem;
+  }
+
+  .rel-daynum {
+    font-size: 1.7rem;
+  }
+}
+
+/* --- Mobile --- */
+@media (max-width: 760px) {
+
+  /* L'en-tête mangeait un tiers du premier écran pour une icône décorative. */
+  .rel-hero {
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .rel-hero-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+  }
+
+  .rel-sub {
+    font-size: 0.85rem;
+    margin-top: 0.2rem;
+  }
+
+  /* La barre d'outils RESTE collante (c'est là que vivent les filtres), mais
+     elle passe en deux rangées compactes qui défilent horizontalement plutôt
+     que d'empiler cinq boutons sur trois lignes. */
+  .rel-toolbar {
+    position: sticky;
+    top: calc(var(--topbar-h, 60px) + 0.25rem);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    margin-bottom: 1.1rem;
+    padding: 0.45rem 0;
+    /* Le fond suit la page sous les cartes qui défilent dessous. */
+    background: var(--bg);
+    /* Déborde des marges du contenu pour que le fond aille bord à bord. */
+    margin-inline: calc(-1 * var(--content-pad, 1.2rem));
+    padding-inline: var(--content-pad, 1.2rem);
+  }
+
+  /* Une seule rangée qui glisse au doigt : aucun bouton ne se retrouve à la
+     ligne, et on garde tous les filtres accessibles. */
+  .rel-actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    /* Les ombres des chips ne doivent pas être rognées par l'overflow. */
+    padding: 0.15rem calc(var(--content-pad, 1.2rem)) 0.15rem 0;
+    margin-right: calc(-1 * var(--content-pad, 1.2rem));
+    scroll-padding-left: 0.2rem;
+  }
+
+  .rel-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .rel-actions>* {
+    flex: 0 0 auto;
+  }
+
+  .rel-big,
+  .rel-wish,
+  .rel-ai-toggle,
+  .rel-dd-btn {
+    font-size: 0.82rem;
+    padding: 0.45rem 0.7rem;
+    border-radius: 999px;
+  }
+
+  /* Le menu déroulant s'ancre à gauche de son bouton et ne dépasse jamais. */
+  .rel-dd-menu {
+    max-width: calc(100vw - 1.6rem);
+  }
+
+  /* La date passe en bandeau horizontal collé sous la barre d'outils : on sait
+     toujours quel jour on regarde, sans sacrifier une colonne de largeur. */
+  .rel-day {
+    grid-template-columns: 1fr;
+    gap: 0.6rem;
+  }
+
+  /* Se cale juste sous la barre d'outils collante (barre du haut + ses deux
+     rangées) : on garde le jour affiché sous les yeux pendant qu'on parcourt
+     une longue journée. */
+  .rel-day-badge {
+    position: sticky;
+    top: calc(var(--topbar-h, 60px) + 6rem);
+    flex-direction: row;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: 12px;
+  }
+
+  .rel-weekday {
+    font-size: 0.66rem;
+  }
+
+  .rel-daynum {
+    font-size: 1.25rem;
+    line-height: 1;
+  }
+
+  .rel-month {
+    font-size: 0.72rem;
+  }
+
+  .rel-count {
+    margin-top: 0;
+    margin-left: auto;
+    font-size: 0.62rem;
+  }
+
+  /* Trois jaquettes par rangée sur un écran courant : assez grandes pour
+     reconnaître un jeu, assez petites pour en voir une journée entière. */
+  .rel-grid {
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: 0.65rem;
+  }
+
+  .rel-timeline {
+    gap: 1.5rem;
+  }
+
+  .relc-cover {
+    border-radius: 11px;
+  }
+
+  .relc-name {
+    font-size: 0.78rem;
+  }
+
+  .relc-plats {
+    font-size: 0.67rem;
+  }
+
+  .rel-now {
+    margin: -0.45rem 0;
+  }
+
+  /* Au doigt, le survol n'existe pas : le « + » d'ajout rapide resterait
+     invisible. On le laisse visible en permanence sur les cartes. */
+  .relc .add-fan.hover-only {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Le grisage hors focus repeint des dizaines de jaquettes (grayscale sur
+     image = filtre coûteux) pour un effet qu'on ne perçoit pas sur un petit
+     écran — on le coupe, c'est autant de travail en moins au défilement. */
+  .rel-day.dim .relc-cover,
+  .rel-day.dim .relc-name,
+  .rel-day.dim .relc-plats,
+  .rel-day.dim .rel-day-badge {
+    filter: none;
+    opacity: 1;
+  }
+
+  /* --- Modale de découverte : feuille plein écran --- */
+  /* Une carte flottante de 94 vw avec des coins arrondis et 4 % de fond visible
+     autour, c'est le pire des deux mondes sur téléphone. */
+  .relm {
+    width: 100%;
+    max-width: none;
+    max-height: 100dvh;
+    height: 100dvh;
+    border-radius: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* La feuille occupe tout : plus de marge de 2vh autour ni de défilement de
+     l'overlay lui-même (c'est .relm qui défile). */
+  .relm-overlay {
+    padding: 0;
+    align-items: stretch;
+    overflow: hidden;
+  }
+
+  .relm-hero-row {
+    padding: 2rem 1rem 0.9rem;
+  }
+
+  .relm-body {
+    padding: 0.9rem 1rem 1.4rem;
+  }
+
+  .relm-cover {
+    width: 78px;
+  }
+
+  .relm-title {
+    font-size: 1.15rem;
+  }
+
+  .relm-shot {
+    width: 124px;
+  }
+
+  /* Les actions se collent en bas de la feuille : « Je le veux » reste sous le
+     pouce quel que soit l'endroit où on a lu. */
+  .relm-actions {
+    position: sticky;
+    bottom: 0;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-inline: -1rem;
+    margin-bottom: -1.4rem;
+    padding: 0.7rem 1rem calc(0.7rem + env(safe-area-inset-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+
+  .relm-wish {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .relm-go {
+    margin-left: 0;
+  }
+
+  .rel-jump {
+    /* Au-dessus de la barre de navigation du bas de l'app. */
+    bottom: calc(var(--bottom-bar-h, 60px) + 0.8rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* --- Petits téléphones --- */
+@media (max-width: 400px) {
+  .rel-grid {
+    grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+    gap: 0.5rem;
+  }
+}
+
+/* Le mini-lecteur flotte en bas : le bouton « Aujourd'hui » lui laisse la place.
+   `--bottom-bar-h` vaut 0 hors mobile, la règle sert donc dans les deux cas. */
+body.mpl-open .rel-jump {
+  bottom: calc(var(--bottom-bar-h, 0px) + 84px + env(safe-area-inset-bottom));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rel-jump {
+    animation: none;
+  }
+}

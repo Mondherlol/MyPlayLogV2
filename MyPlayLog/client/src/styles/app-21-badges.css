@@ -1,0 +1,726 @@
+/* ======================================================================
+   BADGES & MISSIONS — onglet « Badges » du profil
+   Médaillons colorés par rareté (bronze / argent / or / platine), missions
+   à accomplir pour gagner points et badges, et une mise en scène quand un
+   badge tombe. Voir ProfileBadges.jsx + server/src/lib/missions.js.
+   ====================================================================== */
+
+.pb {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+/* Couleurs de rareté : une teinte + un dégradé de médaillon par palier.
+   Portées par la carte, héritées par le médaillon et l'étiquette. */
+.pb-badge.bronze {
+  --pb-tint: #c07a3e;
+  --pb-grad: linear-gradient(145deg, #e0a06a 0%, #a4602c 100%);
+}
+
+.pb-badge.silver {
+  --pb-tint: #8e97a8;
+  --pb-grad: linear-gradient(145deg, #e2e6ee 0%, #9aa2b1 100%);
+}
+
+.pb-badge.gold {
+  --pb-tint: #d8a418;
+  --pb-grad: linear-gradient(145deg, #ffd84a 0%, #d29a06 100%);
+}
+
+.pb-badge.platinum {
+  --pb-tint: #4fb9c9;
+  --pb-grad: linear-gradient(145deg, #a8ecf5 0%, #3f9dad 100%);
+}
+
+/* ---------- Bandeau : anneau de progression + solde ---------- */
+.pb-hero {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  padding: 1.2rem 1.4rem;
+}
+
+/* Anneau conique : --pb-pct (0→100) pilote la portion dorée. */
+.pb-hero-ring {
+  position: relative;
+  flex: 0 0 auto;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(
+    var(--orange) calc(var(--pb-pct) * 1%),
+    var(--surface-2) 0
+  );
+}
+
+.pb-hero-ring-in {
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.05rem;
+  background: var(--surface);
+}
+
+.pb-hero-ring-in svg {
+  color: var(--accent-ink);
+}
+
+.pb-hero-ring-in strong {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.pb-hero-ring-in strong span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.pb-hero-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.pb-hero-title {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.pb-hero-sub {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-soft);
+}
+
+.pb-hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.15rem;
+}
+
+.pb-hero-points {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid rgba(242, 183, 11, 0.42);
+  border-radius: 999px;
+  background: rgba(242, 183, 11, 0.12);
+  font-weight: 700;
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.pb-hero-points svg {
+  color: var(--accent-ink);
+}
+
+/* Rappel « tu as des récompenses qui t'attendent » : il pulse doucement. */
+.pb-hero-ready {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #3a2600;
+  font-weight: 800;
+  font-size: 0.8rem;
+  animation: pb-breathe 2s ease-in-out infinite;
+}
+
+@keyframes pb-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.035); }
+}
+
+/* ---------- Grille de missions ---------- */
+.pb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 0.9rem;
+}
+
+.pb-badge {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.pb-badge:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+/* Mission accomplie : liseré et halo à la couleur de sa rareté. */
+.pb-badge.done {
+  border-color: color-mix(in srgb, var(--pb-tint) 55%, transparent);
+}
+
+.pb-badge.done::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    color-mix(in srgb, var(--pb-tint) 12%, transparent),
+    transparent 62%
+  );
+  pointer-events: none;
+}
+
+/* Mission verrouillée : tout est en sourdine, seul le texte reste lisible. */
+.pb-badge.locked {
+  border-style: dashed;
+}
+
+/* Mission ACCOMPLIE mais pas encore encaissée : c'est la carte qui doit attirer
+   l'œil dans la grille — liseré doré et halo qui respire. */
+.pb-badge.ready {
+  border-color: color-mix(in srgb, var(--orange) 60%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--orange) 35%, transparent),
+    0 10px 30px color-mix(in srgb, var(--orange) 18%, transparent);
+}
+
+.pb-badge.ready::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    color-mix(in srgb, var(--orange) 14%, transparent),
+    transparent 60%
+  );
+  pointer-events: none;
+}
+
+/* Encaissement : la carte « éclate » brièvement (halo + médaillon qui saute). */
+.pb-badge.bursting {
+  animation: pb-burst 0.85s cubic-bezier(0.2, 1.1, 0.4, 1);
+}
+
+.pb-badge.bursting .pb-medal {
+  animation: pb-medal-pop 0.85s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+@keyframes pb-burst {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--orange) 60%, transparent); }
+  55% { box-shadow: 0 0 0 16px color-mix(in srgb, var(--orange) 0%, transparent); }
+  100% { box-shadow: var(--shadow-sm); }
+}
+
+@keyframes pb-medal-pop {
+  0% { transform: scale(1) rotate(0deg); }
+  35% { transform: scale(1.22) rotate(-10deg); }
+  60% { transform: scale(0.96) rotate(4deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+/* ---------- Médaillon ---------- */
+.pb-medal {
+  position: relative;
+  flex: 0 0 auto;
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  color: #2a1c05;
+  background: var(--pb-grad);
+}
+
+.pb-medal.sm {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+}
+
+/* Anneau clair en surimpression : donne le relief « médaille frappée ». */
+.pb-medal-ring {
+  position: absolute;
+  inset: 4px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  pointer-events: none;
+}
+
+.pb-medal.sm .pb-medal-ring {
+  inset: 3px;
+  border-radius: 11px;
+}
+
+/* Verrouillée : médaillon désaturé — on devine la couleur qu'il aura. */
+.pb-badge.locked .pb-medal {
+  background: var(--surface-2);
+  color: var(--text-soft);
+  filter: grayscale(1);
+  opacity: 0.75;
+}
+
+.pb-badge.locked .pb-medal-ring {
+  border-color: var(--border-strong);
+}
+
+/* Pastille d'état en coin (coche ou cadenas). */
+.pb-medal-badge {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 21px;
+  height: 21px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.pb-badge.done .pb-medal-badge {
+  background: #1f9d55;
+  color: #fff;
+}
+
+/* Récompense en attente : le cadeau doré, qui bat doucement. */
+.pb-badge.ready .pb-medal-badge {
+  background: var(--accent-grad);
+  color: #3a2600;
+  animation: pb-breathe 1.6s ease-in-out infinite;
+}
+
+/* ---------- Texte de la mission ---------- */
+.pb-info {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.pb-badge-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.pb-badge-desc {
+  margin: 0;
+  font-size: 0.83rem;
+  line-height: 1.4;
+  color: var(--text-soft);
+}
+
+/* Barre de progression (missions à paliers : 5 abonnements, 10 jeux…) */
+.pb-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+}
+
+.pb-progress-track {
+  flex: 1;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.pb-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  transition: width 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.pb-progress-num {
+  flex: 0 0 auto;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.pb-badge-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.2rem;
+}
+
+.pb-reward {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.84rem;
+  color: var(--accent-ink);
+}
+
+.pb-reward em {
+  font-style: normal;
+  font-weight: 600;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+}
+
+/* Le bouton qui encaisse la récompense — pleine largeur, doré, il prend la
+   place du pied de carte tant que la mission n'est pas récupérée. */
+.pb-claim {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: var(--accent-grad);
+  color: #3a2600;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.88rem;
+  box-shadow: 0 6px 18px -6px color-mix(in srgb, var(--orange) 70%, transparent);
+  transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pb-claim b {
+  padding: 0.05rem 0.42rem;
+  border-radius: 999px;
+  background: rgba(58, 38, 0, 0.16);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.pb-claim:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.06);
+  box-shadow: 0 12px 26px -8px color-mix(in srgb, var(--orange) 80%, transparent);
+}
+
+.pb-claim:disabled {
+  opacity: 0.7;
+}
+
+/* Date d'obtention, en pied de carte : discrète, mais c'est le souvenir. */
+.pb-badge-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+.pb-badge-date svg {
+  flex: 0 0 auto;
+  opacity: 0.8;
+}
+
+.pb-tier-tag {
+  margin-left: auto;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--pb-tint) 45%, transparent);
+  background: color-mix(in srgb, var(--pb-tint) 14%, transparent);
+  color: var(--pb-tint);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ======================================================================
+   Toast de récupération — glisse depuis le bas à la prise d'une récompense
+   ====================================================================== */
+.pb-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--bottom-bar-h, 0px) + env(safe-area-inset-bottom) + 1.4rem);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  max-width: min(380px, calc(100vw - 2rem));
+  padding: 0.7rem 0.9rem;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--orange) 45%, transparent);
+  background: var(--surface);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
+  animation: pb-toast-in 0.35s cubic-bezier(0.2, 1.15, 0.4, 1) both;
+}
+
+@keyframes pb-toast-in {
+  from { opacity: 0; transform: translate(-50%, 22px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.pb-toast-medal {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--accent-grad);
+  color: #3a2600;
+}
+
+.pb-toast-txt {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pb-toast-txt strong {
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pb-toast-txt em {
+  font-style: normal;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+
+.pb-toast-pts {
+  flex: 0 0 auto;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.28rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(242, 183, 11, 0.14);
+  color: var(--accent-ink);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+
+/* ======================================================================
+   Panel admin « Missions » — retouche de l'habillage et du barème
+   ====================================================================== */
+.am-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.am-row {
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--pb-tint, var(--border-strong));
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+/* Les cartes admin reprennent la teinte de rareté de la mission. */
+.am-row.bronze { --pb-tint: #c07a3e; }
+.am-row.silver { --pb-tint: #8e97a8; }
+.am-row.gold { --pb-tint: #d8a418; }
+.am-row.platinum { --pb-tint: #4fb9c9; }
+
+.am-row-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.7rem;
+}
+
+.am-medal {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--pb-tint) 20%, var(--surface-2));
+  color: var(--pb-tint);
+}
+
+.am-row-id {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.am-key {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+/* La condition d'obtention : lecture seule, elle vit dans le code. */
+.am-cond {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+  opacity: 0.85;
+}
+
+.am-tier,
+.am-claimed,
+.am-edited {
+  flex: 0 0 auto;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.am-tier {
+  margin-left: auto;
+  border: 1px solid color-mix(in srgb, var(--pb-tint) 45%, transparent);
+  background: color-mix(in srgb, var(--pb-tint) 14%, transparent);
+  color: var(--pb-tint);
+}
+
+.am-claimed {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  text-transform: none;
+}
+
+.am-edited {
+  background: var(--accent-grad);
+  color: #3a2600;
+}
+
+.am-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) 110px;
+  gap: 0.6rem;
+}
+
+.am-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  min-width: 0;
+}
+
+.am-field > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.am-field input,
+.am-field select {
+  width: 100%;
+  min-width: 0;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
+.am-field input:focus,
+.am-field select:focus {
+  outline: none;
+  border-color: var(--orange);
+}
+
+/* La description prend toute la largeur, sous les trois autres champs. */
+.am-field-desc {
+  grid-column: 1 / -1;
+}
+
+.am-icon-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.am-icon-preview {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--surface-2);
+  color: var(--accent-ink);
+}
+
+.am-row-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+}
+
+.am-row-foot p {
+  margin: 0 auto 0 0;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 760px) {
+  .am-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Mobile ---------- */
+@media (max-width: 700px) {
+  .pb-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pb-hero {
+    padding: 1rem;
+    gap: 0.9rem;
+  }
+
+  .pb-hero-ring {
+    width: 76px;
+    height: 76px;
+  }
+
+  .pb-hero-ring-in {
+    width: 60px;
+    height: 60px;
+  }
+}

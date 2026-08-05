@@ -1,0 +1,2168 @@
+/* ============================================================
+   Page Paramètres + carte d'import + modale d'import Steam
+   ============================================================ */
+
+.settings-page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+}
+.settings-head h1 {
+  font-family: var(--font-display);
+  font-size: 1.9rem;
+  margin: 0 0 0.2rem;
+}
+.settings-head p {
+  color: var(--text-soft);
+  margin: 0 0 1.6rem;
+}
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* --- Onglets verticaux façon Discord --- */
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  position: sticky;
+  top: 72px;
+}
+.settings-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.6rem 0.8rem;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  font: inherit;
+  font-weight: 600;
+  border-radius: 10px;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+}
+.settings-tab:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.settings-tab.active {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.settings-tab.active::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  width: 3px;
+  height: 20px;
+  border-radius: 3px;
+  background: var(--accent-grad);
+}
+.settings-tab {
+  position: relative;
+}
+.settings-tab:disabled {
+  opacity: 0.55;
+  cursor: var(--cursor-default), auto;
+}
+.settings-soon {
+  margin-left: auto;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+.settings-panel {
+  min-height: 300px;
+}
+.settings-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  margin: 0 0 0.3rem;
+}
+.settings-section-sub {
+  color: var(--text-soft);
+  margin: 0 0 1.4rem;
+  max-width: 60ch;
+}
+
+/* Empilement des cartes d'import (Steam, PlayStation…). */
+.import-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* --- Carte d'une plateforme (Steam) --- */
+.import-card {
+  position: relative;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 1.3rem;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.import-card.connected {
+  border-color: rgba(102, 192, 244, 0.4);
+}
+.import-card-glow {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 260px;
+  height: 260px;
+  background: radial-gradient(circle, rgba(102, 192, 244, 0.18), transparent 70%);
+  transform: translate(-30%, -40%);
+  pointer-events: none;
+}
+.import-card-main {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  position: relative;
+}
+.import-logo {
+  width: 58px;
+  height: 58px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: #fff;
+}
+.steam-logo {
+  background: linear-gradient(150deg, #1b2838 0%, #2a475e 100%);
+}
+/* Logo PlayStation (bleu profond -> bleu vif). */
+.psn-logo {
+  background: linear-gradient(150deg, #0b2e6b 0%, #2e6be6 100%);
+}
+.import-card.psn.connected {
+  border-color: rgba(59, 130, 246, 0.42);
+}
+.import-card-glow.psn-glow {
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.2), transparent 70%);
+}
+/* Logo League of Legends (bleu Hextech profond -> or). */
+.lol-logo {
+  background: linear-gradient(150deg, #091428 0%, #0a323c 55%, #c8aa6e 150%);
+}
+
+/* Jaquette IGDB du jeu dans le logo de carte. */
+.import-logo.has-cover {
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.import-logo-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---- État connecté : avatar + pseudo + emblème de rang ---- */
+.trk-connected {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-top: 0.15rem;
+}
+.trk-connected-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.trk-connected-txt strong {
+  font-size: 0.98rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trk-connected-rank {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
+/* Avatar rond (icône d'invocateur / joueur). */
+.trk-av {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+  flex: none;
+  background: var(--surface-2);
+  border: 2px solid var(--border-strong);
+}
+.trk-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.trk-av-fb {
+  font-weight: 800;
+  color: var(--accent-ink);
+}
+
+/* Emblème de rang (petite image) + repli. */
+.trk-emblem {
+  object-fit: contain;
+  flex: none;
+}
+.trk-emblem.fb {
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--accent-ink);
+}
+/* Variante recadrée (blason Community Dragon LoL : image 1280×720 dont le blason
+   ne fait que ~25 %, centré). On agrandit l'image et on masque le débordement,
+   comme le fait RankEmblem dans ProfileTrackerLoL. */
+.trk-emblem.crop {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.22));
+}
+.trk-emblem-img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 350%;
+  height: auto;
+  max-width: none;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* ---- Aperçu du compte trouvé (avant liaison) ---- */
+.trk-preview {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding: 0.9rem;
+  border: 1.5px solid var(--orange);
+  border-radius: 14px;
+  background:
+    radial-gradient(140% 120% at 0% 0%, rgba(242, 183, 11, 0.12), transparent 60%),
+    var(--surface);
+  box-shadow: var(--shadow-sm);
+  animation: trk-preview-in 0.18s ease;
+}
+@keyframes trk-preview-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.trk-preview-id {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.trk-preview-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.trk-preview-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trk-preview-meta {
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+.trk-preview-warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #d8524a;
+}
+.trk-preview-rank {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  flex: none;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  max-width: 90px;
+  text-align: center;
+}
+.trk-preview-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+/* Boutons de l'aperçu : « c'est bien moi » (doré, plein) / « pas moi » (fantôme). */
+.trk-preview-confirm,
+.trk-preview-cancel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: var(--cursor-pointer), pointer;
+  transition: filter 0.15s, background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.trk-preview-confirm {
+  border: 0;
+  background: var(--accent-grad);
+  color: #1a1205;
+  box-shadow: var(--shadow-sm);
+}
+.trk-preview-confirm:hover:not(:disabled) {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+.trk-preview-cancel {
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-soft);
+}
+.trk-preview-cancel:hover:not(:disabled) {
+  border-color: var(--text-soft);
+  color: var(--text);
+}
+.trk-preview-confirm:disabled,
+.trk-preview-cancel:disabled {
+  opacity: 0.6;
+  cursor: var(--cursor-default), auto;
+}
+
+/* ---- Cartes de tracking : espacement + en-tête avec action à droite ---- */
+.trk-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.import-card.trk-card {
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
+}
+.import-card.trk-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+}
+/* Jaquette légèrement zoomée au survol de la carte. */
+.import-card.trk-card:hover .import-logo-cover {
+  transform: scale(1.08);
+}
+.import-logo-cover {
+  transition: transform 0.25s ease;
+}
+.import-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  position: relative;
+}
+.trk-unlink {
+  flex: none;
+  align-self: center;
+}
+.trk-form {
+  margin-top: 1.1rem;
+}
+
+/* Liaison LoL : région (select) + Riot ID sur la 1re ligne, bouton « Rechercher »
+   pleine largeur en dessous (évite un bouton coincé/renvoyé de travers). */
+.import-manual.lol-link {
+  flex-wrap: wrap;
+}
+.import-manual.lol-link .lol-region {
+  flex: 0 0 auto;
+}
+.import-manual.lol-link input {
+  flex: 1 1 130px;
+}
+.import-manual.lol-link .btn-steam-primary {
+  flex: 1 0 100%;
+  justify-content: center;
+}
+.lol-region {
+  padding: 0.6rem 0.7rem;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: var(--cursor-pointer), pointer;
+  max-width: 45%;
+}
+.lol-region:focus {
+  outline: none;
+  border-color: var(--orange);
+}
+.import-card-info {
+  flex: 1;
+  min-width: 0;
+}
+.import-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+.import-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #1b9d55;
+  background: rgba(27, 157, 85, 0.12);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.import-card-desc {
+  color: var(--text-soft);
+  margin: 0.3rem 0 0;
+  font-size: 0.9rem;
+}
+.import-steam-user {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+}
+.import-steam-user img {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+}
+.import-steam-user strong {
+  display: block;
+  font-size: 0.95rem;
+}
+.import-steam-user span {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+.import-error {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 1rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  background: rgba(192, 57, 43, 0.1);
+  color: #c0392b;
+  font-size: 0.85rem;
+}
+:root[data-theme="dark"] .import-error {
+  color: #ff8a7a;
+}
+
+.import-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-top: 1.2rem;
+  flex-wrap: wrap;
+}
+
+.btn-steam-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: none;
+  background: linear-gradient(150deg, #1387d5 0%, #66c0f4 100%);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  padding: 0.62rem 1.1rem;
+  border-radius: 11px;
+  box-shadow: 0 6px 18px rgba(19, 135, 213, 0.3);
+  transition: transform 0.12s, box-shadow 0.12s, filter 0.12s;
+  text-decoration: none;
+}
+.btn-steam-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+.btn-steam-primary:disabled {
+  opacity: 0.6;
+  cursor: var(--cursor-default), auto;
+}
+
+/* Bouton principal PlayStation (bleu). */
+.btn-psn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: none;
+  background: linear-gradient(150deg, #1a56db 0%, #3b82f6 100%);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  padding: 0.62rem 1.1rem;
+  border-radius: 11px;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.32);
+  transition: transform 0.12s, box-shadow 0.12s, filter 0.12s;
+  text-decoration: none;
+}
+.btn-psn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+.btn-psn-primary:disabled {
+  opacity: 0.6;
+  cursor: var(--cursor-default), auto;
+}
+
+/* Guide de récupération du NPSSO (liaison PSN). */
+.psn-connect {
+  margin-top: 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background:
+    radial-gradient(140% 120% at 0% 0%, rgba(59, 130, 246, 0.1), transparent 60%),
+    var(--surface-2);
+  animation: trk-preview-in 0.18s ease;
+}
+.psn-steps {
+  margin: 0 0 0.6rem;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.88rem;
+  color: var(--text-soft);
+  line-height: 1.45;
+}
+.psn-steps code {
+  font-size: 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+.psn-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #3b82f6;
+  font-weight: 600;
+  text-decoration: none;
+}
+.psn-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.psn-note {
+  margin: 0.7rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+.import-manual .btn-psn-primary {
+  flex: none;
+}
+
+.btn-ghost-link {
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.btn-ghost-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: #c0392b;
+  font: inherit;
+  font-weight: 600;
+  padding: 0.55rem 0.9rem;
+  border-radius: 11px;
+}
+.btn-ghost-danger:hover:not(:disabled) {
+  background: rgba(192, 57, 43, 0.08);
+}
+
+.import-manual {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+.import-manual input {
+  flex: 1;
+  padding: 0.6rem 0.8rem;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.import-unlink {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.import-unlink > p {
+  margin: 0 0 0.6rem;
+  font-weight: 600;
+}
+.import-check {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+  cursor: var(--cursor-pointer), pointer;
+}
+.import-check input {
+  margin-top: 2px;
+}
+.import-unlink-actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  margin-top: 0.9rem;
+}
+
+.import-soon-row {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1.4rem;
+  flex-wrap: wrap;
+}
+.import-soon-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+}
+
+/* ============================================================
+   Modale d'import Steam (gamifiée)
+   ============================================================ */
+.steam-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(6, 8, 14, 0.72);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: steam-fade 0.2s ease;
+}
+@keyframes steam-fade {
+  from { opacity: 0; }
+}
+.steam-modal {
+  --step-color: #66c0f4;
+  position: relative;
+  width: min(720px, 100%);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  animation: steam-pop 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+@keyframes steam-pop {
+  from { transform: scale(0.94) translateY(10px); opacity: 0; }
+}
+.steam-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 3;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(128, 128, 140, 0.15);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+}
+.steam-modal-close:hover {
+  background: rgba(128, 128, 140, 0.28);
+}
+.steam-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.2rem;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--step-color) 12%, var(--surface)), var(--surface));
+}
+.steam-modal-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+.steam-steps-dots {
+  display: flex;
+  gap: 6px;
+}
+.step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  transition: all 0.2s;
+}
+.step-dot.active {
+  background: var(--step-color);
+  width: 22px;
+  border-radius: 4px;
+}
+.step-dot.done {
+  background: color-mix(in srgb, var(--step-color) 60%, var(--border-strong));
+}
+
+/* Écrans centrés (scan / import / done / error) */
+.steam-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3rem 1.5rem;
+  gap: 0.5rem;
+}
+.steam-center h3 {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  margin: 0.3rem 0 0;
+}
+.steam-center p {
+  color: var(--text-soft);
+  margin: 0;
+  max-width: 40ch;
+}
+.steam-scan-orbit,
+.steam-import-spinner {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #66c0f4;
+  background: radial-gradient(circle, rgba(102, 192, 244, 0.18), transparent 70%);
+  position: relative;
+}
+.steam-scan-orbit::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: #66c0f4;
+  animation: steam-spin 1s linear infinite;
+}
+@keyframes steam-spin {
+  to { transform: rotate(360deg); }
+}
+.steam-error-icon {
+  color: #c0392b;
+}
+
+/* Étape : intro + cartes */
+.steam-step {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.2rem 1.2rem 0.5rem;
+}
+.steam-step-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.steam-step-title h3 {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  margin: 0;
+}
+.steam-step-count {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--step-color);
+  background: color-mix(in srgb, var(--step-color) 15%, transparent);
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+.steam-selectall {
+  margin-left: auto;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.steam-selectall:hover {
+  color: var(--text);
+  border-color: var(--step-color);
+}
+.steam-step-intro {
+  color: var(--text-soft);
+  font-size: 1rem;
+  line-height: 1.5;
+  margin: 0.5rem 0 1.1rem;
+}
+.steam-step-intro strong {
+  color: var(--text);
+}
+.hl-pink { color: #e0679b; font-weight: 700; }
+
+.steam-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.7rem;
+}
+.steam-game-card {
+  position: relative;
+  display: flex;
+  gap: 0.7rem;
+  padding: 0.6rem;
+  padding-right: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+  opacity: 0;
+  transform: translateY(8px);
+  animation: steam-card-in 0.4s ease forwards;
+  transition: opacity 0.2s, filter 0.2s, border-color 0.15s;
+  cursor: var(--cursor-pointer), pointer;
+  user-select: none;
+}
+.steam-game-card:not(.excluded) {
+  border-color: color-mix(in srgb, var(--step-color) 45%, var(--border));
+}
+.steam-game-card:hover {
+  border-color: var(--step-color);
+}
+@keyframes steam-card-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+.steam-game-card.excluded {
+  opacity: 0.45;
+  filter: grayscale(0.6);
+}
+.steam-game-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  line-height: 0;
+  border-radius: 7px;
+  border: 2px solid var(--border-strong);
+  background: var(--surface);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+.steam-game-check svg {
+  display: block;
+}
+.steam-game-card:not(.excluded) .steam-game-check {
+  background: var(--step-color);
+  border-color: var(--step-color);
+}
+/* Jaquette + bouton « Changer » empilés, calés en haut de la card. */
+.steam-game-coverwrap {
+  align-self: flex-start;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.steam-change-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 62px;
+  padding: 3px 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text-soft);
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 1;
+}
+.steam-change-btn:hover {
+  color: var(--text);
+  border-color: var(--step-color);
+}
+.steam-change-btn.active {
+  color: var(--text);
+  border-color: var(--step-color);
+  background: color-mix(in srgb, var(--step-color) 12%, transparent);
+}
+.steam-change-search {
+  margin-top: 0.15rem;
+}
+.steam-change-reset {
+  margin-top: 0.35rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  text-decoration: underline;
+}
+.steam-change-reset:hover {
+  color: var(--text);
+}
+.steam-game-cover {
+  width: 62px;
+  flex-shrink: 0;
+  align-self: flex-start;
+  aspect-ratio: 3 / 4;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--border);
+}
+.steam-game-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.steam-game-noart {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+.steam-game-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.steam-game-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  line-height: 1.2;
+  padding-right: 1.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.steam-game-meta {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+.steam-never { font-style: italic; }
+.steam-hours-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.steam-hours-jump strong { color: var(--accent-ink); }
+
+.steam-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  width: fit-content;
+}
+.steam-tag.pink { color: #e0679b; background: rgba(224, 103, 155, 0.14); }
+.steam-tag.gold { color: var(--accent-ink); background: rgba(242, 183, 11, 0.14); }
+
+/* Badge de progression des trophées (modale PSN). */
+.psn-trophy-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.14);
+}
+.psn-plat {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-left: 2px;
+  background: linear-gradient(135deg, #cfe0ff, #8aa9e6);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.4);
+}
+/* Teinte bleue des écrans scan/import de la modale PSN. */
+.psn-orbit,
+.psn-spinner {
+  color: #3b82f6;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.18), transparent 70%);
+}
+.psn-orbit::after {
+  border-top-color: #3b82f6;
+}
+
+.steam-status-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 0.15rem;
+}
+.steam-status-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 7px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+}
+.steam-status-btn.active {
+  border-color: var(--step-color);
+  color: var(--text);
+  background: color-mix(in srgb, var(--step-color) 16%, transparent);
+}
+
+/* --- Synchro PSN + jeux en attente de validation / ignorés (Paramètres) --- */
+.psn-sync-line {
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+.psn-sync-msg {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--text);
+}
+.settings-tab-badge {
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #e0894a;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.psn-pending {
+  --step-color: #2e6be6; /* couleur des états actifs réutilisés (statut/console) */
+  margin-top: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+.psn-pending-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.psn-pending-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.psn-pending-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.psn-pending-card {
+  border: 1px solid color-mix(in srgb, #2e6be6 30%, var(--border));
+  border-radius: 14px;
+  background: var(--surface-2);
+  padding: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.psn-pending-main {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.psn-pending-cover {
+  width: 42px;
+  aspect-ratio: 3 / 4;
+  align-self: center;
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+.psn-pending-info {
+  flex: 1;
+  min-width: 0;
+}
+.psn-pending-info .steam-game-name {
+  padding-right: 0;
+}
+.psn-pending-main .steam-game-meta {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}
+.psn-pending-dismiss {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-soft);
+}
+.psn-pending-dismiss:hover {
+  background: color-mix(in srgb, #e5484d 15%, transparent);
+  color: #e5484d;
+}
+.psn-pending-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.15rem;
+}
+.psn-pending-actions .btn-psn-primary {
+  margin-left: auto;
+}
+.psn-pending-search {
+  margin-top: 0.1rem;
+}
+
+.psn-ignored-toggle {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.2rem 0;
+}
+.psn-ignored-toggle:hover {
+  color: var(--text);
+}
+.psn-ignored-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.psn-ignored-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.psn-ignored-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.84rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Sélecteur de console (PS3/PS4/PS5) à l'import */
+.psn-console-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 0.15rem;
+}
+.psn-console-btn {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 3px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+}
+.psn-console-btn.active {
+  border-color: var(--step-color);
+  color: var(--text);
+  background: color-mix(in srgb, var(--step-color) 16%, transparent);
+}
+
+/* --- Étape « À reconnaître » : jeux non matchés, à lier à la main --- */
+.psn-unmatched-done {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--step-color);
+}
+.psn-unmatched-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.psn-unmatched-card {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+  padding: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  transition: border-color 0.15s, background 0.15s;
+}
+.psn-unmatched-card.linked {
+  border-color: color-mix(in srgb, var(--step-color) 55%, var(--border));
+  background: color-mix(in srgb, var(--step-color) 6%, var(--surface-2));
+}
+.psn-unmatched-dismiss {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--text-soft);
+}
+.psn-unmatched-dismiss:hover {
+  background: color-mix(in srgb, #e5484d 15%, transparent);
+  color: #e5484d;
+}
+.psn-unmatched-head {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  padding-right: 1.6rem; /* place pour la croix « ignorer » */
+}
+.psn-unmatched-empty {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+}
+.psn-unmatched-icon {
+  width: 44px;
+  aspect-ratio: 1 / 1; /* les icônes de jeu PSN sont carrées */
+  align-self: center;
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+.psn-unmatched-info {
+  flex: 1;
+  min-width: 0;
+}
+.psn-unmatched-info .steam-game-name {
+  padding-right: 0;
+}
+.psn-unmatched-head .steam-game-meta {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+}
+.psn-unmatched-trophy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.psn-search-box {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-soft);
+}
+.psn-search-box input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.86rem;
+  outline: none;
+}
+.psn-search-results {
+  margin-top: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 244px;
+  overflow-y: auto;
+}
+.psn-search-result {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.35rem 0.4rem;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+}
+.psn-search-result:hover {
+  background: var(--surface-2);
+}
+.psn-search-result img,
+.psn-search-noart {
+  width: 34px;
+  aspect-ratio: 3 / 4;
+  flex-shrink: 0;
+  border-radius: 5px;
+  object-fit: cover;
+  background: var(--border);
+}
+.psn-search-noart {
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+.psn-search-result-name {
+  font-size: 0.85rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.psn-search-result-name em {
+  color: var(--text-soft);
+  font-style: normal;
+}
+.psn-search-empty {
+  padding: 0.5rem;
+  font-size: 0.82rem;
+  font-style: italic;
+  color: var(--text-soft);
+}
+
+.psn-resolved {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.psn-resolved-game {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.psn-resolved-game img,
+.psn-resolved-noart {
+  width: 38px;
+  aspect-ratio: 3 / 4;
+  flex-shrink: 0;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--border);
+}
+.psn-resolved-noart {
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+.psn-resolved-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.psn-relink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-soft);
+  font-size: 0.76rem;
+}
+.psn-relink:hover {
+  color: var(--text);
+}
+
+/* Pied de la modale (toggle succès + navigation) */
+.steam-modal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.2rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  flex-wrap: wrap;
+}
+/* Interrupteur (switch) « importer les succès » */
+.steam-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: none;
+  background: transparent;
+  font: inherit;
+  padding: 0;
+}
+.steam-switch-track {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.steam-switch-track.on {
+  background: linear-gradient(150deg, #1387d5, #66c0f4);
+}
+.steam-switch-track.psn.on {
+  background: linear-gradient(150deg, #1a56db, #3b82f6);
+}
+.steam-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+.steam-switch-track.on .steam-switch-thumb {
+  transform: translateX(18px);
+}
+.steam-switch-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+/* Étape « update » : toggle maj heures + saisie manuelle */
+.steam-update-hours {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.15rem;
+}
+.steam-hours-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 0.25rem 0.55rem;
+  border-radius: 8px;
+}
+.steam-hours-toggle.on {
+  border-color: var(--step-color);
+  color: var(--text);
+  background: color-mix(in srgb, var(--step-color) 14%, transparent);
+}
+.steam-hours-check {
+  width: 15px;
+  height: 15px;
+  border-radius: 5px;
+  border: 1.5px solid var(--border-strong);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  line-height: 0;
+}
+.steam-hours-toggle.on .steam-hours-check {
+  background: var(--step-color);
+  border-color: var(--step-color);
+}
+.steam-hours-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+.steam-hours-current {
+  color: var(--text-soft);
+}
+.steam-hours-edit input {
+  width: 58px;
+  padding: 0.2rem 0.4rem;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.steam-hours-edit input:disabled {
+  opacity: 0.5;
+}
+.steam-hours-unit {
+  font-weight: 700;
+  color: var(--text);
+}
+.steam-foot-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-left: auto;
+}
+
+/* Écran final */
+.steam-done-burst {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #eaa908;
+  background: radial-gradient(circle, rgba(242, 183, 11, 0.22), transparent 70%);
+  animation: steam-burst 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+@keyframes steam-burst {
+  0% { transform: scale(0.3) rotate(-20deg); opacity: 0; }
+  60% { transform: scale(1.15) rotate(6deg); }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+.steam-done-stats {
+  display: flex;
+  gap: 1.4rem;
+  margin: 1rem 0 0.4rem;
+}
+.steam-done-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.steam-done-stat strong {
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  color: var(--accent-ink);
+  line-height: 1;
+}
+.steam-done-stat span {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+@media (max-width: 720px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+  .settings-nav {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 0.3rem;
+  }
+  .settings-tab.active::before { display: none; }
+  .steam-cards { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   Demande de synchro PSN (worker maison) — bannière côté user
+   ============================================================ */
+.psn-request-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.6rem 0 0.2rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--orange) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--orange) 30%, var(--border));
+}
+.psn-request-banner.ok {
+  color: #1f8f4e;
+  background: color-mix(in srgb, #35c46b 14%, var(--surface));
+  border-color: color-mix(in srgb, #35c46b 34%, var(--border));
+}
+:root[data-theme="dark"] .psn-request-banner.ok {
+  color: #52e08a;
+}
+
+/* ============================================================
+   Panel admin : liste des demandes de synchro PSN
+   ============================================================ */
+.psn-req-hint {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+.psn-req-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.psn-req-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.psn-req-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.psn-req-main strong {
+  font-size: 0.9rem;
+}
+.psn-req-sub {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+.psn-req-detail {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+  margin-top: 1px;
+}
+.psn-req-detail.err {
+  color: #d9534f;
+}
+.psn-req-badge {
+  flex-shrink: 0;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  border: 1px solid var(--border-strong);
+  color: var(--text-soft);
+  background: var(--surface);
+}
+.psn-req-badge.pending {
+  color: var(--accent-ink);
+  border-color: color-mix(in srgb, var(--orange) 40%, var(--border));
+  background: color-mix(in srgb, var(--orange) 12%, var(--surface));
+}
+.psn-req-badge.processing {
+  color: #2f8fd0;
+  border-color: color-mix(in srgb, #2f8fd0 40%, var(--border));
+  background: color-mix(in srgb, #2f8fd0 12%, var(--surface));
+}
+.psn-req-badge.done {
+  color: #1f8f4e;
+  border-color: color-mix(in srgb, #35c46b 40%, var(--border));
+  background: color-mix(in srgb, #35c46b 12%, var(--surface));
+}
+.psn-req-badge.error {
+  color: #d9534f;
+  border-color: color-mix(in srgb, #d9534f 40%, var(--border));
+  background: color-mix(in srgb, #d9534f 12%, var(--surface));
+}
+.psn-req-del {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+}
+.psn-req-del:hover:not(:disabled) {
+  color: #e0483f;
+}
+
+/* ============================================================
+   Onglet Confidentialité : compte privé, sous-options,
+   demandes d'abonnement en attente
+   ============================================================ */
+
+.pv-block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 0.4rem 0.9rem;
+  margin-bottom: 1rem;
+  box-shadow: var(--shadow-sm);
+}
+.pv-block.pv-sub.locked {
+  opacity: 0.62;
+}
+
+.pv-sub-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.85rem 0.1rem 0.55rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-soft);
+  border-bottom: 1px solid var(--border);
+}
+.pv-sub-hint {
+  margin-left: auto;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+  font-size: 0.7rem;
+  color: var(--accent-ink);
+}
+.pv-count {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 0 6px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #1a1400;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+/* --- Une ligne de réglage : icône + texte + interrupteur --- */
+.pv-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.85rem 0.1rem;
+  cursor: var(--cursor-pointer), pointer;
+}
+.pv-row + .pv-row {
+  border-top: 1px solid var(--border);
+}
+.pv-row.off {
+  cursor: var(--cursor-default), auto;
+}
+.pv-row-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.pv-row.on:not(.off) .pv-row-icon {
+  color: var(--accent-ink);
+  border-color: color-mix(in srgb, var(--orange) 40%, var(--border));
+  background: color-mix(in srgb, var(--orange) 12%, var(--surface));
+}
+.pv-row-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.pv-row-txt strong {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+.pv-row-txt span {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  line-height: 1.35;
+}
+
+/* --- Interrupteur --- */
+.pv-switch {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+}
+.pv-row-busy {
+  color: var(--text-soft);
+}
+.pv-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.pv-switch-track {
+  display: block;
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  position: relative;
+  transition: background 0.18s, border-color 0.18s;
+}
+.pv-switch-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.18s;
+}
+.pv-switch input:checked + .pv-switch-track {
+  background: var(--accent-grad);
+  border-color: transparent;
+}
+.pv-switch input:checked + .pv-switch-track::after {
+  transform: translateX(18px);
+}
+.pv-switch input:disabled + .pv-switch-track {
+  opacity: 0.5;
+}
+.pv-switch input:focus-visible + .pv-switch-track {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* --- Demandes d'abonnement --- */
+.pv-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.6rem 1rem;
+  color: var(--text-soft);
+  text-align: center;
+}
+.pv-empty p {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.pv-req-list {
+  display: flex;
+  flex-direction: column;
+}
+.pv-req {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.1rem;
+}
+.pv-req + .pv-req {
+  border-top: 1px solid var(--border);
+}
+.pv-req-avatar {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-weight: 800;
+  color: var(--text-soft);
+}
+.pv-req-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pv-req-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.pv-req-txt strong {
+  font-size: 0.92rem;
+}
+.pv-req-txt span {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pv-req-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+.pv-req-ok,
+.pv-req-no {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.45rem 0.7rem;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.pv-req-ok {
+  background: var(--accent-grad);
+  border-color: transparent;
+  color: #1a1400;
+}
+.pv-req-ok:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+.pv-req-no {
+  padding: 0.45rem 0.55rem;
+  color: var(--text-soft);
+}
+.pv-req-no:hover:not(:disabled) {
+  color: #e0483f;
+  border-color: color-mix(in srgb, #e0483f 45%, var(--border));
+}
+.pv-req-ok:disabled,
+.pv-req-no:disabled {
+  opacity: 0.6;
+}
+
+@media (max-width: 560px) {
+  .pv-req-ok span {
+    display: none;
+  }
+  .pv-req-ok {
+    padding: 0.45rem 0.55rem;
+  }
+}
+
+/* ============================================================
+   Onglet Fil d'accueil : familles de cartes affichées / coupées
+   (les interrupteurs eux-mêmes réutilisent les .pv-* ci-dessus)
+   ============================================================ */
+
+.fp-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin: -0.35rem 0 1rem;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+.fp-reset {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.fp-reset:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.fp-reset:disabled {
+  opacity: 0.6;
+}
+
+.fp-warn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid color-mix(in srgb, #e0a23f 45%, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, #e0a23f 12%, var(--surface));
+  font-size: 0.84rem;
+}
+
+/* --- Un domaine : ligne maître (dépliable) + familles en retrait --- */
+.fg {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: 0.75rem;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.fg.off {
+  opacity: 0.72;
+}
+.fg-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-right: 0.9rem;
+}
+.fg-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 0.5rem 0.85rem 0.9rem;
+  background: none;
+  border: 0;
+  text-align: left;
+  color: inherit;
+}
+.fg-open:hover .pv-row-icon {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.fg .pv-row-txt strong {
+  font-size: 0.98rem;
+}
+.fg-chev {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+.fg-open:hover .fg-chev {
+  color: var(--accent-ink);
+}
+.fg-switch {
+  flex-shrink: 0;
+}
+
+/* Domaine réglé « en partie » : le curseur se cale au milieu. */
+.pv-switch input:indeterminate + .pv-switch-track {
+  background: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+.pv-switch input:indeterminate + .pv-switch-track::after {
+  transform: translateX(9px);
+}
+
+/* Les familles d'un domaine déplié : mêmes interrupteurs, en retrait. */
+.fg-kids {
+  padding: 0 0.9rem 0.25rem 2.45rem;
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+.fg-kids .pv-row-txt strong {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+@media (max-width: 560px) {
+  .fg-kids {
+    padding-left: 0.9rem;
+  }
+  .fg-chev {
+    font-size: 0;
+    gap: 0;
+  }
+}

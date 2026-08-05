@@ -1,0 +1,4089 @@
+/* ======================================================================
+   Arcade — magasin de points, caisses et inventaire (+ ouverture CS:GO)
+   ======================================================================
+   Convention de ce fichier : chaque élément « raretable » porte une variable
+   locale --arc-rarity (ou --co-rarity dans la modale), posée en style inline
+   depuis le JS d'après lib/rarity.js. Toutes les auras, bordures et lueurs en
+   découlent — aucune couleur de rareté n'est écrite en dur ici.
+   ====================================================================== */
+
+/* ======================================================================
+   Page /arcade : deux colonnes — la salle à gauche, les classements à droite
+   ====================================================================== */
+.arc-page {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 4rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 336px;
+  gap: 1.5rem;
+  align-items: start;
+}
+.arc-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+}
+
+.arc-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  min-height: 30vh;
+  color: var(--text-soft);
+}
+.arc-err {
+  background: rgba(235, 75, 75, 0.1);
+  border: 1px solid rgba(235, 75, 75, 0.3);
+  color: #eb4b4b;
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--radius);
+  font-size: 0.88rem;
+  margin: 0;
+}
+.arc-h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+  margin: 0;
+}
+.arc-h2 svg {
+  color: var(--accent-ink);
+}
+
+/* ======================================================================
+   Bannière — toujours sombre (effet néon arcade), même en thème clair.
+   ====================================================================== */
+.arc-banner {
+  position: relative;
+  overflow: hidden;
+  border-radius: 22px;
+  padding: 1.6rem 1.7rem;
+  color: #f5f3ea;
+  background:
+    radial-gradient(680px 320px at 88% -30%, rgba(242, 183, 11, 0.28), transparent 60%),
+    radial-gradient(520px 300px at 0% 130%, rgba(126, 96, 255, 0.24), transparent 62%),
+    linear-gradient(150deg, #191a24 0%, #101119 60%, #0b0c12 100%);
+  box-shadow:
+    0 26px 60px -30px rgba(6, 7, 14, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+/* Halo doré qui pulse doucement en fond. */
+.arc-banner-glow {
+  position: absolute;
+  top: -40%;
+  right: -8%;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(242, 183, 11, 0.4), transparent 66%);
+  filter: blur(8px);
+  pointer-events: none;
+  animation: arc-glow 7s ease-in-out infinite;
+}
+@keyframes arc-glow {
+  50% {
+    transform: scale(1.12);
+    opacity: 0.82;
+  }
+}
+/* Fines scanlines — clin d'œil borne d'arcade. */
+.arc-banner-scan {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.03) 0 1px,
+    transparent 1px 4px
+  );
+  -webkit-mask-image: linear-gradient(180deg, #000, transparent 70%);
+  mask-image: linear-gradient(180deg, #000, transparent 70%);
+}
+
+.arc-banner-top {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+.arc-banner-id {
+  min-width: 220px;
+}
+.arc-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #ffd76b;
+  margin-bottom: 0.35rem;
+}
+.arc-title {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4.5vw, 2.9rem);
+  font-weight: 700;
+  line-height: 1;
+  margin: 0 0 0.45rem;
+  background: linear-gradient(120deg, #fff 20%, #ffd24a 60%, #f2a50b);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.arc-sub {
+  margin: 0;
+  color: rgba(240, 236, 222, 0.62);
+  font-size: 0.9rem;
+}
+
+/* Le porte-monnaie, dans la bannière */
+.arc-wallet {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 0.05rem 0.75rem;
+  padding: 0.9rem 1.2rem 0.75rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(4px);
+}
+.arc-wallet-coin {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: linear-gradient(140deg, #ffd24a, #f2a50b);
+  color: #3b2a02;
+  box-shadow: 0 6px 18px -4px rgba(242, 183, 11, 0.7);
+}
+.arc-wallet-num {
+  font-family: var(--font-display);
+  font-size: 1.85rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+.arc-wallet-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(240, 236, 222, 0.55);
+}
+.arc-wallet-hist {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-top: 0.65rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(240, 236, 222, 0.7);
+  font-size: 0.74rem;
+  font-weight: 600;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.arc-wallet-hist:hover,
+.arc-wallet-hist.on {
+  color: #ffd76b;
+  border-color: rgba(255, 215, 107, 0.4);
+}
+.arc-wallet-caret {
+  transition: transform 0.18s ease;
+}
+.arc-wallet-hist.on .arc-wallet-caret {
+  transform: rotate(180deg);
+}
+
+/* Historique déroulé sous la bannière */
+.arc-hist {
+  position: relative;
+  z-index: 1;
+  margin-top: 1.1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.22);
+  padding: 0.4rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.arc-hist-empty {
+  margin: 0;
+  padding: 0.6rem;
+  color: rgba(240, 236, 222, 0.6);
+  font-size: 0.85rem;
+}
+.arc-hist-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.arc-hist-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 9px;
+  font-size: 0.84rem;
+  color: rgba(245, 243, 234, 0.9);
+}
+.arc-hist-row:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.035);
+}
+.arc-hist-src {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.arc-hist-date {
+  color: rgba(240, 236, 222, 0.5);
+  font-size: 0.74rem;
+}
+.arc-hist-amt {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 4ch;
+  text-align: right;
+}
+.arc-hist-amt.up {
+  color: #3ddc84;
+}
+.arc-hist-amt.down {
+  color: #ff6b70;
+}
+
+/* ======================================================================
+   Les mini-jeux — deux cartes de lancement
+   ====================================================================== */
+.arc-games {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+.arc-game {
+  --g-1: #f2b70b;
+  --g-2: #ff9d2e;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1.15rem 1.2rem 1.1rem;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  isolation: isolate;
+  transition: transform 0.2s ease, box-shadow 0.24s ease, border-color 0.2s ease;
+}
+.arc-game.g-pixel {
+  --g-1: #7e60ff;
+  --g-2: #2fa8f5;
+}
+/* Lueur colorée qui monte du bas au survol. */
+.arc-game-glow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(
+    120% 80% at 50% 120%,
+    color-mix(in srgb, var(--g-1) 20%, transparent),
+    transparent 62%
+  );
+  opacity: 0.55;
+  transition: opacity 0.24s ease;
+}
+.arc-game:hover {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--g-1) 50%, var(--border));
+  box-shadow: 0 24px 50px -26px color-mix(in srgb, var(--g-1) 75%, transparent),
+    var(--shadow);
+}
+.arc-game:hover .arc-game-glow {
+  opacity: 1;
+}
+
+.arc-game-top {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+/* Le titre + la description, à droite de l'art. min-width:0 pour que le pitch
+   se replie au lieu de forcer la carte à s'élargir. */
+.arc-game-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  flex: 1;
+}
+/* ---- L'art de la carte ----
+   Pas une icône décorative : une VRAIE jaquette de la bibliothèque, traitée
+   dans l'idiome du mini-jeu (jaquette pixelisée posée sur une pile de cartes
+   pour Pixel Rush, pochette d'où sort le vinyle pour le Blind Test). Le but
+   est qu'on devine la règle sans lire le pitch. */
+.arc-game-art {
+  position: relative;
+  flex: 0 0 auto;
+  width: 96px;
+  height: 90px;
+  perspective: 700px; /* pour le retournement de la carte Pixel Rush */
+}
+/* Repli sans jaquette (bibliothèque vide) : la pastille d'origine. */
+.arc-game-art.fallback {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(140deg, var(--g-1), var(--g-2));
+  color: #fff;
+  box-shadow: 0 12px 26px -12px color-mix(in srgb, var(--g-1) 85%, transparent);
+}
+.arc-game-art svg {
+  filter: drop-shadow(0 3px 7px rgba(0, 0, 0, 0.3));
+}
+
+/* La jaquette, au premier plan dans les deux cas. */
+.arc-art-cover {
+  position: absolute;
+  z-index: 2;
+  top: 3px;
+  left: 0;
+  width: 63px;
+  height: 84px;
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 26px -12px rgba(0, 0, 0, 0.55);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.arc-art-cover img,
+.arc-art-cover canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.arc-game:hover .arc-art-cover {
+  transform: translateY(-3px) rotate(-2deg);
+}
+
+/* ---- Pixel Rush : la carte se retourne au survol ----
+   Jaquette pixelisée + « ? » d'un côté, la réponse de l'autre : la règle du
+   jeu en un geste. L'overflow:hidden est porté par les FACES, jamais par le
+   conteneur en preserve-3d (il aplatirait la scène 3D). */
+.arc-art-flip {
+  position: absolute;
+  z-index: 2;
+  top: 3px;
+  left: 0;
+  width: 63px;
+  height: 84px;
+  transform-style: preserve-3d;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.arc-game:hover .arc-art-flip {
+  transform: rotateY(180deg);
+}
+.arc-art-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 26px -12px rgba(0, 0, 0, 0.55);
+  backface-visibility: hidden;
+}
+.arc-art-face.front {
+  transform: rotateY(180deg);
+  border-color: color-mix(in srgb, var(--g-1) 45%, var(--border));
+}
+.arc-art-face img,
+.arc-art-face canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* Le « ? » posé sur les pixels : sans pastille il se noierait dans l'image. */
+.arc-art-face b {
+  position: relative; /* sinon il passe SOUS le canvas, qui est en absolute */
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(8, 9, 16, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.7);
+}
+
+/* Pixel Rush : la carte suivante de la pile, en biais dessous. */
+.arc-art-deck {
+  position: absolute;
+  z-index: 1;
+  top: 3px;
+  left: 0;
+  width: 63px;
+  height: 84px;
+  border-radius: 9px;
+  background: linear-gradient(160deg, var(--surface-2), var(--surface));
+  border: 1px solid var(--border);
+  transform-origin: bottom left;
+  transform: rotate(11deg);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.arc-game:hover .arc-art-deck {
+  transform: rotate(17deg) translateX(3px);
+}
+
+/* Blind Test : le vinyle sort de la pochette et se met à tourner. */
+.arc-art-disc {
+  position: absolute;
+  z-index: 1;
+  top: 14px;
+  left: 30px;
+  width: 62px;
+  height: 62px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.2), transparent 42%),
+    repeating-radial-gradient(
+      circle at center,
+      #17171b 0,
+      #17171b 1px,
+      #26262c 1px,
+      #26262c 3px
+    ),
+    #0e0e12;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    0 10px 22px -10px rgba(0, 0, 0, 0.65);
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.arc-art-disc::after {
+  content: "";
+  width: 15%;
+  height: 15%;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+.arc-game:hover .arc-art-disc {
+  transform: translateX(9px) rotate(90deg);
+}
+.arc-game-name {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.arc-game-pitch {
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.arc-game-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  /* auto : pousse le pied en bas de la carte, quelle que soit la longueur du
+     pitch — les records et les boutons « Jouer » s'alignent d'une carte à
+     l'autre dans la grille. */
+  margin-top: auto;
+  padding-top: 0.85rem;
+}
+.arc-game-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+.arc-game-stat svg {
+  color: color-mix(in srgb, var(--g-1) 78%, var(--text));
+}
+.arc-game-stat b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.arc-game-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  background: linear-gradient(140deg, var(--g-1), var(--g-2));
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  box-shadow: 0 10px 22px -12px color-mix(in srgb, var(--g-1) 85%, transparent);
+}
+
+/* ---------- La carte « à venir » ---------- */
+/* Volontairement en retrait : pas de survol, pas de couleur d'accent, une
+   bordure en pointillé qui dit « emplacement réservé ». */
+.arc-game-soon {
+  border-style: dashed;
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  box-shadow: none;
+  cursor: default;
+}
+.arc-game-soon .arc-game-name,
+.arc-game-soon .arc-game-pitch,
+.arc-game-soon .arc-game-stat {
+  color: var(--text-soft);
+}
+.arc-game-soon .arc-game-glow {
+  display: none;
+}
+/* L'art : un gros « ? » sur une pastille neutre. */
+.arc-game-art.soon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--text-soft) 12%, transparent);
+  border: 1px dashed var(--border);
+}
+.arc-game-art.soon b {
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  font-weight: 800;
+  color: var(--text-soft);
+}
+/* Le pseudo-bouton : neutre, non cliquable. */
+.arc-game-cta.soon {
+  background: none;
+  box-shadow: none;
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+}
+.arc-game-arrow {
+  transition: transform 0.2s ease;
+}
+.arc-game:hover .arc-game-arrow {
+  transform: translateX(3px);
+}
+
+/* ======================================================================
+   La caisse — carte horizontale
+   ====================================================================== */
+.arc-crate {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 1.1rem 1.25rem;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.arc-crate-glow {
+  position: absolute;
+  left: -60px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(242, 183, 11, 0.18), transparent 68%);
+  pointer-events: none;
+}
+.arc-crate-art {
+  position: relative;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  color: var(--accent-ink);
+}
+.arc-crate-art img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.25));
+}
+.arc-crate-body {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.arc-crate-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+}
+.arc-crate-name {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  margin: 0.15rem 0 0.4rem;
+}
+.arc-crate-teaser {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.arc-crate-pip {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--arc-rarity);
+  box-shadow: 0 0 7px var(--arc-rarity);
+}
+.arc-crate-count {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+  margin-left: 0.35rem;
+}
+.arc-crate-action {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+.arc-crate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1.1rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #3b2a02;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  transition: filter 0.18s ease, transform 0.12s ease;
+}
+.arc-crate-btn:hover:not(:disabled) {
+  filter: brightness(1.07);
+}
+.arc-crate-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.arc-crate-btn:disabled {
+  background: var(--surface-2);
+  color: var(--text-soft);
+  cursor: not-allowed;
+}
+.arc-crate-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.16);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+.arc-crate-btn:disabled .arc-crate-price {
+  background: rgba(0, 0, 0, 0.08);
+}
+.arc-crate-need {
+  font-size: 0.74rem;
+  color: #eb6a5e;
+  font-weight: 600;
+}
+
+/* ======================================================================
+   Rail droit — les classements empilés
+   ====================================================================== */
+.arc-rail {
+  position: sticky;
+  top: 76px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+.arc-rail-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 1rem;
+  margin: 0.2rem 0 -0.1rem;
+}
+.arc-rail-title svg {
+  color: var(--accent-ink);
+}
+
+/* ---- Porte d'entrée de la collection de curseurs (en tête du rail) ---- */
+.arc-rail-cursors {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+  transition: border-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+}
+.arc-rail-cursors:hover {
+  border-color: color-mix(in srgb, var(--orange) 45%, var(--border));
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+.arc-rail-cursors-ic {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: var(--accent-grad);
+  color: #3a2600;
+}
+.arc-rail-cursors-txt {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--text);
+}
+.arc-rail-cursors-txt em {
+  font-style: normal;
+  font-family: var(--font-body);
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+.arc-rail-cursors-arrow {
+  flex: 0 0 auto;
+  color: var(--text-soft);
+  transition: transform 0.16s ease, color 0.16s ease;
+}
+.arc-rail-cursors:hover .arc-rail-cursors-arrow {
+  transform: translateX(3px);
+  color: var(--accent-ink);
+}
+
+/* ---- La porte voisine : les collections des autres ----
+   Même gabarit, mais sa pastille reste neutre : c'est SA collection qui garde
+   le doré, celle des autres n'est qu'un détour. */
+.arc-rail-cursors.friends .arc-rail-cursors-ic {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+}
+.arc-rail-cursors.friends:hover .arc-rail-cursors-ic {
+  color: var(--accent-ink);
+  border-color: color-mix(in srgb, var(--orange) 45%, var(--border));
+}
+
+/* ---- La modale « Mes curseurs » ---- */
+.abar-modal {
+  position: relative;
+  width: min(940px, 100%);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.abar-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+/* Titre + compteur groupés et extensibles : c'est ce bloc qui pousse le
+   bouton et la croix à droite. Deux `margin-left:auto` concurrents se
+   partageraient l'espace libre et laisseraient le bouton au milieu. */
+.abar-modal-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.abar-modal-head h2 {
+  min-width: 0;
+  margin: 0;
+  font-size: 1.15rem;
+}
+.abar-modal-head .modal-close {
+  position: static;
+}
+.abar-modal-body {
+  padding: 1.25rem;
+  overflow-y: auto;
+}
+.abar-count {
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.74rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* « Nouveau curseur » : l'action qui fait grandir la collection. */
+.abar-get {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #3a2600;
+  font-weight: 700;
+  font-size: 0.83rem;
+  transition: filter 0.15s ease, transform 0.12s ease;
+}
+.abar-get:hover {
+  filter: brightness(1.07);
+  transform: translateY(-1px);
+}
+.abar-get b {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.16);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+/* Solde insuffisant : toujours cliquable (voir le contenu de la caisse a de
+   l'intérêt) mais il ne brille plus. */
+.abar-get.poor {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--text-soft);
+}
+.abar-get.poor b {
+  background: var(--surface-2);
+}
+@media (max-width: 560px) {
+  .abar-count {
+    display: none;
+  }
+  .abar-modal-body {
+    padding: 0.9rem;
+  }
+}
+
+/* ======================================================================
+   La modale « Les collections » — comparer avec les joueurs suivis
+   ====================================================================== */
+/* Deux volets : QUI à gauche (la liste des joueurs et leur avancement), QUOI à
+   droite (sa vitrine complète, trous compris). Le volet gauche est la colonne
+   de navigation, il ne défile pas avec la vitrine. */
+.afc-modal {
+  width: min(1040px, 100%);
+}
+
+.afc-fams {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+.afc-fam {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  font-weight: 700;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+.afc-fam:hover {
+  color: var(--text);
+}
+.afc-fam.on {
+  background: var(--accent-grad);
+  color: #3a2600;
+}
+
+.afc-err {
+  margin: 0.9rem 1.25rem 0;
+}
+
+/* La modale est une colonne flex bornée à 88vh : ce bloc prend la hauteur
+   restante et `min-height: 0` autorise ses deux volets à défiler dedans (sans
+   ça, un enfant flex refuse de descendre sous sa hauteur de contenu). */
+.afc-body {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 244px) minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* --- Volet gauche : les joueurs --- */
+.afc-people {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.7rem;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.afc-person {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: none;
+  text-align: left;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+.afc-person:hover {
+  background: var(--surface-2);
+}
+.afc-person.on {
+  border-color: color-mix(in srgb, var(--orange) 45%, var(--border));
+  background: color-mix(in srgb, var(--orange) 9%, var(--surface));
+}
+.afc-person-av {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.afc-person-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.afc-person-txt {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.afc-person-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+/* Jauge d'avancement : la comparaison se lit d'un coup d'œil, sans lire les
+   chiffres. */
+.afc-person-bar {
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.afc-person-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  transition: width 0.3s ease;
+}
+.afc-person-num {
+  flex: 0 0 auto;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.afc-person-num em {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+/* --- Volet droit : la vitrine --- */
+.afc-shelf {
+  padding: 1.1rem 1.25rem 1.25rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.afc-shelf-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 0.9rem;
+}
+.afc-shelf-title {
+  margin: 0;
+  font-size: 1rem;
+}
+.afc-shelf-link {
+  flex: 0 0 auto;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+.afc-shelf-link:hover {
+  text-decoration: underline;
+}
+
+/* Un lot manquant : le visuel reste là (on veut savoir ce qu'on rate) mais
+   décoloré et en creux, avec un cadenas. */
+.afc-card.missing {
+  border-bottom-color: var(--border);
+  background: var(--surface-2);
+}
+.afc-card.missing .arc-inv-aura {
+  opacity: 0;
+}
+.afc-card.missing .arc-inv-art {
+  filter: grayscale(1);
+  opacity: 0.32;
+}
+.afc-card.missing .arc-inv-rarity {
+  color: var(--text-soft);
+}
+.afc-card.missing .arc-inv-name {
+  color: var(--text-soft);
+}
+.afc-card:hover {
+  transform: none; /* vitrine à consulter, pas de boutons à viser */
+}
+.afc-lock {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.5rem;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-soft);
+}
+.afc-equipped {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: auto;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: var(--arc-rarity);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+/* La grille de vitrine n'a pas de bouton en pied : des cases plus petites en
+   tiennent d'autant plus à l'écran. */
+.afc-grid {
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+}
+.afc-grid .arc-inv-name {
+  margin-bottom: 0.35rem;
+}
+
+.afc-empty {
+  display: grid;
+  place-items: center;
+  gap: 0.6rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--text-soft);
+}
+.afc-empty p {
+  max-width: 34ch;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+/* Sous 780 px, les deux volets s'empilent : la liste des joueurs devient une
+   rangée qui défile à l'horizontale, la vitrine prend le reste. */
+@media (max-width: 780px) {
+  .afc-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .afc-people {
+    flex-direction: row;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .afc-person {
+    flex: 0 0 auto;
+    width: 190px;
+  }
+  .afc-shelf {
+    padding: 0.9rem;
+  }
+  .afc-fams {
+    order: 3;
+    width: 100%;
+  }
+  .afc-fam {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+}
+
+.arc-board {
+  --g-1: #f2b70b;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.arc-board.g-pixel {
+  --g-1: #7e60ff;
+}
+.arc-board-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--g-1) 8%, transparent);
+}
+.arc-board-ic {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--g-1) 22%, transparent);
+  color: color-mix(in srgb, var(--g-1) 82%, var(--text));
+}
+.arc-board-name {
+  flex: 1;
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  margin: 0;
+}
+.arc-board-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.arc-board-tab {
+  padding: 0.2rem 0.5rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.arc-board-tab:hover {
+  color: var(--text);
+}
+.arc-board-tab.on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.arc-board-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.4rem;
+}
+.arc-board-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.38rem 0.4rem;
+  border-radius: 10px;
+}
+.arc-board-row:hover {
+  background: var(--surface-2);
+}
+.arc-board-row.me {
+  background: color-mix(in srgb, var(--g-1) 11%, transparent);
+  box-shadow: inset 2px 0 0 var(--g-1);
+}
+.arc-rank {
+  flex: 0 0 auto;
+  width: 21px;
+  height: 21px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+.arc-rank.r1 {
+  background: linear-gradient(140deg, #ffd24a, #e0a008);
+  color: #3b2a02;
+}
+.arc-rank.r2 {
+  background: linear-gradient(140deg, #e6e8ef, #b9bdc9);
+  color: #33363f;
+}
+.arc-rank.r3 {
+  background: linear-gradient(140deg, #e8a877, #c07338);
+  color: #3a2109;
+}
+.arc-board-user {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 1;
+  min-width: 0;
+  color: var(--text);
+}
+.arc-board-user img,
+.arc-board-av {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.arc-board-who {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.arc-board-user:hover .arc-board-who {
+  color: var(--accent-ink);
+}
+.arc-board-fight {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  color: var(--text-soft);
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.arc-board-row:hover .arc-board-fight {
+  opacity: 1;
+}
+.arc-board-fight:hover {
+  background: var(--surface);
+  color: var(--accent-ink);
+}
+.arc-board-score {
+  flex: 0 0 auto;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+.arc-board-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 1.4rem 1rem;
+  text-align: center;
+  color: var(--text-soft);
+}
+.arc-board-empty svg {
+  color: color-mix(in srgb, var(--g-1) 55%, var(--text-soft));
+}
+.arc-board-empty p {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.arc-board-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #3b2a02;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+/* ======================================================================
+   Collection
+   ====================================================================== */
+.arc-collection {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.arc-inv-progress {
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 940px) {
+  .arc-page {
+    grid-template-columns: 1fr;
+  }
+  .arc-rail {
+    position: static;
+    /* Sur mobile, deux classements côte à côte tant que la place le permet. */
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+  }
+  .arc-rail-title {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 560px) {
+  .arc-games {
+    grid-template-columns: 1fr;
+  }
+  /* Art resserré : la carte passe pleine largeur, l'illustration n'a plus
+     besoin d'occuper autant de place au-dessus du titre. */
+  .arc-game-art {
+    width: 84px;
+    height: 78px;
+  }
+  .arc-art-cover,
+  .arc-art-deck,
+  .arc-art-flip {
+    width: 54px;
+    height: 72px;
+  }
+  .arc-art-disc {
+    top: 12px;
+    left: 26px;
+    width: 54px;
+    height: 54px;
+  }
+  .arc-crate {
+    flex-wrap: wrap;
+  }
+  .arc-crate-action {
+    width: 100%;
+    align-items: stretch;
+  }
+  .arc-crate-btn {
+    justify-content: center;
+  }
+}
+
+/* ======================================================================
+   La machine à capsules — la porte, pas la machine
+   ======================================================================
+   Elle est posée AU-DESSUS des caisses et doit se distinguer d'elles au
+   premier coup d'œil : une caisse donne un cosmétique, celle-ci donne un
+   objet qu'on range sur une étagère. D'où le rouge de gashapon plutôt que
+   le doré de l'arcade, et une jauge de complétion que les caisses n'ont pas
+   — c'est le seul lot de la salle qui se COMPLÈTE. */
+.arc-gacha {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1.1rem;
+  overflow: hidden;
+  margin-bottom: 0.9rem;
+  padding: 1.1rem 1.3rem;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background:
+    radial-gradient(120% 140% at 8% 0%, rgba(217, 67, 44, 0.14), transparent 58%),
+    var(--surface);
+  transition: 0.2s;
+}
+.arc-gacha:hover {
+  border-color: rgba(217, 67, 44, 0.4);
+  transform: translateY(-2px);
+}
+.arc-gacha.poor {
+  opacity: 0.82;
+}
+.arc-gacha.done {
+  background:
+    radial-gradient(120% 140% at 8% 0%, rgba(80, 200, 120, 0.14), transparent 58%),
+    var(--surface);
+}
+
+.arc-gacha-glow {
+  position: absolute;
+  left: -6%;
+  top: -60%;
+  width: 220px;
+  aspect-ratio: 1;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 157, 46, 0.22), transparent 68%);
+}
+.arc-gacha.done .arc-gacha-glow {
+  background: radial-gradient(circle, rgba(80, 200, 120, 0.22), transparent 68%);
+}
+
+/* Le dôme en miniature. Les boules sont posées sur deux couronnes par un
+   `nth-child` plutôt qu'en JS : c'est un décor, il n'a pas à coûter un
+   calcul de placement. */
+.arc-gacha-dome {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  border-radius: 50% 50% 44% 44%;
+  overflow: hidden;
+  background:
+    radial-gradient(70% 60% at 32% 24%, rgba(255, 255, 255, 0.35), transparent 55%),
+    linear-gradient(180deg, rgba(150, 175, 205, 0.24), rgba(90, 110, 140, 0.18));
+  box-shadow:
+    inset 0 0 18px rgba(0, 0, 0, 0.3),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.12);
+}
+.arc-gacha-pip {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  translate: -50% -50%;
+  /* Une couronne de six, puis une seconde plus serrée : douze boules
+     suffisent à faire un dôme plein. */
+  transform: rotate(calc(var(--i) * 62deg)) translateY(-22px);
+  background: linear-gradient(
+    150deg,
+    hsl(calc(var(--i) * 47deg) 88% 66%),
+    hsl(calc(var(--i) * 47deg) 74% 50%)
+  );
+  box-shadow: inset 0 -2px 3px rgba(0, 0, 0, 0.25);
+}
+.arc-gacha-pip:nth-child(n + 7) {
+  transform: rotate(calc(var(--i) * 62deg)) translateY(-9px);
+  width: 13px;
+  height: 13px;
+}
+.arc-gacha-pip.got {
+  filter: grayscale(1) brightness(0.6);
+  opacity: 0.45;
+}
+
+.arc-gacha-body {
+  min-width: 0;
+}
+.arc-gacha-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #d9432c;
+}
+.arc-gacha.done .arc-gacha-kicker {
+  color: #2f9e5d;
+}
+.arc-gacha-name {
+  margin: 0.15rem 0 0.1rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+.arc-gacha-pitch {
+  margin: 0 0 0.6rem;
+  font-size: 0.83rem;
+  color: var(--text-soft);
+}
+
+.arc-gacha-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.arc-gacha-gauge {
+  flex: 1 1 130px;
+  height: 6px;
+  min-width: 90px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--border);
+}
+.arc-gacha-gauge i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #ff9d2e, #d9432c);
+  transition: width 0.6s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.arc-gacha.done .arc-gacha-gauge i {
+  background: linear-gradient(90deg, #6fe3a0, #2f9e5d);
+}
+.arc-gacha-progress em {
+  font-style: normal;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+.arc-gacha-progress em strong {
+  color: var(--text);
+}
+
+/* Les jaquettes qui MANQUENT, en sourdine : c'est la vitrine du magasin
+   fermé, celle qui donne envie d'entrer. */
+.arc-gacha-teaser {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.7rem;
+}
+.arc-gacha-teaser span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  aspect-ratio: 3 / 4;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--border);
+  color: var(--text-soft);
+}
+.arc-gacha-teaser span img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: grayscale(1) brightness(0.6);
+}
+.arc-gacha-teaser span.got img {
+  filter: none;
+}
+.arc-gacha-more {
+  font-size: 0.72rem;
+  font-weight: 800;
+  font-style: normal;
+  color: var(--text-soft);
+}
+
+.arc-gacha-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+.arc-gacha-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.1rem;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff9d2e, #d9432c);
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(217, 67, 44, 0.28);
+  transition: 0.16s;
+}
+.arc-gacha-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(217, 67, 44, 0.36);
+}
+.arc-gacha.done .arc-gacha-btn {
+  background: linear-gradient(135deg, #6fe3a0, #2f9e5d);
+  box-shadow: 0 6px 18px rgba(47, 158, 93, 0.28);
+}
+.arc-gacha.poor .arc-gacha-btn {
+  box-shadow: none;
+  filter: saturate(0.55);
+}
+.arc-gacha-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22);
+  font-size: 0.74rem;
+}
+.arc-gacha-need {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #e0483f;
+}
+
+@media (max-width: 720px) {
+  .arc-gacha {
+    grid-template-columns: auto minmax(0, 1fr);
+    row-gap: 0.8rem;
+  }
+  .arc-gacha-action {
+    grid-column: 1 / -1;
+  }
+  .arc-gacha-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ---------- Les caisses (pile de cartes horizontales) ---------- */
+.arc-crates {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+/* ---------- Inventaire ---------- */
+.arc-inv-empty {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+}
+
+/* ======================================================================
+   Cartes de thème : un vrai mini-écran de l'app en aperçu
+   ====================================================================== */
+.arc-themes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0.9rem;
+}
+.arc-theme {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-bottom: 3px solid var(--arc-rarity);
+  border-radius: 16px;
+  background: var(--surface);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.16s ease, box-shadow 0.2s ease, border-color 0.16s ease;
+}
+.arc-theme:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+}
+.arc-theme.equipped {
+  border-color: var(--arc-rarity);
+  box-shadow: 0 0 0 1px var(--arc-rarity), var(--shadow-sm);
+}
+.arc-theme.previewing {
+  border-color: var(--accent-ink);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-ink) 60%, transparent);
+}
+
+/* L'aperçu (le mini-écran) */
+.arc-theme-art {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+}
+.arc-theme-icon {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: rgba(10, 10, 14, 0.5);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.arc-theme-count {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 0.08rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(10, 10, 14, 0.55);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+/* Le mini-écran lui-même (tout en % pour rester net à toute taille) */
+.tp {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+.tp-side {
+  width: 22%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9%;
+  padding: 12% 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+.tp-nav {
+  width: 44%;
+  height: 5.5%;
+  min-height: 3px;
+  border-radius: 999px;
+}
+.tp-main {
+  flex: 1;
+  min-width: 0;
+  padding: 9% 9% 9% 8%;
+  display: flex;
+  flex-direction: column;
+  gap: 7%;
+}
+.tp-hello {
+  width: 48%;
+  height: 8%;
+  min-height: 4px;
+  border-radius: 999px;
+}
+.tp-card {
+  border-radius: 6px;
+  padding: 7% 8%;
+  display: flex;
+  flex-direction: column;
+  gap: 9%;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+.tp-line {
+  height: 7.5%;
+  min-height: 3px;
+  width: 82%;
+  border-radius: 999px;
+}
+.tp-line.short {
+  width: 54%;
+}
+.tp-btn {
+  height: 15%;
+  min-height: 6px;
+  width: 42%;
+  border-radius: 999px;
+  margin-top: 3%;
+}
+
+.arc-theme-info {
+  padding: 0.65rem 0.8rem 0.35rem;
+}
+.arc-theme-rarity {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--arc-rarity);
+}
+.arc-theme-name {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  margin: 0.1rem 0 0;
+}
+.arc-theme-actions {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem 0.75rem;
+}
+.arc-theme-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.arc-theme-btn:not(.ghost) {
+  border: none;
+  background: var(--accent-grad);
+  color: #3b2a02;
+}
+.arc-theme-btn.on:not(.ghost) {
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+.arc-theme-btn.ghost:hover,
+.arc-theme-btn.ghost.on {
+  border-color: var(--accent-ink);
+  color: var(--accent-ink);
+}
+.arc-theme-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+/* ---------- Barre d'aperçu flottante ---------- */
+.arc-preview-bar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(1.1rem + var(--bottom-bar-h, 0px) + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.5rem 0.55rem 0.5rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(18, 19, 28, 0.93);
+  color: #f5f3ea;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 22px 54px -20px rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: arc-preview-in 0.2s ease;
+  max-width: calc(100vw - 1.5rem);
+}
+@keyframes arc-preview-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+.arc-preview-eye {
+  display: grid;
+  place-items: center;
+  color: #ffd76b;
+}
+.arc-preview-txt {
+  font-size: 0.86rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.arc-preview-txt b {
+  font-weight: 700;
+}
+.arc-preview-equip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.85rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent-grad, linear-gradient(120deg, #ffd24a, #f2a50b));
+  color: #3b2a02;
+  font-weight: 700;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.arc-preview-equip:disabled {
+  opacity: 0.8;
+}
+.arc-preview-stop {
+  padding: 0.4rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(245, 243, 234, 0.75);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.arc-preview-stop:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.arc-inv-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.arc-inv-head .arc-h2 {
+  margin-bottom: 0;
+}
+.arc-inv-tabs {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.arc-inv-tab {
+  padding: 0.35rem 0.85rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+.arc-inv-tab.on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.arc-empty-inv {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2.5rem 1rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--text-soft);
+  text-align: center;
+}
+.arc-empty-inv p {
+  margin: 0;
+  font-size: 0.9rem;
+  max-width: 40ch;
+}
+
+.arc-inv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+  gap: 0.85rem;
+}
+.arc-inv-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 1rem 0.75rem 0.85rem;
+  border: 1px solid var(--border);
+  /* La rareté colore la carte par le BAS : une barre franche + un dégradé qui
+     s'éteint. Assez lisible pour trier d'un coup d'œil, assez sobre pour ne
+     pas hurler sur fond blanc. */
+  border-bottom: 3px solid var(--arc-rarity);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+  transition: transform 0.16s ease, box-shadow 0.2s ease;
+}
+.arc-inv-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+}
+.arc-inv-aura {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--arc-rarity) 20%, transparent),
+    transparent 62%
+  );
+  pointer-events: none;
+}
+.arc-inv-card.equipped {
+  border-color: var(--arc-rarity);
+  box-shadow: 0 0 0 1px var(--arc-rarity), var(--shadow-sm);
+}
+.arc-inv-count {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.5rem;
+  z-index: 2;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+.arc-inv-art {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  height: 66px;
+  margin-bottom: 0.6rem;
+}
+.arc-inv-rarity {
+  position: relative;
+  z-index: 1;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--arc-rarity);
+  margin-bottom: 0.2rem;
+}
+.arc-inv-name {
+  position: relative;
+  z-index: 1;
+  font-size: 0.86rem;
+  line-height: 1.25;
+  margin-bottom: 0.7rem;
+}
+.arc-equip {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  width: 100%;
+  margin-top: auto;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+.arc-equip:hover:not(:disabled) {
+  border-color: var(--arc-rarity);
+  color: var(--arc-rarity);
+}
+.arc-equip.on {
+  background: var(--arc-rarity);
+  border-color: var(--arc-rarity);
+  color: #fff;
+}
+.arc-inv-note {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+  margin: 0.85rem 0 0;
+}
+
+/* ---------- Légende des raretés ---------- */
+.arc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.arc-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+.arc-legend-item i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--arc-rarity);
+  box-shadow: 0 0 6px var(--arc-rarity);
+}
+
+/* ---------- Visuel générique d'un lot ---------- */
+/* Boîte carrée de côté `size` (posé en style inline par RewardArt) : toutes
+   les vignettes de lots ont ainsi le même encombrement, quelle que soit la
+   définition du fichier source (32×32 → 350×350). `contain` met à l'échelle
+   sans déformer et centre le visuel dans la boîte. */
+.rw-art-img {
+  object-fit: contain;
+  object-position: center;
+  image-rendering: pixelated; /* les curseurs sont du pixel-art : pas de flou */
+  display: block;
+}
+.rw-art-fallback {
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+  opacity: 0.5;
+}
+
+/* Vignette d'un thème : mini-écran de l'app (barre latérale + carte + accent). */
+.rw-theme-swatch {
+  position: relative;
+  display: block;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+.rw-theme-side {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 26%;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+.rw-theme-card {
+  position: absolute;
+  left: 36%;
+  right: 12%;
+  top: 22%;
+  bottom: 22%;
+  border-radius: 5px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14%;
+  padding: 0 10%;
+}
+.rw-theme-line {
+  height: 9%;
+  min-height: 2px;
+  border-radius: 999px;
+}
+.rw-theme-pill {
+  height: 20%;
+  min-height: 4px;
+  width: 62%;
+  border-radius: 999px;
+}
+
+/* ======================================================================
+   Modale d'ouverture — la bobine
+   ====================================================================== */
+.co-overlay {
+  position: fixed;
+  inset: 0;
+  /* Au-dessus de .modal-overlay (1000) : l'ouverture est lancée DEPUIS la
+     modale de collection, elle doit donc passer par-dessus, pas dessous. */
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(8, 8, 12, 0.78);
+  animation: co-fade 0.2s ease;
+}
+@keyframes co-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.co-modal {
+  position: relative;
+  width: min(920px, 100%);
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 1.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.co-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+.co-close:hover {
+  color: var(--text);
+}
+
+/* ---------- Aperçu du contenu ---------- */
+.co-preview {
+  text-align: center;
+}
+.co-kicker {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+}
+.co-title {
+  font-size: 1.6rem;
+  margin: 0.35rem 0 0.4rem;
+}
+.co-sub {
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  margin: 0 auto 1.25rem;
+  max-width: 52ch;
+}
+
+.co-pool {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 1.4rem;
+  text-align: center;
+}
+.co-pool-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.75rem 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-bottom: 3px solid var(--co-rarity);
+  border-radius: var(--radius);
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--co-rarity) 14%, transparent),
+    transparent 60%
+  );
+}
+.co-pool-art {
+  display: grid;
+  place-items: center;
+  height: 46px;
+}
+.co-pool-name {
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.co-pool-chance {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--co-rarity);
+  font-variant-numeric: tabular-nums;
+}
+
+.co-err {
+  color: #eb4b4b;
+  font-size: 0.85rem;
+  margin: 0 0 0.85rem;
+}
+
+.co-open-btn {
+  /* Le contenu de la caisse peut être long : le bouton reste collé en bas de
+     la modale (c'est elle qui défile) pour ne jamais sortir de l'écran. */
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.8rem 1.6rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #3b2a02;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  /* Halo large : détache le bouton de la grille qui défile dessous. */
+  box-shadow: 0 8px 24px rgba(242, 183, 11, 0.35), 0 0 0 10px var(--surface);
+  transition: filter 0.16s ease, transform 0.12s ease;
+}
+.co-open-btn:hover:not(:disabled) {
+  filter: brightness(1.07);
+}
+.co-open-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.co-open-btn:disabled {
+  filter: grayscale(0.5);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.co-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.18);
+  font-size: 0.85rem;
+}
+
+/* ---------- La piste ---------- */
+.co-stage {
+  --co-item-w: 132px;
+  --co-gap: 10px;
+}
+.co-track {
+  position: relative;
+  overflow: hidden;
+  padding: 1.1rem 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  /* Le contenu qui défile est lourd : on isole la piste pour que le navigateur
+     ne repeigne pas toute la page à chaque frame. */
+  contain: paint;
+}
+
+/* Le repère central : c'est LUI qui désigne le gagnant. Volontairement doré et
+   franc — l'œil doit s'y accrocher pendant toute la descente. */
+.co-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 3px;
+  transform: translateX(-50%);
+  background: var(--accent-grad);
+  box-shadow: 0 0 16px 3px rgba(242, 183, 11, 0.7);
+  z-index: 3;
+  border-radius: 2px;
+}
+.co-marker::before,
+.co-marker::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+}
+.co-marker::before {
+  top: -1px;
+  border-top-color: var(--amber);
+}
+.co-marker::after {
+  bottom: -1px;
+  border-bottom-color: var(--amber);
+}
+
+/* Fondus latéraux : la bande semble venir de nulle part et repartir de même. */
+.co-fade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 90px;
+  z-index: 2;
+  pointer-events: none;
+}
+.co-fade.left {
+  left: 0;
+  background: linear-gradient(to right, var(--surface-2), transparent);
+}
+.co-fade.right {
+  right: 0;
+  background: linear-gradient(to left, var(--surface-2), transparent);
+}
+
+.co-strip {
+  display: flex;
+  gap: var(--co-gap);
+  will-change: transform;
+}
+.co-item {
+  flex: 0 0 var(--co-item-w);
+  width: var(--co-item-w);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 132px;
+  padding: 0.6rem 0.5rem;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--co-rarity) 45%, transparent);
+  border-bottom: 3px solid var(--co-rarity);
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--co-rarity) 28%, transparent),
+    color-mix(in srgb, var(--co-rarity) 5%, transparent)
+  );
+}
+.co-item-art {
+  display: grid;
+  place-items: center;
+  height: 58px;
+}
+.co-item-name {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.2;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* ======================================================================
+   Le « juice » de la révélation : flash, rayons, confettis, tremblement.
+   Tout est décoratif et coupé si prefers-reduced-motion (voir plus bas).
+   ====================================================================== */
+.co-fx {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  /* Clippe la gerbe au viewport : sans ça les confettis qui sortent de l'écran
+     allongeraient la zone défilable de l'overlay. */
+  overflow: hidden;
+}
+
+/* Éclair coloré au moment où le lot se pose. */
+.co-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 46%,
+    color-mix(in srgb, var(--co-rarity) 55%, transparent),
+    transparent 62%
+  );
+  animation: co-flash 0.55s ease-out forwards;
+}
+@keyframes co-flash {
+  from {
+    opacity: 0.95;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Rayons tournants derrière la carte — réservés aux raretés hautes. */
+.co-rays {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 150vmax;
+  height: 150vmax;
+  opacity: 0.3;
+  background: repeating-conic-gradient(
+    from 0deg,
+    color-mix(in srgb, var(--co-rarity) 32%, transparent) 0deg 5deg,
+    transparent 5deg 17deg
+  );
+  /* Fondu circulaire : les rayons naissent du centre et se perdent au bord. */
+  -webkit-mask-image: radial-gradient(circle, #000 0%, transparent 55%);
+  mask-image: radial-gradient(circle, #000 0%, transparent 55%);
+  animation: co-rays-spin 16s linear infinite, co-rays-in 0.6s ease-out;
+}
+@keyframes co-rays-spin {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+@keyframes co-rays-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Gerbe de confettis : chaque particule porte sa trajectoire en variables. */
+.co-burst {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 0;
+  height: 0;
+}
+.co-particle {
+  position: absolute;
+  width: var(--sz);
+  height: var(--sz);
+  background: var(--pc);
+  border-radius: 2px;
+  opacity: 0;
+  animation-name: co-particle;
+  animation-timing-function: cubic-bezier(0.15, 0.7, 0.3, 1);
+  animation-fill-mode: forwards;
+}
+.co-particle.s1 {
+  border-radius: 50%;
+}
+.co-particle.s2 {
+  height: calc(var(--sz) * 0.4);
+  border-radius: 1px;
+}
+@keyframes co-particle {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(0deg) scale(0.4);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty)))
+      rotate(var(--rot)) scale(1);
+  }
+}
+
+/* Secousse de la modale, proportionnelle à la rareté (--co-shake). */
+.co-modal.shake {
+  animation: co-shake 0.5s ease-out;
+}
+@keyframes co-shake {
+  10%,
+  90% {
+    transform: translate3d(calc(var(--co-shake) * -1px), 0, 0);
+  }
+  20%,
+  80% {
+    transform: translate3d(calc(var(--co-shake) * 1px), 0, 0);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translate3d(calc(var(--co-shake) * -0.55px), 0, 0);
+  }
+  40%,
+  60% {
+    transform: translate3d(calc(var(--co-shake) * 0.55px), 0, 0);
+  }
+}
+
+/* Halo central de la piste : l'œil sait où regarder pendant que ça défile. */
+.co-spot {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 160px;
+  transform: translateX(-50%);
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, var(--accent-ink) 22%, transparent),
+    transparent 70%
+  );
+}
+/* Le repère bat tant que la bande tourne, puis se calme à l'arrêt. */
+.co-stage:not(.done) .co-marker {
+  animation: co-marker-pulse 0.55s ease-in-out infinite;
+}
+@keyframes co-marker-pulse {
+  50% {
+    box-shadow: 0 0 26px 6px rgba(242, 183, 11, 0.95);
+  }
+}
+
+/* Bouton « Arrêter » : discret à côté de la relance, qui reste l'action mise
+   en avant. */
+.co-stop {
+  padding: 0.6rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.co-stop:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.co-again:disabled {
+  opacity: 0.5;
+  filter: grayscale(0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .co-flash,
+  .co-rays,
+  .co-particle,
+  .co-modal.shake,
+  .co-stage:not(.done) .co-marker {
+    animation: none;
+  }
+  .co-fx {
+    display: none;
+  }
+}
+
+/* ---------- La révélation ---------- */
+.co-result {
+  margin-top: 1.5rem;
+  padding: 1.5rem 1.25rem 1.25rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--co-rarity);
+  background: radial-gradient(
+    420px 200px at 50% 0%,
+    color-mix(in srgb, var(--co-rarity) 22%, transparent),
+    transparent 70%
+  );
+  text-align: center;
+  animation: co-pop 0.42s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+@keyframes co-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.88) translateY(10px);
+  }
+}
+.co-result-rarity {
+  display: inline-block;
+  padding: 0.22rem 0.75rem;
+  border-radius: 999px;
+  background: var(--co-rarity);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.co-result-art {
+  display: grid;
+  place-items: center;
+  height: 92px;
+  margin: 0.9rem 0 0.5rem;
+}
+/* Halo pulsé derrière le lot : la respiration de la carte de résultat. */
+.co-result-art::before {
+  content: "";
+  position: absolute;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--co-rarity), transparent 62%);
+  opacity: 0.34;
+  animation: co-breathe 2.6s ease-in-out infinite;
+}
+@keyframes co-breathe {
+  50% {
+    transform: scale(1.16);
+    opacity: 0.5;
+  }
+}
+.co-result-name {
+  font-size: 1.4rem;
+  margin-bottom: 0.35rem;
+}
+.co-result-desc {
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  margin: 0 auto 0.9rem;
+  max-width: 46ch;
+}
+.co-dup,
+.co-new,
+.co-try-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  margin: 0 0 1.1rem;
+}
+/* Essai admin : ni gain ni perte, on le dit clairement en doré neutre. */
+.co-try-note {
+  background: color-mix(in srgb, var(--accent-ink) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-ink) 34%, transparent);
+  color: var(--accent-ink);
+}
+.co-new {
+  background: rgba(36, 165, 92, 0.14);
+  border: 1px solid rgba(36, 165, 92, 0.34);
+  color: #24a55c;
+}
+.co-dup {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+}
+.co-dup b {
+  color: var(--accent-ink);
+}
+
+.co-result-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.co-balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.co-balance svg {
+  color: var(--accent-ink);
+}
+.co-again {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 1.1rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #3b2a02;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.co-again:hover {
+  filter: brightness(1.07);
+}
+
+/* ======================================================================
+   Onglet Admin « Récompenses » — réutilise les classes du panel (admin-card,
+   pn-editor, pn-field…) ; on n'ajoute ici que ce qui lui est propre.
+   ====================================================================== */
+.arw-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.6rem;
+}
+.arw-card {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--arc-rarity);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.arw-card.off {
+  opacity: 0.5;
+}
+.arw-card-art {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.arw-card-info {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.arw-card-info strong {
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.arw-card-meta {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+.arw-hint {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  margin: 0.35rem 0 0;
+}
+
+/* « Effacer tout » : présent mais visuellement en retrait, il ne doit jamais
+   se confondre avec l'action principale voisine. */
+.arw-wipe {
+  color: #e5484d;
+  border-color: color-mix(in srgb, #e5484d 35%, var(--border));
+}
+.arw-wipe:hover {
+  background: color-mix(in srgb, #e5484d 10%, transparent);
+  border-color: #e5484d;
+}
+
+/* Résultat du rattrapage de points. */
+.arw-bf {
+  margin-top: 0.6rem;
+}
+.arw-bf-list {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.arw-bf-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-2);
+  font-size: 0.82rem;
+}
+.arw-bf-list strong {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.arw-bf-list span {
+  color: var(--text-soft);
+  font-size: 0.74rem;
+}
+.arw-bf-list em {
+  font-style: normal;
+  font-weight: 800;
+  color: var(--accent-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Barre export / import (transfert entre instances). */
+.arw-transfer {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.arw-transfer-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+.arw-transfer-opt input {
+  accent-color: var(--accent-ink);
+}
+
+/* ⚠ PROVISOIRE (démo vidéo) : bloc « Tirage truqué ». Supprimable d'un bloc. */
+.arw-rig-pick {
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.82rem;
+  max-width: 340px;
+}
+/* Truquage actif : la carte se signale, on ne l'oublie pas en la quittant. */
+.arw-rig.on {
+  border-color: var(--accent-ink);
+  box-shadow: inset 3px 0 0 var(--accent-ink);
+}
+.arw-rig-on {
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+/* ======================================================================
+   Vue liste des lots : édition rapide (rareté, description) à la volée.
+   ====================================================================== */
+.arw-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.arw-list-head,
+.arw-list-row {
+  display: grid;
+  grid-template-columns: 34px minmax(110px, 1fr) 128px minmax(180px, 2fr) 44px auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+.arw-list-head {
+  padding: 0 0.55rem 0.2rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+}
+.arw-list-row {
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--arc-rarity);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.arw-list-row.off {
+  opacity: 0.55;
+}
+/* Ligne touchée mais pas encore enregistrée : liseré doré. */
+.arw-list-row.dirty {
+  border-color: var(--accent-ink);
+  background: color-mix(in srgb, var(--accent-ink) 7%, var(--surface));
+}
+.arw-list-art {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+}
+.arw-list-row input,
+.arw-list-row select {
+  width: 100%;
+  min-width: 0;
+  padding: 0.32rem 0.45rem;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.8rem;
+}
+.arw-list-row input:hover,
+.arw-list-row select:hover {
+  border-color: var(--border);
+}
+.arw-list-row input:focus,
+.arw-list-row select:focus {
+  outline: none;
+  border-color: var(--accent-ink);
+  background: var(--surface);
+}
+.arw-list-name {
+  font-weight: 600;
+}
+/* La rareté se lit à la couleur avant même de lire le mot. */
+.arw-list-rarity {
+  color: var(--arc-rarity) !important;
+  font-weight: 700;
+}
+.arw-list-row .admin-switch.sm {
+  transform: scale(0.8);
+}
+.arw-list-row .pn-admin-actions {
+  display: flex;
+  gap: 0.15rem;
+}
+
+/* Barre d'enregistrement des modifications rapides. */
+.arw-save-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.7rem -1.3rem -1.3rem;
+  padding: 0.7rem 1.3rem;
+  border-top: 1px solid var(--accent-ink);
+  border-radius: 0 0 16px 16px;
+  background: color-mix(in srgb, var(--accent-ink) 8%, var(--surface));
+}
+.arw-save-bar > span {
+  flex: 1;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+@media (max-width: 860px) {
+  .arw-list-head {
+    display: none;
+  }
+  .arw-list-row {
+    grid-template-columns: 34px 1fr 44px auto;
+    row-gap: 0.35rem;
+  }
+  /* Rareté et description passent sur une seconde ligne, pleine largeur. */
+  .arw-list-rarity,
+  .arw-list-desc {
+    grid-column: 2 / -1;
+  }
+}
+
+/* Bouton « Tester » d'un lot curseur : accentué quand le test est actif. */
+.arw-test-btn.on {
+  color: #3a2600;
+  background: var(--accent-grad);
+  border-color: transparent;
+}
+
+/* ======================================================================
+   Banc d'essai du curseur : un panneau flottant, une zone par rôle.
+   ====================================================================== */
+.ctest {
+  position: fixed;
+  z-index: 60;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 224px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--accent-ink) 42%, var(--border));
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28);
+}
+.ctest-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.ctest-head > svg {
+  color: var(--accent-ink);
+  flex: 0 0 auto;
+}
+.ctest-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.84rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ctest-close {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-soft);
+}
+.ctest-close:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.ctest-sub {
+  margin: 0 0 0.15rem;
+  font-size: 0.7rem;
+  color: var(--text-soft);
+}
+
+/* Chaque zone déclenche la variable de SON rôle — même cascade que l'app. */
+.ctest-zone {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  border: 1px dashed var(--border);
+  border-radius: 9px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.74rem;
+  text-align: left;
+}
+.ctest-zone.normal {
+  cursor: var(--cursor-default), auto;
+}
+.ctest-zone.grab {
+  cursor: var(--cursor-grab);
+}
+.ctest-zone.grab:active {
+  cursor: var(--cursor-grabbing);
+}
+.ctest-zone.text::placeholder {
+  color: var(--text-soft);
+}
+
+.ctest-stop {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-top: 0.2rem;
+  padding: 0.45rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent-grad);
+  color: #3a2600;
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+.ctest-stop kbd {
+  font-size: 0.64rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+/* Bouton « Tester » du pied d'éditeur : repoussé à gauche. */
+.pn-foot-left {
+  margin-right: auto;
+}
+.pn-foot-left.on {
+  border-color: var(--accent-ink);
+  color: var(--accent-ink);
+}
+
+@media (max-width: 760px) {
+  .ctest {
+    right: 0.5rem;
+    width: 190px;
+  }
+}
+.arw-img-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+.arw-img-row .arw-hint {
+  flex: 1;
+  min-width: 200px;
+  margin: 0;
+}
+.arw-img-preview {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  /* Damier : seul moyen de juger la transparence d'un curseur avant de le
+     publier (un PNG à fond blanc se voit sur-le-champ). */
+  background-color: var(--surface-2);
+  background-image: linear-gradient(45deg, var(--border) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--border) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--border) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--border) 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+}
+.arw-img-preview img {
+  max-width: 64px;
+  max-height: 64px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+/* Pastille « curseur animé (.ani) » sur l'aperçu. */
+.arw-cursor-badge {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  background: var(--accent-grad);
+  color: #3a2600;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+/* Sélecteur du contenu d'une caisse */
+.arw-pick {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 0.4rem;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 0.25rem;
+}
+.arw-pick-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--arc-rarity);
+  border-radius: 10px;
+  background: var(--surface);
+  /* Sans ça, le <button> garde la couleur système et le nom devient illisible
+     en thème sombre (texte sombre sur fond sombre). */
+  color: var(--text);
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.arw-pick-item:hover {
+  border-color: var(--border-strong);
+}
+.arw-pick-item.on {
+  background: color-mix(in srgb, var(--arc-rarity) 12%, var(--surface));
+  border-color: var(--arc-rarity);
+}
+.arw-pick-item.off {
+  opacity: 0.5;
+}
+.arw-pick-art {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+}
+.arw-pick-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.arw-pick-rarity {
+  font-size: 0.65rem;
+  color: var(--arc-rarity);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.arw-pick-check {
+  color: var(--arc-rarity);
+  flex: 0 0 auto;
+}
+
+/* Carte d'inventaire entièrement cliquable (un clic = équiper / retirer). */
+.arc-inv-card[role="button"] {
+  transition: transform 0.12s ease, border-color 0.15s ease;
+}
+.arc-inv-card[role="button"]:hover {
+  transform: translateY(-2px);
+  border-color: var(--arc-rarity);
+}
+.arc-inv-card[role="button"]:focus-visible {
+  outline: 2px solid var(--arc-rarity);
+  outline-offset: 2px;
+}
+/* L'état n'est plus un bouton : il ne doit plus réagir au survol. */
+.arc-inv-card .arc-equip {
+  pointer-events: none;
+}
+
+/* ======================================================================
+   Cartes de fil « caisse ouverte » (voir FeedCards.jsx).
+   Toute la carte est teintée par --drop-rarity : on juge la prise à l'œil.
+   ====================================================================== */
+.hf-drop-body {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-top: 0.6rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--drop-rarity) 45%, transparent);
+  border-left: 3px solid var(--drop-rarity);
+  border-radius: var(--radius);
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--drop-rarity) 14%, transparent),
+    transparent 70%
+  );
+}
+/* Halo derrière le lot : la couleur « respire » sans animer la carte entière. */
+.hf-drop-aura {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  width: 116px;
+  height: 116px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--drop-rarity), transparent 62%);
+  opacity: 0.28;
+  pointer-events: none;
+}
+.hf-drop-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  flex: 0 0 62px;
+}
+.hf-drop-art img {
+  image-rendering: pixelated;
+}
+.hf-drop-info {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.hf-drop-rarity {
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--drop-rarity);
+}
+.hf-drop-name {
+  font-size: 1.02rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hf-drop-new,
+.hf-drop-dup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+.hf-drop-new {
+  color: var(--drop-rarity);
+  font-weight: 600;
+}
+
+/* Les autres prises de la fournée, en vignettes. */
+.hf-dropg-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.55rem 0 0;
+  padding: 0;
+}
+.hf-dropg-chip {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0; /* c'est un <button> : sans ça le remplissage UA décentre l'art */
+  border: 1px solid color-mix(in srgb, var(--drop-rarity) 55%, transparent);
+  border-bottom: 2px solid var(--drop-rarity);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--drop-rarity) 10%, var(--surface-2));
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.hf-dropg-chip img {
+  image-rendering: pixelated;
+}
+.hf-dropg-chip.best {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--drop-rarity) 55%, transparent);
+}
+
+/* Vignette pointée : elle prend la vedette de la carte (voir
+   CaseOpenGroupEvent), on le signale ici pour qu'on sache d'où vient l'aperçu. */
+.hf-dropg-chip:hover,
+.hf-dropg-chip.peek {
+  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--drop-rarity) 22%, var(--surface-2));
+}
+.hf-dropg-chip.peek {
+  box-shadow: 0 0 0 2px var(--drop-rarity);
+}
+/* ======================================================================
+   Variante « machine à capsules » de la carte de fil
+   ======================================================================
+   Même ossature que la caisse ouverte (elle en réutilise l'aura, l'info et
+   la liste de vignettes), mais l'objet gagné n'est pas un curseur de 32 px :
+   c'est un BOÎTIER, avec sa jaquette et sa tranche. D'où les deux seules
+   choses qui changent — les coquilles écartées autour de lui, et des images
+   qu'on ne pixellise surtout pas. */
+.hf-gacha .hf-drop-body {
+  padding-left: 1.2rem;
+}
+
+/* Les deux moitiés de la capsule, ouvertes autour du boîtier. Décoratives et
+   figées : le fil se lit en défilant, une animation par carte y serait du
+   bruit — la scène animée, c'est la modale qui la joue. */
+.hf-gacha-shell {
+  position: absolute;
+  left: 34px;
+  top: 50%;
+  width: 74px;
+  height: 74px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.hf-gacha-half {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--drop-rarity) 85%, #fff),
+    color-mix(in srgb, var(--drop-rarity) 60%, #111)
+  );
+  opacity: 0.55;
+}
+.hf-gacha-half.top {
+  top: -14px;
+  border-radius: 100% 100% 0 0 / 100% 100% 0 0;
+  rotate: -16deg;
+}
+.hf-gacha-half.bot {
+  bottom: -14px;
+  border-radius: 0 0 100% 100% / 0 0 100% 100%;
+  rotate: 16deg;
+}
+
+/* Le boîtier lui-même : debout, sa tranche teintée sur le bord gauche —
+   exactement le repère qu'on suit sur l'étagère. */
+.hf-gacha-case {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 62px;
+  flex: 0 0 46px;
+  border-radius: 3px 5px 5px 3px;
+  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+}
+.hf-gacha-case img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: auto;
+}
+
+/* Les vignettes de la fournée montrent des jaquettes, pas des curseurs : ni
+   pixellisation, ni fond visible. */
+.hf-gacha .hf-dropg-chip {
+  width: 34px;
+  height: 46px;
+  border-radius: 3px 5px 5px 3px;
+  overflow: hidden;
+}
+.hf-gacha .hf-dropg-chip img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: auto;
+}
+
+/* Pastille discrète en coin : ce lot était un doublon. */
+.hf-dropg-dup {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-soft);
+  border: 1.5px solid var(--surface);
+}
+
+/* ======================================================================
+   Contrôle segmenté (remplace les <select> Famille / Rareté).
+   ====================================================================== */
+.seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding: 0.25rem;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.seg-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.seg-item:hover:not(.on) {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+.seg-item.on {
+  /* Fond doré vif dans les deux thèmes → encre sombre FIXE (pas --accent-ink,
+     qui vire au doré clair en thème sombre et devient illisible ici). */
+  color: #3a2600;
+  background: var(--accent-grad);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+}
+.seg-item.on svg {
+  color: #3a2600;
+}
+/* Raretés : chaque option porte SA couleur (pastille au repos, remplissage
+   quand active). Le sélecteur d'attribut cible les items qui déclarent
+   --seg-color en style inline. */
+.seg-item[style*="--seg-color"]::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--seg-color);
+  flex: 0 0 auto;
+}
+.seg-item[style*="--seg-color"].on {
+  color: #fff;
+  background: var(--seg-color);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--seg-color) 45%, transparent);
+}
+.seg-item[style*="--seg-color"].on::before {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+/* ======================================================================
+   Thème de curseur multi-rôles : import, revue, slots.
+   ====================================================================== */
+.cur-url {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+  padding: 0.3rem 0.35rem 0.3rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.cur-url > svg {
+  color: var(--accent-ink);
+  flex: 0 0 auto;
+}
+.cur-url input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 0.3rem 0;
+  font-size: 0.84rem;
+  color: var(--text);
+}
+.cur-url input:focus {
+  outline: none;
+}
+.cur-url-go {
+  flex: 0 0 auto;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.82rem;
+}
+.cur-or {
+  margin: 0.45rem 0 0.15rem;
+  text-align: center;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-soft);
+}
+
+.cur-drop {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  margin-top: 0.1rem;
+  padding: 1.05rem 1rem;
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  text-align: center;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.cur-drop:hover:not(:disabled) {
+  border-color: var(--accent-ink);
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent-ink) 7%, var(--surface-2));
+}
+.cur-drop-main {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.cur-drop-sub {
+  font-size: 0.73rem;
+}
+
+.cur-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+.cur-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.cur-slot.filled {
+  border-color: color-mix(in srgb, var(--accent-ink) 38%, var(--border));
+}
+/* Le slot dont le menu contextuel est ouvert reste visuellement désigné. */
+.cur-slot.menued {
+  border-color: var(--accent-ink);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-ink) 22%, transparent);
+}
+
+/* Menu contextuel d'un rôle (clic droit). */
+.cur-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 196px;
+  padding: 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+.cur-menu-title {
+  display: block;
+  padding: 0.3rem 0.5rem 0.35rem;
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-soft);
+}
+.cur-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.8rem;
+  text-align: left;
+}
+.cur-menu-item:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.cur-menu-item:disabled {
+  opacity: 0.4;
+}
+.cur-menu-item.danger:hover:not(:disabled) {
+  color: #e5484d;
+}
+/* Vignette du curseur en presse-papier, à côté de « Coller ». */
+.cur-menu-chip {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: var(--surface-2);
+}
+.cur-menu-chip img {
+  image-rendering: pixelated;
+}
+.cur-slot-head {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.cur-slot-head strong {
+  font-size: 0.82rem;
+}
+.cur-slot-head svg {
+  color: var(--accent-ink);
+  flex: 0 0 auto;
+}
+.cur-slot-req {
+  margin-left: auto;
+  font-size: 0.58rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--accent-ink) 15%, transparent);
+  padding: 0.06rem 0.32rem;
+  border-radius: 999px;
+}
+.cur-slot-desc {
+  margin: 0;
+  font-size: 0.67rem;
+  line-height: 1.3;
+  color: var(--text-soft);
+}
+.cur-slot-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: stretch;
+}
+.cur-slot-preview {
+  width: 100%;
+  height: 68px;
+}
+.cur-slot-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.cur-slot-add:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--accent-ink);
+}
+.cur-hotspot {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.67rem;
+  color: var(--text-soft);
+}
+.cur-hotspot span {
+  flex: 1;
+  min-width: 0;
+}
+.cur-hotspot input {
+  width: 46px;
+  padding: 0.2rem 0.3rem;
+  font-size: 0.74rem;
+}
+
+/* Presets de taille d'un rôle. */
+.cur-size {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.67rem;
+  color: var(--text-soft);
+}
+.cur-size > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex: 0 0 auto;
+}
+.cur-size-chips {
+  display: flex;
+  gap: 0.2rem;
+  flex-wrap: wrap;
+}
+.cur-size-chip {
+  min-width: 24px;
+  padding: 0.12rem 0.28rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.cur-size-chip:hover:not(:disabled):not(.on) {
+  color: var(--text);
+  border-color: var(--accent-ink);
+}
+.cur-size-chip.on {
+  color: #3a2600;
+  background: var(--accent-grad);
+  border-color: transparent;
+}
+
+/* Bibliothèque du pack importé (palette réassignable). */
+.cur-lib {
+  margin-top: 0.6rem;
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.cur-lib-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.55rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.cur-lib-head svg {
+  color: var(--accent-ink);
+}
+.cur-lib-sub {
+  margin-left: auto;
+  font-weight: 500;
+  font-size: 0.7rem;
+  color: var(--text-soft);
+}
+.cur-lib-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.45rem;
+}
+.cur-lib-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.cur-lib-thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 46px;
+  border-radius: 8px;
+  background-color: var(--surface-2);
+  background-image: linear-gradient(45deg, var(--border) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--border) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--border) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--border) 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+}
+.cur-lib-thumb img {
+  image-rendering: pixelated;
+}
+.cur-lib-name {
+  max-width: 100%;
+  font-size: 0.65rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cur-lib-item .cur-rev-role {
+  width: 100%;
+}
+
+.cur-review {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--accent-ink) 30%, var(--border));
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.cur-review-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+.cur-review-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(146px, 1fr));
+  gap: 0.5rem;
+}
+.cur-rev-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  transition: opacity 0.15s ease;
+}
+.cur-rev-card.ignored {
+  opacity: 0.45;
+}
+.cur-rev-thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 54px;
+  border-radius: 8px;
+  background-color: var(--surface);
+  background-image: linear-gradient(45deg, var(--border) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--border) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--border) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--border) 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+}
+.cur-rev-thumb img {
+  image-rendering: pixelated;
+}
+.cur-rev-name {
+  max-width: 100%;
+  font-size: 0.67rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cur-rev-role {
+  width: 100%;
+  padding: 0.25rem 0.3rem;
+  font-size: 0.74rem;
+}
+.cur-review-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+/* ======================================================================
+   Passerelle depuis le blind test : les points gagnés, cliquables.
+   (Vit ici plutôt que dans app-14-blindtest.css : c'est l'arcade qui parle.)
+   ====================================================================== */
+.bt-earned {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid rgba(242, 183, 11, 0.42);
+  border-radius: 999px;
+  background: rgba(242, 183, 11, 0.12);
+  color: var(--text);
+  font-size: 0.87rem;
+  transition: background 0.18s ease, transform 0.12s ease;
+}
+.bt-earned:hover {
+  background: rgba(242, 183, 11, 0.2);
+  transform: translateY(-1px);
+}
+.bt-earned svg {
+  color: var(--accent-ink);
+}
+.bt-earned b {
+  font-family: var(--font-display);
+}
+.bt-earned em {
+  font-style: normal;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+/* ---------- Mobile (ouverture de caisse + inventaire) ---------- */
+@media (max-width: 760px) {
+  .co-modal {
+    padding: 1.1rem 0.85rem;
+  }
+  .co-stage {
+    /* Bande plus étroite : sinon deux lots à peine tiennent à l'écran et la
+       descente perd sa lisibilité. La géométrie JS lit ces mêmes valeurs. */
+    --co-item-w: 104px;
+  }
+  .co-item {
+    height: 112px;
+  }
+  .co-fade {
+    width: 48px;
+  }
+  .arc-inv-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  }
+}
+
+/* Le défilement est le cœur du plaisir, mais il reste une longue animation :
+   qui demande moins de mouvement obtient le résultat sans la descente. */
+@media (prefers-reduced-motion: reduce) {
+  .co-strip {
+    transition: none !important;
+  }
+  .co-result,
+  .co-result-art::before {
+    animation: none;
+  }
+}

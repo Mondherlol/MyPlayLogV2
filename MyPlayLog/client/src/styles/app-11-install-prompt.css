@@ -1,0 +1,113 @@
+/* ======================================================================
+   MyPlayLog — Pop-up d'installation PWA
+   Bannière flottante en bas, invitant à installer l'app sur l'écran
+   d'accueil. Ne s'affiche que hors mode standalone (cf. InstallPrompt.jsx).
+   ====================================================================== */
+
+.install-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 120; /* au-dessus du mini-player (110), sous les modales (1000+) */
+
+  width: min(440px, calc(100vw - 1.5rem));
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+
+  padding: 0.9rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+
+  animation: installUp 0.32s cubic-bezier(0.2, 0.8, 0.25, 1) both;
+}
+
+@keyframes installUp {
+  from {
+    transform: translate(-50%, 120%);
+    opacity: 0;
+  }
+}
+
+.install-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  color: #1a1204;
+  background: var(--accent-grad);
+  box-shadow: 0 4px 14px rgba(234, 169, 8, 0.35);
+}
+
+.install-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.install-title {
+  display: block;
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.install-text {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--text-soft);
+}
+
+/* Icônes inline dans les instructions iOS (Partager / +) */
+.install-inline {
+  display: inline;
+  vertical-align: -2px;
+  color: var(--accent-ink);
+}
+
+.install-cta {
+  flex: 0 0 auto;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.install-close {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-soft);
+}
+.install-close:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* Mobile : sur iOS pas de bouton, le texte prend toute la place. */
+@media (max-width: 420px) {
+  .install-prompt {
+    gap: 0.7rem;
+    padding: 0.85rem 0.9rem;
+  }
+  .install-title {
+    font-size: 0.95rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .install-prompt {
+    animation: none;
+  }
+}

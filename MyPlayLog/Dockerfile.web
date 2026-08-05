@@ -1,0 +1,21 @@
+# ---- Frontend React (Vite) servi par Caddy avec HTTPS auto ----
+
+# Étape 1 : build du client React
+FROM node:20-alpine AS build
+WORKDIR /app/client
+
+COPY client/package.json client/package-lock.json ./
+RUN npm ci
+
+COPY client/ ./
+
+# URL de l'API en prod : relative (/api) => même origine, pas de CORS ni mixed-content.
+# Caddy proxifie /api et /uploads vers le backend.
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=$VITE_API_URL
+RUN npm run build
+
+# Étape 2 : Caddy sert le build statique + reverse-proxy vers l'API
+FROM caddy:2-alpine
+COPY Caddyfile /etc/caddy/Caddyfile
+COPY --from=build /app/client/dist /srv
