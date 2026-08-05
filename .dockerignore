@@ -1,9 +1,0 @@
-**/node_modules
-**/.env
-**/dist
-**/*.log
-server/uploads
-server/.igdb-token.json
-.git
-AUTRES
-combined.log

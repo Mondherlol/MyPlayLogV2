@@ -1,3 +1,8 @@
+# Nom de projet figé : sans lui, Compose le déduit du nom du dossier. Ce dossier
+# ayant déjà bougé une fois, un renommage suffirait à créer de NOUVEAUX volumes
+# vides — donc une base et des uploads qui paraîtraient perdus.
+name: myplaylog
+
 services:
   mongo:
     image: mongo:7

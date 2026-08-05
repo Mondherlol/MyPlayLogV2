@@ -19,7 +19,11 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           script: |
             set -e
+            # `git pull` se fait à la racine du dépôt, mais l'app web+serveur
+            # vit dans le sous-dossier MyPlayLog/ (le dépôt sert aussi de
+            # parapluie au projet mobile, qui a son propre dépôt).
             cd ~/myplaylog
             git pull origin main
+            cd MyPlayLog
             docker compose up -d --build
             docker image prune -f
