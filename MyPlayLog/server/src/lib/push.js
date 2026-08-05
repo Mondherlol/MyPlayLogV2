@@ -29,15 +29,25 @@ function chunk(arr, size) {
 }
 
 /**
- * Envoie une notification aux appareils d'une liste d'utilisateurs.
+ * Envoie une notification aux appareils d'une liste d'utilisateurs, et rend
+ * compte du résultat appareil par appareil.
+ *
+ * C'est la version détaillée : elle sert au panel admin, qui doit pouvoir dire
+ * « 42 appareils touchés, 3 refusés » plutôt qu'un simple nombre. Les appels
+ * courants (une notification d'activité) passent par `pushToUsers` juste en
+ * dessous, qui n'en garde que le compte.
  *
  * @param {string[]} userIds   destinataires
- * @param {object}   payload   { title, body, data }
- * @returns {Promise<number>}  nombre de messages acceptés par Expo
+ * @param {object}   payload   { title, body, data, channelId }
+ * @returns {Promise<{devices:number, accepted:number, failed:number, removed:number, errors:object[]}>}
  */
-export async function pushToUsers(userIds, { title, body, data = {} } = {}) {
+export async function sendPush(
+  userIds,
+  { title, body, data = {}, channelId = "messages" } = {}
+) {
+  const empty = { devices: 0, accepted: 0, failed: 0, removed: 0, errors: [] };
   const ids = [...new Set((userIds || []).map(String))].filter(Boolean);
-  if (!ids.length) return 0;
+  if (!ids.length) return empty;
 
   const users = await User.find({ _id: { $in: ids }, "pushTokens.0": { $exists: true } })
     .select("pushTokens")
@@ -57,15 +67,19 @@ export async function pushToUsers(userIds, { title, body, data = {} } = {}) {
         body,
         data,
         sound: "default",
-        channelId: "messages",
+        channelId,
         priority: "high",
       });
     }
   }
-  if (!messages.length) return 0;
+  if (!messages.length) return empty;
 
   let accepted = 0;
   const dead = [];
+  // Motifs de refus regroupés (« DeviceNotRegistered × 3 ») : une liste de
+  // tickets bruts n'apprendrait rien à qui lit le panel admin.
+  const errors = new Map();
+  const noteError = (reason) => errors.set(reason, (errors.get(reason) || 0) + 1);
 
   for (const batch of chunk(messages, CHUNK)) {
     try {
@@ -79,12 +93,21 @@ export async function pushToUsers(userIds, { title, body, data = {} } = {}) {
         body: JSON.stringify(batch),
       });
       const json = await res.json().catch(() => null);
+
+      // Erreur globale du lot (jeton d'API invalide, credentials FCM absentes) :
+      // Expo répond `errors` au lieu de `data`, et aucun ticket n'existe.
+      if (!json?.data && json?.errors?.length) {
+        noteError(json.errors[0]?.message || "Requête refusée par Expo");
+        continue;
+      }
+
       const tickets = json?.data || [];
       tickets.forEach((ticket, i) => {
         if (ticket?.status === "ok") {
           accepted += 1;
           return;
         }
+        noteError(ticket?.details?.error || ticket?.message || "Erreur inconnue");
         if (ticket?.details?.error === "DeviceNotRegistered") {
           dead.push(batch[i].to);
         }
@@ -93,6 +116,7 @@ export async function pushToUsers(userIds, { title, body, data = {} } = {}) {
       // Une notification perdue n'est pas un message perdu : le message est
       // déjà en base et arrivera à l'ouverture de l'app. On ne remonte pas.
       console.error("push send error:", err.message);
+      noteError(err.message || "Réseau injoignable");
     }
   }
 
@@ -112,7 +136,24 @@ export async function pushToUsers(userIds, { title, body, data = {} } = {}) {
     );
   }
 
-  return accepted;
+  return {
+    devices: messages.length,
+    accepted,
+    failed: messages.length - accepted,
+    removed: dead.length,
+    errors: [...errors.entries()].map(([reason, count]) => ({ reason, count })),
+  };
+}
+
+/**
+ * Même envoi, mais on ne garde que le nombre de messages acceptés — la forme
+ * qu'attendent les appels courants (notifications d'activité, messages privés).
+ *
+ * @returns {Promise<number>}
+ */
+export async function pushToUsers(userIds, payload) {
+  const report = await sendPush(userIds, payload);
+  return report.accepted;
 }
 
 // Coupe le texte d'aperçu d'une notification : au-delà, le système tronque de

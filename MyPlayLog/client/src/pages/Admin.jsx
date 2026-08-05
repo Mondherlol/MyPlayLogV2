@@ -42,6 +42,7 @@ import {
   Globe2,
   CalendarDays,
   ScrollText,
+  BellRing,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { applyGeoGlobe } from "../lib/geoGlobe";
@@ -55,12 +56,14 @@ import MissionsPanel from "../components/AdminMissions";
 import EventsPanel from "../components/AdminEvents";
 import CollectionPanel from "../components/AdminCollection";
 import LogsPanel from "../components/AdminLogs";
+import PushPanel from "../components/AdminPush";
 
 // ======================================================================
 //  Page Admin — shell à onglets verticaux (façon Discord).
 // ======================================================================
 const TAB_KEYS = [
   "users",
+  "push",
   "rewards",
   "missions",
   "psn",
@@ -93,6 +96,7 @@ export default function Admin() {
 
   const TABS = [
     { key: "users", label: "Utilisateurs", Icon: Users },
+    { key: "push", label: "Notifications", Icon: BellRing },
     { key: "rewards", label: "Récompenses", Icon: Gift },
     { key: "missions", label: "Missions", Icon: Award },
     { key: "psn", label: "PlayStation", Icon: Trophy, badge: psnActive },
@@ -166,6 +170,7 @@ export default function Admin() {
 
         <section className="admin-panel">
           {safeTab === "users" && <UsersPanel token={token} me={user} />}
+          {safeTab === "push" && <PushPanel token={token} />}
           {safeTab === "rewards" && <RewardsPanel token={token} />}
           {safeTab === "missions" && <MissionsPanel token={token} />}
           {safeTab === "psn" && <PsnPanel token={token} />}

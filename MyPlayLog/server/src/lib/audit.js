@@ -43,6 +43,10 @@ const SKIP = [
   // Le journal lui-même : sans cette ligne, ouvrir l'onglet Logs écrirait une
   // ligne de log, qui rafraîchirait la vue, qui écrirait une ligne…
   /^\/api\/admin\/logs/,
+  // Les annonces push sont journalisées à la main dans routes/admin.js : la
+  // route seule sait ce qui a été écrit et à combien d'appareils c'est parti,
+  // et un essai adressé à soi-même ne mérite pas de ligne.
+  /^\/api\/admin\/push\/send$/,
 ];
 
 // --- Étiquettes lisibles ---

@@ -23,9 +23,11 @@ import GemSkip from "../models/GemSkip.js";
 import GemDiscovery from "../models/GemDiscovery.js";
 import Reward, { REWARD_TYPE_KEYS } from "../models/Reward.js";
 import ServerLog, { LOG_KINDS } from "../models/ServerLog.js";
+import Broadcast from "../models/Broadcast.js";
 import Message from "../models/Message.js";
 import Conversation from "../models/Conversation.js";
 import { logEvent, forgetAdmins } from "../lib/audit.js";
+import { sendPush } from "../lib/push.js";
 import { canUserDownload, isUserAdmin } from "../lib/admin.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { listEnv, setEnvVar, deleteEnvVar } from "../lib/envFile.js";
@@ -1331,6 +1333,172 @@ router.post("/events/sync", async (req, res) => {
     res.status(err.status || 500).json({ error: err.message, log });
   } finally {
     eventSyncRunning = false;
+  }
+});
+
+// ======================================================================
+//  Notifications push — annonces écrites depuis le panel
+// ======================================================================
+// De quoi prévenir tout le monde d'une nouveauté sans passer par un script.
+// Une notification push ne se rattrape pas : envoyée, elle a sonné sur le
+// téléphone des gens. D'où les garde-fous — l'envoi de test à soi-même, le
+// décompte des appareils affiché avant, et l'historique gardé après.
+
+const PUSH_TITLE_MAX = 60; // au-delà, Android tronque de toute façon
+const PUSH_BODY_MAX = 300;
+
+// GET /api/admin/push/audience — qui a l'app installée, et sur combien
+// d'appareils. C'est ce qui alimente la sélection nominative côté panel.
+router.get("/push/audience", async (_req, res) => {
+  try {
+    // `pushTokens` est en `select: false` dans le modèle (c'est une adresse
+    // d'appareil) : il faut le redemander explicitement.
+    const users = await User.find({ "pushTokens.0": { $exists: true } })
+      .select("+pushTokens username avatar lastSeenAt isAdmin isSuperAdmin")
+      .sort({ lastSeenAt: -1, username: 1 })
+      .lean();
+
+    const totalUsers = await User.estimatedDocumentCount();
+
+    res.json({
+      totalUsers,
+      reachable: users.length,
+      devices: users.reduce((n, u) => n + (u.pushTokens || []).length, 0),
+      users: users.map((u) => ({
+        id: u._id,
+        username: u.username,
+        avatar: u.avatar || null,
+        lastSeenAt: u.lastSeenAt || null,
+        isAdmin: !!u.isAdmin || !!u.isSuperAdmin,
+        devices: (u.pushTokens || []).length,
+        platforms: [...new Set((u.pushTokens || []).map((t) => t.platform))],
+      })),
+    });
+  } catch (err) {
+    console.error("admin push audience error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement de l'audience." });
+  }
+});
+
+// GET /api/admin/push/history — les dernières annonces envoyées.
+router.get("/push/history", async (_req, res) => {
+  try {
+    const items = await Broadcast.find()
+      .sort({ createdAt: -1 })
+      .limit(30)
+      .populate("sentBy", "username avatar")
+      .lean();
+
+    res.json({
+      items: items.map((b) => ({
+        id: b._id,
+        title: b.title,
+        body: b.body,
+        path: b.path || "",
+        audience: b.audience,
+        recipients: (b.recipients || []).map(String),
+        devices: b.devices,
+        accepted: b.accepted,
+        failed: b.failed,
+        errors: b.failures || [],
+        createdAt: b.createdAt,
+        sentBy: b.sentBy
+          ? { username: b.sentBy.username, avatar: b.sentBy.avatar || null }
+          : null,
+      })),
+    });
+  } catch (err) {
+    console.error("admin push history error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement de l'historique." });
+  }
+});
+
+// POST /api/admin/push/send — écrit et envoie l'annonce.
+//   audience: "test"     → à soi-même uniquement (rien n'est enregistré)
+//             "selected" → aux comptes cochés
+//             "all"      → à tous ceux qui ont un appareil enregistré
+router.post("/push/send", async (req, res) => {
+  try {
+    const title = String(req.body?.title || "").trim().slice(0, PUSH_TITLE_MAX) || "MyPlayLog";
+    const body = String(req.body?.body || "").trim().slice(0, PUSH_BODY_MAX);
+    const path = String(req.body?.path || "").trim();
+
+    if (!body) return res.status(400).json({ error: "Le message est vide." });
+    // Un chemin doit rester interne : la notification ouvre l'app mobile, pas
+    // un navigateur. Les parenthèses sont admises — expo-router s'en sert pour
+    // ses groupes de routes (« /(tabs)/explorer »). On refuse plutôt que de
+    // nettoyer en silence.
+    if (path && !/^\/[\w\-/.()]*$/.test(path))
+      return res
+        .status(400)
+        .json({ error: "La destination doit être un chemin interne (ex. /notifications)." });
+
+    const audience =
+      req.body?.audience === "test" || req.body?.audience === "selected"
+        ? req.body.audience
+        : "all";
+
+    let ids;
+    if (audience === "test") {
+      ids = [String(req.userId)];
+    } else if (audience === "selected") {
+      ids = [...new Set((req.body?.userIds || []).map(String))].filter((id) =>
+        mongoose.isValidObjectId(id)
+      );
+      if (!ids.length)
+        return res.status(400).json({ error: "Aucun destinataire sélectionné." });
+    } else {
+      const all = await User.find({ "pushTokens.0": { $exists: true } })
+        .select("_id")
+        .lean();
+      ids = all.map((u) => String(u._id));
+    }
+
+    if (!ids.length)
+      return res.status(400).json({ error: "Personne n'a encore l'app mobile installée." });
+
+    const report = await sendPush(ids, {
+      title,
+      body,
+      // `path` est lu par l'app mobile pour ouvrir le bon écran au tap ; sans
+      // lui, la notification se contente de ramener l'app au premier plan.
+      data: path ? { type: "broadcast", path } : { type: "broadcast" },
+    });
+
+    // Un test est un brouillon : on ne le garde pas dans l'historique, sinon
+    // trois essais de formulation y laisseraient trois fausses annonces.
+    let saved = null;
+    if (audience !== "test") {
+      saved = await Broadcast.create({
+        title,
+        body,
+        path,
+        audience,
+        recipients: audience === "selected" ? ids : [],
+        devices: report.devices,
+        accepted: report.accepted,
+        failed: report.failed,
+        failures: report.errors,
+        sentBy: req.userId,
+      });
+
+      logEvent({
+        kind: "admin",
+        label:
+          audience === "all"
+            ? "a envoyé une notification à tout le monde"
+            : `a envoyé une notification à ${ids.length} personne${ids.length > 1 ? "s" : ""}`,
+        actor: req.userId,
+        method: "POST",
+        path: "/api/admin/push/send",
+        meta: { title, body, audience, devices: report.devices, accepted: report.accepted },
+      });
+    }
+
+    res.json({ ...report, audience, recipients: ids.length, id: saved?._id || null });
+  } catch (err) {
+    console.error("admin push send error:", err.message);
+    res.status(500).json({ error: "Erreur lors de l'envoi." });
   }
 });
 

@@ -19626,3 +19626,443 @@ b.hf-dl-src {
     padding-left: 0.9rem;
   }
 }
+/* ======================================================================
+   Onglet Notifications du panel Admin (AdminPush.jsx)
+   ====================================================================== */
+
+/* --- Portée : combien de gens sont réellement joignables --- */
+.push-reach {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+.push-reach-stat {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 1 1 200px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  padding: 0.7rem 0.9rem;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+.push-reach-stat svg {
+  color: var(--orange);
+  flex: none;
+}
+.push-reach-stat strong {
+  font-size: 1.15rem;
+  color: var(--text);
+}
+
+.push-warn {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.9rem;
+  border: 1px solid rgba(242, 183, 11, 0.35);
+  border-radius: 10px;
+  background: rgba(242, 183, 11, 0.1);
+  padding: 0.6rem 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+.push-warn svg {
+  color: var(--orange);
+  flex: none;
+}
+
+.push-empty {
+  padding: 1.1rem 0;
+  text-align: center;
+  font-size: 0.87rem;
+  color: var(--text-soft);
+}
+
+/* --- Rédaction : le formulaire et son aperçu côte à côte --- */
+.push-compose {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 1.2rem;
+  align-items: start;
+}
+.push-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.push-fields input[type="text"],
+.push-fields textarea,
+.push-fields select {
+  width: 100%;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 0.55rem 0.7rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+.push-fields textarea {
+  resize: vertical;
+  min-height: 90px;
+  line-height: 1.45;
+}
+.push-fields input[type="text"]:focus,
+.push-fields textarea:focus,
+.push-fields select:focus {
+  outline: none;
+  border-color: var(--orange);
+}
+.push-count {
+  align-self: flex-end;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+}
+.push-count.warn {
+  color: var(--orange);
+}
+
+/* L'aperçu imite un bandeau de notification : c'est le seul moyen de juger une
+   formulation avant qu'elle ne parte. */
+.push-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  position: sticky;
+  top: 1rem;
+}
+.push-preview-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.push-preview-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+  padding: 0.75rem 0.85rem;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.09);
+}
+.push-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.7rem;
+  color: var(--text-soft);
+  margin-bottom: 0.35rem;
+}
+.push-preview-icon {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  background: var(--orange);
+  color: #191919;
+}
+.push-preview-title {
+  display: block;
+  font-size: 0.88rem;
+  line-height: 1.3;
+}
+.push-preview-body {
+  margin: 0.15rem 0 0;
+  font-size: 0.83rem;
+  line-height: 1.4;
+  color: var(--text-soft);
+  /* Android coupe à deux lignes dans le bandeau replié : l'aperçu ment moins
+     en faisant pareil. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* --- Choix de l'audience --- */
+.push-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+.push-mode {
+  flex: 1 1 200px;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 0.75rem 0.9rem;
+  text-align: left;
+}
+.push-mode svg {
+  flex: none;
+  color: var(--text-soft);
+}
+.push-mode span {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+.push-mode strong {
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.push-mode.active {
+  border-color: var(--orange);
+  background: rgba(242, 183, 11, 0.09);
+}
+.push-mode.active svg {
+  color: var(--orange);
+}
+
+.push-picker {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+.push-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface-2);
+  padding: 0 0.4rem 0 0.7rem;
+  margin-bottom: 0.7rem;
+}
+.push-search svg {
+  color: var(--text-soft);
+  flex: none;
+}
+.push-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  padding: 0.55rem 0;
+  font-size: 0.9rem;
+}
+.push-search input:focus {
+  outline: none;
+}
+
+.push-user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.push-user {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+}
+.push-user:hover {
+  background: var(--surface-2);
+}
+.push-user.on {
+  background: rgba(242, 183, 11, 0.11);
+}
+.push-check {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  flex: none;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 5px;
+  color: #191919;
+}
+.push-user.on .push-check {
+  border-color: var(--orange);
+  background: var(--orange);
+}
+.push-user img,
+.push-user i {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.push-user i {
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-style: normal;
+  color: var(--text-soft);
+}
+.push-user-name {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.push-user-name em {
+  font-style: normal;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--orange);
+}
+.push-user-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: none;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+}
+
+/* --- La barre d'envoi --- */
+.push-send {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9rem;
+}
+.push-send-info {
+  flex: 1 1 240px;
+  display: flex;
+  flex-direction: column;
+}
+.push-send-info strong {
+  font-size: 0.98rem;
+}
+.push-send-info span {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+.push-send-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+/* L'étape de confirmation change de couleur : le bouton n'a plus le même sens
+   qu'une seconde plus tôt, il doit se voir. */
+.btn.push-confirm {
+  background: var(--danger, #c0392b);
+  border-color: var(--danger, #c0392b);
+  color: #fff;
+}
+
+.push-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.7rem 0.8rem;
+  font-size: 0.86rem;
+}
+.push-result > svg {
+  flex: none;
+  margin-top: 0.1rem;
+}
+.push-result div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.push-result span {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+.push-result.ok {
+  border-color: rgba(46, 160, 67, 0.4);
+  background: rgba(46, 160, 67, 0.1);
+}
+.push-result.ok > svg {
+  color: #2ea043;
+}
+.push-result.partial {
+  border-color: rgba(242, 183, 11, 0.4);
+  background: rgba(242, 183, 11, 0.1);
+}
+.push-result.partial > svg {
+  color: var(--orange);
+}
+
+/* --- Historique --- */
+.push-history {
+  display: flex;
+  flex-direction: column;
+}
+.push-hist-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 0;
+}
+.push-hist-row:last-child {
+  border-bottom: none;
+}
+.push-hist-main {
+  flex: 1;
+  min-width: 0;
+}
+.push-hist-main strong {
+  font-size: 0.9rem;
+}
+.push-hist-main p {
+  margin: 0.1rem 0 0.25rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--text-soft);
+}
+.push-hist-meta {
+  font-size: 0.74rem;
+  color: var(--text-soft);
+  opacity: 0.85;
+}
+
+@media (max-width: 860px) {
+  .push-compose {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .push-preview {
+    position: static;
+    max-width: 320px;
+  }
+}
+
+@media (max-width: 640px) {
+  .push-send-actions {
+    width: 100%;
+  }
+  .push-send-actions .btn {
+    flex: 1;
+    justify-content: center;
+  }
+  /* La colonne « appareils / dernière visite » saute : le nom suffit à choisir
+     qui cocher sur un écran étroit. */
+  .push-user-meta {
+    display: none;
+  }
+}
