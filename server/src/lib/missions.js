@@ -676,6 +676,33 @@ function publicMission(m) {
   };
 }
 
+// ----------------------------------------------------------------------
+//  Rareté d'un badge : la part des joueurs qui l'ont décroché.
+// ----------------------------------------------------------------------
+// C'est ce qui donne sa valeur à un badge — « 3 % des joueurs l'ont » se lit
+// d'un coup d'œil là où « 1 sur 34 » demande de calculer. Deux agrégats pour
+// TOUT le catalogue, mis en cache : sans ça, afficher la page des badges
+// coûterait une trentaine de `countDocuments` à chaque ouverture.
+const RARITY_TTL = 10 * 60 * 1000;
+let rarityCache = { at: 0, map: new Map(), players: 0 };
+
+export async function missionRarity() {
+  if (Date.now() - rarityCache.at < RARITY_TTL) return rarityCache;
+  const [rows, players] = await Promise.all([
+    MissionAward.aggregate([
+      { $group: { _id: "$missionKey", holders: { $addToSet: "$user" } } },
+      { $project: { holders: { $size: "$holders" } } },
+    ]),
+    User.estimatedDocumentCount(),
+  ]);
+  rarityCache = {
+    at: Date.now(),
+    map: new Map(rows.map((r) => [r._id, r.holders])),
+    players: Math.max(players, 1),
+  };
+  return rarityCache;
+}
+
 // Champs de User que lisent les `progress` (et le solde affiché).
 const USER_FIELDS =
   "following inventory steam psn points equipped favoritePlatforms favoriteCompanies missionFlags covers cover ostOrder asideConfig bio tagline streak";
@@ -755,12 +782,13 @@ export async function claimMission(userId, missionKey) {
 // clés dans `newlyReady` → le client peut le signaler tout de suite. Sans
 // `award` (profil d'un autre joueur), on ne fait que lire.
 export async function evaluateMissions(targetUserId, { award = false } = {}) {
-  const [user, awards, overrides] = await Promise.all([
+  const [user, awards, overrides, rarity] = await Promise.all([
     User.findById(targetUserId).select(USER_FIELDS),
     MissionAward.find({ user: targetUserId })
       .select("missionKey status readyAt claimedAt")
       .lean(),
     getOverrides(),
+    missionRarity(),
   ]);
   if (!user)
     return { missions: [], balance: 0, done: 0, claimed: 0, claimable: 0, newlyReady: [] };
@@ -798,6 +826,11 @@ export async function evaluateMissions(targetUserId, { award = false } = {}) {
       claimable: !!existing && !claimed,
       readyAt: existing?.readyAt || null,
       claimedAt: existing?.claimedAt || null,
+      // Rareté : part des joueurs qui l'ont décroché, et leur nombre. Un badge
+      // que personne n'a vaut 0 — pas `null`, pour que le client n'ait pas à
+      // distinguer « inconnu » de « personne ».
+      holders: rarity.map.get(m.key) || 0,
+      rarity: Math.round(((rarity.map.get(m.key) || 0) / rarity.players) * 1000) / 10,
     });
   }
 

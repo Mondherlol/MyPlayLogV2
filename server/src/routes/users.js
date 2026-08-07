@@ -26,6 +26,8 @@ import { recordActivity, removeActivity } from "../lib/activity.js";
 import { FEED_KEYS } from "../lib/feedCategories.js";
 import { evaluateMissions, countBadges, triggerMissionCheck } from "../lib/missions.js";
 import { notify } from "../lib/notify.js";
+import { onlineAmong } from "../lib/realtime.js";
+import { shrinkImage } from "../lib/imageResize.js";
 import {
   privacyOf,
   blockIfPrivate,
@@ -458,7 +460,8 @@ router.put("/me/c411", requireAuth, async (req, res) => {
 router.post("/me/avatar", requireAuth, upload.single("avatar"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "Image manquante ou invalide." });
-    const url = `${req.protocol}://${req.get("host")}/uploads/avatars/${req.file.filename}`;
+    const file = await shrinkImage(req.file.path, { maxWidth: 900, quality: 4 });
+    const url = `${req.protocol}://${req.get("host")}/uploads/avatars/${path.basename(file)}`;
     const user = await User.findByIdAndUpdate(
       req.userId,
       { $set: { avatar: url } },
@@ -477,7 +480,8 @@ router.post("/me/avatar", requireAuth, upload.single("avatar"), async (req, res)
 router.post("/me/cover", requireAuth, coverUpload.single("cover"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "Image manquante ou invalide." });
-    const url = `${req.protocol}://${req.get("host")}/uploads/covers/${req.file.filename}`;
+    const file = await shrinkImage(req.file.path, { maxWidth: 1920, quality: 5 });
+    const url = `${req.protocol}://${req.get("host")}/uploads/covers/${path.basename(file)}`;
     res.json({ url });
   } catch (err) {
     console.error("cover upload error:", err.message);
@@ -1911,6 +1915,10 @@ router.get("/:username", optionalAuth, async (req, res) => {
         favoriteCompanies: user.favoriteCompanies || [],
         createdAt: user.createdAt,
         lastSeenAt: user.lastSeenAt || null,
+        // Pastille verte du profil. `lastSeenAt` seul ne suffit pas : il n'est
+        // écrit qu'en fin de session, donc quelqu'un d'actif à l'instant même
+        // y apparaîtrait comme « vu il y a 20 minutes ».
+        online: onlineAmong([user._id]).has(String(user._id)),
         isMe,
         isFollowing,
         // Ce profil est-il abonné à MOI ? (autorise le bouton « Message » :
