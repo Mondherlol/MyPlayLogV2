@@ -89,18 +89,21 @@ export const fileFor = (id) => path.join(CACHE_DIR, `${id}.m4a`);
 //  Appel de yt-dlp
 // ----------------------------------------------------------------------
 
-function baseArgs() {
+// `clients` n'est renseigné que par le diagnostic, pour essayer une autre liste
+// que celle en service sans redéployer ni redémarrer le conteneur.
+function baseArgs(clients = CLIENTS) {
   const args = [
     "--no-playlist",
     "--no-progress",
     "--no-warnings",
-    "--extractor-args",
-    `youtube:player_client=${CLIENTS}`,
     "--retries",
     "3",
     "--socket-timeout",
     "15",
   ];
+  // Liste vide = on laisse yt-dlp choisir ses clients par défaut, qui suivent
+  // l'état du jour de l'anti-bot de YouTube mieux qu'une liste figée ici.
+  if (clients) args.push("--extractor-args", `youtube:player_client=${clients}`);
   // Une clé d'extracteur par option : les cumuler dans un seul `--extractor-args`
   // écraserait la précédente.
   if (POT_URL)
@@ -234,6 +237,27 @@ async function resolveUrl(id) {
 
   resolving.set(id, p);
   return p;
+}
+
+// Résolution nue, sans cache ni dédoublonnage, avec la liste de clients qu'on
+// veut : c'est le banc d'essai du diagnostic. Passer par `resolveUrl` fausserait
+// la mesure (un essai réussi masquerait les suivants via le cache mémoire).
+async function probe(id, clients) {
+  const out = await run(
+    [
+      ...baseArgs(clients),
+      "-f",
+      FORMAT,
+      "--print",
+      "%(format_id)s",
+      "--simulate",
+      `https://www.youtube.com/watch?v=${id}`,
+    ],
+    60000
+  );
+  const formatId = out.trim().split("\n").filter(Boolean).pop();
+  if (!formatId) throw new Error("aucun format sélectionné.");
+  return { formatId };
 }
 
 // ----------------------------------------------------------------------
@@ -475,6 +499,47 @@ router.get("/diag/:videoId", requireAuth, requireAdmin, async (req, res) => {
       out.potPlugin = `indéterminé (${err.message.slice(0, 120)})`;
     }
   }
+  // ?clients=a,b,c — essaie CETTE liste au lieu de celle en service, sans rien
+  // redéployer ni redémarrer. `?clients=auto` laisse yt-dlp choisir la sienne.
+  // Une seule liste vraiment fonctionnelle suffit : on la recopie ensuite dans
+  // YTDLP_CLIENTS depuis l'onglet Secrets.
+  // ?all=1 les essaie toutes à la suite et dit laquelle passe.
+  const asked = req.query.clients;
+  const suite =
+    req.query.all === "1"
+      ? ["", "web_safari", "mweb", "tv", "tv_simply", "android_vr", "ios", "web"]
+      : asked != null
+        ? [asked === "auto" ? "" : String(asked)]
+        : null;
+
+  if (suite) {
+    out.essais = [];
+    for (const clients of suite) {
+      const t = Date.now();
+      try {
+        const r = await probe(id, clients);
+        out.essais.push({
+          clients: clients || "(défaut yt-dlp)",
+          ok: true,
+          ms: Date.now() - t,
+          formatId: r.formatId,
+        });
+      } catch (err) {
+        out.essais.push({
+          clients: clients || "(défaut yt-dlp)",
+          ok: false,
+          ms: Date.now() - t,
+          error: err.message.slice(0, 200),
+        });
+      }
+    }
+    const gagnants = out.essais.filter((e) => e.ok).map((e) => e.clients);
+    out.verdict = gagnants.length
+      ? `à mettre dans YTDLP_CLIENTS : ${gagnants.join(",")}`
+      : "aucune liste ne passe — il faut des cookies ou une autre IP de sortie";
+    return res.json(out);
+  }
+
   const t0 = Date.now();
   try {
     const src = await resolveUrl(id);
