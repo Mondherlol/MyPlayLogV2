@@ -67,6 +67,10 @@ const COOKIES = process.env.YTDLP_COOKIES || "";
 // Proxy facultatif, même logique que pour l'API PSN : si l'IP du VPS finit par
 // être bloquée pour de bon, on fait sortir yt-dlp ET le relais par ailleurs.
 const YT_PROXY = process.env.YTDLP_PROXY || "";
+// Générateur de PO token (service `potoken` du docker-compose). Sans lui,
+// YouTube répond « Sign in to confirm you're not a bot » à une requête sur deux
+// depuis l'IP du VPS — vérifié en prod, c'est LA panne d'origine.
+const POT_URL = (process.env.POT_PROVIDER_URL || "").replace(/\/+$/, "");
 
 // Le format 140 (m4a 128k) existe sur quasiment toutes les vidéos : pas de
 // conversion, donc rien à ré-encoder, donc un flux qu'on peut relayer tel quel.
@@ -97,6 +101,10 @@ function baseArgs() {
     "--socket-timeout",
     "15",
   ];
+  // Une clé d'extracteur par option : les cumuler dans un seul `--extractor-args`
+  // écraserait la précédente.
+  if (POT_URL)
+    args.push("--extractor-args", `youtubepot-bgutilhttp:base_url=${POT_URL}`);
   if (COOKIES && fs.existsSync(COOKIES)) args.push("--cookies", COOKIES);
   if (YT_PROXY) args.push("--proxy", YT_PROXY);
   return args;
@@ -114,6 +122,25 @@ function run(args, timeout = 60000) {
             new Error(String(stderr || err.message).trim().slice(0, 800))
           );
         resolve(String(stdout));
+      }
+    );
+  });
+}
+
+// Comme `run`, mais rend TOUT ce que yt-dlp a écrit, y compris quand il
+// réussit. Réservé au diagnostic : c'est le seul moyen de lire les lignes
+// `[debug]` du mode bavard, qui n'apparaissent que sur la sortie d'erreur.
+function runVerbose(args, timeout = 60000) {
+  return new Promise((resolve, reject) => {
+    execFile(
+      YTDLP,
+      args,
+      { timeout, maxBuffer: 8 * 1024 * 1024 },
+      (err, stdout, stderr) => {
+        const all = `${stdout}\n${stderr}`;
+        if (err && !all.includes("[pot]"))
+          return reject(new Error(String(stderr || err.message).trim().slice(0, 500)));
+        resolve(all);
       }
     );
   });
@@ -416,6 +443,37 @@ router.get("/diag/:videoId", requireAuth, requireAdmin, async (req, res) => {
     out.version = (await run(["--version"], 20000)).trim();
   } catch (err) {
     out.version = `introuvable (${err.message})`;
+  }
+
+  // Le générateur de PO token répond-il ? Trois choses peuvent clocher
+  // indépendamment : le conteneur ne tourne pas, il tourne mais yt-dlp ne
+  // connaît pas le plugin, ou les deux vont bien. On les distingue ici.
+  out.potUrl = POT_URL || null;
+  if (!POT_URL) out.potProvider = "non configuré";
+  else {
+    try {
+      const r = await fetch(`${POT_URL}/ping`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      out.potProvider = r.ok ? "joignable" : `répond ${r.status}`;
+    } catch (err) {
+      out.potProvider = `injoignable — ${err.message}`;
+    }
+    // yt-dlp annonce ses fournisseurs de jeton en mode bavard :
+    //   [debug] [youtube] [pot] PO Token Providers: bgutil:http-1.3.1 (external)
+    // Absent = le plugin n'est pas installé dans l'image, et le conteneur ne
+    // sert alors à rien même s'il tourne.
+    try {
+      const log = await runVerbose(
+        [...baseArgs(), "-f", FORMAT, "--simulate", "-q", "-v",
+         `https://www.youtube.com/watch?v=${id}`],
+        60000
+      );
+      const line = /\[pot\][^\n]*/.exec(log);
+      out.potPlugin = line ? line[0].trim() : "plugin non détecté par yt-dlp";
+    } catch (err) {
+      out.potPlugin = `indéterminé (${err.message.slice(0, 120)})`;
+    }
   }
   const t0 = Date.now();
   try {
