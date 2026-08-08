@@ -22,6 +22,7 @@ import {
   Timer,
   UserPlus,
   Users,
+  Volume1,
   Volume2,
   VolumeX,
   X,
@@ -97,6 +98,15 @@ export default function BlindTestVersus() {
   const [typers, setTypers] = useState({});
   const [ranking, setRanking] = useState(null);
   const [muted, setMuted] = useState(false);
+  // MÊME RÉGLAGE QU'EN SOLO, même clé de stockage : c'est le même jeu, on ne
+  // remonte pas le son deux fois. (`getItem` rend `null` quand rien n'est
+  // stocké, et `Number(null)` vaut 0 — d'où le test explicite de l'absence,
+  // sinon la toute première partie démarre muette.)
+  const [volume, setVolume] = useState(() => {
+    const raw = localStorage.getItem("bt_volume");
+    const v = raw == null ? NaN : Number(raw);
+    return Number.isFinite(v) && v >= 0 && v <= 100 ? v : 100;
+  });
   const [clipReady, setClipReady] = useState(false);
   // Le son n'a PAS démarré, et on sait pourquoi : soit l'extrait n'est pas
   // arrivé (`clipError`), soit le navigateur a refusé la lecture (`soundBlocked`
@@ -112,6 +122,7 @@ export default function BlindTestVersus() {
   const offsetRef = useRef(0);
   const audioRef = useRef(null);
   const mutedRef = useRef(false); // miroir de la sourdine (cf. le départ du son)
+  const volumeRef = useRef(volume); // idem pour le volume
   const unlockedRef = useRef(false); // déverrouillage iOS déjà fait
   const clipStartRef = useRef(0); // où l'extrait commence dans le morceau (s)
   const roundRef = useRef(null); // la manche courante, lue par les écouteurs audio
@@ -120,6 +131,10 @@ export default function BlindTestVersus() {
   // (voir le commentaire de l'effet de téléchargement).
   const phaseStartRef = useRef(0);
   const serverNowRef = useRef(() => Date.now());
+
+  // L'icône suit le niveau : coupé, faible, fort — on lit l'état sans lire le
+  // curseur.
+  const VolIcon = muted || volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
 
   const meId = user?.id ? String(user.id) : "";
   const phase = room?.phase || "lobby";
@@ -369,6 +384,7 @@ export default function BlindTestVersus() {
     try {
       if (Math.abs((el.currentTime || 0) - target) > 0.35) el.currentTime = target;
       el.muted = mutedRef.current;
+      el.volume = volumeRef.current / 100;
       // Un refus de lecture n'est PAS avalé en silence : il allume le bouton
       // « appuie pour lancer le son » (un vrai geste débloque toujours).
       el.play().then(
@@ -412,6 +428,14 @@ export default function BlindTestVersus() {
     if (audioRef.current) audioRef.current.muted = muted;
     sfx.setMuted(muted);
   }, [muted, sfx]);
+
+  // Volume : l'extrait ET les bruitages, retenu pour la prochaine partie.
+  useEffect(() => {
+    volumeRef.current = volume;
+    localStorage.setItem("bt_volume", String(volume));
+    sfx.setLevel(volume / 100);
+    if (audioRef.current) audioRef.current.volume = volume / 100;
+  }, [volume, sfx]);
 
   // Battement pour les chronos.
   useEffect(() => {
@@ -482,6 +506,7 @@ export default function BlindTestVersus() {
     try {
       el.currentTime = (clipStartRef.current || 0) + elapsed;
       el.muted = mutedRef.current;
+      el.volume = volumeRef.current / 100;
       el.play().then(
         () => setSoundBlocked(false),
         () => {}
@@ -686,13 +711,29 @@ export default function BlindTestVersus() {
         <div className="bt-brand">
           <Swords size={17} /> Blind Test — Buzzer
         </div>
-        <button
-          className="bt-vol-btn clickable"
-          onClick={() => setMuted((m) => !m)}
-          title={muted ? "Réactiver le son" : "Couper le son"}
-        >
-          {muted ? <VolumeX size={17} /> : <Volume2 size={17} />}
-        </button>
+        <div className="bt-volume">
+          <button
+            className="bt-vol-btn clickable"
+            onClick={() => setMuted((m) => !m)}
+            title={muted ? "Réactiver le son" : "Couper le son"}
+          >
+            <VolIcon size={17} />
+          </button>
+          <input
+            type="range"
+            className="bt-vol-slider clickable"
+            min="0"
+            max="100"
+            value={muted ? 0 : volume}
+            style={{ "--bt-vol-pct": `${muted ? 0 : volume}%` }}
+            aria-label="Volume"
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setVolume(v);
+              if (muted && v > 0) setMuted(false);
+            }}
+          />
+        </div>
       </header>
 
       <div className="bt-body">
