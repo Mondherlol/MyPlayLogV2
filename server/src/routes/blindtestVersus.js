@@ -1,4 +1,5 @@
 import express from "express";
+import jwt from "jsonwebtoken";
 import BlindTestVersus, { MAX_PLAYERS, LIVES } from "../models/BlindTestVersus.js";
 import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -47,7 +48,29 @@ import {
 //      tout le monde au même instant.
 const router = express.Router();
 
+// ENREGISTRÉE AVANT `requireAuth`, et c'est délibéré : une balise <audio> ne
+// sait pas poser d'en-tête Authorization. Elle passe donc son jeton en query,
+// exactement comme le flux SSE de la messagerie (`/api/chat/stream?token=…`),
+// et le handler vérifie lui-même. C'est ce qui permet de LIRE EN FLUX au lieu
+// de télécharger l'extrait entier avant d'entendre la première note.
+router.get("/:code/clip/:index", serveClip);
+
 router.use(requireAuth);
+
+// Le jeton, d'où qu'il vienne : en-tête pour les appels normaux, query pour ce
+// que le navigateur charge tout seul (audio, image…).
+function userIdFrom(req) {
+  const header = req.headers.authorization || "";
+  const raw = header.startsWith("Bearer ")
+    ? header.slice(7)
+    : String(req.query.token || "");
+  if (!raw) return null;
+  try {
+    return jwt.verify(raw, process.env.JWT_SECRET).sub;
+  } catch {
+    return null;
+  }
+}
 
 const CLIP_SEC = 15;
 const GRACE_MS = 10000;
@@ -266,11 +289,15 @@ function warmClips(room) {
 // GET /clip/:index — l'extrait, en audio pur. Réservé aux joueurs du salon, et
 // seulement pour la manche EN COURS : demander l'extrait de la manche 5 pendant
 // la manche 2 reviendrait à écouter la suite en avance.
-router.get("/:code/clip/:index", async (req, res) => {
+//
+// Enregistrée tout en haut du fichier, hors de `requireAuth` (voir `userIdFrom`).
+async function serveClip(req, res) {
   try {
+    const userId = userIdFrom(req);
+    if (!userId) return res.status(401).json({ error: "Non authentifié." });
     const room = await loadRoom(req.params.code);
     if (!room) return res.status(404).json({ error: "Salon introuvable." });
-    if (!allIds(room).includes(String(req.userId)))
+    if (!allIds(room).includes(String(userId)))
       return res.status(403).json({ error: "Tu ne joues pas ici." });
     const i = Number(req.params.index);
     if (!Number.isInteger(i) || i !== room.index)
@@ -284,9 +311,9 @@ router.get("/:code/clip/:index", async (req, res) => {
     await serveTrack(round.videoId, req, res, "private, no-store");
   } catch (err) {
     console.error("btversus clip error:", err.message);
-    res.status(500).json({ error: "Extrait illisible." });
+    if (!res.headersSent) res.status(500).json({ error: "Extrait illisible." });
   }
-});
+}
 
 // ============================================================
 //  Le déroulé d'une manche

@@ -55,10 +55,16 @@ import { VersusFace, VersusRail, VersusInvite, HUES } from "../components/Versus
 // vidéo, ce qui lui donne son titre — donc la réponse. Ici l'extrait arrive de
 // NOTRE serveur, en audio pur, sous une adresse qui ne dit rien.
 //
-// Et il est TÉLÉCHARGÉ EN ENTIER pendant le sas, pas lu en flux : c'est
-// précisément ce qu'on veut d'un décompte de départ. Quand le « 1 » tombe, le
-// fichier est déjà dans la mémoire du navigateur et tout le monde entend la
-// première note au même instant — personne ne subit son propre tampon.
+// Il est LU EN FLUX, comme en solo. Il a longtemps été téléchargé en entier
+// avant de jouer la moindre note — plusieurs mégaoctets d'attente — pour une
+// raison qui n'avait rien de musical : son adresse exige un jeton, qu'une
+// balise <audio> ne sait pas mettre en en-tête. Le jeton passe désormais en
+// query (comme le flux SSE de la messagerie) et la balise fait son travail.
+//
+// Ce qu'on voulait vraiment du sas — que personne n'attende son propre tampon —
+// est obtenu autrement, et mieux : dès que la durée du morceau est connue, on
+// pose l'aiguille SUR LE CLIMAX pendant le décompte. Le navigateur remplit son
+// tampon à cet endroit précis, et au « go » il ne reste qu'un `play()`.
 const LIVES = 3;
 const HINT_FRACS = [0.35, 0.55, 0.75];
 // Mini wav silencieux, joué en muet dans le geste d'entrée pour déverrouiller
@@ -105,10 +111,11 @@ export default function BlindTestVersus() {
   const suggestRef = useRef(null);
   const offsetRef = useRef(0);
   const audioRef = useRef(null);
-  const urlRef = useRef(null);
   const mutedRef = useRef(false); // miroir de la sourdine (cf. le départ du son)
   const unlockedRef = useRef(false); // déverrouillage iOS déjà fait
   const clipStartRef = useRef(0); // où l'extrait commence dans le morceau (s)
+  const roundRef = useRef(null); // la manche courante, lue par les écouteurs audio
+  const metaForRef = useRef(null); // clip dont la durée est connue
   // Miroirs lus par le départ du son, qui ne doit dépendre QUE de l'extrait
   // (voir le commentaire de l'effet de téléchargement).
   const phaseStartRef = useRef(0);
@@ -117,6 +124,7 @@ export default function BlindTestVersus() {
   const meId = user?.id ? String(user.id) : "";
   const phase = room?.phase || "lobby";
   const round = room?.round || null;
+  roundRef.current = round;
   phaseStartRef.current = room?.phaseStartsAt || 0;
   const players = useMemo(() => room?.players || [], [room]);
   const me = players.find((p) => p.isMe) || null;
@@ -267,139 +275,121 @@ export default function BlindTestVersus() {
   }, [subscribe, code, applyRoom, meId, sfx]);
 
   // ---------- L'extrait ----------
-  // Téléchargé EN ENTIER pendant le sas (cf. l'en-tête). On passe par fetch et
-  // non par `<audio src>` parce que l'adresse est protégée : une balise audio ne
-  // sait pas poser d'en-tête Authorization.
+  // LU EN FLUX, exactement comme en solo. Il était auparavant TÉLÉCHARGÉ EN
+  // ENTIER (fetch → blob → objectURL) parce que son adresse exige un en-tête
+  // Authorization qu'une balise <audio> ne sait pas poser. C'était payer très
+  // cher un détail d'authentification : plusieurs mégaoctets à charger avant
+  // d'entendre la moindre note. Le jeton passe maintenant en query (comme le
+  // flux SSE de la messagerie) et la balise s'occupe du reste.
   //
-  // ⚠️ CE QUI TUAIT LE SON DU MODE MULTI — la vraie cause, trouvée après deux
-  // fausses pistes. Cet effet dépendait de `phase`. Or `phase` passe de « cue »
-  // à « round » PENDANT le téléchargement : React nettoyait donc l'effet, le
-  // `ac.abort()` coupait le fetch en cours… puis un garde-fou anti-doublon
-  // (une ref sur l'index de manche) empêchait de le relancer. L'extrait
-  // n'arrivait JAMAIS, `clipReady` restait faux, et rien ne jouait — sans même
-  // un message d'erreur, puisque l'abandon était traité comme un démontage.
-  // Ça n'échouait que lorsque le téléchargement dépassait le sas : sur une
-  // bonne connexion en local il passait juste, en vrai jamais.
+  // Et c'est ce téléchargement qui tuait le son du mode multi : l'effet
+  // dépendait de `phase`, or `phase` passe de « cue » à « round » PENDANT le
+  // chargement — React nettoyait l'effet, `abort()` coupait le fetch, et un
+  // garde-fou anti-doublon empêchait de le relancer. Silence total, sans même
+  // un message. En flux, il n'y a plus rien à abandonner.
   //
-  // LA RÈGLE : cet effet ne dépend que de CE QU'IL TÉLÉCHARGE. `round.clip`
-  // contient déjà le code du salon et l'index de la manche, donc il change à
-  // chaque manche et à rien d'autre — et il redevient `undefined` en passant
-  // par le salon, ce qui relance proprement le téléchargement d'une revanche
-  // (pour TOUT LE MONDE, pas seulement l'hôte qui a cliqué « on rejoue »).
+  // LA RÈGLE QUI RESTE : cet effet ne dépend que de CE QU'IL CHARGE.
+  // `round.clip` porte déjà le code du salon et l'index de la manche, et il
+  // redevient `undefined` en repassant par le salon — ce qui recharge
+  // proprement une revanche pour TOUT LE MONDE, pas seulement pour l'hôte.
   useEffect(() => {
-    if (!round?.clip) return undefined;
+    const el = audioRef.current;
+    if (!el || !round?.clip) return undefined;
     setClipReady(false);
     setClipError(false);
     setSoundBlocked(false);
-    let dead = false;
-    const ac = new AbortController();
-
-    (async () => {
-      try {
-        const res = await fetch(`${API_BASE}${round.clip}`, {
-          headers: { Authorization: `Bearer ${token}` },
-          signal: ac.signal,
-        });
-        if (!res.ok) throw new Error("clip indisponible");
-        const blob = await res.blob();
-        if (dead) return;
-        if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-        urlRef.current = URL.createObjectURL(blob);
-        const el = audioRef.current;
-        if (!el) return;
-        el.src = urlRef.current;
-        el.load();
-        setClipReady(true);
-      } catch {
-        // Sans extrait, la manche se joue en silence : frustrant mais pas
-        // bloquant, et le serveur enchaîne de toute façon. On le dit à l'écran
-        // plutôt que de laisser croire à un bug de son côté.
-        if (!dead) {
-          setClipReady(false);
-          setClipError(true);
-        }
-      }
-    })();
-
-    return () => {
-      dead = true;
-      ac.abort();
-    };
+    metaForRef.current = null;
+    el.src = `${API_BASE}${round.clip}?token=${encodeURIComponent(token)}`;
+    el.load();
+    return undefined;
   }, [round?.clip, token]);
 
-  // Départ du son : à l'instant exact décidé par le serveur, on pose l'aiguille
-  // sur le climax et on lance. Le son s'arrête à la fin de l'extrait — le temps
-  // bonus se joue en silence, comme en solo.
+  // Le tampon se remplit AU CLIMAX, pas au début du morceau : dès que la durée
+  // est connue, on pose l'aiguille là où l'extrait commencera. Au « go », il ne
+  // reste qu'un `play()` — personne n'attend son propre tampon.
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return undefined;
+
+    const onMeta = () => {
+      const r = roundRef.current;
+      const dur = el.duration;
+      if (!r || !isFinite(dur) || dur <= 0) return;
+      const clip = r.durationSec || 15;
+      clipStartRef.current = Math.min(
+        (r.startFrac || 0.4) * dur,
+        Math.max(0, dur - clip - 1)
+      );
+      metaForRef.current = r.clip;
+      try {
+        el.currentTime = clipStartRef.current;
+      } catch {
+        /* ignore */
+      }
+    };
+    const onCanPlay = () => {
+      if (metaForRef.current === roundRef.current?.clip) setClipReady(true);
+    };
+    const onError = () => {
+      setClipReady(false);
+      setClipError(true);
+    };
+
+    el.addEventListener("loadedmetadata", onMeta);
+    el.addEventListener("canplay", onCanPlay);
+    el.addEventListener("error", onError);
+    return () => {
+      el.removeEventListener("loadedmetadata", onMeta);
+      el.removeEventListener("canplay", onCanPlay);
+      el.removeEventListener("error", onError);
+    };
+  }, []);
+
+  // Départ du son, à l'instant décidé par le serveur. Le son s'arrête à la fin
+  // de l'extrait — le temps bonus se joue en silence, comme en solo.
   //
-  // DEUX BOGUES VÉCUS, tous deux réparés ici, et il faut les connaître avant de
-  // retoucher cet effet :
+  // `clipReady` (canplay) garantit que la durée de CE morceau est connue, donc
+  // que `clipStartRef` pointe sur le bon climax. S'il devient vrai en pleine
+  // manche (flux lent), l'effet rejoue et rattrape le retard.
   //
-  //  1. ON NE PEUT PAS LIRE `el.duration` JUSTE APRÈS `el.load()`. Le décodage
-  //     de l'en-tête est asynchrone : la durée valait `NaN` neuf fois sur dix
-  //     quand l'effet passait, l'ancien `if (dur > 0)` tombait à l'eau… et rien
-  //     ne le relançait. La manche se jouait alors en silence complet — c'est
-  //     LA raison pour laquelle « le son ne se lance juste pas » en multi. On
-  //     attend donc `loadedmetadata` quand la durée n'est pas encore là.
-  //
-  //  2. LA SOURDINE NE DOIT PAS ÊTRE UNE DÉPENDANCE. Elle l'était : couper puis
-  //     remettre le son relançait l'effet, donc REPARTAIT l'extrait du début, au
-  //     milieu de la manche. Le mute vit dans son propre effet (plus bas) et se
-  //     lit ici par une ref.
+  // LA SOURDINE N'EST PAS UNE DÉPENDANCE : elle l'a été, et couper puis remettre
+  // le son REPARTAIT l'extrait du début au milieu de la manche. Elle vit dans
+  // son propre effet, plus bas, et se lit ici par une ref.
   useEffect(() => {
     const el = audioRef.current;
     if (!el || phase !== "round" || !clipReady || !round) return undefined;
-    let stop = null;
-    let dead = false;
 
-    const launch = () => {
-      if (dead) return;
-      const dur = el.duration;
-      if (!isFinite(dur) || dur <= 0) return; // pas encore : on attend l'évènement
-      el.removeEventListener("loadedmetadata", launch);
-      const clip = round.durationSec || 15;
-      const start = Math.min((round.startFrac || 0.4) * dur, Math.max(0, dur - clip - 1));
-      clipStartRef.current = start;
+    const clip = round.durationSec || 15;
+    // Retard éventuel (flux plus lent que le sas) : on prend l'extrait où il en
+    // serait, pas au début — les autres ont déjà entendu ces secondes-là.
+    const late = Math.max(0, (serverNowRef.current() - phaseStartRef.current) / 1000);
+    if (late >= clip) return undefined; // extrait déjà fini : place au temps bonus
 
-      // L'extrait peut arriver EN RETARD (téléchargement plus long que le sas).
-      // On le prend alors où il en serait, pas au début : les autres ont déjà
-      // entendu ces secondes-là, et le rejouer fausserait les indices.
-      const late = Math.max(0, (serverNowRef.current() - phaseStartRef.current) / 1000);
-      if (late >= clip) return; // extrait déjà terminé : place au temps bonus
-
-      try {
-        el.currentTime = start + late;
-        el.muted = mutedRef.current;
-        // Un refus de lecture n'est PLUS avalé en silence : il allume le bouton
-        // « appuie pour lancer le son » (un vrai geste débloque toujours).
-        el.play().then(
-          () => setSoundBlocked(false),
-          () => setSoundBlocked(true)
-        );
-      } catch {
-        setSoundBlocked(true);
-      }
-      // Le chrono de coupure part du VRAI départ du son, pas de l'instant où
-      // l'effet a tourné (qui peut le précéder d'une bonne seconde).
-      clearTimeout(stop);
-      stop = setTimeout(
-        () => {
-          try {
-            el.pause();
-          } catch {
-            /* ignore */
-          }
-        },
-        (clip - late) * 1000
+    const target = clipStartRef.current + late;
+    try {
+      if (Math.abs((el.currentTime || 0) - target) > 0.35) el.currentTime = target;
+      el.muted = mutedRef.current;
+      // Un refus de lecture n'est PAS avalé en silence : il allume le bouton
+      // « appuie pour lancer le son » (un vrai geste débloque toujours).
+      el.play().then(
+        () => setSoundBlocked(false),
+        () => setSoundBlocked(true)
       );
-    };
+    } catch {
+      setSoundBlocked(true);
+    }
 
-    launch();
-    el.addEventListener("loadedmetadata", launch);
-    return () => {
-      dead = true;
-      el.removeEventListener("loadedmetadata", launch);
-      clearTimeout(stop);
-    };
+    const stop = setTimeout(
+      () => {
+        try {
+          el.pause();
+        } catch {
+          /* ignore */
+        }
+      },
+      (clip - late) * 1000
+    );
+    return () => clearTimeout(stop);
   }, [phase, clipReady, round?.index]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Le son se coupe dès qu'on quitte la manche (révélation, sortie de page) ;
@@ -416,13 +406,6 @@ export default function BlindTestVersus() {
       /* ignore */
     }
   }, [phase, player]);
-
-  useEffect(
-    () => () => {
-      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-    },
-    []
-  );
 
   useEffect(() => {
     mutedRef.current = muted;
