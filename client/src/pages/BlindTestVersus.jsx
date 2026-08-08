@@ -106,14 +106,18 @@ export default function BlindTestVersus() {
   const offsetRef = useRef(0);
   const audioRef = useRef(null);
   const urlRef = useRef(null);
-  const loadedForRef = useRef(-1);
   const mutedRef = useRef(false); // miroir de la sourdine (cf. le départ du son)
   const unlockedRef = useRef(false); // déverrouillage iOS déjà fait
   const clipStartRef = useRef(0); // où l'extrait commence dans le morceau (s)
+  // Miroirs lus par le départ du son, qui ne doit dépendre QUE de l'extrait
+  // (voir le commentaire de l'effet de téléchargement).
+  const phaseStartRef = useRef(0);
+  const serverNowRef = useRef(() => Date.now());
 
   const meId = user?.id ? String(user.id) : "";
   const phase = room?.phase || "lobby";
   const round = room?.round || null;
+  phaseStartRef.current = room?.phaseStartsAt || 0;
   const players = useMemo(() => room?.players || [], [room]);
   const me = players.find((p) => p.isMe) || null;
   const hueById = useMemo(() => {
@@ -123,6 +127,7 @@ export default function BlindTestVersus() {
   }, [players]);
 
   const serverNow = useCallback(() => Date.now() + offsetRef.current, []);
+  serverNowRef.current = serverNow;
   const applyRoom = useCallback((r) => {
     if (!r) return;
     if (typeof r.now === "number") offsetRef.current = r.now - Date.now();
@@ -265,10 +270,24 @@ export default function BlindTestVersus() {
   // Téléchargé EN ENTIER pendant le sas (cf. l'en-tête). On passe par fetch et
   // non par `<audio src>` parce que l'adresse est protégée : une balise audio ne
   // sait pas poser d'en-tête Authorization.
+  //
+  // ⚠️ CE QUI TUAIT LE SON DU MODE MULTI — la vraie cause, trouvée après deux
+  // fausses pistes. Cet effet dépendait de `phase`. Or `phase` passe de « cue »
+  // à « round » PENDANT le téléchargement : React nettoyait donc l'effet, le
+  // `ac.abort()` coupait le fetch en cours… puis un garde-fou anti-doublon
+  // (une ref sur l'index de manche) empêchait de le relancer. L'extrait
+  // n'arrivait JAMAIS, `clipReady` restait faux, et rien ne jouait — sans même
+  // un message d'erreur, puisque l'abandon était traité comme un démontage.
+  // Ça n'échouait que lorsque le téléchargement dépassait le sas : sur une
+  // bonne connexion en local il passait juste, en vrai jamais.
+  //
+  // LA RÈGLE : cet effet ne dépend que de CE QU'IL TÉLÉCHARGE. `round.clip`
+  // contient déjà le code du salon et l'index de la manche, donc il change à
+  // chaque manche et à rien d'autre — et il redevient `undefined` en passant
+  // par le salon, ce qui relance proprement le téléchargement d'une revanche
+  // (pour TOUT LE MONDE, pas seulement l'hôte qui a cliqué « on rejoue »).
   useEffect(() => {
-    if (!round?.clip || phase === "lobby" || phase === "done") return undefined;
-    if (loadedForRef.current === round.index) return undefined;
-    loadedForRef.current = round.index;
+    if (!round?.clip) return undefined;
     setClipReady(false);
     setClipError(false);
     setSoundBlocked(false);
@@ -306,7 +325,7 @@ export default function BlindTestVersus() {
       dead = true;
       ac.abort();
     };
-  }, [round?.clip, round?.index, phase, token]);
+  }, [round?.clip, token]);
 
   // Départ du son : à l'instant exact décidé par le serveur, on pose l'aiguille
   // sur le climax et on lance. Le son s'arrête à la fin de l'extrait — le temps
@@ -340,8 +359,15 @@ export default function BlindTestVersus() {
       const clip = round.durationSec || 15;
       const start = Math.min((round.startFrac || 0.4) * dur, Math.max(0, dur - clip - 1));
       clipStartRef.current = start;
+
+      // L'extrait peut arriver EN RETARD (téléchargement plus long que le sas).
+      // On le prend alors où il en serait, pas au début : les autres ont déjà
+      // entendu ces secondes-là, et le rejouer fausserait les indices.
+      const late = Math.max(0, (serverNowRef.current() - phaseStartRef.current) / 1000);
+      if (late >= clip) return; // extrait déjà terminé : place au temps bonus
+
       try {
-        el.currentTime = start;
+        el.currentTime = start + late;
         el.muted = mutedRef.current;
         // Un refus de lecture n'est PLUS avalé en silence : il allume le bouton
         // « appuie pour lancer le son » (un vrai geste débloque toujours).
@@ -355,13 +381,16 @@ export default function BlindTestVersus() {
       // Le chrono de coupure part du VRAI départ du son, pas de l'instant où
       // l'effet a tourné (qui peut le précéder d'une bonne seconde).
       clearTimeout(stop);
-      stop = setTimeout(() => {
-        try {
-          el.pause();
-        } catch {
-          /* ignore */
-        }
-      }, clip * 1000);
+      stop = setTimeout(
+        () => {
+          try {
+            el.pause();
+          } catch {
+            /* ignore */
+          }
+        },
+        (clip - late) * 1000
+      );
     };
 
     launch();
@@ -528,7 +557,6 @@ export default function BlindTestVersus() {
     act(async () => {
       applyRoom((await post("/again")).room);
       setRanking(null);
-      loadedForRef.current = -1;
     });
 
   const start = () =>
