@@ -120,6 +120,7 @@ export default function GeoVersus() {
   // avance de trente secondes jouerait une manche déjà finie.
   const offsetRef = useRef(0);
   const pinSentRef = useRef(false);
+  const cuedRef = useRef(-1); // manche dont on a déjà traité le sas
 
   const meId = user?.id ? String(user.id) : "";
   const phase = room?.phase || "lobby";
@@ -198,7 +199,15 @@ export default function GeoVersus() {
       if (data.room) applyRoom(data.room);
 
       switch (data.kind) {
-        case "cue":
+        case "cue": {
+          // Le sas se rediffuse à chaque atterrissage (il annonce qui l'on
+          // attend) : on ne remet les compteurs à zéro que pour une NOUVELLE
+          // manche. Sans ce garde-fou, `panoReady` retombait à faux alors que
+          // le décor était déjà affiché — et comme `onReady` ne se déclenche
+          // qu'une fois, on n'aurait plus jamais annoncé son atterrissage.
+          const at = data.room?.round?.index ?? data.room?.index ?? 0;
+          if (cuedRef.current === at) break;
+          cuedRef.current = at;
           setPanoReady(false);
           setInput("");
           setHighlight(0);
@@ -207,6 +216,7 @@ export default function GeoVersus() {
           pinSentRef.current = false;
           sfx.play("start");
           break;
+        }
         case "go":
           setTimeout(() => inputRef.current?.focus(), 60);
           break;
@@ -355,6 +365,42 @@ export default function GeoVersus() {
   async function post(path, body) {
     return apiFetch(`/geo/versus/${code}${path}`, { method: "POST", token, body });
   }
+
+  // Retour au salon (fin de partie, « on rejoue ») : la prochaine manche 0 est
+  // une VRAIE nouvelle manche, son sas doit repartir de zéro.
+  useEffect(() => {
+    if (phase === "lobby") cuedRef.current = -1;
+  }, [phase]);
+
+  // ---------- « J'ai atterri » ----------
+  // Le sas ne se referme que quand TOUT LE MONDE a son décor à l'écran (voir
+  // POST /:code/armed côté serveur) : c'est ce qui règle le « je suis encore en
+  // atterrissage alors que les autres tapent déjà ». On l'annonce quand la
+  // texture est affichée — pas quand le téléchargement finit : sur téléphone,
+  // décoder l'image et la monter en texture prend encore une bonne seconde.
+  const armed = useMemo(() => round?.armed || [], [round?.armed]);
+  const iAmArmed = armed.includes(meId);
+  // Ceux qu'on attend, nous exclus (pour nous, c'est notre propre chargement
+  // qui s'affiche, pas une attente).
+  const waitingFor = useMemo(
+    () => players.filter((p) => !p.left && p.id !== meId && !armed.includes(p.id)),
+    [players, armed, meId]
+  );
+
+  useEffect(() => {
+    if (phase !== "cue" || !panoReady || iAmArmed || room?.index == null) return undefined;
+    let alive = true;
+    const send = () => post("/armed", { index: room.index }).catch(() => {});
+    send();
+    // Filet : tant que le serveur ne nous a pas comptés, on répète. Une seule
+    // annonce perdue bloquerait la manche de tout le salon jusqu'à la butée.
+    const iv = setInterval(() => alive && send(), 1500);
+    return () => {
+      alive = false;
+      clearInterval(iv);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, room?.index, panoReady, iAmArmed]);
 
   async function join() {
     try {
@@ -581,6 +627,11 @@ export default function GeoVersus() {
     sfx.play("land");
   }, [sfx]);
 
+  // Décor introuvable : on l'annonce quand même « atterri ». La manche sera
+  // injouable pour moi, mais bloquer les quatre autres jusqu'à la butée du sas
+  // serait pire — et il n'y a plus rien à attendre de mon côté.
+  const onPanoFailed = useCallback(() => setPanoReady(true), []);
+
   // Les épingles de tout le monde, pour la révélation de la manche carte. C'est
   // LE moment du mode buzzer : on découvre d'un coup qui connaissait vraiment le
   // coin, et de combien on s'est fait souffler la première place.
@@ -677,7 +728,13 @@ export default function GeoVersus() {
               </div>
             }
           >
-            <PanoViewer key={round.image} src={round.image} interactive onReady={onPanoReady} />
+            <PanoViewer
+              key={round.image}
+              src={round.image}
+              interactive
+              onReady={onPanoReady}
+              onFailed={onPanoFailed}
+            />
           </Suspense>
 
           <span className="geo-vignette" aria-hidden="true" />
@@ -754,8 +811,25 @@ export default function GeoVersus() {
                 {cueLeft > 0 ? cueLeft : "!"}
               </span>
               <span className="gv-cue-txt">
-                {panoReady ? "Prêt — tout le monde part ensemble" : "Chargement du lieu…"}
+                {!panoReady
+                  ? "Chargement du lieu…"
+                  : waitingFor.length
+                    ? `On attend ${waitingFor.map((p) => p.username).join(", ")}…`
+                    : "Prêt — tout le monde part ensemble"}
               </span>
+              {/* Les têtes de ceux qui ont déjà atterri : on voit le salon se
+                  remplir au lieu de fixer un décompte qui ne bouge plus. */}
+              {panoReady && waitingFor.length > 0 && (
+                <span className="gv-cue-wait">
+                  {players
+                    .filter((p) => !p.left)
+                    .map((p) => (
+                      <i key={p.id} className={armed.includes(p.id) ? "on" : ""}>
+                        <VersusFace user={p} size={26} hue={hueById.get(p.id)} />
+                      </i>
+                    ))}
+                </span>
+              )}
             </div>
           )}
 

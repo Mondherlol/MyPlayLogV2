@@ -280,6 +280,32 @@
   font-size: 0.85rem;
   color: var(--g-soft);
   letter-spacing: 0.04em;
+  text-align: center;
+  max-width: min(90vw, 30rem);
+}
+
+/* Le salon qui atterrit. Un décompte qui ne bouge plus rend fou : ces têtes-là
+   disent QUI l'on attend et que ça avance — celles qui sont arrivées s'allument,
+   les autres restent en retrait. */
+.gv-cue-wait {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.gv-cue-wait i {
+  display: block;
+  line-height: 0;
+  border-radius: 50%;
+  opacity: 0.35;
+  filter: grayscale(1);
+  transition: opacity 0.25s ease, filter 0.25s ease, box-shadow 0.25s ease;
+}
+
+.gv-cue-wait i.on {
+  opacity: 1;
+  filter: none;
+  box-shadow: 0 0 0 2px var(--g-acc);
 }
 
 /* ======================================================================

@@ -57,11 +57,21 @@ const router = express.Router();
 router.use(requireAuth);
 
 // Sas de chargement avant chaque manche. Un panorama pèse plusieurs mégaoctets :
-// en solo on attend simplement qu'il s'affiche (`panoReady`), à plusieurs c'est
-// impossible — attendre le plus lent reviendrait à offrir le décor en avance aux
-// autres. On annonce donc l'image ET l'heure du départ, et chacun charge dans
-// son coin pendant le « 3, 2, 1 ».
+// on annonce l'image ET l'heure du départ, et chacun charge dans son coin
+// pendant le « 3, 2, 1 ».
+//
+// ET LE SAS ATTEND LE PLUS LENT. Avec un décompte fixe, celui dont l'image
+// n'était pas chargée restait sur « Atterrissage… » pendant que les autres
+// tapaient déjà — le défaut le plus rageant du mode. Personne ne part donc tant
+// que tout le monde n'a pas atterri (POST /:code/armed, `round.armed`), et cela
+// n'avantage personne : ceux qui ont fini regardent un décompte, pas le décor.
+// Deux butées pour qu'un onglet mort ne gèle pas la partie : on ne prolonge
+// jamais au-delà de CUE_MAX_MS, et on repousse par petits pas.
 const CUE_MS = 5000;
+// 20 s : au-delà, mieux vaut une manche entamée en retard par un seul qu'un
+// salon entier immobile — et une manche ne dure que 45 s.
+const CUE_MAX_MS = 20000;
+const CUE_STEP_MS = 1200;
 const ROUND_MS = 45000;
 const MAP_MS = 25000;
 const REVEAL_MS = 7000;
@@ -227,6 +237,8 @@ function roundView(room, meId) {
     image: absolutize(base, round.image),
     difficulty: round.difficulty,
     map: mapPayload(base, round),
+    // Qui a fini d'atterrir : le sas s'en sert pour dire qui l'on attend.
+    armed: (round.armed || []).map(String),
     lives: livesOf(round, meId),
     settled: isSettled(round, meId),
     found,
@@ -429,6 +441,10 @@ async function startCue(room, index) {
   room.index = index;
   room.phaseStartsAt = Date.now() + CUE_MS;
   room.phaseEndsAt = room.phaseStartsAt + ROUND_MS;
+  room.cueMaxAt = Date.now() + CUE_MAX_MS;
+  // Nouvelle manche, nouveau décor : personne n'a encore atterri.
+  const round = curRound(room);
+  if (round) round.armed = [];
   touch(room);
   await room.save();
   await room.populate(POPULATE);
@@ -437,8 +453,34 @@ async function startCue(room, index) {
   return room;
 }
 
+// Qui n'a pas encore fini de charger le décor.
+function notArmed(room) {
+  const round = curRound(room);
+  if (!round) return [];
+  const armed = new Set((round.armed || []).map(String));
+  return activePlayers(room)
+    .map((p) => String(p.user?._id || p.user))
+    .filter((id) => !armed.has(id));
+}
+
 async function beginRound(room) {
   if (room.phase !== "cue") return room;
+
+  // Il manque du monde et la butée n'est pas atteinte : on repousse le top
+  // d'un cran et on le fait savoir (le sas affiche qui l'on attend). Le
+  // décompte reste synchronisé chez tout le monde puisqu'il se lit sur
+  // `phaseStartsAt`, rediffusé ici.
+  if (notArmed(room).length && Date.now() < (room.cueMaxAt || 0)) {
+    room.phaseStartsAt = Math.min(Date.now() + CUE_STEP_MS, room.cueMaxAt);
+    room.phaseEndsAt = room.phaseStartsAt + ROUND_MS;
+    touch(room);
+    await room.save();
+    await room.populate(POPULATE);
+    toEachRoom(room, "cue");
+    schedule(room.code, room.phaseStartsAt, () => withRoom(room.code, beginRound));
+    return room;
+  }
+
   room.phase = "round";
   touch(room);
   await room.save();
@@ -869,6 +911,51 @@ router.post("/:code/leave", async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error("geoversus leave error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// POST /:code/armed — « mon panorama est affiché, je peux jouer ».
+//
+// C'est ce qui permet au sas d'attendre le plus lent plutôt que d'égrener cinq
+// secondes dans le vide (voir CUE_MAX_MS). Le client l'envoie quand la texture
+// est RÉELLEMENT à l'écran, pas quand le téléchargement se termine : sur un
+// téléphone, décoder l'image et la monter en texture prend encore une seconde.
+router.post("/:code/armed", async (req, res) => {
+  try {
+    const index = Number(req.body?.index);
+    const out = await withRoom(String(req.params.code), async (room) => {
+      if (room.phase !== "cue" || room.index !== index) return room;
+      const round = curRound(room);
+      const me = findPlayer(room, req.userId);
+      if (!round || !me || me.leftAt) return room;
+      const id = String(req.userId);
+      if ((round.armed || []).some((x) => String(x) === id)) return room;
+      round.armed.push(req.userId);
+      touch(room);
+      await room.save();
+      await room.populate(POPULATE);
+
+      // Le dernier vient d'atterrir : plus rien à attendre. Si le décompte
+      // était déjà écoulé (on prolongeait), on laisse une seconde pour que
+      // tout le monde voie le « ! » avant de partir.
+      if (!notArmed(room).length) {
+        const soon = Date.now() + 1000;
+        if (room.phaseStartsAt < soon) {
+          room.phaseStartsAt = soon;
+          room.phaseEndsAt = soon + ROUND_MS;
+          await room.save();
+          await room.populate(POPULATE);
+          schedule(room.code, room.phaseStartsAt, () => withRoom(room.code, beginRound));
+        }
+      }
+      toEachRoom(room, "cue");
+      return room;
+    });
+    if (!out) return res.status(404).json({ error: "Ce salon n'existe plus." });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("geoversus armed error:", err.message);
     res.status(500).json({ error: "Erreur." });
   }
 });

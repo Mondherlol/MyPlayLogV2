@@ -92,6 +92,13 @@ export default function BlindTestVersus() {
   const [ranking, setRanking] = useState(null);
   const [muted, setMuted] = useState(false);
   const [clipReady, setClipReady] = useState(false);
+  // Le son n'a PAS démarré, et on sait pourquoi : soit l'extrait n'est pas
+  // arrivé (`clipError`), soit le navigateur a refusé la lecture (`soundBlocked`
+  // — mobile, quand aucun geste ne l'a autorisée). Dans les deux cas on le DIT
+  // et on offre une issue : une manche muette sans explication est le pire des
+  // deux mondes.
+  const [clipError, setClipError] = useState(false);
+  const [soundBlocked, setSoundBlocked] = useState(false);
   const [, setTick] = useState(0);
 
   const inputRef = useRef(null);
@@ -102,6 +109,7 @@ export default function BlindTestVersus() {
   const loadedForRef = useRef(-1);
   const mutedRef = useRef(false); // miroir de la sourdine (cf. le départ du son)
   const unlockedRef = useRef(false); // déverrouillage iOS déjà fait
+  const clipStartRef = useRef(0); // où l'extrait commence dans le morceau (s)
 
   const meId = user?.id ? String(user.id) : "";
   const phase = room?.phase || "lobby";
@@ -262,6 +270,8 @@ export default function BlindTestVersus() {
     if (loadedForRef.current === round.index) return undefined;
     loadedForRef.current = round.index;
     setClipReady(false);
+    setClipError(false);
+    setSoundBlocked(false);
     let dead = false;
     const ac = new AbortController();
 
@@ -283,8 +293,12 @@ export default function BlindTestVersus() {
         setClipReady(true);
       } catch {
         // Sans extrait, la manche se joue en silence : frustrant mais pas
-        // bloquant, et le serveur enchaîne de toute façon.
-        if (!dead) setClipReady(false);
+        // bloquant, et le serveur enchaîne de toute façon. On le dit à l'écran
+        // plutôt que de laisser croire à un bug de son côté.
+        if (!dead) {
+          setClipReady(false);
+          setClipError(true);
+        }
       }
     })();
 
@@ -325,12 +339,18 @@ export default function BlindTestVersus() {
       el.removeEventListener("loadedmetadata", launch);
       const clip = round.durationSec || 15;
       const start = Math.min((round.startFrac || 0.4) * dur, Math.max(0, dur - clip - 1));
+      clipStartRef.current = start;
       try {
         el.currentTime = start;
         el.muted = mutedRef.current;
-        el.play().catch(() => {});
+        // Un refus de lecture n'est PLUS avalé en silence : il allume le bouton
+        // « appuie pour lancer le son » (un vrai geste débloque toujours).
+        el.play().then(
+          () => setSoundBlocked(false),
+          () => setSoundBlocked(true)
+        );
       } catch {
-        /* ignore */
+        setSoundBlocked(true);
       }
       // Le chrono de coupure part du VRAI départ du son, pas de l'instant où
       // l'effet a tourné (qui peut le précéder d'une bonne seconde).
@@ -437,6 +457,27 @@ export default function BlindTestVersus() {
     if (now - t.at >= TYPING_MS) fire();
     else t.timer = setTimeout(fire, TYPING_MS - (now - t.at));
   }
+
+  // Rattrapage manuel du son. Un clic est un geste : le navigateur ne peut plus
+  // refuser. On reprend l'extrait LÀ OÙ IL EN SERAIT (pas au début) — sinon on
+  // rejouerait quinze secondes déjà passées pour les autres.
+  const fixSound = useCallback(() => {
+    const el = audioRef.current;
+    if (!el || !round) return;
+    const clip = round.durationSec || 15;
+    const elapsed = Math.max(0, (serverNow() - (room?.phaseStartsAt || 0)) / 1000);
+    if (elapsed >= clip) return setSoundBlocked(false); // trop tard, extrait fini
+    try {
+      el.currentTime = (clipStartRef.current || 0) + elapsed;
+      el.muted = mutedRef.current;
+      el.play().then(
+        () => setSoundBlocked(false),
+        () => {}
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [round, room?.phaseStartsAt, serverNow]);
 
   // ---------- Actions ----------
   const post = (path, body) =>
@@ -746,10 +787,24 @@ export default function BlindTestVersus() {
 
             {phase === "cue" && (
               <p className="bt-grace-hint">
-                {clipReady
-                  ? "Tout le monde part ensemble…"
-                  : "On prépare l'extrait pour tout le monde…"}
+                {clipError
+                  ? "Extrait indisponible — la manche se jouera sans son."
+                  : clipReady
+                    ? "Tout le monde part ensemble…"
+                    : "On prépare l'extrait pour tout le monde…"}
               </p>
+            )}
+
+            {/* Le son n'est pas parti : on ne laisse JAMAIS la manche muette
+                sans issue. Un clic suffit à débloquer une lecture refusée. */}
+            {phase === "round" && soundBlocked && !inGrace && (
+              <button className="bt-sound-fix clickable" onClick={fixSound}>
+                <Volume2 size={16} />
+                Appuie pour lancer le son
+              </button>
+            )}
+            {phase === "round" && clipError && (
+              <p className="bt-grace-hint">Extrait indisponible — devine à l'aveugle !</p>
             )}
             {inGrace && phase === "round" && (
               <p className="bt-grace-hint">Extrait terminé — valide ta réponse !</p>

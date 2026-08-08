@@ -83,6 +83,9 @@ const UA =
 
 const VIDEO_ID = /^[\w-]{11}$/;
 
+// Le contenu d'un videoId ne change jamais.
+const PUBLIC_CACHE = "public, max-age=2592000, immutable";
+
 export const fileFor = (id) => path.join(CACHE_DIR, `${id}.m4a`);
 
 // ----------------------------------------------------------------------
@@ -409,7 +412,7 @@ function teeToCache(id, source, expectedSize) {
   });
 }
 
-async function streamRemote(id, req, res) {
+async function streamRemote(id, req, res, cacheControl = PUBLIC_CACHE) {
   const src = await resolveUrl(id);
   const range = req.headers.range;
 
@@ -427,8 +430,9 @@ async function streamRemote(id, req, res) {
   res.status(upstream.status);
   res.setHeader("Content-Type", "audio/mp4");
   res.setHeader("Accept-Ranges", "bytes");
-  // Le contenu d'un videoId ne change jamais → cache client long.
-  res.setHeader("Cache-Control", "public, max-age=2592000, immutable");
+  // Le contenu d'un videoId ne change jamais → cache client long (sauf pour le
+  // versus, qui sert l'extrait sous une adresse à ne jamais mettre en cache).
+  res.setHeader("Cache-Control", cacheControl);
   for (const h of ["content-length", "content-range"]) {
     const v = upstream.headers.get(h);
     if (v) res.setHeader(h, v);
@@ -555,28 +559,31 @@ router.get("/diag/:videoId", requireAuth, requireAdmin, async (req, res) => {
   res.json(out);
 });
 
-// GET /api/audio/:videoId — le flux m4a de la piste. Servi depuis le cache
-// quand on l'a, relayé depuis YouTube sinon (et mis en cache au passage). Les
-// requêtes Range sont honorées dans les deux cas → déplacement dans la piste.
-router.get("/:videoId", async (req, res) => {
-  const id = req.params.videoId;
-  if (!VIDEO_ID.test(id))
-    return res.status(400).json({ error: "videoId invalide." });
-
+// Sert la piste : depuis le cache quand on l'a, relayée depuis YouTube sinon
+// (et mise en cache au passage). Les requêtes Range sont honorées dans les deux
+// cas → déplacement dans la piste.
+//
+// EXPORTÉ pour le blind test versus, qui sert le même audio sous une adresse
+// qui ne révèle pas le videoId (routes/blindtestVersus.js). Il passait avant
+// par `download()` — extraction COMPLÈTE avec ré-encodage — là où le
+// mini-lecteur se contentait du relais : deux chemins pour le même besoin,
+// donc deux fois plus d'occasions de tomber en panne, et c'est le plus fragile
+// des deux qui portait le mode multijoueur.
+// `cacheControl` : le versus sert le MÊME audio sous une adresse à lui, qui ne
+// doit surtout pas finir dans un cache partagé (l'extrait d'une manche en
+// cours). D'où le réglage par appelant plutôt qu'une valeur en dur.
+export async function serveTrack(id, req, res, cacheControl = PUBLIC_CACHE) {
   const file = fileFor(id);
   if (fs.existsSync(file)) {
     // Marque la piste comme récemment écoutée (pour la purge LRU).
     fs.utimes(file, new Date(), new Date(), () => {});
     return res.sendFile(file, {
-      headers: {
-        "Content-Type": "audio/mp4",
-        "Cache-Control": "public, max-age=2592000, immutable",
-      },
+      headers: { "Content-Type": "audio/mp4", "Cache-Control": cacheControl },
     });
   }
 
   try {
-    await streamRemote(id, req, res);
+    await streamRemote(id, req, res, cacheControl);
   } catch (err) {
     // Relais déjà commencé : le client a raccroché (changement de piste, appli
     // fermée) ou la connexion a lâché en route. Rien à répondre, rien à logger.
@@ -587,16 +594,36 @@ router.get("/:videoId", async (req, res) => {
     try {
       await download(id);
       return res.sendFile(file, {
-        headers: {
-          "Content-Type": "audio/mp4",
-          "Cache-Control": "public, max-age=2592000, immutable",
-        },
+        headers: { "Content-Type": "audio/mp4", "Cache-Control": cacheControl },
       });
     } catch (err2) {
       console.error(`audio ${id}: extraction impossible —`, err2.message);
       return res.status(502).json({ error: "Extraction audio impossible." });
     }
   }
+  return undefined;
+}
+
+// La piste est-elle SERVABLE ? Le fichier en cache, ou à défaut une URL de flux
+// qui répond. On ne télécharge PAS : c'est ce qui permet au sas du versus
+// d'attendre quelques secondes au lieu d'une extraction complète.
+export async function prepareTrack(id) {
+  if (!id || !VIDEO_ID.test(id)) return false;
+  if (fs.existsSync(fileFor(id))) return true;
+  try {
+    await resolveUrl(id);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// GET /api/audio/:videoId — le flux m4a de la piste.
+router.get("/:videoId", async (req, res) => {
+  const id = req.params.videoId;
+  if (!VIDEO_ID.test(id))
+    return res.status(400).json({ error: "videoId invalide." });
+  return serveTrack(id, req, res);
 });
 
 // GET /api/audio/:videoId/prefetch — prépare la piste suivante de la file. On

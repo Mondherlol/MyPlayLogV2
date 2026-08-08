@@ -1,5 +1,4 @@
 import express from "express";
-import fs from "node:fs";
 import BlindTestVersus, { MAX_PLAYERS, LIVES } from "../models/BlindTestVersus.js";
 import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -8,7 +7,7 @@ import { recordActivity } from "../lib/activity.js";
 import { grantPoints } from "../lib/points.js";
 import { triggerMissionCheck } from "../lib/missions.js";
 import { deliverCard, deliverCardToConversation } from "./chat.js";
-import { download, fileFor } from "./audio.js";
+import { download, prepareTrack, serveTrack } from "./audio.js";
 import {
   buildVersusRounds,
   person,
@@ -236,27 +235,30 @@ function toEachRoom(room, kind, payload = {}) {
 // ============================================================
 //  L'extrait audio
 // ============================================================
-// Prépare le fichier d'une piste (téléchargement + cache partagé avec le
-// mini-lecteur). Best-effort : on renvoie `true` si le fichier est là.
+// La piste est-elle servable ? Cache partagé avec le mini-lecteur, ou URL de
+// flux résolue. Best-effort.
+//
+// ON NE TÉLÉCHARGE PLUS LE FICHIER ENTIER ICI. C'était la panne : `download()`
+// lance yt-dlp en extraction complète avec ré-encodage ffmpeg — dix à trente
+// secondes, et une occasion d'échouer que le mini-lecteur, lui, n'a jamais
+// puisqu'il relaie le flux. Résultat : le mode multi partait en silence alors
+// que le solo et le mini-lecteur jouaient très bien la même piste. Les deux
+// passent maintenant par exactement la même mécanique (routes/audio.js).
 async function ensureClip(videoId) {
-  if (!videoId) return false;
-  try {
-    if (fs.existsSync(fileFor(videoId))) return true;
-    await download(videoId);
-    return fs.existsSync(fileFor(videoId));
-  } catch {
-    return false;
-  }
+  return prepareTrack(videoId);
 }
 
-// Lance en fond l'extraction de TOUTES les pistes de la partie. Sans ça, chaque
-// manche paierait son propre délai d'extraction dans le sas ; avec, seule la
-// première peut avoir à attendre.
+// Met en cache, EN FOND, toutes les pistes de la partie. Ici on télécharge pour
+// de bon : à cinq joueurs, un fichier sur le disque est servi cinq fois par
+// `sendFile` au lieu d'ouvrir cinq relais vers YouTube pour le même morceau.
+// C'est un confort, jamais un prérequis — le sas, lui, se contente de savoir la
+// piste servable (`ensureClip`), et le relais rattrape ce qui n'a pas pu être
+// téléchargé.
 function warmClips(room) {
   (async () => {
     for (const r of room.rounds) {
       // eslint-disable-next-line no-await-in-loop
-      await ensureClip(r.videoId).catch(() => false);
+      await download(r.videoId).catch(() => null);
     }
   })().catch(() => {});
 }
@@ -276,19 +278,10 @@ router.get("/:code/clip/:index", async (req, res) => {
     const round = room.rounds[i];
     if (!round?.videoId) return res.status(404).json({ error: "Extrait indisponible." });
 
-    const ready = await ensureClip(round.videoId);
-    if (!ready) return res.status(503).json({ error: "Extrait indisponible." });
-    const file = fileFor(round.videoId);
-    // Marque la piste comme récemment utilisée (purge LRU du cache audio).
-    fs.utimes(file, new Date(), new Date(), () => {});
-    res.sendFile(file, {
-      headers: {
-        "Content-Type": "audio/mp4",
-        // JAMAIS de cache partagé ni de nom de fichier : l'URL ne doit rien
-        // révéler, et le fichier ne doit pas traîner sous un nom parlant.
-        "Cache-Control": "private, no-store",
-      },
-    });
+    // Servi par la mécanique commune (cache, sinon relais du flux). L'adresse,
+    // elle, reste la nôtre : aucun videoId, aucun titre ne traverse — et
+    // JAMAIS de cache partagé sur cette URL-là.
+    await serveTrack(round.videoId, req, res, "private, no-store");
   } catch (err) {
     console.error("btversus clip error:", err.message);
     res.status(500).json({ error: "Extrait illisible." });

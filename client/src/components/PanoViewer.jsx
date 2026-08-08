@@ -252,7 +252,15 @@ function PanoSphere({ texture, ctl }) {
   );
 }
 
-export default function PanoViewer({ src, interactive = true, onReady, className = "" }) {
+// `onFailed` : le décor ne viendra pas. Le versus s'en sert pour ne PAS faire
+// attendre tout le salon derrière un panorama qui ne chargera jamais.
+export default function PanoViewer({
+  src,
+  interactive = true,
+  onReady,
+  onFailed,
+  className = "",
+}) {
   const [texture, setTexture] = useState(null);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
@@ -270,6 +278,8 @@ export default function PanoViewer({ src, interactive = true, onReady, className
   const pinchRef = useRef(null);
   const readyRef = useRef(onReady);
   readyRef.current = onReady;
+  const failedRef = useRef(onFailed);
+  failedRef.current = onFailed;
 
   // --- Chargement de l'image ---
   useEffect(() => {
@@ -300,7 +310,9 @@ export default function PanoViewer({ src, interactive = true, onReady, className
         readyRef.current?.();
       })
       .catch((e) => {
-        if (!ac.signal.aborted) setError(e.message || "Panorama indisponible.");
+        if (ac.signal.aborted) return;
+        setError(e.message || "Panorama indisponible.");
+        failedRef.current?.();
       });
 
     return () => {

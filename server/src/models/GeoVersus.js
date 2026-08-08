@@ -124,6 +124,9 @@ const roundSchema = new mongoose.Schema(
     results: { type: [resultSchema], default: [] },
     // Buzzer : celui qui a arrêté la manche. `null` = personne n'a trouvé.
     winner: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    // Qui a fini d'atterrir : le panorama est chargé ET affiché chez lui. Le
+    // sas ne se referme pas tant qu'il manque quelqu'un (voir `beginRound`).
+    armed: { type: [mongoose.Schema.Types.ObjectId], default: [] },
   },
   { _id: false }
 );
@@ -155,12 +158,18 @@ const geoVersusSchema = new mongoose.Schema(
 
     // lobby → cue → round → map → reveal → (cue…) → done
     //
-    // `cue` est le sas de chargement : un panorama pèse plusieurs mégaoctets et
-    // en solo on attend simplement qu'il s'affiche (`panoReady`). À plusieurs
-    // c'est impossible — attendre le plus lent, c'est offrir le décor en avance
-    // aux autres. On annonce donc l'image ET l'heure du départ quelques
-    // secondes plus tard : chacun charge dans son coin, tout le monde part
-    // ensemble sur le même « 3, 2, 1 ».
+    // `cue` est le sas de chargement : un panorama pèse plusieurs mégaoctets.
+    // On annonce l'image ET l'heure du départ quelques secondes plus tard, et
+    // chacun charge dans son coin.
+    //
+    // LE SAS ATTEND LE PLUS LENT (corrigé le 2026-08-08). Il partait sur un
+    // décompte fixe de 5 s : qui n'avait pas fini de charger restait sur
+    // « Atterrissage… » pendant que les autres tapaient déjà. On craignait
+    // qu'attendre offre le décor en avance aux plus rapides — c'est faux, la
+    // manche ne commence pour PERSONNE tant que le top n'est pas donné : ceux
+    // qui ont fini regardent un décompte, pas le panorama. Le sas se prolonge
+    // donc jusqu'à ce que tout le monde ait atterri (`round.armed`), avec une
+    // butée (`cueMaxAt`) pour qu'un onglet mort ne gèle pas la partie.
     phase: {
       type: String,
       enum: ["lobby", "cue", "round", "map", "reveal", "done"],
@@ -172,6 +181,8 @@ const geoVersusSchema = new mongoose.Schema(
     // clôt la manche, même si tous les onglets sont fermés.
     phaseStartsAt: { type: Number, default: 0 },
     phaseEndsAt: { type: Number, default: 0 },
+    // Jusqu'à quand le sas accepte d'attendre un retardataire (voir `phase`).
+    cueMaxAt: { type: Number, default: 0 },
 
     startedAt: { type: Date, default: null },
     endedAt: { type: Date, default: null },
