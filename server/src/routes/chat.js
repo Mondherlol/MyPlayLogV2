@@ -19,6 +19,9 @@ import { statusOf, clearStatus } from "../lib/liveStatus.js";
 import { triggerMissionCheck } from "../lib/missions.js";
 import { logEvent, ipOf } from "../lib/audit.js";
 import { pushToUsers, preview } from "../lib/push.js";
+// Les modèles seulement, là aussi (cf. WatchParty ci-dessus) : c'est le lien
+// collé dans le message qui redevient une invitation.
+import { cardFromLinks } from "../lib/inviteLinks.js";
 
 const router = express.Router();
 
@@ -1127,7 +1130,7 @@ router.post("/conversations/:id/messages", requireAuth, async (req, res) => {
     const conv = await loadConversation(req.params.id, req.userId);
     if (!conv) return res.status(404).json({ error: "Conversation introuvable." });
 
-    const text = String(req.body?.text || "").trim().slice(0, MAX_TEXT);
+    let text = String(req.body?.text || "").trim().slice(0, MAX_TEXT);
     let media = sanitizeMedia(req.body?.media);
     if (!text && !media.length)
       return res.status(400).json({ error: "Message vide." });
@@ -1144,12 +1147,23 @@ router.post("/conversations/:id/messages", requireAuth, async (req, res) => {
       if (exists) replyTo = req.body.replyTo;
     }
 
+    // Un lien de salon collé dans le fil vaut une invitation : on l'échange
+    // contre la carte que le bouton « Inviter » aurait déposée, lien compris
+    // (lib/inviteLinks.js). Rien ne bouge si le salon n'est plus rejoignable.
+    const invite = await cardFromLinks(
+      text,
+      req.userId,
+      `${req.protocol}://${req.get("host")}`
+    );
+    if (invite) text = invite.text;
+
     const msg = await persistMessage(conv, req.userId, {
       author: req.userId,
       text,
       media,
       mentions: await resolveMentions(text),
       replyTo,
+      ...(invite?.card || {}),
     });
 
     broadcastMessage(conv, msg);

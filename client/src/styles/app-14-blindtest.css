@@ -1801,6 +1801,41 @@
   background: var(--bts-gold-soft);
   color: var(--bts-gold-ink);
 }
+/* « Écouter en entier » : la seconde porte de la card. L'extrait qu'on
+   réécoute est le JEU (bouton plein, juste au-dessus) ; le morceau complet est
+   un plaisir en plus, qui part dans le mini-lecteur et continue par-dessus la
+   manche suivante — d'où un bouton volontairement plus discret. */
+.bt-reveal-full {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  margin-top: 0.3rem;
+  padding: 0.24rem 0.7rem;
+  border-radius: 999px;
+  border: 1px dashed var(--bts-line-2);
+  background: transparent;
+  color: var(--bts-soft);
+  font-weight: 600;
+  font-size: 0.75rem;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.bt-reveal-full span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bt-reveal-full:hover {
+  border-color: var(--bts-gold);
+  color: var(--bts-text);
+}
+.bt-reveal-full.on {
+  border-style: solid;
+  border-color: rgba(242, 183, 11, 0.55);
+  background: var(--bts-gold-soft);
+  color: var(--bts-gold-ink);
+}
+
 /* « Ta réponse » : pill posée sur le voile, SOUS la card. Couleurs explicites
    (le voile est sombre dans les deux thèmes). */
 .bt-reveal-your {

@@ -13,6 +13,7 @@ import {
   Lock,
   Medal,
   Music2,
+  Pause,
   Play,
   RotateCcw,
   Search,
@@ -60,6 +61,10 @@ import { VersusFace, VersusRail, VersusInvite, HUES } from "../components/Versus
 // première note au même instant — personne ne subit son propre tampon.
 const LIVES = 3;
 const HINT_FRACS = [0.35, 0.55, 0.75];
+// Mini wav silencieux, joué en muet dans le geste d'entrée pour déverrouiller
+// la balise <audio> sur iOS (même technique que context/PlayerContext.jsx).
+const SILENT_WAV =
+  "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
 // Cadence d'envoi de « ce que je tape ». Assez serré pour qu'on voie les
 // lettres arriver, assez lâche pour ne pas poster à chaque touche.
 const TYPING_MS = 200;
@@ -95,6 +100,8 @@ export default function BlindTestVersus() {
   const audioRef = useRef(null);
   const urlRef = useRef(null);
   const loadedForRef = useRef(-1);
+  const mutedRef = useRef(false); // miroir de la sourdine (cf. le départ du son)
+  const unlockedRef = useRef(false); // déverrouillage iOS déjà fait
 
   const meId = user?.id ? String(user.id) : "";
   const phase = room?.phase || "lobby";
@@ -290,41 +297,76 @@ export default function BlindTestVersus() {
   // Départ du son : à l'instant exact décidé par le serveur, on pose l'aiguille
   // sur le climax et on lance. Le son s'arrête à la fin de l'extrait — le temps
   // bonus se joue en silence, comme en solo.
+  //
+  // DEUX BOGUES VÉCUS, tous deux réparés ici, et il faut les connaître avant de
+  // retoucher cet effet :
+  //
+  //  1. ON NE PEUT PAS LIRE `el.duration` JUSTE APRÈS `el.load()`. Le décodage
+  //     de l'en-tête est asynchrone : la durée valait `NaN` neuf fois sur dix
+  //     quand l'effet passait, l'ancien `if (dur > 0)` tombait à l'eau… et rien
+  //     ne le relançait. La manche se jouait alors en silence complet — c'est
+  //     LA raison pour laquelle « le son ne se lance juste pas » en multi. On
+  //     attend donc `loadedmetadata` quand la durée n'est pas encore là.
+  //
+  //  2. LA SOURDINE NE DOIT PAS ÊTRE UNE DÉPENDANCE. Elle l'était : couper puis
+  //     remettre le son relançait l'effet, donc REPARTAIT l'extrait du début, au
+  //     milieu de la manche. Le mute vit dans son propre effet (plus bas) et se
+  //     lit ici par une ref.
   useEffect(() => {
     const el = audioRef.current;
     if (!el || phase !== "round" || !clipReady || !round) return undefined;
-    const dur = el.duration || 0;
-    if (dur > 0) {
+    let stop = null;
+    let dead = false;
+
+    const launch = () => {
+      if (dead) return;
+      const dur = el.duration;
+      if (!isFinite(dur) || dur <= 0) return; // pas encore : on attend l'évènement
+      el.removeEventListener("loadedmetadata", launch);
       const clip = round.durationSec || 15;
       const start = Math.min((round.startFrac || 0.4) * dur, Math.max(0, dur - clip - 1));
       try {
         el.currentTime = start;
-        el.muted = muted;
+        el.muted = mutedRef.current;
         el.play().catch(() => {});
       } catch {
         /* ignore */
       }
-      const stop = setTimeout(() => {
+      // Le chrono de coupure part du VRAI départ du son, pas de l'instant où
+      // l'effet a tourné (qui peut le précéder d'une bonne seconde).
+      clearTimeout(stop);
+      stop = setTimeout(() => {
         try {
           el.pause();
         } catch {
           /* ignore */
         }
       }, clip * 1000);
-      return () => clearTimeout(stop);
-    }
-    return undefined;
-  }, [phase, clipReady, round?.index, muted]); // eslint-disable-line react-hooks/exhaustive-deps
+    };
 
-  // Le son se coupe dès qu'on quitte la manche (révélation, sortie de page).
+    launch();
+    el.addEventListener("loadedmetadata", launch);
+    return () => {
+      dead = true;
+      el.removeEventListener("loadedmetadata", launch);
+      clearTimeout(stop);
+    };
+  }, [phase, clipReady, round?.index]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Le son se coupe dès qu'on quitte la manche (révélation, sortie de page) ;
+  // et à l'inverse, un morceau lancé « en entier » depuis la révélation se tait
+  // au départ de la manche suivante — deux musiques ne se superposent jamais.
   useEffect(() => {
-    if (phase === "round") return;
+    if (phase === "round") {
+      player?.pause?.();
+      return;
+    }
     try {
       audioRef.current?.pause();
     } catch {
       /* ignore */
     }
-  }, [phase]);
+  }, [phase, player]);
 
   useEffect(
     () => () => {
@@ -334,6 +376,7 @@ export default function BlindTestVersus() {
   );
 
   useEffect(() => {
+    mutedRef.current = muted;
     if (audioRef.current) audioRef.current.muted = muted;
     sfx.setMuted(muted);
   }, [muted, sfx]);
@@ -399,8 +442,35 @@ export default function BlindTestVersus() {
   const post = (path, body) =>
     apiFetch(`/blindtest/versus/${code}${path}`, { method: "POST", token, body });
 
+  // Déverrouillage iOS : une balise <audio> qui a joué une fois PENDANT un clic
+  // accepte ensuite les lectures programmées. Or ici, le son part sur ordre du
+  // serveur, sans clic — sans ce passage, iOS refuse l'extrait de la première
+  // manche. On s'accroche donc à la première action du salon (« Prêt »,
+  // « Lancer »…), qui a lieu bien avant qu'un extrait ne soit chargé.
+  function unlockAudio() {
+    const el = audioRef.current;
+    if (!el || unlockedRef.current || el.src) return;
+    unlockedRef.current = true;
+    el.muted = true;
+    el.src = SILENT_WAV;
+    el.play()
+      .catch(() => {})
+      .finally(() => {
+        try {
+          el.pause();
+          // Un extrait a pu être chargé entre-temps : on ne lui arrache pas sa
+          // source pour faire le ménage derrière un wav silencieux.
+          if (el.src === SILENT_WAV) el.removeAttribute("src");
+          el.muted = mutedRef.current;
+        } catch {
+          /* ignore */
+        }
+      });
+  }
+
   async function act(fn) {
     if (busy) return;
+    unlockAudio(); // DANS le geste : c'est tout l'intérêt (voir ci-dessus)
     setBusy(true);
     try {
       await fn();
@@ -555,7 +625,7 @@ export default function BlindTestVersus() {
   return (
     <div className="bt-page gv">
       {/* Le lecteur : jamais visible, jamais nommé. */}
-      <audio ref={audioRef} preload="auto" style={{ display: "none" }} />
+      <audio ref={audioRef} preload="auto" playsInline style={{ display: "none" }} />
 
       <header className="bt-topbar">
         <button className="bt-back clickable" onClick={quit}>
@@ -942,6 +1012,23 @@ function Lobby({ room, me, hueById, busy, err, onRounds, onReady, onStart, onInv
 //  La révélation
 // ============================================================
 function Reveal({ round, players, meId, hueById }) {
+  // Écouter le morceau EN ENTIER : le serveur envoie le videoId à la
+  // révélation, précisément pour ça. Le mini-lecteur global s'en charge — et il
+  // se taira tout seul au départ de la manche suivante (voir plus haut).
+  const player = usePlayer();
+  const fullTrack = round.videoId
+    ? {
+        id: `btv-${round.gameId}-${round.videoId}`,
+        videoId: round.videoId,
+        name: round.ostName || round.gameName,
+        artist: round.gameName,
+        artwork: round.cover || null,
+        gameId: round.gameId,
+        gameName: round.gameName,
+      }
+    : null;
+  const fullOn = !!(fullTrack && player?.isPlaying?.(fullTrack));
+
   const results = round.results || [];
   const mine = results.find((r) => r.userId === meId);
   const champ = players.find((p) => p.id === round.winner);
@@ -981,6 +1068,19 @@ function Reveal({ round, players, meId, hueById }) {
             <span className="bt-reveal-ost">
               <Music2 size={12} /> {round.ostName}
             </span>
+          )}
+          {fullTrack && (
+            <button
+              className={`bt-reveal-full clickable ${fullOn ? "on" : ""}`}
+              onClick={() =>
+                player?.toggleTrack?.(fullTrack, [fullTrack], {
+                  source: fullTrack.gameName ? { label: fullTrack.gameName } : undefined,
+                })
+              }
+            >
+              {fullOn ? <Pause size={12} /> : <Music2 size={12} />}
+              <span>{fullOn ? "En cours d'écoute" : "Écouter en entier"}</span>
+            </button>
           )}
 
           <ul className="gv-rv-table">

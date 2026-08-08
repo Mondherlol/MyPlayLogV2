@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { usePlayer } from "../context/PlayerContext";
-import { apiFetch } from "../lib/api";
+import { apiFetch, API_BASE } from "../lib/api";
 import { useLiveStatus } from "../lib/presence";
 import { loadYT } from "../lib/youtube";
 // Règles communes aux mini-jeux « devine le jeu » (partagées avec Pixel Rush) :
@@ -63,6 +63,47 @@ const AUTO_NEXT_MS = 5000;
 // Temps supplémentaire APRÈS la fin de l'extrait pour finir de taper sa
 // réponse (le son est coupé, le chrono devient rouge).
 const GRACE_MS = 10000;
+
+// ============================================================
+//  D'OÙ SORT LE SON — et pourquoi il ne sort plus de l'iframe
+// ============================================================
+// L'extrait passait par une iframe YouTube cachée. Sur téléphone, il ne
+// démarrait pas : il fallait appuyer sur Pause puis Play pour l'entendre.
+//
+// La cause : une iframe d'un AUTRE domaine n'a pas le droit de lancer du son
+// toute seule. Elle ne peut le faire que dans la foulée d'un geste de
+// l'utilisateur, et cette autorisation ne dure que quelques secondes. Or entre
+// le clic sur « Lancer la partie » et le vrai `playVideo()`, il se passe le
+// temps de créer la partie côté serveur PUIS celui de charger la vidéo : bien
+// plus que le délai accordé. L'autorisation avait expiré. Appuyer sur Pause /
+// Play remarchait pour cette exacte raison — le `playVideo()` tombait alors
+// juste après un clic.
+//
+// On lit donc l'extrait avec une balise <audio> de NOTRE page, sur le flux m4a
+// que le serveur extrait déjà (/api/audio/:videoId, celui du mini-lecteur et de
+// l'appli mobile). Une balise de la page, elle, garde l'autorisation acquise au
+// premier clic. Bonus : le placement au climax est à la milliseconde (plus de
+// sondage de `getDuration()`), et l'extrait suivant est préchargé pendant que
+// le précédent joue.
+//
+// L'IFRAME RESTE, EN SECOURS. L'extraction dépend de yt-dlp, que YouTube casse
+// régulièrement (cf. l'en-tête de server/src/routes/audio.js) : si le flux ne
+// vient pas, on rebascule sur l'ancien chemin plutôt que de jouer une manche
+// muette. Sur PC il n'a de toute façon jamais posé de problème.
+const CLIP_FALLBACK_MS = 7000;
+
+// Joué en muet dans le geste de lancement : sur iOS, une balise <audio> qui a
+// joué une fois pendant un clic accepte ensuite les lectures programmées.
+// (Même technique que context/PlayerContext.jsx.)
+const SILENT_WAV =
+  "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+
+// Où poser l'aiguille dans le morceau pour cet extrait.
+function clipStartFor(round, duration) {
+  const clip = round.durationSec;
+  const maxStart = Math.max(0, duration - clip - 1);
+  return Math.min((round.startFrac || 0) * duration, maxStart);
+}
 
 export default function BlindTest() {
   const { token } = useAuth();
@@ -131,9 +172,18 @@ export default function BlindTest() {
   const prevUnlockRef = useRef(0);
   const replayRef = useRef(false); // miroir de replayOn pour les timers
   const clipStartRef = useRef(0); // position (s) du début de l'extrait dans la vidéo
+  const clipLenRef = useRef(15); // longueur (s) de l'extrait de la manche
+  const replayStopRef = useRef(null); // fin d'une réécoute d'extrait
   const revealAtRef = useRef(0); // instant de la révélation (anti Entrée « en retard »)
   const loadingRef = useRef(false); // miroir de clipLoading pour le timer de manche
   const graceRef = useRef(false); // l'extrait est fini, on est dans le temps bonus
+
+  // --- Les deux moteurs de son (cf. l'en-tête « D'OÙ SORT LE SON ») ---
+  const audioRef = useRef(null); // <audio> sur le flux extrait : le principal
+  const engineRef = useRef("audio"); // "audio" | "yt"
+  const pendingRef = useRef(null); // manche dont on attend les métadonnées
+  const fallbackRef = useRef(null); // minuteur de bascule vers l'iframe
+  const unlockedRef = useRef(false); // déverrouillage iOS déjà fait
 
   // --- Player YouTube caché, propre à la page (indépendant du mini-lecteur) ---
   const ytHostRef = useRef(null);
@@ -170,6 +220,8 @@ export default function BlindTest() {
     return () => {
       destroyed = true;
       if (pollRef.current) clearInterval(pollRef.current);
+      clearTimeout(fallbackRef.current);
+      clearTimeout(replayStopRef.current);
       try {
         ytRef.current?.destroy();
       } catch {
@@ -182,9 +234,16 @@ export default function BlindTest() {
   }, []);
 
   const stopClip = useCallback(() => {
+    pendingRef.current = null;
+    clearTimeout(fallbackRef.current);
     if (pollRef.current) {
       clearInterval(pollRef.current);
       pollRef.current = null;
+    }
+    try {
+      audioRef.current?.pause();
+    } catch {
+      /* ignore */
     }
     try {
       ytRef.current?.pauseVideo?.();
@@ -193,17 +252,23 @@ export default function BlindTest() {
     }
   }, []);
 
-  // Charge un extrait : démarre muet, attend la durée, se cale au bon endroit,
-  // puis démasque le son (l'appli est lancée sur un clic → l'audio est autorisé).
-  // Pendant le chargement, un spinner s'affiche sur le vinyle et le chrono de la
-  // manche est réarmé au moment où le son démarre réellement.
-  const playClip = useCallback(
+  // Le son tourne pour de bon : c'est LÀ que la manche commence (le chrono est
+  // gelé pendant le chargement, sinon il descendrait sur du silence).
+  const clipRolling = useCallback(() => {
+    clearTimeout(fallbackRef.current);
+    if (!lockedRef.current && !pausedRef.current) roundStartRef.current = Date.now();
+    loadingRef.current = false;
+    setClipLoading(false);
+  }, []);
+
+  // --- Moteur de secours : l'iframe YouTube (voir l'en-tête) ---------------
+  // Démarre muet, sonde la durée, se cale au climax puis démasque le son.
+  const playClipYT = useCallback(
     (round) => {
       const p = ytRef.current;
-      if (!p) return;
+      if (!p) return clipRolling(); // rien à jouer : la manche continue en silence
+      engineRef.current = "yt";
       seekDoneRef.current = false;
-      loadingRef.current = true;
-      setClipLoading(true);
       try {
         p.loadVideoById(round.videoId);
         p.mute?.();
@@ -223,12 +288,9 @@ export default function BlindTest() {
         }
         if (dur > 0) {
           seekDoneRef.current = true;
-          const clip = round.durationSec;
-          const maxStart = Math.max(0, dur - clip - 1);
-          const startAt = Math.min((round.startFrac || 0) * dur, maxStart);
-          clipStartRef.current = startAt;
+          clipStartRef.current = clipStartFor(round, dur);
           try {
-            pl.seekTo(startAt, true);
+            pl.seekTo(clipStartRef.current, true);
             if (!mutedRef.current) {
               pl.unMute?.();
               pl.setVolume?.(volumeRef.current);
@@ -237,29 +299,94 @@ export default function BlindTest() {
           } catch {
             /* ignore */
           }
-          // Le vrai départ de la manche : le chrono repart quand le son joue.
-          if (!lockedRef.current && !pausedRef.current) roundStartRef.current = Date.now();
-          loadingRef.current = false;
-          setClipLoading(false);
+          clipRolling();
           clearInterval(pollRef.current);
           pollRef.current = null;
         } else if (Date.now() - pollStart > 8000) {
           // Vidéo qui ne répond pas : on retire le spinner, la manche continue.
-          if (!lockedRef.current && !pausedRef.current) roundStartRef.current = Date.now();
-          loadingRef.current = false;
-          setClipLoading(false);
+          clipRolling();
           clearInterval(pollRef.current);
           pollRef.current = null;
         }
       }, 120);
     },
-    []
+    [clipRolling]
   );
 
-  // Applique le mute au player + aux bruitages.
+  // --- Moteur principal : le flux extrait, dans une balise de la page ------
+  const playClip = useCallback(
+    (round) => {
+      loadingRef.current = true;
+      setClipLoading(true);
+      clipLenRef.current = round.durationSec || 15;
+      clearTimeout(fallbackRef.current);
+      const a = audioRef.current;
+      if (!a || !round.videoId) return playClipYT(round);
+
+      engineRef.current = "audio";
+      pendingRef.current = round;
+      try {
+        ytRef.current?.pauseVideo?.();
+      } catch {
+        /* ignore */
+      }
+      a.src = `${API_BASE}/audio/${round.videoId}`;
+      a.load();
+      // Le serveur doit peut-être extraire la piste (quelques secondes). Passé
+      // ce délai, on n'attend plus : l'iframe prend le relais.
+      fallbackRef.current = setTimeout(() => {
+        if (pendingRef.current !== round) return;
+        pendingRef.current = null;
+        playClipYT(round);
+      }, CLIP_FALLBACK_MS);
+    },
+    [playClipYT]
+  );
+
+  // Départ du son dès que la durée du morceau est connue : on pose l'aiguille
+  // au climax et on lance. Un refus de lecture ou un flux introuvable renvoie
+  // sur l'iframe — jamais de manche muette sans avoir tout essayé.
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a) return undefined;
+
+    const onMeta = () => {
+      const round = pendingRef.current;
+      if (!round || engineRef.current !== "audio") return;
+      const dur = a.duration;
+      if (!isFinite(dur) || dur <= 0) return;
+      pendingRef.current = null;
+      clipStartRef.current = clipStartFor(round, dur);
+      try {
+        a.currentTime = clipStartRef.current;
+      } catch {
+        /* ignore */
+      }
+      a.muted = mutedRef.current;
+      a.volume = volumeRef.current / 100;
+      if (pausedRef.current) return clipRolling();
+      a.play().then(clipRolling, () => playClipYT(round));
+    };
+    const onErr = () => {
+      const round = pendingRef.current;
+      if (!round) return;
+      pendingRef.current = null;
+      playClipYT(round);
+    };
+
+    a.addEventListener("loadedmetadata", onMeta);
+    a.addEventListener("error", onErr);
+    return () => {
+      a.removeEventListener("loadedmetadata", onMeta);
+      a.removeEventListener("error", onErr);
+    };
+  }, [clipRolling, playClipYT]);
+
+  // Applique le mute aux deux moteurs + aux bruitages.
   useEffect(() => {
     mutedRef.current = muted;
     sfx.setMuted(muted);
+    if (audioRef.current) audioRef.current.muted = muted;
     try {
       if (muted) ytRef.current?.mute?.();
       else if (readyRef.current) {
@@ -271,12 +398,13 @@ export default function BlindTest() {
     }
   }, [muted, sfx]);
 
-  // Applique le volume au player + aux bruitages, et le retient pour la
+  // Applique le volume aux deux moteurs + aux bruitages, et le retient pour la
   // prochaine session.
   useEffect(() => {
     volumeRef.current = volume;
     localStorage.setItem("bt_volume", String(volume));
     sfx.setLevel(volume / 100);
+    if (audioRef.current) audioRef.current.volume = volume / 100;
     try {
       ytRef.current?.setVolume?.(volume);
     } catch {
@@ -316,6 +444,7 @@ export default function BlindTest() {
     if (next) {
       pauseStartRef.current = Date.now();
       try {
+        audioRef.current?.pause();
         ytRef.current?.pauseVideo?.();
       } catch {
         /* ignore */
@@ -325,7 +454,8 @@ export default function BlindTest() {
       // Pas de reprise du son si l'extrait était déjà terminé (temps bonus).
       if (!graceRef.current) {
         try {
-          ytRef.current?.playVideo?.();
+          if (engineRef.current === "audio") audioRef.current?.play()?.catch(() => {});
+          else ytRef.current?.playVideo?.();
         } catch {
           /* ignore */
         }
@@ -336,26 +466,85 @@ export default function BlindTest() {
 
   // --- Réécoute de l'extrait depuis la card de résultat (toggle) ---
   const toggleReplay = useCallback(() => {
-    const p = ytRef.current;
-    if (!p) return;
     const next = !replayRef.current;
     replayRef.current = next;
     setReplayOn(next);
+    clearTimeout(replayStopRef.current);
+    const a = audioRef.current;
+    const p = ytRef.current;
     try {
-      if (next) {
-        p.seekTo?.(clipStartRef.current || 0, true);
-        if (!mutedRef.current) {
-          p.unMute?.();
-          p.setVolume?.(volumeRef.current);
-        }
-        p.playVideo?.();
-      } else {
-        p.pauseVideo?.();
+      if (!next) {
+        a?.pause();
+        p?.pauseVideo?.();
+        return;
       }
+      // On réécoute L'EXTRAIT : il se recoupe tout seul à sa longueur, sinon il
+      // ne se distinguerait plus du bouton « écouter en entier » juste à côté.
+      replayStopRef.current = setTimeout(() => {
+        replayRef.current = false;
+        setReplayOn(false);
+        try {
+          a?.pause();
+          p?.pauseVideo?.();
+        } catch {
+          /* ignore */
+        }
+      }, clipLenRef.current * 1000);
+      if (engineRef.current === "audio" && a) {
+        a.currentTime = clipStartRef.current || 0;
+        a.muted = mutedRef.current;
+        a.volume = volumeRef.current / 100;
+        a.play().catch(() => {});
+        return;
+      }
+      p?.seekTo?.(clipStartRef.current || 0, true);
+      if (!mutedRef.current) {
+        p?.unMute?.();
+        p?.setVolume?.(volumeRef.current);
+      }
+      p?.playVideo?.();
     } catch {
       /* ignore */
     }
   }, []);
+
+  // --- Écouter le morceau EN ENTIER depuis la card de résultat -------------
+  // Quinze secondes de climax, ça donne envie d'entendre le reste — trouvé ou
+  // pas. On confie donc la piste au mini-lecteur global (context/PlayerContext),
+  // qui sait déjà la jouer partout, écran verrouillé compris, et qui survit à
+  // la fin de la partie : le morceau continue pendant qu'on lit son score.
+  // L'extrait de la manche, lui, se tait — les deux ne jouent jamais ensemble.
+  const fullTrack = useMemo(() => {
+    const r = reveal?.round;
+    if (!r?.videoId) return null;
+    return {
+      id: `bt-${r.gameId}-${r.videoId}`,
+      videoId: r.videoId,
+      name: r.ostName || r.gameName,
+      artist: r.gameName,
+      artwork: r.cover || null,
+      gameId: r.gameId,
+      gameName: r.gameName,
+    };
+  }, [reveal]);
+  const fullOn = !!(fullTrack && player?.isPlaying?.(fullTrack));
+  // Le décompte d'auto-avance se suspend tant qu'on écoute (comme pour la
+  // réécoute) : personne ne doit se faire couper le morceau au bout de 5 s.
+  const fullRef = useRef(false);
+  fullRef.current = fullOn;
+
+  const toggleFull = useCallback(() => {
+    if (!fullTrack) return;
+    if (replayRef.current) {
+      replayRef.current = false;
+      setReplayOn(false);
+      clearTimeout(replayStopRef.current);
+    }
+    stopClip();
+    player?.toggleTrack?.(fullTrack, [fullTrack], {
+      source: fullTrack.gameName ? { label: fullTrack.gameName } : undefined,
+    });
+  }, [fullTrack, player, stopClip]);
 
   // --- Ouverture d'un salon de versus ---
   // Le salon est créé ICI plutôt que sur la page d'à côté : le joueur doit
@@ -377,9 +566,30 @@ export default function BlindTest() {
     }
   }
 
+  // À appeler DANS un geste utilisateur : sur iOS, une balise <audio> qui a
+  // joué une fois pendant un clic accepte ensuite les lectures programmées.
+  const unlockAudio = useCallback(() => {
+    const a = audioRef.current;
+    if (!a || unlockedRef.current) return;
+    unlockedRef.current = true;
+    a.muted = true;
+    a.src = SILENT_WAV;
+    a.play()
+      .catch(() => {})
+      .finally(() => {
+        try {
+          a.pause();
+          a.muted = mutedRef.current;
+        } catch {
+          /* ignore */
+        }
+      });
+  }, []);
+
   // --- Démarrage d'une partie ---
   async function startGame() {
     sfx.resume(); // crée/réveille l'AudioContext dans le geste utilisateur
+    unlockAudio(); // …et déverrouille la balise <audio> dans le même geste
     player?.pause?.(); // coupe le mini-lecteur global (ex. OST des résultats)
     setError("");
     setPhase("loading");
@@ -461,6 +671,12 @@ export default function BlindTest() {
     setTimeLeftMs(total);
     playClip(round);
     sfx.play("start");
+    // Pendant qu'on cherche, le serveur prépare déjà la piste suivante : elle
+    // partira sans temps de chargement (l'extraction est le seul moment lent).
+    const nextRound = rounds[idx + 1];
+    if (nextRound?.videoId) {
+      fetch(`${API_BASE}/audio/${nextRound.videoId}/prefetch`).catch(() => {});
+    }
     // Focus le champ de recherche pour taper tout de suite.
     setTimeout(() => inputRef.current?.focus(), 60);
 
@@ -565,10 +781,14 @@ export default function BlindTest() {
   const goNext = useCallback(() => {
     replayRef.current = false;
     setReplayOn(false);
+    clearTimeout(replayStopRef.current);
+    // Le morceau écouté en entier s'arrête ici : la manche suivante démarre sur
+    // du silence, sinon deux musiques se superposeraient.
+    if (fullRef.current) player?.pause?.();
     setReveal(null);
     if (idx + 1 < rounds.length) setIdx((i) => i + 1);
     else finishGame();
-  }, [idx, rounds.length, finishGame]);
+  }, [idx, rounds.length, finishGame, player]);
   advanceRef.current = goNext;
 
   // Décompte visible de 5 s après la révélation, puis auto-avance (le bouton
@@ -581,7 +801,7 @@ export default function BlindTest() {
     setNextIn(Math.ceil(AUTO_NEXT_MS / 1000));
     const iv = setInterval(() => {
       const now = Date.now();
-      if (!replayRef.current) left -= now - last;
+      if (!replayRef.current && !fullRef.current) left -= now - last;
       last = now;
       if (left <= 0) {
         clearInterval(iv);
@@ -749,6 +969,9 @@ export default function BlindTest() {
   // ============================================================
   return (
     <div className="bt-page">
+      {/* Le moteur principal : une balise de NOTRE page (cf. « D'OÙ SORT LE
+          SON »). `playsInline` pour qu'iOS ne réquisitionne pas l'écran. */}
+      <audio ref={audioRef} preload="auto" playsInline style={{ display: "none" }} />
       <div ref={ytHostRef} style={{ position: "fixed", left: -9999, top: -9999 }} />
 
       <header className="bt-topbar">
@@ -1068,6 +1291,17 @@ export default function BlindTest() {
                     {replayOn ? <Pause size={13} /> : <Play size={13} />}
                     <span>{reveal.round.ostName || "Réécouter l'extrait"}</span>
                   </button>
+                  {/* Le morceau en entier : il part dans le mini-lecteur et
+                      continue par-dessus la suite de la partie. */}
+                  {fullTrack && (
+                    <button
+                      className={`bt-reveal-full clickable ${fullOn ? "on" : ""}`}
+                      onClick={toggleFull}
+                    >
+                      {fullOn ? <Pause size={12} /> : <Music2 size={12} />}
+                      <span>{fullOn ? "En cours d'écoute" : "Écouter en entier"}</span>
+                    </button>
+                  )}
                   <button className="bt-next clickable" onClick={goNext}>
                     {idx + 1 < rounds.length ? "Manche suivante" : "Voir mon score"}
                     <span className="bt-next-count">{nextIn}</span>

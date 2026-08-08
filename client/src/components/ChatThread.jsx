@@ -1,5 +1,6 @@
 import {
   Fragment,
+  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -70,6 +71,15 @@ function emojiOnlyLevel(text) {
 
 // Deux messages du même auteur à moins de 5 min se collent (un seul avatar).
 const GROUP_WINDOW = 5 * 60 * 1000;
+
+// --- Gestes tactiles ---------------------------------------------------
+// Au doigt, il n'y a ni survol ni clic droit : tout passe par le geste.
+// (Le tri se fait par ÉVÈNEMENT, pas par largeur d'écran : un portable à
+// écran tactile a droit au glissement comme un téléphone.)
+const LONG_PRESS = 420; // ms avant l'ouverture du menu
+const SWIPE_TRIGGER = 56; // px de glissement à partir desquels la réponse est armée
+const SWIPE_MAX = 84; // butée visuelle du glissement
+const TAP_SLOP = 10; // px en dessous desquels on considère le doigt immobile
 
 const timeFmt = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" });
 const dayFmt = new Intl.DateTimeFormat("fr-FR", {
@@ -335,23 +345,44 @@ export default function ChatThread({ conversation, token, compact, autoFocus }) 
     }
   }, [convId, token, messages, hasMore, loadingMore]);
 
-  function onScroll() {
-    const el = scrollRef.current;
-    if (!el) return;
-    stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-    if (stickRef.current) setNewBelow(false);
-    if (el.scrollTop < 80) loadMore();
-    // Le fil bouge : menus et palettes (positionnés en fixed) ne sont plus en face.
-    if (ctxMenu) setCtxMenu(null);
-    if (reactMenu) closeReact();
-  }
+  // `loadMore` change à chaque message reçu ; l'écouteur de défilement, lui,
+  // doit rester le MÊME (sinon on repose un écouteur sur le conteneur à
+  // chaque frappe). Il passe donc par une boîte aux lettres.
+  const loadMoreRef = useRef(loadMore);
+  loadMoreRef.current = loadMore;
 
-  // Ouvre le menu contextuel (clic droit sur PC, appui long au doigt), ancré
-  // au point d'appui. `e` peut être un vrai évènement ou un point simulé.
-  const openContext = useCallback((e, m) => {
-    if (m.deleted || m.system) return;
+  // Le défilement au doigt tire 60 évènements par seconde : on ne fait le
+  // travail (mesures + éventuels setState) QU'UNE FOIS par frame, sinon le
+  // fil saccade sur mobile alors qu'il n'y a rien à recalculer.
+  const scrollTickRef = useRef(false);
+  const onScroll = useCallback(() => {
+    if (scrollTickRef.current) return;
+    scrollTickRef.current = true;
+    requestAnimationFrame(() => {
+      scrollTickRef.current = false;
+      const el = scrollRef.current;
+      if (!el) return;
+      stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+      if (stickRef.current) setNewBelow(false);
+      if (el.scrollTop < 80) loadMoreRef.current();
+      // Le fil bouge : menus et palettes ancrés au clic ne sont plus en face.
+      // (La feuille du bas, elle, n'est ancrée à rien : un message qui arrive
+      // pendant qu'on choisit une réaction ne doit pas la faire disparaître.)
+      setCtxMenu((c) => (c && !c.sheet ? null : c));
+      setReactMenu((r) => (r ? null : r));
+      setFullPicker((f) => (f ? false : f));
+    });
+  }, []);
+
+  // Ouvre le menu contextuel (clic droit sur PC, appui long au doigt). Au
+  // doigt (`sheet`), il ne s'ancre pas au point d'appui mais monte du bas de
+  // l'écran : c'est là que le pouce est, et rien n'est rogné par le clavier.
+  const openContext = useCallback((e, m, sheet) => {
+    // Avant toute chose : on coupe le menu natif du navigateur (« Copier /
+    // Partager / Tout sélectionner »), qui volait l'appui long.
     e.preventDefault?.();
-    setCtxMenu({ message: m, x: e.clientX, y: e.clientY });
+    if (m.deleted || m.system) return;
+    setCtxMenu({ message: m, x: e.clientX, y: e.clientY, sheet: !!sheet });
   }, []);
 
   // Clic sur une citation : on remonte au message d'origine. S'il est encore
@@ -435,6 +466,24 @@ export default function ChatThread({ conversation, token, compact, autoFocus }) 
     },
     [token]
   );
+
+  // Rappels donnés aux bulles. Ils prennent le message en argument plutôt que
+  // de se refermer dessus : ainsi ils ne changent JAMAIS d'une frappe à
+  // l'autre, et `MessageRow` (mémorisé) ne redessine que la bulle concernée
+  // au lieu des trente autres — c'est ce qui rend le fil fluide au doigt.
+  const handleReply = useCallback((m) => setReplyTo(m), []);
+  const handleEdit = useCallback((m) => setEditing(m), []);
+  const handleDelete = useCallback((m) => remove(m.id), [remove]);
+  const handleOpenImage = useCallback((url) => setLightbox({ url }), []);
+  const handleToggleReact = useCallback((e, m) => {
+    // Ancre = le bouton sourire : le popover (portail fixed) s'ouvre juste
+    // au-dessus, jamais rogné par un overflow.
+    const r = e.currentTarget.getBoundingClientRect();
+    setFullPicker(false);
+    setReactMenu((cur) =>
+      cur?.id === m.id ? null : { id: m.id, x: r.left + r.width / 2, y: r.top }
+    );
+  }, []);
 
   const ping = useCallback(
     (stopped) => {
@@ -544,22 +593,12 @@ export default function ChatThread({ conversation, token, compact, autoFocus }) 
                     onContext={openContext}
                     onMediaLoad={onMediaLoad}
                     rowRefs={rowRefs}
-                    onToggleReact={(e) => {
-                      // Ancre = le bouton sourire : le popover (portail fixed)
-                      // s'ouvre juste au-dessus, jamais rogné par un overflow.
-                      const r = e.currentTarget.getBoundingClientRect();
-                      setFullPicker(false);
-                      setReactMenu((cur) =>
-                        cur?.id === m.id
-                          ? null
-                          : { id: m.id, x: r.left + r.width / 2, y: r.top }
-                      );
-                    }}
+                    onToggleReact={handleToggleReact}
                     onReact={react}
-                    onReply={() => setReplyTo(m)}
-                    onEdit={() => setEditing(m)}
-                    onDelete={() => remove(m.id)}
-                    onOpenImage={(url) => setLightbox({ url })}
+                    onReply={handleReply}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onOpenImage={handleOpenImage}
                   />
                 )}
                 {/* Accusés de lecture : les pastilles des gens dont c'est le
@@ -645,14 +684,29 @@ export default function ChatThread({ conversation, token, compact, autoFocus }) 
   );
 }
 
-// --- Menu contextuel (clic droit sur un message) ---
+// --- Menu d'un message ---
+// DEUX VISAGES POUR LE MÊME MENU. À la souris, il s'ancre au clic, comme
+// n'importe quel menu contextuel. Au doigt (`menu.sheet`), il monte du bas de
+// l'écran : le petit menu ancré tombait sous le pouce, à moitié hors écran
+// quand on visait le dernier message, et ses cibles de 30 px se rataient une
+// fois sur trois. Une feuille du bas met tout à portée, en grand.
 function ChatMessageMenu({ menu, canModerate, onClose, onReact, onReply, onEdit, onDelete }) {
-  const { message: m } = menu;
+  const { message: m, sheet } = menu;
   const ref = useRef(null);
   const [pos, setPos] = useState({ left: menu.x, top: menu.y });
   const [fullPicker, setFullPicker] = useState(false);
+  // Le doigt qui vient d'ouvrir la feuille se relève une fraction de seconde
+  // plus tard, et le navigateur en tire un clic fantôme AILLEURS que sur la
+  // feuille : sans ce délai, elle se refermerait aussitôt ouverte.
+  const [armed, setArmed] = useState(!sheet);
 
-  useClickOutside(ref, onClose, true);
+  useEffect(() => {
+    if (armed) return undefined;
+    const t = setTimeout(() => setArmed(true), 320);
+    return () => clearTimeout(t);
+  }, [armed]);
+
+  useClickOutside(ref, onClose, armed);
 
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && onClose();
@@ -660,118 +714,194 @@ function ChatMessageMenu({ menu, canModerate, onClose, onReact, onReply, onEdit,
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // Recale le menu pour qu'il tienne dans la fenêtre AVANT la peinture
+  // Recale le menu ancré pour qu'il tienne dans la fenêtre AVANT la peinture
   // (useLayoutEffect) : pas de saut visible entre le point de clic et la
-  // position finale.
+  // position finale. (Sans objet pour la feuille, collée au bas de l'écran.)
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || sheet) return;
     const r = el.getBoundingClientRect();
     const left = Math.min(menu.x, window.innerWidth - r.width - 8);
     const top = Math.min(menu.y, window.innerHeight - r.height - 8);
     setPos({ left: Math.max(8, left), top: Math.max(8, top) });
-  }, [menu.x, menu.y, fullPicker]);
+  }, [menu.x, menu.y, fullPicker, sheet]);
 
   const canEdit = m.mine && !m.deleted && !m.system;
   const canDelete = m.mine || canModerate;
 
-  return createPortal(
-    <div
-      ref={ref}
-      className="chat-ctxmenu"
-      style={{ left: pos.left, top: pos.top }}
-    >
-      <div className="chat-ctxmenu-reacts">
-        {QUICK_REACTIONS.map((emo) => (
-          <button
-            type="button"
-            key={emo}
-            className="chat-ctxmenu-emoji clickable"
-            onClick={() => {
-              onReact(m.id, emo);
-              onClose();
-            }}
-          >
-            {emo}
-          </button>
-        ))}
+  const pick = (emo) => {
+    onReact(m.id, emo);
+    onClose();
+  };
+
+  const reacts = (
+    <div className={sheet ? "chat-sheet-reacts" : "chat-ctxmenu-reacts"}>
+      {QUICK_REACTIONS.map((emo) => (
         <button
           type="button"
-          className="chat-ctxmenu-emoji chat-ctxmenu-more clickable"
-          onClick={() => setFullPicker((v) => !v)}
-          title="Plus d'émojis"
+          key={emo}
+          className="chat-ctxmenu-emoji clickable"
+          onClick={() => pick(emo)}
         >
-          <Smile size={16} />
+          {emo}
         </button>
-      </div>
+      ))}
+      <button
+        type="button"
+        className="chat-ctxmenu-emoji chat-ctxmenu-more clickable"
+        onClick={() => setFullPicker((v) => !v)}
+        title="Plus d'émojis"
+        aria-label="Plus d'émojis"
+      >
+        <Smile size={16} />
+      </button>
+    </div>
+  );
 
-      {fullPicker ? (
-        <div className="chat-ctxmenu-picker">
-          <EmojiPanel
-            onPick={(emo) => {
-              onReact(m.id, emo);
-              onClose();
-            }}
-            height={280}
-          />
-        </div>
-      ) : (
-        <>
-          <button
-            type="button"
-            className="chat-ctxmenu-item clickable"
-            onClick={() => {
-              onReply(m);
-              onClose();
-            }}
-          >
-            <Reply size={15} /> Répondre
-          </button>
-          {m.text && (
-            <button
-              type="button"
-              className="chat-ctxmenu-item clickable"
-              onClick={() => {
-                navigator.clipboard?.writeText(m.text).catch(() => {});
-                onClose();
-              }}
-            >
-              <Copy size={15} /> Copier le texte
-            </button>
-          )}
-          {canEdit && (
-            <button
-              type="button"
-              className="chat-ctxmenu-item clickable"
-              onClick={() => {
-                onEdit(m);
-                onClose();
-              }}
-            >
-              <Pencil size={15} /> Modifier
-            </button>
-          )}
-          {canDelete && (
-            <button
-              type="button"
-              className="chat-ctxmenu-item danger clickable"
-              onClick={() => {
-                onDelete(m.id);
-                onClose();
-              }}
-            >
-              <Trash2 size={15} /> Supprimer
-            </button>
-          )}
-        </>
+  const items = fullPicker ? (
+    <div className="chat-ctxmenu-picker">
+      <EmojiPanel onPick={pick} height={sheet ? 260 : 280} />
+    </div>
+  ) : (
+    <>
+      <button
+        type="button"
+        className="chat-ctxmenu-item clickable"
+        onClick={() => {
+          onReply(m);
+          onClose();
+        }}
+      >
+        <Reply size={15} /> Répondre
+      </button>
+      {m.text && (
+        <button
+          type="button"
+          className="chat-ctxmenu-item clickable"
+          onClick={() => {
+            navigator.clipboard?.writeText(m.text).catch(() => {});
+            onClose();
+          }}
+        >
+          <Copy size={15} /> Copier le texte
+        </button>
       )}
+      {canEdit && (
+        <button
+          type="button"
+          className="chat-ctxmenu-item clickable"
+          onClick={() => {
+            onEdit(m);
+            onClose();
+          }}
+        >
+          <Pencil size={15} /> Modifier
+        </button>
+      )}
+      {canDelete && (
+        <button
+          type="button"
+          className="chat-ctxmenu-item danger clickable"
+          onClick={() => {
+            onDelete(m.id);
+            onClose();
+          }}
+        >
+          <Trash2 size={15} /> Supprimer
+        </button>
+      )}
+    </>
+  );
+
+  if (sheet) {
+    return createPortal(
+      <div className="chat-sheet-wrap" role="dialog" aria-modal="true">
+        <button
+          type="button"
+          className="chat-sheet-back"
+          onClick={onClose}
+          aria-label="Fermer"
+        />
+        <SheetBody innerRef={ref} onClose={onClose}>
+          {reacts}
+          <div className="chat-sheet-items">{items}</div>
+        </SheetBody>
+      </div>,
+      document.body
+    );
+  }
+
+  return createPortal(
+    <div ref={ref} className="chat-ctxmenu" style={{ left: pos.left, top: pos.top }}>
+      {reacts}
+      {items}
     </div>,
     document.body
   );
 }
 
+// La feuille elle-même : on la referme en la poussant vers le bas, comme
+// n'importe quelle feuille d'application native. Le glissement se peint sur le
+// nœud, sans rendu React.
+const SheetBody = function SheetBody({ children, onClose, innerRef }) {
+  const local = useRef(null);
+  const drag = useRef(null);
+  const set = (el) => {
+    local.current = el;
+    if (innerRef) innerRef.current = el;
+  };
+
+  const start = (e) => {
+    const t = e.touches[0];
+    if (!t) return;
+    drag.current = { y: t.clientY, dy: 0 };
+    if (local.current) local.current.style.transition = "none";
+  };
+  const move = (e) => {
+    const d = drag.current;
+    const t = e.touches[0];
+    if (!d || !t) return;
+    d.dy = Math.max(0, t.clientY - d.y);
+    if (local.current) local.current.style.transform = `translate3d(0,${d.dy}px,0)`;
+  };
+  const end = () => {
+    const d = drag.current;
+    drag.current = null;
+    if (!d || !local.current) return;
+    local.current.style.transition = "transform .2s ease";
+    if (d.dy > 90) {
+      local.current.style.transform = "translate3d(0,110%,0)";
+      setTimeout(onClose, 140);
+    } else {
+      local.current.style.transform = "";
+    }
+  };
+
+  return (
+    <div ref={set} className="chat-sheet">
+      {/* La poignée seule capte le glissement : ailleurs, le doigt doit
+          pouvoir parcourir la grille d'émojis sans fermer la feuille. */}
+      <div
+        className="chat-sheet-grip-zone"
+        onTouchStart={start}
+        onTouchMove={move}
+        onTouchEnd={end}
+        onTouchCancel={end}
+      >
+        <span className="chat-sheet-grip" aria-hidden="true" />
+      </div>
+      {children}
+    </div>
+  );
+};
+
 // --- Une bulle ---
-function MessageRow({
+//
+// MÉMORISÉE : un fil ouvert se redessine sans arrêt (quelqu'un écrit, un
+// accusé de lecture tombe, on tape un caractère). Sans `memo`, chacun de ces
+// évènements relançait le rendu des trente bulles à l'écran — twemoji, liens,
+// cartes compris. C'est ce qui faisait ramer le fil au doigt.
+const MessageRow = memo(function MessageRow({
   m,
   grouped,
   isGroup,
@@ -811,27 +941,152 @@ function MessageRow({
     [rowRefs, m.id]
   );
 
-  // Au doigt, il n'y a pas de survol : l'appui long (450 ms) ouvre le même menu
-  // que le clic droit. Un glissement (scroll) annule l'appui.
+  // ============================================================
+  //  Gestes tactiles : glisser pour répondre, appui long, double tape
+  // ============================================================
+  // TROIS GESTES SUR LE MÊME DOIGT, ET UN SEUL À LA FOIS. On décide de la
+  // nature du geste aux dix premiers pixels puis on s'y tient : sans ce
+  // verrou, un début de glissement volait le défilement du fil, et le moindre
+  // frémissement pendant un appui long déclenchait une réponse.
+  //
+  // Le glissement se peint DIRECTEMENT sur le nœud (style.transform), sans
+  // repasser par React : une bulle qui suit le doigt à 60 images/seconde ne
+  // peut pas se permettre soixante rendus.
+  const swipeRef = useRef(null); // ce qui glisse (tout sauf l'icône de réponse)
+  const hintRef = useRef(null); // la flèche qui se dévoile derrière
+  const gesture = useRef(null);
   const pressRef = useRef(null);
+  const longFired = useRef(false); // l'appui long a déjà servi ce doigt
+  const lastTapRef = useRef(0);
+
   const cancelPress = useCallback(() => {
     clearTimeout(pressRef.current);
     pressRef.current = null;
   }, []);
+
+  const paint = useCallback((dx, armed) => {
+    const el = swipeRef.current;
+    if (el) el.style.transform = dx ? `translate3d(${dx}px,0,0)` : "";
+    const h = hintRef.current;
+    if (!h) return;
+    const p = Math.min(1, dx / SWIPE_TRIGGER);
+    h.style.opacity = String(p);
+    h.style.transform = `translateY(-50%) scale(${0.6 + p * 0.4})`;
+    h.classList.toggle("armed", !!armed);
+  }, []);
+
   const onTouchStart = useCallback(
     (e) => {
-      const t = e.touches?.[0];
-      if (!t) return;
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
       const { clientX, clientY } = t;
+      gesture.current = {
+        x: clientX,
+        y: clientY,
+        mode: 0,
+        armed: false,
+        at: Date.now(),
+        // Parti du bord gauche : c'est le geste « retour » du système (qui
+        // ramène à la liste, l'ouverture d'un fil étant dans l'historique).
+        // On ne lui dispute pas le doigt avec une réponse.
+        edge: clientX < 26,
+      };
+      longFired.current = false;
       clearTimeout(pressRef.current);
+      if (m.deleted) return;
       pressRef.current = setTimeout(() => {
         pressRef.current = null;
-        navigator.vibrate?.(12); // petit retour haptique
-        onContext({ clientX, clientY }, m);
-      }, 450);
+        longFired.current = true;
+        gesture.current = null; // l'appui long a gagné : plus de glissement
+        navigator.vibrate?.(14); // petit retour haptique
+        onContext({ clientX, clientY }, m, true);
+      }, LONG_PRESS);
     },
     [onContext, m]
   );
+
+  const onTouchMove = useCallback(
+    (e) => {
+      const g = gesture.current;
+      const t = e.touches[0];
+      if (!g || !t) return;
+      const dx = t.clientX - g.x;
+      const dy = t.clientY - g.y;
+
+      if (g.mode === 0) {
+        // Verrou de direction : vertical = on lit le fil, on ne touche à rien.
+        if (Math.abs(dx) < TAP_SLOP && Math.abs(dy) < TAP_SLOP) return;
+        cancelPress();
+        if (dx > 0 && Math.abs(dx) > Math.abs(dy) && !m.deleted && !g.edge) {
+          g.mode = 1;
+          if (swipeRef.current) swipeRef.current.style.transition = "none";
+        } else {
+          g.mode = -1;
+          return;
+        }
+      }
+      if (g.mode !== 1) return;
+
+      // Résistance passé le seuil : le geste « bute », on SENT qu'il est
+      // acquis sans avoir à regarder l'icône.
+      const off =
+        dx <= SWIPE_TRIGGER
+          ? Math.max(0, dx)
+          : Math.min(SWIPE_MAX, SWIPE_TRIGGER + (dx - SWIPE_TRIGGER) * 0.3);
+      const armed = dx >= SWIPE_TRIGGER;
+      if (armed !== g.armed) {
+        g.armed = armed;
+        if (armed) navigator.vibrate?.(12);
+      }
+      paint(off, armed);
+    },
+    [cancelPress, paint, m.deleted]
+  );
+
+  const onTouchEnd = useCallback(
+    (e) => {
+      cancelPress();
+      const g = gesture.current;
+      gesture.current = null;
+      if (!g) return;
+
+      if (g.mode === 1) {
+        const el = swipeRef.current;
+        if (el) el.style.transition = "transform .22s cubic-bezier(.2,.8,.3,1)";
+        paint(0, false);
+        if (g.armed) onReply(m);
+        return;
+      }
+
+      // Double tape sur la bulle = petit cœur, comme partout ailleurs. Les
+      // liens, images, cartes et pastilles de réaction gardent leur propre
+      // action : on ne réagit que sur du vrai « vide ».
+      if (g.mode !== 0 || longFired.current || m.deleted) return;
+      if (Date.now() - g.at > 260) return;
+      if (e.target?.closest?.("a, button, input, textarea, .chat-media")) return;
+      const now = Date.now();
+      if (now - lastTapRef.current < 300) {
+        lastTapRef.current = 0;
+        navigator.vibrate?.(12);
+        onReact(m.id, "❤️");
+      } else {
+        lastTapRef.current = now;
+      }
+    },
+    [cancelPress, paint, onReply, onReact, m]
+  );
+
+  const onTouchCancel = useCallback(() => {
+    cancelPress();
+    const g = gesture.current;
+    gesture.current = null;
+    if (g?.mode === 1) {
+      const el = swipeRef.current;
+      if (el) el.style.transition = "transform .22s cubic-bezier(.2,.8,.3,1)";
+      paint(0, false);
+    }
+  }, [cancelPress, paint]);
+
   useEffect(() => cancelPress, [cancelPress]);
 
   return (
@@ -840,154 +1095,170 @@ function MessageRow({
       className={`chat-row ${m.mine ? "mine" : ""} ${grouped ? "grouped" : ""} ${
         flash ? "is-flash" : ""
       } ${fresh ? "is-fresh" : ""}`}
-      onContextMenu={(e) => onContext(e, m)}
+      onContextMenu={(e) => {
+        // Android émet AUSSI un `contextmenu` au bout de l'appui long : sans ce
+        // garde-fou, le menu s'ouvrirait deux fois (et se refermerait aussitôt).
+        if (longFired.current) {
+          e.preventDefault();
+          return;
+        }
+        onContext(e, m);
+      }}
       onTouchStart={onTouchStart}
-      onTouchMove={cancelPress}
-      onTouchEnd={cancelPress}
-      onTouchCancel={cancelPress}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onTouchCancel={onTouchCancel}
     >
-      {!m.mine && (
-        <span className="chat-row-av">
-          {!grouped &&
-            (m.author?.username ? (
-              <Link to={`/u/${m.author.username}`} title={m.author.username}>
-                {m.author.avatar ? (
-                  <img src={m.author.avatar} alt="" />
-                ) : (
-                  m.author.username[0].toUpperCase()
-                )}
-              </Link>
-            ) : (
-              "?"
-            ))}
+      {!m.deleted && (
+        <span className="chat-swipe-hint" ref={hintRef} aria-hidden="true">
+          <Reply size={15} />
         </span>
       )}
 
-      <div className="chat-bubble-wrap">
-        {!grouped && isGroup && !m.mine && (
-          <Link to={`/u/${m.author?.username || ""}`} className="chat-row-name">
-            {m.author?.username || "—"}
-          </Link>
-        )}
-
-        {m.replyTo && (
-          <button
-            type="button"
-            className="chat-quote clickable"
-            onClick={() => onJumpTo(m.replyTo.id)}
-            title="Aller au message d'origine"
-          >
-            <strong>{m.replyTo.author?.username || "—"}</strong>
-            <span>
-              {m.replyTo.deleted
-                ? "Message supprimé"
-                : m.replyTo.text || (m.replyTo.kind === "gif" ? "GIF" : "Photo")}
-            </span>
-          </button>
-        )}
-
-        <div
-          className={`chat-bubble ${m.deleted ? "is-deleted" : ""} ${
-            m.game || m.ost || m.party || m.mot || m.versus || m.book ? "has-card" : ""
-          } ${emojiLvl ? `chat-emoji-only lvl-${emojiLvl}` : ""}`}
-        >
-          {m.deleted ? (
-            <em>Message supprimé</em>
-          ) : (
-            <>
-              {m.game && <GameCard game={m.game} />}
-              {m.ost && <OstCard ost={m.ost} />}
-              {m.party && <PartyCard party={m.party} />}
-              {m.mot && <MotCard mot={m.mot} />}
-              {m.versus && <VersusCard versus={m.versus} />}
-              {m.book && <BookCard book={m.book} />}
-              {m.text && <p>{renderMessage(m.text, m.mentions)}</p>}
-              {m.media?.length > 0 && (
-                <div className={`chat-media n-${Math.min(m.media.length, 4)}`}>
-                  {m.media.map((md, i) => (
-                    <button
-                      type="button"
-                      key={i}
-                      className="chat-media-item clickable"
-                      onClick={() => onOpenImage(md.url)}
-                    >
-                      <img src={md.url} alt="" loading="lazy" onLoad={onMediaLoad} />
-                    </button>
-                  ))}
-                </div>
-              )}
-              {ytIds.map((id) => (
-                <YouTubeEmbed key={id} id={id} />
+      <div className="chat-swipe" ref={swipeRef}>
+        {!m.mine && (
+          <span className="chat-row-av">
+            {!grouped &&
+              (m.author?.username ? (
+                <Link to={`/u/${m.author.username}`} title={m.author.username}>
+                  {m.author.avatar ? (
+                    <img src={m.author.avatar} alt="" />
+                  ) : (
+                    m.author.username[0].toUpperCase()
+                  )}
+                </Link>
+              ) : (
+                "?"
               ))}
-            </>
-          )}
-          <span className="chat-time">
-            {timeFmt.format(new Date(m.createdAt))}
-            {m.edited && <em> · modifié</em>}
           </span>
+        )}
+
+        <div className="chat-bubble-wrap">
+          {!grouped && isGroup && !m.mine && (
+            <Link to={`/u/${m.author?.username || ""}`} className="chat-row-name">
+              {m.author?.username || "—"}
+            </Link>
+          )}
+
+          {m.replyTo && (
+            <button
+              type="button"
+              className="chat-quote clickable"
+              onClick={() => onJumpTo(m.replyTo.id)}
+              title="Aller au message d'origine"
+            >
+              <strong>{m.replyTo.author?.username || "—"}</strong>
+              <span>
+                {m.replyTo.deleted
+                  ? "Message supprimé"
+                  : m.replyTo.text || (m.replyTo.kind === "gif" ? "GIF" : "Photo")}
+              </span>
+            </button>
+          )}
+
+          <div
+            className={`chat-bubble ${m.deleted ? "is-deleted" : ""} ${
+              m.game || m.ost || m.party || m.mot || m.versus || m.book ? "has-card" : ""
+            } ${emojiLvl ? `chat-emoji-only lvl-${emojiLvl}` : ""}`}
+          >
+            {m.deleted ? (
+              <em>Message supprimé</em>
+            ) : (
+              <>
+                {m.game && <GameCard game={m.game} />}
+                {m.ost && <OstCard ost={m.ost} />}
+                {m.party && <PartyCard party={m.party} />}
+                {m.mot && <MotCard mot={m.mot} />}
+                {m.versus && <VersusCard versus={m.versus} />}
+                {m.book && <BookCard book={m.book} />}
+                {m.text && <p>{renderMessage(m.text, m.mentions)}</p>}
+                {m.media?.length > 0 && (
+                  <div className={`chat-media n-${Math.min(m.media.length, 4)}`}>
+                    {m.media.map((md, i) => (
+                      <button
+                        type="button"
+                        key={i}
+                        className="chat-media-item clickable"
+                        onClick={() => onOpenImage(md.url)}
+                      >
+                        <img src={md.url} alt="" loading="lazy" onLoad={onMediaLoad} />
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {ytIds.map((id) => (
+                  <YouTubeEmbed key={id} id={id} />
+                ))}
+              </>
+            )}
+            <span className="chat-time">
+              {timeFmt.format(new Date(m.createdAt))}
+              {m.edited && <em> · modifié</em>}
+            </span>
+          </div>
+
+          {m.reactions?.length > 0 && (
+            <div className="chat-reacts">
+              {m.reactions.map((r) => (
+                <button
+                  type="button"
+                  key={r.emoji}
+                  className={`chat-react clickable ${r.mine ? "mine" : ""}`}
+                  onClick={() => onReact(m.id, r.emoji)}
+                >
+                  <span>{r.emoji}</span>
+                  {r.count > 1 && <b>{r.count}</b>}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {m.reactions?.length > 0 && (
-          <div className="chat-reacts">
-            {m.reactions.map((r) => (
-              <button
-                type="button"
-                key={r.emoji}
-                className={`chat-react clickable ${r.mine ? "mine" : ""}`}
-                onClick={() => onReact(m.id, r.emoji)}
-              >
-                <span>{r.emoji}</span>
-                {r.count > 1 && <b>{r.count}</b>}
-              </button>
-            ))}
+        {!m.deleted && (
+          <div className="chat-actions">
+            <button
+              type="button"
+              className="chat-act clickable"
+              onClick={(e) => onToggleReact(e, m)}
+              title="Réagir"
+            >
+              <Smile size={15} />
+            </button>
+            <button
+              type="button"
+              className="chat-act clickable"
+              onClick={() => onReply(m)}
+              title="Répondre"
+            >
+              <Reply size={15} />
+            </button>
+            {m.mine && (
+              <>
+                <button
+                  type="button"
+                  className="chat-act clickable"
+                  onClick={() => onEdit(m)}
+                  title="Modifier"
+                >
+                  <Pencil size={14} />
+                </button>
+                <button
+                  type="button"
+                  className="chat-act clickable"
+                  onClick={() => onDelete(m)}
+                  title="Supprimer"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </>
+            )}
+
           </div>
         )}
       </div>
-
-      {!m.deleted && (
-        <div className="chat-actions">
-          <button
-            type="button"
-            className="chat-act clickable"
-            onClick={onToggleReact}
-            title="Réagir"
-          >
-            <Smile size={15} />
-          </button>
-          <button
-            type="button"
-            className="chat-act clickable"
-            onClick={onReply}
-            title="Répondre"
-          >
-            <Reply size={15} />
-          </button>
-          {m.mine && (
-            <>
-              <button
-                type="button"
-                className="chat-act clickable"
-                onClick={onEdit}
-                title="Modifier"
-              >
-                <Pencil size={14} />
-              </button>
-              <button
-                type="button"
-                className="chat-act clickable"
-                onClick={onDelete}
-                title="Supprimer"
-              >
-                <Trash2 size={14} />
-              </button>
-            </>
-          )}
-
-        </div>
-      )}
     </div>
   );
-}
+});
 
 // --- Palette de réactions (portail fixed : jamais rognée par un overflow,
 //     même dans les fenêtres de chat flottantes) ---
