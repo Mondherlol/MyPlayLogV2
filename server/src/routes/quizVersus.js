@@ -195,7 +195,17 @@ function roundView(room, meId) {
     .map((a, i) => ({ userId: String(a.user), order: i + 1, atMs: a.atMs }));
 
   const view = {
-    ...publicRound(round, {
+    // `round.payload`, PAS `round` : la manche est stockée dans une enveloppe
+    // { type, mode, durationSec, payload } et tout le contenu — l'énoncé, les
+    // propositions, les emojis, les cartes du duel — vit dans `payload`.
+    //
+    // Sérialiser l'enveloppe renvoyait un objet où seuls `type` et
+    // `durationSec` étaient renseignés : le bandeau, le chrono et le joker
+    // s'affichaient normalement, mais la question était vide et la liste des
+    // propositions aussi. La partie paraissait figée alors qu'elle tournait.
+    // (Le reste du fichier lisait déjà `round.payload` — la correction et le
+    // joker, eux, fonctionnaient.)
+    ...publicRound(round.payload || {}, {
       reveal: revealed,
       elapsedMs,
       index: room.index,

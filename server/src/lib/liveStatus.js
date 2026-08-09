@@ -36,6 +36,9 @@ const LABELS = {
   blindtest: "Joue au Blind Test",
   pixel: "Joue à Pixel Rush",
   geo: "Joue à GeoGamer",
+  // Sans cette ligne, `isKnownKind` refuse le statut et la messagerie continue
+  // d'afficher « en ligne » pendant qu'on joue.
+  quiz: "Joue au Grand Quiz",
   arcade: "Traîne à l'arcade",
   watchparty: "Regarde une séance",
 };

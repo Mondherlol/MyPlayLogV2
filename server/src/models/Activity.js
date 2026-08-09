@@ -58,6 +58,15 @@ const activitySchema = new mongoose.Schema(
         // ses points), mais le fil n'en montre qu'une : routes/feed.js
         // dédoublonne par meta.versusId, comme il le fait pour les sessions du
         // mot du jour.
+        "quiz", // a terminé une partie du Grand Quiz (meta = score/épreuves/défi)
+        "quizversus", // a disputé un plateau du Grand Quiz (idem, + la table)
+        //
+        // ATTENTION : CET ENUM EST UN FILTRE SILENCIEUX. Un type absent d'ici
+        // fait échouer `recordActivity` — qui est best-effort et n'affiche donc
+        // rien — et le fil ne reçoit tout simplement jamais la carte. C'est
+        // exactement ce qui est arrivé au Grand Quiz : les parties se jouaient,
+        // les points tombaient, et aucune carte n'apparaissait. Tout nouveau
+        // type de carte commence par une ligne ICI.
         "mot", // a trouvé le mot du jour (meta = score/essais/temps — JAMAIS le
         // mot lui-même : la carte ne doit rien divulguer aux amis qui n'ont pas
         // encore joué)
