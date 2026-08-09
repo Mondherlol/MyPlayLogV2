@@ -31,6 +31,7 @@ import {
   Users,
   Thermometer,
   Library,
+  Lock,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCosmetics } from "../context/CosmeticsContext";
@@ -85,17 +86,6 @@ const GAMES = [
     idOf: (e) => e.geoGameId,
   },
   {
-    key: "quiz",
-    name: "Le Grand Quiz",
-    tag: "Culture JV",
-    pitch:
-      "Huit épreuves tirées au sort : questions, emojis, anagrammes, studios, duels de cartes, piles à trier. Seul ou à six.",
-    Icon: Trophy,
-    path: "/quiz",
-    api: "/quiz/leaderboard",
-    idOf: (e) => e.quizGameId,
-  },
-  {
     key: "mot",
     name: "Mot du jour",
     tag: "Devinette",
@@ -107,6 +97,17 @@ const GAMES = [
     // Pas de bouton « Défier » ici : tout le monde joue DÉJÀ la même énigme le
     // même jour, il n'y a pas de set à rejouer. D'où l'absence d'identifiant.
     idOf: () => null,
+  },
+  {
+    key: "quiz",
+    name: "Le Grand Quiz",
+    tag: "Culture JV",
+    pitch:
+      "Huit épreuves tirées au sort : questions, emojis, anagrammes, studios, duels de cartes, piles à trier. Seul ou à six.",
+    Icon: Trophy,
+    path: "/quiz",
+    api: "/quiz/leaderboard",
+    idOf: (e) => e.quizGameId,
   },
 ];
 
@@ -445,8 +446,12 @@ export default function Arcade() {
               game={g}
               mine={(boards[g.key] || []).find((e) => e.isMe)}
               cover={covers.length ? covers[i % covers.length] : null}
+              // Le Grand Quiz en montre DEUX (le choix A ou B) : la suivante
+              // de la liste, pour ne pas afficher deux fois la même jaquette.
+              cover2={covers.length ? covers[(i + 1) % covers.length] : null}
             />
           ))}
+          <MysteryCard />
         </div>
 
         {/* ---------- La machine à capsules ----------
@@ -637,7 +642,7 @@ export default function Arcade() {
 // bibliothèque, traitée dans l'idiome du jeu : pixelisée sur une pile de
 // cartes de quiz pour Pixel Rush, glissée dans une pochette d'où sort le
 // vinyle pour le Blind Test. On saisit la règle avant même de cliquer.
-function GameCard({ game, mine, cover }) {
+function GameCard({ game, mine, cover, cover2 }) {
   return (
     <Link to={game.path} className={`arc-game g-${game.key} clickable`}>
       <span className="arc-game-glow" aria-hidden="true" />
@@ -645,7 +650,7 @@ function GameCard({ game, mine, cover }) {
           d'un coup d'œil, l'ancien libellé (« Quiz musical »…) faisait
           doublon avec la description. */}
       <span className="arc-game-top">
-        <GameArt game={game} cover={cover} />
+        <GameArt game={game} cover={cover} cover2={cover2} />
         <span className="arc-game-head">
           <span className="arc-game-name">{game.name}</span>
           <span className="arc-game-pitch">{game.pitch}</span>
@@ -671,11 +676,42 @@ function GameCard({ game, mine, cover }) {
   );
 }
 
+// ---------- La carte « jeu mystère » ----------
+// Un emplacement réservé, pas un mini-jeu : ni <Link>, ni classement, ni
+// record. Elle ferme la grille (les mini-jeux sont en nombre pair sans elle)
+// et sert d'appât — d'où le « ? » qui respire et la bordure en pointillé qui
+// dit clairement « ce n'est pas encore cliquable ».
+function MysteryCard() {
+  return (
+    <div className="arc-game arc-game-soon g-mystery">
+      <span className="arc-game-top">
+        <span className="arc-game-art soon" aria-hidden="true">
+          <span className="arc-art-soon-deck" />
+          <b>?</b>
+        </span>
+        <span className="arc-game-head">
+          <span className="arc-game-name">Jeu mystère</span>
+          <span className="arc-game-pitch">
+            Un sixième mini-jeu se monte dans l'arrière-salle. Pas encore
+            d'indice — repasse traîner par ici.
+          </span>
+        </span>
+      </span>
+      <span className="arc-game-foot">
+        <span className="arc-game-stat">
+          <Lock size={13} /> Bientôt
+        </span>
+        <span className="arc-game-cta soon">En préparation</span>
+      </span>
+    </div>
+  );
+}
+
 // Format du canvas de la jaquette pixelisée : 3/4, comme une jaquette.
 const ART_CV_W = 186;
 const ART_CV_H = 248;
 
-function GameArt({ game, cover }) {
+function GameArt({ game, cover, cover2 }) {
   // GeoGamer ne dépend PAS de la bibliothèque du joueur : son art est un
   // panorama fixe, le même pour tout le monde. D'où ce branchement avant le
   // garde-fou ci-dessous — la carte a son globe même sur un compte vide.
@@ -715,6 +751,39 @@ function GameArt({ game, cover }) {
             <i className="cold" />
             <i className="warm" />
             <i className="hot" />
+          </span>
+        </span>
+      </span>
+    );
+  }
+  // Le Grand Quiz : sa règle n'est pas « reconnais ce jeu » mais « choisis ».
+  // D'où DEUX jaquettes côte à côte, A et B, et le buzzer par-dessus qu'on
+  // écrase au survol — la bonne réponse se cerne alors de vert. Rien du
+  // vinyle-dans-sa-pochette du Blind Test, qu'il reprenait jusqu'ici par
+  // défaut. Il faut DEUX jaquettes DIFFÉRENTES : un choix entre deux fois la
+  // même image n'aurait aucun sens, donc sur une bibliothèque trop courte on
+  // retombe sur la pastille plutôt que sur l'art d'un autre jeu.
+  if (game.key === "quiz") {
+    if (!cover?.cover || !cover2?.cover || cover2.cover === cover.cover) {
+      return (
+        <span className="arc-game-art fallback" aria-hidden="true">
+          <game.Icon size={30} />
+        </span>
+      );
+    }
+    return (
+      <span className="arc-game-art" aria-hidden="true">
+        <span className="arc-art-quiz">
+          <span className="arc-art-quiz-pick a">
+            <img src={cover.cover} alt="" loading="lazy" draggable="false" />
+            <b>A</b>
+          </span>
+          <span className="arc-art-quiz-pick b good">
+            <img src={cover2.cover} alt="" loading="lazy" draggable="false" />
+            <b>B</b>
+          </span>
+          <span className="arc-art-quiz-buzz">
+            <i />
           </span>
         </span>
       </span>

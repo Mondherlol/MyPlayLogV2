@@ -6,31 +6,111 @@
    .px-scene). Le reprendre ferait de ce jeu-ci sa variante.
 
    On prend donc l'autre moitié du même imaginaire : LE PUPITRE DE CANDIDAT.
-   Bleu nuit de studio plutôt que noir de salle, lumière rasante qui vient du
-   sol plutôt que projecteurs qui tombent du cintre, et surtout un MOBILIER —
-   un bandeau de question qui occupe la largeur, des pupitres de réponse
+   Un bandeau de question qui occupe la largeur, des pupitres de réponse
    biseautés, un rail de candidats en bas d'écran.
+
+   ------------------------------------------------------------------ le fond
+   AUCUN FOND PEINT. La page tenait sur un bleu nuit à elle, ce qui la coupait
+   du reste du site et la rendait franchement laide en thème clair — elle
+   restait sombre au milieu d'une interface blanche. Elle vit désormais sur le
+   fond du site et n'emprunte QUE ses jetons : elle suit donc le thème clair
+   comme le sombre sans une ligne de plus.
+
+   Tout ce que le plateau ajoute passe par la couche `--qz-*` ci-dessous, seul
+   endroit où une couleur est décidée. Les six qui changent d'un thème à
+   l'autre (le vert, le rouge, l'orange et leurs encres) sont redéclarées dans
+   le bloc sombre : sur fond blanc il faut des teintes soutenues pour rester
+   lisibles, sur fond noir des teintes claires.
 
    Aucune classe .bt-* n'est réutilisée. Le blind test est une page-document
    centrée sur un vinyle ; celle-ci est un plateau. Les seules classes
    empruntées sont .gv-rail* (components/VersusRoom.jsx), partagées par les
-   quatre salons de versus — leur mise en page est retouchée ici pour le rail
-   horizontal, pas réécrite.
-
-   Palette : l'accent doré du site (--gold) reste la couleur de la marque ;
-   chaque épreuve pose en plus sa propre teinte dans --qz-type, qui colore le
-   liseré du plateau, les pupitres actifs et les lignes du récap. C'est ce qui
-   fait qu'on voit d'un coup d'œil qu'on a changé d'épreuve.
+   quatre salons de versus.
    ====================================================================== */
 
+/* ======================================================================
+   La couleur de chaque épreuve
+   ======================================================================
+   Elle vivait en JavaScript (TYPE_UI, lib/quizGame.js), et c'était le défaut
+   qui rendait le thème clair illisible : une couleur écrite dans une constante
+   ne peut pas avoir deux valeurs. Les teintes retenues — des pastels — tenaient
+   sur le fond sombre et disparaissaient sur blanc.
+
+   Elles sont donc ici, déclarées deux fois. Soutenues (niveau 700) pour le
+   thème clair, où elles doivent tenir sur du blanc ; claires pour le sombre, où
+   elles doivent tenir sur du noir. Le composant ne pose plus qu'un
+   `data-qz-type`, et c'est cette feuille qui choisit.
+
+   Elles servent aussi de FOND (pastilles, liserés) via `color-mix` : d'où le
+   choix de teintes franches plutôt que de gris colorés, qui ne se distinguent
+   plus les unes des autres une fois diluées à 10 %. */
+:root {
+  --qz-t-qcm: #b45309;
+  --qz-t-emoji: #0369a1;
+  --qz-t-studio: #6d28d9;
+  --qz-t-duel: #c2410c;
+  --qz-t-pixel: #047857;
+  --qz-t-swipe: #be185d;
+  --qz-t-anagram: #0f766e;
+  --qz-t-motus: #a16207;
+}
+:root[data-theme="dark"] {
+  --qz-t-qcm: #ffd24a;
+  --qz-t-emoji: #7ad0ff;
+  --qz-t-studio: #b493ff;
+  --qz-t-duel: #ff9a6c;
+  --qz-t-pixel: #6ce3a6;
+  --qz-t-swipe: #ff7fa8;
+  --qz-t-anagram: #9fd8c8;
+  --qz-t-motus: #ffb56b;
+}
+[data-qz-type="qcm"] { --qz-type: var(--qz-t-qcm); }
+[data-qz-type="emoji"] { --qz-type: var(--qz-t-emoji); }
+[data-qz-type="studio"] { --qz-type: var(--qz-t-studio); }
+[data-qz-type="duel"] { --qz-type: var(--qz-t-duel); }
+[data-qz-type="pixel"] { --qz-type: var(--qz-t-pixel); }
+[data-qz-type="swipe"] { --qz-type: var(--qz-t-swipe); }
+[data-qz-type="anagram"] { --qz-type: var(--qz-t-anagram); }
+[data-qz-type="motus"] { --qz-type: var(--qz-t-motus); }
+
 .qz-page {
-  --qz-ink: #eaf0ff;
-  --qz-dim: #93a2c4;
-  --qz-bg: #0a1024;
-  --qz-bg2: #060a18;
-  --qz-panel: rgba(19, 28, 56, 0.86);
-  --qz-line: rgba(126, 152, 220, 0.18);
-  --qz-type: var(--gold, #f5c451);
+  /* --- Emprunts au site : la page n'invente aucune de ces valeurs --- */
+  --qz-ink: var(--text);
+  --qz-dim: var(--text-soft);
+  --qz-panel: var(--surface);
+  --qz-panel-2: var(--surface-2);
+  --qz-line: var(--border);
+  --qz-line-2: var(--border-strong);
+  --qz-accent: var(--orange);
+  /* L'accent EN TEXTE : le doré vif est illisible sur blanc, --accent-ink est
+     précisément le jeton que le site tient pour ce cas. */
+  --qz-accent-ink: var(--accent-ink);
+  /* Teinte de l'épreuve en cours. Écrasée en ligne par le composant, mais elle
+     doit avoir une valeur de repli sinon les `color-mix` qui s'en servent
+     échouent en silence. */
+  --qz-type: var(--orange);
+
+  /* --- Sémantique du jeu, version thème clair --- */
+  /* Assez foncés pour que du texte BLANC tienne dessus : ces teintes servent
+     d'aplat aux cases du Motus et aux boutons pleins, où l'encre s'inverse
+     (cf. `color: var(--qz-panel)` plus bas). */
+  --qz-ok: #15803d;
+  --qz-ok-ink: #15803d;
+  --qz-ko: #c81e1e;
+  --qz-ko-ink: #b91c1c;
+  --qz-warn: #b45309;
+  /* Le bleu d'information (régime d'une manche) et le violet du joker : deux
+     teintes que le site n'a pas en jeton, et qui doivent quand même tenir sur
+     fond blanc comme sur fond noir. */
+  --qz-info: #2563eb;
+  --qz-magic: #7c3aed;
+  /* Le reflet posé sur l'arête haute des surfaces. Invisible sur fond blanc
+     (c'est du blanc sur du blanc), il donne en sombre le liseré qui fait lire
+     un panneau comme un objet et non comme un rectangle. */
+  --qz-sheen: rgba(255, 255, 255, 0.7);
+  /* La couleur des ombres. Translucide en clair (une ombre noire franche fait
+     sale sur blanc), opaque en sombre où elle doit vraiment creuser. */
+  --qz-shade: rgba(20, 20, 40, 0.4);
 
   position: relative;
   min-height: 100vh;
@@ -38,42 +118,87 @@
   display: flex;
   flex-direction: column;
   color: var(--qz-ink);
-  background:
-    radial-gradient(120% 80% at 50% 0%, #16224a 0%, var(--qz-bg) 46%, var(--qz-bg2) 100%);
+  /* AUCUN FOND. Pas même `var(--bg)` : le body du site porte une grille
+     (`--app-bg-image`) et un halo d'accent (`body::before`), et repeindre par
+     dessus — fût-ce de la même couleur — les masquait tous les deux. La page
+     posait alors un aplat blanc ou noir au milieu du site au lieu de s'y
+     fondre. On ne peint rien, on laisse voir. */
+  background: transparent;
   /* `clip` et pas `hidden` : `overflow: hidden` sur un ancêtre casse tout
-     `position: sticky` à l'intérieur (piège relevé sur la fiche de jeu, cf.
-     la mémoire du projet). */
+     `position: sticky` à l'intérieur (piège relevé sur la fiche de jeu). */
   overflow-x: clip;
 }
 
-/* ---------- Le décor : lumière au sol, halo derrière le pupitre ---------- */
-.qz-scene {
-  position: fixed;
-  inset: 0;
+:root[data-theme="dark"] .qz-page {
+  --qz-ok: #4ade80;
+  --qz-ok-ink: #a7f3c4;
+  --qz-ko: #ff6b6b;
+  --qz-ko-ink: #ffb4b4;
+  --qz-warn: #f0a53a;
+  --qz-info: #8fd6ff;
+  --qz-magic: #c9b3ff;
+  --qz-sheen: rgba(255, 255, 255, 0.06);
+  --qz-shade: rgba(0, 0, 0, 0.85);
+}
+
+/* ======================================================================
+   Le décor de l'accueil : des jaquettes et des « ? » qui flottent
+   ======================================================================
+   Il remplace l'ancienne surcouche plein écran (deux nappes de lumière fixes),
+   qui posait un voile par-dessus le site sans rien apporter.
+
+   Ici rien n'est fixé au viewport : le décor appartient au bloc d'accueil, il
+   défile avec lui et disparaît dès qu'on lance une partie. Les jaquettes
+   viennent de la bibliothèque du joueur — c'est ce qui fait que l'écran parle
+   de SES jeux. */
+.qz-float {
+  position: absolute;
+  inset: -4% -2%;
   pointer-events: none;
   z-index: 0;
 }
-.qz-scene-floor {
+.qz-float-cover,
+.qz-float-q {
   position: absolute;
-  left: 50%;
-  bottom: -22vh;
-  width: 150vw;
-  height: 48vh;
-  transform: translateX(-50%);
-  background: radial-gradient(50% 60% at 50% 100%, rgba(96, 140, 255, 0.22), transparent 70%);
+  animation: qz-bob 7s ease-in-out infinite;
 }
-.qz-scene-halo {
-  position: absolute;
-  left: 50%;
-  top: -12vh;
-  width: 90vw;
-  max-width: 900px;
-  height: 60vh;
-  transform: translateX(-50%);
-  background: radial-gradient(50% 50% at 50% 50%, rgba(245, 196, 81, 0.1), transparent 70%);
+.qz-float-cover {
+  width: clamp(52px, 7vw, 82px);
+  aspect-ratio: 3 / 4;
+  border-radius: 8px;
+  overflow: hidden;
+  /* Volontairement effacées : elles encadrent le logo, elles ne le
+     concurrencent pas. La saturation tombe aussi — des jaquettes à pleine
+     couleur derrière un titre, c'est illisible. */
+  opacity: 0.5;
+  filter: saturate(0.75);
+  box-shadow: var(--shadow);
+  transform: rotate(var(--rot, 0deg));
+}
+.qz-float-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.qz-float-q {
+  font-family: var(--font-fun, system-ui), system-ui;
+  font-weight: 600;
+  line-height: 1;
+  color: color-mix(in srgb, var(--qz-accent) 55%, transparent);
+  animation-duration: 5.5s;
+}
+@keyframes qz-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--rot, 0deg));
+  }
+  50% {
+    transform: translateY(-14px) rotate(calc(var(--rot, 0deg) * -0.6));
+  }
 }
 
-/* ---------- Barre du haut ---------- */
+/* ---------- Barre du haut ---------- *//* ---------- Barre du haut ---------- */
 .qz-topbar {
   position: relative;
   z-index: 3;
@@ -91,7 +216,7 @@
   padding: 8px 13px;
   border: 1px solid var(--qz-line);
   border-radius: 999px;
-  background: rgba(12, 19, 42, 0.7);
+  background: var(--qz-panel-2);
   color: var(--qz-dim);
   font: inherit;
   font-size: 0.86rem;
@@ -101,7 +226,7 @@
 .qz-back:hover,
 .qz-vol-btn:hover {
   color: var(--qz-ink);
-  border-color: rgba(126, 152, 220, 0.4);
+  border-color: var(--qz-line-2);
 }
 .qz-vol-btn {
   padding: 8px 10px;
@@ -112,7 +237,7 @@
   gap: 8px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  color: var(--gold, #f5c451);
+  color: var(--qz-accent-ink);
 }
 .qz-brand code {
   font-family: ui-monospace, monospace;
@@ -135,69 +260,96 @@
    L'accueil
    ====================================================================== */
 .qz-intro {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
   max-width: 620px;
   margin: auto;
-  padding: 10px 0 30px;
+  padding: 24px 0 30px;
 }
-
-/* Le pupitre vide qui attend son candidat : un trapèze en perspective, un
-   halo, et le bouton du buzzer qui pulse. Trois éléments, zéro image. */
-.qz-hero {
+/* Tout ce qui n'est pas le décor passe devant lui. */
+.qz-intro > *:not(.qz-float) {
   position: relative;
-  width: 220px;
-  height: 130px;
-  margin-bottom: 22px;
-}
-.qz-hero-desk {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: 190px;
-  height: 92px;
-  transform: translateX(-50%) perspective(320px) rotateX(26deg);
-  border-radius: 10px 10px 4px 4px;
-  background: linear-gradient(180deg, #23315f 0%, #131c3c 100%);
-  border: 1px solid rgba(150, 178, 255, 0.28);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(190, 212, 255, 0.2);
-}
-.qz-hero-glow {
-  position: absolute;
-  left: 50%;
-  bottom: 4px;
-  width: 250px;
-  height: 120px;
-  transform: translateX(-50%);
-  background: radial-gradient(50% 50% at 50% 60%, rgba(245, 196, 81, 0.28), transparent 70%);
-  filter: blur(6px);
-}
-.qz-hero-buzzer {
-  position: absolute;
-  left: 50%;
-  top: 34px;
-  width: 44px;
-  height: 44px;
-  transform: translateX(-50%);
-  border-radius: 50%;
-  background: radial-gradient(circle at 38% 32%, #ffe6a3, var(--gold, #f5c451) 45%, #a8761b 100%);
-  box-shadow: 0 0 0 5px rgba(245, 196, 81, 0.14), 0 8px 20px rgba(0, 0, 0, 0.5);
-  animation: qz-buzz 2.4s ease-in-out infinite;
-}
-@keyframes qz-buzz {
-  0%, 100% { transform: translateX(-50%) scale(1); }
-  50% { transform: translateX(-50%) scale(1.07); }
+  z-index: 1;
 }
 
-.qz-kicker {
-  font-size: 0.74rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--gold, #f5c451);
-  margin-bottom: 6px;
+/* ======================================================================
+   LE LOGO
+   ======================================================================
+   Il remplace trois éléments qui disaient la même chose : un pupitre dessiné
+   en CSS, un sur-titre « Le quiz ultime » et un titre « Le Grand Quiz ». Trois
+   objets empilés pour une seule information.
+
+   Police ronde (--font-fun, la Fredoka du site), « Le » posé de biais en
+   petit, « Grand Quiz » en très grand sur le dégradé d'accent, et le « ? » qui
+   rebondit dans le coin. */
+.qz-logo {
+  position: relative;
+  z-index: 1;
+  margin: 6px 0 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 0.9;
+  font-family: var(--font-fun, system-ui), system-ui;
 }
+.qz-logo-le {
+  align-self: flex-start;
+  margin: 0 0 -6px 6px;
+  transform: rotate(-8deg);
+  font-size: clamp(1.1rem, 3.2vw, 1.6rem);
+  font-weight: 600;
+  color: var(--qz-dim);
+}
+.qz-logo-main {
+  position: relative;
+  font-size: clamp(2.6rem, 9vw, 4.6rem);
+  /* 600 : le plus gras que la Fredoka du site fournit (cf. l'@import de
+     index.css). Au-delà, le navigateur fabrique un faux gras. */
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  background: var(--brand-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* Le dégradé sur le texte supprime toute ombre portée classique : on la
+     recrée en `drop-shadow`, qui suit la forme des lettres. */
+  filter: drop-shadow(0 6px 18px color-mix(in srgb, var(--qz-accent) 35%, transparent));
+}
+.qz-logo-q {
+  position: absolute;
+  top: -0.34em;
+  right: -0.42em;
+  font-style: normal;
+  font-size: 0.55em;
+  color: var(--qz-accent-ink);
+  -webkit-text-fill-color: currentColor;
+  animation: qz-logo-q 2.2s ease-in-out infinite;
+}
+@keyframes qz-logo-q {
+  0%,
+  100% {
+    transform: translateY(0) rotate(10deg);
+  }
+  50% {
+    transform: translateY(-9px) rotate(-8deg);
+  }
+}
+.qz-badge-defi {
+  position: relative;
+  z-index: 1;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--qz-accent) 16%, transparent);
+  color: var(--qz-accent-ink);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .qz-title {
   margin: 0 0 10px;
   font-size: clamp(1.9rem, 6vw, 2.8rem);
@@ -235,7 +387,7 @@
   padding: 9px 0;
   border: 1px solid var(--qz-line);
   border-radius: 10px;
-  background: rgba(15, 23, 50, 0.7);
+  background: var(--qz-panel-2);
   color: var(--qz-dim);
   font: inherit;
   font-weight: 700;
@@ -243,55 +395,89 @@
   transition: 0.15s;
 }
 .qz-round-opt.on {
-  color: #10182f;
-  background: var(--gold, #f5c451);
-  border-color: var(--gold, #f5c451);
+  color: var(--qz-ink);
+  background: var(--qz-accent);
+  border-color: var(--qz-accent-ink);
 }
 
-/* Les épreuves qu'on peut décocher. Chacune porte sa teinte. */
+/* ---------- Les épreuves qu'on peut décocher ----------
+   Des pastilles à icône plutôt que des étiquettes de texte : huit épreuves
+   alignées en mots se lisent comme une liste administrative, en icônes ça se
+   parcourt d'un coup d'œil. La durée a disparu — personne ne choisit une
+   épreuve parce qu'elle dure trente secondes plutôt que quarante, et
+   l'information encombrait la vignette. */
 .qz-types-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 9px;
 }
 .qz-type {
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  padding: 10px 11px;
+  align-items: center;
+  gap: 8px;
+  padding: 15px 10px 13px;
   border: 1px solid var(--qz-line);
-  border-radius: 11px;
-  background: rgba(15, 23, 50, 0.7);
+  border-radius: var(--radius, 14px);
+  background: var(--qz-panel);
   color: var(--qz-dim);
   font: inherit;
-  text-align: left;
   cursor: pointer;
-  transition: 0.15s;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.14s, border-color 0.15s, background 0.15s, box-shadow 0.15s,
+    color 0.15s;
+}
+.qz-type:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
 }
 .qz-type b {
-  font-size: 0.86rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+}
+/* La pastille d'icône : c'est elle qui porte la couleur de l'épreuve. */
+.qz-type-ic {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--qz-type) 14%, transparent);
+  color: var(--qz-type);
+  transition: transform 0.16s, background 0.15s;
+}
+.qz-type:hover .qz-type-ic {
+  transform: scale(1.08) rotate(-4deg);
+}
+/* Décochée : elle s'éteint sans disparaître — on doit voir qu'elle existe et
+   qu'on peut la rallumer. */
+.qz-type:not(.on) .qz-type-ic {
+  background: var(--qz-panel-2);
   color: var(--qz-dim);
 }
-.qz-type em {
-  font-style: normal;
-  font-size: 0.7rem;
-  opacity: 0.7;
+.qz-type:not(.on) {
+  opacity: 0.6;
 }
 .qz-type.on {
-  border-color: var(--qz-type);
-  background: color-mix(in srgb, var(--qz-type) 14%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--qz-type) 30%, transparent);
-}
-.qz-type.on b {
-  color: var(--qz-type);
+  border-color: color-mix(in srgb, var(--qz-type) 45%, var(--qz-line));
+  background: color-mix(in srgb, var(--qz-type) 6%, var(--qz-panel));
+  color: var(--qz-ink);
 }
 .qz-type-mark {
   position: absolute;
-  top: 7px;
-  right: 7px;
-  color: var(--qz-type);
+  top: -6px;
+  right: -6px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--qz-type);
+  color: var(--qz-panel);
+  box-shadow: var(--shadow-sm);
 }
 
 .qz-start {
@@ -302,18 +488,18 @@
   padding: 14px 30px;
   border: none;
   border-radius: 999px;
-  background: linear-gradient(180deg, #ffd977, var(--gold, #f5c451));
-  color: #16110a;
+  background: linear-gradient(180deg, #ffd977, var(--qz-accent));
+  color: #2a1e05;
   font: inherit;
   font-size: 1rem;
   font-weight: 800;
   cursor: pointer;
-  box-shadow: 0 12px 30px rgba(245, 196, 81, 0.24);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--qz-accent) 24%, transparent);
   transition: transform 0.12s, box-shadow 0.15s;
 }
 .qz-start:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 16px 36px rgba(245, 196, 81, 0.3);
+  box-shadow: 0 16px 36px color-mix(in srgb, var(--qz-accent) 30%, transparent);
 }
 .qz-start:disabled {
   opacity: 0.55;
@@ -333,7 +519,7 @@
   padding: 1px 6px;
   border: 1px solid var(--qz-line);
   border-radius: 5px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--qz-panel-2);
   font-family: ui-monospace, monospace;
   font-size: 0.75rem;
 }
@@ -344,7 +530,7 @@
   padding: 10px 18px;
   border: 1px solid var(--qz-line);
   border-radius: 999px;
-  background: rgba(12, 19, 42, 0.6);
+  background: var(--qz-panel-2);
   color: var(--qz-dim);
   font: inherit;
   font-size: 0.88rem;
@@ -355,7 +541,7 @@
 .qz-ghost:hover,
 .qz-ghost.on {
   color: var(--qz-ink);
-  border-color: rgba(126, 152, 220, 0.44);
+  border-color: var(--qz-line-2);
 }
 .qz-versus-cta {
   display: inline-flex;
@@ -363,7 +549,7 @@
   gap: 9px;
   margin-top: 20px;
   padding: 11px 22px;
-  border: 1px dashed rgba(126, 152, 220, 0.4);
+  border: 1px dashed var(--qz-line-2);
   border-radius: 999px;
   background: transparent;
   color: var(--qz-ink);
@@ -373,8 +559,8 @@
   transition: 0.15s;
 }
 .qz-versus-cta:hover:not(:disabled) {
-  border-color: var(--gold, #f5c451);
-  background: rgba(245, 196, 81, 0.08);
+  border-color: var(--qz-accent-ink);
+  background: color-mix(in srgb, var(--qz-accent) 8%, transparent);
 }
 .qz-versus-cta em {
   font-style: normal;
@@ -402,8 +588,8 @@
   margin: 0 0 12px;
   padding: 8px 14px;
   border-radius: 10px;
-  background: rgba(255, 107, 107, 0.14);
-  color: #ffb4b4;
+  background: color-mix(in srgb, var(--qz-ko) 14%, transparent);
+  color: var(--qz-ko-ink);
   font-size: 0.86rem;
 }
 
@@ -425,7 +611,7 @@
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 10px 14px;
+  gap: 12px 14px;
 }
 .qz-pips {
   grid-column: 1 / -1;
@@ -436,14 +622,17 @@
   flex: 1;
   height: 3px;
   border-radius: 2px;
-  background: rgba(126, 152, 220, 0.2);
+  background: var(--qz-panel-2);
   transition: background 0.25s;
 }
+/* Franchie : la couleur de SON épreuve, en plus discret. On voit d'un coup
+   d'œil combien on en a fait, et lesquelles. */
 .qz-pips i.done {
-  background: rgba(126, 152, 220, 0.55);
+  background: color-mix(in srgb, var(--qz-type) 55%, var(--qz-line));
 }
 .qz-pips i.cur {
   background: var(--qz-type);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--qz-type) 25%, transparent);
 }
 .qz-round-count {
   font-size: 0.82rem;
@@ -462,7 +651,7 @@
   align-items: center;
   gap: 6px;
   font-weight: 700;
-  color: var(--gold, #f5c451);
+  color: var(--qz-accent-ink);
   font-size: 0.9rem;
 }
 .qzv-streak {
@@ -472,49 +661,73 @@
   margin-left: 4px;
   padding: 1px 7px;
   border-radius: 999px;
-  background: rgba(255, 138, 76, 0.18);
-  color: #ff9a5c;
+  background: color-mix(in srgb, var(--qz-warn) 18%, transparent);
+  color: var(--qz-warn);
   font-size: 0.76rem;
 }
 
-/* ---------- Le chrono : une barre, pas un cadran ----------
-   Sur un plateau, le temps se lit du coin de l'œil PENDANT qu'on lit
-   l'énoncé. Un cadran demanderait de quitter le texte des yeux. */
-.qz-timer {
+/* ---------- Le chrono ----------
+   Un anneau, posé à droite du bandeau d'état. Voir components/quiz/QuizTimer.jsx
+   pour ce qui n'allait pas dans la barre qu'il remplace. */
+.qz-head-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+.qz-ring {
   position: relative;
+  width: 46px;
+  height: 46px;
+  flex: none;
+}
+.qz-ring svg {
   width: 100%;
-  height: 26px;
-  border-radius: 999px;
-  background: rgba(10, 16, 36, 0.8);
-  border: 1px solid var(--qz-line);
-  overflow: hidden;
+  height: 100%;
+  display: block;
 }
-.qz-timer-bar {
-  position: absolute;
-  inset: 0;
-  transform-origin: left center;
-  background: linear-gradient(90deg,
-    color-mix(in srgb, var(--qz-type) 70%, transparent),
-    var(--qz-type));
-  transition: transform 0.1s linear;
+.qz-ring-bg {
+  fill: var(--qz-panel);
+  stroke: var(--qz-line);
+  stroke-width: 4;
 }
-.qz-timer.hot .qz-timer-bar {
-  background: linear-gradient(90deg, #ff6b6b, #ff3d3d);
-  animation: qz-pulse 0.7s ease-in-out infinite;
+.qz-ring-fg {
+  fill: none;
+  stroke: var(--qz-type);
+  stroke-width: 4;
+  stroke-linecap: round;
+  /* Le tracé se raccourcit à chaque tic. La transition l'adoucit sans le
+     retarder : 0,2 s, soit le double d'un tic — au-delà l'anneau prendrait du
+     retard sur le chiffre. */
+  transition: stroke-dashoffset 0.2s linear, stroke 0.2s;
 }
-@keyframes qz-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.65; }
-}
-.qz-timer-num {
+.qz-ring-num {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
   font-weight: 800;
-  font-size: 0.82rem;
-  color: #0b1226;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--qz-ink);
+}
+/* Les dernières secondes : l'anneau vire au rouge et bat. */
+.qz-ring.hot .qz-ring-fg {
+  stroke: var(--qz-ko);
+}
+.qz-ring.hot .qz-ring-num {
+  color: var(--qz-ko-ink);
+}
+.qz-ring.hot {
+  animation: qz-ring-beat 0.7s ease-in-out infinite;
+}
+@keyframes qz-ring-beat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
 }
 
 /* ---------- L'annonce d'épreuve ----------
@@ -558,14 +771,14 @@
   border: 1px solid var(--qz-line);
 }
 .qzv-mode.buzzer {
-  color: #ffcf6d;
-  border-color: rgba(255, 207, 109, 0.4);
-  background: rgba(255, 207, 109, 0.1);
+  color: var(--qz-accent-ink);
+  border-color: color-mix(in srgb, var(--qz-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--qz-accent) 12%, transparent);
 }
 .qzv-mode.parallel {
-  color: #8fd6ff;
-  border-color: rgba(143, 214, 255, 0.36);
-  background: rgba(143, 214, 255, 0.1);
+  color: var(--qz-info);
+  border-color: color-mix(in srgb, var(--qz-info) 40%, transparent);
+  background: color-mix(in srgb, var(--qz-info) 11%, transparent);
 }
 
 /* ---------- Le cadre commun d'une épreuve ---------- */
@@ -593,7 +806,7 @@
 .qz-theme {
   padding: 3px 12px;
   border-radius: 999px;
-  background: rgba(126, 152, 220, 0.14);
+  background: var(--qz-panel-2);
   color: var(--qz-dim);
   font-size: 0.72rem;
   letter-spacing: 0.1em;
@@ -605,22 +818,22 @@
 .qz-question {
   position: relative;
   width: 100%;
-  padding: 26px 26px;
-  border-radius: 16px;
-  background: linear-gradient(180deg, rgba(28, 40, 82, 0.94), rgba(16, 24, 52, 0.94));
-  border: 1px solid rgba(150, 178, 255, 0.22);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(190, 212, 255, 0.16);
+  padding: 30px 28px;
+  border-radius: var(--radius-lg, 20px);
+  background: linear-gradient(180deg, var(--qz-panel), var(--qz-panel-2));
+  border: 1px solid var(--qz-line);
+  box-shadow: var(--shadow), inset 0 1px 0 var(--qz-sheen);
   text-align: center;
 }
 /* Le liseré doré du bas : la signature du bandeau. */
 .qz-question::after {
   content: "";
   position: absolute;
-  left: 16%;
-  right: 16%;
-  bottom: -1px;
-  height: 2px;
-  border-radius: 2px;
+  left: 22%;
+  right: 22%;
+  top: 0;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
   background: linear-gradient(90deg, transparent, var(--qz-type), transparent);
 }
 .qz-question p {
@@ -636,8 +849,11 @@
 .qz-choices {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
+  /* De l'air entre l'énoncé et les propositions : collées, on lisait le bloc
+     comme un seul pavé et l'œil ne savait pas où commencer. */
+  margin-top: 10px;
 }
 .qz-choices.n2 {
   grid-template-columns: 1fr 1fr;
@@ -646,20 +862,31 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 15px 17px;
   border: 1px solid var(--qz-line);
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(24, 34, 70, 0.9), rgba(14, 21, 46, 0.9));
+  border-radius: var(--radius, 14px);
+  background: var(--qz-panel);
   color: var(--qz-ink);
   font: inherit;
   font-size: 0.94rem;
   text-align: left;
   cursor: pointer;
-  transition: transform 0.12s, border-color 0.15s, background 0.15s, opacity 0.2s;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.12s, border-color 0.15s, background 0.15s, box-shadow 0.15s,
+    opacity 0.2s;
+}
+/* Le curseur clavier : le même traitement que le survol, pour qu'on comprenne
+   tout de suite que les flèches font la même chose que la souris. */
+.qz-choice.cursor:not(:disabled) {
+  border-color: color-mix(in srgb, var(--qz-type) 60%, var(--qz-line));
+  background: color-mix(in srgb, var(--qz-type) 7%, var(--qz-panel));
+  box-shadow: var(--shadow), 0 0 0 2px color-mix(in srgb, var(--qz-type) 30%, transparent);
 }
 .qz-choice:hover:not(:disabled) {
   transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--qz-type) 55%, transparent);
+  border-color: color-mix(in srgb, var(--qz-type) 60%, var(--qz-line));
+  background: color-mix(in srgb, var(--qz-type) 7%, var(--qz-panel));
+  box-shadow: var(--shadow);
 }
 .qz-choice:disabled {
   cursor: default;
@@ -671,7 +898,7 @@
   display: grid;
   place-items: center;
   border-radius: 8px;
-  background: rgba(126, 152, 220, 0.16);
+  background: var(--qz-panel-2);
   color: var(--qz-type);
   font-weight: 800;
   font-size: 0.86rem;
@@ -685,20 +912,20 @@
 }
 .qz-choice.picked {
   border-color: var(--qz-type);
-  background: color-mix(in srgb, var(--qz-type) 12%, rgba(14, 21, 46, 0.9));
+  background: color-mix(in srgb, var(--qz-type) 12%, var(--qz-panel-2));
 }
 .qz-choice.good {
-  border-color: #4ade80;
-  background: rgba(74, 222, 128, 0.16);
-  color: #d6ffe6;
+  border-color: var(--qz-ok);
+  background: color-mix(in srgb, var(--qz-ok) 16%, transparent);
+  color: var(--qz-ok-ink);
 }
 .qz-choice.good .qz-choice-letter {
-  background: rgba(74, 222, 128, 0.26);
-  color: #4ade80;
+  background: color-mix(in srgb, var(--qz-ok) 26%, transparent);
+  color: var(--qz-ok);
 }
 .qz-choice.bad {
-  border-color: #ff6b6b;
-  background: rgba(255, 107, 107, 0.14);
+  border-color: var(--qz-ko);
+  background: color-mix(in srgb, var(--qz-ko) 14%, transparent);
 }
 /* Éteinte par le joker : elle reste là (l'écran ne doit pas se réorganiser
    sous les yeux) mais elle sort du jeu. */
@@ -712,10 +939,10 @@
   align-items: center;
   gap: 7px;
   padding: 8px 16px;
-  border: 1px solid rgba(180, 147, 255, 0.4);
+  border: 1px solid color-mix(in srgb, var(--qz-magic) 45%, transparent);
   border-radius: 999px;
-  background: rgba(180, 147, 255, 0.1);
-  color: #c9b3ff;
+  background: color-mix(in srgb, var(--qz-magic) 11%, transparent);
+  color: var(--qz-magic);
   font: inherit;
   font-size: 0.84rem;
   cursor: pointer;
@@ -737,6 +964,54 @@
   line-height: 1.5;
 }
 
+/* La réponse à la révélation : jaquette du jeu concerné quand il y en a un,
+   la bonne proposition en clair, et l'explication en dessous. */
+.qz-qcm-answer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 6px;
+  padding: 12px 18px 12px 12px;
+  border-radius: var(--radius, 14px);
+  border: 1px solid color-mix(in srgb, var(--qz-ok) 40%, transparent);
+  background: color-mix(in srgb, var(--qz-ok) 8%, var(--qz-panel));
+  text-align: left;
+  max-width: 100%;
+  animation: qz-round-in 0.3s ease;
+}
+.qz-qcm-answer img {
+  flex: none;
+  width: 46px;
+  height: 61px;
+  object-fit: cover;
+  border-radius: 6px;
+  box-shadow: var(--shadow-sm);
+}
+.qz-qcm-answer span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.qz-qcm-answer em {
+  font-style: normal;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--qz-dim);
+}
+.qz-qcm-answer b {
+  font-size: 1rem;
+  color: var(--qz-ok-ink);
+  line-height: 1.25;
+}
+.qz-qcm-answer i {
+  font-style: normal;
+  font-size: 0.82rem;
+  color: var(--qz-dim);
+  line-height: 1.45;
+}
+
 /* ======================================================================
    Épreuve 2 — les emojis
    ====================================================================== */
@@ -755,7 +1030,7 @@
 }
 .qz-emoji-one {
   animation: qz-emoji-pop 0.42s backwards cubic-bezier(0.2, 0.9, 0.3, 1.4);
-  filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.4));
+  filter: drop-shadow(0 6px 16px color-mix(in srgb, var(--qz-shade) 40%, transparent));
 }
 @keyframes qz-emoji-pop {
   from { opacity: 0; transform: scale(0.4) rotate(-12deg); }
@@ -777,8 +1052,8 @@
   display: grid;
   place-items: center;
   border-radius: 5px;
-  border-bottom: 2px solid rgba(126, 152, 220, 0.45);
-  background: rgba(18, 27, 58, 0.7);
+  border-bottom: 2px solid var(--qz-line-2);
+  background: var(--qz-panel-2);
   font-size: clamp(0.85rem, 3vw, 1.1rem);
   font-weight: 700;
   text-transform: uppercase;
@@ -802,9 +1077,9 @@
   font-size: 0.95rem;
 }
 .qz-mask.revealed .qz-mask-cell {
-  border-bottom-color: #4ade80;
-  color: #b8ffd2;
-  background: rgba(74, 222, 128, 0.12);
+  border-bottom-color: var(--qz-ok);
+  color: var(--qz-ok-ink);
+  background: color-mix(in srgb, var(--qz-ok) 12%, transparent);
 }
 .qz-mask-hint {
   font-size: 0.78rem;
@@ -823,16 +1098,16 @@
   gap: 4px;
 }
 .qz-lives .on {
-  color: #ff7a90;
+  color: var(--qz-ko-ink);
 }
 .qz-lives .off {
-  color: rgba(126, 152, 220, 0.3);
+  color: var(--qz-dim);
 }
 .qz-wrong {
   padding: 4px 12px;
   border-radius: 999px;
-  background: rgba(255, 107, 107, 0.16);
-  color: #ffb4b4;
+  background: color-mix(in srgb, var(--qz-ko) 16%, transparent);
+  color: var(--qz-ko-ink);
   font-size: 0.8rem;
   animation: qz-shake 0.34s;
 }
@@ -860,7 +1135,7 @@
   padding: 0 14px;
   border: 1px solid var(--qz-line);
   border-radius: 12px;
-  background: rgba(10, 16, 36, 0.85);
+  background: var(--qz-panel-2);
   transition: border-color 0.15s;
 }
 .qz-search:focus-within {
@@ -881,7 +1156,7 @@
   outline: none;
 }
 .qz-search-input::placeholder {
-  color: rgba(147, 162, 196, 0.7);
+  color: var(--qz-dim);
 }
 .qz-suggest {
   position: absolute;
@@ -894,8 +1169,8 @@
   list-style: none;
   border: 1px solid var(--qz-line);
   border-radius: 12px;
-  background: rgba(10, 16, 36, 0.97);
-  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.55);
+  background: var(--qz-panel-2);
+  box-shadow: 0 20px 44px color-mix(in srgb, var(--qz-shade) 55%, transparent);
   overflow-y: auto;
 }
 .qz-suggest.up {
@@ -918,7 +1193,7 @@
   cursor: pointer;
 }
 .qz-suggest-row.on {
-  background: rgba(126, 152, 220, 0.16);
+  background: var(--qz-panel-2);
 }
 .qz-suggest-row img,
 .qz-suggest-ph {
@@ -927,7 +1202,7 @@
   height: 34px;
   object-fit: cover;
   border-radius: 4px;
-  background: rgba(126, 152, 220, 0.14);
+  background: var(--qz-panel-2);
   display: grid;
   place-items: center;
   color: var(--qz-dim);
@@ -961,10 +1236,22 @@
   gap: 4px;
   padding: 20px 28px;
   border-radius: 16px;
-  background: linear-gradient(180deg, rgba(28, 40, 82, 0.9), rgba(16, 24, 52, 0.9));
-  border: 1px solid rgba(150, 178, 255, 0.2);
+  background: linear-gradient(180deg, var(--qz-panel), var(--qz-panel-2));
+  border: 1px solid var(--qz-line-2);
   color: var(--qz-type);
   text-align: center;
+}
+/* Les logos d'IGDB sont des PNG à fond transparent, souvent monochromes clairs
+   ou sombres : on les pose dans un cadre blanc quel que soit le thème, sinon la
+   moitié d'entre eux disparaît. */
+.qz-studio-logo {
+  max-width: 190px;
+  max-height: 64px;
+  object-fit: contain;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
 }
 .qz-studio-head b {
   font-size: clamp(1.4rem, 5vw, 2.1rem);
@@ -991,14 +1278,14 @@
   min-width: 150px;
   min-height: 52px;
   padding: 8px 12px;
-  border: 1px dashed rgba(126, 152, 220, 0.35);
+  border: 1px dashed var(--qz-line-2);
   border-radius: 11px;
-  background: rgba(12, 19, 42, 0.6);
+  background: var(--qz-panel-2);
 }
 .qz-slot.filled {
   border-style: solid;
-  border-color: #4ade80;
-  background: rgba(74, 222, 128, 0.1);
+  border-color: var(--qz-ok);
+  background: color-mix(in srgb, var(--qz-ok) 10%, transparent);
   animation: qz-slot-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.3);
 }
 @keyframes qz-slot-in {
@@ -1012,7 +1299,7 @@
   height: 37px;
   object-fit: cover;
   border-radius: 4px;
-  background: rgba(126, 152, 220, 0.14);
+  background: var(--qz-panel-2);
   display: grid;
   place-items: center;
   color: var(--qz-dim);
@@ -1023,13 +1310,13 @@
   line-height: 1.25;
 }
 .qz-slot-ok {
-  color: #4ade80;
+  color: var(--qz-ok);
 }
 .qz-slot-empty {
   margin: auto;
   font-size: 1.2rem;
   font-weight: 800;
-  color: rgba(126, 152, 220, 0.35);
+  color: var(--qz-dim);
 }
 .qz-rejects {
   display: flex;
@@ -1043,14 +1330,14 @@
   gap: 4px;
   padding: 3px 10px;
   border-radius: 999px;
-  background: rgba(255, 107, 107, 0.12);
-  color: #ffa8a8;
+  background: color-mix(in srgb, var(--qz-ko) 12%, transparent);
+  color: var(--qz-ko-ink);
   font-size: 0.76rem;
   text-decoration: line-through;
 }
 .qz-studio-done {
   margin: 0;
-  color: #8ff0bb;
+  color: var(--qz-ok-ink);
   font-size: 0.9rem;
 }
 .qz-studio-examples {
@@ -1117,13 +1404,13 @@
   padding: 10px;
   border: 1px solid var(--qz-line);
   border-radius: 14px;
-  background: rgba(12, 19, 42, 0.7);
+  background: var(--qz-panel-2);
   transition: border-color 0.15s, background 0.15s;
 }
 .qz-duel-col.over,
 .qz-duel-col.targetable:hover {
   border-color: var(--qz-type);
-  background: color-mix(in srgb, var(--qz-type) 10%, rgba(12, 19, 42, 0.7));
+  background: color-mix(in srgb, var(--qz-type) 10%, var(--qz-panel-2));
 }
 .qz-duel-head {
   display: flex;
@@ -1146,15 +1433,15 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  min-height: 108px;
+  min-height: 128px;
   padding: 8px;
   border-radius: 10px;
-  background: rgba(6, 11, 26, 0.55);
+  background: var(--qz-panel-2);
 }
 .qz-duel-hint {
   margin: auto;
   font-size: 0.76rem;
-  color: rgba(126, 152, 220, 0.5);
+  color: var(--qz-dim);
 }
 /* Le « VS », posé entre les colonnes : c'est lui qui fait lire l'écran comme
    un affrontement plutôt que comme deux listes côte à côte. */
@@ -1181,12 +1468,12 @@
   position: relative;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   justify-content: center;
   align-items: flex-start;
-  padding: 14px 10px 10px;
+  padding: 12px 10px 10px;
   border-radius: 14px;
-  border: 1px dashed rgba(126, 152, 220, 0.3);
+  border: 1px dashed var(--qz-line-2);
   min-height: 78px;
   transition: border-color 0.15s, background 0.15s;
 }
@@ -1197,7 +1484,7 @@
   display: grid;
   place-items: center;
   border-radius: 14px;
-  background: color-mix(in srgb, var(--qz-type) 14%, rgba(6, 11, 26, 0.9));
+  background: color-mix(in srgb, var(--qz-type) 14%, var(--qz-panel-2));
   color: var(--qz-type);
   font-size: 0.84rem;
   font-weight: 600;
@@ -1209,37 +1496,8 @@
 .qz-duel-hand-drop.on {
   opacity: 1;
 }
-.qz-duel-group {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding: 7px 9px 9px;
-  border-radius: 11px;
-  background: rgba(6, 11, 26, 0.45);
-  border: 1px solid rgba(126, 152, 220, 0.14);
-}
-.qz-duel-group-h {
-  font-size: 0.66rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--qz-dim);
-  text-align: center;
-}
-.qz-duel-group-cards {
-  display: flex;
-  gap: 6px;
-}
 /* Dans un groupe, la nature est déjà au-dessus : la carte se réduit à sa
    valeur, précédée d'une petite icône. */
-.qz-duel-group-cards .qz-card {
-  align-items: center;
-  text-align: center;
-  min-width: 84px;
-}
-.qz-card-ic {
-  color: var(--qz-dim);
-  align-self: center;
-}
 .qz-duel-validate {
   display: inline-flex;
   align-items: center;
@@ -1247,8 +1505,8 @@
   padding: 9px 18px;
   border: none;
   border-radius: 999px;
-  background: #4ade80;
-  color: #08210f;
+  background: var(--qz-ok);
+  color: var(--qz-panel);
   font: inherit;
   font-weight: 700;
   font-size: 0.86rem;
@@ -1261,15 +1519,18 @@
 }
 
 /* Une carte à déposer. */
+/* Une affirmation, pas une valeur : le texte est long, la carte s'étale en
+   ligne plutôt que de tenir dans une vignette carrée. */
 .qz-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 8px 11px;
+  gap: 4px;
+  max-width: 260px;
+  padding: 9px 13px;
   border: 1px solid var(--qz-line);
   border-radius: 10px;
-  background: linear-gradient(180deg, rgba(30, 42, 84, 0.95), rgba(18, 26, 56, 0.95));
+  background: linear-gradient(180deg, var(--qz-panel), var(--qz-panel-2));
   cursor: grab;
   user-select: none;
   touch-action: none;
@@ -1287,9 +1548,34 @@
 }
 /* Déposée, elle reste SAISISSABLE : on la reprend pour l'envoyer sur l'autre
    jeu ou la ramener en main. D'où le curseur de préhension conservé. */
+/* L'affirmation elle-même : icône + texte, sur une ligne. */
+.qz-card-claim {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  line-height: 1.3;
+}
+.qz-card-claim b {
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+.qz-card-ic {
+  flex: none;
+  margin-top: 2px;
+  color: var(--qz-type);
+}
+/* Le « pourquoi », à la révélation : c'est lui qui fait apprendre quelque
+   chose plutôt que de seulement sanctionner. */
+.qz-card-why {
+  font-style: normal;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: var(--qz-dim);
+  padding-left: 20px;
+}
 .qz-card.placed {
   cursor: grab;
-  background: rgba(24, 34, 70, 0.8);
+  background: var(--qz-panel-2);
 }
 .qz-card.placed:active {
   cursor: grabbing;
@@ -1300,38 +1586,12 @@
   cursor: default;
 }
 .qz-card.good {
-  border-color: #4ade80;
-  background: rgba(74, 222, 128, 0.14);
+  border-color: var(--qz-ok);
+  background: color-mix(in srgb, var(--qz-ok) 14%, transparent);
 }
 .qz-card.bad {
-  border-color: #ff6b6b;
-  background: rgba(255, 107, 107, 0.14);
-}
-.qz-card-kind {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.64rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--qz-dim);
-}
-.qz-card-value {
-  font-size: 0.88rem;
-  line-height: 1.2;
-}
-.qz-card-ost {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border: 1px solid rgba(126, 152, 220, 0.3);
-  border-radius: 999px;
-  background: rgba(126, 152, 220, 0.1);
-  color: var(--qz-ink);
-  font: inherit;
-  font-size: 0.76rem;
-  cursor: pointer;
+  border-color: var(--qz-ko);
+  background: color-mix(in srgb, var(--qz-ko) 14%, transparent);
 }
 .qz-card-take {
   position: absolute;
@@ -1352,8 +1612,8 @@
   top: 6px;
   right: 7px;
 }
-.qz-card.good .qz-card-mark { color: #4ade80; }
-.qz-card.bad .qz-card-mark { color: #ff6b6b; }
+.qz-card.good .qz-card-mark { color: var(--qz-ok); }
+.qz-card.bad .qz-card-mark { color: var(--qz-ko); }
 
 /* Le fantôme qui suit le curseur. */
 .qz-duel-ghost {
@@ -1361,7 +1621,7 @@
   z-index: 60;
   transform: translate(-50%, -50%) rotate(-4deg) scale(1.06);
   pointer-events: none;
-  filter: drop-shadow(0 12px 26px rgba(0, 0, 0, 0.6));
+  filter: drop-shadow(0 12px 26px color-mix(in srgb, var(--qz-shade) 60%, transparent));
 }
 .qz-card.ghost {
   cursor: grabbing;
@@ -1388,9 +1648,9 @@
   aspect-ratio: 16 / 9;
   border-radius: 14px;
   overflow: hidden;
-  border: 1px solid rgba(150, 178, 255, 0.22);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
-  background: #05060a;
+  border: 1px solid var(--qz-line-2);
+  box-shadow: 0 20px 50px color-mix(in srgb, var(--qz-shade) 45%, transparent);
+  background: var(--qz-panel-2);
 }
 .qz-pixel-def {
   position: absolute;
@@ -1398,7 +1658,7 @@
   bottom: 10px;
   padding: 3px 9px;
   border-radius: 999px;
-  background: rgba(6, 11, 26, 0.75);
+  background: var(--qz-panel-2);
   color: var(--qz-dim);
   font-family: ui-monospace, monospace;
   font-size: 0.72rem;
@@ -1418,8 +1678,8 @@
 .qz-swipe-crit {
   padding: 12px 22px;
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(28, 40, 82, 0.94), rgba(16, 24, 52, 0.94));
-  border: 1px solid rgba(150, 178, 255, 0.22);
+  background: linear-gradient(180deg, var(--qz-panel), var(--qz-panel-2));
+  border: 1px solid var(--qz-line-2);
   font-size: clamp(0.95rem, 3.2vw, 1.25rem);
   font-weight: 700;
   text-align: center;
@@ -1444,14 +1704,14 @@
   transition: 0.15s;
 }
 .qz-swipe-tag.no.on {
-  color: #ff8f8f;
-  border-color: #ff6b6b;
-  background: rgba(255, 107, 107, 0.14);
+  color: var(--qz-ko-ink);
+  border-color: var(--qz-ko);
+  background: color-mix(in srgb, var(--qz-ko) 14%, transparent);
 }
 .qz-swipe-tag.yes.on {
-  color: #8ff0bb;
-  border-color: #4ade80;
-  background: rgba(74, 222, 128, 0.14);
+  color: var(--qz-ok-ink);
+  border-color: var(--qz-ok);
+  background: color-mix(in srgb, var(--qz-ok) 14%, transparent);
 }
 /* LA PULSATION. C'est le retour qui manquait au clavier : à la souris on voit
    la carte suivre le curseur, aux flèches on n'avait strictement rien — d'où
@@ -1460,29 +1720,29 @@
   animation: qz-swipe-hit 0.3s ease;
 }
 .qz-swipe-tag.no.hit {
-  color: #ff8f8f;
-  border-color: #ff6b6b;
-  background: rgba(255, 107, 107, 0.2);
+  color: var(--qz-ko-ink);
+  border-color: var(--qz-ko);
+  background: color-mix(in srgb, var(--qz-ko) 20%, transparent);
 }
 .qz-swipe-tag.yes.hit {
-  color: #8ff0bb;
-  border-color: #4ade80;
-  background: rgba(74, 222, 128, 0.2);
+  color: var(--qz-ok-ink);
+  border-color: var(--qz-ok);
+  background: color-mix(in srgb, var(--qz-ok) 20%, transparent);
 }
 /* Quand le verdict est connu (solo), c'est LUI qui colore le retour, pas le
    côté choisi : on veut savoir si on a eu juste, pas se faire confirmer de
    quel côté on vient de pousser. */
 .qz-swipe-tag.hit.ok,
 .qz-swipe-btn.hit.ok {
-  color: #8ff0bb;
-  border-color: #4ade80;
-  background: rgba(74, 222, 128, 0.26);
+  color: var(--qz-ok-ink);
+  border-color: var(--qz-ok);
+  background: color-mix(in srgb, var(--qz-ok) 26%, transparent);
 }
 .qz-swipe-tag.hit.ko,
 .qz-swipe-btn.hit.ko {
-  color: #ff8f8f;
-  border-color: #ff6b6b;
-  background: rgba(255, 107, 107, 0.26);
+  color: var(--qz-ko-ink);
+  border-color: var(--qz-ko);
+  background: color-mix(in srgb, var(--qz-ko) 26%, transparent);
 }
 @keyframes qz-swipe-hit {
   0% { transform: scale(1); }
@@ -1493,12 +1753,12 @@
   animation: qz-swipe-hit 0.3s ease;
 }
 .qz-swipe-btn.no.hit {
-  border-color: #ff6b6b;
-  background: rgba(255, 107, 107, 0.2);
+  border-color: var(--qz-ko);
+  background: color-mix(in srgb, var(--qz-ko) 20%, transparent);
 }
 .qz-swipe-btn.yes.hit {
-  border-color: #4ade80;
-  background: rgba(74, 222, 128, 0.2);
+  border-color: var(--qz-ok);
+  background: color-mix(in srgb, var(--qz-ok) 20%, transparent);
 }
 
 /* Le tas qui fond. « 12/24 » se lit ; une barre qui se remplit se sent. */
@@ -1514,34 +1774,47 @@
 }
 .qz-swipe-pile {
   position: relative;
-  /* De la hauteur pour que le tas se voie DERRIÈRE la carte de devant : c'est
-     tout l'objet du changement, on ne devinait pas qu'il s'agissait d'un
-     paquet. */
-  height: 300px;
+  /* De quoi loger la carte de devant PLUS le décalage du tas au-dessus d'elle
+     (trois crans de 26 px). */
+  height: 348px;
   display: grid;
   place-items: end center;
   padding-bottom: 4px;
 }
+/* UNE HAUTEUR FIXE, ET C'EST TOUT LE CORRECTIF DU TAS.
+   Les cartes n'en avaient pas : celle de devant portait le titre du jeu
+   (≈ 292 px) là où celles du dessous n'avaient que la jaquette (≈ 250 px). Plus
+   courtes et alignées par le bas, elles se retrouvaient INTÉGRALEMENT derrière
+   la carte de devant — le tas n'apparaissait qu'au moment où on faisait glisser
+   la première, ce qui donnait l'impression qu'il se fabriquait à la volée.
+   À hauteur égale, le décalage vertical se voit tout le temps. */
 .qz-swipe-card {
   position: absolute;
-  width: 168px;
+  width: 200px;
+  height: 292px;
+  display: flex;
+  flex-direction: column;
   border-radius: 14px;
   overflow: hidden;
-  background: rgba(18, 27, 58, 0.95);
-  border: 1px solid rgba(150, 178, 255, 0.24);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  background: var(--qz-panel-2);
+  border: 1px solid var(--qz-line-2);
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--qz-shade) 50%, transparent);
   transition: transform 0.18s ease;
 }
 .qz-swipe-card img {
   display: block;
   width: 100%;
-  height: 210px;
+  /* La jaquette prend toute la place que le titre ne prend pas. Sur les cartes
+     du dessous, qui n'ont pas de titre, elle occupe donc la carte entière. */
+  flex: 1;
+  min-height: 0;
   object-fit: cover;
 }
 .qz-swipe-ph {
   display: grid;
   place-items: center;
-  height: 210px;
+  flex: 1;
+  min-height: 0;
   color: var(--qz-dim);
 }
 .qz-swipe-name {
@@ -1556,12 +1829,16 @@
    maintenant franchement, en s'inclinant alternativement — on voit qu'il en
    reste, on aperçoit les jaquettes qui arrivent, et le tas fond à vue d'œil. */
 .qz-swipe-card.behind {
+  /* Origine EN BAS : la réduction d'échelle rogne alors le haut de la carte et
+     non ses deux extrémités, ce qui rend le décalage prévisible. Avec 26 px par
+     cran, chaque carte du tas dépasse visiblement de celle de devant. */
+  transform-origin: bottom center;
   transform:
-    translateY(calc(var(--k) * -16px))
-    scale(calc(1 - var(--k) * 0.07))
-    rotate(calc((var(--k) - 1.5) * 2.4deg));
-  opacity: calc(1 - var(--k) * 0.22);
-  filter: brightness(0.55) saturate(0.7);
+    translateY(calc(var(--k) * -26px))
+    scale(calc(1 - var(--k) * 0.05))
+    rotate(calc((var(--k) - 1.5) * 2.2deg));
+  opacity: calc(1 - var(--k) * 0.2);
+  filter: brightness(0.7) saturate(0.75);
   z-index: calc(3 - var(--k));
   /* Chaque carte de réserve avance d'un cran quand celle de devant s'en va.
      Comme la `key` porte le jeu et non la position, React réutilise le même
@@ -1610,12 +1887,12 @@
 /* Le liseré de verdict, en solo : on sait tout de suite si la carte est
    partie du bon côté. */
 .qz-swipe-card.outgoing.ok {
-  border-color: #4ade80;
-  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.5), 0 16px 40px rgba(0, 0, 0, 0.5);
+  border-color: var(--qz-ok);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--qz-ok) 50%, transparent), 0 16px 40px color-mix(in srgb, var(--qz-shade) 50%, transparent);
 }
 .qz-swipe-card.outgoing.ko {
-  border-color: #ff6b6b;
-  box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.5), 0 16px 40px rgba(0, 0, 0, 0.5);
+  border-color: var(--qz-ko);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--qz-ko) 50%, transparent), 0 16px 40px color-mix(in srgb, var(--qz-shade) 50%, transparent);
 }
 .qz-swipe-verdict {
   position: absolute;
@@ -1625,12 +1902,12 @@
   border-radius: 14px;
 }
 .qz-swipe-verdict.good {
-  background: rgba(74, 222, 128, 0.3);
-  color: #06301a;
+  background: color-mix(in srgb, var(--qz-ok) 70%, transparent);
+  color: var(--qz-panel);
 }
 .qz-swipe-verdict.bad {
-  background: rgba(255, 107, 107, 0.32);
-  color: #3a0808;
+  background: color-mix(in srgb, var(--qz-ko) 70%, transparent);
+  color: var(--qz-panel);
 }
 .qz-swipe-empty {
   color: var(--qz-dim);
@@ -1648,12 +1925,12 @@
   place-items: center;
   border: 1px solid var(--qz-line);
   border-radius: 50%;
-  background: rgba(12, 19, 42, 0.8);
+  background: var(--qz-panel-2);
   cursor: pointer;
   transition: 0.15s;
 }
-.qz-swipe-btn.no { color: #ff8f8f; }
-.qz-swipe-btn.yes { color: #8ff0bb; }
+.qz-swipe-btn.no { color: var(--qz-ko-ink); }
+.qz-swipe-btn.yes { color: var(--qz-ok-ink); }
 .qz-swipe-btn:hover:not(:disabled) {
   transform: scale(1.08);
 }
@@ -1721,8 +1998,8 @@
   gap: 8px;
   padding: 24px 22px;
   border-radius: 16px;
-  background: linear-gradient(180deg, rgba(28, 40, 82, 0.94), rgba(16, 24, 52, 0.94));
-  border: 1px solid rgba(150, 178, 255, 0.22);
+  background: linear-gradient(180deg, var(--qz-panel), var(--qz-panel-2));
+  border: 1px solid var(--qz-line-2);
   font-size: clamp(1rem, 3.4vw, 1.4rem);
   text-align: center;
 }
@@ -1749,7 +2026,7 @@
   outline: none;
 }
 .qz-fill-input::placeholder {
-  color: rgba(147, 162, 196, 0.45);
+  color: var(--qz-dim);
   letter-spacing: 0.14em;
 }
 .qz-fill-go {
@@ -1759,7 +2036,7 @@
   height: 32px;
   border: 1px solid var(--qz-line);
   border-radius: 8px;
-  background: rgba(12, 19, 42, 0.8);
+  background: var(--qz-panel-2);
   color: var(--qz-type);
   cursor: pointer;
 }
@@ -1767,8 +2044,8 @@
 .qz-fill-answer {
   padding: 6px 14px;
   border-radius: 8px;
-  background: rgba(74, 222, 128, 0.16);
-  color: #b8ffd2;
+  background: color-mix(in srgb, var(--qz-ok) 16%, transparent);
+  color: var(--qz-ok-ink);
   font-weight: 800;
 }
 .qz-fill-hint {
@@ -1799,7 +2076,7 @@
 }
 .qz-chip:hover {
   color: var(--qz-ink);
-  border-color: rgba(126, 152, 220, 0.45);
+  border-color: var(--qz-line-2);
 }
 .qz-chip em {
   font-style: normal;
@@ -1817,8 +2094,8 @@
   gap: 12px;
   padding: 10px 16px 10px 10px;
   border-radius: 12px;
-  border: 1px solid rgba(74, 222, 128, 0.4);
-  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid color-mix(in srgb, var(--qz-ok) 40%, transparent);
+  background: color-mix(in srgb, var(--qz-ok) 10%, transparent);
   animation: qz-round-in 0.3s ease;
 }
 .qz-answer-card img {
@@ -1841,7 +2118,7 @@
 }
 .qz-answer-card a,
 .qz-answer-card b {
-  color: #b8ffd2;
+  color: var(--qz-ok-ink);
   font-weight: 700;
   font-size: 1rem;
   text-decoration: none;
@@ -1862,12 +2139,12 @@
   padding: 12px 14px;
   border-radius: 14px;
   border: 1px solid var(--qz-line);
-  background: rgba(10, 16, 36, 0.94);
+  background: var(--qz-panel-2);
   overflow: hidden;
   animation: qz-round-in 0.3s ease;
 }
-.qz-verdict.good { border-color: rgba(74, 222, 128, 0.5); }
-.qz-verdict.bad { border-color: rgba(255, 107, 107, 0.45); }
+.qz-verdict.good { border-color: color-mix(in srgb, var(--qz-ok) 50%, transparent); }
+.qz-verdict.bad { border-color: color-mix(in srgb, var(--qz-ko) 45%, transparent); }
 /* La barre qui se vide : le décompte avant l'enchaînement automatique.
    5,2 s — à garder synchro avec REVEAL_MS dans pages/Quizz.jsx. */
 .qz-verdict-bar {
@@ -1893,12 +2170,12 @@
   border-radius: 50%;
 }
 .qz-verdict.good .qz-verdict-badge {
-  background: rgba(74, 222, 128, 0.18);
-  color: #4ade80;
+  background: color-mix(in srgb, var(--qz-ok) 18%, transparent);
+  color: var(--qz-ok);
 }
 .qz-verdict.bad .qz-verdict-badge {
-  background: rgba(255, 107, 107, 0.16);
-  color: #ff6b6b;
+  background: color-mix(in srgb, var(--qz-ko) 16%, transparent);
+  color: var(--qz-ko);
 }
 .qz-verdict-txt {
   flex: 1;
@@ -1916,7 +2193,7 @@
   font-size: 1.1rem;
   color: var(--qz-dim);
 }
-.qz-verdict-pts.up { color: var(--gold, #f5c451); }
+.qz-verdict-pts.up { color: var(--qz-accent-ink); }
 .qz-next {
   display: inline-flex;
   align-items: center;
@@ -1924,8 +2201,8 @@
   padding: 9px 16px;
   border: none;
   border-radius: 999px;
-  background: var(--gold, #f5c451);
-  color: #16110a;
+  background: var(--qz-accent);
+  color: #2a1e05;
   font: inherit;
   font-weight: 700;
   font-size: 0.85rem;
@@ -1937,7 +2214,7 @@
   min-width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.18);
+  background: color-mix(in srgb, var(--qz-shade) 18%, transparent);
   font-size: 0.74rem;
 }
 
@@ -1962,15 +2239,18 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: rgba(245, 196, 81, 0.14);
-  color: var(--gold, #f5c451);
+  background: color-mix(in srgb, var(--qz-accent) 14%, transparent);
+  color: var(--qz-accent-ink);
   margin-bottom: 12px;
 }
 .qz-done-score {
   margin: 0;
   font-size: clamp(2.6rem, 10vw, 4rem);
   line-height: 1;
-  color: var(--gold, #f5c451);
+  background: var(--brand-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 .qz-done-score-label {
   font-size: 0.78rem;
@@ -1990,8 +2270,8 @@
   margin-top: 14px;
   padding: 9px 18px;
   border-radius: 999px;
-  border: 1px solid rgba(245, 196, 81, 0.35);
-  background: rgba(245, 196, 81, 0.1);
+  border: 1px solid color-mix(in srgb, var(--qz-accent) 35%, transparent);
+  background: color-mix(in srgb, var(--qz-accent) 10%, transparent);
   color: var(--qz-ink);
   text-decoration: none;
   font-size: 0.86rem;
@@ -2011,12 +2291,12 @@
   font-size: 0.88rem;
 }
 .qz-versus-res.win {
-  background: rgba(74, 222, 128, 0.14);
-  color: #b8ffd2;
+  background: color-mix(in srgb, var(--qz-ok) 14%, transparent);
+  color: var(--qz-ok-ink);
 }
 .qz-versus-res.lose {
-  background: rgba(255, 107, 107, 0.12);
-  color: #ffc4c4;
+  background: color-mix(in srgb, var(--qz-ko) 12%, transparent);
+  color: var(--qz-ko-ink);
 }
 .qz-done-actions {
   display: flex;
@@ -2039,10 +2319,11 @@
 }
 .qz-recap,
 .qz-board {
-  padding: 16px;
+  padding: 18px;
   border: 1px solid var(--qz-line);
-  border-radius: 16px;
+  border-radius: var(--radius-lg, 20px);
   background: var(--qz-panel);
+  box-shadow: var(--shadow-sm);
 }
 .qz-recap-title {
   display: flex;
@@ -2070,7 +2351,7 @@
   gap: 10px;
   padding: 10px;
   border-radius: 11px;
-  background: rgba(10, 16, 36, 0.6);
+  background: var(--qz-panel-2);
   border-left: 3px solid var(--qz-type);
 }
 .qz-recap-row.bad { opacity: 0.72; }
@@ -2097,7 +2378,7 @@
 }
 .qz-recap-a {
   font-size: 0.8rem;
-  color: #8ff0bb;
+  color: var(--qz-ok-ink);
 }
 .qz-recap-a a { color: inherit; }
 .qz-recap-x {
@@ -2117,7 +2398,7 @@
   font-size: 0.92rem;
   color: var(--qz-dim);
 }
-.qz-recap-pts.up { color: var(--gold, #f5c451); }
+.qz-recap-pts.up { color: var(--qz-accent-ink); }
 
 .qz-board-row {
   display: grid;
@@ -2127,18 +2408,21 @@
   padding: 7px 9px;
   border-radius: 10px;
 }
-.qz-board-row.me { background: rgba(245, 196, 81, 0.1); }
+.qz-board-row.me { background: color-mix(in srgb, var(--qz-accent) 10%, transparent); }
 .qz-board-rank {
   width: 22px;
   height: 22px;
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: rgba(126, 152, 220, 0.16);
+  background: var(--qz-panel-2);
   font-size: 0.74rem;
   font-weight: 800;
 }
-.qz-board-rank.r1 { background: rgba(245, 196, 81, 0.3); color: var(--gold, #f5c451); }
+.qz-board-rank.r1 {
+  background: color-mix(in srgb, var(--qz-accent) 30%, transparent);
+  color: var(--qz-accent-ink);
+}
 .qz-board-rank.r2 { background: rgba(200, 214, 240, 0.22); }
 .qz-board-rank.r3 { background: rgba(205, 127, 50, 0.26); }
 .qz-board-user {
@@ -2155,7 +2439,7 @@
   height: 26px;
   border-radius: 50%;
   object-fit: cover;
-  background: rgba(126, 152, 220, 0.2);
+  background: var(--qz-panel-2);
   display: grid;
   place-items: center;
   font-size: 0.72rem;
@@ -2168,7 +2452,7 @@
   font-size: 0.86rem;
 }
 .qz-board-fight { color: var(--qz-dim); }
-.qz-board-score { font-weight: 800; color: var(--gold, #f5c451); }
+.qz-board-score { font-weight: 800; color: var(--qz-accent-ink); }
 .qz-board-loading,
 .qz-board-empty {
   color: var(--qz-dim);
@@ -2188,7 +2472,16 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 14px;
+  gap: 16px;
+  padding: 10px 0 30px;
+}
+/* Le code du salon prend la place du titre dans le logo : c'est LUI qu'on
+   dicte à voix haute, autant qu'il soit l'objet le plus lisible de l'écran. */
+.qzv-logo .qz-logo-main {
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: clamp(2.2rem, 7vw, 3.4rem);
 }
 
 /* Les pupitres en grand : l'image du jeu sert d'écran d'attente. */
@@ -2210,9 +2503,9 @@
   gap: 5px;
   padding: 16px 10px 22px;
   border-radius: 12px 12px 6px 6px;
-  background: linear-gradient(180deg, rgba(30, 43, 88, 0.95), rgba(15, 22, 48, 0.95));
-  border: 1px solid rgba(150, 178, 255, 0.2);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.42);
+  background: linear-gradient(180deg, var(--qz-panel), var(--qz-panel-2));
+  border: 1px solid var(--qz-line-2);
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--qz-shade) 42%, transparent);
 }
 .qzv-desk b {
   font-size: 0.85rem;
@@ -2235,19 +2528,50 @@
   height: 4px;
   transform: translateX(-50%);
   border-radius: 3px;
-  background: rgba(126, 152, 220, 0.22);
+  background: var(--qz-panel-2);
   transition: background 0.25s, box-shadow 0.25s;
 }
 .qzv-desk.ready .qzv-desk-light {
   background: hsl(var(--hue, 40) 90% 62%);
   box-shadow: 0 0 14px hsl(var(--hue, 40) 90% 62% / 0.7);
 }
+/* Une place libre EST un bouton d'invitation : c'est le geste évident quand on
+   regarde un siège vide, et ça évite d'aller chercher « Inviter » ailleurs. */
 .qzv-desk.empty {
   background: transparent;
   border-style: dashed;
-  border-color: rgba(126, 152, 220, 0.25);
+  border-color: var(--qz-line-2);
   box-shadow: none;
+  padding: 0;
+  transition: border-color 0.15s, background 0.15s, transform 0.14s;
+}
+.qzv-desk.empty:hover {
+  transform: translateY(-2px);
+  border-color: var(--qz-accent);
+  background: color-mix(in srgb, var(--qz-accent) 7%, transparent);
+}
+.qzv-desk-invite {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
+  gap: 7px;
+  padding: 16px 10px 22px;
+  border: none;
+  background: transparent;
+  color: var(--qz-dim);
+  font: inherit;
+  cursor: pointer;
+}
+.qzv-desk-invite em {
+  font-style: normal;
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+.qzv-desk.empty:hover .qzv-desk-invite {
+  color: var(--qz-accent-ink);
 }
 .qzv-desk-ph {
   display: grid;
@@ -2255,8 +2579,13 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: rgba(126, 152, 220, 0.12);
-  color: var(--qz-dim);
+  background: var(--qz-panel-2);
+  color: inherit;
+  transition: background 0.15s, transform 0.15s;
+}
+.qzv-desk.empty:hover .qzv-desk-ph {
+  transform: scale(1.1);
+  background: color-mix(in srgb, var(--qz-accent) 18%, transparent);
 }
 .qzv-lobby-actions {
   display: flex;
@@ -2264,19 +2593,56 @@
   justify-content: center;
   gap: 9px;
 }
+/* Les réglages reprennent le gabarit des panneaux du site, comme à l'accueil :
+   le salon ne doit pas avoir l'air d'un autre écran. */
 .qzv-settings {
   width: 100%;
-  padding: 14px;
+  padding: 18px;
   border: 1px solid var(--qz-line);
-  border-radius: 14px;
-  background: rgba(10, 16, 36, 0.5);
+  border-radius: var(--radius-lg, 20px);
+  background: var(--qz-panel);
+  box-shadow: var(--shadow-sm);
+}
+.qzv-settings .qz-types { margin-bottom: 0; }
+
+/* Ce que voient les invités : le programme, sans pouvoir y toucher. */
+.qzv-programme {
+  width: 100%;
+}
+.qzv-programme-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  justify-content: center;
+}
+.qzv-prog-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--qz-type) 35%, var(--qz-line));
+  background: color-mix(in srgb, var(--qz-type) 9%, transparent);
+  color: var(--qz-type);
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 .qzv-wait-host {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 20px;
+  border-radius: 999px;
+  border: 1px dashed var(--qz-line-2);
   color: var(--qz-dim);
   font-size: 0.9rem;
-  line-height: 1.6;
 }
-.qzv-wait-host em { font-style: normal; opacity: 0.8; }
+.qzv-wait-host em {
+  font-style: normal;
+  opacity: 0.75;
+  padding-left: 9px;
+  border-left: 1px solid var(--qz-line);
+}
 
 .qzv-play { max-width: 820px; }
 .qzv-flash {
@@ -2285,8 +2651,8 @@
   font-size: 0.82rem;
   animation: qz-round-in 0.25s ease;
 }
-.qzv-flash.good { background: rgba(74, 222, 128, 0.16); color: #b8ffd2; }
-.qzv-flash.bad { background: rgba(255, 107, 107, 0.12); color: #ffc4c4; }
+.qzv-flash.good { background: color-mix(in srgb, var(--qz-ok) 16%, transparent); color: var(--qz-ok-ink); }
+.qzv-flash.bad { background: color-mix(in srgb, var(--qz-ko) 12%, transparent); color: var(--qz-ko-ink); }
 .qzv-waiting {
   margin: 0;
   color: var(--qz-dim);
@@ -2315,7 +2681,7 @@
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  color: var(--gold, #f5c451);
+  color: var(--qz-accent-ink);
 }
 .qzv-champ b { font-size: 1.2rem; color: var(--qz-ink); }
 .qzv-champ em { font-style: normal; color: var(--qz-dim); font-size: 0.86rem; }
@@ -2335,49 +2701,236 @@
   gap: 10px;
   padding: 9px 12px;
   border-radius: 11px;
-  background: rgba(10, 16, 36, 0.65);
+  background: var(--qz-panel-2);
   border-left: 3px solid hsl(var(--hue, 40) 70% 58%);
 }
-.qzv-rank-row.me { background: rgba(245, 196, 81, 0.1); }
+.qzv-rank-row.me { background: color-mix(in srgb, var(--qz-accent) 10%, transparent); }
 .qzv-rank-id { display: flex; flex-direction: column; min-width: 0; }
 .qzv-rank-id b { font-size: 0.9rem; }
 .qzv-rank-id em { font-style: normal; font-size: 0.74rem; color: var(--qz-dim); }
-.qzv-rank-score { font-weight: 800; color: var(--gold, #f5c451); }
+.qzv-rank-score { font-weight: 800; color: var(--qz-accent-ink); }
 
 /* ======================================================================
    Les cartes du fil et de la messagerie
    ======================================================================
-   Elles réutilisent les gabarits du blind test (.hf-blindtest, .hf-btg) et de
-   la carte de versus (.gv-card-*) : c'est tout l'intérêt d'avoir imposé aux
-   quatre mini-jeux la même forme de réponse. On n'ajoute ici que ce qui est
-   propre au Grand Quiz — les pastilles d'épreuves — et sa couleur. */
-.hf-qz .hf-bt-scorebox {
-  background: linear-gradient(160deg, rgba(245, 196, 81, 0.22), rgba(180, 147, 255, 0.16));
+   Elles réutilisent le gabarit du blind test (.hf-card, .hf-blindtest) pour que
+   le fil reste homogène, mais leur CONTENU leur appartient : le Grand Quiz n'a
+   pas un score dans le vide à montrer, il a une partie composée d'épreuves
+   variées, et c'est ça qui donne envie de cliquer. */
+.hf-qz-body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 2px 2px;
 }
+
+/* L'anneau de réussite. Un pourcentage écrit se lit ; un anneau se sent. */
+.hf-qz-ring {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  flex: none;
+}
+.hf-qz-ring svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.hf-qz-ring-bg {
+  fill: none;
+  stroke: var(--border, #ececef);
+  stroke-width: 6;
+}
+.hf-qz-ring-fg {
+  fill: none;
+  stroke: var(--orange, #f2b70b);
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+.hf-qz-ring-txt {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 1px;
+}
+.hf-qz-ring-txt b {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+.hf-qz-ring-txt em {
+  font-style: normal;
+  font-size: 0.72rem;
+  color: var(--text-soft, #6b6c76);
+}
+
+.hf-qz-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.hf-qz-score {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.hf-qz-score b {
+  font-size: 1.7rem;
+  line-height: 1;
+  /* Le dégradé « encre » du site : lisible sur blanc comme sur noir, là où le
+     doré vif disparaîtrait en thème clair. */
+  background: var(--brand-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.hf-qz-score em {
+  font-style: normal;
+  font-size: 0.78rem;
+  color: var(--text-soft, #6b6c76);
+}
+.hf-qz-pct {
+  font-size: 0.8rem;
+  color: var(--text-soft, #6b6c76);
+}
+
+/* Les épreuves traversées : c'est CE qui distingue une partie d'une autre.
+   « 8 épreuves » ne dit rien, « emojis · duel · studio » raconte la partie. */
 .hf-qz-types {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  margin-top: 6px;
+  margin-top: 3px;
 }
 .hf-qz-type {
   padding: 2px 9px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--qz-type, #f5c451) 20%, transparent);
-  color: color-mix(in srgb, var(--qz-type, #f5c451) 70%, #101010);
+  border: 1px solid color-mix(in srgb, var(--qz-type, var(--orange)) 30%, transparent);
+  background: color-mix(in srgb, var(--qz-type, var(--orange)) 12%, transparent);
+  color: var(--qz-type, var(--accent-ink));
   font-size: 0.7rem;
   font-weight: 600;
   white-space: nowrap;
 }
 .hf-qz-type.more {
-  background: rgba(128, 128, 128, 0.16);
-  color: inherit;
-  opacity: 0.7;
+  border-color: var(--border, #ececef);
+  background: transparent;
+  color: var(--text-soft, #6b6c76);
 }
+
+.hf-qz-versus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px 13px;
+  border-radius: 10px;
+  font-size: 0.84rem;
+}
+.hf-qz-versus.win {
+  background: color-mix(in srgb, #16a34a 12%, transparent);
+  color: #15803d;
+}
+.hf-qz-versus.lose {
+  background: color-mix(in srgb, #dc2626 10%, transparent);
+  color: #b91c1c;
+}
+:root[data-theme="dark"] .hf-qz-versus.win { color: #a7f3c4; }
+:root[data-theme="dark"] .hf-qz-versus.lose { color: #ffb4b4; }
+
+/* L'action, unique et explicite : rejouer le MÊME set est la seule chose qui
+   permette vraiment de comparer deux scores. */
+.hf-qz-cta {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 12px;
+  padding: 11px 16px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--orange) 35%, transparent);
+  background: color-mix(in srgb, var(--orange) 9%, transparent);
+  color: var(--accent-ink);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s, transform 0.12s;
+}
+.hf-qz-cta:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  border-color: var(--orange);
+}
+.hf-qz-cta em {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 0.74rem;
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+/* La carte de rafale : une ligne par partie, chacune défiable. */
+.hf-qz-runs {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.hf-qz-run {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 11px;
+  border-radius: 10px;
+  background: var(--surface-2, #f6f6f8);
+  font-size: 0.8rem;
+}
+.hf-qz-run.best {
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
+}
+.hf-qz-run-pts b { font-size: 0.94rem; }
+.hf-qz-run-stat { color: var(--text-soft, #6b6c76); }
+.hf-qz-run-vs {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.74rem;
+}
+.hf-qz-run-vs.win { color: #15803d; }
+.hf-qz-run-vs.lose { color: #b91c1c; }
+:root[data-theme="dark"] .hf-qz-run-vs.win { color: #a7f3c4; }
+:root[data-theme="dark"] .hf-qz-run-vs.lose { color: #ffb4b4; }
+.hf-qz-run-time {
+  margin-left: auto;
+  color: var(--text-soft, #6b6c76);
+  font-size: 0.74rem;
+}
+.hf-qz-run-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #ececef);
+  color: var(--accent-ink);
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.hf-qz-run-go:hover { border-color: var(--orange); }
+
 /* La vignette de la carte d'invitation, variante Grand Quiz. */
 .gv-card-art.qz {
   background: linear-gradient(150deg, #2a2148, #16224a);
   color: var(--gold, #f5c451);
+}
+
+@media (max-width: 760px) {
+  .hf-qz-run-time { display: none; }
+  .hf-qz-cta em { display: none; }
 }
 
 /* ======================================================================
@@ -2392,7 +2945,10 @@
 
 @media (max-width: 760px) {
   .qz-body { padding: 6px 12px 30px; }
-  .qz-scene-halo { display: none; }
+  /* Le décor flottant saute : il n'y a pas la place, et une jaquette qui
+     chevauche le logo est pire que pas de jaquette du tout. */
+  .qz-float { display: none; }
+  .qz-types-grid { grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); }
   .qz-choices { grid-template-columns: 1fr; }
   .qz-choice { padding: 12px 13px; font-size: 0.9rem; }
   .qz-question { padding: 20px 16px; }
@@ -2402,16 +2958,12 @@
     top: 50%;
     transform: translate(-50%, -50%);
   }
-  .qz-swipe-pile { height: 262px; }
-  .qz-swipe-card { width: 146px; }
-  .qz-swipe-card img,
-  .qz-swipe-ph { height: 182px; }
+  .qz-swipe-pile { height: 296px; }
+  .qz-swipe-card { width: 170px; height: 248px; }
   /* Les groupes de la main passent en pleine largeur : côte à côte sur un
      petit écran, ils se réduisent à des colonnes de deux caractères. */
   .qz-duel-hand { gap: 8px; }
-  .qz-duel-group { flex: 1 1 132px; }
-  .qz-duel-group-cards { justify-content: center; }
-  .qz-swipe-tag { writing-mode: horizontal-tb; padding: 5px 8px; font-size: 0.68rem; }
+      .qz-swipe-tag { writing-mode: horizontal-tb; padding: 5px 8px; font-size: 0.68rem; }
   .qz-recap-row { grid-template-columns: 1fr auto; }
   .qz-recap-type { grid-column: 1 / -1; justify-self: start; }
   .qz-recap-cover { display: none; }
@@ -2437,7 +2989,7 @@
 .admin-quiz .admin-section-head p {
   margin: 0 0 16px;
   max-width: 70ch;
-  color: var(--muted, #6b7280);
+  color: var(--qz-dim);
   font-size: 0.88rem;
   line-height: 1.5;
 }
@@ -2450,18 +3002,18 @@
 }
 .admin-quiz .admin-stat {
   padding: 6px 12px;
-  border: 1px solid var(--border, #e5e7eb);
+  border: 1px solid var(--qz-line);
   border-radius: 999px;
   font-size: 0.82rem;
-  color: var(--muted, #6b7280);
+  color: var(--qz-dim);
 }
 .admin-quiz .admin-stat b {
-  color: var(--text, #111827);
+  color: var(--qz-ink);
 }
 .admin-quiz .admin-stat.warn {
-  border-color: #f0b429;
-  background: rgba(240, 180, 41, 0.1);
-  color: #8a6100;
+  border-color: var(--qz-warn);
+  background: color-mix(in srgb, var(--qz-warn) 10%, transparent);
+  color: var(--qz-warn);
 }
 .admin-quiz .admin-stat.warn b { color: inherit; }
 
@@ -2474,23 +3026,23 @@
 .admin-quiz .admin-seg {
   display: inline-flex;
   padding: 3px;
-  border: 1px solid var(--border, #e5e7eb);
+  border: 1px solid var(--qz-line);
   border-radius: 10px;
-  background: var(--surface-2, #f6f7f9);
+  background: var(--qz-panel-2);
 }
 .admin-quiz .admin-seg-opt {
   padding: 6px 14px;
   border: none;
   border-radius: 7px;
   background: transparent;
-  color: var(--muted, #6b7280);
+  color: var(--qz-dim);
   font: inherit;
   font-size: 0.84rem;
   cursor: pointer;
 }
 .admin-quiz .admin-seg-opt.on {
-  background: var(--gold, #f5c451);
-  color: #16110a;
+  background: var(--qz-accent);
+  color: #2a1e05;
   font-weight: 600;
 }
 
@@ -2498,16 +3050,165 @@
 .admin-quiz .admin-empty {
   padding: 30px 0;
   text-align: center;
-  color: var(--muted, #6b7280);
+  color: var(--qz-dim);
   font-size: 0.88rem;
 }
 .admin-quiz .admin-error {
   margin: 0 0 12px;
   padding: 8px 13px;
   border-radius: 9px;
-  background: rgba(220, 38, 38, 0.1);
-  color: #b91c1c;
+  background: color-mix(in srgb, var(--qz-ko) 10%, transparent);
+  color: var(--qz-ko-ink);
   font-size: 0.86rem;
+}
+
+/* ---------- L'état de la banque, en un coup d'œil ----------
+   Trois ou quatre chiffres, gros, avec sous chacun d'où il vient. C'est la
+   première chose à voir en arrivant : « combien est jouable, combien attend ».
+   L'écran ne disait rien de tout ça, il ouvrait directement sur la file de
+   relecture — donc sur une liste vide tant qu'on n'avait rien généré. */
+.admin-quiz-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.admin-quiz-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 14px 16px;
+  border: 1px solid var(--qz-line);
+  border-radius: var(--radius, 14px);
+  background: var(--qz-panel);
+  box-shadow: var(--shadow-sm);
+}
+.admin-quiz-stat b {
+  font-size: 1.9rem;
+  line-height: 1;
+  color: var(--qz-ink);
+}
+.admin-quiz-stat span {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--qz-ink);
+}
+.admin-quiz-stat em {
+  font-style: normal;
+  font-size: 0.72rem;
+  color: var(--qz-dim);
+}
+.admin-quiz-stat.live b { color: var(--qz-ok-ink); }
+.admin-quiz-stat.todo {
+  border-color: color-mix(in srgb, var(--qz-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--qz-accent) 7%, var(--qz-panel));
+}
+.admin-quiz-stat.todo b { color: var(--qz-accent-ink); }
+.admin-quiz-stat.warn {
+  border-color: color-mix(in srgb, var(--qz-warn) 45%, transparent);
+  background: color-mix(in srgb, var(--qz-warn) 8%, var(--qz-panel));
+}
+.admin-quiz-stat.warn b { color: var(--qz-warn); }
+
+/* ---------- Les deux façons de remplir la banque ---------- */
+.admin-quiz-actions-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.admin-quiz-action {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 16px;
+  border: 1px solid var(--qz-line);
+  border-radius: var(--radius-lg, 20px);
+  background: var(--qz-panel);
+  box-shadow: var(--shadow-sm);
+}
+.admin-quiz-action-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--qz-accent-ink);
+}
+.admin-quiz-action-h b {
+  font-size: 0.98rem;
+  color: var(--qz-ink);
+}
+.admin-quiz-action p {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--qz-dim);
+}
+.admin-quiz-gen {
+  display: flex;
+  gap: 10px;
+}
+.admin-quiz-gen label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.72rem;
+  color: var(--qz-dim);
+}
+.admin-quiz-gen input {
+  width: 74px;
+  padding: 7px 9px;
+  border: 1px solid var(--qz-line);
+  border-radius: 8px;
+  background: var(--qz-panel-2);
+  color: var(--qz-ink);
+  font: inherit;
+  font-size: 0.86rem;
+}
+.admin-quiz-note {
+  font-size: 0.74rem;
+  color: var(--qz-warn);
+}
+
+/* ---------- L'avancement, puis le compte rendu ----------
+   La tâche tourne en fond côté serveur (routes/quizAdmin.js) : sans ce retour
+   en direct, on regarde un bouton grisé pendant une minute sans savoir s'il se
+   passe quelque chose. */
+.admin-quiz-job {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  padding: 11px 15px;
+  margin-bottom: 16px;
+  border-radius: var(--radius, 14px);
+  border: 1px solid var(--qz-line);
+  background: var(--qz-panel-2);
+  font-size: 0.86rem;
+}
+.admin-quiz-job.running {
+  border-color: color-mix(in srgb, var(--qz-accent) 45%, transparent);
+}
+.admin-quiz-job.done {
+  border-color: color-mix(in srgb, var(--qz-ok) 45%, transparent);
+  background: color-mix(in srgb, var(--qz-ok) 8%, var(--qz-panel));
+  color: var(--qz-ok-ink);
+}
+.admin-quiz-job.bad {
+  border-color: color-mix(in srgb, var(--qz-ko) 45%, transparent);
+  background: color-mix(in srgb, var(--qz-ko) 8%, var(--qz-panel));
+  color: var(--qz-ko-ink);
+}
+.admin-quiz-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  transform-origin: left center;
+  background: var(--qz-accent);
+  transition: transform 0.3s ease;
 }
 
 .admin-quiz-list {
@@ -2523,15 +3224,15 @@
   align-items: center;
   gap: 14px;
   padding: 13px 15px;
-  border: 1px solid var(--border, #e5e7eb);
+  border: 1px solid var(--qz-line);
   border-radius: 12px;
-  background: var(--surface, #fff);
+  background: var(--qz-panel);
 }
 /* Une entrée contestée par des joueurs saute aux yeux : c'est celle qu'il faut
    trancher en premier. */
 .admin-quiz-row.flagged {
-  border-color: #f0b429;
-  background: rgba(240, 180, 41, 0.06);
+  border-color: var(--qz-warn);
+  background: color-mix(in srgb, var(--qz-warn) 6%, transparent);
 }
 .admin-quiz-main {
   flex: 1;
@@ -2555,26 +3256,26 @@
   align-self: flex-start;
   padding: 3px 10px;
   border-radius: 999px;
-  background: rgba(22, 163, 74, 0.12);
-  color: #15803d;
+  background: color-mix(in srgb, var(--qz-ok) 12%, transparent);
+  color: var(--qz-ok-ink);
   font-size: 0.82rem;
   font-weight: 600;
 }
 .admin-quiz-wrong {
   font-size: 0.8rem;
-  color: var(--muted, #6b7280);
+  color: var(--qz-dim);
   text-decoration: line-through;
-  text-decoration-color: rgba(220, 38, 38, 0.4);
+  text-decoration-color: color-mix(in srgb, var(--qz-ko) 40%, transparent);
 }
 .admin-quiz-explain {
   font-style: normal;
   font-size: 0.82rem;
-  color: var(--muted, #6b7280);
+  color: var(--qz-dim);
   line-height: 1.4;
 }
 .admin-quiz-meta {
   font-size: 0.74rem;
-  color: var(--muted, #6b7280);
+  color: var(--qz-dim);
   opacity: 0.85;
 }
 .admin-quiz-actions {
@@ -2587,26 +3288,28 @@
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  border: 1px solid var(--border, #e5e7eb);
+  border: 1px solid var(--qz-line);
   border-radius: 9px;
-  background: var(--surface, #fff);
-  color: var(--text, #111827);
+  background: var(--qz-panel);
+  color: var(--qz-ink);
   font: inherit;
   font-size: 0.84rem;
   cursor: pointer;
   transition: 0.15s;
 }
 .admin-quiz .admin-btn:hover:not(:disabled) {
-  border-color: var(--gold, #f5c451);
+  border-color: var(--qz-accent-ink);
 }
 .admin-quiz .admin-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .admin-quiz .admin-btn.ok {
-  background: #16a34a;
-  border-color: #16a34a;
-  color: #fff;
+  background: var(--qz-ok);
+  border-color: var(--qz-ok);
+  /* Le contraire de l'aplat : blanc en clair, sombre sur le vert vif du
+     thème sombre — où du blanc tomberait à un contraste de 1,7. */
+  color: var(--qz-panel);
 }
 .admin-quiz .admin-btn.danger {
-  color: #b91c1c;
+  color: var(--qz-ko-ink);
   padding: 8px 11px;
 }
 
@@ -2650,9 +3353,9 @@
   width: clamp(38px, 9vw, 54px);
   height: clamp(46px, 11vw, 64px);
   border-radius: 10px;
-  background: linear-gradient(180deg, rgba(30, 42, 84, 0.95), rgba(18, 26, 56, 0.95));
-  border: 1px solid rgba(150, 178, 255, 0.24);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(190, 212, 255, 0.16);
+  background: linear-gradient(180deg, var(--qz-panel), var(--qz-panel-2));
+  border: 1px solid var(--qz-line-2);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--qz-shade) 35%, transparent), inset 0 1px 0 var(--qz-sheen);
   font-size: clamp(1.2rem, 4vw, 1.7rem);
   font-weight: 800;
   color: var(--qz-type);
@@ -2671,8 +3374,8 @@
   transform: scale(0.92);
 }
 .qz-tiles.revealed .qz-tile {
-  color: #b8ffd2;
-  border-color: rgba(74, 222, 128, 0.5);
+  color: var(--qz-ok-ink);
+  border-color: color-mix(in srgb, var(--qz-ok) 50%, transparent);
 }
 .qz-anagram-shape {
   font-size: 0.8rem;
@@ -2685,8 +3388,8 @@
 .qz-anagram-extra {
   padding: 3px 10px;
   border-radius: 999px;
-  background: rgba(255, 107, 107, 0.14);
-  color: #ffb4b4;
+  background: color-mix(in srgb, var(--qz-ko) 14%, transparent);
+  color: var(--qz-ko-ink);
   font-size: 0.74rem;
 }
 /* « C'était … », partagé avec le Motus. */
@@ -2696,8 +3399,8 @@
   gap: 12px;
   padding: 10px 16px 10px 10px;
   border-radius: 12px;
-  border: 1px solid rgba(74, 222, 128, 0.4);
-  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid color-mix(in srgb, var(--qz-ok) 40%, transparent);
+  background: color-mix(in srgb, var(--qz-ok) 10%, transparent);
   animation: qz-round-in 0.3s ease;
 }
 .qz-anagram-answer img {
@@ -2719,7 +3422,7 @@
   color: var(--qz-dim);
 }
 .qz-anagram-answer b {
-  color: #b8ffd2;
+  color: var(--qz-ok-ink);
   font-size: 1rem;
 }
 
@@ -2757,14 +3460,14 @@
   width: clamp(34px, 8vw, 48px);
   height: clamp(34px, 8vw, 48px);
   border-radius: 8px;
-  border: 2px solid rgba(126, 152, 220, 0.24);
-  background: rgba(10, 16, 36, 0.6);
+  border: 2px solid var(--qz-line-2);
+  background: var(--qz-panel-2);
   font-size: clamp(1rem, 3.4vw, 1.4rem);
   font-weight: 800;
   text-transform: uppercase;
 }
 .qz-motus-cell.filled {
-  border-color: rgba(150, 178, 255, 0.55);
+  border-color: var(--qz-line-2);
   animation: qz-motus-pop 0.12s ease;
 }
 @keyframes qz-motus-pop {
@@ -2774,22 +3477,29 @@
 /* Les trois couleurs du genre. Le retournement se fait lettre par lettre
    (animation-delay posé en ligne) : c'est ce délai qui rend la lecture du
    résultat lisible au lieu de tout révéler d'un bloc. */
+/* Le texte posé SUR un aplat de couleur doit s'INVERSER avec le thème : les
+   aplats sont soutenus en clair (#16a34a) et vifs en sombre (#4ade80), donc une
+   encre fixe tient sur l'un et disparaît sur l'autre. `var(--qz-panel)` est
+   exactement le contraire de l'aplat dans les deux cas — blanc en clair,
+   presque-noir en sombre — et règle les deux d'une seule règle. */
 .qz-motus-cell.exact,
-.qz-motus-cell.present,
+.qz-motus-cell.present {
+  animation: qz-motus-flip 0.42s backwards ease;
+  color: var(--qz-panel);
+}
 .qz-motus-cell.absent {
   animation: qz-motus-flip 0.42s backwards ease;
-  color: #0b1226;
 }
 .qz-motus-cell.exact {
-  background: #4ade80;
-  border-color: #4ade80;
+  background: var(--qz-ok);
+  border-color: var(--qz-ok);
 }
 .qz-motus-cell.present {
-  background: #f0a53a;
-  border-color: #f0a53a;
+  background: var(--qz-warn);
+  border-color: var(--qz-warn);
 }
 .qz-motus-cell.absent {
-  background: rgba(126, 152, 220, 0.22);
+  background: var(--qz-panel-2);
   border-color: transparent;
   color: var(--qz-dim);
 }
@@ -2828,7 +3538,7 @@
   place-items: center;
   border: 1px solid var(--qz-line);
   border-radius: 7px;
-  background: rgba(24, 34, 70, 0.85);
+  background: var(--qz-panel-2);
   color: var(--qz-ink);
   font: inherit;
   font-weight: 700;
@@ -2849,19 +3559,19 @@
   color: var(--qz-type);
 }
 .qz-motus-key.exact {
-  background: #4ade80;
-  border-color: #4ade80;
-  color: #0b1226;
+  background: var(--qz-ok);
+  border-color: var(--qz-ok);
+  color: var(--qz-panel);
 }
 .qz-motus-key.present {
-  background: #f0a53a;
-  border-color: #f0a53a;
-  color: #0b1226;
+  background: var(--qz-warn);
+  border-color: var(--qz-warn);
+  color: var(--qz-panel);
 }
 /* Éliminée : elle reste lisible mais visiblement hors course. */
 .qz-motus-key.absent {
   opacity: 0.3;
-  background: rgba(10, 16, 36, 0.8);
+  background: var(--qz-panel-2);
 }
 .qz-motus-left {
   font-size: 0.78rem;
@@ -2871,4 +3581,138 @@
 @media (max-width: 760px) {
   .qz-motus-key { height: 38px; font-size: 0.8rem; }
   .qz-tiles { gap: 6px; }
+}
+
+/* ----------------------------------------------------------------------
+   L'art de la carte dans l'arcade (.arc-game.g-quiz)
+   ----------------------------------------------------------------------
+   La carte reprenait l'art PAR DÉFAUT de la grille — jaquette + vinyle qui
+   sort de la pochette — c'est-à-dire, mot pour mot, celui du Blind Test. Or
+   ce jeu-ci ne demande pas de reconnaître une jaquette : il demande de
+   CHOISIR. D'où deux jaquettes côte à côte, A et B, et le buzzer posé
+   par-dessus. Au survol on buzze : le dôme s'enfonce et la bonne réponse se
+   cerne de vert.
+
+   Aucun dégradé : des aplats et des liserés, comme le reste de la grille.
+   Le gabarit reste celui des autres cartes (.arc-game-art : 96×90) pour que
+   les titres s'alignent d'une carte à l'autre. */
+.arc-game.g-quiz {
+  --g-1: #5b7cf0;
+  --g-2: #7e9bff;
+}
+
+.arc-art-quiz {
+  --qzc-good: #35c46f;
+  --qzc-buzz: #e2464d;
+  position: absolute;
+  inset: 0;
+}
+
+/* Les deux propositions : deux jaquettes au même gabarit, légèrement
+   inclinées l'une vers l'autre — un choix posé sur la table. */
+.arc-art-quiz-pick {
+  position: absolute;
+  z-index: 2;
+  top: 8px;
+  width: 42px;
+  height: 56px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 22px -12px color-mix(in srgb, var(--qz-shade) 55%, transparent);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.24s ease;
+}
+.arc-art-quiz-pick.a {
+  left: 0;
+  transform: rotate(-4deg);
+}
+.arc-art-quiz-pick.b {
+  right: 0;
+  transform: rotate(4deg);
+}
+.arc-art-quiz-pick img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* L'étiquette A / B, en haut à gauche de sa jaquette : un aplat sombre pour
+   rester lisible quelle que soit l'image dessous. */
+.arc-art-quiz-pick b {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 5px;
+  background: rgba(8, 9, 16, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+/* Au survol, les deux propositions s'écartent — et la bonne se cerne. */
+.arc-game:hover .arc-art-quiz-pick.a {
+  transform: rotate(-8deg) translate(-2px, -3px);
+}
+.arc-game:hover .arc-art-quiz-pick.b {
+  transform: rotate(8deg) translate(2px, -3px);
+}
+.arc-game:hover .arc-art-quiz-pick.good {
+  border-color: var(--qzc-good);
+  box-shadow: 0 0 0 1px var(--qzc-good), 0 10px 22px -12px color-mix(in srgb, var(--qz-shade) 55%, transparent);
+}
+.arc-game:hover .arc-art-quiz-pick.good b {
+  background: var(--qzc-good);
+  border-color: var(--qzc-good);
+}
+
+/* Le buzzer, par-dessus les deux jaquettes : c'est LUI qui tranche. Le socle
+   est le conteneur (il porte l'ombre portée), le dôme l'élément interne — il
+   doit s'enfoncer seul au survol sans emporter le socle. */
+.arc-art-quiz-buzz {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: 2px;
+  width: 32px;
+  height: 32px;
+  margin-left: -16px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 18px -8px color-mix(in srgb, var(--qz-shade) 60%, transparent);
+}
+.arc-art-quiz-buzz i {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: var(--qzc-buzz);
+  /* Le relief du bouton est une ombre pleine sous le dôme, pas un dégradé :
+     c'est cette hauteur-là qui disparaît quand on buzze. */
+  box-shadow: 0 3px 0 color-mix(in srgb, #000 32%, var(--qzc-buzz));
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+.arc-game:hover .arc-art-quiz-buzz i {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 color-mix(in srgb, #000 32%, var(--qzc-buzz));
+}
+
+@media (max-width: 560px) {
+  .arc-art-quiz-pick {
+    width: 37px;
+    height: 49px;
+  }
+  .arc-art-quiz-buzz {
+    width: 28px;
+    height: 28px;
+    margin-left: -14px;
+  }
 }

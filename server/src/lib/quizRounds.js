@@ -1,5 +1,6 @@
 import UserGame from "../models/UserGame.js";
-import CustomOst from "../models/CustomOst.js";
+import User from "../models/User.js";
+import GameTime from "../models/GameTime.js";
 import QuizEmoji from "../models/QuizEmoji.js";
 import { igdbQuery } from "./igdb.js";
 import { buildQuestions, getFactPool, seenByType, seenQuestionIds } from "./quizBank.js";
@@ -59,7 +60,11 @@ export const TYPE_META = {
   duel: { label: "Duel", durationSec: 55, mode: "parallel", icon: "swords" },
   pixel: { label: "Pixels", durationSec: 30, mode: "buzzer", icon: "grid" },
   swipe: { label: "Le tri", durationSec: 30, mode: "parallel", icon: "layers" },
-  anagram: { label: "Lettres mêlées", durationSec: 45, mode: "buzzer", icon: "shuffle" },
+  // Une minute trente, et autant d'essais qu'on veut : une anagramme se
+  // travaille en essayant des combinaisons à voix haute, pas en jouant sa vie
+  // sur trois propositions. La sanction reste dans le barème (chaque essai raté
+  // rogne les points), pas dans une élimination.
+  anagram: { label: "Lettres mêlées", durationSec: 90, mode: "buzzer", icon: "shuffle" },
   // La plus longue du lot, et de loin : cinq essais successifs, chacun demandant
   // de relire la grille avant de retenter. À trente secondes on n'en place que
   // deux, et l'épreuve se joue au hasard plutôt qu'à la déduction.
@@ -71,7 +76,52 @@ export const TYPE_META = {
 // épuisement et la grille perd son intérêt.
 export const MOTUS_TRIES = 5;
 
+// L'anagramme n'élimine pas : on peut proposer autant de titres qu'on veut
+// dans le temps imparti. Un plafond existe quand même, uniquement pour borner
+// ce qu'un client malveillant peut envoyer.
+export const ANAGRAM_TRIES = 40;
+
 export const ROUND_TYPES = Object.keys(TYPE_META);
+
+// ============================================================
+//  QUELS TITRES ON ACCEPTE DE FAIRE DEVINER
+// ============================================================
+// Quatre épreuves demandent de retrouver un jeu à partir d'un indice : les
+// emojis, la capture pixelisée, l'anagramme et le Motus. Toutes butaient sur le
+// même écueil — le catalogue regorge de titres à rallonge.
+//
+// « Ace Attorney: Trials and Tribulations » n'est pas une énigme difficile,
+// c'est une énigme PÉNIBLE : on a reconnu le jeu en deux secondes et on passe
+// les vingt suivantes à taper un sous-titre exact. Et « Diablo II » demande de
+// deviner non pas un jeu mais un NUMÉRO D'ÉPISODE, ce qui ne teste plus rien.
+//
+// On ne garde donc que des noms de SAGA ou de jeu unique : Bloodborne, Hades,
+// Minecraft, Animal Crossing, Prince of Persia. Concrètement, sont écartés :
+//
+//   • les sous-titres — tout ce qui suit « : », « – » ou « - » entouré
+//     d'espaces (Half-Life garde son trait d'union, il n'est pas un sous-titre) ;
+//   • les numéros d'épisode en fin de titre, en chiffres arabes ou romains.
+//     La limite à trois chiffres est délibérée : elle écarte « Portal 2 » et
+//     « Far Cry 3 » tout en gardant « Cyberpunk 2077 », dont le nombre fait
+//     partie du nom et non d'une numérotation ;
+//   • les mentions d'édition, qui désignent le même jeu sous un autre emballage ;
+//   • ce qui est simplement trop long à taper (plus de quatre mots ou de
+//     vingt-deux lettres).
+const SUBTITLE_RE = /[:–—]|\s-\s/;
+const SEQUEL_RE = /\s+(\d{1,3}|[IVXLCDM]+)$/;
+const EDITION_RE =
+  /\b(edition|remaster(ed)?|remake|goty|deluxe|definitive|collection|anthology|trilogy|complete|bundle|hd)\b/i;
+
+export function isGuessableTitle(name) {
+  const raw = String(name || "").trim();
+  if (!raw) return false;
+  if (SUBTITLE_RE.test(raw)) return false;
+  if (SEQUEL_RE.test(raw)) return false;
+  if (EDITION_RE.test(raw)) return false;
+  if (raw.split(/\s+/).length > 4) return false;
+  const letters = raw.replace(/[^\p{L}\p{N}]/gu, "").length;
+  return letters >= 3 && letters <= 22;
+}
 
 // ============================================================
 //  Matière première commune
@@ -208,7 +258,10 @@ async function buildEmoji(count, ctx) {
           emojis: { $ne: [] },
         },
       },
-      { $sample: { size: count * 3 } },
+      // On tire large : beaucoup d'entrées seront écartées par le filtre de
+      // titre (cf. isGuessableTitle), qui ne peut s'appliquer qu'une fois les
+      // noms résolus auprès d'IGDB.
+      { $sample: { size: count * 8 } },
     ]);
   } catch (err) {
     console.error("quiz emoji draw error:", err.message);
@@ -241,7 +294,7 @@ async function buildEmoji(count, ctx) {
     if (ctx.usedGames.has(r.gameId)) continue;
     const meta = covers.get(r.gameId);
     const name = meta?.name || r.name;
-    if (!name) continue;
+    if (!name || !isGuessableTitle(name)) continue;
     ctx.usedGames.add(r.gameId);
     const dur = TYPE_META.emoji.durationSec;
     out.push({
@@ -276,15 +329,22 @@ const companyCache = new Map(); // nom → { id, games: [{gameId, name, cover}] 
 export async function gamesOfCompany(name) {
   const key = String(name).toLowerCase();
   if (companyCache.has(key)) return companyCache.get(key);
-  const entry = { id: null, games: [] };
+  const entry = { id: null, logo: null, games: [] };
   try {
+    // Le logo en plus du nom : un studio se reconnaît à son logo bien avant de
+    // se reconnaître à son nom écrit. Sur l'épreuve, c'est la différence entre
+    // « Ryu Ga Gotoku Studio » — qui ne dit rien à personne — et une image que
+    // beaucoup ont vue cent fois au lancement d'un jeu.
     const found = await igdbQuery(
       "companies",
-      `fields id,name; where name ~ "${String(name).replace(/"/g, "")}"; limit 3;`
+      `fields id,name,logo.image_id; where name ~ "${String(name).replace(/"/g, "")}"; limit 3;`
     );
     const co = found[0];
     if (co) {
       entry.id = co.id;
+      // `t_logo_med` : les logos d'IGDB sont des PNG à fond transparent, donc
+      // ils se posent aussi bien sur le thème clair que sur le sombre.
+      entry.logo = co.logo?.image_id ? `${IMG}/t_logo_med/${co.logo.image_id}.png` : null;
       const rows = await igdbQuery(
         "involved_companies",
         "fields game.id, game.name, game.cover.image_id, game.game_type," +
@@ -348,6 +408,7 @@ async function buildStudio(count, ctx) {
       type: "studio",
       durationSec: TYPE_META.studio.durationSec,
       studio: cand.name,
+      logo: co.logo || null,
       need: 3,
       // La liste d'acceptation : toute la ludothèque du studio selon IGDB.
       accept: co.games,
@@ -365,71 +426,195 @@ async function buildStudio(count, ctx) {
 }
 
 // ============================================================
-//  4. LE DUEL — deux jeux, des cartes à ranger
+//  4. LE DUEL — deux jeux, des affirmations à attribuer
 // ============================================================
-// « JEU A vs JEU B », et une poignée de cartes à déposer sous le bon : une
-// date, un studio, un genre, une plateforme, parfois un extrait d'OST.
+// « JEU A vs JEU B », et une pile d'affirmations à déposer sur celui qu'elles
+// désignent : « est sorti en premier », « a la meilleure note », « est sorti
+// sur Switch », « a été joué par Léa ».
 //
-// TOUTE LA DIFFICULTÉ EST DANS LA FABRICATION DES CARTES, pas dans l'épreuve.
-// Une carte n'est valide que si sa valeur appartient à UN SEUL des deux jeux.
-// « Action » comme genre de deux jeux d'action, « PC » comme plateforme de deux
-// jeux PC : ce sont des cartes impossibles, et une seule suffit à rendre la
-// manche injuste. Chaque gabarit vérifie donc l'exclusivité avant de produire.
-function duelCards(a, b) {
-  const cards = [];
-  const push = (kind, label, value, owner) =>
-    cards.push({ id: `c${cards.length}`, kind, label, value, owner });
+// ------------------------------------------ pourquoi ce ne sont plus des VALEURS
+// La première version distribuait des valeurs par paires : « 2015 » et « 2020 »
+// à ranger sous le bon jeu, « Capcom » et « FromSoftware », etc. C'était un
+// mauvais jeu, pour une raison structurelle : les cartes allant par deux et les
+// jeux étant deux, POSER L'UNE DÉTERMINAIT L'AUTRE. Six cartes ne posaient donc
+// que trois vraies questions, et la seconde moitié de la manche se jouait
+// mécaniquement. Le genre était pire encore : deux jeux d'action partagent leurs
+// genres, la carte n'avait souvent aucune bonne réponse — il a disparu.
+//
+// Une affirmation, elle, est INDÉPENDANTE. Six affirmations, ce sont six
+// décisions, et chacune peut désigner n'importe lequel des deux jeux : on ne
+// déduit rien de ce qu'on a déjà placé. C'est aussi beaucoup plus parlant —
+// « a le plus d'avis » se raisonne, « 2015 » se récite.
+//
+// -------------------------------------------------------------- la règle d'or
+// Une affirmation n'est retenue que si elle est VRAIE POUR EXACTEMENT UN des
+// deux jeux, et si l'écart est franc. Une note de 84 contre 82 n'est pas une
+// question, c'est un piège : d'où les marges imposées ci-dessous.
+const RATING_GAP = 6;
+const VOTES_RATIO = 1.7;
+const HLTB_RATIO = 1.4;
 
-  // Année : exclusive dès que les deux diffèrent.
+function duelClaims(a, b, extra = {}) {
+  const out = [];
+  // `owner` : l'index du jeu que l'affirmation désigne. `why` : ce qu'on montre
+  // à la révélation — sans lui, on apprend qu'on s'est trompé mais pas pourquoi.
+  const push = (kind, label, owner, why) =>
+    out.push({ id: `c${out.length}`, kind, label, owner, why });
+
+  // --- La sortie ---
   if (a.year && b.year && a.year !== b.year) {
-    push("year", "Année de sortie", String(a.year), 0);
-    push("year", "Année de sortie", String(b.year), 1);
+    push("first", "Est sorti en premier", a.year < b.year ? 0 : 1, `${a.year} contre ${b.year}`);
   }
-  // Studio : idem.
+
+  // --- Une machine exclusive. Le côté est tiré au sort quand les deux jeux ont
+  //     chacun une exclusivité : sinon l'affirmation désignerait toujours le
+  //     même, et on finirait par le remarquer. ---
+  const platA = a.platforms.find((p) => !b.platforms.includes(p));
+  const platB = b.platforms.find((p) => !a.platforms.includes(p));
+  const platSide = platA && platB ? (Math.random() < 0.5 ? 0 : 1) : platA ? 0 : platB ? 1 : null;
+  if (platSide !== null) {
+    const plat = platSide === 0 ? platA : platB;
+    push("platform", `Est sorti sur ${plat}`, platSide, `Seul des deux à être sorti sur ${plat}`);
+  }
+
+  // --- La note ---
+  if (a.rating != null && b.rating != null && Math.abs(a.rating - b.rating) >= RATING_GAP) {
+    push(
+      "rating",
+      "A la meilleure note",
+      a.rating > b.rating ? 0 : 1,
+      `${a.rating}/100 contre ${b.rating}/100`
+    );
+  }
+
+  // --- La notoriété ---
+  if (a.votes && b.votes && Math.min(a.votes, b.votes) > 0) {
+    if (Math.max(a.votes, b.votes) / Math.min(a.votes, b.votes) >= VOTES_RATIO) {
+      push(
+        "votes",
+        "A le plus d'avis de joueurs",
+        a.votes > b.votes ? 0 : 1,
+        `${a.votes} avis contre ${b.votes}`
+      );
+    }
+  }
+
+  // --- Le studio, en affirmation plutôt qu'en étiquette ---
   if (a.studio && b.studio && a.studio !== b.studio) {
-    push("studio", "Développeur", a.studio, 0);
-    push("studio", "Développeur", b.studio, 1);
+    const side = Math.random() < 0.5 ? 0 : 1;
+    push(
+      "studio",
+      `A été développé par ${side === 0 ? a.studio : b.studio}`,
+      side,
+      `${a.name} : ${a.studio} · ${b.name} : ${b.studio}`
+    );
   }
-  // Genre : il faut un genre que l'AUTRE n'a pas.
-  const aGenre = a.genres.find((g) => !b.genres.includes(g));
-  const bGenre = b.genres.find((g) => !a.genres.includes(g));
-  if (aGenre && bGenre) {
-    push("genre", "Genre", aGenre, 0);
-    push("genre", "Genre", bGenre, 1);
+
+  // --- L'éditeur, seulement s'il apporte autre chose que le développeur ---
+  if (
+    a.publisher &&
+    b.publisher &&
+    a.publisher !== b.publisher &&
+    (a.publisher !== a.studio || b.publisher !== b.studio)
+  ) {
+    const side = Math.random() < 0.5 ? 0 : 1;
+    push(
+      "publisher",
+      `A été édité par ${side === 0 ? a.publisher : b.publisher}`,
+      side,
+      `${a.name} : ${a.publisher} · ${b.name} : ${b.publisher}`
+    );
   }
-  // Plateforme : une machine sur laquelle un seul des deux est sorti.
-  const aPlat = a.platforms.find((p) => !b.platforms.includes(p));
-  const bPlat = b.platforms.find((p) => !a.platforms.includes(p));
-  if (aPlat && bPlat) {
-    push("platform", "Plateforme", aPlat, 0);
-    push("platform", "Plateforme", bPlat, 1);
+
+  // --- Le mode de jeu ---
+  const soloOnly = (g) => (g.modes || []).length === 1 && /single/i.test(g.modes[0]);
+  const hasMulti = (g) => (g.modes || []).some((m) => /multi|co-?op/i.test(m));
+  if (hasMulti(a) && soloOnly(b)) push("modes", "Se joue à plusieurs", 0, `${b.name} est purement solo`);
+  else if (hasMulti(b) && soloOnly(a)) push("modes", "Se joue à plusieurs", 1, `${a.name} est purement solo`);
+
+  // --- La durée, quand on la connaît (HowLongToBeat, déjà en cache en base) ---
+  const ta = extra.times?.get(a.id);
+  const tb = extra.times?.get(b.id);
+  if (ta > 0 && tb > 0 && Math.max(ta, tb) / Math.min(ta, tb) >= HLTB_RATIO) {
+    push(
+      "time",
+      "Est le plus court à terminer",
+      ta < tb ? 0 : 1,
+      `${Math.round(ta)} h contre ${Math.round(tb)} h`
+    );
   }
-  return cards;
+
+  // --- Le volet social ---
+  // L'affirmation la plus savoureuse du lot, parce qu'elle ne se déduit d'AUCUNE
+  // donnée publique : il faut connaître la personne. Elle n'apparaît que si le
+  // jeu est dans la ludothèque d'un seul des deux côtés.
+  const pa = extra.players?.get(a.id);
+  const pb = extra.players?.get(b.id);
+  if (pa && !pb) push("player", `A été joué par ${pa}`, 0, `${pa} l'a dans sa ludothèque`);
+  else if (pb && !pa) push("player", `A été joué par ${pb}`, 1, `${pb} l'a dans sa ludothèque`);
+
+  return out;
+}
+
+// Combien d'affirmations par manche. Six est le maximum lisible sur un
+// téléphone ; en dessous de quatre, le duel se plie trop vite.
+const DUEL_MIN = 4;
+const DUEL_MAX = 6;
+
+// ------------------------------------------------------------- l'équilibre
+// Un tirage à plat peut sortir six affirmations qui désignent toutes le même
+// jeu — et ça arrive vraiment, parce que les faits sont corrélés : le jeu le
+// plus ancien est souvent aussi le plus connu, le mieux noté et le plus court.
+// La manche devient alors triviale (« je pose tout à gauche »).
+//
+// On alterne donc les deux camps tant qu'on peut, avant de compléter avec ce
+// qui reste. Le résultat garde le hasard du tirage mais jamais son cas
+// dégénéré.
+function balancedPick(claims, max) {
+  const sides = [shuffle(claims.filter((c) => c.owner === 0)), shuffle(claims.filter((c) => c.owner === 1))];
+  const out = [];
+  // On commence par le camp le mieux fourni : à nombre impair, c'est lui qui
+  // doit avoir la voix de plus.
+  let side = sides[0].length >= sides[1].length ? 0 : 1;
+  while (out.length < max && (sides[0].length || sides[1].length)) {
+    if (sides[side].length) out.push(sides[side].shift());
+    else if (sides[1 - side].length) out.push(sides[1 - side].shift());
+    side = 1 - side;
+  }
+  return shuffle(out);
 }
 
 async function buildDuel(count, ctx) {
   if (count <= 0) return [];
   const pool = shuffle((await getFactPool()).filter((g) => !ctx.usedGames.has(g.id)));
+  const extra = { times: ctx.times, players: ctx.playerOf };
   const out = [];
   const used = new Set();
 
   for (let i = 0; i < pool.length && out.length < count; i += 1) {
     const a = pool[i];
     if (used.has(a.id)) continue;
-    // On cherche un adversaire qui donne au moins trois paires de cartes
-    // exclusives — en dessous, le duel se devine sans réfléchir.
-    const b = pool.find(
-      (g) => g.id !== a.id && !used.has(g.id) && duelCards(a, g).length >= 6
-    );
+    // On cherche un adversaire qui donne assez d'affirmations franches. Deux
+    // épisodes de la même saga partagent presque tout : ils ne passeront pas ce
+    // seuil, et c'est très bien — il n'y aurait rien à départager.
+    let b = null;
+    let claims = [];
+    for (const cand of pool) {
+      if (cand.id === a.id || used.has(cand.id)) continue;
+      const c = duelClaims(a, cand, extra);
+      if (c.length >= DUEL_MIN) {
+        b = cand;
+        claims = c;
+        break;
+      }
+    }
     if (!b) continue;
     used.add(a.id);
     used.add(b.id);
     ctx.usedGames.add(a.id);
     ctx.usedGames.add(b.id);
 
-    // On garde quatre à six cartes : au-delà, le plateau déborde sur mobile et
-    // l'épreuve devient une corvée de rangement.
-    const cards = shuffle(duelCards(a, b)).slice(0, 6);
+    const kept = balancedPick(claims, DUEL_MAX);
     out.push({
       type: "duel",
       durationSec: TYPE_META.duel.durationSec,
@@ -437,50 +622,14 @@ async function buildDuel(count, ctx) {
         { gameId: a.id, name: a.name, cover: a.cover },
         { gameId: b.id, name: b.name, cover: b.cover },
       ],
-      cards: cards.map((c) => ({ id: c.id, kind: c.kind, label: c.label, value: c.value })),
-      // La solution, à part : c'est elle qu'on retire de l'envoi en versus.
-      solution: Object.fromEntries(cards.map((c) => [c.id, c.owner])),
+      cards: kept.map((c) => ({ id: c.id, kind: c.kind, label: c.label })),
+      solution: Object.fromEntries(kept.map((c) => [c.id, c.owner])),
+      // Le pourquoi de chaque affirmation, montré à la révélation.
+      why: Object.fromEntries(kept.map((c) => [c.id, c.why])),
       seenRef: `d:${a.id}-${b.id}`,
     });
   }
-
-  // L'extrait d'OST : une carte « écoute et devine de quel jeu c'est ». Elle ne
-  // s'ajoute que si l'un des deux jeux a une piste en base ET pas l'autre —
-  // sinon la carte serait ambiguë comme n'importe quelle autre.
-  await attachOstCards(out);
   return out;
-}
-
-async function attachOstCards(rounds) {
-  const ids = rounds.flatMap((r) => r.games.map((g) => g.gameId));
-  if (!ids.length) return;
-  let byGame = new Map();
-  try {
-    const rows = await CustomOst.find({ gameId: { $in: ids } })
-      .select("gameId name videoId views")
-      .sort({ views: -1 })
-      .lean();
-    for (const t of rows) if (!byGame.has(t.gameId)) byGame.set(t.gameId, t);
-  } catch {
-    return; // la carte OST est un bonus, jamais une condition
-  }
-  for (const r of rounds) {
-    if (r.cards.length >= 6) continue;
-    const owners = r.games.map((g, i) => ({ i, track: byGame.get(g.gameId) }));
-    const have = owners.filter((o) => o.track);
-    // Exactement un des deux : sinon on ne peut pas trancher à l'oreille.
-    if (have.length !== 1) continue;
-    const { i, track } = have[0];
-    const id = `c${r.cards.length}`;
-    r.cards.push({
-      id,
-      kind: "ost",
-      label: "Extrait d'OST",
-      value: track.name || "Musique",
-      videoId: track.videoId,
-    });
-    r.solution[id] = i;
-  }
 }
 
 // ============================================================
@@ -499,7 +648,12 @@ async function buildPixel(count, ctx, pools) {
   const wanted = shuffle([
     ...shuffle(pools.mine).slice(0, count * 3),
     ...shuffle(pools.famous).slice(0, count * 3),
-  ]).filter((g) => !ctx.usedGames.has(g.gameId) && !ctx.seenHas("pixel", `g:${g.gameId}`));
+  ]).filter(
+    (g) =>
+      isGuessableTitle(g.name) &&
+      !ctx.usedGames.has(g.gameId) &&
+      !ctx.seenHas("pixel", `g:${g.gameId}`)
+  );
 
   const shots = await shotsForGames(wanted.map((g) => g.gameId));
   const out = [];
@@ -688,6 +842,7 @@ async function buildAnagram(count, ctx, pools) {
   for (const g of candidates) {
     if (out.length >= count) break;
     if (ctx.usedGames.has(g.gameId) || ctx.seenHas("anagram", `g:${g.gameId}`)) continue;
+    if (!isGuessableTitle(g.name)) continue;
     const letters = lettersOf(g.name);
     if (letters.length < ANAGRAM_MIN || letters.length > ANAGRAM_MAX) continue;
     ctx.usedGames.add(g.gameId);
@@ -722,10 +877,19 @@ async function buildAnagram(count, ctx, pools) {
 // ça. C'est une contrainte forte, mais le catalogue en regorge — et ce sont
 // justement les titres les plus connus.
 //
-// L'indice (année + studio) est donné d'emblée, contrairement à un Wordle
-// classique. Sans lui, la première proposition se ferait totalement à l'aveugle
-// parmi des milliers de titres ; avec lui, on cherche dans une poignée et la
-// déduction commence dès le premier essai.
+// ------------------------------------------------------- l'indice, à retardement
+// L'indice n'apparaît QU'À LA MI-TEMPS, et il se limite à l'année de sortie.
+//
+// Donné d'emblée et complet (« un jeu de 2016, par Blizzard Entertainment »),
+// il ne laissait plus grand-chose à trouver : sur une poignée de titres
+// possibles, la grille devenait une formalité. Il redevient ce qu'il doit être
+// — un coup de pouce pour qui sèche, pas une réponse offerte à qui n'a pas
+// encore cherché.
+//
+// La première lettre N'EST PAS offerte. Elle l'était — amorce classique du
+// genre — mais cumulée à l'indice elle ne laissait plus rien à trouver : on
+// connaissait la longueur, l'initiale et l'année, ce qui suffit souvent à
+// nommer le jeu sans jouer. La grille se mérite en entier.
 const MOTUS_MIN = 4;
 const MOTUS_MAX = 10;
 
@@ -748,6 +912,7 @@ async function buildMotus(count, ctx, pools) {
     // Un seul mot, sans chiffre ni ponctuation : la grille ne sait afficher que
     // des lettres.
     if (/[^A-Za-z]/.test(String(g.name).trim())) continue;
+    if (!isGuessableTitle(g.name)) continue;
     const letters = lettersOf(g.name);
     if (letters.length < MOTUS_MIN || letters.length > MOTUS_MAX) continue;
     const word = letters.join("");
@@ -760,12 +925,9 @@ async function buildMotus(count, ctx, pools) {
       durationSec: TYPE_META.motus.durationSec,
       length: letters.length,
       tries: MOTUS_TRIES,
-      // La première lettre est offerte, comme au Motus télévisé : elle amorce
-      // la déduction sans rien donner d'essentiel.
-      first: letters[0],
-      hint: meta
-        ? `Un jeu de ${meta.year}${meta.studio ? `, par ${meta.studio}` : ""}`
-        : "Un jeu connu",
+      // L'année seule, et pas avant la mi-temps (cf. l'en-tête).
+      hint: meta?.year ? `Sorti en ${meta.year}` : "",
+      hintAtMs: Math.round(TYPE_META.motus.durationSec * 1000 * 0.5),
       answer: word,
       gameId: g.gameId,
       gameName: g.name,
@@ -774,6 +936,67 @@ async function buildMotus(count, ctx, pools) {
     });
   }
   return out;
+}
+
+// ============================================================
+//  Deux jeux de données pour le duel
+// ============================================================
+// Les durées de complétion (HowLongToBeat), déjà mises en cache en base par le
+// reste du site : on ne va pas les rechercher, on lit ce qui est là. Un jeu
+// absent de la table ne produira simplement pas d'affirmation « le plus court ».
+async function completionTimes() {
+  const map = new Map();
+  try {
+    const rows = await GameTime.find({ normally: { $gt: 0 } })
+      .select("gameId normally")
+      .lean();
+    for (const r of rows) map.set(r.gameId, r.normally);
+  } catch (err) {
+    console.error("quiz hltb error:", err.message);
+  }
+  return map;
+}
+
+// Qui, dans l'entourage, a joué à quoi → Map(gameId → pseudo).
+//
+// En SOLO on regarde les comptes suivis : « a été joué par Léa » n'a de sel que
+// si on connaît Léa. En VERSUS on regarde LA TABLE, ce qui est encore mieux —
+// l'affirmation porte sur quelqu'un qui est en train de jouer avec vous.
+//
+// On ne garde qu'UN nom par jeu (le premier trouvé) : l'affirmation doit
+// désigner une personne, pas énumérer une liste.
+async function playedByEntourage(userIds) {
+  const map = new Map();
+  try {
+    const ids = (userIds || []).filter(Boolean);
+    if (!ids.length) return map;
+
+    let people = ids;
+    if (ids.length === 1) {
+      const me = await User.findById(ids[0]).select("following").lean();
+      people = (me?.following || []).slice(0, 40);
+      if (!people.length) return map;
+    }
+    const users = await User.find({ _id: { $in: people } })
+      .select("username")
+      .lean();
+    const nameOf = new Map(users.map((u) => [String(u._id), u.username]));
+
+    const rows = await UserGame.find({
+      user: { $in: people },
+      status: { $ne: "wishlist" },
+    })
+      .select("gameId user")
+      .lean();
+    for (const r of rows) {
+      if (!r.gameId || map.has(r.gameId)) continue;
+      const name = nameOf.get(String(r.user));
+      if (name) map.set(r.gameId, name);
+    }
+  } catch (err) {
+    console.error("quiz entourage error:", err.message);
+  }
+  return map;
 }
 
 // ============================================================
@@ -850,9 +1073,19 @@ export async function buildQuizRounds({ userIds = [], count = 8, types = ROUND_T
   // jouer les mêmes manches, et filtrer sur l'historique d'un seul des six
   // joueurs n'aurait aucun sens.
   const seen = userIds.length === 1 ? await seenByType(userIds[0]) : new Map();
+  // Ce que le duel a besoin de savoir en plus du catalogue : combien d'heures
+  // pour finir chaque jeu, et qui de l'entourage y a joué. Les deux sont
+  // best-effort — une affirmation qui manque de matière ne se fabrique pas,
+  // c'est tout.
+  const [times, playerOf] = await Promise.all([
+    completionTimes(),
+    playedByEntourage(userIds),
+  ]);
   const ctx = {
     userIds,
     seen,
+    times,
+    playerOf,
     seenGames: (type) =>
       [...(seen.get(type) || [])]
         .filter((r) => r.startsWith("g:"))
@@ -935,8 +1168,8 @@ export function packRound(r) {
 
 export async function unpackRound(r) {
   if (r.type !== "studio" || r.accept?.length) return r;
-  const co = await gamesOfCompany(r.studio).catch(() => ({ games: [] }));
-  return { ...r, accept: co.games };
+  const co = await gamesOfCompany(r.studio).catch(() => ({ games: [], logo: null }));
+  return { ...r, accept: co.games, logo: r.logo || co.logo || null };
 }
 
 export function publicRound(r, { reveal = false, elapsedMs = 0, index = 0, total = 1 } = {}) {
@@ -976,6 +1209,7 @@ export function publicRound(r, { reveal = false, elapsedMs = 0, index = 0, total
       return {
         ...base,
         studio: r.studio,
+        logo: r.logo || null,
         need: r.need,
         // La liste d'acceptation EST la réponse : elle ne sort qu'en solo.
         ...(reveal ? { accept: r.accept, examples: r.examples } : {}),
@@ -986,7 +1220,7 @@ export function publicRound(r, { reveal = false, elapsedMs = 0, index = 0, total
         ...base,
         games: r.games,
         cards: r.cards,
-        ...(reveal ? { solution: r.solution } : {}),
+        ...(reveal ? { solution: r.solution, why: r.why || {} } : {}),
       };
 
     case "pixel":
@@ -1026,8 +1260,12 @@ export function publicRound(r, { reveal = false, elapsedMs = 0, index = 0, total
         ...base,
         length: r.length,
         tries: r.tries,
-        first: r.first,
-        hint: r.hint,
+        hintAtMs: r.hintAtMs,
+        // En versus, l'indice n'existe pas tant que son heure n'est pas venue —
+        // même logique que les lettres qui tombent dans l'épreuve emoji. En
+        // solo il part avec la manche, et c'est le client qui le retient
+        // jusqu'à la mi-temps.
+        hint: reveal || elapsedMs >= (r.hintAtMs ?? 0) ? r.hint : "",
         ...(reveal
           ? { answer: r.answer, gameId: r.gameId, gameName: r.gameName, cover: r.cover }
           : {}),

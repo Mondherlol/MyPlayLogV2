@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 import QuizQuestion from "../models/QuizQuestion.js";
 import QuizEmoji from "../models/QuizEmoji.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
+import { seedFromFiles, generateWithGemini } from "../lib/quizSeed.js";
+import { isGeminiConfigured } from "../lib/gemini.js";
 
 // ======================================================================
 //  La relecture de la banque du Grand Quiz
@@ -27,6 +29,70 @@ const router = express.Router();
 router.use(requireAuth, requireAdmin);
 
 const PAGE = 40;
+
+// ============================================================
+//  Les tâches de remplissage, en arrière-plan
+// ============================================================
+// Importer le contenu local demande une minute (chaque titre d'emoji est résolu
+// auprès d'IGDB, au rythme que leur limite autorise) ; une fournée Gemini, plus
+// encore. Répondre à la requête HTTP seulement à la fin, c'est garantir un
+// délai d'attente dépassé côté navigateur ou proxy.
+//
+// La tâche part donc en fond et la route rend la main tout de suite. Son état
+// vit en mémoire du process — comme les sessions de partie : si le serveur
+// redémarre pendant l'import, on relance, c'est tout. Rien n'est perdu, les
+// écritures déjà faites sont des upserts.
+//
+// UNE SEULE À LA FOIS : deux imports concurrents écriraient les mêmes documents
+// et le compte rendu n'aurait plus de sens.
+let job = null;
+
+const jobView = () =>
+  job && {
+    kind: job.kind,
+    running: job.running,
+    step: job.step,
+    done: job.done,
+    total: job.total,
+    startedAt: job.startedAt,
+    finishedAt: job.finishedAt,
+    result: job.result,
+    error: job.error,
+  };
+
+function startJob(kind, run) {
+  if (job?.running) return false;
+  job = {
+    kind,
+    running: true,
+    step: "",
+    done: 0,
+    total: 0,
+    startedAt: Date.now(),
+    finishedAt: null,
+    result: null,
+    error: null,
+  };
+  const onProgress = ({ step, done, total }) => {
+    job.step = step;
+    job.done = done;
+    job.total = total;
+  };
+  // Volontairement sans `await` : la route a déjà répondu.
+  run(onProgress)
+    .then((result) => {
+      job.result = result;
+    })
+    .catch((err) => {
+      console.error(`admin quiz ${kind} error:`, err.message);
+      job.error = err.message || "Échec de la tâche.";
+    })
+    .finally(() => {
+      job.running = false;
+      job.finishedAt = Date.now();
+    });
+  return true;
+}
 
 // GET /api/admin/quiz — l'état de la banque + une page de la file demandée.
 router.get("/", async (req, res) => {
@@ -54,6 +120,11 @@ router.get("/", async (req, res) => {
         QuizQuestion.countDocuments({ approved: false, flags: { $gt: 0 } }),
         QuizEmoji.countDocuments({ approved: false }),
         QuizEmoji.countDocuments({ approved: true }),
+        // La part écrite à la main : elle dit si l'import local a déjà eu lieu.
+        QuizQuestion.countDocuments({ source: "seed" }),
+        QuizEmoji.countDocuments({ source: "seed" }),
+        QuizQuestion.countDocuments({ source: "gemini" }),
+        QuizEmoji.countDocuments({ source: "gemini" }),
       ]),
     ]);
 
@@ -87,12 +158,50 @@ router.get("/", async (req, res) => {
         questionsFlagged: counts[2],
         emojisPending: counts[3],
         emojisLive: counts[4],
+        questionsSeed: counts[5],
+        emojisSeed: counts[6],
+        questionsGemini: counts[7],
+        emojisGemini: counts[8],
       },
+      // De quoi piloter les deux boutons sans deuxième requête.
+      job: jobView(),
+      geminiReady: isGeminiConfigured(),
     });
   } catch (err) {
     console.error("admin quiz list error:", err.message);
     res.status(500).json({ error: "Banque illisible." });
   }
+});
+
+// POST /api/admin/quiz/seed — importer le contenu écrit à la main.
+//
+// C'est l'équivalent exact de `npm run seed:quiz`, en un clic. Rejouable sans
+// risque : tout est upserté sur l'empreinte du texte (questions) ou sur le jeu
+// (emojis), et ce qui vient de Gemini ou de l'admin n'est jamais touché.
+router.post("/seed", (req, res) => {
+  if (!startJob("seed", (onProgress) => seedFromFiles({ onProgress })))
+    return res.status(409).json({ error: "Une tâche est déjà en cours." });
+  res.json({ job: jobView() });
+});
+
+// POST /api/admin/quiz/generate — une fournée écrite par Gemini.
+// Tout en sort EN ATTENTE DE RELECTURE : la file « à relire » se remplit, le
+// jeu ne change pas tant que rien n'est validé.
+router.post("/generate", (req, res) => {
+  const questions = Math.min(Math.max(Number(req.body?.questions) ?? 30, 0), 100);
+  const emojis = Math.min(Math.max(Number(req.body?.emojis) ?? 20, 0), 100);
+  if (!questions && !emojis)
+    return res.status(400).json({ error: "Rien à générer." });
+  if (!startJob("generate", (onProgress) => generateWithGemini({ questions, emojis, onProgress })))
+    return res.status(409).json({ error: "Une tâche est déjà en cours." });
+  res.json({ job: jobView() });
+});
+
+// GET /api/admin/quiz/job — l'avancement, pour la barre de progression.
+// Séparé de GET / : pendant une tâche on interroge toutes les deux secondes, et
+// recompter la banque entière à chaque fois serait du gâchis.
+router.get("/job", (req, res) => {
+  res.json({ job: jobView() });
 });
 
 // POST /api/admin/quiz/:id — approuver, retirer, ou corriger.

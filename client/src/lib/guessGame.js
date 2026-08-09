@@ -183,6 +183,23 @@ export function dedupeCandidates(candidates) {
 // On teste le nom principal ET les noms alternatifs (FR…), en version normale
 // et « collée » — donc « another code » trouve « Trace Memory », et
 // « assassins creed » trouve « Assassin's Creed ».
+// ------------------------------------------------- le classement des préfixes
+// Le balayage s'arrêtait au HUITIÈME préfixe trouvé, et les gardait dans
+// l'ordre du tableau. Sur une saga bien fournie, c'était rédhibitoire : taper
+// « metal gear solid » remontait « Metal Gear Solid V », « Metal Gear Solid 3 »,
+// « Metal Gear Solid: Peace Walker »… et JAMAIS « Metal Gear Solid » lui-même,
+// qui arrivait plus loin dans la liste. La bonne réponse était impossible à
+// sélectionner.
+//
+// On balaie donc plus large, puis on trie ce qu'on a trouvé :
+//   1. la correspondance EXACTE d'abord — si quelqu'un tape le titre en entier,
+//      c'est celui-là qu'il veut, pas un épisode qui commence pareil ;
+//   2. puis le plus COURT — « Portal » avant « Portal 2 » et « Portal Knights ».
+//
+// Le tri ne porte que sur les préfixes : les acronymes et les sous-chaînes
+// gardent leur ordre, ils sont déjà en second et troisième rang.
+const SCAN = 8; // combien de fois `max` on balaie avant de s'arrêter
+
 export function searchCandidates(input, list, max = 8) {
   const q = norm(input);
   if (!q) return [];
@@ -199,7 +216,11 @@ export function searchCandidates(input, list, max = 8) {
       (qc.length >= 2 && c._sq.some((n) => n.includes(qc)))
     )
       incl.push(c);
-    if (starts.length >= max) break;
+    if (starts.length >= max * SCAN) break;
   }
+
+  const exact = (c) => (c._names.includes(q) || c._sq.includes(qc) ? 0 : 1);
+  starts.sort((a, b) => exact(a) - exact(b) || a.name.length - b.name.length);
+
   return [...starts, ...acro, ...incl].slice(0, max);
 }

@@ -64,7 +64,7 @@ import {
 } from "lucide-react";
 import { Globe2, MapPin, Thermometer, Target, Crown, Users, Zap } from "lucide-react";
 import { rarityColor, rarityLabel } from "../lib/rarity";
-import { typeColor, typeLabel } from "../lib/quizGame";
+import { typeLabel } from "../lib/quizGame";
 import RewardArt from "./RewardArt";
 import { apiFetch } from "../lib/api";
 import { downloadImage } from "../lib/download";
@@ -3265,23 +3265,64 @@ function GeoEvent({ item }) {
 // UNE image à revoir mais huit épreuves de formes différentes. Le bouton mène
 // donc au défi — rejouer le même set est de toute façon la seule façon de
 // comprendre vraiment un score.
-function QuizTypePills({ types }) {
+// Les épreuves traversées, en pastilles colorées. Chacune porte sa teinte via
+// `data-qz-type` (app-36-quizz.css) — la même que dans le jeu, donc on
+// reconnaît d'un coup d'œil « ah, il a eu le duel ».
+function QuizTypePills({ types, max = 6 }) {
   if (!types?.length) return null;
   return (
     <div className="hf-qz-types">
-      {types.slice(0, 5).map((t) => (
-        <span key={t} className="hf-qz-type" style={{ "--qz-type": typeColor(t) }}>
+      {types.slice(0, max).map((t) => (
+        <span key={t} className="hf-qz-type" data-qz-type={t}>
           {typeLabel(t)}
         </span>
       ))}
-      {types.length > 5 && <span className="hf-qz-type more">+{types.length - 5}</span>}
+      {types.length > max && <span className="hf-qz-type more">+{types.length - max}</span>}
     </div>
   );
 }
 
+// L'anneau de réussite. Un pourcentage écrit se lit ; un anneau se SENT — et
+// sur un fil qu'on parcourt au pouce, c'est la différence entre une carte qu'on
+// survole et une carte qu'on comprend.
+function QuizRing({ correct, total }) {
+  const pct = total ? Math.min(1, correct / total) : 0;
+  const R = 26;
+  const C = 2 * Math.PI * R;
+  return (
+    <div className="hf-qz-ring">
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <circle className="hf-qz-ring-bg" cx="32" cy="32" r={R} />
+        <circle
+          className="hf-qz-ring-fg"
+          cx="32"
+          cy="32"
+          r={R}
+          transform="rotate(-90 32 32)"
+          style={{ strokeDasharray: C, strokeDashoffset: C * (1 - pct) }}
+        />
+      </svg>
+      <span className="hf-qz-ring-txt">
+        <b>{correct}</b>
+        <em>/{total}</em>
+      </span>
+    </div>
+  );
+}
+
+// ---------- Le Grand Quiz ----------
+// La carte doit tenir SEULE : le fil se parcourt vite, et personne n'ouvre une
+// modale pour comprendre un score. On y met donc tout ce qui fait la partie —
+// le total, la part réussie, les épreuves traversées — et une seule action, la
+// seule qui ait du sens : rejouer exactement le même set.
+//
+// Pas de modale de résultats, contrairement à Pixel Rush : là-bas il y a UNE
+// image à revoir, ici il y aurait huit épreuves de formes différentes, ce qui
+// ne se résume pas dans une fenêtre. Rejouer le set EST la façon de comprendre
+// un score.
 function QuizEvent({ item }) {
-  const pct = item.total ? Math.round((item.correct / item.total) * 100) : 0;
   const ch = item.challenge;
+  const pct = item.total ? Math.round((item.correct / item.total) * 100) : 0;
   return (
     <article className="hf-card hf-blindtest hf-qz">
       <EventHead user={item.user} date={item.date}>
@@ -3295,35 +3336,45 @@ function QuizEvent({ item }) {
         )}
       </EventHead>
 
-      <div className="hf-bt-body">
-        <div className="hf-bt-scorebox">
-          <span className="hf-bt-score-num">{item.score}</span>
-          <span className="hf-bt-score-lbl">points</span>
-        </div>
-        <div className="hf-bt-meta">
-          <span className="hf-bt-stat">
-            <Trophy size={13} /> {item.correct}/{item.total} épreuves · {pct}%
+      <div className="hf-qz-body">
+        <QuizRing correct={item.correct} total={item.total} />
+
+        <div className="hf-qz-main">
+          <span className="hf-qz-score">
+            <b>{item.score}</b>
+            <em>points</em>
           </span>
-          {ch && (
-            <span className={`hf-bt-versus ${ch.beaten ? "win" : "lose"}`}>
-              <Swords size={12} />
-              {ch.beaten
-                ? `bat ${ch.username} (${ch.score})`
-                : `${ch.username} garde la tête (${ch.score})`}
-            </span>
-          )}
+          <span className="hf-qz-pct">{pct}% de réussite</span>
           <QuizTypePills types={item.types} />
         </div>
       </div>
 
-      <Link to={`/quiz?challenge=${item.quizGameId}`} className="hf-bt-challenge-cta clickable">
+      {ch && (
+        <div className={`hf-qz-versus ${ch.beaten ? "win" : "lose"}`}>
+          <Swords size={13} />
+          {ch.beaten ? (
+            <span>
+              Battu&nbsp;! Il dépasse <b>{ch.username}</b> ({ch.score} pts)
+            </span>
+          ) : (
+            <span>
+              <b>{ch.username}</b> tient bon avec {ch.score} pts
+            </span>
+          )}
+        </div>
+      )}
+
+      <Link to={`/quiz?challenge=${item.quizGameId}`} className="hf-qz-cta clickable">
         <Swords size={15} /> Relever le même quiz
+        <em>mêmes épreuves, même ordre</em>
       </Link>
     </article>
   );
 }
 
 // Plusieurs parties d'affilée du même joueur → une seule carte.
+// On garde le même vocabulaire visuel (anneau, pastilles) pour que les deux
+// cartes se lisent pareil, et chaque ligne reste défiable individuellement.
 function QuizGroupEvent({ item }) {
   return (
     <article className="hf-card hf-blindtest hf-qz hf-btg">
@@ -3331,36 +3382,37 @@ function QuizGroupEvent({ item }) {
         <Trophy size={13} className="hf-inline-ic" /> a enchaîné {item.count} quiz
       </EventHead>
 
-      <div className="hf-btg-summary">
-        <div className="hf-bt-scorebox">
-          <span className="hf-bt-score-num">{item.bestScore}</span>
-          <span className="hf-bt-score-lbl">meilleur</span>
+      <div className="hf-qz-body">
+        <QuizRing correct={item.best.correct} total={item.best.total} />
+        <div className="hf-qz-main">
+          <span className="hf-qz-score">
+            <b>{item.bestScore}</b>
+            <em>son meilleur</em>
+          </span>
+          <span className="hf-qz-pct">{item.count} parties d'affilée</span>
+          <QuizTypePills types={item.best.types} max={5} />
         </div>
-        <span className="hf-btg-summary-txt">
-          {item.count} parties · {item.best.correct}/{item.best.total} au top
-        </span>
       </div>
 
-      <ul className="hf-btg-list">
+      <ul className="hf-qz-runs">
         {item.games.map((g) => {
-          const pct = g.total ? Math.round((g.correct / g.total) * 100) : 0;
           const best = g.score === item.bestScore;
           return (
-            <li key={g.id} className={`hf-btg-row ${best ? "best" : ""}`}>
-              <span className="hf-btg-pts">
+            <li key={g.id} className={`hf-qz-run ${best ? "best" : ""}`}>
+              <span className="hf-qz-run-pts">
                 <b>{g.score}</b> pts
               </span>
-              <span className="hf-btg-stat">
-                <Trophy size={12} /> {g.correct}/{g.total} · {pct}%
+              <span className="hf-qz-run-stat">
+                {g.correct}/{g.total} épreuves
               </span>
               {g.challenge && (
-                <span className={`hf-btg-vs ${g.challenge.beaten ? "win" : "lose"}`}>
+                <span className={`hf-qz-run-vs ${g.challenge.beaten ? "win" : "lose"}`}>
                   <Swords size={11} /> {g.challenge.username}
                 </span>
               )}
-              <span className="hf-btg-time">{timeAgo(g.date)}</span>
-              <Link to={`/quiz?challenge=${g.quizGameId}`} className="hf-btg-see clickable">
-                <Swords size={14} /> Défier
+              <span className="hf-qz-run-time">{timeAgo(g.date)}</span>
+              <Link to={`/quiz?challenge=${g.quizGameId}`} className="hf-qz-run-go clickable">
+                <Swords size={13} /> Défier
               </Link>
             </li>
           );

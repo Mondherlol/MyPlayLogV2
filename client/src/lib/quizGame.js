@@ -22,6 +22,11 @@ import { sameGame } from "./guessGame";
 // ============================================================
 //  Le barème (miroir)
 // ============================================================
+// Une manche parfaite vaut ~85 points, donc une partie de douze manches sans
+// faute plafonne autour de 1000. Voir l'en-tête de server/src/lib/quizScore.js
+// pour le raisonnement — et surtout : LES DEUX FICHIERS DOIVENT BOUGER
+// ENSEMBLE, sinon le total affiché en jeu ne correspond plus à celui qui est
+// enregistré.
 export function speedFrac(timeMs, durationSec) {
   const dur = Math.max(1, durationSec) * 1000;
   if (timeMs == null) return 0;
@@ -41,33 +46,36 @@ export function estimateQuizPoints(round, given, timeMs) {
 
   switch (round.type) {
     case "qcm":
-      return given?.correct ? 220 + Math.round(380 * frac) : 0;
+      return given?.correct ? 30 + Math.round(55 * frac) : 0;
     case "emoji":
-      return given?.correct ? Math.round((260 + Math.round(380 * frac)) * missFactor(misses)) : 0;
+      return given?.correct ? Math.round((32 + Math.round(53 * frac)) * missFactor(misses)) : 0;
     case "studio": {
       const need = round.need || 3;
       const found = Math.min(Number(given?.found) || 0, need);
       if (!found) return 0;
-      return 150 * found + (found >= need ? 100 + Math.round(120 * frac) : 0);
+      return 22 * found + (found >= need ? 12 + Math.round(7 * frac) : 0);
     }
     case "duel": {
       const total = round.cards?.length || 0;
       const ok = Math.min(Number(given?.placed) || 0, total);
-      return 110 * ok + (total && ok === total ? 120 + Math.round(120 * frac) : 0);
+      return (
+        Math.round((65 * ok) / Math.max(1, total)) +
+        (total && ok === total ? 10 + Math.round(10 * frac) : 0)
+      );
     }
     case "pixel":
-      return given?.correct ? 240 + Math.round(400 * frac) : 0;
+      return given?.correct ? 32 + Math.round(53 * frac) : 0;
     case "swipe": {
       const good = Math.max(0, Number(given?.good) || 0);
       const bad = Math.max(0, Number(given?.bad) || 0);
-      return Math.max(0, 70 * good - 35 * bad);
+      return Math.max(0, Math.round(3.5 * good - 2 * bad));
     }
     case "anagram":
-      return given?.correct ? Math.round((250 + Math.round(370 * frac)) * missFactor(misses)) : 0;
+      return given?.correct ? Math.round((32 + Math.round(53 * frac)) * missFactor(misses)) : 0;
     case "motus": {
       if (!given?.correct) return 0;
       const tries = Math.max(1, Math.min(Number(given?.tries) || 1, MOTUS_LADDER.length));
-      return Math.round((340 + Math.round(160 * frac)) * MOTUS_LADDER[tries - 1]);
+      return Math.round((60 + Math.round(25 * frac)) * MOTUS_LADDER[tries - 1]);
     }
     default:
       return 0;
@@ -236,26 +244,33 @@ export const hiddenCount = (cells) => cells.filter((c) => c.kind === "blank").le
 // (TYPE_META, lib/quizRounds.js) — et c'est voulu : les cartes du fil ne
 // reçoivent que des CLÉS d'épreuve (`meta.types`), pas des manches. Sans copie
 // locale, il faudrait une requête au serveur pour afficher trois pastilles.
+//
+// LA COULEUR N'EST PLUS ICI. Elle y était, et c'était un défaut de conception :
+// une couleur écrite en JavaScript est aveugle au thème. Les teintes choisies
+// (des pastels) tenaient sur le fond sombre et devenaient illisibles sur blanc,
+// sans aucun moyen de les corriger — on ne peut pas écrire deux valeurs dans
+// une constante.
+//
+// Elles vivent donc en CSS (`--qz-t-*`, app-36-quizz.css), déclarées deux fois :
+// soutenues pour le thème clair, claires pour le sombre. Le composant ne pose
+// plus qu'un `data-qz-type`, et la feuille de style choisit.
 export const TYPE_UI = {
-  qcm: { label: "Question", color: "#f5c451", hint: "Une bonne réponse sur quatre." },
-  emoji: { label: "Emojis", color: "#7ad0ff", hint: "Devine le jeu derrière les emojis." },
-  studio: { label: "Le studio", color: "#b493ff", hint: "Cite trois jeux de ce studio." },
-  duel: { label: "Duel", color: "#ff9a6c", hint: "Dépose chaque carte sous le bon jeu." },
-  pixel: { label: "Pixels", color: "#6ce3a6", hint: "Reconnais le jeu derrière les pixels." },
-  swipe: { label: "Le tri", color: "#ff7fa8", hint: "Trie la pile le plus vite possible." },
+  qcm: { label: "Question", hint: "Une bonne réponse sur quatre." },
+  emoji: { label: "Emojis", hint: "Devine le jeu derrière les emojis." },
+  studio: { label: "Le studio", hint: "Cite trois jeux de ce studio." },
+  duel: { label: "Duel", hint: "Dépose chaque carte sous le bon jeu." },
+  pixel: { label: "Pixels", hint: "Reconnais le jeu derrière les pixels." },
+  swipe: { label: "Le tri", hint: "Trie la pile le plus vite possible." },
   anagram: {
     label: "Lettres mêlées",
-    color: "#9fd8c8",
     hint: "Remets les lettres dans l'ordre pour retrouver le jeu.",
   },
   motus: {
     label: "Le mot",
-    color: "#ffb56b",
     hint: "Trouve le jeu en cinq essais. Vert : bien placé. Orange : mal placé.",
   },
 };
 
-export const typeColor = (type) => TYPE_UI[type]?.color || "#f5c451";
 export const typeHint = (type) => TYPE_UI[type]?.hint || "";
 export const typeLabel = (type) => TYPE_UI[type]?.label || type;
 
@@ -266,6 +281,9 @@ export const typeLabel = (type) => TYPE_UI[type]?.label || type;
 export function triesFor(type) {
   if (type === "studio") return 6;
   if (type === "motus") return MOTUS_LADDER.length;
+  // L'anagramme n'élimine pas : autant d'essais qu'on veut dans le temps
+  // imparti. Miroir d'ANAGRAM_TRIES côté serveur.
+  if (type === "anagram") return 40;
   if (type === "qcm" || type === "duel" || type === "swipe") return 1;
   return 3;
 }

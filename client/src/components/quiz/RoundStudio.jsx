@@ -86,7 +86,15 @@ export default function RoundStudio({
   return (
     <div className="qz-studio">
       <div className="qz-studio-head">
-        <Building2 size={22} />
+        {/* LE LOGO plutôt qu'une icône générique. Un studio se reconnaît à son
+            logo bien avant de se reconnaître à son nom écrit : « Ryu Ga Gotoku
+            Studio » ne dit rien à grand monde, son logo si. L'icône reste en
+            repli — IGDB n'a pas de logo pour tout le monde. */}
+        {round.logo ? (
+          <img className="qz-studio-logo" src={round.logo} alt="" draggable="false" />
+        ) : (
+          <Building2 size={22} />
+        )}
         <b>{round.studio}</b>
         <em>
           Cite {need} jeux de ce studio

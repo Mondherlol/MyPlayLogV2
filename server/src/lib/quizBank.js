@@ -114,7 +114,10 @@ export async function getFactPool() {
       // (cf. PLATFORM_LABELS), on ne s'en sert plus.
       " platforms.name," +
       " involved_companies.company.name, involved_companies.developer," +
-      " involved_companies.publisher, total_rating_count;" +
+      // `total_rating` et `game_modes` servent aux affirmations du duel
+      // (« a la meilleure note », « se joue à plusieurs ») — cf. duelClaims
+      // dans lib/quizRounds.js.
+      " involved_companies.publisher, total_rating, total_rating_count, game_modes.name;" +
       " where cover != null & version_parent = null & game_type = (0,8,9)" +
       " & first_release_date != null & total_rating_count > 250;" +
       " sort total_rating_count desc; limit 400;";
@@ -134,6 +137,9 @@ export async function getFactPool() {
           publisher: pub || null,
           genres: (g.genres || []).map((x) => x.name).filter(Boolean),
           platforms: cleanPlatforms(g.platforms),
+          rating: g.total_rating != null ? Math.round(g.total_rating) : null,
+          votes: g.total_rating_count || 0,
+          modes: (g.game_modes || []).map((x) => x.name).filter(Boolean),
         };
       })
       .filter((g) => g.year);

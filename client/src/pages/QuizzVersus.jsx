@@ -2,14 +2,24 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
+  Building2,
   Check,
   Copy,
   Crown,
   Flame,
+  Gamepad2,
+  Grid2x2,
+  Keyboard,
+  Layers,
+  ListChecks,
   Loader2,
   Play,
+  Plus,
   RotateCcw,
   Share2,
+  Shuffle,
+  Smile,
+  Swords,
   Trophy,
   UserPlus,
   Users,
@@ -22,8 +32,9 @@ import { useChat } from "../context/ChatContext";
 import { apiFetch } from "../lib/api";
 import { useLiveStatus } from "../lib/presence";
 import { useGameSfx } from "../lib/useGameSfx";
-import { typeColor, typeHint } from "../lib/quizGame";
+import { typeHint } from "../lib/quizGame";
 import QuizRound from "../components/quiz/QuizRound";
+import QuizTimer from "../components/quiz/QuizTimer";
 import { VersusFace, VersusRail, VersusInvite, hueOf } from "../components/VersusRoom";
 
 // ======================================================================
@@ -50,6 +61,19 @@ import { VersusFace, VersusRail, VersusInvite, hueOf } from "../components/Versu
 // Ce que le client ne fait JAMAIS ici, contrairement au solo : corriger. La
 // solution n'arrive qu'à la révélation. `onAttempt` poste au serveur et rend
 // sa réponse — c'est tout.
+
+// Les mêmes icônes qu'à l'accueil : le salon doit avoir l'air de la même
+// application que la page d'où l'on vient.
+const TYPE_ICONS = {
+  qcm: ListChecks,
+  emoji: Smile,
+  studio: Building2,
+  duel: Swords,
+  pixel: Grid2x2,
+  swipe: Layers,
+  anagram: Shuffle,
+  motus: Keyboard,
+};
 
 export default function QuizzVersus() {
   const { code } = useParams();
@@ -364,11 +388,6 @@ export default function QuizzVersus() {
 
   return (
     <div className={`qz-page qzv ${phase === "round" ? "in-game" : ""}`}>
-      <div className="qz-scene" aria-hidden="true">
-        <span className="qz-scene-floor" />
-        <span className="qz-scene-halo" />
-      </div>
-
       <header className="qz-topbar">
         <button type="button" className="qz-back clickable" onClick={leave}>
           <ArrowLeft size={17} /> <span>Quitter</span>
@@ -400,6 +419,7 @@ export default function QuizzVersus() {
             onCopy={copyLink}
             onInvite={() => setShowInvite(true)}
             onReady={(v) => call("/ready", { ready: v })}
+            maxPlayers={room.maxPlayers || 6}
             onSettings={(body) => call("/settings", body)}
             onStart={() => call("/start", {})}
             me={me}
@@ -408,36 +428,36 @@ export default function QuizzVersus() {
 
         {/* ---------------- LA PARTIE ---------------- */}
         {(phase === "cue" || phase === "round" || phase === "reveal") && round && (
-          <div className="qz-play qzv-play" style={{ "--qz-type": typeColor(round.type) }}>
+          <div className="qz-play qzv-play" data-qz-type={round.type}>
             <div className="qz-play-head">
+              {/* Comme en solo : les manches franchies restent colorées. */}
               <div className="qz-pips" aria-hidden="true">
                 {Array.from({ length: room.roundCount }).map((_, i) => (
-                  <i key={i} className={i < room.index ? "done" : i === room.index ? "cur" : ""} />
+                  <i
+                    key={i}
+                    className={i < room.index ? "done" : i === room.index ? "cur" : ""}
+                    data-qz-type={i <= room.index ? round.type : undefined}
+                  />
                 ))}
               </div>
               <span className="qz-round-count">
                 Épreuve <b>{room.index + 1}</b>
                 <em>/ {room.roundCount}</em>
               </span>
-              <span className="qz-live-score">
-                <Trophy size={14} /> {me?.score ?? 0} pts
-                {me?.streak > 1 && (
-                  <b className="qzv-streak">
-                    <Flame size={12} /> ×{me.streak}
-                  </b>
-                )}
-              </span>
-            </div>
-
-            <div className={`qz-timer ${phase === "round" && secondsLeft <= 5 ? "hot" : ""}`}>
-              <i
-                className="qz-timer-bar"
-                style={{
-                  transform: `scaleX(${phase === "round" ? msLeft / durationMs : 1})`,
-                }}
-              />
-              <span className="qz-timer-num">
-                {phase === "cue" ? Math.ceil(cueLeft / 1000) : secondsLeft}
+              <span className="qz-head-right">
+                <span className="qz-live-score">
+                  <Trophy size={14} /> {me?.score ?? 0} pts
+                  {me?.streak > 1 && (
+                    <b className="qzv-streak">
+                      <Flame size={12} /> ×{me.streak}
+                    </b>
+                  )}
+                </span>
+                <QuizTimer
+                  seconds={phase === "cue" ? Math.ceil(cueLeft / 1000) : secondsLeft}
+                  total={phase === "cue" ? 4 : round.durationSec}
+                  hot={phase === "round" && secondsLeft <= 5}
+                />
               </span>
             </div>
 
@@ -550,6 +570,18 @@ const myResult = (round, id) => (round?.results || []).find((r) => r.userId === 
 // ============================================================
 //  Le salon d'avant-partie
 // ============================================================
+// Il faisait pauvre à côté de l'accueil, alors que c'est le premier écran que
+// voient les invités. Trois choses le trahissaient :
+//
+//   • TROIS PLACES en dur, alors qu'on joue jusqu'à six. Le nombre vient
+//     désormais du serveur (`room.maxPlayers`), seul à connaître la limite
+//     qu'il fait respecter.
+//   • Les places libres n'étaient que du décor. Ce sont maintenant des BOUTONS :
+//     c'est le geste évident quand on regarde un siège vide, et ça évite de
+//     chercher le bouton « inviter » ailleurs sur la page.
+//   • Le choix des épreuves n'avait rien à voir avec celui de l'accueil. Il
+//     réutilise exactement les mêmes pastilles à icône (.qz-type), au lieu
+//     d'une seconde interface pour le même réglage.
 function Lobby({
   room,
   active,
@@ -562,6 +594,7 @@ function Lobby({
   onSettings,
   onStart,
   me,
+  maxPlayers,
 }) {
   const [types, setTypes] = useState([]);
   const { token } = useAuth();
@@ -577,30 +610,40 @@ function Lobby({
   }, [token]);
 
   const picked = room.types?.length ? room.types : types.map((t) => t.key);
-  const allReady = active.length >= 2 && active.every((p) => p.ready);
+  const free = Math.max(0, maxPlayers - active.length);
 
   function toggleType(key) {
     if (!room.isHost) return;
-    const next = picked.includes(key)
-      ? picked.filter((k) => k !== key)
-      : [...picked, key];
+    const next = picked.includes(key) ? picked.filter((k) => k !== key) : [...picked, key];
     if (!next.length) return; // on ne décoche jamais tout
     onSettings({ types: next });
   }
 
   return (
     <div className="qzv-lobby">
-      <h1 className="qz-title">Le plateau</h1>
+      <h1 className="qz-logo qzv-logo">
+        <span className="qz-logo-le">Le plateau</span>
+        <span className="qz-logo-main">
+          {room.code}
+          <i className="qz-logo-q" aria-hidden="true">
+            ?
+          </i>
+        </span>
+      </h1>
       <p className="qz-sub">
-        {active.length} candidat{active.length > 1 ? "s" : ""} sur le plateau ·{" "}
+        {active.length} candidat{active.length > 1 ? "s" : ""} sur {maxPlayers} ·{" "}
         {room.roundCount} épreuves
       </p>
 
-      {/* Les pupitres, en grand : c'est l'image du jeu, autant qu'elle serve
-          d'écran d'attente. */}
+      {/* Les pupitres. Occupés, ils montrent qui est là ; libres, ils invitent —
+          au sens propre, ce sont des boutons. */}
       <ul className="qzv-desks">
         {active.map((p) => (
-          <li key={p.id} className={`qzv-desk ${p.ready ? "ready" : ""}`} style={{ "--hue": hueById.get(p.id) }}>
+          <li
+            key={p.id}
+            className={`qzv-desk ${p.ready ? "ready" : ""}`}
+            style={{ "--hue": hueById.get(p.id) }}
+          >
             <VersusFace user={p} size={44} hue={hueById.get(p.id)} />
             <b>{p.username}</b>
             <em>
@@ -610,12 +653,14 @@ function Lobby({
             <span className="qzv-desk-light" aria-hidden="true" />
           </li>
         ))}
-        {Array.from({ length: Math.max(0, 3 - active.length) }).map((_, i) => (
+        {Array.from({ length: free }).map((_, i) => (
           <li key={`e${i}`} className="qzv-desk empty">
-            <span className="qzv-desk-ph">
-              <Users size={20} />
-            </span>
-            <em>place libre</em>
+            <button type="button" className="qzv-desk-invite clickable" onClick={onInvite}>
+              <span className="qzv-desk-ph">
+                <Plus size={20} />
+              </span>
+              <em>Inviter</em>
+            </button>
           </li>
         ))}
       </ul>
@@ -639,10 +684,10 @@ function Lobby({
         </button>
       </div>
 
-      {room.isHost && (
+      {room.isHost ? (
         <div className="qzv-settings">
           <div className="qz-rounds-pick">
-            <span className="qz-rounds-label">Épreuves</span>
+            <span className="qz-rounds-label">Nombre d'épreuves</span>
             <div className="qz-rounds-opts">
               {[5, 8, 12].map((n) => (
                 <button
@@ -664,20 +709,27 @@ function Lobby({
               <div className="qz-types-grid">
                 {types.map((t) => {
                   const on = picked.includes(t.key);
+                  const Icon = TYPE_ICONS[t.key] || ListChecks;
                   return (
                     <button
                       key={t.key}
                       type="button"
                       className={`qz-type clickable ${on ? "on" : ""}`}
-                      style={{ "--qz-type": typeColor(t.key) }}
+                      data-qz-type={t.key}
                       onClick={() => toggleType(t.key)}
                       aria-pressed={on}
                       title={typeHint(t.key)}
                       disabled={busy}
                     >
+                      <span className="qz-type-ic">
+                        <Icon size={19} />
+                      </span>
                       <b>{t.label}</b>
-                      <em>{t.mode === "buzzer" ? "buzzer" : "tous"}</em>
-                      {on && <Check size={13} className="qz-type-mark" />}
+                      {on && (
+                        <span className="qz-type-mark" aria-hidden="true">
+                          <Check size={12} />
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -685,6 +737,27 @@ function Lobby({
             </div>
           )}
         </div>
+      ) : (
+        /* Les invités voient le programme sans pouvoir y toucher : savoir à
+           quoi on va jouer fait partie de l'attente. */
+        types.length > 0 && (
+          <div className="qzv-programme">
+            <span className="qz-rounds-label">Au programme</span>
+            <div className="qzv-programme-row">
+              {types
+                .filter((t) => picked.includes(t.key))
+                .map((t) => {
+                  const Icon = TYPE_ICONS[t.key] || ListChecks;
+                  return (
+                    <span key={t.key} className="qzv-prog-chip" data-qz-type={t.key}>
+                      <Icon size={14} />
+                      {t.label}
+                    </span>
+                  );
+                })}
+            </div>
+          </div>
+        )
       )}
 
       {room.isHost ? (
@@ -699,8 +772,10 @@ function Lobby({
         </button>
       ) : (
         <p className="qzv-wait-host">
-          {allReady ? "Tout le monde est prêt." : "En attente des autres candidats…"}
-          <br />
+          <Gamepad2 size={15} />
+          {active.every((p) => p.ready)
+            ? "Tout le monde est prêt."
+            : "En attente des autres candidats…"}
           <em>L'hôte lance la partie.</em>
         </p>
       )}

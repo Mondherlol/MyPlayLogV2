@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Heart, Shuffle } from "lucide-react";
+import { Shuffle } from "lucide-react";
 import GameSearch from "./GameSearch";
 
 // ======================================================================
@@ -27,7 +27,6 @@ export default function RoundAnagram({
   round,
   locked,
   reveal,
-  lives,
   candidates,
   onAttempt,
   sfx,
@@ -128,17 +127,11 @@ export default function RoundAnagram({
 
       {!reveal && (
         <>
+          {/* PAS DE VIES ICI. Une anagramme se travaille en essayant des
+              combinaisons ; compter trois essais transformait la réflexion en
+              pari. La sanction reste dans le barème — chaque raté rogne les
+              points — mais on n'est jamais sorti de la manche. */}
           <div className="qz-lives-row">
-            <div className="qz-lives" aria-label={`${lives} essais restants`}>
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Heart
-                  key={i}
-                  size={16}
-                  className={i < lives ? "on" : "off"}
-                  fill={i < lives ? "currentColor" : "none"}
-                />
-              ))}
-            </div>
             <span className="qz-anagram-left">
               {left > 0 ? `${left} lettre${left > 1 ? "s" : ""} à caser` : "Toutes casées !"}
             </span>

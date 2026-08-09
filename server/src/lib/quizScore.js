@@ -13,12 +13,21 @@
 //   • `ratio`   — la part réussie, de 0 à 1. C'est ce qui paie.
 //
 // -------------------------------------------------------------- l'équilibrage
-// Toutes les épreuves plafonnent AUX ALENTOURS DE 600 POINTS, volontairement.
-// Une partie enchaîne des épreuves tirées au hasard : si le duel rapportait le
-// double du QCM, deux joueurs n'auraient pas joué la même partie, et le
-// classement ne comparerait plus rien. Les écarts qui restent (le pixel monte
-// un peu plus haut, le swipe un peu moins) reflètent la difficulté réelle, pas
-// une hiérarchie entre les épreuves.
+// UNE MANCHE PARFAITE VAUT ~85 POINTS, quelle que soit l'épreuve. Une partie
+// de douze manches sans faute plafonne donc autour de 1000, et une bonne partie
+// tourne entre 400 et 700.
+//
+// Le premier jeu de valeurs était dix fois trop généreux (une partie ordinaire
+// rapportait 3000 points). Ça cassait deux choses : l'économie de l'arcade, où
+// une seule partie payait plusieurs caisses, et la comparaison avec les trois
+// autres mini-jeux, dont les scores tiennent dans le même ordre de grandeur.
+//
+// Le plafond commun n'est pas cosmétique. Une partie enchaîne des épreuves
+// tirées au hasard : si le duel rapportait le double du QCM, deux joueurs
+// n'auraient pas joué la même partie et le classement ne comparerait plus rien.
+// Les écarts qui subsistent (quelques points) reflètent la difficulté réelle,
+// pas une hiérarchie entre les épreuves.
+export const ROUND_MAX = 85;
 //
 // La part de vitesse est plus faible sur les épreuves longues (duel, studio,
 // swipe) : y courir après le chrono n'a pas de sens quand la manche consiste
@@ -61,7 +70,7 @@ export function scoreRound(round, given, timeMs) {
     case "qcm": {
       const correct = Number(given?.choice) === Number(round.answerIndex);
       if (!correct) return { correct: false, ratio: 0, points: 0 };
-      return { correct: true, ratio: 1, points: 220 + Math.round(380 * frac) };
+      return { correct: true, ratio: 1, points: 30 + Math.round(55 * frac) };
     }
 
     // -------------------------------------------------------------- EMOJIS
@@ -69,7 +78,7 @@ export function scoreRound(round, given, timeMs) {
     case "emoji": {
       const correct = !!given?.correct;
       if (!correct) return { correct: false, ratio: 0, points: 0 };
-      const raw = 260 + Math.round(380 * frac);
+      const raw = 32 + Math.round(53 * frac);
       return { correct: true, ratio: 1, points: Math.round(raw * missFactor(misses)) };
     }
 
@@ -81,8 +90,8 @@ export function scoreRound(round, given, timeMs) {
       const found = Math.min(Number(given?.found) || 0, need);
       const ratio = need ? found / need : 0;
       if (!found) return { correct: false, ratio: 0, points: 0 };
-      const base = 150 * found;
-      const bonus = found >= need ? 100 + Math.round(120 * frac) : 0;
+      const base = 22 * found;
+      const bonus = found >= need ? 12 + Math.round(7 * frac) : 0;
       return { correct: found >= need, ratio, points: base + bonus };
     }
 
@@ -95,8 +104,8 @@ export function scoreRound(round, given, timeMs) {
       const total = round.cards?.length || 0;
       const ok = Math.min(Number(given?.placed) || 0, total);
       const ratio = total ? ok / total : 0;
-      const base = 110 * ok;
-      const bonus = total && ok === total ? 120 + Math.round(120 * frac) : 0;
+      const base = Math.round((65 * ok) / Math.max(1, total));
+      const bonus = total && ok === total ? 10 + Math.round(10 * frac) : 0;
       return { correct: total > 0 && ok === total, ratio, points: base + bonus };
     }
 
@@ -104,12 +113,13 @@ export function scoreRound(round, given, timeMs) {
     case "pixel": {
       const correct = !!given?.correct;
       if (!correct) return { correct: false, ratio: 0, points: 0 };
-      return { correct: true, ratio: 1, points: 240 + Math.round(400 * frac) };
+      return { correct: true, ratio: 1, points: 32 + Math.round(53 * frac) };
     }
 
     // --------------------------------------------------------------- SWIPE
     // Trente secondes, une pile, une seule question. Ici la vitesse n'entre
     // PAS dans la formule : elle est déjà dans le nombre de cartes traitées.
+    // Une pile de 24 entièrement bien triée vaut 84 — le plafond commun.
     // Une erreur coûte, sinon la stratégie gagnante serait de balayer la pile
     // au hasard le plus vite possible.
     case "swipe": {
@@ -117,7 +127,7 @@ export function scoreRound(round, given, timeMs) {
       const bad = Math.max(0, Number(given?.bad) || 0);
       const seen = good + bad;
       const ratio = seen ? good / seen : 0;
-      const points = Math.max(0, 70 * good - 35 * bad);
+      const points = Math.max(0, Math.round(3.5 * good - 2 * bad));
       // « Réussie » = au moins huit bonnes et pas plus d'un quart d'erreurs.
       return { correct: good >= 8 && ratio >= 0.75, ratio, points };
     }
@@ -128,7 +138,7 @@ export function scoreRound(round, given, timeMs) {
     case "anagram": {
       const correct = !!given?.correct;
       if (!correct) return { correct: false, ratio: 0, points: 0 };
-      const raw = 250 + Math.round(370 * frac);
+      const raw = 32 + Math.round(53 * frac);
       return { correct: true, ratio: 1, points: Math.round(raw * missFactor(misses)) };
     }
 
@@ -141,7 +151,7 @@ export function scoreRound(round, given, timeMs) {
       const correct = !!given?.correct;
       if (!correct) return { correct: false, ratio: 0, points: 0 };
       const tries = Math.max(1, Math.min(Number(given?.tries) || 1, MOTUS_LADDER.length));
-      const raw = 340 + Math.round(160 * frac);
+      const raw = 60 + Math.round(25 * frac);
       return { correct: true, ratio: 1, points: Math.round(raw * MOTUS_LADDER[tries - 1]) };
     }
 
@@ -164,10 +174,13 @@ export function scoreRound(round, given, timeMs) {
 //     et marque au prorata. On y ajoute une prime au meilleur de la manche,
 //     sinon une épreuve parallèle rapporterait moins qu'un buzzer gagné et
 //     personne ne voudrait les voir tomber.
-export const BUZZER_POINTS = 320;
-export const BUZZER_SPEED = 140;
-export const PARALLEL_MAX = 420;
-export const PARALLEL_BEST_BONUS = 120;
+// Mêmes ordres de grandeur qu'en solo : une manche gagnée au buzzer vaut
+// ~85 points, une manche parallèle parfaite ~85 avec la prime. Sans cet
+// alignement, jouer à plusieurs rapporterait dix fois plus que jouer seul.
+export const BUZZER_POINTS = 55;
+export const BUZZER_SPEED = 30;
+export const PARALLEL_MAX = 65;
+export const PARALLEL_BEST_BONUS = 20;
 
 export function scoreVersusBuzzer(atMs, durationSec, misses) {
   const frac = speedFrac(atMs, durationSec);

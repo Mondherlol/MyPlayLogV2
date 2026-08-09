@@ -11,6 +11,7 @@ import { person, shuffle } from "./blindtest.js";
 import {
   buildQuizRounds,
   publicRound,
+  ANAGRAM_TRIES,
   MOTUS_TRIES,
   ROUND_TYPES,
   TYPE_META,
@@ -102,6 +103,9 @@ function attemptsAllowed(type) {
   // pavage de couleurs. C'est la seule épreuve où un essai raté APPREND
   // quelque chose, donc la seule où on en autorise autant.
   if (type === "motus") return MOTUS_TRIES;
+  // L'anagramme n'élimine pas : on propose autant de titres qu'on veut dans le
+  // temps imparti (le barème, lui, rogne à chaque raté).
+  if (type === "anagram") return ANAGRAM_TRIES;
   if (type === "qcm" || type === "duel" || type === "swipe") return 1;
   return LIVES;
 }
@@ -247,6 +251,10 @@ function serializeRoom(room, meId) {
     code: room.code,
     hostId,
     isHost: hostId === String(meId),
+    // Le nombre de places : le salon en dessinait trois en dur, alors qu'on
+    // joue jusqu'à six. C'est au serveur de le dire — lui seul connaît
+    // MAX_PLAYERS, et c'est lui qui refuse le septième arrivant.
+    maxPlayers: MAX_PLAYERS,
     roundCount: room.roundCount,
     types: room.types?.length ? room.types : ROUND_TYPES,
     phase: room.phase,

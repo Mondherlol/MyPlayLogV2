@@ -68,6 +68,7 @@ const TAB_KEYS = [
   "missions",
   "psn",
   "geo",
+  "quiz",
   "events",
   "collection",
   "system",
@@ -2134,13 +2135,17 @@ function QuizPanel({ token }) {
   const [kind, setKind] = useState("question");
   const [filter, setFilter] = useState("pending");
   const [data, setData] = useState(null);
+  const [job, setJob] = useState(null);
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
+  const [genQ, setGenQ] = useState(30);
+  const [genE, setGenE] = useState(20);
 
   const load = useCallback(async () => {
     try {
       const d = await apiFetch(`/admin/quiz?kind=${kind}&filter=${filter}`, { token });
       setData(d);
+      setJob(d.job || null);
       setErr("");
     } catch (e) {
       setErr(e.message || "Banque illisible.");
@@ -2151,20 +2156,47 @@ function QuizPanel({ token }) {
     load();
   }, [load]);
 
+  // Tant qu'une tâche tourne, on suit son avancement. On interroge `/job` et
+  // pas la banque entière : recompter tous les documents toutes les deux
+  // secondes serait du gâchis pour une barre de progression.
+  useEffect(() => {
+    if (!job?.running) return undefined;
+    const iv = setInterval(async () => {
+      try {
+        const d = await apiFetch("/admin/quiz/job", { token });
+        setJob(d.job);
+        // Terminée : on recharge les compteurs, qui viennent de changer.
+        if (!d.job?.running) load();
+      } catch {
+        /* on réessaiera au prochain tour */
+      }
+    }, 1500);
+    return () => clearInterval(iv);
+  }, [job?.running, token, load]);
+
+  async function run(path, body) {
+    setBusy(path);
+    try {
+      const d = await apiFetch(`/admin/quiz/${path}`, { method: "POST", token, body });
+      setJob(d.job);
+      setErr("");
+    } catch (e) {
+      setErr(e.message || "Action impossible.");
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function act(item, body, method = "POST") {
     setBusy(item.id);
     try {
       const path =
-        method === "DELETE"
-          ? `/admin/quiz/${item.id}?kind=${kind}`
-          : `/admin/quiz/${item.id}`;
+        method === "DELETE" ? `/admin/quiz/${item.id}?kind=${kind}` : `/admin/quiz/${item.id}`;
       await apiFetch(path, { method, token, body: method === "DELETE" ? undefined : body });
       // On retire la ligne de la pile sans recharger : la relecture est un
       // geste répétitif, un aller-retour serveur entre chaque casserait le
       // rythme (et ferait sauter la liste sous le curseur).
-      setData((d) =>
-        d ? { ...d, items: d.items.filter((x) => x.id !== item.id) } : d
-      );
+      setData((d) => (d ? { ...d, items: d.items.filter((x) => x.id !== item.id) } : d));
     } catch (e) {
       setErr(e.message || "Action impossible.");
     } finally {
@@ -2173,45 +2205,154 @@ function QuizPanel({ token }) {
   }
 
   const c = data?.counts;
+  const running = !!job?.running;
+  const pct = job?.total ? Math.round((job.done / job.total) * 100) : 0;
 
   return (
     // `admin-quiz` porte TOUT l'habillage de cet onglet (app-36-quizz.css).
-    // Les classes génériques utilisées ici — .admin-seg, .admin-stat… — sont
-    // employées ailleurs dans le panneau sans avoir jamais reçu de style : les
-    // habiller globalement changerait l'allure des autres onglets. On les
-    // stylise donc SOUS ce wrapper, et nulle part ailleurs.
     <div className="admin-section admin-quiz">
       <header className="admin-section-head">
         <h2>Banque du Grand Quiz</h2>
         <p>
-          Ce que Gemini a produit n'est jamais tiré en partie avant d'être relu
-          ici. Le seed écrit à la main et les questions calculées depuis IGDB,
-          eux, sont en service d'office.
+          Le jeu tire ses questions de trois sources. Les <b>faits IGDB</b> sont
+          calculés à la volée, infinis et toujours exacts — ils n'ont besoin de
+          rien. Le <b>contenu local</b> (écrit à la main, versionné avec le code)
+          s'importe ici en un clic. Ce que produit <b>l'IA</b> n'est jamais joué
+          avant que tu l'aies relu.
         </p>
       </header>
 
+      {/* ---- L'état de la banque, en un coup d'œil ---- */}
       {c && (
-        <div className="admin-stats-row">
-          <span className="admin-stat">
-            <b>{c.questionsLive}</b> questions en service
-          </span>
-          <span className="admin-stat">
-            <b>{c.questionsPending}</b> à relire
-          </span>
+        <div className="admin-quiz-stats">
+          <div className="admin-quiz-stat live">
+            <b>{c.questionsLive}</b>
+            <span>questions jouables</span>
+            <em>
+              {c.questionsSeed} écrites main · {c.questionsGemini} par IA
+            </em>
+          </div>
+          <div className="admin-quiz-stat live">
+            <b>{c.emojisLive}</b>
+            <span>emojis jouables</span>
+            <em>
+              {c.emojisSeed} écrits main · {c.emojisGemini} par IA
+            </em>
+          </div>
+          <div className={`admin-quiz-stat ${c.questionsPending + c.emojisPending ? "todo" : ""}`}>
+            <b>{c.questionsPending + c.emojisPending}</b>
+            <span>à relire</span>
+            <em>rien de tout ça n'est joué</em>
+          </div>
           {c.questionsFlagged > 0 && (
-            <span className="admin-stat warn">
-              <b>{c.questionsFlagged}</b> signalées par des joueurs
-            </span>
+            <div className="admin-quiz-stat warn">
+              <b>{c.questionsFlagged}</b>
+              <span>signalées</span>
+              <em>contestées en partie</em>
+            </div>
           )}
-          <span className="admin-stat">
-            <b>{c.emojisLive}</b> emojis en service
-          </span>
-          <span className="admin-stat">
-            <b>{c.emojisPending}</b> emojis à relire
-          </span>
         </div>
       )}
 
+      {/* ---- Les deux façons de remplir ---- */}
+      <div className="admin-quiz-actions-row">
+        <div className="admin-quiz-action">
+          <div className="admin-quiz-action-h">
+            <Library size={17} />
+            <b>Contenu local</b>
+          </div>
+          <p>
+            Importe les {c ? c.questionsSeed || 157 : 157} questions et les emojis
+            écrits à la main, livrés avec le code. Chaque titre d'emoji est
+            retrouvé sur IGDB — compte environ une minute la première fois.
+            Rejouable sans risque : rien n'est dupliqué, et ce qui vient de l'IA
+            n'est jamais touché.
+          </p>
+          <button
+            className="admin-btn ok clickable"
+            disabled={running || busy === "seed"}
+            onClick={() => run("seed")}
+          >
+            <Library size={15} /> Importer le contenu local
+          </button>
+        </div>
+
+        <div className="admin-quiz-action">
+          <div className="admin-quiz-action-h">
+            <Sparkles size={17} />
+            <b>Générer avec l'IA</b>
+          </div>
+          <p>
+            Une fournée de questions de culture (anecdotes, personnages,
+            répliques) et de nouvelles suites d'emojis. Tout arrive{" "}
+            <b>en attente de relecture</b> : le jeu ne change pas tant que tu
+            n'as rien validé.
+          </p>
+          <div className="admin-quiz-gen">
+            <label>
+              Questions
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={genQ}
+                onChange={(e) => setGenQ(Number(e.target.value))}
+              />
+            </label>
+            <label>
+              Emojis
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={genE}
+                onChange={(e) => setGenE(Number(e.target.value))}
+              />
+            </label>
+          </div>
+          <button
+            className="admin-btn clickable"
+            disabled={running || busy === "generate" || !data?.geminiReady}
+            onClick={() => run("generate", { questions: genQ, emojis: genE })}
+            title={data?.geminiReady ? undefined : "GEMINI_API_KEY manquant (onglet Secrets)"}
+          >
+            <Sparkles size={15} /> Générer
+          </button>
+          {data && !data.geminiReady && (
+            <span className="admin-quiz-note">
+              Clé Gemini absente — ajoute-la dans l'onglet Secrets.
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ---- L'avancement de la tâche en cours, ou son compte rendu ---- */}
+      {job && (
+        <div className={`admin-quiz-job ${running ? "running" : job.error ? "bad" : "done"}`}>
+          {running ? (
+            <>
+              <Loader2 size={16} className="spin" />
+              <span>
+                {job.kind === "seed" ? "Import en cours" : "Génération en cours"}
+                {job.step ? ` · ${job.step}` : ""} {job.total ? `${job.done}/${job.total}` : ""}
+              </span>
+              <i className="admin-quiz-bar" style={{ transform: `scaleX(${pct / 100})` }} />
+            </>
+          ) : job.error ? (
+            <>
+              <X size={16} />
+              <span>{job.error}</span>
+            </>
+          ) : (
+            <>
+              <Check size={16} />
+              <span>{summarize(job)}</span>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ---- La file de relecture ---- */}
       <div className="admin-filters">
         <div className="admin-seg">
           {[
@@ -2253,10 +2394,10 @@ function QuizPanel({ token }) {
       ) : data.items.length === 0 ? (
         <p className="admin-empty">
           {filter === "pending"
-            ? "Rien à relire. Lance `npm run gen:quiz` pour en produire."
+            ? "Rien à relire. Utilise « Générer » ci-dessus pour en produire."
             : filter === "flagged"
               ? "Aucun signalement en attente."
-              : "Rien en service pour l'instant."}
+              : "Rien en service. Commence par « Importer le contenu local »."}
         </p>
       ) : (
         <ul className="admin-quiz-list">
@@ -2280,9 +2421,7 @@ function QuizPanel({ token }) {
                         : it.answer}
                     </span>
                     {it.choices.length > 1 && (
-                      <span className="admin-quiz-wrong">
-                        {it.choices.slice(1).join(" · ")}
-                      </span>
+                      <span className="admin-quiz-wrong">{it.choices.slice(1).join(" · ")}</span>
                     )}
                     {it.explain && <em className="admin-quiz-explain">{it.explain}</em>}
                   </>
@@ -2331,4 +2470,26 @@ function QuizPanel({ token }) {
       )}
     </div>
   );
+}
+
+// Le compte rendu d'une tâche terminée, en une phrase.
+function summarize(job) {
+  const r = job.result;
+  if (!r) return "Terminé.";
+  const bits = [];
+  if (r.questions)
+    bits.push(
+      `${r.questions.created} question(s) ajoutée(s)` +
+        (r.questions.updated ? `, ${r.questions.updated} mise(s) à jour` : "")
+    );
+  if (r.emojis)
+    bits.push(
+      `${r.emojis.created} emoji(s) ajouté(s)` +
+        (r.emojis.updated ? `, ${r.emojis.updated} mis à jour` : "")
+    );
+  if (r.emojis?.retired) bits.push(`${r.emojis.retired} ancienne(s) entrée(s) retirée(s) du service`);
+  if (r.unresolved?.length) bits.push(`${r.unresolved.length} titre(s) non retrouvé(s) sur IGDB`);
+  if (r.problems?.length) bits.push(`${r.problems.length} entrée(s) mal formée(s)`);
+  if (r.errors?.length) bits.push(r.errors[0]);
+  return bits.join(" · ") || "Terminé, rien de nouveau.";
 }

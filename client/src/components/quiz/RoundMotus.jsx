@@ -18,6 +18,9 @@ import { CornerDownLeft, Delete, Lightbulb } from "lucide-react";
 // navigateur ait jamais connu la solution ; et ce que les couleurs révèlent,
 // le joueur vient de le gagner en dépensant un essai.
 //
+// La première lettre n'est PAS offerte : cumulée à l'indice, elle ne laissait
+// plus grand-chose à trouver. La grille se mérite en entier.
+//
 // ------------------------------------------------------------- le clavier
 // On saisit au clavier physique, mais un pavé de lettres est affiché en
 // dessous : il sert de saisie tactile ET de mémoire des lettres déjà éliminées,
@@ -25,7 +28,7 @@ import { CornerDownLeft, Delete, Lightbulb } from "lucide-react";
 // grille à chaque essai pour se rappeler qu'on a déjà écarté le S.
 const ROWS = ["AZERTYUIOP", "QSDFGHJKLM", "WXCVBN"];
 
-export default function RoundMotus({ round, locked, reveal, onAttempt, sfx }) {
+export default function RoundMotus({ round, elapsedMs, locked, reveal, onAttempt, sfx }) {
   // Les essais déjà joués : [{ guess, marks }].
   const [past, setPast] = useState([]);
   const [draft, setDraft] = useState("");
@@ -40,14 +43,6 @@ export default function RoundMotus({ round, locked, reveal, onAttempt, sfx }) {
     setDraft("");
     setBusy(false);
   }, [round?.index]);
-
-  // La première lettre est offerte : on préremplit la saisie avec, à chaque
-  // nouvel essai. C'est un coup de pouce, pas une contrainte — elle s'efface
-  // comme n'importe quelle autre.
-  useEffect(() => {
-    if (round.first && !draft && past.length === 0) setDraft(round.first);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [round?.index, round.first]);
 
   const submit = useCallback(async () => {
     if (locked || busy || draft.length !== len) {
@@ -119,10 +114,31 @@ export default function RoundMotus({ round, locked, reveal, onAttempt, sfx }) {
 
   const rowsLeft = Math.max(0, maxTries - past.length - (reveal ? 0 : 1));
 
+  const hintAt = round.hintAtMs ?? 0;
+  const hintOpen = !!reveal || (elapsedMs ?? 0) >= hintAt;
+  const hintIn = Math.max(0, Math.ceil((hintAt - (elapsedMs ?? 0)) / 1000));
+
   return (
     <div className="qz-motus">
-      <span className="qz-motus-hint">
-        <Lightbulb size={13} /> {round.hint} · {len} lettres
+      {/* L'INDICE N'ARRIVE QU'À LA MI-TEMPS.
+          En versus le serveur ne l'envoie pas avant (champ vide) ; en solo il
+          arrive avec la manche et c'est ce test qui le retient. Les deux
+          chemins aboutissent au même moment à l'écran.
+
+          Avant l'heure, on affiche le compte à rebours plutôt que rien : savoir
+          qu'un coup de pouce arrive dans vingt secondes change la façon de
+          gérer ses essais. */}
+      <span className={`qz-motus-hint ${hintOpen ? "open" : "waiting"}`}>
+        <Lightbulb size={13} />
+        {hintOpen && round.hint ? (
+          <>
+            {round.hint} · {len} lettres
+          </>
+        ) : (
+          <>
+            {len} lettres · indice dans {hintIn}s
+          </>
+        )}
       </span>
 
       <div className="qz-motus-grid">

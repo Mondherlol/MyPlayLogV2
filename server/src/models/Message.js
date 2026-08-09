@@ -102,22 +102,25 @@ const motCardSchema = new mongoose.Schema(
 // les deux cartes ci-dessus — l'invitation survit au salon, le salon non (les
 // deux modèles de salon s'effacent deux heures après la dernière manche).
 //
-// UNE SEULE carte pour GeoGamer, le blind test ET Pixel Rush, distinguée par
-// `kind` : les trois invitations disent exactement la même chose et mènent au
-// même genre de page, en faire trois schémas aurait dupliqué le rendu côté
-// messagerie.
+// UNE SEULE carte pour GeoGamer, le blind test, Pixel Rush ET le Grand Quiz,
+// distinguée par `kind` : les quatre invitations disent exactement la même
+// chose et mènent au même genre de page, en faire quatre schémas aurait
+// dupliqué le rendu côté messagerie.
 //
-// ATTENTION, `kind` EST UNE ÉNUMÉRATION : un quatrième jeu qui oublierait de
-// s'ajouter ici verrait toutes ses invitations rejetées par Mongoose, et la
-// route d'invitation répondrait « Invitation non envoyée » sans que rien ne
-// dise pourquoi. C'est exactement ce qui est arrivé à Pixel Rush.
+// ATTENTION, `kind` EST UNE ÉNUMÉRATION : un jeu qui oublierait de s'ajouter
+// ici verrait toutes ses invitations rejetées par Mongoose, et la route
+// d'invitation répondrait « Invitation non envoyée » sans que rien ne dise
+// pourquoi. C'est arrivé à Pixel Rush, puis au Grand Quiz — l'avertissement
+// ci-dessus était pourtant écrit. Si un cinquième jeu arrive : commencer PAR
+// cette ligne.
 const versusCardSchema = new mongoose.Schema(
   {
-    kind: { type: String, enum: ["geo", "blindtest", "pixel"], default: "geo" },
+    kind: { type: String, enum: ["geo", "blindtest", "pixel", "quiz"], default: "geo" },
     code: { type: String, required: true },
     mode: { type: String, default: "classic" }, // GeoGamer : classic | buzzer
     hostName: { type: String, default: "" },
     players: { type: Number, default: 1 },
+    // Le Grand Quiz monte à 6 ; les autres salons plafonnent à 5.
     maxPlayers: { type: Number, default: 5 },
     rounds: { type: Number, default: 8 },
   },

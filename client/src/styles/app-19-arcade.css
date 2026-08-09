@@ -571,6 +571,13 @@
 .arc-game-soon .arc-game-glow {
   display: none;
 }
+/* Une carte qui n'emmène nulle part ne doit pas se soulever au survol comme
+   celles qui se cliquent : seul le « ? » réagit (voir plus bas). */
+.arc-game-soon:hover {
+  transform: none;
+  border-color: var(--border);
+  box-shadow: none;
+}
 /* L'art : un gros « ? » sur une pastille neutre. */
 .arc-game-art.soon {
   display: grid;
@@ -582,10 +589,43 @@
   border: 1px dashed var(--border);
 }
 .arc-game-art.soon b {
+  position: relative; /* au-dessus de la carte fantôme */
+  z-index: 1;
   font-family: var(--font-display);
   font-size: 1.7rem;
   font-weight: 800;
   color: var(--text-soft);
+  /* Il respire : c'est le seul signe de vie de la carte, et ce qui la fait
+     lire comme une promesse plutôt que comme un trou dans la grille. */
+  animation: arc-soon-breathe 3.4s ease-in-out infinite;
+}
+/* La carte fantôme glissée dessous : « il y a quelque chose là-dessous ». */
+.arc-art-soon-deck {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--text-soft) 7%, transparent);
+  border: 1px dashed var(--border);
+  transform-origin: bottom left;
+  transform: rotate(9deg);
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.arc-game-soon:hover .arc-art-soon-deck {
+  transform: rotate(15deg) translateX(2px);
+}
+.arc-game-soon:hover .arc-game-art.soon b {
+  color: var(--text);
+}
+@keyframes arc-soon-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
 }
 /* Le pseudo-bouton : neutre, non cliquable. */
 .arc-game-cta.soon {

@@ -1,34 +1,60 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Calendar, Building2, Tag, Gamepad2, Music2, Check, X, Undo2 } from "lucide-react";
-import { API_BASE } from "../../lib/api";
+import {
+  Award,
+  CalendarClock,
+  Check,
+  Gamepad2,
+  Hammer,
+  Timer,
+  Undo2,
+  User,
+  Users,
+  Store,
+  X,
+} from "lucide-react";
 
 // ======================================================================
-//  Épreuve « Duel » — deux jeux, des cartes à ranger
+//  Épreuve « Duel » — deux jeux, des affirmations à attribuer
 // ======================================================================
-// « JEU A vs JEU B », et une poignée de cartes à déposer sous le bon : une
-// date, un studio, un genre, une plateforme, parfois un extrait d'OST.
+// « JEU A vs JEU B », et une pile d'affirmations à déposer sur celui qu'elles
+// désignent : « est sorti en premier », « a la meilleure note », « est sorti
+// sur Switch », « a été joué par Léa ».
+//
+// Ce que ce composant affichait avant, c'étaient des VALEURS par paires
+// (« 2015 » et « 2020 » à ranger). Le défaut était structurel et se voyait en
+// jouant : poser une carte déterminait sa jumelle, donc six cartes ne posaient
+// que trois questions. Le raisonnement derrière le changement est détaillé dans
+// buildDuel (server/src/lib/quizRounds.js) ; ici, la conséquence est qu'une
+// carte n'a plus de « nature » ni de jumelle, et que PLUSIEURS affirmations
+// peuvent parfaitement désigner le même jeu.
 //
 // ------------------------------------------------- pourquoi PAS de HTML5 drag
 // L'API `draggable` native ne marche pas au doigt. Comme la moitié du site est
 // consultée sur téléphone, elle aurait voulu dire écrire l'épreuve deux fois.
 // On passe donc par les POINTER EVENTS, qui couvrent souris, doigt et stylet
-// avec le même code — la carte suit le curseur, et la colonne survolée
-// s'allume.
+// avec le même code.
 //
 // Et parce qu'un glisser reste pénible sur un petit écran, TOUT MARCHE AUSSI
-// AU CLIC : on touche une carte pour la sélectionner, on touche une colonne
+// AU CLIC : on touche une affirmation pour la sélectionner, on touche un jeu
 // pour l'y poser. Les deux gestes écrivent dans la même fonction `place()`.
 //
 // ------------------------------------------------------------ le retour arrière
-// Une carte déposée peut être reprise. C'est important : l'épreuve se joue à
-// la déduction (« si celle-là est à droite, alors celle-ci… »), et une
-// déduction se révise. Rien n'est validé avant la sonnerie ou le bouton.
-const CARD_ICONS = {
-  year: Calendar,
-  studio: Building2,
-  genre: Tag,
+// Une carte déposée peut être reprise, ou envoyée directement sur l'autre jeu.
+// C'est important : l'épreuve se joue à la déduction, et une déduction se
+// révise. Rien n'est validé avant la sonnerie ou le bouton.
+
+// Une icône par nature d'affirmation : elle se lit avant le texte et donne à la
+// pile un peu de relief.
+const CLAIM_ICONS = {
+  first: CalendarClock,
   platform: Gamepad2,
-  ost: Music2,
+  rating: Award,
+  votes: Users,
+  studio: Hammer,
+  publisher: Store,
+  modes: Users,
+  time: Timer,
+  player: User,
 };
 
 export default function RoundDuel({ round, locked, reveal, onAttempt, onProgress, sfx }) {
@@ -78,49 +104,24 @@ export default function RoundDuel({ round, locked, reveal, onAttempt, onProgress
   }, [locked, reveal, send]);
 
   // ------------------------------------------------------------ le dépôt
-  // UNE SEULE CARTE DE CHAQUE NATURE PAR JEU. Un jeu n'a pas deux dates de
-  // sortie ni deux développeurs : empiler « 2015 » et « 2020 » sous le même
-  // titre ne veut rien dire, et laissait proposer une réponse absurde.
-  //
-  // Quand la place est déjà prise, on ne refuse pas le geste — on ÉCHANGE.
-  // Dans un duel, une nature compte deux cartes pour deux jeux : poser l'une
-  // détermine l'autre. Envoyer l'occupante en face est donc à la fois le geste
-  // le plus utile et le plus prévisible. Elle ne retombe en main que si la
-  // place d'en face est elle aussi occupée (le cas de l'OST, seule de sa
-  // nature).
+  // Aucune contrainte d'unicité : plusieurs affirmations peuvent désigner le
+  // même jeu, c'est même le cas normal. L'ancienne règle « une carte de chaque
+  // nature par jeu » (avec échange automatique) n'avait de sens que pour les
+  // valeurs par paires, qui n'existent plus.
   const place = useCallback(
     (cardId, gameIndex) => {
       if (locked || sentRef.current) return;
-      const card = cards.find((c) => c.id === cardId);
       setPlacement((p) => {
         const next = { ...p };
-        if (gameIndex == null) {
-          delete next[cardId];
-          onProgress?.(Object.keys(next).length, "");
-          return next;
-        }
-        if (card) {
-          const occupant = cards.find(
-            (c) => c.id !== cardId && c.kind === card.kind && next[c.id] === gameIndex
-          );
-          if (occupant) {
-            const other = gameIndex === 0 ? 1 : 0;
-            const otherTaken = cards.some(
-              (c) =>
-                c.id !== cardId && c.id !== occupant.id && c.kind === card.kind && next[c.id] === other
-            );
-            if (!otherTaken && games.length > 1) next[occupant.id] = other;
-            else delete next[occupant.id];
-          }
-        }
-        next[cardId] = gameIndex;
+        if (gameIndex == null) delete next[cardId];
+        else next[cardId] = gameIndex;
         onProgress?.(Object.keys(next).length, "");
         return next;
       });
       setPicked(null);
       sfx?.play?.(gameIndex == null ? "tick" : "hint");
     },
-    [locked, sfx, onProgress, cards, games.length]
+    [locked, sfx, onProgress]
   );
 
   // --- Glisser (pointer events) ---
@@ -160,18 +161,6 @@ export default function RoundDuel({ round, locked, reveal, onAttempt, onProgress
 
   const inHand = cards.filter((c) => placement[c.id] == null);
   const allPlaced = inHand.length === 0;
-
-  // Les cartes encore en main, rangées par nature, dans l'ordre où les
-  // gabarits les produisent (année, studio, genre, plateforme, OST) — c'est
-  // l'ordre du plus facile au plus retors, et il vaut mieux que l'alphabet.
-  const groups = (() => {
-    const by = new Map();
-    for (const c of inHand) {
-      if (!by.has(c.kind)) by.set(c.kind, []);
-      by.get(c.kind).push(c);
-    }
-    return [...by.entries()];
-  })();
 
   return (
     <div className="qz-duel" onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
@@ -225,6 +214,7 @@ export default function RoundDuel({ round, locked, reveal, onAttempt, onProgress
                       onPick={() => setPicked((prev) => (prev === c.id ? null : c.id))}
                       onPointerDown={(e) => onPointerDown(e, c.id)}
                       onTake={() => place(c.id, null)}
+                      why={reveal ? round.why?.[c.id] : null}
                     />
                   );
                 })}
@@ -241,39 +231,25 @@ export default function RoundDuel({ round, locked, reveal, onAttempt, onProgress
         </span>
       </div>
 
-      {/* ---- La main, RANGÉE PAR CATÉGORIE ----
-          En vrac, on avait six étiquettes mélangées et il fallait lire chacune
-          pour comprendre laquelle répondait à laquelle. Groupées, la déduction
-          saute aux yeux : « Année de sortie : 2015 ou 2020 » se tranche d'un
-          regard, alors que « 2015 » perdu entre un genre et une plateforme ne
-          dit rien. C'est le même contenu, et une épreuve deux fois plus lisible.
-
-          Une catégorie dont les deux cartes sont déjà posées disparaît : ce qui
-          reste à l'écran est exactement ce qui reste à faire. */}
+      {/* ---- La pile d'affirmations ----
+          Une liste, pas des groupes : chaque affirmation est indépendante, il
+          n'y a plus de « catégorie » à regrouper. */}
       {!reveal && (
         <div className="qz-duel-hand" ref={handRef}>
           <span className={`qz-duel-hand-drop ${drag?.over === "hand" ? "on" : ""}`}>
             Ramène une carte ici pour la reprendre
           </span>
 
-          {groups.map(([kind, list]) => (
-            <div key={kind} className="qz-duel-group">
-              <span className="qz-duel-group-h">{list[0].label}</span>
-              <div className="qz-duel-group-cards">
-                {list.map((c) => (
-                  <DuelCard
-                    key={c.id}
-                    card={c}
-                    picked={picked === c.id}
-                    dragging={drag?.id === c.id}
-                    disabled={locked}
-                    hideKind
-                    onPick={() => setPicked((p) => (p === c.id ? null : c.id))}
-                    onPointerDown={(e) => onPointerDown(e, c.id)}
-                  />
-                ))}
-              </div>
-            </div>
+          {inHand.map((c) => (
+            <DuelCard
+              key={c.id}
+              card={c}
+              picked={picked === c.id}
+              dragging={drag?.id === c.id}
+              disabled={locked}
+              onPick={() => setPicked((p) => (p === c.id ? null : c.id))}
+              onPointerDown={(e) => onPointerDown(e, c.id)}
+            />
           ))}
 
           {allPlaced && (
@@ -302,10 +278,10 @@ export default function RoundDuel({ round, locked, reveal, onAttempt, onProgress
 }
 
 // ---------------------------------------------------------------- une carte
-// La carte OST est la seule qui « fait » quelque chose : elle joue l'extrait.
-// On passe par le flux m4a extrait par le serveur (/api/audio/:videoId), le
-// même que le mini-lecteur et le blind test — une iframe YouTube ici serait
-// impossible à démarrer dans les délais (cf. l'en-tête de pages/BlindTest.jsx).
+// Une affirmation : une icône, le texte, et à la révélation la raison pour
+// laquelle elle désignait ce jeu-là. Ce « pourquoi » n'est pas décoratif — sans
+// lui on apprend qu'on s'est trompé, jamais pourquoi, et l'épreuve n'enseigne
+// rien.
 function DuelCard({
   card,
   placed,
@@ -315,34 +291,13 @@ function DuelCard({
   good,
   bad,
   disabled,
-  // En main, la nature de la carte est déjà écrite au-dessus du groupe : la
-  // répéter sur chaque carte n'ajoute que du bruit. Déposée, en revanche, elle
-  // redevient nécessaire — la carte a quitté son groupe.
-  hideKind,
+  why,
   onPick,
   onTake,
   onPointerDown,
 }) {
-  const audioRef = useRef(null);
-  const [playing, setPlaying] = useState(false);
   if (!card) return null;
-  const Icon = CARD_ICONS[card.kind] || Tag;
-
-  function toggleOst(e) {
-    e.stopPropagation();
-    const a = audioRef.current;
-    if (!a) return;
-    if (playing) {
-      a.pause();
-      setPlaying(false);
-      return;
-    }
-    a.currentTime = 30; // pas l'intro : on veut le thème
-    a.play().then(
-      () => setPlaying(true),
-      () => setPlaying(false)
-    );
-  }
+  const Icon = CLAIM_ICONS[card.kind] || Check;
 
   return (
     <div
@@ -364,31 +319,12 @@ function DuelCard({
       }
       role={onPick ? "button" : undefined}
     >
-      {hideKind ? (
-        <Icon size={12} className="qz-card-ic" />
-      ) : (
-        <span className="qz-card-kind">
-          <Icon size={12} /> {card.label}
-        </span>
-      )}
+      <span className="qz-card-claim">
+        <Icon size={13} className="qz-card-ic" />
+        <b>{card.label}</b>
+      </span>
 
-      {card.kind === "ost" ? (
-        <>
-          <button type="button" className="qz-card-ost clickable" onClick={toggleOst}>
-            <Music2 size={14} />
-            {playing ? "Pause" : "Écouter"}
-          </button>
-          <audio
-            ref={audioRef}
-            src={`${API_BASE}/audio/${card.videoId}`}
-            preload="none"
-            playsInline
-            onEnded={() => setPlaying(false)}
-          />
-        </>
-      ) : (
-        <b className="qz-card-value">{card.value}</b>
-      )}
+      {why && <em className="qz-card-why">{why}</em>}
 
       {placed && onTake && !good && !bad && (
         <button

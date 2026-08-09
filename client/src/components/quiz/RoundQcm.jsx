@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Check, X, Wand2 } from "lucide-react";
 
 // ======================================================================
@@ -20,24 +20,80 @@ export default function RoundQcm({ round, locked, reveal, onAttempt, jokers, onJ
   // lui seul connaît la bonne réponse (cf. POST /:code/joker).
   const [removed, setRemoved] = useState([]);
   const [busy, setBusy] = useState(false);
+  // La proposition survolée au clavier. `-1` = personne, tant qu'on n'a pas
+  // touché aux flèches : on ne veut pas préselectionner une réponse au hasard,
+  // ça inciterait à valider sans lire.
+  const [cursor, setCursor] = useState(-1);
 
   useEffect(() => {
     setChosen(null);
     setRemoved([]);
     setBusy(false);
+    setCursor(-1);
   }, [round?.index, round?.text]);
 
-  async function pick(i) {
-    if (locked || busy || chosen != null || removed.includes(i)) return;
-    setBusy(true);
-    setChosen(i);
-    sfx?.play?.("start");
-    try {
-      await onAttempt({ choice: i });
-    } finally {
-      setBusy(false);
+  const pick = useCallback(
+    async (i) => {
+      if (locked || busy || chosen != null || removed.includes(i)) return;
+      setBusy(true);
+      setChosen(i);
+      sfx?.play?.("start");
+      try {
+        await onAttempt({ choice: i });
+      } finally {
+        setBusy(false);
+      }
+    },
+    [locked, busy, chosen, removed, onAttempt, sfx]
+  );
+
+  // ---------------------------------------------------------------- clavier
+  // Les quatre flèches déplacent la sélection, Entrée valide. Les propositions
+  // sont sur DEUX colonnes : ← → sautent d'une colonne, ↑ ↓ d'une ligne, ce qui
+  // suit ce qu'on voit à l'écran. On boucle aux extrémités plutôt que de buter
+  // — sur quatre entrées, buter n'apprend rien à personne.
+  //
+  // Les propositions éteintes par le joker sont sautées : la sélection ne doit
+  // pas pouvoir se poser sur une case morte.
+  useEffect(() => {
+    if (locked || reveal || chosen != null) return undefined;
+    const n = (round.choices || []).length;
+    if (!n) return undefined;
+
+    const step = (from, delta) => {
+      let i = from;
+      for (let k = 0; k < n; k += 1) {
+        i = (i + delta + n) % n;
+        if (!removed.includes(i)) return i;
+      }
+      return from;
+    };
+
+    function onKey(e) {
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      const cur = cursor < 0 ? -1 : cursor;
+      if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+        e.preventDefault();
+        setCursor(cur < 0 ? 0 : step(cur, e.key === "ArrowDown" ? 2 : 1));
+      } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        setCursor(cur < 0 ? 0 : step(cur, e.key === "ArrowUp" ? -2 : -1));
+      } else if (e.key === "Enter" && cur >= 0) {
+        e.preventDefault();
+        pick(cur);
+      } else if (/^[1-9]$/.test(e.key)) {
+        // Le numéro de la proposition : le geste le plus rapide de tous, et
+        // celui qu'on fait spontanément devant un QCM numéroté.
+        const i = Number(e.key) - 1;
+        if (i < n && !removed.includes(i)) {
+          e.preventDefault();
+          pick(i);
+        }
+      }
     }
-  }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [cursor, removed, round.choices, locked, reveal, chosen, pick]);
 
   async function useJoker() {
     if (!onJoker || locked || chosen != null || !jokers) return;
@@ -71,8 +127,11 @@ export default function RoundQcm({ round, locked, reveal, onAttempt, jokers, onJ
               type="button"
               className={`qz-choice clickable ${chosen === i ? "picked" : ""} ${
                 good ? "good" : ""
-              } ${bad ? "bad" : ""} ${out ? "out" : ""}`}
+              } ${bad ? "bad" : ""} ${out ? "out" : ""} ${
+                cursor === i && chosen == null && !reveal ? "cursor" : ""
+              }`}
               onClick={() => pick(i)}
+              onMouseEnter={() => setCursor(i)}
               disabled={locked || out || chosen != null}
             >
               <span className="qz-choice-letter">{LETTERS[i] || i + 1}</span>
@@ -99,7 +158,22 @@ export default function RoundQcm({ round, locked, reveal, onAttempt, jokers, onJ
         </button>
       )}
 
-      {reveal && round.explain && <p className="qz-explain">{round.explain}</p>}
+      {/* LA RÉPONSE, en clair et illustrée. Le surlignage vert sur la bonne case
+          suffisait à dire « c'était celle-là », mais pas à retenir quoi que ce
+          soit — et quand la question porte sur un jeu, sa jaquette vaut mieux
+          qu'une ligne de texte pour l'ancrer. */}
+      {reveal && (
+        <div className="qz-qcm-answer">
+          {round.cover && (
+            <img src={round.cover} alt="" loading="lazy" draggable="false" />
+          )}
+          <span>
+            <em>La réponse</em>
+            <b>{round.choices?.[round.answerIndex]}</b>
+            {round.explain && <i>{round.explain}</i>}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

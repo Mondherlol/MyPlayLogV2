@@ -2,15 +2,22 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
+  Building2,
   Check,
   Coins,
   Crown,
+  Grid2x2,
   Home,
+  Keyboard,
+  Layers,
+  ListChecks,
   Loader2,
   Play,
   RotateCcw,
   Share2,
+  Shuffle,
   SkipForward,
+  Smile,
   Swords,
   Trophy,
   Users,
@@ -26,10 +33,10 @@ import {
   checkLocal,
   estimateQuizPoints,
   triesFor,
-  typeColor,
   typeHint,
 } from "../lib/quizGame";
 import QuizRound from "../components/quiz/QuizRound";
+import QuizTimer from "../components/quiz/QuizTimer";
 
 // ======================================================================
 //  Le Grand Quiz — solo
@@ -63,8 +70,89 @@ const REVEAL_MS = 5200;
 // ============================================================
 //  L'écran d'accueil
 // ============================================================
+// Une icône par épreuve. Le libellé vient du serveur (il fait autorité sur ce
+// qui existe), l'icône est une affaire d'interface et vit donc ici.
+const TYPE_ICONS = {
+  qcm: ListChecks,
+  emoji: Smile,
+  studio: Building2,
+  duel: Swords,
+  pixel: Grid2x2,
+  swipe: Layers,
+  anagram: Shuffle,
+  motus: Keyboard,
+};
+
+// ------------------------------------------------------------ le décor
+// Des jaquettes qui flottent autour du logo, piochées dans LA BIBLIOTHÈQUE DU
+// JOUEUR (/quiz/covers). C'est ce détail qui fait que l'écran d'accueil parle
+// de SES jeux plutôt que d'être une affiche générique — et ça ne coûte qu'une
+// requête déjà écrite pour la carte de Pixel Rush.
+//
+// Les positions sont fixes et choisies pour encadrer le logo sans jamais le
+// toucher. Elles sont en pourcentages du bloc, donc elles se resserrent d'
+// elles-mêmes sur un petit écran ; en dessous de 760 px le décor disparaît
+// complètement (cf. le CSS) : sur téléphone il n'y a pas la place, et une
+// jaquette qui chevauche le titre est pire que pas de jaquette du tout.
+const SPOTS = [
+  { top: "4%", left: "3%", rot: -10, delay: 0 },
+  { top: "16%", right: "4%", rot: 12, delay: 1.1 },
+  { top: "52%", left: "1%", rot: 8, delay: 2.2 },
+  { top: "63%", right: "2%", rot: -13, delay: 0.5 },
+  { top: "33%", left: "9%", rot: 5, delay: 3 },
+  { top: "6%", right: "18%", rot: -6, delay: 1.7 },
+];
+const MARKS = [
+  { top: "26%", left: "20%", size: 30, delay: 0.3 },
+  { top: "12%", right: "30%", size: 22, delay: 1.4 },
+  { top: "70%", left: "17%", size: 26, delay: 2.1 },
+  { top: "46%", right: "12%", size: 34, delay: 0.9 },
+];
+
+function FloatingDecor({ games }) {
+  return (
+    <div className="qz-float" aria-hidden="true">
+      {SPOTS.map((sp, i) => {
+        const g = games[i % Math.max(1, games.length)];
+        if (!g?.cover) return null;
+        return (
+          <span
+            key={`c${i}`}
+            className="qz-float-cover"
+            style={{
+              top: sp.top,
+              left: sp.left,
+              right: sp.right,
+              "--rot": `${sp.rot}deg`,
+              animationDelay: `${sp.delay}s`,
+            }}
+          >
+            <img src={g.cover} alt="" draggable="false" />
+          </span>
+        );
+      })}
+      {MARKS.map((m, i) => (
+        <span
+          key={`q${i}`}
+          className="qz-float-q"
+          style={{
+            top: m.top,
+            left: m.left,
+            right: m.right,
+            fontSize: `${m.size}px`,
+            animationDelay: `${m.delay}s`,
+          }}
+        >
+          ?
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function Intro({
   challengeId,
+  covers,
   roundCount,
   setRoundCount,
   types,
@@ -76,19 +164,26 @@ function Intro({
 }) {
   return (
     <div className="qz-intro">
-      {/* Le pupitre, vide, qui attend son candidat. C'est l'objet de la page. */}
-      <div className="qz-hero" aria-hidden="true">
-        <span className="qz-hero-desk" />
-        <span className="qz-hero-glow" />
-        <span className="qz-hero-buzzer" />
-      </div>
+      <FloatingDecor games={covers} />
 
-      <span className="qz-kicker">{challengeId ? "Défi entre joueurs" : "Le quiz ultime"}</span>
-      <h1 className="qz-title">{challengeId ? "Relève le défi" : "Le Grand Quiz"}</h1>
+      {/* LE LOGO. Il remplace l'empilement d'avant — un pupitre décoratif, un
+          sur-titre et un titre qui répétaient tous les trois la même chose.
+          Un seul objet, en police ronde, avec le « ? » qui rebondit. */}
+      {challengeId && <span className="qz-badge-defi">Défi entre joueurs</span>}
+      <h1 className="qz-logo">
+        <span className="qz-logo-le">Le</span>
+        <span className="qz-logo-main">
+          Grand Quiz
+          <i className="qz-logo-q" aria-hidden="true">
+            ?
+          </i>
+        </span>
+      </h1>
+
       <p className="qz-sub">
         {challengeId
           ? "Les mêmes épreuves qu'un autre joueur. À toi de faire mieux."
-          : "Huit épreuves, tirées au sort. Des questions, des emojis, des lettres à remettre dans l'ordre, des studios, des duels de cartes, des piles à trier — et le chrono qui court."}
+          : "Huit épreuves pour découvrir que tu connais moins bien les jeux que tu ne le crois."}
       </p>
 
       {!challengeId && (
@@ -118,19 +213,26 @@ function Intro({
               <div className="qz-types-grid">
                 {types.map((t) => {
                   const on = picked.includes(t.key);
+                  const Icon = TYPE_ICONS[t.key] || ListChecks;
                   return (
                     <button
                       key={t.key}
                       type="button"
                       className={`qz-type clickable ${on ? "on" : ""}`}
-                      style={{ "--qz-type": typeColor(t.key) }}
+                      data-qz-type={t.key}
                       onClick={() => toggleType(t.key)}
                       aria-pressed={on}
                       title={typeHint(t.key)}
                     >
+                      <span className="qz-type-ic">
+                        <Icon size={19} />
+                      </span>
                       <b>{t.label}</b>
-                      <em>{t.durationSec}s</em>
-                      {on && <Check size={13} className="qz-type-mark" />}
+                      {on && (
+                        <span className="qz-type-mark" aria-hidden="true">
+                          <Check size={12} />
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -174,6 +276,9 @@ export default function Quizz() {
   const [roundCount, setRoundCount] = useState(8);
   const [types, setTypes] = useState([]);
   const [picked, setPicked] = useState([]);
+  // Les jaquettes qui flottent autour du logo. Purement décoratif : si la
+  // requête échoue, l'écran s'affiche sans elles et personne ne le remarque.
+  const [covers, setCovers] = useState([]);
 
   // Données de la partie
   const [sessionId, setSessionId] = useState(null);
@@ -213,7 +318,6 @@ export default function Quizz() {
   const durationMs = round ? round.durationSec * 1000 : 0;
   const timeLeftMs = Math.max(0, durationMs - elapsedMs);
   const secondsLeft = Math.ceil(timeLeftMs / 1000);
-  const progress = durationMs ? Math.min(1, elapsedMs / durationMs) : 0;
 
   useEffect(() => {
     sfx.setMuted(muted);
@@ -239,6 +343,18 @@ export default function Quizz() {
       })
       .catch(() => {
         /* l'écran de réglage disparaît, la partie se lance avec tout */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [token]);
+
+  useEffect(() => {
+    let alive = true;
+    apiFetch("/quiz/covers", { token })
+      .then((d) => alive && setCovers((d.games || []).filter((g) => g.cover)))
+      .catch(() => {
+        /* décor : jamais bloquant */
       });
     return () => {
       alive = false;
@@ -575,13 +691,6 @@ export default function Quizz() {
 
   return (
     <div className={`qz-page ${inGame ? "in-game" : ""}`}>
-      {/* Le studio : la nappe de lumière au sol et le halo derrière le
-          pupitre. Purement décoratif, et coupé sur mobile (cf. le CSS). */}
-      <div className="qz-scene" aria-hidden="true">
-        <span className="qz-scene-floor" />
-        <span className="qz-scene-halo" />
-      </div>
-
       <header className="qz-topbar">
         <button type="button" className="qz-back clickable" onClick={goBack}>
           <ArrowLeft size={17} /> <span>Retour</span>
@@ -603,6 +712,7 @@ export default function Quizz() {
         {phase === "intro" && (
           <Intro
             challengeId={challengeId}
+            covers={covers}
             roundCount={roundCount}
             setRoundCount={setRoundCount}
             types={types}
@@ -636,30 +746,36 @@ export default function Quizz() {
         )}
 
         {inGame && round && (
-          <div className="qz-play" style={{ "--qz-type": typeColor(round.type) }}>
+          <div className="qz-play" data-qz-type={round.type}>
             {/* Le bandeau d'état : où on en est, et ce qu'on a marqué. */}
             <div className="qz-play-head">
+              {/* Les manches FRANCHIES sont colorées elles aussi. Seule la
+                  courante l'était, ce qui ne disait pas où on en est : une
+                  rangée de points gris avec un point jaune se lit comme « une
+                  seule compte », pas comme « on en a fait trois ». */}
               <div className="qz-pips" aria-hidden="true">
-                {rounds.map((_, i) => (
-                  <i key={i} className={i < idx ? "done" : i === idx ? "cur" : ""} />
+                {rounds.map((r, i) => (
+                  <i
+                    key={i}
+                    className={i < idx ? "done" : i === idx ? "cur" : ""}
+                    data-qz-type={i <= idx ? r.type : undefined}
+                  />
                 ))}
               </div>
               <span className="qz-round-count">
                 Épreuve <b>{idx + 1}</b>
                 <em>/ {rounds.length}</em>
               </span>
-              <span className="qz-live-score">
-                <Trophy size={14} /> {score} pts
+              <span className="qz-head-right">
+                <span className="qz-live-score">
+                  <Trophy size={14} /> {score} pts
+                </span>
+                <QuizTimer
+                  seconds={phase === "playing" ? secondsLeft : round.durationSec}
+                  total={round.durationSec}
+                  hot={hot}
+                />
               </span>
-            </div>
-
-            {/* Le chrono : une barre pleine largeur, pas un anneau. Sur un
-                plateau, le temps qui reste se lit du coin de l'œil pendant
-                qu'on lit l'énoncé — un cadran demanderait de quitter le texte
-                des yeux. */}
-            <div className={`qz-timer ${hot ? "hot" : ""}`}>
-              <i className="qz-timer-bar" style={{ transform: `scaleX(${1 - progress})` }} />
-              <span className="qz-timer-num">{phase === "playing" ? secondsLeft : round.durationSec}</span>
             </div>
 
             {/* L'annonce de l'épreuve. C'est le moment le plus important de
@@ -888,7 +1004,7 @@ function Scoreboard({ final, challengeId, copied, onCopy, onReplay, token }) {
               <li
                 key={r.index}
                 className={`qz-recap-row ${r.correct ? "good" : r.ratio > 0 ? "half" : "bad"}`}
-                style={{ "--qz-type": typeColor(r.type) }}
+                data-qz-type={r.type}
               >
                 <span className="qz-recap-type">{r.label}</span>
                 <span className="qz-recap-info">
