@@ -121,10 +121,14 @@ export default function ChatComposer({
     requestAnimationFrame(() => inputRef.current?.focus());
   }, []);
 
-  // Ouverture d'une fenêtre flottante : curseur direct dans le champ.
+  // Ouverture d'une conversation (page /messages ou fenêtre flottante) :
+  // curseur direct dans le champ. Sur téléphone on s'en abstient — ça ferait
+  // surgir le clavier par-dessus le fil à chaque conversation ouverte.
   useEffect(() => {
-    if (autoFocus) focusInput();
-  }, [autoFocus, focusInput]);
+    if (!autoFocus) return;
+    if (window.matchMedia?.("(max-width: 760px)")?.matches) return;
+    focusInput();
+  }, [autoFocus, conversationId, focusInput]);
 
   function syncScroll() {
     if (hlRef.current && inputRef.current) {

@@ -50,6 +50,8 @@ const activitySchema = new mongoose.Schema(
         "blindtest", // a terminé un blind test musical (meta = score/manches/défi)
         "pixel", // a terminé une partie de Pixel Rush (meta = score/manches/défi)
         "geo", // a terminé une partie de GeoGamer (meta = score/manches/défi)
+        "perroquet", // a imité des sons de jeux (meta = moyenne/manches + le
+        // meilleur enregistrement, que la carte du fil fait écouter)
         "btversus", // a disputé un versus de blind test (même forme que
         // geoversus : une entrée par joueur, dédoublonnée par meta.versusId)
         "pxversus", // a disputé un versus Pixel Rush (idem)

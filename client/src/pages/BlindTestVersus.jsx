@@ -73,6 +73,11 @@ const LIVES = 3;
 const HINT_FRACS = [0.2, 0.4, 0.6, 0.78];
 // Mini wav silencieux, joué en muet dans le geste d'entrée pour déverrouiller
 // la balise <audio> sur iOS (même technique que context/PlayerContext.jsx).
+// Délai au bout duquel on constate que la tête de lecture n'a pas bougé et
+// qu'on relance l'extrait. Court : au-delà, l'extrait est déjà bien entamé pour
+// les autres et le rattrapage ne sert plus à grand-chose.
+const WATCHDOG_MS = 2200;
+
 const SILENT_WAV =
   "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
 // Cadence d'envoi de « ce que je tape ». Assez serré pour qu'on voie les
@@ -137,6 +142,7 @@ export default function BlindTestVersus() {
   const mutedRef = useRef(false); // miroir de la sourdine (cf. le départ du son)
   const volumeRef = useRef(volume); // idem pour le volume
   const unlockedRef = useRef(false); // déverrouillage iOS déjà fait
+  const retriedRef = useRef(null); // extrait déjà relancé par le chien de garde
   const clipStartRef = useRef(0); // où l'extrait commence dans le morceau (s)
   const roundRef = useRef(null); // la manche courante, lue par les écouteurs audio
   const metaForRef = useRef(null); // clip dont la durée est connue
@@ -341,13 +347,20 @@ export default function BlindTestVersus() {
 
     const onMeta = () => {
       const r = roundRef.current;
+      if (!r) return;
       const dur = el.duration;
-      if (!r || !isFinite(dur) || dur <= 0) return;
-      const clip = r.durationSec || 15;
-      clipStartRef.current = Math.min(
-        (r.startFrac || 0.4) * dur,
-        Math.max(0, dur - clip - 1)
-      );
+      // Durée inconnue (flux sans en-tête exploitable, conteneur dont l'index
+      // est en fin de fichier) : on ne sait pas placer l'aiguille au climax,
+      // mais ce n'est PAS une raison de se taire. On jouera depuis le début.
+      if (isFinite(dur) && dur > 0) {
+        const clip = r.durationSec || 15;
+        clipStartRef.current = Math.min(
+          (r.startFrac || 0.4) * dur,
+          Math.max(0, dur - clip - 1)
+        );
+      } else {
+        clipStartRef.current = 0;
+      }
       metaForRef.current = r.clip;
       try {
         el.currentTime = clipStartRef.current;
@@ -376,16 +389,30 @@ export default function BlindTestVersus() {
   // Départ du son, à l'instant décidé par le serveur. Le son s'arrête à la fin
   // de l'extrait — le temps bonus se joue en silence, comme en solo.
   //
-  // `clipReady` (canplay) garantit que la durée de CE morceau est connue, donc
-  // que `clipStartRef` pointe sur le bon climax. S'il devient vrai en pleine
-  // manche (flux lent), l'effet rejoue et rattrape le retard.
+  // `clipReady` (canplay) dit que le tampon est prêt et que `clipStartRef`
+  // pointe sur le bon climax. IL N'EST PLUS UNE CONDITION POUR JOUER, et c'est
+  // le cœur du correctif : la manche partait en silence complet, sans erreur ni
+  // délai, dès que cet état ne tombait pas.
+  //
+  // Il ne tombait pas si `loadedmetadata` n'arrivait jamais avec une durée
+  // exploitable — le morceau ne démarrait alors PAS DU TOUT, et rien ne le
+  // rattrapait : ni deuxième chance, ni message. En solo ce cas existe aussi,
+  // mais un minuteur de sept secondes bascule sur l'iframe YouTube et on entend
+  // quand même quelque chose. Le versus, lui, attendait indéfiniment.
+  //
+  // (L'iframe est hors de question ici : elle exigerait le `videoId`, donc la
+  // réponse, côté client — c'est précisément ce que l'adresse opaque
+  // /clip/:index évite. La tolérance remplace la bascule.)
+  //
+  // On tente donc la lecture à l'heure dite, prêt ou pas. Si le tampon devient
+  // prêt ensuite, l'effet rejoue et se recale au bon endroit.
   //
   // LA SOURDINE N'EST PAS UNE DÉPENDANCE : elle l'a été, et couper puis remettre
   // le son REPARTAIT l'extrait du début au milieu de la manche. Elle vit dans
   // son propre effet, plus bas, et se lit ici par une ref.
   useEffect(() => {
     const el = audioRef.current;
-    if (!el || phase !== "round" || !clipReady || !round) return undefined;
+    if (!el || phase !== "round" || !round) return undefined;
 
     const clip = round.durationSec || 15;
     // Retard éventuel (flux plus lent que le sas) : on prend l'extrait où il en
@@ -418,8 +445,32 @@ export default function BlindTestVersus() {
       },
       (clip - late) * 1000
     );
-    return () => clearTimeout(stop);
-  }, [phase, clipReady, round?.index]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Le chien de garde, équivalent du minuteur de bascule du solo.
+    //
+    // `play()` peut « réussir » sur un élément qui n'avance pas d'un pouce :
+    // tampon vide, flux qui ne vient pas, source jamais vraiment ouverte. On
+    // vérifie donc que la tête de lecture a BOUGÉ. Sinon on recharge la source
+    // une fois et on relance — c'est ce qui rattrapait le solo, et c'est ce qui
+    // manquait ici.
+    const mark = el.currentTime;
+    const watchdog = setTimeout(() => {
+      if (el.paused || Math.abs(el.currentTime - mark) > 0.25) return; // ça tourne
+      if (retriedRef.current === round.clip) return; // une seule reprise
+      retriedRef.current = round.clip;
+      try {
+        el.load();
+        el.play().catch(() => setSoundBlocked(true));
+      } catch {
+        setClipError(true);
+      }
+    }, WATCHDOG_MS);
+
+    return () => {
+      clearTimeout(stop);
+      clearTimeout(watchdog);
+    };
+  }, [phase, clipReady, round?.index, round?.clip]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Le son se coupe dès qu'on quitte la manche (révélation, sortie de page) ;
   // et à l'inverse, un morceau lancé « en entier » depuis la révélation se tait
@@ -548,10 +599,14 @@ export default function BlindTestVersus() {
       .catch(() => {})
       .finally(() => {
         try {
-          el.pause();
-          // Un extrait a pu être chargé entre-temps : on ne lui arrache pas sa
-          // source pour faire le ménage derrière un wav silencieux.
-          if (el.src === SILENT_WAV) el.removeAttribute("src");
+          // Un extrait a pu être chargé — voire lancé — entre-temps : cette
+          // promesse se règle bien après le clic. On ne touche à RIEN qui ne
+          // soit encore le wav silencieux, sinon ce ménage couperait la manche
+          // qu'il est censé rendre possible.
+          if (el.src === SILENT_WAV) {
+            el.pause();
+            el.removeAttribute("src");
+          }
           el.muted = mutedRef.current;
         } catch {
           /* ignore */

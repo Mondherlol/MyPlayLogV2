@@ -12,6 +12,7 @@ import {
   X,
   Music2,
   Grid2x2,
+  Mic2,
   Globe2,
   Trophy,
   Crown,
@@ -109,6 +110,17 @@ const GAMES = [
     api: "/quiz/leaderboard",
     idOf: (e) => e.quizGameId,
   },
+  {
+    key: "perroquet",
+    name: "Le Perroquet",
+    tag: "Micro",
+    pitch:
+      "Un bruit de jeu, et ta voix pour le refaire. Le plus proche marque — comme au bon vieux micro de la console.",
+    Icon: Mic2,
+    path: "/perroquet",
+    api: "/perroquet/leaderboard",
+    idOf: (e) => e.perroquetId,
+  },
 ];
 
 // Libellés des lignes du grand livre (miroir de POINT_SOURCES,
@@ -120,6 +132,7 @@ const SOURCE_LABELS = {
   quiz: "Grand Quiz",
   quizversus: "Grand Quiz — versus",
   mot: "Mot du jour",
+  perroquet: "Le Perroquet",
   case: "Ouverture de caisse",
   duplicate: "Doublon reconverti",
   admin: "Ajustement admin",
@@ -692,7 +705,7 @@ function MysteryCard() {
         <span className="arc-game-head">
           <span className="arc-game-name">Jeu mystère</span>
           <span className="arc-game-pitch">
-            Un sixième mini-jeu se monte dans l'arrière-salle. Pas encore
+            Un septième mini-jeu se monte dans l'arrière-salle. Pas encore
             d'indice — repasse traîner par ici.
           </span>
         </span>
@@ -751,6 +764,25 @@ function GameArt({ game, cover, cover2 }) {
             <i className="cold" />
             <i className="warm" />
             <i className="hot" />
+          </span>
+        </span>
+      </span>
+    );
+  }
+  // Le Perroquet ne dépend pas non plus de la bibliothèque : ce qu'on imite est
+  // un son, pas un jeu. Son art est donc l'instrument — un micro de studio sur
+  // sa suspension, et les ondes qui en partent. C'est la carte la plus sobre de
+  // la grille, et c'est voulu : les autres montrent ce qu'on doit RECONNAÎTRE,
+  // celle-ci montre ce avec quoi on va JOUER.
+  if (game.key === "perroquet") {
+    return (
+      <span className="arc-game-art" aria-hidden="true">
+        <span className="arc-art-pq">
+          <i className="arc-art-pq-wave a" />
+          <i className="arc-art-pq-wave b" />
+          <span className="arc-art-pq-mic">
+            <i className="arc-art-pq-grill" />
+            <i className="arc-art-pq-stem" />
           </span>
         </span>
       </span>

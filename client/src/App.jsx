@@ -13,6 +13,7 @@ import GeoVersus from "./pages/GeoVersus";
 import BlindTestVersus from "./pages/BlindTestVersus";
 import PixelVersus from "./pages/PixelVersus";
 import Quizz from "./pages/Quizz";
+import Perroquet from "./pages/Perroquet";
 import QuizzVersus from "./pages/QuizzVersus";
 import MotDuJour from "./pages/MotDuJour";
 import Arcade from "./pages/Arcade";
@@ -165,6 +166,8 @@ export default function App() {
         {/* Le plateau à plusieurs : adresse des liens d'invitation et des
             cartes envoyées en message privé. */}
         <Route path="/quiz/versus/:code" element={<QuizzVersus />} />
+        {/* Le Perroquet : `?challenge=<id>` rejoue le set de quelqu'un. */}
+        <Route path="/perroquet" element={<Perroquet />} />
         <Route path="/mot" element={<MotDuJour />} />
         <Route path="/playtopia" element={<Playtopia />} />
         <Route path="/explore" element={<Explorer />} />

@@ -76,6 +76,11 @@ const MIN_ROUNDS = 4;
 const MAX_ROUNDS = 14;
 const WINNER_BONUS = 0.2;
 
+// Ce qu'il reste à jouer une fois qu'un joueur a rendu une copie PARFAITE sur
+// une manche parallèle. Assez pour finir une réponse en cours, pas assez pour
+// reprendre sa recherche de zéro.
+const LAST_STRETCH_MS = 12000;
+
 // ============================================================
 //  Combien d'essais, et quand une manche est finie pour quelqu'un
 // ============================================================
@@ -372,13 +377,22 @@ async function endRound(room) {
     };
   });
 
-  // La prime du meilleur, sur une manche parallèle. En cas d'égalité parfaite,
-  // personne ne la touche : la partager en deux ferait deux demi-primes que
-  // personne ne comprendrait au tableau.
+  // La prime du meilleur, sur une manche parallèle — DÉPARTAGÉE AU TEMPS.
+  //
+  // Elle n'allait qu'au meilleur ratio, et seulement s'il était unique. Or sur
+  // l'épreuve du studio, l'égalité à 100 % est le CAS NORMAL : tout le monde
+  // finit par citer trois jeux, donc personne ne touchait jamais la prime, et
+  // trouver ses trois titres en dix secondes rapportait exactement autant que
+  // les trouver en cinquante. Il n'y avait aucune raison de se dépêcher.
+  //
+  // À ratio égal, c'est donc le PREMIER ARRIVÉ qui l'empoche. C'est la seule
+  // chose qui distingue encore deux copies parfaites.
   if (!buzzer && round.results.length) {
     const best = Math.max(...round.results.map((r) => r.ratio || 0));
-    const tops = round.results.filter((r) => (r.ratio || 0) === best && best > 0);
-    if (tops.length === 1) tops[0].points += PARALLEL_BEST_BONUS;
+    const tops = round.results
+      .filter((r) => (r.ratio || 0) === best && best > 0)
+      .sort((a, b) => (a.timeMs ?? Infinity) - (b.timeMs ?? Infinity));
+    if (tops.length) tops[0].points += PARALLEL_BEST_BONUS;
   }
   if (buzzer && winners.length) round.winner = winners[0].user;
   else if (!buzzer && round.results.length) {
@@ -750,9 +764,37 @@ router.post("/:code/answer", async (req, res) => {
         ratio: verdict.ratio,
         atMs,
       });
+
+      // ------------------------------------------- la dernière ligne droite
+      // Sur une manche parallèle, le PREMIER qui rend une copie parfaite
+      // raccourcit le temps qu'il reste à tout le monde.
+      //
+      // Sans ça, avoir cité ses trois jeux en dix secondes n'avait aucun effet :
+      // on restait spectateur pendant que les autres cherchaient tranquillement
+      // jusqu'à la sonnerie, et finir premier ne servait à rien. Maintenant
+      // c'est une pression qu'on met à la table.
+      //
+      // On ne coupe PAS net : douze secondes laissent finir une réponse presque
+      // aboutie. Terminer premier doit avantager, pas éliminer.
+      let stretched = false;
+      if (
+        modeOf(round) === "parallel" &&
+        verdict.correct &&
+        round.attempts.filter((a) => a.correct).length === 1
+      ) {
+        const target = Date.now() + LAST_STRETCH_MS;
+        if (target < room.phaseEndsAt) {
+          room.phaseEndsAt = target;
+          stretched = true;
+        }
+      }
+
       touch(room);
       await room.save();
       await room.populate(POPULATE);
+      // Le minuteur du salon doit suivre la nouvelle heure de fin, sinon la
+      // manche se refermerait à l'heure initialement prévue.
+      if (stretched) clock.at(room.code, room.phaseEndsAt, () => withRoom(room.code, endRound));
 
       const ids = activePlayers(room).map((p) => String(p.user?._id || p.user));
       const found = round.attempts
@@ -773,6 +815,10 @@ router.post("/:code/answer", async (req, res) => {
         livesById: Object.fromEntries(ids.map((id) => [id, livesOf(round, id)])),
         settledById: Object.fromEntries(ids.map((id) => [id, isSettled(round, id)])),
       });
+
+      // Chacun reçoit le salon complet quand l'heure de fin a bougé : sans ça
+      // les chronos des autres continueraient d'égrener l'ancienne.
+      if (stretched) toEachRoom(room, "stretch", { by: String(req.userId) });
 
       if (shouldEndEarly(room, round)) await endRound(room);
       return {

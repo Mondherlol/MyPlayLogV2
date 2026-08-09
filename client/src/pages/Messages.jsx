@@ -418,7 +418,7 @@ export default function Messages() {
               </button>
             </header>
 
-            <ChatThread key={active.id} conversation={active} token={token} />
+            <ChatThread key={active.id} conversation={active} token={token} autoFocus />
           </>
         )}
       </section>

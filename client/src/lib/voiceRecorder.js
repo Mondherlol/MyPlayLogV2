@@ -47,15 +47,27 @@ const WAVE_POINTS = 48;
 //   .stop()   → { blob, mimeType, duration, waveform } (null si rien d'utile)
 //   .cancel() → coupe tout, ne rend rien
 //   .levels   → les niveaux mesurés jusqu'ici (0..100), pour l'affichage direct
-export async function startRecording({ onLevel } = {}) {
+// `raw` : coupe les traitements du navigateur. À utiliser quand ce qui est
+// enregistré va être MESURÉ et pas seulement écouté — c'est le cas du Perroquet
+// (pages/Perroquet.jsx), qui note une imitation sur son enveloppe de volume.
+//
+// Le correcteur de gain automatique est justement conçu pour égaliser le volume
+// dans le temps : il aplatit donc exactement la courbe qu'on veut mesurer, et
+// un cri qui part fort pour retomber ressortirait comme une note tenue. La
+// réduction de bruit, elle, mange les attaques douces. Pour un message vocal
+// ces deux traitements sont des cadeaux ; ici ce sont des faux amis.
+export async function startRecording({ onLevel, raw = false } = {}) {
   const stream = await navigator.mediaDevices.getUserMedia({
-    audio: {
-      // Un message vocal, ce n'est pas de la musique : on prend tout ce que le
-      // navigateur sait faire pour rendre une voix intelligible dans le métro.
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-    },
+    audio: raw
+      ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+      : {
+          // Un message vocal, ce n'est pas de la musique : on prend tout ce que
+          // le navigateur sait faire pour rendre une voix intelligible dans le
+          // métro.
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
   });
 
   const mimeType = pickMimeType();

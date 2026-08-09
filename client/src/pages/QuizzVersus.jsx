@@ -217,11 +217,23 @@ export default function QuizzVersus() {
           // serveur n'envoie rien du contenu, donc on n'a rien à dire non plus.
           if (data.buzzer) {
             if (data.correct && data.by !== meId) sfx.play("wrong");
-            if (data.label) setFlash({ by: data.by, label: data.label, correct: data.correct });
+            if (data.label)
+              setFlash({
+                by: data.by,
+                label: data.correct ? "a trouvé !" : data.label,
+                correct: data.correct,
+              });
           }
           break;
         case "progress":
           setProgress((p) => ({ ...p, [data.by]: data.done }));
+          break;
+        // Quelqu'un a rendu une copie parfaite : le chrono vient d'être
+        // raccourci pour tout le monde. Il FAUT le dire — sinon le temps
+        // restant fond d'un coup sans explication et ça passe pour un bug.
+        case "stretch":
+          setFlash({ by: data.by, label: "a terminé ! Dernière ligne droite", correct: true });
+          sfx.play("tick-hot");
           break;
         case "joker":
           sfx.play("hint");
@@ -497,8 +509,8 @@ export default function QuizzVersus() {
             {/* Ce que quelqu'un vient de proposer, en buzzer. */}
             {flash && (
               <span className={`qzv-flash ${flash.correct ? "good" : "bad"}`} key={flash.label}>
-                <b>{players.find((p) => p.id === flash.by)?.username || "?"}</b>
-                {flash.correct ? " a trouvé !" : ` : ${flash.label}`}
+                <b>{players.find((p) => p.id === flash.by)?.username || "?"}</b>{" "}
+                {flash.correct ? flash.label || "a trouvé !" : `: ${flash.label}`}
               </span>
             )}
 

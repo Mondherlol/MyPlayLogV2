@@ -286,6 +286,7 @@ async function buildTimeline(
   const pixels = []; // idem pour Pixel Rush
   const geos = []; // idem pour GeoGamer
   const quizzes = []; // idem pour le Grand Quiz
+  const perroquets = []; // idem pour Le Perroquet
   const caseopens = []; // idem : ouvrir plusieurs caisses d'affilée est la norme
   const drops = []; // boîtiers sortis de la machine à capsules (idem, en rafale)
   // Victoires collectives au Mot du jour déjà sorties : chaque membre de
@@ -646,6 +647,28 @@ async function buildTimeline(
         total: a.meta.total || 0,
         types: Array.isArray(a.meta.types) ? a.meta.types : [],
         challenge: a.meta.challenge || null,
+      });
+      continue;
+    }
+
+    // Le Perroquet. La carte porte un LECTEUR, pas seulement un score : ce
+    // qu'on veut du fil, c'est entendre le cri de quelqu'un, pas apprendre
+    // qu'il a fait 68 de moyenne. `bestUrl` est le meilleur enregistrement de
+    // la partie ; sans lui la carte n'a aucune raison d'exister, donc on la
+    // laisse tomber plutôt que d'afficher un nombre nu.
+    if (a.type === "perroquet") {
+      if (!a.meta?.perroquetId || !a.meta?.bestUrl) continue;
+      perroquets.push({
+        type: "perroquet",
+        id: `a-${a._id}`,
+        date: a.createdAt,
+        user: person(a.actor),
+        perroquetId: a.meta.perroquetId,
+        score: a.meta.average || 0,
+        rounds: a.meta.rounds || 0,
+        bestBand: a.meta.bestBand || "miss",
+        bestClip: a.meta.bestClip || null,
+        bestUrl: a.meta.bestUrl,
       });
       continue;
     }
@@ -1190,6 +1213,14 @@ async function buildTimeline(
     total: m.total,
     types: m.types,
     challenge: m.challenge,
+  }));
+  pushRuns(perroquets, "perroquetgroup", "pq", (m) => ({
+    perroquetId: m.perroquetId,
+    score: m.score,
+    rounds: m.rounds,
+    bestBand: m.bestBand,
+    bestClip: m.bestClip,
+    bestUrl: m.bestUrl,
   }));
 
   // --- Caisses ouvertes : on en ouvre rarement une seule, donc les ouvertures

@@ -5,6 +5,7 @@ import {
   ShieldCheck,
   Library,
   Trophy,
+  Mic2,
   Check,
   Loader2,
   ExternalLink,
@@ -57,6 +58,7 @@ import EventsPanel from "../components/AdminEvents";
 import CollectionPanel from "../components/AdminCollection";
 import LogsPanel from "../components/AdminLogs";
 import PushPanel from "../components/AdminPush";
+import PerroquetPanel from "../components/AdminPerroquet";
 
 // ======================================================================
 //  Page Admin — shell à onglets verticaux (façon Discord).
@@ -69,6 +71,7 @@ const TAB_KEYS = [
   "psn",
   "geo",
   "quiz",
+  "perroquet",
   "events",
   "collection",
   "system",
@@ -103,6 +106,7 @@ export default function Admin() {
     { key: "psn", label: "PlayStation", Icon: Trophy, badge: psnActive },
     { key: "geo", label: "GeoGamer", Icon: Globe2 },
     { key: "quiz", label: "Quiz", Icon: Trophy },
+    { key: "perroquet", label: "Perroquet", Icon: Mic2 },
     { key: "events", label: "Événements", Icon: CalendarDays },
     { key: "collection", label: "Collection", Icon: Library },
     { key: "system", label: "Système", Icon: Activity },
@@ -178,6 +182,7 @@ export default function Admin() {
           {safeTab === "psn" && <PsnPanel token={token} />}
           {safeTab === "geo" && <GeoGlobePanel token={token} />}
           {safeTab === "quiz" && <QuizPanel token={token} />}
+          {safeTab === "perroquet" && <PerroquetPanel token={token} />}
           {safeTab === "events" && <EventsPanel token={token} />}
           {safeTab === "collection" && <CollectionPanel token={token} />}
           {safeTab === "system" && <SystemPanel token={token} />}

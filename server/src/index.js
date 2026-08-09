@@ -29,6 +29,8 @@ import quizRoutes from "./routes/quiz.js";
 import quizVersusRoutes from "./routes/quizVersus.js";
 import quizAdminRoutes from "./routes/quizAdmin.js";
 import motRoutes from "./routes/mot.js";
+import perroquetRoutes from "./routes/perroquet.js";
+import perroquetAdminRoutes from "./routes/perroquetAdmin.js";
 import presenceRoutes from "./routes/presence.js";
 import arcadeRoutes from "./routes/arcade.js";
 import steamRoutes from "./routes/steam.js";
@@ -124,6 +126,10 @@ app.use("/api/geo", geoRoutes);
 app.use("/api/quiz/versus", quizVersusRoutes);
 app.use("/api/quiz", quizRoutes);
 app.use("/api/mot", motRoutes);
+// Le Perroquet porte lui aussi un `GET /:id/results`, mais aucun chemin fixe à
+// deux segments : `/leaderboard` est à un seul et Express le fait passer avant
+// `/:id/results` sans qu'on ait à ordonner quoi que ce soit.
+app.use("/api/perroquet", perroquetRoutes);
 app.use("/api/presence", presenceRoutes);
 app.use("/api/arcade", arcadeRoutes);
 app.use("/api/steam", steamRoutes);
@@ -132,6 +138,9 @@ app.use("/api/patchnotes", patchnoteRoutes);
 // La relecture de la banque du quiz, avant le routeur d'admin général : ce
 // dernier porte des chemins à un segment qui happeraient /api/admin/quiz.
 app.use("/api/admin/quiz", quizAdminRoutes);
+// La banque de sons du Perroquet, même raison d'ordre : le routeur d'admin
+// général porte des chemins à un segment qui happeraient /api/admin/perroquet.
+app.use("/api/admin/perroquet", perroquetAdminRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/companies", companyRoutes);
 app.use("/api/platforms", platformRoutes);

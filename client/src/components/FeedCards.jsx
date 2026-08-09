@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -12,6 +12,7 @@ import {
   Star,
   Play,
   Pause,
+  Mic2,
   Clapperboard,
   Eye,
   EyeOff,
@@ -188,6 +189,8 @@ export function FeedCard(props) {
     item.type === "quizversus"
   )
     return <VersusEvent {...props} />;
+  if (item.type === "perroquet" || item.type === "perroquetgroup")
+    return <PerroquetEvent {...props} />;
   if (item.type === "mot") return <MotEvent {...props} />;
   if (item.type === "caseopen") return <CaseOpenEvent {...props} />;
   if (item.type === "caseopengroup") return <CaseOpenGroupEvent {...props} />;
@@ -3216,6 +3219,85 @@ export function FeedCardsSkeleton({ count = 3 }) {
 // Même gabarit que le blind test et Pixel Rush — score, réussite — pour que le
 // fil reste lisible d'une carte à l'autre. Carte purement informative : pas de
 // bouton d'action (les lieux ne se rejouent pas à l'identique).
+// ---------- Le Perroquet ----------
+// La SEULE carte de mini-jeu du fil qui se joue au lieu de se lire. Les autres
+// annoncent un score ; celle-ci fait entendre le cri.
+//
+// C'est délibéré et c'est tout le jeu : « Mondher a fait 68 de moyenne » n'a
+// jamais fait rire personne, alors que son imitation ratée de Yoshi, si. D'où
+// un lecteur au centre de la carte plutôt qu'un pavé de statistiques — et d'où
+// le fait qu'on garde les enregistrements en base (server/src/models/
+// PerroquetGame.js) au lieu de ne stocker qu'un nombre.
+//
+// Le regroupement en rafale (`perroquetgroup`) ne montre QUE la meilleure
+// tentative du lot : six lecteurs empilés dans une carte, personne ne les
+// écoute.
+function PerroquetEvent({ item }) {
+  const audioRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  const grouped = item.type === "perroquetgroup";
+  const best = grouped ? item.best : item;
+
+  const toggle = () => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio(best.bestUrl);
+      audioRef.current.addEventListener("ended", () => setPlaying(false));
+    }
+    if (playing) {
+      audioRef.current.pause();
+      setPlaying(false);
+      return;
+    }
+    audioRef.current.currentTime = 0;
+    audioRef.current.play().then(() => setPlaying(true)).catch(() => {});
+  };
+
+  // Le lecteur ne doit pas continuer à jouer quand la carte sort du fil : la
+  // liste est virtualisée (react-virtuoso), donc démonter est la normale, pas
+  // l'exception — sans ça un cri continue tout seul pendant qu'on défile.
+  useEffect(
+    () => () => {
+      audioRef.current?.pause();
+      audioRef.current = null;
+    },
+    []
+  );
+
+  return (
+    <article className="hf-card hf-blindtest hf-perroquet">
+      <EventHead user={item.user} date={item.date}>
+        <Mic2 size={13} className="hf-inline-ic" />{" "}
+        {grouped ? (
+          <>
+            a enchaîné {item.count} parties du Perroquet
+          </>
+        ) : (
+          "a imité des bruits de jeux"
+        )}
+      </EventHead>
+
+      <div className="hf-pq-body">
+        <button
+          className={`hf-pq-play clickable ${playing ? "on" : ""}`}
+          onClick={toggle}
+          aria-label={playing ? "Arrêter" : "Écouter l'imitation"}
+        >
+          {playing ? <Pause size={20} /> : <Play size={20} />}
+        </button>
+        <div className="hf-pq-meta">
+          <b>{best.bestClip || "Sa meilleure imitation"}</b>
+          <span>
+            {best.score} de moyenne · {best.rounds} sons
+          </span>
+        </div>
+        <Link to={`/perroquet?challenge=${best.perroquetId}`} className="hf-pq-cta clickable">
+          <Swords size={14} /> Faire mieux
+        </Link>
+      </div>
+    </article>
+  );
+}
+
 function GeoEvent({ item }) {
   const pct = item.total ? Math.round((item.correct / item.total) * 100) : 0;
   const ch = item.challenge;
