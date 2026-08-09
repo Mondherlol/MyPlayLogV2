@@ -335,16 +335,22 @@ export function ChatProvider({ children }) {
       emit("party", JSON.parse(e.data));
     });
 
-    // Salons « versus » — GeoGamer (routes/geoVersus.js) et blind test
-    // (routes/blindtestVersus.js). Même économie que la watchparty : un seul
-    // nom d'évènement par jeu, le `kind` de la charge dit ce qui s'est passé
-    // (lobby, cue, go, guess, reveal, done…) et la page du salon trie.
+    // Salons « versus » — GeoGamer (routes/geoVersus.js), blind test
+    // (routes/blindtestVersus.js), Pixel Rush et le Grand Quiz. Même économie
+    // que la watchparty : un seul nom d'évènement par jeu, le `kind` de la
+    // charge dit ce qui s'est passé (lobby, cue, go, answer, reveal, done…) et
+    // la page du salon trie.
     //
-    // CES DEUX LIGNES NE SONT PAS OPTIONNELLES : `EventSource` ne remet un
+    // CES QUATRE LIGNES NE SONT PAS OPTIONNELLES : `EventSource` ne remet un
     // évènement nommé qu'aux écouteurs de CE nom. Sans elles le serveur diffuse
-    // dans le vide — une arrivée dans le salon ne se voyait qu'en actualisant,
-    // et le « 3, 2, 1 » du départ restait bloqué sur « ! » puisque le top
-    // (`go`) n'arrivait jamais.
+    // dans le vide — une arrivée dans le salon ne se voit qu'en actualisant, le
+    // « 3, 2, 1 » du départ reste bloqué puisque le top (`go`) n'arrive jamais,
+    // et la partie paraît entièrement cassée alors que le serveur fait son
+    // travail.
+    //
+    // C'EST ARRIVÉ DEUX FOIS : à GeoGamer/blind test, puis au Grand Quiz malgré
+    // cet avertissement. TOUT NOUVEAU SALON DOIT AJOUTER SA LIGNE ICI — c'est
+    // le seul endroit du client qui décide si un jeu reçoit ses évènements.
     es.addEventListener("geoversus", (e) => {
       emit("geoversus", JSON.parse(e.data));
     });
@@ -355,6 +361,10 @@ export function ChatProvider({ children }) {
 
     es.addEventListener("pxversus", (e) => {
       emit("pxversus", JSON.parse(e.data));
+    });
+
+    es.addEventListener("quizversus", (e) => {
+      emit("quizversus", JSON.parse(e.data));
     });
 
     // Journal du serveur, en direct — n'arrive qu'aux administrateurs (le

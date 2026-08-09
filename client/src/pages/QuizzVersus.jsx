@@ -32,7 +32,7 @@ import { useChat } from "../context/ChatContext";
 import { apiFetch } from "../lib/api";
 import { useLiveStatus } from "../lib/presence";
 import { useGameSfx } from "../lib/useGameSfx";
-import { typeHint } from "../lib/quizGame";
+import { triesFor, typeHint } from "../lib/quizGame";
 import QuizRound from "../components/quiz/QuizRound";
 import QuizTimer from "../components/quiz/QuizTimer";
 import { VersusFace, VersusRail, VersusInvite, hueOf } from "../components/VersusRoom";
@@ -372,6 +372,9 @@ export default function QuizzVersus() {
   const settledById = round?.settledById || {};
   const iAmSettled = !!settledById[meId];
   const isBuzzer = (round?.mode || "buzzer") === "buzzer";
+  // Essais autorisés sur l'épreuve en cours (miroir d'attemptsAllowed côté
+  // serveur) : c'est lui qui dimensionne les cœurs du rail.
+  const maxTries = round ? triesFor(round.type) : 3;
 
   // ---------- Rendre sa copie AVANT la sonnerie ----------
   // Sur une manche parallèle (le studio, le duel, le tri), la copie n'est
@@ -515,7 +518,11 @@ export default function QuizzVersus() {
               )}
               livesById={round.livesById || {}}
               hueById={hueById}
-              lives={3}
+              // Le nombre de cœurs suit L'ÉPREUVE, il n'est pas figé à trois.
+              // Un QCM n'autorise qu'un essai : afficher « 1 cœur sur 3 » à tout
+              // le monde dès le début donnait l'impression que la partie
+              // commençait déjà mal engagée.
+              lives={maxTries}
               row
               renderSub={(p) => {
                 const res = phase === "reveal" ? myResult(round, p.id) : null;
@@ -526,9 +533,13 @@ export default function QuizzVersus() {
                       {res.ratio > 0 && res.ratio < 1 ? ` · ${Math.round(res.ratio * 100)}%` : ""}
                     </em>
                   );
+                if (settledById[p.id])
+                  return <em className="gv-rail-ok">{isBuzzer ? "a répondu" : "a rendu"}</em>;
                 if (!isBuzzer && progress[p.id] != null)
                   return <em className="gv-rail-hearts">{progress[p.id]} placé(s)</em>;
-                if (settledById[p.id]) return <em className="gv-rail-ok">a rendu</em>;
+                // Sur une épreuve à essai unique, il n'y a pas de « vies » à
+                // montrer : soit on a répondu, soit on cherche encore.
+                if (maxTries <= 1) return <em className="gv-rail-hearts">cherche…</em>;
                 return null;
               }}
             />
