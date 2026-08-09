@@ -1184,57 +1184,94 @@
 
 /* ======================================================================
    5. Boîtiers 2D (vue grille)
+   ======================================================================
+   LA GRILLE EST UN RAYON VU DE FACE, pas un tableau de vignettes. Chaque
+   entrée est donc un OBJET posé : une coque avec sa tranche, son film
+   plastique et son ombre de contact — et, SOUS lui, l'étiquette de casier
+   qui porte le titre.
+
+   Le texte est sous l'objet et non dessus : imprimé sur la jaquette, il en
+   cachait le tiers, et vingt étiquettes crème alignées faisaient un mur de
+   pavés clairs là où l'on venait regarder des affiches. Sous l'objet, il
+   respire, il s'aligne d'une carte à l'autre, et l'affiche est rendue
+   entière.
    ====================================================================== */
 
 .coll-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 1.5rem 1.3rem;
-  perspective: 1400px;
+  /* Des colonnes un peu plus étroites qu'avant : une affiche de 2/3 se lit
+     très bien à 170 px, et la grille se remplit au lieu de laisser deux
+     boîtiers géants tenir toute une ligne. */
+  grid-template-columns: repeat(auto-fill, minmax(172px, 1fr));
+  gap: 2rem 1.35rem;
+  /* La perspective vit sur la GRILLE : partagée par toutes les cartes, elles
+     penchent toutes vers le même point de fuite, comme une vraie rangée. */
+  perspective: 1600px;
 }
 
 .coll-case {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 0.62rem;
   color: inherit;
+  text-decoration: none;
 }
 
-/* La coque : c'est elle qui bascule sous le curseur, pas l'image. */
+/* La coque : c'est elle qui bascule sous le curseur, pas l'image. Le pivot est
+   sur la TRANCHE (à gauche), donc le boîtier s'ouvre vers nous comme on le
+   ferait en le sortant du rayon — et non comme une carte qui gondole. */
 .coll-case-body {
   position: relative;
   aspect-ratio: 2 / 3;
-  border-radius: 3px 7px 7px 3px;
+  border-radius: 3px 9px 9px 3px;
   background: var(--coll-plastic);
+  transform-origin: 12% 60%;
   /* Volontairement PAS de preserve-3d : la cassette et le disque sont placés
      derrière la jaquette par z-index, et preserve-3d trierait les enfants par
      leur profondeur 3D en ignorant cet ordre. La perspective de .coll-grid
      suffit à la bascule. */
-  transition: transform 0.34s cubic-bezier(0.2, 0.9, 0.25, 1),
-    box-shadow 0.34s ease;
-  /* Un objet posé : ombre de contact serrée + ombre portée large. */
-  box-shadow: 0 2px 4px rgba(10, 10, 20, 0.34), 0 14px 28px rgba(10, 10, 20, 0.26),
+  transition: transform 0.42s cubic-bezier(0.2, 0.9, 0.25, 1),
+    box-shadow 0.42s ease;
+  /* Un objet posé : ombre de contact serrée + ombre portée large + le filet
+     qui dessine l'arête du plastique. */
+  box-shadow: 0 1px 2px rgba(10, 10, 20, 0.3), 0 10px 22px rgba(10, 10, 20, 0.18),
+    0 0 0 1px rgba(10, 10, 20, 0.09);
+}
+
+.coll-case:hover .coll-case-body,
+.coll-case:focus-visible .coll-case-body {
+  transform: rotateY(-17deg) translateZ(26px) translateY(-10px);
+  /* Au survol l'objet DÉCOLLE : l'ombre s'écarte, s'adoucit, et prend un peu
+     de la teinte du titre — la lueur du rayon, pas un néon. */
+  box-shadow: 6px 8px 14px rgba(10, 10, 20, 0.26),
+    28px 34px 56px rgba(10, 10, 20, 0.32),
+    0 18px 44px color-mix(in srgb, var(--tint) 26%, transparent),
     0 0 0 1px rgba(10, 10, 20, 0.1);
 }
 
-.coll-case:hover .coll-case-body {
-  transform: rotateY(-15deg) translateZ(22px) translateY(-8px);
-  box-shadow: 4px 6px 10px rgba(10, 10, 20, 0.3),
-    26px 30px 52px rgba(10, 10, 20, 0.38), 0 0 0 1px rgba(10, 10, 20, 0.12);
+.coll-case:focus-visible {
+  outline: none;
+}
+
+.coll-case:focus-visible .coll-case-cap {
+  color: var(--text);
 }
 
 /* Tranche : un bord épais à gauche, avec le titre imprimé dessus. Sur un DVD
-   elle est fine, sur une VHS elle est franche — c'est le seul repère qui
-   distingue les deux supports au premier coup d'œil. */
+   elle est fine, sur une boîte de jeu elle est franche — c'est le seul repère
+   qui distingue les supports au premier coup d'œil. */
 .coll-case-spine {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
-  width: 13px;
+  width: 12px;
   border-radius: 3px 0 0 3px;
   background: linear-gradient(
     90deg,
-    #0d0e12 0%,
-    #24262e 45%,
+    #06070a 0%,
+    #1c1e26 38%,
+    #2c2e39 72%,
     var(--coll-plastic) 100%
   );
   overflow: hidden;
@@ -1242,33 +1279,65 @@
   place-items: center;
 }
 
+/* Le liseré de teinte en haut de la tranche : l'étiquette de couleur qu'on
+   colle sur le dos d'un boîtier pour retrouver la série d'un coup d'œil. */
+.coll-case-spine::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 22%;
+  background: linear-gradient(
+    180deg,
+    var(--tint),
+    color-mix(in srgb, var(--tint) 0%, transparent)
+  );
+  opacity: 0.75;
+}
+
 .coll-case.fmt-dvd .coll-case-spine {
+  width: 9px;
+}
+
+.coll-case.fmt-book .coll-case-spine {
   width: 8px;
+  border-radius: 2px 0 0 2px;
+}
+
+.coll-case.fmt-gba .coll-case-spine {
+  width: 15px;
 }
 
 .coll-case-spine-label {
   writing-mode: vertical-rl;
   transform: rotate(180deg);
-  font-size: 0.42rem;
-  letter-spacing: 0.1em;
+  font-size: 0.4rem;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.42);
+  color: rgba(255, 255, 255, 0.4);
   white-space: nowrap;
   overflow: hidden;
-  max-height: 92%;
+  max-height: 78%;
 }
 
 /* La jaquette */
 .coll-case-art {
   position: absolute;
-  inset: 0 0 0 13px;
-  border-radius: 0 7px 7px 0;
+  inset: 0 0 0 12px;
+  border-radius: 0 8px 8px 0;
   overflow: hidden;
   background: linear-gradient(150deg, var(--tint) 0%, #101118 78%);
 }
 
 .coll-case.fmt-dvd .coll-case-art {
+  inset: 0 0 0 9px;
+}
+
+.coll-case.fmt-book .coll-case-art {
   inset: 0 0 0 8px;
+}
+
+.coll-case.fmt-gba .coll-case-art {
+  inset: 0 0 0 15px;
 }
 
 .coll-case-art img {
@@ -1277,11 +1346,11 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.5s ease, filter 0.3s ease;
+  transition: transform 0.6s cubic-bezier(0.2, 0.9, 0.25, 1);
 }
 
 .coll-case:hover .coll-case-art img {
-  transform: scale(1.05);
+  transform: scale(1.06);
 }
 
 .coll-case-noart {
@@ -1293,7 +1362,10 @@
   text-align: center;
   font-family: var(--font-display);
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.95rem;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
 }
 
 /* Film plastique : le reflet oblique du blister. DISCRET — c'est la jaquette
@@ -1305,83 +1377,106 @@
   background: linear-gradient(
     108deg,
     rgba(255, 255, 255, 0) 32%,
-    rgba(255, 255, 255, 0.07) 45%,
+    rgba(255, 255, 255, 0.08) 45%,
     rgba(255, 255, 255, 0.015) 52%,
     rgba(255, 255, 255, 0) 60%
   );
   opacity: 0.6;
-  transition: transform 0.5s ease, opacity 0.3s ease;
+  transition: transform 0.6s ease, opacity 0.3s ease;
   pointer-events: none;
 }
 
 /* Au survol, le reflet glisse — et s'efface encore un peu : on se penche sur
    l'objet, donc on veut voir l'image, pas le plastique. */
 .coll-case:hover .coll-case-shine {
-  opacity: 0.35;
+  opacity: 0.34;
+  transform: translateX(14%);
 }
 
-.coll-case:hover .coll-case-shine {
-  transform: translateX(12%);
-}
-
-/* Pastille de support, en haut à gauche */
-.coll-case-fmt {
+/* Voile du bas : il ne porte plus de texte, seulement les pastilles et la
+   jauge. Il reste donc COURT et léger — juste de quoi que du blanc sur une
+   affiche blanche ne mange pas la pastille. */
+.coll-case-scrim {
   position: absolute;
-  top: 0.55rem;
-  left: 0.55rem;
-  font-size: 0.6rem;
+  inset: auto 0 0 0;
+  height: 42%;
+  background: linear-gradient(
+    180deg,
+    rgba(8, 8, 14, 0) 0%,
+    rgba(8, 8, 14, 0.28) 52%,
+    rgba(8, 8, 14, 0.62) 100%
+  );
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+/* Les pastilles : en BAS de l'affiche, pas en haut. Une jaquette porte son
+   titre en haut — c'est là qu'il ne faut rien poser. */
+.coll-case-tags {
+  position: absolute;
+  left: 0.45rem;
+  right: 0.45rem;
+  bottom: 0.45rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  transition: transform 0.3s ease;
+}
+
+.coll-case-fmt {
+  font-size: 0.56rem;
   font-weight: 800;
-  letter-spacing: 0.14em;
-  padding: 0.18rem 0.42rem;
-  border-radius: 3px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.42rem;
+  border-radius: 999px;
   color: #100f0a;
   background: var(--tint);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
-/* Provenance, en haut à droite : discrète mais toujours lisible. */
+/* Provenance : elle n'apparaît QUE lorsqu'elle surprend (voir
+   CollectionCase) — un titre officiel n'a rien à annoncer. */
 .coll-case-lic {
-  position: absolute;
-  top: 0.55rem;
-  right: 0.55rem;
-  font-size: 0.56rem;
+  font-size: 0.54rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 0.18rem 0.4rem;
-  border-radius: 3px;
-  color: rgba(255, 255, 255, 0.88);
-  background: rgba(10, 10, 16, 0.68);
-  backdrop-filter: blur(3px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 0.2rem 0.4rem;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(10, 10, 16, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.16);
 }
 
 .coll-case-lic.lic-public-domain {
   color: #b8f5cf;
-  border-color: rgba(52, 211, 153, 0.4);
+  border-color: rgba(52, 211, 153, 0.42);
 }
 
 .coll-case-lic.lic-fan {
   color: #ffd7a8;
-  border-color: rgba(251, 146, 60, 0.4);
+  border-color: rgba(251, 146, 60, 0.42);
 }
 
 /* Bouton de lecture : n'apparaît qu'au survol, au centre de l'affiche. */
 .coll-case-play {
   position: absolute;
-  top: 42%;
+  top: 46%;
   left: 50%;
-  transform: translate(-50%, -50%) scale(0.7);
-  width: 46px;
-  height: 46px;
+  transform: translate(-50%, -50%) scale(0.6);
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   color: #100f0a;
   background: var(--tint);
   opacity: 0;
-  transition: opacity 0.2s ease, transform 0.24s cubic-bezier(0.2, 1.4, 0.4, 1);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+  transition: opacity 0.2s ease, transform 0.3s cubic-bezier(0.2, 1.5, 0.4, 1);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45),
+    0 0 0 6px color-mix(in srgb, var(--tint) 22%, transparent);
 }
 
 .coll-case:hover .coll-case-play {
@@ -1389,60 +1484,22 @@
   transform: translate(-50%, -50%) scale(1);
 }
 
-/* Étiquette du bas : papier crème pour la VHS, plaque laquée pour le DVD. */
-.coll-case-plate {
+/* La jauge : un filet collé au bas de l'affiche, pas une barre de formulaire.
+   C'est la marque au crayon sur la tranche d'une cassette à moitié vue. */
+.coll-case-line {
   position: absolute;
-  left: 0.5rem;
-  right: 0.5rem;
-  bottom: 0.5rem;
-  padding: 0.5rem 0.6rem 0.55rem;
-  border-radius: 4px;
-  display: flex;
-  flex-direction: column;
-  gap: 0.16rem;
-  background: var(--coll-paper);
-  color: var(--coll-paper-ink);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
-  border-top: 3px solid var(--tint);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.16);
 }
 
-.coll-case.fmt-dvd .coll-case-plate {
-  background: rgba(12, 12, 18, 0.82);
-  color: #fff;
-  backdrop-filter: blur(6px);
-  border-top: none;
-  border-left: 3px solid var(--tint);
-}
-
-.coll-case-franchise {
-  font-size: 0.56rem;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  opacity: 0.6;
-}
-
-.coll-case-title {
-  font-family: var(--font-display);
-  font-size: 0.9rem;
-  line-height: 1.14;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.coll-case-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.68rem;
-  font-weight: 600;
-  opacity: 0.66;
-}
-
-.coll-case-meta em {
-  font-style: normal;
+.coll-case-line i {
+  display: block;
+  height: 100%;
+  background: var(--tint);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--tint) 70%, transparent);
 }
 
 /* Le boîtier laisse dépasser son disque sur le côté au survol. */
@@ -1467,7 +1524,7 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5), 0 6px 16px rgba(0, 0, 0, 0.4);
   transform: translateX(-8%) scale(0.9);
   opacity: 0;
-  transition: transform 0.36s cubic-bezier(0.2, 0.9, 0.25, 1), opacity 0.22s ease;
+  transition: transform 0.42s cubic-bezier(0.2, 0.9, 0.25, 1), opacity 0.22s ease;
   z-index: -1;
 }
 
@@ -1488,7 +1545,7 @@
   );
   transform: translateX(-8%) scale(0.9);
   opacity: 0;
-  transition: transform 0.36s cubic-bezier(0.2, 0.9, 0.25, 1), opacity 0.22s ease;
+  transition: transform 0.42s cubic-bezier(0.2, 0.9, 0.25, 1), opacity 0.22s ease;
 }
 
 .coll-case.fmt-dvd:hover .coll-case-body::after,
@@ -1497,33 +1554,94 @@
   opacity: 1;
 }
 
-.coll-case-progress {
+/* ---- L'étiquette de casier, sous l'objet ------------------------------- */
+
+.coll-case-cap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  padding-left: 2px;
+  min-width: 0;
+}
+
+.coll-case-franchise {
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.coll-case-title {
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.16;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  transition: color 0.2s ease;
+}
+
+.coll-case:hover .coll-case-title {
+  color: var(--orange);
+}
+
+.coll-case-meta {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.6rem;
-}
-
-.coll-case-progress-bar {
-  flex: 1;
-  height: 4px;
-  border-radius: 999px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  overflow: hidden;
-}
-
-.coll-case-progress-bar span {
-  display: block;
-  height: 100%;
-  background: var(--tint, var(--orange));
-}
-
-.coll-case-progress-label {
+  gap: 0.28rem;
+  margin-top: 0.1rem;
   font-size: 0.68rem;
   font-weight: 600;
   color: var(--text-soft);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.coll-case-meta svg {
+  flex: 0 0 auto;
+  opacity: 0.75;
+}
+
+.coll-case-meta em {
+  font-style: normal;
+  opacity: 0.8;
+}
+
+/* Où l'on en est : la seule ligne de la carte qui parle de MOI et non de
+   l'objet, donc la seule qui porte la teinte du titre. */
+.coll-case-resume {
+  margin-top: 0.16rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--tint) 72%, var(--text));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coll-case-body,
+  .coll-case-art img,
+  .coll-case-shine {
+    transition: none;
+  }
+
+  .coll-case:hover .coll-case-body {
+    transform: translateY(-4px);
+  }
+
+  .coll-case:hover .coll-case-art img {
+    transform: none;
+  }
 }
 
 /* ======================================================================
@@ -1537,18 +1655,16 @@
 .coll-shelf3d,
 .coll-shelf-skel {
   position: relative;
-  /* Le rayon prend de la hauteur : c'est elle qui fait la taille des boîtiers
-     (la caméra cadre la rangée dans la hauteur disponible). Le composant range
-     la planche dans le BAS du cadre, mais SANS ciel démesuré au-dessus : la
-     rangée doit toucher le haut du bloc, sinon l'étagère a l'air posée par
-     terre au milieu d'une page vide. (Voir FILL / ABOVE côté composant.) */
+  /* Taille de repli, le temps que la scène se mesure. LA VRAIE TAILLE DU RAYON
+     EST POSÉE EN LIGNE PAR LE COMPOSANT (voir `shelfFit`) : une rangée remplit
+     la largeur de la page, puis le cadre s'allonge d'une planche — le boîtier,
+     lui, garde toujours la même taille à l'écran. Rien ici ne doit donc brider
+     la hauteur : `max-height` ou un `min(…vh)` ramènerait le rayon à deux
+     planches minuscules, exactement ce qu'on a corrigé. */
   height: min(64vh, 580px);
-  min-height: 340px;
-  /* Largeur pilotée par le nombre d'objets (--slots, posé par le composant) :
-     deux boîtiers dans un cadre pleine largeur seraient minuscules et perdus.
-     La colonne s'élargit avec la collection, jusqu'à toute la place. */
+  min-height: 300px;
   width: 100%;
-  max-width: min(100%, calc(var(--slots, 8) * 120px + 300px));
+  max-width: 100%;
   margin-inline: auto;
 }
 
@@ -3100,14 +3216,16 @@
   }
 
   .coll-grid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 1.2rem 0.9rem;
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: 1.5rem 0.85rem;
   }
 
   /* Sur écran tactile, le survol n'existe pas : on garde les boîtiers droits
      et on montre l'essentiel tout de suite. */
   .coll-case:hover .coll-case-body {
     transform: none;
+    box-shadow: 0 1px 2px rgba(10, 10, 20, 0.3),
+      0 10px 22px rgba(10, 10, 20, 0.18), 0 0 0 1px rgba(10, 10, 20, 0.09);
   }
 
   .coll-case-play,
@@ -3117,7 +3235,11 @@
   }
 
   .coll-case-title {
-    font-size: 0.8rem;
+    font-size: 0.82rem;
+  }
+
+  .coll-case-spine-label {
+    display: none;
   }
 
   .coll-hero-body {

@@ -326,7 +326,11 @@ function GameRow({ item, rank, detail, onNeedDetail, onShots, onTrailer }) {
             <Play size={14} fill="currentColor" strokeWidth={0} /> Bande-annonce
           </button>
         )}
-        <GameAddFan game={{ id: gameId, name: item.name, cover }} variant="row" />
+        <GameAddFan
+          game={{ id: gameId, name: item.name, cover }}
+          variant="row"
+          upcoming={upcoming}
+        />
       </div>
 
       {/* Bande de captures : le coup d'œil qui donne envie, cliquable en grand.

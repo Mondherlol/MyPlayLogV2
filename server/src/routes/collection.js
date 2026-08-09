@@ -47,6 +47,7 @@ import {
 } from "../lib/serieIndex.js";
 import { extractComic, dropComic } from "../lib/comicArchive.js";
 import { comicLookup } from "../lib/comicMeta.js";
+import { searchJaquettes, jaquetteImages } from "../lib/cinemapassion.js";
 import { readGbaFile } from "../lib/gbaRom.js";
 import * as tmdb from "../lib/tmdb.js";
 
@@ -1258,6 +1259,34 @@ router.get("/comic-lookup", requireAuth, requireAdmin, async (req, res) => {
       french: 0,
       failed: [],
     });
+  }
+});
+
+// GET /api/collection/jaquettes?q= — les jaquettes DÉPLIÉES que cinemapassion
+// connaît sous ce nom. La réponse ne porte que des titres et des chemins : les
+// vignettes sont demandées ensuite (une page à relire par résultat, voir
+// ci-dessous), pour que la liste s'affiche tout de suite.
+router.get("/jaquettes", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    res.json({ results: await searchJaquettes(req.query.q) });
+  } catch (err) {
+    console.error("jaquette search error:", err.message);
+    res.status(502).json({ error: "Cinéma Passion ne répond pas." });
+  }
+});
+
+// POST /api/collection/jaquettes/images — l'adresse de l'image de chacune des
+// pages données. En POST parce qu'il y en a une trentaine : la même chose en
+// query se ferait couper par la longueur d'URL.
+//
+// Ce sont des ADRESSES, pas des fichiers : c'est la route d'artwork qui
+// rapatriera celle que l'admin aura choisie, par le chemin déjà en place.
+router.post("/jaquettes/images", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    res.json({ images: await jaquetteImages(req.body?.pages) });
+  } catch (err) {
+    console.error("jaquette images error:", err.message);
+    res.status(502).json({ error: "Cinéma Passion ne répond pas." });
   }
 });
 

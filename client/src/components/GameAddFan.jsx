@@ -36,7 +36,16 @@ const STATUS_META = {
 // derrière un « + ». Sur une vignette le « + » économise la place ; dans une
 // liste détaillée on a la largeur, et deviner ce que cache un « + » est une
 // friction inutile.
-export default function GameAddFan({ game, hoverOnly = false, variant = "fan" }) {
+//
+// `upcoming` : jeu pas encore sorti → « J'y ai joué » n'a aucun sens, on ne
+// l'affiche pas (sauf si le jeu est déjà dans la bibliothèque, pour pouvoir
+// corriger).
+export default function GameAddFan({
+  game,
+  hoverOnly = false,
+  variant = "fan",
+  upcoming = false,
+}) {
   const { token } = useAuth();
   const { map, upsertLocal, removeLocal } = useLibrary();
   const entry = map[game.id];
@@ -90,17 +99,19 @@ export default function GameAddFan({ game, hoverOnly = false, variant = "fan" })
             <Bookmark size={15} fill={isWishlist ? "currentColor" : "none"} />
             <span>{isWishlist ? "Dans ma wishlist" : "Je le veux"}</span>
           </button>
-          <button
-            className={`add-row-btn ${isPlayed ? "active" : ""}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowModal(true);
-            }}
-            title="J'y ai joué"
-          >
-            {statusMeta && isPlayed ? <statusMeta.Icon size={15} /> : <Gamepad size={15} />}
-            <span>{isPlayed ? statusMeta?.label || "Joué" : "J'y ai joué"}</span>
-          </button>
+          {(!upcoming || isPlayed) && (
+            <button
+              className={`add-row-btn ${isPlayed ? "active" : ""}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowModal(true);
+              }}
+              title="J'y ai joué"
+            >
+              {statusMeta && isPlayed ? <statusMeta.Icon size={15} /> : <Gamepad size={15} />}
+              <span>{isPlayed ? statusMeta?.label || "Joué" : "J'y ai joué"}</span>
+            </button>
+          )}
           <button
             className="add-row-btn"
             onClick={(e) => {

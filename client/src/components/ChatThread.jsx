@@ -37,6 +37,7 @@ import { renderMessage, extractYouTubeIds, YouTubeEmbed } from "./ListComments";
 import EmojiPanel from "./EmojiPanel";
 import ChatComposer from "./ChatComposer";
 import ChatLightbox from "./ChatLightbox";
+import VoiceBubble from "./VoiceBubble";
 import { useChat } from "../context/ChatContext";
 import { useAuth } from "../context/AuthContext";
 import { usePlayer } from "../context/PlayerContext";
@@ -405,11 +406,11 @@ export default function ChatThread({ conversation, token, compact, autoFocus }) 
 
   // --- Actions ---
   const send = useCallback(
-    async ({ text, media }) => {
+    async ({ text, media, voice }) => {
       const d = await apiFetch(`/chat/conversations/${convId}/messages`, {
         method: "POST",
         token,
-        body: { text, media, replyTo: replyTo?.id || undefined },
+        body: { text, media, voice, replyTo: replyTo?.id || undefined },
       });
       setMessages((prev) =>
         prev.some((m) => m.id === d.message.id) ? prev : [...prev, d.message]
@@ -726,7 +727,8 @@ function ChatMessageMenu({ menu, canModerate, onClose, onReact, onReply, onEdit,
     setPos({ left: Math.max(8, left), top: Math.max(8, top) });
   }, [menu.x, menu.y, fullPicker, sheet]);
 
-  const canEdit = m.mine && !m.deleted && !m.system;
+  // Un vocal ne se corrige pas : on le supprime et on le refait.
+  const canEdit = m.mine && !m.deleted && !m.system && !m.voice;
   const canDelete = m.mine || canModerate;
 
   const pick = (emo) => {
@@ -928,7 +930,8 @@ const MessageRow = memo(function MessageRow({
     m.party ||
     m.mot ||
     m.versus ||
-    m.book
+    m.book ||
+    m.voice
       ? 0
       : emojiOnlyLevel(m.text);
 
@@ -1159,7 +1162,9 @@ const MessageRow = memo(function MessageRow({
           <div
             className={`chat-bubble ${m.deleted ? "is-deleted" : ""} ${
               m.game || m.ost || m.party || m.mot || m.versus || m.book ? "has-card" : ""
-            } ${emojiLvl ? `chat-emoji-only lvl-${emojiLvl}` : ""}`}
+            } ${m.voice ? "has-voice" : ""} ${
+              emojiLvl ? `chat-emoji-only lvl-${emojiLvl}` : ""
+            }`}
           >
             {m.deleted ? (
               <em>Message supprimé</em>
@@ -1171,6 +1176,7 @@ const MessageRow = memo(function MessageRow({
                 {m.mot && <MotCard mot={m.mot} />}
                 {m.versus && <VersusCard versus={m.versus} />}
                 {m.book && <BookCard book={m.book} />}
+                {m.voice && <VoiceBubble voice={m.voice} mine={m.mine} />}
                 {m.text && <p>{renderMessage(m.text, m.mentions)}</p>}
                 {m.media?.length > 0 && (
                   <div className={`chat-media n-${Math.min(m.media.length, 4)}`}>

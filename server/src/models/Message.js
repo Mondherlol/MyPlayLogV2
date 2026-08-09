@@ -142,6 +142,30 @@ const bookCardSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// Message vocal. Le fichier vit dans /uploads/chat comme les images ; ce qui
+// l'accompagne est ce qu'il faut pour l'AFFICHER SANS LE TÉLÉCHARGER :
+//
+//   - `duration` : la durée annoncée par l'enregistreur. Sans elle, la bulle
+//     devrait charger l'audio pour savoir quoi écrire, donc charger vingt
+//     vocaux pour dessiner un fil qu'on ne va peut-être pas écouter.
+//   - `waveform` : l'échantillonnage des niveaux, mesuré PENDANT
+//     l'enregistrement (le micro les donne gratuitement, cf. ChatComposer).
+//     C'est ce qui fait qu'un vocal ressemble à un vocal et pas à une barre
+//     grise — et le refaire côté lecteur imposerait de décoder le fichier.
+//
+// Volontairement peu de points (≈ 48) : au-delà, la silhouette ne se lit plus
+// sur la largeur d'une bulle et le document grossit pour rien.
+const voiceSchema = new mongoose.Schema(
+  {
+    url: { type: String, required: true },
+    // Secondes, une décimale.
+    duration: { type: Number, default: 0 },
+    // Niveaux 0..100 (entiers : un octet suffit à dessiner une barre).
+    waveform: { type: [Number], default: [] },
+  },
+  { _id: false }
+);
+
 const messageSchema = new mongoose.Schema(
   {
     conversation: {
@@ -159,6 +183,9 @@ const messageSchema = new mongoose.Schema(
 
     // Cartes riches : recommandation de jeu / partage d'OST. Un message peut
     // n'être QUE une carte (sans texte ni média).
+    // Message vocal : il remplace le texte et les médias, jamais ne s'y ajoute.
+    voice: { type: voiceSchema, default: null },
+
     game: { type: gameCardSchema, default: null },
     ost: { type: ostCardSchema, default: null },
     party: { type: partyCardSchema, default: null },

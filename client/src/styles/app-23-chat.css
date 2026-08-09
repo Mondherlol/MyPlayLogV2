@@ -2765,31 +2765,17 @@ body.mpl-open .chat-dock {
   min-height: 26px;
 }
 
-/* Actions au survol invisibles dans une fenêtre étroite : on les montre en
-   permanence, discrètes (pas de place pour survoler au pixel près). */
-/* Fenêtre flottante : les boutons d'action ne s'affichent qu'au SURVOL du
-   message (comme sur la page pleine), et flottent sur le côté — à gauche de mes
-   bulles, à droite de celles des autres — sans rogner la largeur du message. */
+/* PAS DE BARRE D'ACTIONS DANS LES FENÊTRES FLOTTANTES.
+   Elle y flottait PAR-DESSUS la bulle (position absolue), faute de place pour
+   la poser à côté : 352 px de large, une bulle qui en occupe 82 %. Ça passait
+   tant qu'une bulle n'était que du texte à lire ; depuis les messages vocaux,
+   elle recouvre le bouton de lecture et la barre de progression — c'est-à-dire
+   précisément ce sur quoi on veut cliquer.
+   Ici, tout passe donc par le CLIC DROIT (et l'appui long au doigt), qui offre
+   déjà répondre / réagir / copier / supprimer. La grande messagerie, elle,
+   garde sa barre : là-bas elle se pose À CÔTÉ du message, sans rien recouvrir. */
 .chat-win .chat-actions {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 6;
-  padding: 3px;
-  border-radius: 999px;
-  background: var(--surface);
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border);
-}
-
-.chat-win .chat-row:not(.mine) .chat-actions {
-  right: 2px;
-  left: auto;
-}
-
-.chat-win .chat-row.mine .chat-actions {
-  left: 2px;
-  right: auto;
+  display: none;
 }
 
 /* --- Pastilles repliées --- */
@@ -3188,6 +3174,19 @@ body.mpl-open .chat-dock {
   }
 }
 
+/* Sur un écran étroit, l'astuce « glisse à gauche » mange la place du vumètre.
+   Le vumètre gagne : il dit que ça enregistre, l'astuce ne fait que rappeler
+   un geste qu'on découvre en une fois. La corbeille reste, elle. */
+@media (max-width: 560px) {
+  .chat-rec-hint {
+    display: none;
+  }
+
+  .chat-rec.cancelling .chat-rec-hint {
+    display: block;
+  }
+}
+
 /* Écrans très étroits : on gagne encore un peu de largeur pour les bulles. */
 @media (max-width: 380px) {
   .chat-bubble-wrap {
@@ -3198,6 +3197,552 @@ body.mpl-open .chat-dock {
     width: 26px;
     height: 26px;
   }
+}
+
+/* ======================================================================
+   Messages vocaux
+   ----------------------------------------------------------------------
+   Une bulle de vocal est une RANGÉE FIXE : bouton, silhouette, durée. Sa
+   largeur ne dépend PAS de la durée du message — un « ok » de deux secondes et
+   une explication de deux minutes ont la même bulle, sinon le fil ressemble à
+   un histogramme et les courts messages deviennent des confettis illisibles.
+   ====================================================================== */
+.chat-bubble.has-voice {
+  padding: 0.45rem 0.55rem 0.35rem;
+}
+
+.voice {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: min(272px, 60vw);
+}
+
+.voice-play {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent-grad);
+  color: #2b2005;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.14s ease;
+}
+
+.voice-play:hover:not(:disabled) {
+  transform: scale(1.06);
+}
+
+.voice-play:disabled {
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+/* Sur la bulle dorée, un bouton doré serait invisible : on l'inverse. */
+.voice.mine .voice-play {
+  background: rgba(255, 250, 240, 0.94);
+  color: #7a5406;
+}
+
+.voice-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+/* La bande de barres EST la zone de saisie : on vise 30 px de haut, pas une
+   poignée de 4 px qu'aucun pouce n'attrape. `touch-action: none` parce que le
+   glissement horizontal nous appartient (déplacement dans le message) et ne
+   doit pas se transformer en défilement du fil. */
+.voice-bars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 30px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.voice-bars i {
+  flex: 1;
+  min-width: 2px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  transition: background 0.12s linear;
+}
+
+.voice-bars i.done {
+  background: var(--orange);
+}
+
+.voice.mine .voice-bars i {
+  background: rgba(255, 250, 240, 0.42);
+}
+
+.voice.mine .voice-bars i.done {
+  background: #fffaf0;
+}
+
+.voice-bars:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.voice-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.voice.mine .voice-meta {
+  color: var(--chat-mine-soft);
+}
+
+.voice-speed {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 0.4rem;
+  background: var(--surface);
+  color: var(--text-soft);
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.voice-speed:hover {
+  border-color: var(--orange);
+  color: var(--accent-ink);
+}
+
+.voice.mine .voice-speed {
+  border-color: rgba(255, 250, 240, 0.4);
+  background: transparent;
+  color: var(--chat-mine-ink);
+}
+
+/* ======================================================================
+   Enregistrement en cours
+   ----------------------------------------------------------------------
+   Elle REMPLACE la ligne de saisie plutôt que de s'ajouter : pendant qu'on
+   parle il n'y a qu'une chose à faire et deux issues, tout le reste est du
+   bruit et des cibles à rater.
+   ====================================================================== */
+.chat-composer-row.is-hidden {
+  display: none;
+}
+
+.chat-rec {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.35rem 0.4rem;
+  border: 1px solid color-mix(in srgb, #e0483d 35%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, #e0483d 8%, var(--surface-2));
+  animation: chat-rec-in 0.16s ease;
+}
+
+@keyframes chat-rec-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* Le geste est parti en annulation : tout vire au rouge AVANT de relâcher —
+   c'est le seul moment où l'information est encore utile. */
+.chat-rec.cancelling {
+  border-color: #e0483d;
+  background: color-mix(in srgb, #e0483d 18%, var(--surface-2));
+}
+
+.chat-rec.cancelling .chat-rec-hint {
+  color: #e0483d;
+  font-weight: 700;
+}
+
+.chat-rec-trash,
+.chat-rec-send {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-soft);
+}
+
+.chat-rec-trash:hover {
+  background: color-mix(in srgb, #e0483d 14%, transparent);
+  color: #e0483d;
+}
+
+.chat-rec-send {
+  background: var(--accent-grad);
+  color: #2b2005;
+  box-shadow: var(--shadow-sm);
+}
+
+.chat-rec-send:hover {
+  transform: scale(1.06);
+}
+
+.chat-rec-dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #e0483d;
+  animation: chat-rec-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes chat-rec-pulse {
+  50% {
+    opacity: 0.25;
+    transform: scale(0.7);
+  }
+}
+
+.chat-rec-time {
+  flex: 0 0 auto;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Le vumètre : la preuve visible que le micro entend. Il défile de droite à
+   gauche (les barres récentes arrivent par la droite), donc il est ancré à
+   droite et déborde vers la gauche. */
+.chat-rec-wave {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  height: 26px;
+  overflow: hidden;
+}
+
+.chat-rec-wave i {
+  flex: 0 0 3px;
+  border-radius: 999px;
+  background: var(--orange);
+  opacity: 0.85;
+}
+
+.chat-rec-hint {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+/* ======================================================================
+   Relecture avant envoi (+ effets de voix)
+   ----------------------------------------------------------------------
+   Le vocal ne part plus au relâchement : il atterrit ici. Rien n'a quitté le
+   navigateur, on peut s'écouter, jeter, ou se coller une voix de canard.
+   ====================================================================== */
+.chat-draft {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.4rem 0.45rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface-2);
+  animation: chat-rec-in 0.16s ease;
+}
+
+.chat-draft-top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chat-draft-play {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Dans le composer, la bulle de relecture prend toute la largeur dispo : elle
+   n'a pas à imiter la largeur fixe qu'elle aura dans le fil. */
+.chat-draft-play .voice {
+  width: 100%;
+}
+
+/* ---------------- Rognage du vocal ----------------
+   Deux poignées sur la silhouette. Ce qui est coupé reste VISIBLE mais voilé :
+   on comprend d'un coup d'œil ce qu'on garde, et on peut revenir en arrière —
+   ce qui serait impossible si la partie retirée disparaissait. */
+.vdraft {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+}
+
+.vdraft-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.vdraft-bars {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 34px;
+  /* Le glissement horizontal nous appartient (poignées, déplacement) : le
+     navigateur ne doit pas le transformer en défilement du fil. */
+  touch-action: none;
+  cursor: pointer;
+}
+
+.vdraft-bars i {
+  flex: 1;
+  min-width: 2px;
+  border-radius: 999px;
+  background: var(--border-strong);
+}
+
+.vdraft-bars i.done {
+  background: var(--orange);
+}
+
+.vdraft-bars i.out {
+  background: var(--border);
+}
+
+.vdraft-veil {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--surface-2) 78%, transparent);
+  pointer-events: none;
+  border-radius: 6px;
+}
+
+.vdraft-veil.left {
+  left: 0;
+}
+
+.vdraft-veil.right {
+  right: 0;
+}
+
+/* La poignée DÉBORDE largement de son trait : c'est la seule façon de
+   l'attraper au pouce. Le trait fait 3 px, la zone sensible 26. */
+.vdraft-grip {
+  position: absolute;
+  top: -5px;
+  bottom: -5px;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 999px;
+  background: var(--orange);
+  box-shadow: 0 0 0 1px var(--surface);
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.vdraft-grip::after {
+  content: "";
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  left: -12px;
+  right: -12px;
+}
+
+/* La pastille qu'on voit et qu'on vise. */
+.vdraft-grip::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: var(--accent-grad);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.28);
+}
+
+.vdraft-grip:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 4px;
+}
+
+.vdraft-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.7rem;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.vdraft-cut {
+  font-style: normal;
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+/* ---------------- Les effets, rangés derrière un bouton ----------------
+   Étalés en permanence, quatre pastilles occupaient la barre alors qu'on n'y
+   touche qu'une fois sur dix — et le rognage, lui, sert à chaque message. */
+.chat-fx-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding-left: 0.15rem;
+}
+
+.chat-fx-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.24rem 0.7rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+  transition: border-color 0.14s ease, color 0.14s ease, background 0.14s ease;
+}
+
+.chat-fx-open:hover:not(:disabled),
+.chat-fx-open.on {
+  border-color: var(--orange);
+  color: var(--accent-ink);
+}
+
+/* Un effet est choisi : le bouton cesse d'être une invitation et devient un
+   état — trait plein, fond doré. */
+.chat-fx-open.picked {
+  border-style: solid;
+  border-color: transparent;
+  background: var(--accent-grad);
+  color: #2b2005;
+}
+
+.chat-fx-clear {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-soft);
+}
+
+.chat-fx-clear:hover {
+  color: #e0483d;
+}
+
+/* La liste : des cartes, pas des lignes. Une icône donne le ton d'un effet plus
+   vite qu'un mot, et on choisit ici avec l'oreille — donc à l'instinct. */
+.chat-fx-pop {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.3rem;
+  width: min(320px, calc(100vw - 2.5rem));
+  padding: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  animation: chat-menu-in 0.14s ease;
+  transform-origin: bottom left;
+}
+
+.chat-fx-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "ico name" "ico hint";
+  align-items: center;
+  column-gap: 0.5rem;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: var(--surface-2);
+  text-align: left;
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+
+.chat-fx-card:hover:not(:disabled) {
+  border-color: var(--orange);
+}
+
+.chat-fx-card.on {
+  border-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 14%, transparent);
+}
+
+.chat-fx-ico {
+  grid-area: ico;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--accent-ink);
+}
+
+.chat-fx-card.on .chat-fx-ico {
+  background: var(--accent-grad);
+  color: #2b2005;
+}
+
+.chat-fx-name {
+  grid-area: name;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.chat-fx-hint {
+  grid-area: hint;
+  font-size: 0.68rem;
+  color: var(--text-soft);
+}
+
+/* Le micro : même emplacement et même taille que le bouton d'envoi, dont il
+   prend la place — la main ne se redéplace pas. */
+.chat-mic {
+  background: var(--surface-2);
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+}
+
+.chat-mic:hover:not(:disabled) {
+  color: var(--accent-ink);
+  border-color: var(--orange);
 }
 
 /* ======================================================================
@@ -3252,6 +3797,68 @@ body.mpl-open .chat-dock {
   .chat-react {
     padding: 0.18rem 0.55rem;
     font-size: 0.9rem;
+  }
+
+  /* Le micro se MAINTIENT : le navigateur ne doit ni sélectionner, ni sortir
+     sa loupe, ni interpréter le glissement d'annulation comme un défilement. */
+  .chat-mic {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: none;
+  }
+
+  /* Maintien en cours : le bouton grossit et s'allume — on SENT qu'on tient
+     quelque chose, même sans regarder. */
+  .chat-mic:active {
+    transform: scale(1.12);
+    background: var(--accent-grad);
+    color: #2b2005;
+    border-color: transparent;
+  }
+
+  /* Barres plus larges : un pouce ne vise pas 2 px. */
+  .voice-bars {
+    height: 34px;
+    gap: 3px;
+  }
+
+  .voice {
+    width: min(240px, 62vw);
+  }
+
+  .voice-play {
+    width: 42px;
+    height: 42px;
+  }
+
+  /* L'astuce du glissement n'a pas sa place à la souris ; au doigt elle est
+     essentielle, mais elle doit céder la place quand l'écran est étroit. */
+  .chat-rec-hint {
+    font-size: 0.68rem;
+  }
+
+  /* Rognage au pouce : poignées plus grosses et bande plus haute. */
+  .vdraft-bars {
+    height: 40px;
+    gap: 3px;
+  }
+
+  .vdraft-grip::before {
+    width: 18px;
+    height: 18px;
+    margin: -9px 0 0 -9px;
+  }
+
+  .vdraft-grip::after {
+    left: -16px;
+    right: -16px;
+  }
+
+  /* Les cartes d'effet passent sur une colonne : deux par ligne, ça fait des
+     cibles de 130 px sur un téléphone, et le texte se coupe. */
+  .chat-fx-pop {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .chat-quote {

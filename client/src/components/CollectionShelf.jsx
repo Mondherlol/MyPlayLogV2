@@ -85,7 +85,10 @@ const GbaPlayer = lazy(() => import("./GbaPlayer"));
 const GAP = 0.016; // jeu entre deux boîtiers
 const EDGE = 0.22; // air laissé de chaque côté de la rangée dans le cadre
 const MIN_W = 1.3; // largeur cadrée minimale (deux titres = gros plan, pas nez à nez)
-const PER_PLANK = 20; // au-delà, une seconde planche flotte sous la première
+// La densité par défaut. Ce n'est PLUS un nombre de boîtiers par planche (une
+// rangée en prend autant que la page est large, voir `shelfFit`) mais la
+// densité non réglée, celle dont `CASE_PX` tire une taille de boîtier.
+const PER_PLANK = 20;
 // Ciel laissé au-dessus du plus grand boîtier d'une planche. L'écart vertical
 // entre deux planches n'est plus une constante : il se calcule à partir de la
 // rangée, puisque les boîtiers n'ont plus tous la même hauteur.
@@ -123,16 +126,20 @@ const HOVER = { lift: 0.015, out: 0.05, tilt: 0.22 };
 // à peine — juste ce qu'il faut pour qu'il ait l'air décollé et non posé.
 const CARRY = { lift: 0.05, out: 0.42, tilt: 0.1 };
 
-// Cadrage du rayon. FILL est la part de la hauteur visible que remplit la
-// rangée : plus il est haut, plus les boîtiers sont gros. ABOVE dit où passe
-// le vide restant.
+// Cadrage du rayon. Le vide autour de la pile de planches est une MARGE FIXE,
+// en unités de scène — jamais une fraction de la hauteur.
 //
-// Le ciel au-dessus sert à la bulle de survol, mais il n'a jamais à être
-// GRAND : au-delà d'une centaine de pixels, la rangée décroche du haut de la
-// page et l'étagère a l'air posée par terre. On garde donc juste ce qu'il faut,
-// et la bulle mord sur la marge de la barre d'outils quand elle est à l'étroit.
-const FILL = 0.74;
-const ABOVE = 0.62;
+// C'était une fraction (74 % de la hauteur visible pour la rangée) et c'est
+// précisément ce qui rendait le rayon illisible : à deux planches, le quart de
+// vide devenait deux fois plus grand, la caméra reculait d'autant, et les
+// tranches partaient au loin. Une marge fixe ne dépend pas du nombre de
+// rangées, donc un boîtier fait la même taille qu'il y en ait une ou six.
+//
+// SKY est le ciel au-dessus de la rangée du haut : c'est là que sort la bulle
+// de survol, elle a juste besoin de sa hauteur. FLOOR est le peu d'air sous la
+// planche du bas, pour son ombre portée.
+const SKY = 0.42;
+const FLOOR = 0.18;
 
 // La planche suit le thème de la page : claire sur fond blanc, sombre sur fond
 // sombre. Discrète dans les deux cas — c'est un support, pas un décor.
@@ -207,18 +214,98 @@ export const SHELF_SKINS = [
   { value: "laque", label: "Laqué" },
 ];
 
-// Combien de boîtiers par planche. C'est le réglage qui change le plus l'allure
-// du rayon : peu par planche et l'on a de grosses tranches sur trois étages,
-// beaucoup et l'on a le mur du vidéoclub. `PER_PLANK` reste la valeur par
-// défaut, celle d'un rayon qu'on n'a pas réglé.
+// La densité du rayon : de grosses tranches sur peu d'étages, ou le mur du
+// vidéoclub. Ce n'est plus un COMPTE par planche (voir `shelfFit` : combien de
+// boîtiers tiennent sur une planche dépend de la largeur de la page, pas d'un
+// réglage), mais la TAILLE d'un boîtier à l'écran.
+//
+// Les valeurs restent 10 / 20 / 34 : ce sont celles déjà enregistrées dans les
+// rayons réglés, et les changer aurait demandé une migration pour un libellé
+// qui, lui, ne bouge pas.
 export const SHELF_DENSITIES = [
   { value: 10, label: "Large" },
   { value: 20, label: "Normal" },
   { value: 34, label: "Serré" },
 ];
 
+// Hauteur d'un boîtier à l'écran, en pixels, pour chaque densité.
+const CASE_PX = { 10: 470, 20: 385, 34: 288 };
+// Au-delà, le rayon fait plusieurs écrans de haut et la scène peint un canvas
+// démesuré à chaque image : les boîtiers se resserrent (voir `shelfFit`).
+const MAX_ROWS = 6;
+
 export function plankSkin(name, theme) {
   return PLANK[name] || PLANK[theme] || PLANK.light;
+}
+
+// ------------------------------------------------------ LA TAILLE DU RAYON --
+//
+// UNE RANGÉE REMPLIT LA LARGEUR DE LA PAGE, PUIS ON PASSE À LA PLANCHE
+// SUIVANTE. C'est toute la règle, et elle tient à ce calcul.
+//
+// Avant, le nombre de boîtiers par planche était un compte fixe et le cadre
+// avait une hauteur fixe : dès la deuxième rangée, la caméra reculait pour
+// faire tenir la pile, et les deux planches se retrouvaient au fond de la
+// pièce. Le rapport s'est inversé — le boîtier a une taille à l'écran, elle ne
+// bouge jamais, et c'est le CADRE qui s'allonge d'une rangée quand il en faut
+// une de plus.
+//
+// Tout est calculé en « unités de scène » (1 ≈ 16 cm) puis converti en pixels
+// par `unit`, et les marges sont exactement celles que `useFraming` appliquera
+// — sinon le cadre et la caméra ne parleraient pas de la même étagère.
+function shelfFit(media, density, availPx, viewH) {
+  const count = Math.max(1, media.length);
+  const tallest = media.reduce((h, m) => Math.max(h, boxOf(m).h), BOX.dvd.h);
+  // Largeur MOYENNE d'une place : les boîtiers n'ont pas tous la même tranche
+  // (un volume est mince, une boîte de jeu épaisse), et prendre le plus large
+  // laisserait un trou au bout de chaque rangée.
+  const step = media.reduce((w, m) => w + boxOf(m).w + GAP, 0) / count;
+
+  let casePx = Math.min(
+    CASE_PX[density] || Math.max(220, Math.min(560, (CASE_PX[20] * 20) / (density || 20))),
+    // Sur un écran bas (ou un portable posé à plat), un boîtier plus haut que
+    // la moitié de la fenêtre oblige à faire défiler pour voir une seule
+    // rangée : le rayon ne se lit plus d'un coup d'œil.
+    Math.round(viewH * 0.52)
+  );
+
+  const rowsAt = (px) => {
+    const unit = px / BOX.dvd.h;
+    // La place vraiment disponible dans le cadre : `useFraming` garde 6 % de
+    // marge en largeur, et la rangée s'arrête à EDGE de chaque bord.
+    const room = availPx / unit / 1.06 - EDGE * 2;
+    const per = Math.max(1, Math.min(count, Math.floor(room / step) || 1));
+    return { unit, per, rows: Math.ceil(count / per) };
+  };
+
+  let f = rowsAt(casePx);
+  // LE SEUL CAS OÙ L'ON RÉTRÉCIT : une collection assez grosse pour empiler
+  // plus de MAX_ROWS planches. Le cadre ferait alors plusieurs écrans de haut
+  // et la scène peindrait un canvas démesuré à chaque image. On serre les
+  // boîtiers jusqu'à retomber sous la limite — jamais avant, et jamais parce
+  // qu'il y a « deux rangées au lieu d'une ».
+  for (let i = 0; i < 6 && f.rows > MAX_ROWS && casePx > 150; i += 1) {
+    casePx = Math.max(150, Math.round(casePx * Math.sqrt(MAX_ROWS / f.rows)));
+    f = rowsAt(casePx);
+  }
+
+  // La pile, du dessous de la planche du bas au sommet des boîtiers du haut.
+  const stack = (f.rows - 1) * (tallest + PLANK_AIR) + tallest + THICK;
+
+  return {
+    perPlank: f.per,
+    rows: f.rows,
+    height: Math.round((stack + SKY + FLOOR) * f.unit),
+    // La largeur ne dépasse jamais ce que la rangée occupe vraiment : six
+    // titres dans un cadre pleine page seraient perdus au milieu du vide.
+    // Plancher à MIN_W, la largeur cadrée minimale de la scène : en dessous,
+    // c'est elle qui commanderait le recul de la caméra et les deux boîtiers
+    // d'un rayon presque vide repartiraient au fond.
+    width: Math.min(
+      availPx,
+      Math.round(Math.max(f.per * step + EDGE * 2, MIN_W) * 1.06 * f.unit)
+    ),
+  };
 }
 
 // ------------------------------------------------------------- lumières --
@@ -562,16 +649,22 @@ function useFraming({ width, height, centerY }) {
   const size = useThree((s) => s.size);
   const aspect = Math.max(0.4, size.width / size.height);
   const vTan = Math.tan((camera.fov * Math.PI) / 180 / 2);
-  const forH = height / FILL / (2 * vTan);
+  const forH = (height + SKY + FLOOR) / (2 * vTan);
   const forW = (width * 1.06) / (2 * vTan * aspect);
-  const d = Math.min(9, Math.max(1.7, Math.max(forH, forW)));
+  // Le plafond de recul est haut : une collection sur six planches est une pile
+  // haute, et le brider ici la ferait rétrécir — exactement ce qu'on cherche à
+  // éviter. C'est le CADRE qui grandit (voir `shelfFit`), pas la caméra qui
+  // recule.
+  const d = Math.min(80, Math.max(1.7, Math.max(forH, forW)));
 
-  // Hauteur réellement visible à ce recul : elle dit combien de vide il reste
-  // autour de la rangée, donc de combien on peut la faire descendre. La caméra
-  // se contente de MONTER (regard toujours horizontal) : décaler le point visé
-  // donnerait une perspective penchée, et les boîtiers verseraient.
-  const visible = 2 * d * vTan;
-  const eyeY = centerY + (visible - height) * (ABOVE - 0.5);
+  // La caméra se contente de MONTER (regard toujours horizontal) : décaler le
+  // point visé donnerait une perspective penchée, et les boîtiers verseraient.
+  // Le ciel demandé est plus haut que le plancher : l'œil monte donc de la
+  // moitié de leur écart, et la pile se pose dans le bas du cadre. (Tout vide
+  // EN PLUS — quand c'est la largeur qui commande le recul — se répartit de
+  // lui-même à parts égales, ce qui est très bien : là, la rangée est au
+  // milieu parce qu'il n'y a rien d'autre à en faire.)
+  const eyeY = centerY + (SKY - FLOOR) / 2;
 
   useLayoutEffect(() => {
     camera.position.set(0, eyeY, d);
@@ -1564,6 +1657,45 @@ export default function CollectionShelf({
   // chaque rendu la ferait tourner en boucle.
   const onAnchor = useCallback((a) => setAnchor(a), []);
 
+  // ------------------------------------------------- la taille du cadre --
+  //
+  // On mesure le PARENT, jamais le cadre lui-même : c'est nous qui posons sa
+  // largeur, et se mesurer soi-même après l'avoir fait ne mesure plus que sa
+  // propre décision (et boucle sur le premier rayon un peu étroit).
+  const [room, setRoom] = useState(() => ({
+    w: 0,
+    h: typeof window === "undefined" ? 800 : window.innerHeight,
+  }));
+  useLayoutEffect(() => {
+    const host = wrapRef.current?.parentElement;
+    if (!host) return undefined;
+    const read = () => {
+      // Sans retirer le padding, la page en donnerait plus qu'elle n'en a et
+      // la dernière tranche de chaque rangée passerait sous la marge.
+      const cs = getComputedStyle(host);
+      const w = Math.max(
+        240,
+        host.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+      );
+      setRoom((r) => (r.w === w && r.h === window.innerHeight ? r : { w, h: window.innerHeight }));
+    };
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(host);
+    // La hauteur de fenêtre borne la taille des boîtiers, et un
+    // ResizeObserver posé sur un bloc en largeur pleine ne la voit pas bouger.
+    window.addEventListener("resize", read);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", read);
+    };
+  }, []);
+
+  const fit = useMemo(
+    () => shelfFit(media, perPlank, room.w || 960, room.h || 800),
+    [media, perPlank, room.w, room.h]
+  );
+
   // ------------------------------------------------------ les jaquettes --
   //
   // TOUT ARRIVE ENSEMBLE, OU RIEN N'ARRIVE. L'ancienne peinture partait boîtier
@@ -1810,14 +1942,19 @@ export default function CollectionShelf({
   }, [dressed]);
 
   return (
-    // `--slots` borne la largeur du canvas selon le nombre d'objets : deux
-    // titres dans un cadre pleine largeur seraient minuscules et perdus.
+    // Le cadre est TAILLÉ pour le rayon (voir `shelfFit`) : sa largeur ne
+    // dépasse pas ce que la rangée occupe, et sa hauteur vaut une rangée —
+    // deux, trois… — à taille de boîtier constante.
     <div
       ref={wrapRef}
       className={`coll-shelf3d ${hovered ? "is-hover" : ""} ${
         dressed ? "is-dressed" : ""
       } ${arranging ? "is-arranging" : ""}`}
-      style={{ "--slots": media.length }}
+      style={{
+        width: `${fit.width}px`,
+        height: `${fit.height}px`,
+        "--rows": fit.rows,
+      }}
     >
       {!skelGone && (
         <ShelfSkeleton
@@ -1850,7 +1987,7 @@ export default function CollectionShelf({
           held={inspected?.media.slug || reading?.media.slug}
           taken={taken}
           arranging={arranging}
-          perPlank={perPlank}
+          perPlank={fit.perPlank}
           onHover={setHovered}
           onPick={pick}
           onAnchor={onAnchor}

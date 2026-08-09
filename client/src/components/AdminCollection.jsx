@@ -48,6 +48,7 @@ import { useAuth } from "../context/AuthContext";
 import { CM, CONSOLE, LICENCES, KINDS, PROVIDERS, boxOf } from "../lib/collection";
 import WrapCropModal from "./WrapCropModal";
 import PdfPagePicker, { isPdf } from "./PdfPagePicker";
+import JaquettePicker from "./JaquettePicker";
 import { Modal, Section } from "./AdminSheet";
 import ComicModal, {
   ComicLookup,
@@ -2851,10 +2852,11 @@ const ARTWORKS = {
 };
 
 function Artwork({ media, token, which, onChanged }) {
-  const [url, setUrl] = useState("");
+  const [typed, setTyped] = useState(""); // l'adresse tapée à la main
   const [busy, setBusy] = useState(false);
   const [fitting, setFitting] = useState(null); // { src, file } — jaquette à mesurer
   const [pdf, setPdf] = useState(null); // PDF déposé, dont il faut choisir la page
+  const [searching, setSearching] = useState(false); // sélecteur Cinéma Passion
   const [lighter, setLighter] = useState(null); // ce que l allègement a donné
   const fileRef = useRef(null);
   const { label, hint } = ARTWORKS[which];
@@ -2871,7 +2873,7 @@ function Artwork({ media, token, which, onChanged }) {
           token,
           body,
         });
-      setUrl("");
+      setTyped("");
       onChanged();
     } catch (e) {
       alert(e.message);
@@ -2930,7 +2932,12 @@ function Artwork({ media, token, which, onChanged }) {
   // Une URL distante ne peut pas être mesurée telle quelle : le canvas refuse
   // de lire les pixels d'une image d'un autre domaine. On la fait donc d'abord
   // rapatrier par le serveur, puis on mesure NOTRE copie, de la même origine.
-  async function fromUrl() {
+  //
+  // L'adresse peut venir de deux endroits — le champ, ou la jaquette désignée
+  // dans le sélecteur Cinéma Passion. Le chemin est le même : c'est une URL, on
+  // la fait rapatrier, on mesure.
+  async function fromUrl(from) {
+    const url = typeof from === "string" ? from : typed;
     // Le serveur ne rapatrie que des images : un lien vers un PDF revient avec
     // un « aucune image utilisable », ce qui n'explique rien. On le dit ici,
     // avec la marche à suivre — la conversion se fait dans le navigateur, il
@@ -2949,7 +2956,7 @@ function Artwork({ media, token, which, onChanged }) {
         token,
         body: { which, url },
       });
-      setUrl("");
+      setTyped("");
       onChanged();
       setFitting({ src: d.media.wrap, file: null });
     } catch (e) {
@@ -3008,11 +3015,15 @@ function Artwork({ media, token, which, onChanged }) {
       {lighter && <span className="adm-coll-lighter">{lighter}</span>}
       <div className="adm-coll-inline">
         <input
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
           placeholder="URL de l'image"
         />
-        <button className="btn btn-ghost clickable" onClick={fromUrl} disabled={!url || busy}>
+        <button
+          className="btn btn-ghost clickable"
+          onClick={() => fromUrl()}
+          disabled={!typed || busy}
+        >
           OK
         </button>
       </div>
@@ -3025,6 +3036,21 @@ function Artwork({ media, token, which, onChanged }) {
         >
           <ImagePlus size={14} /> Image ou PDF
         </button>
+        {/* CHERCHER PLUTÔT QUE COLLER. Une jaquette dépliée ne se trouve ni sur
+            TMDB ni sur TVmaze (eux n'ont que l'affiche portrait) : il fallait
+            aller la pêcher à la main sur cinemapassion, puis copier l'adresse
+            de l'image. Ce bouton fait les deux — on cherche, on désigne
+            l'édition, et le mesureur s'ouvre dessus. */}
+        {which === "wrap" && (
+          <button
+            className="adm-coll-upload clickable"
+            onClick={() => setSearching(true)}
+            disabled={busy}
+            title="Chercher la jaquette dépliée sur Cinéma Passion"
+          >
+            <Search size={14} /> Chercher
+          </button>
+        )}
         {which === "wrap" && current && (
           <button
             className="adm-coll-upload clickable"
@@ -3051,6 +3077,21 @@ function Artwork({ media, token, which, onChanged }) {
           onPick={(image) => {
             setPdf(null);
             return takeFile(image);
+          }}
+        />
+      )}
+
+      {searching && (
+        <JaquettePicker
+          title={media.title}
+          token={token}
+          onCancel={() => setSearching(false)}
+          onPick={(image) => {
+            setSearching(false);
+            // La suite est celle d'une adresse collée à la main : le serveur
+            // rapatrie l'image, puis le mesureur s'ouvre sur NOTRE copie (un
+            // canvas ne peut pas lire les pixels d'un autre domaine).
+            fromUrl(image);
           }}
         />
       )}

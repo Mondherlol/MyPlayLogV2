@@ -121,6 +121,16 @@ export default function BlindTestVersus() {
   const suggestRef = useRef(null);
   const offsetRef = useRef(0);
   const audioRef = useRef(null);
+  // La balise n'est PAS montée au premier rendu : le salon affiche d'abord son
+  // écran de chargement, sans lecteur. Une ref seule laissait donc les effets
+  // qui la câblent (écouteurs, source) tomber sur `null` une fois pour toutes —
+  // le son du mode multi ne partait jamais. On la suit donc dans un état, pour
+  // que ces effets rejouent à l'instant où elle apparaît.
+  const [audioEl, setAudioEl] = useState(null);
+  const setAudioNode = useCallback((el) => {
+    audioRef.current = el;
+    setAudioEl(el);
+  }, []);
   const mutedRef = useRef(false); // miroir de la sourdine (cf. le départ du son)
   const volumeRef = useRef(volume); // idem pour le volume
   const unlockedRef = useRef(false); // déverrouillage iOS déjà fait
@@ -308,7 +318,7 @@ export default function BlindTestVersus() {
   // redevient `undefined` en repassant par le salon — ce qui recharge
   // proprement une revanche pour TOUT LE MONDE, pas seulement pour l'hôte.
   useEffect(() => {
-    const el = audioRef.current;
+    const el = audioEl;
     if (!el || !round?.clip) return undefined;
     setClipReady(false);
     setClipError(false);
@@ -317,13 +327,13 @@ export default function BlindTestVersus() {
     el.src = `${API_BASE}${round.clip}?token=${encodeURIComponent(token)}`;
     el.load();
     return undefined;
-  }, [round?.clip, token]);
+  }, [audioEl, round?.clip, token]);
 
   // Le tampon se remplit AU CLIMAX, pas au début du morceau : dès que la durée
   // est connue, on pose l'aiguille là où l'extrait commencera. Au « go », il ne
   // reste qu'un `play()` — personne n'attend son propre tampon.
   useEffect(() => {
-    const el = audioRef.current;
+    const el = audioEl;
     if (!el) return undefined;
 
     const onMeta = () => {
@@ -358,7 +368,7 @@ export default function BlindTestVersus() {
       el.removeEventListener("canplay", onCanPlay);
       el.removeEventListener("error", onError);
     };
-  }, []);
+  }, [audioEl]);
 
   // Départ du son, à l'instant décidé par le serveur. Le son s'arrête à la fin
   // de l'extrait — le temps bonus se joue en silence, comme en solo.
@@ -702,7 +712,7 @@ export default function BlindTestVersus() {
   return (
     <div className="bt-page gv">
       {/* Le lecteur : jamais visible, jamais nommé. */}
-      <audio ref={audioRef} preload="auto" playsInline style={{ display: "none" }} />
+      <audio ref={setAudioNode} preload="auto" playsInline style={{ display: "none" }} />
 
       <header className="bt-topbar">
         <button className="bt-back clickable" onClick={quit}>

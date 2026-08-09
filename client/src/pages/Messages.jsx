@@ -9,6 +9,7 @@ import {
   Info,
   BellOff,
   Image as ImageIcon,
+  Mic,
   Gamepad2,
   Music,
   BookOpen,
@@ -289,7 +290,11 @@ export default function Messages() {
                               : ""}
                           </b>
                         )}
-                        {c.lastMessage.kind === "image" || c.lastMessage.kind === "gif" ? (
+                        {c.lastMessage.kind === "voice" ? (
+                          <>
+                            <Mic size={13} /> {c.lastMessage.text}
+                          </>
+                        ) : c.lastMessage.kind === "image" || c.lastMessage.kind === "gif" ? (
                           <>
                             <ImageIcon size={13} />{" "}
                             {c.lastMessage.kind === "gif" ? "GIF" : "Photo"}

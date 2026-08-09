@@ -24,7 +24,13 @@ const TYPING_MS = 4500;
 const MAX_WINDOWS = 3;
 
 // Aperçu (liste + panneau) d'un message reçu en direct, cartes comprises.
+const voiceLen = (v) => {
+  const s = Math.max(0, Math.round(v?.duration || 0));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
+
 function previewOf(m) {
+  if (m.voice) return `Message vocal · ${voiceLen(m.voice)}`;
   if (m.game) return m.text || `Jeu : ${m.game.name}`;
   if (m.ost) return m.text || `OST : ${m.ost.name}`;
   if (m.party) return m.text || `Watchparty : ${m.party.title}`;
@@ -36,6 +42,7 @@ function previewOf(m) {
   return "";
 }
 function kindOf(m) {
+  if (m.voice) return "voice";
   if (m.game) return "game";
   if (m.ost) return "ost";
   if (m.party) return "party";
@@ -47,6 +54,7 @@ function kindOf(m) {
 }
 // Texte de la pop-up de notification.
 function toastTextOf(m) {
+  if (m.voice) return `t'a envoyé un vocal · ${voiceLen(m.voice)}`;
   if (m.game) return m.text || `t'a recommandé ${m.game.name}`;
   if (m.ost) return m.text || `t'a partagé « ${m.ost.name} »`;
   // Une invitation est PÉRISSABLE : elle vaut pour la séance qui commence, et la

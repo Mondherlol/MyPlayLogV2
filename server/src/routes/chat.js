@@ -47,6 +47,46 @@ const chatUpload = multer({
     cb(null, /^image\/(jpe?g|png|webp|gif)$/.test(file.mimetype)),
 });
 
+// --- Upload des messages vocaux ---
+// Séparé de l'upload d'images : ni le même filtre de type, ni la même taille.
+// L'extension vient du TYPE MIME et jamais du nom de fichier envoyé par le
+// client — un `MediaRecorder` ne nomme rien, et se fier au nom serait de toute
+// façon la façon classique d'écrire n'importe quoi sur le disque.
+//
+// Les formats acceptés sont ceux que les navigateurs savent produire : webm
+// (Chrome, Firefox), mp4/m4a (Safari), ogg (vieux Firefox). Tous se relisent
+// dans une balise <audio>, donc rien à convertir côté serveur.
+const VOICE_EXT = {
+  "audio/webm": ".webm",
+  // WAV : ce que produit un vocal passé par un effet de voix. Le navigateur ne
+  // sait ré-encoder en compressé qu'en temps réel (cf. client/src/lib/voiceFx.js),
+  // donc il nous rend du brut — mono 16 kHz, ce qui reste léger pour une voix.
+  "audio/wav": ".wav",
+  "audio/wave": ".wav",
+  "audio/x-wav": ".wav",
+  "audio/ogg": ".ogg",
+  "audio/mp4": ".m4a",
+  "audio/mpeg": ".mp3",
+  "audio/aac": ".aac",
+};
+const MAX_VOICE_SEC = 300; // 5 min : au-delà, ce n'est plus un message
+
+const voiceUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, CHAT_DIR),
+    filename: (req, file, cb) => {
+      const base = String(file.mimetype).split(";")[0];
+      cb(
+        null,
+        `v-${Date.now()}-${Math.round(Math.random() * 1e6)}${VOICE_EXT[base] || ".webm"}`
+      );
+    },
+  }),
+  limits: { fileSize: 12 * 1024 * 1024 }, // 12 Mo ≈ 5 min largement
+  fileFilter: (req, file, cb) =>
+    cb(null, Object.hasOwn(VOICE_EXT, String(file.mimetype).split(";")[0])),
+});
+
 // ============================================================
 //  Sérialisation
 // ============================================================
@@ -64,13 +104,21 @@ const userCard = (u) =>
       }
     : null;
 
+// « 0:07 » — la durée d'un vocal, lisible partout (aperçu, citation, bulle).
+const fmtVoice = (sec) => {
+  const s = Math.max(0, Math.round(Number(sec) || 0));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
+
 // Aperçu d'un message cité (bulle « en réponse à »).
 function quoteOf(m) {
   if (!m) return null;
   const text = m.deletedAt
     ? ""
     : m.text ||
-      (m.game
+      (m.voice
+        ? `🎤 Message vocal · ${fmtVoice(m.voice.duration)}`
+        : m.game
         ? `🎮 ${m.game.name}`
         : m.ost
           ? `🎵 ${m.ost.name}`
@@ -87,7 +135,9 @@ function quoteOf(m) {
     id: m._id,
     author: userCard(m.author),
     text,
-    kind: m.game
+    kind: m.voice
+      ? "voice"
+      : m.game
       ? "game"
       : m.ost
         ? "ost"
@@ -127,6 +177,7 @@ function serializeMessage(m, meId) {
     mine: !!m.author && String(m.author._id || m.author) === String(meId),
     text: deleted ? "" : m.text || "",
     media: deleted ? [] : m.media || [],
+    voice: deleted ? null : m.voice || null,
     mentions: (m.mentions || []).map((x) => x.username).filter(Boolean),
     replyTo: quoteOf(m.replyTo),
     reactions: deleted ? [] : groupReactions(m.reactions, meId),
@@ -247,6 +298,23 @@ function sanitizeMedia(list) {
     }));
 }
 
+// Le vocal reçu à l'envoi du message. On ne fait PAS confiance à ce que le
+// client renvoie : l'URL doit être une de celles que /chat/voice a servies
+// (même hôte, dossier des uploads du chat), sinon n'importe qui ferait afficher
+// n'importe quel fichier du web dans une bulle qui a l'air d'être de nous.
+function sanitizeVoice(v) {
+  if (!v || typeof v.url !== "string") return null;
+  if (!/^https?:\/\/[^/]+\/uploads\/chat\/[\w.-]+$/.test(v.url)) return null;
+  const waveform = Array.isArray(v.waveform)
+    ? v.waveform.slice(0, 48).map((n) => Math.max(0, Math.min(100, Math.round(Number(n) || 0))))
+    : [];
+  return {
+    url: v.url,
+    duration: Math.min(MAX_VOICE_SEC, Math.max(0, Math.round(Number(v.duration) * 10) / 10 || 0)),
+    waveform,
+  };
+}
+
 const GIF_MAX_BYTES = 12 * 1024 * 1024; // 12 Mo : au-delà on garde l'URL distante
 
 // Rapatrie un GIF GIPHY sur NOTRE serveur : GIPHY est parfois lent, et une fois
@@ -306,6 +374,7 @@ async function resolveMentions(text) {
 // Texte de l'aperçu dans la liste des conversations.
 function previewText(msg) {
   if (msg.system) return systemPreview(msg);
+  if (msg.voice) return `Message vocal · ${fmtVoice(msg.voice.duration)}`;
   if (msg.game) return msg.text || `Jeu : ${msg.game.name}`;
   if (msg.ost) return msg.text || `OST : ${msg.ost.name}`;
   if (msg.party) return msg.text || `Watchparty : ${msg.party.title}`;
@@ -321,6 +390,7 @@ function previewText(msg) {
 // Type d'aperçu (icône dans la liste) : media, carte de jeu, carte d'OST…
 function previewKind(msg) {
   if (msg.system) return "system";
+  if (msg.voice) return "voice";
   if (msg.game) return "game";
   if (msg.ost) return "ost";
   if (msg.party) return "party";
@@ -1132,7 +1202,15 @@ router.post("/conversations/:id/messages", requireAuth, async (req, res) => {
 
     let text = String(req.body?.text || "").trim().slice(0, MAX_TEXT);
     let media = sanitizeMedia(req.body?.media);
-    if (!text && !media.length)
+    // Un vocal EST le message : il ne se combine ni avec du texte ni avec des
+    // images (une bulle qui porterait les deux ne saurait pas quoi montrer, et
+    // aucune messagerie ne le propose).
+    const voice = sanitizeVoice(req.body?.voice);
+    if (voice) {
+      text = "";
+      media = [];
+    }
+    if (!voice && !text && !media.length)
       return res.status(400).json({ error: "Message vide." });
     // Rapatrie les GIF GIPHY chez nous (affichage instantané côté destinataires).
     media = await localizeMedia(media, req);
@@ -1163,6 +1241,7 @@ router.post("/conversations/:id/messages", requireAuth, async (req, res) => {
       media,
       mentions: await resolveMentions(text),
       replyTo,
+      voice,
       ...(invite?.card || {}),
     });
 
@@ -1214,6 +1293,10 @@ router.put("/messages/:id", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Message introuvable." });
     if (String(msg.author) !== String(req.userId))
       return res.status(403).json({ error: "Ce message n'est pas le tien." });
+    // Un vocal ne se corrige pas : on le supprime et on le refait. (Le client
+    // ne propose déjà pas « Modifier » dessus — ceci est le garde-fou.)
+    if (msg.voice)
+      return res.status(400).json({ error: "Un message vocal ne se modifie pas." });
 
     const conv = await loadConversation(msg.conversation, req.userId);
     if (!conv) return res.status(404).json({ error: "Conversation introuvable." });
@@ -1371,6 +1454,41 @@ router.post("/media", requireAuth, chatUpload.single("media"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "Aucun fichier." });
   const url = `${req.protocol}://${req.get("host")}/uploads/chat/${req.file.filename}`;
   res.status(201).json({ media: { kind: "image", url } });
+});
+
+// POST /api/chat/voice — le fichier d'un message vocal.
+//
+// L'envoi se fait en DEUX TEMPS, comme les images : d'abord le fichier ici, qui
+// rend son URL, puis le message qui la porte. C'est ce qui permet de commencer
+// à téléverser dès que l'enregistrement s'arrête, pendant que la personne
+// décide encore si elle envoie — et de ne rien laisser dans le fil si elle
+// annule.
+//
+// La forme d'onde arrive du client, mesurée pendant l'enregistrement : on la
+// borne (48 entiers 0..100) sans lui faire confiance, mais on ne la recalcule
+// pas — décoder l'audio côté serveur pour redessiner ce que le micro nous a
+// déjà donné serait du travail pur perte.
+router.post("/voice", requireAuth, voiceUpload.single("voice"), (req, res) => {
+  if (!req.file)
+    return res.status(400).json({ error: "Format audio non pris en charge." });
+
+  const duration = Math.min(
+    MAX_VOICE_SEC,
+    Math.max(0, Math.round(Number(req.body?.duration || 0) * 10) / 10)
+  );
+  let waveform = [];
+  try {
+    const raw = JSON.parse(req.body?.waveform || "[]");
+    if (Array.isArray(raw))
+      waveform = raw
+        .slice(0, 48)
+        .map((n) => Math.max(0, Math.min(100, Math.round(Number(n) || 0))));
+  } catch {
+    /* pas de silhouette : la bulle affichera des barres plates */
+  }
+
+  const url = `${req.protocol}://${req.get("host")}/uploads/chat/${req.file.filename}`;
+  res.status(201).json({ voice: { url, duration, waveform } });
 });
 
 // POST /api/chat/share — partage une OST (mini-lecteur) à quelqu'un, en message.

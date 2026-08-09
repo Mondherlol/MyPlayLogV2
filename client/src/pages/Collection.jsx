@@ -424,7 +424,10 @@ export default function Collection() {
             </div>
 
             <div className="coll-arrange-group">
-              <span className="coll-arrange-label">Par planche</span>
+              {/* Plus « combien par planche » : une rangée remplit la largeur
+                  de la page, ce compte-là ne dépend donc plus d'un réglage
+                  (voir shelfFit). Ce qui se règle, c'est la TAILLE. */}
+              <span className="coll-arrange-label">Taille</span>
               <div className="coll-arrange-btns">
                 {SHELF_DENSITIES.map((d) => (
                   <button
