@@ -14,6 +14,7 @@ import BlindTestVersus from "./pages/BlindTestVersus";
 import PixelVersus from "./pages/PixelVersus";
 import Quizz from "./pages/Quizz";
 import Perroquet from "./pages/Perroquet";
+import PerroquetVersus from "./pages/PerroquetVersus";
 import QuizzVersus from "./pages/QuizzVersus";
 import MotDuJour from "./pages/MotDuJour";
 import Arcade from "./pages/Arcade";
@@ -168,6 +169,8 @@ export default function App() {
         <Route path="/quiz/versus/:code" element={<QuizzVersus />} />
         {/* Le Perroquet : `?challenge=<id>` rejoue le set de quelqu'un. */}
         <Route path="/perroquet" element={<Perroquet />} />
+        {/* Le salon à plusieurs : adresse des liens d'invitation. */}
+        <Route path="/perroquet/versus/:code" element={<PerroquetVersus />} />
         <Route path="/mot" element={<MotDuJour />} />
         <Route path="/playtopia" element={<Playtopia />} />
         <Route path="/explore" element={<Explorer />} />

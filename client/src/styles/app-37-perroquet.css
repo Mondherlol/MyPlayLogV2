@@ -216,51 +216,93 @@
 }
 .pq-hint-off { opacity: 0.22; }
 
-/* Le bouton de maintien : l'objet central de la page. */
+/* ---------- Le bouton de maintien ---------- */
+/* L'objet central du jeu. Il porte trois états très différents et doit rester
+   lisible dans les trois : au repos (un micro), en train d'enregistrer (une
+   onde qui défile), en train d'envoyer (une attente). */
+.pq-mic { display: grid; place-items: center; }
+
 .pq-hold {
   position: relative;
   display: grid;
   place-items: center;
-  gap: 8px;
-  width: 190px;
-  height: 190px;
+  align-content: center;
+  gap: 10px;
+  width: 200px;
+  height: 200px;
   border-radius: 50%;
   border: 2px solid var(--pq-line);
-  background: radial-gradient(circle at 50% 35%, #332a20, #1c1712);
+  background:
+    radial-gradient(circle at 50% 32%, #3a2f22, #1a1510 70%);
   color: var(--pq-ink);
   cursor: pointer;
-  /* `touch-action: none` : sans lui, un maintien du doigt déclenche le
-     défilement de la page et le navigateur envoie un `pointercancel` — la prise
-     s'interromprait au milieu du cri, sur mobile uniquement. */
+  /* `touch-action: none` : sans lui, un maintien du doigt fait défiler la page
+     et le navigateur émet un `pointercancel` — la prise s'interromprait au
+     milieu du cri, sur mobile uniquement. */
   touch-action: none;
   user-select: none;
-  transition: border-color 0.2s ease;
+  overflow: hidden;
+  transition: border-color 0.2s ease, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.pq-hold em {
-  font-style: normal;
-  font-size: 0.85rem;
-  color: var(--pq-dim);
-}
+.pq-hold:hover:not(:disabled):not(.on) { transform: scale(1.03); }
+.pq-hold:disabled { opacity: 0.55; cursor: wait; }
 .pq-hold.on {
   border-color: var(--pq-warm);
-  background: radial-gradient(circle at 50% 35%, #4a3a1a, #241c10);
+  background: radial-gradient(circle at 50% 32%, #57411a, #2a2010 70%);
 }
-.pq-hold.on em { color: var(--pq-warm); }
-.pq-hold:disabled { opacity: 0.6; cursor: wait; }
 
-/* L'anneau qui grossit avec la voix. Piloté en `transform` depuis le composant
-   (et pas en largeur/hauteur) : c'est la seule propriété que le navigateur sait
-   animer sans refaire la mise en page, à 60 images par seconde. */
-.pq-hold-ring {
+/* Le halo qui pulse pendant l'enregistrement : il donne le « ça tourne » que
+   l'onde seule ne dit pas (une onde plate ressemble à un micro éteint). */
+.pq-hold-halo {
   position: absolute;
-  inset: -6px;
+  inset: -3px;
   border-radius: 50%;
   border: 2px solid var(--pq-warm);
   opacity: 0;
-  transition: transform 0.08s linear;
   pointer-events: none;
 }
-.pq-hold.on .pq-hold-ring { opacity: 0.5; }
+.pq-hold.on .pq-hold-halo { animation: pq-halo 1.4s ease-out infinite; }
+@keyframes pq-halo {
+  0% { transform: scale(1); opacity: 0.55; }
+  100% { transform: scale(1.16); opacity: 0; }
+}
+
+.pq-hold-ic { color: var(--pq-warm); }
+.pq-hold-lbl {
+  font-style: normal;
+  font-size: 0.85rem;
+  color: var(--pq-dim);
+  max-width: 78%;
+  text-align: center;
+}
+.pq-hold.on .pq-hold-lbl { color: var(--pq-warm); font-weight: 700; }
+
+/* ---------- La forme d'onde en direct ---------- */
+/* Les barres défilent de droite à gauche, comme un sismographe : la dernière
+   mesure entre par la droite. C'est ce sens de lecture qui fait qu'on VOIT le
+   temps passer — une onde symétrique depuis le centre serait plus jolie et ne
+   raconterait rien.
+
+   `align-items: center` : les barres grandissent des deux côtés depuis l'axe,
+   comme une piste audio. Alignées en bas, elles ressembleraient à un
+   histogramme et on lirait « des valeurs » plutôt que « du son ». */
+.pq-wave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 74%;
+  height: 62px;
+}
+.pq-wave i {
+  flex: 1;
+  min-width: 2px;
+  border-radius: 2px;
+  background: var(--pq-warm);
+  /* Pas de transition : la valeur change 60 fois par seconde et une
+     interpolation la retarderait d'autant — l'onde traînerait derrière la voix. */
+  opacity: 0.9;
+}
 
 .pq-skip {
   display: inline-flex;
@@ -959,4 +1001,369 @@
   .pq-admin-add { grid-template-columns: 1fr; }
   .pq-admin-row { flex-wrap: wrap; }
   .pq-admin-main { flex-basis: 100%; order: -1; }
+}
+
+/* ======================================================================
+   Le versus
+   ======================================================================
+   Même cabine, mais on n'y est plus seul : la bande de têtes est présente à
+   tous les écrans. C'est elle qui fait qu'on joue AVEC des gens plutôt que
+   devant un chrono — sans elle, le mode serait un solo avec un tableau à la
+   fin. */
+.pq-center {
+  display: grid;
+  place-items: center;
+  min-height: 60vh;
+  color: var(--pq-dim);
+}
+
+/* ---------- La barre de phase : le battement commun ---------- */
+.pq-phase {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 22px;
+  border-radius: 999px;
+  background: var(--pq-panel);
+  border: 1px solid var(--pq-line);
+}
+.pq-phase-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  font-weight: 700;
+  font-size: 0.86rem;
+}
+.pq-phase-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.pq-phase-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--pq-warm);
+  /* Linéaire et court : la barre doit suivre le chrono, pas l'anticiper avec
+     une courbe d'accélération qui la ferait mentir sur le temps restant. */
+  transition: width 0.1s linear;
+}
+.pq-phase-sec {
+  flex: none;
+  min-width: 34px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.86rem;
+  color: var(--pq-dim);
+}
+.pq-phase.ph-record .pq-phase-name { color: var(--pq-warm); }
+.pq-phase.ph-record .pq-phase-bar i { background: #ff9a6c; }
+.pq-phase.ph-reveal .pq-phase-bar i { background: #6ce3a6; }
+
+/* ---------- Salon d'attente ---------- */
+.pq-lobby { display: grid; justify-items: center; gap: 16px; }
+.pq-code {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 14px 30px;
+  border-radius: 16px;
+  border: 1px dashed var(--pq-line);
+  background: var(--pq-panel);
+  cursor: pointer;
+}
+.pq-code:hover { border-color: var(--pq-warm); }
+.pq-code-lbl { font-size: 0.74rem; color: var(--pq-dim); }
+.pq-code b {
+  font-size: 1.9rem;
+  letter-spacing: 0.22em;
+  font-family: var(--font-display, inherit);
+  color: var(--pq-warm);
+  text-transform: uppercase;
+}
+.pq-code-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.74rem;
+  color: var(--pq-dim);
+}
+
+.pq-lobby-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: grid;
+  gap: 8px;
+}
+.pq-lobby-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--pq-panel);
+  border: 1px solid var(--pq-line);
+}
+.pq-lobby-list li.armed { border-color: rgba(108, 227, 166, 0.4); }
+.pq-lobby-list li.empty {
+  justify-content: center;
+  border-style: dashed;
+  color: var(--pq-dim);
+  font-size: 0.84rem;
+}
+.pq-lobby-list b {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+.pq-crown { color: var(--pq-warm); }
+.pq-mic-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76rem;
+  color: var(--pq-dim);
+}
+.pq-mic-state.ok { color: #6ce3a6; }
+.pq-lobby-wait {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--pq-dim);
+  font-size: 0.86rem;
+}
+
+/* ---------- Avatars et bande de joueurs ---------- */
+.pq-av {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--pq-warm-soft);
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--pq-warm);
+}
+.pq-av.big { width: 60px; height: 60px; font-size: 1.4rem; }
+
+.pq-strip {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+  margin: 24px 0 0;
+  padding: 0;
+}
+.pq-strip li {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: var(--pq-dim);
+  opacity: 0.5;
+  transition: opacity 0.25s ease;
+}
+/* « A rendu sa copie » : la seule information qui circule pendant qu'on
+   enregistre. On ne montre PAS les scores — les voir influencerait le cri de
+   ceux qui n'ont pas encore joué. */
+.pq-strip li.done { opacity: 1; }
+.pq-strip li.done .pq-av { box-shadow: 0 0 0 2px #6ce3a6; }
+.pq-strip-ok {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  padding: 2px;
+  border-radius: 50%;
+  background: #6ce3a6;
+  color: #0d2b1c;
+}
+
+/* ---------- Phase d'écoute ---------- */
+.pq-listen-stage {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 20px 0;
+  text-align: center;
+}
+.pq-listen-stage p { margin: 0; color: var(--pq-dim); }
+.pq-listen-ring {
+  display: grid;
+  place-items: center;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: var(--pq-warm-soft);
+  color: var(--pq-warm);
+  animation: pq-breathe 1.6s ease-in-out infinite;
+}
+@keyframes pq-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.07); }
+}
+
+/* ---------- Phase d'enregistrement ---------- */
+.pq-record-stage { display: grid; justify-items: center; gap: 10px; }
+.pq-waiting {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 40px 20px;
+  color: var(--pq-dim);
+  text-align: center;
+}
+.pq-waiting b { color: var(--pq-ink); font-size: 1.05rem; }
+.pq-waiting > svg { color: #6ce3a6; }
+
+/* ---------- Le verdict ---------- */
+.pq-reveal { display: grid; justify-items: center; gap: 14px; }
+.pq-podium {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: grid;
+  gap: 7px;
+}
+.pq-podium-row {
+  --band: var(--pq-dim);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--pq-panel);
+  border: 1px solid var(--pq-line);
+  border-left: 3px solid var(--band);
+  /* Les lignes entrent l'une après l'autre : le classement se LIT du premier au
+     dernier, il ne doit pas apparaître d'un bloc. C'est trois dixièmes de
+     seconde de suspense, et c'est le seul moment où le jeu en a. */
+  animation: pq-row-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.pq-podium-row:nth-child(1) { animation-delay: 0.05s; }
+.pq-podium-row:nth-child(2) { animation-delay: 0.14s; }
+.pq-podium-row:nth-child(3) { animation-delay: 0.23s; }
+.pq-podium-row:nth-child(4) { animation-delay: 0.32s; }
+.pq-podium-row:nth-child(5) { animation-delay: 0.41s; }
+.pq-podium-row:nth-child(6) { animation-delay: 0.5s; }
+@keyframes pq-row-in {
+  from { opacity: 0; transform: translateX(-14px); }
+  to { opacity: 1; transform: none; }
+}
+.pq-podium-row.band-perfect { --band: #6ce3a6; }
+.pq-podium-row.band-great { --band: #9fd8c8; }
+.pq-podium-row.band-close { --band: #ffd24a; }
+.pq-podium-row.band-meh { --band: #ff9a6c; }
+.pq-podium-row.band-miss { --band: #ff7f8f; }
+.pq-podium-row.me { background: rgba(242, 183, 11, 0.12); }
+
+.pq-podium-rank {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+.pq-podium-rank.r1 { background: var(--pq-warm); color: #241a02; }
+.pq-podium-rank.r2 { background: #c9ccd4; color: #23262e; }
+.pq-podium-rank.r3 { background: #c98a52; color: #241a02; }
+.pq-podium-who {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pq-podium-none { font-size: 0.76rem; color: var(--pq-dim); font-style: italic; }
+.pq-podium-score {
+  flex: none;
+  min-width: 34px;
+  text-align: right;
+  font-weight: 800;
+  color: var(--band, var(--pq-warm));
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Tableau final ---------- */
+.pq-final { display: grid; justify-items: center; gap: 16px; }
+.pq-champ {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 22px 34px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(242, 183, 11, 0.18), transparent);
+  border: 1px solid rgba(242, 183, 11, 0.3);
+  text-align: center;
+}
+.pq-champ > svg { color: var(--pq-warm); }
+.pq-champ b { font-size: 1.2rem; }
+.pq-champ span { font-size: 0.78rem; color: var(--pq-dim); }
+.pq-final-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: grid;
+  gap: 7px;
+}
+.pq-final-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--pq-panel);
+  border: 1px solid var(--pq-line);
+}
+.pq-final-list li.me { border-color: var(--pq-warm); }
+.pq-final-wins { font-size: 0.76rem; color: var(--pq-dim); }
+
+@media (max-width: 560px) {
+  .pq-hold { width: 176px; height: 176px; }
+  .pq-wave { height: 52px; }
+  .pq-code b { font-size: 1.5rem; }
+  .pq-phase { gap: 8px; padding: 9px 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pq-listen-ring,
+  .pq-hold.on .pq-hold-halo { animation: none; }
+  .pq-podium-row { animation: none; }
+}
+
+/* Solo et multi côte à côte sur l'écran d'accueil. */
+.pq-intro-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.pq-go.alt {
+  background: var(--pq-panel);
+  border: 1px solid var(--pq-line);
+  color: var(--pq-ink);
+}
+.pq-go.alt:hover:not(:disabled) {
+  border-color: var(--pq-warm);
+  box-shadow: none;
 }

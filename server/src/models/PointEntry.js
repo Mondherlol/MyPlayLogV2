@@ -18,6 +18,7 @@ export const POINT_SOURCES = {
   quizversus: "Grand Quiz — versus",
   mot: "Mot du jour",
   perroquet: "Le Perroquet",
+  perroquetversus: "Le Perroquet — versus",
   case: "Ouverture de caisse",
   gacha: "Machine à capsules",
   duplicate: "Doublon reconverti",

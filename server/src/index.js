@@ -30,6 +30,7 @@ import quizVersusRoutes from "./routes/quizVersus.js";
 import quizAdminRoutes from "./routes/quizAdmin.js";
 import motRoutes from "./routes/mot.js";
 import perroquetRoutes from "./routes/perroquet.js";
+import perroquetVersusRoutes from "./routes/perroquetVersus.js";
 import perroquetAdminRoutes from "./routes/perroquetAdmin.js";
 import presenceRoutes from "./routes/presence.js";
 import arcadeRoutes from "./routes/arcade.js";
@@ -126,9 +127,9 @@ app.use("/api/geo", geoRoutes);
 app.use("/api/quiz/versus", quizVersusRoutes);
 app.use("/api/quiz", quizRoutes);
 app.use("/api/mot", motRoutes);
-// Le Perroquet porte lui aussi un `GET /:id/results`, mais aucun chemin fixe à
-// deux segments : `/leaderboard` est à un seul et Express le fait passer avant
-// `/:id/results` sans qu'on ait à ordonner quoi que ce soit.
+// Le piège une cinquième fois : /api/perroquet porte un `GET /:id/results` qui
+// avalerait /api/perroquet/versus/<code>. Le versus passe devant.
+app.use("/api/perroquet/versus", perroquetVersusRoutes);
 app.use("/api/perroquet", perroquetRoutes);
 app.use("/api/presence", presenceRoutes);
 app.use("/api/arcade", arcadeRoutes);

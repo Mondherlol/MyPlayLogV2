@@ -12,10 +12,13 @@ import {
   SkipForward,
   Swords,
   Trophy,
+  Users,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch, apiUpload } from "../lib/api";
 import { openMic, closeMic, startTake, canRecord } from "../lib/soundTake";
+import PerroquetHold from "../components/PerroquetHold";
+import ContourChart from "../components/ContourChart";
 
 // ======================================================================
 //  Le Perroquet — imite le son, le plus proche gagne
@@ -126,6 +129,18 @@ export default function Perroquet() {
       setSending(false);
     }
   }, [token, challengeId]);
+
+  // ---------- Ouvrir un salon à plusieurs ----------
+  const openVersus = useCallback(async () => {
+    setSending(true);
+    try {
+      const d = await apiFetch("/perroquet/versus", { method: "POST", token, body: {} });
+      navigate(`/perroquet/versus/${d.room.code}`);
+    } catch (e) {
+      setErr(e.message || "Impossible de créer le salon.");
+      setSending(false);
+    }
+  }, [token, navigate]);
 
   // ---------- Écoute du son à imiter ----------
   const playClip = useCallback((url) => {
@@ -281,6 +296,7 @@ export default function Perroquet() {
         {phase === "intro" && (
           <Intro
             onStart={start}
+            onVersus={openVersus}
             busy={sending}
             challenge={game?.challenge}
             challengeId={challengeId}
@@ -322,7 +338,7 @@ export default function Perroquet() {
 // ============================================================
 //  Écran d'accueil
 // ============================================================
-function Intro({ onStart, busy, challengeId }) {
+function Intro({ onStart, onVersus, busy, challengeId }) {
   return (
     <section className="pq-intro">
       <span className="pq-bird" aria-hidden="true">
@@ -349,10 +365,18 @@ function Intro({ onStart, busy, challengeId }) {
           d'arcade.
         </li>
       </ul>
-      <button className="pq-go clickable" onClick={onStart} disabled={busy}>
-        {busy ? <Loader2 size={18} className="spin" /> : <Play size={18} />}
-        {challengeId ? "Relever le défi" : "Commencer"}
-      </button>
+      <div className="pq-intro-actions">
+        <button className="pq-go clickable" onClick={onStart} disabled={busy}>
+          {busy ? <Loader2 size={18} className="spin" /> : <Play size={18} />}
+          {challengeId ? "Relever le défi" : "Jouer seul"}
+        </button>
+        {/* Le multi est mis SUR LE MÊME PLAN que le solo, pas relégué dans un
+            coin : c'est là que le jeu est le plus drôle — on y écoute les cris
+            des autres, ce que le solo ne peut pas offrir. */}
+        <button className="pq-go alt clickable" onClick={onVersus} disabled={busy}>
+          <Users size={18} /> Jouer à plusieurs
+        </button>
+      </div>
       <p className="pq-mic-note">
         <MicOff size={13} /> Le micro s'ouvre au lancement et se referme en
         quittant la page.
@@ -391,29 +415,13 @@ function Round({
         <span className="pq-hint-off">{"●".repeat(5 - round.difficulty)}</span>
       </div>
 
-      {/* Le bouton de maintien. `onPointerDown/Up` plutôt que les événements
-          souris ou tactiles séparés : un seul jeu de gestionnaires couvre le
-          doigt, la souris et le stylet, et `setPointerCapture` garantit qu'on
-          reçoit le relâchement même si le doigt a glissé hors du bouton — sans
-          quoi l'enregistrement continuerait indéfiniment. */}
-      <button
-        className={`pq-hold clickable ${recording ? "on" : ""}`}
-        disabled={sending}
-        onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId);
-          onHoldStart();
-        }}
-        onPointerUp={onHoldEnd}
-        onPointerCancel={onHoldEnd}
-      >
-        <span
-          className="pq-hold-ring"
-          style={{ transform: `scale(${1 + (recording ? level / 90 : 0)})` }}
-          aria-hidden="true"
-        />
-        {sending ? <Loader2 size={30} className="spin" /> : <Mic size={30} />}
-        <em>{sending ? "On écoute ça…" : recording ? "Vas-y !" : "Maintiens et imite"}</em>
-      </button>
+      <PerroquetHold
+        recording={recording}
+        level={level}
+        busy={sending}
+        onStart={onHoldStart}
+        onEnd={onHoldEnd}
+      />
 
       <button className="pq-skip clickable" onClick={onSkip} disabled={sending || recording}>
         <SkipForward size={15} /> Passer ce son
@@ -493,49 +501,6 @@ function ClipButton({ url, label, kind }) {
     >
       <Play size={14} /> {label}
     </button>
-  );
-}
-
-// ============================================================
-//  Les deux courbes superposées
-// ============================================================
-// La justification visuelle du score. Les deux séries sont des hauteurs en
-// demi-tons RELATIFS à la médiane de chaque son (cf. soundContour.js) : elles
-// sont donc directement comparables, quelle que soit la voix.
-//
-// L'échelle verticale est COMMUNE et calculée sur les deux courbes réunies.
-// Les normaliser séparément ferait coïncider n'importe quoi avec n'importe
-// quoi — une imitation ratée aurait l'air juste, et le dessin mentirait sur le
-// score qu'il est censé expliquer.
-function ContourChart({ target, attempt }) {
-  const W = 320;
-  const H = 96;
-  const all = [...target, ...attempt];
-  const lo = Math.min(...all);
-  const hi = Math.max(...all);
-  const span = Math.max(4, hi - lo); // plancher : une ligne plate ne remplit pas l'écran
-  const pad = 8;
-
-  const toPath = (série) =>
-    série
-      .map((v, i) => {
-        const x = pad + (i / (série.length - 1)) * (W - pad * 2);
-        const y = H - pad - ((v - lo) / span) * (H - pad * 2);
-        return `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`;
-      })
-      .join(" ");
-
-  return (
-    <figure className="pq-chart">
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Ta mélodie comparée à l'originale">
-        <path className="pq-curve target" d={toPath(target)} />
-        <path className="pq-curve attempt" d={toPath(attempt)} />
-      </svg>
-      <figcaption>
-        <span className="pq-key target">l'original</span>
-        <span className="pq-key attempt">toi</span>
-      </figcaption>
-    </figure>
   );
 }
 

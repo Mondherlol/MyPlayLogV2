@@ -699,6 +699,7 @@ async function buildTimeline(
       a.type === "geoversus" ||
       a.type === "btversus" ||
       a.type === "pxversus" ||
+      a.type === "pqversus" ||
       a.type === "quizversus"
     ) {
       if (!a.meta?.versusId) continue;

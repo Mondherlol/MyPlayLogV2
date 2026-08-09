@@ -55,6 +55,7 @@ const activitySchema = new mongoose.Schema(
         "btversus", // a disputé un versus de blind test (même forme que
         // geoversus : une entrée par joueur, dédoublonnée par meta.versusId)
         "pxversus", // a disputé un versus Pixel Rush (idem)
+        "pqversus", // a disputé un versus du Perroquet (idem)
         "geoversus", // a disputé un versus GeoGamer (meta = mode/rang/score +
         // la table complète). Une entrée PAR JOUEUR (chacun a son résultat et
         // ses points), mais le fil n'en montre qu'une : routes/feed.js

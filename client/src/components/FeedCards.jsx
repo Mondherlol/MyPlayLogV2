@@ -186,6 +186,7 @@ export function FeedCard(props) {
     item.type === "geoversus" ||
     item.type === "btversus" ||
     item.type === "pxversus" ||
+    item.type === "pqversus" ||
     item.type === "quizversus"
   )
     return <VersusEvent {...props} />;
@@ -3514,8 +3515,9 @@ function VersusEvent({ item }) {
   const bt = item.type === "btversus";
   const px = item.type === "pxversus";
   const qz = item.type === "quizversus";
-  const game = bt ? "Blind Test" : px ? "Pixel Rush" : qz ? "Grand Quiz" : "GeoGamer";
-  const GameIcon = bt ? Music2 : px ? Grid2x2 : qz ? Trophy : MapPin;
+  const pq = item.type === "pqversus";
+  const game = bt ? "Blind Test" : px ? "Pixel Rush" : qz ? "Grand Quiz" : pq ? "Perroquet" : "GeoGamer";
+  const GameIcon = bt ? Music2 : px ? Grid2x2 : qz ? Trophy : pq ? Mic2 : MapPin;
   const table = [...(item.players || [])].sort((a, b) => a.rank - b.rank);
   const champ = table[0];
   const beaten = table.slice(1);
@@ -3523,7 +3525,7 @@ function VersusEvent({ item }) {
   // il s'oppose à un autre mode réglable. Ailleurs il est soit implicite (blind
   // test, Pixel Rush), soit décidé épreuve par épreuve (Grand Quiz) — l'annoncer
   // sur la carte induirait en erreur.
-  const buzzer = !bt && !px && !qz && item.mode === "buzzer";
+  const buzzer = !bt && !px && !qz && !pq && item.mode === "buzzer";
   // L'écart avec le deuxième : c'est le chiffre qui fait parler (« il l'a eu
   // pour 40 points »), bien plus que le total.
   const gap = table.length > 1 ? champ.score - table[1].score : 0;
