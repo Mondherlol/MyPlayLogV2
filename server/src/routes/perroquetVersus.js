@@ -10,12 +10,14 @@ import PerroquetVersus, {
   REVEAL_SEC,
 } from "../models/PerroquetVersus.js";
 import SoundClip from "../models/SoundClip.js";
+import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { emitTo, onlineAmong } from "../lib/realtime.js";
 import { recordActivity } from "../lib/activity.js";
 import { grantPoints } from "../lib/points.js";
 import { contourOf, compare } from "../lib/soundContour.js";
 import { person } from "./blindtest.js";
+import { deliverCard, deliverCardToConversation } from "./chat.js";
 import {
   makeCode,
   makeRoomQueue,
@@ -659,6 +661,116 @@ router.get("/:code/results", async (req, res) => {
   } catch (err) {
     console.error("pqversus results error:", err.message);
     res.status(500).json({ error: "Erreur de chargement." });
+  }
+});
+
+// ============================================================
+//  POST /:code/invite — la carte d'invitation en message privé
+// ============================================================
+// Même forme que les quatre autres salons : on n'invente rien, la carte de la
+// messagerie est partagée et attend exactement ces champs.
+//
+// Le filtre sur les abonnés n'est pas de la politesse : sans lui, n'importe qui
+// pourrait déposer une carte dans le fil de n'importe qui. On n'écrit qu'à ceux
+// qui suivent déjà l'expéditeur — les autres ressortent dans `skipped`, et
+// l'interface le dit plutôt que de faire semblant d'avoir envoyé.
+router.post("/:code/invite", async (req, res) => {
+  try {
+    const room = await PerroquetVersus.findOne({ code: String(req.params.code) }).populate(
+      POPULATE
+    );
+    if (!room) return res.status(404).json({ error: "Ce salon n'existe plus." });
+    if (!allIds(room).includes(String(req.userId)))
+      return res.status(403).json({ error: "Rejoins le salon avant d'inviter." });
+    if (room.startedAt)
+      return res.status(409).json({ error: "La partie a déjà commencé." });
+
+    const userIds = [...new Set((req.body?.userIds || []).map(String))].slice(0, 10);
+    const conversationIds = [...new Set((req.body?.conversationIds || []).map(String))].slice(0, 10);
+    if (!userIds.length && !conversationIds.length)
+      return res.status(400).json({ error: "Personne à inviter." });
+
+    const [me, targets] = await Promise.all([
+      User.findById(req.userId).select("username").lean(),
+      User.find({ _id: { $in: userIds } }).select("username following").lean(),
+    ]);
+
+    const card = {
+      kind: "perroquet",
+      code: room.code,
+      hostName: me?.username || "",
+      players: activePlayers(room).length,
+      maxPlayers: MAX_PLAYERS,
+      rounds: room.roundCount,
+    };
+    const text = String(req.body?.text || "").slice(0, 300);
+
+    const sent = [];
+    const skipped = [];
+    for (const target of targets) {
+      const allowed = (target.following || []).some((id) => String(id) === String(req.userId));
+      if (!allowed) {
+        skipped.push({ id: String(target._id), username: target.username });
+        continue;
+      }
+      // eslint-disable-next-line no-await-in-loop
+      await deliverCard({ fromId: req.userId, toId: target._id, text, versus: card });
+      sent.push({ id: String(target._id), username: target.username });
+    }
+
+    const groups = [];
+    for (const cid of conversationIds) {
+      // eslint-disable-next-line no-await-in-loop
+      const ok = await deliverCardToConversation({
+        fromId: req.userId,
+        conversationId: cid,
+        text,
+        versus: card,
+      });
+      if (ok) groups.push(cid);
+    }
+
+    res.json({ sent, skipped, groups: groups.length });
+  } catch (err) {
+    console.error("pqversus invite error:", err.message);
+    res.status(500).json({ error: "Invitation non envoyée." });
+  }
+});
+
+// ============================================================
+//  GET /:code/card — l'état du salon pour la carte de la messagerie
+// ============================================================
+// Séparé de `GET /:code`, qui répondrait la manche en cours — donc l'URL du son
+// à imiter. Une carte relue dans un fil de discussion n'a aucune raison de
+// distribuer la réponse de la manche que les autres sont en train de jouer.
+//
+// Un salon disparu n'est PAS une erreur : c'est l'issue normale d'une carte
+// relue trois jours plus tard. On répond « gone » en 200 pour que le client
+// l'affiche au lieu de le traiter comme une panne.
+router.get("/:code/card", async (req, res) => {
+  try {
+    const room = await PerroquetVersus.findOne({ code: String(req.params.code) }).populate(
+      POPULATE
+    );
+    if (!room) return res.json({ state: "gone" });
+    const active = activePlayers(room);
+    const done = room.phase === "done" || !!room.endedAt;
+    const champ = done
+      ? [...room.players].filter((p) => !p.leftAt).sort((a, b) => (b.score || 0) - (a.score || 0))[0]
+      : null;
+    res.json({
+      state: done ? "done" : room.startedAt ? "live" : "lobby",
+      players: active.map((p) => person(p.user)),
+      count: active.length,
+      max: MAX_PLAYERS,
+      rounds: room.roundCount,
+      index: room.index,
+      mine: allIds(room).includes(String(req.userId)),
+      winner: champ ? person(champ.user)?.username || null : null,
+    });
+  } catch (err) {
+    console.error("pqversus card error:", err.message);
+    res.status(500).json({ error: "Erreur." });
   }
 });
 

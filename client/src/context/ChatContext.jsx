@@ -16,6 +16,27 @@ import { playMessageSound } from "../lib/sfx";
 
 const ChatContext = createContext(null);
 
+// ======================================================================
+//  Les salons de versus qui reçoivent le direct
+// ======================================================================
+// `EventSource` n'a pas de « tout écouter » : chaque nom d'évènement exige son
+// propre `addEventListener`. Un salon absent de cette liste diffuse donc dans
+// le vide — le serveur émet, personne n'entend, et RIEN NE SIGNALE L'ERREUR.
+//
+// Le symptôme est déroutant : le salon marche, les joueurs y entrent pour de
+// bon, la base est juste… et aucun écran ne bouge. On cherche le bug côté
+// serveur pendant une heure alors qu'il a parfaitement fait son travail.
+//
+// AJOUTER UN SALON = AJOUTER SON NOM ICI. C'est le seul endroit du client qui
+// décide si un jeu reçoit ses évènements.
+const VERSUS_EVENTS = [
+  "geoversus",
+  "btversus",
+  "pxversus",
+  "quizversus",
+  "pqversus", // Le Perroquet
+];
+
 // Durée d'affichage d'une bulle « X t'a écrit » (ms).
 const TOAST_MS = 6000;
 // Un « … est en train d'écrire » s'efface tout seul si plus rien n'arrive.
@@ -351,21 +372,20 @@ export function ChatProvider({ children }) {
     // C'EST ARRIVÉ DEUX FOIS : à GeoGamer/blind test, puis au Grand Quiz malgré
     // cet avertissement. TOUT NOUVEAU SALON DOIT AJOUTER SA LIGNE ICI — c'est
     // le seul endroit du client qui décide si un jeu reçoit ses évènements.
-    es.addEventListener("geoversus", (e) => {
-      emit("geoversus", JSON.parse(e.data));
-    });
-
-    es.addEventListener("btversus", (e) => {
-      emit("btversus", JSON.parse(e.data));
-    });
-
-    es.addEventListener("pxversus", (e) => {
-      emit("pxversus", JSON.parse(e.data));
-    });
-
-    es.addEventListener("quizversus", (e) => {
-      emit("quizversus", JSON.parse(e.data));
-    });
+    // La liste est DÉRIVÉE et non recopiée quatre fois. L'avertissement
+    // ci-dessus n'a pas suffi : l'oubli s'est reproduit une troisième fois avec
+    // le Perroquet, et le symptôme est toujours le même — le salon fonctionne
+    // parfaitement côté serveur, les joueurs y entrent vraiment, mais aucun
+    // écran ne bouge parce que personne n'écoute. Introuvable dans les logs, le
+    // serveur ayant fait son travail.
+    //
+    // Avec une seule liste, ajouter un salon est une entrée de plus dans un
+    // tableau au lieu d'un bloc à ne pas oublier de copier.
+    for (const name of VERSUS_EVENTS) {
+      es.addEventListener(name, (e) => {
+        emit(name, JSON.parse(e.data));
+      });
+    }
 
     // Journal du serveur, en direct — n'arrive qu'aux administrateurs (le
     // serveur ne l'adresse qu'à eux, cf. lib/audit.js). Simple relais : c'est

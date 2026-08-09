@@ -111,11 +111,20 @@ const motCardSchema = new mongoose.Schema(
 // ici verrait toutes ses invitations rejetées par Mongoose, et la route
 // d'invitation répondrait « Invitation non envoyée » sans que rien ne dise
 // pourquoi. C'est arrivé à Pixel Rush, puis au Grand Quiz — l'avertissement
-// ci-dessus était pourtant écrit. Si un cinquième jeu arrive : commencer PAR
-// cette ligne.
+// ci-dessus était pourtant écrit. Le Perroquet, cinquième, s'y est fait
+// prendre à son tour — et le symptôme est le même à chaque fois : la carte
+// part, Mongoose la refuse, et l'utilisateur lit « Invitation non envoyée »
+// alors que le salon, lui, marche parfaitement. Le jeu s'ajoute à trois
+// registres muets (celui-ci, l'enum d'Activity, la liste d'écoute SSE de
+// ChatContext) : les faire tous les trois AVANT d'écrire la moindre route
+// épargne trois séances de débogage identiques.
 const versusCardSchema = new mongoose.Schema(
   {
-    kind: { type: String, enum: ["geo", "blindtest", "pixel", "quiz"], default: "geo" },
+    kind: {
+      type: String,
+      enum: ["geo", "blindtest", "pixel", "quiz", "perroquet"],
+      default: "geo",
+    },
     code: { type: String, required: true },
     mode: { type: String, default: "classic" }, // GeoGamer : classic | buzzer
     hostName: { type: String, default: "" },

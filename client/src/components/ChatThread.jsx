@@ -1419,7 +1419,7 @@ function BookCard({ book }) {
 }
 
 // ============================================================
-//  Carte « rejoins mon versus » (GeoGamer ou blind test)
+//  Carte « rejoins mon versus » (les cinq salons)
 // ============================================================
 // UN SALON VIT. Il se remplit, il se lance, il se termine, puis il s'efface
 // deux heures plus tard. La carte figée sur l'état du jour de l'envoi mentait
@@ -1476,7 +1476,9 @@ function useVersusRoom(code, game, token) {
           ? `/pixel/versus/${code}/card`
           : game === "qz"
             ? `/quiz/versus/${code}/card`
-            : `/geo/versus/${code}/card`;
+            : game === "pq"
+              ? `/perroquet/versus/${code}/card`
+              : `/geo/versus/${code}/card`;
 
     async function pull() {
       try {
@@ -1526,14 +1528,15 @@ function useVersusRoom(code, game, token) {
 
 function VersusCard({ versus }) {
   const { token } = useAuth();
-  // Quatre jeux passent par cette carte : le blind test, Pixel Rush, GeoGamer
-  // et le Grand Quiz. Le `kind` du message décide, et le reste (têtes, places,
+  // Cinq jeux passent par cette carte : le blind test, Pixel Rush, GeoGamer,
+  // le Grand Quiz et le Perroquet. Le `kind` du message décide, et le reste (têtes, places,
   // état du salon) est rigoureusement identique — c'est tout l'intérêt d'avoir
-  // imposé la même forme de réponse aux quatre routes /card.
+  // imposé la même forme de réponse aux cinq routes /card.
   const bt = versus.kind === "blindtest";
   const px = versus.kind === "pixel";
   const qz = versus.kind === "quiz";
-  const game = bt ? "bt" : px ? "px" : qz ? "qz" : "geo";
+  const pq = versus.kind === "perroquet";
+  const game = bt ? "bt" : px ? "px" : qz ? "qz" : pq ? "pq" : "geo";
   const live = useVersusRoom(versus.code, game, token);
 
   // Trois sources, dans cet ordre : le salon s'il a répondu, sinon ce que porte
@@ -1544,7 +1547,7 @@ function VersusCard({ versus }) {
   const max = known ? live.max : versus.maxPlayers || 5;
   const rounds = known ? live.rounds : versus.rounds || 8;
   const faces = known ? live.players || [] : [];
-  const buzzer = !bt && !px && !qz && (known ? live.mode : versus.mode) === "buzzer";
+  const buzzer = !bt && !px && !qz && !pq && (known ? live.mode : versus.mode) === "buzzer";
   const mine = !!live?.mine;
 
   // Une porte n'est ouverte que si le serveur laisserait vraiment entrer : le
@@ -1602,9 +1605,9 @@ function VersusCard({ versus }) {
       <span className="chat-card-body">
         <span className="chat-card-kicker">
           <Swords size={12} />{" "}
-          {bt ? "Blind test" : px ? "Pixel Rush" : qz ? "Grand Quiz" : "GeoGamer"}
+          {bt ? "Blind test" : px ? "Pixel Rush" : qz ? "Grand Quiz" : pq ? "Le Perroquet" : "GeoGamer"}
           <i className="gv-card-mode">
-            {bt || px ? "versus" : qz ? "plateau" : buzzer ? "buzzer" : "classique"}
+            {bt || px || pq ? "versus" : qz ? "plateau" : buzzer ? "buzzer" : "classique"}
           </i>
         </span>
 
@@ -1646,7 +1649,9 @@ function VersusCard({ versus }) {
             ? `/pixel/versus/${versus.code}`
             : qz
               ? `/quiz/versus/${versus.code}`
-              : `/geo/versus/${versus.code}`
+              : pq
+                ? `/perroquet/versus/${versus.code}`
+                : `/geo/versus/${versus.code}`
       }
       className={`${cls} clickable`}
     >

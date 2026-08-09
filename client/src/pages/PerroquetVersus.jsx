@@ -11,12 +11,14 @@ import {
   MicOff,
   Play,
   Trophy,
+  UserPlus,
   Users,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useChat } from "../context/ChatContext";
 import { apiFetch, apiUpload } from "../lib/api";
 import { openMic, closeMic, startTake, canRecord } from "../lib/soundTake";
+import { VersusInvite } from "../components/VersusRoom";
 import PerroquetHold from "../components/PerroquetHold";
 import ContourChart from "../components/ContourChart";
 
@@ -56,6 +58,7 @@ export default function PerroquetVersus() {
   const [level, setLevel] = useState(0);
   const [sent, setSent] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
 
   const streamRef = useRef(null);
   const takeRef = useRef(null);
@@ -287,6 +290,7 @@ export default function PerroquetVersus() {
             onStart={start}
             busy={busy}
             copied={copied}
+            onInvite={() => setShowInvite(true)}
             onCopy={() => {
               navigator.clipboard?.writeText(window.location.href).catch(() => {});
               setCopied(true);
@@ -347,6 +351,20 @@ export default function PerroquetVersus() {
 
         {phase === "done" && <Final room={room} onQuit={() => navigate("/arcade")} />}
       </div>
+
+      {/* La modale d'invitation est celle des quatre autres salons
+          (components/VersusRoom.jsx), pilotée par son `endpoint` : elle ne sait
+          rien du Perroquet et n'a besoin de rien savoir. */}
+      {showInvite && (
+        <VersusInvite
+          token={token}
+          meId={user?.id}
+          room={room}
+          endpoint={`/perroquet/versus/${room.code}/invite`}
+          title="Inviter au Perroquet"
+          onClose={() => setShowInvite(false)}
+        />
+      )}
     </div>
   );
 }
@@ -354,7 +372,7 @@ export default function PerroquetVersus() {
 // ============================================================
 //  Le salon d'attente
 // ============================================================
-function Lobby({ room, armed, onArm, onStart, busy, copied, onCopy, code }) {
+function Lobby({ room, armed, onArm, onStart, onInvite, busy, copied, onCopy, code }) {
   const active = room.players.filter((p) => !p.left);
   const ready = active.filter((p) => p.armed).length;
   const canStart = room.isHost && active.length >= 2;
@@ -390,6 +408,10 @@ function Lobby({ room, armed, onArm, onStart, busy, copied, onCopy, code }) {
           </li>
         ))}
       </ul>
+
+      <button className="pq-go alt clickable" onClick={onInvite}>
+        <UserPlus size={17} /> Inviter des amis
+      </button>
 
       {!armed && (
         <button className="pq-go clickable" onClick={onArm}>
