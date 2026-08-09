@@ -1367,3 +1367,103 @@
   border-color: var(--pq-warm);
   box-shadow: none;
 }
+
+/* ---------- Les vignettes de courbe du classement ---------- */
+/* Ce qui manquait au verdict : on entendait les autres sans jamais voir OÙ ils
+   étaient partis, alors que c'est exactement ce que le barème note. Chaque
+   ligne porte donc la forme de sa mélodie.
+
+   `preserveAspectRatio: none` côté SVG : la vignette s'étire à la largeur
+   disponible. La déformation est sans conséquence ici — on lit un profil
+   (« ça monte puis ça retombe »), pas des valeurs. */
+.pq-chart-mini {
+  flex: none;
+  width: 76px;
+  height: 26px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px;
+}
+.pq-chart-mini .pq-curve {
+  stroke-width: 4; /* épais : le viewBox est minuscule et s'étire beaucoup */
+}
+.pq-chart-mini .pq-curve.target {
+  stroke: var(--pq-dim);
+  stroke-dasharray: none; /* à cette taille, des pointillés font du bruit */
+  opacity: 0.45;
+}
+.pq-chart-mini .pq-curve.attempt { stroke: var(--band, var(--pq-warm)); }
+
+/* La ligne dont la courbe est affichée en grand. */
+.pq-podium-row.picked {
+  border-color: var(--band);
+  box-shadow: inset 0 0 0 1px var(--band);
+}
+.pq-podium-row.clickable { cursor: pointer; }
+.pq-podium-row.clickable:hover { background: rgba(255, 255, 255, 0.04); }
+
+.pq-pick-hint {
+  margin: -4px 0 0;
+  font-size: 0.74rem;
+  color: var(--pq-dim);
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  /* La vignette part en premier quand la place manque : le nom, le score et le
+     bouton d'écoute sont plus utiles qu'elle sur un écran étroit. */
+  .pq-chart-mini { display: none; }
+  .pq-pick-hint { display: none; }
+}
+
+/* ---------- La revue : on écoute chacun à tour de rôle ---------- */
+/* La ligne en cours de lecture. Le fond ET la bordure changent : le surlignage
+   doit se voir depuis l'autre bout de la pièce — c'est un jeu où l'on regarde
+   souvent l'écran de quelqu'un d'autre. */
+.pq-podium-row.playing {
+  background: color-mix(in srgb, var(--band) 22%, var(--pq-panel));
+  border-color: var(--band);
+  transform: translateX(3px);
+}
+.pq-podium-row { transition: background 0.25s ease, transform 0.25s ease; }
+
+/* Trois barres qui dansent pendant la lecture, figées sinon. Elles remplacent
+   le bouton « écouter » : c'est la ligne entière qui se clique désormais, et
+   deux cibles imbriquées donnaient des clics imprévisibles. */
+.pq-podium-wave {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 16px;
+  width: 18px;
+}
+.pq-podium-wave i {
+  width: 3px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--pq-dim);
+  transition: background 0.2s ease;
+}
+.pq-podium-row.playing .pq-podium-wave i {
+  background: var(--band);
+  animation: pq-eq 0.75s ease-in-out infinite;
+}
+.pq-podium-row.playing .pq-podium-wave i:nth-child(2) { animation-delay: 0.18s; }
+.pq-podium-row.playing .pq-podium-wave i:nth-child(3) { animation-delay: 0.36s; }
+@keyframes pq-eq {
+  0%, 100% { height: 4px; }
+  50% { height: 15px; }
+}
+
+/* L'original en cours de lecture. */
+.pq-clip.on {
+  border-color: var(--pq-warm);
+  background: var(--pq-warm-soft);
+  color: var(--pq-warm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pq-podium-row.playing { transform: none; }
+  .pq-podium-row.playing .pq-podium-wave i { animation: none; height: 12px; }
+}

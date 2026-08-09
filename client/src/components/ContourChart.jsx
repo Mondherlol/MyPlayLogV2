@@ -17,12 +17,18 @@
 // normaliser séparément ferait coïncider n'importe quoi avec n'importe quoi :
 // une imitation ratée aurait l'air juste, et le dessin mentirait sur le score
 // qu'il est précisément là pour expliquer.
-export default function ContourChart({ target, attempt }) {
+// `compact` : la même courbe en vignette, pour tenir dans une ligne de
+// classement. Pas de légende, pas de pointillés — à cette taille ils
+// deviendraient du bruit — mais RIGOUREUSEMENT LE MÊME CALCUL d'échelle. Une
+// vignette qui normaliserait autrement que le grand graphique raconterait une
+// autre histoire que lui, et c'est exactement ce qu'on ne veut pas : les deux
+// sont là pour expliquer le même score.
+export default function ContourChart({ target, attempt, compact = false, name }) {
   if (!target?.length || !attempt?.length) return null;
 
-  const W = 320;
-  const H = 96;
-  const pad = 8;
+  const W = compact ? 90 : 320;
+  const H = compact ? 26 : 96;
+  const pad = compact ? 2 : 8;
   const all = [...target, ...attempt];
   const lo = Math.min(...all);
   const hi = Math.max(...all);
@@ -40,15 +46,33 @@ export default function ContourChart({ target, attempt }) {
       })
       .join(" ");
 
+  const alt = name
+    ? `La mélodie de ${name} comparée à l'originale`
+    : "Ta mélodie comparée à l'originale";
+
+  if (compact)
+    return (
+      <svg
+        className="pq-chart-mini"
+        viewBox={`0 0 ${W} ${H}`}
+        role="img"
+        aria-label={alt}
+        preserveAspectRatio="none"
+      >
+        <path className="pq-curve target" d={toPath(target)} />
+        <path className="pq-curve attempt" d={toPath(attempt)} />
+      </svg>
+    );
+
   return (
     <figure className="pq-chart">
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Ta mélodie comparée à l'originale">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={alt}>
         <path className="pq-curve target" d={toPath(target)} />
         <path className="pq-curve attempt" d={toPath(attempt)} />
       </svg>
       <figcaption>
         <span className="pq-key target">l'original</span>
-        <span className="pq-key attempt">toi</span>
+        <span className="pq-key attempt">{name || "toi"}</span>
       </figcaption>
     </figure>
   );

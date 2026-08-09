@@ -40,7 +40,7 @@ import ffmpegStatic from "ffmpeg-static";
 const FFMPEG = process.env.FFMPEG_PATH || ffmpegStatic || "ffmpeg";
 
 // 16 kHz mono : au-dessus de 8 kHz il n'y a rien qui nous intéresse (on cherche
-// une fondamentale entre 70 et 1000 Hz), et ça divise le décodage par trois.
+// une fondamentale entre 70 et 1400 Hz), et ça divise le décodage par trois.
 const RATE = 16000;
 
 // Fenêtre d'analyse et pas d'avance. 40 ms tient deux périodes complètes même
@@ -50,10 +50,17 @@ const WIN = Math.round(0.04 * RATE); // 640 échantillons
 const HOP = Math.round(0.01 * RATE); // 160 échantillons → une mesure / 10 ms
 
 // Bornes de recherche de la fondamentale. Large exprès : on couvre la basse
-// masculine (~70 Hz) jusqu'aux couinements de Kirby et aux cris de Pokémon
-// (~1000 Hz). Trop resserrer ferait échouer la détection sur la moitié du banc.
+// masculine (~70 Hz) jusqu'aux couinements de Kirby, aux cris de Pokémon et aux
+// jingles de pièce, qui montent volontiers vers 1300 Hz.
+//
+// LE PLAFOND N'EST PAS DÉCORATIF. À 1000 Hz, un son plus aigu que la borne ne
+// pouvait pas être détecté du tout : l'autocorrélation se rabattait sur des
+// sous-harmoniques, en sautant d'une octave à l'autre au fil des trames. Le
+// contour obtenu n'était pas « imprécis », il était FAUX — une pièce qui monte
+// ressortait comme une chute de sept demi-tons, avec une amplitude de trois
+// octaves. Et rien ne le signalait : le taux de voisement restait à 100 %.
 const F0_MIN = 70;
-const F0_MAX = 1000;
+const F0_MAX = 1400;
 const LAG_MIN = Math.floor(RATE / F0_MAX);
 const LAG_MAX = Math.floor(RATE / F0_MIN);
 
@@ -138,6 +145,9 @@ function frameF0(buf, start) {
   for (let i = 0; i < WIN; i += 1) e0 += buf[start + i] * buf[start + i];
   if (e0 <= 1e-9) return { f0: 0, clarity: 0 };
 
+  // On relève TOUTE la courbe d'autocorrélation avant de choisir : le maximum
+  // absolu ne suffit pas (voir plus bas).
+  const norms = new Float64Array(LAG_MAX + 1);
   for (let lag = LAG_MIN; lag <= LAG_MAX; lag += 1) {
     let corr = 0;
     let e1 = 0;
@@ -148,12 +158,35 @@ function frameF0(buf, start) {
     }
     if (e1 <= 1e-9) continue;
     const norm = corr / Math.sqrt(e0 * e1);
+    norms[lag] = norm;
     if (norm > best) {
       best = norm;
       bestLag = lag;
     }
   }
   if (!bestLag || best < CLARITY_MIN) return { f0: 0, clarity: best };
+
+  // ---------------------------------------------- l'erreur d'octave
+  // Un signal périodique se ressemble à lui-même à SA période, mais aussi à
+  // deux fois, trois fois sa période. Prendre le maximum absolu revient donc à
+  // tirer au sort entre la fondamentale et ses sous-harmoniques : d'une trame à
+  // l'autre le gagnant change, et la mélodie relevée saute d'une octave sans
+  // que le son ait bougé.
+  //
+  // La parade classique (YIN, RAPT) : parcourir les décalages du plus court au
+  // plus long et retenir LE PREMIER SOMMET assez proche du maximum. La vraie
+  // période étant toujours le plus court des décalages qui marchent, on la
+  // trouve avant ses multiples.
+  const floorNorm = best * 0.88;
+  for (let lag = LAG_MIN + 1; lag < bestLag; lag += 1) {
+    if (
+      norms[lag] >= floorNorm &&
+      norms[lag] >= norms[lag - 1] &&
+      norms[lag] >= norms[lag + 1]
+    ) {
+      return { f0: RATE / lag, clarity: norms[lag] };
+    }
+  }
   return { f0: RATE / bestLag, clarity: best };
 }
 
@@ -316,9 +349,13 @@ const soften = (dist, tol) => 1 / (1 + (dist / tol) ** 2);
 // Poids des trois critères. La hauteur domine parce que c'est ce que l'oreille
 // juge en premier — mais l'enveloppe compte assez pour qu'une note tenue au bon
 // endroit ne batte pas une imitation qui a le bon rythme.
-const W_PITCH = 0.55;
-const W_ENERGY = 0.3;
-const W_DUR = 0.15;
+// La durée pèse plus qu'il n'y paraît : une fois la détection de hauteur
+// fiabilisée, elle est devenue le SEUL critère capable de sanctionner une
+// imitation deux fois trop lente. Mélodie juste et enveloppe de même forme, ce
+// qui est correct — mais à 0,15 de poids, un tel essai décrochait « Parfait ».
+const W_PITCH = 0.5;
+const W_ENERGY = 0.28;
+const W_DUR = 0.22;
 
 /**
  * Note une imitation contre un son de référence.
@@ -346,7 +383,9 @@ export function compare(target, attempt) {
   // secondes, c'est du bruit de mesure.
   const ratio =
     Math.max(attempt.durationMs, 1) / Math.max(target.durationMs, 1);
-  const duration = soften(Math.abs(Math.log2(ratio)), 0.6);
+  // Tolérance resserrée : un facteur 2 sur la durée s'entend immédiatement,
+  // il ne doit pas coûter que quelques points.
+  const duration = soften(Math.abs(Math.log2(ratio)), 0.35);
 
   // La somme pondérée seule ne suffit PAS, et c'est contre-intuitif : avec une
   // hauteur à zéro, l'enveloppe et la durée garantissent encore 45 points. Une

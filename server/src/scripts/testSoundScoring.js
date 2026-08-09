@@ -50,10 +50,15 @@ function writeNoise(file, dur = 1) {
 
 writeSweep(F("target"), 200, 500);        // LA CIBLE : une montée
 writeSweep(F("same"), 200, 500);          // copie conforme
-// Transposition : MÊME mélodie, voix plus haute. On monte d'une quinte et non
-// d'une octave — à l'octave, le balayage finirait à 1000 Hz, pile sur le
-// plafond de détection (F0_MAX), et le contour serait tronqué par le haut. Le
-// score chuterait alors à cause d'un artefact du banc et non du barème.
+// Transposition : MÊME mélodie, voix plus haute. Le cas qui vérifie que le
+// barème note l'imitation et non la tessiture — une basse et une soprano qui
+// font le même mouvement doivent obtenir la même note.
+//
+// (La quinte plutôt que l'octave est un reste d'époque : le plafond de
+// détection était à 1000 Hz et une transposition à l'octave finissait pile
+// dessus, ce qui faisait chuter le score pour un artefact du banc. Le plafond
+// est passé à 1400 Hz, mais on garde ce cas tel quel — il est validé, et rien
+// n'oblige à tout tester à la limite.)
 writeSweep(F("higher"), 300, 750);
 writeSweep(F("halftempo"), 200, 500, 2);  // même mélodie, deux fois plus lente
 writeSweep(F("down"), 500, 200);          // mélodie inverse
@@ -97,8 +102,12 @@ const checks = [
   ["mélodie inverse : sous le seuil « on y était »", by.down < 48],
   ["note tenue : sous le seuil « on y était »", by.flat < 48],
   ["bruit blanc : au plancher (garde-fou du voisement)", by.noise < 30],
+  // Verrou posé après coup : en fiabilisant la détection de hauteur, la mélodie
+  // d'un essai deux fois trop lent est devenue PARFAITE, et le total remontait
+  // à « Parfait » faute d'un poids suffisant sur la durée.
   ["deux fois plus lent : pénalisé sans être éliminé",
     by.halftempo < by.same && by.halftempo > by.noise],
+  ["deux fois plus lent : n'atteint PAS « parfait »", by.halftempo < 82],
 ];
 
 console.log();

@@ -184,6 +184,47 @@ router.post("/", upload.single("clip"), async (req, res) => {
   }
 });
 
+
+// ============================================================
+//  POST /api/admin/perroquet/recompute — refaire tous les contours
+// ============================================================
+// Les contours sont calculés UNE FOIS, à l'envoi, et stockés (cf.
+// models/SoundClip.js) : c'est ce qui évite de redécoder le son de référence à
+// chaque manche. Le revers, c'est qu'ils vieillissent — dès qu'on touche à
+// lib/soundContour.js, la banque garde des mesures faites par l'ancienne
+// version, et les scores se calculent contre des cibles périmées.
+//
+// Ce bouton existe pour ça. C'est arrivé dès le premier réglage : le plafond de
+// détection est passé de 1000 à 1400 Hz, et tous les sons aigus déjà en banque
+// portaient un contour faux jusqu'à ce recalcul.
+router.post("/recompute", async (req, res) => {
+  try {
+    const rows = await SoundClip.find().lean();
+    let done = 0;
+    const failed = [];
+    for (const c of rows) {
+      const file = path.join(BANK_DIR, path.basename(c.url || ""));
+      if (!c.url?.startsWith("/uploads/perroquet/bank/") || !fs.existsSync(file)) {
+        failed.push(c.label);
+        continue;
+      }
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const contour = await contourOf(file);
+        // eslint-disable-next-line no-await-in-loop
+        await SoundClip.updateOne({ _id: c._id }, { contour });
+        done += 1;
+      } catch {
+        failed.push(c.label);
+      }
+    }
+    res.json({ done, failed });
+  } catch (err) {
+    console.error("perroquet recompute error:", err.message);
+    res.status(500).json({ error: "Recalcul impossible." });
+  }
+});
+
 // ⚠️ LES ROUTES `/demo` PASSENT AVANT `/:id`, ET CE N'EST PAS COSMÉTIQUE.
 // Express essaie les routes dans l'ordre de déclaration : placé après,
 // `DELETE /:id` happerait `DELETE /demo` en croyant que « demo » est un
@@ -198,34 +239,95 @@ router.post("/", upload.single("clip"), async (req, res) => {
 // téléversement, barème, récap — sans avoir à réunir quinze fichiers d'abord.
 // `DELETE /demo` les retire quand la vraie banque est prête.
 const DEMO = [
+  // --- Faciles : un seul mouvement, deux notes au plus ---
   { key: "montee", label: "La montée", notes: [220, 440], dur: 0.8, difficulty: 1 },
   { key: "descente", label: "La descente", notes: [520, 200], dur: 0.8, difficulty: 1 },
+  { key: "coucou", label: "Le coucou", notes: [520, 415], dur: 0.7, style: "steps", difficulty: 1 },
+  { key: "soupir", label: "Le soupir", notes: [480, 250], dur: 1.1, difficulty: 1 },
+  { key: "reveil", label: "Le réveil", notes: [660, 660], dur: 0.5, style: "steps", difficulty: 1 },
+
+  // --- Deux syllabes ---
   { key: "saut", label: "Le saut", notes: [260, 260, 620], dur: 0.7, difficulty: 2 },
+  { key: "piece", label: "La pièce", notes: [988, 1319], dur: 0.5, style: "steps", difficulty: 2 },
+  { key: "appel", label: "L'appel", notes: [400, 600, 400], dur: 0.9, style: "steps", difficulty: 2 },
+  { key: "ressort", label: "Le ressort", notes: [200, 800], dur: 0.45, difficulty: 2 },
+  { key: "porte", label: "La sonnette", notes: [660, 523], dur: 0.9, style: "steps", difficulty: 2 },
+
+  // --- Une inflexion à négocier ---
   { key: "vague", label: "La vague", notes: [300, 560, 300, 560], dur: 1.2, difficulty: 3 },
   { key: "plongeon", label: "Le plongeon", notes: [640, 300, 180], dur: 1.0, difficulty: 3 },
+  { key: "miaou", label: "Le miaulement", notes: [350, 700, 420], dur: 1.0, vibrato: 5, difficulty: 3 },
+  { key: "rebond", label: "Le rebond", notes: [300, 620, 440, 700], dur: 1.0, style: "steps", difficulty: 3 },
+  { key: "fusee", label: "La fusée", notes: [180, 300, 900], dur: 0.9, difficulty: 3 },
+  { key: "bulle", label: "La bulle", notes: [700, 300, 700], dur: 0.8, difficulty: 3 },
+
+  // --- Une vraie mélodie ---
   { key: "question", label: "La question", notes: [300, 280, 500], dur: 0.9, difficulty: 4 },
+  { key: "fanfare", label: "La fanfare", notes: [392, 523, 659, 784], dur: 1.1, style: "steps", difficulty: 4 },
+  { key: "hoquet", label: "Le hoquet", notes: [520, 300, 520, 300], dur: 0.8, style: "steps", difficulty: 4 },
+  { key: "sirene", label: "La sirène", notes: [320, 620, 320, 620], dur: 1.4, vibrato: 3, difficulty: 4 },
+  { key: "victoire", label: "La victoire", notes: [523, 523, 523, 698], dur: 1.0, style: "steps", difficulty: 4 },
+
+  // --- Tordu ---
+  { key: "grandhuit", label: "Le grand huit", notes: [250, 700, 300, 650, 350], dur: 1.5, difficulty: 5 },
+  { key: "zigzag", label: "Le zigzag", notes: [600, 300, 750, 260, 850], dur: 1.3, style: "steps", difficulty: 5 },
+  { key: "cascade", label: "La cascade", notes: [900, 700, 550, 420, 300, 220], dur: 1.2, style: "steps", difficulty: 5 },
+  { key: "gargouille", label: "La gargouille", notes: [180, 420, 200, 380, 170], dur: 1.4, vibrato: 8, difficulty: 5 },
 ];
 
-// Écrit une mélodie en PCM puis l'encapsule en WAV. On GLISSE entre les notes
-// plutôt que de les juxtaposer : une transition franche produit un clic, et
-// surtout une voix humaine glisse — la cible doit être imitable telle quelle.
-function writeMelody(file, notes, dur, sr = 16000) {
+// Écrit une mélodie en PCM puis l'encapsule en WAV.
+//
+// Trois styles, parce qu'une seule forme d'attaque rendait tous les sons
+// interchangeables — et un banc de sons interchangeables ne teste rien :
+//
+//   glide (défaut) : on GLISSE d'une note à l'autre. C'est ce que fait une voix
+//     humaine, donc la cible reste imitable telle quelle ; et une transition
+//     franche entre deux sinus produit un clic désagréable.
+//   steps : chaque note est réattaquée, avec son propre fondu. Donne des sons
+//     « à syllabes » (une sonnette, une fanfare) — que l'oreille compte, et que
+//     le barème note sur l'enveloppe autant que sur la hauteur.
+//   vibrato : une modulation lente de la hauteur. Difficile à imiter
+//     proprement, d'où les difficultés élevées.
+function writeMelody(file, spec, sr = 16000) {
+  const { notes, dur, style = "glide", vibrato = 0 } = spec;
   return new Promise((resolve, reject) => {
     const n = Math.round(sr * dur);
     const buf = Buffer.alloc(n * 2);
     let phase = 0;
+
     for (let i = 0; i < n; i += 1) {
-      const t = (i / n) * (notes.length - 1);
-      const k = Math.min(notes.length - 2, Math.floor(t));
-      // Interpolation logarithmique : c'est ainsi qu'on perçoit la hauteur, et
-      // c'est l'échelle du barème (des demi-tons).
-      const f = notes[k] * (notes[k + 1] / notes[k]) ** (t - k);
-      phase += (2 * Math.PI * f) / sr;
       const x = i / n;
-      const env = Math.min(1, i / (sr * 0.03)) * Math.min(1, (n - i) / (sr * 0.08));
+      let f;
+      let env;
+
+      if (style === "steps") {
+        // Une note par tranche égale, chacune avec son attaque et sa chute.
+        const k = Math.min(notes.length - 1, Math.floor(x * notes.length));
+        f = notes[k];
+        const seg = n / notes.length;
+        const inSeg = i - k * seg;
+        env =
+          Math.min(1, inSeg / (sr * 0.012)) *
+          Math.min(1, (seg - inSeg) / (sr * 0.05));
+      } else {
+        const t = x * (notes.length - 1);
+        const k = Math.min(notes.length - 2, Math.floor(t));
+        // Interpolation logarithmique : c'est ainsi qu'on perçoit la hauteur,
+        // et c'est l'échelle du barème (des demi-tons).
+        f = notes[k] * (notes[k + 1] / notes[k]) ** (t - k);
+        env =
+          Math.min(1, i / (sr * 0.03)) * Math.min(1, (n - i) / (sr * 0.08));
+      }
+
+      if (vibrato) f *= 1 + 0.035 * Math.sin((2 * Math.PI * vibrato * i) / sr);
+
+      phase += (2 * Math.PI * f) / sr;
+      // Une harmonique de plus : un sinus pur sonne comme un test auditif, et
+      // surtout il donne peu de prise à la détection de hauteur du barème.
       const wave = Math.sin(phase) * 0.75 + Math.sin(phase * 2) * 0.25;
-      buf.writeInt16LE(Math.round(wave * env * (1 - x * 0.3) * 20000), i * 2);
+      buf.writeInt16LE(Math.round(wave * env * (1 - x * 0.25) * 20000), i * 2);
     }
+
     const raw = `${file}.raw`;
     fs.writeFileSync(raw, buf);
     execFile(
@@ -249,7 +351,7 @@ router.post("/demo", async (req, res) => {
       const url = `/uploads/perroquet/bank/${name}`;
       if (await SoundClip.exists({ url })) continue;
       const full = path.join(BANK_DIR, name);
-      await writeMelody(full, d.notes, d.dur);
+      await writeMelody(full, d);
       const contour = await contourOf(full);
       await SoundClip.create({
         label: d.label,
