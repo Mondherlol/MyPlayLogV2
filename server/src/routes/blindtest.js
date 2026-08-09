@@ -465,36 +465,91 @@ async function buildRounds(userId, count) {
 //
 // À plusieurs, cette idée ne se transpose pas telle quelle — favoriser la
 // bibliothèque d'UN joueur, ce serait lui offrir la partie. On réunit donc les
-// bibliothèques de TOUS les participants et on tire dedans à égalité : un jeu
-// que trois personnes sur cinq ont joué fait une bonne manche, un jeu que
-// personne n'a touché reste un piège, et personne n'est chez lui.
+// bibliothèques de TOUS les participants.
 //
-// Pas de pondération par le temps de jeu non plus, pour la même raison : elle
-// n'aurait de sens que rapportée à un joueur.
+// MAIS PAS À ÉGALITÉ : UN JEU QUE SEUL UN JOUEUR CONNAÎT N'EST PAS UNE MANCHE.
+// C'est une course à un seul concurrent — les autres écoutent trente secondes
+// d'un morceau qu'ils n'ont aucune chance de nommer, et le buzzer tombe sans
+// que personne n'ait joué. On classe donc les jeux de la table par NOMBRE DE
+// BIBLIOTHÈQUES qui les contiennent :
+//
+//   1. ceux que TOUT LE MONDE a joués — les meilleures manches du mode, tout
+//      le monde est en course ; on s'en garantit une poignée quand il y en a ;
+//   2. ceux qu'au moins DEUX joueurs ont joués — le gros du tirage ;
+//   3. ceux d'un seul joueur — dernier recours, uniquement s'il n'y a pas
+//      assez de matière au-dessus (petites bibliothèques, OST introuvables).
+//
+// Les pièges (gros jeux que personne n'a touchés) restent, mais en portion
+// réduite : ils coûtent une manche entière de silence, et le nouvel indice
+// « personne à la table n'y a joué » leur donne déjà tout leur sel.
+//
+// Pas de pondération par le temps de jeu, en revanche : elle n'aurait de sens
+// que rapportée à un joueur.
+const VERSUS_FOREIGN_SHARE = 0.15;
+// Doit rester en phase avec CLIP_SEC de routes/blindtestVersus.js : c'est la
+// fenêtre sur laquelle on cherche le climax des pistes du versus.
+const VERSUS_CLIP_SEC = 35;
+// Part des manches « bibliothèque » réservée aux jeux que TOUT LE MONDE a
+// joués, quand la table en a en réserve.
+const VERSUS_EVERYONE_SHARE = 0.35;
+
 export async function buildVersusRounds(userIds, count) {
+  const playerCount = new Set(userIds.map(String)).size;
   const played = await UserGame.find({
     user: { $in: userIds },
     status: { $ne: "wishlist" },
   })
-    .select("gameId name cover")
+    .select("gameId name cover user favorite")
     .lean();
 
+  // QUI a joué à QUOI : la donnée centrale de ce tirage. Elle sert deux fois —
+  // à choisir les jeux (ci-dessous) et à composer le dernier indice de la
+  // manche, « y ont joué » (tout en bas).
+  const owners = new Map(); // gameId → Map(userId → { favorite })
   const byId = new Map();
   for (const g of played) {
-    if (!g.gameId || byId.has(g.gameId)) continue;
-    byId.set(g.gameId, { gameId: g.gameId, name: g.name, cover: g.cover || null });
+    if (!g.gameId) continue;
+    if (!owners.has(g.gameId)) owners.set(g.gameId, new Map());
+    const seat = owners.get(g.gameId);
+    const uid = String(g.user);
+    seat.set(uid, { favorite: !!g.favorite || !!seat.get(uid)?.favorite });
+    if (!byId.has(g.gameId))
+      byId.set(g.gameId, { gameId: g.gameId, name: g.name, cover: g.cover || null });
   }
   const sharedGames = await keepRealGames([...byId.values()]);
   const ownedIds = sharedGames.map((g) => g.gameId);
 
-  const foreignTarget = ownedIds.length ? Math.max(1, Math.round(count * 0.25)) : count;
+  const foreignTarget = ownedIds.length
+    ? Math.max(1, Math.round(count * VERSUS_FOREIGN_SHARE))
+    : count;
   const ownedTarget = count - foreignTarget;
   const usedVideo = new Set();
+
+  // Les trois paniers, et l'ordre dans lequel on va piocher. Ce n'est PAS un
+  // filtre : un jeu d'un seul joueur peut encore sortir, mais seulement une
+  // fois les deux premiers paniers épuisés.
+  const everyone = [];
+  const twoPlus = [];
+  const single = [];
+  for (const g of sharedGames) {
+    const n = owners.get(g.gameId)?.size || 0;
+    if (playerCount >= 2 && n >= playerCount) everyone.push(g);
+    else if (n >= 2) twoPlus.push(g);
+    else single.push(g);
+  }
+  const everyoneShuf = shuffle(everyone);
+  const headroom = Math.max(1, Math.round(ownedTarget * VERSUS_EVERYONE_SHARE));
+  const ownedPool = [
+    ...everyoneShuf.slice(0, headroom),
+    ...shuffle(twoPlus),
+    ...everyoneShuf.slice(headroom),
+    ...shuffle(single),
+  ];
 
   // 1. Les jeux de la table qui ont déjà une OST en base.
   const ownedTrackMap = await tracksForGames(ownedIds);
   const rounds = [];
-  for (const g of shuffle([...sharedGames])) {
+  for (const g of ownedPool) {
     if (rounds.length >= ownedTarget) break;
     const tracks = (ownedTrackMap.get(g.gameId) || []).filter((t) => !usedVideo.has(t.videoId));
     if (!tracks.length) continue;
@@ -503,9 +558,9 @@ export async function buildVersusRounds(userIds, count) {
     rounds.push(mkRound(g, t, true));
   }
   if (rounds.length < ownedTarget) {
-    const missing = shuffle(
-      sharedGames.filter((g) => !(ownedTrackMap.get(g.gameId) || []).length)
-    );
+    // Toujours dans le même ordre de préférence : scraper une OST manquante ne
+    // doit pas faire remonter un jeu que seul un joueur connaît.
+    const missing = ownedPool.filter((g) => !(ownedTrackMap.get(g.gameId) || []).length);
     rounds.push(...(await scrapeFill(missing, ownedTarget - rounds.length, true, usedVideo)));
   }
 
@@ -559,15 +614,31 @@ export async function buildVersusRounds(userIds, count) {
         r.climaxed = true;
       }
     }
-    warmClimax(out.map((r) => r.videoId).filter(Boolean), CLIP_SEC);
+    // La fenêtre du versus est plus longue que celle du solo (voir CLIP_SEC
+    // dans routes/blindtestVersus.js) : le climax se cherche sur la bonne.
+    warmClimax(out.map((r) => r.videoId).filter(Boolean), VERSUS_CLIP_SEC);
   } catch {
     /* le climax est un confort */
   }
+  // Indices, comme en solo — plus un quatrième qui n'existe qu'ici : QUI, À
+  // CETTE TABLE, A CE JEU EN BIBLIOTHÈQUE (et qui l'a mis en favori). Il tombe
+  // en dernier, et c'est le plus fort du mode : il ne donne pas le titre, il
+  // donne l'adversaire à surveiller. Une liste vide dit l'inverse, et c'est un
+  // indice aussi — personne ici ne l'a joué.
+  let hintMap = new Map();
   try {
-    const hints = await hintsForGames(out.map((r) => r.gameId));
-    for (const r of out) r.hints = hints.get(r.gameId) || null;
+    hintMap = await hintsForGames(out.map((r) => r.gameId));
   } catch {
-    /* une manche se joue très bien sans indices */
+    /* une manche se joue très bien sans indices IGDB */
+  }
+  for (const r of out) {
+    r.hints = {
+      ...(hintMap.get(r.gameId) || {}),
+      players: [...(owners.get(r.gameId) || new Map())].map(([id, seat]) => ({
+        id,
+        favorite: !!seat.favorite,
+      })),
+    };
   }
   return out;
 }

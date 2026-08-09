@@ -72,8 +72,16 @@ function userIdFrom(req) {
   }
 }
 
-const CLIP_SEC = 15;
-const GRACE_MS = 10000;
+// L'EXTRAIT DURE PLUS LONGTEMPS QU'EN SOLO, ET IL N'Y A PAS DE TEMPS MORT.
+// Le solo coupe le son au bout de quinze secondes et laisse dix secondes de
+// silence pour finir de taper : c'est un chrono personnel, il faut bien le
+// clore. En buzzer, la manche s'arrête d'elle-même dès que quelqu'un trouve ou
+// que plus personne n'a de vie (`shouldEndEarly`) — la borne de temps ne sert
+// qu'aux manches que personne ne décroche. Autant, alors, laisser la musique
+// tourner : dix secondes de silence collectif pendant que trois joueurs
+// cherchent encore, c'est du jeu en moins pour tout le monde.
+const CLIP_SEC = 35;
+const GRACE_MS = 0;
 const ROUND_MS = CLIP_SEC * 1000 + GRACE_MS;
 // Sas minimum, même quand tout est déjà en cache : c'est le « 3, 2, 1 ».
 const CUE_MIN_MS = 5000;

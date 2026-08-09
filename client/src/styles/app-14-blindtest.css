@@ -1523,6 +1523,68 @@
   to { opacity: 1; transform: none; }
 }
 
+/* Dernier indice du versus : « y ont joué », avec les têtes des joueurs
+   concernés. Il est plus large que les autres — on l'assume, c'est celui qui
+   décide de la manche. La teinte du liseré est celle du joueur dans le rail
+   (--hue, posée par le JSX), pour qu'on le reconnaisse sans lire son nom. */
+.bt-hint.who { gap: 0.45rem; }
+.bt-hint-avs {
+  display: inline-flex;
+  align-items: center;
+}
+.bt-hint-av {
+  position: relative;
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  overflow: visible;
+  border: 2px solid hsl(var(--hue, 45) 85% 62%);
+  background: var(--bts-panel, #1b1b22);
+  margin-left: -6px;
+}
+.bt-hint-av:first-child { margin-left: 0; }
+.bt-hint-av img,
+.bt-hint-av i {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.bt-hint-av i {
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: hsl(var(--hue, 45) 85% 72%);
+}
+.bt-hint-fav {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #e0245e;
+  color: #fff;
+}
+.bt-hint-favtxt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+@media (max-width: 760px) {
+  .bt-hint-av { width: 19px; height: 19px; }
+  .bt-hint-favtxt { display: none; }
+}
+
 /* Recherche / réponse */
 .bt-guess {
   position: relative;

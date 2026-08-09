@@ -63,9 +63,14 @@ const roundSchema = new mongoose.Schema(
     // (models/OstClimax.js), sinon une estimation.
     startFrac: { type: Number, default: 0.4 },
     climaxed: { type: Boolean, default: false },
-    // Indices dévoilés au fil de l'extrait (année → plateformes → studio).
-    // Recopiés ici : ils sont envoyés AVEC la manche, ce sont eux le vrai jeu
-    // d'information avant la révélation.
+    // Indices dévoilés au fil de l'extrait (année → plateformes → studio → qui
+    // y a joué). Recopiés ici : ils sont envoyés AVEC la manche, ce sont eux le
+    // vrai jeu d'information avant la révélation.
+    //
+    // Le dernier, `players`, est propre au versus : la liste des joueurs de la
+    // table qui ont ce jeu en bibliothèque (`[{ id, favorite }]`), vide quand
+    // c'est un piège que personne n'a joué. C'est l'indice le plus fort du
+    // mode — il ne dit pas le titre, il dit à qui le demander.
     hints: { type: mongoose.Schema.Types.Mixed, default: null },
 
     attempts: { type: [attemptSchema], default: [] },
@@ -93,7 +98,7 @@ const blindTestVersusSchema = new mongoose.Schema(
     code: { type: String, required: true, unique: true, index: true },
     host: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     roundCount: { type: Number, default: 8 },
-    durationSec: { type: Number, default: 15 },
+    durationSec: { type: Number, default: 35 },
 
     players: { type: [playerSchema], default: [] },
     rounds: { type: [roundSchema], default: [] },

@@ -67,7 +67,10 @@ import { VersusFace, VersusRail, VersusInvite, HUES } from "../components/Versus
 // pose l'aiguille SUR LE CLIMAX pendant le décompte. Le navigateur remplit son
 // tampon à cet endroit précis, et au « go » il ne reste qu'un `play()`.
 const LIVES = 3;
-const HINT_FRACS = [0.35, 0.55, 0.75];
+// Quatre paliers ici (le solo en a trois) : l'extrait dure plus longtemps et se
+// termine avec la manche, il y a la place pour un dernier indice — celui qui
+// dit QUI, à cette table, a ce jeu en bibliothèque.
+const HINT_FRACS = [0.2, 0.4, 0.6, 0.78];
 // Mini wav silencieux, joué en muet dans le geste d'entrée pour déverrouiller
 // la balise <audio> sur iOS (même technique que context/PlayerContext.jsx).
 const SILENT_WAV =
@@ -655,7 +658,10 @@ export default function BlindTestVersus() {
   const msLeft = room?.phaseEndsAt ? Math.max(0, room.phaseEndsAt - now) : 0;
   const cueLeft = room?.phaseStartsAt ? Math.ceil((room.phaseStartsAt - now) / 1000) : 0;
   const clipMs = (round?.durationSec || 15) * 1000;
-  const graceMs = round?.graceMs || 10000;
+  // Le versus n'a PAS de temps mort : le serveur envoie 0 (la manche s'arrête
+  // au buzzer ou à la fin de l'extrait). `??` et non `||` — un 0 est une
+  // valeur, pas une absence.
+  const graceMs = round?.graceMs ?? 0;
   // Comme en solo : l'anneau montre l'écoute, puis le temps bonus en rouge.
   const listenLeft = Math.max(0, msLeft - graceMs);
   const inGrace = phase === "round" && msLeft > 0 && listenLeft <= 0;
@@ -678,8 +684,26 @@ export default function BlindTestVersus() {
       });
     if (h.studio) pool.push({ key: "studio", Icon: Building2, label: "Studio", text: h.studio });
     else if (h.genre) pool.push({ key: "genre", Icon: Tag, label: "Genre", text: h.genre });
-    return pool.slice(0, 3).map((p, i) => ({ ...p, atMs: HINT_FRACS[i] * clipMs }));
-  }, [round, clipMs]);
+    // Le dernier, et le plus fort : QUI À CETTE TABLE Y A JOUÉ. On ne donne pas
+    // le titre, on donne l'adversaire à surveiller — et si la liste est vide,
+    // c'est un piège que personne n'a touché, ce qui se sait aussi.
+    if (Array.isArray(h.players)) {
+      const seats = h.players
+        .map((o) => ({ ...o, p: players.find((pl) => pl.id === o.id) }))
+        .filter((o) => o.p);
+      pool.push({
+        key: "who",
+        Icon: Users,
+        label: "Y ont joué",
+        seats,
+        favs: seats.filter((o) => o.favorite),
+        text: seats.length
+          ? seats.map((o) => o.p.username).join(" · ")
+          : "Personne à cette table",
+      });
+    }
+    return pool.slice(0, 4).map((p, i) => ({ ...p, atMs: HINT_FRACS[i] * clipMs }));
+  }, [round, clipMs, players]);
 
   // ---------- Écrans ----------
   if (loading)
@@ -879,9 +903,47 @@ export default function BlindTestVersus() {
                   const open = elapsedMs >= h.atMs;
                   const inSec = Math.max(0, Math.ceil((h.atMs - elapsedMs) / 1000));
                   return (
-                    <span key={h.key} className={`bt-hint ${open ? "open" : ""}`}>
+                    <span
+                      key={h.key}
+                      className={`bt-hint ${open ? "open" : ""} ${h.seats ? "who" : ""}`}
+                    >
                       {open ? <h.Icon size={13} /> : <Lock size={12} />}
-                      <span>{open ? h.text : h.label}</span>
+                      {open && h.seats ? (
+                        <>
+                          {h.seats.length > 0 && (
+                            <span className="bt-hint-avs">
+                              {h.seats.map((o) => (
+                                <span
+                                  key={o.id}
+                                  className="bt-hint-av"
+                                  title={o.p.username}
+                                  style={{ "--hue": hueById.get(o.id) ?? 0 }}
+                                >
+                                  {o.p.avatar ? (
+                                    <img src={o.p.avatar} alt="" draggable="false" />
+                                  ) : (
+                                    <i>{(o.p.username || "?")[0].toUpperCase()}</i>
+                                  )}
+                                  {o.favorite && (
+                                    <b className="bt-hint-fav" aria-hidden="true">
+                                      <Heart size={8} />
+                                    </b>
+                                  )}
+                                </span>
+                              ))}
+                            </span>
+                          )}
+                          <span>{h.text}</span>
+                          {h.favs.length > 0 && (
+                            <em className="bt-hint-favtxt">
+                              <Heart size={10} /> favori de{" "}
+                              {h.favs.map((o) => o.p.username).join(", ")}
+                            </em>
+                          )}
+                        </>
+                      ) : (
+                        <span>{open ? h.text : h.label}</span>
+                      )}
                       {!open && <i className="bt-hint-t">{inSec}s</i>}
                     </span>
                   );
