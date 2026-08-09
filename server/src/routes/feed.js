@@ -55,7 +55,8 @@ const INTERACTIONS = [
   "comment_reply",
   "list_like",
   "comment_like",
-  "playlist_listen",
+  // `playlist_listen` est volontairement absent : « X a écouté la playlist de
+  // Y » n'apprend rien au fil (le propriétaire a déjà sa notification).
   "review_comment",
   "review_comment_reply",
   "review_comment_like",
@@ -73,6 +74,18 @@ const COLLECTION_TYPES = [
   "collection_comment_reply",
   "collection_comment_like",
 ];
+
+// Une piste de playlist telle que la carte du fil la joue (mini-lecteur).
+const trackMini = (i) => ({
+  refId: i.refId,
+  name: i.name,
+  artist: i.artist || null,
+  image: i.image || null,
+  videoId: i.videoId || null,
+  url: i.url || null,
+  gameId: i.gameId || null,
+  gameName: i.gameName || null,
+});
 
 // Mini-carte de liste embarquée dans les évènements.
 function listMini(l) {
@@ -103,16 +116,7 @@ function listMini(l) {
           tracks: items
             .filter((i) => i.kind === "track" && (i.videoId || i.url))
             .slice(0, 6)
-            .map((i) => ({
-              refId: i.refId,
-              name: i.name,
-              artist: i.artist || null,
-              image: i.image || null,
-              videoId: i.videoId || null,
-              url: i.url || null,
-              gameId: i.gameId || null,
-              gameName: i.gameName || null,
-            })),
+            .map(trackMini),
         }
       : {}),
   };
@@ -559,12 +563,21 @@ async function buildTimeline(
           list: listMini(a.list),
         });
       } else {
+        // Ce qui vient d'être ajouté est le sujet de la carte : on le sort du
+        // lot pour que le lecteur voie QUELLES pistes/jeux ont rejoint la
+        // liste, et pas seulement les premières déjà en place.
+        const refIds = new Set((a.meta?.refIds || []).map(String));
+        const added = (a.list.items || [])
+          .filter((i) => refIds.has(String(i.refId)))
+          .slice(0, 6)
+          .map((i) => ({ ...trackMini(i), kind: i.kind }));
         events.push({
           type: "listadd",
           id: `a-${a._id}`,
           date: a.createdAt,
           user: person(a.actor),
           count: a.meta?.added || 1,
+          added,
           list: listMini(a.list),
         });
       }
@@ -637,7 +650,7 @@ async function buildTimeline(
     // affiche la table entière. Même dédoublonnage que les sessions du mot du
     // jour — sans lui, un versus à cinq inonderait le fil de cinq cartes
     // racontant la même chose.
-    if (a.type === "geoversus" || a.type === "btversus") {
+    if (a.type === "geoversus" || a.type === "btversus" || a.type === "pxversus") {
       if (!a.meta?.versusId) continue;
       if (versusSeen.has(a.meta.versusId)) continue;
       versusSeen.add(a.meta.versusId);
@@ -775,8 +788,7 @@ async function buildTimeline(
       (a.type === "list_comment" ||
         a.type === "list_like" ||
         a.type === "comment_reply" ||
-        a.type === "comment_like" ||
-        a.type === "playlist_listen") &&
+        a.type === "comment_like") &&
       !onList;
     if (listMissing) continue;
 

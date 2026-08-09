@@ -24,9 +24,8 @@ import {
   Timer,
   Home,
   Coins,
-  Maximize2,
-  Minimize2,
   Scan,
+  Users,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
@@ -42,14 +41,29 @@ import {
 import { useGameSfx } from "../lib/useGameSfx";
 
 // ============================================================
-//  Pixel Rush — devine le jeu derrière des screenshots pixelisés
+//  Pixel Rush — devine le jeu derrière une capture pixelisée
 // ============================================================
-// Toutes les captures de la manche sont posées d'emblée en grille (2 par
-// ligne) : rien à faire défiler, on embrasse l'ensemble d'un coup d'œil et on
-// clique pour zoomer sur l'une d'elles. Pendant la manche (`durationSec`) :
+// UNE capture, en grand, noyée sous les pixels. Pendant la manche
+// (`durationSec`) :
 //   • la définition remonte un peu (PIX_START → PIX_END blocs de large), sans
 //     jamais devenir lisible : le rendu net est réservé à la révélation ;
 //   • chaque seconde écoulée coûte des points (cf. lib/guessGame).
+//
+// C'ÉTAIT UNE GRILLE DE QUATRE. Quatre vignettes à douze blocs de large,
+// ça n'apprend pas quatre fois plus : ça divise l'attention entre quatre
+// taches de couleur, et on finissait par en agrandir une de toute façon. On en
+// montre donc une, plein cadre, et on donne DE QUOI LA FOUILLER :
+//
+//   • LE COIN LIBRE — un angle de l'image échappe à la pixelisation. C'est le
+//     point d'accroche : un bout d'interface, un logo, une texture. Le serveur
+//     décide lequel (`clearCorner`), pour que le versus soit identique pour
+//     toute la table et qu'un défi rejoué le soit à l'identique.
+//   • LA LOUPE — au survol (au doigt sur mobile), un disque suit le curseur et
+//     redessine CETTE ZONE-LÀ bien plus finement. On ne voit jamais l'image
+//     nette, mais on peut scruter un détail — et c'est ce qui rend la fin de
+//     manche jouable au lieu d'être une attente.
+//
+// Les deux vivent dans components/PixelCanvas.jsx.
 
 // Largeur de l'image en « blocs ». On reste volontairement TRÈS grossier : à
 // 24 blocs on lit des masses de couleur et une ambiance, jamais une scène.
@@ -63,10 +77,9 @@ const AUTO_NEXT_MS = 5000;
 // Fractions de la manche auxquelles les indices se dévoilent.
 const HINT_FRACS = [0.35, 0.55, 0.75];
 
-// Une capture de la révélation : elle arrive dans son état pixelisé de fin de
+// La capture de la révélation : elle arrive dans son état pixelisé de fin de
 // manche, puis se « développe » comme une photo — les blocs fondent jusqu'à
-// l'image nette. Chaque capture démarre un peu après la précédente (`delay`),
-// ce qui donne la cascade.
+// l'image nette.
 const REVEAL_ANIM_MS = 700;
 
 function RevealShot({ src, from, delay = 0, label }) {
@@ -220,7 +233,6 @@ export default function PixelRush() {
   });
   const [score, setScore] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
-  const [zoom, setZoom] = useState(null); // index du cliché agrandi (null = grille)
   const [reveal, setReveal] = useState(null); // { correct, points, round, guessName, shot }
   const [nextIn, setNextIn] = useState(5);
   const [paused, setPaused] = useState(false);
@@ -243,9 +255,6 @@ export default function PixelRush() {
   const pauseStartRef = useRef(0);
   const prevUnlockRef = useRef(0);
   const revealAtRef = useRef(0);
-  // Miroir du zoom : le timer de manche est armé une seule fois, sa closure ne
-  // verrait sinon que l'état initial.
-  const zoomRef = useRef(null);
   // Définition atteinte à l'instant de la réponse : la révélation repart de là.
   const blocksRef = useRef(PIX_START);
 
@@ -274,7 +283,9 @@ export default function PixelRush() {
   const timeLeftMs = Math.max(0, durationMs - elapsedMs);
   const secondsLeft = Math.ceil(timeLeftMs / 1000);
 
-  const shots = round?.shots || [];
+  // Une seule capture par manche depuis la refonte ; les parties d'avant en
+  // portent quatre, on prend la première.
+  const shot = round?.shots?.[0] || null;
   // Définition courante — jamais lisible, même à la dernière seconde. Arrondie
   // ici : les canvas ne se redessinent qu'au changement de palier (une quinzaine
   // de fois par manche) et pas à chaque tic de 100 ms.
@@ -311,6 +322,26 @@ export default function PixelRush() {
     }
   }
 
+  // --- Ouverture d'un salon de versus ---
+  // Le salon est créé ICI plutôt que sur la page d'à côté (même choix qu'au
+  // blind test) : le joueur doit arriver sur un salon qui existe déjà, avec un
+  // lien à copier tout de suite.
+  const [opening, setOpening] = useState(false);
+  async function openVersus() {
+    if (opening) return;
+    setOpening(true);
+    sfx.resume();
+    try {
+      const d = await apiFetch("/pixel/versus", { method: "POST", token, body: {} });
+      navigate(`/pixel/versus/${d.room.code}`);
+    } catch (e) {
+      setError(e.message || "Impossible d'ouvrir un salon.");
+      setPhase("error");
+    } finally {
+      setOpening(false);
+    }
+  }
+
   // --- Verrouille la réponse de la manche courante (guess ou temps écoulé) ---
   const lockGuess = useCallback(
     (cand) => {
@@ -337,9 +368,7 @@ export default function PixelRush() {
         points,
         round: r,
         guessName: cand ? cand.name : null,
-        // On révèle en net le cliché zoomé, sinon le premier de la grille.
-        // Toutes les captures de la manche se dépixelisent dans la modale.
-        shots: r.shots || [],
+        shot: r.shots?.[0] || null,
         blocks: blocksRef.current,
       });
     },
@@ -354,8 +383,6 @@ export default function PixelRush() {
     setReveal(null);
     setInput("");
     setHighlight(0);
-    zoomRef.current = null;
-    setZoom(null);
     setElapsedMs(0);
     lockedRef.current = false;
     lastTickRef.current = -1;
@@ -494,17 +521,6 @@ export default function PixelRush() {
     }, 100);
     return () => clearInterval(iv);
   }, [reveal]);
-
-  // --- Zoom sur un cliché (re-clic = retour à la grille) ---
-  const toggleZoom = useCallback((i) => {
-    if (lockedRef.current || pausedRef.current) return;
-    setZoom((z) => {
-      const next = z === i ? null : i;
-      zoomRef.current = next;
-      return next;
-    });
-    sfx.play("shot");
-  }, [sfx]);
 
   // --- Raccourcis clavier (PC) ---
   useEffect(() => {
@@ -701,6 +717,21 @@ export default function PixelRush() {
             <span className="bt-kbd-hint">
               ou appuie sur <kbd>Entrée</kbd>
             </span>
+
+            {/* La porte du mode à plusieurs, en second rang : le solo reste
+                l'entrée par défaut (on y joue seul, à toute heure), le versus
+                demande d'avoir du monde sous la main. */}
+            {!challengeId && (
+              <button
+                className="geo-versus-cta clickable"
+                onClick={openVersus}
+                disabled={opening}
+              >
+                {opening ? <Loader2 size={16} className="spin" /> : <Users size={16} />}
+                Jouer en versus
+                <em>jusqu'à 5 joueurs · tomates autorisées</em>
+              </button>
+            )}
           </div>
         )}
 
@@ -749,37 +780,23 @@ export default function PixelRush() {
               </span>
             </div>
 
-            {/* ---- L'écran : toutes les captures, 2 par ligne ---- */}
+            {/* ---- L'écran : LA capture, plein cadre ---- */}
             <div className={`px-stage ${secondsLeft <= 5 ? "hot" : ""} ${paused ? "paused" : ""}`}>
-              <div
-                className={`px-grid n-${Math.min(shots.length, 4)} ${
-                  zoom != null ? "zoomed" : ""
-                }`}
-              >
-                {shots.map((s, i) => (
-                  <button
-                    key={s}
-                    className={`px-tile clickable ${zoom === i ? "on" : ""} ${
-                      zoom != null && zoom !== i ? "off" : ""
-                    }`}
-                    onClick={() => toggleZoom(i)}
-                    title={zoom === i ? "Revenir à la grille" : "Agrandir cette capture"}
-                    aria-label={
-                      zoom === i ? "Revenir à la grille" : `Agrandir la capture ${i + 1}`
-                    }
-                  >
-                    <PixelCanvas
-                      src={s}
-                      blocks={blocks}
-                      reveal={false}
-                      label={`Capture pixelisée ${i + 1} sur ${shots.length}`}
-                    />
-                    <span className="px-tile-n">{i + 1}</span>
-                    <span className="px-tile-zoom" aria-hidden="true">
-                      {zoom === i ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-                    </span>
-                  </button>
-                ))}
+              <div className="px-grid n-1">
+                {/* `key` sur l'URL : la carte est REDISTRIBUÉE à chaque
+                    manche (l'animation px-deal ne rejoue que sur un montage). */}
+                <div className="px-tile solo" key={shot}>
+                  <PixelCanvas
+                    src={shot}
+                    blocks={blocks}
+                    reveal={false}
+                    clear={round.clearCorner}
+                    // La loupe se coupe en pause : sinon on scrute l'image
+                    // chrono arrêté, ce qui n'est plus tout à fait le jeu.
+                    loupe={!paused && !reveal}
+                    label="Capture pixelisée"
+                  />
+                </div>
               </div>
 
               {/* Chrono + définition, posés sur l'écran */}
@@ -895,18 +912,14 @@ export default function PixelRush() {
               <div className="bt-overlay" role="dialog" aria-modal="true">
                 <div className={`px-reveal ${reveal.correct ? "good" : "bad"}`}>
                   <i className="bt-reveal-progress" aria-hidden="true" />
-                  <div
-                    className={`px-reveal-shots n-${Math.min(reveal.shots.length, 4)}`}
-                  >
-                    {reveal.shots.map((s, i) => (
+                  <div className="px-reveal-shots n-1">
+                    {reveal.shot && (
                       <RevealShot
-                        key={s}
-                        src={s}
+                        src={reveal.shot}
                         from={reveal.blocks}
-                        delay={i * 130}
                         label={`Capture de ${reveal.round.gameName}`}
                       />
-                    ))}
+                    )}
                     <span className="px-reveal-badge">
                       {reveal.correct ? <Check size={20} /> : <X size={20} />}
                     </span>

@@ -40,7 +40,6 @@ import {
   Flame,
   Infinity as InfinityIcon,
   Disc3,
-  Headphones,
   Trophy,
   Swords,
   Music2,
@@ -121,7 +120,6 @@ const ACTION_META = {
   comment_reply: { Icon: CornerDownRight, verb: "a répondu à", ctx: "list", quote: true },
   list_like: { Icon: Heart, verb: "a aimé la liste de", ctx: "list", quote: false },
   comment_like: { Icon: Heart, verb: "a aimé un commentaire de", ctx: "list", quote: true },
-  playlist_listen: { Icon: Headphones, verb: "écoute la playlist de", ctx: "list", quote: false },
   review_comment: { Icon: MessageCircle, verb: "a commenté l'avis de", ctx: "review", quote: true },
   review_comment_reply: { Icon: CornerDownRight, verb: "a répondu à", ctx: "review", quote: true },
   review_comment_like: { Icon: Heart, verb: "a aimé une réponse de", ctx: "review", quote: true },
@@ -180,7 +178,7 @@ export function FeedCard(props) {
   if (item.type === "pixelgroup") return <PixelRushGroupEvent {...props} />;
   if (item.type === "geo") return <GeoEvent {...props} />;
   if (item.type === "geogroup") return <GeoGroupEvent {...props} />;
-  if (item.type === "geoversus" || item.type === "btversus")
+  if (item.type === "geoversus" || item.type === "btversus" || item.type === "pxversus")
     return <VersusEvent {...props} />;
   if (item.type === "mot") return <MotEvent {...props} />;
   if (item.type === "caseopen") return <CaseOpenEvent {...props} />;
@@ -928,11 +926,82 @@ function ListEvent({ item }) {
   );
 }
 
+// Ce qui vient d'être ajouté : c'est le SUJET de la carte, donc ça passe
+// devant, en grand et jouable — les pistes déjà en place n'ont rien de neuf à
+// raconter et restent dans la mini-carte du dessous.
+function AddedItems({ list, added }) {
+  const player = usePlayer();
+  const toTrack = (x) => ({
+    id: x.refId,
+    videoId: x.videoId,
+    url: x.url,
+    name: x.name,
+    artist: x.artist,
+    artwork: x.image,
+    gameId: x.gameId,
+    gameName: x.gameName,
+  });
+  const queue = added.filter((t) => t.videoId || t.url).map(toTrack);
+
+  return (
+    <div className="hf-added">
+      {added.map((it) => {
+        const playable = !!(it.videoId || it.url);
+        const track = toTrack(it);
+        const cur = playable && player.isCurrent(track);
+        const isPlaying = playable && player.isPlaying(track);
+        const Row = playable ? "button" : "div";
+        return (
+          <Row
+            key={it.refId}
+            className={`hf-added-row ${playable ? "clickable" : ""} ${cur ? "current" : ""}`}
+            onClick={
+              playable
+                ? (e) => {
+                    e.stopPropagation();
+                    player.toggleTrack(track, queue, {
+                      source: { href: `/lists/${list.id}`, label: list.title },
+                    });
+                  }
+                : undefined
+            }
+            title={playable ? `Écouter ${it.name}` : it.name}
+          >
+            <span className="hf-added-art">
+              {it.image ? (
+                <img src={it.image} alt="" loading="lazy" draggable="false" />
+              ) : (
+                <Music size={16} />
+              )}
+              {playable && (
+                <span className={`hf-added-play ${isPlaying ? "on" : ""}`}>
+                  {isPlaying ? <Pause size={15} /> : <Play size={15} />}
+                </span>
+              )}
+            </span>
+            <span className="hf-added-body">
+              <span className="hf-added-name">{it.name}</span>
+              {!!(it.gameName || it.artist) && (
+                <span className="hf-added-sub">{it.gameName || it.artist}</span>
+              )}
+            </span>
+            <span className="hf-added-tag">Nouveau</span>
+          </Row>
+        );
+      })}
+    </div>
+  );
+}
+
 // --- Éléments ajoutés à une liste / des OST ajoutées à une playlist ---
 function ListAddEvent({ item }) {
   const isPlaylist = item.list.type === "playlist";
   const kind = kindWord(item.list.itemKind, item.count);
   const what = item.count > 1 ? `${item.count} ${kind}` : `${item.list.itemKind === "ost" ? "une" : "un"} ${kind}`;
+  // Les cartes d'avant ce changement n'ont pas gardé QUOI a été ajouté : on
+  // retombe alors sur l'ancien affichage (premières pistes de la playlist).
+  const added = item.added || [];
+  const named = added.length === 1 ? added[0].name : null;
   return (
     <article className="hf-card hf-list">
       <EventHead
@@ -944,9 +1013,19 @@ function ListAddEvent({ item }) {
           </span>
         }
       >
-        a ajouté {what} à sa {isPlaylist ? "playlist" : "liste"}
+        {named ? (
+          <>
+            a ajouté <span className="hf-added-title">{named}</span> à sa{" "}
+            {isPlaylist ? "playlist" : "liste"}
+          </>
+        ) : (
+          <>
+            a ajouté {what} à sa {isPlaylist ? "playlist" : "liste"}
+          </>
+        )}
       </EventHead>
-      <ListMini list={item.list} showTracks />
+      {added.length > 0 && <AddedItems list={item.list} added={added} />}
+      <ListMini list={item.list} showTracks={added.length === 0} />
     </article>
   );
 }
@@ -3176,10 +3255,13 @@ function GeoEvent({ item }) {
 // le gros chiffre habituel.
 function VersusEvent({ item }) {
   const bt = item.type === "btversus";
+  const px = item.type === "pxversus";
+  const game = bt ? "Blind Test" : px ? "Pixel Rush" : "GeoGamer";
+  const GameIcon = bt ? Music2 : px ? Grid2x2 : MapPin;
   const table = [...(item.players || [])].sort((a, b) => a.rank - b.rank);
   const champ = table[0];
   const beaten = table.slice(1);
-  const buzzer = !bt && item.mode === "buzzer";
+  const buzzer = !bt && !px && item.mode === "buzzer";
   // L'écart avec le deuxième : c'est le chiffre qui fait parler (« il l'a eu
   // pour 40 points »), bien plus que le total.
   const gap = table.length > 1 ? champ.score - table[1].score : 0;
@@ -3187,8 +3269,7 @@ function VersusEvent({ item }) {
   return (
     <article className="hf-card hf-blindtest hf-geo hf-gv">
       <EventHead user={item.user} date={item.date}>
-        <Swords size={13} className="hf-inline-ic" /> a gagné un versus{" "}
-        {bt ? "Blind Test" : "GeoGamer"}
+        <Swords size={13} className="hf-inline-ic" /> a gagné un versus {game}
         {beaten.length > 0 && (
           <>
             {" "}
@@ -3206,11 +3287,17 @@ function VersusEvent({ item }) {
 
       <div className="hf-gv-meta">
         <span className={`hf-gv-mode ${buzzer ? "buzzer" : ""}`}>
-          {bt ? <Music2 size={12} /> : buzzer ? <Zap size={12} /> : <Users size={12} />}
-          {bt ? "Blind test" : buzzer ? "Buzzer" : "Classique"}
+          {bt || px ? (
+            <GameIcon size={12} />
+          ) : buzzer ? (
+            <Zap size={12} />
+          ) : (
+            <Users size={12} />
+          )}
+          {bt ? "Blind test" : px ? "Pixel Rush" : buzzer ? "Buzzer" : "Classique"}
         </span>
         <span className="hf-bt-stat">
-          {bt ? <Music2 size={13} /> : <MapPin size={13} />} {item.total} manches
+          <GameIcon size={13} /> {item.total} manches
         </span>
         {gap > 0 && (
           <span className="hf-gv-gap">
@@ -3238,7 +3325,10 @@ function VersusEvent({ item }) {
         ))}
       </ol>
 
-      <Link to={bt ? "/blindtest" : "/geo"} className="hf-mot-cta clickable">
+      <Link
+        to={bt ? "/blindtest" : px ? "/pixel" : "/geo"}
+        className="hf-mot-cta clickable"
+      >
         Lancer un versus
       </Link>
     </article>

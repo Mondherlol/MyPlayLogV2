@@ -1849,6 +1849,12 @@
   color: #fff;
   background: linear-gradient(160deg, #c084fc, #7c3aed);
 }
+/* Pixel Rush : l'or du plateau télé, pour qu'on distingue les trois jeux dans
+   le fil d'une conversation sans lire le libellé. */
+.gv-card-art.px {
+  color: #2b1d02;
+  background: linear-gradient(160deg, #ffd24a, #f2a50b);
+}
 
 .chat-card-vs {
   width: 268px;
@@ -2315,6 +2321,13 @@ a.chat-card-vs:hover .gv-card-state b {
   background:
     radial-gradient(circle at 18% 0%, rgba(212, 175, 55, 0.16), transparent 55%),
     radial-gradient(circle at 85% 100%, rgba(212, 175, 55, 0.09), transparent 50%);
+}
+/* Pixel Rush : les poursuites du plateau télé plutôt que l'or du vinyle, et
+   un soupçon de rouge tomate — on annonce la couleur du mode. */
+.gv-lobby-bg.px {
+  background:
+    radial-gradient(circle at 15% 0%, rgba(255, 190, 60, 0.16), transparent 55%),
+    radial-gradient(circle at 88% 100%, rgba(226, 86, 90, 0.12), transparent 52%);
 }
 
 .bt-page.gv .gv-lobby {

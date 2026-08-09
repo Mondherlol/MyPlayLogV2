@@ -1124,7 +1124,9 @@
 .coll-skel-case {
   display: block;
   aspect-ratio: 2 / 3;
-  border-radius: 3px 7px 7px 3px;
+  /* Le même arrondi que le boîtier fini : l'attente doit avoir sa forme, sinon
+     la grille change de dessin au moment où elle se remplit. */
+  border-radius: 14px;
   background: var(--surface-2);
   box-shadow: inset 0 0 0 1px var(--border);
   animation: coll-skel-breathe 2.4s ease-in-out var(--d, 0ms) infinite;
@@ -1185,159 +1187,107 @@
 /* ======================================================================
    5. Boîtiers 2D (vue grille)
    ======================================================================
-   LA GRILLE EST UN RAYON VU DE FACE, pas un tableau de vignettes. Chaque
-   entrée est donc un OBJET posé : une coque avec sa tranche, son film
-   plastique et son ombre de contact — et, SOUS lui, l'étiquette de casier
-   qui porte le titre.
+   L'AFFICHE D'ABORD. La grille avait fini par être un catalogue de gadgets :
+   un disque qui sortait du boîtier au survol, une bascule 3D, un film
+   plastique, une plaque de titre sur l'image. Beaucoup de décor, et l'affiche
+   — la seule chose qu'on vient regarder — passait dessous.
 
-   Le texte est sous l'objet et non dessus : imprimé sur la jaquette, il en
-   cachait le tiers, et vingt étiquettes crème alignées faisaient un mur de
-   pavés clairs là où l'on venait regarder des affiches. Sous l'objet, il
-   respire, il s'aligne d'une carte à l'autre, et l'affiche est rendue
-   entière.
+   Ce qui reste du boîtier tient en deux traits : le CHANT à gauche (un liseré
+   sombre et son arête claire, l'épaisseur de l'objet) et la teinte du titre.
+   Tout le reste est de la mise en page : une image nette, un survol qui
+   soulève et allume, et le texte SOUS l'objet où il se lit vraiment.
    ====================================================================== */
 
 .coll-grid {
   display: grid;
-  /* Des colonnes un peu plus étroites qu'avant : une affiche de 2/3 se lit
-     très bien à 170 px, et la grille se remplit au lieu de laisser deux
-     boîtiers géants tenir toute une ligne. */
-  grid-template-columns: repeat(auto-fill, minmax(172px, 1fr));
-  gap: 2rem 1.35rem;
-  /* La perspective vit sur la GRILLE : partagée par toutes les cartes, elles
-     penchent toutes vers le même point de fuite, comme une vraie rangée. */
-  perspective: 1600px;
+  grid-template-columns: repeat(auto-fill, minmax(182px, 1fr));
+  gap: 1.9rem 1.15rem;
 }
 
 .coll-case {
   display: flex;
   flex-direction: column;
-  gap: 0.62rem;
+  gap: 0.7rem;
   color: inherit;
   text-decoration: none;
+  /* La carte entière monte d'un bloc : l'image et son étiquette appartiennent
+     au même objet, les animer séparément les décollerait l'une de l'autre. */
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* La coque : c'est elle qui bascule sous le curseur, pas l'image. Le pivot est
-   sur la TRANCHE (à gauche), donc le boîtier s'ouvre vers nous comme on le
-   ferait en le sortant du rayon — et non comme une carte qui gondole. */
+.coll-case:hover,
+.coll-case:focus-visible {
+  transform: translateY(-8px);
+  outline: none;
+}
+
 .coll-case-body {
   position: relative;
   aspect-ratio: 2 / 3;
-  border-radius: 3px 9px 9px 3px;
-  background: var(--coll-plastic);
-  transform-origin: 12% 60%;
-  /* Volontairement PAS de preserve-3d : la cassette et le disque sont placés
-     derrière la jaquette par z-index, et preserve-3d trierait les enfants par
-     leur profondeur 3D en ignorant cet ordre. La perspective de .coll-grid
-     suffit à la bascule. */
-  transition: transform 0.42s cubic-bezier(0.2, 0.9, 0.25, 1),
-    box-shadow 0.42s ease;
-  /* Un objet posé : ombre de contact serrée + ombre portée large + le filet
-     qui dessine l'arête du plastique. */
-  box-shadow: 0 1px 2px rgba(10, 10, 20, 0.3), 0 10px 22px rgba(10, 10, 20, 0.18),
-    0 0 0 1px rgba(10, 10, 20, 0.09);
+  border-radius: 14px;
+  overflow: hidden;
+  background: linear-gradient(155deg, var(--tint) 0%, #12131a 82%);
+  /* Trois couches, comme un objet posé sur une table : le trait de contour
+     qui détache la carte du fond, l'ombre de contact serrée, l'ombre portée
+     large et douce. */
+  box-shadow: 0 0 0 1px rgba(12, 12, 22, 0.09), 0 2px 6px rgba(12, 12, 22, 0.14),
+    0 14px 30px rgba(12, 12, 22, 0.16);
+  transition: box-shadow 0.32s ease;
 }
 
 .coll-case:hover .coll-case-body,
 .coll-case:focus-visible .coll-case-body {
-  transform: rotateY(-17deg) translateZ(26px) translateY(-10px);
-  /* Au survol l'objet DÉCOLLE : l'ombre s'écarte, s'adoucit, et prend un peu
-     de la teinte du titre — la lueur du rayon, pas un néon. */
-  box-shadow: 6px 8px 14px rgba(10, 10, 20, 0.26),
-    28px 34px 56px rgba(10, 10, 20, 0.32),
-    0 18px 44px color-mix(in srgb, var(--tint) 26%, transparent),
-    0 0 0 1px rgba(10, 10, 20, 0.1);
+  /* Au survol l'objet s'allume : l'ombre descend, s'élargit, et prend la
+     teinte du titre. C'est ce halo qui fait la différence entre « une image
+     qui bouge » et « un objet qu'on soulève ». */
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tint) 38%, transparent),
+    0 6px 14px rgba(12, 12, 22, 0.2),
+    0 22px 46px color-mix(in srgb, var(--tint) 34%, transparent),
+    0 26px 50px rgba(12, 12, 22, 0.22);
 }
 
-.coll-case:focus-visible {
-  outline: none;
+:root[data-theme="dark"] .coll-case-body {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 2px 6px rgba(0, 0, 0, 0.4),
+    0 14px 30px rgba(0, 0, 0, 0.42);
 }
 
-.coll-case:focus-visible .coll-case-cap {
-  color: var(--text);
-}
-
-/* Tranche : un bord épais à gauche, avec le titre imprimé dessus. Sur un DVD
-   elle est fine, sur une boîte de jeu elle est franche — c'est le seul repère
-   qui distingue les supports au premier coup d'œil. */
+/* Le chant du boîtier : deux traits de 4 px collés au bord gauche, pas une
+   tranche dessinée. C'est le minimum qui dise « objet » plutôt que
+   « vignette » — et ça ne mange que quatre pixels d'affiche. */
 .coll-case-spine {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
-  width: 12px;
-  border-radius: 3px 0 0 3px;
+  width: 5px;
+  z-index: 2;
   background: linear-gradient(
     90deg,
-    #06070a 0%,
-    #1c1e26 38%,
-    #2c2e39 72%,
-    var(--coll-plastic) 100%
+    rgba(6, 7, 11, 0.92) 0%,
+    rgba(6, 7, 11, 0.55) 62%,
+    rgba(6, 7, 11, 0) 100%
   );
-  overflow: hidden;
-  display: grid;
-  place-items: center;
+  pointer-events: none;
 }
 
-/* Le liseré de teinte en haut de la tranche : l'étiquette de couleur qu'on
-   colle sur le dos d'un boîtier pour retrouver la série d'un coup d'œil. */
-.coll-case-spine::before {
+/* L'arête polie, celle qui attrape la lumière de la pièce. */
+.coll-case-spine::after {
   content: "";
   position: absolute;
-  inset: 0 0 auto 0;
-  height: 22%;
+  inset: 0 auto 0 0;
+  width: 1px;
   background: linear-gradient(
     180deg,
-    var(--tint),
-    color-mix(in srgb, var(--tint) 0%, transparent)
+    rgba(255, 255, 255, 0.42),
+    rgba(255, 255, 255, 0.08) 40%,
+    rgba(255, 255, 255, 0.28)
   );
-  opacity: 0.75;
 }
 
-.coll-case.fmt-dvd .coll-case-spine {
-  width: 9px;
-}
-
-.coll-case.fmt-book .coll-case-spine {
-  width: 8px;
-  border-radius: 2px 0 0 2px;
-}
-
-.coll-case.fmt-gba .coll-case-spine {
-  width: 15px;
-}
-
-.coll-case-spine-label {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  font-size: 0.4rem;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.4);
-  white-space: nowrap;
-  overflow: hidden;
-  max-height: 78%;
-}
-
-/* La jaquette */
 .coll-case-art {
   position: absolute;
-  inset: 0 0 0 12px;
-  border-radius: 0 8px 8px 0;
+  inset: 0;
   overflow: hidden;
-  background: linear-gradient(150deg, var(--tint) 0%, #101118 78%);
-}
-
-.coll-case.fmt-dvd .coll-case-art {
-  inset: 0 0 0 9px;
-}
-
-.coll-case.fmt-book .coll-case-art {
-  inset: 0 0 0 8px;
-}
-
-.coll-case.fmt-gba .coll-case-art {
-  inset: 0 0 0 15px;
 }
 
 .coll-case-art img {
@@ -1346,11 +1296,15 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.6s cubic-bezier(0.2, 0.9, 0.25, 1);
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.32s ease;
 }
 
 .coll-case:hover .coll-case-art img {
-  transform: scale(1.06);
+  transform: scale(1.07);
+  /* À peine : l'affiche est déjà étalonnée, on la réveille, on ne la
+     retouche pas. */
+  filter: saturate(1.06) brightness(1.03);
 }
 
 .coll-case-noart {
@@ -1358,219 +1312,183 @@
   inset: 0;
   display: grid;
   place-items: center;
-  padding: 1rem;
+  padding: 1.1rem;
   text-align: center;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 0.95rem;
-  line-height: 1.2;
-  color: rgba(255, 255, 255, 0.92);
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+  font-size: 0.98rem;
+  line-height: 1.22;
+  color: rgba(255, 255, 255, 0.94);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
 }
 
-/* Film plastique : le reflet oblique du blister. DISCRET — c'est la jaquette
-   qu'on regarde, pas le reflet ; un éclat trop franc lave l'affiche en son
-   milieu et on ne lit plus l'image dessous. */
+/* Le balayage de lumière : invisible au repos, il TRAVERSE l'affiche au
+   survol. Un reflet fixe salissait l'image en permanence ; en mouvement, il
+   ne dure que le temps du geste et c'est lui qui donne le brillant. */
 .coll-case-shine {
   position: absolute;
-  inset: 0;
+  inset: -30% -60%;
   background: linear-gradient(
-    108deg,
-    rgba(255, 255, 255, 0) 32%,
-    rgba(255, 255, 255, 0.08) 45%,
-    rgba(255, 255, 255, 0.015) 52%,
-    rgba(255, 255, 255, 0) 60%
+    104deg,
+    rgba(255, 255, 255, 0) 42%,
+    rgba(255, 255, 255, 0.16) 50%,
+    rgba(255, 255, 255, 0) 58%
   );
-  opacity: 0.6;
-  transition: transform 0.6s ease, opacity 0.3s ease;
+  transform: translateX(-60%);
+  opacity: 0;
   pointer-events: none;
+  transition: transform 0.75s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
 }
 
-/* Au survol, le reflet glisse — et s'efface encore un peu : on se penche sur
-   l'objet, donc on veut voir l'image, pas le plastique. */
 .coll-case:hover .coll-case-shine {
-  opacity: 0.34;
-  transform: translateX(14%);
+  transform: translateX(60%);
+  opacity: 1;
 }
 
-/* Voile du bas : il ne porte plus de texte, seulement les pastilles et la
-   jauge. Il reste donc COURT et léger — juste de quoi que du blanc sur une
-   affiche blanche ne mange pas la pastille. */
+/* Le voile du bas : au repos il assied les pastilles, au survol il monte pour
+   porter le bouton de lecture sans assombrir toute l'affiche. */
 .coll-case-scrim {
   position: absolute;
   inset: auto 0 0 0;
-  height: 42%;
+  height: 46%;
   background: linear-gradient(
     180deg,
     rgba(8, 8, 14, 0) 0%,
-    rgba(8, 8, 14, 0.28) 52%,
-    rgba(8, 8, 14, 0.62) 100%
+    rgba(8, 8, 14, 0.32) 55%,
+    rgba(8, 8, 14, 0.74) 100%
   );
-  opacity: 0.9;
+  opacity: 0.85;
   pointer-events: none;
+  transition: opacity 0.32s ease;
 }
 
-/* Les pastilles : en BAS de l'affiche, pas en haut. Une jaquette porte son
-   titre en haut — c'est là qu'il ne faut rien poser. */
+.coll-case:hover .coll-case-scrim {
+  opacity: 1;
+}
+
+/* Les pastilles vivent en HAUT à gauche, au-dessus du chant. En bas, elles se
+   cognaient à la jauge et au bouton de lecture. */
 .coll-case-tags {
   position: absolute;
-  left: 0.45rem;
-  right: 0.45rem;
-  bottom: 0.45rem;
+  top: 0.5rem;
+  left: 0.6rem;
+  right: 0.5rem;
+  z-index: 3;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.3rem;
-  transition: transform 0.3s ease;
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease;
 }
 
 .coll-case-fmt {
-  font-size: 0.56rem;
+  font-size: 0.55rem;
   font-weight: 800;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  padding: 0.2rem 0.42rem;
+  padding: 0.22rem 0.46rem;
   border-radius: 999px;
-  color: #100f0a;
-  background: var(--tint);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.94);
+  /* Verre teinté plutôt qu'aplat doré : la pastille doit se poser SUR
+     l'affiche sans lui disputer la couleur. */
+  background: rgba(10, 11, 18, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(6px);
 }
 
-/* Provenance : elle n'apparaît QUE lorsqu'elle surprend (voir
-   CollectionCase) — un titre officiel n'a rien à annoncer. */
+.coll-case:hover .coll-case-fmt {
+  color: #100f0a;
+  background: var(--tint);
+  border-color: transparent;
+}
+
 .coll-case-lic {
-  font-size: 0.54rem;
+  font-size: 0.53rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 0.2rem 0.4rem;
+  padding: 0.22rem 0.42rem;
   border-radius: 999px;
   color: rgba(255, 255, 255, 0.9);
-  background: rgba(10, 10, 16, 0.62);
+  background: rgba(10, 10, 16, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(6px);
 }
 
 .coll-case-lic.lic-public-domain {
   color: #b8f5cf;
-  border-color: rgba(52, 211, 153, 0.42);
+  border-color: rgba(52, 211, 153, 0.44);
 }
 
 .coll-case-lic.lic-fan {
   color: #ffd7a8;
-  border-color: rgba(251, 146, 60, 0.42);
+  border-color: rgba(251, 146, 60, 0.44);
 }
 
-/* Bouton de lecture : n'apparaît qu'au survol, au centre de l'affiche. */
+/* Le bouton de lecture : au CENTRE, et il arrive en ressort. C'est le seul
+   élément qui a le droit de porter la teinte pleine — c'est l'action. */
 .coll-case-play {
   position: absolute;
-  top: 46%;
+  top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%) scale(0.6);
-  width: 44px;
-  height: 44px;
+  z-index: 3;
+  transform: translate(-50%, -50%) scale(0.55);
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   color: #100f0a;
   background: var(--tint);
   opacity: 0;
-  transition: opacity 0.2s ease, transform 0.3s cubic-bezier(0.2, 1.5, 0.4, 1);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45),
-    0 0 0 6px color-mix(in srgb, var(--tint) 22%, transparent);
+  pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.38s cubic-bezier(0.2, 1.5, 0.4, 1);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.42),
+    0 0 0 8px color-mix(in srgb, var(--tint) 18%, transparent);
 }
 
-.coll-case:hover .coll-case-play {
+.coll-case:hover .coll-case-play,
+.coll-case:focus-visible .coll-case-play {
   opacity: 1;
   transform: translate(-50%, -50%) scale(1);
 }
 
-/* La jauge : un filet collé au bas de l'affiche, pas une barre de formulaire.
-   C'est la marque au crayon sur la tranche d'une cassette à moitié vue. */
+/* La jauge : un filet au ras du bas de l'affiche. Pas une barre de
+   formulaire — la marque au crayon sur la tranche d'une cassette à moitié
+   vue. */
 .coll-case-line {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
+  z-index: 3;
   height: 3px;
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .coll-case-line i {
   display: block;
   height: 100%;
   background: var(--tint);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--tint) 70%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--tint) 75%, transparent);
 }
 
-/* Le boîtier laisse dépasser son disque sur le côté au survol. */
-.coll-case.fmt-dvd .coll-case-body::after {
-  content: "";
-  position: absolute;
-  top: 22%;
-  right: 4px;
-  width: 62%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: conic-gradient(
-      from 210deg,
-      rgba(255, 255, 255, 0.5),
-      rgba(140, 200, 255, 0.35) 18%,
-      rgba(255, 220, 160, 0.4) 38%,
-      rgba(180, 255, 210, 0.32) 58%,
-      rgba(255, 255, 255, 0.45) 80%,
-      rgba(255, 255, 255, 0.5)
-    ),
-    #b9bec9;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5), 0 6px 16px rgba(0, 0, 0, 0.4);
-  transform: translateX(-8%) scale(0.9);
-  opacity: 0;
-  transition: transform 0.42s cubic-bezier(0.2, 0.9, 0.25, 1), opacity 0.22s ease;
-  z-index: -1;
-}
-
-.coll-case.fmt-dvd .coll-case-body::before {
-  /* Le trou central du disque. */
-  content: "";
-  position: absolute;
-  top: 22%;
-  right: 4px;
-  width: 62%;
-  aspect-ratio: 1;
-  z-index: -1;
-  background: radial-gradient(
-    circle,
-    var(--coll-room) 0 11%,
-    rgba(255, 255, 255, 0.6) 11% 13%,
-    transparent 13%
-  );
-  transform: translateX(-8%) scale(0.9);
-  opacity: 0;
-  transition: transform 0.42s cubic-bezier(0.2, 0.9, 0.25, 1), opacity 0.22s ease;
-}
-
-.coll-case.fmt-dvd:hover .coll-case-body::after,
-.coll-case.fmt-dvd:hover .coll-case-body::before {
-  transform: translateX(34%) scale(0.9) rotate(22deg);
-  opacity: 1;
-}
-
-/* ---- L'étiquette de casier, sous l'objet ------------------------------- */
+/* ---- L'étiquette, sous l'objet ---------------------------------------- */
 
 .coll-case-cap {
   display: flex;
   flex-direction: column;
-  gap: 0.12rem;
-  padding-left: 2px;
+  gap: 0.1rem;
+  padding: 0 2px;
   min-width: 0;
 }
 
 .coll-case-franchise {
-  font-size: 0.55rem;
+  font-size: 0.54rem;
   font-weight: 800;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--text-soft);
-  opacity: 0.85;
+  color: color-mix(in srgb, var(--tint) 62%, var(--text-soft));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1578,9 +1496,10 @@
 
 .coll-case-title {
   font-family: var(--font-display);
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   font-weight: 700;
-  line-height: 1.16;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
   color: var(--text);
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -1593,13 +1512,16 @@
   color: var(--orange);
 }
 
+/* Une seule ligne d'information, en petites capitales espacées : le support,
+   puis l'année. Deux faits, pas une fiche technique. */
 .coll-case-meta {
   display: flex;
   align-items: center;
-  gap: 0.28rem;
-  margin-top: 0.1rem;
-  font-size: 0.68rem;
-  font-weight: 600;
+  gap: 0.3rem;
+  margin-top: 0.22rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
   color: var(--text-soft);
   white-space: nowrap;
   overflow: hidden;
@@ -1608,39 +1530,44 @@
 
 .coll-case-meta svg {
   flex: 0 0 auto;
-  opacity: 0.75;
+  opacity: 0.7;
 }
 
 .coll-case-meta em {
   font-style: normal;
-  opacity: 0.8;
+  opacity: 0.75;
 }
 
-/* Où l'on en est : la seule ligne de la carte qui parle de MOI et non de
-   l'objet, donc la seule qui porte la teinte du titre. */
+/* Où l'on en est : la seule ligne qui parle de MOI et non de l'objet, donc la
+   seule qui porte la teinte du titre. */
 .coll-case-resume {
-  margin-top: 0.16rem;
-  font-size: 0.66rem;
+  margin-top: 0.2rem;
+  font-size: 0.65rem;
   font-weight: 700;
-  color: color-mix(in srgb, var(--tint) 72%, var(--text));
+  color: color-mix(in srgb, var(--tint) 70%, var(--text));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .coll-case-body,
+  .coll-case,
   .coll-case-art img,
-  .coll-case-shine {
-    transition: none;
+  .coll-case-shine,
+  .coll-case-play {
+    transition-duration: 0.01ms;
   }
 
-  .coll-case:hover .coll-case-body {
-    transform: translateY(-4px);
+  .coll-case:hover {
+    transform: none;
   }
 
   .coll-case:hover .coll-case-art img {
     transform: none;
+  }
+
+  .coll-case-shine {
+    display: none;
   }
 }
 
@@ -3220,26 +3147,41 @@
     gap: 1.5rem 0.85rem;
   }
 
-  /* Sur écran tactile, le survol n'existe pas : on garde les boîtiers droits
-     et on montre l'essentiel tout de suite. */
-  .coll-case:hover .coll-case-body {
+  /* Sur écran tactile, le survol n'existe pas — et pire, il RESTE collé au
+     dernier élément touché. On neutralise donc tout ce qu'il déclenche : la
+     carte ne se soulève pas, l'affiche ne grossit pas, et rien ne s'allume
+     sous le doigt qui vient de faire défiler la grille. */
+  .coll-case:hover {
     transform: none;
-    box-shadow: 0 1px 2px rgba(10, 10, 20, 0.3),
-      0 10px 22px rgba(10, 10, 20, 0.18), 0 0 0 1px rgba(10, 10, 20, 0.09);
+  }
+
+  .coll-case:hover .coll-case-body {
+    box-shadow: 0 0 0 1px rgba(12, 12, 22, 0.09),
+      0 2px 6px rgba(12, 12, 22, 0.14), 0 14px 30px rgba(12, 12, 22, 0.16);
+  }
+
+  .coll-case:hover .coll-case-art img {
+    transform: none;
+    filter: none;
+  }
+
+  .coll-case:hover .coll-case-fmt {
+    color: rgba(255, 255, 255, 0.94);
+    background: rgba(10, 11, 18, 0.55);
+    border-color: rgba(255, 255, 255, 0.16);
   }
 
   .coll-case-play,
-  .coll-case.fmt-dvd .coll-case-body::after,
-  .coll-case.fmt-dvd .coll-case-body::before {
+  .coll-case-shine {
     display: none;
+  }
+
+  .coll-case-body {
+    border-radius: 11px;
   }
 
   .coll-case-title {
-    font-size: 0.82rem;
-  }
-
-  .coll-case-spine-label {
-    display: none;
+    font-size: 0.84rem;
   }
 
   .coll-hero-body {

@@ -26,6 +26,7 @@ import {
   Popcorn,
   Thermometer,
   Globe2,
+  Grid2x2,
   Swords,
   Zap,
   Crown,
@@ -1457,7 +1458,7 @@ function fetchVersusCard(code, path, token) {
   return p;
 }
 
-function useVersusRoom(code, bt, token) {
+function useVersusRoom(code, game, token) {
   const [live, setLive] = useState(() => {
     const hit = versusCache.get(code);
     return hit && Date.now() - hit.at < VERSUS_TTL ? hit.data : null;
@@ -1467,9 +1468,12 @@ function useVersusRoom(code, bt, token) {
   useEffect(() => {
     if (!code || !token) return undefined;
     let alive = true;
-    const path = bt
-      ? `/blindtest/versus/${code}/card`
-      : `/geo/versus/${code}/card`;
+    const path =
+      game === "bt"
+        ? `/blindtest/versus/${code}/card`
+        : game === "px"
+          ? `/pixel/versus/${code}/card`
+          : `/geo/versus/${code}/card`;
 
     async function pull() {
       try {
@@ -1512,15 +1516,21 @@ function useVersusRoom(code, bt, token) {
       clearInterval(iv);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [code, bt, token]);
+  }, [code, game, token]);
 
   return live;
 }
 
 function VersusCard({ versus }) {
   const { token } = useAuth();
+  // Trois jeux passent par cette carte : le blind test, Pixel Rush et
+  // GeoGamer. Le `kind` du message décide, et le reste (têtes, places, état du
+  // salon) est rigoureusement identique — c'est tout l'intérêt d'avoir imposé
+  // la même forme de réponse aux trois routes /card.
   const bt = versus.kind === "blindtest";
-  const live = useVersusRoom(versus.code, bt, token);
+  const px = versus.kind === "pixel";
+  const game = bt ? "bt" : px ? "px" : "geo";
+  const live = useVersusRoom(versus.code, game, token);
 
   // Trois sources, dans cet ordre : le salon s'il a répondu, sinon ce que porte
   // le message (périmé mais parlant), sinon les valeurs par défaut.
@@ -1530,7 +1540,7 @@ function VersusCard({ versus }) {
   const max = known ? live.max : versus.maxPlayers || 5;
   const rounds = known ? live.rounds : versus.rounds || 8;
   const faces = known ? live.players || [] : [];
-  const buzzer = !bt && (known ? live.mode : versus.mode) === "buzzer";
+  const buzzer = !bt && !px && (known ? live.mode : versus.mode) === "buzzer";
   const mine = !!live?.mine;
 
   // Une porte n'est ouverte que si le serveur laisserait vraiment entrer : le
@@ -1568,13 +1578,23 @@ function VersusCard({ versus }) {
           de la PAGE GeoGamer (app-25-geo.css), qui impose un `min-height`
           plein écran — la vignette de 54 px devenait une colonne noire d'un
           écran de haut au milieu du fil. */}
-      <span className={`chat-card-cover gv-card-art ${bt ? "bt" : ""}`}>
-        {bt ? <Music size={22} /> : buzzer ? <Zap size={22} /> : <Globe2 size={22} />}
+      <span className={`chat-card-cover gv-card-art ${bt ? "bt" : ""} ${px ? "px" : ""}`}>
+        {bt ? (
+          <Music size={22} />
+        ) : px ? (
+          <Grid2x2 size={22} />
+        ) : buzzer ? (
+          <Zap size={22} />
+        ) : (
+          <Globe2 size={22} />
+        )}
       </span>
       <span className="chat-card-body">
         <span className="chat-card-kicker">
-          <Swords size={12} /> {bt ? "Blind test" : "GeoGamer"}
-          <i className="gv-card-mode">{bt ? "versus" : buzzer ? "buzzer" : "classique"}</i>
+          <Swords size={12} /> {bt ? "Blind test" : px ? "Pixel Rush" : "GeoGamer"}
+          <i className="gv-card-mode">
+            {bt || px ? "versus" : buzzer ? "buzzer" : "classique"}
+          </i>
         </span>
 
         {/* Les têtes plutôt qu'un décompte écrit : on reconnaît sa bande d'un
@@ -1606,7 +1626,13 @@ function VersusCard({ versus }) {
   const cls = `chat-card chat-card-vs ${status.tone}`;
   return joinable ? (
     <Link
-      to={bt ? `/blindtest/versus/${versus.code}` : `/geo/versus/${versus.code}`}
+      to={
+        bt
+          ? `/blindtest/versus/${versus.code}`
+          : px
+            ? `/pixel/versus/${versus.code}`
+            : `/geo/versus/${versus.code}`
+      }
       className={`${cls} clickable`}
     >
       {body}

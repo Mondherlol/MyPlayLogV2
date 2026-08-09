@@ -72,11 +72,6 @@ export default function CollectionCase({ media }) {
       title={media.title}
     >
       <div className="coll-case-body">
-        {/* Tranche : le petit bord sombre qui donne l'épaisseur. */}
-        <span className="coll-case-spine" aria-hidden="true">
-          <span className="coll-case-spine-label">{media.title}</span>
-        </span>
-
         <div className="coll-case-art">
           {media.poster ? (
             <img src={media.poster} alt="" loading="lazy" />
@@ -110,6 +105,10 @@ export default function CollectionCase({ media }) {
           {/* Un jeu n'a pas d'avancement mesurable de notre côté : la jauge
               serait toujours à zéro, ce qui dirait le contraire du temps de
               jeu affiché juste à côté. */}
+          {/* Le chant du boîtier, posé PAR-DESSUS l'affiche : deux traits
+              collés au bord gauche, l'épaisseur de l'objet en cinq pixels. */}
+          <span className="coll-case-spine" aria-hidden="true" />
+
           {!game && bar > 0 && (
             <span className="coll-case-line" aria-hidden="true">
               <i style={{ width: `${bar}%` }} />

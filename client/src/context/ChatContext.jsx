@@ -353,6 +353,10 @@ export function ChatProvider({ children }) {
       emit("btversus", JSON.parse(e.data));
     });
 
+    es.addEventListener("pxversus", (e) => {
+      emit("pxversus", JSON.parse(e.data));
+    });
+
     // Journal du serveur, en direct — n'arrive qu'aux administrateurs (le
     // serveur ne l'adresse qu'à eux, cf. lib/audit.js). Simple relais : c'est
     // l'onglet « Logs » du panel admin qui décide quoi en faire.

@@ -2003,3 +2003,121 @@ body.mpl-open .pld-done {
     opacity: 1 !important;
   }
 }
+
+/* --- Fil : ce qui vient d'être ajouté à une liste / playlist ---------------
+   Bandeau doré au-dessus de la mini-carte : la carte parle de CES éléments-là,
+   pas des pistes déjà en place. */
+.hf-added {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+
+.hf-added-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.45rem 0.6rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--orange);
+  background: rgba(242, 183, 11, 0.07);
+  color: inherit;
+  transition: border-color 0.15s ease, transform 0.12s ease;
+}
+
+.hf-added-row.clickable:hover {
+  border-color: var(--border-strong);
+  border-left-color: var(--orange);
+  transform: translateY(-1px);
+}
+
+.hf-added-row.current {
+  border-color: var(--orange);
+  border-left-color: var(--orange);
+}
+
+.hf-added-art {
+  position: relative;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 9px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+}
+
+.hf-added-art img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hf-added-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 10, 15, 0.45);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.hf-added-row:hover .hf-added-play,
+.hf-added-play.on {
+  opacity: 1;
+}
+
+.hf-added-body {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.hf-added-name {
+  font-weight: 700;
+  font-size: 0.86rem;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hf-added-sub {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hf-added-tag {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  border: 1px solid var(--orange);
+  border-radius: 999px;
+  padding: 0.1rem 0.42rem;
+}
+
+/* Le titre de l'OST ajoutée, dans la phrase de la carte */
+.hf-added-title {
+  font-weight: 700;
+  color: var(--accent-ink);
+}

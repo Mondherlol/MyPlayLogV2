@@ -59,6 +59,11 @@ export function VersusFace({ user, size = 28, hue, title }) {
 //
 // `row` : disposition horizontale, pour les pages où le rail est en tête de
 // colonne plutôt que collé dans un coin.
+//
+// `onPlayerContext` : clic droit sur une ligne. Le rail ne décide de rien — il
+// remonte l'évènement et le joueur visé, à charge du jeu d'en faire quelque
+// chose (Pixel Rush y accroche son menu « jeter une tomate »). Optionnel : sans
+// lui, le menu contextuel du navigateur s'ouvre normalement.
 export function VersusRail({
   players,
   found = [],
@@ -69,6 +74,7 @@ export function VersusRail({
   lives: maxLives = 3,
   row = false,
   renderSub = null,
+  onPlayerContext = null,
 }) {
   return (
     <ul className={`gv-rail ${row ? "row" : ""}`}>
@@ -84,8 +90,18 @@ export function VersusRail({
               key={p.id}
               className={`gv-rail-row ${hit ? "found" : ""} ${dead ? "out" : ""} ${
                 p.isMe ? "me" : ""
-              } ${!p.online ? "away" : ""} ${missed[p.id] ? "missed" : ""}`}
+              } ${!p.online ? "away" : ""} ${missed[p.id] ? "missed" : ""} ${
+                onPlayerContext ? "ctx" : ""
+              }`}
               style={{ "--hue": hueById.get(p.id) }}
+              onContextMenu={
+                onPlayerContext
+                  ? (e) => {
+                      e.preventDefault();
+                      onPlayerContext(e, p);
+                    }
+                  : undefined
+              }
             >
               <VersusFace user={p} size={26} hue={hueById.get(p.id)} />
               <span className="gv-rail-id">

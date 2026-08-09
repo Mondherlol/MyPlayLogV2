@@ -22,6 +22,7 @@ import freeGamesRoutes from "./routes/freeGames.js";
 import blindtestRoutes from "./routes/blindtest.js";
 import blindtestVersusRoutes from "./routes/blindtestVersus.js";
 import pixelRoutes from "./routes/pixel.js";
+import pixelVersusRoutes from "./routes/pixelVersus.js";
 import geoRoutes from "./routes/geo.js";
 import geoVersusRoutes from "./routes/geoVersus.js";
 import motRoutes from "./routes/mot.js";
@@ -106,6 +107,9 @@ app.use("/api/free-games", freeGamesRoutes);
 // Même précaution que pour /api/geo/versus : monté AVANT le routeur solo.
 app.use("/api/blindtest/versus", blindtestVersusRoutes);
 app.use("/api/blindtest", blindtestRoutes);
+// Le versus AVANT le solo : /api/pixel/:id/results happerait sinon
+// /api/pixel/versus/... (même piège que /api/blindtest/versus).
+app.use("/api/pixel/versus", pixelVersusRoutes);
 app.use("/api/pixel", pixelRoutes);
 // AVANT /api/geo, et ce n'est pas cosmétique : le routeur solo porte un
 // `GET /:id/results` qui happerait les chemins à deux segments. Monter le

@@ -467,31 +467,27 @@ async function buildRounds(userId, count) {
 // bibliothèque d'UN joueur, ce serait lui offrir la partie. On réunit donc les
 // bibliothèques de TOUS les participants.
 //
-// MAIS PAS À ÉGALITÉ : UN JEU QUE SEUL UN JOUEUR CONNAÎT N'EST PAS UNE MANCHE.
-// C'est une course à un seul concurrent — les autres écoutent trente secondes
-// d'un morceau qu'ils n'ont aucune chance de nommer, et le buzzer tombe sans
-// que personne n'ait joué. On classe donc les jeux de la table par NOMBRE DE
-// BIBLIOTHÈQUES qui les contiennent :
+// UNE SEULE FAVEUR, ET ELLE EST LÉGÈRE : on se garantit quelques manches que
+// TOUT LE MONDE a jouées — ce sont les meilleures du mode, toute la table est
+// en course. Le reste est tiré à plat : jeux d'un seul joueur ET pièges que
+// personne n'a touchés compris.
 //
-//   1. ceux que TOUT LE MONDE a joués — les meilleures manches du mode, tout
-//      le monde est en course ; on s'en garantit une poignée quand il y en a ;
-//   2. ceux qu'au moins DEUX joueurs ont joués — le gros du tirage ;
-//   3. ceux d'un seul joueur — dernier recours, uniquement s'il n'y a pas
-//      assez de matière au-dessus (petites bibliothèques, OST introuvables).
-//
-// Les pièges (gros jeux que personne n'a touchés) restent, mais en portion
-// réduite : ils coûtent une manche entière de silence, et le nouvel indice
-// « personne à la table n'y a joué » leur donne déjà tout leur sel.
+// C'est délibéré, et c'est un arbitrage contre le confort : trier par nombre de
+// bibliothèques donnerait de meilleures manches en moyenne, mais toujours LES
+// MÊMES — le petit noyau commun d'un groupe d'amis tourne en boucle d'une
+// partie à l'autre. Le tirage à plat garde de la surprise, et l'indice « y ont
+// joué » (tout en bas) rend justement les manches obscures jouables : il dit à
+// qui la réponse coûte le moins cher.
 //
 // Pas de pondération par le temps de jeu, en revanche : elle n'aurait de sens
 // que rapportée à un joueur.
-const VERSUS_FOREIGN_SHARE = 0.15;
+const VERSUS_FOREIGN_SHARE = 0.25;
 // Doit rester en phase avec CLIP_SEC de routes/blindtestVersus.js : c'est la
 // fenêtre sur laquelle on cherche le climax des pistes du versus.
 const VERSUS_CLIP_SEC = 35;
 // Part des manches « bibliothèque » réservée aux jeux que TOUT LE MONDE a
-// joués, quand la table en a en réserve.
-const VERSUS_EVERYONE_SHARE = 0.35;
+// joués, quand la table en a en réserve. Le reste part au tirage à plat.
+const VERSUS_EVERYONE_SHARE = 0.3;
 
 export async function buildVersusRounds(userIds, count) {
   const playerCount = new Set(userIds.map(String)).size;
@@ -525,25 +521,20 @@ export async function buildVersusRounds(userIds, count) {
   const ownedTarget = count - foreignTarget;
   const usedVideo = new Set();
 
-  // Les trois paniers, et l'ordre dans lequel on va piocher. Ce n'est PAS un
-  // filtre : un jeu d'un seul joueur peut encore sortir, mais seulement une
-  // fois les deux premiers paniers épuisés.
+  // La poignée de jeux communs à toute la table passe devant ; tout le reste
+  // est mélangé ensemble, sans regarder combien de joueurs l'ont.
   const everyone = [];
-  const twoPlus = [];
-  const single = [];
+  const rest = [];
   for (const g of sharedGames) {
     const n = owners.get(g.gameId)?.size || 0;
     if (playerCount >= 2 && n >= playerCount) everyone.push(g);
-    else if (n >= 2) twoPlus.push(g);
-    else single.push(g);
+    else rest.push(g);
   }
   const everyoneShuf = shuffle(everyone);
   const headroom = Math.max(1, Math.round(ownedTarget * VERSUS_EVERYONE_SHARE));
   const ownedPool = [
     ...everyoneShuf.slice(0, headroom),
-    ...shuffle(twoPlus),
-    ...everyoneShuf.slice(headroom),
-    ...shuffle(single),
+    ...shuffle([...rest, ...everyoneShuf.slice(headroom)]),
   ];
 
   // 1. Les jeux de la table qui ont déjà une OST en base.
@@ -558,8 +549,6 @@ export async function buildVersusRounds(userIds, count) {
     rounds.push(mkRound(g, t, true));
   }
   if (rounds.length < ownedTarget) {
-    // Toujours dans le même ordre de préférence : scraper une OST manquante ne
-    // doit pas faire remonter un jeu que seul un joueur connaît.
     const missing = ownedPool.filter((g) => !(ownedTrackMap.get(g.gameId) || []).length);
     rounds.push(...(await scrapeFill(missing, ownedTarget - rounds.length, true, usedVideo)));
   }

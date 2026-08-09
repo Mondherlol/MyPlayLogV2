@@ -35,7 +35,6 @@ export const FEED_CATEGORIES = [
       "comment_reply",
       "list_like",
       "comment_like",
-      "playlist_listen",
     ],
     cards: ["list", "listadd"],
   },

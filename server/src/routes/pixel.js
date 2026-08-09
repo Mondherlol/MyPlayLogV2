@@ -23,20 +23,35 @@ import {
   hintsForGames,
 } from "./blindtest.js";
 
-// Pixel Rush : on montre les captures d'écran d'un jeu, ÉNORMÉMENT pixelisées,
-// et le joueur devine de quel jeu il s'agit. Toutes les captures de la manche
-// sont visibles d'emblée (grille 2×2) ; le temps qui passe fait juste remonter
-// un peu leur définition — sans jamais les rendre lisibles — et coûte des
-// points. L'image nette n'apparaît qu'à la révélation.
+// Pixel Rush : on montre UNE capture d'écran d'un jeu, ÉNORMÉMENT pixelisée,
+// et le joueur devine de quel jeu il s'agit. Le temps qui passe fait remonter
+// un peu la définition — sans jamais la rendre lisible — et coûte des points.
+// L'image nette n'apparaît qu'à la révélation.
+//
+// UNE SEULE CAPTURE, ET C'ÉTAIT QUATRE. La grille de quatre vignettes divisait
+// l'attention sans rien apprendre de plus : à 12 blocs de large, quatre petites
+// images floues ne valent pas une grande. On en montre donc une, en grand, et
+// on donne de quoi la fouiller — le coin libre et la loupe (voir `clearCorner`
+// ci-dessous et components/PixelCanvas.jsx).
 //
 // Le pixel est appliqué CÔTÉ CLIENT (canvas) : le serveur envoie des URLs
 // IGDB standard. C'est assumé — comme pour le blind test, la triche par
 // devtools est possible et sans intérêt entre amis (cf. publicRounds).
 const router = express.Router();
 
-const ROUND_SEC = 15; // durée d'une manche
+// Durée d'une manche. Trente secondes, comme le versus : depuis qu'il n'y a
+// plus qu'une capture, la manche se joue à la loupe — on balaie l'image, on
+// revient sur un détail. Quinze secondes suffisaient à REGARDER quatre
+// vignettes ; elles ne suffisent pas à en FOUILLER une.
+const ROUND_SEC = 30;
 const DEFAULT_ROUNDS = 10;
-const SHOTS_PER_ROUND = 4;
+const SHOTS_PER_ROUND = 1;
+
+// Les quatre coins possibles du « coin libre » : l'angle de l'image qui échappe
+// à la pixelisation. Tiré ICI et transporté avec la manche — en versus, tout le
+// monde doit avoir le même, et au rejeu d'un défi on veut retrouver le sien.
+const CORNERS = ["tl", "tr", "bl", "br"];
+const pickCorner = () => CORNERS[Math.floor(Math.random() * CORNERS.length)];
 
 // Screenshots d'un lot de jeux → Map(gameId → [urls]). Un seul aller-retour
 // IGDB par tranche de 300 jeux ; les jeux sans screenshot sont simplement
@@ -74,6 +89,7 @@ function mkRound(g, shots, owned) {
     gameName: g.name,
     cover: g.cover || null,
     shots: shuffle([...shots]).slice(0, SHOTS_PER_ROUND),
+    clearCorner: pickCorner(),
     owned,
     playtimeHours: g.playtimeHours ?? null,
     rating: g.rating ?? null,
@@ -175,6 +191,143 @@ async function buildRounds(userId, count) {
   return { rounds, candidates };
 }
 
+// ======================================================================
+//  Le versus : tirer pour UNE TABLE
+// ======================================================================
+// Même philosophie que le blind test (cf. buildVersusRounds dans
+// routes/blindtest.js, qui porte le raisonnement en entier) : on réunit les
+// bibliothèques de tous les participants, on se garantit quelques jeux que
+// TOUT LE MONDE a joués, et on tire le reste à plat pour ne pas rejouer le même
+// petit noyau commun à chaque partie.
+//
+// La différence tient à la matière : ici il faut des SCREENSHOTS IGDB, pas des
+// OST. Beaucoup de jeux n'en ont pas — on interroge donc large et on garde ce
+// qui répond.
+const PXV_FOREIGN_SHARE = 0.25;
+const PXV_EVERYONE_SHARE = 0.3;
+
+export async function buildPixelVersusRounds(userIds, count) {
+  const playerCount = new Set(userIds.map(String)).size;
+  const played = await UserGame.find({
+    user: { $in: userIds },
+    status: { $ne: "wishlist" },
+  })
+    .select("gameId name cover user favorite")
+    .lean();
+
+  // QUI a joué à QUOI : sert au tirage ET au dernier indice de la manche
+  // (« y ont joué », avec les têtes des joueurs concernés).
+  const owners = new Map(); // gameId → Map(userId → { favorite })
+  const byId = new Map();
+  for (const g of played) {
+    if (!g.gameId) continue;
+    if (!owners.has(g.gameId)) owners.set(g.gameId, new Map());
+    const seat = owners.get(g.gameId);
+    const uid = String(g.user);
+    seat.set(uid, { favorite: !!g.favorite || !!seat.get(uid)?.favorite });
+    if (!byId.has(g.gameId))
+      byId.set(g.gameId, { gameId: g.gameId, name: g.name, cover: g.cover || null });
+  }
+  const tableGames = await keepRealGames([...byId.values()]);
+  const ownedIds = tableGames.map((g) => g.gameId);
+
+  const foreignTarget = ownedIds.length
+    ? Math.max(1, Math.round(count * PXV_FOREIGN_SHARE))
+    : count;
+  const ownedTarget = count - foreignTarget;
+
+  const everyone = [];
+  const rest = [];
+  for (const g of tableGames) {
+    const n = owners.get(g.gameId)?.size || 0;
+    if (playerCount >= 2 && n >= playerCount) everyone.push(g);
+    else rest.push(g);
+  }
+  const everyoneShuf = shuffle(everyone);
+  const headroom = Math.max(1, Math.round(ownedTarget * PXV_EVERYONE_SHARE));
+  const ownedPool = [
+    ...everyoneShuf.slice(0, headroom),
+    ...shuffle([...rest, ...everyoneShuf.slice(headroom)]),
+  ];
+
+  const famous = await getFamousPool();
+  const ownedSet = new Set(ownedIds);
+  const foreignPool = shuffle(famous.filter((g) => !ownedSet.has(g.id))).map((g) => ({
+    gameId: g.id,
+    name: g.name,
+    cover: g.cover,
+  }));
+
+  // On demande BEAUCOUP plus de jeux que de manches : tous n'ont pas de
+  // screenshot, et une seule requête IGDB sert tout le monde.
+  const ownedPick = ownedPool.slice(0, ownedTarget * 4 + 10);
+  const foreignPick = foreignPool.slice(0, foreignTarget * 4 + 10);
+  const shotMap = await shotsForGames([...ownedPick, ...foreignPick].map((g) => g.gameId));
+
+  const usedGames = new Set();
+  const take = (pool, target, owned) => {
+    const out = [];
+    for (const g of pool) {
+      if (out.length >= target) break;
+      if (usedGames.has(g.gameId)) continue;
+      const shots = shotMap.get(g.gameId);
+      if (!shots?.length) continue;
+      usedGames.add(g.gameId);
+      out.push(mkRound(g, shots, owned));
+    }
+    return out;
+  };
+
+  let rounds = [...take(ownedPick, ownedTarget, true), ...take(foreignPick, foreignTarget, false)];
+  // Une catégorie a manqué de matière : on complète avec l'autre.
+  if (rounds.length < count)
+    rounds.push(...take(foreignPick, count - rounds.length, false));
+  if (rounds.length < count) rounds.push(...take(ownedPick, count - rounds.length, true));
+  rounds = shuffle(rounds).slice(0, count);
+
+  // Indices, dont le quatrième propre au versus : qui, à cette table, a ce jeu
+  // en bibliothèque. Voir models/PixelVersus.js.
+  let hintMap = new Map();
+  try {
+    hintMap = await hintsForGames(rounds.map((r) => r.gameId));
+  } catch {
+    /* une manche se joue très bien sans indices IGDB */
+  }
+  for (const r of rounds) {
+    r.hints = {
+      ...(hintMap.get(r.gameId) || {}),
+      players: [...(owners.get(r.gameId) || new Map())].map(([id, seat]) => ({
+        id,
+        favorite: !!seat.favorite,
+      })),
+    };
+  }
+  return rounds;
+}
+
+// La liste proposable à la recherche, IDENTIQUE POUR TOUTE LA TABLE — même
+// exigence d'équité qu'au blind test : un joueur dont la liste contiendrait un
+// titre absent chez les autres le taperait plus vite.
+export async function pixelVersusCandidates(userIds = [], rounds = []) {
+  const [played, famous] = await Promise.all([
+    userIds.length
+      ? UserGame.find({ user: { $in: userIds }, status: { $ne: "wishlist" } })
+          .select("gameId name cover")
+          .lean()
+      : [],
+    getFamousPool(),
+  ]);
+  const candMap = new Map();
+  const addCand = (id, name, cover) => {
+    if (!id || candMap.has(id)) return;
+    candMap.set(id, { id, name, cover: cover || null });
+  };
+  for (const g of played) addCand(g.gameId, g.name, g.cover || null);
+  for (const g of famous) addCand(g.id, g.name, g.cover);
+  for (const r of rounds) addCand(r.gameId, r.gameName, r.cover);
+  return attachAltNames([...candMap.values()]);
+}
+
 // Score d'une manche (serveur) — MÊME formule que le blind test, pour que les
 // deux jeux se valent au classement et à la cagnotte. Rapide = plus de points ;
 // un jeu jamais joué deviné rapporte gros ; ne PAS reconnaître un jeu qu'on
@@ -217,6 +370,7 @@ function publicRounds(rounds, durationSec, hintMap = new Map()) {
   return rounds.map((r, i) => ({
     id: i,
     shots: r.shots,
+    clearCorner: r.clearCorner || "tl",
     durationSec,
     gameId: r.gameId,
     gameName: r.gameName,
@@ -343,6 +497,9 @@ router.get("/challenge/:id", requireAuth, async (req, res) => {
         gameName: r.gameName,
         cover: r.cover || null,
         shots: r.shots || [],
+        // Même coin libre que l'auteur du défi — sinon ce n'est plus le même
+        // set. Les parties d'avant n'en ont pas : on en tire un.
+        clearCorner: r.clearCorner || pickCorner(),
         owned,
         playtimeHours: owned ? e.playtimeHours ?? null : null,
         rating: owned ? e.rating ?? null : null,
@@ -428,6 +585,7 @@ router.post("/finish", requireAuth, async (req, res) => {
         gameName: r.gameName,
         cover: r.cover || null,
         shots: r.shots || [],
+        clearCorner: r.clearCorner || null,
         owned: !!r.owned,
         playtimeHours: r.playtimeHours ?? null,
         rating: r.rating ?? null,

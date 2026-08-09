@@ -52,6 +52,7 @@ const activitySchema = new mongoose.Schema(
         "geo", // a terminé une partie de GeoGamer (meta = score/manches/défi)
         "btversus", // a disputé un versus de blind test (même forme que
         // geoversus : une entrée par joueur, dédoublonnée par meta.versusId)
+        "pxversus", // a disputé un versus Pixel Rush (idem)
         "geoversus", // a disputé un versus GeoGamer (meta = mode/rang/score +
         // la table complète). Une entrée PAR JOUEUR (chacun a son résultat et
         // ses points), mais le fil n'en montre qu'une : routes/feed.js
@@ -93,7 +94,7 @@ const activitySchema = new mongoose.Schema(
     //                  "favorite"|"ost"|"character"|"time"|"bundle", ... }] }
     //                 ("bundle" = jeux d'un bundle cochés terminés :
     //                  { done, total, names: [noms nouvellement finis] })
-    //  list_items  → { added: n }
+    //  list_items  → { added: n, refIds: [ids des éléments ajoutés] }
     meta: { type: mongoose.Schema.Types.Mixed, default: null },
   },
   { timestamps: true }

@@ -11,6 +11,7 @@ import PixelRush from "./pages/PixelRush";
 import GeoGamer from "./pages/GeoGamer";
 import GeoVersus from "./pages/GeoVersus";
 import BlindTestVersus from "./pages/BlindTestVersus";
+import PixelVersus from "./pages/PixelVersus";
 import MotDuJour from "./pages/MotDuJour";
 import Arcade from "./pages/Arcade";
 import Playtopia from "./pages/Playtopia";
@@ -152,6 +153,8 @@ export default function App() {
         {/* Salon de versus musical : adresse des liens d'invitation. */}
         <Route path="/blindtest/versus/:code" element={<BlindTestVersus />} />
         <Route path="/pixel" element={<PixelRush />} />
+        {/* Salon de versus visuel : adresse des liens d'invitation. */}
+        <Route path="/pixel/versus/:code" element={<PixelVersus />} />
         <Route path="/geo" element={<GeoGamer />} />
         {/* Le salon de versus : c'est aussi l'adresse des liens d'invitation
             et des cartes envoyées en message privé. */}

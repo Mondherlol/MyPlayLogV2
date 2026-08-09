@@ -8,7 +8,14 @@ const roundSchema = new mongoose.Schema(
     gameId: { type: Number, required: true }, // le VRAI jeu (la réponse)
     gameName: { type: String, default: "" },
     cover: { type: String, default: null },
-    shots: { type: [String], default: [] }, // screenshots IGDB (2 à 4)
+    // La capture de la manche. Un tableau alors qu'il n'y en a plus qu'une :
+    // les parties d'avant en portent quatre, et le récap comme la modale de
+    // résultats les rouvrent toutes — on ne casse pas l'historique pour ça.
+    shots: { type: [String], default: [] },
+    // L'angle laissé net (« tl » | « tr » | « bl » | « br »), pour rejouer un
+    // défi à l'identique. Absent sur les parties d'avant : le client retombe
+    // sur le coin haut-gauche.
+    clearCorner: { type: String, default: null },
     // Difficulté (relative au joueur de CETTE partie) :
     owned: { type: Boolean, default: false }, // le jeu est dans sa biblio ?
     playtimeHours: { type: Number, default: null },

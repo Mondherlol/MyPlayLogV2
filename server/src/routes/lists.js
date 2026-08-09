@@ -557,10 +557,13 @@ router.put("/:id", requireAuth, async (req, res) => {
         list.tiers = DEFAULT_TIERS;
     }
     let addedCount = 0;
+    let addedRefIds = [];
     if (b.items !== undefined && Array.isArray(b.items)) {
       const before = new Set(list.items.map((i) => String(i.refId)));
       list.items = b.items.map(sanitizeItem).filter(Boolean);
-      addedCount = list.items.filter((i) => !before.has(String(i.refId))).length;
+      const fresh = list.items.filter((i) => !before.has(String(i.refId)));
+      addedCount = fresh.length;
+      addedRefIds = fresh.map((i) => String(i.refId));
     }
     if (b.tiers !== undefined && list.type === "tier") {
       const t = sanitizeTiers(b.tiers);
@@ -572,7 +575,12 @@ router.put("/:id", requireAuth, async (req, res) => {
     await list.save({ validateModifiedOnly: true });
     // Fil : « X a ajouté n jeux à sa liste » (fusionné si ajouts rapprochés).
     if (addedCount > 0)
-      recordListItemsActivity({ actor: req.userId, list: list._id, added: addedCount });
+      recordListItemsActivity({
+        actor: req.userId,
+        list: list._id,
+        added: addedCount,
+        refIds: addedRefIds,
+      });
     const full = await List.findById(list._id)
       .populate("user", "username avatar isSystem")
       .populate("comments.user", "username avatar")
@@ -682,7 +690,12 @@ router.post("/:id/items", requireAuth, async (req, res) => {
       list.items.push(item);
       await list.save({ validateModifiedOnly: true });
       // Fil : ajouts quick-add cumulés dans une seule carte.
-      recordListItemsActivity({ actor: req.userId, list: list._id, added: 1 });
+      recordListItemsActivity({
+        actor: req.userId,
+        list: list._id,
+        added: 1,
+        refIds: [item.refId],
+      });
     }
     res.status(201).json({ added: !exists, itemCount: list.items.length });
   } catch (err) {
@@ -732,6 +745,10 @@ router.post("/:id/listen", requireAuth, async (req, res) => {
       { new: true, select: "listenCount" }
     ).lean();
 
+    // L'activité « playlist_listen » ne produit PLUS de carte dans le fil (une
+    // écoute n'apprend rien aux abonnés, cf. routes/feed.js) : elle ne sert
+    // plus qu'ici, de registre « cet auditeur a-t-il déjà été signalé ? » pour
+    // ne notifier le propriétaire qu'une fois.
     const existing = await Activity.findOne({
       actor: req.userId,
       type: "playlist_listen",
@@ -753,13 +770,6 @@ router.post("/:id/listen", requireAuth, async (req, res) => {
         list: list._id,
         snippet: list.title,
       });
-    } else if (Date.now() - new Date(existing.createdAt).getTime() > 6 * 60 * 60 * 1000) {
-      // Ré-écoute plus tard : on re-date la carte pour qu'elle remonte.
-      const now = new Date();
-      await Activity.collection.updateOne(
-        { _id: existing._id },
-        { $set: { createdAt: now, updatedAt: now } }
-      );
     }
     res.json({ ok: true, listenCount: updated?.listenCount ?? null });
   } catch (err) {

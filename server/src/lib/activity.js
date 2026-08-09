@@ -96,9 +96,12 @@ export async function recordGameActivity({ actor, gameId, gameName, gameCover, c
 }
 
 // Journalise l'ajout d'éléments à une liste : les ajouts rapprochés se
-// cumulent dans une seule carte (meta.added).
-export async function recordListItemsActivity({ actor, list, added }) {
+// cumulent dans une seule carte (meta.added). `refIds` retient QUELS éléments
+// ont été ajoutés, pour que la carte du fil les mette en avant plutôt que de
+// montrer les premières pistes de la playlist (qui, elles, n'ont rien de neuf).
+export async function recordListItemsActivity({ actor, list, added, refIds = [] }) {
   if (!added) return;
+  const ids = refIds.map(String).filter(Boolean).slice(0, 12);
   try {
     const since = new Date(Date.now() - MERGE_WINDOW);
     const recent = await Activity.findOne({
@@ -118,7 +121,10 @@ export async function recordListItemsActivity({ actor, list, added }) {
         { _id: recent._id },
         {
           $set: {
-            meta: { added: (recent.meta?.added || 0) + added },
+            meta: {
+              added: (recent.meta?.added || 0) + added,
+              refIds: [...new Set([...ids, ...(recent.meta?.refIds || [])])].slice(0, 12),
+            },
             createdAt: now,
             updatedAt: now,
           },
@@ -127,7 +133,12 @@ export async function recordListItemsActivity({ actor, list, added }) {
       return;
     }
 
-    await Activity.create({ actor, type: "list_items", list, meta: { added } });
+    await Activity.create({
+      actor,
+      type: "list_items",
+      list,
+      meta: { added, refIds: ids },
+    });
   } catch (err) {
     console.error("activity list items error:", err.message);
   }

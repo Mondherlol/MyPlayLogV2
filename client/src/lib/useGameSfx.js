@@ -36,6 +36,38 @@ export function useGameSfx() {
     osc.stop(t0 + dur + 0.03);
   }, []);
 
+  // Bruit blanc filtré : tout ce qui n'a pas de hauteur — un souffle, un
+  // impact, une giclée. Le filtre balaie `from` → `to` pendant la durée, ce qui
+  // suffit à faire entendre la différence entre un « fwoosh » (qui monte) et un
+  // « splotch » (qui s'effondre vers les graves).
+  const noise = useCallback((dur, opts = {}) => {
+    const ctx = ctxRef.current;
+    if (!ctx || mutedRef.current) return;
+    const { gain = 0.12, from = 2400, to = 240, q = 1, when = 0, type = "lowpass" } = opts;
+    const g0 = Math.max(0.0001, gain * levelRef.current);
+    if (g0 <= 0.0001) return;
+    const t0 = ctx.currentTime + when;
+    const frames = Math.max(1, Math.ceil(ctx.sampleRate * dur));
+    const buf = ctx.createBuffer(1, frames, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < frames; i += 1) data[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filt = ctx.createBiquadFilter();
+    filt.type = type;
+    filt.Q.value = q;
+    filt.frequency.setValueAtTime(from, t0);
+    filt.frequency.exponentialRampToValueAtTime(Math.max(40, to), t0 + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(g0, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(filt);
+    filt.connect(g);
+    g.connect(ctx.destination);
+    src.start(t0);
+    src.stop(t0 + dur + 0.02);
+  }, []);
+
   const play = useCallback(
     (name) => {
       if (!ctxRef.current) return;
@@ -99,11 +131,29 @@ export function useGameSfx() {
         case "pin":
           tone(700, 0.04, "square", 0.05);
           break;
+
+        // --- Pixel Rush versus : les tomates ---
+        // Le lancer, entendu par tout le monde : un souffle bref qui s'éloigne.
+        // Il prépare l'impact — sans lui, la tomate arrive de nulle part.
+        case "throw":
+          noise(0.17, { from: 700, to: 3000, gain: 0.05, type: "bandpass", q: 0.7 });
+          break;
+        // L'impact. Trois couches, et il faut les trois : le CLAQUEMENT (bruit
+        // aigu très court), la MATIÈRE qui s'écrase (le même bruit qui
+        // s'effondre vers les graves sur un tiers de seconde), et le POIDS
+        // (deux sinus très bas). Sans la couche grave ça fait « chhht » ; sans
+        // la couche aiguë ça fait un coup de grosse caisse.
+        case "splat":
+          noise(0.08, { from: 5400, to: 800, gain: 0.17, type: "lowpass" });
+          noise(0.34, { from: 1000, to: 110, gain: 0.1, type: "lowpass", when: 0.04 });
+          tone(92, 0.22, "sine", 0.15);
+          tone(56, 0.3, "sine", 0.1, 0.03);
+          break;
         default:
           break;
       }
     },
-    [tone]
+    [tone, noise]
   );
 
   const setMuted = useCallback((v) => {
