@@ -14,6 +14,8 @@ export const POINT_SOURCES = {
   blindtest: "Blind test",
   pixel: "Pixel Rush",
   geo: "GeoGamer",
+  quiz: "Grand Quiz",
+  quizversus: "Grand Quiz — versus",
   mot: "Mot du jour",
   case: "Ouverture de caisse",
   gacha: "Machine à capsules",

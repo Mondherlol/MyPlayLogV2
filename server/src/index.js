@@ -25,6 +25,9 @@ import pixelRoutes from "./routes/pixel.js";
 import pixelVersusRoutes from "./routes/pixelVersus.js";
 import geoRoutes from "./routes/geo.js";
 import geoVersusRoutes from "./routes/geoVersus.js";
+import quizRoutes from "./routes/quiz.js";
+import quizVersusRoutes from "./routes/quizVersus.js";
+import quizAdminRoutes from "./routes/quizAdmin.js";
 import motRoutes from "./routes/mot.js";
 import presenceRoutes from "./routes/presence.js";
 import arcadeRoutes from "./routes/arcade.js";
@@ -116,12 +119,19 @@ app.use("/api/pixel", pixelRoutes);
 // versus d'abord lève toute ambiguïté.
 app.use("/api/geo/versus", geoVersusRoutes);
 app.use("/api/geo", geoRoutes);
+// Même piège une quatrième fois : /api/quiz porte un `GET /:id/results` qui
+// avalerait /api/quiz/versus/<code>. Le versus passe devant.
+app.use("/api/quiz/versus", quizVersusRoutes);
+app.use("/api/quiz", quizRoutes);
 app.use("/api/mot", motRoutes);
 app.use("/api/presence", presenceRoutes);
 app.use("/api/arcade", arcadeRoutes);
 app.use("/api/steam", steamRoutes);
 app.use("/api/psn", psnRoutes);
 app.use("/api/patchnotes", patchnoteRoutes);
+// La relecture de la banque du quiz, avant le routeur d'admin général : ce
+// dernier porte des chemins à un segment qui happeraient /api/admin/quiz.
+app.use("/api/admin/quiz", quizAdminRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/companies", companyRoutes);
 app.use("/api/platforms", platformRoutes);

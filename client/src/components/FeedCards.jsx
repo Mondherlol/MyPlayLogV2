@@ -64,6 +64,7 @@ import {
 } from "lucide-react";
 import { Globe2, MapPin, Thermometer, Target, Crown, Users, Zap } from "lucide-react";
 import { rarityColor, rarityLabel } from "../lib/rarity";
+import { typeColor, typeLabel } from "../lib/quizGame";
 import RewardArt from "./RewardArt";
 import { apiFetch } from "../lib/api";
 import { downloadImage } from "../lib/download";
@@ -178,7 +179,14 @@ export function FeedCard(props) {
   if (item.type === "pixelgroup") return <PixelRushGroupEvent {...props} />;
   if (item.type === "geo") return <GeoEvent {...props} />;
   if (item.type === "geogroup") return <GeoGroupEvent {...props} />;
-  if (item.type === "geoversus" || item.type === "btversus" || item.type === "pxversus")
+  if (item.type === "quiz") return <QuizEvent {...props} />;
+  if (item.type === "quizgroup") return <QuizGroupEvent {...props} />;
+  if (
+    item.type === "geoversus" ||
+    item.type === "btversus" ||
+    item.type === "pxversus" ||
+    item.type === "quizversus"
+  )
     return <VersusEvent {...props} />;
   if (item.type === "mot") return <MotEvent {...props} />;
   if (item.type === "caseopen") return <CaseOpenEvent {...props} />;
@@ -3247,6 +3255,121 @@ function GeoEvent({ item }) {
   );
 }
 
+// ---------- Le Grand Quiz ----------
+// Même gabarit que le blind test et Pixel Rush, à un ajout près qui compte :
+// LES ÉPREUVES TRAVERSÉES, en pastilles. « 8 épreuves » ne dit rien d'une
+// partie ; « emojis · duel · studio » la raconte, et c'est ce qui donne envie
+// de relever le défi plutôt que de faire défiler.
+//
+// Pas de modale de résultats ici, contrairement à Pixel Rush : il n'y a pas
+// UNE image à revoir mais huit épreuves de formes différentes. Le bouton mène
+// donc au défi — rejouer le même set est de toute façon la seule façon de
+// comprendre vraiment un score.
+function QuizTypePills({ types }) {
+  if (!types?.length) return null;
+  return (
+    <div className="hf-qz-types">
+      {types.slice(0, 5).map((t) => (
+        <span key={t} className="hf-qz-type" style={{ "--qz-type": typeColor(t) }}>
+          {typeLabel(t)}
+        </span>
+      ))}
+      {types.length > 5 && <span className="hf-qz-type more">+{types.length - 5}</span>}
+    </div>
+  );
+}
+
+function QuizEvent({ item }) {
+  const pct = item.total ? Math.round((item.correct / item.total) * 100) : 0;
+  const ch = item.challenge;
+  return (
+    <article className="hf-card hf-blindtest hf-qz">
+      <EventHead user={item.user} date={item.date}>
+        <Trophy size={13} className="hf-inline-ic" />{" "}
+        {ch ? (
+          <>
+            a défié <b>{ch.username}</b> au Grand Quiz
+          </>
+        ) : (
+          "a fait une partie du Grand Quiz"
+        )}
+      </EventHead>
+
+      <div className="hf-bt-body">
+        <div className="hf-bt-scorebox">
+          <span className="hf-bt-score-num">{item.score}</span>
+          <span className="hf-bt-score-lbl">points</span>
+        </div>
+        <div className="hf-bt-meta">
+          <span className="hf-bt-stat">
+            <Trophy size={13} /> {item.correct}/{item.total} épreuves · {pct}%
+          </span>
+          {ch && (
+            <span className={`hf-bt-versus ${ch.beaten ? "win" : "lose"}`}>
+              <Swords size={12} />
+              {ch.beaten
+                ? `bat ${ch.username} (${ch.score})`
+                : `${ch.username} garde la tête (${ch.score})`}
+            </span>
+          )}
+          <QuizTypePills types={item.types} />
+        </div>
+      </div>
+
+      <Link to={`/quiz?challenge=${item.quizGameId}`} className="hf-bt-challenge-cta clickable">
+        <Swords size={15} /> Relever le même quiz
+      </Link>
+    </article>
+  );
+}
+
+// Plusieurs parties d'affilée du même joueur → une seule carte.
+function QuizGroupEvent({ item }) {
+  return (
+    <article className="hf-card hf-blindtest hf-qz hf-btg">
+      <EventHead user={item.user} date={item.date}>
+        <Trophy size={13} className="hf-inline-ic" /> a enchaîné {item.count} quiz
+      </EventHead>
+
+      <div className="hf-btg-summary">
+        <div className="hf-bt-scorebox">
+          <span className="hf-bt-score-num">{item.bestScore}</span>
+          <span className="hf-bt-score-lbl">meilleur</span>
+        </div>
+        <span className="hf-btg-summary-txt">
+          {item.count} parties · {item.best.correct}/{item.best.total} au top
+        </span>
+      </div>
+
+      <ul className="hf-btg-list">
+        {item.games.map((g) => {
+          const pct = g.total ? Math.round((g.correct / g.total) * 100) : 0;
+          const best = g.score === item.bestScore;
+          return (
+            <li key={g.id} className={`hf-btg-row ${best ? "best" : ""}`}>
+              <span className="hf-btg-pts">
+                <b>{g.score}</b> pts
+              </span>
+              <span className="hf-btg-stat">
+                <Trophy size={12} /> {g.correct}/{g.total} · {pct}%
+              </span>
+              {g.challenge && (
+                <span className={`hf-btg-vs ${g.challenge.beaten ? "win" : "lose"}`}>
+                  <Swords size={11} /> {g.challenge.username}
+                </span>
+              )}
+              <span className="hf-btg-time">{timeAgo(g.date)}</span>
+              <Link to={`/quiz?challenge=${g.quizGameId}`} className="hf-btg-see clickable">
+                <Swords size={14} /> Défier
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </article>
+  );
+}
+
 // ---------- GeoGamer versus : la partie à plusieurs ----------
 // UNE PARTIE, UNE CARTE, même si chaque joueur a sa ligne d'activité (le fil
 // dédoublonne par versusId, cf. routes/feed.js). D'où un gabarit différent des
@@ -3256,12 +3379,17 @@ function GeoEvent({ item }) {
 function VersusEvent({ item }) {
   const bt = item.type === "btversus";
   const px = item.type === "pxversus";
-  const game = bt ? "Blind Test" : px ? "Pixel Rush" : "GeoGamer";
-  const GameIcon = bt ? Music2 : px ? Grid2x2 : MapPin;
+  const qz = item.type === "quizversus";
+  const game = bt ? "Blind Test" : px ? "Pixel Rush" : qz ? "Grand Quiz" : "GeoGamer";
+  const GameIcon = bt ? Music2 : px ? Grid2x2 : qz ? Trophy : MapPin;
   const table = [...(item.players || [])].sort((a, b) => a.rank - b.rank);
   const champ = table[0];
   const beaten = table.slice(1);
-  const buzzer = !bt && !px && item.mode === "buzzer";
+  // Le mode « buzzer » n'est une INFORMATION que pour GeoGamer, seul salon où
+  // il s'oppose à un autre mode réglable. Ailleurs il est soit implicite (blind
+  // test, Pixel Rush), soit décidé épreuve par épreuve (Grand Quiz) — l'annoncer
+  // sur la carte induirait en erreur.
+  const buzzer = !bt && !px && !qz && item.mode === "buzzer";
   // L'écart avec le deuxième : c'est le chiffre qui fait parler (« il l'a eu
   // pour 40 points »), bien plus que le total.
   const gap = table.length > 1 ? champ.score - table[1].score : 0;

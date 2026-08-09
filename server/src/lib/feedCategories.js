@@ -102,6 +102,11 @@ export const FEED_CATEGORIES = [
     cards: ["geo", "geogroup", "geoversus"],
   },
   {
+    key: "quiz",
+    activity: ["quiz", "quizversus"],
+    cards: ["quiz", "quizgroup", "quizversus"],
+  },
+  {
     key: "mot",
     activity: ["mot"],
     cards: ["mot"],

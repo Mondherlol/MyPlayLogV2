@@ -317,6 +317,12 @@ const FEED_GROUPS = [
         desc: "Parties et versus de GeoGamer.",
       },
       {
+        key: "quiz",
+        Icon: Trophy,
+        title: "Le Grand Quiz",
+        desc: "Parties, défis et plateaux à plusieurs.",
+      },
+      {
         key: "mot",
         Icon: SpellCheck,
         title: "Mot du jour",

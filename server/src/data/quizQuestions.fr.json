@@ -1,0 +1,1345 @@
+{
+  "_readme": [
+    "Socle de questions du Grand Quiz, écrites à la main, en français.",
+    "Rejoué par `npm run seed:quiz` (scripts/seedQuizQuestions.js), qui upserte",
+    "sur l'empreinte du texte : relancer le script ne crée jamais de doublon et",
+    "met à jour les questions dont le libellé n'a pas bougé.",
+    "",
+    "RÈGLE DE RÉDACTION : la bonne réponse est TOUJOURS en premier dans",
+    "`choices`. L'ordre est mélangé au tirage. Ne jamais ajouter de champ",
+    "d'index de bonne réponse : il se désynchronise à la première édition.",
+    "",
+    "Pour un `truefalse`, `answer` vaut true ou false et `choices` est ignoré.",
+    "",
+    "`difficulty` : 1 = tout le monde la sait, 5 = il faut être du sérail.",
+    "`theme` sert à ne pas enchaîner trois questions Nintendo (cf. quizBank.js)."
+  ],
+  "questions": [
+    {
+      "kind": "qcm",
+      "text": "Quel studio a développé Bloodborne ?",
+      "choices": ["FromSoftware", "Team Ninja", "Santa Monica Studio", "Capcom"],
+      "explain": "FromSoftware, sous la direction d'Hidetaka Miyazaki, pour Sony en 2015.",
+      "difficulty": 2,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel est le jeu vidéo le plus vendu de tous les temps ?",
+      "choices": ["Minecraft", "Tetris", "Grand Theft Auto V", "Wii Sports"],
+      "explain": "Minecraft dépasse les 300 millions d'exemplaires, loin devant tout le reste.",
+      "difficulty": 2,
+      "theme": "records"
+    },
+    {
+      "kind": "qcm",
+      "text": "De quel pays vient le studio CD Projekt Red ?",
+      "choices": ["Pologne", "République tchèque", "Ukraine", "Hongrie"],
+      "explain": "Le studio est basé à Varsovie, en Pologne.",
+      "difficulty": 2,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Qui est le créateur de la série Metal Gear ?",
+      "choices": ["Hideo Kojima", "Shinji Mikami", "Yu Suzuki", "Goichi Suda"],
+      "explain": "Hideo Kojima, chez Konami, depuis le tout premier Metal Gear en 1987.",
+      "difficulty": 2,
+      "theme": "createurs"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quelle intelligence artificielle vous « guide » dans Portal ?",
+      "choices": ["GLaDOS", "SHODAN", "Cortana", "AM"],
+      "explain": "GLaDOS, et le gâteau est un mensonge.",
+      "difficulty": 2,
+      "theme": "personnages"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel jeu a été élu Jeu de l'année 2023 aux Game Awards ?",
+      "choices": [
+        "Baldur's Gate 3",
+        "The Legend of Zelda: Tears of the Kingdom",
+        "Alan Wake 2",
+        "Marvel's Spider-Man 2"
+      ],
+      "explain": "Baldur's Gate 3, de Larian Studios, a raflé la mise cette année-là.",
+      "difficulty": 2,
+      "theme": "recompenses"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel jeu a été élu Jeu de l'année 2022 aux Game Awards ?",
+      "choices": ["Elden Ring", "God of War Ragnarök", "Stray", "Horizon Forbidden West"],
+      "explain": "Elden Ring, de FromSoftware.",
+      "difficulty": 2,
+      "theme": "recompenses"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel jeu a été élu Jeu de l'année 2021 aux Game Awards ?",
+      "choices": ["It Takes Two", "Deathloop", "Resident Evil Village", "Metroid Dread"],
+      "explain": "It Takes Two, le jeu coopératif d'Hazelight signé Josef Fares.",
+      "difficulty": 3,
+      "theme": "recompenses"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel jeu a été élu Jeu de l'année 2020 aux Game Awards ?",
+      "choices": ["The Last of Us Part II", "Hades", "Ghost of Tsushima", "Doom Eternal"],
+      "explain": "The Last of Us Part II, de Naughty Dog.",
+      "difficulty": 3,
+      "theme": "recompenses"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel jeu a été élu Jeu de l'année 2018 aux Game Awards ?",
+      "choices": [
+        "God of War",
+        "Red Dead Redemption 2",
+        "Celeste",
+        "Marvel's Spider-Man"
+      ],
+      "explain": "God of War, le redémarrage nordique de Santa Monica Studio.",
+      "difficulty": 3,
+      "theme": "recompenses"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel jeu a été élu Jeu de l'année 2017 aux Game Awards ?",
+      "choices": [
+        "The Legend of Zelda: Breath of the Wild",
+        "Super Mario Odyssey",
+        "Horizon Zero Dawn",
+        "PlayerUnknown's Battlegrounds"
+      ],
+      "explain": "Breath of the Wild, qui inaugurait aussi la Nintendo Switch.",
+      "difficulty": 2,
+      "theme": "recompenses"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio a créé Half-Life ?",
+      "choices": ["Valve", "id Software", "Epic Games", "3D Realms"],
+      "explain": "Valve, pour son tout premier jeu, en 1998.",
+      "difficulty": 2,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel éditeur japonais est derrière Street Fighter ?",
+      "choices": ["Capcom", "SNK", "Konami", "Namco"],
+      "explain": "Capcom, depuis 1987.",
+      "difficulty": 1,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Dans quelle ville se déroule Grand Theft Auto V ?",
+      "choices": ["Los Santos", "Liberty City", "Vice City", "San Fierro"],
+      "explain": "Los Santos, la Los Angeles de Rockstar.",
+      "difficulty": 2,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel jeu a fait exploser le genre du battle royale en 2017 ?",
+      "choices": [
+        "PlayerUnknown's Battlegrounds",
+        "Fortnite",
+        "Apex Legends",
+        "Call of Duty: Warzone"
+      ],
+      "explain": "PUBG a ouvert la voie ; Fortnite l'a suivi quelques mois plus tard.",
+      "difficulty": 3,
+      "theme": "histoire"
+    },
+    {
+      "kind": "qcm",
+      "text": "Qui a composé la musique des premiers Final Fantasy ?",
+      "choices": ["Nobuo Uematsu", "Koji Kondo", "Yoko Shimomura", "Yasunori Mitsuda"],
+      "explain": "Nobuo Uematsu, compositeur historique de la saga.",
+      "difficulty": 3,
+      "theme": "musique"
+    },
+    {
+      "kind": "qcm",
+      "text": "Qui a composé le thème de Super Mario Bros. ?",
+      "choices": ["Koji Kondo", "Nobuo Uematsu", "Hirokazu Tanaka", "Junichi Masuda"],
+      "explain": "Koji Kondo, l'un des thèmes les plus reconnaissables au monde.",
+      "difficulty": 3,
+      "theme": "musique"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio a développé Dark Souls ?",
+      "choices": ["FromSoftware", "Bandai Namco", "PlatinumGames", "Atlus"],
+      "explain": "FromSoftware développe, Bandai Namco édite — d'où la confusion fréquente.",
+      "difficulty": 2,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Dans Minecraft, quelle créature explose au contact du joueur ?",
+      "choices": ["Le Creeper", "L'Enderman", "Le Zombie", "Le Squelette"],
+      "explain": "Le Creeper, né d'un bug de modélisation d'un cochon.",
+      "difficulty": 1,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio a développé The Witcher 3: Wild Hunt ?",
+      "choices": ["CD Projekt Red", "Bethesda", "BioWare", "Obsidian"],
+      "explain": "CD Projekt Red, d'après les romans d'Andrzej Sapkowski.",
+      "difficulty": 1,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "De quelle œuvre littéraire la série The Witcher est-elle tirée ?",
+      "choices": [
+        "Les romans d'Andrzej Sapkowski",
+        "Une bande dessinée tchèque",
+        "Un cycle de contes russes",
+        "Un jeu de rôle papier polonais"
+      ],
+      "explain": "Le Sorceleur, cycle de l'écrivain polonais Andrzej Sapkowski.",
+      "difficulty": 3,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio a développé Overwatch ?",
+      "choices": ["Blizzard Entertainment", "Riot Games", "Valve", "Respawn"],
+      "explain": "Blizzard, à partir des restes du projet annulé Titan.",
+      "difficulty": 1,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel jeu d'arcade de 1972 a lancé l'industrie du jeu vidéo ?",
+      "choices": ["Pong", "Space Invaders", "Pac-Man", "Asteroids"],
+      "explain": "Pong, d'Atari — le premier succès commercial du média.",
+      "difficulty": 3,
+      "theme": "histoire"
+    },
+    {
+      "kind": "qcm",
+      "text": "En quelle année est sorti Pac-Man ?",
+      "choices": ["1980", "1978", "1983", "1985"],
+      "explain": "1980, signé Toru Iwatani chez Namco.",
+      "difficulty": 3,
+      "theme": "histoire"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio a créé Doom ?",
+      "choices": ["id Software", "Valve", "Apogee", "Raven Software"],
+      "explain": "id Software, en 1993, après Wolfenstein 3D.",
+      "difficulty": 2,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Qui a créé le personnage de Mario ?",
+      "choices": ["Shigeru Miyamoto", "Satoru Iwata", "Gunpei Yokoi", "Takashi Tezuka"],
+      "explain": "Shigeru Miyamoto, pour Donkey Kong en 1981.",
+      "difficulty": 2,
+      "theme": "createurs"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel Pokémon porte le numéro 1 du Pokédex national ?",
+      "choices": ["Bulbizarre", "Salamèche", "Carapuce", "Pikachu"],
+      "explain": "Bulbizarre. Pikachu n'est que le 25e.",
+      "difficulty": 2,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio français a développé Life is Strange ?",
+      "choices": ["Dontnod Entertainment", "Quantic Dream", "Arkane Studios", "Asobo Studio"],
+      "explain": "Dontnod, studio parisien, en 2015.",
+      "difficulty": 3,
+      "theme": "france"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio bordelais a développé Microsoft Flight Simulator (2020) ?",
+      "choices": ["Asobo Studio", "Dontnod", "Cyanide", "Motion Twin"],
+      "explain": "Asobo Studio, à Bordeaux.",
+      "difficulty": 4,
+      "theme": "france"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio lyonnais a développé Dishonored ?",
+      "choices": ["Arkane Studios", "Eugen Systems", "Amplitude", "Spiders"],
+      "explain": "Arkane Studios, fondé à Lyon en 1999.",
+      "difficulty": 3,
+      "theme": "france"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio bordelais a développé Dead Cells ?",
+      "choices": ["Motion Twin", "Asobo Studio", "Shiro Games", "Dontnod"],
+      "explain": "Motion Twin, coopérative bordelaise, en 2018.",
+      "difficulty": 4,
+      "theme": "france"
+    },
+    {
+      "kind": "qcm",
+      "text": "Qui a fondé le studio Quantic Dream ?",
+      "choices": ["David Cage", "Michel Ancel", "Éric Chahi", "Frédérick Raynal"],
+      "explain": "David Cage, à qui l'on doit Heavy Rain et Detroit: Become Human.",
+      "difficulty": 3,
+      "theme": "france"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel créateur français est derrière Rayman et Beyond Good & Evil ?",
+      "choices": ["Michel Ancel", "David Cage", "Éric Chahi", "Yves Guillemot"],
+      "explain": "Michel Ancel, chez Ubisoft Montpellier.",
+      "difficulty": 3,
+      "theme": "france"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel jeu français de 1991 raconte l'histoire de Lester, téléporté sur une planète hostile ?",
+      "choices": ["Another World", "Flashback", "Alone in the Dark", "Little Big Adventure"],
+      "explain": "Another World, d'Éric Chahi, développé presque entièrement seul.",
+      "difficulty": 5,
+      "theme": "france"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio français a développé Dofus ?",
+      "choices": ["Ankama", "Nadeo", "Focus", "Cyanide"],
+      "explain": "Ankama, à Roubaix, depuis 2004.",
+      "difficulty": 3,
+      "theme": "france"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel jeu de course français se joue sur des circuits construits par les joueurs ?",
+      "choices": ["TrackMania", "V-Rally", "Test Drive Unlimited", "Flatout"],
+      "explain": "TrackMania, du studio Nadeo.",
+      "difficulty": 3,
+      "theme": "france"
+    },
+    {
+      "kind": "qcm",
+      "text": "Combien de joueurs s'affrontent dans une partie classique de Fortnite Battle Royale ?",
+      "choices": ["100", "60", "150", "64"],
+      "explain": "Cent joueurs largués sur la même île.",
+      "difficulty": 1,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Comment appelle-t-on le traître dans Among Us ?",
+      "choices": ["L'Imposteur", "Le Saboteur", "Le Fantôme", "Le Traître"],
+      "explain": "L'Imposteur — un ou plusieurs par partie.",
+      "difficulty": 1,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel acteur prête ses traits à Johnny Silverhand dans Cyberpunk 2077 ?",
+      "choices": ["Keanu Reeves", "Norman Reedus", "Mads Mikkelsen", "Idris Elba"],
+      "explain": "Keanu Reeves, dont l'annonce à l'E3 2019 est restée célèbre.",
+      "difficulty": 2,
+      "theme": "personnages"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel écrivain a participé à l'écriture de l'univers d'Elden Ring ?",
+      "choices": [
+        "George R. R. Martin",
+        "Neil Gaiman",
+        "Brandon Sanderson",
+        "Patrick Rothfuss"
+      ],
+      "explain": "George R. R. Martin a écrit la mythologie ; Miyazaki en a fait le jeu.",
+      "difficulty": 2,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Dans quelle série de jeux trouve-t-on les abris Vault-Tec ?",
+      "choices": ["Fallout", "BioShock", "Metro", "Wasteland"],
+      "explain": "Fallout, et ses abris antiatomiques aux expériences douteuses.",
+      "difficulty": 2,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel est le cinquième épisode de la série The Elder Scrolls ?",
+      "choices": ["Skyrim", "Oblivion", "Morrowind", "Daggerfall"],
+      "explain": "Skyrim (2011). Oblivion était le quatrième.",
+      "difficulty": 2,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quelle entreprise a racheté Bethesda (ZeniMax) en 2021 ?",
+      "choices": ["Microsoft", "Sony", "Tencent", "Embracer Group"],
+      "explain": "Microsoft, pour 7,5 milliards de dollars.",
+      "difficulty": 3,
+      "theme": "industrie"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quelle entreprise a racheté Activision Blizzard en 2023 ?",
+      "choices": ["Microsoft", "Sony", "Tencent", "Amazon"],
+      "explain": "Microsoft, pour près de 69 milliards de dollars.",
+      "difficulty": 2,
+      "theme": "industrie"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel géant chinois possède Riot Games ?",
+      "choices": ["Tencent", "NetEase", "Alibaba", "ByteDance"],
+      "explain": "Tencent, propriétaire à 100 % depuis 2015.",
+      "difficulty": 3,
+      "theme": "industrie"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel FPS tactique de Riot Games est sorti en 2020 ?",
+      "choices": ["Valorant", "Overwatch", "The Finals", "Rainbow Six Siege"],
+      "explain": "Valorant, le premier pas de Riot hors de League of Legends.",
+      "difficulty": 2,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Counter-Strike a d'abord existé sous quelle forme ?",
+      "choices": [
+        "Un mod de Half-Life",
+        "Un jeu d'arcade",
+        "Un mod de Quake",
+        "Un jeu de plateau"
+      ],
+      "explain": "Un mod de Half-Life signé Minh Le et Jess Cliffe, en 1999.",
+      "difficulty": 3,
+      "theme": "histoire"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio a développé Crash Bandicoot à l'origine ?",
+      "choices": ["Naughty Dog", "Insomniac Games", "Sucker Punch", "Toys for Bob"],
+      "explain": "Naughty Dog, bien avant Uncharted et The Last of Us.",
+      "difficulty": 3,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio a créé Ratchet & Clank ?",
+      "choices": ["Insomniac Games", "Naughty Dog", "Media Molecule", "Sucker Punch"],
+      "explain": "Insomniac Games, qui signera aussi Marvel's Spider-Man.",
+      "difficulty": 3,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Comment s'appelle l'adolescente que Joel escorte dans The Last of Us ?",
+      "choices": ["Ellie", "Abby", "Tess", "Sarah"],
+      "explain": "Ellie, immunisée contre le champignon Cordyceps.",
+      "difficulty": 1,
+      "theme": "personnages"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel est le nom du héros de la série Uncharted ?",
+      "choices": ["Nathan Drake", "Lara Croft", "Rico Rodriguez", "Sam Fisher"],
+      "explain": "Nathan Drake, chasseur de trésors de Naughty Dog.",
+      "difficulty": 1,
+      "theme": "personnages"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio a développé Horizon Zero Dawn ?",
+      "choices": ["Guerrilla Games", "Naughty Dog", "Santa Monica Studio", "Sucker Punch"],
+      "explain": "Guerrilla Games, le studio néerlandais de Killzone.",
+      "difficulty": 3,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Comment s'appelle l'héroïne rousse de la série Horizon ?",
+      "choices": ["Aloy", "Ellie", "Senua", "Faith"],
+      "explain": "Aloy, chasseuse dans un monde peuplé de machines.",
+      "difficulty": 2,
+      "theme": "personnages"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio a développé Ghost of Tsushima ?",
+      "choices": ["Sucker Punch", "Team Ninja", "Naughty Dog", "Guerrilla Games"],
+      "explain": "Sucker Punch, studio américain, malgré le sujet japonais.",
+      "difficulty": 3,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel jeu indépendant met en scène un chat errant dans une cité de robots ?",
+      "choices": ["Stray", "Little Nightmares", "Inside", "Gris"],
+      "explain": "Stray, de BlueTwelve Studio — un studio montpelliérain.",
+      "difficulty": 2,
+      "theme": "indes"
+    },
+    {
+      "kind": "qcm",
+      "text": "Dans quel jeu indépendant gravit-on une montagne en ramassant des fraises ?",
+      "choices": ["Celeste", "Hollow Knight", "Ori and the Blind Forest", "Getting Over It"],
+      "explain": "Celeste, de Maddy Makes Games, en 2018.",
+      "difficulty": 3,
+      "theme": "indes"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel personnage incarne-t-on dans Hades, de Supergiant Games ?",
+      "choices": ["Zagreus", "Kratos", "Orphée", "Achille"],
+      "explain": "Zagreus, fils d'Hadès, qui tente de fuir les Enfers.",
+      "difficulty": 3,
+      "theme": "personnages"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio australien a développé Hollow Knight ?",
+      "choices": ["Team Cherry", "Motion Twin", "Moon Studios", "Playdead"],
+      "explain": "Team Cherry, à Adélaïde, à trois personnes.",
+      "difficulty": 4,
+      "theme": "indes"
+    },
+    {
+      "kind": "qcm",
+      "text": "Qui a développé Stardew Valley, quasiment seul ?",
+      "choices": ["Eric Barone", "Toby Fox", "Markus Persson", "Lucas Pope"],
+      "explain": "Eric Barone, alias ConcernedApe, pendant quatre ans.",
+      "difficulty": 3,
+      "theme": "indes"
+    },
+    {
+      "kind": "qcm",
+      "text": "Qui a créé Undertale ?",
+      "choices": ["Toby Fox", "Eric Barone", "Edmund McMillen", "Derek Yu"],
+      "explain": "Toby Fox, qui en a aussi composé toute la musique.",
+      "difficulty": 3,
+      "theme": "indes"
+    },
+    {
+      "kind": "qcm",
+      "text": "Dans quel jeu indépendant contrôle-t-on un poste de douane ?",
+      "choices": ["Papers, Please", "This War of Mine", "Beholder", "Orwell"],
+      "explain": "Papers, Please, de Lucas Pope. « Gloire à l'Arstotzka. »",
+      "difficulty": 4,
+      "theme": "indes"
+    },
+    {
+      "kind": "qcm",
+      "text": "Combien Microsoft a-t-il payé pour racheter Mojang en 2014 ?",
+      "choices": [
+        "2,5 milliards de dollars",
+        "500 millions de dollars",
+        "7,5 milliards de dollars",
+        "18 milliards de dollars"
+      ],
+      "explain": "2,5 milliards de dollars pour Minecraft et son studio.",
+      "difficulty": 4,
+      "theme": "industrie"
+    },
+    {
+      "kind": "qcm",
+      "text": "Comment s'appelle le protagoniste de Red Dead Redemption 2 ?",
+      "choices": ["Arthur Morgan", "John Marston", "Dutch van der Linde", "Micah Bell"],
+      "explain": "Arthur Morgan. John Marston était le héros du premier épisode.",
+      "difficulty": 2,
+      "theme": "personnages"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel acteur incarne Sam Porter Bridges dans Death Stranding ?",
+      "choices": ["Norman Reedus", "Mads Mikkelsen", "Léa Seydoux", "Guillermo del Toro"],
+      "explain": "Norman Reedus, scanné et doublé par ses soins.",
+      "difficulty": 3,
+      "theme": "personnages"
+    },
+    {
+      "kind": "qcm",
+      "text": "Dans quel jeu doit-on abattre seize colosses, et rien d'autre ?",
+      "choices": ["Shadow of the Colossus", "Ico", "The Last Guardian", "Journey"],
+      "explain": "Shadow of the Colossus, de Fumito Ueda, en 2005.",
+      "difficulty": 3,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Qui a créé la série Civilization ?",
+      "choices": ["Sid Meier", "Will Wright", "Peter Molyneux", "Chris Sawyer"],
+      "explain": "Sid Meier, dont le nom figure dans le titre depuis 1991.",
+      "difficulty": 3,
+      "theme": "createurs"
+    },
+    {
+      "kind": "qcm",
+      "text": "Qui a créé Les Sims ?",
+      "choices": ["Will Wright", "Sid Meier", "Peter Molyneux", "Richard Garriott"],
+      "explain": "Will Wright, également créateur de SimCity.",
+      "difficulty": 3,
+      "theme": "createurs"
+    },
+    {
+      "kind": "qcm",
+      "text": "En quelle année World of Warcraft est-il sorti ?",
+      "choices": ["2004", "2001", "2006", "2008"],
+      "explain": "2004, et le MMORPG n'a plus jamais été le même.",
+      "difficulty": 3,
+      "theme": "histoire"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel objet de Mario Kart vise automatiquement le joueur en tête ?",
+      "choices": ["La carapace bleue", "La carapace rouge", "L'éclair", "Le Bill Balle"],
+      "explain": "La carapace à épines bleue, cauchemar des premiers de la course.",
+      "difficulty": 1,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Qui dirige la série Super Smash Bros. ?",
+      "choices": ["Masahiro Sakurai", "Shigeru Miyamoto", "Eiji Aonuma", "Yoshiaki Koizumi"],
+      "explain": "Masahiro Sakurai, depuis le premier épisode sur Nintendo 64.",
+      "difficulty": 4,
+      "theme": "createurs"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quelle console portable de Sony est sortie en 2004 ?",
+      "choices": ["La PSP", "La PS Vita", "La PocketStation", "La PS TV"],
+      "explain": "La PlayStation Portable ; la Vita lui succédera en 2011.",
+      "difficulty": 3,
+      "theme": "machines"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quelle a été la dernière console de salon fabriquée par SEGA ?",
+      "choices": ["La Dreamcast", "La Saturn", "La Mega Drive", "La Master System"],
+      "explain": "La Dreamcast (1998), après laquelle SEGA est devenu éditeur seul.",
+      "difficulty": 3,
+      "theme": "machines"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quelle console de Nintendo est restée sur cartouche quand ses rivales passaient au CD ?",
+      "choices": ["La Nintendo 64", "La Super Nintendo", "La GameCube", "La Wii"],
+      "explain": "La Nintendo 64 (1996), un choix qui lui a coûté Final Fantasy VII.",
+      "difficulty": 3,
+      "theme": "machines"
+    },
+    {
+      "kind": "qcm",
+      "text": "En quelle année la première Xbox est-elle sortie ?",
+      "choices": ["2001", "1999", "2003", "2005"],
+      "explain": "2001, la première console de salon de Microsoft.",
+      "difficulty": 3,
+      "theme": "machines"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel jeu de tir a servi de locomotive au lancement de la première Xbox ?",
+      "choices": [
+        "Halo: Combat Evolved",
+        "Perfect Dark",
+        "Gears of War",
+        "Call of Duty 2"
+      ],
+      "explain": "Halo, de Bungie, indissociable du succès de la machine.",
+      "difficulty": 2,
+      "theme": "machines"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio développe la série Destiny ?",
+      "choices": ["Bungie", "343 Industries", "Respawn", "Infinity Ward"],
+      "explain": "Bungie, après avoir quitté la série Halo.",
+      "difficulty": 3,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Comment s'appelle la série Resident Evil au Japon ?",
+      "choices": ["Biohazard", "Survivor", "Umbrella", "Nemesis"],
+      "explain": "Biohazard — le nom a changé en Occident pour des raisons de marque.",
+      "difficulty": 3,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel éditeur est à l'origine de Monster Hunter ?",
+      "choices": ["Capcom", "Square Enix", "Bandai Namco", "Koei Tecmo"],
+      "explain": "Capcom, depuis 2004.",
+      "difficulty": 2,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel chasseur de démons stylé est le héros de Devil May Cry ?",
+      "choices": ["Dante", "Nero", "Vergil", "Bayonetta"],
+      "explain": "Dante — Nero et Vergil sont arrivés plus tard.",
+      "difficulty": 2,
+      "theme": "personnages"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio suédois développe Battlefield ?",
+      "choices": ["DICE", "Avalanche Studios", "Massive Entertainment", "Mojang"],
+      "explain": "DICE, à Stockholm, racheté par EA en 2006.",
+      "difficulty": 3,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio a développé Titanfall puis Apex Legends ?",
+      "choices": ["Respawn Entertainment", "DICE", "Infinity Ward", "Treyarch"],
+      "explain": "Respawn, fondé par des anciens d'Infinity Ward.",
+      "difficulty": 3,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio a créé le tout premier Call of Duty ?",
+      "choices": ["Infinity Ward", "Treyarch", "Sledgehammer Games", "Raven Software"],
+      "explain": "Infinity Ward, en 2003.",
+      "difficulty": 3,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel personnage tanuki tient le magasin et les prêts dans Animal Crossing ?",
+      "choices": ["Tom Nook", "Marie", "Serena", "Kéké Laglisse"],
+      "explain": "Tom Nook, et son crédit sans intérêts mais sans fin.",
+      "difficulty": 2,
+      "theme": "personnages"
+    },
+    {
+      "kind": "qcm",
+      "text": "Dans quel jeu de Nintendo recouvre-t-on le terrain d'encre colorée ?",
+      "choices": ["Splatoon", "Arms", "Nintendo Land", "Mario Paint"],
+      "explain": "Splatoon, apparu sur Wii U en 2015.",
+      "difficulty": 2,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Comment appelle-t-on la séquence « ↑ ↑ ↓ ↓ ← → ← → B A » ?",
+      "choices": ["Le code Konami", "Le code Namco", "Le code Sega", "Le code Atari"],
+      "explain": "Le code Konami, popularisé par Contra sur NES.",
+      "difficulty": 3,
+      "theme": "histoire"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel jeu de Taito a lancé la vague des shoot'em up en 1978 ?",
+      "choices": ["Space Invaders", "Galaga", "Defender", "Asteroids"],
+      "explain": "Space Invaders, au point d'avoir provoqué une pénurie de pièces au Japon.",
+      "difficulty": 3,
+      "theme": "histoire"
+    },
+    {
+      "kind": "qcm",
+      "text": "Qui a créé Tetris ?",
+      "choices": ["Alexeï Pajitnov", "Toru Iwatani", "Gunpei Yokoi", "Nolan Bushnell"],
+      "explain": "Alexeï Pajitnov, en 1984, dans un institut de recherche soviétique.",
+      "difficulty": 3,
+      "theme": "createurs"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel jeu Atari 2600 est régulièrement cité comme le pire de l'histoire ?",
+      "choices": [
+        "E.T. the Extra-Terrestrial",
+        "Pac-Man",
+        "Custer's Revenge",
+        "Superman"
+      ],
+      "explain": "E.T., développé en cinq semaines, symbole du krach de 1983.",
+      "difficulty": 4,
+      "theme": "histoire"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quelle est la première console de salon de l'histoire ?",
+      "choices": [
+        "La Magnavox Odyssey",
+        "L'Atari 2600",
+        "La Nintendo NES",
+        "La Coleco Telstar"
+      ],
+      "explain": "La Magnavox Odyssey, en 1972, conçue par Ralph Baer.",
+      "difficulty": 4,
+      "theme": "histoire"
+    },
+    {
+      "kind": "qcm",
+      "text": "En quelle année Nintendo a-t-elle été fondée ?",
+      "choices": ["1889", "1933", "1952", "1971"],
+      "explain": "1889 — d'abord fabricant de cartes à jouer hanafuda.",
+      "difficulty": 4,
+      "theme": "histoire"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel accessoire Nintendo permet de jouer avec des maquettes en carton ?",
+      "choices": ["Nintendo Labo", "amiibo", "Ring Fit", "Wii Balance Board"],
+      "explain": "Nintendo Labo, sorti sur Switch en 2018.",
+      "difficulty": 3,
+      "theme": "machines"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio japonais est derrière Persona et Shin Megami Tensei ?",
+      "choices": ["Atlus", "Falcom", "Arc System Works", "Vanillaware"],
+      "explain": "Atlus, désormais dans le giron de SEGA.",
+      "difficulty": 3,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel jeu de Square Enix, sorti en 1997, a marqué le passage de Final Fantasy à la 3D ?",
+      "choices": ["Final Fantasy VII", "Final Fantasy VI", "Final Fantasy VIII", "Final Fantasy IX"],
+      "explain": "Final Fantasy VII, sur PlayStation, avec ses décors précalculés.",
+      "difficulty": 2,
+      "theme": "histoire"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel est le nom de l'épée légendaire de la série The Legend of Zelda ?",
+      "choices": ["L'Épée de Légende", "Excalibur", "La Lame d'Ombre", "La Grande Épée"],
+      "explain": "L'Épée de Légende (Master Sword), scellée dans son piédestal.",
+      "difficulty": 2,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio a développé Baldur's Gate 3 ?",
+      "choices": ["Larian Studios", "BioWare", "Obsidian", "Owlcat Games"],
+      "explain": "Larian Studios, studio belge, après la série Divinity.",
+      "difficulty": 2,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio a développé Cuphead, au style de dessin animé des années 30 ?",
+      "choices": ["Studio MDHR", "Team Cherry", "Playdead", "Moon Studios"],
+      "explain": "Studio MDHR, dont les animations sont peintes à la main.",
+      "difficulty": 4,
+      "theme": "indes"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel jeu de gestion consiste à bâtir un parc d'attractions ?",
+      "choices": ["RollerCoaster Tycoon", "SimCity", "Theme Hospital", "Zoo Tycoon"],
+      "explain": "RollerCoaster Tycoon, écrit en assembleur par Chris Sawyer.",
+      "difficulty": 3,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Dans BioShock, dans quelle cité sous-marine se déroule le premier épisode ?",
+      "choices": ["Rapture", "Columbia", "Atlantis", "Neo-Venise"],
+      "explain": "Rapture, la cité d'Andrew Ryan. Columbia, c'est BioShock Infinite.",
+      "difficulty": 3,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel est le vrai nom de la Guerrière au casque de Metroid ?",
+      "choices": ["Samus Aran", "Sylux", "Ridley", "Adam Malkovich"],
+      "explain": "Samus Aran, chasseuse de primes.",
+      "difficulty": 2,
+      "theme": "personnages"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel genre de jeu League of Legends représente-t-il ?",
+      "choices": ["Un MOBA", "Un MMORPG", "Un FPS", "Un jeu de cartes"],
+      "explain": "Un MOBA, héritier du mod Defense of the Ancients de Warcraft III.",
+      "difficulty": 1,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel jeu de cartes de Blizzard se déroule dans l'univers de Warcraft ?",
+      "choices": ["Hearthstone", "Gwent", "Legends of Runeterra", "Artifact"],
+      "explain": "Hearthstone, sorti en 2014.",
+      "difficulty": 2,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio japonais a développé NieR: Automata ?",
+      "choices": ["PlatinumGames", "FromSoftware", "Atlus", "Grasshopper Manufacture"],
+      "explain": "PlatinumGames, sur un scénario de Yoko Taro.",
+      "difficulty": 4,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel jeu de Nintendo se joue en attrapant des créatures avec des Poké Balls ?",
+      "choices": ["Pokémon", "Yo-kai Watch", "Digimon", "Monster Rancher"],
+      "explain": "Pokémon, dont le premier épisode date de 1996 sur Game Boy.",
+      "difficulty": 1,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio a développé Sekiro: Shadows Die Twice ?",
+      "choices": ["FromSoftware", "Team Ninja", "Capcom", "Koei Tecmo"],
+      "explain": "FromSoftware, entre Dark Souls III et Elden Ring.",
+      "difficulty": 2,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Dans Portal 2, quel personnage est un cœur de personnalité sphérique et bavard ?",
+      "choices": ["Wheatley", "GLaDOS", "Cave Johnson", "Atlas"],
+      "explain": "Wheatley, doublé par Stephen Merchant.",
+      "difficulty": 4,
+      "theme": "personnages"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio a développé la série Yakuza (Like a Dragon) ?",
+      "choices": ["Ryu Ga Gotoku Studio", "Atlus", "Team Ninja", "Capcom"],
+      "explain": "Ryu Ga Gotoku Studio, chez SEGA.",
+      "difficulty": 4,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel événement annuel de Los Angeles était LE grand salon du jeu vidéo ?",
+      "choices": ["L'E3", "La Gamescom", "Le Tokyo Game Show", "La PAX"],
+      "explain": "L'Electronic Entertainment Expo, arrêté définitivement en 2023.",
+      "difficulty": 2,
+      "theme": "industrie"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel salon du jeu vidéo se tient chaque année à Cologne, en Allemagne ?",
+      "choices": ["La Gamescom", "L'E3", "La PAX East", "Le Tokyo Game Show"],
+      "explain": "La Gamescom, le plus grand salon grand public du monde.",
+      "difficulty": 3,
+      "theme": "industrie"
+    },
+    {
+      "kind": "qcm",
+      "text": "Qui présente et produit la cérémonie des Game Awards ?",
+      "choices": ["Geoff Keighley", "Jeff Gerstmann", "Greg Miller", "Adam Sessler"],
+      "explain": "Geoff Keighley, depuis la création de la cérémonie en 2014.",
+      "difficulty": 3,
+      "theme": "industrie"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel jeu de Nintendo a inauguré la Switch en mars 2017 ?",
+      "choices": [
+        "The Legend of Zelda: Breath of the Wild",
+        "Super Mario Odyssey",
+        "Splatoon 2",
+        "Mario Kart 8 Deluxe"
+      ],
+      "explain": "Breath of the Wild, sorti le jour même de la console.",
+      "difficulty": 2,
+      "theme": "machines"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio polonais a développé Frostpunk et This War of Mine ?",
+      "choices": ["11 bit studios", "CD Projekt Red", "Techland", "Bloober Team"],
+      "explain": "11 bit studios, à Varsovie.",
+      "difficulty": 4,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Dans Dark Souls, comment se soigne-t-on ?",
+      "choices": [
+        "Avec la Fiole d'Estus",
+        "Avec des potions rouges",
+        "En dormant",
+        "Avec des herbes"
+      ],
+      "explain": "La Fiole d'Estus, rechargée aux feux de camp.",
+      "difficulty": 2,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel jeu de survie spatiale se joue en réparant un vaisseau tout en démasquant un traître ?",
+      "choices": ["Among Us", "Lethal Company", "Phasmophobia", "Deceit"],
+      "explain": "Among Us, sorti en 2018 mais devenu un phénomène en 2020.",
+      "difficulty": 2,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel studio a développé Assassin's Creed ?",
+      "choices": ["Ubisoft", "Electronic Arts", "Activision", "Bethesda"],
+      "explain": "Ubisoft Montréal, pour le premier épisode en 2007.",
+      "difficulty": 1,
+      "theme": "studios"
+    },
+    {
+      "kind": "qcm",
+      "text": "Où se déroule le tout premier Assassin's Creed ?",
+      "choices": [
+        "En Terre sainte, pendant la Troisième croisade",
+        "Pendant la Révolution française",
+        "Dans l'Italie de la Renaissance",
+        "Dans l'Égypte ptolémaïque"
+      ],
+      "explain": "En Terre sainte, en 1191, avec Altaïr.",
+      "difficulty": 3,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quelle série de jeux de rôle japonaise met en scène des Personas et des lycéens ?",
+      "choices": ["Persona", "Danganronpa", "Trails", "Tales of"],
+      "explain": "Persona, série dérivée de Shin Megami Tensei.",
+      "difficulty": 2,
+      "theme": "univers"
+    },
+    {
+      "kind": "qcm",
+      "text": "Quel jeu de plateforme de 2018 a été développé par le studio français Motion Twin ?",
+      "choices": ["Dead Cells", "Rayman Legends", "Hollow Knight", "Katana Zero"],
+      "explain": "Dead Cells, un roguevania devenu une référence du genre.",
+      "difficulty": 3,
+      "theme": "france"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Mario s'appelait « Jumpman » dans le tout premier Donkey Kong.",
+      "answer": true,
+      "explain": "Vrai : il n'a été baptisé Mario qu'ensuite, en hommage à un propriétaire d'entrepôt de Nintendo of America.",
+      "difficulty": 3,
+      "theme": "histoire"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Le personnage de Luigi est apparu avant Mario.",
+      "answer": false,
+      "explain": "Faux : Mario est apparu en 1981 dans Donkey Kong, Luigi en 1983 dans Mario Bros.",
+      "difficulty": 2,
+      "theme": "histoire"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Pac-Man aurait été inspiré par une pizza à laquelle il manquait une part.",
+      "answer": true,
+      "explain": "Vrai : c'est l'anecdote racontée par son créateur Toru Iwatani.",
+      "difficulty": 2,
+      "theme": "histoire"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Le premier Resident Evil est sorti sur PlayStation.",
+      "answer": true,
+      "explain": "Vrai, en 1996, avant d'être porté sur Saturn et PC.",
+      "difficulty": 2,
+      "theme": "histoire"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Steam appartient à Microsoft.",
+      "answer": false,
+      "explain": "Faux : Steam est la plateforme de Valve, restée indépendante.",
+      "difficulty": 1,
+      "theme": "industrie"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Nintendo a été fondée au XIXe siècle.",
+      "answer": true,
+      "explain": "Vrai : en 1889, comme fabricant de cartes à jouer.",
+      "difficulty": 3,
+      "theme": "histoire"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Le studio FromSoftware est américain.",
+      "answer": false,
+      "explain": "Faux : FromSoftware est un studio japonais, basé à Tokyo.",
+      "difficulty": 2,
+      "theme": "studios"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Ubisoft est une entreprise française.",
+      "answer": true,
+      "explain": "Vrai : fondée en 1986 en Bretagne par les frères Guillemot.",
+      "difficulty": 1,
+      "theme": "france"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Les God of War de 2018 et 2022 puisent dans la mythologie nordique.",
+      "answer": true,
+      "explain": "Vrai : la saga a quitté le panthéon grec pour Midgard.",
+      "difficulty": 2,
+      "theme": "univers"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Doom est sorti avant Wolfenstein 3D.",
+      "answer": false,
+      "explain": "Faux : Wolfenstein 3D date de 1992, Doom de 1993.",
+      "difficulty": 3,
+      "theme": "histoire"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Zelda est le nom du héros que l'on incarne dans The Legend of Zelda.",
+      "answer": false,
+      "explain": "Faux : on incarne Link. Zelda est la princesse.",
+      "difficulty": 1,
+      "theme": "personnages"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Dans Minecraft, l'Enderman devient hostile si on le regarde.",
+      "answer": true,
+      "explain": "Vrai : croiser son regard suffit à le rendre agressif.",
+      "difficulty": 2,
+      "theme": "univers"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Final Fantasy VII est d'abord sorti sur Nintendo 64.",
+      "answer": false,
+      "explain": "Faux : Square a choisi la PlayStation, notamment pour le support CD.",
+      "difficulty": 2,
+      "theme": "histoire"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Le premier Final Fantasy devait être le dernier jeu de son studio.",
+      "answer": true,
+      "explain": "Vrai : Square était au bord de la faillite — d'où le « Final ».",
+      "difficulty": 3,
+      "theme": "histoire"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Le studio Naughty Dog appartient à Sony.",
+      "answer": true,
+      "explain": "Vrai, depuis 2001.",
+      "difficulty": 2,
+      "theme": "industrie"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Le studio Bungie a été racheté par Sony.",
+      "answer": true,
+      "explain": "Vrai, en 2022, pour 3,6 milliards de dollars.",
+      "difficulty": 3,
+      "theme": "industrie"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Samus Aran, l'héroïne de Metroid, est une femme.",
+      "answer": true,
+      "explain": "Vrai — révélation de la fin du premier épisode, en 1986.",
+      "difficulty": 2,
+      "theme": "personnages"
+    },
+    {
+      "kind": "truefalse",
+      "text": "La Dreamcast est sortie après la PlayStation 2.",
+      "answer": false,
+      "explain": "Faux : la Dreamcast date de 1998 au Japon, la PS2 de 2000.",
+      "difficulty": 3,
+      "theme": "machines"
+    },
+    {
+      "kind": "truefalse",
+      "text": "La Game Boy d'origine avait un écran couleur.",
+      "answer": false,
+      "explain": "Faux : un écran monochrome verdâtre. La Game Boy Color arrive en 1998.",
+      "difficulty": 1,
+      "theme": "machines"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Des cartouches du jeu E.T. ont réellement été enterrées dans un désert américain.",
+      "answer": true,
+      "explain": "Vrai : enfouies au Nouveau-Mexique en 1983, exhumées en 2014.",
+      "difficulty": 4,
+      "theme": "histoire"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Le krach du jeu vidéo de 1983 a surtout touché l'Amérique du Nord.",
+      "answer": true,
+      "explain": "Vrai : le Japon et l'Europe y ont largement échappé.",
+      "difficulty": 4,
+      "theme": "histoire"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Tetris a été créé en Union soviétique.",
+      "answer": true,
+      "explain": "Vrai : par Alexeï Pajitnov, à Moscou, en 1984.",
+      "difficulty": 2,
+      "theme": "histoire"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Rockstar North, le studio derrière GTA V, est écossais.",
+      "answer": true,
+      "explain": "Vrai : basé à Édimbourg, ex-DMA Design.",
+      "difficulty": 3,
+      "theme": "studios"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Le jeu Journey se joue en discutant au micro avec les autres joueurs.",
+      "answer": false,
+      "explain": "Faux : aucune parole, aucun pseudo — on ne communique que par un chant.",
+      "difficulty": 3,
+      "theme": "univers"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Minecraft a été créé par un studio japonais.",
+      "answer": false,
+      "explain": "Faux : par le Suédois Markus « Notch » Persson, chez Mojang.",
+      "difficulty": 1,
+      "theme": "studios"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Il est possible de terminer Dark Souls sans jamais monter de niveau.",
+      "answer": true,
+      "explain": "Vrai : les runs « SL1 » sont un défi bien connu de la communauté.",
+      "difficulty": 4,
+      "theme": "univers"
+    },
+    {
+      "kind": "truefalse",
+      "text": "La série Souls de FromSoftware est éditée par Bandai Namco.",
+      "answer": true,
+      "explain": "Vrai pour Dark Souls et Elden Ring ; Bloodborne, lui, est édité par Sony.",
+      "difficulty": 3,
+      "theme": "industrie"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Le studio Larian, auteur de Baldur's Gate 3, est belge.",
+      "answer": true,
+      "explain": "Vrai : fondé à Gand en 1996.",
+      "difficulty": 4,
+      "theme": "studios"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Le jeu Stray, avec son chat, a été développé par un studio français.",
+      "answer": true,
+      "explain": "Vrai : BlueTwelve Studio, à Montpellier.",
+      "difficulty": 4,
+      "theme": "france"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Le premier épisode d'Assassin's Creed se déroule pendant la Révolution française.",
+      "answer": false,
+      "explain": "Faux : c'est Unity. Le premier se passe pendant la Troisième croisade.",
+      "difficulty": 2,
+      "theme": "univers"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Pikachu est le premier Pokémon du Pokédex national.",
+      "answer": false,
+      "explain": "Faux : c'est Bulbizarre. Pikachu est le 25e.",
+      "difficulty": 2,
+      "theme": "univers"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Le studio Atlus appartient à SEGA.",
+      "answer": true,
+      "explain": "Vrai, depuis 2013.",
+      "difficulty": 4,
+      "theme": "industrie"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Half-Life 2 est sorti la même année que World of Warcraft.",
+      "answer": true,
+      "explain": "Vrai : tous les deux en 2004, à quelques semaines d'intervalle.",
+      "difficulty": 4,
+      "theme": "histoire"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Le compositeur Nobuo Uematsu a travaillé sur la série Final Fantasy.",
+      "answer": true,
+      "explain": "Vrai : il en est le compositeur historique.",
+      "difficulty": 2,
+      "theme": "musique"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Le salon E3 se tenait à New York.",
+      "answer": false,
+      "explain": "Faux : à Los Angeles, la plupart du temps au Convention Center.",
+      "difficulty": 3,
+      "theme": "industrie"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Un « roguelike » se caractérise par des niveaux générés aléatoirement et une mort définitive.",
+      "answer": true,
+      "explain": "Vrai : le genre tire son nom du jeu Rogue (1980).",
+      "difficulty": 2,
+      "theme": "genres"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Le terme « metroidvania » vient de la fusion de Metroid et Castlevania.",
+      "answer": true,
+      "explain": "Vrai : des cartes labyrinthiques qu'on rouvre au fil des capacités gagnées.",
+      "difficulty": 2,
+      "theme": "genres"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Un « MOBA » désigne un jeu de tir à la première personne.",
+      "answer": false,
+      "explain": "Faux : Multiplayer Online Battle Arena, comme League of Legends ou Dota 2.",
+      "difficulty": 2,
+      "theme": "genres"
+    },
+    {
+      "kind": "truefalse",
+      "text": "La PlayStation est née d'un projet de lecteur CD avorté avec Nintendo.",
+      "answer": true,
+      "explain": "Vrai : la « Nintendo PlayStation », abandonnée, a poussé Sony à faire sa console.",
+      "difficulty": 4,
+      "theme": "histoire"
+    },
+    {
+      "kind": "truefalse",
+      "text": "Shigeru Miyamoto a créé à la fois Mario, Zelda et Donkey Kong.",
+      "answer": true,
+      "explain": "Vrai : les trois piliers de Nintendo portent sa signature.",
+      "difficulty": 2,
+      "theme": "createurs"
+    }
+  ]
+}

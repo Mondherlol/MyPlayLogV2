@@ -101,6 +101,7 @@ export default function Admin() {
     { key: "missions", label: "Missions", Icon: Award },
     { key: "psn", label: "PlayStation", Icon: Trophy, badge: psnActive },
     { key: "geo", label: "GeoGamer", Icon: Globe2 },
+    { key: "quiz", label: "Quiz", Icon: Trophy },
     { key: "events", label: "Événements", Icon: CalendarDays },
     { key: "collection", label: "Collection", Icon: Library },
     { key: "system", label: "Système", Icon: Activity },
@@ -175,6 +176,7 @@ export default function Admin() {
           {safeTab === "missions" && <MissionsPanel token={token} />}
           {safeTab === "psn" && <PsnPanel token={token} />}
           {safeTab === "geo" && <GeoGlobePanel token={token} />}
+          {safeTab === "quiz" && <QuizPanel token={token} />}
           {safeTab === "events" && <EventsPanel token={token} />}
           {safeTab === "collection" && <CollectionPanel token={token} />}
           {safeTab === "system" && <SystemPanel token={token} />}
@@ -2111,6 +2113,222 @@ function PatchnoteItemEditor({ token, item, index, onChange, onRemove, canRemove
         )}
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={onUpload} />
       </div>
+    </div>
+  );
+}
+
+// ======================================================================
+//  Onglet Quiz — la relecture de la banque du Grand Quiz
+// ======================================================================
+// Le Grand Quiz tire ses questions de trois sources (cf.
+// server/src/models/QuizQuestion.js). Deux ne demandent rien : les faits IGDB
+// sont exacts par construction, le seed est écrit à la main. La troisième —
+// Gemini — produit du bon et du faux avec le même aplomb, et NE SORT JAMAIS EN
+// JEU tant que personne ne l'a relue. C'est ici qu'on tranche.
+//
+// L'écran est volontairement une CHAÎNE : une pile, deux gros boutons, on
+// enchaîne. Relire cinquante questions dans un formulaire à onglets, personne
+// ne le fait ; relire cinquante questions en cliquant « garder / jeter », c'est
+// dix minutes.
+function QuizPanel({ token }) {
+  const [kind, setKind] = useState("question");
+  const [filter, setFilter] = useState("pending");
+  const [data, setData] = useState(null);
+  const [busy, setBusy] = useState("");
+  const [err, setErr] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const d = await apiFetch(`/admin/quiz?kind=${kind}&filter=${filter}`, { token });
+      setData(d);
+      setErr("");
+    } catch (e) {
+      setErr(e.message || "Banque illisible.");
+    }
+  }, [token, kind, filter]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function act(item, body, method = "POST") {
+    setBusy(item.id);
+    try {
+      const path =
+        method === "DELETE"
+          ? `/admin/quiz/${item.id}?kind=${kind}`
+          : `/admin/quiz/${item.id}`;
+      await apiFetch(path, { method, token, body: method === "DELETE" ? undefined : body });
+      // On retire la ligne de la pile sans recharger : la relecture est un
+      // geste répétitif, un aller-retour serveur entre chaque casserait le
+      // rythme (et ferait sauter la liste sous le curseur).
+      setData((d) =>
+        d ? { ...d, items: d.items.filter((x) => x.id !== item.id) } : d
+      );
+    } catch (e) {
+      setErr(e.message || "Action impossible.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  const c = data?.counts;
+
+  return (
+    // `admin-quiz` porte TOUT l'habillage de cet onglet (app-36-quizz.css).
+    // Les classes génériques utilisées ici — .admin-seg, .admin-stat… — sont
+    // employées ailleurs dans le panneau sans avoir jamais reçu de style : les
+    // habiller globalement changerait l'allure des autres onglets. On les
+    // stylise donc SOUS ce wrapper, et nulle part ailleurs.
+    <div className="admin-section admin-quiz">
+      <header className="admin-section-head">
+        <h2>Banque du Grand Quiz</h2>
+        <p>
+          Ce que Gemini a produit n'est jamais tiré en partie avant d'être relu
+          ici. Le seed écrit à la main et les questions calculées depuis IGDB,
+          eux, sont en service d'office.
+        </p>
+      </header>
+
+      {c && (
+        <div className="admin-stats-row">
+          <span className="admin-stat">
+            <b>{c.questionsLive}</b> questions en service
+          </span>
+          <span className="admin-stat">
+            <b>{c.questionsPending}</b> à relire
+          </span>
+          {c.questionsFlagged > 0 && (
+            <span className="admin-stat warn">
+              <b>{c.questionsFlagged}</b> signalées par des joueurs
+            </span>
+          )}
+          <span className="admin-stat">
+            <b>{c.emojisLive}</b> emojis en service
+          </span>
+          <span className="admin-stat">
+            <b>{c.emojisPending}</b> emojis à relire
+          </span>
+        </div>
+      )}
+
+      <div className="admin-filters">
+        <div className="admin-seg">
+          {[
+            ["question", "Questions"],
+            ["emoji", "Emojis"],
+          ].map(([k, label]) => (
+            <button
+              key={k}
+              className={`admin-seg-opt clickable ${kind === k ? "on" : ""}`}
+              onClick={() => setKind(k)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="admin-seg">
+          {[
+            ["pending", "À relire"],
+            ["flagged", "Signalées"],
+            ["live", "En service"],
+          ].map(([k, label]) => (
+            <button
+              key={k}
+              className={`admin-seg-opt clickable ${filter === k ? "on" : ""}`}
+              onClick={() => setFilter(k)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {err && <p className="admin-error">{err}</p>}
+
+      {!data ? (
+        <div className="admin-loading">
+          <Loader2 size={20} className="spin" />
+        </div>
+      ) : data.items.length === 0 ? (
+        <p className="admin-empty">
+          {filter === "pending"
+            ? "Rien à relire. Lance `npm run gen:quiz` pour en produire."
+            : filter === "flagged"
+              ? "Aucun signalement en attente."
+              : "Rien en service pour l'instant."}
+        </p>
+      ) : (
+        <ul className="admin-quiz-list">
+          {data.items.map((it) => (
+            <li key={it.id} className={`admin-quiz-row ${it.flags > 0 ? "flagged" : ""}`}>
+              <div className="admin-quiz-main">
+                {kind === "emoji" ? (
+                  <>
+                    <span className="admin-quiz-emojis">{it.emojis.join(" ")}</span>
+                    <b className="admin-quiz-answer">{it.name}</b>
+                  </>
+                ) : (
+                  <>
+                    <b className="admin-quiz-q">{it.text}</b>
+                    <span className="admin-quiz-answer">
+                      <Check size={13} />{" "}
+                      {typeof it.answer === "boolean"
+                        ? it.answer
+                          ? "Vrai"
+                          : "Faux"
+                        : it.answer}
+                    </span>
+                    {it.choices.length > 1 && (
+                      <span className="admin-quiz-wrong">
+                        {it.choices.slice(1).join(" · ")}
+                      </span>
+                    )}
+                    {it.explain && <em className="admin-quiz-explain">{it.explain}</em>}
+                  </>
+                )}
+                <span className="admin-quiz-meta">
+                  {it.source} · difficulté {it.difficulty}
+                  {it.theme ? ` · ${it.theme}` : ""}
+                  {it.timesAsked > 0 &&
+                    ` · posée ${it.timesAsked}×, réussie ${Math.round(
+                      (it.timesCorrect / it.timesAsked) * 100
+                    )}%`}
+                  {it.flags > 0 && ` · ${it.flags} signalement(s)`}
+                </span>
+              </div>
+
+              <div className="admin-quiz-actions">
+                {!it.approved ? (
+                  <button
+                    className="admin-btn ok clickable"
+                    disabled={busy === it.id}
+                    onClick={() => act(it, { kind, approved: true })}
+                  >
+                    <Check size={15} /> Mettre en service
+                  </button>
+                ) : (
+                  <button
+                    className="admin-btn clickable"
+                    disabled={busy === it.id}
+                    onClick={() => act(it, { kind, approved: false })}
+                  >
+                    <X size={15} /> Retirer
+                  </button>
+                )}
+                <button
+                  className="admin-btn danger clickable"
+                  disabled={busy === it.id}
+                  onClick={() => act(it, null, "DELETE")}
+                  title="Supprimer définitivement"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

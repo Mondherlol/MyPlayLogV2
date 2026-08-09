@@ -27,6 +27,7 @@ import {
   Thermometer,
   Globe2,
   Grid2x2,
+  Trophy,
   Swords,
   Zap,
   Crown,
@@ -1473,7 +1474,9 @@ function useVersusRoom(code, game, token) {
         ? `/blindtest/versus/${code}/card`
         : game === "px"
           ? `/pixel/versus/${code}/card`
-          : `/geo/versus/${code}/card`;
+          : game === "qz"
+            ? `/quiz/versus/${code}/card`
+            : `/geo/versus/${code}/card`;
 
     async function pull() {
       try {
@@ -1523,13 +1526,14 @@ function useVersusRoom(code, game, token) {
 
 function VersusCard({ versus }) {
   const { token } = useAuth();
-  // Trois jeux passent par cette carte : le blind test, Pixel Rush et
-  // GeoGamer. Le `kind` du message décide, et le reste (têtes, places, état du
-  // salon) est rigoureusement identique — c'est tout l'intérêt d'avoir imposé
-  // la même forme de réponse aux trois routes /card.
+  // Quatre jeux passent par cette carte : le blind test, Pixel Rush, GeoGamer
+  // et le Grand Quiz. Le `kind` du message décide, et le reste (têtes, places,
+  // état du salon) est rigoureusement identique — c'est tout l'intérêt d'avoir
+  // imposé la même forme de réponse aux quatre routes /card.
   const bt = versus.kind === "blindtest";
   const px = versus.kind === "pixel";
-  const game = bt ? "bt" : px ? "px" : "geo";
+  const qz = versus.kind === "quiz";
+  const game = bt ? "bt" : px ? "px" : qz ? "qz" : "geo";
   const live = useVersusRoom(versus.code, game, token);
 
   // Trois sources, dans cet ordre : le salon s'il a répondu, sinon ce que porte
@@ -1540,7 +1544,7 @@ function VersusCard({ versus }) {
   const max = known ? live.max : versus.maxPlayers || 5;
   const rounds = known ? live.rounds : versus.rounds || 8;
   const faces = known ? live.players || [] : [];
-  const buzzer = !bt && !px && (known ? live.mode : versus.mode) === "buzzer";
+  const buzzer = !bt && !px && !qz && (known ? live.mode : versus.mode) === "buzzer";
   const mine = !!live?.mine;
 
   // Une porte n'est ouverte que si le serveur laisserait vraiment entrer : le
@@ -1578,11 +1582,17 @@ function VersusCard({ versus }) {
           de la PAGE GeoGamer (app-25-geo.css), qui impose un `min-height`
           plein écran — la vignette de 54 px devenait une colonne noire d'un
           écran de haut au milieu du fil. */}
-      <span className={`chat-card-cover gv-card-art ${bt ? "bt" : ""} ${px ? "px" : ""}`}>
+      <span
+        className={`chat-card-cover gv-card-art ${bt ? "bt" : ""} ${px ? "px" : ""} ${
+          qz ? "qz" : ""
+        }`}
+      >
         {bt ? (
           <Music size={22} />
         ) : px ? (
           <Grid2x2 size={22} />
+        ) : qz ? (
+          <Trophy size={22} />
         ) : buzzer ? (
           <Zap size={22} />
         ) : (
@@ -1591,9 +1601,10 @@ function VersusCard({ versus }) {
       </span>
       <span className="chat-card-body">
         <span className="chat-card-kicker">
-          <Swords size={12} /> {bt ? "Blind test" : px ? "Pixel Rush" : "GeoGamer"}
+          <Swords size={12} />{" "}
+          {bt ? "Blind test" : px ? "Pixel Rush" : qz ? "Grand Quiz" : "GeoGamer"}
           <i className="gv-card-mode">
-            {bt || px ? "versus" : buzzer ? "buzzer" : "classique"}
+            {bt || px ? "versus" : qz ? "plateau" : buzzer ? "buzzer" : "classique"}
           </i>
         </span>
 
@@ -1610,7 +1621,9 @@ function VersusCard({ versus }) {
           <b>
             {count}/{max}
           </b>
-          <em>{rounds} manches</em>
+          <em>
+            {rounds} {qz ? "épreuves" : "manches"}
+          </em>
         </span>
 
         <span className={`gv-card-state ${status.tone}`}>
@@ -1631,7 +1644,9 @@ function VersusCard({ versus }) {
           ? `/blindtest/versus/${versus.code}`
           : px
             ? `/pixel/versus/${versus.code}`
-            : `/geo/versus/${versus.code}`
+            : qz
+              ? `/quiz/versus/${versus.code}`
+              : `/geo/versus/${versus.code}`
       }
       className={`${cls} clickable`}
     >

@@ -149,6 +149,13 @@ export function estimateMapPoints(map, guess) {
 export function dedupeCandidates(candidates) {
   const byCanon = new Map();
   for (const c of candidates || []) {
+    // Une entrée sans titre est écartée d'emblée. Elle ne servirait à rien (on
+    // ne peut pas taper un nom vide) et, surtout, la fusion plus bas compare
+    // des longueurs de noms : un `name` absent y jetait une TypeError qui
+    // emportait toute la page. Le producteur fautif se corrige à la source,
+    // mais quatre mini-jeux dépendent de cette fonction — elle ne doit pas
+    // pouvoir tomber pour une ligne malformée.
+    if (!c?.name) continue;
     const key = canonName(c.name) || norm(c.name);
     const prev = byCanon.get(key);
     if (!prev) {

@@ -56,7 +56,11 @@ const pickCorner = () => CORNERS[Math.floor(Math.random() * CORNERS.length)];
 // Screenshots d'un lot de jeux → Map(gameId → [urls]). Un seul aller-retour
 // IGDB par tranche de 300 jeux ; les jeux sans screenshot sont simplement
 // absents de la Map (ils ne feront pas de manche).
-async function shotsForGames(ids) {
+//
+// Exporté pour l'épreuve « pixel » du Grand Quiz (lib/quizRounds.js) : elle
+// pixelise exactement de la même façon, autant que la façon d'aller chercher
+// les captures soit littéralement la même fonction.
+export async function shotsForGames(ids) {
   const list = [...new Set(ids)].filter(Boolean);
   const map = new Map();
   if (!list.length) return map;

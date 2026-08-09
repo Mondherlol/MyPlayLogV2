@@ -9,6 +9,8 @@
     "dev": "nodemon src/index.js",
     "seed:patch11": "node src/scripts/seedPatchnoteV11.js",
     "seed:arcade": "node src/scripts/seedArcade.js",
+    "seed:quiz": "node src/scripts/seedQuiz.js",
+    "gen:quiz": "node src/scripts/generateQuiz.js",
     "sync:events": "node src/scripts/syncEventLists.js",
     "seed:collection": "node src/scripts/seedCollection.js",
     "build:mots": "node src/scripts/buildMotsDict.js",

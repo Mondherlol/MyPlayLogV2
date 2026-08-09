@@ -85,6 +85,17 @@ const GAMES = [
     idOf: (e) => e.geoGameId,
   },
   {
+    key: "quiz",
+    name: "Le Grand Quiz",
+    tag: "Culture JV",
+    pitch:
+      "Huit épreuves tirées au sort : questions, emojis, anagrammes, studios, duels de cartes, piles à trier. Seul ou à six.",
+    Icon: Trophy,
+    path: "/quiz",
+    api: "/quiz/leaderboard",
+    idOf: (e) => e.quizGameId,
+  },
+  {
     key: "mot",
     name: "Mot du jour",
     tag: "Devinette",
@@ -105,6 +116,8 @@ const SOURCE_LABELS = {
   blindtest: "Blind test",
   pixel: "Pixel Rush",
   geo: "GeoGamer",
+  quiz: "Grand Quiz",
+  quizversus: "Grand Quiz — versus",
   mot: "Mot du jour",
   case: "Ouverture de caisse",
   duplicate: "Doublon reconverti",

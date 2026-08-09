@@ -12,6 +12,8 @@ import GeoGamer from "./pages/GeoGamer";
 import GeoVersus from "./pages/GeoVersus";
 import BlindTestVersus from "./pages/BlindTestVersus";
 import PixelVersus from "./pages/PixelVersus";
+import Quizz from "./pages/Quizz";
+import QuizzVersus from "./pages/QuizzVersus";
 import MotDuJour from "./pages/MotDuJour";
 import Arcade from "./pages/Arcade";
 import Playtopia from "./pages/Playtopia";
@@ -159,6 +161,10 @@ export default function App() {
         {/* Le salon de versus : c'est aussi l'adresse des liens d'invitation
             et des cartes envoyées en message privé. */}
         <Route path="/geo/versus/:code" element={<GeoVersus />} />
+        <Route path="/quiz" element={<Quizz />} />
+        {/* Le plateau à plusieurs : adresse des liens d'invitation et des
+            cartes envoyées en message privé. */}
+        <Route path="/quiz/versus/:code" element={<QuizzVersus />} />
         <Route path="/mot" element={<MotDuJour />} />
         <Route path="/playtopia" element={<Playtopia />} />
         <Route path="/explore" element={<Explorer />} />

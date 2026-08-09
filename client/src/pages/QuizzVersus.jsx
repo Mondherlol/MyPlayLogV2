@@ -1,0 +1,759 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  Check,
+  Copy,
+  Crown,
+  Flame,
+  Loader2,
+  Play,
+  RotateCcw,
+  Share2,
+  Trophy,
+  UserPlus,
+  Users,
+  Volume2,
+  VolumeX,
+  X,
+} from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { useChat } from "../context/ChatContext";
+import { apiFetch } from "../lib/api";
+import { useLiveStatus } from "../lib/presence";
+import { useGameSfx } from "../lib/useGameSfx";
+import { typeColor, typeHint } from "../lib/quizGame";
+import QuizRound from "../components/quiz/QuizRound";
+import { VersusFace, VersusRail, VersusInvite, hueOf } from "../components/VersusRoom";
+
+// ======================================================================
+//  Le Grand Quiz — le plateau à plusieurs
+// ======================================================================
+// Le quatrième salon de versus du site, et il reprend sans discuter tout ce
+// que les trois autres ont mis au point : le rail de joueurs, la carte
+// d'invitation, les phases pilotées par une horloge SERVEUR (personne n'a à
+// cliquer « suivant », et une partie survit à un onglet fermé).
+//
+// Deux choses lui sont propres, et ce sont elles qui changent l'ergonomie :
+//
+// 1. ON NE JOUE PAS DEUX MANCHES DE SUITE DE LA MÊME FAÇON. D'où l'annonce
+//    d'épreuve pendant le « cue », qui est ici une nécessité et pas une
+//    politesse : arriver sur un duel de cartes sans avoir vu qu'on jouait au
+//    duel, c'est une manche perdue.
+//
+// 2. LE BUZZER N'EST PAS UNIVERSEL. Sur un QCM ou des emojis, le premier qui
+//    trouve clôt la manche. Sur le studio, le duel et le tri, tout le monde
+//    travaille jusqu'à la sonnerie et marque au prorata. Le serveur tranche
+//    (`round.mode`), le client se contente d'afficher la bonne consigne — mais
+//    il DOIT l'afficher, sinon on ne sait pas s'il faut se dépêcher.
+//
+// Ce que le client ne fait JAMAIS ici, contrairement au solo : corriger. La
+// solution n'arrive qu'à la révélation. `onAttempt` poste au serveur et rend
+// sa réponse — c'est tout.
+
+export default function QuizzVersus() {
+  const { code } = useParams();
+  const { token, user } = useAuth();
+  const { subscribe } = useChat();
+  const navigate = useNavigate();
+  const sfx = useGameSfx();
+
+  const [room, setRoom] = useState(null);
+  const [candidates, setCandidates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [ranking, setRanking] = useState(null);
+  // Progression des autres pendant une manche parallèle (« 12 cartes »).
+  const [progress, setProgress] = useState({});
+  const [flash, setFlash] = useState(null);
+  const [nowTick, setNowTick] = useState(0);
+
+  const meId = String(user?._id || user?.id || "");
+  const roomRef = useRef(null);
+  roomRef.current = room;
+
+  // Décalage entre l'horloge du serveur et celle du navigateur. Sans lui, un
+  // client dont la pendule avance de dix secondes verrait tous les chronos à
+  // zéro. Mesuré à chaque réception (`room.now`).
+  const skewRef = useRef(0);
+
+  const applyRoom = useCallback((r) => {
+    if (!r) return;
+    if (r.now) skewRef.current = r.now - Date.now();
+    setRoom(r);
+  }, []);
+
+  const phase = room?.phase || "lobby";
+  const round = room?.round || null;
+  const players = useMemo(() => room?.players || [], [room]);
+  const me = players.find((p) => p.isMe) || null;
+  const hueById = useMemo(
+    () => new Map(players.filter((p) => !p.left).map((p, i) => [p.id, hueOf(i)])),
+    [players]
+  );
+
+  useLiveStatus("quiz", room?.started ? `plateau ${room.index + 1}/${room.roundCount}` : "salon", {
+    token,
+  });
+
+  useEffect(() => {
+    sfx.setMuted(muted);
+  }, [muted, sfx]);
+
+  useEffect(() => {
+    document.body.classList.add("bt-immersive");
+    return () => document.body.classList.remove("bt-immersive");
+  }, []);
+
+  // Le contexte audio ne peut naître que dans un geste : on l'attrape au
+  // premier clic ou à la première touche, quel qu'il soit.
+  useEffect(() => {
+    const wake = () => sfx.resume();
+    window.addEventListener("pointerdown", wake, { once: true });
+    window.addEventListener("keydown", wake, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", wake);
+      window.removeEventListener("keydown", wake);
+    };
+  }, [sfx]);
+
+  // Une horloge locale à 10 Hz : c'est elle qui fait descendre le chrono et
+  // avancer le masque des emojis entre deux messages du serveur.
+  useEffect(() => {
+    if (phase !== "round" && phase !== "cue") return undefined;
+    const iv = setInterval(() => setNowTick((n) => n + 1), 100);
+    return () => clearInterval(iv);
+  }, [phase]);
+
+  // ---------- Chargement ----------
+  const load = useCallback(async () => {
+    try {
+      const d = await apiFetch(`/quiz/versus/${code}`, { token });
+      applyRoom(d.room);
+      if (d.candidates) setCandidates(d.candidates);
+      setErr("");
+      if (!d.member && d.room && !d.room.started && !d.room.endedAt) {
+        const j = await apiFetch(`/quiz/versus/${code}/join`, { method: "POST", token });
+        applyRoom(j.room);
+      }
+    } catch (e) {
+      setErr(e.message || "Plateau introuvable.");
+    } finally {
+      setLoading(false);
+    }
+  }, [code, token, applyRoom]);
+
+  useEffect(() => {
+    if (token && code) load();
+  }, [token, code, load]);
+
+  // La liste de recherche ne voyage que dans la réponse à /start, que seul
+  // l'hôte reçoit. Sans ce rattrapage, les invités jouent les épreuves à
+  // saisie libre sans suggestions. (Même correctif que les trois autres
+  // salons, où le défaut avait été trouvé en jouant.)
+  useEffect(() => {
+    if (!token || !code) return undefined;
+    if (!room?.started || phase === "done" || candidates.length) return undefined;
+    let alive = true;
+    apiFetch(`/quiz/versus/${code}`, { token })
+      .then((d) => {
+        if (alive && d.candidates?.length) setCandidates(d.candidates);
+      })
+      .catch(() => {
+        /* on réessaiera au prochain changement de phase */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [token, code, room?.started, phase, candidates.length]);
+
+  // ---------- Le direct ----------
+  useEffect(() => {
+    if (!subscribe || !code) return undefined;
+    return subscribe((event, data) => {
+      if (event !== "quizversus" || data?.code !== code) return;
+      if (data.room) applyRoom(data.room);
+
+      switch (data.kind) {
+        case "cue":
+          setProgress({});
+          setFlash(null);
+          sfx.play("start");
+          break;
+        case "go":
+          sfx.play("hint");
+          break;
+        case "answer":
+          // En buzzer, on annonce qui a bien répondu et avec quoi : voir les
+          // fausses pistes des autres fait partie du mode. En parallèle, le
+          // serveur n'envoie rien du contenu, donc on n'a rien à dire non plus.
+          if (data.buzzer) {
+            if (data.correct && data.by !== meId) sfx.play("wrong");
+            if (data.label) setFlash({ by: data.by, label: data.label, correct: data.correct });
+          }
+          break;
+        case "progress":
+          setProgress((p) => ({ ...p, [data.by]: data.done }));
+          break;
+        case "joker":
+          sfx.play("hint");
+          break;
+        case "reveal":
+          sfx.play(data.room?.round?.results?.find((r) => r.userId === meId)?.correct ? "correct" : "wrong");
+          break;
+        case "done":
+          setRanking(data.ranking || []);
+          sfx.play("finish");
+          break;
+        case "closed":
+          setErr("L'hôte a fermé le plateau.");
+          break;
+        default:
+          break;
+      }
+    });
+  }, [subscribe, code, applyRoom, meId, sfx]);
+
+  useEffect(() => {
+    if (!flash) return undefined;
+    const t = setTimeout(() => setFlash(null), 2200);
+    return () => clearTimeout(t);
+  }, [flash]);
+
+  // ---------- Chrono commun ----------
+  // Toutes les horloges partent de `phaseEndsAt`, une date SERVEUR : c'est ce
+  // qui garantit que les six écrans affichent la même seconde.
+  const serverNow = Date.now() + skewRef.current;
+  const durationMs = (round?.durationSec || 20) * 1000;
+  const msLeft = room?.phaseEndsAt ? Math.max(0, room.phaseEndsAt - serverNow) : 0;
+  const cueLeft = room?.phaseStartsAt ? Math.max(0, room.phaseStartsAt - serverNow) : 0;
+  const elapsedMs = phase === "round" ? Math.max(0, durationMs - msLeft) : 0;
+  const secondsLeft = Math.ceil(msLeft / 1000);
+  // `nowTick` n'est pas lu, mais il force le recalcul du chrono à 10 Hz : sans
+  // cette dépendance, l'affichage ne bougerait qu'à l'arrivée d'un message.
+  void nowTick;
+
+  // ---------- Actions ----------
+  const call = useCallback(
+    async (path, body, method = "POST") => {
+      setBusy(true);
+      try {
+        const d = await apiFetch(`/quiz/versus/${code}${path}`, { method, token, body });
+        if (d.room) applyRoom(d.room);
+        if (d.candidates) setCandidates(d.candidates);
+        setErr("");
+        return d;
+      } catch (e) {
+        setErr(e.message || "Erreur.");
+        return null;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [code, token, applyRoom]
+  );
+
+  // La tentative : ici, c'est le SERVEUR qui corrige (cf. l'en-tête).
+  const attempt = useCallback(
+    async (given) => {
+      try {
+        const d = await apiFetch(`/quiz/versus/${code}/answer`, {
+          method: "POST",
+          token,
+          body: { given },
+        });
+        if (d.correct) sfx.play("correct");
+        return d;
+      } catch (e) {
+        // Une manche déjà close ou un doublon : on le dit sans casser l'épreuve.
+        setErr(e.message || "Réponse non enregistrée.");
+        return { correct: false, settled: true, lives: 0 };
+      }
+    },
+    [code, token, sfx]
+  );
+
+  const useJoker = useCallback(async () => {
+    try {
+      return await apiFetch(`/quiz/versus/${code}/joker`, { method: "POST", token });
+    } catch (e) {
+      setErr(e.message || "Joker indisponible.");
+      return null;
+    }
+  }, [code, token]);
+
+  // Diffusion de l'avancement pendant une manche parallèle. Volontairement
+  // étranglée : sans ça, un tri de vingt-quatre cartes enverrait vingt-quatre
+  // requêtes en trente secondes, par joueur.
+  const lastProgressRef = useRef(0);
+  const sendProgress = useCallback(
+    (done) => {
+      const now = Date.now();
+      if (now - lastProgressRef.current < 700) return;
+      lastProgressRef.current = now;
+      apiFetch(`/quiz/versus/${code}/progress`, {
+        method: "POST",
+        token,
+        body: { done },
+      }).catch(() => {});
+    },
+    [code, token]
+  );
+
+  function copyLink() {
+    navigator.clipboard?.writeText(`${window.location.origin}/quiz/versus/${code}`).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1800);
+      },
+      () => {}
+    );
+  }
+
+  const leave = useCallback(async () => {
+    await apiFetch(`/quiz/versus/${code}/leave`, { method: "POST", token }).catch(() => {});
+    navigate("/arcade");
+  }, [code, token, navigate]);
+
+  // ---------- Rendu ----------
+  if (loading) {
+    return (
+      <div className="qz-page qzv">
+        <div className="qz-loading">
+          <Loader2 size={32} className="spin" />
+          <p>On ouvre le plateau…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (err && !room) {
+    return (
+      <div className="qz-page qzv">
+        <div className="qz-loading qz-err">
+          <p>{err}</p>
+          <Link to="/arcade" className="qz-ghost clickable">
+            Retour à l'arcade
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const active = players.filter((p) => !p.left);
+  const settledById = round?.settledById || {};
+  const iAmSettled = !!settledById[meId];
+  const isBuzzer = (round?.mode || "buzzer") === "buzzer";
+
+  // ---------- Rendre sa copie AVANT la sonnerie ----------
+  // Sur une manche parallèle (le studio, le duel, le tri), la copie n'est
+  // envoyée qu'une fois, et c'est le composant qui la déclenche en réaction à
+  // `locked`. Or ici c'est le SERVEUR qui referme la manche à `phaseEndsAt` :
+  // si on attendait sa notification pour verrouiller, l'envoi partirait après
+  // le dépouillement et serait refusé — trente secondes de tri perdues.
+  //
+  // On gèle donc l'épreuve un peu avant l'heure. Ça coûte la dernière carte, ce
+  // qui est très largement préférable à perdre la manche entière. Les manches
+  // au buzzer ne sont pas concernées : elles envoient à chaque essai.
+  const FLUSH_MS = 900;
+  const nearEnd = phase === "round" && !isBuzzer && msLeft <= FLUSH_MS;
+
+  return (
+    <div className={`qz-page qzv ${phase === "round" ? "in-game" : ""}`}>
+      <div className="qz-scene" aria-hidden="true">
+        <span className="qz-scene-floor" />
+        <span className="qz-scene-halo" />
+      </div>
+
+      <header className="qz-topbar">
+        <button type="button" className="qz-back clickable" onClick={leave}>
+          <ArrowLeft size={17} /> <span>Quitter</span>
+        </button>
+        <div className="qz-brand">
+          <Trophy size={17} /> Plateau · <code>{code}</code>
+        </div>
+        <button
+          type="button"
+          className="qz-vol-btn clickable"
+          onClick={() => setMuted((m) => !m)}
+          title={muted ? "Réactiver les sons" : "Couper les sons"}
+        >
+          {muted ? <VolumeX size={17} /> : <Volume2 size={17} />}
+        </button>
+      </header>
+
+      <div className="qz-body">
+        {err && room && <p className="qzv-err">{err}</p>}
+
+        {/* ---------------- LE SALON ---------------- */}
+        {phase === "lobby" && (
+          <Lobby
+            room={room}
+            active={active}
+            hueById={hueById}
+            busy={busy}
+            copied={copied}
+            onCopy={copyLink}
+            onInvite={() => setShowInvite(true)}
+            onReady={(v) => call("/ready", { ready: v })}
+            onSettings={(body) => call("/settings", body)}
+            onStart={() => call("/start", {})}
+            me={me}
+          />
+        )}
+
+        {/* ---------------- LA PARTIE ---------------- */}
+        {(phase === "cue" || phase === "round" || phase === "reveal") && round && (
+          <div className="qz-play qzv-play" style={{ "--qz-type": typeColor(round.type) }}>
+            <div className="qz-play-head">
+              <div className="qz-pips" aria-hidden="true">
+                {Array.from({ length: room.roundCount }).map((_, i) => (
+                  <i key={i} className={i < room.index ? "done" : i === room.index ? "cur" : ""} />
+                ))}
+              </div>
+              <span className="qz-round-count">
+                Épreuve <b>{room.index + 1}</b>
+                <em>/ {room.roundCount}</em>
+              </span>
+              <span className="qz-live-score">
+                <Trophy size={14} /> {me?.score ?? 0} pts
+                {me?.streak > 1 && (
+                  <b className="qzv-streak">
+                    <Flame size={12} /> ×{me.streak}
+                  </b>
+                )}
+              </span>
+            </div>
+
+            <div className={`qz-timer ${phase === "round" && secondsLeft <= 5 ? "hot" : ""}`}>
+              <i
+                className="qz-timer-bar"
+                style={{
+                  transform: `scaleX(${phase === "round" ? msLeft / durationMs : 1})`,
+                }}
+              />
+              <span className="qz-timer-num">
+                {phase === "cue" ? Math.ceil(cueLeft / 1000) : secondsLeft}
+              </span>
+            </div>
+
+            {phase === "cue" && (
+              <div className="qz-cue" key={room.index}>
+                <span className="qz-cue-n">Épreuve {room.index + 1}</span>
+                <b className="qz-cue-label">{round.label}</b>
+                <em className="qz-cue-hint">{typeHint(round.type)}</em>
+                {/* La consigne du mode : il FAUT la dire. « Le premier qui
+                    trouve » et « chacun sa copie » ne se jouent pas pareil. */}
+                <span className={`qzv-mode ${isBuzzer ? "buzzer" : "parallel"}`}>
+                  {isBuzzer ? "Au buzzer — le premier rafle tout" : "Chacun sa copie, tout le monde marque"}
+                </span>
+              </div>
+            )}
+
+            {phase !== "cue" && (
+              <QuizRound
+                round={round}
+                elapsedMs={elapsedMs}
+                timeLeftMs={msLeft}
+                locked={iAmSettled || phase === "reveal" || nearEnd}
+                reveal={phase === "reveal" ? { correct: myResult(round, meId)?.correct } : null}
+                lives={round.lives ?? 3}
+                candidates={candidates}
+                onAttempt={attempt}
+                onProgress={sendProgress}
+                jokers={me?.jokers ?? 0}
+                onJoker={round.type === "qcm" ? useJoker : null}
+                sfx={sfx}
+              />
+            )}
+
+            {/* Ce que quelqu'un vient de proposer, en buzzer. */}
+            {flash && (
+              <span className={`qzv-flash ${flash.correct ? "good" : "bad"}`} key={flash.label}>
+                <b>{players.find((p) => p.id === flash.by)?.username || "?"}</b>
+                {flash.correct ? " a trouvé !" : ` : ${flash.label}`}
+              </span>
+            )}
+
+            {iAmSettled && phase === "round" && (
+              <p className="qzv-waiting">
+                {isBuzzer ? "Ta manche est finie." : "Copie rendue."} On attend les autres…
+              </p>
+            )}
+
+            {/* Le rail des pupitres. Il descend en bas d'écran pendant la
+                manche : c'est le mobilier du plateau, pas un panneau latéral. */}
+            <VersusRail
+              players={players}
+              found={round.found || []}
+              out={Object.keys(settledById).filter(
+                (id) => settledById[id] && !(round.found || []).some((f) => f.userId === id)
+              )}
+              livesById={round.livesById || {}}
+              hueById={hueById}
+              lives={3}
+              row
+              renderSub={(p) => {
+                const res = phase === "reveal" ? myResult(round, p.id) : null;
+                if (res)
+                  return (
+                    <em className={res.points > 0 ? "gv-rail-ok" : "gv-rail-out"}>
+                      {res.points > 0 ? `+${res.points}` : "0"}
+                      {res.ratio > 0 && res.ratio < 1 ? ` · ${Math.round(res.ratio * 100)}%` : ""}
+                    </em>
+                  );
+                if (!isBuzzer && progress[p.id] != null)
+                  return <em className="gv-rail-hearts">{progress[p.id]} placé(s)</em>;
+                if (settledById[p.id]) return <em className="gv-rail-ok">a rendu</em>;
+                return null;
+              }}
+            />
+          </div>
+        )}
+
+        {/* ---------------- LE CLASSEMENT ---------------- */}
+        {phase === "done" && (
+          <Final
+            ranking={ranking || []}
+            hueById={hueById}
+            meId={meId}
+            isHost={room?.isHost}
+            busy={busy}
+            onAgain={() => {
+              setRanking(null);
+              call("/again", {});
+            }}
+          />
+        )}
+      </div>
+
+      {showInvite && room && (
+        <VersusInvite
+          token={token}
+          meId={meId}
+          room={room}
+          endpoint={`/quiz/versus/${room.code}/invite`}
+          title="Inviter sur le plateau"
+          onClose={() => setShowInvite(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+const myResult = (round, id) => (round?.results || []).find((r) => r.userId === id) || null;
+
+// ============================================================
+//  Le salon d'avant-partie
+// ============================================================
+function Lobby({
+  room,
+  active,
+  hueById,
+  busy,
+  copied,
+  onCopy,
+  onInvite,
+  onReady,
+  onSettings,
+  onStart,
+  me,
+}) {
+  const [types, setTypes] = useState([]);
+  const { token } = useAuth();
+
+  useEffect(() => {
+    let alive = true;
+    apiFetch("/quiz/types", { token })
+      .then((d) => alive && setTypes(d.types || []))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [token]);
+
+  const picked = room.types?.length ? room.types : types.map((t) => t.key);
+  const allReady = active.length >= 2 && active.every((p) => p.ready);
+
+  function toggleType(key) {
+    if (!room.isHost) return;
+    const next = picked.includes(key)
+      ? picked.filter((k) => k !== key)
+      : [...picked, key];
+    if (!next.length) return; // on ne décoche jamais tout
+    onSettings({ types: next });
+  }
+
+  return (
+    <div className="qzv-lobby">
+      <h1 className="qz-title">Le plateau</h1>
+      <p className="qz-sub">
+        {active.length} candidat{active.length > 1 ? "s" : ""} sur le plateau ·{" "}
+        {room.roundCount} épreuves
+      </p>
+
+      {/* Les pupitres, en grand : c'est l'image du jeu, autant qu'elle serve
+          d'écran d'attente. */}
+      <ul className="qzv-desks">
+        {active.map((p) => (
+          <li key={p.id} className={`qzv-desk ${p.ready ? "ready" : ""}`} style={{ "--hue": hueById.get(p.id) }}>
+            <VersusFace user={p} size={44} hue={hueById.get(p.id)} />
+            <b>{p.username}</b>
+            <em>
+              {p.isHost ? "hôte" : p.ready ? "prêt" : "en attente"}
+              {!p.online && " · absent"}
+            </em>
+            <span className="qzv-desk-light" aria-hidden="true" />
+          </li>
+        ))}
+        {Array.from({ length: Math.max(0, 3 - active.length) }).map((_, i) => (
+          <li key={`e${i}`} className="qzv-desk empty">
+            <span className="qzv-desk-ph">
+              <Users size={20} />
+            </span>
+            <em>place libre</em>
+          </li>
+        ))}
+      </ul>
+
+      <div className="qzv-lobby-actions">
+        <button type="button" className="qz-ghost clickable" onClick={onCopy}>
+          {copied ? <Check size={16} /> : <Copy size={16} />}
+          {copied ? "Lien copié" : "Copier le lien"}
+        </button>
+        <button type="button" className="qz-ghost clickable" onClick={onInvite}>
+          <UserPlus size={16} /> Inviter
+        </button>
+        <button
+          type="button"
+          className={`qz-ghost clickable ${me?.ready ? "on" : ""}`}
+          onClick={() => onReady(!me?.ready)}
+          disabled={busy}
+        >
+          {me?.ready ? <Check size={16} /> : <X size={16} />}
+          {me?.ready ? "Prêt" : "Pas prêt"}
+        </button>
+      </div>
+
+      {room.isHost && (
+        <div className="qzv-settings">
+          <div className="qz-rounds-pick">
+            <span className="qz-rounds-label">Épreuves</span>
+            <div className="qz-rounds-opts">
+              {[5, 8, 12].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className={`qz-round-opt clickable ${room.roundCount === n ? "on" : ""}`}
+                  onClick={() => onSettings({ rounds: n })}
+                  disabled={busy}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {types.length > 0 && (
+            <div className="qz-types">
+              <span className="qz-rounds-label">Au programme</span>
+              <div className="qz-types-grid">
+                {types.map((t) => {
+                  const on = picked.includes(t.key);
+                  return (
+                    <button
+                      key={t.key}
+                      type="button"
+                      className={`qz-type clickable ${on ? "on" : ""}`}
+                      style={{ "--qz-type": typeColor(t.key) }}
+                      onClick={() => toggleType(t.key)}
+                      aria-pressed={on}
+                      title={typeHint(t.key)}
+                      disabled={busy}
+                    >
+                      <b>{t.label}</b>
+                      <em>{t.mode === "buzzer" ? "buzzer" : "tous"}</em>
+                      {on && <Check size={13} className="qz-type-mark" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {room.isHost ? (
+        <button
+          type="button"
+          className="qz-start clickable"
+          onClick={onStart}
+          disabled={busy || active.length < 2}
+        >
+          {busy ? <Loader2 size={18} className="spin" /> : <Play size={18} />}
+          {active.length < 2 ? "Il faut être au moins deux" : "Lancer le plateau"}
+        </button>
+      ) : (
+        <p className="qzv-wait-host">
+          {allReady ? "Tout le monde est prêt." : "En attente des autres candidats…"}
+          <br />
+          <em>L'hôte lance la partie.</em>
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+//  Le classement final
+// ============================================================
+function Final({ ranking, hueById, meId, isHost, busy, onAgain }) {
+  const champ = ranking[0] || null;
+  return (
+    <div className="qzv-final">
+      {champ && (
+        <div className="qzv-champ">
+          <Crown size={26} />
+          <VersusFace user={champ.user} size={64} hue={hueById.get(champ.id)} />
+          <b>{champ.user?.username}</b>
+          <em>{champ.score} points</em>
+        </div>
+      )}
+
+      <ol className="qzv-rank">
+        {ranking.map((r) => (
+          <li key={r.id} className={`qzv-rank-row ${r.id === meId ? "me" : ""}`} style={{ "--hue": hueById.get(r.id) }}>
+            <span className={`qz-board-rank r${r.rank}`}>{r.rank}</span>
+            <VersusFace user={r.user} size={30} hue={hueById.get(r.id)} />
+            <span className="qzv-rank-id">
+              <b>{r.user?.username}</b>
+              <em>
+                {r.correct} épreuve{r.correct > 1 ? "s" : ""} réussie{r.correct > 1 ? "s" : ""}
+                {r.bestStreak > 1 && ` · série de ${r.bestStreak}`}
+              </em>
+            </span>
+            <span className="qzv-rank-score">{r.score}</span>
+          </li>
+        ))}
+      </ol>
+
+      <div className="qz-done-actions">
+        {isHost && (
+          <button type="button" className="qz-start sm clickable" onClick={onAgain} disabled={busy}>
+            <RotateCcw size={16} /> On remet ça
+          </button>
+        )}
+        <Link to="/quiz" className="qz-ghost clickable">
+          <Share2 size={16} /> Jouer en solo
+        </Link>
+        <Link to="/arcade" className="qz-ghost clickable">
+          <Trophy size={16} /> Arcade
+        </Link>
+      </div>
+    </div>
+  );
+}

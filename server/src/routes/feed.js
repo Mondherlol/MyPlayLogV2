@@ -285,6 +285,7 @@ async function buildTimeline(
   const blindtests = []; // regroupés en rafale après la boucle des activités
   const pixels = []; // idem pour Pixel Rush
   const geos = []; // idem pour GeoGamer
+  const quizzes = []; // idem pour le Grand Quiz
   const caseopens = []; // idem : ouvrir plusieurs caisses d'affilée est la norme
   const drops = []; // boîtiers sortis de la machine à capsules (idem, en rafale)
   // Victoires collectives au Mot du jour déjà sorties : chaque membre de
@@ -628,6 +629,27 @@ async function buildTimeline(
       continue;
     }
 
+    // Le Grand Quiz. Même carte que les trois autres mini-jeux, à un détail
+    // près : `types` liste les épreuves traversées. C'est ce qui distingue une
+    // partie d'une autre — « 8 épreuves » ne dit rien, « emojis · duel ·
+    // studio » raconte la partie.
+    if (a.type === "quiz") {
+      if (!a.meta?.quizGameId) continue;
+      quizzes.push({
+        type: "quiz",
+        id: `a-${a._id}`,
+        date: a.createdAt,
+        user: person(a.actor),
+        quizGameId: a.meta.quizGameId,
+        score: a.meta.score || 0,
+        correct: a.meta.correct || 0,
+        total: a.meta.total || 0,
+        types: Array.isArray(a.meta.types) ? a.meta.types : [],
+        challenge: a.meta.challenge || null,
+      });
+      continue;
+    }
+
     if (a.type === "geo") {
       if (!a.meta?.geoGameId) continue;
       geos.push({
@@ -650,7 +672,12 @@ async function buildTimeline(
     // affiche la table entière. Même dédoublonnage que les sessions du mot du
     // jour — sans lui, un versus à cinq inonderait le fil de cinq cartes
     // racontant la même chose.
-    if (a.type === "geoversus" || a.type === "btversus" || a.type === "pxversus") {
+    if (
+      a.type === "geoversus" ||
+      a.type === "btversus" ||
+      a.type === "pxversus" ||
+      a.type === "quizversus"
+    ) {
       if (!a.meta?.versusId) continue;
       if (versusSeen.has(a.meta.versusId)) continue;
       versusSeen.add(a.meta.versusId);
@@ -1154,6 +1181,14 @@ async function buildTimeline(
     score: m.score,
     correct: m.correct,
     total: m.total,
+    challenge: m.challenge,
+  }));
+  pushRuns(quizzes, "quizgroup", "qz", (m) => ({
+    quizGameId: m.quizGameId,
+    score: m.score,
+    correct: m.correct,
+    total: m.total,
+    types: m.types,
     challenge: m.challenge,
   }));
 
