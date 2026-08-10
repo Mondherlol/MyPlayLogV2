@@ -14,6 +14,9 @@ const roundSchema = new mongoose.Schema(
     label: { type: String, default: "" },
     game: { type: String, default: "" },
     clipUrl: { type: String, default: "" },
+    // Le pseudo du joueur qui a déposé ce son, s'il vient d'une librairie
+    // personnelle. Vide pour les sons officiels.
+    addedBy: { type: String, default: "" },
 
     // L'enregistrement du joueur (/uploads/perroquet/…). Null si la manche a
     // été passée.

@@ -7,11 +7,13 @@ import {
   Loader2,
   Play,
   Plus,
+  Scissors,
   Sparkles,
   Trash2,
   Upload,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
+import AudioTrimmer from "./AudioTrimmer";
 
 // ======================================================================
 //  Onglet « Perroquet » — la banque de sons
@@ -33,10 +35,16 @@ import { apiFetch, apiUpload } from "../lib/api";
 //      arrivent. Un clip à 15 % voisé ou dont la moyenne plafonne à 25 est un
 //      mauvais clip — et c'est invisible à l'écoute.
 
+// « Communauté » n'est pas un filtre comme les autres : c'est un AUTRE monde.
+// Les sons déposés par les joueurs (client/src/components/SoundLibrary.jsx) ne
+// sortent que sur les tables qui ont coché « sons personnalisés », donc ils ne
+// concurrencent pas la banque officielle — mais un administrateur doit pouvoir
+// les écouter et en retirer un qui n'a rien à faire là.
 const FILTERS = [
   { key: "all", label: "Tous" },
   { key: "active", label: "En service" },
   { key: "off", label: "Éteints" },
+  { key: "community", label: "Communauté" },
 ];
 
 const DIFF_HINT = {
@@ -141,6 +149,9 @@ export default function AdminPerroquet({ token }) {
           <span className="admin-stat">
             <b>{c.off}</b> éteints
           </span>
+          <span className="admin-stat">
+            <b>{c.community || 0}</b> déposés par des joueurs
+          </span>
           {c.active < 5 && (
             <span className="admin-stat warn">
               <AlertTriangle size={13} /> il en faut au moins 5 pour une partie
@@ -216,12 +227,31 @@ export default function AdminPerroquet({ token }) {
 function AddForm({ token, onAdded }) {
   const fileRef = useRef(null);
   const [file, setFile] = useState(null);
+  // L'extrait rogné, quand on est passé par le rogneur : c'est LUI qu'on envoie
+  // à la place du fichier d'origine. Le même outil que les joueurs
+  // (components/AudioTrimmer.jsx) — un « wahoo » se découpe de la même façon
+  // qu'on soit administrateur ou non, et deux découpeurs à maintenir pour le
+  // même geste n'auraient aucune justification.
+  const [trimmed, setTrimmed] = useState(null); // { blob, seconds }
+  const [trimming, setTrimming] = useState(false);
   const [label, setLabel] = useState("");
   const [game, setGame] = useState("");
   const [difficulty, setDifficulty] = useState(2);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
+
+  function pickFile(f) {
+    setFile(f);
+    setTrimmed(null);
+    // Le rogneur s'ouvre TOUT SEUL : la banque ne veut que des extraits de 0,3
+    // à 2 s, et un fichier sourcé ailleurs les respecte rarement du premier
+    // coup. L'ouvrir d'office fait de la découpe l'étape normale plutôt qu'un
+    // rattrapage après un refus du serveur.
+    setTrimming(!!f);
+    setOk("");
+    setErr("");
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -231,7 +261,8 @@ function AddForm({ token, onAdded }) {
     setOk("");
     try {
       const fd = new FormData();
-      fd.append("clip", file);
+      if (trimmed) fd.append("clip", trimmed.blob, "extrait.wav");
+      else fd.append("clip", file);
       fd.append("label", label.trim());
       fd.append("game", game.trim());
       fd.append("difficulty", String(difficulty));
@@ -246,6 +277,8 @@ function AddForm({ token, onAdded }) {
       );
       // On garde le jeu et la difficulté : on enchaîne rarement un seul son.
       setFile(null);
+      setTrimmed(null);
+      setTrimming(false);
       setLabel("");
       if (fileRef.current) fileRef.current.value = "";
       onAdded();
@@ -265,13 +298,56 @@ function AddForm({ token, onAdded }) {
           ref={fileRef}
           type="file"
           accept="audio/*"
-          onChange={(e) => {
-            setFile(e.target.files?.[0] || null);
-            setOk("");
-            setErr("");
-          }}
+          onChange={(e) => pickFile(e.target.files?.[0] || null)}
         />
       </label>
+
+      {/* ---------- La découpe ----------
+          Repliée dès qu'un extrait est validé : ce qui compte ensuite, c'est de
+          nommer le son, pas de continuer à regarder la forme d'onde. */}
+      {file && trimming && (
+        <div className="pq-admin-trim">
+          <AudioTrimmer
+            file={file}
+            // Quatre secondes : la borne que le serveur refuse au-delà
+            // (routes/perroquetAdmin.js). Le rogneur ne doit pas pouvoir
+            // fabriquer un extrait que l'envoi rejettera derrière.
+            maxSeconds={4}
+            onCancel={() => setTrimming(false)}
+            onConfirm={(blob, seconds) => {
+              setTrimmed({ blob, seconds });
+              setTrimming(false);
+            }}
+          />
+        </div>
+      )}
+
+      {file && !trimming && (
+        <p className="pq-admin-cut">
+          {trimmed ? (
+            <>
+              <Scissors size={13} /> Extrait rogné —{" "}
+              <b>{trimmed.seconds.toFixed(2)} s</b>
+            </>
+          ) : (
+            <>
+              <Scissors size={13} /> Fichier envoyé tel quel
+            </>
+          )}
+          <button type="button" className="admin-btn clickable" onClick={() => setTrimming(true)}>
+            {trimmed ? "Reprendre la découpe" : "Rogner"}
+          </button>
+          {trimmed && (
+            <button
+              type="button"
+              className="admin-btn clickable"
+              onClick={() => setTrimmed(null)}
+            >
+              Annuler la découpe
+            </button>
+          )}
+        </p>
+      )}
 
       <input
         className="pq-admin-in"
@@ -351,6 +427,7 @@ function ClipRow({ item, busy, onToggle, onDiff, onDelete }) {
       <div className="pq-admin-main">
         <b>{item.label}</b>
         {item.game && <em>{item.game}</em>}
+        {item.owner && <span className="pq-admin-owner">par {item.owner}</span>}
         <span className="pq-admin-meta">
           {(item.durationMs / 1000).toFixed(1)} s ·{" "}
           <i className={thin ? "warn" : ""}>{Math.round(item.voicedRatio * 100)} % mélodique</i>

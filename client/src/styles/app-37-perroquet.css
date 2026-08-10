@@ -826,6 +826,39 @@
 }
 .pq-admin-file input { display: none; }
 
+/* ---------- Le rogneur dans le panneau d'admin ----------
+   Le composant est le même que côté joueur (components/AudioTrimmer.jsx) et son
+   habillage vit dans la cabine : il attend les variables --pq-*, qui n'existent
+   pas ici. On les redéclare, et on garde le fond sombre — une forme d'onde dorée
+   sur blanc serait illisible, et l'îlot sombre marque bien que ce bloc est un
+   outil, pas un champ de formulaire de plus. */
+.pq-admin-trim {
+  --pq-ink: #f2ece2;
+  --pq-dim: #a79c8d;
+  --pq-line: rgba(226, 190, 130, 0.2);
+  --pq-warm: #f2b70b;
+  --pq-warm-soft: rgba(242, 183, 11, 0.16);
+
+  grid-column: 1 / -1;
+  border-radius: 13px;
+  background: #14100c;
+}
+.pq-admin-trim .pq-trim { border-color: var(--pq-line); background: transparent; }
+.pq-admin-trim .pq-err { color: #ff9a9a; }
+
+/* L'état de la découpe, une fois le rogneur refermé. */
+.pq-admin-cut {
+  grid-column: 1 / -1;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+.pq-admin-cut b { color: var(--text); }
+
 .pq-admin-in {
   padding: 10px 12px;
   border: 1px solid var(--border);
@@ -1466,4 +1499,545 @@
 @media (prefers-reduced-motion: reduce) {
   .pq-podium-row.playing { transform: none; }
   .pq-podium-row.playing .pq-podium-wave i { animation: none; height: 12px; }
+}
+
+/* ======================================================================
+   Les sons de la communauté
+   ======================================================================
+   Deux endroits, une seule idée : un joueur dépose ses propres sons, et ils ne
+   sortent que si la table le demande (cf. components/SoundLibrary.jsx).
+
+   La modale de librairie est montée dans <body> par un portail : elle est donc
+   HORS de .pq-page et n'hérite pas de ses variables. La cabine y est repeinte à
+   la main — sans quoi le panneau ressortirait aux couleurs de l'application, en
+   plein milieu d'un jeu qui assume son décor sombre.
+   ====================================================================== */
+
+/* ---------- L'entrée depuis l'accueil du solo ---------- */
+.pq-mine {
+  margin-top: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+.pq-mine-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border: 1px solid var(--pq-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--pq-ink);
+  font-size: 0.84rem;
+  font-weight: 600;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.pq-mine-open:hover { border-color: var(--pq-warm); }
+.pq-mine-open em {
+  font-style: normal;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--pq-warm-soft);
+  color: var(--pq-warm);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+/* L'interrupteur « mes sons » du solo et celui de l'hôte en versus : même
+   objet, même geste, deux écrans. */
+.pq-mine-sw,
+.pq-sw {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 15px 8px 10px;
+  border: 1px solid var(--pq-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--pq-dim);
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.pq-mine-sw i,
+.pq-sw i {
+  position: relative;
+  width: 34px;
+  height: 19px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  transition: background 0.18s ease;
+}
+.pq-mine-sw i::after,
+.pq-sw i::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.18s ease;
+}
+.pq-mine-sw.on,
+.pq-sw.on { color: var(--pq-warm); border-color: var(--pq-warm); }
+.pq-mine-sw.on i,
+.pq-sw.on i { background: var(--pq-warm); }
+.pq-mine-sw.on i::after,
+.pq-sw.on i::after { transform: translateX(15px); }
+.pq-sw { padding: 6px; }
+.pq-sw:disabled { opacity: 0.5; }
+
+/* Le crédit du déposant, sous la réponse. */
+.pq-by {
+  display: block;
+  margin-top: 3px;
+  color: var(--pq-warm);
+  font-size: 0.76rem;
+}
+.pq-recap-label em.by { color: var(--pq-warm); opacity: 0.85; }
+
+/* ---------- Le bloc « sons des joueurs » du salon ---------- */
+.pq-custom {
+  width: 100%;
+  max-width: 420px;
+  padding: 13px 15px;
+  border: 1px solid var(--pq-line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pq-custom-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pq-custom-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pq-custom-txt b {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.88rem;
+  color: var(--pq-ink);
+}
+.pq-custom-txt em {
+  font-style: normal;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: var(--pq-dim);
+}
+.pq-custom-state { font-size: 0.76rem; color: var(--pq-dim); }
+.pq-custom-state.on { color: var(--pq-warm); }
+.pq-custom-who {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pq-custom-who li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--pq-warm-soft);
+  color: var(--pq-ink);
+  font-size: 0.74rem;
+}
+.pq-custom-who em { font-style: normal; font-weight: 800; color: var(--pq-warm); }
+.pq-custom-lib {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border: 1px solid var(--pq-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--pq-ink);
+  font-size: 0.79rem;
+  font-weight: 600;
+}
+.pq-custom-lib:hover { border-color: var(--pq-warm); color: var(--pq-warm); }
+
+/* ======================================================================
+   La modale « Ma librairie »
+   ====================================================================== */
+.pq-lib {
+  --pq-ink: #f2ece2;
+  --pq-dim: #a79c8d;
+  --pq-line: rgba(226, 190, 130, 0.16);
+  --pq-warm: #f2b70b;
+  --pq-warm-soft: rgba(242, 183, 11, 0.16);
+
+  width: min(560px, 94vw);
+  max-height: 88dvh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--pq-line);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #1b1611 0%, #100d0a 100%);
+  color: var(--pq-ink);
+  overflow: hidden;
+}
+.pq-lib-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--pq-line);
+}
+.pq-lib-head > span {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pq-lib-head b {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.98rem;
+}
+.pq-lib-head em { font-style: normal; font-size: 0.76rem; color: var(--pq-dim); }
+.pq-lib-body {
+  padding: 14px 16px 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+.pq-lib-rule {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 11px;
+  background: var(--pq-warm-soft);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--pq-ink);
+}
+.pq-lib-rule b { color: var(--pq-warm); }
+.pq-lib-tip,
+.pq-lib-empty,
+.pq-lib-load {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--pq-dim);
+}
+.pq-lib-tip b { color: var(--pq-ink); }
+.pq-lib-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed var(--pq-line);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--pq-ink);
+  font-size: 0.88rem;
+  font-weight: 700;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.pq-lib-add:hover:not(:disabled) { border-color: var(--pq-warm); color: var(--pq-warm); }
+.pq-lib-add:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ---------- La fiche du son fraîchement rogné ---------- */
+.pq-lib-form {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 13px;
+  border: 1px solid var(--pq-line);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.pq-lib-form-top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.pq-lib-preview,
+.pq-lib-recut,
+.pq-lib-cancel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border: 1px solid var(--pq-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--pq-ink);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.pq-lib-preview:hover,
+.pq-lib-recut:hover,
+.pq-lib-cancel:hover { border-color: var(--pq-warm); color: var(--pq-warm); }
+.pq-lib-dur {
+  margin-right: auto;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--pq-warm);
+  font-variant-numeric: tabular-nums;
+}
+.pq-lib-field { display: flex; flex-direction: column; gap: 5px; }
+.pq-lib-field span { font-size: 0.75rem; color: var(--pq-dim); }
+.pq-lib-field input,
+.pq-lib-field select {
+  padding: 9px 11px;
+  border: 1px solid var(--pq-line);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--pq-ink);
+  font-size: 0.86rem;
+}
+.pq-lib-field input:focus,
+.pq-lib-field select:focus { outline: none; border-color: var(--pq-warm); }
+.pq-lib-form-actions { display: flex; justify-content: flex-end; gap: 9px; }
+.pq-lib-send {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--pq-warm);
+  color: #241a02;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+.pq-lib-send:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ---------- Les sons déjà déposés ---------- */
+.pq-lib-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pq-lib-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--pq-line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.pq-lib-row.off { opacity: 0.55; }
+.pq-lib-play {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--pq-line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--pq-warm);
+}
+.pq-lib-play:hover { background: var(--pq-warm-soft); }
+.pq-lib-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.pq-lib-main b {
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pq-lib-main em,
+.pq-lib-meta { font-style: normal; font-size: 0.72rem; color: var(--pq-dim); }
+.pq-lib-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid var(--pq-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--pq-dim);
+  font-size: 0.71rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pq-lib-toggle.on { color: var(--pq-warm); border-color: rgba(242, 183, 11, 0.45); }
+.pq-lib-del {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--pq-line);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--pq-dim);
+}
+.pq-lib-del:hover { border-color: #e05656; color: #e05656; }
+
+/* ======================================================================
+   Le rogneur
+   ======================================================================
+   La piste occupe toute la largeur : c'est l'objet de l'écran, on y cherche un
+   cri à l'œil. Les poignées ont une zone de préhension de 18 px pour un trait
+   de 2 px — au doigt, une poignée fine est une poignée qu'on n'attrape jamais.
+   ====================================================================== */
+.pq-trim {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid var(--pq-line);
+  border-radius: 13px;
+  background: rgba(0, 0, 0, 0.25);
+}
+.pq-trim-help,
+.pq-trim-load {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  color: var(--pq-dim);
+}
+.pq-trim-help b { color: var(--pq-warm); }
+.pq-trim-track {
+  position: relative;
+  height: 104px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.45);
+  /* Sans ça, le doigt fait défiler la page au lieu de tirer la poignée. */
+  touch-action: none;
+  user-select: none;
+  overflow: hidden;
+}
+.pq-trim-wave { display: block; width: 100%; height: 100%; }
+.pq-trim-sel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  cursor: grab;
+  border-top: 2px solid var(--pq-warm);
+  border-bottom: 2px solid var(--pq-warm);
+}
+.pq-trim-sel:active { cursor: grabbing; }
+.pq-trim-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 18px;
+  margin-left: -9px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.pq-trim-handle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 8px;
+  width: 2px;
+  background: var(--pq-warm);
+}
+.pq-trim-handle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 12px;
+  height: 30px;
+  margin-top: -15px;
+  border-radius: 4px;
+  background: var(--pq-warm);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+.pq-trim-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--pq-dim);
+  font-variant-numeric: tabular-nums;
+}
+.pq-trim-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+.pq-trim-play,
+.pq-trim-cancel {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border: 1px solid var(--pq-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--pq-ink);
+  font-size: 0.79rem;
+  font-weight: 600;
+}
+.pq-trim-play:hover,
+.pq-trim-cancel:hover { border-color: var(--pq-warm); color: var(--pq-warm); }
+.pq-trim-len {
+  margin-right: auto;
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: var(--pq-warm);
+  font-variant-numeric: tabular-nums;
+}
+.pq-trim-len.over { color: #e05656; }
+.pq-trim-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 17px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--pq-warm);
+  color: #241a02;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+.pq-trim-ok:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Sur mobile la piste est plus haute : c'est le seul endroit où la précision du
+   geste compte, et le doigt masque ce qu'il déplace. */
+@media (max-width: 620px) {
+  .pq-trim-track { height: 126px; }
+  .pq-lib-row { flex-wrap: wrap; }
+  .pq-lib-main { flex: 1 1 100%; order: 2; }
+}
+
+/* Le son d'un joueur, dans la banque d'admin. */
+.pq-admin-owner {
+  font-size: 0.72rem;
+  color: var(--accent-ink, #b8860b);
 }

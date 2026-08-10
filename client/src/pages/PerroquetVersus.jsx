@@ -9,6 +9,7 @@ import {
   Loader2,
   Mic,
   MicOff,
+  Music,
   Play,
   Trophy,
   UserPlus,
@@ -21,6 +22,7 @@ import { openMic, closeMic, startTake, canRecord } from "../lib/soundTake";
 import { VersusInvite } from "../components/VersusRoom";
 import PerroquetHold from "../components/PerroquetHold";
 import ContourChart from "../components/ContourChart";
+import SoundLibrary from "../components/SoundLibrary";
 
 // ======================================================================
 //  Le Perroquet — versus
@@ -59,6 +61,11 @@ export default function PerroquetVersus() {
   const [sent, setSent] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [showLib, setShowLib] = useState(false);
+  // Ce que les librairies des joueurs présents apportent au tirage. Compté par
+  // le serveur (GET /pool) et pas déduit du salon : c'est une requête, on ne la
+  // colle pas dans chaque diffusion du salon.
+  const [pool, setPool] = useState(null);
 
   const streamRef = useRef(null);
   const takeRef = useRef(null);
@@ -219,6 +226,42 @@ export default function PerroquetVersus() {
     }
   }, [recording, code, token]);
 
+  // ---------- Les sons des joueurs ----------
+  const loadPool = useCallback(async () => {
+    try {
+      setPool(await apiFetch(`/perroquet/versus/${code}/pool`, { token }));
+    } catch {
+      /* le décompte est indicatif : son échec ne casse pas le lobby */
+    }
+  }, [code, token]);
+
+  // Recompté quand la table change : quelqu'un qui arrive apporte ses sons, et
+  // l'hôte doit voir ce qu'il embarque au moment où il coche.
+  const playerCount = room?.players?.filter((p) => !p.left).length || 0;
+  useEffect(() => {
+    if (phase === "lobby") loadPool();
+  }, [phase, playerCount, loadPool]);
+
+  const setCustomSounds = useCallback(
+    async (on) => {
+      setBusy(true);
+      try {
+        const d = await apiFetch(`/perroquet/versus/${code}/options`, {
+          method: "POST",
+          token,
+          body: { customSounds: on },
+        });
+        applyRoom(d.room);
+        setErr("");
+      } catch (e) {
+        setErr(e.message || "Réglage impossible.");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [code, token, applyRoom]
+  );
+
   const start = useCallback(async () => {
     setBusy(true);
     try {
@@ -290,6 +333,9 @@ export default function PerroquetVersus() {
             onStart={start}
             busy={busy}
             copied={copied}
+            pool={pool}
+            onCustomSounds={setCustomSounds}
+            onLibrary={() => setShowLib(true)}
             onInvite={() => setShowInvite(true)}
             onCopy={() => {
               navigator.clipboard?.writeText(window.location.href).catch(() => {});
@@ -365,6 +411,18 @@ export default function PerroquetVersus() {
           onClose={() => setShowInvite(false)}
         />
       )}
+
+      {/* La librairie s'ouvre DEPUIS le salon : c'est là qu'on apprend que
+          l'hôte a coché les sons personnalisés, donc là qu'on a envie d'en
+          déposer un avant le départ. Le décompte du salon se recompte à la
+          fermeture. */}
+      {showLib && (
+        <SoundLibrary
+          token={token}
+          onClose={() => setShowLib(false)}
+          onChanged={loadPool}
+        />
+      )}
     </div>
   );
 }
@@ -372,7 +430,20 @@ export default function PerroquetVersus() {
 // ============================================================
 //  Le salon d'attente
 // ============================================================
-function Lobby({ room, armed, onArm, onStart, onInvite, busy, copied, onCopy, code }) {
+function Lobby({
+  room,
+  armed,
+  onArm,
+  onStart,
+  onInvite,
+  busy,
+  copied,
+  onCopy,
+  code,
+  pool,
+  onCustomSounds,
+  onLibrary,
+}) {
   const active = room.players.filter((p) => !p.left);
   const ready = active.filter((p) => p.armed).length;
   const canStart = room.isHost && active.length >= 2;
@@ -412,6 +483,58 @@ function Lobby({ room, armed, onArm, onStart, onInvite, busy, copied, onCopy, co
       <button className="pq-go alt clickable" onClick={onInvite}>
         <UserPlus size={17} /> Inviter des amis
       </button>
+
+      {/* ---------- Les sons des joueurs ----------
+          Un réglage d'hôte, mais affiché à TOUT LE MONDE : les autres doivent
+          savoir que leurs propres sons vont sortir (et aller en déposer avant
+          le départ). Le montrer au seul hôte ferait de la case une surprise au
+          milieu de la partie. */}
+      <div className="pq-custom">
+        <div className="pq-custom-head">
+          <span className="pq-custom-txt">
+            <b>
+              <Music size={15} /> Sons des joueurs
+            </b>
+            <em>
+              {room.customSounds
+                ? pool?.custom
+                  ? `${pool.custom} son(s) déposés par les joueurs présents s'ajoutent au tirage.`
+                  : "Personne à cette table n'a encore déposé de son."
+                : "Le tirage n'utilise que les sons officiels."}
+            </em>
+          </span>
+          {room.isHost ? (
+            <button
+              className={`pq-sw clickable ${room.customSounds ? "on" : ""}`}
+              onClick={() => onCustomSounds(!room.customSounds)}
+              disabled={busy}
+              role="switch"
+              aria-checked={!!room.customSounds}
+              aria-label="Sons des joueurs"
+            >
+              <i />
+            </button>
+          ) : (
+            <span className={`pq-custom-state ${room.customSounds ? "on" : ""}`}>
+              {room.customSounds ? "activés" : "désactivés"}
+            </span>
+          )}
+        </div>
+
+        {room.customSounds && pool?.contributors?.length > 0 && (
+          <ul className="pq-custom-who">
+            {pool.contributors.map((c) => (
+              <li key={c.name}>
+                {c.name} <em>{c.count}</em>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <button className="pq-custom-lib clickable" onClick={onLibrary}>
+          <Music size={14} /> Ma librairie de sons
+        </button>
+      </div>
 
       {!armed && (
         <button className="pq-go clickable" onClick={onArm}>
@@ -549,6 +672,9 @@ function Reveal({ round, byId, meId }) {
       <p className="pq-answer">
         C'était <b>{round.label}</b>
         {round.game ? <em> — {round.game}</em> : null}
+        {round.addedBy ? (
+          <span className="pq-by">proposé par {round.addedBy}</span>
+        ) : null}
       </p>
 
       <ol className="pq-podium">

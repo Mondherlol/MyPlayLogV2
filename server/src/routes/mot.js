@@ -1967,4 +1967,41 @@ router.post("/team/:code/leave", requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/mot/team/:code/kick — sortir quelqu'un de l'équipe.
+// Réservé au propriétaire, sinon n'importe qui pourrait vider la bande des
+// autres. Comme pour le départ volontaire, la partie du jour n'est pas touchée :
+// on retire du carnet d'adresses, pas de la table déjà en cours.
+router.post("/team/:code/kick", requireAuth, async (req, res) => {
+  try {
+    const team = await MotTeam.findOne({
+      code: String(req.params.code || "").toLowerCase().trim(),
+    });
+    if (!team) return res.status(404).json({ error: "Cette équipe n'existe plus." });
+    if (String(team.owner) !== String(req.userId))
+      return res
+        .status(403)
+        .json({ error: "Seul le créateur de l'équipe peut en retirer quelqu'un." });
+
+    const target = String(req.body?.userId || "");
+    if (!target) return res.status(400).json({ error: "Qui veux-tu retirer ?" });
+    if (target === String(req.userId))
+      return res
+        .status(400)
+        .json({ error: "Pour sortir toi-même, quitte l'équipe." });
+
+    const before = teamMemberIds(team).length;
+    team.members = (team.members || []).filter(
+      (m) => String(m.user?._id || m.user) !== target
+    );
+    if (teamMemberIds(team).length === before)
+      return res.status(409).json({ error: "Cette personne n'est pas dans l'équipe." });
+
+    await team.save();
+    res.json({ team: publicTeam(await populateTeam(team), { meId: req.userId }) });
+  } catch (err) {
+    console.error("mot team kick error:", err.message);
+    res.status(500).json({ error: "Impossible de retirer ce joueur." });
+  }
+});
+
 export default router;

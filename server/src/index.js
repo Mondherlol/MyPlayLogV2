@@ -31,6 +31,7 @@ import quizAdminRoutes from "./routes/quizAdmin.js";
 import motRoutes from "./routes/mot.js";
 import perroquetRoutes from "./routes/perroquet.js";
 import perroquetVersusRoutes from "./routes/perroquetVersus.js";
+import perroquetSoundRoutes from "./routes/perroquetSounds.js";
 import perroquetAdminRoutes from "./routes/perroquetAdmin.js";
 import presenceRoutes from "./routes/presence.js";
 import arcadeRoutes from "./routes/arcade.js";
@@ -128,8 +129,10 @@ app.use("/api/quiz/versus", quizVersusRoutes);
 app.use("/api/quiz", quizRoutes);
 app.use("/api/mot", motRoutes);
 // Le piège une cinquième fois : /api/perroquet porte un `GET /:id/results` qui
-// avalerait /api/perroquet/versus/<code>. Le versus passe devant.
+// avalerait /api/perroquet/versus/<code> — et `DELETE /:id` avalerait de même
+// /api/perroquet/sounds/<id>. Les deux sous-routeurs passent devant.
 app.use("/api/perroquet/versus", perroquetVersusRoutes);
+app.use("/api/perroquet/sounds", perroquetSoundRoutes);
 app.use("/api/perroquet", perroquetRoutes);
 app.use("/api/presence", presenceRoutes);
 app.use("/api/arcade", arcadeRoutes);

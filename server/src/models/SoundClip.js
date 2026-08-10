@@ -50,6 +50,21 @@ const soundClipSchema = new mongoose.Schema(
     // leur référence. On ne supprime pas un clip qui est dans un historique.
     active: { type: Boolean, default: true },
 
+    // ---------------------------------------------------- les sons de la commu
+    // `owner` vide = son officiel, déposé depuis le panneau d'admin : il fait
+    // partie du tirage de tout le monde, tout le temps.
+    //
+    // `owner` renseigné = son déposé par un joueur depuis SA librairie. Il ne
+    // sort JAMAIS d'office : il n'entre dans le tirage que si la partie a activé
+    // les sons personnalisés, et uniquement pour les joueurs présents (cf.
+    // routes/perroquetSounds.js). C'est ce qui permet d'ouvrir le dépôt à tout
+    // le monde sans que la banque commune parte à la dérive : un son bancal ne
+    // gêne que la table qui a choisi de le jouer.
+    owner: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    // Le pseudo au moment du dépôt : sert à afficher « proposé par … » à la
+    // révélation sans peupler un utilisateur par manche.
+    ownerName: { type: String, default: "" },
+
     // Statistiques de tirage, pour repérer les clips injouables : un son que
     // personne ne dépasse jamais 30 est soit mal découpé, soit pas imitable.
     timesPlayed: { type: Number, default: 0 },
@@ -60,5 +75,7 @@ const soundClipSchema = new mongoose.Schema(
 
 // Le tirage d'une manche filtre sur `active` puis échantillonne par difficulté.
 soundClipSchema.index({ active: 1, difficulty: 1 });
+// La librairie d'un joueur, et le tirage « sons des joueurs présents ».
+soundClipSchema.index({ owner: 1, createdAt: -1 });
 
 export default mongoose.model("SoundClip", soundClipSchema);

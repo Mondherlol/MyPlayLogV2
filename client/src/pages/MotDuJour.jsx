@@ -16,6 +16,7 @@ import {
   Target,
   Users,
   UserPlus,
+  UserMinus,
   LogOut,
   Link2,
   Check,
@@ -599,6 +600,25 @@ export default function MotDuJour() {
     }
   }
 
+  // Sortir quelqu'un de l'équipe (réservé au créateur, le serveur revérifie).
+  async function kickFromTeam(code, member) {
+    if (busy) return;
+    if (!window.confirm(`Retirer ${member.username} de l'équipe ?`)) return;
+    setBusy(true);
+    try {
+      await apiFetch(`/mot/team/${code}/kick`, {
+        method: "POST",
+        token,
+        body: { userId: member.id },
+      });
+      await loadToday();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function leaveSession() {
     if (busy || !inSession) return;
     if (
@@ -773,9 +793,11 @@ export default function MotDuJour() {
             teams={state?.teams || []}
             busy={busy}
             currentCode={session?.code}
+            meId={user?.id}
             onPlay={playWithTeam}
             onRename={renameTeam}
             onLeave={leaveTeam}
+            onKick={kickFromTeam}
           />
         )}
 
@@ -1107,7 +1129,7 @@ function TeamUp({ busy, sessions, onOpen, onJoin }) {
 // La liste des bandes avec qui on cherche. Une session meurt à minuit, une
 // équipe non : c'est ici qu'on retrouve les mêmes joueurs le lendemain, sans
 // avoir à réinviter personne (cf. models/MotTeam.js).
-function Teams({ teams, busy, currentCode, onPlay, onRename, onLeave }) {
+function Teams({ teams, busy, currentCode, meId, onPlay, onRename, onLeave, onKick }) {
   if (!teams.length) return null;
   return (
     <section className="mdj-teams">
@@ -1127,9 +1149,11 @@ function Teams({ teams, busy, currentCode, onPlay, onRename, onLeave }) {
             team={t}
             busy={busy}
             here={t.session?.code && t.session.code === currentCode}
+            meId={meId}
             onPlay={() => onPlay(t.code)}
             onRename={() => onRename(t.code, t.name)}
             onLeave={() => onLeave(t.code)}
+            onKick={(member) => onKick(t.code, member)}
           />
         ))}
       </ul>
@@ -1137,9 +1161,15 @@ function Teams({ teams, busy, currentCode, onPlay, onRename, onLeave }) {
   );
 }
 
-function TeamRow({ team, busy, here, onPlay, onRename, onLeave }) {
+function TeamRow({ team, busy, here, meId, onPlay, onRename, onLeave, onKick }) {
   const [copied, setCopied] = useState(false);
+  // Le trombinoscope ne s'ouvre qu'à la demande : dans le rail, une équipe tient
+  // sur une ligne, et sortir quelqu'un n'est pas un geste de tous les jours.
+  const [roster, setRoster] = useState(false);
   const s = team.session;
+  // Retirer un membre est réservé au créateur (le serveur le revérifie) et n'a
+  // de sens que s'il reste quelqu'un d'autre que soi.
+  const canManage = team.isOwner && team.members.length > 1;
   const label =
     team.name ||
     team.members
@@ -1202,6 +1232,15 @@ function TeamRow({ team, busy, here, onPlay, onRename, onLeave }) {
         <button className="mdj-team-ic clickable" onClick={onRename} title="Renommer">
           <Pencil size={14} />
         </button>
+        {canManage && (
+          <button
+            className={`mdj-team-ic clickable ${roster ? "on" : ""}`}
+            onClick={() => setRoster((v) => !v)}
+            title="Gérer les membres"
+          >
+            <UserMinus size={14} />
+          </button>
+        )}
         <button
           className="mdj-team-ic clickable"
           onClick={onLeave}
@@ -1211,6 +1250,29 @@ function TeamRow({ team, busy, here, onPlay, onRename, onLeave }) {
           <LogOut size={14} />
         </button>
       </span>
+      {canManage && roster && (
+        <ul className="mdj-team-roster">
+          {team.members.map((m) => (
+            <li key={m.id}>
+              <Face user={m} size={22} />
+              <b>{m.username}</b>
+              {m.id === meId ? (
+                <em>toi</em>
+              ) : (
+                <button
+                  className="mdj-team-kick clickable"
+                  onClick={() => onKick(m)}
+                  disabled={busy}
+                  title={`Retirer ${m.username} de l'équipe`}
+                >
+                  <UserMinus size={13} />
+                  Retirer
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </li>
   );
 }

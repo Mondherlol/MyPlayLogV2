@@ -89,6 +89,9 @@ const clipFull = (req, c) => ({
   game: c.game || null,
   gameId: c.gameId || null,
   difficulty: c.difficulty,
+  // Le crédit du déposant, pour les sons de librairie. C'est la contrepartie du
+  // dépôt libre : on a envie de savoir de qui vient le cri qu'on vient d'imiter.
+  addedBy: c.owner ? c.ownerName || "" : "",
   contour: c.contour ? { pitch: c.contour.pitch, energy: c.contour.energy } : null,
 });
 
@@ -100,8 +103,17 @@ const clipFull = (req, c) => ({
 // donne envie de recommencer. Tirer uniformément produit régulièrement des
 // parties toutes faciles ou toutes infaisables, ce qui est le meilleur moyen de
 // faire lâcher un joueur à la deuxième partie.
-async function drawClips(excludeIds = []) {
-  const match = { active: true, _id: { $nin: excludeIds } };
+// `mineId` : l'identifiant du joueur quand il a coché « ajouter mes sons ».
+// Sans lui, seuls les sons officiels (owner absent) sortent — c'est la règle
+// générale des sons de librairie, cf. routes/perroquetSounds.js.
+async function drawClips(excludeIds = [], mineId = null) {
+  const match = {
+    active: true,
+    _id: { $nin: excludeIds },
+    ...(mineId
+      ? { $or: [{ owner: null }, { owner: new mongoose.Types.ObjectId(mineId) }] }
+      : { owner: null }),
+  };
   // Un échantillon par palier, puis on trie du plus facile au plus dur.
   const picked = [];
   const seen = new Set();
@@ -159,7 +171,10 @@ router.post("/start", requireAuth, async (req, res) => {
       clips = ids.map((id) => byId.get(String(id))).filter(Boolean);
       challenge = src;
     } else {
-      clips = await drawClips();
+      // « Ajouter mes sons » : en solo, le joueur est son propre hôte. Ses
+      // clips rejoignent le tirage à côté des officiels — jamais à leur place,
+      // sinon une librairie de trois sons ferait une partie de trois sons.
+      clips = await drawClips([], req.body?.mine ? req.userId : null);
     }
 
     if (clips.length < 1)
@@ -176,6 +191,7 @@ router.post("/start", requireAuth, async (req, res) => {
         label: c.label,
         game: c.game || "",
         clipUrl: c.url,
+        addedBy: c.owner ? c.ownerName || "" : "",
       })),
       challengeOf: challenge?._id || null,
       challengedUser: challenge?.user?._id || null,
@@ -386,6 +402,7 @@ const serializeGame = (req, g) => ({
   rounds: g.rounds.map((r) => ({
     label: r.label,
     game: r.game || null,
+    addedBy: r.addedBy || "",
     clipUrl: abs(req, r.clipUrl),
     attemptUrl: abs(req, r.attemptUrl),
     score: r.score,

@@ -32,7 +32,20 @@ router.use(requireAuth, requireAdmin);
 const FFMPEG = process.env.FFMPEG_PATH || ffmpegStatic || "ffmpeg";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BANK_DIR = path.join(__dirname, "../../uploads/perroquet/bank");
+const UPLOADS_DIR = path.join(__dirname, "../../uploads");
 fs.mkdirSync(BANK_DIR, { recursive: true });
+
+// Le fichier d'un clip sur le disque. Deux dossiers coexistent désormais :
+// `bank/` pour les sons officiels et `user/` pour les librairies des joueurs
+// (routes/perroquetSounds.js). L'admin voit et modère les deux, donc il ne peut
+// plus supposer BANK_DIR — d'où le chemin dérivé de l'URL, borné à `uploads/`
+// pour qu'une URL trafiquée en base ne fasse pas sortir du dossier.
+function fileOf(clip) {
+  const rel = String(clip?.url || "");
+  if (!rel.startsWith("/uploads/perroquet/")) return null;
+  const full = path.join(UPLOADS_DIR, rel.slice("/uploads/".length));
+  return full.startsWith(UPLOADS_DIR) ? full : null;
+}
 
 // Formats acceptés à l'envoi. Plus large que ce qu'un navigateur enregistre :
 // ici on téléverse des fichiers trouvés ailleurs (mp3, wav, ogg, flac…).
@@ -75,6 +88,9 @@ const serialize = (req, c) => ({
   url: abs(req, c.url),
   difficulty: c.difficulty,
   active: c.active,
+  // Qui l'a déposé : vide pour la banque officielle, le pseudo du joueur pour
+  // un son de librairie. C'est ce qui distingue les deux mondes dans l'écran.
+  owner: c.owner ? c.ownerName || "un joueur" : "",
   durationMs: c.contour?.durationMs || 0,
   voicedRatio: c.contour?.voicedRatio || 0,
   timesPlayed: c.timesPlayed || 0,
@@ -90,18 +106,24 @@ const serialize = (req, c) => ({
 router.get("/", async (req, res) => {
   try {
     const filter = req.query.filter || "all";
+    // Les sons de la communauté sont dans la MÊME collection mais forment une
+    // liste à part : les mélanger noierait la banque officielle sous les dépôts
+    // des joueurs, alors qu'ils n'ont pas le même statut (les uns sortent
+    // partout, les autres seulement sur les tables qui les ont demandés).
+    const scope = filter === "community" ? { owner: { $ne: null } } : { owner: null };
     const q =
-      filter === "active" ? { active: true } :
-      filter === "off" ? { active: false } :
-      {};
+      filter === "active" ? { ...scope, active: true } :
+      filter === "off" ? { ...scope, active: false } :
+      scope;
     const rows = await SoundClip.find(q).sort({ difficulty: 1, createdAt: -1 }).lean();
-    const [active, off] = await Promise.all([
-      SoundClip.countDocuments({ active: true }),
-      SoundClip.countDocuments({ active: false }),
+    const [active, off, community] = await Promise.all([
+      SoundClip.countDocuments({ active: true, owner: null }),
+      SoundClip.countDocuments({ active: false, owner: null }),
+      SoundClip.countDocuments({ owner: { $ne: null } }),
     ]);
     res.json({
       items: rows.map((c) => serialize(req, c)),
-      counts: { active, off, total: active + off },
+      counts: { active, off, community, total: active + off },
     });
   } catch (err) {
     console.error("perroquet admin list error:", err.message);
@@ -203,8 +225,8 @@ router.post("/recompute", async (req, res) => {
     let done = 0;
     const failed = [];
     for (const c of rows) {
-      const file = path.join(BANK_DIR, path.basename(c.url || ""));
-      if (!c.url?.startsWith("/uploads/perroquet/bank/") || !fs.existsSync(file)) {
+      const file = fileOf(c);
+      if (!file || !fs.existsSync(file)) {
         failed.push(c.label);
         continue;
       }
@@ -434,11 +456,8 @@ router.delete("/:id", async (req, res) => {
       });
     }
 
-    if (clip.url?.startsWith("/uploads/perroquet/bank/")) {
-      fs.promises
-        .unlink(path.join(BANK_DIR, path.basename(clip.url)))
-        .catch(() => {});
-    }
+    const file = fileOf(clip);
+    if (file) fs.promises.unlink(file).catch(() => {});
     await clip.deleteOne();
     res.json({ ok: true });
   } catch (err) {

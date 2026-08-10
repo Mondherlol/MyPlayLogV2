@@ -68,6 +68,9 @@ const roundSchema = new mongoose.Schema(
     game: { type: String, default: "" },
     clipUrl: { type: String, default: "" },
     difficulty: { type: Number, default: 2 },
+    // Le pseudo du joueur qui a déposé ce son quand il vient d'une librairie
+    // personnelle : « proposé par Momo », à la révélation. Vide pour l'officiel.
+    addedBy: { type: String, default: "" },
     takes: { type: [takeSchema], default: [] },
   },
   { _id: false }
@@ -96,6 +99,13 @@ const perroquetVersusSchema = new mongoose.Schema(
     players: { type: [playerSchema], default: [] },
     rounds: { type: [roundSchema], default: [] },
     roundCount: { type: Number, default: 5 },
+
+    // Les sons déposés par les joueurs entrent-ils dans le tirage ? C'est un
+    // réglage d'HÔTE, et par défaut non : une partie ouverte à des inconnus doit
+    // rester la partie officielle, prévisible. Quand c'est coché, seuls les sons
+    // des joueurs PRÉSENTS dans ce salon sont ajoutés — jamais ceux de toute la
+    // communauté, qui feraient une banque parallèle que personne n'a validée.
+    customSounds: { type: Boolean, default: false },
 
     // lobby → listen → record → reveal → (manche suivante) → done
     phase: { type: String, default: "lobby" },

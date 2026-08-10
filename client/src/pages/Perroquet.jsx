@@ -7,6 +7,7 @@ import {
   Loader2,
   Mic,
   MicOff,
+  Music,
   Play,
   RotateCcw,
   SkipForward,
@@ -19,6 +20,7 @@ import { apiFetch, apiUpload } from "../lib/api";
 import { openMic, closeMic, startTake, canRecord } from "../lib/soundTake";
 import PerroquetHold from "../components/PerroquetHold";
 import ContourChart from "../components/ContourChart";
+import SoundLibrary from "../components/SoundLibrary";
 
 // ======================================================================
 //  Le Perroquet — imite le son, le plus proche gagne
@@ -73,6 +75,13 @@ export default function Perroquet() {
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
   const [recap, setRecap] = useState(null);
+  // La librairie personnelle : combien de sons prêts, et est-ce qu'on joue
+  // avec. En solo, le joueur EST l'hôte — c'est donc lui qui décide, mais la
+  // règle reste la même qu'en versus : rien n'entre dans le tirage sans un
+  // geste explicite (cf. components/SoundLibrary.jsx).
+  const [showLib, setShowLib] = useState(false);
+  const [myCount, setMyCount] = useState(0);
+  const [useMine, setUseMine] = useState(false);
 
   const streamRef = useRef(null);
   const takeRef = useRef(null);
@@ -94,6 +103,24 @@ export default function Perroquet() {
     []
   );
 
+  // Le compte de sons personnels prêts à sortir : il conditionne l'affichage de
+  // l'interrupteur (proposer « jouer avec mes sons » à qui n'en a aucun ne
+  // ferait qu'ajouter une case morte).
+  const loadMine = useCallback(async () => {
+    try {
+      const d = await apiFetch("/perroquet/sounds", { token });
+      const n = (d.items || []).filter((c) => c.active).length;
+      setMyCount(n);
+      if (!n) setUseMine(false);
+    } catch {
+      /* la librairie est un bonus : son échec ne bloque pas le jeu */
+    }
+  }, [token]);
+
+  useEffect(() => {
+    loadMine();
+  }, [loadMine]);
+
   // ---------- Lancement ----------
   const start = useCallback(async () => {
     setErr("");
@@ -111,7 +138,9 @@ export default function Perroquet() {
       const data = await apiFetch("/perroquet/start", {
         method: "POST",
         token,
-        body: challengeId ? { challenge: challengeId } : {},
+        // Un défi rejoue le set exact de l'autre partie : y ajouter ses propres
+        // sons n'aurait aucun sens, ce ne serait plus le même défi.
+        body: challengeId ? { challenge: challengeId } : { mine: useMine },
       });
       setGame(data);
       setIndex(0);
@@ -128,7 +157,7 @@ export default function Perroquet() {
     } finally {
       setSending(false);
     }
-  }, [token, challengeId]);
+  }, [token, challengeId, useMine]);
 
   // ---------- Ouvrir un salon à plusieurs ----------
   const openVersus = useCallback(async () => {
@@ -300,6 +329,10 @@ export default function Perroquet() {
             busy={sending}
             challenge={game?.challenge}
             challengeId={challengeId}
+            myCount={myCount}
+            useMine={useMine}
+            onToggleMine={() => setUseMine((v) => !v)}
+            onLibrary={() => setShowLib(true)}
           />
         )}
 
@@ -331,6 +364,14 @@ export default function Perroquet() {
           />
         )}
       </div>
+
+      {showLib && (
+        <SoundLibrary
+          token={token}
+          onClose={() => setShowLib(false)}
+          onChanged={loadMine}
+        />
+      )}
     </div>
   );
 }
@@ -338,7 +379,16 @@ export default function Perroquet() {
 // ============================================================
 //  Écran d'accueil
 // ============================================================
-function Intro({ onStart, onVersus, busy, challengeId }) {
+function Intro({
+  onStart,
+  onVersus,
+  busy,
+  challengeId,
+  myCount,
+  useMine,
+  onToggleMine,
+  onLibrary,
+}) {
   return (
     <section className="pq-intro">
       <span className="pq-bird" aria-hidden="true">
@@ -377,6 +427,30 @@ function Intro({ onStart, onVersus, busy, challengeId }) {
           <Users size={18} /> Jouer à plusieurs
         </button>
       </div>
+      {/* --- La librairie personnelle ---
+          Sous les boutons, pas au-dessus : c'est un complément au jeu, pas une
+          étape avant de jouer. Mais visible d'emblée, parce qu'un dépôt qu'on
+          ne découvre qu'au fond d'un réglage n'existe pas. */}
+      {!challengeId && (
+        <div className="pq-mine">
+          <button className="pq-mine-open clickable" onClick={onLibrary}>
+            <Music size={15} /> Ma librairie de sons
+            {myCount > 0 && <em>{myCount}</em>}
+          </button>
+          {myCount > 0 && (
+            <button
+              className={`pq-mine-sw clickable ${useMine ? "on" : ""}`}
+              onClick={onToggleMine}
+              role="switch"
+              aria-checked={useMine}
+            >
+              <i />
+              Ajouter mes sons au tirage
+            </button>
+          )}
+        </div>
+      )}
+
       <p className="pq-mic-note">
         <MicOff size={13} /> Le micro s'ouvre au lancement et se referme en
         quittant la page.
@@ -444,6 +518,11 @@ function RoundResult({ result, onNext, last, busy }) {
       <p className="pq-answer">
         C'était <b>{result.clip.label}</b>
         {result.clip.game ? <em> — {result.clip.game}</em> : null}
+        {/* Le crédit du déposant : c'est la contrepartie du dépôt libre, et
+            c'est ce qui donne envie d'en ajouter. */}
+        {result.clip.addedBy ? (
+          <span className="pq-by">proposé par {result.clip.addedBy}</span>
+        ) : null}
       </p>
 
       {!skipped && result.contour && result.clip.contour && (
@@ -524,6 +603,7 @@ function Recap({ recap, onReplay, onHome }) {
             <span className="pq-recap-label">
               <b>{r.label}</b>
               {r.game ? <em>{r.game}</em> : null}
+              {r.addedBy ? <em className="by">par {r.addedBy}</em> : null}
             </span>
             <span className="pq-recap-clips">
               <ClipButton url={r.clipUrl} label="L'original" kind="target" />

@@ -802,6 +802,74 @@
   color: var(--accent-ink);
 }
 
+.mdj-team-ic.on {
+  border-color: var(--orange);
+  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
+}
+
+/* --- Le trombinoscope, pour sortir quelqu'un ---
+   Replié par défaut : il prend toute la largeur de la ligne d'équipe, sous
+   les actions, et ne s'ouvre que quand le créateur veut faire le ménage. */
+.mdj-team-roster {
+  flex: 0 0 100%;
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--bg-soft, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mdj-team-roster li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mdj-team-roster b {
+  flex: 1;
+  overflow: hidden;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.mdj-team-roster em {
+  font-size: 0.72rem;
+  font-style: normal;
+  color: var(--text-soft);
+}
+
+.mdj-team-kick {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 0.73rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.mdj-team-kick:hover:not(:disabled) {
+  border-color: var(--danger, #e05656);
+  background: color-mix(in srgb, var(--danger, #e05656) 12%, transparent);
+  color: var(--danger, #e05656);
+}
+
+.mdj-team-kick:disabled {
+  opacity: 0.55;
+}
+
 /* --- L'invitation, à l'arrivée sur la page ---
    Une MODALE et pas un bandeau : accepter verse définitivement ses essais
    solo au pot commun. Une décision irréversible mérite qu'on s'arrête

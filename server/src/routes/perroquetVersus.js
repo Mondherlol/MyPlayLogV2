@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import multer from "multer";
+import mongoose from "mongoose";
 import PerroquetVersus, {
   MAX_PLAYERS,
   LISTEN_SEC,
@@ -119,6 +120,7 @@ function roundView(room, meId) {
     // La réponse, seulement à la révélation.
     label: revealing ? r.label : null,
     game: revealing ? r.game || null : null,
+    addedBy: revealing ? r.addedBy || "" : "",
     contour: revealing ? clipContour(r) : null,
     // Qui a déjà rendu : affiché pendant l'enregistrement (sans les scores).
     // C'est ce qui dit « plus que toi » et évite d'attendre bêtement.
@@ -170,6 +172,7 @@ function serializeRoom(room, meId) {
     hostId,
     isHost: hostId === String(meId),
     roundCount: room.roundCount,
+    customSounds: !!room.customSounds,
     phase: room.phase,
     index: room.index,
     phaseStartsAt: room.phaseStartsAt,
@@ -354,9 +357,19 @@ async function finish(room) {
 // ============================================================
 //  Tirage
 // ============================================================
-async function drawRounds(count) {
+// `ownerIds` : les joueurs dont la librairie personnelle entre dans le tirage.
+// Vide (le défaut) = sons officiels seulement. La liste vient TOUJOURS des
+// joueurs présents au moment du lancement — c'est ce qui fait qu'on ne tombe
+// jamais sur le son d'un inconnu, cf. routes/perroquetSounds.js.
+async function drawRounds(count, ownerIds = []) {
+  const ids = ownerIds.map((id) => new mongoose.Types.ObjectId(String(id)));
   const rows = await SoundClip.aggregate([
-    { $match: { active: true } },
+    {
+      $match: {
+        active: true,
+        ...(ids.length ? { $or: [{ owner: null }, { owner: { $in: ids } }] } : { owner: null }),
+      },
+    },
     { $sample: { size: count * 3 } },
   ]);
   const seen = new Set();
@@ -376,6 +389,7 @@ async function drawRounds(count) {
       game: c.game || "",
       clipUrl: c.url,
       difficulty: c.difficulty,
+      addedBy: c.owner ? c.ownerName || "" : "",
     }));
 }
 
@@ -386,7 +400,10 @@ async function drawRounds(count) {
 // POST / — créer un salon
 router.post("/", async (req, res) => {
   try {
-    const active = await SoundClip.countDocuments({ active: true });
+    // Les sons officiels seulement : c'est le tirage par défaut d'un salon
+    // neuf. Compter aussi les librairies personnelles laisserait créer un salon
+    // qui n'a en réalité rien à jouer si l'hôte ne coche pas les sons perso.
+    const active = await SoundClip.countDocuments({ active: true, owner: null });
     if (active < 3)
       return res.status(503).json({
         error:
@@ -488,6 +505,70 @@ router.post("/:code/armed", async (req, res) => {
   }
 });
 
+// ============================================================
+//  POST /:code/options — les réglages de l'hôte (avant le départ)
+// ============================================================
+// Un seul réglage pour l'instant : les sons personnalisés. Il est diffusé à
+// tout le salon plutôt que gardé côté hôte, parce qu'il change ce que les
+// autres vont jouer — et parce que c'est LUI qui donne envie d'aller remplir sa
+// librairie avant que la partie ne parte.
+router.post("/:code/options", async (req, res) => {
+  try {
+    const out = await withRoom(req.params.code, async (room) => {
+      if (!room) return { status: 404, body: { error: "Salon introuvable." } };
+      if (!isHost(room, req.userId))
+        return { status: 403, body: { error: "Seul l'hôte change les réglages." } };
+      if (room.startedAt)
+        return { status: 409, body: { error: "La partie a déjà commencé." } };
+
+      if (typeof req.body?.customSounds === "boolean")
+        room.customSounds = req.body.customSounds;
+      touch(room);
+      await room.save();
+      await room.populate(POPULATE);
+      toEachRoom(room, "lobby");
+      return { status: 200, body: { room: serializeRoom(room, req.userId) } };
+    });
+    if (!out) return res.status(404).json({ error: "Salon introuvable." });
+    res.status(out.status).json(out.body);
+  } catch (err) {
+    console.error("pqversus options error:", err.message);
+    res.status(500).json({ error: "Réglage impossible." });
+  }
+});
+
+// ============================================================
+//  GET /:code/pool — ce que les joueurs présents apportent
+// ============================================================
+// Le décompte affiché sous l'interrupteur de l'hôte. Séparé de la
+// sérialisation du salon parce qu'il coûte une requête : la diffuser à chaque
+// évènement du salon (donc à chaque copie rendue) reviendrait à compter la
+// banque six fois par manche pour un chiffre qui n'intéresse que le lobby.
+router.get("/:code/pool", async (req, res) => {
+  try {
+    const room = await PerroquetVersus.findOne({ code: String(req.params.code) })
+      .select("players")
+      .lean();
+    if (!room) return res.status(404).json({ error: "Salon introuvable." });
+    const ids = (room.players || [])
+      .filter((p) => !p.leftAt)
+      .map((p) => new mongoose.Types.ObjectId(String(p.user)));
+
+    const rows = await SoundClip.aggregate([
+      { $match: { active: true, owner: { $in: ids } } },
+      { $group: { _id: "$ownerName", n: { $sum: 1 } } },
+      { $sort: { n: -1 } },
+    ]);
+    res.json({
+      custom: rows.reduce((s, r) => s + r.n, 0),
+      contributors: rows.map((r) => ({ name: r._id || "?", count: r.n })),
+    });
+  } catch (err) {
+    console.error("pqversus pool error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
 // POST /:code/start — l'hôte lance
 router.post("/:code/start", async (req, res) => {
   try {
@@ -500,7 +581,14 @@ router.post("/:code/start", async (req, res) => {
       if (activePlayers(room).length < 2)
         return { status: 409, body: { error: "Il faut être au moins deux." } };
 
-      const rounds = await drawRounds(room.roundCount);
+      // Les librairies des joueurs PRÉSENTS, et seulement si l'hôte a coché.
+      // La liste est figée ici, au lancement : quelqu'un qui rejoindrait après
+      // (reconnexion mise à part, impossible) n'ajouterait rien en cours de
+      // route, et les manches resteraient celles qu'on a annoncées au départ.
+      const rounds = await drawRounds(
+        room.roundCount,
+        room.customSounds ? activePlayers(room).map((p) => idOf(p.user)) : []
+      );
       if (rounds.length < 1)
         return { status: 503, body: { error: "Banque de sons vide." } };
 
