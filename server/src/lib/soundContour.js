@@ -206,6 +206,15 @@ function frameF0(buf, start) {
 //            plutôt que d'avoir bien imité.
 //   energy : enveloppe de volume ramenée à 0..1 par son propre pic. Même
 //            raison : on ne note pas qui crie le plus fort.
+//   voiced : 0..1 par point — « y avait-il vraiment une hauteur à cet
+//            instant ? ». C'EST LA PIÈCE QUI MANQUAIT, et son absence se voyait
+//            à l'écran : les trames muettes sont interpolées depuis leurs
+//            voisines (cf. fillGaps), donc la courbe continuait de monter et de
+//            descendre AU MILIEU DES SILENCES. Le tracé avait l'air inventé
+//            parce qu'il l'était : on dessinait de l'interpolation comme si
+//            c'était de la mesure. Le masque permet au graphique de rompre le
+//            trait là où il n'y a rien, et au barème de ne noter que les
+//            instants où il y avait quelque chose à imiter.
 export async function contourOf(file) {
   const pcm = await decodePcm(file);
   if (pcm.length < WIN * 2) throw new Error("son trop court");
@@ -236,11 +245,23 @@ export async function contourOf(file) {
   // interpole depuis leurs voisines au lieu de les mettre à zéro : un zéro
   // creuserait un canyon dans la mélodie et pèserait bien plus lourd dans la
   // comparaison que l'absence d'information qu'il représente.
+  //
+  // Le GATE s'applique ici AUSSI, pas seulement aux deux bouts : un blanc au
+  // milieu d'un « wa… hoo » n'a pas plus de hauteur qu'un blanc au début. Sans
+  // cette condition, l'autocorrélation d'un fond de souffle passait le seuil de
+  // clarté et plantait une note au milieu du silence.
+  const gateLevel = peak * GATE;
   const raw = new Array(len);
   for (let i = 0; i < len; i += 1) {
     const { f0: hz, clarity } = f0[from + i];
-    raw[i] = hz > 0 && clarity >= CLARITY_MIN ? 12 * Math.log2(hz / 55) : null;
+    const audible = rms[from + i] >= gateLevel;
+    raw[i] =
+      audible && hz > 0 && clarity >= CLARITY_MIN ? 12 * Math.log2(hz / 55) : null;
   }
+  // Le masque est relevé AVANT de combler les trous : après, l'information est
+  // perdue — c'est justement tout ce qui reste pour distinguer une hauteur
+  // mesurée d'une hauteur devinée.
+  const mask = raw.map((v) => (v === null ? 0 : 1));
   const voiced = raw.filter((v) => v !== null);
   const voicedRatio = voiced.length / len;
   fillGaps(raw);
@@ -265,6 +286,10 @@ export async function contourOf(file) {
   return {
     pitch: pitch.map(r3),
     energy: energy.map(r3),
+    // Ré-échantillonné comme les autres : les valeurs intermédiaires (0,4 à la
+    // frontière d'un silence) sont un aveu d'incertitude utile, on ne les
+    // arrondit pas à 0/1.
+    voiced: resample(mask, POINTS).map(r3),
     durationMs: Math.round(len * (HOP / RATE) * 1000),
     voicedRatio: r3(voicedRatio),
   };
@@ -342,6 +367,62 @@ function dtw(a, b) {
   return prev[n] / n;
 }
 
+// ---------------------------------------------------------- DTW PONDÉRÉ
+// Le même alignement, mais chaque appariement pèse ce que valait l'instant de
+// la CIBLE : fort et voisé = plein poids, muet = poids nul.
+//
+// C'EST LE CORRECTIF DE FOND DU BARÈME. Le DTW nu comparait les 64 points à
+// égalité, or après fillGaps la moitié d'entre eux peut être de
+// l'interpolation dans du silence. Deux essais qui s'entendent pareil
+// obtenaient des notes éloignées parce que le hasard de ce remplissage pesait
+// autant que la mélodie — d'où des scores qui avaient l'air tirés au sort. On
+// ne note désormais que les instants où il y avait une hauteur à imiter.
+//
+// Le poids est celui de la cible SEULE, jamais de la tentative : sinon se
+// taire pendant le cri (poids nul des deux côtés) sortirait gratuit.
+function dtwWeighted(a, b, w) {
+  const n = a.length;
+  const INF = Infinity;
+  let prevC = new Float64Array(n + 1).fill(INF);
+  let curC = new Float64Array(n + 1).fill(INF);
+  let prevW = new Float64Array(n + 1);
+  let curW = new Float64Array(n + 1);
+  prevC[0] = 0;
+  for (let i = 1; i <= n; i += 1) {
+    curC.fill(INF);
+    curW.fill(0);
+    const lo = Math.max(1, i - BAND);
+    const hi = Math.min(n, i + BAND);
+    for (let j = lo; j <= hi; j += 1) {
+      const wj = w[j - 1];
+      const cost = Math.abs(a[i - 1] - b[j - 1]) * wj;
+      // Le poids accumulé doit suivre LE MÊME chemin que le coût : diviser à la
+      // fin par la somme de tous les poids donnerait un résultat qui dépend du
+      // chemin qu'on n'a pas pris.
+      let bestC = prevC[j];
+      let bestW = prevW[j];
+      if (curC[j - 1] < bestC) {
+        bestC = curC[j - 1];
+        bestW = curW[j - 1];
+      }
+      if (prevC[j - 1] < bestC) {
+        bestC = prevC[j - 1];
+        bestW = prevW[j - 1];
+      }
+      if (bestC === INF) continue;
+      curC[j] = cost + bestC;
+      curW[j] = wj + bestW;
+    }
+    [prevC, curC] = [curC, prevC];
+    [prevW, curW] = [curW, prevW];
+  }
+  // Cible entièrement muette (ça ne devrait pas arriver : l'admin refuse les
+  // sons non mélodiques) : on retombe sur la comparaison à égalité plutôt que
+  // de diviser par zéro et de distribuer des « Parfait ».
+  if (!(prevW[n] > 1e-6)) return dtw(a, b);
+  return prevC[n] / prevW[n];
+}
+
 // Une distance (en demi-tons, ou en unités d'enveloppe) devient une note 0..1.
 // Courbe douce plutôt que seuil : `tol` est l'écart qui vaut encore 0,5.
 const soften = (dist, tol) => 1 / (1 + (dist / tol) ** 2);
@@ -357,6 +438,21 @@ const W_PITCH = 0.5;
 const W_ENERGY = 0.28;
 const W_DUR = 0.22;
 
+// Le poids d'un instant de la cible : voisé ET audible. Le plancher à 0,2 sur
+// l'énergie évite qu'une fin de cri qui s'éteint ne compte pour rien — elle est
+// faible, pas absente.
+function weightsOf(target) {
+  const n = target.pitch.length;
+  const energy = target.energy || [];
+  const voiced = target.voiced || null;
+  const w = new Float64Array(n);
+  for (let i = 0; i < n; i += 1) {
+    const e = 0.2 + 0.8 * Math.min(1, Math.max(0, energy[i] ?? 1));
+    w[i] = voiced ? e * Math.min(1, Math.max(0, voiced[i])) : e;
+  }
+  return w;
+}
+
 /**
  * Note une imitation contre un son de référence.
  * Rend { score (0..100), pitch, energy, duration (0..100 chacun), band }.
@@ -366,7 +462,13 @@ export function compare(target, attempt) {
 
   // Deux demi-tons d'écart moyen = 0,5. C'est calibré à l'oreille : à un
   // demi-ton près on entend « c'est ça », à quatre on entend une autre mélodie.
-  const pitchDist = dtw(attempt.pitch, target.pitch);
+  //
+  // Le poids par instant : ce que la cible avait à faire entendre. Les contours
+  // enregistrés avant l'ajout de `voiced` (banque existante) n'en ont pas — on
+  // se rabat alors sur la seule enveloppe, ce qui reste meilleur que l'égalité
+  // parfaite d'avant. `npm run` du recalcul de l'admin les remet à niveau.
+  const w = weightsOf(target);
+  const pitchDist = dtwWeighted(attempt.pitch, target.pitch, w);
   let pitch = soften(pitchDist, 2.0);
 
   // Une tentative sans aucune hauteur franche (on a soufflé dans le micro) ne

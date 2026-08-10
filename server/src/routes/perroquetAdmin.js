@@ -7,6 +7,8 @@ import multer from "multer";
 import ffmpegStatic from "ffmpeg-static";
 import SoundClip from "../models/SoundClip.js";
 import PerroquetGame from "../models/PerroquetGame.js";
+import PerroquetTake from "../models/PerroquetTake.js";
+import User from "../models/User.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { contourOf } from "../lib/soundContour.js";
 
@@ -100,6 +102,26 @@ const upload = multer({
   { name: "clip", maxCount: 1 },
   { name: "image", maxCount: 1 },
 ]);
+
+// L'édition d'une fiche ne remplace que L'IMAGE, jamais l'audio (cf. le PATCH
+// plus bas). D'où un middleware séparé plutôt que le `upload` ci-dessus : il
+// n'accepte qu'un champ, donc un `clip` glissé dans le formulaire d'édition est
+// refusé au lieu d'être écrit sur le disque puis oublié.
+//
+// Il traverse sans rien faire les requêtes JSON (multer ne regarde que le
+// multipart) : l'interrupteur « éteindre / rallumer » continue d'envoyer du JSON.
+const editUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, IMG_DIR),
+    filename: (req, file, cb) => {
+      const base = String(file.mimetype).split(";")[0];
+      cb(null, `i-${Date.now()}-${Math.round(Math.random() * 1e6)}${IMG_EXT[base] || ".png"}`);
+    },
+  }),
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: (req, file, cb) =>
+    cb(null, Object.hasOwn(IMG_EXT, String(file.mimetype).split(";")[0])),
+}).single("image");
 
 const abs = (req, u) =>
   !u ? null : /^https?:/i.test(u) ? u : `${req.protocol}://${req.get("host")}${u}`;
@@ -435,31 +457,220 @@ router.delete("/demo", async (req, res) => {
   }
 });
 
+// ======================================================================
+//  Les essais des joueurs
+// ======================================================================
+// ⚠️ Comme `/demo`, ces routes PASSENT AVANT `/:id` : « attempts » se ferait
+// happer comme un identifiant de son sinon.
+//
+// CE QU'ON REGARDE ICI n'a rien à voir avec la banque : ce sont les
+// ENREGISTREMENTS DES JOUEURS, un par manche jouée, archivés dans
+// models/PerroquetTake.js au moment où l'imitation est notée. Deux usages, et
+// c'est le second qui a motivé la collection :
+//
+//   1. tout de suite — écouter, télécharger, effacer. Un joueur qui a crié
+//      autre chose que le son laisse un fichier sur le disque, et il faut
+//      pouvoir le retirer sans aller chercher dans quelle partie il était ;
+//   2. plus tard — le wrapped annuel. « Ton meilleur cri de l'année » suppose
+//      qu'on ait gardé les cris, et qu'ils soient interrogeables par joueur et
+//      par date, ce que des tableaux imbriqués dans des parties ne sont pas.
+const takeOf = (req, t) => ({
+  id: String(t._id),
+  mode: t.mode,
+  url: abs(req, t.url),
+  label: t.label || "un son",
+  // Le son d'origine, pour pouvoir comparer d'une écoute à l'autre : sans lui on
+  // entend un cri sans savoir ce qu'il visait.
+  clipUrl: abs(req, t.clipUrl),
+  image: abs(req, t.imageUrl) || "",
+  score: t.score || 0,
+  band: t.band || "miss",
+  at: t.createdAt,
+});
+
+// ------------------------------------------------------------
+//  GET /api/admin/perroquet/attempts — un joueur par ligne
+// ------------------------------------------------------------
+// Groupé côté base : rendre les essais à plat, c'est des milliers de lignes dont
+// on ne veut voir qu'une poignée. On déplie joueur par joueur, à la demande.
+router.get("/attempts", async (req, res) => {
+  try {
+    const rows = await PerroquetTake.aggregate([
+      {
+        $group: {
+          _id: "$user",
+          takes: { $sum: 1 },
+          best: { $max: "$score" },
+          avg: { $avg: "$score" },
+          last: { $max: "$createdAt" },
+        },
+      },
+      { $sort: { last: -1 } },
+      { $limit: 300 },
+    ]);
+
+    const users = await User.find({ _id: { $in: rows.map((r) => r._id) } })
+      .select("username avatar")
+      .lean();
+    const byId = new Map(users.map((u) => [String(u._id), u]));
+
+    res.json({
+      // Un compte supprimé garde ses lignes : ses fichiers sont toujours sur le
+      // disque, donc il faut pouvoir les retrouver pour les effacer. Le masquer
+      // ferait exactement l'inverse de ce que cet écran sert à faire.
+      users: rows.map((r) => {
+        const u = byId.get(String(r._id));
+        return {
+          id: String(r._id),
+          username: u?.username || "compte supprimé",
+          avatar: abs(req, u?.avatar) || null,
+          gone: !u,
+          takes: r.takes,
+          best: r.best || 0,
+          avg: Math.round(r.avg || 0),
+          last: r.last,
+        };
+      }),
+      total: await PerroquetTake.estimatedDocumentCount(),
+    });
+  } catch (err) {
+    console.error("perroquet attempts list error:", err.message);
+    res.status(500).json({ error: "Essais illisibles." });
+  }
+});
+
+// ------------------------------------------------------------
+//  GET /api/admin/perroquet/attempts/:userId — les essais d'un joueur
+// ------------------------------------------------------------
+router.get("/attempts/:userId", async (req, res) => {
+  try {
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 60));
+    const rows = await PerroquetTake.find({ user: req.params.userId })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+    res.json({ items: rows.map((t) => takeOf(req, t)), limit });
+  } catch (err) {
+    console.error("perroquet attempts read error:", err.message);
+    res.status(500).json({ error: "Essais illisibles." });
+  }
+});
+
+// ------------------------------------------------------------
+//  DELETE /api/admin/perroquet/attempts/:id — effacer un essai
+// ------------------------------------------------------------
+// Suppression réelle, fichier compris. Contrairement à un son de la banque, il
+// n'y a rien à préserver : personne ne rejoue l'imitation d'un inconnu depuis un
+// classement.
+//
+// EN SOLO IL Y A UNE SECONDE RÉFÉRENCE. La manche de la partie pointe sur le
+// même fichier (models/PerroquetGame.js) et son récap le rejoue : effacer le
+// fichier sans couper cette référence donnerait un lecteur muet dans
+// l'historique du joueur. On la met donc à `null`, ce qui est exactement l'état
+// « manche passée » que le récap sait déjà afficher.
+async function dropTake(t) {
+  const f = fileOf({ url: t.url });
+  if (f) await fs.promises.unlink(f).catch(() => {});
+  if (t.game && t.roundIndex != null) {
+    await PerroquetGame.updateOne(
+      { _id: t.game },
+      { $set: { [`rounds.${t.roundIndex}.attemptUrl`]: null } }
+    ).catch(() => {});
+  }
+}
+
+router.delete("/attempts/user/:userId", async (req, res) => {
+  try {
+    const rows = await PerroquetTake.find({ user: req.params.userId }).lean();
+    for (const t of rows) {
+      // eslint-disable-next-line no-await-in-loop
+      await dropTake(t);
+    }
+    const r = await PerroquetTake.deleteMany({ user: req.params.userId });
+    res.json({ removed: r.deletedCount });
+  } catch (err) {
+    console.error("perroquet attempts purge error:", err.message);
+    res.status(500).json({ error: "Suppression impossible." });
+  }
+});
+
+router.delete("/attempts/:id", async (req, res) => {
+  try {
+    const t = await PerroquetTake.findById(req.params.id).lean();
+    if (!t) return res.status(404).json({ error: "Essai introuvable." });
+    await dropTake(t);
+    await PerroquetTake.deleteOne({ _id: t._id });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("perroquet attempt delete error:", err.message);
+    res.status(500).json({ error: "Suppression impossible." });
+  }
+});
+
 // ============================================================
 //  PATCH /api/admin/perroquet/:id — corriger une fiche
 // ============================================================
-// Le fichier ne se remplace pas : on change le nom, le jeu, la difficulté, ou
-// on éteint. Pour un autre son, on en ajoute un et on retire l'ancien — sinon
-// il faudrait recalculer le contour et les statistiques de terrain accumulées
-// ne voudraient plus rien dire.
-router.patch("/:id", async (req, res) => {
+// L'AUDIO NE SE REMPLACE PAS : on change le nom, le jeu, la difficulté,
+// l'image, ou on éteint. Pour un autre son, on en ajoute un et on retire
+// l'ancien — sinon il faudrait recalculer le contour, et les statistiques de
+// terrain accumulées (« jouée 40×, moyenne 62 ») porteraient sur un son qui
+// n'est plus celui qu'on écoute.
+//
+// L'image, elle, se change : c'est de l'habillage montré à la révélation, elle
+// n'entre dans aucun calcul. Sans ça un son ajouté sans illustration restait nu
+// à vie, et la seule façon de lui en donner une était de le supprimer pour le
+// redéposer — c'est-à-dire de perdre ses statistiques.
+//
+// Deux formats d'entrée, et c'est voulu : du JSON pour l'interrupteur
+// éteindre/rallumer (une ligne de la liste), du multipart quand un fichier
+// accompagne la correction. `editUpload` laisse passer le premier sans y toucher.
+router.patch("/:id", editUpload, async (req, res) => {
+  // Le fichier est déjà sur le disque quand on arrive ici : tout retour en
+  // erreur doit le balayer, sinon IMG_DIR accumule les images d'éditions
+  // abandonnées que plus rien ne référence.
+  const cleanup = () => {
+    if (req.file) fs.promises.unlink(req.file.path).catch(() => {});
+  };
   try {
-    const set = {};
+    const clip = await SoundClip.findById(req.params.id);
+    if (!clip) {
+      cleanup();
+      return res.status(404).json({ error: "Son introuvable." });
+    }
+
     if (typeof req.body?.label === "string") {
       const v = req.body.label.trim();
-      if (!v) return res.status(400).json({ error: "Le nom ne peut pas être vide." });
-      set.label = v;
+      if (!v) {
+        cleanup();
+        return res.status(400).json({ error: "Le nom ne peut pas être vide." });
+      }
+      clip.label = v;
     }
-    if (typeof req.body?.game === "string") set.game = req.body.game.trim();
+    if (typeof req.body?.game === "string") clip.game = req.body.game.trim();
     if (req.body?.difficulty != null)
-      set.difficulty = Math.max(1, Math.min(5, Number(req.body.difficulty) || 2));
-    if (typeof req.body?.active === "boolean") set.active = req.body.active;
-    if (req.body?.gameId !== undefined) set.gameId = Number(req.body.gameId) || null;
+      clip.difficulty = Math.max(1, Math.min(5, Number(req.body.difficulty) || 2));
+    // En multipart tout arrive en texte : « false » est une chaîne, et une
+    // chaîne non vide est vraie. D'où les deux lectures.
+    if (typeof req.body?.active === "boolean") clip.active = req.body.active;
+    else if (req.body?.active === "true" || req.body?.active === "false")
+      clip.active = req.body.active === "true";
+    if (req.body?.gameId !== undefined) clip.gameId = Number(req.body.gameId) || null;
 
-    const clip = await SoundClip.findByIdAndUpdate(req.params.id, set, { new: true });
-    if (!clip) return res.status(404).json({ error: "Son introuvable." });
+    // ---------- l'image ----------
+    // Nouvelle image ou retrait : dans les deux cas l'ancienne quitte le disque.
+    // Elle n'est partagée avec rien — un clip a la sienne — donc la garder ne
+    // ferait qu'engraisser `uploads/` de fichiers que rien ne sert plus.
+    const wantsRemove = req.body?.removeImage === "1" || req.body?.removeImage === true;
+    if (req.file || wantsRemove) {
+      const old = clip.image ? fileOf({ url: clip.image }) : null;
+      clip.image = req.file ? `/uploads/perroquet/img/${req.file.filename}` : "";
+      if (old) fs.promises.unlink(old).catch(() => {});
+    }
+
+    await clip.save();
     res.json({ item: serialize(req, clip) });
   } catch (err) {
+    cleanup();
     console.error("perroquet admin patch error:", err.message);
     res.status(500).json({ error: "Modification impossible." });
   }

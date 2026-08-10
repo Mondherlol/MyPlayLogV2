@@ -142,10 +142,14 @@ export default function BlindTestVersus() {
   const mutedRef = useRef(false); // miroir de la sourdine (cf. le départ du son)
   const volumeRef = useRef(volume); // idem pour le volume
   const unlockedRef = useRef(false); // déverrouillage iOS déjà fait
-  const retriedRef = useRef(null); // extrait déjà relancé par le chien de garde
+  const retriedRef = useRef(null); // extrait déjà rechargé par le chien de garde
   const clipStartRef = useRef(0); // où l'extrait commence dans le morceau (s)
   const roundRef = useRef(null); // la manche courante, lue par les écouteurs audio
   const metaForRef = useRef(null); // clip dont la durée est connue
+  // « La manche est en cours, le son DOIT jouer. » C'est ce drapeau, et non un
+  // état React, que consultent les écouteurs audio : les métadonnées peuvent
+  // arriver AVANT comme APRÈS le « go », et dans les deux cas il faut partir.
+  const wantAudioRef = useRef(false);
   // Miroirs lus par le départ du son, qui ne doit dépendre QUE de l'extrait
   // (voir le commentaire de l'effet de téléchargement).
   const phaseStartRef = useRef(0);
@@ -333,10 +337,65 @@ export default function BlindTestVersus() {
     setClipError(false);
     setSoundBlocked(false);
     metaForRef.current = null;
+    retriedRef.current = null;
+    clipStartRef.current = 0;
     el.src = `${API_BASE}${round.clip}?token=${encodeURIComponent(token)}`;
     el.load();
     return undefined;
   }, [audioEl, round?.clip, token]);
+
+  // ---------- Le départ du son, en un seul endroit ----------
+  // C'EST LA MÉCANIQUE DU SOLO, transposée. En solo, `play()` n'est PAS appelé
+  // par un effet de rendu : il est appelé par l'écouteur `loadedmetadata`, à
+  // l'instant exact où le morceau devient jouable. Ici le « go » vient du
+  // serveur, donc les deux moments (« c'est l'heure » et « le son est prêt »)
+  // sont indépendants et peuvent arriver dans n'importe quel ordre. La fonction
+  // ci-dessous est appelée par les DEUX, et par le chien de garde : le premier
+  // qui trouve la situation jouable lance, les autres ne font rien de mal.
+  //
+  // Deux pièges d'une version précédente, qui rendaient la manche muette sans
+  // le moindre message :
+  //   - le placement de l'aiguille et `play()` étaient dans le MÊME `try`. Tant
+  //     que la durée n'est pas connue, écrire `currentTime` peut lever — et on
+  //     partait dans le `catch` SANS avoir joué. Or c'est exactement le cas où
+  //     il faut jouer quand même, quitte à démarrer au début du morceau.
+  //   - le chien de garde renonçait sur `el.paused`, en croyant que ça voulait
+  //     dire « ça tourne ». C'est le contraire : en pause = rien ne sort. Il
+  //     abandonnait donc précisément dans le cas qu'il devait rattraper.
+  const rollClip = useCallback(() => {
+    const el = audioRef.current;
+    const r = roundRef.current;
+    if (!el || !r || !wantAudioRef.current || !el.src) return;
+
+    const clipLen = r.durationSec || 15;
+    // Retard éventuel (flux plus lent que le sas) : on prend l'extrait où il en
+    // serait, pas au début — les autres ont déjà entendu ces secondes-là.
+    const late = Math.max(0, (serverNowRef.current() - phaseStartRef.current) / 1000);
+    if (late >= clipLen) return; // extrait déjà fini : place au temps bonus
+
+    // L'aiguille D'ABORD, et surtout à part : son échec ne doit jamais empêcher
+    // la lecture. Sans métadonnées on ne sait pas où est le climax — on joue
+    // depuis le début plutôt que de se taire.
+    if (metaForRef.current === r.clip) {
+      const target = (clipStartRef.current || 0) + late;
+      try {
+        if (Math.abs((el.currentTime || 0) - target) > 0.35) el.currentTime = target;
+      } catch {
+        /* durée pas encore connue : tant pis pour le climax */
+      }
+    }
+
+    el.muted = mutedRef.current;
+    el.volume = volumeRef.current / 100;
+    try {
+      const p = el.play();
+      // Un refus de lecture n'est PAS avalé en silence : il allume le bouton
+      // « appuie pour lancer le son » (un vrai geste débloque toujours).
+      if (p?.then) p.then(() => setSoundBlocked(false), () => setSoundBlocked(true));
+    } catch {
+      setSoundBlocked(true);
+    }
+  }, []);
 
   // Le tampon se remplit AU CLIMAX, pas au début du morceau : dès que la durée
   // est connue, on pose l'aiguille là où l'extrait commencera. Au « go », il ne
@@ -367,9 +426,13 @@ export default function BlindTestVersus() {
       } catch {
         /* ignore */
       }
+      // Le « go » est peut-être déjà passé pendant le chargement : c'est ICI
+      // qu'on rattrape, comme le solo lance sa manche depuis cet écouteur.
+      rollClip();
     };
     const onCanPlay = () => {
       if (metaForRef.current === roundRef.current?.clip) setClipReady(true);
+      rollClip();
     };
     const onError = () => {
       setClipReady(false);
@@ -378,13 +441,15 @@ export default function BlindTestVersus() {
 
     el.addEventListener("loadedmetadata", onMeta);
     el.addEventListener("canplay", onCanPlay);
+    el.addEventListener("canplaythrough", onCanPlay);
     el.addEventListener("error", onError);
     return () => {
       el.removeEventListener("loadedmetadata", onMeta);
       el.removeEventListener("canplay", onCanPlay);
+      el.removeEventListener("canplaythrough", onCanPlay);
       el.removeEventListener("error", onError);
     };
-  }, [audioEl]);
+  }, [audioEl, rollClip]);
 
   // Départ du son, à l'instant décidé par le serveur. Le son s'arrête à la fin
   // de l'extrait — le temps bonus se joue en silence, comme en solo.
@@ -412,31 +477,21 @@ export default function BlindTestVersus() {
   // son propre effet, plus bas, et se lit ici par une ref.
   useEffect(() => {
     const el = audioRef.current;
-    if (!el || phase !== "round" || !round) return undefined;
+    if (!el || phase !== "round" || !round) {
+      wantAudioRef.current = false;
+      return undefined;
+    }
 
     const clip = round.durationSec || 15;
-    // Retard éventuel (flux plus lent que le sas) : on prend l'extrait où il en
-    // serait, pas au début — les autres ont déjà entendu ces secondes-là.
     const late = Math.max(0, (serverNowRef.current() - phaseStartRef.current) / 1000);
     if (late >= clip) return undefined; // extrait déjà fini : place au temps bonus
 
-    const target = clipStartRef.current + late;
-    try {
-      if (Math.abs((el.currentTime || 0) - target) > 0.35) el.currentTime = target;
-      el.muted = mutedRef.current;
-      el.volume = volumeRef.current / 100;
-      // Un refus de lecture n'est PAS avalé en silence : il allume le bouton
-      // « appuie pour lancer le son » (un vrai geste débloque toujours).
-      el.play().then(
-        () => setSoundBlocked(false),
-        () => setSoundBlocked(true)
-      );
-    } catch {
-      setSoundBlocked(true);
-    }
+    wantAudioRef.current = true;
+    rollClip();
 
     const stop = setTimeout(
       () => {
+        wantAudioRef.current = false;
         try {
           el.pause();
         } catch {
@@ -449,28 +504,40 @@ export default function BlindTestVersus() {
     // Le chien de garde, équivalent du minuteur de bascule du solo.
     //
     // `play()` peut « réussir » sur un élément qui n'avance pas d'un pouce :
-    // tampon vide, flux qui ne vient pas, source jamais vraiment ouverte. On
-    // vérifie donc que la tête de lecture a BOUGÉ. Sinon on recharge la source
-    // une fois et on relance — c'est ce qui rattrapait le solo, et c'est ce qui
-    // manquait ici.
-    const mark = el.currentTime;
-    const watchdog = setTimeout(() => {
-      if (el.paused || Math.abs(el.currentTime - mark) > 0.25) return; // ça tourne
-      if (retriedRef.current === round.clip) return; // une seule reprise
-      retriedRef.current = round.clip;
-      try {
-        el.load();
-        el.play().catch(() => setSoundBlocked(true));
-      } catch {
-        setClipError(true);
+    // tampon vide, flux qui ne vient pas, métadonnées qui ne viendront jamais.
+    // On regarde donc la seule chose qui compte — LA TÊTE DE LECTURE A-T-ELLE
+    // BOUGÉ — et on relance tant que non. La reprise est répétée (le flux met
+    // parfois quelques secondes à s'ouvrir) ; le rechargement complet de la
+    // source, lui, n'a lieu qu'une fois, à la troisième vérification sèche.
+    let idle = 0;
+    let mark = -1;
+    const watchdog = setInterval(() => {
+      if (!wantAudioRef.current) return;
+      const at = el.currentTime;
+      if (!el.paused && Math.abs(at - mark) > 0.05) {
+        mark = at; // ça tourne : rien à faire
+        idle = 0;
+        return;
       }
-    }, WATCHDOG_MS);
+      mark = at;
+      idle += 1;
+      if (idle === 3 && retriedRef.current !== round.clip) {
+        // Source qui n'a jamais vraiment ouvert : on la recharge, une fois.
+        retriedRef.current = round.clip;
+        try {
+          el.load();
+        } catch {
+          setClipError(true);
+        }
+      }
+      rollClip();
+    }, WATCHDOG_MS / 3);
 
     return () => {
       clearTimeout(stop);
-      clearTimeout(watchdog);
+      clearInterval(watchdog);
     };
-  }, [phase, clipReady, round?.index, round?.clip]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [phase, round?.index, round?.clip, rollClip]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Le son se coupe dès qu'on quitte la manche (révélation, sortie de page) ;
   // et à l'inverse, un morceau lancé « en entier » depuis la révélation se tait
@@ -562,23 +629,12 @@ export default function BlindTestVersus() {
   // refuser. On reprend l'extrait LÀ OÙ IL EN SERAIT (pas au début) — sinon on
   // rejouerait quinze secondes déjà passées pour les autres.
   const fixSound = useCallback(() => {
-    const el = audioRef.current;
-    if (!el || !round) return;
-    const clip = round.durationSec || 15;
+    const clip = roundRef.current?.durationSec || 15;
     const elapsed = Math.max(0, (serverNow() - (room?.phaseStartsAt || 0)) / 1000);
     if (elapsed >= clip) return setSoundBlocked(false); // trop tard, extrait fini
-    try {
-      el.currentTime = (clipStartRef.current || 0) + elapsed;
-      el.muted = mutedRef.current;
-      el.volume = volumeRef.current / 100;
-      el.play().then(
-        () => setSoundBlocked(false),
-        () => {}
-      );
-    } catch {
-      /* ignore */
-    }
-  }, [round, room?.phaseStartsAt, serverNow]);
+    wantAudioRef.current = true;
+    rollClip();
+  }, [room?.phaseStartsAt, serverNow, rollClip]);
 
   // ---------- Actions ----------
   const post = (path, body) =>

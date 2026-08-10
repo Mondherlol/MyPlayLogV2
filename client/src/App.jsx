@@ -16,6 +16,8 @@ import Quizz from "./pages/Quizz";
 import Perroquet from "./pages/Perroquet";
 import PerroquetVersus from "./pages/PerroquetVersus";
 import QuizzVersus from "./pages/QuizzVersus";
+import Imposteur from "./pages/Imposteur";
+import ImposteurRoom from "./pages/ImposteurRoom";
 import MotDuJour from "./pages/MotDuJour";
 import Arcade from "./pages/Arcade";
 import Playtopia from "./pages/Playtopia";
@@ -171,6 +173,12 @@ export default function App() {
         <Route path="/perroquet" element={<Perroquet />} />
         {/* Le salon à plusieurs : adresse des liens d'invitation. */}
         <Route path="/perroquet/versus/:code" element={<PerroquetVersus />} />
+        {/* L'Imposteur n'a pas de mode solo : « /imposteur » est un hall, et
+            le salon EST le jeu. D'où l'absence de segment « /versus » — mais
+            le hall doit rester déclaré AVANT, sinon « /imposteur » serait lu
+            comme un code de salon vide. */}
+        <Route path="/imposteur" element={<Imposteur />} />
+        <Route path="/imposteur/:code" element={<ImposteurRoom />} />
         <Route path="/mot" element={<MotDuJour />} />
         <Route path="/playtopia" element={<Playtopia />} />
         <Route path="/explore" element={<Explorer />} />

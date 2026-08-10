@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Activity,
+  ArrowLeft,
   ArrowRight,
   Coins,
   Loader2,
@@ -296,11 +297,13 @@ export default function Perroquet() {
       <PerroquetDecor />
 
       <header className="pq-top">
-        {/* Plus de bouton « Arcade » ici : la barre latérale y ramène déjà, et
-            il alourdissait le coin haut-gauche. Un espace muet tient la balance
-            à gauche du titre, en miroir du compteur. Le retour vers le solo, lui,
-            n'a de sens que depuis le versus — il y est. */}
-        <span className="pq-progress ghost" aria-hidden="true" />
+        {/* Le retour à l'arcade. Il avait été retiré au motif que la barre
+            latérale y ramène déjà — sauf qu'elle ramène à l'accueil, pas à la
+            salle de jeux d'où l'on vient, et sur téléphone elle est repliée.
+            Un mini-jeu doit avoir sa porte de sortie visible. */}
+        <Link to="/arcade" className="pq-back clickable">
+          <ArrowLeft size={17} /> <span>Arcade</span>
+        </Link>
         <span className="pq-title">
           <Mic size={15} /> Le Perroquet
         </span>
@@ -538,14 +541,32 @@ function RoundResult({ result, onNext, last, busy, user }) {
           <ContourChart
             target={result.clip.contour.pitch}
             attempt={result.contour.pitch}
+            targetEnergy={result.clip.contour.energy}
+            targetVoiced={result.clip.contour.voiced}
+            attemptVoiced={result.contour.voiced}
             band={result.band}
             progress={current ? progress : null}
             progressOn={current === "target" ? "target" : "attempt"}
           />
           <div className="pq-detail">
-            <Bar Icon={Music} label="Mélodie" value={result.pitch} />
-            <Bar Icon={Activity} label="Rythme" value={result.energy} />
-            <Bar Icon={Timer} label="Durée" value={result.duration} />
+            <Bar
+              Icon={Music}
+              label="Mélodie"
+              hint="la courbe des notes"
+              value={result.pitch}
+            />
+            <Bar
+              Icon={Activity}
+              label="Rythme"
+              hint="les attaques et les silences"
+              value={result.energy}
+            />
+            <Bar
+              Icon={Timer}
+              label="Durée"
+              hint="la longueur du cri"
+              value={result.duration}
+            />
           </div>
         </>
       )}
@@ -600,17 +621,32 @@ function useCountUp(target, ms) {
   return v;
 }
 
-function Bar({ Icon, label, value }) {
+// Les trois critères du barème, un par ligne.
+//
+// Trois colonnes serrées avec une icône collée au libellé et un nombre nu à côté
+// donnaient un bloc illisible — on ne savait même pas si « 62 » était une note
+// sur 100, un rang ou des points. Une ligne par critère laisse la place de dire
+// CE QU'ON MESURE, et le nombre porte son unité : c'est un pourcentage de
+// ressemblance, autant l'écrire.
+function Bar({ Icon, label, hint, value }) {
+  const v = Math.max(0, Math.min(100, Math.round(value || 0)));
   return (
-    <span className="pq-bar">
-      <em>
-        <Icon size={12} /> {label}
-      </em>
-      <i>
-        <b style={{ width: `${Math.max(2, value)}%` }} />
-      </i>
-      <span>{value}</span>
-    </span>
+    <div className="pq-bar" style={{ "--v": `${v}%` }}>
+      <span className="pq-bar-ico" aria-hidden="true">
+        <Icon size={15} />
+      </span>
+      <span className="pq-bar-txt">
+        <b>{label}</b>
+        <em>{hint}</em>
+      </span>
+      <span className="pq-bar-val">
+        {v}
+        <i>%</i>
+      </span>
+      <span className="pq-bar-track" aria-hidden="true">
+        <i />
+      </span>
+    </div>
   );
 }
 

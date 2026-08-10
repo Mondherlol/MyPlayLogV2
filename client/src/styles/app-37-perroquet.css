@@ -579,44 +579,100 @@
 }
 
 /* ---------- Les trois composantes ---------- */
+/* ======================================================================
+   Le détail du score : mélodie / rythme / durée
+   ======================================================================
+   Une LIGNE par critère, pas une colonne : il faut la place d'écrire ce que le
+   critère mesure, sans quoi le nombre est une énigme (« 62 » sur quoi ?). Le
+   nombre est donc un pourcentage assumé, l'icône vit dans sa pastille, et la
+   jauge court sous la ligne entière au lieu d'être coincée entre deux mots. */
 .pq-detail {
   width: 100%;
   display: flex;
-  gap: 14px;
-}
-.pq-bar {
-  flex: 1;
-  display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 0.72rem;
+  padding: 6px 4px 2px;
+}
+.pq-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 2px 10px;
+  padding: 7px 4px 9px;
+}
+/* Un filet entre les lignes plutôt que trois cartes : le détail est une
+   annexe du score, il ne doit pas peser autant que lui. */
+.pq-bar + .pq-bar { border-top: 1px solid var(--pq-line); }
+
+.pq-bar-ico {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  color: var(--band, var(--orange));
+  background: color-mix(in srgb, var(--band, var(--orange)) 14%, transparent);
+}
+.pq-bar-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.pq-bar-txt b {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--pq-ink);
+  line-height: 1.1;
+}
+.pq-bar-txt em {
+  font-style: normal;
+  font-size: 0.68rem;
+  color: var(--pq-dim);
+  line-height: 1.2;
+}
+
+/* Le nombre : gros, tabulaire (sinon les trois lignes dansent d'un chiffre à
+   l'autre), et son « % » plus petit — c'est une unité, pas une donnée. */
+.pq-bar-val {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--pq-ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.pq-bar-val i {
+  font-style: normal;
+  font-size: 0.66rem;
+  font-weight: 700;
   color: var(--pq-dim);
 }
-.pq-bar em {
-  font-style: normal;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.pq-bar em svg { color: var(--band, var(--orange)); }
-.pq-bar i {
+
+/* La jauge sous toute la ligne. `--v` vient du composant. */
+.pq-bar-track {
+  grid-column: 1 / -1;
   display: block;
-  height: 6px;
+  height: 5px;
+  margin-top: 7px;
   border-radius: 999px;
   background: var(--pq-line-2);
   overflow: hidden;
 }
-.pq-bar i b {
+.pq-bar-track i {
   display: block;
+  width: var(--v, 0%);
+  min-width: 5px;
   height: 100%;
   border-radius: 999px;
-  background: var(--band, var(--orange));
-  transition: width 0.7s cubic-bezier(0.2, 0.9, 0.3, 1);
-}
-.pq-bar > span {
-  font-weight: 700;
-  color: var(--pq-ink);
-  font-variant-numeric: tabular-nums;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--band, var(--orange)) 55%, transparent),
+    var(--band, var(--orange))
+  );
+  transition: width 0.8s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 
 /* ---------- Les extraits à réécouter ---------- */
@@ -641,6 +697,29 @@
 }
 .pq-clip:hover { color: var(--pq-ink); }
 .pq-clip.k-attempt { color: var(--pq-warm-ink); }
+
+/* La photo de profil dans le bouton « Toi ». Sans taille imposée elle sortait à
+   sa dimension naturelle et faisait gonfler tout le bouton : c'est une pastille
+   de la hauteur du texte, rien de plus. */
+.pq-clip-av {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-left: -3px;
+}
+span.pq-clip-av.ph {
+  display: inline-grid;
+  place-items: center;
+  background: var(--pq-warm-soft);
+  color: var(--pq-warm-ink);
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.pq-recap-clips .pq-clip-av { width: 16px; height: 16px; }
+
 /* Celui qui joue en ce moment : le même repère que la ligne surlignée du
    classement, pour qu'on sache toujours ce qu'on entend. */
 .pq-clip.on {
@@ -707,10 +786,26 @@
   stroke-dasharray: none;
   stroke-width: 3;
 }
-.pq-curve-area {
-  fill: color-mix(in srgb, var(--pq-ink) 6%, transparent);
+/* L'enveloppe de volume de l'original, en fond. Elle situe le son dans le
+   temps : les creux sont les silences, et c'est exactement là que les traits de
+   hauteur se rompent. */
+.pq-curve-env {
+  fill: color-mix(in srgb, var(--pq-ink) 7%, transparent);
   stroke: none;
 }
+
+/* Le filet fantôme : les bouts de courbe que le serveur a INTERPOLÉS, faute de
+   hauteur mesurable (silence, souffle, consonne). Ils gardent la continuité du
+   geste sans se faire passer pour de la mesure — c'est tout le problème qu'ils
+   posaient quand ils étaient tracés comme le reste. */
+.pq-curve.ghost {
+  stroke-width: 1.2;
+  stroke-dasharray: 1.5 3.5;
+  opacity: 0.45;
+  filter: none;
+}
+.pq-curve.ghost.target { stroke: var(--pq-line-2); }
+.pq-curve.ghost.attempt { stroke: var(--band, var(--orange)); }
 .pq-curve-head {
   fill: var(--band, var(--orange));
   stroke: var(--pq-panel);
@@ -734,6 +829,12 @@
   background: var(--pq-line-2);
 }
 .pq-key.attempt::before { background: var(--band, var(--orange)); }
+.pq-key.mute { opacity: 0.75; }
+.pq-key.mute::before {
+  height: 0;
+  border-top: 2px dashed var(--pq-line-2);
+  background: none;
+}
 
 /* La vignette d'une ligne de classement : RIGOUREUSEMENT le même calcul
    d'échelle que le grand graphique — une vignette qui normaliserait autrement
@@ -1478,7 +1579,8 @@
 .pq-admin-img.has { border-style: solid; border-color: var(--orange); }
 .pq-lib-img img,
 .pq-admin-img img { width: 100%; height: 100%; object-fit: cover; }
-.pq-lib-img-x {
+.pq-lib-img-x,
+.pq-admin-img-x {
   display: grid;
   place-items: center;
   width: 22px;
@@ -1490,7 +1592,24 @@
   background: var(--pq-panel);
   color: var(--pq-dim);
 }
-.pq-lib-img-x:hover { color: var(--pq-b-miss); border-color: var(--pq-b-miss); }
+.pq-lib-img-x:hover,
+.pq-admin-img-x:hover { color: var(--pq-b-miss); border-color: var(--pq-b-miss); }
+
+/* Quand une image est déjà là, la vignette ne dit plus qu'elle est cliquable :
+   ce voile au survol le rappelle. Sans lui, on croit que l'image est figée et on
+   supprime le son pour le redéposer. */
+.pq-admin-img-hint {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, #000 55%, transparent);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.pq-admin-img:not(.has) .pq-admin-img-hint { display: none; }
+.pq-admin-img:hover .pq-admin-img-hint { opacity: 1; }
 .pq-lib-field {
   flex: 1;
   min-width: 0;
@@ -1734,7 +1853,225 @@
 
 /* ======================================================================
    L'onglet « Perroquet » du panneau d'admin
-   ====================================================================== */
+   ======================================================================
+   TOUT est scopé sous `.admin-perroquet`, y compris les classes génériques
+   (.admin-btn, .admin-seg, .admin-stat…). Elles sont employées un peu partout
+   dans le panneau d'admin sans avoir jamais reçu de style — c'est pour ça que
+   les boutons de cet onglet sortaient en boutons bruts du navigateur. Les
+   habiller globalement changerait l'allure de tous les autres onglets d'un coup,
+   ce qui n'est pas ce qu'on vient faire ; on les habille donc ici, comme
+   l'onglet Quiz le fait de son côté (app-36-quizz.css).
+
+   Les jetons `--pq-*` sont déclarés sur `.pq-page` : le panneau d'admin n'est
+   pas dans la page du jeu, il faut donc les reposer ici pour que les blocs
+   partagés (la carte d'identité d'un son, le rogneur) trouvent leurs couleurs. */
+.admin-perroquet {
+  --pq-ink: var(--text);
+  --pq-dim: var(--text-soft);
+  --pq-panel: var(--surface);
+  --pq-panel-2: var(--surface-2, var(--surface));
+  --pq-line: var(--border);
+  --pq-line-2: var(--border-strong);
+  --pq-warm: var(--orange);
+  --pq-warm-ink: var(--accent-ink);
+  --pq-warm-soft: color-mix(in srgb, var(--orange) 14%, transparent);
+}
+
+.admin-perroquet .admin-section-head h2 {
+  margin: 0 0 4px;
+  font-size: 1.15rem;
+}
+.admin-perroquet .admin-section-head p,
+.admin-perroquet .pq-admin-lead {
+  margin: 0 0 16px;
+  max-width: 72ch;
+  color: var(--pq-dim);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+.admin-perroquet .pq-admin-lead b { color: var(--pq-ink); }
+
+/* ---------- Les deux sous-onglets ----------
+   Des pastilles, pas un segmenté : on ne compare pas deux filtres d'une même
+   liste, on change de sujet. Le filtre de la banque juste en dessous est un
+   segmenté, lui — la différence de forme évite de lire les deux niveaux comme
+   un seul. */
+.admin-perroquet .pq-admin-subs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--pq-line);
+}
+.admin-perroquet .pq-admin-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border: 1px solid var(--pq-line-2);
+  border-radius: 999px;
+  background: var(--pq-panel);
+  color: var(--pq-dim);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.admin-perroquet .pq-admin-sub:hover {
+  border-color: var(--orange);
+  color: var(--pq-warm-ink);
+}
+.admin-perroquet .pq-admin-sub.on {
+  border-color: transparent;
+  background: var(--orange);
+  /* Sur l'aplat doré, une encre sombre : le blanc y tombe à un contraste de 1,8
+     et disparaît en thème clair comme en sombre. */
+  color: #241a02;
+}
+
+/* ---------- Les chiffres de tête ---------- */
+.admin-perroquet .admin-stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.admin-perroquet .admin-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--pq-line);
+  border-radius: 999px;
+  font-size: 0.82rem;
+  color: var(--pq-dim);
+}
+.admin-perroquet .admin-stat b { color: var(--pq-ink); }
+.admin-perroquet .admin-stat.warn {
+  border-color: var(--pq-b-meh);
+  background: color-mix(in srgb, var(--pq-b-meh) 10%, transparent);
+  color: var(--pq-b-meh);
+}
+.admin-perroquet .admin-stat.warn b { color: inherit; }
+
+/* ---------- Le filtre de la banque ---------- */
+.admin-perroquet .admin-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.admin-perroquet .admin-seg {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--pq-line);
+  border-radius: 11px;
+  background: var(--pq-panel-2);
+}
+.admin-perroquet .admin-seg-opt {
+  padding: 7px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--pq-dim);
+  font: inherit;
+  font-size: 0.83rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.admin-perroquet .admin-seg-opt:hover { color: var(--pq-ink); }
+.admin-perroquet .admin-seg-opt.on {
+  background: var(--orange);
+  color: #241a02;
+  font-weight: 700;
+}
+
+/* ---------- LE BOUTON ----------
+   Une pastille, comme partout dans le Perroquet (le rogneur, la librairie) : le
+   jeu n'a pas un seul angle droit, un bouton rectangulaire ici jurait. Trois
+   variantes et pas une de plus : neutre, la validation en doré plein, le
+   destructif en rouge au survol seulement — un rouge permanent sur chaque ligne
+   de la liste crie plus fort que le contenu. */
+.admin-perroquet .admin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 15px;
+  border: 1px solid var(--pq-line-2);
+  border-radius: 999px;
+  background: var(--pq-panel);
+  color: var(--pq-ink);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.admin-perroquet .admin-btn:hover:not(:disabled) {
+  border-color: var(--orange);
+  color: var(--pq-warm-ink);
+  background: var(--pq-warm-soft);
+}
+.admin-perroquet .admin-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.admin-perroquet .admin-btn.ok {
+  align-self: flex-start;
+  border-color: transparent;
+  background: var(--accent-grad, var(--orange));
+  background-color: var(--orange);
+  color: #241a02;
+  font-weight: 800;
+}
+.admin-perroquet .admin-btn.ok:hover:not(:disabled) {
+  border-color: transparent;
+  color: #241a02;
+  filter: brightness(1.06);
+}
+.admin-perroquet .admin-btn.danger:hover:not(:disabled) {
+  border-color: var(--pq-b-miss);
+  background: color-mix(in srgb, var(--pq-b-miss) 12%, transparent);
+  color: var(--pq-b-miss);
+}
+/* Les actions d'une ligne : carrées, sans texte, alignées sur la hauteur du
+   bouton d'écoute. C'est une barre d'outils, pas quatre boutons à lire. */
+.admin-perroquet .admin-btn.icon {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 11px;
+}
+.admin-perroquet .admin-btn.on {
+  border-color: var(--orange);
+  background: var(--pq-warm-soft);
+  color: var(--pq-warm-ink);
+}
+
+.admin-perroquet .admin-loading,
+.admin-perroquet .admin-empty {
+  padding: 30px 0;
+  text-align: center;
+  color: var(--pq-dim);
+  font-size: 0.88rem;
+}
+.admin-perroquet .admin-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.admin-perroquet .admin-error {
+  margin: 0 0 12px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--pq-b-miss) 10%, transparent);
+  color: var(--pq-b-miss);
+  font-size: 0.85rem;
+}
+
 .pq-admin-add {
   display: flex;
   flex-direction: column;
@@ -1805,16 +2142,32 @@
   flex-direction: column;
   gap: 8px;
 }
+/* La ligne porte le cadre, `rowline` porte la mise en colonnes : l'éditeur se
+   déplie DANS la même carte, sous la ligne, plutôt que dans un panneau à part —
+   on corrige le son qu'on vient d'écouter, les deux doivent rester ensemble. */
 .pq-admin-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  transition: border-color 0.15s ease;
+}
+.pq-admin-row.off { opacity: 0.55; }
+.pq-admin-row.editing { border-color: var(--orange); }
+.pq-admin-rowline {
   display: flex;
   align-items: center;
   gap: 11px;
-  padding: 9px 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
 }
-.pq-admin-row.off { opacity: 0.55; }
+.pq-admin-acts {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
 .pq-admin-play {
   flex: 0 0 auto;
   display: inline-flex;
@@ -1827,13 +2180,29 @@
   background: transparent;
   color: var(--accent-ink);
 }
-.pq-admin-play:hover { background: color-mix(in srgb, var(--orange) 14%, transparent); }
+.pq-admin-play:hover { background: var(--pq-warm-soft); }
+/* Ce qui joue, en doré plein : avec un seul lecteur pour tout l'onglet, c'est la
+   seule façon de savoir lequel des vingt boutons est en train de parler. */
+.pq-admin-play.on {
+  border-color: transparent;
+  background: var(--orange);
+  color: #241a02;
+}
 .pq-admin-thumb {
   width: 36px;
   height: 36px;
   flex: 0 0 auto;
   border-radius: 9px;
   object-fit: cover;
+}
+/* Le carré vide d'un son sans illustration. Il n'est pas décoratif : il rend
+   visible d'un coup d'œil ce qu'il reste à illustrer dans la banque. */
+.pq-admin-thumb.none {
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--pq-line-2);
+  color: var(--pq-dim);
+  opacity: 0.7;
 }
 .pq-admin-main {
   flex: 1;
@@ -1861,6 +2230,157 @@
   color: var(--pq-b-meh);
 }
 
+/* ---------- Corriger une fiche ----------
+   Déplié sous la ligne, sur un fond plus creux : on est entré dans un mode, il
+   faut que ça se voie sans avoir à relire les boutons. */
+.pq-admin-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--pq-panel-2);
+}
+.pq-admin-edit-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.pq-admin-diff {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  color: var(--pq-dim);
+}
+.pq-admin-diff select {
+  padding: 8px 10px;
+  border: 1px solid var(--pq-line-2);
+  border-radius: 9px;
+  background: var(--pq-panel);
+  color: var(--pq-ink);
+  font: inherit;
+  font-size: 0.84rem;
+}
+/* Pourquoi l'audio n'est pas là : le remplacer périmerait le contour ET les
+   statistiques de terrain. Dit sur place, sinon la question revient. */
+.pq-admin-edit-note {
+  margin-right: auto;
+  font-size: 0.72rem;
+  color: var(--pq-dim);
+}
+
+/* ======================================================================
+   Sous-onglet « Sons des joueurs »
+   ======================================================================
+   Un joueur par carte, dépliable. On ne modère pas ces fichiers, on les écoute :
+   d'où une carte qui se replie plutôt qu'une liste plate de mille lignes, et un
+   score coloré par verdict — la même couleur que dans le jeu, pour lire l'essai
+   avant même de l'avoir lancé. */
+.pq-admin-users {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pq-admin-user {
+  border: 1px solid var(--pq-line);
+  border-radius: 14px;
+  background: var(--pq-panel);
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+.pq-admin-user.open { border-color: var(--orange); }
+.pq-admin-user-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pq-admin-user-head:hover { background: var(--pq-warm-soft); }
+.pq-admin-av {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--pq-panel-2);
+  color: var(--pq-dim);
+  font-size: 0.85rem;
+  font-weight: 800;
+  overflow: hidden;
+}
+.pq-admin-av img { width: 100%; height: 100%; object-fit: cover; }
+/* Compte supprimé : ses lignes restent, parce que ses fichiers sont encore sur
+   le disque et qu'il faut pouvoir les retrouver pour les effacer. */
+.pq-admin-av.gone { opacity: 0.5; }
+.pq-admin-user-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.pq-admin-user-main b { font-size: 0.88rem; }
+.pq-admin-user-main .pq-admin-meta i {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--pq-warm-ink);
+}
+.pq-admin-chev {
+  flex: 0 0 auto;
+  color: var(--pq-dim);
+  transition: transform 0.18s ease;
+}
+.pq-admin-user.open .pq-admin-chev { transform: rotate(180deg); }
+.pq-admin-user-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 12px 12px;
+}
+.pq-admin-user-body > .admin-btn { align-self: flex-start; }
+
+.pq-admin-takes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pq-admin-take {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  border: 1px solid var(--pq-line);
+  border-radius: 12px;
+  background: var(--pq-panel-2);
+}
+/* Le score prend la couleur du verdict — `band-*` est posé sur la ligne, comme
+   dans le récap du jeu : le même chiffre se lit de la même façon partout. */
+.pq-admin-take .pq-admin-score {
+  flex: 0 0 auto;
+  min-width: 2.4ch;
+  text-align: right;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--band);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ======================================================================
    Petits écrans et mouvement réduit
    ====================================================================== */
@@ -1876,6 +2396,14 @@
   .pq-recap-label { flex: 1 1 100%; order: 2; }
   .pq-lib-row { flex-wrap: wrap; }
   .pq-lib-main { flex: 1 1 100%; order: 2; }
+  /* Les lignes d'admin passent en deux étages : le nom sous les boutons plutôt
+     que quatre pastilles écrasées à côté d'un titre coupé. */
+  .pq-admin-rowline,
+  .pq-admin-take { flex-wrap: wrap; }
+  .pq-admin-rowline .pq-admin-main,
+  .pq-admin-take .pq-admin-main { flex: 1 1 100%; order: 2; }
+  .pq-admin-acts { margin-left: auto; }
+  .pq-admin-edit-note { flex: 1 1 100%; margin-right: 0; }
   .pq-trim-track { height: 126px; }
   .pq-podium-row .pq-chart-mini { display: none; }
 }
@@ -1896,4 +2424,233 @@
   .pq-podium-row.playing { transform: none; }
   .pq-go:hover:not(:disabled),
   .pq-next:hover:not(:disabled) { transform: none; }
+}
+
+/* ----------------------------------------------------------------------
+   L'art de la carte dans l'arcade (.arc-game.g-perroquet)
+   ----------------------------------------------------------------------
+   IL MANQUAIT PUREMENT ET SIMPLEMENT. Le balisage existait dans Arcade.jsx
+   (.arc-art-pq et ses trois enfants) mais aucune feuille ne l'habillait :
+   la carte du Perroquet montrait donc un rectangle vide de 96×90, là où
+   toutes les autres montrent quelque chose. Un art sans style n'est pas
+   « sobre », il est invisible.
+
+   Ce qu'on dessine : l'INSTRUMENT, pas un jeu à reconnaître — c'est la
+   distinction du mode, on n'y devine pas une jaquette, on y parle. Un micro
+   de studio sur son pied, et les ondes qui en partent. Rien d'opaque : tout
+   en var(--surface)/var(--border), donc l'art suit le thème du joueur, comme
+   la fiche du Mot du jour (app-33). */
+.arc-game.g-perroquet {
+  --g-1: #e0653c;
+  --g-2: #f2b70b;
+}
+
+.arc-art-pq {
+  position: absolute;
+  inset: 0;
+}
+
+/* Le corps du micro : une capsule au gabarit d'une jaquette étroite, posée
+   à gauche pour laisser la place aux ondes. */
+.arc-art-pq-mic {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  left: 8px;
+  width: 36px;
+  height: 52px;
+  border-radius: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 26px -12px rgba(0, 0, 0, 0.55);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* La grille : des stries régulières, teintées de l'accent. Un dégradé répété
+   plutôt que dix éléments — c'est exactement ce que fait un micro. */
+.arc-art-pq-grill {
+  position: absolute;
+  inset: 6px;
+  border-radius: 13px;
+  background: repeating-linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--g-1) 55%, transparent) 0 2px,
+    transparent 2px 5px
+  );
+}
+
+/* Le pied. Il DÉBORDE du corps (d'où l'absence d'overflow sur la capsule) :
+   un micro qui s'arrête au ras de sa grille flotte dans le vide. */
+.arc-art-pq-stem {
+  position: absolute;
+  left: 50%;
+  bottom: -18px;
+  width: 4px;
+  height: 18px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: var(--border-strong, var(--border));
+}
+.arc-art-pq-stem::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -3px;
+  width: 26px;
+  height: 7px;
+  margin-left: -13px;
+  border-radius: 50%;
+  background: var(--surface-2, var(--surface));
+  border: 1px solid var(--border);
+}
+
+/* Les ondes : deux arcs concentriques qui partent de la grille. Ils battent
+   en décalé — deux arcs synchronisés font un halo, deux arcs décalés font un
+   son qui se propage. */
+.arc-art-pq-wave {
+  position: absolute;
+  z-index: 1;
+  top: 46%;
+  left: 36px;
+  border: 2px solid transparent;
+  border-right-color: color-mix(in srgb, var(--g-1) 78%, transparent);
+  border-radius: 50%;
+  animation: arc-pq-wave 2.6s ease-out infinite;
+}
+/* Les diamètres sont calés sur les 96 px du gabarit : la plus grande onde
+   s'arrête au bord, elle ne doit pas mordre sur le titre à côté. */
+.arc-art-pq-wave.a {
+  width: 30px;
+  height: 30px;
+  margin-top: -15px;
+}
+.arc-art-pq-wave.b {
+  width: 48px;
+  height: 48px;
+  margin-top: -24px;
+  animation-delay: -1.3s;
+}
+
+@keyframes arc-pq-wave {
+  0% { opacity: 0; transform: scale(0.72); }
+  35% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.12); }
+}
+
+/* Même geste que les autres cartes : au survol l'objet se soulève, et le son
+   part plus vite. */
+.arc-game.g-perroquet:hover .arc-art-pq-mic {
+  transform: translateY(-3px) rotate(-3deg);
+}
+.arc-game.g-perroquet:hover .arc-art-pq-wave {
+  animation-duration: 1.2s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arc-art-pq-wave { animation: none; opacity: 0.85; }
+}
+
+/* ======================================================================
+   Card du fil « a imité des bruits de jeux » — PerroquetEvent
+   ======================================================================
+   Elle n'avait aucun style : trois éléments nus les uns sous les autres. Or
+   c'est la seule carte de mini-jeu du fil qui se JOUE — le bouton de lecture
+   est l'information principale, pas le score. La mise en page le dit : une
+   grosse pastille ronde à gauche, le titre du son au milieu, le défi à droite.
+   On reprend les jetons de l'app (aucune couleur inventée ici) pour rester
+   cohérent avec la card du blind test juste à côté dans le fil. */
+.hf-perroquet .hf-pq-body {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-top: 0.15rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+/* Le lecteur. Rond, plein, de la taille d'un vrai bouton de lecture : c'est le
+   geste qu'on veut voir en premier en défilant. */
+.hf-pq-play {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent-grad);
+  color: #3a2600;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.hf-pq-play:hover { transform: scale(1.06); }
+.hf-pq-play svg { margin-left: 2px; }
+.hf-pq-play.on svg { margin-left: 0; }
+
+/* Pendant la lecture : une onde qui part du bouton, pour qu'on repère d'un
+   coup d'œil quelle carte du fil est en train de crier. */
+.hf-pq-play.on {
+  animation: hf-pq-pulse 1.6s ease-out infinite;
+}
+@keyframes hf-pq-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--orange) 55%, transparent); }
+  100% { box-shadow: 0 0 0 14px color-mix(in srgb, var(--orange) 0%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hf-pq-play.on { animation: none; }
+  .hf-pq-play:hover { transform: none; }
+}
+
+.hf-pq-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+/* Le nom du son passe avant le score : c'est lui qui donne envie d'écouter. */
+.hf-pq-meta b {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hf-pq-meta span {
+  font-size: 0.79rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.hf-pq-cta {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--text);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.hf-pq-cta:hover {
+  border-color: var(--orange);
+  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--orange) 8%, transparent);
+}
+
+/* En étroit le défi passe sous le lecteur plutôt que de comprimer le titre du
+   son en trois lettres suivies de points. */
+@media (max-width: 520px) {
+  .hf-perroquet .hf-pq-body { flex-wrap: wrap; }
+  .hf-pq-cta { width: 100%; justify-content: center; }
 }

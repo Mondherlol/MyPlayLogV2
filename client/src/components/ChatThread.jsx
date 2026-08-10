@@ -31,6 +31,7 @@ import {
   Swords,
   Zap,
   Crown,
+  VenetianMask,
   BookOpen,
   BookMarked,
 } from "lucide-react";
@@ -1478,7 +1479,11 @@ function useVersusRoom(code, game, token) {
             ? `/quiz/versus/${code}/card`
             : game === "pq"
               ? `/perroquet/versus/${code}/card`
-              : `/geo/versus/${code}/card`;
+              : game === "im"
+                ? // L'Imposteur n'a pas de mode solo : pas de « /versus » dans
+                  // son chemin, le salon EST le jeu.
+                  `/imposteur/${code}/card`
+                : `/geo/versus/${code}/card`;
 
     async function pull() {
       try {
@@ -1528,15 +1533,17 @@ function useVersusRoom(code, game, token) {
 
 function VersusCard({ versus }) {
   const { token } = useAuth();
-  // Cinq jeux passent par cette carte : le blind test, Pixel Rush, GeoGamer,
-  // le Grand Quiz et le Perroquet. Le `kind` du message décide, et le reste (têtes, places,
-  // état du salon) est rigoureusement identique — c'est tout l'intérêt d'avoir
-  // imposé la même forme de réponse aux cinq routes /card.
+  // Six jeux passent par cette carte : le blind test, Pixel Rush, GeoGamer,
+  // le Grand Quiz, le Perroquet et l'Imposteur. Le `kind` du message décide, et
+  // le reste (têtes, places, état du salon) est rigoureusement identique —
+  // c'est tout l'intérêt d'avoir imposé la même forme de réponse aux six
+  // routes /card.
   const bt = versus.kind === "blindtest";
   const px = versus.kind === "pixel";
   const qz = versus.kind === "quiz";
   const pq = versus.kind === "perroquet";
-  const game = bt ? "bt" : px ? "px" : qz ? "qz" : pq ? "pq" : "geo";
+  const im = versus.kind === "imposteur";
+  const game = bt ? "bt" : px ? "px" : qz ? "qz" : pq ? "pq" : im ? "im" : "geo";
   const live = useVersusRoom(versus.code, game, token);
 
   // Trois sources, dans cet ordre : le salon s'il a répondu, sinon ce que porte
@@ -1547,7 +1554,8 @@ function VersusCard({ versus }) {
   const max = known ? live.max : versus.maxPlayers || 5;
   const rounds = known ? live.rounds : versus.rounds || 8;
   const faces = known ? live.players || [] : [];
-  const buzzer = !bt && !px && !qz && !pq && (known ? live.mode : versus.mode) === "buzzer";
+  const buzzer =
+    !bt && !px && !qz && !pq && !im && (known ? live.mode : versus.mode) === "buzzer";
   const mine = !!live?.mine;
 
   // Une porte n'est ouverte que si le serveur laisserait vraiment entrer : le
@@ -1588,7 +1596,7 @@ function VersusCard({ versus }) {
       <span
         className={`chat-card-cover gv-card-art ${bt ? "bt" : ""} ${px ? "px" : ""} ${
           qz ? "qz" : ""
-        }`}
+        } ${im ? "im" : ""}`}
       >
         {bt ? (
           <Music size={22} />
@@ -1596,6 +1604,8 @@ function VersusCard({ versus }) {
           <Grid2x2 size={22} />
         ) : qz ? (
           <Trophy size={22} />
+        ) : im ? (
+          <VenetianMask size={22} />
         ) : buzzer ? (
           <Zap size={22} />
         ) : (
@@ -1605,9 +1615,27 @@ function VersusCard({ versus }) {
       <span className="chat-card-body">
         <span className="chat-card-kicker">
           <Swords size={12} />{" "}
-          {bt ? "Blind test" : px ? "Pixel Rush" : qz ? "Grand Quiz" : pq ? "Le Perroquet" : "GeoGamer"}
+          {bt
+            ? "Blind test"
+            : px
+              ? "Pixel Rush"
+              : qz
+                ? "Grand Quiz"
+                : pq
+                  ? "Le Perroquet"
+                  : im
+                    ? "L'Imposteur"
+                    : "GeoGamer"}
           <i className="gv-card-mode">
-            {bt || px || pq ? "versus" : qz ? "plateau" : buzzer ? "buzzer" : "classique"}
+            {bt || px || pq
+              ? "versus"
+              : im
+                ? "salon"
+                : qz
+                  ? "plateau"
+                  : buzzer
+                    ? "buzzer"
+                    : "classique"}
           </i>
         </span>
 
@@ -1651,7 +1679,9 @@ function VersusCard({ versus }) {
               ? `/quiz/versus/${versus.code}`
               : pq
                 ? `/perroquet/versus/${versus.code}`
-                : `/geo/versus/${versus.code}`
+                : im
+                  ? `/imposteur/${versus.code}`
+                  : `/geo/versus/${versus.code}`
       }
       className={`${cls} clickable`}
     >

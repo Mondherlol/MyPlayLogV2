@@ -187,6 +187,7 @@ export function FeedCard(props) {
     item.type === "btversus" ||
     item.type === "pxversus" ||
     item.type === "pqversus" ||
+    item.type === "impversus" ||
     item.type === "quizversus"
   )
     return <VersusEvent {...props} />;
@@ -3516,8 +3517,29 @@ function VersusEvent({ item }) {
   const px = item.type === "pxversus";
   const qz = item.type === "quizversus";
   const pq = item.type === "pqversus";
-  const game = bt ? "Blind Test" : px ? "Pixel Rush" : qz ? "Grand Quiz" : pq ? "Perroquet" : "GeoGamer";
-  const GameIcon = bt ? Music2 : px ? Grid2x2 : qz ? Trophy : pq ? Mic2 : MapPin;
+  const im = item.type === "impversus";
+  const game = bt
+    ? "Blind Test"
+    : px
+      ? "Pixel Rush"
+      : qz
+        ? "Grand Quiz"
+        : pq
+          ? "Perroquet"
+          : im
+            ? "Imposteur"
+            : "GeoGamer";
+  const GameIcon = bt
+    ? Music2
+    : px
+      ? Grid2x2
+      : qz
+        ? Trophy
+        : pq
+          ? Mic2
+          : im
+            ? VenetianMask
+            : MapPin;
   const table = [...(item.players || [])].sort((a, b) => a.rank - b.rank);
   const champ = table[0];
   const beaten = table.slice(1);
@@ -3525,7 +3547,7 @@ function VersusEvent({ item }) {
   // il s'oppose à un autre mode réglable. Ailleurs il est soit implicite (blind
   // test, Pixel Rush), soit décidé épreuve par épreuve (Grand Quiz) — l'annoncer
   // sur la carte induirait en erreur.
-  const buzzer = !bt && !px && !qz && !pq && item.mode === "buzzer";
+  const buzzer = !bt && !px && !qz && !pq && !im && item.mode === "buzzer";
   // L'écart avec le deuxième : c'est le chiffre qui fait parler (« il l'a eu
   // pour 40 points »), bien plus que le total.
   const gap = table.length > 1 ? champ.score - table[1].score : 0;
@@ -3533,7 +3555,10 @@ function VersusEvent({ item }) {
   return (
     <article className="hf-card hf-blindtest hf-geo hf-gv">
       <EventHead user={item.user} date={item.date}>
-        <Swords size={13} className="hf-inline-ic" /> a gagné un versus {game}
+        <Swords size={13} className="hf-inline-ic" />{" "}
+        {/* L'Imposteur n'est pas un « versus » : on n'y bat personne à un
+            barème, on démasque (ou on s'échappe). Le verbe change avec lui. */}
+        {im ? "a gagné une partie de l'Imposteur" : `a gagné un versus ${game}`}
         {beaten.length > 0 && (
           <>
             {" "}
@@ -3551,14 +3576,22 @@ function VersusEvent({ item }) {
 
       <div className="hf-gv-meta">
         <span className={`hf-gv-mode ${buzzer ? "buzzer" : ""}`}>
-          {bt || px ? (
+          {bt || px || im ? (
             <GameIcon size={12} />
           ) : buzzer ? (
             <Zap size={12} />
           ) : (
             <Users size={12} />
           )}
-          {bt ? "Blind test" : px ? "Pixel Rush" : buzzer ? "Buzzer" : "Classique"}
+          {bt
+            ? "Blind test"
+            : px
+              ? "Pixel Rush"
+              : im
+                ? "L'Imposteur"
+                : buzzer
+                  ? "Buzzer"
+                  : "Classique"}
         </span>
         <span className="hf-bt-stat">
           <GameIcon size={13} /> {item.total} manches
@@ -3590,10 +3623,10 @@ function VersusEvent({ item }) {
       </ol>
 
       <Link
-        to={bt ? "/blindtest" : px ? "/pixel" : "/geo"}
+        to={bt ? "/blindtest" : px ? "/pixel" : im ? "/imposteur" : "/geo"}
         className="hf-mot-cta clickable"
       >
-        Lancer un versus
+        {im ? "Ouvrir un salon" : "Lancer un versus"}
       </Link>
     </article>
   );

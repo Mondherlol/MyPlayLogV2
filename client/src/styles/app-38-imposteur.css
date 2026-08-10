@@ -1,0 +1,1598 @@
+/* ======================================================================
+   L'Imposteur — tout le monde a le même jeu, sauf un
+   ======================================================================
+   ------------------------------------------------------------------ le fond
+   AUCUN FOND PEINT, même règle que le Perroquet et le Grand Quiz : la page vit
+   sur le fond de l'application et n'emprunte que ses jetons, donc elle suit le
+   thème clair comme le sombre sans une ligne de plus. Une page « salle
+   d'interrogatoire » toute noire au milieu d'un site blanc, c'est joli sur une
+   maquette et sale en vrai.
+
+   Ce qu'elle ajoute tient en trois choses :
+     - un décor de masques très sourds, derrière tout ;
+     - la couche `--imp-*` ci-dessous, seul endroit où une couleur est décidée ;
+     - UNE couleur de rôle, `--imp-mask` (le violet du masque), réservée à
+       l'imposteur et à rien d'autre. Elle ne sort qu'à la révélation : la voir
+       plus tôt, ne serait-ce qu'une fois, c'est donner la réponse.
+
+   ------------------------------------------------------------ la hiérarchie
+   Un seul écran compte, celui des indices, et dedans une seule chose : LE MOT
+   EN TRAIN DE S'ÉCRIRE. Tout le reste de cette feuille lui cède le pas —
+   tailles, contrastes, animations. Si un jour quelque chose sur cet écran
+   attire l'œil plus que `.imp-live`, c'est ce quelque chose qui a tort.
+   ====================================================================== */
+
+/* La couleur du masque : soutenue en thème clair (elle doit tenir sur blanc),
+   claire en sombre. Une seule valeur en éteindrait une des deux. */
+/* ---------------------------------------------------------------------
+   TOUTE la couche de jetons vit sur `:root`, et non sur `.imp-page`.
+   Ce n'est pas un détail de rangement : la fiche d'un jeu s'ouvre en
+   surcouche, dans un portail accroché à <body> — donc HORS de `.imp-page`.
+   Tant que les jetons étaient déclarés sur la page, la barre du bas de cette
+   surcouche héritait de variables inexistantes et se peignait… transparente,
+   avec le texte de la fiche qui passait au travers du champ d'indice. */
+:root {
+  --imp-mask: #6d28d9;
+  --imp-mask-soft: color-mix(in srgb, #6d28d9 12%, transparent);
+  --imp-good: #15803d;
+  --imp-bad: #b91c1c;
+
+  --imp-ink: var(--text);
+  --imp-dim: var(--text-soft);
+  --imp-panel: var(--surface);
+  --imp-panel-2: var(--surface-2, var(--surface));
+  --imp-line: var(--border);
+  --imp-line-2: var(--border-strong);
+  --imp-warm: var(--orange);
+  /* L'accent EN TEXTE : le doré vif est illisible sur blanc, --accent-ink est
+     le jeton que le site tient précisément pour ce cas. */
+  --imp-warm-ink: var(--accent-ink);
+  --imp-warm-soft: color-mix(in srgb, var(--orange) 14%, transparent);
+}
+:root[data-theme="dark"] {
+  --imp-mask: #b79bff;
+  --imp-mask-soft: color-mix(in srgb, #b79bff 16%, transparent);
+  --imp-good: #6ce3a6;
+  --imp-bad: #ff8080;
+}
+
+/* ======================================================================
+   La page
+   ====================================================================== */
+.imp-page {
+  position: relative;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--imp-ink);
+  padding: 0 16px 56px;
+  /* `clip` et surtout PAS `hidden` : `hidden` sur un ancêtre tue tous les
+     `position: sticky` descendants (le piège documenté dans app-02). */
+  overflow-x: clip;
+}
+
+.imp-stage {
+  width: 100%;
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-top: 8px;
+}
+.imp-center {
+  min-height: 60dvh;
+  align-items: center;
+  justify-content: center;
+}
+
+.imp-err {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--imp-bad) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--imp-bad) 34%, transparent);
+  color: var(--imp-bad);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ---------- Le décor ----------
+   Trois masques qui dérivent très lentement, et un cône de lumière au-dessus.
+   Rien de plus : c'est un fond, pas un spectacle. Sous 760 px il disparaît —
+   sur téléphone il n'y a pas la place, et un ornement qui passe derrière le
+   bouton principal est pire que pas d'ornement. */
+.imp-decor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+.imp-decor-spot {
+  position: absolute;
+  top: -220px;
+  left: 50%;
+  width: 620px;
+  height: 620px;
+  margin-left: -310px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--imp-mask) 12%, transparent),
+    transparent 68%
+  );
+}
+.imp-decor-mask {
+  position: absolute;
+  width: 120px;
+  height: 74px;
+  border-radius: 60px 60px 44px 44px;
+  border: 2px solid color-mix(in srgb, var(--imp-ink) 8%, transparent);
+  opacity: 0.5;
+  animation: imp-drift 26s ease-in-out infinite;
+}
+.imp-decor-mask::before,
+.imp-decor-mask::after {
+  content: "";
+  position: absolute;
+  top: 22px;
+  width: 30px;
+  height: 18px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--imp-ink) 7%, transparent);
+}
+.imp-decor-mask::before { left: 16px; }
+.imp-decor-mask::after { right: 16px; }
+.imp-decor-mask.a { top: 14%; left: 6%; animation-delay: -3s; }
+.imp-decor-mask.b { top: 52%; right: 8%; transform: rotate(-12deg); animation-delay: -11s; }
+.imp-decor-mask.c { bottom: 10%; left: 18%; transform: rotate(9deg); animation-delay: -19s; }
+
+@keyframes imp-drift {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -22px; }
+}
+
+.imp-page > *:not(.imp-decor) { position: relative; z-index: 1; }
+
+/* ======================================================================
+   Le hall
+   ====================================================================== */
+.imp-hero {
+  width: 100%;
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 46px 0 26px;
+  text-align: center;
+}
+.imp-hero-mask {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 26px;
+  color: var(--imp-mask);
+  background: var(--imp-mask-soft);
+  border: 1px solid color-mix(in srgb, var(--imp-mask) 30%, transparent);
+  animation: imp-breathe 4.5s ease-in-out infinite;
+}
+@keyframes imp-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+.imp-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--imp-dim);
+}
+.imp-hero-title {
+  margin: 0;
+  font-size: clamp(2rem, 7vw, 3rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+.imp-hero-sub {
+  margin: 0;
+  max-width: 460px;
+  color: var(--imp-dim);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.imp-hero-sub b { color: var(--imp-mask); }
+
+.imp-rules {
+  width: 100%;
+  max-width: 900px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.imp-rule {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--imp-panel);
+  border: 1px solid var(--imp-line);
+}
+.imp-rule-ic {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  color: var(--imp-warm-ink);
+  background: var(--imp-warm-soft);
+}
+.imp-rule b { font-size: 0.92rem; }
+.imp-rule p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--imp-dim);
+}
+
+.imp-hall-actions {
+  width: 100%;
+  max-width: 900px;
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 12px;
+  align-items: start;
+}
+.imp-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 18px;
+  background: var(--imp-panel);
+  border: 1px solid var(--imp-line);
+}
+.imp-panel-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+.imp-panel-sub,
+.imp-hint {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--imp-dim);
+}
+.imp-back-link {
+  align-self: center;
+  margin-top: auto;
+  font-size: 0.82rem;
+  color: var(--imp-dim);
+  text-decoration: none;
+}
+.imp-back-link:hover { color: var(--imp-ink); }
+
+.imp-joinbox {
+  display: flex;
+  gap: 8px;
+}
+.imp-joinbox input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--imp-line-2);
+  background: var(--imp-panel-2);
+  color: var(--imp-ink);
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: lowercase;
+}
+.imp-joinbox input:focus {
+  outline: none;
+  border-color: var(--imp-warm);
+}
+
+/* ---------- Les réglages ---------- */
+.imp-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.imp-setting > span {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--imp-dim);
+}
+.imp-chips { display: flex; gap: 6px; }
+.imp-chip {
+  min-width: 34px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--imp-line-2);
+  background: transparent;
+  color: var(--imp-dim);
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.85rem;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.imp-chip:hover:not(:disabled) { color: var(--imp-ink); }
+.imp-chip.on {
+  background: var(--imp-warm);
+  border-color: var(--imp-warm);
+  color: #1a1206;
+}
+.imp-chip:disabled { opacity: 0.55; }
+.imp-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--imp-panel);
+  border: 1px solid var(--imp-line);
+}
+
+/* ---------- Les boutons ---------- */
+.imp-go {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 18px;
+  border: none;
+  border-radius: 13px;
+  background: var(--imp-warm);
+  color: #1a1206;
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.95rem;
+  text-decoration: none;
+  transition: filter 0.15s, transform 0.1s;
+}
+.imp-go:hover:not(:disabled) { filter: brightness(1.06); }
+.imp-go:active:not(:disabled) { transform: translateY(1px); }
+.imp-go:disabled { opacity: 0.5; }
+.imp-go.alt {
+  background: transparent;
+  border: 1px solid var(--imp-line-2);
+  color: var(--imp-ink);
+}
+.imp-quiet {
+  align-self: center;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--imp-dim);
+  font: inherit;
+  font-size: 0.82rem;
+}
+.imp-quiet:hover { color: var(--imp-ink); }
+
+/* ======================================================================
+   Le salon : l'entête
+   ====================================================================== */
+.imp-top {
+  width: 100%;
+  max-width: 760px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 0 6px;
+}
+.imp-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--imp-dim);
+  text-decoration: none;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+.imp-back:hover { color: var(--imp-ink); }
+.imp-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--imp-mask);
+}
+.imp-progress {
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: var(--imp-ink);
+}
+.imp-progress em {
+  font-style: normal;
+  font-size: 0.8rem;
+  color: var(--imp-dim);
+}
+.imp-progress.ghost { opacity: 0; }
+
+/* ---------- La barre de phase : le battement commun ---------- */
+.imp-phase {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 13px;
+  border-radius: 13px;
+  background: var(--imp-panel);
+  border: 1px solid var(--imp-line);
+}
+.imp-phase-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.imp-phase-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--imp-ink) 10%, transparent);
+  overflow: hidden;
+}
+.imp-phase-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--imp-warm);
+  transition: width 0.12s linear;
+}
+.imp-phase.ph-vote .imp-phase-bar i,
+.imp-phase.ph-steal .imp-phase-bar i { background: var(--imp-mask); }
+.imp-phase-sec {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 52px;
+  justify-content: flex-end;
+  font-size: 0.82rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--imp-dim);
+}
+
+/* ======================================================================
+   Le lobby
+   ====================================================================== */
+.imp-lobby {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.imp-code {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--imp-panel);
+  border: 1px dashed var(--imp-line-2);
+  cursor: pointer;
+}
+.imp-code-lbl {
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--imp-dim);
+}
+.imp-code b {
+  flex: 1;
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: 0.28em;
+  color: var(--imp-warm-ink);
+}
+.imp-code-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--imp-dim);
+}
+
+.imp-lobby-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+.imp-lobby-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 13px;
+  background: var(--imp-panel);
+  border: 1px solid var(--imp-line);
+}
+.imp-lobby-list li b {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+.imp-lobby-list li.empty {
+  color: var(--imp-dim);
+  font-size: 0.85rem;
+  border-style: dashed;
+  background: transparent;
+}
+.imp-crown { color: var(--imp-warm-ink); }
+/* « prêt » / « en attente » / « hôte » : un mot, pas une pastille. Une pastille
+   verte ne dit pas si le joueur est connecté ou s'il a confirmé — et c'est la
+   seconde information qui intéresse l'hôte au moment de lancer. */
+.imp-state {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--imp-dim);
+}
+.imp-state.on { color: var(--imp-good); }
+.imp-lobby-list li.ok { border-color: color-mix(in srgb, var(--imp-good) 40%, var(--imp-line)); }
+.imp-lobby-wait {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--imp-dim);
+}
+
+/* ======================================================================
+   La carte — le seul moment où l'on est seul
+   ======================================================================
+   Elle se retourne UNE fois, à l'entrée en scène. Elle est rigoureusement la
+   même pour l'imposteur et pour les autres : pas une teinte, pas un pixel ne
+   les distingue. Une nuance ici, et le mode n'existe plus. */
+.imp-card-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 0 8px;
+}
+.imp-card {
+  width: min(320px, 84vw);
+  aspect-ratio: 3 / 4;
+  perspective: 1200px;
+}
+.imp-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  animation: imp-flip 1s cubic-bezier(0.6, 0, 0.2, 1) 0.35s forwards;
+}
+@keyframes imp-flip {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(180deg); }
+}
+.imp-card-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 22px;
+  border-radius: 22px;
+  backface-visibility: hidden;
+  text-align: center;
+  border: 1px solid var(--imp-line-2);
+  background: var(--imp-panel);
+}
+.imp-card-face.back {
+  color: var(--imp-mask);
+  background:
+    radial-gradient(circle at 50% 34%, var(--imp-mask-soft), transparent 62%),
+    var(--imp-panel);
+}
+.imp-card-face.back em {
+  font-style: normal;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--imp-dim);
+}
+.imp-card-face.front {
+  transform: rotateY(180deg);
+  background:
+    radial-gradient(circle at 50% 30%, var(--imp-warm-soft), transparent 64%),
+    var(--imp-panel);
+}
+.imp-card-kicker,
+.imp-card-foot {
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--imp-dim);
+}
+.imp-card-face.front b {
+  font-size: clamp(1.15rem, 4.6vw, 1.6rem);
+  font-weight: 900;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+/* LA JAQUETTE EST LE SUJET DE LA CARTE. Elle faisait 92 px, en appoint sous un
+   gros titre — or c'est l'image qu'on retient, pas un nom lu en huit secondes,
+   et c'est elle qui dit « ah oui, CE jeu-là » à qui ne connaît que de nom.
+   Elle prend donc toute la largeur utile de la carte, et c'est un bouton :
+   la fiche complète se déplie depuis elle. */
+.imp-card-cover {
+  position: relative;
+  width: min(190px, 62%);
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 12px;
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.imp-card-cover img {
+  width: 100%;
+  display: block;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px -18px rgba(0, 0, 0, 0.65);
+}
+.imp-card-cover:hover:not(:disabled) { transform: translateY(-3px) scale(1.02); }
+.imp-card-cover:disabled { cursor: default; }
+/* L'invite à ouvrir, posée sur le bas de la jaquette : discrète, mais elle
+   apprend le geste dès la première manche. */
+.imp-card-cover-open {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 99px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #fff;
+  background: color-mix(in srgb, #000 62%, transparent);
+  backdrop-filter: blur(4px);
+  white-space: nowrap;
+}
+.imp-card-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--imp-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ======================================================================
+   Les indices — la frappe en direct
+   ======================================================================
+   `.imp-live` EST l'écran. Le reste (file d'attente, mots déjà tombés) est
+   délibérément plus petit, plus pâle, plus calme. */
+.imp-clue-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.imp-mic {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 18px;
+  border-radius: 20px;
+  background: var(--imp-panel);
+  border: 1px solid var(--imp-line);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.imp-mic.mine {
+  border-color: color-mix(in srgb, var(--imp-warm) 55%, transparent);
+  box-shadow: 0 0 0 3px var(--imp-warm-soft);
+}
+.imp-mic-who {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+.imp-mic-who b { font-size: 1rem; }
+.imp-mic-who em {
+  font-style: normal;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--imp-dim);
+}
+.imp-mic-note {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--imp-dim);
+}
+
+/* Le mot qui s'écrit : gros, monospace, et un curseur qui bat. Le monospace
+   n'est pas une coquetterie — en proportionnelle, chaque lettre décale tout le
+   mot et l'œil perd le fil de ce qui vient d'être tapé. */
+.imp-live {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 62px;
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 16px;
+  background: var(--imp-panel-2);
+  border: 1px solid var(--imp-line);
+}
+.imp-live-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: clamp(1.4rem, 6vw, 2.2rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  word-break: break-all;
+  text-align: center;
+}
+.imp-live-ph {
+  font-size: 1.6rem;
+  color: var(--imp-dim);
+  letter-spacing: 0.2em;
+}
+.imp-caret {
+  width: 3px;
+  height: clamp(1.5rem, 6vw, 2.2rem);
+  border-radius: 2px;
+  background: var(--imp-warm);
+  animation: imp-blink 1s steps(1) infinite;
+}
+.imp-live.typing .imp-caret { animation-duration: 0.6s; }
+@keyframes imp-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.imp-form {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 420px;
+}
+.imp-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 13px 16px;
+  border-radius: 13px;
+  border: 1px solid var(--imp-line-2);
+  background: var(--imp-panel-2);
+  color: var(--imp-ink);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.imp-form input:focus {
+  outline: none;
+  border-color: var(--imp-warm);
+}
+.imp-send {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  border: none;
+  border-radius: 13px;
+  background: var(--imp-warm);
+  color: #1a1206;
+}
+.imp-send:disabled { opacity: 0.45; }
+
+/* ---------- La file d'attente ---------- */
+.imp-queue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.imp-queue::-webkit-scrollbar { display: none; }
+.imp-queue li {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  border-radius: 99px;
+  background: var(--imp-panel);
+  border: 1px solid var(--imp-line);
+  font-size: 0.82rem;
+  color: var(--imp-dim);
+}
+.imp-queue li.now {
+  color: var(--imp-ink);
+  border-color: var(--imp-warm);
+  background: var(--imp-warm-soft);
+  font-weight: 800;
+}
+.imp-queue li.gone { opacity: 0.4; text-decoration: line-through; }
+.imp-queue li em {
+  font-style: normal;
+  font-weight: 800;
+  font-size: 0.72rem;
+  opacity: 0.7;
+}
+
+/* ---------- Les mots déjà tombés ---------- */
+.imp-clues {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.imp-clues li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border-radius: 13px;
+  background: var(--imp-panel);
+  border: 1px solid var(--imp-line);
+  animation: imp-pop 0.25s ease-out;
+}
+@keyframes imp-pop {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.imp-clues li b { font-size: 0.95rem; font-weight: 800; }
+.imp-clues li em {
+  font-style: normal;
+  font-size: 0.75rem;
+  color: var(--imp-dim);
+}
+.imp-clues li.missed b { color: var(--imp-dim); font-weight: 600; font-style: italic; }
+.imp-clues.recap { justify-content: center; }
+
+.imp-callvote {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 12px 16px;
+  border-radius: 13px;
+  border: 1px solid var(--imp-line-2);
+  background: transparent;
+  color: var(--imp-ink);
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+.imp-callvote em {
+  font-style: normal;
+  font-weight: 900;
+  font-size: 0.8rem;
+  color: var(--imp-dim);
+  font-variant-numeric: tabular-nums;
+}
+.imp-callvote.on {
+  border-color: var(--imp-mask);
+  color: var(--imp-mask);
+  background: var(--imp-mask-soft);
+}
+
+/* ======================================================================
+   Le vote
+   ====================================================================== */
+.imp-vote-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.imp-h2 {
+  margin: 0;
+  font-size: clamp(1.2rem, 4.4vw, 1.6rem);
+  font-weight: 900;
+  text-align: center;
+}
+.imp-ballots {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+.imp-ballot {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 10px;
+  border-radius: 16px;
+  border: 1px solid var(--imp-line);
+  background: var(--imp-panel);
+  color: var(--imp-ink);
+  font: inherit;
+  transition: transform 0.12s, border-color 0.15s, background 0.15s;
+}
+.imp-ballot:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--imp-mask);
+}
+.imp-ballot b { font-size: 0.88rem; }
+.imp-ballot:disabled { opacity: 0.72; }
+.imp-ballot.picked {
+  border-color: var(--imp-mask);
+  background: var(--imp-mask-soft);
+  opacity: 1;
+}
+.imp-ballot-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--imp-good);
+}
+.imp-vote-note {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--imp-dim);
+}
+
+/* ======================================================================
+   La dernière chance
+   ====================================================================== */
+.imp-steal-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 0;
+  text-align: center;
+}
+.imp-steal-ring {
+  display: grid;
+  place-items: center;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  color: var(--imp-mask);
+  background: var(--imp-mask-soft);
+  border: 1px solid color-mix(in srgb, var(--imp-mask) 34%, transparent);
+  animation: imp-breathe 2.2s ease-in-out infinite;
+}
+.imp-steal-note {
+  margin: 0;
+  max-width: 440px;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--imp-dim);
+}
+.imp-steal-options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+.imp-steal-opt {
+  width: 100%;
+  padding: 16px 14px;
+  border-radius: 15px;
+  border: 1px solid var(--imp-line-2);
+  background: var(--imp-panel);
+  color: var(--imp-ink);
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.95rem;
+  transition: transform 0.12s, border-color 0.15s, background 0.15s;
+}
+.imp-steal-opt:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--imp-mask);
+  background: var(--imp-mask-soft);
+}
+
+/* ======================================================================
+   La révélation
+   ====================================================================== */
+.imp-result-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.imp-unmask {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px;
+  width: 100%;
+  border-radius: 20px;
+  text-align: center;
+  background:
+    radial-gradient(circle at 50% 0%, var(--imp-mask-soft), transparent 60%),
+    var(--imp-panel);
+  border: 1px solid var(--imp-line);
+  animation: imp-rise 0.35s ease-out;
+}
+@keyframes imp-rise {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.imp-unmask-face {
+  display: grid;
+  place-items: center;
+  color: var(--imp-mask);
+}
+.imp-unmask > b {
+  font-size: clamp(1.1rem, 4.6vw, 1.5rem);
+  font-weight: 900;
+}
+.imp-verdict {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--imp-dim);
+}
+.v-escape .imp-verdict { color: var(--imp-mask); }
+.v-caught .imp-verdict { color: var(--imp-good); }
+.v-steal .imp-verdict { color: var(--imp-warm-ink); }
+
+.imp-games {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+}
+.imp-game {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px;
+  border-radius: 15px;
+  background: var(--imp-panel);
+  border: 1px solid var(--imp-line);
+  text-align: center;
+  color: var(--imp-ink);
+  font: inherit;
+  transition: transform 0.15s, border-color 0.15s;
+}
+button.imp-game:hover { transform: translateY(-2px); }
+.imp-game img {
+  width: 74px;
+  border-radius: 9px;
+  box-shadow: 0 12px 24px -14px rgba(0, 0, 0, 0.6);
+}
+.imp-game-ph {
+  display: grid;
+  place-items: center;
+  width: 74px;
+  height: 99px;
+  border-radius: 9px;
+  color: var(--imp-dim);
+  background: var(--imp-panel-2);
+  border: 1px solid var(--imp-line);
+}
+.imp-game-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--imp-dim);
+}
+button.imp-game:hover .imp-game-open { color: var(--imp-mask); }
+.imp-game em {
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--imp-dim);
+}
+.imp-game b { font-size: 1rem; font-weight: 900; text-wrap: balance; }
+.imp-game.imp {
+  border-color: color-mix(in srgb, var(--imp-mask) 45%, transparent);
+  background: var(--imp-mask-soft);
+}
+.imp-game.imp b { color: var(--imp-mask); }
+
+.imp-stealline {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--imp-dim);
+  text-align: center;
+}
+.imp-stealline.ok b { color: var(--imp-warm-ink); }
+.imp-stealline.ko b { color: var(--imp-bad); }
+
+.imp-tally,
+.imp-final-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.imp-tally li,
+.imp-final-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 13px;
+  border-radius: 13px;
+  background: var(--imp-panel);
+  border: 1px solid var(--imp-line);
+}
+.imp-tally li.imp {
+  border-color: color-mix(in srgb, var(--imp-mask) 45%, transparent);
+  background: var(--imp-mask-soft);
+}
+.imp-final-list li.me { border-color: var(--imp-warm); }
+.imp-tally-who {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+.imp-tally-votes {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.imp-tally-votes em {
+  font-style: normal;
+  font-size: 0.74rem;
+  color: var(--imp-dim);
+}
+.imp-tally-pts {
+  min-width: 46px;
+  text-align: right;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: var(--imp-dim);
+}
+.imp-tally-pts.up { color: var(--imp-warm-ink); }
+.imp-final-esc {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--imp-mask);
+}
+
+/* ======================================================================
+   Le tableau final
+   ====================================================================== */
+.imp-final {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.imp-champ {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 22px 26px;
+  border-radius: 20px;
+  color: var(--imp-warm-ink);
+  background:
+    radial-gradient(circle at 50% 0%, var(--imp-warm-soft), transparent 62%),
+    var(--imp-panel);
+  border: 1px solid var(--imp-line);
+}
+.imp-champ b { font-size: 1.2rem; color: var(--imp-ink); }
+.imp-champ span { font-size: 0.8rem; color: var(--imp-dim); }
+.imp-rank {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--imp-ink) 8%, transparent);
+  font-size: 0.8rem;
+  font-weight: 900;
+  color: var(--imp-dim);
+}
+.imp-rank.r1 { background: var(--imp-warm); color: #1a1206; }
+.imp-final-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ======================================================================
+   Communs
+   ====================================================================== */
+.imp-av {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+.imp-av.ph {
+  background: var(--imp-warm-soft);
+  color: var(--imp-warm-ink);
+}
+.imp-av.big { width: 52px; height: 52px; font-size: 1.15rem; }
+.imp-av.small { width: 20px; height: 20px; font-size: 0.62rem; }
+
+/* La vignette de l'invitation dans la messagerie (la carte est partagée par
+   les six salons, seule sa pastille change). */
+.gv-card-art.im {
+  color: var(--imp-mask, #6d28d9);
+  background: color-mix(in srgb, var(--imp-mask, #6d28d9) 14%, transparent);
+}
+
+/* ======================================================================
+   Le bandeau « ça tourne toujours » (fiche ouverte par-dessus la partie)
+   ======================================================================
+   La contrepartie indispensable de la surcouche : sans lui, on lit la fiche
+   d'un jeu en ayant complètement oublié qu'une manche défile derrière. Il
+   donne la phase, le décompte, et la porte de sortie. */
+.imp-hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px clamp(0.8rem, 3vw, 1.4rem);
+  background: color-mix(in srgb, var(--imp-mask) 16%, var(--surface));
+  border-bottom: 1px solid color-mix(in srgb, var(--imp-mask) 35%, transparent);
+  backdrop-filter: blur(8px);
+}
+.imp-hud b {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+}
+.imp-hud em {
+  font-style: normal;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--imp-dim);
+  font-variant-numeric: tabular-nums;
+}
+.imp-hud-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--imp-mask);
+  animation: imp-blink 1.4s ease-in-out infinite;
+}
+.imp-hud-min {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 11px;
+  border: 1px solid color-mix(in srgb, var(--imp-mask) 40%, transparent);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--imp-ink);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+.imp-hud-back {
+  padding: 7px 13px;
+  border: none;
+  border-radius: 10px;
+  background: var(--imp-mask);
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.8rem;
+}
+
+/* ======================================================================
+   La barre du bas de la fiche : jouer sans fermer
+   ======================================================================
+   Elle flotte au-dessus de la fiche ouverte. Quand c'est le tour du joueur,
+   elle porte le champ d'indice — c'est ce qui permet de lire la page d'un jeu
+   pendant sa propre partie sans avoir à choisir entre les deux. */
+.imp-dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px clamp(0.8rem, 3vw, 1.4rem);
+  background: color-mix(in srgb, var(--imp-mask) 10%, var(--surface));
+  border-top: 1px solid var(--imp-line);
+  backdrop-filter: blur(8px);
+}
+/* À toi de jouer : le liseré doré, la seule chose qui doit attirer l'œil hors
+   de la fiche. */
+.imp-dock.act {
+  border-top: 2px solid var(--imp-warm);
+  background: color-mix(in srgb, var(--imp-warm) 12%, var(--surface));
+}
+.imp-dock-lbl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.imp-dock-form {
+  flex: 1;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+.imp-dock-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--imp-line-2);
+  background: var(--imp-panel);
+  color: var(--imp-ink);
+  font: inherit;
+  font-weight: 700;
+}
+.imp-dock-form input:focus { outline: none; border-color: var(--imp-warm); }
+/* Ce que le locuteur est en train de taper, en petit : la frappe en direct
+   suit jusque dans la fiche, on ne rate pas le moment drôle. */
+.imp-dock-live {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--imp-dim);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.imp-dock-live.on { color: var(--imp-ink); }
+.imp-dock-live .imp-caret { height: 1rem; width: 2px; }
+.imp-dock-sec {
+  font-size: 0.85rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--imp-dim);
+}
+.imp-dock-back {
+  padding: 8px 13px;
+  border: none;
+  border-radius: 10px;
+  background: var(--imp-warm);
+  color: #1a1206;
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.82rem;
+}
+
+/* ======================================================================
+   Ma carte, présente toute la manche
+   ======================================================================
+   Collée sous la barre de phase. Elle tient en une ligne pour ne pas manger
+   l'écran des indices — c'est un rappel et une porte, pas le sujet. */
+.imp-mine {
+  position: sticky;
+  top: 6px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px 10px 10px;
+  border-radius: 16px;
+  background: var(--imp-panel);
+  border: 1px solid var(--imp-line);
+  color: var(--imp-ink);
+  font: inherit;
+  text-align: left;
+  box-shadow: 0 10px 26px -20px rgba(0, 0, 0, 0.7);
+  transition: border-color 0.15s, transform 0.15s;
+}
+button.imp-mine:hover {
+  border-color: var(--imp-mask);
+  transform: translateY(-1px);
+}
+.imp-mine img,
+.imp-mine-ph {
+  width: 64px;
+  height: 86px;
+  flex: 0 0 auto;
+  object-fit: cover;
+  border-radius: 9px;
+}
+.imp-mine-ph {
+  display: grid;
+  place-items: center;
+  color: var(--imp-dim);
+  background: var(--imp-panel-2);
+  border: 1px solid var(--imp-line);
+}
+.imp-mine-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.imp-mine-txt em {
+  font-style: normal;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--imp-dim);
+}
+.imp-mine-txt b {
+  font-size: 1rem;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.imp-mine-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--imp-mask);
+}
+
+/* ======================================================================
+   La carte de l'arcade
+   ======================================================================
+   Elle vit ICI et pas dans app-19, comme le Grand Quiz garde la sienne dans
+   app-36 : l'art d'un mini-jeu appartient au mini-jeu.
+
+   Les six autres cartes montrent ce qu'il faut RECONNAÎTRE (une jaquette, un
+   panorama, un micro). Celle-ci ne peut pas : ce qu'on cherche n'est pas un
+   jeu, c'est quelqu'un. Elle joue donc la règle avec la paire d'exemple —
+   DEUX fois Animal Crossing, UNE fois Tomodachi Life, cerclée de violet.
+
+   Trois aplats sombres ne racontaient rien : il faut voir les jaquettes pour
+   comprendre que deux sont pareilles et qu'une ne l'est pas. Le gabarit reste
+   96×90 pour que les titres s'alignent d'une carte à l'autre. */
+.arc-game.g-imposteur {
+  --g-1: #6d28d9;
+  --g-2: #a78bfa;
+}
+.arc-art-imp {
+  position: absolute;
+  inset: 0;
+}
+.arc-art-imp-card {
+  position: absolute;
+  top: 20px;
+  width: 33px;
+  height: 44px;
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--surface-2, var(--surface));
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 20px -11px rgba(0, 0, 0, 0.55);
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.3s ease;
+}
+.arc-art-imp-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  /* Arrondi porté par l'image ET par la carte : l'intrus doit laisser
+     dépasser sa pastille de masque, donc lui seul ne peut pas rogner ses
+     enfants (voir `overflow: visible` plus bas). */
+  border-radius: 6px;
+}
+.arc-art-imp-card.a { left: 0; transform: rotate(-9deg); }
+.arc-art-imp-card.b { left: 27px; transform: rotate(-1deg); }
+
+/* L'intrus : même gabarit, même pile — seul le liseré violet le désigne, et
+   il n'apparaît QUE sur cette vignette. C'est la couleur de rôle du jeu
+   (`--imp-mask`), et elle ne sert jamais à autre chose. */
+.arc-art-imp-card.c {
+  right: 0;
+  z-index: 2;
+  overflow: visible;
+  transform: rotate(8deg);
+  border-color: color-mix(in srgb, var(--g-2) 70%, transparent);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--g-2) 45%, transparent),
+    0 12px 22px -10px color-mix(in srgb, var(--g-1) 75%, transparent);
+}
+/* La pastille du masque, en bas à droite de l'intrus : le liseré seul se
+   remarque, mais il ne DIT rien — le masque, si. */
+.arc-art-imp-mask {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(150deg, var(--g-1), var(--g-2));
+  border: 1.5px solid var(--surface);
+}
+/* Au survol, l'intrus se détache du rang : c'est exactement ce qui doit lui
+   arriver dans une partie. */
+.arc-game.g-imposteur:hover .arc-art-imp-card.c {
+  transform: rotate(8deg) translateY(-7px) scale(1.06);
+}
+.arc-game.g-imposteur:hover .arc-art-imp-card.a { transform: rotate(-12deg) translateY(2px); }
+
+/* ======================================================================
+   Téléphone
+   ======================================================================
+   Le décor disparaît (pas la place), les grilles passent en colonne, et la
+   carte rétrécit — mais `.imp-live` garde sa taille : c'est la seule chose
+   qu'on regarde, la rapetisser sur le support où l'on joue le plus serait
+   exactement le mauvais arbitrage. */
+@media (max-width: 760px) {
+  .imp-decor { display: none; }
+  .imp-rules,
+  .imp-hall-actions,
+  .imp-games { grid-template-columns: 1fr; }
+  .imp-hero { padding-top: 28px; }
+  .imp-code b { font-size: 1.25rem; letter-spacing: 0.18em; }
+  .imp-setting { justify-content: space-between; }
+  .imp-ballots { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
+}

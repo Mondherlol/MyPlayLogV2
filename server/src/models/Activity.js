@@ -56,6 +56,9 @@ const activitySchema = new mongoose.Schema(
         // geoversus : une entrée par joueur, dédoublonnée par meta.versusId)
         "pxversus", // a disputé un versus Pixel Rush (idem)
         "pqversus", // a disputé un versus du Perroquet (idem)
+        "impversus", // a disputé une partie de l'Imposteur (idem — une entrée
+        // par joueur, dédoublonnée par meta.versusId, la carte du fil montre
+        // la table complète)
         "geoversus", // a disputé un versus GeoGamer (meta = mode/rang/score +
         // la table complète). Une entrée PAR JOUEUR (chacun a son résultat et
         // ses points), mais le fil n'en montre qu'une : routes/feed.js

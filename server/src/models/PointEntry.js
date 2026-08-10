@@ -19,6 +19,7 @@ export const POINT_SOURCES = {
   mot: "Mot du jour",
   perroquet: "Le Perroquet",
   perroquetversus: "Le Perroquet — versus",
+  imposteur: "L'Imposteur",
   case: "Ouverture de caisse",
   gacha: "Machine à capsules",
   duplicate: "Doublon reconverti",

@@ -3216,6 +3216,9 @@ body.mpl-open .chat-dock {
   align-items: center;
   gap: 0.6rem;
   width: min(272px, 60vw);
+  /* La bulle commande : dans la fenêtre flottante ou un fil étroit, elle est
+     plus serrée que ces 272 px et la rangée doit rentrer dedans, pas dépasser. */
+  max-width: 100%;
 }
 
 .voice-play {
@@ -3266,10 +3269,14 @@ body.mpl-open .chat-dock {
   height: 30px;
   cursor: pointer;
   touch-action: none;
+  /* Ceinture de sécurité : le temps que la bande soit mesurée (premier rendu),
+     le trop-plein de barres est rogné au lieu de sortir de la bulle. */
+  min-width: 0;
+  overflow: hidden;
 }
 
 .voice-bars i {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 2px;
   border-radius: 999px;
   background: var(--border-strong);

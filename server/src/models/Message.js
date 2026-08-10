@@ -122,14 +122,14 @@ const versusCardSchema = new mongoose.Schema(
   {
     kind: {
       type: String,
-      enum: ["geo", "blindtest", "pixel", "quiz", "perroquet"],
+      enum: ["geo", "blindtest", "pixel", "quiz", "perroquet", "imposteur"],
       default: "geo",
     },
     code: { type: String, required: true },
     mode: { type: String, default: "classic" }, // GeoGamer : classic | buzzer
     hostName: { type: String, default: "" },
     players: { type: Number, default: 1 },
-    // Le Grand Quiz monte à 6 ; les autres salons plafonnent à 5.
+    // Le Grand Quiz monte à 6, l'Imposteur à 8 ; les autres plafonnent à 5.
     maxPlayers: { type: Number, default: 5 },
     rounds: { type: Number, default: 8 },
   },

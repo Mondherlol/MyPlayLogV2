@@ -248,10 +248,50 @@ function CompanyList({ names, role, navigate }) {
   );
 }
 
-export default function GamePage() {
-  const { id } = useParams();
-  const navigate = useNavigate();
+// ======================================================================
+//  La fiche, en page OU en surcouche
+// ======================================================================
+// Sans argument, c'est la page de la route /game/:id — le cas de toujours.
+//
+// Avec `embedded`, la MÊME fiche s'ouvre par-dessus autre chose sans quitter la
+// page en dessous : c'est l'Imposteur qui l'a demandée (on tombe sur un jeu
+// qu'on ne connaît pas, on veut le regarder sans abandonner la partie en
+// cours), et rien n'y est spécifique à ce jeu-là.
+//
+// LA RÈGLE DE LA SURCOUCHE : elle ne navigue jamais. Une fiche empilée qui
+// emmènerait vers /company/x, /explore ou un profil ferait sortir de la partie
+// par accident — exactement ce qu'on cherchait à éviter en l'ouvrant ici. Deux
+// gestes seulement restent vivants : fermer, et ouvrir la fiche d'un AUTRE jeu
+// (similaire, remake…), qui se substitue dans la même surcouche.
+//
+// Concrètement, `navigate` est confisqué ci-dessous — tous les boutons de la
+// page passent par cette variable locale, y compris CompanyLink. Les <Link>,
+// eux, sont neutralisés par la surcouche elle-même (components/
+// GameSheetOverlay.jsx), qui intercepte le clic avant le routeur.
+export default function GamePage({
+  gameId = null,
+  embedded = false,
+  onClose = null,
+  onOpenGame = null,
+}) {
+  const params = useParams();
+  const id = String(gameId || params.id || "");
+  const routerNavigate = useNavigate();
+  const navigate = useMemo(() => {
+    if (!embedded) return routerNavigate;
+    return (to) => {
+      if (to === -1) return onClose?.();
+      const game = typeof to === "string" && to.match(/^\/game\/([^/?#]+)/);
+      if (game) return onOpenGame?.(game[1]);
+      // Tout le reste (studio, plateforme, explorateur, connexion) : ignoré.
+      return undefined;
+    };
+  }, [embedded, routerNavigate, onClose, onOpenGame]);
   const [searchParams, setSearchParams] = useSearchParams();
+  // En surcouche, l'onglet ne passe pas par l'URL : celle-ci appartient à la
+  // page en dessous (le salon de l'Imposteur), qui n'a pas à se retrouver avec
+  // un `?tab=ost` collé dessus — ni à le garder après fermeture.
+  const [embTab, setEmbTab] = useState("infos");
   const { user, token, updateUser } = useAuth();
   const { map, upsertLocal, removeLocal } = useLibrary();
 
@@ -305,11 +345,12 @@ export default function GamePage() {
   // Onglet actif : vit dans l'URL (?tab=…) pour survivre au refresh et au
   // retour arrière (replace : changer d'onglet n'empile pas d'historique).
   // « media » : ancien onglet fusionné dans « Feed » (liens/notifs historiques).
-  const rawTab = searchParams.get("tab");
+  const rawTab = embedded ? embTab : searchParams.get("tab");
   const wantTab = rawTab === "media" ? "feed" : rawTab;
   const tab = tabs.some((t) => t.id === wantTab && t.ready) ? wantTab : "infos";
   function setTab(next) {
-    setSearchParams(next === "infos" ? {} : { tab: next }, { replace: true });
+    if (embedded) setEmbTab(next);
+    else setSearchParams(next === "infos" ? {} : { tab: next }, { replace: true });
     scrollTabsToTop();
   }
 
@@ -638,7 +679,7 @@ export default function GamePage() {
   const hasTtb = ttb.hastily || ttb.normally || ttb.completely;
 
   return (
-    <div className="gamepage" {...swipe}>
+    <div className={`gamepage ${embedded ? "gp-embedded" : ""}`} {...swipe}>
       {/* Fond flouté */}
       <div className="gp-backdrop">
         {backdrop ? (
@@ -650,7 +691,15 @@ export default function GamePage() {
       </div>
 
       <button className="gp-back clickable" onClick={() => navigate(-1)}>
-        <ArrowLeft size={18} /> Retour
+        {embedded ? (
+          <>
+            <X size={18} /> Fermer
+          </>
+        ) : (
+          <>
+            <ArrowLeft size={18} /> Retour
+          </>
+        )}
       </button>
 
       {/* Ce jeu est offert quelque part en ce moment → banderole flottante */}

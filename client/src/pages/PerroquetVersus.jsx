@@ -644,6 +644,9 @@ function Reveal({ round, byId, meId }) {
         <ContourChart
           target={round.contour.pitch}
           attempt={shown.contour.pitch}
+          targetEnergy={round.contour.energy}
+          targetVoiced={round.contour.voiced}
+          attemptVoiced={shown.contour.voiced}
           name={shownId === String(meId) ? "toi" : byId.get(shownId)?.username}
           band={shown.band}
           progress={live ? progress : null}
@@ -670,6 +673,8 @@ function Reveal({ round, byId, meId }) {
                 <ContourChart
                   target={round.contour.pitch}
                   attempt={t.contour.pitch}
+                  targetVoiced={round.contour.voiced}
+                  attemptVoiced={t.contour.voiced}
                   name={p?.username}
                   compact
                 />

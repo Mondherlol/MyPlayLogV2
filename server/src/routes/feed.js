@@ -700,6 +700,7 @@ async function buildTimeline(
       a.type === "btversus" ||
       a.type === "pxversus" ||
       a.type === "pqversus" ||
+      a.type === "impversus" ||
       a.type === "quizversus"
     ) {
       if (!a.meta?.versusId) continue;

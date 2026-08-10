@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import multer from "multer";
 import SoundClip from "../models/SoundClip.js";
 import PerroquetGame from "../models/PerroquetGame.js";
+import PerroquetTake from "../models/PerroquetTake.js";
 import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { recordActivity } from "../lib/activity.js";
@@ -94,7 +95,16 @@ const clipFull = (req, c) => ({
   // Le crédit du déposant, pour les sons de librairie. C'est la contrepartie du
   // dépôt libre : on a envie de savoir de qui vient le cri qu'on vient d'imiter.
   addedBy: c.owner ? c.ownerName || "" : "",
-  contour: c.contour ? { pitch: c.contour.pitch, energy: c.contour.energy } : null,
+  contour: c.contour
+    ? {
+        pitch: c.contour.pitch,
+        energy: c.contour.energy,
+        // Le masque de voisement part au client : c'est lui qui permet au
+        // graphique de rompre le trait dans les silences au lieu de dessiner
+        // l'interpolation comme si c'était une mélodie.
+        voiced: c.contour.voiced || null,
+      }
+    : null,
 });
 
 // ============================================================
@@ -315,11 +325,30 @@ router.post(
         { $inc: { timesPlayed: 1, scoreSum: result.score } }
       ).catch(() => {});
 
+      // L'archive des essais (models/PerroquetTake.js). La tentative est déjà
+      // dans la manche juste au-dessus : cette ligne-là ne sert pas à rejouer la
+      // partie, elle sert à retrouver « tous les cris de ce joueur » sans
+      // déplier les parties de tout le monde. Best-effort, comme les
+      // statistiques : une archive manquante ne doit pas coûter une manche.
+      PerroquetTake.create({
+        user: req.userId,
+        mode: "solo",
+        url: rel,
+        clip: clip._id,
+        label: clip.label,
+        clipUrl: clip.url,
+        imageUrl: clip.image || "",
+        score: result.score,
+        band: result.band,
+        game: game._id,
+        roundIndex: i,
+      }).catch(() => {});
+
       res.json({
         ...result,
         attemptUrl: url,
         clip: clipFull(req, clip),
-        contour: { pitch: contour.pitch, energy: contour.energy },
+        contour: { pitch: contour.pitch, energy: contour.energy, voiced: contour.voiced },
       });
     } catch (err) {
       cleanup();

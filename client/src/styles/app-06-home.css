@@ -20066,3 +20066,130 @@ b.hf-dl-src {
     display: none;
   }
 }
+
+/* ======================================================================
+   La fiche d'un jeu EN SURCOUCHE (components/GameSheetOverlay.jsx)
+   ======================================================================
+   Même fiche, même feuille de style : on ne redessine rien ici, on la
+   déménage. Elle s'ouvre par-dessus une page qui reste montée (une partie de
+   l'Imposteur en cours, par exemple) et qui doit continuer à vivre derrière —
+   d'où une couche fixe avec son PROPRE défilement, plutôt qu'une page.
+
+   Deux corrections suffisent, et elles viennent toutes deux du fait que
+   `.gamepage` a été écrite pour vivre dans `.app-content` :
+     - ses marges négatives (qui la faisaient déborder du padding du layout)
+       n'ont plus rien à annuler ici ;
+     - son bouton de retour se cale sur la barre du haut et la barre latérale,
+       qui ne sont pas au-dessus de la surcouche. */
+.gsheet {
+  position: fixed;
+  inset: 0;
+  /* Le niveau des modales (1000) et pas un cran en dessous : la barre du haut
+     de l'application monte à 140, et la fiche passait dessous — on lisait la
+     moitié du bandeau de rappel avec la barre de recherche par-dessus. Les
+     modales que la fiche ouvre elle-même (« j'y ai joué », listes) sont créées
+     APRÈS dans le document : à z-index égal, elles repassent devant. */
+  z-index: 1000;
+  background: var(--bg);
+  animation: gsheet-in 0.22s ease-out;
+}
+@keyframes gsheet-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- L'ouverture depuis la jaquette ----------
+   La fiche se DÉPLIE de l'image qu'on vient de toucher : elle part de sa
+   position et de sa taille (variables posées en JS depuis le rectangle réel)
+   et grandit jusqu'au plein écran. Une surcouche qui apparaît de nulle part
+   fait perdre le fil de ce qu'on regardait ; celle-ci dit « c'est CETTE image
+   que tu ouvres ».
+
+   La courbe est franche au départ puis très amortie : c'est ce qui donne
+   l'impression que l'objet a du poids, plutôt qu'un simple fondu. */
+.gsheet.zoomed {
+  animation: gsheet-zoom 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes gsheet-zoom {
+  from {
+    opacity: 0.2;
+    border-radius: 18px;
+    transform: translate(var(--gs-dx), var(--gs-dy)) scale(var(--gs-s));
+  }
+  60% { opacity: 1; }
+  to {
+    opacity: 1;
+    border-radius: 0;
+    transform: translate(0, 0) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gsheet,
+  .gsheet.zoomed { animation: none; }
+}
+
+/* ---------- Réduite ----------
+   La fiche n'est pas fermée, elle est rangée : GamePage reste monté (jeu
+   chargé, onglet, images), donc rouvrir est instantané. Le conteneur se
+   rétracte en pastille dans un coin et cesse de couvrir le plateau. */
+.gsheet.min {
+  inset: auto clamp(0.8rem, 3vw, 1.4rem) clamp(0.8rem, 3vw, 1.4rem) auto;
+  width: auto;
+  height: auto;
+  background: transparent;
+  animation: none;
+}
+.gsheet.min .gsheet-scroll { display: none; }
+.gsheet-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px 8px 8px;
+  border-radius: 16px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.6);
+  animation: gsheet-in 0.2s ease-out;
+}
+.gsheet-pill img {
+  width: 34px;
+  height: 46px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.gsheet-pill span {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.25;
+}
+.gsheet-pill b { font-size: 0.85rem; }
+.gsheet-pill em {
+  font-style: normal;
+  font-size: 0.75rem;
+  color: var(--text-soft);
+}
+
+/* La barre du bas laissée à l'appelant : elle flotte au-dessus du contenu de
+   la fiche, qui garde donc de la place sous lui pour ne pas finir dessous. */
+.gsheet:not(.min) .gp-embedded { padding-bottom: 92px; }
+.gsheet-scroll {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: clip;
+  -webkit-overflow-scrolling: touch;
+}
+.gp-embedded {
+  margin: 0;
+  min-height: 100%;
+}
+/* Le bouton « Fermer » de la fiche : sous le bandeau de rappel, et calé sur la
+   surcouche et non sur le gabarit de l'application. */
+.gp-embedded .gp-back {
+  position: absolute;
+  top: 58px;
+  left: clamp(0.8rem, 3vw, 1.6rem);
+}

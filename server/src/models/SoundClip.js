@@ -24,6 +24,10 @@ const contourSchema = new mongoose.Schema(
   {
     pitch: { type: [Number], default: [] },  // 64 demi-tons relatifs
     energy: { type: [Number], default: [] }, // 64 valeurs 0..1
+    // 64 valeurs 0..1 : « y avait-il une hauteur mesurée à cet instant ? ».
+    // Vide pour les clips entrés avant son ajout ; le barème et le graphique
+    // savent tous deux s'en passer, et le recalcul de l'admin le remplit.
+    voiced: { type: [Number], default: [] },
     durationMs: { type: Number, default: 0 },
     voicedRatio: { type: Number, default: 0 },
   },

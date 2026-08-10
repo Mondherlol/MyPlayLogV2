@@ -30,6 +30,7 @@ import {
   Sunset,
   Contrast,
   Users,
+  VenetianMask,
   Thermometer,
   Library,
   Lock,
@@ -121,6 +122,19 @@ const GAMES = [
     api: "/perroquet/leaderboard",
     idOf: (e) => e.perroquetId,
   },
+  {
+    key: "imposteur",
+    name: "L'Imposteur",
+    tag: "Bluff",
+    pitch:
+      "Tout le monde a le même jeu, sauf un — qui l'ignore. Un mot chacun, puis on vote. À partir de 3 joueurs.",
+    Icon: VenetianMask,
+    path: "/imposteur",
+    api: "/imposteur/leaderboard",
+    // Aucun bouton « Défier » : il n'y a pas de set à rejouer, une partie est
+    // une soirée avec des gens. Comme le Mot du jour, pas d'identifiant.
+    idOf: () => null,
+  },
 ];
 
 // Libellés des lignes du grand livre (miroir de POINT_SOURCES,
@@ -133,6 +147,7 @@ const SOURCE_LABELS = {
   quizversus: "Grand Quiz — versus",
   mot: "Mot du jour",
   perroquet: "Le Perroquet",
+  imposteur: "L'Imposteur",
   case: "Ouverture de caisse",
   duplicate: "Doublon reconverti",
   admin: "Ajustement admin",
@@ -705,7 +720,7 @@ function MysteryCard() {
         <span className="arc-game-head">
           <span className="arc-game-name">Jeu mystère</span>
           <span className="arc-game-pitch">
-            Un septième mini-jeu se monte dans l'arrière-salle. Pas encore
+            Un huitième mini-jeu se monte dans l'arrière-salle. Pas encore
             d'indice — repasse traîner par ici.
           </span>
         </span>
@@ -783,6 +798,39 @@ function GameArt({ game, cover, cover2 }) {
           <span className="arc-art-pq-mic">
             <i className="arc-art-pq-grill" />
             <i className="arc-art-pq-stem" />
+          </span>
+        </span>
+      </span>
+    );
+  }
+  // L'Imposteur ne dépend pas non plus de la bibliothèque : ce qu'on cherche
+  // n'est pas un jeu mais une PERSONNE. Son art est donc la règle elle-même,
+  // jouée avec la paire d'exemple du jeu — DEUX fois Animal Crossing, UNE fois
+  // Tomodachi Life. On comprend le mode sans avoir lu une ligne : trois cartes
+  // qui se ressemblent, et une qui n'est pas la bonne.
+  //
+  // Les deux jaquettes sont servies depuis /public (client/public/arcade) et
+  // non depuis IGDB : c'est le seul art de la grille qui ne vient pas de la
+  // bibliothèque du joueur, donc rien ne le fournirait à l'exécution — et deux
+  // fichiers de 14 Ko posés à côté de l'app coûtent moins qu'un aller-retour
+  // vers un CDN externe à chaque affichage de l'arcade. La première carte et
+  // la deuxième pointent le MÊME fichier : le navigateur ne le charge qu'une
+  // fois, et c'est aussi ce qui rend les deux « pareilles » au pixel près.
+  if (game.key === "imposteur") {
+    return (
+      <span className="arc-game-art" aria-hidden="true">
+        <span className="arc-art-imp">
+          <span className="arc-art-imp-card a">
+            <img src="/arcade/imposteur-a.jpg" alt="" loading="lazy" draggable="false" />
+          </span>
+          <span className="arc-art-imp-card b">
+            <img src="/arcade/imposteur-a.jpg" alt="" loading="lazy" draggable="false" />
+          </span>
+          <span className="arc-art-imp-card c odd">
+            <img src="/arcade/imposteur-b.jpg" alt="" loading="lazy" draggable="false" />
+            <i className="arc-art-imp-mask">
+              <VenetianMask size={11} />
+            </i>
           </span>
         </span>
       </span>

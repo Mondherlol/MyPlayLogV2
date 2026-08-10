@@ -33,6 +33,7 @@ import perroquetRoutes from "./routes/perroquet.js";
 import perroquetVersusRoutes from "./routes/perroquetVersus.js";
 import perroquetSoundRoutes from "./routes/perroquetSounds.js";
 import perroquetAdminRoutes from "./routes/perroquetAdmin.js";
+import imposteurRoutes from "./routes/imposteur.js";
 import presenceRoutes from "./routes/presence.js";
 import arcadeRoutes from "./routes/arcade.js";
 import steamRoutes from "./routes/steam.js";
@@ -134,6 +135,10 @@ app.use("/api/mot", motRoutes);
 app.use("/api/perroquet/versus", perroquetVersusRoutes);
 app.use("/api/perroquet/sounds", perroquetSoundRoutes);
 app.use("/api/perroquet", perroquetRoutes);
+// L'Imposteur n'a pas de mode solo : un seul routeur, donc aucun ordre à
+// respecter ici. Le piège des cinq autres jeux se rejoue en revanche À
+// L'INTÉRIEUR du routeur, où `GET /leaderboard` doit passer avant `GET /:code`.
+app.use("/api/imposteur", imposteurRoutes);
 app.use("/api/presence", presenceRoutes);
 app.use("/api/arcade", arcadeRoutes);
 app.use("/api/steam", steamRoutes);

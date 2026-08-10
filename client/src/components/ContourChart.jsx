@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 // ======================================================================
 //  Les deux courbes superposées
 // ======================================================================
@@ -16,6 +18,21 @@
 // normaliser séparément ferait coïncider n'importe quoi avec n'importe quoi :
 // une imitation ratée aurait l'air juste, et le dessin mentirait sur le score
 // qu'il est précisément là pour expliquer.
+//
+// ------------------------------------------- POURQUOI LE TRAIT SE ROMPT
+// Le graphique donnait l'impression de tracer n'importe quoi — « ça monte dans
+// les silences, ça descend là où je parle » — et c'était vrai. Les instants sans
+// hauteur mesurable (silence, souffle, consonne) sont comblés par interpolation
+// côté serveur, parce que le barème a besoin d'une série continue ; on les
+// dessinait ensuite exactement comme des notes mesurées. Le tracé montrait donc
+// du remplissage avec l'aplomb d'une mesure.
+//
+// Désormais le masque `voiced` accompagne chaque contour et le trait plein
+// s'arrête où la mesure s'arrête : les bouts interpolés restent en filet
+// fantôme. Et l'aire de fond n'est plus l'aire sous la courbe de hauteur (qui ne
+// voulait rien dire : la hauteur est relative, son « sous » est arbitraire) mais
+// L'ENVELOPPE DE VOLUME DE L'ORIGINAL. On voit d'un coup d'œil où le son est
+// fort, où il se tait, et pourquoi le trait s'interrompt là.
 //
 // ---------------------------------------------------------------- `progress`
 // De 0 à 1 : la courbe se DESSINE au rythme de la lecture, et un point la suit
@@ -45,9 +62,38 @@ function smoothPath(pts) {
   return d;
 }
 
+// Les intervalles d'indices où il y a VRAIMENT une hauteur. On passe la moitié
+// comme seuil : les valeurs intermédiaires du masque sont des frontières de
+// silence (le contour est ré-échantillonné à 64 points, une frontière tombe
+// rarement pile sur un point).
+//
+// Les tronçons d'un seul point sont jetés : un trait de zéro pixel ne se voit
+// pas, il ne fait que trouer la courbe pour rien.
+function voicedSpans(mask, n) {
+  if (!mask?.length) return [[0, n - 1]];
+  const spans = [];
+  let start = -1;
+  for (let i = 0; i < n; i += 1) {
+    const on = (mask[i] ?? 1) >= 0.5;
+    if (on && start < 0) start = i;
+    if (!on && start >= 0) {
+      if (i - 1 > start) spans.push([start, i - 1]);
+      start = -1;
+    }
+  }
+  if (start >= 0 && n - 1 > start) spans.push([start, n - 1]);
+  return spans;
+}
+
 export default function ContourChart({
   target,
   attempt,
+  // Les enveloppes et les masques de voisement, quand on les a. Le composant
+  // fonctionne sans (vignettes, contours d'avant leur existence) : il retombe
+  // alors sur deux traits pleins, l'ancien comportement.
+  targetEnergy = null,
+  targetVoiced = null,
+  attemptVoiced = null,
   compact = false,
   name,
   progress = null,
@@ -57,6 +103,10 @@ export default function ContourChart({
   progressOn = "attempt",
   band,
 }) {
+  // Les identifiants des clips doivent être uniques par instance : le versus
+  // affiche jusqu'à sept graphiques sur le même écran, et deux `clipPath` de
+  // même id feraient tous porter le découpage du premier.
+  const uid = useId().replace(/:/g, "");
   if (!target?.length || !attempt?.length) return null;
 
   const W = compact ? 90 : 320;
@@ -70,9 +120,10 @@ export default function ContourChart({
   // un gouffre.
   const span = Math.max(4, hi - lo);
 
+  const xOf = (i, n) => pad + (i / (n - 1)) * (W - pad * 2);
   const toPoints = (serie) =>
     serie.map((v, i) => ({
-      x: pad + (i / (serie.length - 1)) * (W - pad * 2),
+      x: xOf(i, serie.length),
       y: H - pad - ((v - lo) / span) * (H - pad * 2),
     }));
 
@@ -81,6 +132,28 @@ export default function ContourChart({
   const alt = name
     ? `La mélodie de ${name} comparée à l'originale`
     : "Ta mélodie comparée à l'originale";
+
+  // Un rectangle par tronçon mesuré, débordant d'un demi-pas de chaque côté pour
+  // que la coupe tombe entre deux points et non sur l'un d'eux.
+  const clipRects = (mask, n) => {
+    const half = (W - pad * 2) / (n - 1) / 2;
+    return voicedSpans(mask, n).map(([a, b], k) => (
+      <rect
+        key={k}
+        x={xOf(a, n) - half}
+        y={-H}
+        width={xOf(b, n) - xOf(a, n) + half * 2}
+        height={H * 3}
+      />
+    ));
+  };
+
+  const clips = (
+    <defs>
+      <clipPath id={`pqv-t-${uid}`}>{clipRects(targetVoiced, target.length)}</clipPath>
+      <clipPath id={`pqv-a-${uid}`}>{clipRects(attemptVoiced, attempt.length)}</clipPath>
+    </defs>
+  );
 
   if (compact)
     return (
@@ -91,8 +164,17 @@ export default function ContourChart({
         aria-label={alt}
         preserveAspectRatio="none"
       >
-        <path className="pq-curve target" d={smoothPath(targetPts)} />
-        <path className="pq-curve attempt" d={smoothPath(attemptPts)} />
+        {clips}
+        <path
+          className="pq-curve target"
+          d={smoothPath(targetPts)}
+          clipPath={`url(#pqv-t-${uid})`}
+        />
+        <path
+          className="pq-curve attempt"
+          d={smoothPath(attemptPts)}
+          clipPath={`url(#pqv-a-${uid})`}
+        />
       </svg>
     );
 
@@ -112,28 +194,57 @@ export default function ContourChart({
 
   const dash = { strokeDasharray: 1, strokeDashoffset: 1 - (at ?? 1) };
   const liveOn = (which) => at != null && progressOn === which;
+  // Le filet fantôme suit le MÊME dévoilement que le trait plein : sinon la
+  // forme entière du son serait déjà visible avant qu'on l'ait entendu.
+  const revealProps = (which) =>
+    liveOn(which) ? { pathLength: 1, style: dash } : {};
+
+  // L'enveloppe de volume de l'original, en fond. C'est elle qui rend le reste
+  // lisible : les creux sont les silences, et c'est là que les traits se
+  // rompent. Son échelle est la sienne (0 en bas, le pic à mi-hauteur) — elle ne
+  // se lit pas sur l'axe des hauteurs, elle situe le son dans le temps.
+  const envPath = (() => {
+    if (!targetEnergy?.length) return "";
+    const n = targetEnergy.length;
+    const base = H - pad * 0.4;
+    const tall = (H - pad * 2) * 0.55;
+    const pts = targetEnergy.map((v, i) => ({
+      x: xOf(i, n),
+      y: base - Math.min(1, Math.max(0, v)) * tall,
+    }));
+    return `${smoothPath(pts)} L${pts[n - 1].x.toFixed(1)} ${base} L${pts[0].x.toFixed(1)} ${base} Z`;
+  })();
 
   return (
     <figure className={`pq-chart ${band ? `band-${band}` : ""} ${at != null ? "live" : ""}`}>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={alt}>
-        {/* L'aire sous l'original : elle donne du corps à la référence sans
-            ajouter une deuxième ligne à lire. */}
+        {clips}
+        {envPath && <path className="pq-curve-env" d={envPath} />}
+
         <path
-          className="pq-curve-area"
-          d={`${smoothPath(targetPts)} L${W - pad} ${H} L${pad} ${H} Z`}
+          className="pq-curve ghost target"
+          d={smoothPath(targetPts)}
+          {...revealProps("target")}
         />
         <path
           className={`pq-curve target ${liveOn("target") ? "on" : ""}`}
           d={smoothPath(targetPts)}
-          pathLength={liveOn("target") ? 1 : undefined}
-          style={liveOn("target") ? dash : undefined}
+          clipPath={`url(#pqv-t-${uid})`}
+          {...revealProps("target")}
+        />
+
+        <path
+          className="pq-curve ghost attempt"
+          d={smoothPath(attemptPts)}
+          {...revealProps("attempt")}
         />
         <path
           className={`pq-curve attempt ${liveOn("attempt") ? "on" : ""}`}
           d={smoothPath(attemptPts)}
-          pathLength={liveOn("attempt") ? 1 : undefined}
-          style={liveOn("attempt") ? dash : undefined}
+          clipPath={`url(#pqv-a-${uid})`}
+          {...revealProps("attempt")}
         />
+
         {head && (
           <circle
             className={`pq-curve-head ${progressOn}`}
@@ -146,6 +257,9 @@ export default function ContourChart({
       <figcaption>
         <span className="pq-key target">l'original</span>
         <span className="pq-key attempt">{name || "toi"}</span>
+        {(targetVoiced || attemptVoiced) && (
+          <span className="pq-key mute">sans hauteur</span>
+        )}
       </figcaption>
     </figure>
   );

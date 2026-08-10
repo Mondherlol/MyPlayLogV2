@@ -11,6 +11,7 @@ import PerroquetVersus, {
   REVEAL_SEC,
 } from "../models/PerroquetVersus.js";
 import SoundClip from "../models/SoundClip.js";
+import PerroquetTake from "../models/PerroquetTake.js";
 import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { emitTo, onlineAmong } from "../lib/realtime.js";
@@ -282,6 +283,7 @@ async function beginReveal(room) {
       clipContours.set(String(round.clip), {
         pitch: clip.contour.pitch,
         energy: clip.contour.energy,
+        voiced: clip.contour.voiced || null,
       });
   }
 
@@ -672,7 +674,9 @@ router.post("/:code/take", upload.single("attempt"), async (req, res) => {
         energyScore: result?.energy || 0,
         durationScore: result?.duration || 0,
         band: result?.band || "miss",
-        contour: contour ? { pitch: contour.pitch, energy: contour.energy } : null,
+        contour: contour
+          ? { pitch: contour.pitch, energy: contour.energy, voiced: contour.voiced }
+          : null,
         submitted: true,
       });
       touch(r);
@@ -691,6 +695,26 @@ router.post("/:code/take", upload.single("attempt"), async (req, res) => {
     });
 
     if (!out) return res.status(409).json({ error: "Copie non retenue." });
+
+    // L'archive des essais (models/PerroquetTake.js). ELLE COMPTE DOUBLE ICI :
+    // le salon porte un TTL de six heures, donc sans cette ligne les
+    // enregistrements d'une soirée à six disparaissent de la base pendant la
+    // nuit — en laissant leurs fichiers sur le disque. Écrite après le verrou,
+    // pour n'archiver que les copies effectivement retenues.
+    if (rel)
+      PerroquetTake.create({
+        user: req.userId,
+        mode: "versus",
+        url: rel,
+        clip: round.clip,
+        label: round.label || "",
+        clipUrl: round.clipUrl || "",
+        imageUrl: round.imageUrl || "",
+        score: result?.score || 0,
+        band: result?.band || "miss",
+        versusCode: room.code,
+      }).catch(() => {});
+
     res.json({
       score: result?.score || 0,
       band: result?.band || "miss",

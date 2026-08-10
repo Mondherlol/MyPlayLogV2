@@ -35,6 +35,8 @@ const VERSUS_EVENTS = [
   "pxversus",
   "quizversus",
   "pqversus", // Le Perroquet
+  "imposteur", // L'Imposteur (le seul jeu 100 % à plusieurs : pas de suffixe
+  // « versus », son nom d'évènement EST son nom)
 ];
 
 // Durée d'affichage d'une bulle « X t'a écrit » (ms).
