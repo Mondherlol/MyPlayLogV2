@@ -28,19 +28,40 @@
 // « canard » et le « monstre » que tout le monde connaît (et que les dessins
 // animés font depuis toujours en accélérant la bande). Décaler la hauteur SANS
 // toucher au débit demanderait un vocodeur de phase — beaucoup de code pour un
-// résultat moins drôle. Le troisième module l'amplitude par un oscillateur
-// grave : c'est la voix de robot, et elle ne change ni la durée ni le débit.
+// résultat moins drôle. Les deux autres ne touchent ni à la durée ni au débit :
+// le ROBOT module l'amplitude par un oscillateur grave, le MÉGAPHONE sature le
+// signal et le passe dans la bande étroite d'un porte-voix.
 
 export const VOICE_EFFECTS = [
   { id: "none", label: "Normal", icon: "mic", hint: "Ta voix, telle quelle" },
   { id: "duck", label: "Canard", icon: "bird", rate: 1.55, hint: "Aiguë et pressée" },
   { id: "deep", label: "Monstre", icon: "ghost", rate: 0.72, hint: "Grave et lente" },
   { id: "robot", label: "Robot", icon: "bot", rate: 1, hint: "Métallique" },
+  // Le dernier ne change ni la hauteur ni le débit : il SATURE. C'est la voix
+  // qui force, celle du haut-parleur poussé trop loin — l'effet qu'on attend
+  // quand on crie un cri de jeu vidéo, et le seul du lot qui rende une imitation
+  // plus impressionnante au lieu de la déguiser.
+  { id: "mega", label: "Mégaphone", icon: "mega", rate: 1, hint: "Saturée, poussée à fond" },
 ];
 
 // Une voix reste parfaitement intelligible à 16 kHz — et un message de cinq
 // minutes tient sous la limite d'envoi.
 const FX_RATE = 16000;
+
+// La courbe de saturation du mégaphone, échantillonnée une fois : un
+// `WaveShaper` veut une table, pas une formule. tanh comprime en douceur —
+// linéaire au centre, de plus en plus plate vers les bords, sans le coude franc
+// d'un écrêtage.
+let softCurve = null;
+function softClipCurve(points = 1024) {
+  if (softCurve) return softCurve;
+  softCurve = new Float32Array(points);
+  for (let i = 0; i < points; i += 1) {
+    const x = (i / (points - 1)) * 2 - 1;
+    softCurve[i] = Math.tanh(x * 2.2);
+  }
+  return softCurve;
+}
 
 function ctxClass() {
   return typeof window !== "undefined"
@@ -156,7 +177,36 @@ export async function renderVoice(blob, { effectId = "none", start = 0, end = 1 
   src.buffer = decoded;
   src.playbackRate.value = rate;
 
-  if (fx.id === "robot") {
+  if (fx.id === "mega") {
+    // Saturation douce (tangente hyperbolique) : au-delà d'un certain niveau, le
+    // signal cesse de monter et se déforme au lieu d'écrêter carré. Un simple
+    // gain élevé ne donnerait rien — la lecture ramène tout à l'échelle — et un
+    // écrêtage dur donnerait du bruit blanc, pas une voix qui force.
+    const drive = ctx.createGain();
+    drive.gain.value = 4;
+    const shaper = ctx.createWaveShaper();
+    shaper.curve = softClipCurve();
+    shaper.oversample = "4x"; // sans quoi la distorsion replie des aigus faux
+    // La bande d'un haut-parleur de mégaphone : rien sous 300 Hz (le corps de la
+    // voix disparaît, c'est ce qui fait « porte-voix ») et rien au-dessus de
+    // 3,5 kHz (la saturation y est agressive).
+    const hp = ctx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 320;
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 3500;
+    // La saturation remonte le niveau moyen : on redescend pour ne pas rendre un
+    // fichier qui sature à la lecture par-dessus.
+    const out = ctx.createGain();
+    out.gain.value = 0.55;
+    src.connect(drive);
+    drive.connect(shaper);
+    shaper.connect(hp);
+    hp.connect(lp);
+    lp.connect(out);
+    out.connect(ctx.destination);
+  } else if (fx.id === "robot") {
     // Modulation en anneau : on multiplie le signal par un oscillateur grave.
     // Le gain part de 0 et c'est l'oscillateur (qui va de -1 à +1) qui le pilote
     // — d'où une multiplication, et non une simple addition de bourdon.

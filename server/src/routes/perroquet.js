@@ -95,6 +95,10 @@ const clipFull = (req, c) => ({
   // Le crédit du déposant, pour les sons de librairie. C'est la contrepartie du
   // dépôt libre : on a envie de savoir de qui vient le cri qu'on vient d'imiter.
   addedBy: c.owner ? c.ownerName || "" : "",
+  // L'effet à passer sur la voix du joueur à la révélation. Il n'arrive qu'ICI,
+  // avec la réponse : annoncé avant, « voix de robot » soufflerait à moitié de
+  // quel personnage il s'agit.
+  effect: c.effect || "none",
   contour: c.contour
     ? {
         pitch: c.contour.pitch,
@@ -205,6 +209,7 @@ router.post("/start", requireAuth, async (req, res) => {
         clipUrl: c.url,
         imageUrl: c.image || "",
         addedBy: c.owner ? c.ownerName || "" : "",
+        effect: c.effect || "none",
       })),
       challengeOf: challenge?._id || null,
       challengedUser: challenge?.user?._id || null,
@@ -436,6 +441,7 @@ const serializeGame = (req, g) => ({
     game: r.game || null,
     image: abs(req, r.imageUrl) || "",
     addedBy: r.addedBy || "",
+    effect: r.effect || "none",
     clipUrl: abs(req, r.clipUrl),
     attemptUrl: abs(req, r.attemptUrl),
     score: r.score,

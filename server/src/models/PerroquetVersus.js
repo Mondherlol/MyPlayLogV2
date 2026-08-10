@@ -72,6 +72,10 @@ const roundSchema = new mongoose.Schema(
     // Le pseudo du joueur qui a déposé ce son quand il vient d'une librairie
     // personnelle : « proposé par Momo », à la révélation. Vide pour l'officiel.
     addedBy: { type: String, default: "" },
+    // L'effet passé sur les voix à la révélation (« voix de robot »). Copié au
+    // tirage, comme le nom et l'image : la manche doit se rejouer telle qu'elle
+    // a été jouée, même si le clip est réglé autrement plus tard.
+    effect: { type: String, default: "none" },
     takes: { type: [takeSchema], default: [] },
   },
   { _id: false }

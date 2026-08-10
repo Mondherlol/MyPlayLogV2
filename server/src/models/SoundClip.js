@@ -49,6 +49,30 @@ const soundClipSchema = new mongoose.Schema(
     image: { type: String, default: "" },
     contour: { type: contourSchema, default: () => ({}) },
 
+    // ------------------------------------------------ l'effet de la révélation
+    // « Wall-E » demande une voix de robot, « Kirby » une voix de canard. On
+    // coche l'effet au dépôt du son, et à la révélation la TENTATIVE DU JOUEUR
+    // est rejouée à travers lui : on s'entend en robot juste après avoir crié
+    // normalement, et c'est là qu'on rit.
+    //
+    // TROIS CHOSES QUE L'EFFET N'EST PAS, et il fallait choisir :
+    //   - il ne touche PAS au son de référence (c'est le son du jeu, il est déjà
+    //     ce qu'il doit être) ;
+    //   - il ne touche PAS au fichier enregistré : on stocke la voix brute. Le
+    //     rendu se fait à la lecture, dans le navigateur (client/src/lib/
+    //     voiceFx.js), donc changer l'effet d'un son n'invalide aucune archive ;
+    //   - il n'entre PAS dans le barème. Noter une voix passée au modulateur en
+    //     anneau contre un cri de jeu ne voudrait rien dire : le contour de
+    //     hauteur, qui est tout le barème, y survivrait mal. On mesure la voix
+    //     telle qu'elle a été criée, on la déguise seulement pour l'écoute.
+    // Les identifiants sont ceux des messages vocaux (client/src/lib/voiceFx.js) :
+    // même liste, mêmes rendus, une seule chose à maintenir.
+    effect: {
+      type: String,
+      enum: ["none", "duck", "deep", "robot", "mega"],
+      default: "none",
+    },
+
     // 1 (facile à imiter : une note, deux syllabes) → 5 (mélodie tordue).
     // Sert à composer une partie qui monte en difficulté plutôt qu'à tirer
     // cinq monstres d'affilée.
@@ -85,5 +109,9 @@ const soundClipSchema = new mongoose.Schema(
 soundClipSchema.index({ active: 1, difficulty: 1 });
 // La librairie d'un joueur, et le tirage « sons des joueurs présents ».
 soundClipSchema.index({ owner: 1, createdAt: -1 });
+
+// Les effets acceptés, pour que les routes valident sans redéclarer la liste.
+export const EFFECTS = ["none", "duck", "deep", "robot", "mega"];
+export const cleanEffect = (v) => (EFFECTS.includes(String(v)) ? String(v) : "none");
 
 export default mongoose.model("SoundClip", soundClipSchema);

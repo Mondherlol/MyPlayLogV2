@@ -5,7 +5,7 @@ import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import multer from "multer";
 import ffmpegStatic from "ffmpeg-static";
-import SoundClip from "../models/SoundClip.js";
+import SoundClip, { cleanEffect } from "../models/SoundClip.js";
 import PerroquetGame from "../models/PerroquetGame.js";
 import PerroquetTake from "../models/PerroquetTake.js";
 import User from "../models/User.js";
@@ -135,6 +135,8 @@ const serialize = (req, c) => ({
   image: abs(req, c.image) || "",
   difficulty: c.difficulty,
   active: c.active,
+  // L'effet appliqué à la voix du joueur à la révélation (« voix de robot »).
+  effect: c.effect || "none",
   // Qui l'a déposé : vide pour la banque officielle, le pseudo du joueur pour
   // un son de librairie. C'est ce qui distingue les deux mondes dans l'écran.
   owner: c.owner ? c.ownerName || "un joueur" : "",
@@ -246,6 +248,9 @@ router.post("/", upload, async (req, res) => {
       url: `/uploads/perroquet/bank/${clipFile.filename}`,
       image: imgFile ? `/uploads/perroquet/img/${imgFile.filename}` : "",
       contour,
+      // L'effet de la révélation. Filtré par le modèle plutôt que cru sur
+      // parole : c'est du multipart, donc du texte libre.
+      effect: cleanEffect(req.body?.effect),
       active: req.body?.active !== "false",
     });
 
@@ -647,6 +652,10 @@ router.patch("/:id", editUpload, async (req, res) => {
       clip.label = v;
     }
     if (typeof req.body?.game === "string") clip.game = req.body.game.trim();
+    // L'effet se corrige après coup, contrairement à l'audio : il ne touche ni
+    // le contour ni les statistiques, il ne vit qu'à la lecture. C'est aussi le
+    // réglage qu'on a le plus envie d'essayer une fois le son entendu en jeu.
+    if (req.body?.effect !== undefined) clip.effect = cleanEffect(req.body.effect);
     if (req.body?.difficulty != null)
       clip.difficulty = Math.max(1, Math.min(5, Number(req.body.difficulty) || 2));
     // En multipart tout arrive en texte : « false » est une chaîne, et une

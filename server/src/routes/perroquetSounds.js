@@ -1,13 +1,15 @@
 import express from "express";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import multer from "multer";
-import SoundClip from "../models/SoundClip.js";
+import SoundClip, { cleanEffect } from "../models/SoundClip.js";
 import PerroquetGame from "../models/PerroquetGame.js";
 import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { contourOf } from "../lib/soundContour.js";
+import { needsTranscode, toMp3 } from "../lib/audioConvert.js";
 
 // ======================================================================
 //  La librairie de sons d'un joueur
@@ -60,7 +62,33 @@ const EXT = {
   "audio/x-m4a": ".m4a",
   "audio/aac": ".aac",
   "audio/flac": ".flac",
+  // Les mémos vocaux de téléphone. Ils ne RESTENT pas en AMR : aucun navigateur
+  // ne sait le décoder, donc le fichier est transcodé en mp3 juste après
+  // l'arrivée (cf. plus bas). Sans cette conversion, le dépôt réussirait — le
+  // serveur, lui, décode l'AMR sans problème — et le son serait muet en partie.
+  "audio/amr": ".amr",
+  "audio/amr-wb": ".amr",
+  "audio/3gpp": ".3gp",
+  "audio/3gpp2": ".3gp",
 };
+
+// Les mémos vocaux arrivent souvent SANS type utilisable : Android envoie un
+// `.amr` en `application/octet-stream`, et certains explorateurs de fichiers ne
+// déclarent rien du tout. Refuser sur cette base seule reviendrait à refuser le
+// format qu'on est précisément en train d'accepter — on regarde donc aussi le
+// nom du fichier.
+const NAME_EXT = new Set([
+  ".amr", ".3gp", ".3gpp", ".3g2", ".awb", ".wma", ".aif", ".aiff",
+  ".wav", ".mp3", ".ogg", ".oga", ".opus", ".webm", ".m4a", ".mp4", ".aac", ".flac",
+]);
+
+// Le type déclaré, ou le nom à défaut. Rend l'extension sous laquelle stocker.
+function extFor(file) {
+  const mime = String(file.mimetype).split(";")[0];
+  if (Object.hasOwn(EXT, mime)) return EXT[mime];
+  const ext = path.extname(file.originalname || "").toLowerCase();
+  return NAME_EXT.has(ext) ? ext : null;
+}
 
 // Cinq secondes de PCM tiennent largement dedans ; la borne est là pour le
 // fichier « on a oublié de couper », pas pour l'usage normal.
@@ -91,14 +119,14 @@ const upload = multer({
         null,
         file.fieldname === "image"
           ? `i-${stamp}${IMG_EXT[base] || ".png"}`
-          : `u-${stamp}${EXT[base] || ".wav"}`
+          : `u-${stamp}${extFor(file) || ".wav"}`
       );
     },
   }),
   limits: { fileSize: MAX_BYTES },
   fileFilter: (req, file, cb) => {
     const type = String(file.mimetype).split(";")[0];
-    cb(null, file.fieldname === "image" ? Object.hasOwn(IMG_EXT, type) : Object.hasOwn(EXT, type));
+    cb(null, file.fieldname === "image" ? Object.hasOwn(IMG_EXT, type) : !!extFor(file));
   },
 }).fields([
   { name: "clip", maxCount: 1 },
@@ -116,6 +144,7 @@ const serialize = (req, c) => ({
   image: abs(req, c.image) || "",
   difficulty: c.difficulty,
   active: c.active,
+  effect: c.effect || "none",
   durationMs: c.contour?.durationMs || 0,
   timesPlayed: c.timesPlayed || 0,
   avgScore: c.timesPlayed ? Math.round(c.scoreSum / c.timesPlayed) : null,
@@ -142,6 +171,66 @@ router.get("/", async (req, res) => {
 });
 
 // ============================================================
+//  POST /convert — rendre un fichier lisible par le navigateur
+// ============================================================
+// ⚠️ DÉCLARÉE AVANT `/:id` : sinon `PATCH/DELETE /:id` happerait « convert »
+// comme un identifiant de son. Même piège que les routes `/demo` de l'admin.
+//
+// Le rogneur (client/src/components/AudioTrimmer.jsx) a besoin de DÉCODER le
+// fichier pour dessiner sa forme d'onde et laisser choisir les cinq secondes.
+// Il passe par `decodeAudioData`, qui ne sait pas lire l'AMR des mémos vocaux —
+// et aucun navigateur ne le saura jamais.
+//
+// Deux issues possibles, et une seule tient : soit on transcode ici et le joueur
+// rogne normalement, soit on rogne côté serveur — c'est-à-dire qu'on choisit à
+// sa place quel bout du mémo garder, exactement la décision qu'on refuse de
+// prendre pour lui (cf. l'en-tête du fichier). Donc on transcode.
+//
+// La réponse est le mp3 BRUT, pas du JSON : le client le remet dans un `File` et
+// la suite du dépôt ne sait même pas qu'une conversion a eu lieu. Rien n'est
+// gardé sur le disque — cette route ne dépose pas un son, elle rend un fichier
+// lisible.
+const convertUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, os.tmpdir()),
+    filename: (req, file, cb) =>
+      cb(null, `mpl-in-${Date.now()}-${Math.round(Math.random() * 1e6)}${
+        path.extname(file.originalname || "").toLowerCase().slice(0, 8) || ".bin"
+      }`),
+  }),
+  // Plus large que le dépôt : ici on reçoit le fichier D'ORIGINE, pas l'extrait
+  // de cinq secondes. Un mémo vocal de trois minutes ou un mp3 arraché d'une
+  // vidéo passent par là.
+  limits: { fileSize: 30 * 1024 * 1024 },
+}).single("clip");
+
+router.post("/convert", convertUpload, async (req, res) => {
+  const src = req.file?.path;
+  // Les deux fichiers temporaires — celui reçu et le mp3 produit — sont effacés
+  // ici, quoi qu'il arrive : cette route ne dépose rien, elle répond.
+  let out = null;
+  const cleanup = () => {
+    for (const f of [src, out]) if (f) fs.promises.unlink(f).catch(() => {});
+  };
+  try {
+    if (!src) return res.status(400).json({ error: "Aucun fichier reçu." });
+    out = await toMp3(src, { maxSeconds: 180 });
+    const buf = await fs.promises.readFile(out);
+    res.type("audio/mpeg").send(buf);
+  } catch (err) {
+    console.error("perroquet convert error:", err.message);
+    res.status(422).json({
+      error:
+        err.message === "aucune piste audio"
+          ? "Ce fichier ne contient pas de son."
+          : "Impossible de lire ce fichier audio.",
+    });
+  } finally {
+    cleanup();
+  }
+});
+
+// ============================================================
 //  POST / — déposer un son
 // ============================================================
 // Multipart : le fichier sous `clip`, plus label / game / difficulty.
@@ -154,9 +243,14 @@ router.get("/", async (req, res) => {
 router.post("/", upload, async (req, res) => {
   const clipFile = req.files?.clip?.[0] || null;
   const imgFile = req.files?.image?.[0] || null;
+  // Le chemin qu'on garde vraiment, et le nom sous lequel il est servi. Ils
+  // changent si le fichier doit être transcodé, d'où ces deux variables plutôt
+  // qu'un usage direct de `clipFile.filename` partout.
+  let clipPath = clipFile?.path || null;
+  let clipName = clipFile?.filename || null;
   const cleanup = () => {
-    for (const f of [clipFile, imgFile]) {
-      if (f) fs.promises.unlink(f.path).catch(() => {});
+    for (const f of [clipPath, imgFile?.path, clipFile?.path]) {
+      if (f) fs.promises.unlink(f).catch(() => {});
     }
   };
   try {
@@ -181,9 +275,35 @@ router.post("/", upload, async (req, res) => {
       });
     }
 
+    // ------------------------------------------------ le filet de sécurité AMR
+    // Le client convertit normalement AVANT de rogner (cf. la route /convert),
+    // et ce qui arrive ici est un wav sorti du rogneur. Mais rien ne garantit ce
+    // chemin — l'app mobile, un vieux client, un envoi direct — et un .amr
+    // stocké tel quel serait un son que PERSONNE ne peut écouter en partie,
+    // alors que son dépôt aurait répondu « c'est bon » : le serveur, lui, décode
+    // l'AMR sans broncher. On le convertit donc aussi ici, et on ne garde que le
+    // mp3. Placé APRÈS les vérifications gratuites (nom, quota) : inutile de
+    // payer un ffmpeg pour un dépôt qu'on va refuser de toute façon.
+    if (
+      needsTranscode(clipFile.originalname, clipFile.mimetype) ||
+      needsTranscode(clipName)
+    ) {
+      try {
+        const mp3 = await toMp3(clipPath, { maxSeconds: 30, outDir: USER_DIR });
+        fs.promises.unlink(clipPath).catch(() => {});
+        clipPath = mp3;
+        clipName = path.basename(mp3);
+      } catch {
+        cleanup();
+        return res
+          .status(422)
+          .json({ error: "Impossible de convertir ce fichier audio." });
+      }
+    }
+
     let contour;
     try {
-      contour = await contourOf(clipFile.path);
+      contour = await contourOf(clipPath);
     } catch (e) {
       cleanup();
       return res.status(422).json({
@@ -214,9 +334,10 @@ router.post("/", upload, async (req, res) => {
     const me = await User.findById(req.userId).select("username").lean();
     const clip = await SoundClip.create({
       label,
-      url: `/uploads/perroquet/user/${clipFile.filename}`,
+      url: `/uploads/perroquet/user/${clipName}`,
       image: imgFile ? `/uploads/perroquet/img/${imgFile.filename}` : "",
       contour,
+      effect: cleanEffect(req.body?.effect),
       active: true,
       owner: req.userId,
       ownerName: me?.username || "",
@@ -247,6 +368,7 @@ router.patch("/:id", async (req, res) => {
       clip.label = v;
     }
     if (typeof req.body?.active === "boolean") clip.active = req.body.active;
+    if (req.body?.effect !== undefined) clip.effect = cleanEffect(req.body.effect);
 
     await clip.save();
     res.json({ item: serialize(req, clip) });

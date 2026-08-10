@@ -55,5 +55,29 @@ export async function apiUpload(path, formData, token, method = "POST") {
   return data;
 }
 
+// Upload d'un fichier dont la réponse est un FICHIER, pas du JSON : le serveur
+// rend des octets (typiquement un audio transcodé, cf. /perroquet/sounds/convert)
+// qu'on remet directement dans un Blob. Une variante d'`apiUpload` plutôt qu'un
+// drapeau : les deux ne rendent pas la même chose, et un appelant qui se trompe
+// doit s'en apercevoir tout de suite.
+export async function apiUploadForBlob(path, formData, token, method = "POST") {
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+  if (!res.ok) {
+    // L'échec, lui, arrive en JSON : c'est là qu'est le message à afficher.
+    let data = null;
+    try {
+      data = await res.json();
+    } catch {
+      /* pas de JSON */
+    }
+    throw new Error(data?.error || "Échec de l'upload.");
+  }
+  return res.blob();
+}
+
 // Base de l'API (utile pour construire des URLs d'images servies par le serveur)
 export const API_BASE = BASE;

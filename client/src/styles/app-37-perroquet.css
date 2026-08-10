@@ -675,6 +675,96 @@
   transition: width 0.8s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 
+/* ======================================================================
+   Les effets de voix
+   ======================================================================
+   Cochés au dépôt d'un son, appliqués à la voix du joueur à la révélation (cf.
+   client/src/lib/clipFx.js). Chaque effet a SA couleur : on choisit quatre fois
+   par son déposé, et une rangée de pastilles identiques obligerait à relire les
+   libellés à chaque fois. */
+.pq-fx-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+.pq-fx-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--pq-dim, var(--text-soft));
+}
+.pq-fx-opts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pq-fx-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border, var(--pq-line));
+  border-radius: 999px;
+  background: var(--surface, var(--pq-panel));
+  color: var(--text-soft, var(--pq-dim));
+  font-size: 0.74rem;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease,
+    transform 0.15s ease;
+}
+.pq-fx-btn em { font-style: normal; font-weight: 700; }
+.pq-fx-btn:hover { transform: translateY(-1px); color: var(--text, var(--pq-ink)); }
+/* Coché : la couleur de l'effet prend toute la pastille. */
+.pq-fx-btn.on {
+  border-color: var(--fx);
+  background: color-mix(in srgb, var(--fx) 16%, transparent);
+  color: var(--fx-ink, var(--fx));
+}
+/* Un jeu de teintes par effet, repris par l'étiquette de la révélation. */
+.fx-none { --fx: #8b93a7; --fx-ink: #6b7488; }
+.fx-duck { --fx: #f0b93c; --fx-ink: #a97a09; }
+.fx-deep { --fx: #8b6cf0; --fx-ink: #6a49d8; }
+.fx-robot { --fx: #3fc9b5; --fx-ink: #1c8a7c; }
+.fx-mega { --fx: #f2734d; --fx-ink: #c24a22; }
+@media (prefers-color-scheme: dark) {
+  .fx-none { --fx-ink: #aeb6c8; }
+  .fx-duck { --fx-ink: #f5cd6d; }
+  .fx-deep { --fx-ink: #b9a3ff; }
+  .fx-robot { --fx-ink: #7fe6d6; }
+  .fx-mega { --fx-ink: #ff9f7d; }
+}
+
+/* L'étiquette « voix de robot » de la révélation : elle explique pourquoi on
+   s'entend déformé. Sans elle, on croit que le micro a un problème. */
+.pq-fx-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px dashed var(--fx, var(--pq-line-2));
+  color: var(--fx-ink, var(--fx));
+  background: color-mix(in srgb, var(--fx, #8b93a7) 10%, transparent);
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Dans une liste (banque d'admin, « mes sons ») l'étiquette accompagne le nom :
+   elle doit rester discrète, c'est une propriété du son, pas son titre. */
+.pq-admin-main .pq-fx-tag,
+.pq-lib-main .pq-fx-tag {
+  padding: 2px 7px;
+  font-size: 0.64rem;
+  border-style: solid;
+}
+
+/* La rangée compacte des extraits en attente : icônes seules, le libellé
+   n'apparaît que sur l'effet retenu. */
+.pq-fx-row.compact .pq-fx-btn { padding: 5px 8px; }
+
 /* ---------- Les extraits à réécouter ---------- */
 .pq-replay {
   display: flex;
@@ -2114,15 +2204,123 @@ span.pq-clip-av.ph {
   font-size: 0.88rem;
 }
 .pq-admin-in:focus { outline: none; border-color: var(--orange); }
-.pq-admin-cut {
+/* ---------- La fiche commune à tous les extraits ----------
+   Encadrée et titrée : sans cadre, on lit « un formulaire de plus » et on la
+   remplit en croyant décrire le premier extrait. C'est le seul bloc de l'écran
+   qui agit sur PLUSIEURS lignes à la fois, il doit se voir comme tel. */
+.pq-admin-common {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--pq-line-2);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--orange) 5%, var(--surface));
+}
+.pq-admin-common-head {
   display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
+  gap: 7px;
   font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--text);
+}
+.pq-admin-common-head em {
+  font-style: normal;
+  font-weight: 500;
+  font-size: 0.72rem;
   color: var(--text-soft);
 }
-.pq-admin-cut b { color: var(--text); font-variant-numeric: tabular-nums; }
+.pq-admin-common-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+/* L'aperçu du numéro dans l'interrupteur : c'est lui qui rend le réglage
+   compréhensible sans le lire (« ah, ça donnera Cri de Yoshi 2 »). */
+.pq-admin-common-row .pq-sw-line b {
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Une ligne qui ne suit plus la fiche commune. Repérable d'un coup d'œil :
+   autrement, régler le haut et voir trois lignes sur quinze ne pas bouger
+   ressemble à un bug. */
+.pq-admin-cut-row.apart {
+  border-left: 3px solid var(--orange);
+}
+.pq-admin-apart {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--accent-ink, var(--orange));
+}
+.pq-admin-revert {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+.pq-admin-revert:hover { color: var(--text); border-color: var(--border-strong); }
+
+/* ---------- Les extraits pris dans le fichier, en attente d'envoi ----------
+   Une pile de lignes numérotées, dont le numéro reprend celui dessiné sur la
+   forme d'onde du rogneur : c'est ce qui relie « la bande 3 » à « la ligne 3 »
+   quand on tire quinze sons du même fichier. */
+.pq-admin-cuts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pq-admin-cut-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+/* Refusé par le serveur : la ligne reste, elle porte sa raison. */
+.pq-admin-cut-row.bad { border-color: var(--pq-b-miss); }
+.pq-admin-cut-n {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.pq-admin-cut-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pq-admin-cut-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
 .pq-admin-msg {
   margin: 0;
   display: flex;

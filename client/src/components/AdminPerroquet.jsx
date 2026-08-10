@@ -7,12 +7,14 @@ import {
   Eye,
   EyeOff,
   ImagePlus,
+  Layers,
   Loader2,
   Music,
   Pencil,
   Play,
   Plus,
   RefreshCw,
+  RotateCcw,
   Scissors,
   Sparkles,
   Square,
@@ -25,6 +27,7 @@ import { apiFetch, apiUpload } from "../lib/api";
 import AudioTrimmer from "./AudioTrimmer";
 import { niceSoundName } from "../lib/soundTake";
 import { downloadFile } from "../lib/download";
+import VoiceFxPicker, { FxTag } from "./VoiceFxPicker";
 
 // ======================================================================
 //  Onglet « Perroquet » — deux mondes, deux sous-onglets
@@ -312,74 +315,212 @@ function BankPanel({ token }) {
 }
 
 // ============================================================
-//  Ajouter un son
+//  Ajouter des sons
 // ============================================================
-// Deux champs seulement : le nom — pré-rempli depuis le nom du fichier — et une
-// image facultative, montrée à la révélation. Le jeu et la difficulté ont été
-// retirés : le premier répétait le nom neuf fois sur dix, la seconde demandait
-// de noter à l'aveugle un son qu'on n'a pas encore fait jouer.
+// UN FICHIER, PLUSIEURS SONS. C'est la forme que prend le sourçage réel : on
+// arrive avec une rip d'OST, une planche de bruitages, la bande-son d'une vidéo
+// de « tous les cris de Yoshi » — jamais avec un fichier par cri. L'écran ne
+// demandait qu'un extrait à la fois, donc chaque son coûtait un nouveau choix de
+// fichier, un nouveau décodage et un nouveau cadrage du même audio ; garnir la
+// banque devenait une corvée mécanique, et c'est comme ça qu'une banque reste
+// petite.
 //
-// Le rogneur s'ouvre dès qu'un fichier est choisi : la banque ne veut que des
-// extraits de 0,3 à 2 s, et un fichier sourcé ailleurs les respecte rarement du
-// premier coup. En faire l'étape normale évite le refus du serveur suivi d'un
-// aller-retour dans un éditeur audio.
+// Le rogneur reste donc OUVERT (mode `multi` de components/AudioTrimmer.jsx) :
+// chaque extrait validé tombe dans une liste en dessous, la sélection saute
+// d'elle-même au son suivant, et les zones déjà prises restent dessinées sur la
+// forme d'onde. On nomme les extraits dans la liste, puis on envoie tout d'un
+// coup.
+//
+// -------------------------------------------- LA FICHE COMMUNE, ET LES ÉCARTS
+// Quinze cris tirés de la même vidéo veulent presque toujours la même fiche : la
+// même image, le même effet, et un nom qui ne varie que par un numéro. Les
+// ressaisir quinze fois, c'est retrouver exactement la corvée qu'on venait
+// d'enlever — l'écran est passé de « un fichier par son » à « une fiche par
+// extrait », ce qui est moins pire mais pas mieux.
+//
+// D'où un fonctionnement par HÉRITAGE plutôt que par recopie : la fiche du haut
+// vaut pour tous les extraits, et chaque ligne peut s'en écarter. Le choix
+// compte, parce qu'un bouton « appliquer à tous » aurait l'air équivalent et ne
+// l'est pas : il écrase, donc il faut le recliquer après chaque nouvelle coupe,
+// et il efface au passage les lignes qu'on avait déjà personnalisées. Ici une
+// ligne modifiée reste modifiée (elle porte alors la mention « à part », et une
+// flèche la fait revenir au commun), et une ligne coupée après coup hérite
+// toute seule.
+//
+// ---------------------------------------- pourquoi PAS une route en lot
+// L'envoi reste UN APPEL PAR SON, en série. Une route « /bulk » économiserait
+// des allers-retours et coûterait ce qui compte ici : le serveur mesure le
+// contour de chaque extrait et REFUSE ceux qui n'ont pas de hauteur à imiter
+// (routes/perroquetAdmin.js). Ce verdict est par son. En lot, un refus sur sept
+// devient un message global à débrouiller ; en série, la ligne fautive reste
+// dans la liste avec sa raison, ses six voisines sont ajoutées, et on ne
+// recoupe que celle-là.
+
+// La fiche effective d'un extrait : la sienne pour les champs qu'on a touchés,
+// celle du haut pour les autres.
+//
+// LE NOM EST NUMÉROTÉ par défaut, et ce n'est pas cosmétique : le nom est LA
+// RÉPONSE affichée en jeu, et sept sons différents qui s'appellent tous « Cri de
+// Yoshi » donnent sept manches dont on ne peut pas dire laquelle on a jouée. La
+// numérotation se coupe quand même d'un clic — un « Sonnerie » qui sort d'un
+// fichier de sonneries identiques n'a rien à numéroter — mais elle est le défaut
+// parce que c'est presque toujours ce qu'on veut.
+function effectiveCut(cut, common, i, total) {
+  const base = (common.label || "").trim();
+  return {
+    label: cut.touched.label
+      ? cut.label
+      : !base
+        ? ""
+        : common.numbered && total > 1
+          ? `${base} ${i + 1}`
+          : base,
+    image: cut.touched.image ? cut.image : common.image,
+    effect: cut.touched.effect ? cut.effect : common.effect,
+  };
+}
+
+const BLANK_COMMON = { label: "", image: null, effect: "none", numbered: true };
+
 function AddForm({ token, onAdded }) {
   const fileRef = useRef(null);
   const [file, setFile] = useState(null);
-  // L'extrait rogné, quand on est passé par le rogneur : c'est LUI qu'on envoie
-  // à la place du fichier d'origine. Le même outil que les joueurs
-  // (components/AudioTrimmer.jsx) — un « wahoo » se découpe de la même façon
-  // qu'on soit administrateur ou non.
-  const [trimmed, setTrimmed] = useState(null); // { blob, seconds }
-  const [trimming, setTrimming] = useState(false);
-  const [image, setImage] = useState(null);
-  const [label, setLabel] = useState("");
+  // La fiche héritée par tous les extraits.
+  const [common, setCommon] = useState(BLANK_COMMON);
+  // Les extraits en attente d'envoi : { key, blob, seconds, range, label, image,
+  // effect, touched, err }. `touched` dit quels champs ont été repris à la main
+  // sur CETTE ligne — les autres suivent la fiche commune, même si elle change
+  // après coup.
+  const [cuts, setCuts] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(0); // progression pendant l'envoi en série
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
+  const keyRef = useRef(0);
 
   function pickFile(f) {
     setFile(f);
-    setTrimmed(null);
-    setTrimming(!!f);
-    setLabel(f ? niceSoundName(f.name) : "");
+    setCuts([]);
+    // Le nom du fichier pré-remplit la fiche commune : c'est le bon nom neuf
+    // fois sur dix, et il vaut alors pour tous les extraits d'un coup.
+    setCommon({ ...BLANK_COMMON, label: f ? niceSoundName(f.name) : "" });
+    setOk("");
+    setErr("");
+    setSent(0);
+  }
+
+  function addCut(blob, seconds, range) {
+    keyRef.current += 1;
+    setCuts((list) => [
+      ...list,
+      {
+        key: keyRef.current,
+        blob,
+        seconds,
+        range,
+        label: "",
+        image: null,
+        effect: "none",
+        touched: { label: false, image: false, effect: false },
+        err: "",
+      },
+    ]);
     setOk("");
     setErr("");
   }
 
+  // Une modification de ligne marque le champ comme « à part » : il ne suivra
+  // plus la fiche commune. C'est ce qui permet de régler le haut ensuite sans
+  // écraser le travail déjà fait en bas.
+  const patchCut = (key, patch, field) =>
+    setCuts((list) =>
+      list.map((c) =>
+        c.key === key
+          ? {
+              ...c,
+              ...patch,
+              err: "",
+              touched: field ? { ...c.touched, [field]: true } : c.touched,
+            }
+          : c
+      )
+    );
+  // Le retour au commun, pour la ligne qu'on a personnalisée par erreur.
+  const resetCut = (key) =>
+    setCuts((list) =>
+      list.map((c) =>
+        c.key === key
+          ? {
+              ...c,
+              label: "",
+              image: null,
+              effect: "none",
+              touched: { label: false, image: false, effect: false },
+            }
+          : c
+      )
+    );
+  const dropCut = (key) => setCuts((list) => list.filter((c) => c.key !== key));
+
+  // Les plages déjà retenues, dessinées sur la piste du rogneur. Dérivées de
+  // `cuts` : retirer une ligne de la liste doit effacer sa bande, sinon l'écran
+  // affirme qu'un passage est pris alors qu'il ne l'est plus.
+  const marks = useMemo(() => cuts.map((c) => c.range).filter(Boolean), [cuts]);
+
+  // Ce qui part vraiment : la fiche effective de chaque extrait.
+  const ready = useMemo(
+    () =>
+      cuts.map((c, i) => ({ cut: c, eff: effectiveCut(c, common, i, cuts.length) })),
+    [cuts, common]
+  );
+  const named = ready.filter((r) => r.eff.label.trim()).length;
+
   async function submit(e) {
     e.preventDefault();
-    if (!file || !label.trim()) return;
+    const todo = ready.filter((r) => r.eff.label.trim());
+    if (!todo.length) return;
     setBusy(true);
     setErr("");
     setOk("");
-    try {
-      const fd = new FormData();
-      if (trimmed) fd.append("clip", trimmed.blob, "extrait.wav");
-      else fd.append("clip", file);
-      fd.append("label", label.trim());
-      if (image) fd.append("image", image, image.name);
-      const d = await apiUpload("/admin/perroquet", fd, token);
-      // Le contour revient dans la réponse : on affiche ce que le serveur a
-      // mesuré. La confirmation qui compte n'est pas « ajouté », c'est « voilà
-      // ce qu'il en a compris ».
-      setOk(
-        `« ${d.item.label} » ajouté — ${d.item.durationMs} ms, ${Math.round(
-          d.item.voicedRatio * 100
-        )} % mélodique.`
-      );
-      setFile(null);
-      setTrimmed(null);
-      setTrimming(false);
-      setImage(null);
-      setLabel("");
-      if (fileRef.current) fileRef.current.value = "";
-      onAdded();
-    } catch (e2) {
-      setErr(e2.message || "Impossible d'ajouter ce son.");
-    } finally {
-      setBusy(false);
+    setSent(0);
+
+    let added = 0;
+    const failed = [];
+    for (const { cut, eff } of todo) {
+      try {
+        const fd = new FormData();
+        fd.append("clip", cut.blob, "extrait.wav");
+        fd.append("label", eff.label.trim());
+        fd.append("effect", eff.effect || "none");
+        if (eff.image instanceof File) fd.append("image", eff.image, eff.image.name);
+        // eslint-disable-next-line no-await-in-loop
+        await apiUpload("/admin/perroquet", fd, token);
+        added += 1;
+        setSent(added);
+      } catch (e2) {
+        failed.push({ key: cut.key, err: e2.message || "Refusé." });
+      }
     }
+
+    // Ne restent que les refusés, chacun avec sa raison : la liste devient la
+    // liste de ce qu'il y a à corriger.
+    setCuts((list) =>
+      list
+        .filter((c) => failed.some((f) => f.key === c.key))
+        .map((c) => ({ ...c, err: failed.find((f) => f.key === c.key)?.err || c.err }))
+    );
+    if (added) {
+      setOk(
+        `${added} son${added > 1 ? "s" : ""} ajouté${added > 1 ? "s" : ""}${
+          failed.length ? ` — ${failed.length} refusé${failed.length > 1 ? "s" : ""}` : ""
+        }.`
+      );
+      onAdded();
+    }
+    if (failed.length && !added)
+      setErr("Aucun son n'a été accepté — la raison est sur chaque ligne.");
+    setBusy(false);
+    setSent(0);
   }
 
   return (
@@ -395,10 +536,7 @@ function AddForm({ token, onAdded }) {
         />
       </label>
 
-      {/* ---------- La découpe ----------
-          Repliée dès qu'un extrait est validé : ce qui compte ensuite, c'est de
-          nommer le son, pas de continuer à regarder la forme d'onde. */}
-      {file && trimming && (
+      {file && (
         <div className="pq-admin-trim">
           <AudioTrimmer
             file={file}
@@ -406,40 +544,82 @@ function AddForm({ token, onAdded }) {
             // (routes/perroquetAdmin.js). Le rogneur ne doit pas pouvoir
             // fabriquer un extrait que l'envoi rejettera derrière.
             maxSeconds={4}
-            onCancel={() => setTrimming(false)}
-            onConfirm={(blob, seconds) => {
-              setTrimmed({ blob, seconds });
-              setTrimming(false);
+            multi
+            marks={marks}
+            confirmLabel="Prendre cet extrait"
+            cancelLabel="Changer de fichier"
+            onCancel={() => {
+              pickFile(null);
+              if (fileRef.current) fileRef.current.value = "";
             }}
+            onConfirm={addCut}
           />
         </div>
       )}
 
-      {file && !trimming && (
-        <>
-          {/* La fiche d'identité du son : image + nom, exactement celle que
-              voient les joueurs dans leur librairie (components/SoundLibrary
-              .jsx). Le même objet se remplit de la même façon des deux côtés. */}
-          <IdCard image={image} onImage={setImage} label={label} onLabel={setLabel} />
-          <span className="pq-admin-cut">
-            <Scissors size={13} />
-            {trimmed ? <b>{trimmed.seconds.toFixed(2)} s</b> : "fichier entier"}
-            <button type="button" className="admin-btn clickable" onClick={() => setTrimming(true)}>
-              {trimmed ? "Redécouper" : "Rogner"}
-            </button>
-            {trimmed && (
-              <button type="button" className="admin-btn clickable" onClick={() => setTrimmed(null)}>
-                Annuler la découpe
-              </button>
-            )}
+      {/* ---------- La fiche commune ---------- */}
+      {file && (
+        <div className="pq-admin-common">
+          <span className="pq-admin-common-head">
+            <Layers size={13} /> Pour tous les extraits
+            <em>chaque ligne peut s'en écarter</em>
           </span>
-        </>
+          <IdCard
+            image={common.image}
+            onImage={(v) => setCommon((c) => ({ ...c, image: v instanceof File ? v : null }))}
+            label={common.label}
+            onLabel={(v) => setCommon((c) => ({ ...c, label: v }))}
+          />
+          <div className="pq-admin-common-row">
+            <VoiceFxPicker
+              value={common.effect}
+              onChange={(v) => setCommon((c) => ({ ...c, effect: v }))}
+            />
+            <button
+              type="button"
+              className={`pq-sw-line clickable ${common.numbered ? "on" : ""}`}
+              role="switch"
+              aria-checked={common.numbered}
+              onClick={() => setCommon((c) => ({ ...c, numbered: !c.numbered }))}
+              title="Le nom est la réponse affichée en jeu : sans numéro, plusieurs sons répondent la même chose"
+            >
+              <i />
+              numéroter&nbsp;(<b>{(common.label || "Nom").trim()} 2</b>)
+            </button>
+          </div>
+        </div>
       )}
 
-      <button className="admin-btn ok clickable" disabled={busy || !file || !label.trim()}>
-        {busy ? <Loader2 size={14} className="spin" /> : <Plus size={14} />}
-        Ajouter
-      </button>
+      {cuts.length > 0 && (
+        <ul className="pq-admin-cuts">
+          {ready.map(({ cut, eff }, i) => (
+            <CutRow
+              key={cut.key}
+              n={i + 1}
+              cut={cut}
+              eff={eff}
+              onLabel={(v) => patchCut(cut.key, { label: v }, "label")}
+              onImage={(v) =>
+                patchCut(cut.key, { image: v instanceof File ? v : null }, "image")
+              }
+              onEffect={(v) => patchCut(cut.key, { effect: v }, "effect")}
+              onReset={() => resetCut(cut.key)}
+              onDrop={() => dropCut(cut.key)}
+            />
+          ))}
+        </ul>
+      )}
+
+      {cuts.length > 0 && (
+        <button className="admin-btn ok clickable" disabled={busy || !named}>
+          {busy ? <Loader2 size={14} className="spin" /> : <Plus size={14} />}
+          {busy
+            ? `Envoi ${sent}/${named}…`
+            : named
+              ? `Ajouter ${named} son${named > 1 ? "s" : ""} à la banque`
+              : "Donne un nom là-haut pour envoyer"}
+        </button>
+      )}
 
       {err && <p className="pq-admin-msg bad">{err}</p>}
       {ok && (
@@ -448,6 +628,84 @@ function AddForm({ token, onAdded }) {
         </p>
       )}
     </form>
+  );
+}
+
+// ============================================================
+//  Un extrait en attente d'envoi
+// ============================================================
+// La même fiche d'identité que partout ailleurs (image + nom), plus de quoi
+// réécouter ce qu'on a coupé — c'est le seul moyen de vérifier un cadrage sans
+// revenir au rogneur — et de quoi retirer la ligne.
+//
+// `cut` porte ce qui a été saisi ICI, `eff` ce qui partira vraiment (la fiche
+// commune complète les champs laissés tranquilles). C'est `eff` qu'on affiche :
+// une ligne qui montrerait un nom vide alors qu'elle s'appellera « Cri 3 » ne
+// dirait pas la vérité sur ce qu'on est en train d'envoyer.
+function CutRow({ n, cut, eff, onLabel, onImage, onEffect, onReset, onDrop }) {
+  // L'objet-URL de l'extrait, révoqué au démontage : un blob de plus retenu en
+  // mémoire à chaque coupe, sur un fichier dont on tire quinze sons, ça se voit.
+  const urlRef = useRef(null);
+  if (!urlRef.current) urlRef.current = URL.createObjectURL(cut.blob);
+  useEffect(
+    () => () => {
+      URL.revokeObjectURL(urlRef.current);
+    },
+    []
+  );
+
+  const apart = cut.touched.label || cut.touched.image || cut.touched.effect;
+
+  return (
+    <li className={`pq-admin-cut-row ${cut.err ? "bad" : ""} ${apart ? "apart" : ""}`}>
+      <span className="pq-admin-cut-n">{n}</span>
+      <button
+        type="button"
+        className="pq-admin-play clickable"
+        onClick={() => {
+          const a = new Audio(urlRef.current);
+          a.play().catch(() => {});
+        }}
+        aria-label={`Écouter l'extrait ${n}`}
+      >
+        <Play size={14} />
+      </button>
+      <div className="pq-admin-cut-main">
+        <IdCard image={eff.image} onImage={onImage} label={eff.label} onLabel={onLabel} />
+        <VoiceFxPicker value={eff.effect} onChange={onEffect} compact label={false} />
+        <span className="pq-admin-cut-meta">
+          <Scissors size={12} /> {cut.seconds.toFixed(2)} s
+          {cut.range ? ` · à ${cut.range.start.toFixed(1)} s du fichier` : ""}
+          {apart && (
+            <>
+              {" · "}
+              <i className="pq-admin-apart">à part</i>
+              <button
+                type="button"
+                className="pq-admin-revert clickable"
+                onClick={onReset}
+                title="Revenir à la fiche commune"
+              >
+                <RotateCcw size={11} /> suivre le commun
+              </button>
+            </>
+          )}
+        </span>
+        {cut.err && (
+          <span className="pq-admin-flag">
+            <AlertTriangle size={12} /> {cut.err}
+          </span>
+        )}
+      </div>
+      <button
+        type="button"
+        className="admin-btn icon danger clickable"
+        onClick={onDrop}
+        aria-label="Retirer cet extrait"
+      >
+        <Trash2 size={14} />
+      </button>
+    </li>
   );
 }
 
@@ -556,6 +814,7 @@ function ClipRow({ item, token, busy, player, onToggle, onDelete, onSaved }) {
 
         <div className="pq-admin-main">
           <b>{item.label}</b>
+          <FxTag id={item.effect} />
           {item.game && <em>{item.game}</em>}
           {item.owner && <span className="pq-admin-owner">par {item.owner}</span>}
           <span className="pq-admin-meta">
@@ -653,6 +912,7 @@ function ClipEdit({ item, token, onClose, onSaved }) {
   // peuvent pas être le même message pour le serveur.
   const [image, setImage] = useState(null);
   const [game, setGame] = useState(item.game || "");
+  const [effect, setEffect] = useState(item.effect || "none");
   const [difficulty, setDifficulty] = useState(item.difficulty || 2);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -668,6 +928,7 @@ function ClipEdit({ item, token, onClose, onSaved }) {
       const fd = new FormData();
       fd.append("label", label.trim());
       fd.append("game", game.trim());
+      fd.append("effect", effect);
       fd.append("difficulty", String(difficulty));
       if (image instanceof File) fd.append("image", image, image.name);
       else if (image === "") fd.append("removeImage", "1");
@@ -683,6 +944,10 @@ function ClipEdit({ item, token, onClose, onSaved }) {
   return (
     <form className="pq-admin-edit" onSubmit={save}>
       <IdCard image={shown} onImage={setImage} label={label} onLabel={setLabel} autoFocus />
+      {/* L'effet se corrige ici, contrairement à l'audio : il ne touche ni le
+          contour ni les statistiques. C'est même le réglage qu'on a le plus
+          envie de changer une fois le son entendu en partie. */}
+      <VoiceFxPicker value={effect} onChange={setEffect} />
       <div className="pq-admin-edit-row">
         <input
           className="pq-admin-in"

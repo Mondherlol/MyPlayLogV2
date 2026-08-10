@@ -125,6 +125,10 @@ function roundView(room, meId) {
     // imite reviendrait à afficher la solution en grand.
     image: revealing ? absFor(room.code, r.imageUrl) || "" : "",
     addedBy: revealing ? r.addedBy || "" : "",
+    // Comme la réponse : l'effet ne sort qu'à la révélation. C'est là qu'on
+    // entend les six imitations passées au robot, et c'est tout le plaisir de
+    // cette phase.
+    effect: revealing ? r.effect || "none" : "none",
     contour: revealing ? clipContour(r) : null,
     // Qui a déjà rendu : affiché pendant l'enregistrement (sans les scores).
     // C'est ce qui dit « plus que toi » et évite d'attendre bêtement.
@@ -396,6 +400,7 @@ async function drawRounds(count, ownerIds = []) {
       imageUrl: c.image || "",
       difficulty: c.difficulty,
       addedBy: c.owner ? c.ownerName || "" : "",
+      effect: c.effect || "none",
     }));
 }
 

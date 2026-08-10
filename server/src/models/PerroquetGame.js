@@ -18,6 +18,11 @@ const roundSchema = new mongoose.Schema(
     // Le pseudo du joueur qui a déposé ce son, s'il vient d'une librairie
     // personnelle. Vide pour les sons officiels.
     addedBy: { type: String, default: "" },
+    // L'effet à passer sur la voix du joueur quand on réécoute cette manche
+    // (« voix de robot »). Copié ici pour la même raison que le nom : si l'effet
+    // du clip change demain, le récap doit rejouer la partie telle qu'elle a été
+    // jouée — on a ri sur un robot, on doit réentendre un robot.
+    effect: { type: String, default: "none" },
 
     // L'enregistrement du joueur (/uploads/perroquet/…). Null si la manche a
     // été passée.

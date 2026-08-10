@@ -20,6 +20,8 @@ import { useChat } from "../context/ChatContext";
 import { apiFetch, apiUpload } from "../lib/api";
 import { openMic, closeMic, startTake, canRecord } from "../lib/soundTake";
 import { useClipReel } from "../lib/clipReel";
+import { useEffectedUrls } from "../lib/clipFx";
+import { FxTag } from "../components/VoiceFxPicker";
 import { VersusInvite } from "../components/VersusRoom";
 import PerroquetHold from "../components/PerroquetHold";
 import ContourChart from "../components/ContourChart";
@@ -588,19 +590,33 @@ function Lobby({
 function Reveal({ round, byId, meId }) {
   const [pick, setPick] = useState(null);
 
+  // L'effet du son déguise TOUTES les voix de la manche, pas seulement la sienne
+  // — c'est le meilleur moment du mode : six personnes en robot d'affilée. On
+  // prépare les six rendus d'un coup et la séquence attend qu'ils soient prêts
+  // (cf. lib/clipFx.js) ; démarrée avant, elle passerait la première voix en
+  // clair, et c'est justement celle-là qui lance le fou rire.
+  const effect = round.effect || "none";
+  const urls = useMemo(
+    () => (round.takes || []).map((t) => t.attemptUrl).filter(Boolean),
+    [round.takes]
+  );
+  const { fx, ready } = useEffectedUrls(urls, effect);
+
   const queue = useMemo(() => {
     const takes = (round.takes || []).filter((t) => t.attemptUrl);
     // `takes` arrive trié par rang (1 = meilleur) : on le renverse.
     const worstFirst = [...takes].sort((a, b) => (b.rank || 99) - (a.rank || 99));
     return [
       { id: "target", url: round.clipUrl },
-      ...worstFirst.map((t) => ({ id: t.userId, url: t.attemptUrl })),
+      ...worstFirst.map((t) => ({ id: t.userId, url: fx(t.attemptUrl) })),
     ];
-  }, [round.takes, round.clipUrl]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [round.takes, round.clipUrl, ready]);
 
   const { current, progress, play } = useClipReel({
     items: queue,
     restartKey: round.index,
+    enabled: ready,
     onItem: (id) => {
       // Le grand graphique suit la lecture. Les regarder se désynchroniser
       // serait pire que pas de graphique du tout.
@@ -637,6 +653,7 @@ function Reveal({ round, byId, meId }) {
         >
           <Play size={13} /> L'original
         </button>
+        <FxTag id={effect} />
       </div>
 
       {/* La courbe de celui qu'on écoute, contre l'originale. */}
@@ -664,7 +681,7 @@ function Reveal({ round, byId, meId }) {
               className={`pq-podium-row band-${t.band} ${mine ? "me" : ""} ${
                 t.userId === shownId ? "picked" : ""
               } ${t.userId === current ? "playing" : ""} clickable`}
-              onClick={() => play(t.userId, t.attemptUrl)}
+              onClick={() => play(t.userId, fx(t.attemptUrl))}
             >
               <span className={`pq-podium-rank r${t.rank}`}>{t.rank}</span>
               {p && <Avatar p={p} />}

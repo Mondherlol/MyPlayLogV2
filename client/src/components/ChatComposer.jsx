@@ -9,6 +9,7 @@ import {
   Pencil,
   Plus,
   Film,
+  Megaphone,
   Mic,
   Trash2,
   Check,
@@ -43,7 +44,7 @@ const fmtSec = (s) =>
 // L'icône d'un effet. La correspondance vit ICI et pas dans lib/voiceFx.js :
 // la bibliothèque d'effets ne connaît que du son, elle n'a pas à importer des
 // composants d'interface.
-const FX_ICONS = { mic: Mic, bird: Bird, ghost: Ghost, bot: Bot };
+const FX_ICONS = { mic: Mic, bird: Bird, ghost: Ghost, bot: Bot, mega: Megaphone };
 function FxIcon({ id, size }) {
   const Ico = FX_ICONS[id] || Sparkles;
   return <Ico size={size} />;

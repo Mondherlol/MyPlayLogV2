@@ -15,7 +15,9 @@ import {
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { niceSoundName } from "../lib/soundTake";
+import { playableAudioFile } from "../lib/playableAudio";
 import AudioTrimmer from "./AudioTrimmer";
+import VoiceFxPicker, { FxTag } from "./VoiceFxPicker";
 
 // ======================================================================
 //  « Ma librairie de sons » — le dépôt communautaire du Perroquet
@@ -43,7 +45,30 @@ export default function SoundLibrary({ token, onClose, onChanged }) {
   const [busy, setBusy] = useState("");
   // Le dépôt en cours : { file } pendant le rognage, puis { blob, seconds }.
   const [draft, setDraft] = useState(null);
+  // Le temps de rendre un mémo vocal décodable (aller-retour serveur + ffmpeg) :
+  // sans ce voyant, cliquer sur un .amr ne fait rien de visible pendant deux
+  // secondes, et on reclique.
+  const [converting, setConverting] = useState(false);
   const fileRef = useRef(null);
+
+  // Le fichier choisi doit d'abord être DÉCODABLE PAR LE NAVIGATEUR : le rogneur
+  // dessine sa forme d'onde depuis un AudioBuffer. L'AMR des mémos vocaux ne
+  // l'est pas — le serveur le transcode alors en mp3 (cf. lib/playableAudio.js),
+  // et le reste du dépôt se déroule comme d'habitude.
+  async function pick(file) {
+    setErr("");
+    setConverting(false);
+    try {
+      const ready = await playableAudioFile(file, token, {
+        onConverting: () => setConverting(true),
+      });
+      setDraft({ file: ready });
+    } catch (e) {
+      setErr(e.message || "Impossible de lire ce fichier audio.");
+    } finally {
+      setConverting(false);
+    }
+  }
 
   const load = useCallback(async () => {
     try {
@@ -149,27 +174,36 @@ export default function SoundLibrary({ token, onClose, onChanged }) {
               <input
                 ref={fileRef}
                 type="file"
-                accept="audio/*"
+                // `audio/*` laisse de côté les mémos vocaux que certains
+                // téléphones déclarent en `application/octet-stream` : les
+                // extensions sont listées à côté pour qu'ils restent
+                // sélectionnables dans l'explorateur de fichiers.
+                accept="audio/*,.amr,.3gp,.3gpp,.awb,.m4a,.wma,.aiff"
                 hidden
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) setDraft({ file: f });
+                  if (f) pick(f);
                   e.target.value = "";
                 }}
               />
               <button
                 className="pq-lib-add clickable"
                 onClick={() => fileRef.current?.click()}
-                disabled={full}
+                disabled={full || converting}
               >
-                <Plus size={17} />
-                {full ? "Librairie pleine" : "Ajouter un son"}
+                {converting ? <Loader2 size={17} className="spin" /> : <Plus size={17} />}
+                {full
+                  ? "Librairie pleine"
+                  : converting
+                    ? "Conversion du fichier…"
+                    : "Ajouter un son"}
               </button>
               {!full && (
                 <p className="pq-lib-tip">
-                  N'importe quel fichier audio — tu le rognes juste après. Il
-                  faut un <b>cri</b> ou une <b>mélodie</b> : un bruit sourd n'a
-                  rien à imiter.
+                  N'importe quel fichier audio — <b>mémo vocal .amr</b> compris,
+                  il est converti tout seul. Tu le rognes juste après. Il faut un{" "}
+                  <b>cri</b> ou une <b>mélodie</b> : un bruit sourd n'a rien à
+                  imiter.
                 </p>
               )}
             </>
@@ -236,6 +270,7 @@ export default function SoundLibrary({ token, onClose, onChanged }) {
 function DraftForm({ draft, token, onCancel, onRecut, onDone }) {
   const [label, setLabel] = useState(() => niceSoundName(draft.file?.name));
   const [image, setImage] = useState(null);
+  const [effect, setEffect] = useState("none");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const urlRef = useRef(null);
@@ -268,6 +303,7 @@ function DraftForm({ draft, token, onCancel, onRecut, onDone }) {
       const fd = new FormData();
       fd.append("clip", draft.blob, "extrait.wav");
       fd.append("label", label.trim());
+      fd.append("effect", effect);
       if (image) fd.append("image", image, image.name);
       await apiUpload("/perroquet/sounds", fd, token);
       await onDone();
@@ -338,6 +374,10 @@ function DraftForm({ draft, token, onCancel, onRecut, onDone }) {
         </label>
       </div>
 
+      {/* L'effet passé sur la voix de CELUI QUI IMITE, à la révélation. Le son
+          déposé, lui, n'est jamais touché : c'est le son du jeu. */}
+      <VoiceFxPicker value={effect} onChange={setEffect} />
+
       {err && (
         <p className="pq-err">
           <AlertTriangle size={13} /> {err}
@@ -378,6 +418,7 @@ function LibRow({ item, busy, onToggle, onDelete }) {
       {item.image && <img className="pq-lib-thumb" src={item.image} alt="" loading="lazy" />}
       <span className="pq-lib-main">
         <b>{item.label}</b>
+        <FxTag id={item.effect} />
         <span className="pq-lib-meta">
           {(item.durationMs / 1000).toFixed(1)} s
           {item.timesPlayed > 0 && ` · joué ${item.timesPlayed}× (moy. ${item.avgScore})`}

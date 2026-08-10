@@ -19,6 +19,16 @@ import { Loader2, Pause, Play, Scissors, X } from "lucide-react";
 // Le serveur revérifie la durée à l'arrivée (routes/perroquetSounds.js) : un
 // client peut mentir, et la borne est une règle de jeu, pas une politesse.
 //
+// ------------------------------------------------------ le mode `multi`
+// Un même fichier contient souvent DIX sons à prendre : une rip d'OST, une
+// planche de bruitages, une vidéo de tous les cris d'un personnage. En mode
+// normal, le rogneur rend un extrait et disparaît — pour le suivant il fallait
+// rechoisir le fichier, attendre le décodage, refaire le cadrage. En mode
+// `multi` il RESTE OUVERT : chaque extrait validé est remis à l'appelant, la
+// sélection saute d'elle-même au son suivant, et les zones déjà prises sont
+// dessinées sur la forme d'onde (`marks`) pour qu'on voie ce qu'on a couvert.
+// Le fichier n'est décodé qu'une fois, la fenêtre ne se referme jamais.
+//
 // ------------------------------------------------------------------ le format
 // On réencode en WAV 16 bits mono, à la main. C'est le seul format qu'on sache
 // écrire sans embarquer d'encodeur : MediaRecorder ne sait pas réencoder un
@@ -28,7 +38,20 @@ import { Loader2, Pause, Play, Scissors, X } from "lucide-react";
 
 const MIN_SEC = 0.25;
 
-export default function AudioTrimmer({ file, maxSeconds = 5, onCancel, onConfirm }) {
+export default function AudioTrimmer({
+  file,
+  maxSeconds = 5,
+  onCancel,
+  onConfirm,
+  // Reste ouvert et enchaîne les extraits (cf. l'en-tête).
+  multi = false,
+  // Les passages déjà retenus, en secondes : [{ start, end }]. Dessinés sur la
+  // piste. C'est l'APPELANT qui les tient — il est le seul à savoir lesquels ont
+  // été gardés, et lesquels ont été retirés de sa liste depuis.
+  marks = [],
+  confirmLabel,
+  cancelLabel,
+}) {
   const [buffer, setBuffer] = useState(null);
   const [peaks, setPeaks] = useState(null);
   const [range, setRange] = useState({ start: 0, end: maxSeconds });
@@ -131,12 +154,31 @@ export default function AudioTrimmer({ file, maxSeconds = 5, onCancel, onConfirm
     g.fillRect(0, 0, x(range.start), h);
     g.fillRect(x(range.end), 0, w - x(range.end), h);
 
+    // Les extraits déjà retenus, PAR-DESSUS le voile : ils sont presque toujours
+    // en dehors de la sélection courante, donc dans la zone assombrie — dessinés
+    // dessous, ils seraient délavés au point d'être invisibles.
+    marks.forEach((m, i) => {
+      const mx = x(m.start);
+      const mw = Math.max(2, x(m.end) - mx);
+      g.fillStyle = "rgba(90, 220, 170, 0.22)";
+      g.fillRect(mx, 0, mw, h);
+      g.fillStyle = "rgba(90, 220, 170, 0.85)";
+      g.fillRect(mx, 0, 1.5, h);
+      g.fillRect(mx + mw - 1.5, 0, 1.5, h);
+      // Le numéro, pour relier la bande à sa ligne dans la liste en dessous.
+      if (mw > 14) {
+        g.font = "600 10px system-ui, sans-serif";
+        g.fillStyle = "rgba(255, 255, 255, 0.92)";
+        g.fillText(String(i + 1), mx + 3, 11);
+      }
+    });
+
     // La tête de lecture.
     if (cursor != null) {
       g.fillStyle = "#fff";
       g.fillRect(x(cursor), 0, 1.5, h);
     }
-  }, [peaks, buffer, range, cursor]);
+  }, [peaks, buffer, range, cursor, marks]);
 
   useLayoutEffect(() => {
     draw();
@@ -241,7 +283,18 @@ export default function AudioTrimmer({ file, maxSeconds = 5, onCancel, onConfirm
     try {
       stop();
       const blob = encodeWav(buffer, range.start, range.end);
-      await onConfirm(blob, range.end - range.start);
+      // La plage part avec l'extrait : l'appelant en a besoin pour la dessiner
+      // en `marks`, et elle ne se déduit pas du blob.
+      await onConfirm(blob, range.end - range.start, { start: range.start, end: range.end });
+      if (multi) {
+        // On saute AU SON SUIVANT, pas juste après la coupe : dans un fichier de
+        // bruitages il y a du silence entre chaque, et laisser la sélection
+        // dessus obligerait à repousser la poignée à la main à chaque extrait.
+        const from = firstOnset(buffer, range.end);
+        if (buffer.duration - from > MIN_SEC) {
+          setRange({ start: from, end: Math.min(buffer.duration, from + maxSeconds) });
+        }
+      }
     } catch (e) {
       setErr(e.message || "Découpe impossible.");
     } finally {
@@ -265,6 +318,7 @@ export default function AudioTrimmer({ file, maxSeconds = 5, onCancel, onConfirm
           <p className="pq-trim-help">
             Fais glisser les poignées pour garder le passage à imiter.
             <b> {maxSeconds} secondes maximum.</b>
+            {multi && " Le fichier reste ouvert : enchaîne les extraits."}
           </p>
 
           <div
@@ -316,7 +370,7 @@ export default function AudioTrimmer({ file, maxSeconds = 5, onCancel, onConfirm
               {len.toFixed(2)} s
             </span>
             <button className="pq-trim-cancel clickable" onClick={onCancel} type="button">
-              <X size={15} /> Annuler
+              <X size={15} /> {cancelLabel || "Annuler"}
             </button>
             <button
               className="pq-trim-ok clickable"
@@ -325,7 +379,7 @@ export default function AudioTrimmer({ file, maxSeconds = 5, onCancel, onConfirm
               type="button"
             >
               {busy ? <Loader2 size={15} className="spin" /> : <Scissors size={15} />}
-              Garder cet extrait
+              {confirmLabel || "Garder cet extrait"}
             </button>
           </div>
         </>
@@ -365,17 +419,27 @@ function computePeaks(buffer, bars = 420) {
   return out;
 }
 
-// Le premier instant où ça sonne vraiment, pour cadrer la sélection de départ.
-function firstOnset(buffer) {
+// Le premier instant où ça sonne vraiment À PARTIR DE `fromSec`, pour cadrer la
+// sélection — au départ (fromSec = 0), puis après chaque extrait en mode multi.
+//
+// Le seuil se calcule sur TOUT le fichier, pas sur la portion examinée : mesuré
+// sur la seule fin, un dernier cri deux fois plus faible que les autres
+// définirait son propre maximum et le silence qui le précède passerait pour du
+// son.
+function firstOnset(buffer, fromSec = 0) {
   const data = buffer.getChannelData(0);
   const win = Math.max(1, Math.floor(buffer.sampleRate * 0.01));
   let max = 0;
   for (let i = 0; i < data.length; i += win) max = Math.max(max, Math.abs(data[i]));
   const gate = max * 0.08;
-  for (let i = 0; i < data.length; i += win) {
+  const from = Math.min(data.length - 1, Math.max(0, Math.floor(fromSec * buffer.sampleRate)));
+  for (let i = from; i < data.length; i += win) {
     if (Math.abs(data[i]) > gate) return Math.max(0, i / buffer.sampleRate - 0.05);
   }
-  return 0;
+  // Plus rien après : on laisse la sélection où elle était plutôt que de la
+  // renvoyer au début du fichier, ce qui donnerait l'impression d'avoir tout
+  // perdu.
+  return fromSec;
 }
 
 // AudioBuffer → WAV mono 16 bits. Le taux d'échantillonnage est plafonné à

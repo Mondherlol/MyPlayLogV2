@@ -20,6 +20,8 @@ import { useAuth } from "../context/AuthContext";
 import { apiFetch, apiUpload } from "../lib/api";
 import { openMic, closeMic, startTake, canRecord } from "../lib/soundTake";
 import { useClipReel } from "../lib/clipReel";
+import { effectedUrl, useEffectedUrls } from "../lib/clipFx";
+import { FxTag } from "../components/VoiceFxPicker";
 import PerroquetHold from "../components/PerroquetHold";
 import ContourChart from "../components/ContourChart";
 import SoundLibrary from "../components/SoundLibrary";
@@ -496,18 +498,28 @@ function Round({ recording, level, sending, onListen, onHoldStart, onHoldEnd, on
 // grimpe se regarde.
 function RoundResult({ result, onNext, last, busy, user }) {
   const skipped = result.skipped;
+
+  // L'effet du son (« Wall-E » veut du robot) s'applique à LA VOIX DU JOUEUR, à
+  // la lecture seulement — le fichier gardé et le score portent sur la voix nue
+  // (cf. lib/clipFx.js). `ready` retient la bande-son le temps du rendu : sinon
+  // on entendrait sa vraie voix, et l'effet n'arriverait qu'en réécoutant.
+  const effect = result.clip?.effect || "none";
+  const attempts = useMemo(() => [result.attemptUrl], [result.attemptUrl]);
+  const { fx, ready } = useEffectedUrls(attempts, effect);
+  const myUrl = fx(result.attemptUrl);
+
   const reel = useMemo(
     () =>
       [
         { id: "target", url: result.clip?.url },
-        { id: "me", url: result.attemptUrl },
+        { id: "me", url: myUrl },
       ].filter((x) => x.url),
-    [result]
+    [result, myUrl]
   );
   const { current, progress, play } = useClipReel({
     items: reel,
     restartKey: result.clip?.id || "r",
-    enabled: !skipped,
+    enabled: !skipped && ready,
   });
 
   const score = useCountUp(skipped ? 0 : result.score, 700);
@@ -581,7 +593,7 @@ function RoundResult({ result, onNext, last, busy, user }) {
         {result.attemptUrl && (
           <button
             className={`pq-clip clickable k-attempt ${current === "me" ? "on" : ""}`}
-            onClick={() => play("me", result.attemptUrl)}
+            onClick={() => play("me", myUrl)}
           >
             {user?.avatar ? (
               <img className="pq-clip-av" src={user.avatar} alt="" loading="lazy" />
@@ -593,6 +605,9 @@ function RoundResult({ result, onNext, last, busy, user }) {
             Toi
           </button>
         )}
+        {/* Pourquoi on s'entend bizarre. Sans cette étiquette, le premier
+            réflexe est de croire que le micro a un problème. */}
+        <FxTag id={effect} />
       </div>
 
       <button className="pq-next clickable" onClick={onNext} disabled={busy}>
@@ -650,13 +665,19 @@ function Bar({ Icon, label, hint, value }) {
   );
 }
 
-function ClipButton({ url, label, kind, av, avName }) {
+// Le bouton d'écoute du récap. `effect` déguise la voix comme à la révélation :
+// on rit une deuxième fois en fin de partie, et une manche jouée en robot doit se
+// réécouter en robot. Le rendu est mis en cache par lib/clipFx.js, donc le
+// deuxième clic est instantané.
+function ClipButton({ url, label, kind, effect, av, avName }) {
   const ref = useRef(null);
   return (
     <button
       className={`pq-clip clickable k-${kind}`}
-      onClick={() => {
-        if (!ref.current) ref.current = new Audio(url);
+      onClick={async () => {
+        const src = await effectedUrl(url, effect);
+        if (!ref.current) ref.current = new Audio();
+        if (ref.current.src !== src) ref.current.src = src;
         ref.current.currentTime = 0;
         ref.current.play().catch(() => {});
       }}
@@ -712,6 +733,7 @@ function Recap({ recap, onReplay, onHome, user }) {
                   url={r.attemptUrl}
                   label="Toi"
                   kind="attempt"
+                  effect={r.effect}
                   av={user?.avatar}
                   avName={user?.username}
                 />
