@@ -23,14 +23,21 @@
 //      dans son format compressé et sa qualité d'origine. On ne paie le WAV
 //      que si on a demandé un effet.
 //
-// LES EFFETS EUX-MÊMES : deux jouent sur la VITESSE DE LECTURE, ce qui monte ou
-// descend la hauteur de la voix en même temps que le débit. C'est exactement le
-// « canard » et le « monstre » que tout le monde connaît (et que les dessins
-// animés font depuis toujours en accélérant la bande). Décaler la hauteur SANS
-// toucher au débit demanderait un vocodeur de phase — beaucoup de code pour un
-// résultat moins drôle. Les deux autres ne touchent ni à la durée ni au débit :
-// le ROBOT module l'amplitude par un oscillateur grave, le MÉGAPHONE sature le
-// signal et le passe dans la bande étroite d'un porte-voix.
+// LES EFFETS EUX-MÊMES. Trois jouent sur la VITESSE DE LECTURE, ce qui monte ou
+// descend la hauteur de la voix en même temps que le débit : le « canard », le
+// « monstre » et « Yoshi » — c'est ce que les dessins animés font depuis toujours
+// en accélérant la bande. Décaler la hauteur SANS toucher au débit demanderait un
+// vocodeur de phase : beaucoup de code pour un résultat moins drôle.
+//
+// Les trois autres laissent la durée tranquille : le ROBOT module l'amplitude par
+// un oscillateur grave, le MÉGAPHONE sature le signal et le passe dans la bande
+// étroite d'un porte-voix, la CATHÉDRALE le convolue avec une réponse
+// impulsionnelle — et rallonge donc le rendu de sa queue de réverbération.
+//
+// Un effet ne se reconnaît presque jamais à un seul traitement : « Yoshi » n'est
+// pas qu'une accélération (ce serait le canard), c'est l'accélération PLUS un
+// chevrotement PLUS une bosse nasale. C'est la règle à garder en tête en ajoutant
+// le suivant.
 
 export const VOICE_EFFECTS = [
   { id: "none", label: "Normal", icon: "mic", hint: "Ta voix, telle quelle" },
@@ -42,6 +49,15 @@ export const VOICE_EFFECTS = [
   // quand on crie un cri de jeu vidéo, et le seul du lot qui rende une imitation
   // plus impressionnante au lieu de la déguiser.
   { id: "mega", label: "Mégaphone", icon: "mega", rate: 1, hint: "Saturée, poussée à fond" },
+  // Le dinosaure. Trois ingrédients — la vitesse, le chevrotement, le nasal — et
+  // ce sont les deux derniers qui le rendent reconnaissable (cf. la chaîne).
+  {
+    id: "yoshi",
+    label: "Yoshi",
+    icon: "egg",
+    rate: 1.42,
+    hint: "Aiguë et chantante, comme le dinosaure",
+  },
   // Le seul effet qui RALLONGE le son : la queue de réverbération continue après
   // la fin de la voix. D'où `tail`, les 2,6 s de rendu supplémentaires sans
   // lesquelles l'écho serait coupé net au dernier mot — ce qui sonne comme un
@@ -253,6 +269,56 @@ export async function renderVoice(blob, { effectId = "none", start = 0, end = 1 
     shaper.connect(hp);
     hp.connect(lp);
     lp.connect(out);
+    out.connect(ctx.destination);
+  } else if (fx.id === "yoshi") {
+    // Monter la hauteur ne suffit PAS : accéléré tout seul, on obtient le
+    // « canard » qui existe déjà deux lignes plus haut. Ce qui rend une voix
+    // reconnaissable comme celle de Yoshi, c'est le reste :
+    //
+    //   1. LE VIBRATO. Sa voix chevrote — c'est un échantillon joué avec une
+    //      modulation de vitesse, pas une note tenue. On module donc la vitesse
+    //      de lecture par un oscillateur à 6,5 Hz. Sur `playbackRate` et non sur
+    //      `detune` : les deux donnent le même résultat, mais `detune` sur une
+    //      source de mémoire tampon n'est pas implémenté partout, et un effet qui
+    //      marche sur trois navigateurs sur quatre ne vaut pas mieux qu'un effet
+    //      cassé.
+    //   2. LE NASAL. Un creux dans les graves et une bosse vers 2 kHz : c'est la
+    //      signature « jouet », celle qui fait entendre un petit museau plutôt
+    //      qu'une gorge humaine accélérée.
+    const wobble = ctx.createOscillator();
+    wobble.frequency.value = 6.5;
+    const depth = ctx.createGain();
+    // ±0,035 autour de 1,42, soit une quarantaine de centièmes de ton : au-delà
+    // (60 et plus, essayés d'abord) on quitte le chevrotement pour le mal de mer,
+    // et la mélodie imitée cesse d'être reconnaissable — or c'est elle qu'on
+    // vient de noter.
+    depth.gain.value = 0.035;
+    wobble.connect(depth);
+    depth.connect(src.playbackRate);
+    wobble.start();
+
+    const body = ctx.createBiquadFilter();
+    body.type = "highpass";
+    body.frequency.value = 300; // on enlève le coffre de la voix humaine
+    const nasal = ctx.createBiquadFilter();
+    nasal.type = "peaking";
+    nasal.frequency.value = 2000;
+    nasal.Q.value = 1.1;
+    nasal.gain.value = 9;
+    // Le sifflement de l'accélération, rabattu comme pour le canard.
+    const tone = ctx.createBiquadFilter();
+    tone.type = "lowpass";
+    tone.frequency.value = 5200;
+    const out = ctx.createGain();
+    // La bosse nasale ajoute 9 dB dans la bande où la voix a le plus d'énergie :
+    // sans compensation, le rendu écrête. 0,52 et pas 0,6 : sur un cri strident —
+    // c'est-à-dire le cas normal ici — la moitié de l'énergie tombe dans la bande
+    // relevée, et 0,6 laissait passer une crête à 1,03.
+    out.gain.value = 0.52;
+    src.connect(body);
+    body.connect(nasal);
+    nasal.connect(tone);
+    tone.connect(out);
     out.connect(ctx.destination);
   } else if (fx.id === "echo") {
     // Voix directe + voix réverbérée, mélangées. Garder du direct est ce qui

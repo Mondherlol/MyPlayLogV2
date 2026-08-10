@@ -4,7 +4,9 @@ import {
   Activity,
   ArrowLeft,
   ArrowRight,
+  Check,
   Coins,
+  Ear,
   Loader2,
   Mic,
   Music,
@@ -15,6 +17,7 @@ import {
   Timer,
   Trophy,
   Users,
+  Volume2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch, apiUpload } from "../lib/api";
@@ -47,6 +50,22 @@ import PerroquetDecor from "../components/PerroquetDecor";
 //      dès qu'on voit pourquoi on l'a eu — « ah oui, je suis parti trop haut ».
 //      Le tracé fini et immobile ne reliait rien à rien ; celui qui court avec
 //      la lecture montre à quel instant l'écart s'est creusé.
+//
+// ------------------------------------------------- ON NE REND PAS AU DOIGT LEVÉ
+// Relâcher le bouton envoyait l'imitation, point. Le premier essai partait donc
+// toujours : celui où on a été surpris par la fin du son, celui où on a ri au
+// milieu, celui où le chat a miaulé. Il y a maintenant une ÉTAPE DE RELECTURE
+// entre les deux — on se réécoute, on réécoute l'original, on refait autant de
+// fois qu'on veut, et on valide quand on est prêt.
+//
+// Rien ne monte au serveur avant la validation : l'essai vit dans un blob local.
+// C'est ce qui rend « Refaire » gratuit et instantané, et ce qui évite de
+// polluer la banque d'essais (models/PerroquetTake.js) de brouillons que
+// personne ne veut réentendre.
+//
+// L'effet de voix n'est PAS appliqué à cette relecture, volontairement : on
+// vérifie son imitation, pas la blague. Le déguisement arrive au verdict, et
+// c'est là qu'il fait son effet.
 //
 // ------------------------------------------------------------- le décor
 // AUCUN FOND PEINT. La page tenait sur un brun de cabine qui la coupait du
@@ -87,6 +106,10 @@ export default function Perroquet() {
   const [myCount, setMyCount] = useState(0);
   const [useMine, setUseMine] = useState(false);
 
+  // L'essai en attente de validation : { blob, mimeType, url, seconds }. Tant
+  // qu'il est là, la manche n'est pas rendue.
+  const [take, setTake] = useState(null);
+
   const streamRef = useRef(null);
   const takeRef = useRef(null);
   const startedAtRef = useRef(0);
@@ -106,6 +129,17 @@ export default function Perroquet() {
     },
     []
   );
+
+  // L'objet-URL de l'essai en attente : révoqué dès qu'on le remplace ou qu'on
+  // quitte la manche. Un blob d'audio retenu par manche, sur une partie de cinq
+  // manches où l'on refait trois fois, ça finit par peser.
+  const dropTake = useCallback(() => {
+    setTake((t) => {
+      if (t?.url) URL.revokeObjectURL(t.url);
+      return null;
+    });
+  }, []);
+  useEffect(() => () => dropTake(), [dropTake]);
 
   const loadMine = useCallback(async () => {
     try {
@@ -182,6 +216,10 @@ export default function Perroquet() {
   // d'écouter puis d'imiter, pas de chercher un bouton « écouter ».
   useEffect(() => {
     if (phase === "play" && round && !result) playClip(round.url);
+    // `take` est volontairement hors des dépendances : le son ne doit se relancer
+    // qu'à l'ARRIVÉE sur la manche, pas à chaque fois qu'on jette un essai pour
+    // en refaire un — on serait interrompu par l'original au moment de crier.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, round, result, playClip]);
 
   // ---------- La prise ----------
@@ -195,44 +233,71 @@ export default function Perroquet() {
     takeRef.current = startTake(streamRef.current, { onLevel: setLevel });
   }, [recording, sending, result]);
 
+  // Relâcher ne rend RIEN : ça pose l'essai sur la table. Il attend ensuite une
+  // validation (ou un « Refaire », qui ne coûte qu'un blob jeté).
   const endHold = useCallback(async () => {
     if (!recording || !takeRef.current) return;
     const held = Date.now() - startedAtRef.current;
     setRecording(false);
     setLevel(0);
-    const take = takeRef.current;
+    const rec = takeRef.current;
     takeRef.current = null;
 
     if (held < HOLD_MIN_MS) {
-      take.cancel();
+      rec.cancel();
       setErr("Maintiens le bouton pendant que tu imites.");
       return;
     }
 
     setErr("");
+    try {
+      const out = await rec.stop();
+      if (!out?.blob?.size) throw new Error("Rien n'a été enregistré.");
+      setTake((prev) => {
+        if (prev?.url) URL.revokeObjectURL(prev.url);
+        return {
+          blob: out.blob,
+          mimeType: out.mimeType,
+          url: URL.createObjectURL(out.blob),
+          seconds: held / 1000,
+        };
+      });
+    } catch (e) {
+      setErr(e.message || "Impossible de relire l'enregistrement.");
+    }
+  }, [recording]);
+
+  // La validation : c'est ICI que la manche est rendue et notée.
+  const submitTake = useCallback(async () => {
+    if (!take || sending) return;
+    setErr("");
     setSending(true);
     try {
-      const out = await take.stop();
-      if (!out?.blob?.size) throw new Error("Rien n'a été enregistré.");
       const fd = new FormData();
       // L'extension suit le type MIME réel : Safari rend du mp4, pas du webm.
-      fd.append("attempt", out.blob, `attempt.${out.mimeType.includes("mp4") ? "m4a" : "webm"}`);
+      fd.append(
+        "attempt",
+        take.blob,
+        `attempt.${take.mimeType.includes("mp4") ? "m4a" : "webm"}`
+      );
       const data = await apiUpload(`/perroquet/${game.gameId}/round/${index}`, fd, token);
       setResults((r) => {
         const next = [...r];
         next[index] = data;
         return next;
       });
+      dropTake();
     } catch (e) {
       setErr(e.message || "Impossible d'envoyer l'imitation.");
     } finally {
       setSending(false);
     }
-  }, [recording, game, index, token]);
+  }, [take, sending, game, index, token, dropTake]);
 
   // ---------- Passer / avancer ----------
   const skip = useCallback(async () => {
     if (sending || result) return;
+    dropTake();
     setSending(true);
     try {
       const fd = new FormData(); // sans fichier = manche passée
@@ -247,9 +312,10 @@ export default function Perroquet() {
     } finally {
       setSending(false);
     }
-  }, [sending, result, game, index, token]);
+  }, [sending, result, game, index, token, dropTake]);
 
   const next = useCallback(async () => {
+    dropTake();
     if (index + 1 < game.rounds.length) {
       setIndex((i) => i + 1);
       return;
@@ -269,12 +335,21 @@ export default function Perroquet() {
     } finally {
       setSending(false);
     }
-  }, [index, game, token]);
+  }, [index, game, token, dropTake]);
 
-  // ---------- Barre d'espace : le même geste au clavier ----------
+  // ---------- Le clavier : le même geste sans la souris ----------
+  // Espace maintenu = enregistrer, et pendant qu'un essai attend, Entrée le
+  // valide. Espace REFAIT alors l'essai : le geste d'enregistrer ne change pas de
+  // sens selon l'état de l'écran, c'est ce qui permet d'enchaîner
+  // « espace, espace, espace, entrée » sans regarder.
   useEffect(() => {
     if (phase !== "play") return undefined;
     const down = (e) => {
+      if (e.code === "Enter" && take) {
+        e.preventDefault();
+        submitTake();
+        return;
+      }
       if (e.code !== "Space" || e.repeat) return;
       e.preventDefault();
       beginHold();
@@ -290,7 +365,7 @@ export default function Perroquet() {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, [phase, beginHold, endHold]);
+  }, [phase, beginHold, endHold, take, submitTake]);
 
   const inGame = phase === "play";
 
@@ -348,12 +423,16 @@ export default function Perroquet() {
               />
             ) : (
               <Round
+                image={round.image}
+                take={take}
                 recording={recording}
                 level={level}
                 sending={sending}
                 onListen={() => playClip(round.url)}
                 onHoldStart={beginHold}
                 onHoldEnd={endHold}
+                onRedo={dropTake}
+                onSubmit={submitTake}
                 onSkip={skip}
               />
             )}
@@ -467,25 +546,123 @@ function Pips({ total, index, results }) {
 // ============================================================
 //  Une manche
 // ============================================================
-function Round({ recording, level, sending, onListen, onHoldStart, onHoldEnd, onSkip }) {
+// Deux temps, et le second n'existait pas : on imite, PUIS on décide si c'est
+// celle-là qu'on rend.
+function Round({
+  image,
+  take,
+  recording,
+  level,
+  sending,
+  onListen,
+  onHoldStart,
+  onHoldEnd,
+  onRedo,
+  onSubmit,
+  onSkip,
+}) {
   return (
     <section className="pq-round">
-      <button className="pq-listen clickable" onClick={onListen} disabled={recording}>
-        <Play size={15} /> Réécouter
-      </button>
+      <ListenCue image={image} recording={recording} />
 
-      <PerroquetHold
-        recording={recording}
-        level={level}
-        busy={sending}
-        onStart={onHoldStart}
-        onEnd={onHoldEnd}
-      />
+      {/* L'essai attend, SAUF si on est en train d'en refaire un : sinon la barre
+          d'espace lancerait un enregistrement derrière le panneau de relecture,
+          et on crierait sans voir ni le bouton ni le niveau du micro. */}
+      {take && !recording ? (
+        <TakeReview
+          take={take}
+          busy={sending}
+          onListen={onListen}
+          onRedo={onRedo}
+          onSubmit={onSubmit}
+        />
+      ) : (
+        <>
+          <button className="pq-listen clickable" onClick={onListen} disabled={recording}>
+            <Play size={15} /> Réécouter
+          </button>
 
-      <button className="pq-skip clickable" onClick={onSkip} disabled={sending || recording}>
-        <SkipForward size={14} /> Passer
-      </button>
+          <PerroquetHold
+            recording={recording}
+            level={level}
+            busy={sending}
+            onStart={onHoldStart}
+            onEnd={onHoldEnd}
+          />
+
+          <button className="pq-skip clickable" onClick={onSkip} disabled={sending || recording}>
+            <SkipForward size={14} /> Passer
+          </button>
+        </>
+      )}
     </section>
+  );
+}
+
+// Qui l'on imite. L'écran d'imitation n'avait AUCUN visuel : on écoutait un son
+// venu de nulle part sans savoir quoi se mettre en tête. L'image du son arrive
+// donc avec lui (cf. clipTeaser dans server/src/routes/perroquet.js) ; le nom et
+// le score, eux, restent pour le verdict.
+//
+// Sans image (les sons n'en ont pas tous), la pastille tombe sur une oreille —
+// le même repère que la phase d'écoute du mode à plusieurs.
+function ListenCue({ image, recording }) {
+  return (
+    <span className={`pq-cue ${image ? "has" : ""} ${recording ? "rec" : ""}`} aria-hidden="true">
+      <i className="pq-cue-ring" />
+      <i className="pq-cue-ring d" />
+      {image ? <img src={image} alt="" draggable="false" /> : <Ear size={34} />}
+    </span>
+  );
+}
+
+// L'essai posé sur la table : on se réécoute, on compare à l'original, on refait
+// ou on valide. C'est le seul écran du jeu où RIEN n'est encore parti au serveur.
+function TakeReview({ take, busy, onListen, onRedo, onSubmit }) {
+  const mineRef = useRef(null);
+  // On s'écoute tout de suite : c'est ce qu'on veut faire en relâchant le bouton,
+  // et l'attendre d'un clic de plus n'apporte rien.
+  useEffect(() => {
+    const a = new Audio(take.url);
+    mineRef.current = a;
+    a.play().catch(() => {});
+    return () => a.pause();
+  }, [take.url]);
+
+  const playMine = () => {
+    const a = mineRef.current;
+    if (!a) return;
+    a.currentTime = 0;
+    a.play().catch(() => {});
+  };
+
+  return (
+    <div className="pq-take">
+      <p className="pq-take-head">
+        <Check size={15} /> Ton essai <em>{take.seconds.toFixed(1)} s</em>
+      </p>
+
+      <div className="pq-take-row">
+        <button type="button" className="pq-clip clickable k-attempt" onClick={playMine}>
+          <Play size={13} /> Mon essai
+        </button>
+        <button type="button" className="pq-clip clickable k-target" onClick={onListen}>
+          <Volume2 size={13} /> Le son à imiter
+        </button>
+      </div>
+
+      <div className="pq-take-row">
+        <button type="button" className="pq-redo clickable" onClick={onRedo} disabled={busy}>
+          <RotateCcw size={15} /> Refaire
+        </button>
+        <button type="button" className="pq-next clickable" onClick={onSubmit} disabled={busy}>
+          {busy ? <Loader2 size={16} className="spin" /> : <Check size={16} />}
+          Valider <ArrowRight size={16} />
+        </button>
+      </div>
+
+      <p className="pq-take-hint">Espace pour refaire · Entrée pour valider</p>
+    </div>
   );
 }
 

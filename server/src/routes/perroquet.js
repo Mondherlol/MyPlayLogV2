@@ -73,13 +73,24 @@ const upload = multer({
 const abs = (req, u) =>
   !u ? null : /^https?:/i.test(u) ? u : `${req.protocol}://${req.get("host")}${u}`;
 
-// Ce qu'on montre du clip AVANT que la manche soit jouée : surtout pas la
-// réponse. Le contour non plus — il dessine littéralement la mélodie à imiter,
-// l'envoyer d'avance reviendrait à donner la solution en clair.
+// Ce qu'on montre du clip AVANT que la manche soit jouée.
+//
+// Le CONTOUR reste interdit : il dessine littéralement la mélodie à imiter,
+// l'envoyer d'avance reviendrait à donner la solution en clair. Le NOM aussi —
+// c'est la réponse, et elle se découvre au verdict.
+//
+// L'IMAGE, elle, part maintenant avec le son. Choix assumé et discutable : elle
+// en dit long (une tête de Yoshi, c'est la réponse en image), mais l'écran
+// d'imitation était nu — on écoutait un son sorti de nulle part, sans savoir
+// quoi se mettre en tête. Voir qui on imite pendant qu'on imite aide à viser, et
+// le verdict garde ce qui compte vraiment : le nom, le score et la comparaison
+// des courbes. Pour revenir en arrière, il suffit de retirer cette ligne (le
+// client sait se passer d'image, il affiche alors une pastille sonore).
 const clipTeaser = (req, c) => ({
   id: String(c._id),
   url: abs(req, c.url),
   difficulty: c.difficulty,
+  image: abs(req, c.image) || "",
 });
 
 // Le clip une fois la manche jouée : là, tout.

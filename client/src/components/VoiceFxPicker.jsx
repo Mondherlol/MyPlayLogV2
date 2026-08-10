@@ -1,4 +1,4 @@
-import { Bird, Bot, Church, Ghost, Megaphone, Mic, Sparkles } from "lucide-react";
+import { Bird, Bot, Church, Egg, Ghost, Megaphone, Mic, Sparkles } from "lucide-react";
 import { VOICE_EFFECTS } from "../lib/voiceFx";
 
 // ======================================================================
@@ -14,7 +14,15 @@ import { VOICE_EFFECTS } from "../lib/voiceFx";
 // (« Wall-E » veut du robot), donc tout le monde s'entend pareil sur la même
 // manche — et en versus la comparaison des six imitations reste juste.
 
-const ICONS = { mic: Mic, bird: Bird, ghost: Ghost, bot: Bot, mega: Megaphone, church: Church };
+const ICONS = {
+  mic: Mic,
+  bird: Bird,
+  ghost: Ghost,
+  bot: Bot,
+  mega: Megaphone,
+  church: Church,
+  egg: Egg,
+};
 
 export function FxIcon({ id, size = 14 }) {
   const Ico = ICONS[id] || Sparkles;
