@@ -77,6 +77,18 @@ const roundSchema = new mongoose.Schema(
     // a été jouée, même si le clip est réglé autrement plus tard.
     effect: { type: String, default: "none" },
     takes: { type: [takeSchema], default: [] },
+
+    // Qui a demandé à passer à la suite pendant la révélation. Le chrono de
+    // 18 secondes est un PLAFOND, pas un temps de parole imposé : quand tout le
+    // monde a fini de rire, rester devant un classement figé est le seul moment
+    // creux de la partie. Une voix par joueur, et la manche s'enchaîne dès que
+    // tous les présents ont voté.
+    //
+    // Rangé par MANCHE et pas sur le salon : le vote est celui de « cette
+    // révélation-là », il n'a aucune raison de survivre à la suivante — et
+    // remettre un compteur à zéro à chaque phase est exactement le genre de
+    // nettoyage qu'on oublie.
+    ready: { type: [mongoose.Schema.Types.ObjectId], ref: "User", default: [] },
   },
   { _id: false }
 );

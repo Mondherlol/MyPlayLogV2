@@ -1574,6 +1574,40 @@ span.pq-clip-av.ph {
   0%, 100% { height: 4px; }
   50% { height: 15px; }
 }
+/* ---------- « On passe à la suite ? » ----------
+   Le vote qui abrège la révélation. Posé sous le classement : c'est la dernière
+   chose qu'on fait de cet écran, elle n'a rien à faire au-dessus de ce qu'on
+   vient regarder. */
+.pq-nextvote {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+/* Le compteur de voix, dans le bouton : « 3/5 » dit d'un coup d'œil qu'on attend
+   encore, sans ligne de texte supplémentaire. */
+.pq-next em {
+  font-style: normal;
+  font-weight: 800;
+  font-size: 0.78rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.16);
+  font-variant-numeric: tabular-nums;
+}
+/* Ma voix est donnée : le bouton cesse d'appeler au clic et devient un état. */
+.pq-next.voted {
+  background: var(--pq-panel);
+  background-color: var(--pq-panel);
+  border: 1px solid var(--pq-line-2);
+  color: var(--pq-dim);
+}
+.pq-next.voted em { background: var(--pq-line-2); color: var(--pq-ink); }
+.pq-nextvote-who {
+  font-size: 0.72rem;
+  color: var(--pq-dim);
+}
+
 .pq-pick-hint {
   margin: 0;
   font-size: 0.73rem;

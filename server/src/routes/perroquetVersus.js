@@ -133,6 +133,10 @@ function roundView(room, meId) {
     // Qui a déjà rendu : affiché pendant l'enregistrement (sans les scores).
     // C'est ce qui dit « plus que toi » et évite d'attendre bêtement.
     done: r.takes.filter((t) => t.submitted).map((t) => idOf(t.user)),
+    // Qui vote pour passer à la suite (phase de révélation). On envoie la LISTE
+    // et pas un simple compte : l'écran montre qui attend encore, ce qui vaut
+    // mieux que « 3/5 » quand on cherche à savoir sur qui on patiente.
+    ready: revealing ? (r.ready || []).map((id) => idOf(id)) : [],
     // Ma propre note, dès qu'elle est calculée : je peux la voir avant la
     // révélation générale, ça n'apprend rien sur les autres.
     mine: mine?.submitted
@@ -729,6 +733,62 @@ router.post("/:code/take", upload.single("attempt"), async (req, res) => {
     cleanup();
     console.error("pqversus take error:", err.message);
     res.status(500).json({ error: "Impossible d'envoyer l'imitation." });
+  }
+});
+
+// ============================================================
+//  POST /:code/next — « moi j'ai fini d'écouter »
+// ============================================================
+// Le vote pour abréger la révélation. Il ne saute rien et ne coupe la parole à
+// personne : la manche n'avance que quand TOUS LES PRÉSENTS ont voté. À défaut,
+// le chrono de 18 secondes fait son travail comme avant.
+//
+// Le seuil est l'unanimité des présents, pas une majorité : sur cinq joueurs,
+// trois voix suffisantes couperaient le son de celui qui écoutait encore son
+// propre cri — et c'est précisément ce qu'on vient regarder.
+//
+// Le vote est IDEMPOTENT (revoter ne fait rien) et la voix de quelqu'un qui
+// quitte le salon ne bloque rien : on compare aux joueurs encore là.
+router.post("/:code/next", async (req, res) => {
+  try {
+    const out = await withRoom(req.params.code, async (room) => {
+      if (!room || room.phase !== "reveal") return { ok: false };
+      const round = room.rounds[room.index];
+      if (!round) return { ok: false };
+      const me = String(req.userId);
+      // Un spectateur qui n'est pas dans la partie ne vote pas.
+      if (!findPlayer(room, me)) return { ok: false };
+
+      if (!(round.ready || []).some((id) => idOf(id) === me)) round.ready.push(me);
+      touch(room);
+
+      const alive = playerIds(room);
+      const votes = round.ready.map((id) => idOf(id)).filter((id) => alive.includes(id));
+
+      if (votes.length < alive.length) {
+        await room.save();
+        await room.populate(POPULATE);
+        toEachRoom(room, "ready");
+        return { ok: true, votes: votes.length, total: alive.length };
+      }
+
+      // Unanimité : on enchaîne tout de suite. Le minuteur de la révélation est
+      // remplacé par celui de la phase suivante (cf. makeClock : une horloge par
+      // salon), donc il ne viendra pas faire avancer la manche une deuxième fois.
+      if (room.index + 1 >= room.rounds.length) {
+        await finish(room);
+        return { ok: true, advanced: true };
+      }
+      room.index += 1;
+      await beginListen(room);
+      return { ok: true, advanced: true };
+    });
+
+    if (!out?.ok) return res.status(409).json({ error: "Ce n'est pas le moment." });
+    res.json(out);
+  } catch (err) {
+    console.error("pqversus next error:", err.message);
+    res.status(500).json({ error: "Impossible de passer à la suite." });
   }
 });
 

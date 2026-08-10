@@ -11,6 +11,7 @@ import {
   MicOff,
   Music,
   Play,
+  SkipForward,
   Trophy,
   UserPlus,
   Users,
@@ -131,6 +132,22 @@ export default function PerroquetVersus() {
       }
     });
   }, [subscribe, code, applyRoom]);
+
+  // ---------- « J'ai fini d'écouter » ----------
+  // Le vote qui abrège la révélation quand tout le monde a fini de rire. Le
+  // serveur décide (routes/perroquetVersus.js) : ici on lève la main, et l'état
+  // revient par le direct comme tout le reste.
+  const [voting, setVoting] = useState(false);
+  const voteNext = useCallback(async () => {
+    setVoting(true);
+    try {
+      await apiFetch(`/perroquet/versus/${code}/next`, { method: "POST", token });
+    } catch {
+      /* la phase a déjà tourné : le direct remettra l'écran d'aplomb */
+    } finally {
+      setVoting(false);
+    }
+  }, [code, token]);
 
   // ---------- Micro : ouvert une fois, pour toute la partie ----------
   const arm = useCallback(async () => {
@@ -405,7 +422,14 @@ export default function PerroquetVersus() {
         )}
 
         {phase === "reveal" && round && (
-          <Reveal round={round} byId={byId} meId={user?.id} />
+          <Reveal
+            round={round}
+            byId={byId}
+            meId={user?.id}
+            players={room.players}
+            onNext={voteNext}
+            voting={voting}
+          />
         )}
 
         {phase === "done" && <Final room={room} onQuit={() => navigate("/arcade")} />}
@@ -587,7 +611,7 @@ function Lobby({
 // POURQUOI PAS LES SIX COURBES SUPERPOSÉES : à deux courbes on lit un écart, à
 // six on lit un plat de spaghettis. La vignette de chaque ligne donne la forme
 // d'un coup d'œil ; le grand graphique compare vraiment, une à la fois.
-function Reveal({ round, byId, meId }) {
+function Reveal({ round, byId, meId, players = [], onNext, voting }) {
   const [pick, setPick] = useState(null);
 
   // L'effet du son déguise TOUTES les voix de la manche, pas seulement la sienne
@@ -717,7 +741,62 @@ function Reveal({ round, byId, meId }) {
       </ol>
 
       <p className="pq-pick-hint">Du dernier au premier · touche une ligne pour la rejouer</p>
+
+      <NextVote
+        round={round}
+        players={players}
+        meId={meId}
+        onNext={onNext}
+        voting={voting}
+      />
     </section>
+  );
+}
+
+// ============================================================
+//  « On passe à la suite ? »
+// ============================================================
+// La révélation a un chrono de 18 secondes, et c'est le seul moment creux de la
+// partie : quand tout le monde a fini d'écouter, on regarde un classement figé en
+// attendant que le temps passe. Ce bouton laisse la table décider.
+//
+// UNE VOIX PAR JOUEUR, et il faut TOUT LE MONDE. C'est ce qui le rend acceptable :
+// personne ne se fait couper son propre cri par trois impatients. Tant qu'il
+// manque quelqu'un, le bouton dit sur qui on attend — patienter sans savoir
+// pourquoi est bien plus long que patienter en connaissant la raison.
+function NextVote({ round, players, meId, onNext, voting }) {
+  const here = players.filter((p) => !p.left);
+  const votes = round.ready || [];
+  const mine = votes.includes(String(meId));
+  const waiting = here.filter((p) => !votes.includes(p.id));
+
+  return (
+    <div className="pq-nextvote">
+      <button
+        className={`pq-next clickable ${mine ? "voted" : ""}`}
+        onClick={onNext}
+        disabled={mine || voting}
+      >
+        {voting ? (
+          <Loader2 size={16} className="spin" />
+        ) : mine ? (
+          <Check size={16} />
+        ) : (
+          <SkipForward size={16} />
+        )}
+        {mine ? "En attente des autres" : "Passer à la suite"}
+        {here.length > 1 && (
+          <em>
+            {votes.length}/{here.length}
+          </em>
+        )}
+      </button>
+      {mine && waiting.length > 0 && (
+        <span className="pq-nextvote-who">
+          on attend {waiting.map((p) => p.username).join(", ")}
+        </span>
+      )}
+    </div>
   );
 }
 
