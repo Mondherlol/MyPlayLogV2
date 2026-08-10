@@ -19,10 +19,12 @@ import { useAuth } from "../context/AuthContext";
 import { useChat } from "../context/ChatContext";
 import { apiFetch, apiUpload } from "../lib/api";
 import { openMic, closeMic, startTake, canRecord } from "../lib/soundTake";
+import { useClipReel } from "../lib/clipReel";
 import { VersusInvite } from "../components/VersusRoom";
 import PerroquetHold from "../components/PerroquetHold";
 import ContourChart from "../components/ContourChart";
 import SoundLibrary from "../components/SoundLibrary";
+import PerroquetDecor from "../components/PerroquetDecor";
 
 // ======================================================================
 //  Le Perroquet — versus
@@ -294,19 +296,28 @@ export default function PerroquetVersus() {
     );
 
   return (
-    <div className="pq-page pq-versus">
+    <div className={`pq-page pq-versus ${phase !== "lobby" ? "in-game" : ""}`}>
+      <PerroquetDecor />
+      <header className="pq-top">
+        {/* Depuis le versus, le retour naturel est le solo — c'est de là qu'on
+            arrive en cliquant « À plusieurs » — et non l'arcade. */}
+        <Link to="/perroquet" className="pq-back clickable">
+          <ArrowLeft size={17} /> <span>Solo</span>
+        </Link>
+        <span className="pq-title">
+          <Users size={15} /> Perroquet · versus
+        </span>
+        {phase !== "lobby" && phase !== "done" ? (
+          <span className="pq-progress">
+            {(round?.index ?? 0) + 1}
+            <em>/{round?.total ?? room.roundCount}</em>
+          </span>
+        ) : (
+          <span className="pq-progress ghost" />
+        )}
+      </header>
+
       <div className="pq-stage">
-        <header className="pq-top">
-          <Link to="/arcade" className="pq-back clickable">
-            <ArrowLeft size={18} /> Arcade
-          </Link>
-          <span className="pq-title">Perroquet · versus</span>
-          {phase !== "lobby" && phase !== "done" && (
-            <span className="pq-progress">
-              {(round?.index ?? 0) + 1} / {round?.total ?? room.roundCount}
-            </span>
-          )}
-        </header>
 
         {err && <p className="pq-err">{err}</p>}
 
@@ -350,7 +361,7 @@ export default function PerroquetVersus() {
             <span className="pq-listen-ring" aria-hidden="true">
               <Ear size={38} />
             </span>
-            <p>Mémorise la mélodie. Tu vas devoir la refaire.</p>
+            <p>Mémorise la mélodie.</p>
             <PlayerStrip players={room.players} />
           </section>
         )}
@@ -498,9 +509,9 @@ function Lobby({
             <em>
               {room.customSounds
                 ? pool?.custom
-                  ? `${pool.custom} son(s) déposés par les joueurs présents s'ajoutent au tirage.`
-                  : "Personne à cette table n'a encore déposé de son."
-                : "Le tirage n'utilise que les sons officiels."}
+                  ? `+${pool.custom} son(s) des joueurs présents`
+                  : "personne n'a encore déposé de son"
+                : "sons officiels seulement"}
             </em>
           </span>
           {room.isHost ? (
@@ -549,15 +560,11 @@ function Lobby({
         </button>
       ) : (
         <p className="pq-lobby-wait">
-          <Loader2 size={14} className="spin" /> L'hôte lance la partie quand tout
-          le monde est prêt.
+          <Loader2 size={14} className="spin" /> L'hôte lance la partie.
         </p>
       )}
 
-      <p className="pq-mic-note">
-        Le micro s'autorise <b>avant</b> le départ : une fois la fenêtre ouverte,
-        il n'y a pas de rattrapage.
-      </p>
+      <p className="pq-mic-note">Le micro s'autorise avant le départ.</p>
     </section>
   );
 }
@@ -565,34 +572,21 @@ function Lobby({
 // ============================================================
 //  Le verdict d'une manche — le moment du jeu
 // ============================================================
+// LA REVUE. Les enregistrements s'enchaînent tout seuls, un à la fois, DU PIRE
+// AU MEILLEUR — la règle de tous les jeux télévisés : on garde le vainqueur
+// pour la fin. Le surlignage remonte donc les lignes, et la dernière voix
+// entendue est celle du gagnant. L'original ouvre la séquence, sinon on écoute
+// six imitations sans avoir en tête ce qu'elles imitaient.
+//
+// La mécanique est dans lib/clipReel.js, partagée avec le solo ; ce qu'elle
+// ajoute ici, c'est `progress` : la grande courbe se dessine au rythme exact du
+// son qui joue. On ENTEND et on VOIT la même tentative avancer.
+//
+// POURQUOI PAS LES SIX COURBES SUPERPOSÉES : à deux courbes on lit un écart, à
+// six on lit un plat de spaghettis. La vignette de chaque ligne donne la forme
+// d'un coup d'œil ; le grand graphique compare vraiment, une à la fois.
 function Reveal({ round, byId, meId }) {
-  // Quelle courbe s'affiche en grand. On part de la SIENNE — c'est celle qu'on
-  // vient de faire et la première question qu'on se pose — puis un clic sur
-  // n'importe quelle ligne bascule dessus.
-  //
-  // POURQUOI PAS LES SIX SUPERPOSÉES : à deux courbes on lit un écart, à six on
-  // lit un plat de spaghettis. La vignette de chaque ligne donne déjà la forme
-  // d'un coup d'œil ; le grand graphique sert à comparer VRAIMENT, donc une à
-  // la fois contre l'original.
   const [pick, setPick] = useState(null);
-
-  // ---------------------------------------------------------------- la revue
-  // On enchaîne les enregistrements TOUT SEUL, sans rien cliquer. C'est ce qui
-  // transforme un tableau de scores en moment de jeu : personne n'appuie sur
-  // six boutons de lecture pour écouter ses camarades, alors que tout le monde
-  // écoute une séquence qui se déroule.
-  //
-  // L'ORDRE VA DU PIRE AU MEILLEUR, à rebours de la liste affichée. C'est la
-  // règle de tous les jeux télévisés : on garde le vainqueur pour la fin. Le
-  // surlignage remonte donc les lignes, et la dernière entendue est celle du
-  // gagnant — la révélation tombe au bon moment au lieu d'être passée en
-  // premier.
-  //
-  // L'original ouvre la séquence : sans lui, on écoute six imitations sans
-  // avoir en tête ce qu'elles imitaient.
-  const [nowPlaying, setNowPlaying] = useState(null); // userId, ou "target"
-  const audioRef = useRef(null);
-  const timerRef = useRef(null);
 
   const queue = useMemo(() => {
     const takes = (round.takes || []).filter((t) => t.attemptUrl);
@@ -604,78 +598,58 @@ function Reveal({ round, byId, meId }) {
     ];
   }, [round.takes, round.clipUrl]);
 
-  // Relancé à chaque MANCHE, pas à chaque rendu : `round.index` est la seule
-  // dépendance qui doive redémarrer la revue.
-  useEffect(() => {
-    let alive = true;
-    let i = 0;
-    const audio = new Audio();
-    audioRef.current = audio;
-
-    const next = () => {
-      if (!alive || i >= queue.length) {
-        if (alive) setNowPlaying(null);
-        return;
-      }
-      const item = queue[i];
-      i += 1;
-      setNowPlaying(item.id);
-      // Le grand graphique suit la lecture : on ENTEND et on VOIT la même
-      // tentative. Les regarder se désynchroniser serait pire que pas de
-      // graphique du tout.
-      if (item.id !== "target") setPick(item.id);
-      audio.src = item.url;
-      audio.currentTime = 0;
-      audio.play().catch(() => {
-        // Lecture refusée (onglet en arrière-plan, politique d'autoplay) : on
-        // n'insiste pas et on passe au suivant, sinon la revue se bloque net.
-        timerRef.current = setTimeout(next, 300);
-      });
-    };
-
-    // Un silence entre deux extraits : collés, on ne sait plus où finit l'un et
-    // où commence l'autre — et c'est précisément la comparaison qu'on veut.
-    const onEnd = () => {
-      timerRef.current = setTimeout(next, 450);
-    };
-    audio.addEventListener("ended", onEnd);
-    next();
-
-    return () => {
-      alive = false;
-      clearTimeout(timerRef.current);
-      audio.removeEventListener("ended", onEnd);
-      audio.pause();
-      audioRef.current = null;
-    };
-  }, [round.index, queue]);
-
-  // Un clic reprend la main sur la revue : on écoute ce qu'on veut, quand on
-  // veut. La séquence automatique ne doit jamais empêcher d'y revenir.
-  const playOne = (id, url) => {
-    clearTimeout(timerRef.current);
-    setPick(id === "target" ? null : id);
-    if (!url) return;
-    const a = audioRef.current;
-    if (!a) return;
-    setNowPlaying(id);
-    a.src = url;
-    a.currentTime = 0;
-    a.play().catch(() => {});
-  };
+  const { current, progress, play } = useClipReel({
+    items: queue,
+    restartKey: round.index,
+    onItem: (id) => {
+      // Le grand graphique suit la lecture. Les regarder se désynchroniser
+      // serait pire que pas de graphique du tout.
+      if (id !== "target") setPick(id);
+    },
+  });
 
   const shownId = pick || String(meId);
   const shown = round.takes?.find((t) => t.userId === shownId && t.contour);
+  const live = current === shownId || current === "target";
 
   return (
     <section className="pq-reveal">
-      <p className="pq-answer">
-        C'était <b>{round.label}</b>
-        {round.game ? <em> — {round.game}</em> : null}
-        {round.addedBy ? (
-          <span className="pq-by">proposé par {round.addedBy}</span>
-        ) : null}
-      </p>
+      <div className="pq-verdict">
+        {round.image ? (
+          <span className="pq-face">
+            <img src={round.image} alt="" draggable="false" />
+          </span>
+        ) : (
+          <span className="pq-face ph" aria-hidden="true">
+            <Music size={24} />
+          </span>
+        )}
+        <span className="pq-verdict-txt">
+          <b className="pq-band">C'était</b>
+          <span className="pq-answer">
+            {round.label}
+            {round.addedBy ? <em>proposé par {round.addedBy}</em> : null}
+          </span>
+        </span>
+        <button
+          className={`pq-clip clickable k-target ${current === "target" ? "on" : ""}`}
+          onClick={() => play("target", round.clipUrl)}
+        >
+          <Play size={13} /> L'original
+        </button>
+      </div>
+
+      {/* La courbe de celui qu'on écoute, contre l'originale. */}
+      {round.contour && shown && (
+        <ContourChart
+          target={round.contour.pitch}
+          attempt={shown.contour.pitch}
+          name={shownId === String(meId) ? "toi" : byId.get(shownId)?.username}
+          band={shown.band}
+          progress={live ? progress : null}
+          progressOn={current === "target" ? "target" : "attempt"}
+        />
+      )}
 
       <ol className="pq-podium">
         {(round.takes || []).map((t) => {
@@ -686,15 +660,12 @@ function Reveal({ round, byId, meId }) {
               key={t.userId}
               className={`pq-podium-row band-${t.band} ${mine ? "me" : ""} ${
                 t.userId === shownId ? "picked" : ""
-              } ${t.userId === nowPlaying ? "playing" : ""} clickable`}
-              onClick={() => playOne(t.userId, t.attemptUrl)}
+              } ${t.userId === current ? "playing" : ""} clickable`}
+              onClick={() => play(t.userId, t.attemptUrl)}
             >
               <span className={`pq-podium-rank r${t.rank}`}>{t.rank}</span>
               {p && <Avatar p={p} />}
               <span className="pq-podium-who">{p?.username || "…"}</span>
-              {/* La forme de SA mélodie, en vignette. C'est ce qui manquait :
-                  on entendait les autres sans jamais voir où ils étaient
-                  partis, alors que c'est précisément ce que le barème note. */}
               {round.contour && t.contour && (
                 <ContourChart
                   target={round.contour.pitch}
@@ -705,9 +676,8 @@ function Reveal({ round, byId, meId }) {
               )}
               {t.attemptUrl ? (
                 // Un indicateur, pas un bouton : c'est la LIGNE ENTIÈRE qui se
-                // clique. Deux cibles côte à côte dont l'une est incluse dans
-                // l'autre, c'est la garantie de clics qui ne font pas ce qu'on
-                // croyait.
+                // clique. Deux cibles imbriquées, c'est la garantie de clics qui
+                // ne font pas ce qu'on croyait.
                 <span className="pq-podium-wave" aria-hidden="true">
                   <i /><i /><i />
                 </span>
@@ -720,29 +690,7 @@ function Reveal({ round, byId, meId }) {
         })}
       </ol>
 
-      {/* La courbe sélectionnée contre l'originale : même justification qu'en
-          solo, mais on peut désormais regarder celle de n'importe qui. */}
-      {round.contour && shown && (
-        <ContourChart
-          target={round.contour.pitch}
-          attempt={shown.contour.pitch}
-          name={shownId === String(meId) ? "toi" : byId.get(shownId)?.username}
-        />
-      )}
-      {round.takes?.some((t) => t.contour) && (
-        <p className="pq-pick-hint">
-          On les écoute du dernier au premier. Touche une ligne pour la rejouer.
-        </p>
-      )}
-
-      <div className="pq-replay">
-        <button
-          className={`pq-clip clickable k-target ${nowPlaying === "target" ? "on" : ""}`}
-          onClick={() => playOne("target", round.clipUrl)}
-        >
-          <Play size={13} /> L'original
-        </button>
-      </div>
+      <p className="pq-pick-hint">Du dernier au premier · touche une ligne pour la rejouer</p>
     </section>
   );
 }

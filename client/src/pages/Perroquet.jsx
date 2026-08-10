@@ -1,54 +1,55 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
-  ArrowLeft,
+  Activity,
   ArrowRight,
   Coins,
   Loader2,
   Mic,
-  MicOff,
   Music,
   Play,
   RotateCcw,
   SkipForward,
   Swords,
+  Timer,
   Trophy,
   Users,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch, apiUpload } from "../lib/api";
 import { openMic, closeMic, startTake, canRecord } from "../lib/soundTake";
+import { useClipReel } from "../lib/clipReel";
 import PerroquetHold from "../components/PerroquetHold";
 import ContourChart from "../components/ContourChart";
 import SoundLibrary from "../components/SoundLibrary";
+import PerroquetDecor from "../components/PerroquetDecor";
 
 // ======================================================================
 //  Le Perroquet — imite le son, le plus proche gagne
 // ======================================================================
-// On fait entendre un son de jeu (le cri de Yoshi, le « wahoo » de Mario), le
-// joueur le refait à la voix, le serveur note à quel point c'était proche.
-// Inspiré des vieux Mario où il fallait crier dans le micro de la console.
+// On fait entendre un son de jeu, le joueur le refait à la voix, le serveur
+// note à quel point c'était proche.
 //
 // ------------------------------------------------- CE QUI PORTE LE JEU
 // Ce n'est PAS le score. Un barème qui compare des voix humaines à des sons
 // synthétisés est forcément approximatif (cf. server/src/lib/soundContour.js),
-// et afficher un nombre nu ferait contester chaque manche.
+// et un nombre nu ferait contester chaque manche. Ce qui porte le jeu, c'est
+// qu'on RÉÉCOUTE — d'où deux choix d'écran qui ne sont pas des ornements :
 //
-// Ce qui porte le jeu, c'est qu'on RÉÉCOUTE. D'où deux choix d'écran qui ne
-// sont pas des ornements :
+//   1. LA REVUE AUTOMATIQUE. Au verdict, l'original puis sa propre tentative
+//      s'enchaînent tout seuls (lib/clipReel.js). Personne n'appuie sur deux
+//      boutons de lecture pour se comparer ; tout le monde écoute une séquence
+//      qui se déroule.
+//   2. LA COURBE QUI SE DESSINE AU RYTHME DU SON. Un score devient acceptable
+//      dès qu'on voit pourquoi on l'a eu — « ah oui, je suis parti trop haut ».
+//      Le tracé fini et immobile ne reliait rien à rien ; celui qui court avec
+//      la lecture montre à quel instant l'écart s'est creusé.
 //
-//   1. LES DEUX COURBES SUPERPOSÉES. Un score devient acceptable dès qu'on voit
-//      pourquoi on l'a eu — « ah oui, je suis parti trop haut ». Sans le
-//      dessin, 62/100 est une sentence ; avec, c'est une explication.
-//   2. LES DEUX SONS REJOUÉS CÔTE À CÔTE, l'original et sa propre tentative.
-//      C'est le moment où on rit, et c'est la raison de garder les
-//      enregistrements en base plutôt que de ne stocker qu'un nombre.
-//
-// ------------------------------------------------------ le maintien
-// On enregistre TANT QU'ON APPUIE, comme les messages vocaux de la messagerie.
-// Un mode « clic pour démarrer / clic pour arrêter » obligerait à décider quand
-// on a fini alors qu'on est en train de crier — et la durée fait partie de la
-// note. Maintenir, c'est le geste juste : on relâche quand le cri est fini.
+// ------------------------------------------------------------- le décor
+// AUCUN FOND PEINT. La page tenait sur un brun de cabine qui la coupait du
+// reste du site et virait au sale en thème clair. Elle vit désormais sur le
+// fond de l'application et n'emprunte que ses jetons (même parti pris que le
+// Grand Quiz) ; tout ce qu'elle ajoute passe par la couche `--pq-*` du CSS.
 
 const HOLD_MIN_MS = 250; // en deçà, c'est un clic, pas une imitation
 
@@ -61,7 +62,7 @@ const BAND_LABEL = {
 };
 
 export default function Perroquet() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const challengeId = params.get("challenge");
@@ -75,10 +76,10 @@ export default function Perroquet() {
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
   const [recap, setRecap] = useState(null);
+
   // La librairie personnelle : combien de sons prêts, et est-ce qu'on joue
-  // avec. En solo, le joueur EST l'hôte — c'est donc lui qui décide, mais la
-  // règle reste la même qu'en versus : rien n'entre dans le tirage sans un
-  // geste explicite (cf. components/SoundLibrary.jsx).
+  // avec. En solo le joueur est son propre hôte — mais la règle ne change pas :
+  // rien n'entre dans le tirage sans un geste explicite.
   const [showLib, setShowLib] = useState(false);
   const [myCount, setMyCount] = useState(0);
   const [useMine, setUseMine] = useState(false);
@@ -103,9 +104,6 @@ export default function Perroquet() {
     []
   );
 
-  // Le compte de sons personnels prêts à sortir : il conditionne l'affichage de
-  // l'interrupteur (proposer « jouer avec mes sons » à qui n'en a aucun ne
-  // ferait qu'ajouter une case morte).
   const loadMine = useCallback(async () => {
     try {
       const d = await apiFetch("/perroquet/sounds", { token });
@@ -125,9 +123,7 @@ export default function Perroquet() {
   const start = useCallback(async () => {
     setErr("");
     if (!canRecord()) {
-      setErr(
-        "Ce navigateur ne sait pas enregistrer. Il faut Chrome, Firefox ou Safari, et une connexion sécurisée (https)."
-      );
+      setErr("Ce navigateur ne sait pas enregistrer (il faut https).");
       return;
     }
     setSending(true);
@@ -159,7 +155,6 @@ export default function Perroquet() {
     }
   }, [token, challengeId, useMine]);
 
-  // ---------- Ouvrir un salon à plusieurs ----------
   const openVersus = useCallback(async () => {
     setSending(true);
     try {
@@ -219,11 +214,7 @@ export default function Perroquet() {
       const fd = new FormData();
       // L'extension suit le type MIME réel : Safari rend du mp4, pas du webm.
       fd.append("attempt", out.blob, `attempt.${out.mimeType.includes("mp4") ? "m4a" : "webm"}`);
-      const data = await apiUpload(
-        `/perroquet/${game.gameId}/round/${index}`,
-        fd,
-        token
-      );
+      const data = await apiUpload(`/perroquet/${game.gameId}/round/${index}`, fd, token);
       setResults((r) => {
         const next = [...r];
         next[index] = data;
@@ -242,11 +233,7 @@ export default function Perroquet() {
     setSending(true);
     try {
       const fd = new FormData(); // sans fichier = manche passée
-      const data = await apiUpload(
-        `/perroquet/${game.gameId}/round/${index}`,
-        fd,
-        token
-      );
+      const data = await apiUpload(`/perroquet/${game.gameId}/round/${index}`, fd, token);
       setResults((r) => {
         const next = [...r];
         next[index] = data;
@@ -283,7 +270,7 @@ export default function Perroquet() {
 
   // ---------- Barre d'espace : le même geste au clavier ----------
   useEffect(() => {
-    if (phase !== "play") return;
+    if (phase !== "play") return undefined;
     const down = (e) => {
       if (e.code !== "Space" || e.repeat) return;
       e.preventDefault();
@@ -302,24 +289,31 @@ export default function Perroquet() {
     };
   }, [phase, beginHold, endHold]);
 
-  // ============================================================
-  //  Rendu
-  // ============================================================
-  return (
-    <div className="pq-page">
-      <div className="pq-stage">
-        <header className="pq-top">
-          <Link to="/arcade" className="pq-back clickable">
-            <ArrowLeft size={18} /> Arcade
-          </Link>
-          <span className="pq-title">Le Perroquet</span>
-          {phase === "play" && (
-            <span className="pq-progress">
-              {index + 1} / {game.rounds.length}
-            </span>
-          )}
-        </header>
+  const inGame = phase === "play";
 
+  return (
+    <div className={`pq-page ${inGame ? "in-game" : ""}`}>
+      <PerroquetDecor />
+
+      <header className="pq-top">
+        {/* Plus de bouton « Arcade » ici : la barre latérale y ramène déjà, et
+            il alourdissait le coin haut-gauche. Un espace muet tient la balance
+            à gauche du titre, en miroir du compteur. Le retour vers le solo, lui,
+            n'a de sens que depuis le versus — il y est. */}
+        <span className="pq-progress ghost" aria-hidden="true" />
+        <span className="pq-title">
+          <Mic size={15} /> Le Perroquet
+        </span>
+        {inGame ? (
+          <span className="pq-progress">
+            {index + 1}<em>/{game.rounds.length}</em>
+          </span>
+        ) : (
+          <span className="pq-progress ghost" />
+        )}
+      </header>
+
+      <div className="pq-stage">
         {err && <p className="pq-err">{err}</p>}
 
         {phase === "intro" && (
@@ -327,7 +321,6 @@ export default function Perroquet() {
             onStart={start}
             onVersus={openVersus}
             busy={sending}
-            challenge={game?.challenge}
             challengeId={challengeId}
             myCount={myCount}
             useMine={useMine}
@@ -337,19 +330,29 @@ export default function Perroquet() {
         )}
 
         {phase === "play" && round && (
-          <Round
-            round={round}
-            result={result}
-            recording={recording}
-            level={level}
-            sending={sending}
-            onListen={() => playClip(round.url)}
-            onHoldStart={beginHold}
-            onHoldEnd={endHold}
-            onSkip={skip}
-            onNext={next}
-            last={index + 1 >= game.rounds.length}
-          />
+          <>
+            <Pips total={game.rounds.length} index={index} results={results} />
+            {result ? (
+              <RoundResult
+                key={index}
+                result={result}
+                onNext={next}
+                last={index + 1 >= game.rounds.length}
+                busy={sending}
+                user={user}
+              />
+            ) : (
+              <Round
+                recording={recording}
+                level={level}
+                sending={sending}
+                onListen={() => playClip(round.url)}
+                onHoldStart={beginHold}
+                onHoldEnd={endHold}
+                onSkip={skip}
+              />
+            )}
+          </>
         )}
 
         {phase === "recap" && recap && (
@@ -361,16 +364,13 @@ export default function Perroquet() {
               setPhase("intro");
             }}
             onHome={() => navigate("/arcade")}
+            user={user}
           />
         )}
       </div>
 
       {showLib && (
-        <SoundLibrary
-          token={token}
-          onClose={() => setShowLib(false)}
-          onChanged={loadMine}
-        />
+        <SoundLibrary token={token} onClose={() => setShowLib(false)} onChanged={loadMine} />
       )}
     </div>
   );
@@ -391,103 +391,83 @@ function Intro({
 }) {
   return (
     <section className="pq-intro">
-      <span className="pq-bird" aria-hidden="true">
-        <i className="pq-bird-wave a" />
-        <i className="pq-bird-wave b" />
-        <Mic size={34} />
+      <span className="pq-logo-orb" aria-hidden="true">
+        <i className="pq-ring r1" />
+        <i className="pq-ring r2" />
+        <i className="pq-ring r3" />
+        <Mic size={38} />
       </span>
-      <h1>Imite le son.</h1>
+
+      <h1 className="pq-logo">
+        Le <b>Perroquet</b>
+      </h1>
       <p className="pq-lead">
-        On te fait entendre un bruit de jeu. Tu le refais à la voix, en
-        maintenant le bouton. Le plus proche gagne.
+        {challengeId
+          ? "Les mêmes sons qu'un autre joueur. À toi de crier plus juste."
+          : "Écoute le son. Refais-le à la voix. Le plus proche gagne."}
       </p>
-      <ul className="pq-rules">
-        <li>
-          <b>La mélodie compte</b>, pas ta voix : monter et redescendre au bon
-          endroit vaut mieux que d'avoir le bon timbre.
-        </li>
-        <li>
-          <b>Le rythme aussi</b> : une attaque sèche ne s'imite pas avec un
-          soupir.
-        </li>
-        <li>
-          Cinq sons, une note sur 100 par son. Ta moyenne devient des points
-          d'arcade.
-        </li>
-      </ul>
+
       <div className="pq-intro-actions">
         <button className="pq-go clickable" onClick={onStart} disabled={busy}>
           {busy ? <Loader2 size={18} className="spin" /> : <Play size={18} />}
-          {challengeId ? "Relever le défi" : "Jouer seul"}
+          {challengeId ? "Relever le défi" : "Jouer"}
         </button>
-        {/* Le multi est mis SUR LE MÊME PLAN que le solo, pas relégué dans un
-            coin : c'est là que le jeu est le plus drôle — on y écoute les cris
-            des autres, ce que le solo ne peut pas offrir. */}
+        {/* Le multi est sur le MÊME PLAN que le solo : c'est là que le jeu est
+            le plus drôle — on y écoute les cris des autres. */}
         <button className="pq-go alt clickable" onClick={onVersus} disabled={busy}>
-          <Users size={18} /> Jouer à plusieurs
+          <Users size={18} /> À plusieurs
+          <em>jusqu'à 6</em>
         </button>
       </div>
-      {/* --- La librairie personnelle ---
-          Sous les boutons, pas au-dessus : c'est un complément au jeu, pas une
-          étape avant de jouer. Mais visible d'emblée, parce qu'un dépôt qu'on
-          ne découvre qu'au fond d'un réglage n'existe pas. */}
+
       {!challengeId && (
         <div className="pq-mine">
           <button className="pq-mine-open clickable" onClick={onLibrary}>
-            <Music size={15} /> Ma librairie de sons
+            <Music size={15} /> Mes sons
             {myCount > 0 && <em>{myCount}</em>}
           </button>
           {myCount > 0 && (
             <button
-              className={`pq-mine-sw clickable ${useMine ? "on" : ""}`}
+              className={`pq-sw-line clickable ${useMine ? "on" : ""}`}
               onClick={onToggleMine}
               role="switch"
               aria-checked={useMine}
             >
               <i />
-              Ajouter mes sons au tirage
+              les ajouter au tirage
             </button>
           )}
         </div>
       )}
-
-      <p className="pq-mic-note">
-        <MicOff size={13} /> Le micro s'ouvre au lancement et se referme en
-        quittant la page.
-      </p>
     </section>
+  );
+}
+
+// ============================================================
+//  La progression de la partie
+// ============================================================
+function Pips({ total, index, results }) {
+  return (
+    <div className="pq-pips" aria-hidden="true">
+      {Array.from({ length: total }).map((_, i) => (
+        <i
+          key={i}
+          className={i === index ? "cur" : results[i] ? `done band-${results[i].band}` : ""}
+        />
+      ))}
+    </div>
   );
 }
 
 // ============================================================
 //  Une manche
 // ============================================================
-function Round({
-  round,
-  result,
-  recording,
-  level,
-  sending,
-  onListen,
-  onHoldStart,
-  onHoldEnd,
-  onSkip,
-  onNext,
-  last,
-}) {
-  if (result) return <RoundResult result={result} onNext={onNext} last={last} busy={sending} />;
-
+function Round({ recording, level, sending, onListen, onHoldStart, onHoldEnd, onSkip }) {
   return (
     <section className="pq-round">
       <button className="pq-listen clickable" onClick={onListen} disabled={recording}>
-        <Play size={18} /> Réécouter
+        <Play size={15} /> Réécouter
       </button>
-
-      <div className="pq-hint">
-        Difficulté&nbsp;
-        {"●".repeat(round.difficulty)}
-        <span className="pq-hint-off">{"●".repeat(5 - round.difficulty)}</span>
-      </div>
 
       <PerroquetHold
         recording={recording}
@@ -498,7 +478,7 @@ function Round({
       />
 
       <button className="pq-skip clickable" onClick={onSkip} disabled={sending || recording}>
-        <SkipForward size={15} /> Passer ce son
+        <SkipForward size={14} /> Passer
       </button>
     </section>
   );
@@ -507,58 +487,125 @@ function Round({
 // ============================================================
 //  Le résultat d'une manche
 // ============================================================
-function RoundResult({ result, onNext, last, busy }) {
+// L'original puis sa propre tentative s'enchaînent tout seuls, et la courbe se
+// dessine avec celui qui joue (cf. lib/clipReel.js). Le score se compte en
+// montant : un nombre qui s'installe se lit comme un verdict, un nombre qui
+// grimpe se regarde.
+function RoundResult({ result, onNext, last, busy, user }) {
   const skipped = result.skipped;
+  const reel = useMemo(
+    () =>
+      [
+        { id: "target", url: result.clip?.url },
+        { id: "me", url: result.attemptUrl },
+      ].filter((x) => x.url),
+    [result]
+  );
+  const { current, progress, play } = useClipReel({
+    items: reel,
+    restartKey: result.clip?.id || "r",
+    enabled: !skipped,
+  });
+
+  const score = useCountUp(skipped ? 0 : result.score, 700);
+
   return (
     <section className={`pq-result band-${result.band}`}>
-      <span className="pq-band">{BAND_LABEL[result.band] || "—"}</span>
-      {!skipped && <span className="pq-score">{result.score}</span>}
-      {result.reason && <p className="pq-reason">{result.reason}</p>}
+      <div className="pq-verdict">
+        {result.clip?.image ? (
+          <span className="pq-face">
+            <img src={result.clip.image} alt="" draggable="false" />
+          </span>
+        ) : (
+          <span className="pq-face ph" aria-hidden="true">
+            <Music size={26} />
+          </span>
+        )}
+        <span className="pq-verdict-txt">
+          <b className="pq-band">{BAND_LABEL[result.band] || "—"}</b>
+          <span className="pq-answer">
+            {result.clip.label}
+            {result.clip.addedBy ? <em>proposé par {result.clip.addedBy}</em> : null}
+          </span>
+        </span>
+        {!skipped && <span className="pq-score">{score}</span>}
+      </div>
 
-      <p className="pq-answer">
-        C'était <b>{result.clip.label}</b>
-        {result.clip.game ? <em> — {result.clip.game}</em> : null}
-        {/* Le crédit du déposant : c'est la contrepartie du dépôt libre, et
-            c'est ce qui donne envie d'en ajouter. */}
-        {result.clip.addedBy ? (
-          <span className="pq-by">proposé par {result.clip.addedBy}</span>
-        ) : null}
-      </p>
+      {result.reason && <p className="pq-reason">{result.reason}</p>}
 
       {!skipped && result.contour && result.clip.contour && (
         <>
-          {/* LE cœur de l'écran : on VOIT l'écart. Voir la note de tête. */}
           <ContourChart
             target={result.clip.contour.pitch}
             attempt={result.contour.pitch}
+            band={result.band}
+            progress={current ? progress : null}
+            progressOn={current === "target" ? "target" : "attempt"}
           />
           <div className="pq-detail">
-            <Bar label="Mélodie" value={result.pitch} />
-            <Bar label="Rythme" value={result.energy} />
-            <Bar label="Durée" value={result.duration} />
+            <Bar Icon={Music} label="Mélodie" value={result.pitch} />
+            <Bar Icon={Activity} label="Rythme" value={result.energy} />
+            <Bar Icon={Timer} label="Durée" value={result.duration} />
           </div>
         </>
       )}
 
       <div className="pq-replay">
-        <ClipButton url={result.clip.url} label="L'original" kind="target" />
+        <button
+          className={`pq-clip clickable k-target ${current === "target" ? "on" : ""}`}
+          onClick={() => play("target", result.clip.url)}
+        >
+          <Play size={13} /> L'original
+        </button>
         {result.attemptUrl && (
-          <ClipButton url={result.attemptUrl} label="Toi" kind="attempt" />
+          <button
+            className={`pq-clip clickable k-attempt ${current === "me" ? "on" : ""}`}
+            onClick={() => play("me", result.attemptUrl)}
+          >
+            {user?.avatar ? (
+              <img className="pq-clip-av" src={user.avatar} alt="" loading="lazy" />
+            ) : (
+              <span className="pq-clip-av ph">
+                {(user?.username || "?")[0].toUpperCase()}
+              </span>
+            )}
+            Toi
+          </button>
         )}
       </div>
 
       <button className="pq-next clickable" onClick={onNext} disabled={busy}>
         {busy ? <Loader2 size={16} className="spin" /> : null}
-        {last ? "Voir le résultat" : "Son suivant"} <ArrowRight size={16} />
+        {last ? "Mon résultat" : "Suivant"} <ArrowRight size={16} />
       </button>
     </section>
   );
 }
 
-function Bar({ label, value }) {
+// Un compteur qui monte. Amorti sur la fin (courbe en sortie), sinon il a
+// l'air de s'arrêter net au lieu de se poser.
+function useCountUp(target, ms) {
+  const [v, setV] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const t0 = performance.now();
+    const tick = (t) => {
+      const p = Math.min(1, (t - t0) / ms);
+      setV(Math.round(target * (1 - (1 - p) ** 3)));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, ms]);
+  return v;
+}
+
+function Bar({ Icon, label, value }) {
   return (
     <span className="pq-bar">
-      <em>{label}</em>
+      <em>
+        <Icon size={12} /> {label}
+      </em>
       <i>
         <b style={{ width: `${Math.max(2, value)}%` }} />
       </i>
@@ -567,7 +614,7 @@ function Bar({ label, value }) {
   );
 }
 
-function ClipButton({ url, label, kind }) {
+function ClipButton({ url, label, kind, av, avName }) {
   const ref = useRef(null);
   return (
     <button
@@ -578,7 +625,16 @@ function ClipButton({ url, label, kind }) {
         ref.current.play().catch(() => {});
       }}
     >
-      <Play size={14} /> {label}
+      {kind === "attempt" ? (
+        av ? (
+          <img className="pq-clip-av" src={av} alt="" loading="lazy" />
+        ) : (
+          <span className="pq-clip-av ph">{(avName || "?")[0].toUpperCase()}</span>
+        )
+      ) : (
+        <Play size={13} />
+      )}{" "}
+      {label}
     </button>
   );
 }
@@ -586,28 +642,44 @@ function ClipButton({ url, label, kind }) {
 // ============================================================
 //  Fin de partie
 // ============================================================
-function Recap({ recap, onReplay, onHome }) {
+function Recap({ recap, onReplay, onHome, user }) {
+  const avg = useCountUp(recap.average, 900);
   return (
     <section className="pq-recap">
-      <h2>
-        <Trophy size={20} /> {recap.average} de moyenne
-      </h2>
-      <p className="pq-recap-pts">
-        <Coins size={15} /> +{recap.average} points d'arcade
-      </p>
+      <div className="pq-recap-hero">
+        <span className="pq-recap-badge">
+          <Trophy size={26} />
+        </span>
+        <b className="pq-recap-avg">{avg}</b>
+        <span className="pq-recap-unit">de moyenne</span>
+        <span className="pq-recap-pts">
+          <Coins size={14} /> +{recap.average} points d'arcade
+        </span>
+      </div>
 
       <ul className="pq-recap-list">
         {recap.rounds.map((r, i) => (
           <li key={i} className={`pq-recap-row band-${r.band}`}>
-            <span className="pq-recap-n">{i + 1}</span>
+            {r.image ? (
+              <img className="pq-recap-img" src={r.image} alt="" loading="lazy" />
+            ) : (
+              <span className="pq-recap-n">{i + 1}</span>
+            )}
             <span className="pq-recap-label">
               <b>{r.label}</b>
-              {r.game ? <em>{r.game}</em> : null}
               {r.addedBy ? <em className="by">par {r.addedBy}</em> : null}
             </span>
             <span className="pq-recap-clips">
               <ClipButton url={r.clipUrl} label="L'original" kind="target" />
-              {r.attemptUrl && <ClipButton url={r.attemptUrl} label="Toi" kind="attempt" />}
+              {r.attemptUrl && (
+                <ClipButton
+                  url={r.attemptUrl}
+                  label="Toi"
+                  kind="attempt"
+                  av={user?.avatar}
+                  avName={user?.username}
+                />
+              )}
             </span>
             <span className="pq-recap-score">{r.skipped ? "—" : r.score}</span>
           </li>
@@ -618,14 +690,11 @@ function Recap({ recap, onReplay, onHome }) {
         <button className="pq-go clickable" onClick={onReplay}>
           <RotateCcw size={17} /> Rejouer
         </button>
-        <Link
-          to={`/perroquet?challenge=${recap.gameId}`}
-          className="pq-challenge clickable"
-        >
-          <Swords size={16} /> Lien de défi
+        <Link to={`/perroquet?challenge=${recap.gameId}`} className="pq-challenge clickable">
+          <Swords size={16} /> Défier un ami
         </Link>
         <button className="pq-quit clickable" onClick={onHome}>
-          Retour à l'arcade
+          Arcade
         </button>
       </div>
     </section>

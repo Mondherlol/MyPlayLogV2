@@ -67,6 +67,7 @@ const roundSchema = new mongoose.Schema(
     label: { type: String, default: "" },
     game: { type: String, default: "" },
     clipUrl: { type: String, default: "" },
+    imageUrl: { type: String, default: "" },
     difficulty: { type: Number, default: 2 },
     // Le pseudo du joueur qui a déposé ce son quand il vient d'une librairie
     // personnelle : « proposé par Momo », à la révélation. Vide pour l'officiel.

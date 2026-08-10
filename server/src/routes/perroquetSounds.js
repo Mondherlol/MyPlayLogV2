@@ -41,7 +41,9 @@ router.use(requireAuth);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const USER_DIR = path.join(__dirname, "../../uploads/perroquet/user");
+const IMG_DIR = path.join(__dirname, "../../uploads/perroquet/img");
 fs.mkdirSync(USER_DIR, { recursive: true });
+fs.mkdirSync(IMG_DIR, { recursive: true });
 
 // Le trimmer rend toujours du WAV (c'est ce que la Web Audio API sait réencoder
 // sans bibliothèque). Les autres types sont là pour les navigateurs qui
@@ -69,18 +71,39 @@ const MIN_MS = 250;
 // dur. C'est aussi la borne qui empêche un compte de remplir le serveur.
 const MAX_PER_USER = 40;
 
+// L'illustration : facultative, et volontairement permissive côté format —
+// c'est un visuel de confort, pas une pièce du jeu.
+const IMG_EXT = {
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/webp": ".webp",
+  "image/gif": ".gif",
+};
+
 const upload = multer({
   storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, USER_DIR),
+    destination: (req, file, cb) =>
+      cb(null, file.fieldname === "image" ? IMG_DIR : USER_DIR),
     filename: (req, file, cb) => {
       const base = String(file.mimetype).split(";")[0];
-      cb(null, `u-${Date.now()}-${Math.round(Math.random() * 1e6)}${EXT[base] || ".wav"}`);
+      const stamp = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+      cb(
+        null,
+        file.fieldname === "image"
+          ? `i-${stamp}${IMG_EXT[base] || ".png"}`
+          : `u-${stamp}${EXT[base] || ".wav"}`
+      );
     },
   }),
   limits: { fileSize: MAX_BYTES },
-  fileFilter: (req, file, cb) =>
-    cb(null, Object.hasOwn(EXT, String(file.mimetype).split(";")[0])),
-});
+  fileFilter: (req, file, cb) => {
+    const type = String(file.mimetype).split(";")[0];
+    cb(null, file.fieldname === "image" ? Object.hasOwn(IMG_EXT, type) : Object.hasOwn(EXT, type));
+  },
+}).fields([
+  { name: "clip", maxCount: 1 },
+  { name: "image", maxCount: 1 },
+]);
 
 const abs = (req, u) =>
   !u ? null : /^https?:/i.test(u) ? u : `${req.protocol}://${req.get("host")}${u}`;
@@ -90,6 +113,7 @@ const serialize = (req, c) => ({
   label: c.label,
   game: c.game || "",
   url: abs(req, c.url),
+  image: abs(req, c.image) || "",
   difficulty: c.difficulty,
   active: c.active,
   durationMs: c.contour?.durationMs || 0,
@@ -127,13 +151,19 @@ router.get("/", async (req, res) => {
 // hauteur, donc rien à mesurer — accepté, il distribuerait des points au hasard
 // et on mettrait des semaines à comprendre pourquoi les scores de cette table
 // sont absurdes. Mieux vaut refuser à l'entrée, en le disant.
-router.post("/", upload.single("clip"), async (req, res) => {
+router.post("/", upload, async (req, res) => {
+  const clipFile = req.files?.clip?.[0] || null;
+  const imgFile = req.files?.image?.[0] || null;
   const cleanup = () => {
-    if (req.file) fs.promises.unlink(req.file.path).catch(() => {});
+    for (const f of [clipFile, imgFile]) {
+      if (f) fs.promises.unlink(f.path).catch(() => {});
+    }
   };
   try {
-    if (!req.file)
+    if (!clipFile) {
+      cleanup();
       return res.status(400).json({ error: "Format audio non pris en charge." });
+    }
 
     const label = String(req.body?.label || "").trim().slice(0, 60);
     if (!label) {
@@ -153,7 +183,7 @@ router.post("/", upload.single("clip"), async (req, res) => {
 
     let contour;
     try {
-      contour = await contourOf(req.file.path);
+      contour = await contourOf(clipFile.path);
     } catch (e) {
       cleanup();
       return res.status(422).json({
@@ -184,10 +214,9 @@ router.post("/", upload.single("clip"), async (req, res) => {
     const me = await User.findById(req.userId).select("username").lean();
     const clip = await SoundClip.create({
       label,
-      game: String(req.body?.game || "").trim().slice(0, 80),
-      url: `/uploads/perroquet/user/${req.file.filename}`,
+      url: `/uploads/perroquet/user/${clipFile.filename}`,
+      image: imgFile ? `/uploads/perroquet/img/${imgFile.filename}` : "",
       contour,
-      difficulty: Math.max(1, Math.min(5, Number(req.body?.difficulty) || 2)),
       active: true,
       owner: req.userId,
       ownerName: me?.username || "",
@@ -217,9 +246,6 @@ router.patch("/:id", async (req, res) => {
       if (!v) return res.status(400).json({ error: "Le nom ne peut pas être vide." });
       clip.label = v;
     }
-    if (typeof req.body?.game === "string") clip.game = req.body.game.trim().slice(0, 80);
-    if (req.body?.difficulty != null)
-      clip.difficulty = Math.max(1, Math.min(5, Number(req.body.difficulty) || 2));
     if (typeof req.body?.active === "boolean") clip.active = req.body.active;
 
     await clip.save();
@@ -255,6 +281,9 @@ router.delete("/:id", async (req, res) => {
 
     if (clip.url?.startsWith("/uploads/perroquet/user/")) {
       fs.promises.unlink(path.join(USER_DIR, path.basename(clip.url))).catch(() => {});
+    }
+    if (clip.image?.startsWith("/uploads/perroquet/img/")) {
+      fs.promises.unlink(path.join(IMG_DIR, path.basename(clip.image))).catch(() => {});
     }
     await clip.deleteOne();
     res.json({ ok: true });

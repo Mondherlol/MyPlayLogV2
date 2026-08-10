@@ -32,8 +32,10 @@ router.use(requireAuth, requireAdmin);
 const FFMPEG = process.env.FFMPEG_PATH || ffmpegStatic || "ffmpeg";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BANK_DIR = path.join(__dirname, "../../uploads/perroquet/bank");
+const IMG_DIR = path.join(__dirname, "../../uploads/perroquet/img");
 const UPLOADS_DIR = path.join(__dirname, "../../uploads");
 fs.mkdirSync(BANK_DIR, { recursive: true });
+fs.mkdirSync(IMG_DIR, { recursive: true });
 
 // Le fichier d'un clip sur le disque. Deux dossiers coexistent désormais :
 // `bank/` pour les sons officiels et `user/` pour les librairies des joueurs
@@ -64,18 +66,40 @@ const EXT = {
   "audio/x-flac": ".flac",
 };
 
+// L'illustration facultative du son, montrée à la révélation seulement. Elle
+// vit dans le même dossier que celles des joueurs : c'est le même objet, seul
+// le déposant change.
+const IMG_EXT = {
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/webp": ".webp",
+  "image/gif": ".gif",
+};
+
 const upload = multer({
   storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, BANK_DIR),
+    destination: (req, file, cb) =>
+      cb(null, file.fieldname === "image" ? IMG_DIR : BANK_DIR),
     filename: (req, file, cb) => {
       const base = String(file.mimetype).split(";")[0];
-      cb(null, `c-${Date.now()}-${Math.round(Math.random() * 1e6)}${EXT[base] || ".mp3"}`);
+      const stamp = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+      cb(
+        null,
+        file.fieldname === "image"
+          ? `i-${stamp}${IMG_EXT[base] || ".png"}`
+          : `c-${stamp}${EXT[base] || ".mp3"}`
+      );
     },
   }),
   limits: { fileSize: 8 * 1024 * 1024 },
-  fileFilter: (req, file, cb) =>
-    cb(null, Object.hasOwn(EXT, String(file.mimetype).split(";")[0])),
-});
+  fileFilter: (req, file, cb) => {
+    const type = String(file.mimetype).split(";")[0];
+    cb(null, file.fieldname === "image" ? Object.hasOwn(IMG_EXT, type) : Object.hasOwn(EXT, type));
+  },
+}).fields([
+  { name: "clip", maxCount: 1 },
+  { name: "image", maxCount: 1 },
+]);
 
 const abs = (req, u) =>
   !u ? null : /^https?:/i.test(u) ? u : `${req.protocol}://${req.get("host")}${u}`;
@@ -86,6 +110,7 @@ const serialize = (req, c) => ({
   game: c.game || "",
   gameId: c.gameId || null,
   url: abs(req, c.url),
+  image: abs(req, c.image) || "",
   difficulty: c.difficulty,
   active: c.active,
   // Qui l'a déposé : vide pour la banque officielle, le pseudo du joueur pour
@@ -140,13 +165,19 @@ router.get("/", async (req, res) => {
 // C'est ce qui fait qu'une manche de jeu ne redécode jamais le son de
 // référence : elle compare la voix du joueur à une centaine de nombres déjà en
 // base (cf. models/SoundClip.js).
-router.post("/", upload.single("clip"), async (req, res) => {
+router.post("/", upload, async (req, res) => {
+  const clipFile = req.files?.clip?.[0] || null;
+  const imgFile = req.files?.image?.[0] || null;
   const cleanup = () => {
-    if (req.file) fs.promises.unlink(req.file.path).catch(() => {});
+    for (const f of [clipFile, imgFile]) {
+      if (f) fs.promises.unlink(f.path).catch(() => {});
+    }
   };
   try {
-    if (!req.file)
+    if (!clipFile) {
+      cleanup();
       return res.status(400).json({ error: "Format audio non pris en charge." });
+    }
 
     const label = String(req.body?.label || "").trim();
     if (!label) {
@@ -156,7 +187,7 @@ router.post("/", upload.single("clip"), async (req, res) => {
 
     let contour;
     try {
-      contour = await contourOf(req.file.path);
+      contour = await contourOf(clipFile.path);
     } catch (e) {
       cleanup();
       return res.status(422).json({
@@ -190,11 +221,9 @@ router.post("/", upload.single("clip"), async (req, res) => {
 
     const clip = await SoundClip.create({
       label,
-      game: String(req.body?.game || "").trim(),
-      gameId: Number(req.body?.gameId) || null,
-      url: `/uploads/perroquet/bank/${req.file.filename}`,
+      url: `/uploads/perroquet/bank/${clipFile.filename}`,
+      image: imgFile ? `/uploads/perroquet/img/${imgFile.filename}` : "",
       contour,
-      difficulty: Math.max(1, Math.min(5, Number(req.body?.difficulty) || 2)),
       active: req.body?.active !== "false",
     });
 
@@ -456,8 +485,9 @@ router.delete("/:id", async (req, res) => {
       });
     }
 
-    const file = fileOf(clip);
-    if (file) fs.promises.unlink(file).catch(() => {});
+    for (const f of [fileOf(clip), fileOf({ url: clip.image })]) {
+      if (f) fs.promises.unlink(f).catch(() => {});
+    }
     await clip.deleteOne();
     res.json({ ok: true });
   } catch (err) {

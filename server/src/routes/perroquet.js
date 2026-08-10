@@ -89,6 +89,8 @@ const clipFull = (req, c) => ({
   game: c.game || null,
   gameId: c.gameId || null,
   difficulty: c.difficulty,
+  // L'illustration, s'il y en a une : elle n'arrive qu'ICI, avec la réponse.
+  image: abs(req, c.image) || "",
   // Le crédit du déposant, pour les sons de librairie. C'est la contrepartie du
   // dépôt libre : on a envie de savoir de qui vient le cri qu'on vient d'imiter.
   addedBy: c.owner ? c.ownerName || "" : "",
@@ -191,6 +193,7 @@ router.post("/start", requireAuth, async (req, res) => {
         label: c.label,
         game: c.game || "",
         clipUrl: c.url,
+        imageUrl: c.image || "",
         addedBy: c.owner ? c.ownerName || "" : "",
       })),
       challengeOf: challenge?._id || null,
@@ -402,6 +405,7 @@ const serializeGame = (req, g) => ({
   rounds: g.rounds.map((r) => ({
     label: r.label,
     game: r.game || null,
+    image: abs(req, r.imageUrl) || "",
     addedBy: r.addedBy || "",
     clipUrl: abs(req, r.clipUrl),
     attemptUrl: abs(req, r.attemptUrl),

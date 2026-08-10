@@ -128,3 +128,19 @@ export function startTake(stream, { onLevel } = {}) {
     },
   };
 }
+
+// Le nom d'un son, deviné depuis le nom du fichier déposé.
+//
+// C'est presque toujours le bon : on télécharge « yoshi-cri.mp3 », pas
+// « audio_47.mp3 ». Le pré-remplir évite le champ vide devant lequel on hésite,
+// et il reste modifiable — c'est une proposition, pas une décision.
+export function niceSoundName(filename = "") {
+  const base = String(filename).replace(/\.[a-z0-9]+$/i, "");
+  const clean = base
+    .replace(/[_+]+/g, " ")
+    .replace(/-+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 60);
+  return clean ? clean[0].toUpperCase() + clean.slice(1) : "";
+}

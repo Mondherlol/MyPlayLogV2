@@ -39,6 +39,10 @@ const soundClipSchema = new mongoose.Schema(
     gameId: { type: Number, default: null }, // IGDB, si on l'a
     // Le fichier servi au navigateur (/uploads/perroquet/…).
     url: { type: String, required: true },
+    // Une image, facultative : la tête du personnage, la jaquette, le mème.
+    // Elle n'est montrée qu'À LA RÉVÉLATION, jamais pendant qu'on imite — elle
+    // donnerait la réponse, et la moitié du plaisir est de la découvrir.
+    image: { type: String, default: "" },
     contour: { type: contourSchema, default: () => ({}) },
 
     // 1 (facile à imiter : une note, deux syllabes) → 5 (mélodie tordue).

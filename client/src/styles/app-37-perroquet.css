@@ -1,375 +1,691 @@
 /* ======================================================================
    Le Perroquet — imite le son
    ======================================================================
-   L'identité : UNE CABINE D'ENREGISTREMENT. Fond sombre, halo chaud au centre,
-   mousse acoustique en fond, et le micro comme seul objet à l'écran.
+   ------------------------------------------------------------------ le fond
+   AUCUN FOND PEINT. La page tenait sur un brun de « cabine d'enregistrement »
+   qui la coupait du reste du site et virait franchement au sale en thème clair
+   — elle restait sombre au milieu d'une interface blanche. Elle vit désormais
+   sur le fond de l'application et n'emprunte QUE ses jetons : elle suit le
+   thème clair comme le sombre sans une ligne de plus. Même parti pris que le
+   Grand Quiz (app-36-quizz.css), pour la même raison.
 
-   Pourquoi pas un plateau de télé : Pixel Rush occupe déjà le registre
-   « projecteurs et public en ombres chinoises », et le Grand Quiz celui du
-   pupitre de candidat. Un troisième plateau ferait de ce jeu une variante des
-   deux autres alors que son geste — être seul devant un micro — appelle
-   exactement l'imaginaire inverse : petit, feutré, intime.
-
-   La page assume un décor SOMBRE dans les deux thèmes du site. Ce n'est pas un
-   oubli du thème clair : une cabine éclairée en blanc n'est plus une cabine, et
-   les autres mini-jeux prennent la même liberté. Tout est donc peint
-   explicitement, sans jamais hériter du fond de l'application.
+   Ce que la page ajoute par-dessus tient en trois choses, et rien d'autre :
+     - un décor de notes qui montent, très sourd, derrière le contenu ;
+     - la couche `--pq-*` ci-dessous, seul endroit où une couleur est décidée ;
+     - la couleur de verdict (`band-*`), qui teinte le score, la courbe et la
+       ligne de classement d'un même joueur — c'est ce qui fait lire les trois
+       comme une seule information.
    ====================================================================== */
 
+/* ======================================================================
+   La couleur d'un verdict
+   ======================================================================
+   Déclarée deux fois : soutenue pour le thème clair, où elle doit tenir sur du
+   blanc ; claire pour le sombre. Une seule valeur ferait disparaître le vert de
+   « parfait » sur l'un des deux fonds. */
+:root {
+  --pq-b-perfect: #15803d;
+  --pq-b-great: #047857;
+  --pq-b-close: #b45309;
+  --pq-b-meh: #c2410c;
+  --pq-b-miss: #b91c1c;
+}
+:root[data-theme="dark"] {
+  --pq-b-perfect: #6ce3a6;
+  --pq-b-great: #7fd8b4;
+  --pq-b-close: #ffc95e;
+  --pq-b-meh: #ff9a6c;
+  --pq-b-miss: #ff8080;
+}
+.band-perfect { --band: var(--pq-b-perfect); }
+.band-great { --band: var(--pq-b-great); }
+.band-close { --band: var(--pq-b-close); }
+.band-meh { --band: var(--pq-b-meh); }
+.band-miss { --band: var(--pq-b-miss); }
+
+/* ======================================================================
+   La page
+   ====================================================================== */
 .pq-page {
-  --pq-ink: #f2ece2;
-  --pq-dim: #a79c8d;
-  --pq-bg: #17130f;
-  --pq-bg2: #0d0b09;
-  --pq-panel: rgba(38, 31, 25, 0.9);
-  --pq-line: rgba(226, 190, 130, 0.16);
-  --pq-warm: #f2b70b;
-  --pq-warm-soft: rgba(242, 183, 11, 0.16);
+  --pq-ink: var(--text);
+  --pq-dim: var(--text-soft);
+  --pq-panel: var(--surface);
+  --pq-panel-2: var(--surface-2, var(--surface));
+  --pq-line: var(--border);
+  --pq-line-2: var(--border-strong);
+  --pq-warm: var(--orange);
+  /* L'accent EN TEXTE : le doré vif est illisible sur blanc, --accent-ink est
+     précisément le jeton que le site tient pour ce cas. */
+  --pq-warm-ink: var(--accent-ink);
+  --pq-warm-soft: color-mix(in srgb, var(--orange) 14%, transparent);
+  --band: var(--orange);
 
-  min-height: 100dvh;
-  color: var(--pq-ink);
-  background:
-    radial-gradient(120% 80% at 50% 0%, rgba(242, 183, 11, 0.1), transparent 60%),
-    linear-gradient(180deg, var(--pq-bg) 0%, var(--pq-bg2) 100%);
-  /* La mousse acoustique : une trame de losanges, très discrète. Elle donne la
-     matière du décor sans qu'on la regarde jamais vraiment. */
-  background-attachment: fixed;
-  display: flex;
-  justify-content: center;
-  padding: 24px 16px 60px;
-}
-
-.pq-page::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.5;
-  background-image:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.02) 25%, transparent 25%),
-    linear-gradient(225deg, rgba(255, 255, 255, 0.02) 25%, transparent 25%),
-    linear-gradient(45deg, rgba(0, 0, 0, 0.14) 25%, transparent 25%),
-    linear-gradient(315deg, rgba(0, 0, 0, 0.14) 25%, transparent 25%);
-  background-size: 26px 26px;
-}
-
-.pq-stage {
   position: relative;
-  width: 100%;
-  max-width: 560px;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--pq-ink);
+  padding: 0 16px 56px;
+  overflow-x: clip;
 }
 
-/* ---------- Bandeau ---------- */
+/* ---------- Le décor ----------
+   Rien que des notes qui montent, très sourdes, derrière le contenu. Les deux
+   halos dorés qui lavaient la page d'un dégradé jaune ont été retirés : ils la
+   coupaient du reste du site et viraient au sale en thème clair. Sous 760 px le
+   décor disparaît — sur téléphone il n'y a pas la place, et un ornement qui
+   passe derrière le bouton principal est pire que pas d'ornement du tout. */
+.pq-decor {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.pq-note {
+  position: absolute;
+  bottom: -40px;
+  color: var(--pq-warm-ink);
+  opacity: 0;
+  line-height: 1;
+  animation-name: pq-rise;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes pq-rise {
+  0% { transform: translateY(0) rotate(-8deg); opacity: 0; }
+  12% { opacity: 0.22; }
+  85% { opacity: 0.12; }
+  100% { transform: translateY(-108vh) rotate(14deg); opacity: 0; }
+}
+
+/* ---------- La barre du haut ---------- */
 .pq-top {
+  position: relative;
+  z-index: 1;
+  width: min(920px, 100%);
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 22px;
+  padding: 18px 0 10px;
 }
-.pq-back {
+.pq-back,
+.pq-title,
+.pq-progress {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  color: var(--pq-dim);
-  text-decoration: none;
-  font-size: 0.88rem;
-}
-.pq-back:hover { color: var(--pq-ink); }
-.pq-title {
-  flex: 1;
-  text-align: center;
-  font-family: var(--font-display, inherit);
-  font-weight: 800;
-  letter-spacing: 0.02em;
-}
-.pq-progress {
-  font-variant-numeric: tabular-nums;
-  color: var(--pq-dim);
+  gap: 7px;
   font-size: 0.85rem;
 }
+.pq-back {
+  color: var(--pq-dim);
+  text-decoration: none;
+  padding: 7px 12px 7px 8px;
+  border-radius: 999px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.pq-back:hover { color: var(--pq-ink); background: var(--pq-panel-2); }
+.pq-title {
+  flex: 1;
+  justify-content: center;
+  font-family: var(--font-display, inherit);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.pq-title svg { color: var(--pq-warm-ink); }
+.pq-progress {
+  min-width: 54px;
+  justify-content: flex-end;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+.pq-progress em { font-style: normal; font-weight: 500; color: var(--pq-dim); }
+.pq-progress.ghost { visibility: hidden; }
+
+.pq-stage {
+  position: relative;
+  z-index: 1;
+  width: min(660px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+.pq-center { justify-content: center; min-height: 50dvh; }
 
 .pq-err {
-  margin: 0 0 16px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: rgba(255, 107, 107, 0.12);
-  border: 1px solid rgba(255, 107, 107, 0.3);
-  color: #ffb4b4;
-  font-size: 0.88rem;
-  text-align: center;
+  width: 100%;
+  margin: 0;
+  padding: 10px 13px;
+  border: 1px solid color-mix(in srgb, var(--pq-b-miss) 45%, transparent);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--pq-b-miss) 10%, transparent);
+  color: var(--pq-b-miss);
+  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  gap: 7px;
 }
 
-/* ---------- Accueil ---------- */
+/* ======================================================================
+   L'écran d'accueil
+   ====================================================================== */
 .pq-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
-  padding: 8px 4px;
+  gap: 14px;
+  padding-top: 4vh;
+  animation: pq-pop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.4) both;
 }
-.pq-bird {
+@keyframes pq-pop {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Le micro et ses ondes : le seul objet de l'écran. Les anneaux partent de lui
+   en continu — c'est ce qui fait qu'un logo statique devient un jeu de son. */
+.pq-logo-orb {
   position: relative;
   display: grid;
   place-items: center;
-  width: 92px;
-  height: 92px;
-  margin: 0 auto 18px;
+  width: 108px;
+  height: 108px;
   border-radius: 50%;
-  background: var(--pq-warm-soft);
-  color: var(--pq-warm);
+  background: var(--accent-grad, var(--orange));
+  color: #241a02;
+  box-shadow: 0 14px 40px color-mix(in srgb, var(--orange) 35%, transparent);
 }
-/* Deux ondes qui s'échappent du micro, décalées : le son qui part. */
-.pq-bird-wave {
+.pq-ring {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 1px solid var(--pq-warm);
-  opacity: 0;
-  animation: pq-ping 2.6s ease-out infinite;
+  border: 2px solid color-mix(in srgb, var(--orange) 55%, transparent);
+  animation: pq-ping 3s ease-out infinite;
 }
-.pq-bird-wave.b { animation-delay: 1.3s; }
+.pq-ring.r2 { animation-delay: 1s; }
+.pq-ring.r3 { animation-delay: 2s; }
 @keyframes pq-ping {
-  0% { transform: scale(0.85); opacity: 0.55; }
-  100% { transform: scale(1.9); opacity: 0; }
+  0% { transform: scale(1); opacity: 0.55; }
+  100% { transform: scale(2.1); opacity: 0; }
 }
 
-.pq-intro h1 {
-  margin: 0 0 8px;
-  font-size: 1.7rem;
-  font-family: var(--font-display, inherit);
+.pq-logo {
+  margin: 4px 0 0;
+  font-family: var(--font-fun, var(--font-display, inherit));
+  font-size: clamp(2.1rem, 7vw, 3.1rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+.pq-logo b {
+  font-weight: 600;
+  background: var(--accent-grad, none);
+  background-color: var(--orange);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 .pq-lead {
-  margin: 0 auto 22px;
-  max-width: 40ch;
+  margin: 0;
+  max-width: 34ch;
   color: var(--pq-dim);
-  line-height: 1.55;
-}
-.pq-rules {
-  list-style: none;
-  margin: 0 auto 26px;
-  padding: 16px 18px;
-  max-width: 42ch;
-  text-align: left;
-  background: var(--pq-panel);
-  border: 1px solid var(--pq-line);
-  border-radius: 14px;
-  display: grid;
-  gap: 10px;
-  font-size: 0.88rem;
+  font-size: 0.95rem;
   line-height: 1.5;
-  color: var(--pq-dim);
 }
-.pq-rules b { color: var(--pq-ink); }
 
+.pq-intro-actions {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
 .pq-go {
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  padding: 13px 30px;
+  padding: 13px 26px;
   border: 0;
   border-radius: 999px;
-  background: var(--pq-warm);
+  background: var(--accent-grad, var(--orange));
+  background-color: var(--orange);
   color: #241a02;
-  font-weight: 800;
-  font-size: 1rem;
+  font-family: var(--font-display, inherit);
+  font-weight: 700;
+  font-size: 0.98rem;
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .pq-go:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 10px 26px rgba(242, 183, 11, 0.3);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--orange) 34%, transparent);
 }
-.pq-go:disabled { opacity: 0.6; cursor: not-allowed; }
-
-.pq-mic-note {
-  margin: 16px 0 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.pq-go:disabled { opacity: 0.55; cursor: not-allowed; }
+.pq-go.alt {
+  background: var(--pq-panel);
+  border: 1px solid var(--pq-line-2);
+  color: var(--pq-ink);
+}
+.pq-go.alt:hover:not(:disabled) {
+  border-color: var(--orange);
+  box-shadow: none;
+}
+.pq-go em {
+  font-style: normal;
+  font-size: 0.74rem;
+  font-weight: 500;
   color: var(--pq-dim);
-  font-size: 0.78rem;
 }
 
-/* ---------- Une manche ---------- */
-.pq-round {
-  display: grid;
-  justify-items: center;
-  gap: 20px;
-  padding-top: 12px;
+/* ---------- Mes sons ---------- */
+.pq-mine {
+  margin-top: 2px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
 }
-.pq-listen {
+.pq-mine-open {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 20px;
-  border-radius: 999px;
+  padding: 8px 15px;
   border: 1px solid var(--pq-line);
+  border-radius: 999px;
   background: var(--pq-panel);
   color: var(--pq-ink);
-  cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: border-color 0.15s ease;
 }
-.pq-listen:hover:not(:disabled) { border-color: var(--pq-warm); }
-.pq-listen:disabled { opacity: 0.45; }
+.pq-mine-open:hover { border-color: var(--orange); }
+.pq-mine-open em {
+  font-style: normal;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--pq-warm-soft);
+  color: var(--pq-warm-ink);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
 
-.pq-hint {
+/* L'interrupteur, en deux tailles : avec libellé (accueil solo) et nu (lobby). */
+.pq-sw-line,
+.pq-sw {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 15px 8px 10px;
+  border: 1px solid var(--pq-line);
+  border-radius: 999px;
+  background: transparent;
   color: var(--pq-dim);
   font-size: 0.8rem;
-  letter-spacing: 0.14em;
+  font-weight: 600;
+  transition: color 0.15s ease, border-color 0.15s ease;
 }
-.pq-hint-off { opacity: 0.22; }
+.pq-sw { padding: 6px; }
+.pq-sw-line i,
+.pq-sw i {
+  position: relative;
+  width: 34px;
+  height: 19px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--pq-line-2);
+  transition: background 0.18s ease;
+}
+.pq-sw-line i::after,
+.pq-sw i::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--pq-panel);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.18s ease;
+}
+.pq-sw-line.on,
+.pq-sw.on { color: var(--pq-warm-ink); border-color: var(--orange); }
+.pq-sw-line.on i,
+.pq-sw.on i { background: var(--orange); }
+.pq-sw-line.on i::after,
+.pq-sw.on i::after { transform: translateX(15px); }
+.pq-sw:disabled { opacity: 0.5; }
+
+/* ======================================================================
+   Une manche
+   ====================================================================== */
+.pq-pips {
+  display: flex;
+  gap: 7px;
+}
+.pq-pips i {
+  width: 22px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--pq-line-2);
+  transition: background 0.25s ease, transform 0.25s ease;
+}
+.pq-pips i.done { background: var(--band, var(--orange)); }
+.pq-pips i.cur {
+  background: var(--orange);
+  transform: scaleX(1.35);
+}
+
+.pq-round {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding-top: 2vh;
+}
+.pq-listen,
+.pq-skip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border: 1px solid var(--pq-line);
+  border-radius: 999px;
+  background: var(--pq-panel);
+  color: var(--pq-ink);
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.pq-listen:hover:not(:disabled) { border-color: var(--orange); }
+.pq-skip {
+  border-color: transparent;
+  background: transparent;
+  color: var(--pq-dim);
+  font-weight: 500;
+}
+.pq-skip:hover:not(:disabled) { color: var(--pq-ink); }
 
 /* ---------- Le bouton de maintien ---------- */
-/* L'objet central du jeu. Il porte trois états très différents et doit rester
-   lisible dans les trois : au repos (un micro), en train d'enregistrer (une
-   onde qui défile), en train d'envoyer (une attente). */
-.pq-mic { display: grid; place-items: center; }
-
+.pq-mic {
+  display: grid;
+  place-items: center;
+  padding: 6px;
+}
 .pq-hold {
   position: relative;
   display: grid;
   place-items: center;
-  align-content: center;
-  gap: 10px;
-  width: 200px;
-  height: 200px;
+  gap: 6px;
+  width: 208px;
+  height: 208px;
+  border: 0;
   border-radius: 50%;
-  border: 2px solid var(--pq-line);
-  background:
-    radial-gradient(circle at 50% 32%, #3a2f22, #1a1510 70%);
+  background: var(--pq-panel);
+  box-shadow:
+    inset 0 0 0 1px var(--pq-line),
+    0 18px 44px rgba(0, 0, 0, 0.14);
   color: var(--pq-ink);
   cursor: pointer;
-  /* `touch-action: none` : sans lui, un maintien du doigt fait défiler la page
-     et le navigateur émet un `pointercancel` — la prise s'interromprait au
-     milieu du cri, sur mobile uniquement. */
   touch-action: none;
   user-select: none;
-  overflow: hidden;
-  transition: border-color 0.2s ease, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.12s ease, box-shadow 0.2s ease;
 }
-.pq-hold:hover:not(:disabled):not(.on) { transform: scale(1.03); }
-.pq-hold:disabled { opacity: 0.55; cursor: wait; }
+.pq-hold:disabled { opacity: 0.6; cursor: wait; }
 .pq-hold.on {
-  border-color: var(--pq-warm);
-  background: radial-gradient(circle at 50% 32%, #57411a, #2a2010 70%);
+  transform: scale(1.03);
+  box-shadow:
+    inset 0 0 0 2px var(--orange),
+    0 0 0 12px var(--pq-warm-soft),
+    0 18px 44px color-mix(in srgb, var(--orange) 25%, transparent);
 }
-
-/* Le halo qui pulse pendant l'enregistrement : il donne le « ça tourne » que
-   l'onde seule ne dit pas (une onde plate ressemble à un micro éteint). */
+/* Le halo qui respire : c'est lui qui dit « appuie », avant même le libellé. */
 .pq-hold-halo {
   position: absolute;
-  inset: -3px;
+  inset: -6px;
   border-radius: 50%;
-  border: 2px solid var(--pq-warm);
-  opacity: 0;
-  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--orange) 40%, transparent);
+  animation: pq-breathe 2.6s ease-in-out infinite;
 }
-.pq-hold.on .pq-hold-halo { animation: pq-halo 1.4s ease-out infinite; }
-@keyframes pq-halo {
-  0% { transform: scale(1); opacity: 0.55; }
-  100% { transform: scale(1.16); opacity: 0; }
+.pq-hold.on .pq-hold-halo { animation: none; opacity: 0; }
+@keyframes pq-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.06); opacity: 0.15; }
 }
-
-.pq-hold-ic { color: var(--pq-warm); }
+.pq-hold-ic {
+  display: grid;
+  place-items: center;
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  background: var(--accent-grad, var(--orange));
+  background-color: var(--orange);
+  color: #241a02;
+}
 .pq-hold-lbl {
   font-style: normal;
   font-size: 0.85rem;
+  font-weight: 700;
   color: var(--pq-dim);
-  max-width: 78%;
-  text-align: center;
 }
-.pq-hold.on .pq-hold-lbl { color: var(--pq-warm); font-weight: 700; }
+.pq-hold.on .pq-hold-lbl { color: var(--pq-warm-ink); }
 
-/* ---------- La forme d'onde en direct ---------- */
-/* Les barres défilent de droite à gauche, comme un sismographe : la dernière
-   mesure entre par la droite. C'est ce sens de lecture qui fait qu'on VOIT le
-   temps passer — une onde symétrique depuis le centre serait plus jolie et ne
-   raconterait rien.
-
-   `align-items: center` : les barres grandissent des deux côtés depuis l'axe,
-   comme une piste audio. Alignées en bas, elles ressembleraient à un
-   histogramme et on lirait « des valeurs » plutôt que « du son ». */
+/* La forme d'onde en direct : les barres défilent de droite à gauche, comme un
+   sismographe. Voir sa propre courbe se dessiner pendant qu'on crie, c'est voir
+   ce sur quoi on va être jugé. */
 .pq-wave {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 2px;
-  width: 74%;
-  height: 62px;
+  height: 84px;
+  width: 148px;
 }
 .pq-wave i {
   flex: 1;
-  min-width: 2px;
-  border-radius: 2px;
-  background: var(--pq-warm);
-  /* Pas de transition : la valeur change 60 fois par seconde et une
-     interpolation la retarderait d'autant — l'onde traînerait derrière la voix. */
-  opacity: 0.9;
+  min-height: 3px;
+  border-radius: 999px;
+  background: var(--orange);
+  transition: height 0.06s linear;
 }
 
-.pq-skip {
-  display: inline-flex;
+/* ======================================================================
+   Le verdict d'une manche
+   ====================================================================== */
+.pq-result,
+.pq-reveal {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  border: 0;
-  background: none;
-  color: var(--pq-dim);
-  cursor: pointer;
-  font-size: 0.82rem;
-}
-.pq-skip:hover:not(:disabled) { color: var(--pq-ink); }
-.pq-skip:disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* ---------- Résultat d'une manche ---------- */
-.pq-result {
-  --band: var(--pq-dim);
-  display: grid;
-  justify-items: center;
   gap: 14px;
-  padding: 22px 18px;
-  background: var(--pq-panel);
-  border: 1px solid var(--pq-line);
-  border-radius: 18px;
+  animation: pq-pop 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
 }
-/* Une couleur par palier : le score se lit avant d'être lu. */
-.pq-result.band-perfect { --band: #6ce3a6; }
-.pq-result.band-great { --band: #9fd8c8; }
-.pq-result.band-close { --band: #ffd24a; }
-.pq-result.band-meh { --band: #ff9a6c; }
-.pq-result.band-miss { --band: #ff7f8f; }
 
+/* Le bandeau de réponse : l'image, le verdict, le score. Un seul objet — trois
+   blocs empilés donnaient trois choses à lire là où il n'y a qu'une nouvelle. */
+.pq-verdict {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 12px 14px;
+  border: 1px solid var(--pq-line);
+  border-left: 4px solid var(--band, var(--orange));
+  border-radius: 16px;
+  background: var(--pq-panel);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+}
+.pq-face {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--pq-panel-2);
+  color: var(--pq-dim);
+  animation: pq-face-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.5) both;
+}
+.pq-face img { width: 100%; height: 100%; object-fit: cover; }
+@keyframes pq-face-in {
+  from { transform: scale(0.4) rotate(-12deg); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.pq-verdict-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 .pq-band {
-  color: var(--band);
-  font-weight: 800;
-  font-size: 1.15rem;
-  font-family: var(--font-display, inherit);
+  font-family: var(--font-fun, inherit);
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--band, var(--orange));
+}
+.pq-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--pq-ink);
+}
+.pq-answer em {
+  font-style: normal;
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--pq-warm-ink);
 }
 .pq-score {
-  font-size: 3rem;
-  font-weight: 800;
+  font-family: var(--font-display, inherit);
+  font-size: 2.5rem;
+  font-weight: 700;
   line-height: 1;
-  color: var(--band);
+  color: var(--band, var(--orange));
   font-variant-numeric: tabular-nums;
 }
-.pq-reason,
-.pq-answer {
+.pq-reason {
   margin: 0;
-  text-align: center;
   color: var(--pq-dim);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  text-align: center;
 }
-.pq-answer b { color: var(--pq-ink); }
-.pq-answer em { font-style: normal; }
 
-/* ---------- Les deux courbes ---------- */
-.pq-chart {
-  margin: 4px 0 0;
+/* ---------- Les trois composantes ---------- */
+.pq-detail {
   width: 100%;
+  display: flex;
+  gap: 14px;
+}
+.pq-bar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: var(--pq-dim);
+}
+.pq-bar em {
+  font-style: normal;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.pq-bar em svg { color: var(--band, var(--orange)); }
+.pq-bar i {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--pq-line-2);
+  overflow: hidden;
+}
+.pq-bar i b {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--band, var(--orange));
+  transition: width 0.7s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.pq-bar > span {
+  font-weight: 700;
+  color: var(--pq-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Les extraits à réécouter ---------- */
+.pq-replay {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 9px;
+}
+.pq-clip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border: 1px solid var(--pq-line);
+  border-radius: 999px;
+  background: var(--pq-panel);
+  color: var(--pq-dim);
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.pq-clip:hover { color: var(--pq-ink); }
+.pq-clip.k-attempt { color: var(--pq-warm-ink); }
+/* Celui qui joue en ce moment : le même repère que la ligne surlignée du
+   classement, pour qu'on sache toujours ce qu'on entend. */
+.pq-clip.on {
+  border-color: var(--orange);
+  background: var(--pq-warm-soft);
+  color: var(--pq-warm-ink);
+}
+
+.pq-next {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 24px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent-grad, var(--orange));
+  background-color: var(--orange);
+  color: #241a02;
+  font-size: 0.9rem;
+  font-weight: 700;
+  transition: transform 0.15s ease;
+}
+.pq-next:hover:not(:disabled) { transform: translateY(-2px); }
+.pq-next:disabled { opacity: 0.6; }
+
+/* ======================================================================
+   Les deux courbes
+   ======================================================================
+   La pièce d'interface la plus importante du jeu (cf.
+   components/ContourChart.jsx). En mode `live`, le tracé se dessine au rythme
+   du son et un point le suit en tête : c'est ce qui relie enfin le dessin au
+   son qu'on entend. */
+.pq-chart {
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px 8px;
+  border: 1px solid var(--pq-line);
+  border-radius: 16px;
+  background: var(--pq-panel);
 }
 .pq-chart svg {
+  display: block;
   width: 100%;
   height: auto;
-  display: block;
-  background: rgba(0, 0, 0, 0.25);
-  border-radius: 12px;
+  overflow: visible;
 }
 .pq-curve {
   fill: none;
@@ -378,745 +694,274 @@
   stroke-linejoin: round;
 }
 .pq-curve.target {
-  stroke: var(--pq-dim);
-  stroke-dasharray: 5 5;
+  stroke: var(--pq-line-2);
+  stroke-dasharray: 4 5;
 }
-.pq-curve.attempt { stroke: var(--band, var(--pq-warm)); }
+.pq-curve.attempt {
+  stroke: var(--band, var(--orange));
+  filter: drop-shadow(0 2px 6px color-mix(in srgb, var(--band, var(--orange)) 45%, transparent));
+}
+/* La courbe en cours de lecture passe devant : trait plein, plus épais. */
+.pq-curve.target.on {
+  stroke: var(--pq-warm-ink);
+  stroke-dasharray: none;
+  stroke-width: 3;
+}
+.pq-curve-area {
+  fill: color-mix(in srgb, var(--pq-ink) 6%, transparent);
+  stroke: none;
+}
+.pq-curve-head {
+  fill: var(--band, var(--orange));
+  stroke: var(--pq-panel);
+  stroke-width: 2;
+}
+.pq-curve-head.target { fill: var(--pq-warm-ink); }
 .pq-chart figcaption {
   display: flex;
   justify-content: center;
-  gap: 16px;
-  margin-top: 8px;
-  font-size: 0.76rem;
+  gap: 14px;
+  padding-top: 4px;
+  font-size: 0.7rem;
   color: var(--pq-dim);
 }
+.pq-key { display: inline-flex; align-items: center; gap: 5px; }
 .pq-key::before {
   content: "";
-  display: inline-block;
   width: 14px;
   height: 2px;
-  margin-right: 6px;
-  vertical-align: middle;
-  background: currentColor;
+  border-radius: 2px;
+  background: var(--pq-line-2);
 }
-.pq-key.attempt { color: var(--band, var(--pq-warm)); }
+.pq-key.attempt::before { background: var(--band, var(--orange)); }
 
-/* ---------- Le détail du barème ---------- */
-.pq-detail {
-  display: grid;
-  gap: 8px;
+/* La vignette d'une ligne de classement : RIGOUREUSEMENT le même calcul
+   d'échelle que le grand graphique — une vignette qui normaliserait autrement
+   raconterait une autre histoire que lui. */
+.pq-chart-mini {
+  width: 74px;
+  height: 24px;
+  flex: 0 0 auto;
+}
+.pq-chart-mini .pq-curve { stroke-width: 4; }
+
+/* ======================================================================
+   Fin de partie (solo)
+   ====================================================================== */
+.pq-recap {
   width: 100%;
-  max-width: 300px;
-}
-.pq-bar {
-  display: grid;
-  grid-template-columns: 62px 1fr 32px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  font-size: 0.78rem;
-  color: var(--pq-dim);
+  gap: 16px;
+  animation: pq-pop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
 }
-.pq-bar em { font-style: normal; }
-.pq-bar i {
-  height: 6px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.09);
-  overflow: hidden;
+.pq-recap-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
 }
-.pq-bar i b {
-  display: block;
-  height: 100%;
-  border-radius: 3px;
-  background: var(--band, var(--pq-warm));
-  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+.pq-recap-badge {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  margin-bottom: 6px;
+  border-radius: 50%;
+  background: var(--accent-grad, var(--orange));
+  background-color: var(--orange);
+  color: #241a02;
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--orange) 32%, transparent);
 }
-.pq-bar span {
-  text-align: right;
+.pq-recap-avg {
+  font-family: var(--font-display, inherit);
+  font-size: 3.4rem;
+  font-weight: 700;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
-
-/* ---------- Réécoute ---------- */
-.pq-replay {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-.pq-clip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 15px;
-  border-radius: 999px;
-  border: 1px solid var(--pq-line);
-  background: rgba(0, 0, 0, 0.25);
-  color: var(--pq-ink);
-  cursor: pointer;
-  font-size: 0.82rem;
-}
-.pq-clip:hover { border-color: var(--pq-warm); }
-.pq-clip.k-attempt { border-color: rgba(242, 183, 11, 0.4); }
-
-.pq-next {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-  padding: 11px 24px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--pq-warm);
-  color: #241a02;
-  font-weight: 700;
-  cursor: pointer;
-}
-.pq-next:disabled { opacity: 0.6; cursor: wait; }
-
-/* ---------- Fin de partie ---------- */
-.pq-recap {
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-}
-.pq-recap h2 {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0;
-  font-size: 1.6rem;
-  color: var(--pq-warm);
-  font-family: var(--font-display, inherit);
-}
+.pq-recap-unit { color: var(--pq-dim); font-size: 0.84rem; }
 .pq-recap-pts {
+  margin-top: 8px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin: 0 0 14px;
-  color: var(--pq-dim);
-  font-size: 0.88rem;
+  padding: 5px 13px;
+  border-radius: 999px;
+  background: var(--pq-warm-soft);
+  color: var(--pq-warm-ink);
+  font-size: 0.8rem;
+  font-weight: 700;
 }
+
 .pq-recap-list {
-  list-style: none;
-  margin: 0 0 20px;
-  padding: 0;
   width: 100%;
-  display: grid;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 .pq-recap-row {
-  --band: var(--pq-dim);
-  display: grid;
-  grid-template-columns: 26px 1fr auto 42px;
+  display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  background: var(--pq-panel);
+  gap: 11px;
+  padding: 9px 12px;
   border: 1px solid var(--pq-line);
-  border-left: 3px solid var(--band);
-  border-radius: 12px;
+  border-left: 3px solid var(--band, var(--orange));
+  border-radius: 13px;
+  background: var(--pq-panel);
 }
-.pq-recap-row.band-perfect { --band: #6ce3a6; }
-.pq-recap-row.band-great { --band: #9fd8c8; }
-.pq-recap-row.band-close { --band: #ffd24a; }
-.pq-recap-row.band-meh { --band: #ff9a6c; }
-.pq-recap-row.band-miss { --band: #ff7f8f; }
-
 .pq-recap-n {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  background: var(--pq-panel-2);
   color: var(--pq-dim);
-  font-size: 0.8rem;
-  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
-.pq-recap-label { display: grid; min-width: 0; }
+.pq-recap-img {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  object-fit: cover;
+}
+.pq-recap-label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
 .pq-recap-label b {
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .pq-recap-label em {
   font-style: normal;
-  font-size: 0.75rem;
+  font-size: 0.71rem;
   color: var(--pq-dim);
 }
-.pq-recap-clips { display: flex; gap: 6px; }
-.pq-recap-clips .pq-clip { padding: 6px 10px; font-size: 0.74rem; }
+.pq-recap-label em.by { color: var(--pq-warm-ink); }
+.pq-recap-clips { display: inline-flex; gap: 6px; }
+.pq-recap-clips .pq-clip { padding: 5px 10px; font-size: 0.72rem; }
 .pq-recap-score {
+  min-width: 34px;
   text-align: right;
   font-weight: 800;
-  color: var(--band);
+  color: var(--band, var(--orange));
   font-variant-numeric: tabular-nums;
 }
 
 .pq-recap-actions {
   display: flex;
-  gap: 10px;
   flex-wrap: wrap;
   justify-content: center;
+  gap: 10px;
 }
-.pq-challenge {
+.pq-challenge,
+.pq-quit {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 13px 22px;
+  gap: 8px;
+  padding: 11px 20px;
+  border: 1px solid var(--pq-line-2);
   border-radius: 999px;
-  border: 1px solid var(--pq-line);
   background: var(--pq-panel);
   color: var(--pq-ink);
-  text-decoration: none;
-  font-size: 0.9rem;
-}
-.pq-challenge:hover { border-color: var(--pq-warm); }
-.pq-quit {
-  padding: 13px 20px;
-  border: 0;
-  background: none;
-  color: var(--pq-dim);
-  cursor: pointer;
-  font-size: 0.9rem;
-}
-.pq-quit:hover { color: var(--pq-ink); }
-
-/* ---------- Mobile ---------- */
-@media (max-width: 560px) {
-  .pq-hold { width: 168px; height: 168px; }
-  .pq-recap-row {
-    grid-template-columns: 22px 1fr 42px;
-    row-gap: 8px;
-  }
-  .pq-recap-clips { grid-column: 2 / -1; }
-}
-
-/* Les animations décoratives disparaissent si la personne a demandé qu'on
-   arrête de bouger. L'anneau du micro RESTE : ce n'est pas une décoration,
-   c'est le seul retour qui dit que le micro capte quelque chose. */
-@media (prefers-reduced-motion: reduce) {
-  .pq-bird-wave { animation: none; opacity: 0.25; }
-  .pq-go:hover:not(:disabled) { transform: none; }
-}
-
-/* ======================================================================
-   La carte du Perroquet dans la grille de l'arcade
-   ======================================================================
-   Rangée ICI et non dans app-19-arcade.css, en suivant ce qu'a fait le Grand
-   Quiz : l'habillage propre à un mini-jeu vit avec ce mini-jeu, de sorte qu'en
-   retirant le jeu on retire tout son CSS d'un bloc.
-
-   Un micro de studio sur sa suspension, et deux ondes qui s'en échappent. Les
-   ondes accélèrent au survol : la carte « parle » quand on s'en approche. */
-.arc-art-pq {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 100%;
-  border-radius: 16px;
-  background: radial-gradient(circle at 50% 40%, #332a20, #15110d);
-  overflow: hidden;
-}
-.arc-art-pq-mic {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  justify-items: center;
-}
-.arc-art-pq-grill {
-  display: block;
-  width: 34px;
-  height: 50px;
-  border-radius: 17px;
-  background: linear-gradient(160deg, #f2d79a, #b98f2e);
-  /* La grille : des rainures horizontales, pas une texture d'image. */
-  background-image: repeating-linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0.28) 0 2px,
-    transparent 2px 5px
-  );
-  background-color: #d8ac45;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
-}
-.arc-art-pq-stem {
-  display: block;
-  width: 6px;
-  height: 22px;
-  margin-top: -2px;
-  border-radius: 0 0 3px 3px;
-  background: linear-gradient(180deg, #8a7345, #4a3d24);
-}
-.arc-art-pq-wave {
-  position: absolute;
-  width: 74px;
-  height: 74px;
-  border-radius: 50%;
-  border: 1px solid rgba(242, 183, 11, 0.55);
-  opacity: 0;
-  animation: arc-pq-ping 3s ease-out infinite;
-}
-.arc-art-pq-wave.b { animation-delay: 1.5s; }
-.arc-game:hover .arc-art-pq-wave { animation-duration: 1.6s; }
-@keyframes arc-pq-ping {
-  0% { transform: scale(0.6); opacity: 0.6; }
-  100% { transform: scale(1.7); opacity: 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .arc-art-pq-wave { animation: none; opacity: 0.3; }
-}
-
-/* ======================================================================
-   La carte du Perroquet dans le fil
-   ======================================================================
-   Un lecteur, un titre, un bouton de défi. Volontairement plus dépouillée que
-   les cartes des autres mini-jeux : celles-ci alignent des statistiques parce
-   qu'il n'y a rien d'autre à en montrer, alors qu'ici le contenu EST le son.
-   Tout ce qui entourerait le bouton de lecture le concurrencerait. */
-.hf-pq-body {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 14px;
-}
-.hf-pq-play {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  border: 0;
-  background: var(--orange, #f2b70b);
-  color: #241a02;
-  cursor: pointer;
-  transition: transform 0.15s ease;
-}
-.hf-pq-play:hover { transform: scale(1.06); }
-.hf-pq-play.on {
-  background: var(--surface-2, #f6f6f8);
-  color: var(--text);
-  box-shadow: 0 0 0 2px var(--orange, #f2b70b);
-}
-.hf-pq-meta {
-  flex: 1;
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-.hf-pq-meta b {
-  font-size: 0.92rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hf-pq-meta span {
-  font-size: 0.78rem;
-  color: var(--text-soft);
-}
-.hf-pq-cta {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  text-decoration: none;
-  font-size: 0.8rem;
-}
-.hf-pq-cta:hover { border-color: var(--orange, #f2b70b); }
-
-@media (max-width: 520px) {
-  .hf-pq-body { flex-wrap: wrap; }
-  .hf-pq-cta { width: 100%; justify-content: center; }
-}
-
-/* ======================================================================
-   Onglet « Perroquet » du panneau d'admin
-   ======================================================================
-   Rangé ici et non dans le CSS de l'admin, comme l'a fait le Grand Quiz :
-   l'habillage propre à un mini-jeu vit avec lui, et retirer le jeu retire tout
-   son style d'un bloc.
-
-   TOUT est scopé sous `.admin-perroquet`. Les classes génériques du panneau
-   (.admin-seg, .admin-stat, .admin-btn…) sont employées par d'autres onglets
-   sans avoir jamais reçu de style : les habiller globalement changerait
-   l'allure de ces onglets-là, ce qui n'est pas ce qu'on vient faire. */
-.admin-perroquet .admin-section-head h2 {
-  margin: 0 0 4px;
-  font-size: 1.15rem;
-}
-.admin-perroquet .admin-section-head p {
-  margin: 0 0 16px;
-  max-width: 74ch;
-  color: var(--text-soft);
-  font-size: 0.88rem;
-  line-height: 1.5;
-}
-.admin-perroquet .admin-stats-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-.admin-perroquet .admin-stat {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 13px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface-2, #f6f6f8);
-  font-size: 0.82rem;
-  color: var(--text-soft);
-}
-.admin-perroquet .admin-stat b { color: var(--text); }
-.admin-perroquet .admin-stat.warn {
-  border-color: rgba(242, 183, 11, 0.5);
-  background: rgba(242, 183, 11, 0.12);
-  color: var(--accent-ink, #97680a);
-}
-.admin-perroquet .admin-error {
-  margin: 0 0 14px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: rgba(255, 107, 107, 0.1);
-  border: 1px solid rgba(255, 107, 107, 0.32);
   font-size: 0.86rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color 0.15s ease;
 }
-.admin-perroquet .admin-loading,
-.admin-perroquet .admin-empty {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 24px 4px;
-  color: var(--text-soft);
-  font-size: 0.88rem;
-}
-
-/* ---------- Le formulaire d'ajout ---------- */
-.pq-admin-add {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  padding: 16px;
-  margin-bottom: 20px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--surface-2, #f6f6f8);
-}
-/* Le sélecteur de fichier occupe toute la largeur : c'est le premier geste, et
-   c'est le seul champ sans lequel rien ne part. */
-.pq-admin-file {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
-  border: 1px dashed var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  font-size: 0.86rem;
-  color: var(--text-soft);
-  cursor: pointer;
-}
-.pq-admin-file:hover { border-color: var(--orange, #f2b70b); }
-.pq-admin-file.has {
-  border-style: solid;
-  border-color: var(--orange, #f2b70b);
-  color: var(--text);
-}
-.pq-admin-file input { display: none; }
-
-/* ---------- Le rogneur dans le panneau d'admin ----------
-   Le composant est le même que côté joueur (components/AudioTrimmer.jsx) et son
-   habillage vit dans la cabine : il attend les variables --pq-*, qui n'existent
-   pas ici. On les redéclare, et on garde le fond sombre — une forme d'onde dorée
-   sur blanc serait illisible, et l'îlot sombre marque bien que ce bloc est un
-   outil, pas un champ de formulaire de plus. */
-.pq-admin-trim {
-  --pq-ink: #f2ece2;
-  --pq-dim: #a79c8d;
-  --pq-line: rgba(226, 190, 130, 0.2);
-  --pq-warm: #f2b70b;
-  --pq-warm-soft: rgba(242, 183, 11, 0.16);
-
-  grid-column: 1 / -1;
-  border-radius: 13px;
-  background: #14100c;
-}
-.pq-admin-trim .pq-trim { border-color: var(--pq-line); background: transparent; }
-.pq-admin-trim .pq-err { color: #ff9a9a; }
-
-/* L'état de la découpe, une fois le rogneur refermé. */
-.pq-admin-cut {
-  grid-column: 1 / -1;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 9px;
-  font-size: 0.8rem;
-  color: var(--text-soft);
-}
-.pq-admin-cut b { color: var(--text); }
-
-.pq-admin-in {
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--text);
-  font-size: 0.88rem;
-}
-.pq-admin-in:first-of-type { grid-column: 1 / -1; }
-.pq-admin-diff {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.82rem;
-  color: var(--text-soft);
-}
-.pq-admin-diff select,
-.pq-admin-diffsel {
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text);
-  font-size: 0.84rem;
-}
-.pq-admin-msg {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 0;
-  font-size: 0.84rem;
-}
-.pq-admin-msg.good { color: #1d8a5a; }
-.pq-admin-msg.bad { color: #c0392b; }
-
-/* ---------- Filtres et démo ---------- */
-.admin-perroquet .admin-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 14px;
-}
-.admin-perroquet .admin-seg {
-  display: inline-flex;
-  padding: 3px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface-2, #f6f6f8);
-}
-.admin-perroquet .admin-seg-opt {
-  padding: 6px 14px;
-  border: 0;
-  border-radius: 999px;
-  background: none;
-  color: var(--text-soft);
-  cursor: pointer;
-  font-size: 0.82rem;
-}
-.admin-perroquet .admin-seg-opt.on {
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-.pq-admin-demo { display: flex; gap: 8px; }
-
-.admin-perroquet .admin-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 13px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-  font-size: 0.82rem;
-}
-.admin-perroquet .admin-btn:hover:not(:disabled) {
-  border-color: var(--orange, #f2b70b);
-}
-.admin-perroquet .admin-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.admin-perroquet .admin-btn.ok {
-  background: var(--orange, #f2b70b);
-  border-color: transparent;
-  color: #241a02;
-  font-weight: 700;
-  justify-content: center;
-}
-.admin-perroquet .admin-btn.danger:hover:not(:disabled) {
-  border-color: #e05252;
-  color: #c0392b;
-}
-
-/* ---------- La banque ---------- */
-.pq-admin-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 8px;
-}
-.pq-admin-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
-}
-/* Un son éteint reste lisible mais visiblement hors service : on le consulte
-   encore (ses statistiques disent pourquoi il a été retiré). */
-.pq-admin-row.off {
-  opacity: 0.55;
-  background: var(--surface-2, #f6f6f8);
-}
-.pq-admin-play {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--surface-2, #f6f6f8);
-  color: var(--text);
-  cursor: pointer;
-}
-.pq-admin-play:hover {
-  background: var(--orange, #f2b70b);
-  border-color: transparent;
-  color: #241a02;
-}
-.pq-admin-main {
-  flex: 1;
-  min-width: 0;
-  display: grid;
-  gap: 1px;
-}
-.pq-admin-main b {
-  font-size: 0.9rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.pq-admin-main em {
-  font-style: normal;
-  font-size: 0.78rem;
-  color: var(--text-soft);
-}
-.pq-admin-meta {
-  font-size: 0.76rem;
-  color: var(--text-soft);
-}
-.pq-admin-meta i { font-style: normal; }
-.pq-admin-meta i.warn {
-  color: #c0392b;
-  font-weight: 700;
-}
-.pq-admin-flag {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 3px;
-  font-size: 0.74rem;
-  color: #c0392b;
-}
-
-@media (max-width: 720px) {
-  .pq-admin-add { grid-template-columns: 1fr; }
-  .pq-admin-row { flex-wrap: wrap; }
-  .pq-admin-main { flex-basis: 100%; order: -1; }
-}
+.pq-challenge:hover,
+.pq-quit:hover { border-color: var(--orange); }
 
 /* ======================================================================
    Le versus
-   ======================================================================
-   Même cabine, mais on n'y est plus seul : la bande de têtes est présente à
-   tous les écrans. C'est elle qui fait qu'on joue AVEC des gens plutôt que
-   devant un chrono — sans elle, le mode serait un solo avec un tableau à la
-   fin. */
-.pq-center {
-  display: grid;
-  place-items: center;
-  min-height: 60vh;
-  color: var(--pq-dim);
-}
+   ====================================================================== */
 
-/* ---------- La barre de phase : le battement commun ---------- */
+/* ---------- La barre de phase : le battement commun de la partie ---------- */
 .pq-phase {
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
-  margin-bottom: 22px;
+  padding: 9px 14px;
+  border: 1px solid var(--pq-line);
   border-radius: 999px;
   background: var(--pq-panel);
-  border: 1px solid var(--pq-line);
 }
 .pq-phase-name {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  flex: none;
+  font-size: 0.82rem;
   font-weight: 700;
-  font-size: 0.86rem;
+  white-space: nowrap;
 }
+.pq-phase.ph-listen { --band: var(--pq-b-great); }
+.pq-phase.ph-record { --band: var(--orange); }
+.pq-phase.ph-reveal { --band: var(--pq-b-close); }
+.pq-phase-name svg { color: var(--band); }
 .pq-phase-bar {
   flex: 1;
   height: 6px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: var(--pq-line-2);
   overflow: hidden;
 }
 .pq-phase-bar i {
   display: block;
   height: 100%;
-  border-radius: 3px;
-  background: var(--pq-warm);
-  /* Linéaire et court : la barre doit suivre le chrono, pas l'anticiper avec
-     une courbe d'accélération qui la ferait mentir sur le temps restant. */
-  transition: width 0.1s linear;
+  border-radius: 999px;
+  background: var(--band);
+  transition: width 0.12s linear;
 }
 .pq-phase-sec {
-  flex: none;
-  min-width: 34px;
+  min-width: 30px;
   text-align: right;
+  font-size: 0.8rem;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
-  font-size: 0.86rem;
-  color: var(--pq-dim);
+  color: var(--band);
 }
-.pq-phase.ph-record .pq-phase-name { color: var(--pq-warm); }
-.pq-phase.ph-record .pq-phase-bar i { background: #ff9a6c; }
-.pq-phase.ph-reveal .pq-phase-bar i { background: #6ce3a6; }
 
-/* ---------- Salon d'attente ---------- */
-.pq-lobby { display: grid; justify-items: center; gap: 16px; }
+/* ---------- Le salon ---------- */
+.pq-lobby {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
 .pq-code {
-  display: grid;
-  justify-items: center;
-  gap: 3px;
-  padding: 14px 30px;
-  border-radius: 16px;
-  border: 1px dashed var(--pq-line);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 18px;
+  border: 1px dashed var(--pq-line-2);
+  border-radius: 14px;
   background: var(--pq-panel);
   cursor: pointer;
+  transition: border-color 0.15s ease;
 }
-.pq-code:hover { border-color: var(--pq-warm); }
-.pq-code-lbl { font-size: 0.74rem; color: var(--pq-dim); }
+.pq-code:hover { border-color: var(--orange); }
+.pq-code-lbl { font-size: 0.72rem; color: var(--pq-dim); }
 .pq-code b {
-  font-size: 1.9rem;
-  letter-spacing: 0.22em;
-  font-family: var(--font-display, inherit);
-  color: var(--pq-warm);
+  font-family: ui-monospace, monospace;
+  font-size: 1.3rem;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
+  color: var(--pq-warm-ink);
 }
 .pq-code-copy {
   display: inline-flex;
@@ -1127,520 +972,90 @@
 }
 
 .pq-lobby-list {
+  width: 100%;
   list-style: none;
   margin: 0;
   padding: 0;
-  width: 100%;
-  display: grid;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
 }
 .pq-lobby-list li {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--pq-line);
   border-radius: 12px;
   background: var(--pq-panel);
-  border: 1px solid var(--pq-line);
 }
-.pq-lobby-list li.armed { border-color: rgba(108, 227, 166, 0.4); }
+.pq-lobby-list li.armed { border-color: color-mix(in srgb, var(--pq-b-great) 50%, transparent); }
 .pq-lobby-list li.empty {
   justify-content: center;
   border-style: dashed;
+  background: transparent;
   color: var(--pq-dim);
-  font-size: 0.84rem;
+  font-size: 0.8rem;
+  gap: 7px;
 }
 .pq-lobby-list b {
   flex: 1;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.9rem;
+  font-size: 0.87rem;
 }
-.pq-crown { color: var(--pq-warm); }
+.pq-crown { color: var(--pq-warm-ink); }
 .pq-mic-state {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 0.76rem;
+  font-size: 0.73rem;
   color: var(--pq-dim);
 }
-.pq-mic-state.ok { color: #6ce3a6; }
-.pq-lobby-wait {
+.pq-mic-state.ok { color: var(--pq-b-great); }
+.pq-lobby-wait,
+.pq-mic-note {
+  margin: 0;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  margin: 0;
-  color: var(--pq-dim);
-  font-size: 0.86rem;
-}
-
-/* ---------- Avatars et bande de joueurs ---------- */
-.pq-av {
-  flex: none;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
-  background: var(--pq-warm-soft);
-  display: grid;
-  place-items: center;
-  font-size: 0.8rem;
-  font-weight: 800;
-  color: var(--pq-warm);
-}
-.pq-av.big { width: 60px; height: 60px; font-size: 1.4rem; }
-
-.pq-strip {
-  list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 14px;
-  margin: 24px 0 0;
-  padding: 0;
-}
-.pq-strip li {
-  position: relative;
-  display: grid;
-  justify-items: center;
-  gap: 4px;
-  font-size: 0.72rem;
-  color: var(--pq-dim);
-  opacity: 0.5;
-  transition: opacity 0.25s ease;
-}
-/* « A rendu sa copie » : la seule information qui circule pendant qu'on
-   enregistre. On ne montre PAS les scores — les voir influencerait le cri de
-   ceux qui n'ont pas encore joué. */
-.pq-strip li.done { opacity: 1; }
-.pq-strip li.done .pq-av { box-shadow: 0 0 0 2px #6ce3a6; }
-.pq-strip-ok {
-  position: absolute;
-  top: -3px;
-  right: -3px;
-  padding: 2px;
-  border-radius: 50%;
-  background: #6ce3a6;
-  color: #0d2b1c;
-}
-
-/* ---------- Phase d'écoute ---------- */
-.pq-listen-stage {
-  display: grid;
-  justify-items: center;
-  gap: 14px;
-  padding: 20px 0;
-  text-align: center;
-}
-.pq-listen-stage p { margin: 0; color: var(--pq-dim); }
-.pq-listen-ring {
-  display: grid;
-  place-items: center;
-  width: 110px;
-  height: 110px;
-  border-radius: 50%;
-  background: var(--pq-warm-soft);
-  color: var(--pq-warm);
-  animation: pq-breathe 1.6s ease-in-out infinite;
-}
-@keyframes pq-breathe {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.07); }
-}
-
-/* ---------- Phase d'enregistrement ---------- */
-.pq-record-stage { display: grid; justify-items: center; gap: 10px; }
-.pq-waiting {
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-  padding: 40px 20px;
-  color: var(--pq-dim);
-  text-align: center;
-}
-.pq-waiting b { color: var(--pq-ink); font-size: 1.05rem; }
-.pq-waiting > svg { color: #6ce3a6; }
-
-/* ---------- Le verdict ---------- */
-.pq-reveal { display: grid; justify-items: center; gap: 14px; }
-.pq-podium {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  display: grid;
   gap: 7px;
-}
-.pq-podium-row {
-  --band: var(--pq-dim);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
-  border-radius: 12px;
-  background: var(--pq-panel);
-  border: 1px solid var(--pq-line);
-  border-left: 3px solid var(--band);
-  /* Les lignes entrent l'une après l'autre : le classement se LIT du premier au
-     dernier, il ne doit pas apparaître d'un bloc. C'est trois dixièmes de
-     seconde de suspense, et c'est le seul moment où le jeu en a. */
-  animation: pq-row-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards;
-}
-.pq-podium-row:nth-child(1) { animation-delay: 0.05s; }
-.pq-podium-row:nth-child(2) { animation-delay: 0.14s; }
-.pq-podium-row:nth-child(3) { animation-delay: 0.23s; }
-.pq-podium-row:nth-child(4) { animation-delay: 0.32s; }
-.pq-podium-row:nth-child(5) { animation-delay: 0.41s; }
-.pq-podium-row:nth-child(6) { animation-delay: 0.5s; }
-@keyframes pq-row-in {
-  from { opacity: 0; transform: translateX(-14px); }
-  to { opacity: 1; transform: none; }
-}
-.pq-podium-row.band-perfect { --band: #6ce3a6; }
-.pq-podium-row.band-great { --band: #9fd8c8; }
-.pq-podium-row.band-close { --band: #ffd24a; }
-.pq-podium-row.band-meh { --band: #ff9a6c; }
-.pq-podium-row.band-miss { --band: #ff7f8f; }
-.pq-podium-row.me { background: rgba(242, 183, 11, 0.12); }
-
-.pq-podium-rank {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  font-size: 0.76rem;
-  font-weight: 800;
-}
-.pq-podium-rank.r1 { background: var(--pq-warm); color: #241a02; }
-.pq-podium-rank.r2 { background: #c9ccd4; color: #23262e; }
-.pq-podium-rank.r3 { background: #c98a52; color: #241a02; }
-.pq-podium-who {
-  flex: 1;
-  min-width: 0;
-  font-size: 0.88rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.pq-podium-none { font-size: 0.76rem; color: var(--pq-dim); font-style: italic; }
-.pq-podium-score {
-  flex: none;
-  min-width: 34px;
-  text-align: right;
-  font-weight: 800;
-  color: var(--band, var(--pq-warm));
-  font-variant-numeric: tabular-nums;
-}
-
-/* ---------- Tableau final ---------- */
-.pq-final { display: grid; justify-items: center; gap: 16px; }
-.pq-champ {
-  display: grid;
-  justify-items: center;
-  gap: 5px;
-  padding: 22px 34px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(242, 183, 11, 0.18), transparent);
-  border: 1px solid rgba(242, 183, 11, 0.3);
-  text-align: center;
-}
-.pq-champ > svg { color: var(--pq-warm); }
-.pq-champ b { font-size: 1.2rem; }
-.pq-champ span { font-size: 0.78rem; color: var(--pq-dim); }
-.pq-final-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  display: grid;
-  gap: 7px;
-}
-.pq-final-list li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
-  border-radius: 12px;
-  background: var(--pq-panel);
-  border: 1px solid var(--pq-line);
-}
-.pq-final-list li.me { border-color: var(--pq-warm); }
-.pq-final-wins { font-size: 0.76rem; color: var(--pq-dim); }
-
-@media (max-width: 560px) {
-  .pq-hold { width: 176px; height: 176px; }
-  .pq-wave { height: 52px; }
-  .pq-code b { font-size: 1.5rem; }
-  .pq-phase { gap: 8px; padding: 9px 12px; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pq-listen-ring,
-  .pq-hold.on .pq-hold-halo { animation: none; }
-  .pq-podium-row { animation: none; }
-}
-
-/* Solo et multi côte à côte sur l'écran d'accueil. */
-.pq-intro-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-.pq-go.alt {
-  background: var(--pq-panel);
-  border: 1px solid var(--pq-line);
-  color: var(--pq-ink);
-}
-.pq-go.alt:hover:not(:disabled) {
-  border-color: var(--pq-warm);
-  box-shadow: none;
-}
-
-/* ---------- Les vignettes de courbe du classement ---------- */
-/* Ce qui manquait au verdict : on entendait les autres sans jamais voir OÙ ils
-   étaient partis, alors que c'est exactement ce que le barème note. Chaque
-   ligne porte donc la forme de sa mélodie.
-
-   `preserveAspectRatio: none` côté SVG : la vignette s'étire à la largeur
-   disponible. La déformation est sans conséquence ici — on lit un profil
-   (« ça monte puis ça retombe »), pas des valeurs. */
-.pq-chart-mini {
-  flex: none;
-  width: 76px;
-  height: 26px;
-  border-radius: 5px;
-  background: rgba(0, 0, 0, 0.3);
-  padding: 2px;
-}
-.pq-chart-mini .pq-curve {
-  stroke-width: 4; /* épais : le viewBox est minuscule et s'étire beaucoup */
-}
-.pq-chart-mini .pq-curve.target {
-  stroke: var(--pq-dim);
-  stroke-dasharray: none; /* à cette taille, des pointillés font du bruit */
-  opacity: 0.45;
-}
-.pq-chart-mini .pq-curve.attempt { stroke: var(--band, var(--pq-warm)); }
-
-/* La ligne dont la courbe est affichée en grand. */
-.pq-podium-row.picked {
-  border-color: var(--band);
-  box-shadow: inset 0 0 0 1px var(--band);
-}
-.pq-podium-row.clickable { cursor: pointer; }
-.pq-podium-row.clickable:hover { background: rgba(255, 255, 255, 0.04); }
-
-.pq-pick-hint {
-  margin: -4px 0 0;
-  font-size: 0.74rem;
+  font-size: 0.78rem;
   color: var(--pq-dim);
-  text-align: center;
 }
 
-@media (max-width: 560px) {
-  /* La vignette part en premier quand la place manque : le nom, le score et le
-     bouton d'écoute sont plus utiles qu'elle sur un écran étroit. */
-  .pq-chart-mini { display: none; }
-  .pq-pick-hint { display: none; }
-}
-
-/* ---------- La revue : on écoute chacun à tour de rôle ---------- */
-/* La ligne en cours de lecture. Le fond ET la bordure changent : le surlignage
-   doit se voir depuis l'autre bout de la pièce — c'est un jeu où l'on regarde
-   souvent l'écran de quelqu'un d'autre. */
-.pq-podium-row.playing {
-  background: color-mix(in srgb, var(--band) 22%, var(--pq-panel));
-  border-color: var(--band);
-  transform: translateX(3px);
-}
-.pq-podium-row { transition: background 0.25s ease, transform 0.25s ease; }
-
-/* Trois barres qui dansent pendant la lecture, figées sinon. Elles remplacent
-   le bouton « écouter » : c'est la ligne entière qui se clique désormais, et
-   deux cibles imbriquées donnaient des clics imprévisibles. */
-.pq-podium-wave {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  height: 16px;
-  width: 18px;
-}
-.pq-podium-wave i {
-  width: 3px;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--pq-dim);
-  transition: background 0.2s ease;
-}
-.pq-podium-row.playing .pq-podium-wave i {
-  background: var(--band);
-  animation: pq-eq 0.75s ease-in-out infinite;
-}
-.pq-podium-row.playing .pq-podium-wave i:nth-child(2) { animation-delay: 0.18s; }
-.pq-podium-row.playing .pq-podium-wave i:nth-child(3) { animation-delay: 0.36s; }
-@keyframes pq-eq {
-  0%, 100% { height: 4px; }
-  50% { height: 15px; }
-}
-
-/* L'original en cours de lecture. */
-.pq-clip.on {
-  border-color: var(--pq-warm);
-  background: var(--pq-warm-soft);
-  color: var(--pq-warm);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pq-podium-row.playing { transform: none; }
-  .pq-podium-row.playing .pq-podium-wave i { animation: none; height: 12px; }
-}
-
-/* ======================================================================
-   Les sons de la communauté
-   ======================================================================
-   Deux endroits, une seule idée : un joueur dépose ses propres sons, et ils ne
-   sortent que si la table le demande (cf. components/SoundLibrary.jsx).
-
-   La modale de librairie est montée dans <body> par un portail : elle est donc
-   HORS de .pq-page et n'hérite pas de ses variables. La cabine y est repeinte à
-   la main — sans quoi le panneau ressortirait aux couleurs de l'application, en
-   plein milieu d'un jeu qui assume son décor sombre.
-   ====================================================================== */
-
-/* ---------- L'entrée depuis l'accueil du solo ---------- */
-.pq-mine {
-  margin-top: 18px;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 10px;
-}
-.pq-mine-open {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 16px;
-  border: 1px solid var(--pq-line);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--pq-ink);
-  font-size: 0.84rem;
-  font-weight: 600;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-.pq-mine-open:hover { border-color: var(--pq-warm); }
-.pq-mine-open em {
-  font-style: normal;
-  min-width: 20px;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--pq-warm-soft);
-  color: var(--pq-warm);
-  font-size: 0.74rem;
-  font-weight: 800;
-}
-
-/* L'interrupteur « mes sons » du solo et celui de l'hôte en versus : même
-   objet, même geste, deux écrans. */
-.pq-mine-sw,
-.pq-sw {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  padding: 8px 15px 8px 10px;
-  border: 1px solid var(--pq-line);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--pq-dim);
-  font-size: 0.82rem;
-  font-weight: 600;
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
-.pq-mine-sw i,
-.pq-sw i {
-  position: relative;
-  width: 34px;
-  height: 19px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
-  transition: background 0.18s ease;
-}
-.pq-mine-sw i::after,
-.pq-sw i::after {
-  content: "";
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  background: #fff;
-  transition: transform 0.18s ease;
-}
-.pq-mine-sw.on,
-.pq-sw.on { color: var(--pq-warm); border-color: var(--pq-warm); }
-.pq-mine-sw.on i,
-.pq-sw.on i { background: var(--pq-warm); }
-.pq-mine-sw.on i::after,
-.pq-sw.on i::after { transform: translateX(15px); }
-.pq-sw { padding: 6px; }
-.pq-sw:disabled { opacity: 0.5; }
-
-/* Le crédit du déposant, sous la réponse. */
-.pq-by {
-  display: block;
-  margin-top: 3px;
-  color: var(--pq-warm);
-  font-size: 0.76rem;
-}
-.pq-recap-label em.by { color: var(--pq-warm); opacity: 0.85; }
-
-/* ---------- Le bloc « sons des joueurs » du salon ---------- */
+/* ---------- Les sons des joueurs ---------- */
 .pq-custom {
   width: 100%;
-  max-width: 420px;
-  padding: 13px 15px;
+  padding: 12px 14px;
   border: 1px solid var(--pq-line);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--pq-panel);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 9px;
 }
-.pq-custom-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
+.pq-custom-head { display: flex; align-items: center; gap: 10px; }
 .pq-custom-txt {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 .pq-custom-txt b {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 0.88rem;
-  color: var(--pq-ink);
+  font-size: 0.87rem;
 }
 .pq-custom-txt em {
   font-style: normal;
-  font-size: 0.76rem;
-  line-height: 1.4;
+  font-size: 0.75rem;
   color: var(--pq-dim);
 }
-.pq-custom-state { font-size: 0.76rem; color: var(--pq-dim); }
-.pq-custom-state.on { color: var(--pq-warm); }
+.pq-custom-state { font-size: 0.75rem; color: var(--pq-dim); }
+.pq-custom-state.on { color: var(--pq-warm-ink); }
 .pq-custom-who {
   list-style: none;
   margin: 0;
@@ -1656,34 +1071,265 @@
   padding: 3px 9px;
   border-radius: 999px;
   background: var(--pq-warm-soft);
-  color: var(--pq-ink);
-  font-size: 0.74rem;
+  font-size: 0.73rem;
 }
-.pq-custom-who em { font-style: normal; font-weight: 800; color: var(--pq-warm); }
+.pq-custom-who em { font-style: normal; font-weight: 800; color: var(--pq-warm-ink); }
 .pq-custom-lib {
   align-self: flex-start;
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 7px 13px;
-  border: 1px solid var(--pq-line);
+  padding: 6px 13px;
+  border: 1px solid var(--pq-line-2);
   border-radius: 999px;
   background: transparent;
   color: var(--pq-ink);
-  font-size: 0.79rem;
+  font-size: 0.77rem;
   font-weight: 600;
 }
-.pq-custom-lib:hover { border-color: var(--pq-warm); color: var(--pq-warm); }
+.pq-custom-lib:hover { border-color: var(--orange); color: var(--pq-warm-ink); }
+
+/* ---------- Écoute et enregistrement ---------- */
+.pq-listen-stage,
+.pq-record-stage {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding-top: 2vh;
+}
+.pq-listen-stage p { margin: 0; color: var(--pq-dim); font-size: 0.9rem; }
+.pq-listen-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: var(--pq-warm-soft);
+  color: var(--pq-warm-ink);
+}
+.pq-listen-ring::before,
+.pq-listen-ring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--orange) 50%, transparent);
+  animation: pq-ping 2.4s ease-out infinite;
+}
+.pq-listen-ring::after { animation-delay: 1.2s; }
+
+.pq-waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 20px;
+  color: var(--pq-dim);
+  text-align: center;
+}
+.pq-waiting b { color: var(--pq-ink); font-size: 1rem; }
+.pq-waiting > svg { color: var(--pq-warm-ink); }
+
+.pq-strip {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+.pq-strip li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: var(--pq-dim);
+  opacity: 0.55;
+  transition: opacity 0.2s ease;
+}
+.pq-strip li.done { opacity: 1; color: var(--pq-b-great); }
+.pq-strip-ok {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  padding: 2px;
+  border-radius: 50%;
+  background: var(--pq-b-great);
+  color: var(--pq-panel);
+}
+
+.pq-av {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  background: var(--pq-panel-2);
+  color: var(--pq-dim);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.pq-av.big { width: 66px; height: 66px; font-size: 1.4rem; }
+
+/* ---------- La révélation ---------- */
+.pq-podium {
+  width: 100%;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.pq-podium-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--pq-line);
+  border-left: 3px solid var(--band, var(--orange));
+  border-radius: 12px;
+  background: var(--pq-panel);
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.pq-podium-row.me { background: var(--pq-warm-soft); }
+.pq-podium-row.picked { border-color: var(--pq-line-2); }
+/* Celui qu'on entend : il sort du rang. C'est le seul repère qui dise « c'est
+   CETTE voix », et il doit se voir sans lire. */
+.pq-podium-row.playing {
+  transform: translateX(6px) scale(1.02);
+  border-color: var(--band, var(--orange));
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--band, var(--orange)) 28%, transparent);
+}
+.pq-podium-rank {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  background: var(--pq-panel-2);
+  color: var(--pq-dim);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+.pq-podium-rank.r1 {
+  background: var(--accent-grad, var(--orange));
+  background-color: var(--orange);
+  color: #241a02;
+}
+.pq-podium-who {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pq-podium-none { font-size: 0.71rem; color: var(--pq-dim); }
+.pq-podium-score {
+  min-width: 32px;
+  text-align: right;
+  font-weight: 800;
+  color: var(--band, var(--orange));
+  font-variant-numeric: tabular-nums;
+}
+/* Un indicateur, pas un bouton : c'est la ligne entière qui se clique. */
+.pq-podium-wave {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 16px;
+}
+.pq-podium-wave i {
+  width: 3px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--pq-line-2);
+  transition: background 0.2s ease;
+}
+.pq-podium-row.playing .pq-podium-wave i {
+  background: var(--band);
+  animation: pq-eq 0.75s ease-in-out infinite;
+}
+.pq-podium-row.playing .pq-podium-wave i:nth-child(2) { animation-delay: 0.18s; }
+.pq-podium-row.playing .pq-podium-wave i:nth-child(3) { animation-delay: 0.36s; }
+@keyframes pq-eq {
+  0%, 100% { height: 4px; }
+  50% { height: 15px; }
+}
+.pq-pick-hint {
+  margin: 0;
+  font-size: 0.73rem;
+  color: var(--pq-dim);
+}
+
+/* ---------- Le tableau final ---------- */
+.pq-final {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  animation: pq-pop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+}
+.pq-champ {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 18px 30px;
+  border-radius: 20px;
+  background: var(--pq-warm-soft);
+}
+.pq-champ > svg { color: var(--pq-warm-ink); }
+.pq-champ b { font-size: 1.15rem; }
+.pq-champ span { font-size: 0.76rem; color: var(--pq-dim); }
+.pq-final-list {
+  width: 100%;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.pq-final-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--pq-line);
+  border-radius: 12px;
+  background: var(--pq-panel);
+}
+.pq-final-list li.me { border-color: var(--orange); }
+.pq-final-wins { font-size: 0.73rem; color: var(--pq-dim); }
 
 /* ======================================================================
    La modale « Ma librairie »
-   ====================================================================== */
+   ======================================================================
+   Montée dans <body> par un portail : elle est HORS de .pq-page et n'hérite
+   donc pas de ses variables. Elles sont redéclarées ici, à l'identique. */
 .pq-lib {
-  --pq-ink: #f2ece2;
-  --pq-dim: #a79c8d;
-  --pq-line: rgba(226, 190, 130, 0.16);
-  --pq-warm: #f2b70b;
-  --pq-warm-soft: rgba(242, 183, 11, 0.16);
+  --pq-ink: var(--text);
+  --pq-dim: var(--text-soft);
+  --pq-panel: var(--surface);
+  --pq-panel-2: var(--surface-2, var(--surface));
+  --pq-line: var(--border);
+  --pq-line-2: var(--border-strong);
+  --pq-warm-ink: var(--accent-ink);
+  --pq-warm-soft: color-mix(in srgb, var(--orange) 14%, transparent);
 
   width: min(560px, 94vw);
   max-height: 88dvh;
@@ -1691,7 +1337,7 @@
   flex-direction: column;
   border: 1px solid var(--pq-line);
   border-radius: 18px;
-  background: linear-gradient(180deg, #1b1611 0%, #100d0a 100%);
+  background: var(--pq-panel);
   color: var(--pq-ink);
   overflow: hidden;
 }
@@ -1715,32 +1361,35 @@
   gap: 8px;
   font-size: 0.98rem;
 }
-.pq-lib-head em { font-style: normal; font-size: 0.76rem; color: var(--pq-dim); }
+.pq-lib-head em { font-style: normal; font-size: 0.74rem; color: var(--pq-dim); }
 .pq-lib-body {
   padding: 14px 16px 18px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 13px;
+  gap: 12px;
 }
 .pq-lib-rule {
   margin: 0;
-  padding: 10px 12px;
+  padding: 9px 12px;
   border-radius: 11px;
   background: var(--pq-warm-soft);
-  font-size: 0.78rem;
+  font-size: 0.77rem;
   line-height: 1.5;
-  color: var(--pq-ink);
 }
-.pq-lib-rule b { color: var(--pq-warm); }
+.pq-lib-rule b { color: var(--pq-warm-ink); }
 .pq-lib-tip,
 .pq-lib-empty,
 .pq-lib-load {
   margin: 0;
-  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.77rem;
   line-height: 1.5;
   color: var(--pq-dim);
 }
+.pq-lib-tip { display: block; }
 .pq-lib-tip b { color: var(--pq-ink); }
 .pq-lib-add {
   display: inline-flex;
@@ -1748,18 +1397,18 @@
   justify-content: center;
   gap: 8px;
   padding: 12px;
-  border: 1px dashed var(--pq-line);
+  border: 1px dashed var(--pq-line-2);
   border-radius: 13px;
-  background: rgba(255, 255, 255, 0.03);
+  background: transparent;
   color: var(--pq-ink);
   font-size: 0.88rem;
   font-weight: 700;
   transition: border-color 0.15s ease, color 0.15s ease;
 }
-.pq-lib-add:hover:not(:disabled) { border-color: var(--pq-warm); color: var(--pq-warm); }
+.pq-lib-add:hover:not(:disabled) { border-color: var(--orange); color: var(--pq-warm-ink); }
 .pq-lib-add:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* ---------- La fiche du son fraîchement rogné ---------- */
+/* ---------- La fiche du son rogné ---------- */
 .pq-lib-form {
   display: flex;
   flex-direction: column;
@@ -1767,7 +1416,7 @@
   padding: 13px;
   border: 1px solid var(--pq-line);
   border-radius: 13px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--pq-panel-2);
 }
 .pq-lib-form-top {
   display: flex;
@@ -1782,36 +1431,83 @@
   align-items: center;
   gap: 6px;
   padding: 7px 13px;
-  border: 1px solid var(--pq-line);
+  border: 1px solid var(--pq-line-2);
   border-radius: 999px;
-  background: transparent;
+  background: var(--pq-panel);
   color: var(--pq-ink);
-  font-size: 0.78rem;
+  font-size: 0.77rem;
   font-weight: 600;
 }
 .pq-lib-preview:hover,
 .pq-lib-recut:hover,
-.pq-lib-cancel:hover { border-color: var(--pq-warm); color: var(--pq-warm); }
+.pq-lib-cancel:hover { border-color: var(--orange); color: var(--pq-warm-ink); }
 .pq-lib-dur {
   margin-right: auto;
   font-size: 0.8rem;
   font-weight: 800;
-  color: var(--pq-warm);
+  color: var(--pq-warm-ink);
   font-variant-numeric: tabular-nums;
 }
-.pq-lib-field { display: flex; flex-direction: column; gap: 5px; }
-.pq-lib-field span { font-size: 0.75rem; color: var(--pq-dim); }
-.pq-lib-field input,
-.pq-lib-field select {
-  padding: 9px 11px;
-  border: 1px solid var(--pq-line);
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.3);
-  color: var(--pq-ink);
-  font-size: 0.86rem;
+
+/* La carte d'identité du son : l'image à gauche, le nom à droite. Deux champs,
+   pas cinq — le jeu et la difficulté ont été retirés. */
+.pq-lib-idcard,
+.pq-admin-idcard {
+  display: flex;
+  align-items: center;
+  gap: 11px;
 }
-.pq-lib-field input:focus,
-.pq-lib-field select:focus { outline: none; border-color: var(--pq-warm); }
+.pq-lib-img,
+.pq-admin-img {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  flex: 0 0 auto;
+  border: 1px dashed var(--pq-line-2);
+  border-radius: 14px;
+  background: var(--pq-panel);
+  color: var(--pq-dim);
+  overflow: hidden;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.pq-lib-img:hover,
+.pq-admin-img:hover { border-color: var(--orange); color: var(--pq-warm-ink); }
+.pq-lib-img.has,
+.pq-admin-img.has { border-style: solid; border-color: var(--orange); }
+.pq-lib-img img,
+.pq-admin-img img { width: 100%; height: 100%; object-fit: cover; }
+.pq-lib-img-x {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  align-self: flex-start;
+  margin-left: -8px;
+  border: 1px solid var(--pq-line-2);
+  border-radius: 50%;
+  background: var(--pq-panel);
+  color: var(--pq-dim);
+}
+.pq-lib-img-x:hover { color: var(--pq-b-miss); border-color: var(--pq-b-miss); }
+.pq-lib-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.pq-lib-field span { font-size: 0.74rem; color: var(--pq-dim); }
+.pq-lib-field input {
+  padding: 10px 12px;
+  border: 1px solid var(--pq-line-2);
+  border-radius: 10px;
+  background: var(--pq-panel);
+  color: var(--pq-ink);
+  font-size: 0.9rem;
+}
+.pq-lib-field input:focus { outline: none; border-color: var(--orange); }
 .pq-lib-form-actions { display: flex; justify-content: flex-end; gap: 9px; }
 .pq-lib-send {
   display: inline-flex;
@@ -1820,7 +1516,8 @@
   padding: 9px 18px;
   border: 0;
   border-radius: 999px;
-  background: var(--pq-warm);
+  background: var(--accent-grad, var(--orange));
+  background-color: var(--orange);
   color: #241a02;
   font-size: 0.84rem;
   font-weight: 800;
@@ -1840,10 +1537,10 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 11px;
+  padding: 8px 11px;
   border: 1px solid var(--pq-line);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--pq-panel-2);
 }
 .pq-lib-row.off { opacity: 0.55; }
 .pq-lib-play {
@@ -1853,12 +1550,19 @@
   justify-content: center;
   width: 30px;
   height: 30px;
-  border: 1px solid var(--pq-line);
+  border: 1px solid var(--pq-line-2);
   border-radius: 50%;
   background: transparent;
-  color: var(--pq-warm);
+  color: var(--pq-warm-ink);
 }
 .pq-lib-play:hover { background: var(--pq-warm-soft); }
+.pq-lib-thumb {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  object-fit: cover;
+}
 .pq-lib-main {
   flex: 1;
   min-width: 0;
@@ -1872,22 +1576,21 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.pq-lib-main em,
-.pq-lib-meta { font-style: normal; font-size: 0.72rem; color: var(--pq-dim); }
+.pq-lib-meta { font-size: 0.71rem; color: var(--pq-dim); }
 .pq-lib-toggle {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   padding: 5px 10px;
-  border: 1px solid var(--pq-line);
+  border: 1px solid var(--pq-line-2);
   border-radius: 999px;
   background: transparent;
   color: var(--pq-dim);
-  font-size: 0.71rem;
+  font-size: 0.7rem;
   font-weight: 600;
   white-space: nowrap;
 }
-.pq-lib-toggle.on { color: var(--pq-warm); border-color: rgba(242, 183, 11, 0.45); }
+.pq-lib-toggle.on { color: var(--pq-warm-ink); border-color: var(--orange); }
 .pq-lib-del {
   flex: 0 0 auto;
   display: inline-flex;
@@ -1895,28 +1598,27 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  border: 1px solid var(--pq-line);
+  border: 1px solid var(--pq-line-2);
   border-radius: 9px;
   background: transparent;
   color: var(--pq-dim);
 }
-.pq-lib-del:hover { border-color: #e05656; color: #e05656; }
+.pq-lib-del:hover { border-color: var(--pq-b-miss); color: var(--pq-b-miss); }
 
 /* ======================================================================
    Le rogneur
    ======================================================================
    La piste occupe toute la largeur : c'est l'objet de l'écran, on y cherche un
-   cri à l'œil. Les poignées ont une zone de préhension de 18 px pour un trait
-   de 2 px — au doigt, une poignée fine est une poignée qu'on n'attrape jamais.
-   ====================================================================== */
+   cri à l'œil. Les poignées ont 18 px de zone de préhension pour un trait de
+   2 px — au doigt, une poignée fine est une poignée qu'on n'attrape jamais. */
 .pq-trim {
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 13px;
-  border: 1px solid var(--pq-line);
+  border: 1px solid var(--pq-line, var(--border));
   border-radius: 13px;
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--pq-panel-2, var(--surface-2));
 }
 .pq-trim-help,
 .pq-trim-load {
@@ -1924,17 +1626,18 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 0.78rem;
-  color: var(--pq-dim);
+  font-size: 0.77rem;
+  color: var(--pq-dim, var(--text-soft));
 }
-.pq-trim-help b { color: var(--pq-warm); }
+.pq-trim-help b { color: var(--pq-warm-ink, var(--accent-ink)); }
 .pq-trim-track {
   position: relative;
   height: 104px;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.45);
-  /* Sans ça, le doigt fait défiler la page au lieu de tirer la poignée. */
-  touch-action: none;
+  /* La forme d'onde est peinte au canevas en doré : elle a besoin d'un fond
+     sombre dans les deux thèmes, sinon elle disparaît sur blanc. */
+  background: #14100c;
+  touch-action: none; /* sinon le doigt fait défiler la page au lieu de tirer */
   user-select: none;
   overflow: hidden;
 }
@@ -1944,8 +1647,8 @@
   top: 0;
   bottom: 0;
   cursor: grab;
-  border-top: 2px solid var(--pq-warm);
-  border-bottom: 2px solid var(--pq-warm);
+  border-top: 2px solid var(--orange);
+  border-bottom: 2px solid var(--orange);
 }
 .pq-trim-sel:active { cursor: grabbing; }
 .pq-trim-handle {
@@ -1964,7 +1667,7 @@
   bottom: 0;
   left: 8px;
   width: 2px;
-  background: var(--pq-warm);
+  background: var(--orange);
 }
 .pq-trim-handle::after {
   content: "";
@@ -1975,14 +1678,14 @@
   height: 30px;
   margin-top: -15px;
   border-radius: 4px;
-  background: var(--pq-warm);
+  background: var(--orange);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 .pq-trim-scale {
   display: flex;
   justify-content: space-between;
-  font-size: 0.7rem;
-  color: var(--pq-dim);
+  font-size: 0.69rem;
+  color: var(--pq-dim, var(--text-soft));
   font-variant-numeric: tabular-nums;
 }
 .pq-trim-actions {
@@ -1997,23 +1700,23 @@
   align-items: center;
   gap: 7px;
   padding: 8px 14px;
-  border: 1px solid var(--pq-line);
+  border: 1px solid var(--pq-line-2, var(--border-strong));
   border-radius: 999px;
-  background: transparent;
-  color: var(--pq-ink);
-  font-size: 0.79rem;
+  background: var(--pq-panel, var(--surface));
+  color: var(--pq-ink, var(--text));
+  font-size: 0.78rem;
   font-weight: 600;
 }
 .pq-trim-play:hover,
-.pq-trim-cancel:hover { border-color: var(--pq-warm); color: var(--pq-warm); }
+.pq-trim-cancel:hover { border-color: var(--orange); color: var(--accent-ink); }
 .pq-trim-len {
   margin-right: auto;
   font-size: 0.86rem;
   font-weight: 800;
-  color: var(--pq-warm);
+  color: var(--accent-ink);
   font-variant-numeric: tabular-nums;
 }
-.pq-trim-len.over { color: #e05656; }
+.pq-trim-len.over { color: var(--pq-b-miss); }
 .pq-trim-ok {
   display: inline-flex;
   align-items: center;
@@ -2021,23 +1724,176 @@
   padding: 9px 17px;
   border: 0;
   border-radius: 999px;
-  background: var(--pq-warm);
+  background: var(--accent-grad, var(--orange));
+  background-color: var(--orange);
   color: #241a02;
   font-size: 0.82rem;
   font-weight: 800;
 }
 .pq-trim-ok:disabled { opacity: 0.55; cursor: not-allowed; }
 
-/* Sur mobile la piste est plus haute : c'est le seul endroit où la précision du
-   geste compte, et le doigt masque ce qu'il déplace. */
-@media (max-width: 620px) {
-  .pq-trim-track { height: 126px; }
-  .pq-lib-row { flex-wrap: wrap; }
-  .pq-lib-main { flex: 1 1 100%; order: 2; }
+/* ======================================================================
+   L'onglet « Perroquet » du panneau d'admin
+   ====================================================================== */
+.pq-admin-add {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2, #f6f6f8);
+}
+.pq-admin-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 0.86rem;
+  color: var(--text-soft);
+  cursor: pointer;
+}
+.pq-admin-file:hover { border-color: var(--orange); }
+.pq-admin-file.has {
+  border-style: solid;
+  border-color: var(--orange);
+  color: var(--text);
+}
+.pq-admin-file input { display: none; }
+.pq-admin-trim { border-radius: 13px; }
+.pq-admin-idcard { flex-wrap: wrap; }
+.pq-admin-in {
+  flex: 1;
+  min-width: 220px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.88rem;
+}
+.pq-admin-in:focus { outline: none; border-color: var(--orange); }
+.pq-admin-cut {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+.pq-admin-cut b { color: var(--text); font-variant-numeric: tabular-nums; }
+.pq-admin-msg {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.82rem;
+}
+.pq-admin-msg.bad { color: var(--pq-b-miss); }
+.pq-admin-msg.good { color: var(--pq-b-perfect); }
+.pq-admin-demo { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+
+.pq-admin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pq-admin-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.pq-admin-row.off { opacity: 0.55; }
+.pq-admin-play {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--accent-ink);
+}
+.pq-admin-play:hover { background: color-mix(in srgb, var(--orange) 14%, transparent); }
+.pq-admin-thumb {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  object-fit: cover;
+}
+.pq-admin-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.pq-admin-main b { font-size: 0.87rem; }
+.pq-admin-main em,
+.pq-admin-meta,
+.pq-admin-owner {
+  font-style: normal;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+.pq-admin-owner { color: var(--accent-ink); }
+.pq-admin-meta i { font-style: normal; }
+.pq-admin-meta i.warn { color: var(--pq-b-meh); font-weight: 700; }
+.pq-admin-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.71rem;
+  color: var(--pq-b-meh);
 }
 
-/* Le son d'un joueur, dans la banque d'admin. */
-.pq-admin-owner {
-  font-size: 0.72rem;
-  color: var(--accent-ink, #b8860b);
+/* ======================================================================
+   Petits écrans et mouvement réduit
+   ====================================================================== */
+@media (max-width: 760px) {
+  /* Le décor disparaît : il n'y a pas la place, et il passerait derrière le
+     bouton principal. */
+  .pq-decor { display: none; }
+  .pq-hold { width: 168px; height: 168px; }
+  .pq-wave { width: 118px; height: 66px; }
+  .pq-verdict { flex-wrap: wrap; }
+  .pq-score { margin-left: auto; font-size: 2.1rem; }
+  .pq-recap-row { flex-wrap: wrap; }
+  .pq-recap-label { flex: 1 1 100%; order: 2; }
+  .pq-lib-row { flex-wrap: wrap; }
+  .pq-lib-main { flex: 1 1 100%; order: 2; }
+  .pq-trim-track { height: 126px; }
+  .pq-podium-row .pq-chart-mini { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pq-note,
+  .pq-ring,
+  .pq-hold-halo,
+  .pq-listen-ring::before,
+  .pq-listen-ring::after,
+  .pq-podium-row.playing .pq-podium-wave i { animation: none; }
+  .pq-intro,
+  .pq-result,
+  .pq-reveal,
+  .pq-recap,
+  .pq-final,
+  .pq-face { animation: none; }
+  .pq-podium-row.playing { transform: none; }
+  .pq-go:hover:not(:disabled),
+  .pq-next:hover:not(:disabled) { transform: none; }
 }

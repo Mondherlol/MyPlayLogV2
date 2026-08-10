@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Check,
   Eye,
   EyeOff,
+  ImagePlus,
   Loader2,
   Play,
   Plus,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import AudioTrimmer from "./AudioTrimmer";
+import { niceSoundName } from "../lib/soundTake";
 
 // ======================================================================
 //  Onglet « Perroquet » — la banque de sons
@@ -27,9 +29,8 @@ import AudioTrimmer from "./AudioTrimmer";
 // pour une seule décision à chaque fois : est-ce que ce son est IMITABLE ? D'où
 // deux partis pris :
 //
-//   1. Le formulaire d'ajout garde ses valeurs après un envoi réussi (sauf le
-//      fichier et le nom). On enchaîne dix cris du même jeu sans retaper le jeu
-//      ni la difficulté.
+//   1. Le dépôt tient en un geste et deux champs : on choisit un fichier, on le
+//      rogne, le nom se pré-remplit tout seul. Rien à ressaisir entre deux sons.
 //   2. Chaque ligne montre « % voisé » et la moyenne des scores obtenus. Le
 //      premier dit si le son a une mélodie à imiter, le second si les joueurs y
 //      arrivent. Un clip à 15 % voisé ou dont la moyenne plafonne à 25 est un
@@ -47,13 +48,6 @@ const FILTERS = [
   { key: "community", label: "Communauté" },
 ];
 
-const DIFF_HINT = {
-  1: "une note tenue",
-  2: "deux syllabes",
-  3: "une inflexion",
-  4: "une vraie mélodie",
-  5: "tordu",
-};
 
 export default function AdminPerroquet({ token }) {
   const [filter, setFilter] = useState("all");
@@ -211,7 +205,6 @@ export default function AdminPerroquet({ token }) {
               item={it}
               busy={busy === it.id}
               onToggle={() => patch(it, { active: !it.active })}
-              onDiff={(d) => patch(it, { difficulty: d })}
               onDelete={() => remove(it)}
             />
           ))}
@@ -224,31 +217,44 @@ export default function AdminPerroquet({ token }) {
 // ============================================================
 //  Ajouter un son
 // ============================================================
+// Deux champs seulement : le nom — pré-rempli depuis le nom du fichier — et une
+// image facultative, montrée à la révélation. Le jeu et la difficulté ont été
+// retirés : le premier répétait le nom neuf fois sur dix, la seconde demandait
+// de noter à l'aveugle un son qu'on n'a pas encore fait jouer.
+//
+// Le rogneur s'ouvre dès qu'un fichier est choisi : la banque ne veut que des
+// extraits de 0,3 à 2 s, et un fichier sourcé ailleurs les respecte rarement du
+// premier coup. En faire l'étape normale évite le refus du serveur suivi d'un
+// aller-retour dans un éditeur audio.
 function AddForm({ token, onAdded }) {
   const fileRef = useRef(null);
+  const imgRef = useRef(null);
   const [file, setFile] = useState(null);
   // L'extrait rogné, quand on est passé par le rogneur : c'est LUI qu'on envoie
   // à la place du fichier d'origine. Le même outil que les joueurs
   // (components/AudioTrimmer.jsx) — un « wahoo » se découpe de la même façon
-  // qu'on soit administrateur ou non, et deux découpeurs à maintenir pour le
-  // même geste n'auraient aucune justification.
+  // qu'on soit administrateur ou non.
   const [trimmed, setTrimmed] = useState(null); // { blob, seconds }
   const [trimming, setTrimming] = useState(false);
+  const [image, setImage] = useState(null);
   const [label, setLabel] = useState("");
-  const [game, setGame] = useState("");
-  const [difficulty, setDifficulty] = useState(2);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
 
+  const imgUrl = useMemo(() => (image ? URL.createObjectURL(image) : ""), [image]);
+  useEffect(
+    () => () => {
+      if (imgUrl) URL.revokeObjectURL(imgUrl);
+    },
+    [imgUrl]
+  );
+
   function pickFile(f) {
     setFile(f);
     setTrimmed(null);
-    // Le rogneur s'ouvre TOUT SEUL : la banque ne veut que des extraits de 0,3
-    // à 2 s, et un fichier sourcé ailleurs les respecte rarement du premier
-    // coup. L'ouvrir d'office fait de la découpe l'étape normale plutôt qu'un
-    // rattrapage après un refus du serveur.
     setTrimming(!!f);
+    setLabel(f ? niceSoundName(f.name) : "");
     setOk("");
     setErr("");
   }
@@ -264,21 +270,20 @@ function AddForm({ token, onAdded }) {
       if (trimmed) fd.append("clip", trimmed.blob, "extrait.wav");
       else fd.append("clip", file);
       fd.append("label", label.trim());
-      fd.append("game", game.trim());
-      fd.append("difficulty", String(difficulty));
+      if (image) fd.append("image", image, image.name);
       const d = await apiUpload("/admin/perroquet", fd, token);
-      // Le contour revient dans la réponse : on affiche tout de suite ce que le
-      // serveur a mesuré. C'est la confirmation qui compte — pas « ajouté »,
-      // mais « voilà ce qu'il en a compris ».
+      // Le contour revient dans la réponse : on affiche ce que le serveur a
+      // mesuré. La confirmation qui compte n'est pas « ajouté », c'est « voilà
+      // ce qu'il en a compris ».
       setOk(
         `« ${d.item.label} » ajouté — ${d.item.durationMs} ms, ${Math.round(
           d.item.voicedRatio * 100
         )} % mélodique.`
       );
-      // On garde le jeu et la difficulté : on enchaîne rarement un seul son.
       setFile(null);
       setTrimmed(null);
       setTrimming(false);
+      setImage(null);
       setLabel("");
       if (fileRef.current) fileRef.current.value = "";
       onAdded();
@@ -323,57 +328,46 @@ function AddForm({ token, onAdded }) {
       )}
 
       {file && !trimming && (
-        <p className="pq-admin-cut">
-          {trimmed ? (
-            <>
-              <Scissors size={13} /> Extrait rogné —{" "}
-              <b>{trimmed.seconds.toFixed(2)} s</b>
-            </>
-          ) : (
-            <>
-              <Scissors size={13} /> Fichier envoyé tel quel
-            </>
-          )}
-          <button type="button" className="admin-btn clickable" onClick={() => setTrimming(true)}>
-            {trimmed ? "Reprendre la découpe" : "Rogner"}
+        <div className="pq-admin-idcard">
+          <button
+            type="button"
+            className={`pq-admin-img clickable ${imgUrl ? "has" : ""}`}
+            onClick={() => imgRef.current?.click()}
+            title={imgUrl ? "Changer l'image" : "Ajouter une image (montrée à la révélation)"}
+          >
+            {imgUrl ? <img src={imgUrl} alt="" /> : <ImagePlus size={20} />}
           </button>
-          {trimmed && (
-            <button
-              type="button"
-              className="admin-btn clickable"
-              onClick={() => setTrimmed(null)}
-            >
-              Annuler la découpe
+          <input
+            ref={imgRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => {
+              setImage(e.target.files?.[0] || null);
+              e.target.value = "";
+            }}
+          />
+          <input
+            className="pq-admin-in"
+            placeholder="Nom — la réponse affichée (ex. « Le wahoo de Mario »)"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            maxLength={80}
+          />
+          <span className="pq-admin-cut">
+            <Scissors size={13} />
+            {trimmed ? <b>{trimmed.seconds.toFixed(2)} s</b> : "fichier entier"}
+            <button type="button" className="admin-btn clickable" onClick={() => setTrimming(true)}>
+              {trimmed ? "Redécouper" : "Rogner"}
             </button>
-          )}
-        </p>
+            {trimmed && (
+              <button type="button" className="admin-btn clickable" onClick={() => setTrimmed(null)}>
+                Annuler la découpe
+              </button>
+            )}
+          </span>
+        </div>
       )}
-
-      <input
-        className="pq-admin-in"
-        placeholder="Nom — la réponse affichée (ex. « Le wahoo de Mario »)"
-        value={label}
-        onChange={(e) => setLabel(e.target.value)}
-        maxLength={80}
-      />
-      <input
-        className="pq-admin-in"
-        placeholder="Jeu (facultatif)"
-        value={game}
-        onChange={(e) => setGame(e.target.value)}
-        maxLength={80}
-      />
-
-      <label className="pq-admin-diff">
-        <span>Difficulté à imiter</span>
-        <select value={difficulty} onChange={(e) => setDifficulty(Number(e.target.value))}>
-          {[1, 2, 3, 4, 5].map((d) => (
-            <option key={d} value={d}>
-              {d} — {DIFF_HINT[d]}
-            </option>
-          ))}
-        </select>
-      </label>
 
       <button className="admin-btn ok clickable" disabled={busy || !file || !label.trim()}>
         {busy ? <Loader2 size={14} className="spin" /> : <Plus size={14} />}
@@ -393,7 +387,7 @@ function AddForm({ token, onAdded }) {
 // ============================================================
 //  Une ligne de la banque
 // ============================================================
-function ClipRow({ item, busy, onToggle, onDiff, onDelete }) {
+function ClipRow({ item, busy, onToggle, onDelete }) {
   const audioRef = useRef(null);
   useEffect(
     () => () => {
@@ -424,6 +418,8 @@ function ClipRow({ item, busy, onToggle, onDiff, onDelete }) {
         <Play size={15} />
       </button>
 
+      {item.image && <img className="pq-admin-thumb" src={item.image} alt="" loading="lazy" />}
+
       <div className="pq-admin-main">
         <b>{item.label}</b>
         {item.game && <em>{item.game}</em>}
@@ -448,20 +444,6 @@ function ClipRow({ item, busy, onToggle, onDiff, onDelete }) {
           </span>
         )}
       </div>
-
-      <select
-        className="pq-admin-diffsel"
-        value={item.difficulty}
-        onChange={(e) => onDiff(Number(e.target.value))}
-        disabled={busy}
-        title="Difficulté à imiter"
-      >
-        {[1, 2, 3, 4, 5].map((d) => (
-          <option key={d} value={d}>
-            {d}
-          </option>
-        ))}
-      </select>
 
       <button
         className="admin-btn clickable"

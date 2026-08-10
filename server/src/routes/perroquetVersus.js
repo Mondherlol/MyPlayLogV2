@@ -120,6 +120,9 @@ function roundView(room, meId) {
     // La réponse, seulement à la révélation.
     label: revealing ? r.label : null,
     game: revealing ? r.game || null : null,
+    // L'illustration ne sort qu'avec la réponse : la montrer pendant qu'on
+    // imite reviendrait à afficher la solution en grand.
+    image: revealing ? absFor(room.code, r.imageUrl) || "" : "",
     addedBy: revealing ? r.addedBy || "" : "",
     contour: revealing ? clipContour(r) : null,
     // Qui a déjà rendu : affiché pendant l'enregistrement (sans les scores).
@@ -388,6 +391,7 @@ async function drawRounds(count, ownerIds = []) {
       label: c.label,
       game: c.game || "",
       clipUrl: c.url,
+      imageUrl: c.image || "",
       difficulty: c.difficulty,
       addedBy: c.owner ? c.ownerName || "" : "",
     }));

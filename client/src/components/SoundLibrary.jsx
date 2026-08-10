@@ -1,17 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   AlertTriangle,
   Check,
+  ImagePlus,
   Loader2,
   Music,
   Play,
   Plus,
+  Scissors,
   Trash2,
   Upload,
   X,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
+import { niceSoundName } from "../lib/soundTake";
 import AudioTrimmer from "./AudioTrimmer";
 
 // ======================================================================
@@ -33,13 +36,6 @@ import AudioTrimmer from "./AudioTrimmer";
 // n'est tenable que si on peut rogner ICI (components/AudioTrimmer.jsx) — sinon
 // on renvoie chaque déposant vers un éditeur audio, c'est-à-dire nulle part.
 
-const DIFF_HINT = {
-  1: "une note tenue",
-  2: "deux syllabes",
-  3: "une inflexion",
-  4: "une vraie mélodie",
-  5: "tordu",
-};
 
 export default function SoundLibrary({ token, onClose, onChanged }) {
   const [data, setData] = useState(null);
@@ -141,9 +137,8 @@ export default function SoundLibrary({ token, onClose, onChanged }) {
 
         <div className="pq-lib-body">
           <p className="pq-lib-rule">
-            Tes sons n'entrent en partie que si <b>les sons personnalisés sont
-            activés</b> — par toi en solo, par l'hôte en versus. Et seuls ceux
-            des joueurs présents à la table sont tirés.
+            Tes sons sortent seulement dans les parties où <b>les sons
+            personnalisés</b> sont activés.
           </p>
 
           {err && <p className="pq-err">{err}</p>}
@@ -172,9 +167,9 @@ export default function SoundLibrary({ token, onClose, onChanged }) {
               </button>
               {!full && (
                 <p className="pq-lib-tip">
-                  Prends n'importe quel fichier audio : tu le rogneras juste
-                  après. Un <b>cri</b> ou une <b>mélodie</b> — un fracas ou un
-                  bruit sourd n'a pas de hauteur à imiter, et sera refusé.
+                  N'importe quel fichier audio — tu le rognes juste après. Il
+                  faut un <b>cri</b> ou une <b>mélodie</b> : un bruit sourd n'a
+                  rien à imiter.
                 </p>
               )}
             </>
@@ -209,10 +204,7 @@ export default function SoundLibrary({ token, onClose, onChanged }) {
               <Loader2 size={16} className="spin" /> Chargement…
             </p>
           ) : !data.items.length ? (
-            <p className="pq-lib-empty">
-              Rien pour l'instant. Le premier son que tu déposes sera jouable
-              dès la prochaine partie où les sons personnalisés sont activés.
-            </p>
+            <p className="pq-lib-empty">Rien pour l'instant.</p>
           ) : (
             <ul className="pq-lib-list">
               {data.items.map((it) => (
@@ -236,24 +228,35 @@ export default function SoundLibrary({ token, onClose, onChanged }) {
 // ============================================================
 //  La fiche du son qu'on vient de rogner
 // ============================================================
-// Le nom est demandé APRÈS la découpe, pas avant : on ne sait comment appeler
-// un extrait qu'une fois qu'on l'a entendu.
+// Deux champs, pas cinq. Le nom — pré-rempli depuis le nom du fichier, parce
+// qu'il est presque toujours le bon — et une image facultative. Le jeu et la
+// difficulte ont ete retires : le premier faisait doublon avec le nom neuf fois
+// sur dix, la seconde demandait a quelqu'un qui n'a pas encore joue le son de
+// noter a quel point il est dur a imiter.
 function DraftForm({ draft, token, onCancel, onRecut, onDone }) {
-  const [label, setLabel] = useState("");
-  const [game, setGame] = useState("");
-  const [difficulty, setDifficulty] = useState(2);
+  const [label, setLabel] = useState(() => niceSoundName(draft.file?.name));
+  const [image, setImage] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const urlRef = useRef(null);
+  const imgRef = useRef(null);
 
-  // L'URL locale de l'extrait, pour le réécouter avant d'envoyer. Révoquée au
-  // démontage : un objet-URL qui traîne garde le blob en mémoire.
+  // L'URL locale de l'extrait, pour le reecouter avant d'envoyer. Revoquee au
+  // demontage : un objet-URL qui traine garde le blob en memoire.
   if (!urlRef.current) urlRef.current = URL.createObjectURL(draft.blob);
   useEffect(
     () => () => {
       URL.revokeObjectURL(urlRef.current);
     },
     []
+  );
+
+  const imgUrl = useMemo(() => (image ? URL.createObjectURL(image) : ""), [image]);
+  useEffect(
+    () => () => {
+      if (imgUrl) URL.revokeObjectURL(imgUrl);
+    },
+    [imgUrl]
   );
 
   async function submit(e) {
@@ -265,8 +268,7 @@ function DraftForm({ draft, token, onCancel, onRecut, onDone }) {
       const fd = new FormData();
       fd.append("clip", draft.blob, "extrait.wav");
       fd.append("label", label.trim());
-      fd.append("game", game.trim());
-      fd.append("difficulty", String(difficulty));
+      if (image) fd.append("image", image, image.name);
       await apiUpload("/perroquet/sounds", fd, token);
       await onDone();
     } catch (e2) {
@@ -284,43 +286,57 @@ function DraftForm({ draft, token, onCancel, onRecut, onDone }) {
           className="pq-lib-preview clickable"
           onClick={() => new Audio(urlRef.current).play().catch(() => {})}
         >
-          <Play size={15} /> Réécouter
+          <Play size={15} /> Reecouter
         </button>
         <span className="pq-lib-dur">{draft.seconds.toFixed(2)} s</span>
         <button type="button" className="pq-lib-recut clickable" onClick={onRecut}>
-          Recommencer la découpe
+          <Scissors size={14} /> Redecouper
         </button>
       </div>
 
-      <label className="pq-lib-field">
-        <span>Nom du son</span>
+      <div className="pq-lib-idcard">
+        {/* L'image n'est montree qu'a la revelation, jamais pendant qu'on
+            imite : elle donnerait la reponse. */}
+        <button
+          type="button"
+          className={`pq-lib-img clickable ${imgUrl ? "has" : ""}`}
+          onClick={() => imgRef.current?.click()}
+          title={imgUrl ? "Changer l'image" : "Ajouter une image"}
+        >
+          {imgUrl ? <img src={imgUrl} alt="" /> : <ImagePlus size={20} />}
+        </button>
+        {imgUrl && (
+          <button
+            type="button"
+            className="pq-lib-img-x clickable"
+            onClick={() => setImage(null)}
+            aria-label="Retirer l'image"
+          >
+            <X size={12} />
+          </button>
+        )}
         <input
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          placeholder="Le cri de Yoshi"
-          maxLength={60}
-          autoFocus
+          ref={imgRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => {
+            setImage(e.target.files?.[0] || null);
+            e.target.value = "";
+          }}
         />
-      </label>
-      <label className="pq-lib-field">
-        <span>Jeu (facultatif)</span>
-        <input
-          value={game}
-          onChange={(e) => setGame(e.target.value)}
-          placeholder="Super Mario World"
-          maxLength={80}
-        />
-      </label>
-      <label className="pq-lib-field">
-        <span>Difficulté à imiter</span>
-        <select value={difficulty} onChange={(e) => setDifficulty(Number(e.target.value))}>
-          {[1, 2, 3, 4, 5].map((d) => (
-            <option key={d} value={d}>
-              {d} — {DIFF_HINT[d]}
-            </option>
-          ))}
-        </select>
-      </label>
+
+        <label className="pq-lib-field">
+          <span>Nom du son</span>
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="Le cri de Yoshi"
+            maxLength={60}
+            autoFocus
+          />
+        </label>
+      </div>
 
       {err && (
         <p className="pq-err">
@@ -334,7 +350,7 @@ function DraftForm({ draft, token, onCancel, onRecut, onDone }) {
         </button>
         <button type="submit" className="pq-lib-send clickable" disabled={busy || !label.trim()}>
           {busy ? <Loader2 size={15} className="spin" /> : <Upload size={15} />}
-          Ajouter à ma librairie
+          Ajouter
         </button>
       </div>
     </form>
@@ -359,11 +375,11 @@ function LibRow({ item, busy, onToggle, onDelete }) {
       >
         <Play size={14} />
       </button>
+      {item.image && <img className="pq-lib-thumb" src={item.image} alt="" loading="lazy" />}
       <span className="pq-lib-main">
         <b>{item.label}</b>
-        {item.game && <em>{item.game}</em>}
         <span className="pq-lib-meta">
-          {(item.durationMs / 1000).toFixed(1)} s · difficulté {item.difficulty}
+          {(item.durationMs / 1000).toFixed(1)} s
           {item.timesPlayed > 0 && ` · joué ${item.timesPlayed}× (moy. ${item.avgScore})`}
         </span>
       </span>
