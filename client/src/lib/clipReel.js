@@ -34,6 +34,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // gentiment les uns des autres, qui est le but du mode. `waiting` dit qu'on est
 // dans ce blanc, pour que l'écran l'assume au lieu d'avoir l'air en panne.
 //
+// Et comme un blanc de cinq secondes est parfois quatre de trop, `skipWait` le
+// coupe : la pause est un CADEAU DE TEMPS, pas une attente imposée. C'est ce qui
+// permet de la régler généreusement — quand elle traîne, on l'écourte d'un clic
+// au lieu de subir un réglage choisi pour la table la plus bavarde.
+//
 // Un clic reprend toujours la main : la séquence automatique ne doit jamais
 // empêcher de réécouter ce qu'on veut, quand on veut.
 
@@ -53,6 +58,10 @@ export function useClipReel({ items, restartKey, gapMs = 420, onItem, enabled = 
   const rafRef = useRef(0);
   const timerRef = useRef(null);
   const spanRef = useRef(1); // la part « utile » de l'extrait en cours
+  // La suite de la séquence, tenue à disposition pour pouvoir l'appeler d'un clic
+  // (cf. `skipWait`). Elle vit dans la fermeture de l'effet ci-dessous, qui est le
+  // seul endroit à connaître la position dans la file.
+  const nextRef = useRef(null);
   const itemsRef = useRef(items);
   const onItemRef = useRef(onItem);
   itemsRef.current = items;
@@ -80,6 +89,16 @@ export function useClipReel({ items, restartKey, gapMs = 420, onItem, enabled = 
     }
     rafRef.current = requestAnimationFrame(track);
   }, []);
+
+  // Couper court à la pause : on passe à la voix suivante tout de suite. Sans
+  // effet si aucune pause n'est en cours — cliquer ne doit jamais interrompre une
+  // voix qu'on est en train d'écouter.
+  const skipWait = useCallback(() => {
+    if (!waiting || !nextRef.current) return;
+    clearTimeout(timerRef.current);
+    setWaiting(false);
+    nextRef.current();
+  }, [waiting]);
 
   const stop = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
@@ -177,10 +196,12 @@ export function useClipReel({ items, restartKey, gapMs = 420, onItem, enabled = 
       timerRef.current = setTimeout(next, wait);
     };
     a.addEventListener("ended", onEnd);
+    nextRef.current = next;
     next();
 
     return () => {
       alive = false;
+      nextRef.current = null;
       clearTimeout(timerRef.current);
       cancelAnimationFrame(rafRef.current);
       a.removeEventListener("ended", onEnd);
@@ -199,5 +220,5 @@ export function useClipReel({ items, restartKey, gapMs = 420, onItem, enabled = 
     []
   );
 
-  return { current, progress, waiting, play, stop };
+  return { current, progress, waiting, play, stop, skipWait };
 }

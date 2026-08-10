@@ -641,14 +641,16 @@ function Reveal({ round, byId, meId, players = [], onNext, voting }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [round.takes, round.clipUrl, ready]);
 
-  const { current, progress, waiting, play } = useClipReel({
+  const { current, progress, waiting, play, skipWait } = useClipReel({
     items: queue,
     restartKey: round.index,
     enabled: ready,
-    // Deux secondes entre chaque voix : le temps de rire, de dire « n'importe
+    // Cinq secondes entre chaque voix : le temps de rire, de dire « n'importe
     // quoi » et de se retourner vers le suivant. C'est la raison d'être de cette
-    // phase — l'enchaînement serré la transformait en carrousel.
-    gapMs: 2000,
+    // phase — l'enchaînement serré la transformait en carrousel. Généreux parce
+    // qu'un clic l'écourte (`skipWait`) : mieux vaut trop de temps qu'on peut
+    // couper que pas assez qu'on ne peut pas rattraper.
+    gapMs: 5000,
     onItem: (id) => {
       // Le grand graphique suit la lecture. Les regarder se désynchroniser
       // serait pire que pas de graphique du tout.
@@ -744,11 +746,18 @@ function Reveal({ round, byId, meId, players = [], onNext, voting }) {
         })}
       </ol>
 
-      <p className={`pq-pick-hint ${waiting ? "waiting" : ""}`}>
-        {waiting
-          ? "On en parle… la voix suivante arrive"
-          : "Du dernier au premier · touche une ligne pour la rejouer"}
-      </p>
+      {waiting ? (
+        // Pendant la pause, la ligne d'aide devient le bouton qui l'abrège : le
+        // geste attendu à cet instant est « bon, au suivant », il doit être là où
+        // l'œil est déjà.
+        <button type="button" className="pq-pick-hint waiting clickable" onClick={skipWait}>
+          On en parle… <b>cliquer pour la voix suivante</b>
+        </button>
+      ) : (
+        <p className="pq-pick-hint">
+          Du dernier au premier · touche une ligne pour la rejouer
+        </p>
+      )}
 
       <NextVote
         round={round}

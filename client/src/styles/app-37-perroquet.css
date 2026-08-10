@@ -1613,16 +1613,36 @@ span.pq-clip-av.ph {
   font-size: 0.73rem;
   color: var(--pq-dim);
 }
-/* Pendant la pause entre deux voix, la même ligne dit qu'on attend EXPRÈS. Sans
-   ça, deux secondes de silence passent pour une lecture en panne — et quelqu'un
-   reclique sur une ligne au milieu de la discussion. */
+/* Pendant la pause entre deux voix, la ligne d'aide devient le BOUTON qui
+   l'abrège. Deux raisons de le mettre là plutôt qu'ailleurs : c'est là que l'œil
+   est déjà (on vient de lire le classement juste au-dessus), et une ligne muette
+   pendant cinq secondes passerait pour une lecture en panne — quelqu'un
+   recliquerait sur une ligne au milieu de la discussion.
+
+   Assez grand pour un pouce : c'est le geste le plus fréquent de la phase. */
 .pq-pick-hint.waiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border: 1px dashed var(--orange);
+  border-radius: 999px;
+  background: var(--pq-warm-soft);
   color: var(--pq-warm-ink);
+  font-size: 0.76rem;
   font-weight: 600;
-  animation: pq-hint-breathe 2s ease-in-out infinite;
+  animation: pq-hint-breathe 2.4s ease-in-out infinite;
+  transition: transform 0.15s ease, border-style 0.15s ease;
+}
+.pq-pick-hint.waiting b { font-weight: 800; }
+.pq-pick-hint.waiting:hover {
+  border-style: solid;
+  transform: translateY(-1px);
+  animation: none;
+  opacity: 1;
 }
 @keyframes pq-hint-breathe {
-  0%, 100% { opacity: 0.55; }
+  0%, 100% { opacity: 0.72; }
   50% { opacity: 1; }
 }
 
