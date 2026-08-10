@@ -505,16 +505,17 @@ function RoundResult({ result, onNext, last, busy, user }) {
   // on entendrait sa vraie voix, et l'effet n'arriverait qu'en réécoutant.
   const effect = result.clip?.effect || "none";
   const attempts = useMemo(() => [result.attemptUrl], [result.attemptUrl]);
-  const { fx, ready } = useEffectedUrls(attempts, effect);
+  const { fx, spanOf, ready } = useEffectedUrls(attempts, effect);
   const myUrl = fx(result.attemptUrl);
+  const mySpan = spanOf(result.attemptUrl);
 
   const reel = useMemo(
     () =>
       [
         { id: "target", url: result.clip?.url },
-        { id: "me", url: myUrl },
+        { id: "me", url: myUrl, span: mySpan },
       ].filter((x) => x.url),
-    [result, myUrl]
+    [result, myUrl, mySpan]
   );
   const { current, progress, play } = useClipReel({
     items: reel,
@@ -593,7 +594,7 @@ function RoundResult({ result, onNext, last, busy, user }) {
         {result.attemptUrl && (
           <button
             className={`pq-clip clickable k-attempt ${current === "me" ? "on" : ""}`}
-            onClick={() => play("me", myUrl)}
+            onClick={() => play("me", myUrl, mySpan)}
           >
             {user?.avatar ? (
               <img className="pq-clip-av" src={user.avatar} alt="" loading="lazy" />

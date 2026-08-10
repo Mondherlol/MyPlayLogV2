@@ -6,6 +6,7 @@ import {
   Download,
   Eye,
   EyeOff,
+  ImageDown,
   ImagePlus,
   Layers,
   Loader2,
@@ -205,6 +206,30 @@ function BankPanel({ token }) {
     }
   }
 
+  // La reprise des illustrations déjà en base. La réduction et la
+  // déduplication s'appliquent à l'envoi (server/src/lib/clipImage.js) : sans ce
+  // bouton, tout ce qui a été déposé avant garde ses captures de 3 Mo et ses
+  // copies du même fichier.
+  async function optimizeImages() {
+    setBusy("images");
+    try {
+      const d = await apiFetch("/admin/perroquet/optimize-images", {
+        method: "POST",
+        token,
+      });
+      await load();
+      setErr(
+        d.done
+          ? `${d.done} illustration(s) reprise(s) sur ${d.total} — ${d.freedKb} Ko libérés.`
+          : `Rien à reprendre : les ${d.total} illustrations sont déjà au format.`
+      );
+    } catch (e) {
+      setErr(e.message || "Optimisation impossible.");
+    } finally {
+      setBusy("");
+    }
+  }
+
   const c = data?.counts;
 
   return (
@@ -281,6 +306,19 @@ function BankPanel({ token }) {
               <RefreshCw size={14} />
             )}
             Remesurer les contours
+          </button>
+          <button
+            className="admin-btn clickable"
+            onClick={optimizeImages}
+            disabled={!!busy}
+            title="Réduire et dédoublonner les illustrations déjà en base"
+          >
+            {busy === "images" ? (
+              <Loader2 size={14} className="spin" />
+            ) : (
+              <ImageDown size={14} />
+            )}
+            Compresser les images
           </button>
         </div>
       </div>
@@ -486,15 +524,27 @@ function AddForm({ token, onAdded }) {
 
     let added = 0;
     const failed = [];
+    // L'IMAGE NE MONTE QU'UNE FOIS. Quinze extraits qui partagent la tête de
+    // Yoshi, c'était quinze fois les mêmes octets sur le réseau — et sur une
+    // capture d'écran de 3 Mo, l'envoi durait plus longtemps que tout le reste du
+    // travail. Dès qu'un son est accepté, le serveur nous rend l'URL de son
+    // image ; les suivants n'envoient plus que ce nom. Le serveur dédoublonne
+    // aussi de son côté (par empreinte du contenu, cf. lib/clipImage.js) : ici on
+    // économise le TRANSFERT, là-bas le DISQUE.
+    const uploaded = new Map(); // le File choisi -> l'URL rendue par le serveur
     for (const { cut, eff } of todo) {
+      const img = eff.image instanceof File ? eff.image : null;
+      const already = img ? uploaded.get(img) : null;
       try {
         const fd = new FormData();
         fd.append("clip", cut.blob, "extrait.wav");
         fd.append("label", eff.label.trim());
         fd.append("effect", eff.effect || "none");
-        if (eff.image instanceof File) fd.append("image", eff.image, eff.image.name);
+        if (already) fd.append("imageUrl", already);
+        else if (img) fd.append("image", img, img.name);
         // eslint-disable-next-line no-await-in-loop
-        await apiUpload("/admin/perroquet", fd, token);
+        const d = await apiUpload("/admin/perroquet", fd, token);
+        if (img && !already && d?.item?.image) uploaded.set(img, d.item.image);
         added += 1;
         setSent(added);
       } catch (e2) {

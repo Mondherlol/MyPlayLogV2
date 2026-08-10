@@ -69,7 +69,7 @@ const soundClipSchema = new mongoose.Schema(
     // même liste, mêmes rendus, une seule chose à maintenir.
     effect: {
       type: String,
-      enum: ["none", "duck", "deep", "robot", "mega"],
+      enum: ["none", "duck", "deep", "robot", "mega", "echo"],
       default: "none",
     },
 
@@ -111,7 +111,7 @@ soundClipSchema.index({ active: 1, difficulty: 1 });
 soundClipSchema.index({ owner: 1, createdAt: -1 });
 
 // Les effets acceptés, pour que les routes valident sans redéclarer la liste.
-export const EFFECTS = ["none", "duck", "deep", "robot", "mega"];
+export const EFFECTS = ["none", "duck", "deep", "robot", "mega", "echo"];
 export const cleanEffect = (v) => (EFFECTS.includes(String(v)) ? String(v) : "none");
 
 export default mongoose.model("SoundClip", soundClipSchema);

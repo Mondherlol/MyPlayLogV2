@@ -13,8 +13,27 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // au rythme du son (cf. components/ContourChart.jsx). Sans lui on entend un cri
 // pendant qu'un graphique fini reste immobile à côté, et rien ne relie les deux.
 //
+// CE QUE `span` CHANGE. Un extrait peut durer plus longtemps que ce qu'il a à
+// raconter : la voix passée à la cathédrale (lib/clipFx.js) continue de résonner
+// deux secondes et demie après le dernier mot. `span` (0..1) dit quelle fraction
+// porte le propos, et il sert à deux choses :
+//
+//   1. L'AVANCEMENT s'y rapporte. Sinon la courbe se dessinerait à moitié
+//      vitesse, puis resterait finie pendant que la queue sonne.
+//   2. LA SÉQUENCE N'ATTEND PAS TOUTE LA QUEUE. Elle en laisse entendre `RING`,
+//      puis passe au suivant. Ce n'est pas un raffinement : la révélation d'un
+//      versus dure 18 secondes côté serveur (models/PerroquetVersus.js) et
+//      enchaîne jusqu'à six imitations. À 2,5 s de résonance chacune, la phase
+//      changeait avant qu'on ait entendu les meilleures — c'est-à-dire la fin du
+//      jeu télévisé, ce pour quoi tout le monde est là.
+//
 // Un clic reprend toujours la main : la séquence automatique ne doit jamais
 // empêcher de réécouter ce qu'on veut, quand on veut.
+
+// Ce qu'on laisse entendre de la résonance avant d'enchaîner. Assez pour que la
+// nef s'entende, assez peu pour que six imitations tiennent dans la phase.
+const RING_SEC = 0.7;
+
 export function useClipReel({ items, restartKey, gapMs = 420, onItem, enabled = true }) {
   const [current, setCurrent] = useState(null); // l'identifiant qui joue
   const [progress, setProgress] = useState(0);  // 0..1 dans l'extrait en cours
@@ -22,6 +41,7 @@ export function useClipReel({ items, restartKey, gapMs = 420, onItem, enabled = 
   const audioRef = useRef(null);
   const rafRef = useRef(0);
   const timerRef = useRef(null);
+  const spanRef = useRef(1); // la part « utile » de l'extrait en cours
   const itemsRef = useRef(items);
   const onItemRef = useRef(onItem);
   itemsRef.current = items;
@@ -34,7 +54,19 @@ export function useClipReel({ items, restartKey, gapMs = 420, onItem, enabled = 
     // sur certains webm produits par MediaRecorder : dans les deux cas on
     // n'affiche pas d'avancement plutôt qu'un chiffre faux.
     const d = a.duration;
-    if (Number.isFinite(d) && d > 0) setProgress(Math.min(1, a.currentTime / d));
+    const span = spanRef.current || 1;
+    if (Number.isFinite(d) && d > 0) {
+      setProgress(Math.min(1, a.currentTime / (d * span)));
+      // La queue de réverbération : on en laisse passer un peu, puis on coupe et
+      // on laisse la séquence continuer. `ended` est émis à la main plutôt que
+      // simulé par un saut de `currentTime` — un saut relancerait le décodeur et
+      // produirait un clic.
+      if (span < 0.98 && a.currentTime >= d * span + RING_SEC) {
+        a.pause();
+        a.dispatchEvent(new Event("ended"));
+        return;
+      }
+    }
     rafRef.current = requestAnimationFrame(track);
   }, []);
 
@@ -52,10 +84,11 @@ export function useClipReel({ items, restartKey, gapMs = 420, onItem, enabled = 
 
   // Rejouer un extrait précis, à la demande.
   const play = useCallback(
-    (id, url) => {
+    (id, url, span = 1) => {
       clearTimeout(timerRef.current);
       cancelAnimationFrame(rafRef.current);
       if (!url) return;
+      spanRef.current = span || 1;
       let a = audioRef.current;
       if (!a) {
         a = new Audio();
@@ -99,6 +132,7 @@ export function useClipReel({ items, restartKey, gapMs = 420, onItem, enabled = 
       }
       setCurrent(item.id);
       setProgress(0);
+      spanRef.current = item.span || 1;
       onItemRef.current?.(item.id);
       a.src = item.url;
       a.currentTime = 0;
@@ -113,9 +147,14 @@ export function useClipReel({ items, restartKey, gapMs = 420, onItem, enabled = 
 
     // Un silence entre deux extraits : collés, on ne sait plus où finit l'un et
     // où commence l'autre — et c'est précisément la comparaison qu'on veut.
+    //
+    // Sauf après une queue de réverbération : elle vient DÉJÀ de séparer les deux
+    // voix mieux qu'un blanc ne le ferait, et le blanc en plus coûte une demi-
+    // seconde par joueur — sur six, de quoi faire déborder la phase.
     const onEnd = () => {
       setProgress(1);
-      timerRef.current = setTimeout(next, gapMs);
+      const rang = (spanRef.current || 1) < 0.98;
+      timerRef.current = setTimeout(next, rang ? 80 : gapMs);
     };
     a.addEventListener("ended", onEnd);
     next();

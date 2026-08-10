@@ -728,12 +728,14 @@
 .fx-deep { --fx: #8b6cf0; --fx-ink: #6a49d8; }
 .fx-robot { --fx: #3fc9b5; --fx-ink: #1c8a7c; }
 .fx-mega { --fx: #f2734d; --fx-ink: #c24a22; }
+.fx-echo { --fx: #5b9bf0; --fx-ink: #2f6ec4; }
 @media (prefers-color-scheme: dark) {
   .fx-none { --fx-ink: #aeb6c8; }
   .fx-duck { --fx-ink: #f5cd6d; }
   .fx-deep { --fx-ink: #b9a3ff; }
   .fx-robot { --fx-ink: #7fe6d6; }
   .fx-mega { --fx-ink: #ff9f7d; }
+  .fx-echo { --fx-ink: #96c2ff; }
 }
 
 /* L'étiquette « voix de robot » de la révélation : elle explique pourquoi on

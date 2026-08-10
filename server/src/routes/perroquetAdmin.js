@@ -11,6 +11,12 @@ import PerroquetTake from "../models/PerroquetTake.js";
 import User from "../models/User.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { contourOf } from "../lib/soundContour.js";
+import {
+  dropClipImage,
+  isStoredClipImage,
+  knownClipImage,
+  storeClipImage,
+} from "../lib/clipImage.js";
 
 // ======================================================================
 //  La banque de sons du Perroquet — administration
@@ -243,10 +249,17 @@ router.post("/", upload, async (req, res) => {
       });
     }
 
+    // L'illustration : réduite et nommée par son contenu (lib/clipImage.js).
+    // `imageUrl` est l'autre chemin — celui du dépôt en lot, où les extraits
+    // suivants ne renvoient que le nom de l'image que le premier a téléversée.
+    let imgName = "";
+    if (imgFile) imgName = await storeClipImage(imgFile.path, IMG_DIR);
+    else if (req.body?.imageUrl) imgName = knownClipImage(req.body.imageUrl, IMG_DIR) || "";
+
     const clip = await SoundClip.create({
       label,
       url: `/uploads/perroquet/bank/${clipFile.filename}`,
-      image: imgFile ? `/uploads/perroquet/img/${imgFile.filename}` : "",
+      image: imgName ? `/uploads/perroquet/img/${imgName}` : "",
       contour,
       // L'effet de la révélation. Filtré par le modèle plutôt que cru sur
       // parole : c'est du multipart, donc du texte libre.
@@ -262,6 +275,76 @@ router.post("/", upload, async (req, res) => {
   }
 });
 
+
+// ============================================================
+//  POST /api/admin/perroquet/optimize-images — reprendre les illustrations
+// ============================================================
+// ⚠️ AVANT `/:id`, comme les autres routes nommées.
+//
+// La réduction et la déduplication (lib/clipImage.js) s'appliquent à l'envoi,
+// donc seulement aux sons déposés APRÈS. Une banque garnie avant gardait ses
+// captures d'écran de 3 Mo servies pour être affichées sur 72 px, et ses copies
+// octet pour octet de la même tête de personnage. Ce bouton refait le travail sur
+// l'existant.
+//
+// Idempotent par construction : une image déjà réduite ressort identique
+// (shrinkImage rend l'original quand le ré-encodage l'alourdirait), donc même
+// empreinte, donc même nom — la deuxième exécution ne touche à rien.
+router.post("/optimize-images", async (req, res) => {
+  try {
+    const rows = await SoundClip.find({ image: /^\/uploads\/perroquet\/img\// })
+      .select("image")
+      .lean();
+    let done = 0;
+    let freed = 0;
+    for (const c of rows) {
+      const name = path.basename(c.image);
+      const full = path.join(IMG_DIR, name);
+      // Fichier absent, ou déjà déplacé par un tour précédent de cette même
+      // boucle (plusieurs fiches partagent une image) : rien à faire.
+      // eslint-disable-next-line no-continue
+      if (!fs.existsSync(full)) continue;
+      // Déjà passée par la chaîne : on n'y touche PAS. Ré-encoder un JPEG déjà
+      // réduit le rend un peu plus petit et un peu plus abîmé — donc sous un
+      // nouveau nom — et la reprise dégraderait les images à chaque clic au lieu
+      // de ne rien faire (cf. lib/clipImage.js).
+      // eslint-disable-next-line no-await-in-loop, no-continue
+      if (await isStoredClipImage(name, IMG_DIR)) continue;
+
+      const before = fs.statSync(full).size;
+      // storeClipImage CONSOMME le fichier qu'on lui donne (il le déplace) : on
+      // travaille sur une copie, sinon un échec en cours de route laisserait la
+      // fiche sans illustration.
+      const tmp = path.join(IMG_DIR, `tmp-${Date.now()}-${Math.round(Math.random() * 1e6)}${path.extname(name)}`);
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await fs.promises.copyFile(full, tmp);
+        // eslint-disable-next-line no-await-in-loop
+        const out = await storeClipImage(tmp, IMG_DIR);
+        const url = `/uploads/perroquet/img/${out}`;
+        if (url !== c.image) {
+          // TOUTES les fiches qui pointaient sur l'ancienne, pas seulement
+          // celle-ci : c'est justement le cas des doublons qu'on vient de
+          // fusionner. Migrer une fiche à la fois laisserait les autres sur un
+          // fichier qu'on est en train d'effacer.
+          // eslint-disable-next-line no-await-in-loop
+          await SoundClip.updateMany({ image: c.image }, { image: url });
+          // eslint-disable-next-line no-await-in-loop
+          await dropClipImage(c.image, IMG_DIR);
+          freed += Math.max(0, before - fs.statSync(path.join(IMG_DIR, out)).size);
+          done += 1;
+        }
+      } catch (e) {
+        fs.promises.unlink(tmp).catch(() => {});
+        console.error("perroquet image optimize:", name, e.message);
+      }
+    }
+    res.json({ done, total: rows.length, freedKb: Math.round(freed / 1024) });
+  } catch (err) {
+    console.error("perroquet optimize images error:", err.message);
+    res.status(500).json({ error: "Optimisation impossible." });
+  }
+});
 
 // ============================================================
 //  POST /api/admin/perroquet/recompute — refaire tous les contours
@@ -671,9 +754,14 @@ router.patch("/:id", editUpload, async (req, res) => {
     // ferait qu'engraisser `uploads/` de fichiers que rien ne sert plus.
     const wantsRemove = req.body?.removeImage === "1" || req.body?.removeImage === true;
     if (req.file || wantsRemove) {
-      const old = clip.image ? fileOf({ url: clip.image }) : null;
-      clip.image = req.file ? `/uploads/perroquet/img/${req.file.filename}` : "";
-      if (old) fs.promises.unlink(old).catch(() => {});
+      const old = clip.image;
+      const name = req.file ? await storeClipImage(req.file.path, IMG_DIR) : "";
+      clip.image = name ? `/uploads/perroquet/img/${name}` : "";
+      // L'ancienne peut être PARTAGÉE avec d'autres sons depuis que les images
+      // sont dédoublonnées (lib/clipImage.js) : on ne l'efface que si plus
+      // personne ne l'affiche. Et si la nouvelle est la même (même contenu, donc
+      // même nom), il n'y a rien à effacer du tout.
+      if (old && old !== clip.image) await dropClipImage(old, IMG_DIR, clip._id);
     }
 
     await clip.save();
@@ -705,9 +793,12 @@ router.delete("/:id", async (req, res) => {
       });
     }
 
-    for (const f of [fileOf(clip), fileOf({ url: clip.image })]) {
-      if (f) fs.promises.unlink(f).catch(() => {});
-    }
+    const audio = fileOf(clip);
+    if (audio) fs.promises.unlink(audio).catch(() => {});
+    // L'image, elle, est peut-être celle de quatorze autres sons de la même
+    // fournée : c'est le prix de la déduplication, et l'oublier rendrait ces
+    // quatorze-là aveugles.
+    await dropClipImage(clip.image, IMG_DIR, clip._id);
     await clip.deleteOne();
     res.json({ ok: true });
   } catch (err) {

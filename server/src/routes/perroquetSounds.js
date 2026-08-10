@@ -10,6 +10,7 @@ import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { contourOf } from "../lib/soundContour.js";
 import { needsTranscode, toMp3 } from "../lib/audioConvert.js";
+import { dropClipImage, storeClipImage } from "../lib/clipImage.js";
 
 // ======================================================================
 //  La librairie de sons d'un joueur
@@ -331,11 +332,15 @@ router.post("/", upload, async (req, res) => {
       });
     }
 
+    // Réduite et nommée par son contenu, comme côté admin : la même tête de
+    // Pikachu déposée par trois joueurs ne fait qu'un fichier.
+    const imgName = imgFile ? await storeClipImage(imgFile.path, IMG_DIR) : "";
+
     const me = await User.findById(req.userId).select("username").lean();
     const clip = await SoundClip.create({
       label,
       url: `/uploads/perroquet/user/${clipName}`,
-      image: imgFile ? `/uploads/perroquet/img/${imgFile.filename}` : "",
+      image: imgName ? `/uploads/perroquet/img/${imgName}` : "",
       contour,
       effect: cleanEffect(req.body?.effect),
       active: true,
@@ -404,9 +409,9 @@ router.delete("/:id", async (req, res) => {
     if (clip.url?.startsWith("/uploads/perroquet/user/")) {
       fs.promises.unlink(path.join(USER_DIR, path.basename(clip.url))).catch(() => {});
     }
-    if (clip.image?.startsWith("/uploads/perroquet/img/")) {
-      fs.promises.unlink(path.join(IMG_DIR, path.basename(clip.image))).catch(() => {});
-    }
+    // Jamais sans vérifier : depuis la déduplication, cette image est peut-être
+    // aussi celle d'un autre son (le sien ou celui de quelqu'un d'autre).
+    await dropClipImage(clip.image, IMG_DIR, clip._id);
     await clip.deleteOne();
     res.json({ ok: true });
   } catch (err) {

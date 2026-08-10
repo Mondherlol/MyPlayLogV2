@@ -34,16 +34,23 @@ import { canApplyEffects, renderVoice } from "./voiceFx";
 // Borné et purgé du plus ancien : un objet-URL retient son blob en mémoire
 // jusqu'à révocation, et une partie de vingt manches en fabriquerait autant.
 const CACHE_MAX = 24;
-const cache = new Map(); // `${url}|${effet}` -> objet-URL
+// `${url}|${effet}` -> { url: objet-URL, span: part du rendu qui porte la voix }
+const cache = new Map();
 
-function remember(key, objUrl) {
-  cache.set(key, objUrl);
+function remember(key, entry) {
+  cache.set(key, entry);
   while (cache.size > CACHE_MAX) {
     const oldest = cache.keys().next().value;
-    URL.revokeObjectURL(cache.get(oldest));
+    URL.revokeObjectURL(cache.get(oldest).url);
     cache.delete(oldest);
   }
 }
+
+// Ce qu'on sait d'un enregistrement déguisé : où l'écouter, et sur quelle
+// fraction de sa durée la voix parle encore. `span` vaut 1 partout sauf pour la
+// cathédrale, dont la queue résonne après le dernier mot — et c'est cette
+// fraction qui permet à la courbe de suivre LA VOIX plutôt que la durée totale.
+const AS_IS = (url) => ({ url, span: 1 });
 
 /**
  * L'URL de `url` passée à l'effet, ou `url` elle-même si rien n'est à faire
@@ -52,22 +59,30 @@ function remember(key, objUrl) {
  * NE JETTE JAMAIS : un effet est un ornement. S'il échoue on entend la voix
  * telle quelle, ce qui est exactement ce qui se passait avant qu'il existe.
  */
-export async function effectedUrl(url, effectId) {
-  if (!url || !effectId || effectId === "none" || !canApplyEffects()) return url;
+export async function effectedClip(url, effectId) {
+  if (!url || !effectId || effectId === "none" || !canApplyEffects()) return AS_IS(url);
   const key = `${url}|${effectId}`;
   const known = cache.get(key);
   if (known) return known;
   try {
     const res = await fetch(url);
-    if (!res.ok) return url;
+    if (!res.ok) return AS_IS(url);
     const out = await renderVoice(await res.blob(), { effectId });
-    if (!out?.blob) return url;
-    const objUrl = URL.createObjectURL(out.blob);
-    remember(key, objUrl);
-    return objUrl;
+    if (!out?.blob) return AS_IS(url);
+    const entry = {
+      url: URL.createObjectURL(out.blob),
+      span: out.voiceRatio || 1,
+    };
+    remember(key, entry);
+    return entry;
   } catch {
-    return url;
+    return AS_IS(url);
   }
+}
+
+/** La même chose quand seule l'URL intéresse l'appelant (un bouton d'écoute). */
+export async function effectedUrl(url, effectId) {
+  return (await effectedClip(url, effectId)).url;
 }
 
 const NO_SWAP = new Map();
@@ -106,7 +121,7 @@ export function useEffectedUrls(urls, effectId) {
     let alive = true;
     setState({ map: NO_SWAP, ready: false });
     Promise.all(
-      listRef.current.map(async (u) => [u, await effectedUrl(u, effectId)])
+      listRef.current.map(async (u) => [u, await effectedClip(u, effectId)])
     ).then((pairs) => {
       if (alive) setState({ map: new Map(pairs), ready: true });
     });
@@ -116,7 +131,10 @@ export function useEffectedUrls(urls, effectId) {
   }, [key, effectId, active]);
 
   return {
-    fx: (u) => (u ? state.map.get(u) || u : u),
+    fx: (u) => (u ? state.map.get(u)?.url || u : u),
+    // La part de la lecture pendant laquelle la voix parle encore : à passer à
+    // la bande-son pour que la courbe ne se traîne pas pendant la réverbération.
+    spanOf: (u) => (u ? state.map.get(u)?.span || 1 : 1),
     ready: state.ready,
   };
 }

@@ -600,7 +600,7 @@ function Reveal({ round, byId, meId }) {
     () => (round.takes || []).map((t) => t.attemptUrl).filter(Boolean),
     [round.takes]
   );
-  const { fx, ready } = useEffectedUrls(urls, effect);
+  const { fx, spanOf, ready } = useEffectedUrls(urls, effect);
 
   const queue = useMemo(() => {
     const takes = (round.takes || []).filter((t) => t.attemptUrl);
@@ -608,7 +608,11 @@ function Reveal({ round, byId, meId }) {
     const worstFirst = [...takes].sort((a, b) => (b.rank || 99) - (a.rank || 99));
     return [
       { id: "target", url: round.clipUrl },
-      ...worstFirst.map((t) => ({ id: t.userId, url: fx(t.attemptUrl) })),
+      ...worstFirst.map((t) => ({
+        id: t.userId,
+        url: fx(t.attemptUrl),
+        span: spanOf(t.attemptUrl),
+      })),
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [round.takes, round.clipUrl, ready]);
@@ -681,7 +685,7 @@ function Reveal({ round, byId, meId }) {
               className={`pq-podium-row band-${t.band} ${mine ? "me" : ""} ${
                 t.userId === shownId ? "picked" : ""
               } ${t.userId === current ? "playing" : ""} clickable`}
-              onClick={() => play(t.userId, fx(t.attemptUrl))}
+              onClick={() => play(t.userId, fx(t.attemptUrl), spanOf(t.attemptUrl))}
             >
               <span className={`pq-podium-rank r${t.rank}`}>{t.rank}</span>
               {p && <Avatar p={p} />}

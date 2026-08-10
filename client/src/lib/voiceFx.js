@@ -42,6 +42,18 @@ export const VOICE_EFFECTS = [
   // quand on crie un cri de jeu vidéo, et le seul du lot qui rende une imitation
   // plus impressionnante au lieu de la déguiser.
   { id: "mega", label: "Mégaphone", icon: "mega", rate: 1, hint: "Saturée, poussée à fond" },
+  // Le seul effet qui RALLONGE le son : la queue de réverbération continue après
+  // la fin de la voix. D'où `tail`, les 2,6 s de rendu supplémentaires sans
+  // lesquelles l'écho serait coupé net au dernier mot — ce qui sonne comme un
+  // bug, pas comme une cathédrale.
+  {
+    id: "echo",
+    label: "Cathédrale",
+    icon: "church",
+    rate: 1,
+    tail: 2.6,
+    hint: "Un écho immense, comme dans une nef",
+  },
 ];
 
 // Une voix reste parfaitement intelligible à 16 kHz — et un message de cinq
@@ -61,6 +73,39 @@ function softClipCurve(points = 1024) {
     softCurve[i] = Math.tanh(x * 2.2);
   }
   return softCurve;
+}
+
+// La réponse impulsionnelle de la « cathédrale ».
+//
+// Une réverbération, c'est la somme de milliers d'échos rapprochés qui se
+// mélangent — pas trois répétitions espacées. On la fabrique donc comme telle :
+// du BRUIT qui décroît, passé au convolueur. Une ligne de délai avec réinjection
+// donnerait un « slap-back » de micro de karaoké, ce qui n'est pas du tout la
+// même chose (et on l'entend tout de suite).
+//
+// Trois détails font toute la crédibilité de la nef :
+//   - la MONTÉE : les premières réflexions arrivent progressivement, le temps que
+//     le son atteigne les murs. Un plateau immédiat sonne électronique.
+//   - la DÉCROISSANCE exponentielle, ~40 dB sur toute la longueur.
+//   - la QUEUE PLUS SOURDE que le début : la pierre absorbe les aigus à chaque
+//     rebond. C'est le passe-bas de la chaîne, plus bas que l'instinct ne le
+//     suggère, qui donne l'impression d'un volume immense plutôt que d'une salle
+//     de bain.
+function nefImpulse(ctx, seconds) {
+  const len = Math.max(1, Math.floor(ctx.sampleRate * seconds));
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  const rise = Math.max(1, Math.floor(ctx.sampleRate * 0.03));
+  for (let i = 0; i < len; i += 1) {
+    const t = i / len;
+    const build = i < rise ? i / rise : 1;
+    // -5,2 : la queue tombe sous le plancher de silence de `trimTail` avant la
+    // fin de la réponse. Une décroissance plus lente serait encore audible au
+    // dernier échantillon, et l'écho se couperait net — le défaut qu'on entend
+    // immédiatement dans une fausse réverbération.
+    d[i] = (Math.random() * 2 - 1) * Math.exp(-5.2 * t) * build;
+  }
+  return buf;
 }
 
 function ctxClass() {
@@ -170,7 +215,10 @@ export async function renderVoice(blob, { effectId = "none", start = 0, end = 1 
   const span = Math.max(0.05, (Math.min(1, end) - Math.max(0, start))) * decoded.duration;
   const outSec = span / rate;
 
-  const length = Math.max(1, Math.ceil((outSec + TAIL_PAD) * FX_RATE));
+  // La queue de réverbération vit APRÈS la voix : sans cette rallonge, l'écho
+  // serait coupé au dernier mot. `trimTail` reprendra ce qui reste de silence,
+  // donc être généreux ici ne coûte rien.
+  const length = Math.max(1, Math.ceil((outSec + TAIL_PAD + (fx.tail || 0)) * FX_RATE));
   const ctx = new OfflineAudioContext(1, length, FX_RATE);
 
   const src = ctx.createBufferSource();
@@ -206,6 +254,43 @@ export async function renderVoice(blob, { effectId = "none", start = 0, end = 1 
     hp.connect(lp);
     lp.connect(out);
     out.connect(ctx.destination);
+  } else if (fx.id === "echo") {
+    // Voix directe + voix réverbérée, mélangées. Garder du direct est ce qui
+    // permet de comprendre encore ce qui a été crié : en tout-réverbéré, la nef
+    // avale l'imitation et on ne peut plus la comparer à l'original — or c'est
+    // toute la manche.
+    // La somme des deux voies peut dépasser le plein niveau — et l'écriture du
+    // WAV borne à ±1, donc ça ne « monte » pas, ça DISTORD. D'où un étage de
+    // mélange qui redescend l'ensemble : mesuré sur une convolution simulée, la
+    // crête passe de ~1,27 (donc écrêtée) à ~0,64.
+    const mix = ctx.createGain();
+    mix.gain.value = 0.62;
+    mix.connect(ctx.destination);
+
+    const dry = ctx.createGain();
+    dry.gain.value = 0.62;
+    src.connect(dry);
+    dry.connect(mix);
+
+    // Le pré-délai : le temps que le son aille jusqu'aux murs. 70 ms, c'est ce
+    // qui décolle l'écho de la voix au lieu de l'empâter.
+    const pre = ctx.createDelay(0.5);
+    pre.delayTime.value = 0.07;
+    const stone = ctx.createBiquadFilter();
+    stone.type = "lowpass";
+    stone.frequency.value = 2600;
+    const nef = ctx.createConvolver();
+    // `normalize` (actif par défaut) ramène le gain de la convolution à un niveau
+    // comparable au signal d'entrée : sans lui, le niveau dépendrait de la
+    // longueur de la réponse, et allonger la nef ferait saturer.
+    nef.buffer = nefImpulse(ctx, fx.tail || 2.6);
+    const wet = ctx.createGain();
+    wet.gain.value = 0.85;
+    src.connect(pre);
+    pre.connect(stone);
+    stone.connect(nef);
+    nef.connect(wet);
+    wet.connect(mix);
   } else if (fx.id === "robot") {
     // Modulation en anneau : on multiplie le signal par un oscillateur grave.
     // Le gain part de 0 et c'est l'oscillateur (qui va de -1 à +1) qui le pilote
@@ -251,5 +336,14 @@ export async function renderVoice(blob, { effectId = "none", start = 0, end = 1 
           return cut;
         })();
 
-  return { blob: toWav(out), duration: out.duration, mimeType: "audio/wav" };
+  // `voiceRatio` : quelle FRACTION du résultat porte encore la voix. Il vaut 1
+  // partout sauf pour la cathédrale, dont la queue continue de sonner après.
+  //
+  // Sans lui, l'écran du Perroquet redevenait faux : la courbe se dessine au
+  // rythme de la lecture (components/ContourChart.jsx), et une lecture deux fois
+  // plus longue que la voix faisait avancer le tracé à moitié vitesse, puis
+  // regarder la queue résonner sur une courbe déjà finie. C'est exactement le
+  // décalage qu'on avait corrigé.
+  const voiceRatio = out.duration > 0 ? Math.min(1, outSec / out.duration) : 1;
+  return { blob: toWav(out), duration: out.duration, voiceRatio, mimeType: "audio/wav" };
 }
