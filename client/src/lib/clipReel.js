@@ -27,6 +27,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 //      changeait avant qu'on ait entendu les meilleures — c'est-à-dire la fin du
 //      jeu télévisé, ce pour quoi tout le monde est là.
 //
+// CE QUE `gapMs` CHANGE. Le blanc entre deux extraits n'est pas qu'une politesse
+// de montage : dans la révélation à plusieurs, c'est LE temps de commenter la voix
+// qu'on vient d'entendre. Enchaînées à 400 ms, les six imitations défilaient sans
+// que personne puisse réagir — on regardait un carrousel au lieu de se moquer
+// gentiment les uns des autres, qui est le but du mode. `waiting` dit qu'on est
+// dans ce blanc, pour que l'écran l'assume au lieu d'avoir l'air en panne.
+//
 // Un clic reprend toujours la main : la séquence automatique ne doit jamais
 // empêcher de réécouter ce qu'on veut, quand on veut.
 
@@ -37,6 +44,10 @@ const RING_SEC = 0.7;
 export function useClipReel({ items, restartKey, gapMs = 420, onItem, enabled = true }) {
   const [current, setCurrent] = useState(null); // l'identifiant qui joue
   const [progress, setProgress] = useState(0);  // 0..1 dans l'extrait en cours
+  // Vrai pendant le blanc entre deux extraits. Sur un `gapMs` de deux secondes —
+  // la pause pour commenter la voix qu'on vient d'entendre — l'écran doit dire
+  // qu'il attend exprès, sinon on croit que la lecture a planté.
+  const [waiting, setWaiting] = useState(false);
 
   const audioRef = useRef(null);
   const rafRef = useRef(0);
@@ -80,6 +91,7 @@ export function useClipReel({ items, restartKey, gapMs = 420, onItem, enabled = 
     }
     setCurrent(null);
     setProgress(0);
+    setWaiting(false);
   }, []);
 
   // Rejouer un extrait précis, à la demande.
@@ -99,6 +111,7 @@ export function useClipReel({ items, restartKey, gapMs = 420, onItem, enabled = 
       a.currentTime = 0;
       setCurrent(id);
       setProgress(0);
+      setWaiting(false);
       onItemRef.current?.(id);
       a.play().catch(() => {});
       rafRef.current = requestAnimationFrame(track);
@@ -132,6 +145,7 @@ export function useClipReel({ items, restartKey, gapMs = 420, onItem, enabled = 
       }
       setCurrent(item.id);
       setProgress(0);
+      setWaiting(false);
       spanRef.current = item.span || 1;
       onItemRef.current?.(item.id);
       a.src = item.url;
@@ -154,7 +168,13 @@ export function useClipReel({ items, restartKey, gapMs = 420, onItem, enabled = 
     const onEnd = () => {
       setProgress(1);
       const rang = (spanRef.current || 1) < 0.98;
-      timerRef.current = setTimeout(next, rang ? 80 : gapMs);
+      // Après une queue de réverbération, on retire de la pause le temps que la
+      // queue a déjà pris : elle sépare les voix, mais elle ne se DISCUTE pas —
+      // on ne parle pas par-dessus. Le rythme reste donc le même d'une manche à
+      // l'autre, avec ou sans effet.
+      const wait = rang ? Math.max(300, gapMs - Math.round(RING_SEC * 1000)) : gapMs;
+      setWaiting(wait > 400 && i < list.length);
+      timerRef.current = setTimeout(next, wait);
     };
     a.addEventListener("ended", onEnd);
     next();
@@ -179,5 +199,5 @@ export function useClipReel({ items, restartKey, gapMs = 420, onItem, enabled = 
     []
   );
 
-  return { current, progress, play, stop };
+  return { current, progress, waiting, play, stop };
 }

@@ -39,7 +39,17 @@ export const MAX_PLAYERS = 6;
 // qu'un solo avec un tableau à la fin.
 export const LISTEN_SEC = 5;  // on écoute le son, micro fermé
 export const RECORD_SEC = 12; // la fenêtre d'enregistrement, commune à tous
-export const REVEAL_SEC = 18; // on réécoute tout le monde — LE moment du jeu
+// LE moment du jeu : on réécoute tout le monde. Passé de 18 à 32 secondes le
+// jour où une PAUSE a été posée entre chaque voix (client/src/pages/
+// PerroquetVersus.jsx) — sans elle, les six imitations s'enchaînaient sans
+// respiration et personne n'avait le temps de commenter celle qu'il venait
+// d'entendre, ce qui est pourtant tout ce qu'on vient faire ici.
+//
+// Une phase longue n'est acceptable que parce que la table peut l'ABRÉGER : le
+// vote « passer à la suite » (POST /:code/next) enchaîne dès que tout le monde a
+// fini. Les deux vont ensemble ; allonger sans le vote, ce serait imposer un
+// temps mort à ceux qui ont déjà tout entendu.
+export const REVEAL_SEC = 32;
 
 const takeSchema = new mongoose.Schema(
   {

@@ -1613,6 +1613,19 @@ span.pq-clip-av.ph {
   font-size: 0.73rem;
   color: var(--pq-dim);
 }
+/* Pendant la pause entre deux voix, la même ligne dit qu'on attend EXPRÈS. Sans
+   ça, deux secondes de silence passent pour une lecture en panne — et quelqu'un
+   reclique sur une ligne au milieu de la discussion. */
+.pq-pick-hint.waiting {
+  color: var(--pq-warm-ink);
+  font-weight: 600;
+  animation: pq-hint-breathe 2s ease-in-out infinite;
+}
+@keyframes pq-hint-breathe {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
 
 /* ---------- Le tableau final ---------- */
 .pq-final {

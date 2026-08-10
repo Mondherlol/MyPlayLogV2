@@ -641,10 +641,14 @@ function Reveal({ round, byId, meId, players = [], onNext, voting }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [round.takes, round.clipUrl, ready]);
 
-  const { current, progress, play } = useClipReel({
+  const { current, progress, waiting, play } = useClipReel({
     items: queue,
     restartKey: round.index,
     enabled: ready,
+    // Deux secondes entre chaque voix : le temps de rire, de dire « n'importe
+    // quoi » et de se retourner vers le suivant. C'est la raison d'être de cette
+    // phase — l'enchaînement serré la transformait en carrousel.
+    gapMs: 2000,
     onItem: (id) => {
       // Le grand graphique suit la lecture. Les regarder se désynchroniser
       // serait pire que pas de graphique du tout.
@@ -740,7 +744,11 @@ function Reveal({ round, byId, meId, players = [], onNext, voting }) {
         })}
       </ol>
 
-      <p className="pq-pick-hint">Du dernier au premier · touche une ligne pour la rejouer</p>
+      <p className={`pq-pick-hint ${waiting ? "waiting" : ""}`}>
+        {waiting
+          ? "On en parle… la voix suivante arrive"
+          : "Du dernier au premier · touche une ligne pour la rejouer"}
+      </p>
 
       <NextVote
         round={round}
