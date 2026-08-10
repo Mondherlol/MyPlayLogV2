@@ -17,6 +17,7 @@ import {
   knownClipImage,
   storeClipImage,
 } from "../lib/clipImage.js";
+import { boostAudio, peakDb } from "../lib/audioConvert.js";
 
 // ======================================================================
 //  La banque de sons du Perroquet — administration
@@ -148,6 +149,9 @@ const serialize = (req, c) => ({
   owner: c.owner ? c.ownerName || "un joueur" : "",
   durationMs: c.contour?.durationMs || 0,
   voicedRatio: c.contour?.voicedRatio || 0,
+  // Le pic du fichier, en dBFS. Mesuré une fois et rangé avec le contour : le
+  // relever à chaque affichage de la liste voudrait dire un ffmpeg par ligne.
+  peakDb: c.contour?.peakDb ?? null,
   timesPlayed: c.timesPlayed || 0,
   // La moyenne des scores obtenus : le seul signal de terrain qui dise si un
   // son est imitable. Un clip que personne ne dépasse 30 est mal découpé ou pas
@@ -277,6 +281,52 @@ router.post("/", upload, async (req, res) => {
 
 
 // ============================================================
+//  POST /api/admin/perroquet/:id/boost — monter le niveau
+// ============================================================
+// Les sons déposés par les joueurs sortent d'un micro de téléphone à deux
+// mètres : ils plafonnent couramment vingt décibels sous les sons officiels. En
+// partie, on n'entend pas ce qu'on doit imiter — et monter le volume du système
+// fait exploser le clip suivant.
+//
+// Le fichier est réécrit sur place, à pic constant (-1 dBFS), sans changer de nom
+// (cf. lib/audioConvert.js : renommer casserait les récaps de l'historique). Le
+// CONTOUR est ensuite remesuré, et ce n'est pas superflu : le réencodage déplace
+// une poignée de trames à la marge du voisement. Le barème, lui, ne bouge pas —
+// il est insensible au niveau par construction.
+router.post("/:id/boost", async (req, res) => {
+  try {
+    const clip = await SoundClip.findById(req.params.id);
+    if (!clip) return res.status(404).json({ error: "Son introuvable." });
+    const file = fileOf(clip);
+    if (!file || !fs.existsSync(file))
+      return res.status(404).json({ error: "Fichier absent du disque." });
+
+    const out = await boostAudio(file);
+    if (!out.applied) {
+      return res.json({
+        item: serialize(req, clip),
+        applied: false,
+        before: out.before,
+      });
+    }
+
+    // Le fichier a changé : sa mesure doit changer avec lui.
+    const contour = await contourOf(file);
+    clip.contour = { ...contour, peakDb: await peakDb(file) };
+    await clip.save();
+    res.json({
+      item: serialize(req, clip),
+      applied: true,
+      before: out.before,
+      gainDb: Math.round(out.gainDb * 10) / 10,
+    });
+  } catch (err) {
+    console.error("perroquet boost error:", err.message);
+    res.status(422).json({ error: "Impossible de monter le niveau de ce son." });
+  }
+});
+
+// ============================================================
 //  POST /api/admin/perroquet/optimize-images — reprendre les illustrations
 // ============================================================
 // ⚠️ AVANT `/:id`, comme les autres routes nommées.
@@ -372,6 +422,10 @@ router.post("/recompute", async (req, res) => {
       try {
         // eslint-disable-next-line no-await-in-loop
         const contour = await contourOf(file);
+        // Le pic est relevé ici et pas à l'affichage : c'est le seul endroit qui
+        // paie déjà un ffmpeg par son.
+        // eslint-disable-next-line no-await-in-loop
+        contour.peakDb = await peakDb(file);
         // eslint-disable-next-line no-await-in-loop
         await SoundClip.updateOne({ _id: c._id }, { contour });
         done += 1;

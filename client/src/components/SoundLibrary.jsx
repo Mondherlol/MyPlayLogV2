@@ -11,6 +11,7 @@ import {
   Scissors,
   Trash2,
   Upload,
+  Volume2,
   X,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
@@ -137,6 +138,33 @@ export default function SoundLibrary({ token, onClose, onChanged }) {
     }
   }
 
+  // Monter le niveau d'un son enregistré trop loin du micro. Sans ça, il faut
+  // refaire tout le dépôt pour un problème qui se règle en un clic — et un son
+  // qu'on n'entend pas est un son qui ne sortira jamais en partie.
+  async function boost(item) {
+    setBusy(item.id);
+    try {
+      const d = await apiFetch(`/perroquet/sounds/${item.id}/boost`, {
+        method: "POST",
+        token,
+      });
+      setData((s) => ({
+        ...s,
+        items: s.items.map((x) => (x.id === item.id ? d.item : x)),
+      }));
+      setErr(
+        d.applied
+          ? `« ${item.label} » monté de +${d.gainDb} dB : il s'entendra en partie.`
+          : `« ${item.label} » est déjà au bon niveau.`
+      );
+      onChanged?.();
+    } catch (e) {
+      setErr(e.message || "Impossible de monter le niveau.");
+    } finally {
+      setBusy("");
+    }
+  }
+
   const full = data && data.items.length >= data.max;
 
   return createPortal(
@@ -248,6 +276,7 @@ export default function SoundLibrary({ token, onClose, onChanged }) {
                   busy={busy === it.id}
                   onToggle={() => toggle(it)}
                   onDelete={() => remove(it)}
+                  onBoost={() => boost(it)}
                 />
               ))}
             </ul>
@@ -400,7 +429,11 @@ function DraftForm({ draft, token, onCancel, onRecut, onDone }) {
 // ============================================================
 //  Une ligne de la librairie
 // ============================================================
-function LibRow({ item, busy, onToggle, onDelete }) {
+function LibRow({ item, busy, onToggle, onDelete, onBoost }) {
+  // Un pic à plus de 6 dB sous le plein niveau s'entend mal en partie : le
+  // bouton se met en avant tout seul dans ce cas, sinon on ne saurait pas qu'il
+  // y a quelque chose à corriger.
+  const quiet = item.peakDb != null && item.peakDb < -6;
   const audioRef = useRef(null);
   return (
     <li className={`pq-lib-row ${item.active ? "" : "off"}`}>
@@ -421,6 +454,7 @@ function LibRow({ item, busy, onToggle, onDelete }) {
         <FxTag id={item.effect} />
         <span className="pq-lib-meta">
           {(item.durationMs / 1000).toFixed(1)} s
+          {quiet && <i className="pq-lib-quiet"> · trop faible</i>}
           {item.timesPlayed > 0 && ` · joué ${item.timesPlayed}× (moy. ${item.avgScore})`}
         </span>
       </span>
@@ -432,6 +466,15 @@ function LibRow({ item, busy, onToggle, onDelete }) {
       >
         {busy ? <Loader2 size={13} className="spin" /> : <Check size={13} />}
         {item.active ? "dans le tirage" : "en pause"}
+      </button>
+      <button
+        className={`pq-lib-del clickable ${quiet ? "up" : ""}`}
+        onClick={onBoost}
+        disabled={busy}
+        title={quiet ? "Trop faible : monter le son" : "Monter le son"}
+        aria-label="Monter le son"
+      >
+        <Volume2 size={14} />
       </button>
       <button
         className="pq-lib-del clickable"

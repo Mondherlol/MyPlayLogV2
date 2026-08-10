@@ -2386,6 +2386,25 @@ span.pq-clip-av.ph {
   font-size: 0.88rem;
 }
 .pq-admin-in:focus { outline: none; border-color: var(--orange); }
+/* ---------- Un son trop faible ----------
+   Le bouton « monter le son » et la mention du niveau. Ils ne s'allument que
+   quand il y a quelque chose à corriger : un bouton toujours en alerte cesse
+   d'être une alerte. */
+.admin-btn.icon.warn {
+  border-color: var(--orange);
+  color: var(--accent-ink, var(--orange));
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
+}
+.pq-lib-quiet {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--accent-ink, var(--orange));
+}
+.pq-lib-del.up {
+  border-color: var(--orange);
+  color: var(--accent-ink, var(--orange));
+}
+
 /* ---------- La fiche commune à tous les extraits ----------
    Encadrée et titrée : sans cadre, on lit « un formulaire de plus » et on la
    remplit en croyant décrire le premier extrait. C'est le seul bloc de l'écran

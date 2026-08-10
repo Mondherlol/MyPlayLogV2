@@ -9,7 +9,7 @@ import PerroquetGame from "../models/PerroquetGame.js";
 import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { contourOf } from "../lib/soundContour.js";
-import { needsTranscode, toMp3 } from "../lib/audioConvert.js";
+import { boostAudio, needsTranscode, peakDb, toMp3 } from "../lib/audioConvert.js";
 import { dropClipImage, storeClipImage } from "../lib/clipImage.js";
 
 // ======================================================================
@@ -147,6 +147,7 @@ const serialize = (req, c) => ({
   active: c.active,
   effect: c.effect || "none",
   durationMs: c.contour?.durationMs || 0,
+  peakDb: c.contour?.peakDb ?? null,
   timesPlayed: c.timesPlayed || 0,
   avgScore: c.timesPlayed ? Math.round(c.scoreSum / c.timesPlayed) : null,
   createdAt: c.createdAt,
@@ -336,6 +337,10 @@ router.post("/", upload, async (req, res) => {
     // Pikachu déposée par trois joueurs ne fait qu'un fichier.
     const imgName = imgFile ? await storeClipImage(imgFile.path, IMG_DIR) : "";
 
+    // Le niveau du dépôt, relevé une fois : c'est lui qui fait apparaître le
+    // bouton « monter le son » sur les enregistrements trop faibles.
+    contour.peakDb = await peakDb(clipPath);
+
     const me = await User.findById(req.userId).select("username").lean();
     const clip = await SoundClip.create({
       label,
@@ -353,6 +358,43 @@ router.post("/", upload, async (req, res) => {
     cleanup();
     console.error("perroquet library add error:", err.message);
     res.status(500).json({ error: "Impossible d'ajouter ce son." });
+  }
+});
+
+// ============================================================
+//  POST /:id/boost — monter le niveau de MON son
+// ============================================================
+// Le même geste que côté admin, pour ses propres sons : un cri enregistré de
+// loin est inaudible en partie, et personne ne devrait avoir à redéposer le
+// fichier pour ça. Le fichier est réécrit à -1 dBFS sans changer de nom, et son
+// contour remesuré (cf. lib/audioConvert.js).
+router.post("/:id/boost", async (req, res) => {
+  try {
+    const clip = await SoundClip.findOne({ _id: req.params.id, owner: req.userId });
+    if (!clip) return res.status(404).json({ error: "Son introuvable." });
+    if (!clip.url?.startsWith("/uploads/perroquet/user/"))
+      return res.status(409).json({ error: "Ce son ne t'appartient pas." });
+
+    const file = path.join(USER_DIR, path.basename(clip.url));
+    if (!fs.existsSync(file))
+      return res.status(404).json({ error: "Fichier absent du disque." });
+
+    const out = await boostAudio(file);
+    if (!out.applied)
+      return res.json({ item: serialize(req, clip), applied: false, before: out.before });
+
+    const contour = await contourOf(file);
+    clip.contour = { ...contour, peakDb: await peakDb(file) };
+    await clip.save();
+    res.json({
+      item: serialize(req, clip),
+      applied: true,
+      before: out.before,
+      gainDb: Math.round(out.gainDb * 10) / 10,
+    });
+  } catch (err) {
+    console.error("perroquet sound boost error:", err.message);
+    res.status(422).json({ error: "Impossible de monter le niveau de ce son." });
   }
 });
 

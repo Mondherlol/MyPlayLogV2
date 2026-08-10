@@ -30,6 +30,11 @@ const contourSchema = new mongoose.Schema(
     voiced: { type: [Number], default: [] },
     durationMs: { type: Number, default: 0 },
     voicedRatio: { type: Number, default: 0 },
+    // Le pic du fichier en dBFS (0 = plein niveau, -19 = beaucoup trop faible).
+    // Rangé avec le contour parce qu'il se mesure au même moment, et il sert à
+    // repérer d'un coup d'œil les sons inaudibles dans le panneau d'admin.
+    // `null` pour les clips mesurés avant son existence.
+    peakDb: { type: Number, default: null },
   },
   { _id: false }
 );

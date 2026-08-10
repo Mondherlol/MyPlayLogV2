@@ -22,6 +22,7 @@ import {
   Trash2,
   Upload,
   Users,
+  Volume2,
   X,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
@@ -164,6 +165,30 @@ function BankPanel({ token }) {
       // parties muettes ; on relaie la raison plutôt qu'un « échec » sec, et on
       // propose le geste qu'il faut faire à la place.
       setErr(e.message || "Suppression impossible.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  // Monter le niveau d'un son trop faible. Le serveur réécrit le fichier à
+  // -1 dBFS et remesure son contour (server/src/lib/audioConvert.js) ; on relaie
+  // ce qu'il a fait, parce que « +18 dB » est la seule façon de savoir que le
+  // clic a servi — le bouton ne change rien à l'écran.
+  async function boost(item) {
+    setBusy(item.id);
+    try {
+      const d = await apiFetch(`/admin/perroquet/${item.id}/boost`, {
+        method: "POST",
+        token,
+      });
+      replace(d.item);
+      setErr(
+        d.applied
+          ? `« ${item.label} » monté de +${d.gainDb} dB (le pic passait de ${d.before} à -1 dB).`
+          : `« ${item.label} » est déjà au niveau (pic ${d.before} dB).`
+      );
+    } catch (e) {
+      setErr(e.message || "Impossible de monter le niveau.");
     } finally {
       setBusy("");
     }
@@ -343,6 +368,7 @@ function BankPanel({ token }) {
               player={player}
               onToggle={() => patch(it, { active: !it.active })}
               onDelete={() => remove(it)}
+              onBoost={() => boost(it)}
               onSaved={replace}
             />
           ))}
@@ -832,13 +858,17 @@ function IdCard({ image, onImage, label, onLabel, autoFocus = false }) {
 // ============================================================
 //  Une ligne de la banque
 // ============================================================
-function ClipRow({ item, token, busy, player, onToggle, onDelete, onSaved }) {
+function ClipRow({ item, token, busy, player, onToggle, onDelete, onBoost, onSaved }) {
   const [editing, setEditing] = useState(false);
   const playing = player.url === item.url;
 
   // Sous 40 %, le son n'a pas grand-chose à imiter : accepté à l'envoi mais
   // signalé ici, parce qu'il donnera des scores erratiques.
   const thin = item.voicedRatio < 0.4;
+  // Un pic à plus de 6 dB sous le plein niveau s'entend mal en partie, surtout
+  // sur un téléphone. C'est le cas courant des dépôts de joueurs, et ça ne se
+  // voit pas dans une liste : d'où la mention, à côté du bouton qui la corrige.
+  const quiet = item.peakDb != null && item.peakDb < -6;
   // Une moyenne basse sur un nombre de parties significatif : les joueurs n'y
   // arrivent pas. Sous 10 parties, c'est du bruit statistique.
   const hard = item.timesPlayed >= 10 && item.avgScore != null && item.avgScore < 30;
@@ -870,6 +900,12 @@ function ClipRow({ item, token, busy, player, onToggle, onDelete, onSaved }) {
           <span className="pq-admin-meta">
             {(item.durationMs / 1000).toFixed(1)} s ·{" "}
             <i className={thin ? "warn" : ""}>{Math.round(item.voicedRatio * 100)} % mélodique</i>
+            {item.peakDb != null && (
+              <>
+                {" · "}
+                <i className={quiet ? "warn" : ""}>{Math.round(item.peakDb)} dB</i>
+              </>
+            )}
             {item.timesPlayed > 0 && (
               <>
                 {" "}
@@ -895,6 +931,18 @@ function ClipRow({ item, token, busy, player, onToggle, onDelete, onSaved }) {
             title="Télécharger le fichier"
           >
             <Download size={14} />
+          </button>
+          <button
+            className={`admin-btn icon clickable ${quiet ? "warn" : ""}`}
+            onClick={onBoost}
+            disabled={busy}
+            title={
+              quiet
+                ? `Trop faible (${Math.round(item.peakDb)} dB) : monter le niveau`
+                : "Monter le niveau du fichier"
+            }
+          >
+            {busy ? <Loader2 size={14} className="spin" /> : <Volume2 size={14} />}
           </button>
           <button
             className={`admin-btn icon clickable ${editing ? "on" : ""}`}
