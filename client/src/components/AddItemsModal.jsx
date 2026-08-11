@@ -307,6 +307,9 @@ function CharsOfGame({ game, token, existing, onToggle, onBack }) {
   const [chars, setChars] = useState([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
+  // La galerie de personnages est partagée : seul le staff peut l'enrichir.
+  const { user } = useAuth();
+  const canEdit = !!user?.isStaff;
 
   useEffect(() => {
     let alive = true;
@@ -337,7 +340,9 @@ function CharsOfGame({ game, token, existing, onToggle, onBack }) {
         <>
           {chars.length === 0 && (
             <p className="additems-hint font-fun" style={{ padding: "1rem 0" }}>
-              Aucun personnage connu pour ce jeu — ajoute le tien&nbsp;!
+              {canEdit
+                ? "Aucun personnage connu pour ce jeu — ajoute le tien !"
+                : "Aucun personnage connu pour ce jeu."}
             </p>
           )}
           <div className="additems-grid chars">
@@ -361,13 +366,15 @@ function CharsOfGame({ game, token, existing, onToggle, onBack }) {
                 />
               );
             })}
-            {/* Ajouter mon propre personnage */}
-            <button className="pick-card char add clickable" onClick={() => setAdding(true)}>
-              <div className="pick-cover char add">
-                <UserPlus size={22} />
-              </div>
-              <span className="pick-name">Ajouter</span>
-            </button>
+            {/* Ajouter un personnage (staff uniquement) */}
+            {canEdit && (
+              <button className="pick-card char add clickable" onClick={() => setAdding(true)}>
+                <div className="pick-cover char add">
+                  <UserPlus size={22} />
+                </div>
+                <span className="pick-name">Ajouter</span>
+              </button>
+            )}
           </div>
         </>
       )}

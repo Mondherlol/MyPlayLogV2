@@ -30,8 +30,9 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useChat } from "../context/ChatContext";
 import { usePlayer } from "../context/PlayerContext";
-import { apiFetch, API_BASE } from "../lib/api";
+import { apiFetch } from "../lib/api";
 import { useLiveStatus } from "../lib/presence";
+import { loadYT } from "../lib/youtube";
 import { dedupeCandidates, searchCandidates } from "../lib/guessGame";
 import { useGameSfx } from "../lib/useGameSfx";
 import { VersusFace, VersusRail, VersusInvite, HUES } from "../components/VersusRoom";
@@ -52,34 +53,34 @@ import { VersusFace, VersusRail, VersusInvite, HUES } from "../components/Versus
 //     fausse piste.
 //
 // ------------------------------------------------------------------ le son
-// LA GROSSE DIFFÉRENCE AVEC LE SOLO : pas de lecteur YouTube. Le solo charge la
-// vidéo, ce qui lui donne son titre — donc la réponse. Ici l'extrait arrive de
-// NOTRE serveur, en audio pur, sous une adresse qui ne dit rien.
+// EXACTEMENT LE MÊME MOTEUR QUE LE SOLO : une iframe YouTube cachée, pilotée
+// par l'API IFrame (lib/youtube.js).
 //
-// Il est LU EN FLUX, comme en solo. Il a longtemps été téléchargé en entier
-// avant de jouer la moindre note — plusieurs mégaoctets d'attente — pour une
-// raison qui n'avait rien de musical : son adresse exige un jeton, qu'une
-// balise <audio> ne sait pas mettre en en-tête. Le jeton passe désormais en
-// query (comme le flux SSE de la messagerie) et la balise fait son travail.
+// Ça n'a pas toujours été le cas. L'extrait passait par NOTRE serveur, en audio
+// pur, sous une adresse qui ne disait rien (/clip/:index) — pour que le videoId,
+// donc le titre, donc la réponse, ne parte jamais au navigateur. C'était plus
+// propre sur le papier et intenable en pratique : ce chemin repose sur yt-dlp,
+// et depuis l'IP d'un datacenter YouTube le bloque en permanence. En prod, toute
+// piste absente du cache disque renvoyait 502 et LA MANCHE PARTAIT MUETTE —
+// pendant que le solo, sur la même piste, retombait sur cette iframe et jouait
+// très bien. Un mode inviolable et silencieux ne vaut pas un mode jouable.
 //
-// Ce qu'on voulait vraiment du sas — que personne n'attende son propre tampon —
-// est obtenu autrement, et mieux : dès que la durée du morceau est connue, on
-// pose l'aiguille SUR LE CLIMAX pendant le décompte. Le navigateur remplit son
-// tampon à cet endroit précis, et au « go » il ne reste qu'un `play()`.
+// LE PIÈGE DE L'IFRAME, et comment le solo le contourne : une iframe d'un autre
+// domaine ne peut pas lancer de son toute seule. Elle le peut MUETTE, toujours.
+// On charge donc la vidéo en sourdine pendant le sas, on pose l'aiguille sur le
+// climax dès que la durée est connue, et au « go » il ne reste qu'à démasquer le
+// son et lancer — ce que le navigateur accepte parce que la page a déjà reçu un
+// clic (« Lancer la partie », « Je suis prêt »).
 const LIVES = 3;
 // Quatre paliers ici (le solo en a trois) : l'extrait dure plus longtemps et se
 // termine avec la manche, il y a la place pour un dernier indice — celui qui
 // dit QUI, à cette table, a ce jeu en bibliothèque.
 const HINT_FRACS = [0.2, 0.4, 0.6, 0.78];
-// Mini wav silencieux, joué en muet dans le geste d'entrée pour déverrouiller
-// la balise <audio> sur iOS (même technique que context/PlayerContext.jsx).
-// Délai au bout duquel on constate que la tête de lecture n'a pas bougé et
-// qu'on relance l'extrait. Court : au-delà, l'extrait est déjà bien entamé pour
-// les autres et le rattrapage ne sert plus à grand-chose.
-const WATCHDOG_MS = 2200;
-
-const SILENT_WAV =
-  "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+// Cadence de sondage de `getDuration()` : l'API IFrame ne prévient pas quand
+// elle connaît la durée, il faut la lui demander. Au-delà de PROBE_GIVEUP_MS on
+// renonce à viser le climax et on joue depuis le début plutôt que se taire.
+const PROBE_MS = 120;
+const PROBE_GIVEUP_MS = 8000;
 // Cadence d'envoi de « ce que je tape ». Assez serré pour qu'on voie les
 // lettres arriver, assez lâche pour ne pas poster à chaque touche.
 const TYPING_MS = 200;
@@ -128,32 +129,39 @@ export default function BlindTestVersus() {
   const inputRef = useRef(null);
   const suggestRef = useRef(null);
   const offsetRef = useRef(0);
-  const audioRef = useRef(null);
-  // La balise n'est PAS montée au premier rendu : le salon affiche d'abord son
-  // écran de chargement, sans lecteur. Une ref seule laissait donc les effets
-  // qui la câblent (écouteurs, source) tomber sur `null` une fois pour toutes —
-  // le son du mode multi ne partait jamais. On la suit donc dans un état, pour
-  // que ces effets rejouent à l'instant où elle apparaît.
-  const [audioEl, setAudioEl] = useState(null);
-  const setAudioNode = useCallback((el) => {
-    audioRef.current = el;
-    setAudioEl(el);
-  }, []);
   const mutedRef = useRef(false); // miroir de la sourdine (cf. le départ du son)
   const volumeRef = useRef(volume); // idem pour le volume
-  const unlockedRef = useRef(false); // déverrouillage iOS déjà fait
-  const retriedRef = useRef(null); // extrait déjà rechargé par le chien de garde
   const clipStartRef = useRef(0); // où l'extrait commence dans le morceau (s)
-  const roundRef = useRef(null); // la manche courante, lue par les écouteurs audio
-  const metaForRef = useRef(null); // clip dont la durée est connue
+  const roundRef = useRef(null); // la manche courante, lue par les sondages
   // « La manche est en cours, le son DOIT jouer. » C'est ce drapeau, et non un
-  // état React, que consultent les écouteurs audio : les métadonnées peuvent
-  // arriver AVANT comme APRÈS le « go », et dans les deux cas il faut partir.
+  // état React, que consulte le sondage de durée : le climax peut être trouvé
+  // AVANT comme APRÈS le « go », et dans les deux cas il faut partir.
   const wantAudioRef = useRef(false);
-  // Miroirs lus par le départ du son, qui ne doit dépendre QUE de l'extrait
-  // (voir le commentaire de l'effet de téléchargement).
+  // Miroirs lus par le départ du son, qui ne doit dépendre QUE de la manche.
   const phaseStartRef = useRef(0);
   const serverNowRef = useRef(() => Date.now());
+
+  // --- Le lecteur YouTube caché, propre à la page (cf. « le son ») ----------
+  // `ytHostRef` porte un <div> React ; l'API IFrame, elle, remplace le nœud
+  // qu'on lui donne — d'où le <div> JETABLE créé à la main dedans. Monter le
+  // lecteur SUR un nœud géré par React fait planter la page au démontage
+  // (React ne retrouve plus son enfant) : même piège qu'à la fiche de jeu.
+  // Le conteneur N'EXISTE PAS au premier rendu : la page renvoie d'abord son
+  // écran de chargement, puis éventuellement son écran d'erreur. Une ref seule
+  // laisserait l'effet de création tomber sur `null` une fois pour toutes — et
+  // le lecteur ne serait jamais monté. On suit donc le nœud dans un ÉTAT, pour
+  // que l'effet rejoue à l'instant où il apparaît. (C'est la panne qu'avait
+  // déjà la balise <audio> qu'il remplace.)
+  const ytHostRef = useRef(null);
+  const [ytHost, setYtHost] = useState(null);
+  const setYtHostNode = useCallback((el) => {
+    ytHostRef.current = el;
+    setYtHost(el);
+  }, []);
+  const ytRef = useRef(null);
+  const readyRef = useRef(false); // le lecteur a fini de s'initialiser
+  const probeRef = useRef(null); // sondage de getDuration() en cours
+  const cuedForRef = useRef(null); // videoId déjà chargé dans le lecteur
 
   // L'icône suit le niveau : coupé, faible, fort — on lit l'état sans lire le
   // curseur.
@@ -312,179 +320,179 @@ export default function BlindTestVersus() {
     });
   }, [subscribe, code, applyRoom, meId, sfx]);
 
-  // ---------- L'extrait ----------
-  // LU EN FLUX, exactement comme en solo. Il était auparavant TÉLÉCHARGÉ EN
-  // ENTIER (fetch → blob → objectURL) parce que son adresse exige un en-tête
-  // Authorization qu'une balise <audio> ne sait pas poser. C'était payer très
-  // cher un détail d'authentification : plusieurs mégaoctets à charger avant
-  // d'entendre la moindre note. Le jeton passe maintenant en query (comme le
-  // flux SSE de la messagerie) et la balise s'occupe du reste.
-  //
-  // Et c'est ce téléchargement qui tuait le son du mode multi : l'effet
-  // dépendait de `phase`, or `phase` passe de « cue » à « round » PENDANT le
-  // chargement — React nettoyait l'effet, `abort()` coupait le fetch, et un
-  // garde-fou anti-doublon empêchait de le relancer. Silence total, sans même
-  // un message. En flux, il n'y a plus rien à abandonner.
-  //
-  // LA RÈGLE QUI RESTE : cet effet ne dépend que de CE QU'IL CHARGE.
-  // `round.clip` porte déjà le code du salon et l'index de la manche, et il
-  // redevient `undefined` en repassant par le salon — ce qui recharge
-  // proprement une revanche pour TOUT LE MONDE, pas seulement pour l'hôte.
+  // ---------- L'extrait : le lecteur YouTube caché ----------
+  // Créé une seule fois, pour toute la partie. On lui donne un <div> jetable
+  // (voir `ytHostRef` plus haut) et on le détruit au démontage de la page.
   useEffect(() => {
-    const el = audioEl;
-    if (!el || !round?.clip) return undefined;
-    setClipReady(false);
-    setClipError(false);
-    setSoundBlocked(false);
-    metaForRef.current = null;
-    retriedRef.current = null;
-    clipStartRef.current = 0;
-    el.src = `${API_BASE}${round.clip}?token=${encodeURIComponent(token)}`;
-    el.load();
-    return undefined;
-  }, [audioEl, round?.clip, token]);
-
-  // ---------- Le départ du son, en un seul endroit ----------
-  // C'EST LA MÉCANIQUE DU SOLO, transposée. En solo, `play()` n'est PAS appelé
-  // par un effet de rendu : il est appelé par l'écouteur `loadedmetadata`, à
-  // l'instant exact où le morceau devient jouable. Ici le « go » vient du
-  // serveur, donc les deux moments (« c'est l'heure » et « le son est prêt »)
-  // sont indépendants et peuvent arriver dans n'importe quel ordre. La fonction
-  // ci-dessous est appelée par les DEUX, et par le chien de garde : le premier
-  // qui trouve la situation jouable lance, les autres ne font rien de mal.
-  //
-  // Deux pièges d'une version précédente, qui rendaient la manche muette sans
-  // le moindre message :
-  //   - le placement de l'aiguille et `play()` étaient dans le MÊME `try`. Tant
-  //     que la durée n'est pas connue, écrire `currentTime` peut lever — et on
-  //     partait dans le `catch` SANS avoir joué. Or c'est exactement le cas où
-  //     il faut jouer quand même, quitte à démarrer au début du morceau.
-  //   - le chien de garde renonçait sur `el.paused`, en croyant que ça voulait
-  //     dire « ça tourne ». C'est le contraire : en pause = rien ne sort. Il
-  //     abandonnait donc précisément dans le cas qu'il devait rattraper.
-  const rollClip = useCallback(() => {
-    const el = audioRef.current;
-    const r = roundRef.current;
-    if (!el || !r || !wantAudioRef.current || !el.src) return;
-
-    const clipLen = r.durationSec || 15;
-    // Retard éventuel (flux plus lent que le sas) : on prend l'extrait où il en
-    // serait, pas au début — les autres ont déjà entendu ces secondes-là.
-    const late = Math.max(0, (serverNowRef.current() - phaseStartRef.current) / 1000);
-    if (late >= clipLen) return; // extrait déjà fini : place au temps bonus
-
-    // L'aiguille D'ABORD, et surtout à part : son échec ne doit jamais empêcher
-    // la lecture. Sans métadonnées on ne sait pas où est le climax — on joue
-    // depuis le début plutôt que de se taire.
-    if (metaForRef.current === r.clip) {
-      const target = (clipStartRef.current || 0) + late;
+    if (!ytHost) return undefined;
+    let destroyed = false;
+    loadYT().then((YT) => {
+      if (destroyed || !ytHostRef.current) return;
+      const host = document.createElement("div");
+      ytHostRef.current.appendChild(host);
+      ytRef.current = new YT.Player(host, {
+        height: "0",
+        width: "0",
+        playerVars: {
+          autoplay: 0,
+          playsinline: 1,
+          controls: 0,
+          disablekb: 1,
+          fs: 0,
+          rel: 0,
+          modestbranding: 1,
+        },
+        events: {
+          onReady: () => {
+            readyRef.current = true;
+            // La manche a pu démarrer pendant que l'API se chargeait.
+            cueClipRef.current();
+          },
+          // Vidéo supprimée, bloquée dans le pays, lecture interdite hors
+          // YouTube : la manche se jouera sans son, mais on le DIT.
+          onError: () => setClipError(true),
+        },
+      });
+    });
+    return () => {
+      destroyed = true;
+      clearInterval(probeRef.current);
       try {
-        if (Math.abs((el.currentTime || 0) - target) > 0.35) el.currentTime = target;
-      } catch {
-        /* durée pas encore connue : tant pis pour le climax */
-      }
-    }
-
-    el.muted = mutedRef.current;
-    el.volume = volumeRef.current / 100;
-    try {
-      const p = el.play();
-      // Un refus de lecture n'est PAS avalé en silence : il allume le bouton
-      // « appuie pour lancer le son » (un vrai geste débloque toujours).
-      if (p?.then) p.then(() => setSoundBlocked(false), () => setSoundBlocked(true));
-    } catch {
-      setSoundBlocked(true);
-    }
-  }, []);
-
-  // Le tampon se remplit AU CLIMAX, pas au début du morceau : dès que la durée
-  // est connue, on pose l'aiguille là où l'extrait commencera. Au « go », il ne
-  // reste qu'un `play()` — personne n'attend son propre tampon.
-  useEffect(() => {
-    const el = audioEl;
-    if (!el) return undefined;
-
-    const onMeta = () => {
-      const r = roundRef.current;
-      if (!r) return;
-      const dur = el.duration;
-      // Durée inconnue (flux sans en-tête exploitable, conteneur dont l'index
-      // est en fin de fichier) : on ne sait pas placer l'aiguille au climax,
-      // mais ce n'est PAS une raison de se taire. On jouera depuis le début.
-      if (isFinite(dur) && dur > 0) {
-        const clip = r.durationSec || 15;
-        clipStartRef.current = Math.min(
-          (r.startFrac || 0.4) * dur,
-          Math.max(0, dur - clip - 1)
-        );
-      } else {
-        clipStartRef.current = 0;
-      }
-      metaForRef.current = r.clip;
-      try {
-        el.currentTime = clipStartRef.current;
+        ytRef.current?.destroy();
       } catch {
         /* ignore */
       }
-      // Le « go » est peut-être déjà passé pendant le chargement : c'est ICI
-      // qu'on rattrape, comme le solo lance sa manche depuis cet écouteur.
-      rollClip();
+      ytRef.current = null;
+      readyRef.current = false;
+      if (ytHostRef.current) ytHostRef.current.innerHTML = "";
     };
-    const onCanPlay = () => {
-      if (metaForRef.current === roundRef.current?.clip) setClipReady(true);
-      rollClip();
-    };
-    const onError = () => {
-      setClipReady(false);
+  }, [ytHost]);
+
+  // Le départ du son, à l'instant décidé par le serveur.
+  //
+  // Appelé par le sondage de durée ET par le passage en phase « round » : les
+  // deux peuvent arriver dans n'importe quel ordre, le premier qui trouve la
+  // situation jouable lance, l'autre ne fait rien de mal. `wantAudioRef` dit
+  // « la manche est en cours », `clipStartRef` où se trouve le climax.
+  const rollClip = useCallback(() => {
+    const p = ytRef.current;
+    const r = roundRef.current;
+    if (!p || !r || !wantAudioRef.current || !readyRef.current) return;
+
+    const clipLen = r.durationSec || 15;
+    // Retard éventuel (iframe plus lente que le sas) : on prend l'extrait où il
+    // en serait, pas au début — les autres ont déjà entendu ces secondes-là.
+    const late = Math.max(0, (serverNowRef.current() - phaseStartRef.current) / 1000);
+    if (late >= clipLen) return; // extrait déjà fini
+
+    try {
+      p.seekTo((clipStartRef.current || 0) + late, true);
+      // Démasquer le son : accepté parce que la page a déjà reçu un clic
+      // (« Lancer », « Je suis prêt »). Sans ce clic — un invité qui n'a fait
+      // qu'ouvrir le lien — ça reste muet, d'où le bouton de secours plus bas.
+      if (mutedRef.current) p.mute?.();
+      else {
+        p.unMute?.();
+        p.setVolume?.(volumeRef.current);
+      }
+      p.playVideo?.();
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  // Charge la vidéo de la manche, EN SOURDINE, et pose l'aiguille sur le
+  // climax. C'est tout l'intérêt du sas : au « go », il ne reste qu'à démasquer.
+  //
+  // L'API IFrame ne prévient pas quand elle connaît la durée — il faut la lui
+  // demander en boucle (`PROBE_MS`). Passé `PROBE_GIVEUP_MS` on renonce au
+  // climax et on jouera depuis le début : une manche qui commence au mauvais
+  // endroit vaut mieux qu'une manche muette.
+  const cueClip = useCallback(() => {
+    const p = ytRef.current;
+    const r = roundRef.current;
+    if (!p || !readyRef.current || !r?.videoId) return;
+    if (cuedForRef.current === r.videoId) return; // déjà chargée
+    cuedForRef.current = r.videoId;
+
+    setClipReady(false);
+    setClipError(false);
+    clearInterval(probeRef.current);
+    try {
+      p.mute?.(); // muet obligatoire : c'est la seule lecture qu'on nous accorde
+      p.loadVideoById(r.videoId);
+    } catch {
       setClipError(true);
-    };
+      return;
+    }
 
-    el.addEventListener("loadedmetadata", onMeta);
-    el.addEventListener("canplay", onCanPlay);
-    el.addEventListener("canplaythrough", onCanPlay);
-    el.addEventListener("error", onError);
-    return () => {
-      el.removeEventListener("loadedmetadata", onMeta);
-      el.removeEventListener("canplay", onCanPlay);
-      el.removeEventListener("canplaythrough", onCanPlay);
-      el.removeEventListener("error", onError);
-    };
-  }, [audioEl, rollClip]);
+    const startedAt = Date.now();
+    probeRef.current = setInterval(() => {
+      const pl = ytRef.current;
+      const cur = roundRef.current;
+      // La manche a changé sous nos pieds : ce sondage ne concerne plus rien.
+      if (!pl || cur?.videoId !== r.videoId) return clearInterval(probeRef.current);
 
-  // Départ du son, à l'instant décidé par le serveur. Le son s'arrête à la fin
-  // de l'extrait — le temps bonus se joue en silence, comme en solo.
-  //
-  // `clipReady` (canplay) dit que le tampon est prêt et que `clipStartRef`
-  // pointe sur le bon climax. IL N'EST PLUS UNE CONDITION POUR JOUER, et c'est
-  // le cœur du correctif : la manche partait en silence complet, sans erreur ni
-  // délai, dès que cet état ne tombait pas.
-  //
-  // Il ne tombait pas si `loadedmetadata` n'arrivait jamais avec une durée
-  // exploitable — le morceau ne démarrait alors PAS DU TOUT, et rien ne le
-  // rattrapait : ni deuxième chance, ni message. En solo ce cas existe aussi,
-  // mais un minuteur de sept secondes bascule sur l'iframe YouTube et on entend
-  // quand même quelque chose. Le versus, lui, attendait indéfiniment.
-  //
-  // (L'iframe est hors de question ici : elle exigerait le `videoId`, donc la
-  // réponse, côté client — c'est précisément ce que l'adresse opaque
-  // /clip/:index évite. La tolérance remplace la bascule.)
-  //
-  // On tente donc la lecture à l'heure dite, prêt ou pas. Si le tampon devient
-  // prêt ensuite, l'effet rejoue et se recale au bon endroit.
-  //
-  // LA SOURDINE N'EST PAS UNE DÉPENDANCE : elle l'a été, et couper puis remettre
-  // le son REPARTAIT l'extrait du début au milieu de la manche. Elle vit dans
-  // son propre effet, plus bas, et se lit ici par une ref.
+      let dur = 0;
+      try {
+        dur = pl.getDuration?.() || 0;
+      } catch {
+        /* pas encore prêt */
+      }
+
+      if (dur > 0) {
+        clearInterval(probeRef.current);
+        const clipLen = r.durationSec || 15;
+        clipStartRef.current = Math.min(
+          (r.startFrac || 0.4) * dur,
+          Math.max(0, dur - clipLen - 1)
+        );
+        try {
+          pl.seekTo(clipStartRef.current, true);
+          // Toujours muet, et en pause tant que le « go » n'est pas donné : on
+          // ne fait que remplir le tampon au bon endroit.
+          if (!wantAudioRef.current) pl.pauseVideo?.();
+        } catch {
+          /* ignore */
+        }
+        setClipReady(true);
+        rollClip(); // le « go » est peut-être déjà passé
+      } else if (Date.now() - startedAt > PROBE_GIVEUP_MS) {
+        clearInterval(probeRef.current);
+        clipStartRef.current = 0;
+        setClipReady(true);
+        rollClip();
+      }
+    }, PROBE_MS);
+  }, [rollClip]);
+
+  // `onReady` de l'iframe peut tomber avant que `cueClip` n'existe dans sa
+  // version à jour : on le lit par une ref plutôt que de le capturer.
+  const cueClipRef = useRef(cueClip);
+  cueClipRef.current = cueClip;
+
+  // Nouvelle manche = nouvelle vidéo à précharger. `round.videoId` redevient
+  // absent en repassant par le salon, ce qui remet le lecteur à zéro pour une
+  // revanche — pour TOUT LE MONDE, pas seulement pour l'hôte.
   useEffect(() => {
-    const el = audioRef.current;
-    if (!el || phase !== "round" || !round) {
+    if (!round?.videoId) {
+      cuedForRef.current = null;
+      return;
+    }
+    cueClip();
+  }, [round?.videoId, cueClip]);
+
+  // Le « go ». Le son s'arrête à la fin de l'extrait — le temps bonus se joue
+  // en silence, comme en solo.
+  useEffect(() => {
+    if (phase !== "round" || !round) {
       wantAudioRef.current = false;
       return undefined;
     }
 
-    const clip = round.durationSec || 15;
+    const clipLen = round.durationSec || 15;
     const late = Math.max(0, (serverNowRef.current() - phaseStartRef.current) / 1000);
-    if (late >= clip) return undefined; // extrait déjà fini : place au temps bonus
+    if (late >= clipLen) return undefined;
 
     wantAudioRef.current = true;
     rollClip();
@@ -493,51 +501,46 @@ export default function BlindTestVersus() {
       () => {
         wantAudioRef.current = false;
         try {
-          el.pause();
+          ytRef.current?.pauseVideo?.();
         } catch {
           /* ignore */
         }
       },
-      (clip - late) * 1000
+      (clipLen - late) * 1000
     );
 
-    // Le chien de garde, équivalent du minuteur de bascule du solo.
-    //
-    // `play()` peut « réussir » sur un élément qui n'avance pas d'un pouce :
-    // tampon vide, flux qui ne vient pas, métadonnées qui ne viendront jamais.
-    // On regarde donc la seule chose qui compte — LA TÊTE DE LECTURE A-T-ELLE
-    // BOUGÉ — et on relance tant que non. La reprise est répétée (le flux met
-    // parfois quelques secondes à s'ouvrir) ; le rechargement complet de la
-    // source, lui, n'a lieu qu'une fois, à la troisième vérification sèche.
+    // Chien de garde : `playVideo()` peut ne rien produire (autoplay refusé
+    // faute de clic sur la page, tampon vide). On regarde la seule chose qui
+    // compte — LA TÊTE DE LECTURE A-T-ELLE BOUGÉ — et on relance tant que non.
+    // Au bout de trois vérifications sèches on affiche le bouton de secours :
+    // un vrai clic lève toujours le refus.
     let idle = 0;
     let mark = -1;
     const watchdog = setInterval(() => {
       if (!wantAudioRef.current) return;
-      const at = el.currentTime;
-      if (!el.paused && Math.abs(at - mark) > 0.05) {
-        mark = at; // ça tourne : rien à faire
+      let at = 0;
+      try {
+        at = ytRef.current?.getCurrentTime?.() || 0;
+      } catch {
+        /* ignore */
+      }
+      if (Math.abs(at - mark) > 0.05) {
+        mark = at; // ça tourne
         idle = 0;
+        setSoundBlocked(false);
         return;
       }
       mark = at;
       idle += 1;
-      if (idle === 3 && retriedRef.current !== round.clip) {
-        // Source qui n'a jamais vraiment ouvert : on la recharge, une fois.
-        retriedRef.current = round.clip;
-        try {
-          el.load();
-        } catch {
-          setClipError(true);
-        }
-      }
+      if (idle >= 3) setSoundBlocked(true);
       rollClip();
-    }, WATCHDOG_MS / 3);
+    }, 700);
 
     return () => {
       clearTimeout(stop);
       clearInterval(watchdog);
     };
-  }, [phase, round?.index, round?.clip, rollClip]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [phase, round?.index, round?.videoId, rollClip]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Le son se coupe dès qu'on quitte la manche (révélation, sortie de page) ;
   // et à l'inverse, un morceau lancé « en entier » depuis la révélation se tait
@@ -548,7 +551,7 @@ export default function BlindTestVersus() {
       return;
     }
     try {
-      audioRef.current?.pause();
+      ytRef.current?.pauseVideo?.();
     } catch {
       /* ignore */
     }
@@ -556,8 +559,16 @@ export default function BlindTestVersus() {
 
   useEffect(() => {
     mutedRef.current = muted;
-    if (audioRef.current) audioRef.current.muted = muted;
     sfx.setMuted(muted);
+    try {
+      if (muted) ytRef.current?.mute?.();
+      else if (readyRef.current) {
+        ytRef.current?.unMute?.();
+        ytRef.current?.setVolume?.(volumeRef.current);
+      }
+    } catch {
+      /* ignore */
+    }
   }, [muted, sfx]);
 
   // Volume : l'extrait ET les bruitages, retenu pour la prochaine partie.
@@ -565,7 +576,11 @@ export default function BlindTestVersus() {
     volumeRef.current = volume;
     localStorage.setItem("bt_volume", String(volume));
     sfx.setLevel(volume / 100);
-    if (audioRef.current) audioRef.current.volume = volume / 100;
+    try {
+      ytRef.current?.setVolume?.(volume);
+    } catch {
+      /* ignore */
+    }
   }, [volume, sfx]);
 
   // Battement pour les chronos.
@@ -640,39 +655,8 @@ export default function BlindTestVersus() {
   const post = (path, body) =>
     apiFetch(`/blindtest/versus/${code}${path}`, { method: "POST", token, body });
 
-  // Déverrouillage iOS : une balise <audio> qui a joué une fois PENDANT un clic
-  // accepte ensuite les lectures programmées. Or ici, le son part sur ordre du
-  // serveur, sans clic — sans ce passage, iOS refuse l'extrait de la première
-  // manche. On s'accroche donc à la première action du salon (« Prêt »,
-  // « Lancer »…), qui a lieu bien avant qu'un extrait ne soit chargé.
-  function unlockAudio() {
-    const el = audioRef.current;
-    if (!el || unlockedRef.current || el.src) return;
-    unlockedRef.current = true;
-    el.muted = true;
-    el.src = SILENT_WAV;
-    el.play()
-      .catch(() => {})
-      .finally(() => {
-        try {
-          // Un extrait a pu être chargé — voire lancé — entre-temps : cette
-          // promesse se règle bien après le clic. On ne touche à RIEN qui ne
-          // soit encore le wav silencieux, sinon ce ménage couperait la manche
-          // qu'il est censé rendre possible.
-          if (el.src === SILENT_WAV) {
-            el.pause();
-            el.removeAttribute("src");
-          }
-          el.muted = mutedRef.current;
-        } catch {
-          /* ignore */
-        }
-      });
-  }
-
   async function act(fn) {
     if (busy) return;
-    unlockAudio(); // DANS le geste : c'est tout l'intérêt (voir ci-dessus)
     setBusy(true);
     try {
       await fn();
@@ -846,8 +830,10 @@ export default function BlindTestVersus() {
 
   return (
     <div className="bt-page gv">
-      {/* Le lecteur : jamais visible, jamais nommé. */}
-      <audio ref={setAudioNode} preload="auto" playsInline style={{ display: "none" }} />
+      {/* Le lecteur : hors écran, jamais visible. L'API IFrame remplace le nœud
+          qu'on lui donne — d'où le <div> jetable créé à la main là-dedans, et
+          pas sur ce conteneur-ci, que React gère. */}
+      <div ref={setYtHostNode} style={{ position: "fixed", left: -9999, top: -9999 }} />
 
       <header className="bt-topbar">
         <button className="bt-back clickable" onClick={quit}>

@@ -7457,6 +7457,11 @@
   background: linear-gradient(100deg, #b06cff, #7a3bff);
   color: #fff;
 }
+/* Staff : modération du catalogue (OST, personnages), pas d'accès au panel. */
+.au-admin-badge.staff {
+  background: linear-gradient(100deg, #4aa3ff, #2b6fd6);
+  color: #fff;
+}
 
 /* --- Drawer fiche utilisateur --- */
 .admin-drawer-overlay {

@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Play, Pause, Star, Music, Loader2, Search, Plus, X, Trash2 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { loadYT } from "../lib/youtube";
+import { useAuth } from "../context/AuthContext";
 import { usePlayer } from "../context/PlayerContext";
 import ScrollRow from "./ScrollRow";
 import AddOstModal from "./AddOstModal";
@@ -22,6 +23,10 @@ export default function OstPicker({ gameId, gameName, token, favorite, onSelect 
   const ytRef = useRef(null); // player YouTube
   const ytDivRef = useRef(null);
   const globalPlayer = usePlayer(); // barre audio globale (à mettre en pause)
+  // Éditer l'OST (ajouter/retirer) est réservé au staff : ici on ne fait que
+  // choisir sa piste favorite, ce qui reste ouvert à tout le monde.
+  const { user } = useAuth();
+  const canEdit = !!user?.isStaff;
 
   useEffect(() => {
     let alive = true;
@@ -180,7 +185,7 @@ export default function OstPicker({ gameId, gameName, token, favorite, onSelect 
                   className={`ost-card ${fav ? "fav" : ""}`}
                   onContextMenu={(e) => {
                     e.preventDefault();
-                    setMenu({ x: e.clientX, y: e.clientY, track: t });
+                    if (canEdit) setMenu({ x: e.clientX, y: e.clientY, track: t });
                   }}
                 >
                   <div className="ost-art">
@@ -212,17 +217,19 @@ export default function OstPicker({ gameId, gameName, token, favorite, onSelect 
               );
             })}
 
-            <button
-              className="ost-card ost-add clickable"
-              onClick={() => setAdding(true)}
-              title="Ajouter une OST YouTube"
-            >
-              <div className="ost-art add">
-                <Plus size={24} />
-              </div>
-              <span className="ost-name">Ajouter</span>
-              <span className="ost-artist">YouTube</span>
-            </button>
+            {canEdit && (
+              <button
+                className="ost-card ost-add clickable"
+                onClick={() => setAdding(true)}
+                title="Ajouter une OST YouTube"
+              >
+                <div className="ost-art add">
+                  <Plus size={24} />
+                </div>
+                <span className="ost-name">Ajouter</span>
+                <span className="ost-artist">YouTube</span>
+              </button>
+            )}
           </ScrollRow>
 
           {filtered.length === 0 && query && (

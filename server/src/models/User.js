@@ -26,8 +26,12 @@ const userSchema = new mongoose.Schema(
     // par les autres. Au tout premier démarrage sans super-admin, il est
     // bootstrappé depuis ADMIN_EMAIL (server/.env) — ensuite la base fait foi.
     // `isAdmin` : administrateur « simple » nommé par le super-admin.
+    // `isStaff` : modérateur du catalogue. Ne donne AUCUN accès au panel admin,
+    // seulement le droit de toucher aux données partagées d'une fiche de jeu
+    // (OST, personnages) — que tout le monde pouvait modifier avant.
     isSuperAdmin: { type: Boolean, default: false },
     isAdmin: { type: Boolean, default: false },
+    isStaff: { type: Boolean, default: false },
     // Compte de service du site (« MyPlayLog »), propriétaire des listes
     // officielles générées automatiquement — les listes d'événements, par
     // exemple. Personne ne s'y connecte : il est créé par script avec un mot de
@@ -352,6 +356,9 @@ userSchema.methods.toPublic = function () {
       : null,
     isAdmin: !!this.isSuperAdmin || !!this.isAdmin,
     isSuperAdmin: !!this.isSuperAdmin,
+    // Pilote l'affichage des outils d'édition de l'OST et des personnages ; les
+    // administrateurs l'ont d'office. Le serveur revérifie sur chaque route.
+    isStaff: !!this.isSuperAdmin || !!this.isAdmin || !!this.isStaff,
     // Pilote l'affichage de l'onglet « Téléchargements » ; le serveur refait le
     // contrôle sur chaque route concernée (masquer n'est pas protéger).
     canDownload: !!this.isSuperAdmin || !!this.isAdmin || !!this.canDownload,

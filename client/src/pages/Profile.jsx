@@ -32,6 +32,7 @@ import {
   Award,
   Lock,
   Clock3,
+  Wrench,
 } from "lucide-react";
 import twemoji from "@twemoji/api";
 import { apiFetch, apiUpload } from "../lib/api";
@@ -194,6 +195,11 @@ function LockedProfile({ profile, covers, signedIn, busy, onFollow }) {
           <div className="pf-idmain">
             <div className="pf-namerow">
               <h1 className="pf-username">{profile.username}</h1>
+              {profile.isStaff && (
+                <span className="pf-staff-chip" title="Membre du staff MyPlayLog">
+                  <Wrench size={12} /> Staff
+                </span>
+              )}
               <span className="pf-private-chip">
                 <Lock size={12} /> Privé
               </span>
@@ -943,6 +949,11 @@ export default function Profile() {
           <div className="pf-idmain">
             <div className="pf-namerow">
               <h1 className="pf-username">{profile.username}</h1>
+              {profile.isStaff && (
+                <span className="pf-staff-chip" title="Membre du staff MyPlayLog">
+                  <Wrench size={12} /> Staff
+                </span>
+              )}
               {profile.isPrivate && (
                 <span className="pf-private-chip" title="Compte privé">
                   <Lock size={12} /> Privé

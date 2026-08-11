@@ -44,6 +44,7 @@ import {
   CalendarDays,
   ScrollText,
   BellRing,
+  Wrench,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { applyGeoGlobe } from "../lib/geoGlobe";
@@ -214,6 +215,7 @@ function timeAgo(date) {
 const USER_FILTERS = [
   { key: "all", label: "Tous" },
   { key: "admin", label: "Admins" },
+  { key: "staff", label: "Staff" },
   { key: "download", label: "Téléchargement" },
 ];
 
@@ -270,7 +272,13 @@ function UsersPanel({ token, me }) {
   }, [q]);
 
   const shown = users.filter((u) =>
-    filter === "admin" ? u.isAdmin : filter === "download" ? u.canDownload : true
+    filter === "admin"
+      ? u.isAdmin
+      : filter === "staff"
+        ? u.isStaff
+        : filter === "download"
+          ? u.canDownload
+          : true
   );
 
   // La sélection ne porte que sur ce qui est À L'ÉCRAN : cocher « tout » puis
@@ -481,6 +489,13 @@ function UsersPanel({ token, me }) {
                       <span className="au-admin-badge" title="Administrateur">
                         <ShieldCheck size={12} /> Admin
                       </span>
+                    ) : u.isStaff ? (
+                      <span
+                        className="au-admin-badge staff"
+                        title="Staff : peut gérer les OST et les personnages"
+                      >
+                        <Wrench size={12} /> Staff
+                      </span>
                     ) : null}
                     {u.canDownload && (
                       <span
@@ -607,6 +622,10 @@ function UserDrawer({ token, userId, me, onClose, onDirty }) {
                     <span className="au-admin-badge">
                       <ShieldCheck size={12} /> Admin
                     </span>
+                  ) : u.isStaff ? (
+                    <span className="au-admin-badge staff">
+                      <Wrench size={12} /> Staff
+                    </span>
                   ) : null}
                 </div>
                 <span className="au-email">{u.email}</span>
@@ -647,6 +666,11 @@ function UserDrawer({ token, userId, me, onClose, onDirty }) {
               {/* Accès au téléchargement : le seul moyen d'ouvrir l'onglet
                   « Téléchargements » d'une fiche de jeu. Fermé par défaut. */}
               <DownloadToggle token={token} user={u} onSaved={load} onDirty={onDirty} />
+
+              {/* Staff : édition des OST et des personnages des fiches de jeu. */}
+              {!u.isSuper && (
+                <StaffToggle token={token} user={u} onSaved={load} onDirty={onDirty} />
+              )}
 
               {isSuperMe && !u.isSuper && (
                 <AdminToggle token={token} user={u} onSaved={load} onDirty={onDirty} />
@@ -1031,6 +1055,59 @@ function DownloadToggle({ token, user, onSaved, onDirty }) {
           disabled={busy}
           role="switch"
           aria-checked={user.downloadFlag}
+        >
+          <span className="admin-switch-knob">
+            {busy && <Loader2 size={11} className="spin" />}
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// --- Rôle staff : gestion des OST et des personnages d'une fiche de jeu ---
+// Même logique que l'accès au téléchargement : l'interrupteur porte sur le
+// DRAPEAU (`staffFlag`), un administrateur ayant déjà le droit par son rôle.
+function StaffToggle({ token, user, onSaved, onDirty }) {
+  const [busy, setBusy] = useState(false);
+  const viaRole = user.isAdmin && !user.staffFlag;
+
+  async function toggle() {
+    setBusy(true);
+    try {
+      await apiFetch(`/admin/users/${user.id}/staff`, {
+        method: "PATCH",
+        token,
+        body: { isStaff: !user.staffFlag },
+      });
+      onSaved();
+      onDirty();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="admin-field">
+      <label>
+        <Wrench size={14} /> Rôle staff
+      </label>
+      <div className="admin-toggle-row">
+        <span>
+          {user.staffFlag
+            ? "Peut ajouter, retirer et renommer les OST et les personnages."
+            : viaRole
+              ? "Accordé d'office : c'est un administrateur."
+              : "Ne peut pas modifier les OST ni les personnages des jeux."}
+        </span>
+        <button
+          className={`admin-switch clickable ${user.staffFlag ? "on" : ""}`}
+          onClick={toggle}
+          disabled={busy}
+          role="switch"
+          aria-checked={user.staffFlag}
         >
           <span className="admin-switch-knob">
             {busy && <Loader2 size={11} className="spin" />}

@@ -2,11 +2,13 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Star, User, Plus, Search, X, Pencil, Trash2 } from "lucide-react";
 import { apiFetch } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 import ScrollRow from "./ScrollRow";
 import AddCharacterModal from "./AddCharacterModal";
 
-// Rangée de personnages : recherche, ajout, et clic droit (modifier/retirer)
-// sur ceux ajoutés par soi.
+// Rangée de personnages : recherche, choix du favori, et — pour le staff
+// uniquement — ajout et clic droit (modifier/retirer). La galerie est
+// partagée par tout le site, seul le choix du favori est personnel.
 export default function CharacterPicker({
   gameId,
   token,
@@ -20,6 +22,8 @@ export default function CharacterPicker({
   const [menu, setMenu] = useState(null); // { x, y, char }
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(null);
+  const { user } = useAuth();
+  const canEdit = !!user?.isStaff;
 
   const filtered = query
     ? characters.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()))
@@ -74,9 +78,11 @@ export default function CharacterPicker({
               }
               onContextMenu={(e) => {
                 e.preventDefault();
-                if (c.mine) setMenu({ x: e.clientX, y: e.clientY, char: c });
+                if (canEdit && c.custom) setMenu({ x: e.clientX, y: e.clientY, char: c });
               }}
-              title={c.mine ? `${c.name} (clic droit pour modifier)` : c.name}
+              title={
+                canEdit && c.custom ? `${c.name} (clic droit pour modifier)` : c.name
+              }
             >
               <div className="char-card-img">
                 {c.image ? (
@@ -99,16 +105,18 @@ export default function CharacterPicker({
             </button>
           );
         })}
-        <button
-          className="char-card add clickable"
-          onClick={() => setAdding(true)}
-          title="Ajouter un personnage"
-        >
-          <div className="char-card-img add">
-            <Plus size={22} />
-          </div>
-          <span className="char-card-name">Ajouter</span>
-        </button>
+        {canEdit && (
+          <button
+            className="char-card add clickable"
+            onClick={() => setAdding(true)}
+            title="Ajouter un personnage"
+          >
+            <div className="char-card-img add">
+              <Plus size={22} />
+            </div>
+            <span className="char-card-name">Ajouter</span>
+          </button>
+        )}
       </ScrollRow>
 
       {menu &&

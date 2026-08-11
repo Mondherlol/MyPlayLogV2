@@ -11,12 +11,16 @@ import {
   Users,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 import AddCharacterModal from "./AddCharacterModal";
 
 // Onglet « Personnages » de la page jeu : galerie de tous les personnages
-// (IGDB + communauté), avec ajout / modification / suppression des siens.
+// (IGDB + communauté). L'ajout / la modification / la suppression sont
+// réservés au staff : la galerie est partagée par tout le site.
 // Le personnage favori (défini via la modale « Joué ») est mis en avant.
 export default function GameCharacters({ gameId, token, favoriteName }) {
+  const { user } = useAuth();
+  const canEdit = !!user?.isStaff;
   const [loading, setLoading] = useState(true);
   const [chars, setChars] = useState([]);
   const [query, setQuery] = useState("");
@@ -93,9 +97,11 @@ export default function GameCharacters({ gameId, token, favoriteName }) {
               </button>
             )}
           </div>
-          <button className="gpc-add-btn clickable" onClick={() => setAdding(true)}>
-            <Plus size={16} /> Ajouter
-          </button>
+          {canEdit && (
+            <button className="gpc-add-btn clickable" onClick={() => setAdding(true)}>
+              <Plus size={16} /> Ajouter
+            </button>
+          )}
         </div>
       </div>
 
@@ -107,7 +113,7 @@ export default function GameCharacters({ gameId, token, favoriteName }) {
               ? "Aucun personnage ne correspond à ta recherche."
               : "Aucun personnage pour ce jeu pour l'instant."}
           </p>
-          {!query && (
+          {!query && canEdit && (
             <button className="btn btn-primary" onClick={() => setAdding(true)}>
               <Plus size={16} /> Ajouter le premier
             </button>
@@ -140,7 +146,10 @@ export default function GameCharacters({ gameId, token, favoriteName }) {
                     </span>
                   )}
 
-                  {c.mine && (
+                  {/* Seuls les personnages ajoutés à la main existent en base :
+                      ceux d'IGDB / VNDB ne se modifient pas. Le staff modère
+                      ceux de tout le monde, pas seulement les siens. */}
+                  {canEdit && c.custom && (
                     <div className="gpc-card-actions">
                       <button
                         className="gpc-act clickable"
@@ -168,16 +177,18 @@ export default function GameCharacters({ gameId, token, favoriteName }) {
             );
           })}
 
-          <button
-            className="gpc-card gpc-add-card clickable"
-            onClick={() => setAdding(true)}
-            title="Ajouter un personnage"
-          >
-            <div className="gpc-card-img gpc-add-tile">
-              <Plus size={26} />
-            </div>
-            <span className="gpc-card-name">Ajouter</span>
-          </button>
+          {canEdit && (
+            <button
+              className="gpc-card gpc-add-card clickable"
+              onClick={() => setAdding(true)}
+              title="Ajouter un personnage"
+            >
+              <div className="gpc-card-img gpc-add-tile">
+                <Plus size={26} />
+              </div>
+              <span className="gpc-card-name">Ajouter</span>
+            </button>
+          )}
         </div>
       )}
 

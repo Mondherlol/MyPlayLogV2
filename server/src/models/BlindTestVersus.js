@@ -17,17 +17,22 @@ import mongoose from "mongoose";
 // chaque note du début décisive. Les trois vies sont là pour que se tromper ne
 // mette pas hors course d'un coup.
 //
-// ------------------------------------------------------- pourquoi pas YouTube
-// LE POINT QUI A DÉCIDÉ DE TOUTE L'ARCHITECTURE : en solo, le client charge la
-// vidéo YouTube et connaît donc son titre — « Zelda BOTW OST – Hyrule Field ».
-// Tricher n'y lèse que soi. En versus, la même chose donnerait la réponse à qui
-// ouvre la console, et le classement ne voudrait plus rien dire.
+// ------------------------------------------------------------- d'où vient le son
+// L'extrait sort de l'iframe YouTube, comme en solo.
 //
-// L'extrait passe donc par NOTRE serveur, en audio pur : le client demande
-// `/api/blindtest/versus/:code/clip/:index` et reçoit un flux m4a. Aucun
-// videoId, aucun titre, aucune miniature ne traverse — rien à lire nulle part
-// avant la révélation. (Le fichier vient du même cache que le mini-lecteur,
-// cf. routes/audio.js : une piste déjà écoutée sur le site est déjà prête.)
+// CE N'A PAS TOUJOURS ÉTÉ LE CAS, et le revirement mérite d'être connu avant
+// d'y retoucher. En solo, charger la vidéo donne son titre au client — « Zelda
+// BOTW OST – Hyrule Field » — mais tricher n'y lèse que soi. En versus, ça
+// donne la réponse à qui ouvre la console. L'extrait passait donc par NOTRE
+// serveur, en audio pur, sous une adresse muette (`/clip/:index`) : rien à lire
+// nulle part avant la révélation.
+//
+// Ce chemin repose sur yt-dlp, et depuis l'IP d'un datacenter YouTube le bloque
+// en permanence (cf. l'en-tête de routes/audio.js). En prod, toute piste absente
+// du cache disque renvoyait 502 et la manche partait MUETTE — pendant que le
+// solo, sur la même piste, retombait sur l'iframe et jouait très bien. Un mode
+// inviolable et silencieux ne vaut pas un mode jouable : le `videoId` part
+// maintenant dès le sas, et la triche à la console est un risque assumé.
 const attemptSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
@@ -56,7 +61,8 @@ const roundSchema = new mongoose.Schema(
     gameId: { type: Number, default: null },
     gameName: { type: String, default: "" },
     cover: { type: String, default: null },
-    // La piste. `videoId` NE SORT JAMAIS avant la révélation (cf. l'en-tête).
+    // La piste. `videoId` part au client dès le sas — l'iframe en a besoin
+    // (cf. l'en-tête). Le nom du jeu, lui, reste au chaud jusqu'à la révélation.
     videoId: { type: String, default: "" },
     ostName: { type: String, default: "" },
     // Où commencer dans le morceau — sur le climax quand il a été mesuré

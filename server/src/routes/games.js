@@ -6,7 +6,13 @@ import multer from "multer";
 import mongoose from "mongoose";
 import { igdbQuery } from "../lib/igdb.js";
 import { isConfigured, getServiceAccessToken, fetchUserTitles, fetchTitleTrophies } from "../lib/psn.js";
-import { requireAuth, optionalAuth, requireDownloadAccess } from "../middleware/auth.js";
+import {
+  requireAuth,
+  optionalAuth,
+  requireDownloadAccess,
+  requireStaff,
+  markStaff,
+} from "../middleware/auth.js";
 import { notify } from "../lib/notify.js";
 import { recordActivity, removeActivity } from "../lib/activity.js";
 import { summarizeReactions, reviewComment } from "../lib/reviewSerialize.js";
@@ -923,7 +929,9 @@ router.get("/yt-info", requireAuth, async (req, res) => {
 });
 
 // --- Ajout d'une piste d'OST via un lien YouTube (titre auto si absent) ---
-router.post("/:id/ost", requireAuth, async (req, res) => {
+// L'OST d'un jeu est commune à tout le site : ajouter, retirer ou renommer une
+// piste est réservé au staff (voir requireStaff).
+router.post("/:id/ost", requireAuth, requireStaff, async (req, res) => {
   try {
     const url = String(req.body?.url || "").trim();
     const videoId = youtubeId(url);
@@ -954,7 +962,7 @@ router.post("/:id/ost", requireAuth, async (req, res) => {
 });
 
 // --- Import d'une playlist YouTube entière ---
-router.post("/:id/ost/playlist", requireAuth, async (req, res) => {
+router.post("/:id/ost/playlist", requireAuth, requireStaff, async (req, res) => {
   try {
     const playlistId = youtubePlaylistId(req.body?.url || "");
     if (!playlistId)
@@ -987,7 +995,7 @@ router.post("/:id/ost/playlist", requireAuth, async (req, res) => {
 });
 
 // --- Masquer des OST pour cet utilisateur (retirer "pour de bon") ---
-router.post("/:id/ost/hide", requireAuth, async (req, res) => {
+router.post("/:id/ost/hide", requireAuth, requireStaff, async (req, res) => {
   try {
     const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : [];
     if (!ids.length) return res.status(400).json({ error: "Aucune piste." });
@@ -1003,7 +1011,7 @@ router.post("/:id/ost/hide", requireAuth, async (req, res) => {
 });
 
 // --- Restaurer des OST masquées (les sortir de la corbeille) ---
-router.post("/:id/ost/unhide", requireAuth, async (req, res) => {
+router.post("/:id/ost/unhide", requireAuth, requireStaff, async (req, res) => {
   try {
     const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : [];
     if (!ids.length) return res.status(400).json({ error: "Aucune piste." });
@@ -1018,7 +1026,7 @@ router.post("/:id/ost/unhide", requireAuth, async (req, res) => {
 });
 
 // --- Renommer des OST en masse pour cet utilisateur (ex: retirer un préfixe) ---
-router.post("/:id/ost/rename", requireAuth, async (req, res) => {
+router.post("/:id/ost/rename", requireAuth, requireStaff, async (req, res) => {
   try {
     const list = Array.isArray(req.body?.renames) ? req.body.renames : [];
     const entries = list
@@ -1063,7 +1071,7 @@ async function fetchBundleGames(bundleId) {
     .sort((a, b) => (a.releaseDate || Infinity) - (b.releaseDate || Infinity));
 }
 
-router.get("/:id/details", optionalAuth, async (req, res) => {
+router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
@@ -1103,6 +1111,10 @@ router.get("/:id/details", optionalAuth, async (req, res) => {
       image: c.image,
       custom: true,
       mine: String(c.addedBy) === String(req.userId),
+      // Modifiable / supprimable : le staff modère les personnages de tous,
+      // les autres n'ont plus la main (même sur les leurs) depuis que
+      // l'ajout est réservé au staff.
+      editable: !!req.isStaff,
     }));
 
     // Pour les visual novels, on complète avec les personnages de VNDB
@@ -1174,7 +1186,8 @@ router.post("/:id/cover", requireAuth, upload.single("cover"), async (req, res) 
 });
 
 // --- Ajout d'un personnage custom (nom + image optionnelle, partagé) ---
-router.post("/:id/character", requireAuth, upload.single("image"), async (req, res) => {
+// Partagé par tout le site → réservé au staff, comme l'OST.
+router.post("/:id/character", requireAuth, requireStaff, upload.single("image"), async (req, res) => {
   try {
     const name = String(req.body?.name || "").trim();
     if (!name) return res.status(400).json({ error: "Le nom du personnage est requis." });
@@ -1196,13 +1209,11 @@ router.post("/:id/character", requireAuth, upload.single("image"), async (req, r
   }
 });
 
-// --- Modifier un perso custom (uniquement le sien) ---
-router.put("/:id/character/:charId", requireAuth, upload.single("image"), async (req, res) => {
+// --- Modifier un perso custom (le staff modère ceux de tout le monde) ---
+router.put("/:id/character/:charId", requireAuth, requireStaff, upload.single("image"), async (req, res) => {
   try {
     const cc = await CustomCharacter.findById(req.params.charId);
     if (!cc) return res.status(404).json({ error: "Personnage introuvable." });
-    if (String(cc.addedBy) !== String(req.userId))
-      return res.status(403).json({ error: "Tu ne peux modifier que tes personnages." });
     const name = String(req.body?.name || "").trim();
     if (name) cc.name = name;
     if (req.file)
@@ -1217,13 +1228,11 @@ router.put("/:id/character/:charId", requireAuth, upload.single("image"), async 
   }
 });
 
-// --- Retirer un perso custom (uniquement le sien) ---
-router.delete("/:id/character/:charId", requireAuth, async (req, res) => {
+// --- Retirer un perso custom (le staff modère ceux de tout le monde) ---
+router.delete("/:id/character/:charId", requireAuth, requireStaff, async (req, res) => {
   try {
     const cc = await CustomCharacter.findById(req.params.charId);
     if (!cc) return res.json({ ok: true });
-    if (String(cc.addedBy) !== String(req.userId))
-      return res.status(403).json({ error: "Tu ne peux retirer que tes personnages." });
     await cc.deleteOne();
     res.json({ ok: true });
   } catch (err) {

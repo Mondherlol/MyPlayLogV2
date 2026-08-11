@@ -3560,6 +3560,22 @@ button.pf-stat:hover {
   white-space: nowrap;
 }
 
+/* Pastille « Staff » à côté du pseudo : même gabarit que la pastille privée,
+   en bleu pour ne pas la confondre avec l'accent doré du site. */
+.pf-staff-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.24rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #2b6fd6 45%, var(--border));
+  background: color-mix(in srgb, #4aa3ff 14%, var(--surface));
+  color: #2b6fd6;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 /* Demande d'abonnement envoyée : bouton en retrait (comme « Suivi(e) »). */
 .follow-btn.requested {
   background: var(--surface);

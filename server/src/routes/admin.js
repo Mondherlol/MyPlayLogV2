@@ -28,7 +28,7 @@ import Message from "../models/Message.js";
 import Conversation from "../models/Conversation.js";
 import { logEvent, forgetAdmins } from "../lib/audit.js";
 import { sendPush } from "../lib/push.js";
-import { canUserDownload, isUserAdmin } from "../lib/admin.js";
+import { canUserDownload, isUserAdmin, isUserStaff } from "../lib/admin.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { listEnv, setEnvVar, deleteEnvVar } from "../lib/envFile.js";
 import {
@@ -59,7 +59,7 @@ router.get("/users", async (req, res) => {
     // lastSeenAt) retombent en fin de liste, départagés par date d'inscription.
     const users = await User.find(filter)
       .select(
-        "username email avatar createdAt lastSeenAt following isAdmin isSuperAdmin points canDownload"
+        "username email avatar createdAt lastSeenAt following isAdmin isSuperAdmin isStaff points canDownload"
       )
       .sort({ lastSeenAt: -1, createdAt: -1 })
       .limit(500)
@@ -87,6 +87,10 @@ router.get("/users", async (req, res) => {
         lastSeenAt: u.lastSeenAt || null,
         isAdmin: isUserAdmin(u),
         isSuper: !!u.isSuperAdmin,
+        isStaff: isUserStaff(u),
+        // Comme pour le téléchargement : le drapeau BRUT, sans le rôle admin,
+        // pour que l'interrupteur reflète ce qui est vraiment stocké.
+        staffFlag: !!u.isStaff,
         canDownload: canUserDownload(u),
         // Le drapeau BRUT, sans le coup de pouce accordé aux admins : la case à
         // cocher doit refléter ce qui est réellement stocké, sinon décocher un
@@ -236,6 +240,28 @@ router.patch("/users/:id/download", async (req, res) => {
   }
 });
 
+// --- Rôle staff d'UN compte (interrupteur de la fiche) ---
+// Ouvert à tous les administrateurs (pas seulement au super-admin) : nommer un
+// modérateur de catalogue n'engage pas les mêmes pouvoirs que nommer un admin.
+router.patch("/users/:id/staff", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id))
+      return res.status(404).json({ error: "Utilisateur introuvable." });
+    const isStaff = req.body?.isStaff === true;
+    const u = await User.findByIdAndUpdate(
+      id,
+      { $set: { isStaff } },
+      { new: true, timestamps: false }
+    ).select("isAdmin isSuperAdmin isStaff");
+    if (!u) return res.status(404).json({ error: "Utilisateur introuvable." });
+    res.json({ staffFlag: !!u.isStaff, isStaff: isUserStaff(u) });
+  } catch (err) {
+    console.error("admin user staff error:", err.message);
+    res.status(500).json({ error: "Erreur lors de la mise à jour." });
+  }
+});
+
 // Carte légère d'un utilisateur pour les listes d'abonnés / abonnements.
 function userCard(u) {
   return {
@@ -256,7 +282,7 @@ router.get("/users/:id", async (req, res) => {
 
     const user = await User.findById(id)
       .select(
-        "username email avatar bio createdAt lastSeenAt following isAdmin isSuperAdmin canDownload points equipped inventory"
+        "username email avatar bio createdAt lastSeenAt following isAdmin isSuperAdmin isStaff canDownload points equipped inventory"
       )
       .populate("following", "username avatar isAdmin isSuperAdmin")
       .lean();
@@ -311,6 +337,8 @@ router.get("/users/:id", async (req, res) => {
         lastSeenAt: user.lastSeenAt || null,
         isAdmin: isUserAdmin(user),
         isSuper: !!user.isSuperAdmin,
+        isStaff: isUserStaff(user),
+        staffFlag: !!user.isStaff,
         canDownload: canUserDownload(user),
         downloadFlag: !!user.canDownload,
         gameCount,

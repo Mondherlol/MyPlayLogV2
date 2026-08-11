@@ -20,6 +20,15 @@ export function isUserAdmin(user) {
   return !!user.isSuperAdmin || !!user.isAdmin;
 }
 
+// Le « staff » modère le catalogue : OST et personnages d'une fiche de jeu.
+// Ces données sont PARTAGÉES par tout le monde — avec la fréquentation, les
+// laisser ouvertes au premier venu revenait à confier le catalogue à l'inconnu.
+// Les administrateurs l'ont d'office (ce sont eux qui nomment le staff).
+export function isUserStaff(user) {
+  if (!user) return false;
+  return isUserAdmin(user) || !!user.isStaff;
+}
+
 // L'onglet « Téléchargements » d'une fiche de jeu n'est ouvert à PERSONNE par
 // défaut : l'accès se donne à la main, compte par compte, depuis le panel admin
 // (User.canDownload). Les administrateurs l'ont d'office — ce sont eux qui

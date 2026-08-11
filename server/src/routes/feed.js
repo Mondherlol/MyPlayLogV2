@@ -123,14 +123,130 @@ function listMini(l) {
 }
 
 // ============================================================
+//  Lecture des sources : documents → cartes
+// ============================================================
+// Écart max entre deux évènements consécutifs d'une même série (23 caisses
+// ouvertes à la suite = UNE carte). Défini ici plutôt que dans buildTimeline :
+// la lecture des sources doit raisonner avec le même écart que le
+// regroupement, sinon elle ne sait pas combien de documents aller chercher.
+const GROUP_GAP = 2 * 60 * 60 * 1000; // 2 h
+
+// Estimation BASSE du nombre de cartes que produiront ces documents : une
+// série de documents de même clé, espacés de moins de GROUP_GAP, compte pour
+// une seule carte. Sous-estimer est sans danger (on lit un peu plus que
+// nécessaire), surestimer ferait rater des cartes — d'où une clé volontairement
+// grossière, plus grossière que le vrai regroupement.
+function countCards(docs, { dateField, keyOf }) {
+  const lastOf = new Map();
+  let n = 0;
+  for (const d of docs) {
+    const k = keyOf(d);
+    if (k == null) continue; // document qui ne donnera aucune carte
+    const t = new Date(d[dateField]).getTime();
+    const prev = lastOf.get(k);
+    if (prev === undefined || prev - t > GROUP_GAP) n++;
+    lastOf.set(k, t);
+  }
+  return n;
+}
+
+const idOf = (v) => String(v?._id || v || "");
+
+// Clé de regroupement d'une ligne d'activité, du point de vue des cartes.
+// Volontairement plus grossière que le vrai regroupement (qui distingue par
+// exemple les cartes riches des simples) : mieux vaut lire trop que trop peu.
+// Deux exceptions dans l'autre sens, où la carte est UNE pour PLUSIEURS
+// joueurs : un versus (chaque participant a sa ligne) et une victoire d'équipe
+// au mot du jour. Là, la clé ignore l'acteur, sinon on croirait tenir cinq
+// cartes là où le fil n'en montrera qu'une.
+const actCardKey = (a) => {
+  const m = a.meta || {};
+  if (m.versusId) return `versus-${m.versusId}`;
+  if (a.type === "mot" && m.session) return `mot-${m.session}`;
+  return `${idOf(a.actor)}-${a.type}`;
+};
+
+// Parties trackées : un groupe par joueur, par provider et par compte (un
+// smurf ne fusionne jamais avec le compte principal) — cf. le regroupement.
+const matchCardKey = (m) => `${idOf(m.user)}-${m.provider}-${m.slot || 0}`;
+
+// Lecture par lots d'une source dont les documents se REGROUPENT en cartes.
+// Borner la requête à `cap` documents (ce qu'on faisait) revient à ne remonter
+// qu'une poignée de cartes dès qu'un joueur enchaîne : 23 caisses ouvertes
+// consomment 23 des 24 lignes budgétées et n'en produisent qu'une. On lit donc
+// paquet par paquet jusqu'à TENIR `cap` cartes.
+// Retourne `complete: true` quand la source a été lue jusqu'au bout — il n'y a
+// alors rien à sauter en dessous.
+async function readBatched(fetchPage, { dateField, cap, keyOf, batch, maxDocs = 800 }) {
+  const docs = [];
+  const seen = new Set();
+  let mark = null; // date du dernier document lu (curseur interne, inclusif)
+  for (;;) {
+    const rows = await fetchPage(mark, batch);
+    let added = 0;
+    for (const r of rows) {
+      const id = String(r._id);
+      if (seen.has(id)) continue; // le curseur est inclusif → recouvrement
+      seen.add(id);
+      docs.push(r);
+      added++;
+    }
+    if (rows.length < batch) return { docs, complete: true };
+    // Aucun document neuf : un lot entier partage la même date, le curseur ne
+    // peut plus avancer. On s'arrête plutôt que de tourner en rond.
+    if (!added) return { docs, complete: false };
+    if (countCards(docs, { dateField, keyOf }) >= cap) return { docs, complete: false };
+    if (docs.length >= maxDocs) return { docs, complete: false };
+    const next = rows[rows.length - 1][dateField];
+    if (!next) return { docs, complete: true };
+    // Curseur INCLUSIF : deux documents à la milliseconde près ne doivent pas
+    // tomber de part et d'autre d'un lot (d'où le dédoublonnage ci-dessus).
+    mark = next;
+  }
+}
+
+// Horizon d'une source lue d'un bloc : date du dernier document rendu quand la
+// requête a buté sur sa limite. En dessous de cette date on ne sait rien de
+// cette source — c'est là que la page devra s'arrêter.
+const horizonOf = (rows, field, cap) =>
+  rows.length >= cap && rows.length ? new Date(rows[rows.length - 1][field]) : null;
+
+// Découpe finale, commune à l'accueil et au feed de profil.
+// `floor` = la plus RÉCENTE des dates d'horizon des sources tronquées : en
+// dessous, la fusion est incomplète, donc la page s'y arrête et le curseur
+// repart exactement de là. Sans ça, une page remplie par les sources bavardes
+// (parties trackées, téléchargements) datait son curseur d'il y a une semaine
+// et sautait définitivement tout ce que les autres sources n'avaient pas eu la
+// place de remonter.
+function paginate(events, { limit, floor, complete }) {
+  let usable = floor ? events.filter((e) => new Date(e.date) >= floor) : events;
+  // Garde-fou : jamais une page vide alors qu'on a des cartes sous la main —
+  // le fil afficherait « c'est calme par ici » sans plus jamais rien demander.
+  if (!usable.length && events.length) usable = events;
+  const page = usable.slice(0, limit);
+  let nextCursor = null;
+  if (usable.length > page.length && page.length) {
+    nextCursor = new Date(page[page.length - 1].date).toISOString();
+  } else if (!complete && floor) {
+    // Page arrêtée par l'horizon et non par sa taille : on reprend à l'horizon.
+    nextCursor = floor.toISOString();
+  }
+  return { page, nextCursor };
+}
+
+// ============================================================
 //  Construction de la timeline (partagée accueil / feed de profil)
 // ============================================================
 // La timeline est bâtie sur le journal Activity (les VRAIES actions : passage
 // en « terminé », note posée, OST choisie…), plus les reposts, documentaires
 // recommandés et découvertes de pépites. On n'infère plus rien des updatedAt :
 // modifier une entrée ne la fait plus remonter comme « nouvellement terminée ».
-// Chaque source est bornée à `limit` : on est donc sûr d'avoir les `limit`
-// évènements les plus récents toutes sources confondues.
+// Chaque source est bornée à `limit`, SAUF celles dont les documents se
+// regroupent en cartes (journal Activity, parties trackées) : celles-là sont
+// lues par lots jusqu'à tenir une page de cartes (cf. readBatched). Les sources
+// qui butent quand même sur leur limite renvoient un « horizon » : la timeline
+// s'arrête à la plus récente de ces dates, en dessous elle serait trouée.
+// Retourne { events, floor, complete } — voir paginate().
 // `only: "media"` restreint la timeline aux fan arts republiés (onglet
 // « Médias » du feed de profil, et bento indépendant du fil).
 async function buildTimeline(
@@ -139,6 +255,13 @@ async function buildTimeline(
 ) {
   const hasBefore = before && !Number.isNaN(before.getTime());
   const lt = (field) => (hasBefore ? { [field]: { $lt: before } } : {});
+  // Même chose, avec le curseur interne (inclusif) d'une lecture par lots.
+  const range = (field, mark) => {
+    const c = {};
+    if (hasBefore) c.$lt = before;
+    if (mark) c.$lte = mark;
+    return Object.keys(c).length ? { [field]: c } : {};
+  };
   const wantAll = only !== "media";
   // Familles de cartes coupées par le joueur (Paramètres > Fil d'accueil) :
   // on écarte AVANT d'interroger, pour que la page reste pleine (cf.
@@ -156,10 +279,10 @@ async function buildTimeline(
     watched,
     liked,
     commented,
-    acts,
+    actsRead,
     gems,
     downloads,
-    trackerMatches,
+    matchesRead,
     rankChanges,
     mediaPosts,
   ] = await Promise.all([
@@ -219,19 +342,30 @@ async function buildTimeline(
           .lean(),
     // Pas de carte pour « à regarder plus tard » : c'est une intention privée
     // (une file d'attente), pas une action à raconter au fil.
+    // Journal d'activité : source la plus bavarde ET la plus regroupée (mini-
+    // jeux en rafale, caisses, capsules…). Lue par lots — cf. readBatched.
     !wantAll
-      ? Promise.resolve([])
-      : Activity.find({
-          actor: actorScope,
-          ...(activityOff.length ? { type: { $nin: activityOff } } : {}),
-          ...lt("createdAt"),
-        })
-          .sort({ createdAt: -1 })
-          .limit(limit * 2) // les activités portent plusieurs types d'évènements
-          .populate("actor", "username avatar")
-          .populate("target", "username avatar")
-          .populate("list", "title type cover visibility items likes comments")
-          .lean(),
+      ? Promise.resolve({ docs: [], complete: true })
+      : readBatched(
+          (mark, size) =>
+            Activity.find({
+              actor: actorScope,
+              ...(activityOff.length ? { type: { $nin: activityOff } } : {}),
+              ...range("createdAt", mark),
+            })
+              .sort({ createdAt: -1 })
+              .limit(size)
+              .populate("actor", "username avatar")
+              .populate("target", "username avatar")
+              .populate("list", "title type cover visibility items likes comments")
+              .lean(),
+          {
+            dateField: "createdAt",
+            cap,
+            keyOf: actCardKey,
+            batch: Math.max(cap * 3, 60),
+          }
+        ),
     !wantAll || !wants("gem")
       ? Promise.resolve([])
       : GemDiscovery.find({ user: userScope, ...lt("updatedAt") })
@@ -250,15 +384,24 @@ async function buildTimeline(
     // Parties de jeux trackés (Marvel Rivals…) — datées par `playedAt` (heure
     // réelle de la partie), regroupées en « a enchaîné N parties sur … ».
     !wantAll || !wants("tracker")
-      ? Promise.resolve([])
-      : TrackerMatch.find({
-          user: userScope,
-          ...(hasBefore ? { playedAt: { $lt: before } } : {}),
-        })
-          .sort({ playedAt: -1 })
-          .limit(limit * 3) // plusieurs parties fusionnent en une carte
-          .populate("user", "username avatar")
-          .lean(),
+      ? Promise.resolve({ docs: [], complete: true })
+      : readBatched(
+          (mark, size) =>
+            TrackerMatch.find({
+              user: userScope,
+              ...range("playedAt", mark),
+            })
+              .sort({ playedAt: -1 })
+              .limit(size)
+              .populate("user", "username avatar")
+              .lean(),
+          {
+            dateField: "playedAt",
+            cap,
+            keyOf: matchCardKey,
+            batch: Math.max(cap * 4, 80),
+          }
+        ),
     // Montées / descentes de rang classé (session) → card « X est passé … ».
     !wantAll || !wants("tracker")
       ? Promise.resolve([])
@@ -280,6 +423,36 @@ async function buildTimeline(
           .populate("comments.user", "username avatar")
           .lean(),
   ]);
+
+  const acts = actsRead.docs;
+  const trackerMatches = matchesRead.docs;
+
+  // Horizon de la fusion : sous la plus RÉCENTE des dates auxquelles une source
+  // s'est arrêtée sans être épuisée, la timeline serait trouée. paginate() y
+  // coupe la page et y repointe le curseur — c'est ce qui empêche le fil de
+  // sauter d'un coup à « il y a une semaine ».
+  const horizons = [
+    horizonOf(reposts, "createdAt", cap),
+    horizonOf(docs, "recommendedAt", cap),
+    horizonOf(watched, "watchedAt", cap),
+    horizonOf(liked, "likedAt", cap),
+    horizonOf(commented, "commentedAt", cap),
+    horizonOf(gems, "updatedAt", cap),
+    horizonOf(downloads, "createdAt", cap),
+    horizonOf(rankChanges, "lastAt", cap),
+    horizonOf(mediaPosts, "createdAt", cap),
+    // Les deux sources lues par lots : elles n'ont d'horizon que si elles se
+    // sont arrêtées avant d'être épuisées.
+    actsRead.complete || !acts.length
+      ? null
+      : new Date(acts[acts.length - 1].createdAt),
+    matchesRead.complete || !trackerMatches.length
+      ? null
+      : new Date(trackerMatches[trackerMatches.length - 1].playedAt),
+  ].filter(Boolean);
+  const floor = horizons.length
+    ? new Date(Math.max(...horizons.map((d) => d.getTime())))
+    : null;
 
   const events = [];
   const blindtests = []; // regroupés en rafale après la boucle des activités
@@ -503,7 +676,8 @@ async function buildTimeline(
   // sans note/review/OST) d'un même joueur, même statut, rapprochées dans le
   // temps → UNE carte « a ajouté N jeux à sa liste de souhaits » avec les
   // jaquettes. Les cartes riches restent individuelles.
-  const GROUP_GAP = 2 * 60 * 60 * 1000; // 2 h entre deux évènements consécutifs
+  // (GROUP_GAP est défini en tête de fichier : la lecture des sources doit
+  // raisonner avec le même écart que le regroupement.)
   const isSimple = (ev) =>
     !!ev.status &&
     !ev.hasReview &&
@@ -1536,7 +1710,11 @@ async function buildTimeline(
   events.sort((a, b) => new Date(b.date) - new Date(a.date));
   // Dernier passage : les sources coupées plus haut ne produisent déjà plus
   // rien, mais une carte reste une carte — on vérifie sur le type final.
-  return cardOff.size ? events.filter((e) => !cardOff.has(e.type)) : events;
+  return {
+    events: cardOff.size ? events.filter((e) => !cardOff.has(e.type)) : events,
+    floor,
+    complete: !floor,
+  };
 }
 
 // ============================================================
@@ -1577,7 +1755,7 @@ router.get("/home", requireAuth, async (req, res) => {
         ? { $ne: req.userId, $nin: privateIds }
         : { $in: followed };
 
-    const events = await buildTimeline(req, {
+    const timeline = await buildTimeline(req, {
       userScope,
       actorScope: userScope,
       before,
@@ -1588,11 +1766,11 @@ router.get("/home", requireAuth, async (req, res) => {
       hidden: me?.feedHidden || [],
     });
 
-    const page = events.slice(0, limit);
-    const nextCursor =
-      events.length > page.length && page.length
-        ? new Date(page[page.length - 1].date).toISOString()
-        : null;
+    const { page, nextCursor } = paginate(timeline.events, {
+      limit,
+      floor: timeline.floor,
+      complete: timeline.complete,
+    });
 
     res.json({ items: page, nextCursor, community });
   } catch (err) {
@@ -1643,7 +1821,7 @@ router.get("/user/:username", optionalAuth, async (req, res) => {
 
     // Rançon (avis de recherche) : nombre de délits de téléchargement × 60 $.
     // Uniquement sur la première page (rail latéral du profil).
-    const [events, stats, dlCount] = await Promise.all([
+    const [timeline, stats, dlCount] = await Promise.all([
       buildTimeline(req, {
         userScope: u._id,
         actorScope: u._id,
@@ -1655,11 +1833,11 @@ router.get("/user/:username", optionalAuth, async (req, res) => {
       before ? Promise.resolve(null) : Download.countDocuments({ user: u._id }),
     ]);
 
-    const page = events.slice(0, limit);
-    const nextCursor =
-      events.length > page.length && page.length
-        ? new Date(page[page.length - 1].date).toISOString()
-        : null;
+    const { page, nextCursor } = paginate(timeline.events, {
+      limit,
+      floor: timeline.floor,
+      complete: timeline.complete,
+    });
 
     res.json({
       items: page,

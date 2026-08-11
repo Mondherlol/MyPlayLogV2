@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { makeCache } from "../lib/cache";
+import { useAuth } from "../context/AuthContext";
 import { usePlayer } from "../context/PlayerContext";
 import AddOstModal from "./AddOstModal";
 import MassRenameOstModal from "./MassRenameOstModal";
@@ -55,6 +56,12 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
 
   // Lecture déléguée au mini-lecteur global.
   const player = usePlayer();
+
+  // L'OST est commune à tout le site : seul le staff (et les admins) peut
+  // l'éditer. Le serveur refuse de toute façon les routes correspondantes —
+  // on masque simplement des boutons qui ne mèneraient nulle part.
+  const { user } = useAuth();
+  const canEdit = !!user?.isStaff;
 
   // Garde le cache à jour à chaque changement de liste (ajout/masquage/restauration).
   function commit(nextTracks, nextTrash) {
@@ -181,7 +188,7 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
               </button>
             )}
           </div>
-          {tracks.length > 0 && (
+          {canEdit && tracks.length > 0 && (
             <button
               className="gp-ost-trash-btn clickable"
               onClick={() => setRenaming(true)}
@@ -190,7 +197,7 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
               <TextCursorInput size={15} />
             </button>
           )}
-          {trash.length > 0 && (
+          {canEdit && trash.length > 0 && (
             <button
               className={`gp-ost-trash-btn clickable ${showTrash ? "active" : ""}`}
               onClick={() => setShowTrash((v) => !v)}
@@ -203,7 +210,7 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
         </div>
       </div>
 
-      {showTrash && trash.length > 0 && (
+      {canEdit && showTrash && trash.length > 0 && (
         <div className="gp-ost-trash">
           <div className="gp-ost-trash-head">
             <span className="gp-ost-trash-title">
@@ -328,22 +335,24 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
               );
             })}
 
-            <button
-              className="gp-ost-item gp-ost-add clickable"
-              onClick={() => setAdding(true)}
-              title="Ajouter une OST YouTube"
-            >
-              <div className="gp-vinyl gp-vinyl-add">
-                <div className="gp-vinyl-disc" />
-                <span className="gp-vinyl-add-icon">
-                  <Plus size={26} />
-                </span>
-              </div>
-              <div className="gp-ost-meta">
-                <span className="gp-vinyl-name">Ajouter</span>
-                <span className="gp-vinyl-artist">depuis YouTube</span>
-              </div>
-            </button>
+            {canEdit && (
+              <button
+                className="gp-ost-item gp-ost-add clickable"
+                onClick={() => setAdding(true)}
+                title="Ajouter une OST YouTube"
+              >
+                <div className="gp-vinyl gp-vinyl-add">
+                  <div className="gp-vinyl-disc" />
+                  <span className="gp-vinyl-add-icon">
+                    <Plus size={26} />
+                  </span>
+                </div>
+                <div className="gp-ost-meta">
+                  <span className="gp-vinyl-name">Ajouter</span>
+                  <span className="gp-vinyl-artist">depuis YouTube</span>
+                </div>
+              </button>
+            )}
           </div>
 
           {filtered.length === 0 && query && (
@@ -351,7 +360,9 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
           )}
           {tracks.length === 0 && !query && (
             <div className="gp-ost-none">
-              Aucune OST trouvée pour ce jeu — ajoute-en une depuis YouTube.
+              {canEdit
+                ? "Aucune OST trouvée pour ce jeu — ajoute-en une depuis YouTube."
+                : "Aucune OST trouvée pour ce jeu pour l'instant."}
             </div>
           )}
         </>
@@ -379,15 +390,19 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
               >
                 <ListPlus size={15} /> Ajouter à une playlist
               </button>
-              <button className="ctx-item clickable" onClick={() => hide([menu.track.id])}>
-                <Trash2 size={15} /> Retirer cette OST
-              </button>
-              <button
-                className="ctx-item danger clickable"
-                onClick={() => hide(filtered.map((t) => t.id))}
-              >
-                <Trash2 size={15} /> Tout retirer
-              </button>
+              {canEdit && (
+                <>
+                  <button className="ctx-item clickable" onClick={() => hide([menu.track.id])}>
+                    <Trash2 size={15} /> Retirer cette OST
+                  </button>
+                  <button
+                    className="ctx-item danger clickable"
+                    onClick={() => hide(filtered.map((t) => t.id))}
+                  >
+                    <Trash2 size={15} /> Tout retirer
+                  </button>
+                </>
+              )}
             </div>
           </>,
           document.body

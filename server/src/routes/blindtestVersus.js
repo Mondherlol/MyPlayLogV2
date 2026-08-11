@@ -1,5 +1,4 @@
 import express from "express";
-import jwt from "jsonwebtoken";
 import BlindTestVersus, { MAX_PLAYERS, LIVES } from "../models/BlindTestVersus.js";
 import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -8,7 +7,6 @@ import { recordActivity } from "../lib/activity.js";
 import { grantPoints } from "../lib/points.js";
 import { triggerMissionCheck } from "../lib/missions.js";
 import { deliverCard, deliverCardToConversation } from "./chat.js";
-import { download, prepareTrack, serveTrack } from "./audio.js";
 import {
   buildVersusRounds,
   person,
@@ -34,43 +32,22 @@ import {
 // (lib/versusRoom.js) et l'esprit : le serveur arbitre, le chrono est à lui, et
 // la réponse ne sort qu'à la révélation.
 //
-// Trois choses lui sont propres, et ce sont elles qui ont demandé du travail :
+// Deux choses lui sont propres :
 //
-//   1. L'AUDIO NE PASSE PAS PAR YOUTUBE. Charger la vidéo côté client
-//      donnerait son titre — donc la réponse — à qui ouvre la console. On sert
-//      donc l'extrait depuis notre propre cache, sous une adresse qui ne dit
-//      rien : /clip/:index. Voir l'en-tête de models/BlindTestVersus.js.
-//   2. LE SAS S'ALLONGE TANT QUE L'EXTRAIT N'EST PAS PRÊT. Extraire l'audio
-//      d'une piste inconnue prend quelques secondes ; partir sans attendre
-//      donnerait l'avantage à ceux dont le fichier est déjà en cache.
-//   3. LES INDICES du solo (année, plateformes, studio) sont conservés : ils
+//   1. L'AUDIO SORT DE L'IFRAME YOUTUBE, exactement comme en solo. Il a
+//      longtemps été relayé par notre serveur sous une adresse opaque
+//      (/clip/:index) pour ne pas livrer le videoId — donc la réponse — à qui
+//      ouvre la console. Ce chemin dépendait de yt-dlp, et depuis une IP de
+//      datacenter YouTube le casse en permanence : en prod le mode multi
+//      partait MUET, pendant que le solo retombait sur l'iframe et jouait très
+//      bien la même piste. On a tranché pour un mode jouable plutôt qu'un mode
+//      inviolable et silencieux. Le videoId part donc dès le sas (roundView).
+//   2. LES INDICES du solo (année, plateformes, studio) sont conservés : ils
 //      sont l'essentiel de la tension d'une manche, et ils sont les mêmes pour
 //      tout le monde au même instant.
 const router = express.Router();
 
-// ENREGISTRÉE AVANT `requireAuth`, et c'est délibéré : une balise <audio> ne
-// sait pas poser d'en-tête Authorization. Elle passe donc son jeton en query,
-// exactement comme le flux SSE de la messagerie (`/api/chat/stream?token=…`),
-// et le handler vérifie lui-même. C'est ce qui permet de LIRE EN FLUX au lieu
-// de télécharger l'extrait entier avant d'entendre la première note.
-router.get("/:code/clip/:index", serveClip);
-
 router.use(requireAuth);
-
-// Le jeton, d'où qu'il vienne : en-tête pour les appels normaux, query pour ce
-// que le navigateur charge tout seul (audio, image…).
-function userIdFrom(req) {
-  const header = req.headers.authorization || "";
-  const raw = header.startsWith("Bearer ")
-    ? header.slice(7)
-    : String(req.query.token || "");
-  if (!raw) return null;
-  try {
-    return jwt.verify(raw, process.env.JWT_SECRET).sub;
-  } catch {
-    return null;
-  }
-}
 
 // L'EXTRAIT DURE PLUS LONGTEMPS QU'EN SOLO, ET IL N'Y A PAS DE TEMPS MORT.
 // Le solo coupe le son au bout de quinze secondes et laisse dix secondes de
@@ -83,11 +60,9 @@ function userIdFrom(req) {
 const CLIP_SEC = 35;
 const GRACE_MS = 0;
 const ROUND_MS = CLIP_SEC * 1000 + GRACE_MS;
-// Sas minimum, même quand tout est déjà en cache : c'est le « 3, 2, 1 ».
+// Le sas : « 3, 2, 1 ». Il laisse aussi à chaque iframe le temps de charger la
+// vidéo et de poser l'aiguille au climax, muette, avant le départ commun.
 const CUE_MIN_MS = 5000;
-// Au-delà, on part quand même — mieux vaut une manche sans son pour un joueur
-// qu'un salon bloqué sur une piste que yt-dlp n'arrive pas à extraire.
-const CUE_MAX_MS = 25000;
 const REVEAL_MS = 7000;
 const DEFAULT_ROUNDS = 8;
 
@@ -143,9 +118,10 @@ function isSettled(round, userId) {
 // ============================================================
 //  Sérialisation
 // ============================================================
-// CE QUE LE CLIENT A LE DROIT DE SAVOIR. Avant la révélation : qu'il y a un
-// extrait à écouter (à une adresse anonyme), les indices, et l'état des autres.
-// Ni le nom du jeu, ni la jaquette, ni le titre du morceau, ni le videoId.
+// CE QUE LE CLIENT A LE DROIT DE SAVOIR. Avant la révélation : de quoi jouer
+// l'extrait, les indices, et l'état des autres. Ni le nom du jeu, ni la
+// jaquette, ni le titre du morceau — le videoId, lui, est nécessaire à l'iframe
+// et part donc tout de suite (voir l'en-tête du fichier).
 function roundView(room, meId) {
   const round = curRound(room);
   if (!round || room.phase === "lobby") return null;
@@ -158,12 +134,17 @@ function roundView(room, meId) {
   const view = {
     index: room.index,
     total: room.rounds.length,
-    // L'adresse de l'extrait : elle ne désigne que « la manche n° i de ce
-    // salon ». Rien à y lire, rien à chercher ailleurs avec.
-    clip: `/blindtest/versus/${room.code}/clip/${room.index}`,
-    // Où se caler dans le morceau. Ce n'est PAS une fuite : une position ne dit
-    // rien du jeu, et le client doit bien savoir où poser l'aiguille — le
-    // fichier qu'il reçoit est le morceau entier, pas l'extrait découpé.
+    // L'EXTRAIT SORT DE L'IFRAME YOUTUBE, comme en solo — donc le videoId part
+    // dès le sas. C'est un choix assumé et il a un prix : qui ouvre la console
+    // pendant la manche peut remonter au titre de la vidéo, donc à la réponse.
+    // On l'accepte parce que l'autre chemin (l'audio relayé par notre serveur
+    // sous une adresse opaque) dépend de yt-dlp, que YouTube casse en
+    // permanence depuis une IP de datacenter : il rendait le mode multi muet en
+    // prod alors que le solo, lui, retombait sur cette même iframe et jouait.
+    // Mieux vaut un mode jouable qu'un mode inviolable et silencieux.
+    videoId: round.videoId,
+    // Où se caler dans le morceau : le client reçoit la vidéo entière, pas
+    // l'extrait découpé, et doit savoir où poser l'aiguille.
     startFrac: round.startFrac ?? 0.4,
     durationSec: CLIP_SEC,
     graceMs: GRACE_MS,
@@ -198,9 +179,6 @@ function roundView(room, meId) {
     view.gameName = round.gameName;
     view.cover = round.cover;
     view.ostName = round.ostName;
-    // À la révélation seulement : de quoi réécouter le morceau en entier dans
-    // le mini-lecteur, comme le fait le tableau de scores du solo.
-    view.videoId = round.videoId;
     view.results = round.results.map((r) => ({
       userId: String(r.user),
       correct: r.correct,
@@ -264,105 +242,24 @@ function toEachRoom(room, kind, payload = {}) {
 }
 
 // ============================================================
-//  L'extrait audio
-// ============================================================
-// La piste est-elle servable ? Cache partagé avec le mini-lecteur, ou URL de
-// flux résolue. Best-effort.
-//
-// ON NE TÉLÉCHARGE PLUS LE FICHIER ENTIER ICI. C'était la panne : `download()`
-// lance yt-dlp en extraction complète avec ré-encodage ffmpeg — dix à trente
-// secondes, et une occasion d'échouer que le mini-lecteur, lui, n'a jamais
-// puisqu'il relaie le flux. Résultat : le mode multi partait en silence alors
-// que le solo et le mini-lecteur jouaient très bien la même piste. Les deux
-// passent maintenant par exactement la même mécanique (routes/audio.js).
-async function ensureClip(videoId) {
-  return prepareTrack(videoId);
-}
-
-// Met en cache, EN FOND, toutes les pistes de la partie. Ici on télécharge pour
-// de bon : à cinq joueurs, un fichier sur le disque est servi cinq fois par
-// `sendFile` au lieu d'ouvrir cinq relais vers YouTube pour le même morceau.
-// C'est un confort, jamais un prérequis — le sas, lui, se contente de savoir la
-// piste servable (`ensureClip`), et le relais rattrape ce qui n'a pas pu être
-// téléchargé.
-function warmClips(room) {
-  (async () => {
-    for (const r of room.rounds) {
-      // eslint-disable-next-line no-await-in-loop
-      await download(r.videoId).catch(() => null);
-    }
-  })().catch(() => {});
-}
-
-// GET /clip/:index — l'extrait, en audio pur. Réservé aux joueurs du salon, et
-// seulement pour la manche EN COURS : demander l'extrait de la manche 5 pendant
-// la manche 2 reviendrait à écouter la suite en avance.
-//
-// Enregistrée tout en haut du fichier, hors de `requireAuth` (voir `userIdFrom`).
-async function serveClip(req, res) {
-  try {
-    const userId = userIdFrom(req);
-    if (!userId) return res.status(401).json({ error: "Non authentifié." });
-    const room = await loadRoom(req.params.code);
-    if (!room) return res.status(404).json({ error: "Salon introuvable." });
-    if (!allIds(room).includes(String(userId)))
-      return res.status(403).json({ error: "Tu ne joues pas ici." });
-    const i = Number(req.params.index);
-    if (!Number.isInteger(i) || i !== room.index)
-      return res.status(403).json({ error: "Ce n'est pas la manche en cours." });
-    const round = room.rounds[i];
-    if (!round?.videoId) return res.status(404).json({ error: "Extrait indisponible." });
-
-    // Servi par la mécanique commune (cache, sinon relais du flux). L'adresse,
-    // elle, reste la nôtre : aucun videoId, aucun titre ne traverse — et
-    // JAMAIS de cache partagé sur cette URL-là.
-    await serveTrack(round.videoId, req, res, "private, no-store");
-  } catch (err) {
-    console.error("btversus clip error:", err.message);
-    if (!res.headersSent) res.status(500).json({ error: "Extrait illisible." });
-  }
-}
-
-// ============================================================
 //  Le déroulé d'une manche
 // ============================================================
+// LE SAS EST DE DURÉE FIXE. Il s'allongeait avant, le temps que notre serveur
+// ait extrait la piste lui-même — c'était le prix de
+// l'audio relayé maison. Maintenant que chaque navigateur charge la vidéo
+// directement chez YouTube, il n'y a plus rien à attendre côté serveur : les
+// cinq secondes servent au décompte « 3, 2, 1 » et au préchargement de l'iframe
+// de chacun, qui se cale au climax pendant ce temps-là.
 async function startCue(room, index) {
   room.phase = "cue";
   room.index = index;
-  const round = room.rounds[index];
   room.phaseStartsAt = Date.now() + CUE_MIN_MS;
   room.phaseEndsAt = room.phaseStartsAt + ROUND_MS;
   touch(room);
   await room.save();
   await room.populate(POPULATE);
   toEachRoom(room, "cue");
-
-  // Le sas attend que l'extrait soit RÉELLEMENT prêt : tant que le fichier
-  // n'est pas là, personne ne part. Le décompte affiché se cale sur la nouvelle
-  // heure de départ, rediffusée si l'attente s'allonge.
-  (async () => {
-    const deadline = Date.now() + CUE_MAX_MS;
-    const ok = await ensureClip(round?.videoId);
-    const now = Date.now();
-    const startAt = ok
-      ? Math.max(room.phaseStartsAt, now)
-      : Math.max(room.phaseStartsAt, Math.min(now, deadline));
-    await withRoom(room.code, async (r) => {
-      if (r.phase !== "cue" || r.index !== index) return r;
-      if (startAt > r.phaseStartsAt) {
-        r.phaseStartsAt = startAt;
-        r.phaseEndsAt = startAt + ROUND_MS;
-        await r.save();
-        await r.populate(POPULATE);
-        toEachRoom(r, "cue");
-      }
-      clock.at(r.code, r.phaseStartsAt, () => withRoom(r.code, beginRound));
-      return r;
-    });
-  })().catch(() => {
-    clock.at(room.code, room.phaseStartsAt, () => withRoom(room.code, beginRound));
-  });
-
+  clock.at(room.code, room.phaseStartsAt, () => withRoom(room.code, beginRound));
   return room;
 }
 
@@ -676,9 +573,6 @@ router.post("/:code/start", async (req, res) => {
       }
       await room.save();
       await room.populate(POPULATE);
-      // Toutes les pistes en extraction dès maintenant : seule la première
-      // manche peut avoir à patienter dans son sas.
-      warmClips(room);
       // La liste de recherche se construit ICI, avant d'armer le sas : elle
       // dépend des manches (toutes les réponses doivent y être) mais passe par
       // IGDB, et la calculer après le départ grignoterait le décompte commun.

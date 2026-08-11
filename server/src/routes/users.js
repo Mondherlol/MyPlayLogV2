@@ -18,7 +18,7 @@ import { igdbQuery } from "../lib/igdb.js";
 import { ensureGameMeta } from "../lib/gameMeta.js";
 import { ensureEntityLogos } from "../lib/entityLogos.js";
 import { setServiceNpsso, getServiceStatus, clearServiceTokens } from "../lib/psn.js";
-import { isUserAdmin } from "../lib/admin.js";
+import { isUserAdmin, isUserStaff } from "../lib/admin.js";
 import { isExpoPushToken } from "../lib/push.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { summarizeReactions, reviewComment } from "../lib/reviewSerialize.js";
@@ -1796,6 +1796,9 @@ router.get("/:username", optionalAuth, async (req, res) => {
           covers: flags.hideCover ? [] : user.effectiveCovers(),
           bio: user.bio,
           createdAt: user.createdAt,
+          // Le badge « Staff » s'affiche même sur une carte de visite verrouillée :
+          // savoir à qui on a affaire ne dépend pas de l'abonnement.
+          isStaff: isUserStaff(user),
           isMe: false,
           isFollowing: false,
           locked: true,
@@ -1919,6 +1922,8 @@ router.get("/:username", optionalAuth, async (req, res) => {
         // écrit qu'en fin de session, donc quelqu'un d'actif à l'instant même
         // y apparaîtrait comme « vu il y a 20 minutes ».
         online: onlineAmong([user._id]).has(String(user._id)),
+        // Badge « Staff » à côté du pseudo (les admins en font partie).
+        isStaff: isUserStaff(user),
         isMe,
         isFollowing,
         // Ce profil est-il abonné à MOI ? (autorise le bouton « Message » :

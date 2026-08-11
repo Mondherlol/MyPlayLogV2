@@ -176,6 +176,10 @@ function TracksOfGame({ game, token, existing, onToggle, onBack }) {
   const [renamingAll, setRenamingAll] = useState(false); // MassRenameOstModal
   const [showTrash, setShowTrash] = useState(false);
   const [rename, setRename] = useState(null); // { id, value } — renommage inline
+  // Éditer l'OST du jeu (ajouter/retirer/renommer) est réservé au staff ;
+  // composer sa playlist reste ouvert à tout le monde.
+  const { user } = useAuth();
+  const canEdit = !!user?.isStaff;
 
   // Comme dans GameOst : chaque mutation met aussi à jour le cache partagé de
   // l'onglet OST de la page jeu (mêmes clés localStorage).
@@ -314,14 +318,16 @@ function TracksOfGame({ game, token, existing, onToggle, onBack }) {
               onChange={(e) => setFilter(e.target.value)}
             />
           )}
-          <button
-            className="aost-tool clickable"
-            onClick={() => setAdding(true)}
-            title="Ajouter une OST YouTube (piste ou playlist)"
-          >
-            <Plus size={15} />
-          </button>
-          {tracks.length > 0 && (
+          {canEdit && (
+            <button
+              className="aost-tool clickable"
+              onClick={() => setAdding(true)}
+              title="Ajouter une OST YouTube (piste ou playlist)"
+            >
+              <Plus size={15} />
+            </button>
+          )}
+          {canEdit && tracks.length > 0 && (
             <button
               className="aost-tool clickable"
               onClick={() => setRenamingAll(true)}
@@ -330,7 +336,7 @@ function TracksOfGame({ game, token, existing, onToggle, onBack }) {
               <TextCursorInput size={15} />
             </button>
           )}
-          {trash.length > 0 && (
+          {canEdit && trash.length > 0 && (
             <button
               className={`aost-tool clickable ${showTrash ? "active" : ""}`}
               onClick={() => setShowTrash((v) => !v)}
@@ -340,7 +346,7 @@ function TracksOfGame({ game, token, existing, onToggle, onBack }) {
               <span className="aost-tool-count">{trash.length}</span>
             </button>
           )}
-          {shown.length > 0 && (
+          {canEdit && shown.length > 0 && (
             <button
               className="aost-tool danger clickable"
               onClick={() => hide(shown.map((t) => t.id))}
@@ -352,7 +358,7 @@ function TracksOfGame({ game, token, existing, onToggle, onBack }) {
         </div>
       </div>
 
-      {showTrash && trash.length > 0 && (
+      {canEdit && showTrash && trash.length > 0 && (
         <div className="aost-trash">
           <span className="aost-trash-title">
             <Trash2 size={13} /> Pistes retirées
@@ -387,7 +393,9 @@ function TracksOfGame({ game, token, existing, onToggle, onBack }) {
         <p className="additems-hint font-fun" style={{ padding: "1rem 0" }}>
           {filter
             ? `Aucune piste pour « ${filter} ».`
-            : "Aucune OST trouvée pour ce jeu — ajoute-en une depuis YouTube (+)."}
+            : canEdit
+              ? "Aucune OST trouvée pour ce jeu — ajoute-en une depuis YouTube (+)."
+              : "Aucune OST trouvée pour ce jeu."}
         </p>
       ) : (
         <div className="aost-tracks">
@@ -457,26 +465,30 @@ function TracksOfGame({ game, token, existing, onToggle, onBack }) {
                   )}
                 </span>
                 <span className="aost-track-actions">
-                  <button
-                    className="aost-tool clickable"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setRename({ id: t.id, value: t.name });
-                    }}
-                    title="Renommer cette piste"
-                  >
-                    <Pencil size={13} />
-                  </button>
-                  <button
-                    className="aost-tool danger clickable"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      hide([t.id]);
-                    }}
-                    title="Retirer cette OST (corbeille)"
-                  >
-                    <Trash2 size={13} />
-                  </button>
+                  {canEdit && (
+                    <>
+                      <button
+                        className="aost-tool clickable"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRename({ id: t.id, value: t.name });
+                        }}
+                        title="Renommer cette piste"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        className="aost-tool danger clickable"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          hide([t.id]);
+                        }}
+                        title="Retirer cette OST (corbeille)"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </>
+                  )}
                   <span className={`aost-track-toggle ${added ? "on" : ""}`}>
                     {added ? <Check size={16} /> : <Plus size={16} />}
                   </span>

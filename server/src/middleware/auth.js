@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
-import { canUserDownload, isUserAdmin } from "../lib/admin.js";
+import { canUserDownload, isUserAdmin, isUserStaff } from "../lib/admin.js";
 import { dayKey, touchStreak } from "../lib/streak.js";
 
 // Présence : on note le dernier passage de chaque utilisateur (affiché sur son
@@ -84,6 +84,39 @@ export async function requireAdmin(req, res, next) {
   } catch {
     return res.status(500).json({ error: "Erreur d'authentification admin." });
   }
+}
+
+// À chaîner APRÈS requireAuth : réserve la route au staff (ou à un
+// administrateur). C'est ICI que se joue la restriction sur les contenus
+// partagés d'une fiche de jeu — le client se contente de cacher les boutons.
+// Renseigne req.isStaff pour les routes qui assouplissent une règle ensuite
+// (ex : le staff peut modifier un personnage qu'il n'a pas ajouté).
+export async function requireStaff(req, res, next) {
+  try {
+    const user = await User.findById(req.userId).select("isAdmin isSuperAdmin isStaff");
+    if (!isUserStaff(user))
+      return res
+        .status(403)
+        .json({ error: "Cette action est réservée au staff de MyPlayLog." });
+    req.isStaff = true;
+    next();
+  } catch {
+    return res.status(500).json({ error: "Erreur d'authentification." });
+  }
+}
+
+// Vrai/faux sans bloquer : renseigne req.isStaff pour les routes ouvertes à
+// tous mais dont une partie du comportement change pour le staff.
+export async function markStaff(req, _res, next) {
+  try {
+    if (req.userId) {
+      const user = await User.findById(req.userId).select("isAdmin isSuperAdmin isStaff");
+      req.isStaff = isUserStaff(user);
+    }
+  } catch {
+    req.isStaff = false;
+  }
+  next();
 }
 
 // À chaîner APRÈS requireAuth : réserve la route aux comptes autorisés à
