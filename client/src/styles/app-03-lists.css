@@ -2274,6 +2274,32 @@
   gap: 0.75rem;
 }
 
+/* Variante virtualisée (Explorer) : Virtuoso mesure la hauteur de chaque
+   élément et empile les positions lui-même. Un `gap` flex lui échappe — les
+   lignes finiraient superposées. L'écart passe donc dans le conteneur de
+   ligne, dont la hauteur, elle, est bien mesurée. */
+.lr-list.is-virtual {
+  display: block;
+  gap: 0;
+}
+
+.lr-vrow {
+  padding-bottom: 0.75rem;
+}
+
+/* Attente de la 1re page (Explorer) : des pavés à la hauteur d'une ligne, pour
+   que la page ne sursaute pas quand les vraies lignes arrivent. */
+.lr-row-skeleton {
+  height: 210px;
+  border-radius: 16px;
+  background: linear-gradient(100deg,
+      var(--surface-2) 30%,
+      var(--border) 50%,
+      var(--surface-2) 70%);
+  background-size: 200% 100%;
+  animation: shimmer 1.3s infinite linear;
+}
+
 /* Zones NOMMÉES, et non des colonnes positionnelles : le rang n'existe que sur
    une liste classée, et sans lui tout se décalait d'un cran — la jaquette
    héritait de la colonne `auto` (donc sa largeur naturelle, énorme) et le texte

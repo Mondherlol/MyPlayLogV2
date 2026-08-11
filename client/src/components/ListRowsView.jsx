@@ -40,7 +40,10 @@ const fmtDate = new Intl.DateTimeFormat("fr-FR", {
 
 // File d'attente partagée par toutes les lignes : ce qui apparaît dans la même
 // fenêtre de 150 ms part groupé.
-function useGameDetails(token) {
+// Exporté avec `GameRow` et `TrailerModal` : l'Explorer affiche EXACTEMENT les
+// mêmes lignes, mais dans une liste virtualisée à défilement infini — il lui
+// faut donc les pièces, pas le composant complet.
+export function useGameDetails(token) {
   const [details, setDetails] = useState({});
   const pending = useRef(new Set());
   const asked = useRef(new Set());
@@ -113,7 +116,7 @@ function Countdown({ ts }) {
 
 // Bande-annonce en modale. Lecteur jeté à la fermeture — pas de suivi de
 // progression ici, contrairement au lecteur social de l'onglet Vidéos.
-function TrailerModal({ trailer, gameName, onClose }) {
+export function TrailerModal({ trailer, gameName, onClose }) {
   useScrollLock();
   useBackClose(onClose, "listTrailer");
   useEffect(() => {
@@ -190,7 +193,7 @@ function Langs({ detail: d }) {
 const idOf = (item) => item.gameId || Number(item.refId) || null;
 
 // --- Une ligne ---
-function GameRow({ item, rank, detail, onNeedDetail, onShots, onTrailer }) {
+export function GameRow({ item, rank, detail, onNeedDetail, onShots, onTrailer }) {
   const rowRef = useRef(null);
   const gameId = idOf(item);
 

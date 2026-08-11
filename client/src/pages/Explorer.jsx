@@ -20,6 +20,12 @@ import { makeCache } from "../lib/cache";
 import { useAuth } from "../context/AuthContext";
 import GameCard from "../components/GameCard";
 import FilterSection from "../components/FilterSection";
+import MediaLightbox from "../components/MediaLightbox";
+import {
+  GameRow,
+  TrailerModal,
+  useGameDetails,
+} from "../components/ListRowsView";
 
 const PAGE_SIZE = 24;
 
@@ -134,6 +140,13 @@ export default function Explorer() {
   const [view, setView] = useState(
     () => localStorage.getItem("mpl_explorer_view") || "grid"
   ); // "grid" | "list"
+
+  // Vue liste : exactement les lignes détaillées d'une liste de jeux
+  // (plateformes, langues, compte à rebours, captures, bande-annonce). Les
+  // détails IGDB arrivent par lots au fil du défilement, comme dans ListDetail.
+  const [details, requestDetail] = useGameDetails(token);
+  const [shots, setShots] = useState(null); // { items, index, title }
+  const [trailer, setTrailer] = useState(null); // { trailer, gameName }
 
   function changeView(v) {
     setView(v);
@@ -598,9 +611,19 @@ export default function Explorer() {
                     increaseViewportBy={{ top: 400, bottom: 800 }}
                     context={{ loading, hasMore, count: games.length }}
                     components={explorerComponents}
+                    listClassName="lr-list is-virtual"
                     itemContent={(_, g) => (
-                      <div className="game-list-item">
-                        <GameCard game={g} variant="list" />
+                      // L'écart entre les lignes est porté par ce conteneur, pas
+                      // par un `gap` : Virtuoso mesure la hauteur des éléments,
+                      // et un gap flex qu'il ne voit pas les fait se chevaucher.
+                      <div className="lr-vrow">
+                        <GameRow
+                          item={{ name: g.name, image: g.cover, gameId: g.id }}
+                          detail={details[g.id]}
+                          onNeedDetail={requestDetail}
+                          onShots={setShots}
+                          onTrailer={setTrailer}
+                        />
                       </div>
                     )}
                   />
@@ -622,12 +645,12 @@ export default function Explorer() {
                   une grille simple, non virtualisée, le temps de la 1re page. */}
               {loading && games.length === 0 && (
                 <div
-                  className={view === "list" ? "game-list" : "game-grid"}
+                  className={view === "list" ? "lr-list" : "game-grid"}
                   ref={gridRef}
                 >
-                  {Array.from({ length: view === "list" ? 6 : cols * 2 }).map((_, i) => (
+                  {Array.from({ length: view === "list" ? 4 : cols * 2 }).map((_, i) => (
                     <div
-                      className={view === "list" ? "game-row-skeleton" : "game-skeleton"}
+                      className={view === "list" ? "lr-row-skeleton" : "game-skeleton"}
                       key={`sk-${i}`}
                     />
                   ))}
@@ -637,6 +660,26 @@ export default function Explorer() {
           )}
         </div>
       </div>
+
+      {/* Captures en grand et bande-annonce des lignes (vue liste) : montées au
+          niveau de la page, sinon Virtuoso les démonterait en recyclant la
+          ligne dont elles sont parties. */}
+      {shots && (
+        <MediaLightbox
+          items={shots.items}
+          index={shots.index}
+          onIndex={(index) => setShots((s) => ({ ...s, index }))}
+          onClose={() => setShots(null)}
+          title={shots.title}
+        />
+      )}
+      {trailer && (
+        <TrailerModal
+          trailer={trailer.trailer}
+          gameName={trailer.gameName}
+          onClose={() => setTrailer(null)}
+        />
+      )}
 
       {/* Bouton flottant d'ouverture des filtres (mobile uniquement) */}
       <button
