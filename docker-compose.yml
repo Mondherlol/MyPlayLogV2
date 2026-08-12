@@ -112,14 +112,34 @@ services:
           sleep 3600
           exit 1
         fi
-        # `--external-ip` n'est ajouté QUE s'il est renseigné : sur un VPS dont
-        # l'adresse publique est portée directement par l'interface (c'est le cas
-        # ici, en réseau hôte), coturn la détecte seul. Passer une valeur vide,
-        # en revanche, est une erreur de syntaxe qui l'empêche de démarrer.
+        # ⚠️ ON LUI IMPOSE UNE SEULE ADRESSE, et c'est important.
+        #
+        # Laissé libre, coturn prend TOUTES les interfaces de la machine : l'IP
+        # publique, mais aussi les ponts Docker (172.x), Tailscale (100.x), la
+        # boucle locale. Il distribue ensuite les relais en alternance entre
+        # elles — donc la plupart du temps il annonce au navigateur une adresse
+        # que personne ne peut joindre. Le relais semble fonctionner et échoue
+        # sept fois sur huit, ce qui est bien pire qu'une panne franche.
+        #
+        # Les trois options vont ensemble :
+        #   listening-ip  où il écoute
+        #   relay-ip      par où il fait transiter
+        #   external-ip   ce qu'il ANNONCE aux navigateurs
+        #
+        # Sans TURN_PUBLIC_IP, on laisse coturn se débrouiller : ça marche sur
+        # une machine à une seule interface, et un démarrage réussi vaut mieux
+        # qu'un refus si quelqu'un déploie ailleurs.
+        BIND=""
+        if [ -n "$$TURN_PUBLIC_IP" ]; then
+          BIND="--listening-ip=$$TURN_PUBLIC_IP --relay-ip=$$TURN_PUBLIC_IP --external-ip=$$TURN_PUBLIC_IP"
+        else
+          echo "coturn: TURN_PUBLIC_IP absent — coturn ecoutera sur TOUTES les interfaces"
+          echo "coturn: (ponts Docker compris), ce qui rend le relais peu fiable."
+        fi
         exec turnserver -c /etc/coturn/turnserver.conf \
           --static-auth-secret="$$TURN_SECRET" \
           --realm="$${TURN_REALM:-myplaylog.cc}" \
-          $${TURN_PUBLIC_IP:+--external-ip="$$TURN_PUBLIC_IP"}
+          $$BIND
 
   web:
     build:
