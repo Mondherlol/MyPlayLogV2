@@ -1248,9 +1248,17 @@ function Volume({
       // reste de la pose, au lieu de l'exclure. Sans ça, un volume ouvert depuis
       // la vitrine rentrait au rayon de face — une couverture qui recule dans la
       // planche au lieu d'un livre qui se range.
+      // ET LE QUART DE TOUR SE TOURNE DANS LE SENS DU VOLUME. La scène est
+      // retournée pour un manga (`scale-x = -1`, plus bas) : le dos reste à
+      // l'origine, mais les plats partent de l'autre côté. Le même quart de tour
+      // présentait donc la GOUTTIÈRE à la caméra là où un comic présentait son
+      // dos — le volume rentrait au rayon par la mauvaise tranche, et se
+      // retournait d'un coup en arrivant dans sa fente. Le miroir de la scène
+      // veut son miroir ici aussi.
       const face = f ? Math.max(0, (arrive - 0.28) / 0.72) : 1;
       rig.current.rotation.y =
-        (pose ? pose.spinY * rest : 0) + (Math.PI / 2) * (1 - face);
+        (pose ? pose.spinY * rest : 0) +
+        (rtl ? -Math.PI / 2 : Math.PI / 2) * (1 - face);
       // On le regarde d'un rien au-dessus : de quoi que les piles et le dos
       // existent, pas au point de rendre les planches fuyantes. Et on se remet
       // droit dès qu'on zoome — à ce moment-là on vient LIRE, et la moindre

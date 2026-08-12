@@ -50,6 +50,7 @@ const BookReader3D = lazy(() => import("../components/BookReader3D"));
 const GbaPlayer = lazy(() => import("../components/GbaPlayer"));
 import {
   CONSOLE,
+  FLAT_FIRST,
   FORMATS,
   LICENCES,
   PROVIDERS,
@@ -64,6 +65,7 @@ import {
   langsOf,
   sourcesInLang,
 } from "../lib/collection";
+import useMediaQuery from "../hooks/useMediaQuery";
 
 // Où l'on garde « je regarde en VF ». Une préférence de spectateur, pas un
 // réglage du titre : elle traverse les fiches (voir le sélecteur de piste).
@@ -95,6 +97,13 @@ export default function CollectionDetail() {
   // bulle ou dérouler un scan long). Deux façons de lire le même titre, pas un
   // lecteur et son repli.
   const [reading, setReading] = useState(null); // "volume" | "plat" | null
+  // CE QUE « OUVRIR » VEUT DIRE DÉPEND DE L'ÉCRAN. Sur un grand, c'est le volume
+  // qu'on prend en main ; sur un téléphone, c'est la planche, en grand, tout de
+  // suite (voir FLAT_FIRST). Les deux lecteurs restent accessibles des deux
+  // côtés — seul change celui que le bouton principal ouvre, et donc celui
+  // qu'une reprise de lecture ou une planche désignée déclenchent.
+  const flatFirst = useMediaQuery(FLAT_FIRST);
+  const firstReader = flatFirst ? "plat" : "volume";
   const [openAt, setOpenAt] = useState(null); // planche demandée à l'ouverture
   const [season, setSeason] = useState(null);
   const [playing, setPlaying] = useState(false); // la console est allumée
@@ -292,13 +301,13 @@ export default function CollectionDetail() {
           ? askedPage
           : media.progress?.page || 0
       );
-      setReading("volume");
+      setReading(firstReader);
       dropPlayParam();
       return;
     }
     const index = Number.isFinite(askedEpisode) ? askedEpisode : 0;
     watch(index, media.progress?.positionSeconds || 0);
-  }, [media, autoPlay, askedEpisode, askedPage, watch, dropPlayParam]);
+  }, [media, autoPlay, askedEpisode, askedPage, watch, dropPlayParam, firstReader]);
 
   const seasons = useMemo(() => {
     const set = [...new Set((media?.episodes || []).map((e) => e.season || 1))];
@@ -537,7 +546,7 @@ export default function CollectionDetail() {
                     className="btn btn-primary clickable"
                     onClick={() => {
                       setOpenAt(pageAt);
-                      setReading("volume");
+                      setReading(firstReader);
                     }}
                   >
                     <BookOpen size={17} />
@@ -549,22 +558,41 @@ export default function CollectionDetail() {
                       onClick={() => {
                         savePage(0);
                         setOpenAt(0);
-                        setReading("volume");
+                        setReading(firstReader);
                       }}
                     >
                       Repartir du début
                     </button>
                   )}
-                  <button
-                    className="btn btn-ghost clickable"
-                    onClick={() => {
-                      setOpenAt(pageAt);
-                      setReading("plat");
-                    }}
-                    title="Planche pleine page : zoom, planche-contact, ruban vertical"
-                  >
-                    Lecture à plat
-                  </button>
+                  {/* L'AUTRE FAÇON DE LIRE, toujours à un bouton. Ce qu'elle
+                      propose s'inverse avec l'écran : sur un grand, « Ouvrir »
+                      donne le volume et ce bouton donne la planche à plat ; sur
+                      un téléphone, c'est l'inverse — la lecture est à plat, et
+                      le volume 3D devient ce qu'il est là-bas, un plaisir qu'on
+                      va chercher. */}
+                  {flatFirst ? (
+                    <button
+                      className="btn btn-ghost clickable"
+                      onClick={() => {
+                        setOpenAt(pageAt);
+                        setReading("volume");
+                      }}
+                      title="Le volume en 3D : on l'ouvre et on tourne les pages"
+                    >
+                      Feuilleter en 3D
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-ghost clickable"
+                      onClick={() => {
+                        setOpenAt(pageAt);
+                        setReading("plat");
+                      }}
+                      title="Planche pleine page : zoom, planche-contact, ruban vertical"
+                    >
+                      Lecture à plat
+                    </button>
+                  )}
                 </>
               ) : (
                 <>
@@ -743,14 +771,15 @@ export default function CollectionDetail() {
                 </em>
               </h2>
             </div>
-            {/* Un aperçu cliquable : on ouvre le volume À LA PLANCHE qu'on
-                désigne, comme on pose le doigt au milieu d'un livre. */}
+            {/* Un aperçu cliquable : on ouvre À LA PLANCHE qu'on désigne, comme
+                on pose le doigt au milieu d'un livre — dans le lecteur que
+                l'écran appelle (voir `firstReader`). */}
             <Plates
               pages={media.pages || []}
               pageAt={pageAt}
               onOpen={(index) => {
                 setOpenAt(index);
-                setReading("volume");
+                setReading(firstReader);
               }}
             />
           </section>

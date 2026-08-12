@@ -1,3 +1,37 @@
+import {
+  accentInk,
+  alpha,
+  canvasOf,
+  drawCover,
+  ensureFonts,
+  fadeInto,
+  fitOneLine,
+  fitTracked,
+  foldShading,
+  grain,
+  inkOn,
+  luminanceOf,
+  shade,
+  tintLogo,
+  loadImage,
+  makeField,
+  roundRect,
+  rule,
+  SANS,
+  SERIF,
+  trackedText,
+  trackedWidth,
+  wrapText,
+} from "./canvasKit";
+import {
+  MARK_FILES,
+  paintDvdBack,
+  paintDvdSleeve,
+  paintSpineLogo,
+  paintSpineMark,
+  pickImage,
+} from "./dvdSkin";
+
 // ======================================================================
 //  Collection — repères d'affichage et peinture des boîtiers
 // ======================================================================
@@ -62,6 +96,24 @@ export const isComic = (media) => media?.kind === "comic";
 // Aucun composant ne lit donc `readDirection` en direct : un boîtier de DVD n'a
 // pas de sens de lecture, quelle qu'ait été sa vie d'avant.
 export const isRtl = (media) => isComic(media) && media?.readDirection === "rtl";
+
+// LE VOLUME 3D EST UN OBJET DE BUREAU, ET C'EST TRÈS BIEN COMME ÇA. On l'ouvre,
+// on le tourne, on le feuillette — mais on ne LIT pas dedans sur un téléphone :
+// la planche est vue en perspective, elle n'occupe qu'une fraction d'un écran
+// déjà petit, et ses gestes (survol, molette, six touches, lecture guidée) ont
+// été pensés pour un clavier. Sur un pouce, il ne restait que le glissement, et
+// une planche haute de six centimètres.
+//
+// Sous ce seuil, « Ouvrir » ouvre donc la LECTURE À PLAT (voir ComicReader) :
+// une planche pleine largeur, le pincer-zoomer, le tap pour tourner, le ruban
+// vertical. Le volume 3D reste offert d'un bouton — c'est un plaisir, pas la
+// seule porte.
+//
+// 900 px, comme partout ailleurs dans la section : c'est déjà le seuil du
+// tutoriel du volume 3D et celui de la double page à plat, et trois seuils
+// voisins qui divergeraient donneraient un lecteur qui change de nature au
+// milieu d'un redimensionnement.
+export const FLAT_FIRST = "(max-width: 900px)";
 
 // ------------------------------------------------------- les doubles pages --
 //
@@ -337,270 +389,16 @@ export function resumeLabel(media) {
   return `Ép. ${num}`;
 }
 
-// ------------------------------------------------------- images / canvas --
-
-// Charge une image utilisable dans un canvas destiné à WebGL. `crossOrigin`
-// est obligatoire : sans en-tête CORS, le canvas devient « souillé » et la
-// texture échoue (boîtier de couleur unie sur le rayonnage).
-function loadTag(src, cors) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    if (cors) img.crossOrigin = "anonymous";
-    // Le décodage est demandé À PART, et hors du fil principal. Sans ça il a
-    // lieu au premier `drawImage`, donc en plein milieu de la peinture : une
-    // affiche de 1500 px décodée là, c'est une saccade, et quarante boîtiers
-    // font quarante saccades pendant que l'étagère se garnit.
-    img.decoding = "async";
-    img.onload = () => {
-      const done = () => resolve(img);
-      if (img.decode) img.decode().then(done, done);
-      else done();
-    };
-    img.onerror = () => resolve(null);
-    img.src = src;
-  });
-}
-
-// Deux tentatives, parce qu'un échec ici est INVISIBLE (le boîtier se peint
-// alors en couleur unie) et qu'on ne saurait pas pourquoi :
-//   1. la balise <img crossOrigin> — le chemin normal ;
-//   2. un fetch + blob: URL en repli. Une blob: URL est de notre origine, donc
-//      elle ne peut jamais souiller le canvas — ça sauve les cas tordus, comme
-//      une image déjà en cache navigateur depuis une requête SANS CORS (une
-//      vignette de la grille 2D), que Chrome ressort parfois telle quelle.
-export async function loadImage(src) {
-  if (!src) return null;
-  const direct = await loadTag(src, true);
-  if (direct) return direct;
-  try {
-    const res = await fetch(src, { mode: "cors" });
-    if (!res.ok) return null;
-    const url = URL.createObjectURL(await res.blob());
-    const img = await loadTag(url, false);
-    URL.revokeObjectURL(url);
-    return img;
-  } catch {
-    return null;
-  }
-}
-
-// Dessine une image en « cover » (remplit le cadre, recadre le débord).
-// `ax` / `ay` disent QUELLE part on garde quand ça déborde : 0,5 recadre au
-// centre, 0 colle en haut à gauche. Sur une affiche, le sujet est presque
-// toujours dans le haut — un recadrage centré lui coupe la tête.
-function drawCover(ctx, img, x, y, w, h, ax = 0.5, ay = 0.5) {
-  const ratio = Math.max(w / img.width, h / img.height);
-  const dw = img.width * ratio;
-  const dh = img.height * ratio;
-  ctx.drawImage(img, x + (w - dw) * ax, y + (h - dh) * ay, dw, dh);
-}
-
-// Texte coupé en lignes qui tiennent dans `max`, `lines` au plus. Ce qui
-// dépasse est signalé par des points de suspension SUR LA DERNIÈRE LIGNE —
-// un résumé qui s'arrête net au milieu d'un mot fait bâclé.
-function wrap(ctx, text, max, lines = 3) {
-  const words = String(text || "").split(/\s+/).filter(Boolean);
-  const out = [];
-  let line = "";
-  let i = 0;
-  for (; i < words.length; i++) {
-    const next = line ? `${line} ${words[i]}` : words[i];
-    if (ctx.measureText(next).width > max && line) {
-      out.push(line);
-      line = words[i];
-      if (out.length === lines) break;
-    } else line = next;
-  }
-  // Sortie normale de la boucle : tout est passé, la dernière ligne se pose
-  // telle quelle. Sortie par `break` : il reste du texte, donc et seulement
-  // donc on signale la coupe.
-  //
-  // L'ancienne version ajoutait les points de suspension dès que le compte de
-  // lignes était atteint — même quand le texte tombait juste. Résultat : TOUT
-  // titre tenant pile en deux lignes s'affichait tronqué (« Castlevania:
-  // Nocturne… »), ce qui donnait l'air bâclé à des faces parfaitement calées.
-  if (out.length < lines) {
-    if (line) out.push(line);
-    return out;
-  }
-  const rest = line || i < words.length;
-  if (rest && out.length) {
-    let last = out[out.length - 1];
-    while (last.length > 4 && ctx.measureText(`${last}…`).width > max) {
-      last = last.slice(0, -1).trim();
-    }
-    out[out.length - 1] = `${last}…`;
-  }
-  return out.slice(0, lines);
-}
-
-// ------------------------------------------------------ boîte à couleurs --
-
-// Un ton de la teinte du titre, éclairci (t > 0) ou assombri (t < 0). Toute la
-// tranche est bâtie là-dessus : une seule couleur servie par l'API, déclinée en
-// bandeaux, ombres et filets — c'est ce qui fait qu'un boîtier a l'air imprimé
-// plutôt que colorié.
-// Le résultat sort en HEXA, et pas en `rgb(…)` : un ton dérivé est presque
-// toujours repassé à `alpha()` juste après (une encre d'accent, un filet), et
-// celui-ci ne sait lire que de l'hexa — il retombait sinon sur le doré par
-// défaut, donc TOUS les boîtiers avaient les mêmes accents dorés.
-function shade(hex, t) {
-  const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(String(hex || ""));
-  if (!m) return hex || "#f2b70b";
-  const to = t > 0 ? 255 : 0;
-  const k = Math.abs(t);
-  const rgb = m.slice(1).map((v) => Math.round(parseInt(v, 16) * (1 - k) + to * k));
-  return `#${rgb.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
-}
-
-function alpha(hex, a) {
-  const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(String(hex || ""));
-  if (!m) return `rgba(242, 183, 11, ${a})`;
-  const [r, g, b] = m.slice(1).map((v) => parseInt(v, 16));
-  return `rgba(${r}, ${g}, ${b}, ${a})`;
-}
-
-// Rectangle à coins arrondis — les pastilles, les fenêtres, les cartouches.
-function roundRect(ctx, x, y, w, h, r) {
-  const rad = Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + rad, y);
-  ctx.arcTo(x + w, y, x + w, y + h, rad);
-  ctx.arcTo(x + w, y + h, x, y + h, rad);
-  ctx.arcTo(x, y + h, x, y, rad);
-  ctx.arcTo(x, y, x + w, y, rad);
-  ctx.closePath();
-}
-
-// ------------------------------------------------------------ typographie --
+// ------------------------------------------------------------- l'atelier --
 //
-// DEUX familles, deux rôles, et rien d'autre — c'est la règle qui sépare une
-// édition soignée d'une jaquette de supermarché :
-//
-//   • une didone à fort contraste pour les TITRES. Un titre de film gravé dans
-//     une grotesque géométrique fait « application » ; en didone, il fait
-//     « objet imprimé » ;
-//   • une grotesque neutre, en petites capitales espacées, pour TOUT le reste
-//     (mentions, cartouche, résumé). La petite typo d'un dos de boîtier se lit,
-//     elle ne s'admire pas.
-const SERIF = '"Playfair Display", "Times New Roman", Georgia, serif';
-const SANS = "Inter, system-ui, sans-serif";
+// Les gestes de peinture (charger une image, poser du texte interlettré, tirer
+// un champ de couleur d'une affiche) vivaient ici, puis le gabarit de jaquette
+// vidéo est né à côté et en a eu besoin des mêmes : ils sont partis dans
+// `canvasKit`, qui ne connaît rien aux boîtiers. Ce fichier garde ce qui est
+// PROPRE À L'OBJET — les faces, la feuille, les matières de l'étagère.
+export { loadImage };
 
-// UN CANVAS NE DÉCLENCHE PAS LE CHARGEMENT D'UNE POLICE. `ctx.font` accepte
-// n'importe quel nom et retombe sans rien dire sur un repli système si la fonte
-// n'a jamais servi dans le DOM. La didone ne sert QUE sur les boîtiers : sans
-// cette demande explicite, toutes les jaquettes sortiraient en Times — et
-// `document.fonts.ready` seul ne le verrait même pas, puisqu'il n'attend que ce
-// qui est DÉJÀ demandé.
-const FACES = [
-  '600 40px "Playfair Display"',
-  '700 40px "Playfair Display"',
-  'italic 500 40px "Playfair Display"',
-  "500 40px Inter",
-  "700 40px Inter",
-];
-let fontsReady = null;
-function ensureFonts() {
-  if (!fontsReady) {
-    fontsReady = (async () => {
-      try {
-        await Promise.all(FACES.map((f) => document.fonts.load(f)));
-        await document.fonts.ready;
-      } catch {
-        /* pas d'API de polices : on peint avec ce qui est disponible */
-      }
-    })();
-  }
-  return fontsReady;
-}
-
-// Capitales espacées, tracées lettre à lettre. `ctx.letterSpacing` existe mais
-// `measureText` L'IGNORE dans plusieurs navigateurs : un texte centré partait
-// alors de travers, et une ligne calée à droite débordait. En traçant
-// nous-mêmes, la largeur est connue au pixel — et l'interlettrage marche
-// partout, y compris dans un repère tourné (les tranches).
-function trackedWidth(ctx, text, track) {
-  const chars = [...String(text)];
-  if (!chars.length) return 0;
-  let w = -track;
-  for (const ch of chars) w += ctx.measureText(ch).width + track;
-  return w;
-}
-
-function trackedText(ctx, text, x, y, track, align = "left") {
-  const chars = [...String(text)];
-  if (!chars.length) return 0;
-  const total = trackedWidth(ctx, text, track);
-  const prev = ctx.textAlign;
-  ctx.textAlign = "left";
-  let cx = align === "center" ? x - total / 2 : align === "right" ? x - total : x;
-  for (const ch of chars) {
-    ctx.fillText(ch, cx, y);
-    cx += ctx.measureText(ch).width + track;
-  }
-  ctx.textAlign = prev;
-  return total;
-}
-
-// Le filet : le trait fin qui sépare deux blocs. Tout le dos tient sur des
-// filets et des marges plutôt que sur des cadres et des aplats — un encadré de
-// couleur autour de chaque chose, c'est exactement ce qui fait « bon marché ».
-function rule(ctx, x, y, w, color, weight = 1) {
-  ctx.fillStyle = color;
-  ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.max(1, Math.round(weight)));
-}
-
-// La teinte du titre, ÉCLAIRCIE jusqu'à devenir une encre. Servie telle quelle,
-// une couleur tirée d'une affiche (donc souvent saturée à bloc) tache le dos et
-// se bat avec le texte ; éclaircie, elle reste reconnaissable, se pose sur du
-// sombre sans crier, et sert de fil conducteur entre les trois faces.
-const accentInk = (color) => shade(color, 0.55);
-
-// Même office que `fitOneLine`, mais pour du texte INTERLETTRÉ : la largeur
-// d'une ligne espacée ne se mesure pas avec `measureText`, il faut l'additionner
-// (voir `trackedWidth`). L'espacement suit la taille — le réduire seul donnerait
-// des capitales serrées sur une tranche et aérées sur la suivante.
-function fitTracked(ctx, text, maxRun, font, size, min, ratio) {
-  let s = size;
-  let t = String(text || "");
-  ctx.font = font(s);
-  while (trackedWidth(ctx, t, s * ratio) > maxRun && s > min) {
-    s -= 1;
-    ctx.font = font(s);
-  }
-  while (trackedWidth(ctx, t, s * ratio) > maxRun && t.length > 3) {
-    t = `${t.slice(0, -2).trim()}…`;
-  }
-  return { text: t, track: s * ratio };
-}
-
-// Réduit la police jusqu'à ce que le texte tienne, puis coupe si vraiment
-// nécessaire. Sert aux titres de tranche, où la longueur disponible est fixe.
-function fitOneLine(ctx, text, maxWidth, font, size, min) {
-  let s = size;
-  let t = String(text || "");
-  ctx.font = font(s);
-  while (ctx.measureText(t).width > maxWidth && s > min) {
-    s -= 1;
-    ctx.font = font(s);
-  }
-  while (ctx.measureText(t).width > maxWidth && t.length > 4) {
-    t = `${t.slice(0, -2).trim()}…`;
-  }
-  return t;
-}
-
-// Grain de papier : quelques milliers de points translucides. Une jaquette
-// imprimée n'est jamais lisse, et c'est ce qui vend le côté « vieux boîtier ».
-function grain(ctx, w, h, amount = 0.05) {
-  ctx.save();
-  ctx.globalAlpha = amount;
-  for (let i = 0; i < w * h * 0.004; i++) {
-    ctx.fillStyle = Math.random() > 0.5 ? "#fff" : "#000";
-    ctx.fillRect(Math.random() * w, Math.random() * h, 1, 1);
-  }
-  ctx.restore();
-}
+// ---------------------------------------------------------------- papier --
 
 // LE CHANT D'UN BLOC DE PAGES. Une bande de fils crème, irréguliers : c'est la
 // seule chose qui distingue vraiment du papier d'un savon beige, et sur un
@@ -712,130 +510,6 @@ export function paintShade(h = 64) {
   return canvas;
 }
 
-// Le carton d'un boîtier n'est jamais plat : ses deux arêtes sont pliées, donc
-// plus sombres, et la lumière file au centre. Sans ça, une tranche ressemble à
-// un rectangle de couleur. Dosé léger : la tranche est la face qu'on LIT, elle
-// ne doit pas s'assombrir pour faire joli.
-function foldShading(ctx, w, h) {
-  const g = ctx.createLinearGradient(0, 0, w, 0);
-  g.addColorStop(0, "rgba(0,0,0,0.34)");
-  g.addColorStop(0.16, "rgba(0,0,0,0.05)");
-  g.addColorStop(0.44, "rgba(255,255,255,0.07)");
-  g.addColorStop(0.7, "rgba(255,255,255,0.02)");
-  g.addColorStop(0.9, "rgba(0,0,0,0.08)");
-  g.addColorStop(1, "rgba(0,0,0,0.38)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, w, h);
-}
-
-// ------------------------------------------------------------- le champ --
-//
-// LE FOND DE TOUTES LES FACES, ET LE CŒUR DE LA REFONTE. Avant, une face non
-// illustrée était un aplat de `media.color` : une couleur brute, servie à
-// pleine saturation sur toute la hauteur — d'où ces boîtiers fluo qui faisaient
-// « imprimé chez soi ».
-//
-// Ici, la couleur ne vient plus d'un champ de la base mais de L'AFFICHE
-// elle-même : on la réduit à une poignée de pixels, on la réétale, et il ne
-// reste que ses tons — une lumière, pas une image. Posée sur un aplat très
-// sombre de la teinte, elle donne à chaque boîtier SES couleurs sans jamais
-// menacer la lisibilité du texte qui viendra dessus.
-
-// Flou fait main : réduction brutale puis remontée en deux paliers, le lissage
-// du navigateur faisant le travail. `ctx.filter` ferait la même chose en une
-// ligne, mais il manque encore à l'appel sur assez de navigateurs pour qu'on ne
-// puisse pas bâtir le fond dessus.
-function blurUp(ctx, img, w, h, cover) {
-  const small = canvasOf(cover ? 28 : 10, 28);
-  const sc = small.getContext("2d");
-  // Hors « cover », l'image est ÉTIRÉE sans égard pour ses proportions : sur
-  // une tranche de 90 px de large, un recadrage ne garderait qu'une lichette de
-  // l'affiche, donc une seule de ses couleurs.
-  if (cover) drawCover(sc, img, 0, 0, small.width, small.height);
-  else sc.drawImage(img, 0, 0, small.width, small.height);
-
-  const mid = canvasOf(Math.max(8, w / 8), Math.max(8, h / 8));
-  const mc = mid.getContext("2d");
-  mc.imageSmoothingEnabled = true;
-  mc.imageSmoothingQuality = "high";
-  mc.drawImage(small, 0, 0, mid.width, mid.height);
-
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(mid, 0, 0, w, h);
-}
-
-// Le champ complet, rendu dans son propre canvas : il sert de fond, mais AUSSI
-// de matière pour fondre l'affiche dedans (voir `fadeInto`) — il faut donc
-// pouvoir le redessiner à l'identique après coup.
-function makeField(w, h, color, img, { cover = false, light = 0.62, veil = 0.5 } = {}) {
-  const canvas = canvasOf(w, h);
-  const ctx = canvas.getContext("2d");
-
-  ctx.fillStyle = shade(color, -0.82);
-  ctx.fillRect(0, 0, w, h);
-
-  if (img) {
-    ctx.save();
-    ctx.globalAlpha = light;
-    blurUp(ctx, img, w, h, cover);
-    ctx.restore();
-  } else {
-    // Pas de visuel : une descente en diagonale plutôt qu'un aplat, pour que la
-    // face garde un modelé.
-    const g = ctx.createLinearGradient(0, 0, w, h);
-    g.addColorStop(0, shade(color, -0.5));
-    g.addColorStop(0.55, shade(color, -0.76));
-    g.addColorStop(1, "#0a0b10");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, w, h);
-  }
-
-  // Le voile de nuit : c'est lui qui garantit qu'un texte blanc passera, quelle
-  // que soit l'affiche en dessous. Plus dense en bas, où vivent les mentions.
-  const scrim = ctx.createLinearGradient(0, 0, 0, h);
-  scrim.addColorStop(0, `rgba(8,9,14,${veil * 0.82})`);
-  scrim.addColorStop(0.55, `rgba(8,9,14,${Math.min(1, veil * 1.1)})`);
-  scrim.addColorStop(1, `rgba(6,7,11,${Math.min(1, veil * 1.35)})`);
-  ctx.fillStyle = scrim;
-  ctx.fillRect(0, 0, w, h);
-
-  // Vignettage : les bords rentrent dans l'ombre, le regard va au centre. Un
-  // fond parfaitement uniforme n'existe sur aucun objet imprimé.
-  const vig = ctx.createRadialGradient(w / 2, h * 0.42, 0, w / 2, h * 0.42, Math.max(w, h) * 0.78);
-  vig.addColorStop(0, "rgba(0,0,0,0)");
-  vig.addColorStop(0.65, "rgba(0,0,0,0)");
-  vig.addColorStop(1, "rgba(0,0,0,0.5)");
-  ctx.fillStyle = vig;
-  ctx.fillRect(0, 0, w, h);
-
-  return canvas;
-}
-
-// Fond une image DANS le champ : on redessine le champ par-dessus, en dégradé
-// d'opacité. Recouvrir avec un dégradé « couleur du fond » approché laissait
-// toujours une couture — ici c'est le fond lui-même qui remonte, donc le
-// raccord est invisible par construction.
-function fadeInto(ctx, field, x, y, w, h) {
-  const patch = canvasOf(w, h);
-  const p = patch.getContext("2d");
-  p.drawImage(field, x, y, w, h, 0, 0, patch.width, patch.height);
-  p.globalCompositeOperation = "destination-in";
-  const g = p.createLinearGradient(0, 0, 0, patch.height);
-  g.addColorStop(0, "rgba(0,0,0,0)");
-  g.addColorStop(1, "rgba(0,0,0,1)");
-  p.fillStyle = g;
-  p.fillRect(0, 0, patch.width, patch.height);
-  ctx.drawImage(patch, x, y, w, h);
-}
-
-function canvasOf(width, height) {
-  const c = document.createElement("canvas");
-  c.width = Math.max(2, Math.round(width));
-  c.height = Math.max(2, Math.round(height));
-  return c;
-}
-
 // ---------------------------------------------------------------- tranche --
 // LA face qu'on voit dans le rayon — 90 px de large pour 1024 de haut. Il n'y a
 // pas plus contraint comme format : tout ce qu'on y pose de trop se lit comme
@@ -862,23 +536,62 @@ function canvasOf(width, height) {
 // (voir `makeField`). Sur une étagère, les tranches s'alignent donc en une
 // suite de tons sourds, chacun venant de SON visuel — au lieu d'une rangée de
 // rectangles fluo.
-function paintSpine(media, img, width, height) {
+function paintSpine(media, art, width, height) {
   const canvas = canvasOf(width, height);
   const w = canvas.width;
   const h = canvas.height;
   const ctx = canvas.getContext("2d");
-  const color = media.color || "#f2b70b";
-  const accent = accentInk(color);
+  // LA VIGNETTE DE TRANCHE SE CHOISIT, elle aussi. Par défaut l'affiche (c'est
+  // le cadrage portrait le plus proche d'une colonne de 55 px), mais tel titre
+  // n'est reconnaissable que sur une photo, et tel autre a une affiche que ce
+  // recadrage massacre.
+  const img =
+    pickImage(media.caseArt?.spine, art) === "none"
+      ? null
+      : pickImage(media.caseArt?.spine, art) || art.poster || art.backdrop;
+  const color = media.caseArt?.color || media.color || "#f2b70b";
+  // Même règle que sur les deux autres faces : une tranche sans vignette EST la
+  // couleur choisie dans le studio, servie telle quelle, et son encre bascule au
+  // noir si cette couleur est claire.
+  // LE FOND DE LA TRANCHE, TROIS FAÇONS. C'est la face qu'on voit dans le
+  // rayon, alignée sur trente autres : le champ tiré du visuel donne une rangée
+  // de tons sourds, mais une collection se range aussi très bien en aplats
+  // francs — et un dégradé qui part de la vignette pour finir dans la couleur
+  // du boîtier est ce que fait la moitié des éditeurs.
+  //
+  //   image  la vignette floutée, comme avant (défaut)
+  //   flat   la couleur unie, telle quelle
+  //   fade   la vignette en tête, qui se perd dans la couleur vers le bas
+  const spineBg = media.caseArt?.spineBg || "image";
+  const flat = !img || spineBg === "flat";
+  const bg = media.caseArt?.color || null;
+  const ink = flat ? inkOn(bg) : "#ffffff";
+  const accent = flat && bg ? shade(bg, luminanceOf(bg) > 0.56 ? -0.55 : 0.55) : accentInk(color);
   const px = (v) => Math.max(1, Math.round(v));
   const mid = w / 2;
-  const HAIR = "rgba(255,255,255,0.15)";
+  const HAIR = alpha(ink, 0.16);
 
   // --- Le champ, gardé sous la main : c'est lui qui remontera par-dessus le
   //     bas de l'affiche pour l'y fondre sans couture. Le voile est dosé pour le
   //     CAS DÉFAVORABLE — une affiche à fond blanc : sans lui, la tranche
   //     virait au gris clair et le titre blanc s'y noyait.
-  const field = makeField(w, h, color, img, { light: 0.62, veil: 0.52 });
+  const field = makeField(w, h, color, flat ? null : img, {
+    light: 0.62,
+    veil: 0.52,
+    bg,
+  });
   ctx.drawImage(field, 0, 0);
+
+  // Le dégradé : la couleur du boîtier remonte depuis le bas et éteint le champ
+  // tiré du visuel. Le haut garde donc ses tons, le pied est net — c'est là que
+  // se lisent la date et la marque.
+  if (spineBg === "fade" && img) {
+    const g = ctx.createLinearGradient(0, h * 0.18, 0, h);
+    g.addColorStop(0, alpha(bg || shade(color, -0.82), 0));
+    g.addColorStop(1, alpha(bg || shade(color, -0.82), 1));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, h * 0.18, w, h * 0.82);
+  }
 
   // --- 0. LE CAPUCHON DE CONSOLE. Un boîtier de jeu porte, en haut de sa
   //     tranche, un bandeau blanc où court le nom de la machine : c'est ce qui
@@ -900,7 +613,7 @@ function paintSpine(media, img, width, height) {
   //     le bandeau de la console, le titre, et c'est tout. Et la boîte GBA est
   //     déjà d'un tiers plus courte qu'un DVD — lui prendre en plus un quart de
   //     sa hauteur laisserait au titre une course où plus rien ne tient.
-  const artH = img && !isGame(media) ? h * 0.22 : 0;
+  const artH = img && !flat && !isGame(media) ? h * 0.22 : 0;
   if (artH) {
     ctx.save();
     ctx.beginPath();
@@ -910,7 +623,9 @@ function paintSpine(media, img, width, height) {
     // est dans le premier tiers.
     drawCover(ctx, img, 0, capH, w, artH, 0.5, 0.3);
     ctx.restore();
-    fadeInto(ctx, field, 0, capH + artH * 0.6, w, artH * 0.4);
+    // En mode « fade », le dégradé posé plus haut fait déjà l'extinction : la
+    // fondre une seconde fois dans le champ la salirait.
+    if (spineBg !== "fade") fadeInto(ctx, field, 0, capH + artH * 0.6, w, artH * 0.4);
   }
 
   if (capH) paintSpineCap(ctx, w, capH);
@@ -961,29 +676,39 @@ function paintSpine(media, img, width, height) {
     ctx.restore();
   }
 
-  // --- 3. Le titre, plein champ, en didone. C'est LUI qu'on cherche des yeux
-  //     en passant devant l'étagère.
-  ctx.save();
-  ctx.translate(mid, titleTop + titleRun / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  const title = fitOneLine(
-    ctx,
-    media.title,
-    titleRun,
-    (s) => `600 ${s}px ${SERIF}`,
-    px(w * 0.52),
-    px(w * 0.24)
-  );
-  // Une ombre COURTE et sombre : la didone a des déliés fins, il leur faut de
-  // quoi se détacher du champ sans qu'on voie l'ombre elle-même.
-  ctx.shadowColor = "rgba(0,0,0,0.6)";
-  ctx.shadowOffsetX = px(w * 0.015);
-  ctx.shadowBlur = px(w * 0.07);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText(title, 0, 0);
-  ctx.restore();
+  // --- 3. Le titre, plein champ. LE LOGO PASSE DEVANT LA DIDONE quand on en a
+  //     un : c'est la face qu'on voit dans le rayon, et une rangée de tranches
+  //     portant chacune sa vraie typo, c'est très exactement ce à quoi ressemble
+  //     une étagère de DVD. La didone reprend la main dès que le logo ne tient
+  //     pas dans la course — écrasé, il ferait moins bien qu'un titre bien posé.
+  if (
+    media.caseArt?.logo !== false &&
+    paintSpineLogo(ctx, art.logo, mid, titleTop, titleRun, w)
+  ) {
+    // Le logo occupe tout le bloc de titre : rien d'autre à poser ici.
+  } else {
+    ctx.save();
+    ctx.translate(mid, titleTop + titleRun / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const title = fitOneLine(
+      ctx,
+      media.title,
+      titleRun,
+      (s) => `600 ${s}px ${SERIF}`,
+      px(w * 0.52),
+      px(w * 0.24)
+    );
+    // Une ombre COURTE et sombre : la didone a des déliés fins, il leur faut de
+    // quoi se détacher du champ sans qu'on voie l'ombre elle-même.
+    ctx.shadowColor = "rgba(0,0,0,0.6)";
+    ctx.shadowOffsetX = px(w * 0.015);
+    ctx.shadowBlur = px(w * 0.07);
+    ctx.fillStyle = ink;
+    ctx.fillText(title, 0, 0);
+    ctx.restore();
+  }
 
   // --- 4. Le pied : un filet, la date. Plus de bandeau sombre — c'est le
   //     vignettage du champ qui assied déjà l'objet sur la planche.
@@ -1008,7 +733,7 @@ function paintSpine(media, img, width, height) {
     ctx.translate(mid, yearTop + yearRun / 2);
     ctx.rotate(-Math.PI / 2);
     ctx.textBaseline = "middle";
-    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.fillStyle = alpha(ink, 0.8);
     const year = fitTracked(
       ctx,
       foot,
@@ -1022,17 +747,27 @@ function paintSpine(media, img, width, height) {
     ctx.restore();
   }
 
-  // La marque de collection : un losange, pas un mot. Un nom d'éditeur écrit là
-  // demanderait une course de 100 px de plus, qu'on volerait au titre — et à
-  // cette taille il ne serait de toute façon qu'un trait gris. Le losange, lui,
-  // se pose en 6 px et suffit à ranger l'objet dans une série.
-  ctx.save();
-  ctx.translate(mid, markY);
-  ctx.rotate(Math.PI / 4);
-  ctx.fillStyle = alpha(accent, 0.7);
-  const m = w * 0.075;
-  ctx.fillRect(-m / 2, -m / 2, m, m);
-  ctx.restore();
+  // LA MARQUE DE PIED. Sur un boîtier vidéo, c'est le logo du support (voir
+  // `paintSpineMark`) : déposé dans `client/public/case/`, il court alors d'un
+  // bout à l'autre de la rangée et c'est LUI qui fait « collection », bien avant
+  // qu'on ait lu un titre.
+  //
+  // À défaut — pas de fichier déposé, ou un rayon qui n'est pas de la vidéo —
+  // le losange reprend sa place. Un nom d'éditeur écrit là demanderait une
+  // course de 100 px qu'on volerait au titre, et à cette taille il ne serait
+  // qu'un trait gris ; le losange se pose en 6 px et suffit à ranger l'objet
+  // dans une série.
+  const marked =
+    !isComic(media) && !isGame(media) && paintSpineMark(ctx, art, media, mid, markY, w, ink);
+  if (!marked) {
+    ctx.save();
+    ctx.translate(mid, markY);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = alpha(accent, 0.7);
+    const m = w * 0.075;
+    ctx.fillRect(-m / 2, -m / 2, m, m);
+    ctx.restore();
+  }
 
   foldShading(ctx, w, h);
   grain(ctx, w, h, 0.03);
@@ -1137,7 +872,7 @@ function paintSleeve(media, img, width, height) {
   const size = px(media.title.length > 26 ? w * 0.1 : w * 0.14);
   ctx.font = `600 ${size}px ${SERIF}`;
   ctx.fillStyle = "#fff";
-  const lines = wrap(ctx, media.title, w * 0.78, 3);
+  const lines = wrapText(ctx, media.title, w * 0.78, 3);
   let y = h * 0.5 - ((lines.length - 1) * size * 1.14) / 2;
   for (const line of lines) {
     ctx.fillText(line, w / 2, y);
@@ -1235,7 +970,7 @@ function paintBack(media, img, backdrop, width, height) {
     ctx.font = `600 ${tSize}px ${SERIF}`;
   }
   ctx.fillStyle = "#fff";
-  for (const line of wrap(ctx, media.title, inner, 2)) {
+  for (const line of wrapText(ctx, media.title, inner, 2)) {
     ctx.fillText(line, pad, y);
     y += tSize * 1.16;
   }
@@ -1268,7 +1003,7 @@ function paintBack(media, img, backdrop, width, height) {
     const gSize = px(w * 0.036);
     ctx.font = `italic 500 ${gSize}px ${SERIF}`;
     ctx.fillStyle = alpha(accent, 0.92);
-    for (const line of wrap(ctx, media.tagline, inner * 0.92, 2)) {
+    for (const line of wrapText(ctx, media.tagline, inner * 0.92, 2)) {
       ctx.fillText(line, pad, y);
       y += gSize * 1.3;
     }
@@ -1360,7 +1095,7 @@ function paintBack(media, img, backdrop, width, height) {
     if (max > 0) {
       ctx.font = `400 ${size}px ${SANS}`;
       ctx.fillStyle = "rgba(255,255,255,0.76)";
-      for (const line of wrap(ctx, media.synopsis, inner, max)) {
+      for (const line of wrapText(ctx, media.synopsis, inner, max)) {
         ctx.fillText(line, pad, y);
         y += lineH;
       }
@@ -1550,21 +1285,110 @@ export async function paintCase(media, quality = 1024) {
   const wrap = await loadImage(media.wrap);
   if (wrap) return { artwork: true, ...trimSheet(wrap, box) };
 
-  // Le bandeau part avec l'affiche : il sert de fond et de vignettes au dos.
-  // Chargé seulement s'il existe et diffère — deux requêtes par boîtier, ce
-  // n'est pas rien sur une grande étagère.
-  const [img, backdrop] = await Promise.all([
-    loadImage(media.poster),
-    media.backdrop && media.backdrop !== media.poster ? loadImage(media.backdrop) : null,
-  ]);
+  const art = await loadArt(media);
+  const { poster: img, backdrop } = art;
+
   // Les trois faces sont peintes séparément — chacune a sa composition, ses
   // proportions et ses règles — puis COUSUES bout à bout dans l'ordre de la
   // jaquette dépliée. Ce qui en sort est indiscernable d'une jaquette fournie,
   // et suit donc exactement le même chemin ensuite.
-  const back = paintBack(media, img, backdrop, (quality * box.d) / box.h, quality);
-  const spine = paintSpine(media, img, (quality * box.w) / box.h, quality);
-  const sleeve = paintSleeve(media, img, (quality * box.d) / box.h, quality);
+  //
+  // LE RAYON VIDÉO A SON PROPRE GABARIT (voir dvdSkin) : couverture à logo, dos
+  // à sommaire et cartouche technique, code-barres. Le papier et la cartouche
+  // gardent le gabarit maison — un volume relié n'a ni zone, ni piste sonore,
+  // ni format d'image, et lui coller un pied de DVD serait un contresens.
+  const video = !isComic(media) && !isGame(media);
+  const back = video
+    ? paintDvdBack(media, art, (quality * box.d) / box.h, quality)
+    : paintBack(media, img, backdrop, (quality * box.d) / box.h, quality);
+  const spine = paintSpine(media, art, (quality * box.w) / box.h, quality);
+  const sleeve = video
+    ? paintDvdSleeve(media, art, (quality * box.d) / box.h, quality)
+    : paintSleeve(media, img, (quality * box.d) / box.h, quality);
   return { artwork: !!img, ...stitchSheet(back, spine, sleeve) };
+}
+
+// TOUT LE MATÉRIEL D'UN BOÎTIER, CHARGÉ D'UN COUP. Affiche, bandeau, logo du
+// titre, photos d'exploitation, marques de studio : jusqu'à huit images, qui
+// partent ENSEMBLE. En série, ce serait huit allers-retours bout à bout par
+// boîtier — sur une étagère de quarante titres, c'est la différence entre une
+// seconde et une demi-minute.
+//
+// Rien n'est obligatoire : chaque image manquante revient `null`, et la face
+// qui l'attendait se recompose sans elle.
+// LEQUEL DES LOGOS. `artwork.logo` est le dernier arrivé ; le fonds les garde
+// tous, et le studio peut en désigner un autre — TMDB rend parfois le logo
+// d'une édition étrangère là où celui d'avant était le bon.
+function logoUrl(media) {
+  const m = /^logos:(\d+)$/.exec(media.caseArt?.logoPick || "");
+  return (m && media.logos?.[Number(m[1])]) || media.logo || null;
+}
+
+async function loadArt(media) {
+  const wantsPrint = !isComic(media) && !isGame(media);
+  const stills = wantsPrint ? (media.stills || []).slice(0, 4) : [];
+  const studios = wantsPrint ? (media.studios || []).slice(0, 2) : [];
+
+  // Les logos de support (DVD, Blu-ray, Dolby, zone) sont des fichiers déposés
+  // dans `client/public/case/` — voir MARK_FILES. Ils sont FACULTATIFS : ceux
+  // qui manquent laissent la place au tracé maison. Le navigateur les met en
+  // cache dès le premier boîtier, donc ces requêtes ne coûtent qu'une fois.
+  const markKeys = wantsPrint ? Object.keys(MARK_FILES) : [];
+
+  // DU FONDS, ON NE CHARGE QUE CE QUI SERT. Il peut contenir quarante-huit
+  // visuels — les décoder tous coûterait plus cher que tout le reste de la
+  // peinture réunie, pour trois images utilisées. On ne va donc chercher que les
+  // rangs réellement DÉSIGNÉS par les trois faces.
+  const wanted = new Set();
+  if (wantsPrint) {
+    for (const spec of [media.caseArt?.front, media.caseArt?.back, media.caseArt?.spine]) {
+      const m = /^pool:(\d+)$/.exec(spec || "");
+      if (m) wanted.add(Number(m[1]));
+    }
+  }
+  const poolRanks = [...wanted];
+
+  const [poster, backdrop, logo, stillImgs, studioImgs, markImgs, poolImgs] = await Promise.all([
+    loadImage(media.poster),
+    // Chargé seulement s'il existe ET s'il diffère de l'affiche : sur la
+    // moitié du rayon, les deux pointent le même fichier.
+    media.backdrop && media.backdrop !== media.poster ? loadImage(media.backdrop) : null,
+    wantsPrint ? loadImage(logoUrl(media)) : null,
+    Promise.all(stills.map((s) => loadImage(s))),
+    Promise.all(studios.map((s) => loadImage(s.logo))),
+    Promise.all(markKeys.map((k) => loadImage(MARK_FILES[k]))),
+    Promise.all(poolRanks.map((i) => loadImage(media.pool?.[i]))),
+  ]);
+
+  const marks = {};
+  markKeys.forEach((k, i) => {
+    // Détourés en blanc SANS CONDITION : un logo de support se pose toujours
+    // sur un pied sombre, et la plupart de ces fichiers circulent en noir.
+    if (markImgs[i]) marks[k] = tintLogo(markImgs[i], "#ffffff", "always");
+  });
+
+  // Le fonds est rendu en TABLEAU CREUX, indexé par le rang : c'est le rang
+  // que porte le désignateur, et le renuméroter ici ferait pointer « pool:3 »
+  // sur la troisième image CHARGÉE plutôt que sur la troisième du fonds.
+  const pool = [];
+  poolRanks.forEach((rank, i) => {
+    if (poolImgs[i]) pool[rank] = poolImgs[i];
+  });
+
+  return {
+    poster,
+    backdrop,
+    marks,
+    pool,
+    // Un logo noir sur transparent (c'est le cas de la plupart) disparaîtrait
+    // sur une jaquette de nuit : on le détoure en blanc s'il est sombre.
+    logo: logo ? tintLogo(logo) : null,
+    stills: stillImgs.filter(Boolean),
+    // Les marques de studio, elles, sont détourées SANS condition : elles se
+    // posent toujours sur un pied sombre, et les servir en noir n'a jamais de
+    // sens ici.
+    studios: studioImgs.filter(Boolean).map((s) => tintLogo(s, "#ffffff", "always")),
+  };
 }
 
 // Une jaquette fournie n'est presque jamais cadrée sur son illustration : un

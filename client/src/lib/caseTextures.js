@@ -62,6 +62,18 @@ function keyOf(media, quality) {
     media.wrap || "",
     media.poster || "",
     media.backdrop || "",
+    // LE MATÉRIEL D'IMPRESSION FAIT PARTIE DE L'IDENTITÉ DE LA JAQUETTE. Sans
+    // lui dans la clé, un logo récupéré depuis le mini-studio ne changeait rien
+    // à l'écran : le magasin ressortait la peinture d'avant, et on croyait que
+    // la récupération avait échoué.
+    media.logo || "",
+    (media.stills || []).join(","),
+    // Le fonds entre dans la clé : une image remise en place depuis le studio
+    // change la jaquette sans qu'aucun autre champ ne bouge.
+    (media.pool || []).join(","),
+    (media.logos || []).join(","),
+    (media.studios || []).map((s) => s.logo || "").join(","),
+    JSON.stringify(media.caseArt || {}),
     // Les dimensions taillent la feuille : un boîtier remesuré n'est plus le
     // même objet, et sa jaquette n'a plus les mêmes proportions.
     `${box.w}x${box.h}x${box.d}`,

@@ -42,6 +42,7 @@ import {
   Unplug,
   Coins,
   Hand,
+  Disc3,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -62,6 +63,7 @@ import { shrinkImageFile, fmtBytes } from "../lib/imageFile";
 // L'essai d'un boîtier (bouton « Tester » de la liste). Chargé à la demande :
 // il traîne derrière lui toute la scène 3D du rayon.
 const CasePreview = lazy(() => import("./AdminCasePreview"));
+const CaseStudio = lazy(() => import("./CaseStudioModal"));
 
 // ------------------------------------------------ d'où vient une adresse ----
 //
@@ -378,25 +380,47 @@ const EMPTY_DRAFT = {
 // clic ne se laisse lire qu'un lecteur à la fois, et chaque import successif
 // doit AJOUTER son adresse aux précédentes au lieu d'effacer les autres.
 //
-// Les lignes suivantes (s'il y en a) ne sont pas touchées : on ne réécrit que
-// celle du film.
-function mergeFilmLine(text, title, urls) {
+// SAUF QUAND LE FILM EN A DEUX. « The Dark Knight Returns » est sorti en deux
+// parties, chacune avec sa fiche et ses lecteurs chez l'hébergeur : ce ne sont
+// NI deux miroirs (ils ne montrent pas le même film, et le poste passerait de
+// l'un à l'autre en croyant changer de source), NI deux titres (c'est un seul
+// boîtier sur l'étagère). Ce sont deux PARTIES, rangées exactement comme les
+// épisodes d'une série — la fiche sait déjà les afficher (voir `soloFilm` dans
+// CollectionDetail : un film à plusieurs entrées garde sa liste).
+//
+// D'où le NUMÉRO DE PARTIE : il désigne LA LIGNE à écrire, et aucune autre ne
+// bouge. Sur cette ligne, les adresses se cumulent comme avant.
+const EP_MARK = /^s\s*(\d{1,2})\s*[·.\-–]?\s*e\s*\.?\s*(\d{1,3})\b/i;
+// Une adresse, avec la marque de piste qui la précède parfois (« vf@https://… ») :
+// la perdre en relisant la ligne effacerait la version d'à côté.
+const TAGGED_URL_G = /(?:[a-z]{2,6}@)?https?:\/\/\S+/g;
+
+function mergeFilmPart(text, title, urls, part = 1) {
   const lines = String(text || "")
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter(Boolean);
-  const first = lines[0] || "";
-  const all = [...new Set([...(first.match(/https?:\/\/\S+/g) || []), ...urls])];
+  // Une liste écrite avant les parties n'a pas de repère : sa position fait
+  // office de numéro, et la première ligne reste donc la partie 1.
+  const numOf = (line, i) => Number(line.match(EP_MARK)?.[2] ?? i + 1);
+  const at = lines.findIndex((l, i) => numOf(l, i) === part);
+  const old = at >= 0 ? lines[at] : "";
+  const all = [...new Set([...(old.match(TAGGED_URL_G) || []), ...urls])];
   if (!all.length) return text;
   // L'étiquette déjà écrite l'emporte : elle a pu être corrigée à la main.
+  const cut = old.search(/(?:[a-z]{2,6}@)?https?:\/\//i);
   const label =
-    first
-      .split(/https?:\/\//)[0]
-      .replace(/[—–|-]\s*$/, "")
+    (cut < 0 ? old : old.slice(0, cut))
+      .replace(EP_MARK, "")
+      .replace(/[—–|:-]+\s*$/, "")
       .trim() ||
-    title ||
-    "";
-  return [`${label ? `${label} — ` : ""}${all.join(" | ")}`, ...lines.slice(1)].join("\n");
+    (part > 1 ? `Partie ${part}` : title || "");
+  const head = [`S01E${String(part).padStart(2, "0")}`, label].filter(Boolean).join(" ");
+  const line = `${head} — ${all.join(" | ")}`;
+  const out = [...lines];
+  if (at >= 0) out[at] = line;
+  else out.push(line);
+  return out.join("\n");
 }
 
 // Ce qu'on écrit dans la zone de liste quand elle est vide : le format y est
@@ -849,9 +873,14 @@ function Row({ media, token, onEdit, onChanged }) {
   // L'ESSAI. Le boîtier pris en main, exactement comme sur l'étagère — la seule
   // façon de voir ce qu'on vient de poser (voir AdminCasePreview).
   const [trying, setTrying] = useState(false);
+  // LE STUDIO DE JAQUETTE (voir CaseStudioModal).
+  const [studio, setStudio] = useState(false);
   // Un titre qui se regarde et qui a quelque chose à regarder : sans épisode,
   // il n'y a aucune porte à laquelle frapper.
   const watchable = WATCHABLE.includes(media.kind) && media.episodeCount > 0;
+  // Ce qui se FABRIQUE en boîtier de DVD : un film sans épisode enregistré a
+  // lui aussi une jaquette à composer, donc pas le même test que ci-dessus.
+  const printable = WATCHABLE.includes(media.kind);
   const check = media.sourceCheck;
 
   async function refresh() {
@@ -972,6 +1001,19 @@ function Row({ media, token, onEdit, onChanged }) {
         >
           <Hand size={15} />
         </button>
+        {/* LE STUDIO DE JAQUETTE. Réservé au rayon vidéo : le gabarit qu'il
+            règle est celui d'un boîtier de DVD (logo, sommaire, zone, code-
+            barres), et rien de tout ça n'a de sens sur un volume relié ou une
+            boîte de cartouche. */}
+        {printable && (
+          <button
+            className="adm-coll-icon clickable"
+            onClick={() => setStudio(true)}
+            title="Studio de jaquette — logo, sommaire, mentions du boîtier"
+          >
+            <Disc3 size={15} />
+          </button>
+        )}
         <a
           className="adm-coll-icon clickable"
           href={`/collection/${media.slug}`}
@@ -1046,6 +1088,20 @@ function Row({ media, token, onEdit, onChanged }) {
       {trying && (
         <Suspense fallback={null}>
           <CasePreview media={media} token={token} onClose={() => setTrying(false)} />
+        </Suspense>
+      )}
+
+      {/* Le studio descend lui aussi à la demande : il embarque le peintre de
+          jaquettes, dont le panneau n'a pas besoin tant qu'on ne fabrique pas
+          une couverture. */}
+      {studio && (
+        <Suspense fallback={null}>
+          <CaseStudio
+            media={media}
+            token={token}
+            onClose={() => setStudio(false)}
+            onChanged={onChanged}
+          />
         </Suspense>
       )}
     </li>
@@ -1427,6 +1483,9 @@ function CreateModal({ token, onClose, onDone }) {
 
         <ListImport
           token={token}
+          // La nature en cours de saisie : c'est elle qui ouvre le numéro de
+          // partie, une fois qu'on sait qu'on remplit un film.
+          kind={draft.kind}
           // Le lecteur SUIT L'ADRESSE, à la frappe : il n'y a plus personne à
           // qui poser la question, et le formulaire doit changer de forme
           // pendant qu'on colle, pas après.
@@ -1457,14 +1516,16 @@ function CreateModal({ token, onClose, onDone }) {
               kind: film ? "film" : prev.kind,
               // Un import téléchargé REMPLACE (il apporte tout le titre) ;
               // une source collée S'AJOUTE (elle n'apporte qu'une saison).
-              // Un film, lui, tient sur UNE ligne dont les adresses se
-              // cumulent : c'est ainsi qu'on rattrape les lecteurs qu'une
-              // fiche ne monte qu'au clic (voir mergeFilmLine).
+              // Un film, lui, tient sur UNE ligne — celle de sa partie — dont
+              // les adresses se cumulent : c'est ainsi qu'on rattrape les
+              // lecteurs qu'une fiche ne monte qu'au clic, et qu'un film en
+              // deux volets se remplit fiche après fiche (voir mergeFilmPart).
               episodesText: film
-                ? mergeFilmLine(
+                ? mergeFilmPart(
                     prev.episodesText,
                     prev.title || d.title,
-                    (d.players || []).map((p) => p.url)
+                    (d.players || []).map((p) => p.url),
+                    d.part || 1
                   )
                 : d.appendList
                   ? [prev.episodesText.trim(), d.appendList].filter(Boolean).join("\n")
@@ -1636,11 +1697,17 @@ const IMPORT_LANG = "vf";
 // lecteur sur deux grandes cartes pour voir apparaître le bon champ. À l'ajout,
 // c'est `onYoutube` qui prend le relais : la playlist ne se scrape pas comme
 // une fiche, elle se VÉRIFIE (aperçu), et le formulaire s'en trouve changé.
-function ListImport({ token, slug, onImported, onApplied, onUrl, onYoutube }) {
+function ListImport({ token, slug, kind, onImported, onApplied, onUrl, onYoutube }) {
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState(null);
   const [error, setError] = useState(null);
+  // LA PARTIE QU'ON EST EN TRAIN DE REMPLIR. Un film en deux volets a deux
+  // fiches chez l'hébergeur : on colle la première, puis la seconde, et c'est ce
+  // numéro qui les empêche de se prendre l'une pour un miroir de l'autre. Il
+  // avance tout seul après chaque import réussi — l'ordre dans lequel on colle
+  // est celui des parties, et le corriger reste possible avant de récupérer.
+  const [part, setPart] = useState(1);
   // Le repli manuel. Il ne s'ouvre pas tout seul au premier échec : la plupart
   // des erreurs sont de simples fautes d'adresse, et l'ouvrir à chaque fois
   // reviendrait à proposer la corvée avant le remède.
@@ -1655,6 +1722,12 @@ function ListImport({ token, slug, onImported, onApplied, onUrl, onYoutube }) {
   // sur un titre déjà posé, le serveur sait la reconnaître et la remplacer
   // lui-même, c'est donc le même bouton que pour une fiche.
   const yt = !slug && !!onYoutube && site?.value === "youtube";
+  // Le numéro de partie ne s'ouvre que sur un FILM : ailleurs il ne désigne
+  // rien (une série range ses épisodes toute seule, avec les repères de sa
+  // fiche). `kind` vient du formulaire — ou du boîtier, en édition — et le
+  // rapport prend le relais à l'ajout, où la nature du titre ne se sait qu'une
+  // fois la première fiche récupérée.
+  const film = !yt && (kind === "film" || report?.kind === "film");
 
   // Ce qu'on tape remonte au formulaire : c'est lui qui en déduit le lecteur.
   function typed(v) {
@@ -1672,7 +1745,16 @@ function ListImport({ token, slug, onImported, onApplied, onUrl, onYoutube }) {
       // `lang` ne choisit plus rien : une source collée porte TOUTES les
       // versions de la fiche, et elles sont désormais toutes reprises. Il ne
       // reste qu'une préférence — celle qui se branchera en premier.
-      const body = { text: source, season: pasteSeason, url: url.trim(), lang: IMPORT_LANG };
+      // `part` ne sert qu'aux fiches de FILM : pour une série, c'est `season`
+      // qui range ce qu'on colle. Les deux voyagent, le serveur lit celui qui
+      // correspond à ce qu'il a reconnu dans la source.
+      const body = {
+        text: source,
+        season: pasteSeason,
+        part,
+        url: url.trim(),
+        lang: IMPORT_LANG,
+      };
       // En édition, un collage COMPLÈTE la source en place : il n'apporte qu'un
       // lecteur (celui affiché au moment de la copie) ou qu'une saison.
       const d = slug
@@ -1682,7 +1764,7 @@ function ListImport({ token, slug, onImported, onApplied, onUrl, onYoutube }) {
             body: { ...body, merge: true },
           })
         : await apiFetch("/collection/import/paste", { method: "POST", token, body });
-      setReport(d.report || d);
+      setReport({ ...(d.report || d), part });
       if (slug) {
         onApplied(d);
         setSource("");
@@ -1695,11 +1777,16 @@ function ListImport({ token, slug, onImported, onApplied, onUrl, onYoutube }) {
       // saison d'un coup) : elle s'ajoute de la même façon. Ne restent à part
       // que les collages qui ne décrivent QUE la fiche, sans un lien.
       const brings = d.kind === "episodes" || d.kind === "series";
-      onImported(brings ? { ...d, list: "", appendList: d.list } : { ...d, list: "" });
+      onImported(
+        brings ? { ...d, list: "", appendList: d.list } : { ...d, list: "", part }
+      );
       if (brings) {
         setSource("");
         setPasteSeason((n) => n + 1); // la prochaine, la plus probable
       }
+      // Le collage d'un film sert justement à rattraper un lecteur à la fois :
+      // la partie, elle, ne change que lorsqu'on a fini d'en remplir une, donc
+      // on la laisse où elle est.
     } catch (e) {
       setError(e.message);
     } finally {
@@ -1727,16 +1814,22 @@ function ListImport({ token, slug, onImported, onApplied, onUrl, onYoutube }) {
             token,
             // Un lien REMPLACE : il apporte la fiche entière, donc tous ses
             // lecteurs. C'est le geste qu'on attend d'un bouton qui dit
-            // « remplacer ».
-            body: { url: url.trim(), lang: IMPORT_LANG, merge: false },
+            // « remplacer » — mais il ne remplace QUE la partie visée, les
+            // autres volets du film ne sont pas dans cette fiche-là.
+            body: { url: url.trim(), lang: IMPORT_LANG, merge: false, part },
           })
         : await apiFetch(
             `/collection/import/link?url=${encodeURIComponent(url)}&lang=${IMPORT_LANG}`,
             { token }
           );
-      setReport(d.report || d);
+      // La partie voyage AVEC le rapport : le champ, lui, est déjà passé à la
+      // suivante quand celui-ci s'affiche, et il annoncerait le mauvais volet.
+      setReport({ ...(d.report || d), part });
       if (slug) onApplied(d);
-      else onImported(d);
+      else onImported({ ...d, part });
+      // Une fiche de film remplie, la suivante qu'on collera est la partie
+      // d'après : c'est le cas le plus probable, et il ne coûte rien à défaire.
+      if ((d.report || d).kind === "film") setPart((n) => n + 1);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -1780,6 +1873,23 @@ function ListImport({ token, slug, onImported, onApplied, onUrl, onYoutube }) {
             placeholder="https://www.youtube.com/…&list=… · https://anime-sama.xx/catalogue/… · https://site-de-streaming/le-film"
             onKeyDown={(e) => e.key === "Enter" && url.trim() && !busy && run()}
           />
+          {/* LA PARTIE VISÉE. Deux fiches pour un seul film (« Part 1 », « Part
+              2 ») : sans ce numéro, la seconde s'ajoutait en miroir de la
+              première et le poste croyait changer de source en changeant de
+              film. Il avance tout seul d'un import à l'autre. */}
+          {film && (
+            <label className="adm-coll-part">
+              Partie
+              <input
+                type="number"
+                min={1}
+                max={99}
+                value={part}
+                onChange={(e) => setPart(Math.max(1, Number(e.target.value) || 1))}
+                title="Le volet du film que cette fiche remplit — les autres ne bougent pas."
+              />
+            </label>
+          )}
           <button
             className={`btn clickable ${slug ? "btn-primary" : "btn-ghost"}`}
             onClick={run}
@@ -1949,6 +2059,10 @@ function FilmReport({ report }) {
       <div>
         <strong>{report.title}</strong>
         <span>
+          {/* OÙ CETTE FICHE EST ALLÉE. Sur un film en plusieurs volets, c'est la
+              seule chose qu'on cherche à vérifier après un import : le second
+              lien s'est-il rangé en partie 2, ou par-dessus la partie 1 ? */}
+          {report.part > 1 ? `Partie ${report.part} · ` : ""}
           {players.length} lecteur{players.length > 1 ? "s" : ""}
           {report.year ? ` · ${report.year}` : ""}
           {report.runtime ? ` · ${report.runtime} min` : ""}
@@ -2587,7 +2701,12 @@ function SourceSection({ media, token, onChanged }) {
           sur-le-champ : plus de « changer le lien ici, puis rafraîchir là-bas »,
           qui ne marchait de toute façon pas pour un titre servi par des
           hébergeurs tiers. */}
-      <ListImport token={token} slug={media.slug} onApplied={applyImport} />
+      <ListImport
+        token={token}
+        slug={media.slug}
+        kind={media.kind}
+        onApplied={applyImport}
+      />
 
       {msg && (
         <p className={msg.ok ? "adm-src-done-msg" : "adm-coll-error"}>
@@ -2602,8 +2721,10 @@ function SourceSection({ media, token, onChanged }) {
       <div className="adm-coll-field">
         <span>
           <ListVideo size={13} /> {media.kind === "film" ? "Lecteurs" : "Épisodes"} — une
-          ligne par {media.kind === "film" ? "film" : "épisode"}, miroirs séparés par
-          « | », version en tête d'adresse (<code>vf@https://…</code>)
+          ligne par {media.kind === "film" ? "partie du film" : "épisode"}, miroirs
+          séparés par « | », version en tête d'adresse (<code>vf@https://…</code>)
+          {media.kind === "film" &&
+            " — un film d'un seul tenant n'en a qu'une, un diptyque en a deux (S01E01, S01E02)."}
         </span>
         {text === null ? (
           <div className="adm-coll-state">

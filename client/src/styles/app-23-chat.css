@@ -4011,91 +4011,274 @@ body.mpl-open .chat-dock {
 }
 
 /* ======================================================================
-   Carte « regarde cette planche »
+   « Regarde cette planche »
    ======================================================================
-   BÂTIE À L'ENVERS DES AUTRES. Les cartes du fil sont une vignette à gauche et
-   du texte à droite ; celle-ci met la CAPTURE en premier et en grand, parce que
-   c'est elle le message — le titre et la planche ne sont que le moyen d'y
-   retourner. Elle est donc plus large, et en colonne. */
-.chat-card-book {
+   UNE PHOTO, PAS UNE CARTE. Elle se pose dans la bulle comme une image
+   envoyée (mêmes coins, même fond noir dessous), et tout ce qui l'entoure est
+   réduit à un bandeau : la provenance à gauche, la planche à droite. Pas de
+   cadre orange, pas de titre en gros — la capture est déjà cadrée sur ce qu'on
+   voulait montrer, elle n'a pas besoin d'être présentée. */
+.chat-shot {
+  display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  width: 300px;
-  border-color: color-mix(in srgb, var(--orange) 34%, transparent);
-  background: color-mix(in srgb, var(--orange) 6%, transparent);
+  gap: 0.35rem;
+  width: min(320px, 100%);
+  margin: 0.3rem 0 0.1rem;
 }
 
-.chat-book-shot {
+.chat-shot-img {
   display: block;
-  border-radius: 9px;
+  border: none;
+  padding: 0;
+  border-radius: 12px;
   overflow: hidden;
   background: #0b0a10;
-  margin-bottom: 0.15rem;
+  line-height: 0;
 }
 
-.chat-book-shot img {
+.chat-shot-img img {
   display: block;
   width: 100%;
-  max-height: 200px;
-  object-fit: cover;
-  transition: transform 0.25s ease;
+  /* `contain` et non `cover` : une capture recadrée sur trois cases est déjà
+     LE cadre voulu — la rogner une seconde fois pour tenir dans une vignette
+     carrée couperait précisément ce qu'on voulait montrer. */
+  max-height: 320px;
+  object-fit: contain;
 }
 
-.chat-book-shot:hover img {
-  transform: scale(1.02);
+.chat-shot-noimg {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--text-soft);
 }
 
-.chat-card-book .chat-card-kicker {
-  color: var(--accent-ink);
-}
-
-.chat-card-book .chat-card-sub {
-  font-size: 0.74rem;
-  opacity: 0.7;
-}
-
-/* LES DEUX PORTES. « À cette planche » est ce qu'on vient de me montrer,
-   « depuis le début » est ce que ça m'a donné envie de faire — la première est
-   donc pleine, la seconde discrète. */
-.chat-book-acts {
+.chat-shot-foot {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  margin-top: 0.35rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  /* La bulle ne garde que 4 px de marge autour d'une carte : le bandeau se
+     donne le sien, sinon la jaquette touche le bord. */
+  padding: 0 0.2rem 0.15rem;
 }
 
-.chat-book-btn {
+/* D'OÙ ÇA SORT. La jaquette en miniature fait le travail d'une phrase : on
+   reconnaît le tome avant d'avoir lu le titre. */
+.chat-shot-from {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+.chat-shot-from img,
+.chat-shot-ic {
+  flex: none;
+  width: 26px;
+  height: 36px;
+  border-radius: 4px;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.chat-shot-from > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.chat-shot-from strong {
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-shot-from em {
+  font-style: normal;
+  font-size: 0.7rem;
+  opacity: 0.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-shot-from:hover strong {
+  text-decoration: underline;
+}
+
+/* LE NUMÉRO DE PLANCHE EST UN BOUTON. C'est la porte du volume, pas une
+   légende : il en a donc la forme, et il rouvre le bouquin sur place. */
+.chat-shot-page {
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 0.28rem;
   padding: 0.3rem 0.6rem;
   border-radius: 999px;
   border: 1px solid var(--border-strong);
-  font-size: 0.73rem;
-  font-weight: 700;
-  text-decoration: none;
-  color: var(--text-soft);
   background: var(--surface);
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
-.chat-book-btn:hover {
+.chat-shot-page:hover {
   border-color: var(--orange);
   color: var(--text);
 }
 
-.chat-book-btn.primary {
-  border-color: transparent;
-  background: var(--accent-grad);
-  color: #1a1204;
+/* La même barre, mais dans la visionneuse plein écran : fond sombre imposé,
+   puisqu'elle flotte sur du noir et non dans une bulle. */
+.chat-lightbox-book {
+  position: absolute;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.4rem 0.5rem 0.4rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(20, 19, 26, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(6px);
 }
 
-.chat-book-btn.primary:hover {
+.chat-lb-book-from {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  text-decoration: none;
+  color: #f3f0ea;
+}
+
+.chat-lb-book-from img,
+.chat-lb-book-ic {
+  flex: none;
+  width: 24px;
+  height: 33px;
+  border-radius: 4px;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.chat-lb-book-from > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.chat-lb-book-from strong {
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-lb-book-from em {
+  font-style: normal;
+  font-size: 0.7rem;
+  opacity: 0.6;
+}
+
+.chat-lb-book-open {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: none;
+  background: var(--accent-grad);
   color: #1a1204;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.chat-lb-book-open:hover {
   filter: brightness(1.05);
 }
 
+/* ---------------------------------------------------------------------
+   Le volume qui s'ouvre depuis la conversation (BookQuickReader)
+   ---------------------------------------------------------------------
+   Seuls l'attente et le refus passent par ici : une fois les planches là,
+   c'est le lecteur 3D qui prend tout l'écran et ce panneau n'existe plus. */
+.bqr-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.75);
+}
+
+.bqr-panel {
+  position: relative;
+  width: min(340px, 92vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.6rem 1.2rem 1.2rem;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #14131a;
+  color: #f3f0ea;
+  text-align: center;
+}
+
+.bqr-panel p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.bqr-ic {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.bqr-x {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.bqr-x:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
 @media (max-width: 560px) {
-  .chat-card-book {
+  .chat-shot {
     width: 100%;
   }
 }

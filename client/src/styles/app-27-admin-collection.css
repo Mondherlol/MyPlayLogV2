@@ -1079,6 +1079,25 @@
   min-width: 96px;
 }
 
+/* LE VOLET DU FILM, posé entre l'adresse et le bouton : deux caractères de
+   large, parce que c'est tout ce qu'on y écrit. Même traitement que le select
+   ci-dessus — dans une rangée flex, la règle générale des champs l'étirerait. */
+.adm-coll-part {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 0 0 auto;
+  font-size: 0.76rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.adm-coll-field .adm-coll-inline .adm-coll-part input {
+  flex: 0 0 auto;
+  width: 52px;
+  text-align: center;
+}
+
 .adm-coll-import-report {
   display: flex;
   gap: 0.8rem;

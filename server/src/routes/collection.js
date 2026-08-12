@@ -25,6 +25,9 @@ import {
   buildMedia,
   localizeCast,
   downloadArtwork,
+  fetchCaseMeta,
+  mergeArtwork,
+  cleanEpisodeTitle,
   tvmazeSearch,
   wikiSearch,
   extractPlaylistId,
@@ -392,6 +395,12 @@ const abs = (req, p) =>
 const coverOf = (m) =>
   m.kind === "comic" && m.pages?.length ? m.pages[0].file : m.artwork?.poster;
 
+// COMBIEN D'ÉPISODES TIENNENT AU DOS D'UN BOÎTIER. Vingt-deux, parce que c'est
+// ce qu'on peut imprimer en deux colonnes sans descendre sous le corps où un
+// titre d'épisode cesse d'être lisible. Une série plus longue bascule sur le
+// sommaire des saisons — c'est exactement ce que fait un coffret.
+const CASE_EPISODES = 22;
+
 // Vue « étagère » : tout sauf les épisodes (une série de 78 épisodes pèserait
 // pour rien dans la liste).
 function serializeCard(req, m, progress) {
@@ -455,6 +464,43 @@ function serializeCard(req, m, progress) {
     poster: abs(req, coverOf(m)),
     backdrop: abs(req, m.artwork?.backdrop),
     wrap: abs(req, m.artwork?.wrap),
+    // LE MATÉRIEL D'IMPRESSION VOYAGE AVEC LA CARTE, comme l'affiche : la
+    // jaquette est peinte depuis le rayon, avant même qu'on ouvre une fiche
+    // (voir caseTextures côté client). Aller le chercher plus tard voudrait
+    // dire repeindre le boîtier une seconde fois sous les yeux du visiteur.
+    logo: abs(req, m.artwork?.logo),
+    stills: (m.artwork?.stills || []).map((s) => abs(req, s)).filter(Boolean),
+    // LE FONDS : tout ce que le titre a jamais eu comme visuel, dans l'ordre où
+    // c'est arrivé. C'est ce que montre le studio, et le rang y est un contrat —
+    // une jaquette désigne son image par « pool:3 » (voir `mergeArtwork`).
+    pool: (m.artwork?.pool || []).map((s) => abs(req, s)).filter(Boolean),
+    logos: (m.artwork?.logos || []).map((s) => abs(req, s)).filter(Boolean),
+    studios: (m.studios || []).map((s) => ({ name: s.name, logo: abs(req, s.logo) })),
+    seasons: (m.seasons || []).map((s) => ({
+      number: s.number,
+      name: s.name,
+      episodeCount: s.episodeCount,
+      year: s.year,
+    })),
+    caseArt: m.caseArt || {},
+    // Le sommaire imprimé au dos : numéro et titre, RIEN d'autre, et vingt-deux
+    // au plus — au-delà, un dos de DVD ne liste plus, il renvoie aux saisons.
+    // La liste complète des épisodes (adresses, miroirs, résumés) reste à la
+    // fiche : elle pèse cent fois ça, et le rayon n'en fait rien.
+    //
+    // LE TITRE EST NETTOYÉ ICI, ET SEULEMENT ICI. Celui qui est en base vient
+    // souvent de YouTube (« Sonic X épisode 12 - Le duel final VF HD ») : la
+    // fiche l'affiche tel quel, parce qu'il faut pouvoir reconnaître la vidéo
+    // qu'on va lancer. Au dos d'un boîtier, ce préambule prend toute la ligne et
+    // le sommaire n'annonce plus que vingt-deux fois le nom de la série.
+    caseEpisodes:
+      m.kind === "series"
+        ? (m.episodes || []).slice(0, CASE_EPISODES).map((e) => ({
+            n: e.number ?? e.index + 1,
+            s: e.season || 1,
+            t: cleanEpisodeTitle(e.title || "", m.title).slice(0, 60),
+          }))
+        : [],
     // Dimensions sur mesure du boîtier (null = gabarit DVD). La scène 3D en a
     // besoin dès le rayon, donc ça part avec la carte et non avec la fiche.
     box: m.box?.w && m.box?.h && m.box?.d ? m.box : null,
@@ -1612,7 +1658,16 @@ router.post(
   upload.single("file"),
   async (req, res) => {
     try {
-      const which = ["backdrop", "wrap"].includes(req.body.which)
+      // « logo » suit le même chemin que les autres visuels : le mini-studio
+      // permet d'en poser un à la main quand TMDB n'en a pas — c'est le cas de
+      // presque toutes les web-séries, et c'est justement là que le titre
+      // composé fait le plus pauvre.
+      //
+      // « pool » ne remplace RIEN : l'image entre au fonds, et c'est le studio
+      // qui décidera ensuite sur quelle face la poser. C'est par là que passe
+      // une couverture ou un dos tout faits — ce ne sont ni une affiche ni un
+      // bandeau, et les faire passer pour tels fausserait la fiche entière.
+      const which = ["backdrop", "wrap", "logo", "pool"].includes(req.body.which)
         ? req.body.which
         : "poster";
       const media = await CollectionMedia.findOne({ slug: req.params.slug });
@@ -1642,8 +1697,19 @@ router.post(
       if (!stored)
         return res.status(400).json({ error: "Aucune image utilisable fournie." });
 
+      if (which === "pool") {
+        media.artwork = mergeArtwork(media.artwork?.toObject?.() || media.artwork, {});
+        media.artwork.pool = [...(media.artwork.pool || []), stored];
+        await media.save();
+        return res.json({ media: serializeFull(req, media.toObject(), null) });
+      }
+
       media.artwork[which] = stored;
       if (which === "poster") media.artwork.thumb = stored;
+      // Le visuel remplacé n'est pas perdu : il entre au fonds, et le studio
+      // peut le remettre sur n'importe quelle face. C'est le même principe que
+      // pour le rafraîchissement — on ne détruit pas une image qu'on a déjà.
+      media.artwork = mergeArtwork(media.artwork?.toObject?.() || media.artwork, {});
       await media.save();
       res.json({ media: serializeFull(req, media.toObject(), null) });
     } catch (err) {
@@ -1652,6 +1718,167 @@ router.post(
     }
   }
 );
+
+// ======================================================================
+//  Le mini-studio de jaquette
+// ======================================================================
+// Deux gestes, et deux seulement : ALLER CHERCHER le matériel d'impression
+// (logo, photos, marque du studio, saisons) et POSER les quelques réglages qui
+// ne se devinent pas. Tout le reste — la composition, la hiérarchie, les
+// icônes, le code-barres — est peint côté client par le gabarit, et n'a aucun
+// réglage : c'est la condition pour que le gabarit par défaut soit soigné.
+
+// POST /api/collection/:slug/case-meta — rapatrie le matériel depuis TMDB.
+router.post("/:slug/case-meta", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const media = await CollectionMedia.findOne({ slug: req.params.slug });
+    if (!media) return res.status(404).json({ error: "Média introuvable." });
+    if (!["series", "film"].includes(media.kind))
+      return res
+        .status(400)
+        .json({ error: "Le matériel de jaquette ne concerne que les séries et les films." });
+
+    const got = await fetchCaseMeta(media);
+
+    // CE QUI EST REVENU REMPLACE, CE QUI MANQUE NE VIDE RIEN — et RIEN NE SE
+    // PERD : l'ancien logo comme les anciennes photos rejoignent le fonds, d'où
+    // le studio peut les remettre en place. Le geste doit pouvoir se rejouer
+    // vingt fois sans qu'on risque de perdre le visuel qu'on avait choisi.
+    media.artwork = mergeArtwork(media.artwork?.toObject?.() || media.artwork, {
+      logo: got.logo || null,
+      stills: got.stills,
+    });
+    if (got.studios.length) media.studios = got.studios;
+    if (got.seasons.length) media.seasons = got.seasons;
+    if (!media.tmdbRef) media.tmdbRef = got.ref;
+    await media.save();
+
+    res.json({
+      media: serializeFull(req, media.toObject(), null),
+      found: {
+        logo: !!got.logo,
+        stills: got.stills.length,
+        studios: got.studios.length,
+        seasons: got.seasons.length,
+      },
+    });
+  } catch (err) {
+    console.error("collection case-meta error:", err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Un désignateur d'image valide : « auto », « none », « poster », « backdrop »
+// ou « still:N ». Une valeur inventée est REFUSÉE plutôt qu'ignorée — elle
+// reviendrait au panneau comme un réglage valide, et la jaquette retomberait en
+// silence sur l'automatique sans que personne ne comprenne pourquoi.
+const IMAGE_SPEC = /^(auto|none|poster|backdrop|still:\d{1,2}|pool:\d{1,2})$/;
+
+const SUMMARIES = ["auto", "episodes", "seasons", "stills"];
+
+// Le catalogue de fontes, recopié de `FONTS` côté client. Recopié et pas
+// partagé : le serveur ne charge pas de module du client, et c'est une liste de
+// sept clés qui bouge une fois par an. Elle est là pour REFUSER ce qu'elle ne
+// connaît pas — voir plus bas pourquoi une fonte inconnue est pire qu'une
+// erreur.
+const CASE_FONTS = [
+  "didone",
+  "grotesk",
+  "inter",
+  "fredoka",
+  "georgia",
+  "impact",
+  "courier",
+];
+
+// PUT /api/collection/:slug/case-art — les réglages du mini-studio.
+router.put("/:slug/case-art", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const caseArt = {};
+    for (const key of ["front", "back", "spine"]) {
+      const v = body[key] === undefined ? "auto" : String(body[key]);
+      if (!IMAGE_SPEC.test(v))
+        return res.status(400).json({ error: `Image « ${key} » inconnue.` });
+      caseArt[key] = v;
+    }
+    const summary = body.summary === undefined ? "auto" : String(body.summary);
+    if (!SUMMARIES.includes(summary))
+      return res.status(400).json({ error: "Sommaire inconnu." });
+    caseArt.summary = summary;
+
+    // L'encre : un hexa à six chiffres, ou rien. Une chaîne libre finirait dans
+    // un `fillStyle`, où une valeur illisible ne lève aucune erreur — elle peint
+    // simplement en noir, et on chercherait longtemps.
+    const color = String(body.color || "").trim();
+    if (color && !/^#[\da-f]{6}$/i.test(color))
+      return res.status(400).json({ error: "Couleur de boîtier invalide." });
+    caseArt.color = color.toLowerCase();
+
+    // Les faces toutes faites, et le cadrage.
+    caseArt.frontFull = !!body.frontFull;
+    caseArt.backFull = !!body.backFull;
+    for (const key of ["frontCrop", "backCrop"]) {
+      const v = body[key];
+      const n = Number(v);
+      caseArt[key] =
+        v === "" || v === null || v === undefined || !Number.isFinite(n)
+          ? null
+          : Math.max(0, Math.min(100, Math.round(n)));
+    }
+
+    const spineBg = String(body.spineBg || "image");
+    if (!["image", "flat", "fade"].includes(spineBg))
+      return res.status(400).json({ error: "Fond de tranche inconnu." });
+    caseArt.spineBg = spineBg;
+
+    // La place et la taille du logo. Bornées ici plutôt que dans le curseur :
+    // une valeur inventée peindrait un logo hors de la face, et l'admin ne
+    // verrait qu'une couverture qui a perdu son titre.
+    const num = (v, min, max, fallback) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.max(min, Math.min(max, Math.round(n))) : fallback;
+    };
+    caseArt.logoX = num(body.logoX, 0, 100, 50);
+    caseArt.logoY = num(body.logoY, 0, 100, 72);
+    caseArt.logoSize = num(body.logoSize, 20, 160, 100);
+    const logoTint = String(body.logoTint || "auto");
+    if (!["auto", "none", "white", "black"].includes(logoTint))
+      return res.status(400).json({ error: "Traitement de logo inconnu." });
+    caseArt.logoTint = logoTint;
+
+    // Les fontes : une clé du catalogue, ou rien. Un nom de famille libre
+    // partirait tel quel dans `ctx.font`, où une valeur inconnue ne lève aucune
+    // erreur — elle retombe en silence sur du Times, et c'est ça qui s'imprime.
+    for (const key of ["fontTitle", "fontText"]) {
+      const v = String(body[key] || "");
+      if (v && !CASE_FONTS.includes(v))
+        return res.status(400).json({ error: `Police « ${v} » inconnue.` });
+      caseArt[key] = v;
+    }
+
+    caseArt.logo = body.logo === undefined ? true : !!body.logo;
+    const logoPick = String(body.logoPick || "auto");
+    if (!/^(auto|logos:\d{1,2})$/.test(logoPick))
+      return res.status(400).json({ error: "Logo inconnu." });
+    caseArt.logoPick = logoPick;
+    caseArt.barcode = body.barcode === undefined ? true : !!body.barcode;
+    caseArt.edition = String(body.edition || "").slice(0, 40);
+    const discs = Number(body.discs);
+    caseArt.discs = Number.isFinite(discs) ? Math.max(0, Math.min(12, Math.round(discs))) : 0;
+
+    const media = await CollectionMedia.findOneAndUpdate(
+      { slug: req.params.slug },
+      { $set: { caseArt } },
+      { new: true, runValidators: true }
+    ).lean();
+    if (!media) return res.status(404).json({ error: "Média introuvable." });
+    res.json({ media: serializeFull(req, media, null) });
+  } catch (err) {
+    console.error("collection case-art error:", err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
 
 // PUT /api/collection/:slug/episodes — réécrit la liste des épisodes d'un
 // titre servi par un lecteur tiers. C'est LE geste d'entretien de ces
@@ -1768,16 +1995,20 @@ router.get("/:slug/source", requireAuth, requireAdmin, async (req, res) => {
   res.json(sourcePayload(media));
 });
 
-// Les adresses déjà en place sur le premier épisode — c'est-à-dire, pour un
-// film, TOUS ses lecteurs. Sert au collage : une fiche qui ne monte ses lecteurs
+// Les adresses déjà en place sur une PARTIE — c'est-à-dire, pour un film d'un
+// seul tenant, TOUS ses lecteurs. Sert au collage : une fiche qui ne monte ses lecteurs
 // qu'au clic ne se laisse lire qu'un lecteur à la fois, et chaque passage doit
 // AJOUTER le sien aux autres au lieu de les balayer.
 // Les adresses gardent leur ÉTIQUETTE DE PISTE (« vf@https://… ») : c'est ce
 // qui permet à deux imports successifs — la page VF, puis la page VOSTFR du même
 // film — de remplir un seul boîtier à deux versions. Les rendre nues ici
 // effacerait la première à chaque fois qu'on ajoute la seconde.
-function filmUrlsOf(media) {
-  const ep = media.episodes?.[0];
+function filmUrlsOf(media, part = 1) {
+  const eps = media.episodes || [];
+  // Le numéro ÉCRIT sur l'épisode fait foi ; à défaut (liste d'avant les
+  // parties, où rien n'était numéroté) c'est la position qui compte, et la
+  // partie 1 reste donc la première entrée.
+  const ep = eps.find((e, i) => (e.number ?? i + 1) === part);
   if (!ep) return [];
   const tag = (url, lang) => (url && lang ? `${lang}@${url}` : url);
   const main =
@@ -1786,6 +2017,59 @@ function filmUrlsOf(media) {
     tag(main, ep.lang),
     ...(ep.mirrors || []).map((m) => tag(m.url, m.lang)),
   ].filter(Boolean);
+}
+
+// Le repère d'une ligne de liste (« S01E02 ») : la saison, puis le numéro.
+const EP_MARK = /^s\s*(\d{1,2})\s*[·.\-–]?\s*e\s*\.?\s*(\d{1,3})\b/i;
+
+// ÉCRIRE UNE PARTIE DE FILM, SANS TOUCHER AUX AUTRES.
+//
+// Un film sort parfois en deux volets, et l'hébergeur leur donne deux fiches
+// séparées (« … part 1 … », « … part 2 … »). Les verser dans la même ligne en
+// aurait fait des MIROIRS : le poste serait passé de l'un à l'autre en croyant
+// changer de source, et aurait montré la fin à qui cherchait le début. Ce sont
+// deux entrées du même boîtier — exactement ce que la fiche sait déjà afficher
+// quand un film a plus d'une ligne (voir `soloFilm`, CollectionDetail).
+//
+// Le numéro désigne donc LA LIGNE : elle est réécrite ou ajoutée, les autres
+// restent où elles sont. C'est aussi ce qui permet de re-scraper le premier
+// volet sans perdre le second.
+//
+// On repart de `episodesToLines` plutôt que de `source.list` : c'est la seule
+// écriture dont chaque ligne porte son repère, donc la seule qu'on puisse
+// adresser par numéro.
+function writeFilmPart(media, part, found, merge) {
+  const lines = episodesToLines(media.episodes || [])
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const at = lines.findIndex((l) => Number(l.match(EP_MARK)?.[2]) === part);
+  const old = at >= 0 ? lines[at] : "";
+  const cut = old.search(/(?:[a-z]{2,6}@)?https?:\/\//i);
+  // L'étiquette déjà écrite l'emporte : elle a pu être corrigée à la main.
+  const label =
+    (cut < 0 ? old : old.slice(0, cut))
+      .replace(EP_MARK, "")
+      .replace(/[—–|:-]+\s*$/, "")
+      .trim() ||
+    (part > 1 ? `Partie ${part}` : media.title);
+  // Sur la ligne visée, les adresses se cumulent quand on complète (un collage
+  // ne rapporte que le lecteur affiché au moment de la copie) et se remplacent
+  // quand on re-scrape la fiche entière.
+  const urls = [...new Set([...(merge ? filmUrlsOf(media, part) : []), ...found])];
+  const head = [`S01E${String(part).padStart(2, "0")}`, label].filter(Boolean).join(" ");
+  const out = [...lines];
+  const line = `${head} — ${urls.join(" | ")}`;
+  if (at >= 0) out[at] = line;
+  else out.push(line);
+  // Les parties se lisent dans l'ordre : retomber sur le premier volet APRÈS
+  // avoir posé le second ne doit pas les inverser dans le boîtier.
+  return out
+    .sort(
+      (a, b) =>
+        (Number(a.match(EP_MARK)?.[2]) || 0) - (Number(b.match(EP_MARK)?.[2]) || 0)
+    )
+    .join("\n");
 }
 
 // Deux listes d'épisodes en une, À REPÈRE ÉGAL LA NOUVELLE GAGNE. Un collage
@@ -1842,6 +2126,11 @@ router.post("/:slug/source/import", requireAuth, requireAdmin, async (req, res) 
     // lien REMPLACE (il apporte toute la fiche). C'est le client qui tranche,
     // parce que c'est lui qui sait sur quel bouton on a appuyé.
     const merge = req.body?.merge === true;
+    // LE VOLET DU FILM que cette fiche remplit. Sans lui, un film en deux
+    // parties ne pouvait pas se monter : la seconde fiche s'ajoutait en miroir
+    // de la première. Il ne concerne QUE les films — une série range ses
+    // épisodes avec les repères de sa propre fiche.
+    const part = Math.min(99, Math.max(1, Number(req.body?.part) || 1));
 
     if (!url && !text)
       return res.status(400).json({ error: "Il faut une adresse ou une source collée." });
@@ -1924,14 +2213,13 @@ router.post("/:slug/source/import", requireAuth, requireAdmin, async (req, res) 
       // une page après l'autre (voir `tagFilm`, lib/filmIndex.js).
       const tag = imported.langs?.length === 1 ? `${imported.langs[0]}@` : "";
       const found = (imported.players || []).map((p) => `${tag}${p.url}`);
-      const all = merge ? [...new Set([...filmUrlsOf(media), ...found])] : found;
-      if (!all.length)
+      if (!found.length && !(merge && filmUrlsOf(media, part).length))
         return res.status(400).json({
           error:
             "Aucun lecteur trouvé sur cette page : le site va les chercher au clic. " +
             "Ouvre la fiche, choisis un lecteur, puis colle la source ici.",
         });
-      list = `${media.title} — ${all.join(" | ")}`;
+      list = writeFilmPart(media, part, found, merge);
     } else if (imported.kind === "catalogue") {
       return res.status(400).json({
         error:
@@ -1984,6 +2272,10 @@ router.post("/:slug/refresh", requireAuth, requireAdmin, async (req, res) => {
     if (!existing) return res.status(404).json({ error: "Média introuvable." });
     const built = await buildMedia({ ...existing, ...req.body, url: existing.source.url });
     built.cast = await localizeCast(built);
+    // RAFRAÎCHIR N'EST PAS REMPLACER : `buildMedia` a déjà fusionné les visuels
+    // avec ceux de la fiche (voir `mergeArtwork`), sans quoi ce
+    // `findOneAndUpdate` — qui écrase le sous-document `artwork` en entier —
+    // emporterait le logo, les photos et la jaquette dépliée mesurée à la main.
     const media = await CollectionMedia.findOneAndUpdate({ slug: existing.slug }, built, {
       new: true,
     }).lean();

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useScrollLock } from "../hooks/useScrollLock";
 import { useBackClose } from "../hooks/useBackClose";
+import useMediaQuery from "../hooks/useMediaQuery";
 import { isRtl, spreadTest } from "../lib/collection";
 import { playPageTurnSound, primePaperSounds } from "../lib/sfx";
 import "swiper/css";
@@ -48,12 +49,14 @@ import "swiper/css/zoom";
 //
 // TROIS MODES, parce qu'un même volume ne se lit pas pareil selon l'écran :
 //
-//   • PAGE — une planche à la fois, la lecture par défaut sur téléphone ;
+//   • PAGE — une planche à la fois, cadrée en entier : la lecture d'une petite
+//     fenêtre, et celle qu'on veut pour regarder une planche comme un tableau ;
 //   • DOUBLE — deux planches côte à côte comme un volume ouvert, avec la
 //     reliure au centre. C'est la lecture juste sur un écran large, et la
 //     seule qui rende les doubles pages telles qu'elles ont été dessinées ;
 //   • RUBAN — tout à la verticale, en défilement continu : la lecture des
-//     scans longs, et celle qu'on veut au pouce sur un téléphone.
+//     scans longs, et CELLE DU TÉLÉPHONE (voir PHONE) — la seule des trois où
+//     la planche est cadrée sur sa largeur, donc la seule qui se lise au pouce.
 
 // Ce que Swiper garde monté autour de la planche courante. Deux devant, une
 // derrière : tourner une page ne doit jamais donner un carré vide, et revenir
@@ -66,6 +69,27 @@ const BEHIND = 1;
 // deux planches avant de zoomer. À la souris on tourne tout de suite — personne
 // ne double-clique pour lire.
 const TAP_WAIT = 230;
+
+// ---------------------------------------------------------- au téléphone --
+//
+// UN TÉLÉPHONE NE LIT PAS COMME UN ÉCRAN. Une planche cadrée sur sa HAUTEUR sur
+// un écran de 6 pouces, c'est une planche large de quatre centimètres : les
+// bulles y sont des taches grises, et lire un volume demande de pincer, lire,
+// dézoomer, glisser, repincer — à chaque page. C'est le mode page, et c'est ce
+// qui rendait la lecture impraticable au pouce.
+//
+// Le ruban vertical, lui, cadre la planche sur sa LARGEUR et se parcourt au
+// pouce, d'un seul geste continu, comme tout ce qu'on lit sur un téléphone.
+// C'est donc lui par défaut là-bas — et le mode double, qui met DEUX planches
+// dans cette même largeur, n'y est simplement pas proposé.
+const PHONE = "(max-width: 700px)";
+
+// Le mode choisi se garde, mais PAS ENTRE LES DEUX FORMATS D'ÉCRAN. Une seule
+// clé, et le « double » posé sur l'ordinateur le lundi rouvrait le téléphone en
+// double le mardi — le réglage le moins lisible des trois, hérité d'un écran
+// qu'on n'a pas sous les yeux. Chaque appareil garde donc le sien.
+const MODE_KEY = "mpl-comic-mode";
+const PHONE_MODE_KEY = "mpl-comic-mode-phone";
 
 // Découpe le volume en VUES. Une vue est ce que l'écran montre d'un coup : une
 // planche en mode page, une ou deux en mode double. C'est l'unité de
@@ -105,13 +129,30 @@ export default function ComicReader({ media, startPage = 0, onClose, onProgress 
   const pages = useMemo(() => media.pages || [], [media.pages]);
   const rtl = isRtl(media);
 
+  // AU POUCE OU À L'ÉCRAN. Deux usages, et pas seulement deux tailles : ce qui
+  // change n'est pas la mise en page mais le GESTE de lecture (voir PHONE).
+  const phone = useMediaQuery(PHONE);
+  // La clé où se garde le mode est celle de l'appareil AU MOMENT DE L'OUVERTURE,
+  // et elle ne bouge plus : sans ce gel, faire pivoter un téléphone en paysage
+  // (donc « pas téléphone » le temps d'une rotation) recopierait le réglage du
+  // pouce dans celui de l'écran, et réciproquement.
+  const modeKey = useRef(
+    window.matchMedia(PHONE).matches ? PHONE_MODE_KEY : MODE_KEY
+  ).current;
   const [mode, setMode] = useState(() => {
-    const saved = localStorage.getItem("mpl-comic-mode");
+    const saved = localStorage.getItem(modeKey);
     if (saved) return saved;
+    if (modeKey === PHONE_MODE_KEY) return "ribbon";
     // Le mode double n'a de sens que sur un écran large : proposé d'office sur
-    // un téléphone, il donnerait deux planches illisibles.
+    // une petite fenêtre, il donnerait deux planches illisibles.
     return window.innerWidth >= 900 ? "double" : "page";
   });
+  // LE MODE DEMANDÉ, ET CELUI QU'ON PEUT TENIR. Le double ne rentre pas sur un
+  // téléphone : basculer en portrait au milieu d'un volume ouvert en double
+  // donnerait deux planches de quatre centimètres. Il retombe donc sur la page
+  // seule le temps que l'écran soit étroit — le réglage, lui, n'est pas perdu :
+  // c'est `mode` qui reste enregistré, et l'écran large le retrouve intact.
+  const layout = phone && mode === "double" ? "page" : mode;
   const [page, setPage] = useState(() => Math.min(startPage, Math.max(0, pages.length - 1)));
   const [zoomed, setZoomed] = useState(false);
   const [thumbs, setThumbs] = useState(false);
@@ -126,7 +167,7 @@ export default function ComicReader({ media, startPage = 0, onClose, onProgress 
 
   useScrollLock(true);
   useBackClose(onClose, "comic");
-  useEffect(() => localStorage.setItem("mpl-comic-mode", mode), [mode]);
+  useEffect(() => localStorage.setItem(modeKey, mode), [modeKey, mode]);
   // Les prises de papier descendent à l'ouverture : ici on peut glisser vers la
   // planche suivante dans la seconde, il n'y a pas de vol pour couvrir
   // l'attente. Demandées au premier geste, elles le laisseraient muet.
@@ -136,8 +177,8 @@ export default function ComicReader({ media, startPage = 0, onClose, onProgress 
 
   const isSpread = useMemo(() => spreadTest(pages), [pages]);
   const views = useMemo(
-    () => buildViews(pages, mode === "double", isSpread),
-    [pages, mode, isSpread]
+    () => buildViews(pages, layout === "double", isSpread),
+    [pages, layout, isSpread]
   );
 
   // La vue qui CONTIENT la planche courante. C'est ce passage par la planche
@@ -212,11 +253,11 @@ export default function ComicReader({ media, startPage = 0, onClose, onProgress 
       const on = document.activeElement;
       if (on && (on.nodeName === "INPUT" || on.isContentEditable)) return undefined;
       if (e.key === "ArrowDown" || e.key === " ") {
-        if (mode === "ribbon") return undefined;
+        if (layout === "ribbon") return undefined;
         e.preventDefault();
         return advance();
       }
-      if (e.key === "ArrowUp") return mode === "ribbon" ? undefined : back();
+      if (e.key === "ArrowUp") return layout === "ribbon" ? undefined : back();
       if (e.key === "Home") return setPage(0);
       if (e.key === "End") return setPage(pages.length - 1);
       if (e.key.toLowerCase() === "d") return setMode((m) => (m === "double" ? "page" : "double"));
@@ -225,7 +266,7 @@ export default function ComicReader({ media, startPage = 0, onClose, onProgress 
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [advance, back, close, mode, thumbs, pages.length]);
+  }, [advance, back, close, layout, thumbs, pages.length]);
 
   // --- plein écran réel. Le mode « lecture pure » demandé : plus de barre du
   //     navigateur, plus rien que la planche.
@@ -300,13 +341,13 @@ export default function ComicReader({ media, startPage = 0, onClose, onProgress 
   // mode. On lui laisse le temps d'arriver, puis on le suit.
   const settled = useRef(false);
   useEffect(() => {
-    if (mode !== "ribbon") return undefined;
+    if (layout !== "ribbon") return undefined;
     settled.current = false;
     const t = setTimeout(() => {
       settled.current = true;
     }, 500);
     return () => clearTimeout(t);
-  }, [mode]);
+  }, [layout]);
 
   if (!pages.length) return null;
   const view = views[viewIndex] || [pages[0]];
@@ -317,7 +358,7 @@ export default function ComicReader({ media, startPage = 0, onClose, onProgress 
       ref={stageRef}
       className={`creader ${full ? "is-full" : ""} ${chrome ? "" : "bare"} ${
         zoomed ? "is-zoomed" : ""
-      } mode-${mode}`}
+      } mode-${layout}`}
       style={{ "--tint": media.color || "var(--orange)" }}
       role="dialog"
       aria-label={`Lecture — ${media.title}`}
@@ -335,23 +376,32 @@ export default function ComicReader({ media, startPage = 0, onClose, onProgress 
           </span>
         </div>
 
+        {/* LA BARRE D'UN TÉLÉPHONE NE TIENT PAS SIX BOUTONS. À 360 px, six
+            pastilles au format du doigt ne laissent plus rien au titre — et
+            deux d'entre elles n'ont de toute façon rien à y faire : le double
+            page (deux planches dans une largeur de pouce) et le plein écran
+            (l'API n'existe pas sur iOS, et le mobilier s'escamote déjà d'un tap
+            au milieu de la planche). Restent les deux façons de lire qui ont un
+            sens là-bas, et la planche-contact. */}
         <div className="creader-tools">
           <button
-            className={`creader-icon clickable ${mode === "page" ? "on" : ""}`}
+            className={`creader-icon clickable ${layout === "page" ? "on" : ""}`}
             onClick={() => setMode("page")}
             title="Une planche à la fois"
           >
             <BookOpen size={17} />
           </button>
+          {!phone && (
+            <button
+              className={`creader-icon clickable ${layout === "double" ? "on" : ""}`}
+              onClick={() => setMode("double")}
+              title="Volume ouvert, deux planches (D)"
+            >
+              <Columns2 size={17} />
+            </button>
+          )}
           <button
-            className={`creader-icon clickable ${mode === "double" ? "on" : ""}`}
-            onClick={() => setMode("double")}
-            title="Volume ouvert, deux planches (D)"
-          >
-            <Columns2 size={17} />
-          </button>
-          <button
-            className={`creader-icon clickable ${mode === "ribbon" ? "on" : ""}`}
+            className={`creader-icon clickable ${layout === "ribbon" ? "on" : ""}`}
             onClick={() => setMode("ribbon")}
             title="Ruban vertical, défilement continu"
           >
@@ -360,7 +410,7 @@ export default function ComicReader({ media, startPage = 0, onClose, onProgress 
           <span className="creader-sep" />
           {/* Le zoom à la souris : au doigt il se fait au pincer, et personne
               ne va chercher un bouton pour ça. */}
-          {mode !== "ribbon" && (
+          {layout !== "ribbon" && !phone && (
             <button
               className={`creader-icon clickable ${zoomed ? "on" : ""}`}
               onClick={toggleZoom}
@@ -377,22 +427,31 @@ export default function ComicReader({ media, startPage = 0, onClose, onProgress 
           >
             <LayoutGrid size={17} />
           </button>
-          <button
-            className="creader-icon clickable"
-            onClick={() => setFull((f) => !f)}
-            title="Lecture pure (F)"
-          >
-            {full ? <Minimize size={17} /> : <Maximize size={17} />}
-          </button>
+          {!phone && (
+            <button
+              className="creader-icon clickable"
+              onClick={() => setFull((f) => !f)}
+              title="Lecture pure (F)"
+            >
+              {full ? <Minimize size={17} /> : <Maximize size={17} />}
+            </button>
+          )}
         </div>
       </header>
 
       {/* ---------------- la planche ---------------- */}
-      {mode === "ribbon" ? (
+      {layout === "ribbon" ? (
         // L'enveloppe porte la hauteur (elle est l'étage du milieu, entre les
         // deux barres) et Virtuoso la remplit : il lui faut une hauteur
         // DÉFINIE pour savoir ce qu'il doit monter.
-        <div className="creader-ribbon">
+        //
+        // ET ELLE REÇOIT LE TAP QUI ESCAMOTE LE MOBILIER, comme la planche du
+        // carrousel juste en dessous (voir `onTap`). Sans lui, le ruban était le
+        // seul des trois modes où les deux barres restaient à demeure — soit,
+        // sur un téléphone, un bon cinquième de la hauteur perdu pendant toute
+        // la lecture, et aucun moyen de le récupérer. Un geste de défilement ne
+        // produit pas de clic : seul un vrai tap arrive ici.
+        <div className="creader-ribbon" onClick={() => setChrome((c) => !c)}>
           <Virtuoso
             data={pages}
             // On rouvre le ruban là où l'on en était, et la planche courante
@@ -428,7 +487,7 @@ export default function ComicReader({ media, startPage = 0, onClose, onProgress 
         <Swiper
           // Le découpage change avec le mode : on remonte le carrousel plutôt
           // que de lui faire avaler une autre liste sous les pieds.
-          key={`${mode}-${rtl ? "rtl" : "ltr"}`}
+          key={`${layout}-${rtl ? "rtl" : "ltr"}`}
           className="creader-swiper"
           modules={[Virtual, Zoom, Keyboard, Mousewheel, A11y]}
           // LE SENS DE LECTURE EST PORTÉ PAR LE CONTENEUR. Swiper retourne son

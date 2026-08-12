@@ -1,0 +1,525 @@
+/* ======================================================================
+   Le studio de jaquette (panneau Admin)
+   ======================================================================
+   DEUX COLONNES, ET UN RAPPORT DE FORCE ASSUMÉ : l'objet à gauche prend toute
+   la place qu'il peut, les leviers à droite tiennent dans une colonne étroite.
+   C'est la mise en page d'un atelier — on regarde ce qu'on fabrique, on ne
+   contemple pas ses outils.
+
+   Sous 900 px, la colonne des leviers passe SOUS l'objet plutôt qu'à côté :
+   une jaquette dépliée dans 300 px de large ne se juge pas.
+   ====================================================================== */
+
+.casestudio {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  display: flex;
+  padding: clamp(0.6rem, 2.5vw, 1.6rem);
+  background: rgba(6, 6, 10, 0.8);
+  backdrop-filter: blur(4px);
+  overflow: auto;
+}
+
+.casestudio-sheet {
+  margin: auto;
+  width: min(1180px, 100%);
+  display: flex;
+  flex-direction: column;
+  max-height: 100%;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.casestudio-sheet header {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.casestudio-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--accent-soft, rgba(242, 183, 11, 0.14));
+  color: var(--accent);
+  flex: none;
+}
+
+.casestudio-titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.casestudio-titles h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1rem;
+}
+
+.casestudio-titles p {
+  margin: 0.1rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.casestudio-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 1rem;
+  padding: 1rem;
+  overflow: auto;
+}
+
+/* ---------------------------------------------------------- l'objet ---- */
+
+.casestudio-stage {
+  min-width: 0;
+}
+
+.casestudio-views {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.casestudio-views button {
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.casestudio-views button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #14151a;
+}
+
+/* Le damier : la jaquette est peinte sur un canvas transparent aux bords, et
+   sans lui on ne distingue pas un fond noir d'un trou dans l'image. */
+.casestudio-view {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 0.8rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background:
+    repeating-conic-gradient(rgba(128, 128, 128, 0.09) 0% 25%, transparent 0% 50%) 50% / 18px
+    18px;
+}
+
+.casestudio-view canvas {
+  max-width: 100%;
+  max-height: min(62vh, 620px);
+  border-radius: 3px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.45);
+}
+
+/* Une face seule se regarde en grand ; la feuille dépliée, elle, est trois
+   fois plus large que haute et doit tenir dans la largeur. */
+.casestudio-view.sheet canvas {
+  width: 100%;
+  height: auto;
+}
+
+.casestudio-wait {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(10, 11, 16, 0.72);
+  color: #fff;
+}
+
+.casestudio-warn {
+  margin: 0.7rem 0 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius);
+  background: rgba(242, 183, 11, 0.1);
+  border: 1px solid rgba(242, 183, 11, 0.28);
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+
+/* --------------------------------------------------------- les leviers -- */
+
+.casestudio-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  min-width: 0;
+}
+
+/* Les onglets : une face par onglet, plus le matériel. Sélectionner un onglet
+   TOURNE l'objet à gauche — c'est le geste qu'on ferait avec le boîtier. */
+.casestudio-tabs {
+  display: flex;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2, rgba(128, 128, 128, 0.05));
+}
+
+.casestudio-tabs button {
+  flex: 1;
+  padding: 0.34rem 0.2rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.casestudio-tabs button.on {
+  background: var(--accent);
+  color: #14151a;
+}
+
+/* ------------------------------------------- choisir une image par face -- */
+
+.casestudio-pick {
+  margin-bottom: 0.8rem;
+}
+
+.casestudio-pick-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  margin-bottom: 0.34rem;
+}
+
+/* Déposer sa propre image POUR CETTE FACE : le bouton vit dans l'intitulé du
+   choix d'image, là où l'on constate qu'aucune vignette ne convient. */
+.casestudio-drop {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  padding: 0.14rem 0.44rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+/* Deux réglages côte à côte quand ils vont par paire (x/y, deux polices). */
+.casestudio-duo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.casestudio-slider {
+  display: block;
+  margin-bottom: 0.7rem;
+}
+
+.casestudio-slider > span {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 0.74rem;
+  font-weight: 700;
+  margin-bottom: 0.1rem;
+}
+
+.casestudio-slider b {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
+.casestudio-slider input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.casestudio-slider em {
+  display: block;
+  margin-top: 0.16rem;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  font-style: normal;
+  color: var(--text-soft);
+}
+
+.casestudio-field > span {
+  display: flex;
+  align-items: center;
+  gap: 0.26rem;
+}
+
+.casestudio-thumbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(66px, 1fr));
+  gap: 0.35rem;
+}
+
+.casestudio-thumb {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm, 6px);
+  overflow: hidden;
+  background: rgba(128, 128, 128, 0.12);
+  aspect-ratio: 4 / 3;
+}
+
+.casestudio-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* « Auto » et « Aucune » n'ont pas d'image : une icône centrée, et le nom
+   dessous plutôt qu'en surimpression. */
+.casestudio-thumb.flat {
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+}
+
+.casestudio-thumb em {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0.12rem 0.2rem;
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: 700;
+  text-align: center;
+  color: #fff;
+  background: rgba(8, 9, 14, 0.72);
+}
+
+.casestudio-thumb.flat em {
+  background: transparent;
+  color: var(--text-soft);
+  bottom: 0.1rem;
+}
+
+.casestudio-thumb.on {
+  border-color: var(--accent);
+}
+
+/* Les logos sont détourés sur fond transparent : un damier sombre derrière,
+   sinon un logo blanc sur le fond clair du panneau est invisible. Et ils se
+   voient ENTIERS (`contain`) — un logo recadré n'est plus un logo. */
+.casestudio-thumbs.logos .casestudio-thumb {
+  aspect-ratio: 16 / 7;
+  background:
+    repeating-conic-gradient(rgba(255, 255, 255, 0.06) 0% 25%, transparent 0% 50%) 50% / 12px
+      12px,
+    #1b1c22;
+}
+
+.casestudio-thumbs.logos img {
+  object-fit: contain;
+  padding: 0.2rem;
+}
+
+/* L'encre : la pastille de couleur, le champ hexa, et le retour à la teinte
+   de la fiche. */
+.casestudio-ink {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.casestudio-ink input[type="color"] {
+  width: 34px;
+  height: 30px;
+  padding: 2px;
+  flex: none;
+  cursor: pointer;
+}
+
+.casestudio-ink input:not([type="color"]) {
+  flex: 1;
+  min-width: 80px;
+}
+
+.casestudio-ink .btn {
+  font-size: 0.7rem;
+  padding: 0.28rem 0.5rem;
+}
+
+.casestudio-panel code {
+  font-size: 0.68rem;
+  padding: 0.05rem 0.24rem;
+  border-radius: 4px;
+  background: rgba(128, 128, 128, 0.16);
+}
+
+.casestudio-panel section {
+  padding: 0.8rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2, rgba(128, 128, 128, 0.05));
+}
+
+.casestudio-panel h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.84rem;
+  font-family: var(--font-display);
+}
+
+.casestudio-hint {
+  margin: 0 0 0.6rem;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: var(--text-soft);
+}
+
+.casestudio-stock {
+  list-style: none;
+  margin: 0 0 0.6rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.casestudio-stock li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  opacity: 0.6;
+}
+
+.casestudio-stock li.on {
+  opacity: 1;
+  color: var(--accent);
+  border-color: rgba(242, 183, 11, 0.4);
+  background: rgba(242, 183, 11, 0.08);
+}
+
+.casestudio-row {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.casestudio-row .btn {
+  font-size: 0.76rem;
+  padding: 0.36rem 0.6rem;
+}
+
+.casestudio-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.74rem;
+  color: var(--accent);
+}
+
+.casestudio-field,
+.casestudio-check {
+  display: block;
+  margin-bottom: 0.7rem;
+}
+
+.casestudio-field:last-child,
+.casestudio-check:last-child {
+  margin-bottom: 0;
+}
+
+.casestudio-field > span {
+  display: block;
+  font-size: 0.74rem;
+  font-weight: 700;
+  margin-bottom: 0.22rem;
+}
+
+.casestudio-field select,
+.casestudio-field input {
+  width: 100%;
+  padding: 0.38rem 0.5rem;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.8rem;
+}
+
+.casestudio-field em,
+.casestudio-check em {
+  display: block;
+  margin-top: 0.22rem;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  font-style: normal;
+  color: var(--text-soft);
+}
+
+.casestudio-check {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 0.45rem;
+  align-items: center;
+  cursor: pointer;
+}
+
+.casestudio-check input {
+  grid-row: 1;
+}
+
+.casestudio-check > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.casestudio-check em {
+  grid-column: 2;
+}
+
+.casestudio-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.8rem 1rem;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 900px) {
+  .casestudio-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

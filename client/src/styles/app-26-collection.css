@@ -2218,6 +2218,105 @@
   opacity: 0;
 }
 
+/* ------------------------------------------------------ tourner la page --
+   UNE SEULE PLANCHE, ET DEUX FLÈCHES AUX BOUTS. Le rayon ne s'empile plus :
+   ce qui ne tient pas sur la rangée attend derrière ces boutons (voir
+   `shelfFit`, qui leur réserve la place — ARROW_GUTTER — avant de compter les
+   boîtiers). Ils sont posés SUR la scène, à hauteur de rangée, et se donnent
+   la même matière que le reste de la page : rond, clair, une ombre douce. */
+.coll-shelf-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+  backdrop-filter: blur(6px);
+  color: var(--text);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  transition:
+    transform 0.18s ease,
+    opacity 0.18s ease,
+    background 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.coll-shelf-arrow.left {
+  left: 0.35rem;
+}
+
+.coll-shelf-arrow.right {
+  right: 0.35rem;
+}
+
+.coll-shelf-arrow:hover:not(:disabled) {
+  background: var(--card);
+  border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
+  color: var(--orange);
+}
+
+.coll-shelf-arrow.left:hover:not(:disabled) {
+  transform: translateY(-50%) translateX(-2px);
+}
+
+.coll-shelf-arrow.right:hover:not(:disabled) {
+  transform: translateY(-50%) translateX(2px);
+}
+
+/* Au bout du rayon : la flèche reste, éteinte. La retirer ferait sauter
+   l'autre d'un côté à l'autre du cadre à la première et à la dernière page. */
+.coll-shelf-arrow:disabled {
+  opacity: 0.28;
+  cursor: default;
+  box-shadow: none;
+}
+
+/* Où l'on en est : discret, sous la rangée, avec autant de points que de
+   planches — c'est lui qui dit qu'il y a un « derrière ». */
+.coll-shelf-pager {
+  position: absolute;
+  left: 50%;
+  bottom: 0.2rem;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--text-soft);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.coll-shelf-pager b {
+  color: var(--text);
+}
+
+.coll-shelf-pager i {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.coll-shelf-pager em {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text-soft) 35%, transparent);
+  transition: background 0.2s ease;
+}
+
+.coll-shelf-pager em.on {
+  background: var(--orange);
+}
+
 /* Visuel manquant : signalé, jamais silencieux. */
 .coll-shelf-warn {
   position: absolute;

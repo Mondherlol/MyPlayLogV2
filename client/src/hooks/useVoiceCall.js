@@ -48,6 +48,19 @@ import {
 
 const PING_MS = 30_000;
 
+// Débranche l'émission audio d'une connexion, sans la démonter. `replaceTrack`
+// est le seul geste de WebRTC qui coupe le son SANS renégociation — retirer la
+// piste rouvrirait une poignée de main à chaque manche. Utilisé pendant un
+// emprunt du micro (voir plus bas) : la piste continue de tourner pour le
+// MediaRecorder, mais plus rien ne part vers les autres.
+function holdSenders(pc, held) {
+  for (const s of pc?.getSenders?.() || []) {
+    if (s.track?.kind !== "audio") continue;
+    held.add(s);
+    s.replaceTrack(null).catch(() => {});
+  }
+}
+
 // ======================================================================
 //  LE VOLUME DE CHAQUE PERSONNE
 // ======================================================================
@@ -191,6 +204,15 @@ export default function useVoiceCall({
   const silentRef = useRef(silent);
   const mutedRef = useRef(false);
   const inCallRef = useRef(false);
+  // ---------- LE PRÊT DU MICRO ----------
+  // Voir `oneMicAtATime` dans lib/soundTake.js : sur téléphone, le jeu ne peut
+  // pas ouvrir sa propre capture pendant que l'appel tient la sienne. Il
+  // emprunte donc celle-ci le temps d'une imitation.
+  //   borrowRef  combien d'emprunts en cours (un seul en pratique, mais un
+  //              compteur ne se désynchronise pas si deux se chevauchent).
+  //   heldRef    les émetteurs qu'on a débranchés pendant l'emprunt.
+  const borrowRef = useRef(0);
+  const heldRef = useRef(new Set());
   // Les arrivées des premières secondes ne font PAS de bruit : entrer dans un
   // appel où trois personnes discutent déclencherait trois « quelqu'un est
   // arrivé » d'affilée, alors que personne n'est arrivé — c'est nous.
@@ -458,6 +480,9 @@ export default function useVoiceCall({
       });
       entry.pc = pc;
       entry.session = sid;
+      // Une connexion ouverte PENDANT une imitation ne doit pas être la seule à
+      // la diffuser : elle naît avec la piste (vivante, puisqu'on enregistre).
+      if (borrowRef.current) holdSenders(pc, heldRef.current);
       sync();
     },
     [attachAudio, dropPeer, sync]
@@ -560,6 +585,10 @@ export default function useVoiceCall({
     watchRef.current = null;
     boostRef.current.ctx?.close().catch(() => {});
     boostRef.current = { ctx: null, nodes: new Map() };
+    // Un emprunt en cours meurt avec l'appel : les émetteurs viennent d'être
+    // fermés, il n'y a plus rien à leur rendre.
+    borrowRef.current = 0;
+    heldRef.current.clear();
     setInCall(false);
     setLocalSpeaking({});
     setRemoteSpeaking({});
@@ -576,25 +605,58 @@ export default function useVoiceCall({
   // après qu'on soit parti est un comportement qu'on n'accepterait de personne.
   useEffect(() => () => leave(), [leave]);
 
+  // ---------- L'état de MA piste ----------
+  // Un seul endroit qui décide, parce qu'il y a maintenant trois raisons de se
+  // taire et qu'elles se contredisent :
+  //
+  //   la phase du jeu (`silent`) et le bouton de micro coupent la piste ;
+  //   un EMPRUNT, lui, exige l'inverse — une piste coupée n'enregistre que du
+  //   silence, et c'était exactement la panne du téléphone.
+  //
+  // Pendant un emprunt la piste reste donc VIVANTE, et c'est l'ÉMISSION qu'on
+  // débranche (`replaceTrack(null)`, sans renégociation) : personne n'entend
+  // l'imitation en direct, mais le MediaRecorder, lui, la capte.
+  const applyMic = useCallback(() => {
+    const borrowed = borrowRef.current > 0;
+    const on = !silentRef.current && !mutedRef.current;
+    for (const t of streamRef.current?.getAudioTracks?.() || [])
+      t.enabled = on || borrowed;
+  }, []);
+
+  const borrowMic = useCallback(() => {
+    const stream = streamRef.current;
+    if (!stream) return null;
+    borrowRef.current += 1;
+    for (const p of peersRef.current.values()) holdSenders(p.pc, heldRef.current);
+    applyMic();
+    return stream;
+  }, [applyMic]);
+
+  const releaseMic = useCallback(() => {
+    if (!borrowRef.current) return;
+    borrowRef.current -= 1;
+    if (borrowRef.current) return;
+    const track = streamRef.current?.getAudioTracks?.()[0] || null;
+    for (const s of heldRef.current) if (track) s.replaceTrack(track).catch(() => {});
+    heldRef.current.clear();
+    applyMic();
+  }, [applyMic]);
+
   // ---------- La coupure, et le bouton de micro ----------
-  // Le même effet pour les deux : ce que la piste sortante doit faire ne dépend
-  // que de « la phase me fait taire » OU « j'ai coupé mon micro ».
   useEffect(() => {
     silentRef.current = silent;
-    const on = !silent && !mutedRef.current;
-    for (const t of streamRef.current?.getAudioTracks?.() || []) t.enabled = on;
+    applyMic();
     // `applyVolume` remet chaque connexion d'aplomb : il sait couper la balise
     // OU l'amplificateur selon le chemin emprunté par cette personne-là.
     for (const [peerId] of peersRef.current) applyVolume(peerId);
-  }, [silent, applyVolume]);
+  }, [silent, applyMic, applyVolume]);
 
   const toggleMute = useCallback(() => {
     const next = !mutedRef.current;
     mutedRef.current = next;
     setMuted(next);
     playMicToggleSound(!next);
-    for (const t of streamRef.current?.getAudioTracks?.() || [])
-      t.enabled = !next && !silentRef.current;
+    applyMic();
     apiFetch(`${base}/mute`, {
       method: "POST",
       token,
@@ -602,7 +664,7 @@ export default function useVoiceCall({
     }).catch(() => {
       /* l'état partagé n'a pas suivi : ma piste, elle, est bien coupée */
     });
-  }, [base, token]);
+  }, [base, token, applyMic]);
 
   // ---------- Le direct ----------
   useEffect(() => {
@@ -794,5 +856,9 @@ export default function useVoiceCall({
     join,
     leave,
     toggleMute,
+    // Le prêt du micro : la page du Perroquet s'en sert sur téléphone, où une
+    // seconde capture n'est pas possible (lib/soundTake.js).
+    borrowMic,
+    releaseMic,
   };
 }

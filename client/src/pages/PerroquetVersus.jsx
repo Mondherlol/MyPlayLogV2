@@ -19,7 +19,15 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useChat } from "../context/ChatContext";
 import { apiFetch, apiUpload } from "../lib/api";
-import { openMic, closeMic, startTake, canRecord } from "../lib/soundTake";
+import {
+  openMic,
+  closeMic,
+  startTake,
+  canRecord,
+  oneMicAtATime,
+  makeClipPlayer,
+  preferSpeaker,
+} from "../lib/soundTake";
 import { useClipReel } from "../lib/clipReel";
 import { useEffectedUrls } from "../lib/clipFx";
 import { FxTag } from "../components/VoiceFxPicker";
@@ -59,6 +67,20 @@ import useVoiceCall from "../hooks/useVoiceCall";
 //
 // La page ne fait qu'une chose là-dedans : dire QUAND on se tait, parce qu'elle
 // est la seule à connaître la phase.
+//
+// ------------------------------------------------- ET LE TÉLÉPHONE, LÀ-DEDANS
+// L'appel a fait apparaître une panne qui n'existait pas avant lui, et
+// uniquement sur mobile : DEUX captures du micro en même temps. Celle de
+// l'appel, et celle du jeu — volontairement brute pour ne pas fausser la note
+// (lib/soundTake.js). Un ordinateur les sert toutes les deux ; iOS et une
+// bonne part d'Android n'en accordent qu'UNE, et la nouvelle demande vide
+// silencieusement l'ancienne : la piste reste « live » et ne livre plus rien.
+//
+// D'où le symptôme rapporté, et sa forme si particulière : « j'appuie sur
+// enregistrer et ça ne prend pas ma voix — mais seulement quand je suis dans
+// l'appel ». Sur ces appareils, on n'ouvre donc PAS de second micro : la prise
+// EMPRUNTE celui de l'appel (`call.borrowMic`), qui le laisse vivant le temps
+// de l'imitation tout en débranchant ce qui part vers les autres.
 
 const PHASE_LABEL = {
   listen: "Écoute bien",
@@ -85,9 +107,16 @@ export default function PerroquetVersus() {
   // le serveur (GET /pool) et pas déduit du salon : c'est une requête, on ne la
   // colle pas dans chaque diffusion du salon.
   const [pool, setPool] = useState(null);
+  // Le micro du jeu est-il utilisable ? Un état, pas une lecture de `ref` dans
+  // le rendu : la ref ne provoque aucun rendu, si bien que l'écran restait sur
+  // « Micro fermé » après l'avoir autorisé au milieu d'une manche.
+  const [micOn, setMicOn] = useState(false);
 
   const streamRef = useRef(null);
   const takeRef = useRef(null);
+  // Vrai quand la prise en cours tourne sur le micro de l'appel : il faudra le
+  // rendre à la fin (voir la note de tête).
+  const borrowedRef = useRef(false);
   const audioRef = useRef(null);
   // L'écart entre l'horloge du serveur et celle de cette machine. Sans lui, un
   // poste en avance de 30 s afficherait « 0 s » alors que la fenêtre vient de
@@ -122,6 +151,12 @@ export default function PerroquetVersus() {
     subscribe,
     silent,
   });
+
+  // L'appel change d'objet à chaque rendu ; le garder en ref évite de
+  // reconstruire les gestes d'enregistrement soixante fois par seconde.
+  const callRef = useRef(call);
+  callRef.current = call;
+  const oneMic = oneMicAtATime();
 
   const applyRoom = useCallback((r) => {
     if (!r) return;
@@ -193,8 +228,17 @@ export default function PerroquetVersus() {
       setErr("Ce navigateur ne sait pas enregistrer (il faut https).");
       return;
     }
+    // Le geste qui autorise le micro sert AUSSI à débloquer la lecture du son
+    // de la manche : sur iPhone, elle exige d'être née d'un contact avec
+    // l'écran, et il n'y en a plus un seul une fois la partie lancée.
+    audioRef.current?.prime();
+    preferSpeaker();
     try {
-      streamRef.current = await openMic();
+      // Sur téléphone, si l'appel tient déjà le micro, en demander un second
+      // lui prendrait le sien : on s'en passe et la prise empruntera le sien.
+      if (!(oneMic && callRef.current.inCall) && !streamRef.current)
+        streamRef.current = await openMic();
+      setMicOn(true);
       await apiFetch(`/perroquet/versus/${code}/armed`, {
         method: "POST",
         token,
@@ -208,14 +252,63 @@ export default function PerroquetVersus() {
           : e.message || "Micro indisponible."
       );
     }
-  }, [code, token]);
+  }, [code, token, oneMic]);
+
+  // ---------- Téléphone : un micro à la fois ----------
+  // Décrocher pendant qu'on tient le micro du jeu, c'est le perdre — le système
+  // le donne à l'appel et ne rend qu'un flux vide. On le referme donc nous-mêmes
+  // (la prise passera par l'emprunt), et on le rouvre en raccrochant.
+  useEffect(() => {
+    if (!oneMic) return;
+    if (call.inCall) {
+      if (streamRef.current) {
+        closeMic(streamRef.current);
+        streamRef.current = null;
+      }
+      preferSpeaker();
+      return;
+    }
+    if (!streamRef.current && micOn)
+      openMic()
+        .then((s) => {
+          streamRef.current = s;
+        })
+        .catch(() => setMicOn(false));
+  }, [oneMic, call.inCall, micOn]);
+
+  // Dans l'appel, le micro est de toute façon accordé : afficher « micro fermé »
+  // et redemander une autorisation qu'on a déjà serait absurde. On se déclare
+  // prêt dans la foulée, sinon l'hôte attend un « 2/2 » qui ne viendra pas
+  // alors que tout le monde est déjà en train de se parler.
+  useEffect(() => {
+    if (!call.inCall) return;
+    setMicOn(true);
+    if (me?.armed) return;
+    apiFetch(`/perroquet/versus/${code}/armed`, {
+      method: "POST",
+      token,
+      body: { armed: true },
+    }).catch(() => {
+      /* le salon dira le contraire au prochain rafraîchissement */
+    });
+  }, [call.inCall, me?.armed, code, token]);
+
+  // Le lecteur du son de la manche existe DÈS LE SALON, pas à la première
+  // écoute : il pose son filet (le premier contact avec l'écran vaut
+  // autorisation de jouer, cf. `makeClipPlayer`) et, sur iPhone, ce contact
+  // n'arrive jamais une fois la partie lancée — on écoute, on n'appuie sur rien.
+  useEffect(() => {
+    if (!audioRef.current) audioRef.current = makeClipPlayer();
+    audioRef.current.prime();
+  }, []);
 
   useEffect(
     () => () => {
       takeRef.current?.cancel();
       closeMic(streamRef.current);
       streamRef.current = null;
-      audioRef.current?.pause();
+      audioRef.current?.destroy();
+      audioRef.current = null;
     },
     []
   );
@@ -228,10 +321,12 @@ export default function PerroquetVersus() {
     if (phase !== "listen" || !round?.clipUrl) return;
     if (playedRef.current === round.index) return;
     playedRef.current = round.index;
-    if (!audioRef.current) audioRef.current = new Audio();
-    audioRef.current.src = round.clipUrl;
-    audioRef.current.currentTime = 0;
-    audioRef.current.play().catch(() => {});
+    // Une balise posée dans le document et amorcée par un geste, PAS un
+    // `new Audio()` : voir `makeClipPlayer` (lib/soundTake.js). Sur iPhone,
+    // l'ancien montage ne jouait jamais rien — la manche s'ouvrait en silence.
+    if (!audioRef.current) audioRef.current = makeClipPlayer();
+    preferSpeaker();
+    audioRef.current.play(round.clipUrl);
   }, [phase, round?.clipUrl, round?.index]);
 
   // ---------- Compte à rebours (décoratif : voir la note de tête) ----------
@@ -254,10 +349,19 @@ export default function PerroquetVersus() {
 
   // ---------- La prise ----------
   const beginHold = useCallback(() => {
-    if (recording || sent || phase !== "record" || !streamRef.current) return;
+    if (recording || sent || phase !== "record") return;
+    // Le micro du jeu s'il existe, celui de l'appel sinon. L'ordre compte : la
+    // capture brute donne la note la plus juste, l'emprunt est le repli qui
+    // sauve la manche là où un second micro est impossible.
+    const stream = streamRef.current || callRef.current.borrowMic?.() || null;
+    if (!stream) {
+      setErr("Micro indisponible : autorise-le pour participer.");
+      return;
+    }
+    borrowedRef.current = stream !== streamRef.current;
     audioRef.current?.pause();
     setRecording(true);
-    takeRef.current = startTake(streamRef.current, { onLevel: setLevel });
+    takeRef.current = startTake(stream, { onLevel: setLevel });
   }, [recording, sent, phase]);
 
   const endHold = useCallback(async () => {
@@ -269,6 +373,13 @@ export default function PerroquetVersus() {
     setBusy(true);
     try {
       const out = await take.stop();
+      // Le micro revient à l'appel DÈS l'arrêt, pas après l'envoi : l'upload
+      // dure parfois une seconde, et la révélation ne doit pas commencer avec
+      // une table encore muette.
+      if (borrowedRef.current) {
+        borrowedRef.current = false;
+        callRef.current.releaseMic?.();
+      }
       if (!out?.blob?.size) throw new Error("Rien n'a été enregistré.");
       const fd = new FormData();
       fd.append(
@@ -281,6 +392,12 @@ export default function PerroquetVersus() {
     } catch (e) {
       setErr(e.message || "Envoi impossible.");
     } finally {
+      // Une prise qui échoue rend le micro comme les autres : le garder
+      // laisserait la table muette jusqu'à la fin de la partie.
+      if (borrowedRef.current) {
+        borrowedRef.current = false;
+        callRef.current.releaseMic?.();
+      }
       setBusy(false);
     }
   }, [recording, code, token]);
@@ -323,6 +440,10 @@ export default function PerroquetVersus() {
 
   const start = useCallback(async () => {
     setBusy(true);
+    // Dernier geste avant que la partie s'enchaîne toute seule : on en profite
+    // pour débloquer la lecture (voir l'effet de montage).
+    audioRef.current?.prime();
+    preferSpeaker();
     try {
       const d = await apiFetch(`/perroquet/versus/${code}/start`, {
         method: "POST",
@@ -437,7 +558,7 @@ export default function PerroquetVersus() {
                   joueur(s)…
                 </span>
               </div>
-            ) : !streamRef.current ? (
+            ) : !micOn ? (
               <div className="pq-waiting">
                 <MicOff size={26} />
                 <b>Micro fermé</b>

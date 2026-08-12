@@ -918,7 +918,10 @@ export async function buildMedia(input) {
     franchise: input.franchise || "",
     games: input.games || [],
     color: input.color || "#f2b70b",
-    artwork: { poster, backdrop, thumb: poster },
+    // Fusionné avec ce qui était déjà là, jamais substitué : un rafraîchissement
+    // passe par ici, et il ne doit emporter ni le logo, ni les photos, ni la
+    // jaquette dépliée. Ce qui est remplacé entre au fonds (voir `mergeArtwork`).
+    artwork: mergeArtwork(input.artwork, { poster, backdrop, thumb: poster }),
     source: {
       provider: manual ? episodes[0]?.provider || "embed" : "youtube",
       videoId: videoId || episodes[0]?.videoId || null,
@@ -956,6 +959,111 @@ export async function buildMedia(input) {
     order: input.order ?? 0,
     enrichedAt: new Date(),
   };
+}
+
+// ======================================================================
+//  Le fonds d'images — ce qu'on garde, quoi qu'il arrive
+// ======================================================================
+// Au-delà, on arrête d'empiler : quarante-huit visuels pour un titre, c'est
+// déjà six rafraîchissements complets, et le studio n'en montre pas tant. La
+// borne mord sur les PLUS ANCIENS, jamais sur ce qui est en place.
+const POOL_MAX = 48;
+
+// Ajoute au fonds sans jamais rien retirer ni réordonner. L'ordre est un
+// contrat : le studio désigne une image par son rang (« pool:3 »), et un rang
+// qui glisse repeint la mauvaise face.
+function addToPool(pool, urls) {
+  const out = [...(pool || [])];
+  for (const url of urls) {
+    if (!url || out.includes(url)) continue;
+    out.push(url);
+  }
+  // Si ça déborde, ce sont les plus vieux qui partent — et les rangs des
+  // survivants bougeraient. On préfère donc arrêter d'ajouter : une image de
+  // trop qui n'entre pas est un moindre mal qu'une jaquette qui change de
+  // visuel toute seule.
+  return out.slice(0, POOL_MAX);
+}
+
+// FUSIONNE L'ANCIEN ET LE NOUVEAU. Appelé partout où des visuels arrivent —
+// enrichissement, TMDB, dépôt à la main. Deux règles, et elles ont chacune
+// coûté quelque chose :
+//
+//   1. CE QUI N'EST PAS FOURNI N'EST PAS EFFACÉ. `findOneAndUpdate` avec un
+//      objet remplace le sous-document ENTIER : un « rafraîchir » emportait
+//      avec lui le logo, les photos, et jusqu'à la jaquette dépliée mesurée à
+//      la main dans l'outil d'alignement. Des heures de travail, pour un clic
+//      censé mettre à jour un synopsis ;
+//   2. TOUT CE QUI PASSE ENTRE DANS LE FONDS, l'ancien comme le nouveau. Une
+//      affiche remplacée reste disponible dans le studio, où on peut la
+//      remettre sur n'importe quelle face.
+export function mergeArtwork(before = {}, next = {}) {
+  const keep = (key) => (next[key] === undefined || next[key] === null ? before[key] : next[key]);
+  const merged = {
+    poster: keep("poster") || null,
+    backdrop: keep("backdrop") || null,
+    thumb: keep("thumb") || null,
+    wrap: keep("wrap") || null,
+    logo: keep("logo") || null,
+    stills: next.stills?.length ? next.stills : before.stills || [],
+  };
+  merged.pool = addToPool(before.pool, [
+    before.poster,
+    before.backdrop,
+    ...(before.stills || []),
+    merged.poster,
+    merged.backdrop,
+    ...merged.stills,
+  ]);
+  merged.logos = addToPool(before.logos, [before.logo, merged.logo]);
+  return merged;
+}
+
+// ======================================================================
+//  Le matériel d'impression d'un boîtier
+// ======================================================================
+// LE LOGO, LES PHOTOS, LA MARQUE DU STUDIO — ce qu'on imprime vraiment sur une
+// jaquette, et que l'enrichissement de fiche n'allait pas chercher. C'est un
+// geste À PART, déclenché depuis le mini-studio : trois requêtes TMDB et
+// jusqu'à sept images rapatriées, ce serait un luxe à chaque « rafraîchir »
+// alors qu'on ne fabrique une jaquette qu'une fois.
+//
+// TOUT EST FACULTATIF, ET RIEN N'ÉCRASE À L'AVEUGLE : ce qui ne revient pas
+// (pas de logo pour cette œuvre, pas de clé TMDB) laisse le champ tel quel, et
+// la face retombe sur ce qu'elle sait composer sans lui.
+export async function fetchCaseMeta(media) {
+  if (!tmdb.enabled()) throw new Error("Aucune clé TMDB configurée.");
+
+  // La fiche déjà retenue d'abord — c'est celle que l'admin a validée. Sinon on
+  // cherche sur le titre, et on garde la référence trouvée : le prochain appel
+  // retombera sur la même.
+  const ref = media.tmdbRef || (await tmdb.find(media.title, media.kind));
+  if (!ref) throw new Error("Aucune fiche TMDB pour ce titre.");
+
+  const got = await tmdb.extras(ref);
+  if (!got) throw new Error("TMDB n'a rien renvoyé pour cette fiche.");
+
+  const slug = media.slug;
+  const logo = got.logo ? await downloadArtwork(got.logo, `${slug}-logo`) : null;
+
+  // Les photos partent ENSEMBLE : quatre allers-retours en série, c'est deux
+  // secondes d'attente là où il en faut une demie.
+  const stills = (
+    await Promise.all(
+      got.stills.map((url, i) => downloadArtwork(url, `${slug}-still${i}`))
+    )
+  ).filter(Boolean);
+
+  const studios = (
+    await Promise.all(
+      got.studios.map(async (s, i) => ({
+        name: s.name,
+        logo: await downloadArtwork(s.logo, `${slug}-studio${i}`),
+      }))
+    )
+  ).filter((s) => s.logo || s.name);
+
+  return { ref, logo, stills, studios, seasons: got.seasons };
 }
 
 // Rapatrie les photos du casting (les vignettes TVmaze sont distantes) :

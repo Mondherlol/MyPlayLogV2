@@ -180,6 +180,11 @@ const bookCardSchema = new mongoose.Schema(
     page: { type: Number, default: 0 },
     pages: { type: Number, default: 0 },
     shot: { type: String, default: null },
+    // La jaquette du volume. Elle ne sert pas à ouvrir quoi que ce soit : elle
+    // dit D'OÙ VIENT la capture, en vignette sous l'image — sans elle, un gros
+    // plan sur trois cases est une image sans provenance, et il faut lire le
+    // titre pour savoir de quel bouquin on parle.
+    cover: { type: String, default: null },
     color: { type: String, default: null },
   },
   { _id: false }

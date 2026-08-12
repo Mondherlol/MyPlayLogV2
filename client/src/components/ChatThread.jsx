@@ -44,6 +44,7 @@ import { renderMessage, extractYouTubeIds, YouTubeEmbed } from "./ListComments";
 import EmojiPanel from "./EmojiPanel";
 import ChatComposer from "./ChatComposer";
 import ChatLightbox from "./ChatLightbox";
+import BookQuickReader from "./BookQuickReader";
 import VoiceBubble from "./VoiceBubble";
 import { useChat } from "../context/ChatContext";
 import { useCall } from "../context/CallContext";
@@ -164,7 +165,10 @@ export default function ChatThread({ conversation, token, compact, autoFocus }) 
   const [editing, setEditing] = useState(null);
   const [reactMenu, setReactMenu] = useState(null); // { id, x, y } — palette de réactions (portail)
   const [fullPicker, setFullPicker] = useState(false);
-  const [lightbox, setLightbox] = useState(null); // { url }
+  const [lightbox, setLightbox] = useState(null); // { url, book? }
+  // Un volume ouvert PAR-DESSUS le fil : on ne quitte pas une conversation pour
+  // aller lire la planche qu'on vient d'y recevoir (voir BookQuickReader).
+  const [reading, setReading] = useState(null); // { slug, page }
   const [newBelow, setNewBelow] = useState(false); // message reçu alors qu'on lit plus haut
   const [jumpTo, setJumpTo] = useState(null); // message cité qu'on veut rejoindre
   const [flash, setFlash] = useState(null); // message mis en évidence à l'arrivée
@@ -494,6 +498,18 @@ export default function ChatThread({ conversation, token, compact, autoFocus }) 
   const handleEdit = useCallback((m) => setEditing(m), []);
   const handleDelete = useCallback((m) => remove(m.id), [remove]);
   const handleOpenImage = useCallback((url) => setLightbox({ url }), []);
+  // La capture s'agrandit comme une photo, mais la visionneuse garde de quoi
+  // remonter au volume : c'est le même objet qui voyage jusqu'à la barre du bas.
+  const handleOpenShot = useCallback(
+    (book) => book.shot && setLightbox({ url: book.shot, book }),
+    []
+  );
+  // Ouvrir le bouquin ferme l'agrandissement : les deux sont le même geste
+  // poursuivi, pas deux couches à empiler l'une sur l'autre.
+  const handleOpenBook = useCallback((book) => {
+    setLightbox(null);
+    setReading({ slug: book.slug, page: book.page || 0 });
+  }, []);
   const handleToggleReact = useCallback((e, m) => {
     // Ancre = le bouton sourire : le popover (portail fixed) s'ouvre juste
     // au-dessus, jamais rogné par un overflow.
@@ -638,6 +654,8 @@ export default function ChatThread({ conversation, token, compact, autoFocus }) 
                     onEdit={handleEdit}
                     onDelete={handleDelete}
                     onOpenImage={handleOpenImage}
+                    onOpenShot={handleOpenShot}
+                    onOpenBook={handleOpenBook}
                   />
                 )}
                 {/* Accusés de lecture : les pastilles des gens dont c'est le
@@ -695,7 +713,20 @@ export default function ChatThread({ conversation, token, compact, autoFocus }) 
       />
 
       {lightbox && (
-        <ChatLightbox url={lightbox.url} onClose={() => setLightbox(null)} />
+        <ChatLightbox
+          url={lightbox.url}
+          book={lightbox.book}
+          onOpenBook={handleOpenBook}
+          onClose={() => setLightbox(null)}
+        />
+      )}
+
+      {reading && (
+        <BookQuickReader
+          slug={reading.slug}
+          page={reading.page}
+          onClose={() => setReading(null)}
+        />
       )}
 
       {ctxMenu && (
@@ -957,6 +988,8 @@ const MessageRow = memo(function MessageRow({
   onEdit,
   onDelete,
   onOpenImage,
+  onOpenShot,
+  onOpenBook,
 }) {
   const ytIds = m.deleted ? [] : extractYouTubeIds(m.text);
   // Message « que des emojis » (sans média ni carte) → rendu géant, sans bulle.
@@ -1217,7 +1250,13 @@ const MessageRow = memo(function MessageRow({
                 {m.mot && <MotCard mot={m.mot} />}
                 {m.versus && <VersusCard versus={m.versus} />}
                 {m.listen && <ListenCard listen={m.listen} />}
-                {m.book && <BookCard book={m.book} />}
+                {m.book && (
+                  <BookCard
+                    book={m.book}
+                    onOpenShot={onOpenShot}
+                    onOpenBook={onOpenBook}
+                  />
+                )}
                 {m.voice && <VoiceBubble voice={m.voice} mine={m.mine} />}
                 {m.text && <p>{renderMessage(m.text, m.mentions)}</p>}
                 {m.media?.length > 0 && (
@@ -1405,55 +1444,70 @@ function PartyCard({ party }) {
   );
 }
 
-// --- Carte « regarde cette planche » ---
+// --- « Regarde cette planche » ---
 //
-// LA SEULE CARTE DU FIL QUI MONTRE UNE IMAGE FAITE À LA MAIN. Les autres
-// portent une jaquette de catalogue ; celle-ci porte la CAPTURE prise dans le
-// volume ouvert, à la case près — c'est elle le message, le reste n'est que le
-// moyen d'y retourner. Elle est donc bâtie à l'envers des autres : l'image en
-// grand d'abord, le titre dessous.
+// CE N'EST PLUS UNE CARTE, C'EST UNE IMAGE. Les autres cartes du fil annoncent
+// une CHOSE (un salon, un jeu, une séance) et l'encadrent donc comme une
+// affiche ; celle-ci ne présente rien du tout — la capture EST le message, et
+// on l'a même recadrée à la case près avant de l'envoyer. Un cadre orange, un
+// titre, deux boutons empilés dessous, ça faisait d'un « mdr regarde sa tête »
+// une fiche produit.
+//
+// Elle se comporte donc comme n'importe quelle photo du fil : on clique, ça
+// s'agrandit, ça se zoome, ça se déplace. Ce qu'elle a en plus tient dans le
+// bandeau du bas, et c'est exactement ce qu'une capture doit dire de plus
+// qu'une photo : DE QUEL BOUQUIN elle sort (la vignette et le titre mènent à sa
+// fiche), et À QUELLE PLANCHE — ce chiffre-là n'est pas une légende, c'est un
+// bouton, et il rouvre le volume par-dessus la conversation.
 //
 // ELLE NE PÉRIME PAS. Une invitation de watchparty meurt avec la séance ; un
-// passage de bouquin s'ouvre aussi bien six mois plus tard. D'où les deux
-// portes plutôt qu'un lien : à la planche qu'on me montre, ou depuis le début
-// si ça m'a donné envie de lire le tome.
-//
-// Deux liens dans une carte, donc pas de carte-lien : imbriquer des ancres
-// n'est pas valide, et « ouvrir » ne doit pas se déclencher parce qu'on a
-// cliqué à côté de l'image.
-function BookCard({ book }) {
+// passage de bouquin s'ouvre aussi bien six mois plus tard.
+function BookCard({ book, onOpenShot, onOpenBook }) {
   const at = (book.page || 0) + 1;
   return (
-    <div className="chat-card chat-card-book">
-      {book.shot && (
-        <Link
-          to={`/collection/${book.slug}?play=1&page=${book.page || 0}`}
-          className="chat-book-shot clickable"
-          title={`Ouvrir à la planche ${at}`}
+    <div className="chat-shot">
+      {book.shot ? (
+        <button
+          type="button"
+          className="chat-shot-img clickable"
+          onClick={() => onOpenShot?.(book)}
+          title="Agrandir"
         >
           <img src={book.shot} alt="" loading="lazy" />
-        </Link>
+        </button>
+      ) : (
+        // Les tout premiers partages n'avaient pas d'image (capture ratée) :
+        // il reste la provenance, et elle suffit à retrouver le passage.
+        <span className="chat-shot-noimg">
+          <BookOpen size={14} /> Un passage de {book.title || "bouquin"}
+        </span>
       )}
-      <span className="chat-card-kicker">
-        <BookOpen size={12} /> Planche {at}
-        {book.pages ? ` / ${book.pages}` : ""}
-      </span>
-      <span className="chat-card-title">{book.title}</span>
-      {book.franchise && <span className="chat-card-sub">{book.franchise}</span>}
-      <span className="chat-book-acts">
-        <Link
-          to={`/collection/${book.slug}?play=1&page=${book.page || 0}`}
-          className="chat-book-btn primary clickable"
-        >
-          <BookMarked size={13} /> Ouvrir à cette planche
+
+      <div className="chat-shot-foot">
+        <Link to={`/collection/${book.slug}`} className="chat-shot-from clickable">
+          {book.cover ? (
+            <img src={book.cover} alt="" loading="lazy" />
+          ) : (
+            <span className="chat-shot-ic">
+              <BookOpen size={13} />
+            </span>
+          )}
+          <span>
+            <strong>{book.title}</strong>
+            {book.franchise && <em>{book.franchise}</em>}
+          </span>
         </Link>
-        <Link
-          to={`/collection/${book.slug}?play=1&page=0`}
-          className="chat-book-btn clickable"
+
+        <button
+          type="button"
+          className="chat-shot-page clickable"
+          onClick={() => onOpenBook?.(book)}
+          title="Ouvrir le volume à cette planche"
         >
-          Depuis le début
-        </Link>
-      </span>
+          <BookMarked size={12} /> Planche {at}
+          {book.pages ? ` / ${book.pages}` : ""}
+        </button>
+      </div>
     </div>
   );
 }

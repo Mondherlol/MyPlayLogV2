@@ -194,6 +194,109 @@ const boxSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// ----------------------------------------------------------------------
+//  Ce qu'il faut pour IMPRIMER un boîtier, et qu'aucune fiche ne portait
+// ----------------------------------------------------------------------
+// Un vrai DVD ne montre pas une affiche recadrée : il montre un LOGO de titre
+// posé sur une image du film, des photos d'exploitation au dos, la marque du
+// studio en pied, et un code-barres. Rien de tout ça ne vivait en base — d'où
+// des faces composées avec le seul matériel disponible (l'affiche, le bandeau)
+// et cet air de vignette agrandie.
+//
+// Ces trois blocs sont donc du MATÉRIEL D'IMPRESSION, pas des métadonnées de
+// fiche : ils ne servent qu'au boîtier, ils se récupèrent d'un coup depuis TMDB
+// (voir `fetchCaseMeta`), et leur absence ne casse rien — la face retombe sur
+// ce qu'elle sait faire aujourd'hui.
+const studioSchema = new mongoose.Schema(
+  { name: { type: String, default: "" }, logo: { type: String, default: null } },
+  { _id: false }
+);
+
+const seasonSchema = new mongoose.Schema(
+  {
+    number: { type: Number, required: true },
+    name: { type: String, default: "" },
+    episodeCount: { type: Number, default: 0 },
+    year: { type: Number, default: null },
+  },
+  { _id: false }
+);
+
+// LE PEU QU'ON RÈGLE À LA MAIN. Le mini-studio ne propose que ces boutons-là,
+// et c'est volontaire : plus il y a de réglages, moins le modèle par défaut est
+// travaillé — on repousse sur l'admin le soin qu'on n'a pas mis dans le
+// gabarit. Tout est donc « auto » par défaut, et chaque champ n'existe que pour
+// rattraper un cas que la machine ne peut pas deviner (un logo illisible sur
+// cette image-là, un dos trop chargé pour une série de 78 épisodes).
+const caseArtSchema = new mongoose.Schema(
+  {
+    // QUELLE IMAGE SUR QUELLE FACE. Un DÉSIGNATEUR, jamais une adresse :
+    // « auto », « none », « poster », « backdrop », « still:2 ». Une URL
+    // enregistrée ici vieillirait au premier « récupérer » (les photos changent
+    // de nom de fichier), et traînerait un nom d'hôte dans la base.
+    front: { type: String, default: "auto" }, // la couverture
+    back: { type: String, default: "auto" }, // la photo de tête du dos
+    spine: { type: String, default: "auto" }, // la vignette de la tranche
+    // UNE FACE TOUTE FAITE. L'image désignée couvre alors la face ENTIÈRE et
+    // rien n'est composé dessus : c'est le cas d'une couverture trouvée ailleurs
+    // ou dessinée à la main, que notre pied et notre mention d'édition ne
+    // feraient que gâcher.
+    frontFull: { type: Boolean, default: false },
+    backFull: { type: Boolean, default: false },
+
+    // Où l'image est coupée, en pour-cent de sa hauteur (0 = on garde le haut).
+    // Vide = le réglage du gabarit. C'est LE rattrapage des « images moches » :
+    // neuf fois sur dix, ce n'est pas l'image qui est mauvaise, c'est l'endroit
+    // où on l'a coupée.
+    frontCrop: { type: Number, default: null },
+    backCrop: { type: Number, default: null },
+
+    // Le fond de la tranche : le champ tiré du visuel, un aplat, ou le visuel
+    // qui se perd dans la couleur du boîtier.
+    spineBg: { type: String, enum: ["image", "flat", "fade"], default: "image" },
+
+    // La place du logo sur la couverture, en pour-cent de la face, et sa taille
+    // en pour-cent de la taille de référence. Le bon endroit dépend entièrement
+    // de l'image dessous : aucun gabarit ne peut le deviner.
+    logoX: { type: Number, default: 50 },
+    logoY: { type: Number, default: 72 },
+    logoSize: { type: Number, default: 100 },
+    // Faut-il repeindre le logo ? « auto » ne touche qu'aux logos monochromes
+    // qui se perdraient sur le fond ; les trois autres forcent la main.
+    logoTint: { type: String, enum: ["auto", "none", "white", "black"], default: "auto" },
+
+    // Les deux fontes de la jaquette (voir FONTS côté client). Vide = celles du
+    // gabarit : didone pour les titres, grotesque neutre pour le texte.
+    fontTitle: { type: String, default: "" },
+    fontText: { type: String, default: "" },
+
+    // Le sommaire du dos : épisodes, saisons, ou seulement des photos.
+    summary: {
+      type: String,
+      enum: ["auto", "episodes", "seasons", "stills"],
+      default: "auto",
+    },
+    // L'encre du boîtier. Vide = la teinte de la fiche (`color`), qui a été
+    // choisie pour l'étiquette de la grille et ne convient pas toujours à un
+    // objet imprimé.
+    color: { type: String, default: "" },
+    // Poser le logo du titre sur la couverture. Coupé = le titre est composé.
+    logo: { type: Boolean, default: true },
+    // LEQUEL des logos du fonds. « auto » = le dernier arrivé (),
+    // « logos:2 » = le troisième jamais récupéré. Même principe que les images
+    // de face : TMDB rend parfois le logo d'une autre édition, et celui qu'on
+    // avait ne doit pas être perdu pour autant.
+    logoPick: { type: String, default: "auto" },
+    barcode: { type: Boolean, default: true },
+    // La mention d'édition imprimée en tête de couverture (« ÉDITION
+    // COLLECTOR », « INTÉGRALE SAISON 1 »). Vide = déduite du contenu.
+    edition: { type: String, default: "" },
+    // Nombre de disques annoncés au dos. 0 = déduit du nombre d'épisodes.
+    discs: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
 const collectionMediaSchema = new mongoose.Schema(
   {
     slug: { type: String, required: true, unique: true },
@@ -288,7 +391,45 @@ const collectionMediaSchema = new mongoose.Schema(
       // boîtier 3D à elle seule (découpée en trois), et rien n'est composé
       // par-dessus — c'est l'artwork qui commande.
       wrap: { type: String, default: null },
+      // Le LOGO DU TITRE, détouré sur fond transparent — l'objet le plus utile
+      // de tout ce fichier pour une jaquette. Un titre composé en didone reste
+      // une approximation ; le logo, lui, EST l'identité graphique de l'œuvre,
+      // et c'est ce qu'on lit sur un vrai boîtier.
+      logo: { type: String, default: null },
+      // Les photos d'exploitation du dos. Trois ou quatre cadrages DIFFÉRENTS,
+      // là où le dos se contentait de recadrer trois fois le même bandeau.
+      stills: { type: [String], default: [] },
+
+      // ------------------------------------------------------------------
+      //  LE FONDS — tout ce qu'on a JAMAIS eu, et qu'on ne jette pas
+      // ------------------------------------------------------------------
+      // ON NE DÉTRUIT PAS UNE IMAGE QU'ON A DÉJÀ. Un « rafraîchir » remplaçait
+      // en bloc l'affiche, le bandeau, les photos et le logo par ce que la
+      // source servait CE JOUR-LÀ : une belle affiche patiemment choisie
+      // disparaissait au profit d'une autre, sans un mot, et sans moyen de
+      // revenir en arrière — les fichiers restaient pourtant sur le disque,
+      // simplement plus référencés nulle part.
+      //
+      // Le fonds règle ça une fois pour toutes. Il est en AJOUT SEUL : chaque
+      // visuel rapatrié y entre et n'en sort jamais, quelle que soit la source
+      // (l'enrichissement, TMDB, un fichier déposé à la main). Les champs
+      // ci-dessus ne disent plus que ce qui est EN PLACE aujourd'hui ; le fonds
+      // dit ce qui est DISPONIBLE, et c'est lui que montre le studio.
+      //
+      // L'ordre ne change jamais : le studio désigne une image par son RANG
+      // (« pool:3 »), et un rang qui se déplace repeindrait la mauvaise face.
+      pool: { type: [String], default: [] },
+      // Le même fonds, pour les logos de titre — mêmes causes, mêmes effets :
+      // TMDB rend parfois un logo superbe, parfois celui d'une autre édition.
+      logos: { type: [String], default: [] },
     },
+
+    // La marque des studios (nom + logo détouré), imprimée en pied de dos.
+    studios: { type: [studioSchema], default: [] },
+    // Le découpage réel en saisons, pour le dos d'un coffret de série.
+    seasons: { type: [seasonSchema], default: [] },
+    // Les réglages du mini-studio. Vide = tout en automatique.
+    caseArt: { type: caseArtSchema, default: () => ({}) },
 
     // Dimensions sur mesure du boîtier, posées par l'outil d'alignement quand
     // une jaquette complète est fournie. Vide = gabarit DVD standard.

@@ -10,6 +10,13 @@
 .creader {
   position: fixed;
   inset: 0;
+  /* LA HAUTEUR DU VIEWPORT QU'ON A VRAIMENT. Sur un téléphone, `inset: 0` d'un
+     élément fixe se résout sur le GRAND viewport — celui d'avant que la barre
+     d'adresse ne redescende. La barre du bas du lecteur (compteur, règle)
+     tombait donc sous celle du navigateur : on lisait sans jamais savoir où on
+     en était, et la règle était inatteignable. `dvh` suit le viewport tel qu'il
+     est à l'instant, et prime sur `bottom` puisque la hauteur est fixée. */
+  height: 100dvh;
   z-index: 300;
   display: flex;
   flex-direction: column;
@@ -39,12 +46,20 @@
   z-index: 2;
 }
 
+/* Les encoches et la barre de geste ne mangent pas les commandes : la croix se
+   pose sous l'encoche, la règle au-dessus du trait du bas. */
 .creader-bar {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: calc(0.55rem + env(safe-area-inset-top));
+  padding-left: calc(0.8rem + env(safe-area-inset-left));
+  padding-right: calc(0.8rem + env(safe-area-inset-right));
 }
 
 .creader-foot {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: calc(0.55rem + env(safe-area-inset-bottom));
+  padding-left: calc(0.8rem + env(safe-area-inset-left));
+  padding-right: calc(0.8rem + env(safe-area-inset-right));
 }
 
 /* « Lecture pure » : le mobilier s'escamote sans laisser de trou — la planche
@@ -457,6 +472,85 @@
 
   .creader-dir {
     display: none;
+  }
+}
+
+/* ---------- au pouce ----------
+   LE MOBILIER SE MET AU FORMAT DU DOIGT, ET LA PLANCHE PREND TOUT LE RESTE.
+   Trois choses seulement, mais ce sont elles qui séparent « ça s'affiche sur
+   téléphone » de « ça se lit sur téléphone » :
+
+     • des pastilles qu'on atteint sans viser (34 px, c'est la taille d'un
+       curseur, pas celle d'un pouce — la recommandation est à 44) ;
+     • un ruban À FOND PERDU : la planche est cadrée sur la LARGEUR de l'écran,
+       et le moindre liseré de marge est autant de bulle en moins ;
+     • deux barres qui ne prennent que ce qu'il leur faut, et qui s'escamotent
+       au tap (voir `creader.bare`).
+
+   Le seuil suit celui du composant (`PHONE`) : c'est lui qui décide déjà du
+   ruban par défaut et des boutons qu'on retire, les deux doivent basculer
+   ensemble. */
+@media (max-width: 700px) {
+  .creader-icon {
+    width: 42px;
+    height: 42px;
+  }
+
+  .creader-bar,
+  .creader-foot {
+    gap: 0.4rem;
+    padding-left: calc(0.45rem + env(safe-area-inset-left));
+    padding-right: calc(0.45rem + env(safe-area-inset-right));
+  }
+
+  .creader-tools {
+    gap: 0;
+  }
+
+  /* Le ruban à fond perdu : plus de marge, plus de coins arrondis, plus de
+     filet entre les planches — un scan long se lit d'une traite, et deux
+     planches qui se suivent doivent se toucher. */
+  .creader-strip {
+    width: 100%;
+    margin-bottom: 0;
+  }
+
+  /* Idem pour la planche seule : ce que le carrousel prenait en marge, c'est
+     de la hauteur d'image en moins. */
+  .creader-swiper .swiper-slide {
+    padding: 0;
+  }
+
+  .creader-sheet img {
+    border-radius: 0;
+  }
+
+  /* La règle se saisit au doigt : un curseur de 14 px se rate une fois sur
+     deux, et rater la règle c'est sauter trente planches. */
+  .creader-rule {
+    height: 30px;
+  }
+
+  .creader-rule input::-webkit-slider-thumb {
+    width: 20px;
+    height: 20px;
+  }
+
+  .creader-rule input::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* La planche-contact : des vignettes plus petites, pour en voir plus d'un
+     coup d'œil — c'est à ça qu'elle sert. */
+  .creader-thumbs {
+    padding: 0.7rem;
+    padding-bottom: calc(0.7rem + env(safe-area-inset-bottom));
+  }
+
+  .creader-thumbs-grid {
+    grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+    gap: 0.45rem;
   }
 }
 
@@ -1332,11 +1426,101 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+/* LA SURFACE DE RECADRAGE ÉPOUSE L'IMAGE, PAS LE CADRE. Le rectangle qu'on
+   trace est en fractions de l'image : si le bloc qui reçoit le doigt était plus
+   large qu'elle (bandes noires d'un `object-fit: contain`), le cadre dessiné
+   tomberait à côté de ce qui part. D'où une boîte qui rétrécit sur l'image. */
+.bshot-stage {
+  position: relative;
+  display: block;
+  width: fit-content;
+  margin: 0 auto;
+  line-height: 0;
+  cursor: crosshair;
+  touch-action: none; /* le glissement trace un cadre, il ne fait pas défiler */
+  user-select: none;
+}
+
 .bshot-shot img {
   display: block;
-  width: 100%;
+  max-width: 100%;
   max-height: 34vh;
-  object-fit: contain;
+  width: auto;
+  height: auto;
+  pointer-events: none;
+}
+
+.bshot-veil {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 5, 10, 0.66);
+  pointer-events: none;
+}
+
+.bshot-frame {
+  position: absolute;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+/* Les quatre coins : un trait blanc seul se perd sur une planche claire. */
+.bshot-frame::before,
+.bshot-frame::after {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--orange, #e8a33d);
+}
+
+.bshot-frame::before {
+  top: -1px;
+  left: -1px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.bshot-frame::after {
+  right: -1px;
+  bottom: -1px;
+  border-left: none;
+  border-top: none;
+}
+
+.bshot-crop-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: -0.3rem;
+  font-size: 0.73rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.bshot-crop-bar span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.bshot-full {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.24rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.bshot-full:hover {
+  border-color: var(--orange, #e8a33d);
+  color: #fff;
 }
 
 .bshot-shot figcaption {

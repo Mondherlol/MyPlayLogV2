@@ -222,4 +222,80 @@ export async function show(ref) {
   };
 }
 
-export default { enabled, search, find, show, makeRef, parseRef };
+// -------------------------------------------------- matériel d'impression --
+//
+// CE QUI FAIT UN BOÎTIER, ET QUE `show()` NE RAMÈNE PAS. La fiche sert la page
+// (résumé, casting, épisodes) ; le boîtier, lui, s'imprime — et une jaquette
+// s'imprime avec des choses qui n'intéressent aucune fiche : le logo du titre
+// détouré, deux ou trois photos d'exploitation, la marque du studio, le
+// découpage en saisons.
+//
+// C'est un appel À PART, et pas un `append_to_response` de plus sur `show()` :
+// on ne le passe qu'au moment où quelqu'un fabrique une jaquette, alors que
+// `show()` tourne à chaque enrichissement de fiche.
+//
+// LES LANGUES DES LOGOS, dans l'ordre où on les veut : le français d'abord
+// (c'est un rayon français), l'anglais ensuite, et enfin les logos SANS langue
+// — ce sont les typographies internationales, souvent les plus belles, et TMDB
+// les range à part plutôt que de les rattacher à une locale.
+const LOGO_LANGS = ["fr", "en", null];
+
+function pickLogo(logos = []) {
+  const png = logos.filter((l) => l.file_path && !/\.svg$/i.test(l.file_path));
+  // Un SVG ne se dessine pas de façon fiable dans un canvas WebGL (dimensions
+  // intrinsèques absentes, polices non embarquées) : on ne le retient qu'à
+  // défaut de tout PNG.
+  const pool = png.length ? png : logos;
+  for (const lang of LOGO_LANGS) {
+    const found = pool
+      .filter((l) => (l.iso_639_1 || null) === lang)
+      .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))[0];
+    if (found) return img(found.file_path, "w500");
+  }
+  return null;
+}
+
+export async function extras(ref) {
+  const parsed = parseRef(ref);
+  if (!parsed || !enabled()) return null;
+  const { type, id } = parsed;
+
+  const [d, images] = await Promise.all([
+    get(`/${type}/${id}`),
+    get(`/${type}/${id}/images`, {
+      // Sans ça, `language=fr-FR` filtrerait les images sur le seul français —
+      // c'est-à-dire, neuf fois sur dix, aucune image du tout.
+      language: "fr",
+      include_image_language: "fr,en,null",
+    }),
+  ]);
+  if (!d && !images) return null;
+
+  return {
+    logo: pickLogo(images?.logos || []),
+    // Les photos du dos : les meilleurs bandeaux SANS texte incrusté (TMDB
+    // range ceux-là sous « pas de langue »), du mieux noté au moins bien.
+    stills: (images?.backdrops || [])
+      .filter((b) => !b.iso_639_1)
+      .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))
+      .slice(0, 4)
+      .map((b) => img(b.file_path, "w780"))
+      .filter(Boolean),
+    studios: (d?.production_companies || [])
+      .filter((c) => c.logo_path)
+      .slice(0, 2)
+      .map((c) => ({ name: c.name || "", logo: img(c.logo_path, "w300") })),
+    seasons: (d?.seasons || [])
+      .filter((s) => (s.episode_count || 0) > 0 && s.season_number > 0)
+      .sort((a, b) => a.season_number - b.season_number)
+      .slice(0, MAX_SEASONS)
+      .map((s) => ({
+        number: s.season_number,
+        name: s.name || "",
+        episodeCount: s.episode_count || 0,
+        year: year(s.air_date),
+      })),
+  };
+}
+
+export default { enabled, search, find, show, extras, makeRef, parseRef };

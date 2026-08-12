@@ -12,7 +12,15 @@ import {
 import { createPortal } from "react-dom";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { X, ArrowRight, BookOpen, Gamepad2, MessageCircle } from "lucide-react";
+import {
+  X,
+  ArrowRight,
+  BookOpen,
+  Gamepad2,
+  MessageCircle,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { useScrollLock } from "../hooks/useScrollLock";
 import { useBackClose } from "../hooks/useBackClose";
 import { apiFetch } from "../lib/api";
@@ -230,9 +238,9 @@ export const SHELF_DENSITIES = [
 
 // Hauteur d'un boîtier à l'écran, en pixels, pour chaque densité.
 const CASE_PX = { 10: 470, 20: 385, 34: 288 };
-// Au-delà, le rayon fait plusieurs écrans de haut et la scène peint un canvas
-// démesuré à chaque image : les boîtiers se resserrent (voir `shelfFit`).
-const MAX_ROWS = 6;
+// La place prise de chaque côté par les flèches de page : la rangée s'arrête
+// avant elles, sinon le premier et le dernier boîtier passeraient dessous.
+const ARROW_GUTTER = 92;
 
 export function plankSkin(name, theme) {
   return PLANK[name] || PLANK[theme] || PLANK.light;
@@ -240,15 +248,18 @@ export function plankSkin(name, theme) {
 
 // ------------------------------------------------------ LA TAILLE DU RAYON --
 //
-// UNE RANGÉE REMPLIT LA LARGEUR DE LA PAGE, PUIS ON PASSE À LA PLANCHE
-// SUIVANTE. C'est toute la règle, et elle tient à ce calcul.
+// UNE SEULE PLANCHE, ET ON TOURNE LA PAGE. C'est toute la règle, et elle tient
+// à ce calcul.
 //
-// Avant, le nombre de boîtiers par planche était un compte fixe et le cadre
-// avait une hauteur fixe : dès la deuxième rangée, la caméra reculait pour
-// faire tenir la pile, et les deux planches se retrouvaient au fond de la
-// pièce. Le rapport s'est inversé — le boîtier a une taille à l'écran, elle ne
-// bouge jamais, et c'est le CADRE qui s'allonge d'une rangée quand il en faut
-// une de plus.
+// Une pile de planches, c'était un mur : le cadre faisait plusieurs écrans de
+// haut, la scène peignait un canvas démesuré à chaque image, et il fallait
+// faire défiler la page pour voir le bas de sa propre étagère. Un rayon de
+// vidéoclub se parcourt à l'horizontale — on regarde UNE rangée, à hauteur
+// d'yeux, et ce qui ne tient pas dessus attend derrière les flèches.
+//
+// Le boîtier a donc une taille à l'écran, elle ne bouge jamais ; la rangée
+// prend la largeur de la page moins la place des flèches ; et le reste de la
+// collection est découpé en pages de `perPage` boîtiers.
 //
 // Tout est calculé en « unités de scène » (1 ≈ 16 cm) puis converti en pixels
 // par `unit`, et les marges sont exactement celles que `useFraming` appliquera
@@ -269,42 +280,45 @@ function shelfFit(media, density, availPx, viewH) {
     Math.round(viewH * 0.52)
   );
 
-  const rowsAt = (px) => {
+  const fitIn = (px, widthPx) => {
     const unit = px / BOX.dvd.h;
     // La place vraiment disponible dans le cadre : `useFraming` garde 6 % de
     // marge en largeur, et la rangée s'arrête à EDGE de chaque bord.
-    const room = availPx / unit / 1.06 - EDGE * 2;
+    const room = widthPx / unit / 1.06 - EDGE * 2;
     const per = Math.max(1, Math.min(count, Math.floor(room / step) || 1));
-    return { unit, per, rows: Math.ceil(count / per) };
+    return { unit, per };
   };
 
-  let f = rowsAt(casePx);
-  // LE SEUL CAS OÙ L'ON RÉTRÉCIT : une collection assez grosse pour empiler
-  // plus de MAX_ROWS planches. Le cadre ferait alors plusieurs écrans de haut
-  // et la scène peindrait un canvas démesuré à chaque image. On serre les
-  // boîtiers jusqu'à retomber sous la limite — jamais avant, et jamais parce
-  // qu'il y a « deux rangées au lieu d'une ».
-  for (let i = 0; i < 6 && f.rows > MAX_ROWS && casePx > 150; i += 1) {
-    casePx = Math.max(150, Math.round(casePx * Math.sqrt(MAX_ROWS / f.rows)));
-    f = rowsAt(casePx);
-  }
+  let f = fitIn(casePx, availPx);
+  // TOUT NE TIENT PAS : la rangée recule des deux côtés pour laisser passer les
+  // flèches. On ne le fait qu'à ce moment-là — une collection qui tient d'une
+  // pièce n'a pas de flèches, donc rien à céder.
+  const paged = f.per < count;
+  if (paged) f = fitIn(casePx, Math.max(240, availPx - ARROW_GUTTER * 2));
 
-  // La pile, du dessous de la planche du bas au sommet des boîtiers du haut.
-  const stack = (f.rows - 1) * (tallest + PLANK_AIR) + tallest + THICK;
+  const pageCount = Math.ceil(count / f.per);
+  // Une seule planche : du dessous de la planche au sommet des boîtiers.
+  const stack = tallest + THICK;
 
   return {
-    perPlank: f.per,
-    rows: f.rows,
+    perPage: f.per,
+    pageCount,
     height: Math.round((stack + SKY + FLOOR) * f.unit),
     // La largeur ne dépasse jamais ce que la rangée occupe vraiment : six
     // titres dans un cadre pleine page seraient perdus au milieu du vide.
     // Plancher à MIN_W, la largeur cadrée minimale de la scène : en dessous,
     // c'est elle qui commanderait le recul de la caméra et les deux boîtiers
     // d'un rayon presque vide repartiraient au fond.
-    width: Math.min(
-      availPx,
-      Math.round(Math.max(f.per * step + EDGE * 2, MIN_W) * 1.06 * f.unit)
-    ),
+    //
+    // Dès qu'il y a des pages, en revanche, c'est TOUTE la largeur : un cadre
+    // taillé au plus juste rétrécirait sur la dernière page, à moitié pleine,
+    // et les flèches se rapprocheraient d'un cran à chaque tour.
+    width: paged
+      ? availPx
+      : Math.min(
+          availPx,
+          Math.round(Math.max(f.per * step + EDGE * 2, MIN_W) * 1.06 * f.unit)
+        ),
   };
 }
 
@@ -1696,6 +1710,59 @@ export default function CollectionShelf({
     [media, perPlank, room.w, room.h]
   );
 
+  // ------------------------------------------------------- tourner la page --
+  //
+  // UNE PLANCHE À LA FOIS. Ce qui ne tient pas sur la rangée n'est pas empilé
+  // au-dessus : il attend derrière les flèches, et la scène ne monte JAMAIS que
+  // les boîtiers de la page courante — c'est aussi ce qui garde le canvas petit
+  // et le rayon fluide quand la collection est grosse.
+  const [page, setPage] = useState(0);
+
+  // On revient au début quand le rayon change de contenu (filtre, recherche,
+  // boîtier gagné) — mais PAS quand il change d'ordre : ranger un boîtier
+  // renvoie une nouvelle liste à chaque déplacement, et repartir à la première
+  // page à chaque geste rendrait le rangement impraticable.
+  useEffect(() => setPage(0), [media.length]);
+
+  // La page courante peut disparaître sous les pieds : une fenêtre élargie fait
+  // tenir plus de boîtiers par rangée, donc moins de pages.
+  const lastPage = Math.max(0, fit.pageCount - 1);
+  useEffect(() => setPage((p) => Math.min(p, lastPage)), [lastPage]);
+  const at = Math.min(page, lastPage);
+
+  const onPage = useMemo(
+    () => media.slice(at * fit.perPage, at * fit.perPage + fit.perPage),
+    [media, at, fit.perPage]
+  );
+
+  const turn = useCallback(
+    (dir) => {
+      // Le boîtier survolé part avec la page : sans ça, sa bulle resterait
+      // accrochée à un titre qui n'est plus sur la planche.
+      setHovered(null);
+      setPage((p) => {
+        const n = p + dir;
+        return n < 0 || n > lastPage ? p : n;
+      });
+    },
+    [lastPage]
+  );
+
+  // Les flèches du clavier tournent la page elles aussi — mais pas pendant
+  // qu'une vitrine, un volume ou une console occupent l'écran : là, ces touches
+  // appartiennent à ce qu'on a en main.
+  const busy = !!inspected || !!reading || !!playing;
+  useEffect(() => {
+    if (fit.pageCount < 2 || busy) return undefined;
+    const key = (e) => {
+      if (e.target?.closest?.("input, textarea, [contenteditable]")) return;
+      if (e.key === "ArrowLeft") turn(-1);
+      else if (e.key === "ArrowRight") turn(1);
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [fit.pageCount, busy, turn]);
+
   // ------------------------------------------------------ les jaquettes --
   //
   // TOUT ARRIVE ENSEMBLE, OU RIEN N'ARRIVE. L'ancienne peinture partait boîtier
@@ -1953,7 +2020,6 @@ export default function CollectionShelf({
       style={{
         width: `${fit.width}px`,
         height: `${fit.height}px`,
-        "--rows": fit.rows,
       }}
     >
       {!skelGone && (
@@ -1981,13 +2047,15 @@ export default function CollectionShelf({
       >
         <Warmer queue={warm} />
         <ShelfScene
-          media={media}
+          // La page, et elle seule : la planche ne porte jamais plus que ce
+          // qu'elle peut tenir.
+          media={onPage}
           art={art}
           hovered={hovered}
           held={inspected?.media.slug || reading?.media.slug}
           taken={taken}
           arranging={arranging}
-          perPlank={fit.perPlank}
+          perPlank={fit.perPage}
           onHover={setHovered}
           onPick={pick}
           onAnchor={onAnchor}
@@ -1995,6 +2063,52 @@ export default function CollectionShelf({
           skin={skin}
         />
       </Canvas>
+
+      {/* ------------------------------------------------ tourner la page --
+          Deux flèches aux bouts de la planche, comme on pousse une rangée de
+          boîtiers du doigt pour voir ceux du fond. Elles ne s'affichent que
+          s'il y a vraiment quelque chose derrière, et elles s'effacent pendant
+          qu'on a un boîtier en main — la page ne doit pas tourner sous la
+          vitrine. */}
+      {fit.pageCount > 1 && dressed && (
+        <>
+          <button
+            type="button"
+            className="coll-shelf-arrow left clickable"
+            onClick={() => turn(-1)}
+            disabled={at === 0}
+            aria-label="Boîtiers précédents"
+            title="Boîtiers précédents (←)"
+          >
+            <ChevronLeft size={22} />
+          </button>
+          <button
+            type="button"
+            className="coll-shelf-arrow right clickable"
+            onClick={() => turn(1)}
+            disabled={at >= lastPage}
+            aria-label="Boîtiers suivants"
+            title="Boîtiers suivants (→)"
+          >
+            <ChevronRight size={22} />
+          </button>
+
+          {/* Où l'on en est dans le rayon. Le compte de boîtiers, pas
+              seulement le numéro de page : « 21-40 sur 96 » dit tout de suite
+              ce qu'on a sous les yeux et ce qui reste. */}
+          <span className="coll-shelf-pager" aria-live="polite">
+            <b>
+              {at * fit.perPage + 1}–{Math.min(media.length, (at + 1) * fit.perPage)}
+            </b>{" "}
+            sur {media.length}
+            <i aria-hidden="true">
+              {Array.from({ length: Math.min(fit.pageCount, 12) }).map((_, i) => (
+                <em key={i} className={i === Math.min(at, 11) ? "on" : ""} />
+              ))}
+            </i>
+          </span>
+        </>
+      )}
 
       {/* La bulle du boîtier survolé : en HTML par-dessus la scène, mais
           ancrée sur SA position à l'écran — la typographie du site y est bien

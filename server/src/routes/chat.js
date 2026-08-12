@@ -1590,6 +1590,13 @@ router.post("/share-book", requireAuth, async (req, res) => {
     if (shot && !ours)
       return res.status(400).json({ error: "Capture invalide." });
 
+    // La jaquette suit la même règle que la capture, en plus large : elle sort
+    // du catalogue (donc de /uploads/collection) et non du dossier du chat,
+    // mais elle vient de chez nous ou elle ne vient pas. Une vignette qui n'est
+    // pas la nôtre, c'est un mouchard posé dans une conversation privée.
+    const cover = String(raw.cover || "");
+    const coverOurs = /^https?:\/\//.test(cover) && host && cover.includes(host);
+
     const page = Math.max(0, Math.min(9999, Math.round(Number(raw.page) || 0)));
     const card = {
       slug,
@@ -1598,6 +1605,7 @@ router.post("/share-book", requireAuth, async (req, res) => {
       page,
       pages: Math.max(0, Math.min(9999, Math.round(Number(raw.pages) || 0))),
       shot: shot || null,
+      cover: coverOurs ? cover.slice(0, 500) : null,
       color: raw.color ? String(raw.color).slice(0, 32) : null,
     };
     const text = req.body?.message ? String(req.body.message).slice(0, 500) : "";
