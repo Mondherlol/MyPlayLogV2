@@ -36,6 +36,7 @@ import { triesFor, typeHint } from "../lib/quizGame";
 import QuizRound from "../components/quiz/QuizRound";
 import QuizTimer from "../components/quiz/QuizTimer";
 import { VersusFace, VersusRail, VersusInvite, hueOf } from "../components/VersusRoom";
+import GameChat from "../components/GameChat";
 
 // ======================================================================
 //  Le Grand Quiz — le plateau à plusieurs
@@ -582,6 +583,19 @@ export default function QuizzVersus() {
           endpoint={`/quiz/versus/${room.code}/invite`}
           title="Inviter sur le plateau"
           onClose={() => setShowInvite(false)}
+        />
+      )}
+
+      {/* Le chat du salon : réservé à ceux qui jouent (un curieux muni du lien
+          n'a rien à souffler à la table). */}
+      {room && me && (
+        <GameChat
+          token={token}
+          code={code}
+          event="quizversus"
+          endpoint="/quiz/versus"
+          players={players}
+          meId={meId}
         />
       )}
     </div>

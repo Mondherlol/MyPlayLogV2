@@ -1,0 +1,563 @@
+/* ======================================================================
+   Diffuser sa partie GBA — le bandeau, le panneau, la page du spectateur
+   ======================================================================
+   L'IMAGE NE PASSE PAS PAR LE SERVEUR (WebRTC, voir lib/gbaStream.js) : ce
+   fichier n'habille qu'un `<video>` et quelques listes. Deux endroits :
+
+     • CHEZ L'HÔTE — un bandeau « EN DIRECT » posé sur la console (hors de la
+       barre du haut, qui s'efface au bout de trois secondes : savoir qu'on est
+       regardé n'est pas une commande, c'est un fait) et le panneau des
+       spectateurs, dans la même coquille `.gbx-sheet` que les autres ;
+     • CHEZ LE SPECTATEUR — une page à part, du même noir que la console. */
+
+/* ================================================================== l'hôte ==*/
+
+/* Le point rouge qui bat. Deux couches, comme le rail d'activité : un point
+   plein, un halo qui s'échappe. Une opacité qui clignote se lit comme un défaut
+   d'affichage, pas comme un direct. */
+.gbx-live-dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: #e0342b;
+}
+
+.gbx-live-dot::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid #e0342b;
+  animation: gbx-live-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes gbx-live-ping {
+  from {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+/* Le bandeau, en haut à droite de la console. Il NE S'EFFACE PAS avec les
+   commandes — d'où sa position propre, hors de `.gbx-top`. */
+.gbx-live {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  z-index: 11;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #ffd7d4;
+  background: rgba(224, 52, 43, 0.16);
+  border: 1px solid rgba(224, 52, 43, 0.45);
+  backdrop-filter: blur(8px);
+}
+
+.gbx-live em {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-style: normal;
+  letter-spacing: 0;
+  color: #fff;
+  padding-left: 7px;
+  border-left: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.gbx-live.starting {
+  color: #d7dae3;
+  background: rgba(12, 14, 20, 0.8);
+  border-color: rgba(255, 255, 255, 0.14);
+  letter-spacing: 0.04em;
+  gap: 5px;
+}
+
+/* --- le lien à envoyer : la première chose du panneau, et la plus grosse --- */
+.gbx-share {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  text-align: left;
+  color: #e3e5ec;
+  background: color-mix(in srgb, var(--tint) 12%, rgba(255, 255, 255, 0.04));
+  border: 1px solid color-mix(in srgb, var(--tint) 30%, transparent);
+  transition: background 0.15s ease;
+}
+
+.gbx-share:hover {
+  background: color-mix(in srgb, var(--tint) 20%, rgba(255, 255, 255, 0.06));
+}
+
+.gbx-share-ic {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 9px;
+  background: var(--tint);
+  color: #10121a;
+}
+
+.gbx-share-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.gbx-share-txt strong {
+  font-size: 0.8rem;
+}
+
+.gbx-share-txt em {
+  font-size: 0.66rem;
+  font-style: normal;
+  color: #8d92a1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- une ligne de spectateur --- */
+.gbx-row.watcher .gbx-row-icon {
+  overflow: hidden;
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: #d7dae3;
+}
+
+.gbx-row.watcher .gbx-row-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gbx-row.watcher strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* La main levée : à côté du nom, là où l'on décide. */
+.gbx-hand {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: #10121a;
+  background: var(--tint);
+  animation: gbx-hand-wave 1.6s ease-in-out infinite;
+}
+
+@keyframes gbx-hand-wave {
+  50% {
+    transform: translateY(-2px) rotate(-12deg);
+  }
+}
+
+.gbx-link-ok {
+  color: #6fd08c !important;
+}
+
+.gbx-link-bad {
+  color: #ff8b82 !important;
+}
+
+.gbx-link-wait {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.gbx-pad-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  padding: 6px 10px;
+  border-radius: 9px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #d7dae3;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.gbx-pad-btn:hover {
+  background: var(--tint);
+  border-color: transparent;
+  color: #10121a;
+}
+
+.gbx-pad-btn.on {
+  background: color-mix(in srgb, var(--tint) 22%, transparent);
+  border-color: color-mix(in srgb, var(--tint) 45%, transparent);
+  color: var(--tint);
+}
+
+.gbx-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: #ffb4ad;
+  background: rgba(224, 52, 43, 0.14);
+  border: 1px solid rgba(224, 52, 43, 0.3);
+}
+
+.gbx-warn.soft {
+  color: #ffcf8b;
+  background: rgba(234, 169, 8, 0.12);
+  border-color: rgba(234, 169, 8, 0.28);
+}
+
+.gbx-warn svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.gbx-stop {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 2px;
+  padding: 9px;
+  border-radius: 11px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #ff8b82;
+  background: rgba(224, 52, 43, 0.14);
+  border: 1px solid rgba(224, 52, 43, 0.3);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.gbx-stop:hover {
+  background: #e0342b;
+  color: #fff;
+}
+
+/* ============================================================ le spectateur ==
+   MÊME NOIR QUE LA CONSOLE. On regarde la même chose, à un réseau près : une
+   page blanche autour de l'écran d'un jeu rétro casserait le peu d'immersion
+   qu'un flux de 240 pixels peut offrir. */
+
+.gbw {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  background: #05060a;
+  color: #e9eaf0;
+  overflow: hidden;
+}
+
+.gbw-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.gbw-back,
+.gbw-btn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #c3c7d4;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.gbw-back:hover,
+.gbw-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.gbw-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #ffd7d4;
+  background: rgba(224, 52, 43, 0.16);
+  border: 1px solid rgba(224, 52, 43, 0.45);
+}
+
+.gbw-id {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.gbw-id strong {
+  font-size: 0.88rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gbw-id em {
+  font-size: 0.68rem;
+  font-style: normal;
+  color: #8d92a1;
+}
+
+.gbw-id em a {
+  color: #b6bbc8;
+  text-decoration: none;
+}
+
+.gbw-id em a:hover {
+  color: #fff;
+}
+
+.gbw-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #9aa0b0;
+}
+
+/* --- l'écran ---
+   L'image fait 240 × 160 : on la laisse GRANDIR jusqu'à remplir, sans jamais la
+   déformer (`contain`), et en pixels francs — une image de GBA lissée par un
+   navigateur devient une aquarelle. */
+.gbw-screen {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 10px;
+}
+
+.gbw-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  background: #000;
+  border-radius: 6px;
+}
+
+.gbw-wait {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  padding: 20px;
+  background: rgba(5, 6, 10, 0.9);
+}
+
+.gbw-wait strong {
+  font-size: 0.95rem;
+}
+
+.gbw-wait span {
+  max-width: 40ch;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: #9aa0b0;
+}
+
+.gbw-wait svg {
+  color: var(--accent-ink, #eaa908);
+}
+
+.gbw-unmute {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #10121a;
+  background: #fff;
+  border: 0;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* --- le bas : qui joue, et le bouton pour demander --- */
+.gbw-ask {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.gbw-holder {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: #9aa0b0;
+}
+
+.gbw-holder strong {
+  color: #e9eaf0;
+}
+
+.gbw-hand {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #10121a;
+  background: var(--accent-grad, #eaa908);
+  border: 0;
+  transition: filter 0.15s ease;
+}
+
+.gbw-hand:hover {
+  filter: brightness(1.08);
+}
+
+/* Main levée : on attend, donc le bouton cesse d'appeler à l'action. */
+.gbw-hand.on {
+  background: transparent;
+  color: var(--accent-ink, #eaa908);
+  border: 1px solid color-mix(in srgb, var(--accent-ink, #eaa908) 45%, transparent);
+}
+
+.gbw-yours {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 0;
+  padding: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #10121a;
+  background: var(--accent-grad, #eaa908);
+}
+
+/* La manette du spectateur reprend celle de la console (GbaPad) : elle flotte
+   sur l'image en paysage, et prend le bas de la page en portrait. Ici elle est
+   TOUJOURS en flux — la page n'a pas de commandes à masquer, et un pad posé sur
+   une vidéo de 240 pixels en cacherait la moitié. */
+.gbw .gbx-pad {
+  position: relative;
+  inset: auto;
+  flex: none;
+  height: min(42vh, 340px);
+  padding: 0 18px calc(14px + env(safe-area-inset-bottom, 0px));
+}
+
+.gbw .gbx-pad-mid {
+  top: 2px;
+  bottom: auto;
+}
+
+.gbw-err {
+  margin: 0;
+  padding: 8px 14px;
+  text-align: center;
+  font-size: 0.74rem;
+  color: #ff8b82;
+}
+
+.gbw-state {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+  background: #05060a;
+  color: #e9eaf0;
+}
+
+.gbw-state strong {
+  font-size: 1.05rem;
+}
+
+.gbw-state p {
+  margin: 0;
+  max-width: 44ch;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: #9aa0b0;
+}
+
+.gbw-state svg {
+  color: var(--accent-ink, #eaa908);
+}
+
+.gbw-state .btn {
+  margin-top: 8px;
+}
+
+/* En paysage sur téléphone, la manette reprend son rôle de couche flottante :
+   l'écran est déjà à l'étroit en hauteur, lui retirer 40 % ne laisserait plus
+   rien à regarder. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .gbw .gbx-pad {
+    position: absolute;
+    inset: 0;
+    height: auto;
+    padding: 0 14px 14px;
+  }
+
+  .gbw-yours {
+    display: none;
+  }
+}

@@ -32,8 +32,10 @@ import {
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { useLiveStatus } from "../lib/presence";
 import CollectionViewer from "../components/CollectionViewer";
 import CollectionComments from "../components/CollectionComments";
+import CollectionGameLink from "../components/CollectionGameLink";
 import GachaModal from "../components/GachaModal";
 
 // Le lecteur à plat embarque son carrousel (Swiper) : comme le volume 3D, il
@@ -110,6 +112,21 @@ export default function CollectionDetail() {
   // paramètre et non sur sa valeur.
   const askedPage = params.has("page") ? Number(params.get("page")) : null;
   const autoStarted = useRef(false);
+
+  // ------------------------------------------- « en ce moment », côté rayon --
+  // REGARDER ET LIRE SONT DES ACTIVITÉS, au même titre que jouer, et c'est ce
+  // qui manquait au statut : on ne voyait dans le rail des amis que les
+  // mini-jeux. La console, elle, s'annonce depuis GbaPlayer — elle s'ouvre aussi
+  // depuis l'étagère, sans passer par cette page.
+  //
+  // Le titre EST le détail : « Regarde · Le Prisonnier » donne envie d'aller
+  // voir, « Regarde une séance » non.
+  const liveKind = reading ? "comic" : watching ? "collection" : null;
+  useLiveStatus(liveKind || "", media?.title || "", {
+    token,
+    active: !!liveKind,
+    path: `/collection/${slug}`,
+  });
 
   useEffect(() => {
     let alive = true;
@@ -647,7 +664,10 @@ export default function CollectionDetail() {
                   pastille de licence et au bas de la page Collection. */}
             </div>
 
-            {media.games?.length > 0 && (
+            {/* Les jeux dont ce titre parle. SUR UNE CARTOUCHE, PAS ICI : le
+                rattachement d'un jeu à sa propre fiche mérite mieux qu'un lien
+                perdu sous les boutons — il a sa section (voir plus bas). */}
+            {!game && media.games?.length > 0 && (
               <div className="coll-hero-games">
                 <Gamepad2 size={14} />
                 {media.games.map((g) => (
@@ -734,6 +754,15 @@ export default function CollectionDetail() {
               }}
             />
           </section>
+        )}
+
+        {/* ---------------- la fiche du jeu ----------------
+            CE QUI SORT LE RAYON DU CUL-DE-SAC. Une cartouche posée sur
+            l'étagère ignorait tout du jeu qu'elle contient, alors que sa fiche
+            complète — notes, avis, OST, listes, captures — est à une page d'ici.
+            Voir CollectionGameLink. */}
+        {game && media.games?.[0] && (
+          <CollectionGameLink game={media.games[0]} token={token} />
         )}
 
         {/* ---------------- la cartouche ---------------- */}

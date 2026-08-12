@@ -414,6 +414,11 @@ function systemPreview(msg) {
       return `Groupe renommé « ${d.name || ""} »`;
     case "avatar":
       return "Photo du groupe modifiée";
+    // La trace d'un appel vocal (routes/calls.js). Un appel manqué DOIT laisser
+    // une ligne : c'est la seule chose qui reste quand on n'était pas là, et
+    // c'est ce qu'on vient chercher en rouvrant la conversation.
+    case "call":
+      return d.missed ? "Appel manqué" : `Appel · ${d.duration || ""}`.trim();
     default:
       return "";
   }
@@ -466,7 +471,10 @@ function broadcastMessage(conv, msg, event = "message") {
 }
 
 // Message de service (« a rejoint le groupe »…), créé + diffusé.
-async function pushSystem(conv, actorId, system, systemData) {
+// Exporté pour routes/calls.js, qui dépose la ligne d'appel dans le fil. Le
+// sens de la dépendance compte : c'est l'appel qui connaît la messagerie, pas
+// l'inverse — la messagerie marchait très bien avant qu'on puisse s'appeler.
+export async function pushSystem(conv, actorId, system, systemData) {
   const msg = await persistMessage(conv, actorId, {
     author: actorId,
     system,

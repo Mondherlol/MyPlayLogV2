@@ -142,6 +142,7 @@ export default function BlindTest() {
   // discute (cf. lib/presence.js). Rien à nettoyer : le hook s'éteint seul.
   useLiveStatus("blindtest", rounds.length ? `manche ${idx + 1}/${rounds.length}` : "", {
     token,
+    path: "/blindtest",
   });
   const [score, setScore] = useState(0);
   const [timeLeftMs, setTimeLeftMs] = useState(0);

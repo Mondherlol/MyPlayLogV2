@@ -230,6 +230,7 @@ export default function PixelRush() {
   // discute (cf. lib/presence.js). Rien à nettoyer : le hook s'éteint seul.
   useLiveStatus("pixel", rounds.length ? `manche ${idx + 1}/${rounds.length}` : "", {
     token,
+    path: "/pixel",
   });
   const [score, setScore] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);

@@ -35,8 +35,20 @@ const VERSUS_EVENTS = [
   "pxversus",
   "quizversus",
   "pqversus", // Le Perroquet
+  "pqvoice", // L'appel vocal de son salon (hooks/useVoiceCall.js) : la
+  // signalisation WebRTC de l'appel, à part du salon lui-même parce qu'un
+  // candidat ICE n'a rien à faire dans la diffusion de l'état de la partie.
+  // Sans cette ligne, personne ne s'entend et rien ne le signale.
   "imposteur", // L'Imposteur (le seul jeu 100 % à plusieurs : pas de suffixe
   // « versus », son nom d'évènement EST son nom)
+  "call", // Les appels vocaux de la messagerie (context/CallContext.jsx) :
+  // sonnerie, décrochage, et la signalisation WebRTC de l'appel lui-même.
+  "gbastream", // Diffuser sa partie GBA : signalisation WebRTC + la manette
+  // qu'on passe (routes/gbaStream.js). Sans cette ligne, l'offre de l'hôte
+  // n'arrive jamais et le spectateur reste sur un écran noir.
+  "listen", // Écouter à plusieurs (routes/listen.js) : les repères de lecture
+  // de l'hôte. Sans cette ligne, l'auditeur reste bloqué sur la piste avec
+  // laquelle il est entré — le changement de morceau n'arrive jamais.
 ];
 
 // Durée d'affichage d'une bulle « X t'a écrit » (ms).

@@ -56,6 +56,7 @@ import ComicModal, {
   applyComicPick,
 } from "./AdminComicModal";
 import GameModal from "./AdminGameModal";
+import IgdbPicker from "./AdminIgdbPicker";
 import { shrinkImageFile, fmtBytes } from "../lib/imageFile";
 
 // L'essai d'un boîtier (bouton « Tester » de la liste). Chargé à la demande :
@@ -668,7 +669,7 @@ export default function CollectionPanel({ token }) {
         </div>
         <div className="adm-coll-head-btns">
           <button className="btn btn-ghost clickable" onClick={() => setAddingGame(true)}>
-            <Gamepad2 size={16} /> Jeu DS
+            <Gamepad2 size={16} /> Jeu GBA
           </button>
           <button className="btn btn-ghost clickable" onClick={() => setAddingComic(true)}>
             <BookOpen size={16} /> Comic / manga
@@ -2155,6 +2156,7 @@ function EditDrawer({ media, token, onClose, onChanged }) {
             set={set}
             onChanged={onChanged}
           />
+          <IgdbBox media={media} token={token} onChanged={onChanged} />
         </Section>
       ) : comic ? (
         /* LE PAPIER N'A PAS DE LIEN DE STREAMING — il avait pourtant le
@@ -2254,6 +2256,118 @@ function EditDrawer({ media, token, onClose, onChanged }) {
         </div>
       </Section>
     </Modal>
+  );
+}
+
+// ------------------------------------------------------------- IGDB --------
+//
+// RATTACHER LA FICHE AU VRAI JEU, et la remplir avec ce qu'IGDB en sait. Deux
+// choses en une, parce qu'elles n'ont de sens qu'ensemble :
+//
+//   • LE RATTACHEMENT rend le boîtier cliquable vers la fiche du jeu (note,
+//     avis, OST, listes, jaquettes) — sans lui, le rayon jeu est un cul-de-sac
+//     dans une application qui ne parle que de jeux ;
+//   • LE REMPLISSAGE évite de taper à la main un résumé, un éditeur, une année
+//     et une jaquette pour chaque cartouche.
+//
+// PAR DÉFAUT ON NE COMBLE QUE LES TROUS. Ce qui a été écrit à la main gagne —
+// un titre français, un synopsis raccourci, une jaquette scannée. Le bouton
+// « tout réécrire » existe pour le cas inverse, et il le dit.
+
+function IgdbBox({ media, token, onChanged }) {
+  const linked = media.games?.[0] || null;
+  const [busy, setBusy] = useState(false);
+  const [force, setForce] = useState(false);
+  const [note, setNote] = useState(null);
+  const [error, setError] = useState(null);
+
+  async function link(game) {
+    setBusy(true);
+    setError(null);
+    setNote(null);
+    try {
+      const d = await apiFetch(`/collection/${media.slug}/igdb`, {
+        method: "POST",
+        token,
+        body: { igdbId: game.id, force },
+      });
+      setNote(
+        d.filled?.length
+          ? `Rempli : ${d.filled.join(", ")}.`
+          : "Rattaché — rien à compléter, la fiche était déjà remplie."
+      );
+      onChanged();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="adm-igdb-box">
+      <div className="adm-igdb-head">
+        <strong>
+          <Gamepad2 size={14} /> La fiche du jeu
+        </strong>
+        <label className="adm-igdb-force">
+          <input
+            type="checkbox"
+            checked={force}
+            onChange={(e) => setForce(e.target.checked)}
+          />
+          Tout réécrire
+        </label>
+      </div>
+
+      {linked ? (
+        <div className="adm-igdb-picked">
+          <span className="adm-igdb-cover">
+            {media.poster ? <img src={media.poster} alt="" /> : <Gamepad2 size={18} />}
+          </span>
+          <div>
+            <strong>
+              <Check size={13} /> {linked.name || `IGDB ${linked.igdbId}`}
+            </strong>
+            <em>
+              Le boîtier renvoie vers cette fiche · IGDB {linked.igdbId}
+            </em>
+          </div>
+          <a
+            className="btn btn-ghost clickable"
+            href={`/game/${linked.igdbId}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Voir
+          </a>
+        </div>
+      ) : (
+        <p className="adm-coll-hint">
+          Aucun jeu rattaché : le boîtier ne mène nulle part, et sa fiche n'a que
+          ce qui a été tapé ici.
+        </p>
+      )}
+
+      {busy ? (
+        <p className="adm-coll-hint">
+          <Loader2 size={13} className="spin" /> On demande à IGDB…
+        </p>
+      ) : (
+        <IgdbPicker token={token} onPick={link} />
+      )}
+
+      {note && (
+        <p className="adm-coll-hint">
+          <Check size={12} /> {note}
+        </p>
+      )}
+      {error && (
+        <p className="adm-coll-error">
+          <AlertTriangle size={14} /> {error}
+        </p>
+      )}
+    </div>
   );
 }
 

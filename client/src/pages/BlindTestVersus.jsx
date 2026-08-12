@@ -36,6 +36,7 @@ import { loadYT } from "../lib/youtube";
 import { dedupeCandidates, searchCandidates } from "../lib/guessGame";
 import { useGameSfx } from "../lib/useGameSfx";
 import { VersusFace, VersusRail, VersusInvite, HUES } from "../components/VersusRoom";
+import GameChat from "../components/GameChat";
 
 // ======================================================================
 //  Blind test VERSUS — le buzzer
@@ -1157,6 +1158,19 @@ export default function BlindTestVersus() {
           endpoint={`/blindtest/versus/${room.code}/invite`}
           title="Inviter au blind test"
           onClose={() => setShowInvite(false)}
+        />
+      )}
+
+      {/* Le chat du salon : réservé à ceux qui jouent (un curieux muni du lien
+          n'a rien à souffler à la table). */}
+      {room && me && (
+        <GameChat
+          token={token}
+          code={code}
+          event="btversus"
+          endpoint="/blindtest/versus"
+          players={players}
+          meId={meId}
         />
       )}
     </div>

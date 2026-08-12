@@ -14,9 +14,11 @@ import {
   Music,
   BookOpen,
   Loader2,
+  Phone,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useChat } from "../context/ChatContext";
+import { useCall } from "../context/CallContext";
 import { apiFetch } from "../lib/api";
 import { timeAgo } from "../lib/lists";
 import { presenceText, isPlaying } from "../lib/presence";
@@ -38,6 +40,7 @@ export default function Messages() {
     isWindowFocused,
     refresh,
   } = useChat();
+  const { startCall, callIn, activeId: activeCallId } = useCall();
 
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
@@ -407,6 +410,20 @@ export default function Messages() {
                 </span>
               </div>
               {active.muted && <BellOff size={15} className="chat-head-muted" />}
+              {/* Appeler. Le même bouton lance l'appel et rejoint celui qui
+                  tourne déjà : côté serveur c'est la même route, et côté
+                  utilisateur c'est la même intention — « je veux être dans
+                  l'appel de cette conversation ». */}
+              <button
+                type="button"
+                className={`chat-head-btn clickable ${callIn?.(active.id) ? "ringing" : ""}`}
+                onClick={() => startCall(active.id)}
+                disabled={String(activeCallId || "") === String(active.id)}
+                title={callIn?.(active.id) ? "Rejoindre l'appel" : "Appeler"}
+                aria-label="Appeler"
+              >
+                <Phone size={18} />
+              </button>
               <button
                 type="button"
                 className="chat-head-btn clickable"

@@ -3053,3 +3053,154 @@ span.pq-clip-av.ph {
   .hf-perroquet .hf-pq-body { flex-wrap: wrap; }
   .hf-pq-cta { width: 100%; justify-content: center; }
 }
+
+/* ======================================================================
+   L'appel vocal du salon
+   ======================================================================
+   Une bande posée sous l'écran de jeu, à la même place d'un bout à l'autre de
+   la partie (cf. components/VoiceCallBar.jsx).
+
+   TOUT SE JOUE SUR L'ÉTAT « on ne s'entend plus » : c'est le cœur du mode, et
+   c'est ce qui passerait pour une panne s'il n'était pas dit franchement. D'où
+   une bande qui CHANGE DE COULEUR et pas seulement de libellé — de la couleur
+   chaude du site à un gris de cabine fermée. */
+.pq-call {
+  position: relative;
+  z-index: 2;
+  margin: 18px auto 0;
+  width: min(560px, 100%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--pq-line);
+  background: var(--pq-panel);
+  transition: border-color 0.25s ease, background 0.25s ease, opacity 0.25s ease;
+}
+.pq-call.idle { flex-wrap: wrap; justify-content: center; border-radius: 16px; }
+.pq-call.gagged {
+  border-color: var(--pq-line-2);
+  background: var(--pq-panel-2);
+  /* La bande recule pendant la coupure : c'est le moment où l'écran de jeu
+     compte, pas elle. */
+  opacity: 0.75;
+}
+
+.pq-call-join {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.95rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--pq-line-2);
+  background: transparent;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--pq-ink);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.pq-call-join:hover:not(:disabled) {
+  border-color: var(--pq-warm);
+  color: var(--pq-warm-ink);
+  background: var(--pq-warm-soft);
+}
+.pq-call-join:disabled { opacity: 0.6; }
+.pq-call-pitch {
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: var(--pq-dim);
+  text-align: center;
+}
+.pq-call-err {
+  width: 100%;
+  text-align: center;
+  font-size: 0.74rem;
+  color: var(--pq-b-miss);
+}
+
+.pq-call-state {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--pq-warm-ink);
+  white-space: nowrap;
+}
+.pq-call.gagged .pq-call-state { color: var(--pq-dim); }
+
+.pq-call-heads {
+  flex: 1 1 auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.pq-call-heads li {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  /* L'anneau est TOUJOURS là, transparent au repos : le faire apparaître ferait
+     sauter les têtes de deux pixels à chaque syllabe. */
+  box-shadow: 0 0 0 2px transparent;
+  transition: box-shadow 0.12s ease, opacity 0.2s ease;
+}
+.pq-call-heads li img,
+.pq-call-heads li .ph {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  background: var(--pq-panel-2);
+  color: var(--pq-dim);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.pq-call-heads li.talking { box-shadow: 0 0 0 2px var(--pq-warm); }
+.pq-call-heads li.muted,
+.pq-call-heads li.wait { opacity: 0.45; }
+.pq-call.gagged .pq-call-heads li { opacity: 0.5; box-shadow: none; }
+.pq-call-off {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  padding: 2px;
+  border-radius: 50%;
+  background: var(--pq-panel);
+  color: var(--pq-b-miss);
+}
+
+.pq-call-mic,
+.pq-call-hang {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--pq-line-2);
+  background: transparent;
+  color: var(--pq-ink);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.pq-call-mic:hover:not(:disabled) { border-color: var(--pq-warm); color: var(--pq-warm-ink); }
+.pq-call-mic.off { border-color: var(--pq-b-miss); color: var(--pq-b-miss); }
+.pq-call-mic:disabled { opacity: 0.5; }
+.pq-call-hang:hover { border-color: var(--pq-b-miss); color: var(--pq-b-miss); }
+
+/* En étroit, le libellé d'état tiendrait la moitié de la bande : les têtes et
+   les deux boutons passent d'abord, l'état repasse à la ligne. */
+@media (max-width: 520px) {
+  .pq-call { flex-wrap: wrap; border-radius: 16px; justify-content: center; }
+  .pq-call-state { width: 100%; justify-content: center; }
+  .pq-call-heads { flex: 1 1 auto; justify-content: center; }
+}

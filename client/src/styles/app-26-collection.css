@@ -3306,3 +3306,331 @@
   color: var(--text-soft);
   font-family: var(--font-mono, monospace);
 }
+
+/* ======================================================================
+   La cartouche et sa fiche de jeu
+   ======================================================================
+   LE RAYON JEU ÉTAIT UN CUL-DE-SAC : on posait une cartouche, on y jouait, et
+   c'était tout — alors que la note, les avis, l'OST et les listes de ce même
+   jeu vivent à une page d'ici. Cette section est le pont, et elle est faite
+   pour DONNER ENVIE D'Y ALLER : les images du jeu en action (aucun scan de
+   boîte ne montre ça), les deux notes, et un bouton.
+
+   TOUT LE BLOC EST UN LIEN. Sur un téléphone, viser un mot souligné au milieu
+   d'une carte est un exercice ; viser la carte, non. */
+
+.coll-gamecard {
+  grid-column: 1;
+  /* UN ENFANT DE GRILLE NE RÉTRÉCIT PAS SOUS SON CONTENU sans qu'on le lui
+     dise : sa largeur minimale vaut celle de ce qu'il contient. La bande de
+     captures fait six images de 168 pixels, donc la carte réclamait mille
+     pixels et débordait de l'écran — alors qu'elle a justement un
+     `overflow-x` pour ne pas le faire. */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.coll-gamecard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.coll-gamecard-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: none;
+  padding: 0.34rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--accent-ink) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-ink) 26%, transparent);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.coll-gamecard-cta:hover {
+  background: var(--accent-grad);
+  color: #23180a;
+  border-color: transparent;
+}
+
+.coll-gamecard-body {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.7rem;
+  border-radius: 12px;
+  text-decoration: none;
+  color: inherit;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.coll-gamecard-body:hover {
+  border-color: color-mix(in srgb, var(--accent-ink) 40%, transparent);
+  transform: translateY(-1px);
+}
+
+.coll-gamecard-cover {
+  width: 58px;
+  height: 78px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--text-soft);
+  box-shadow: 0 6px 16px rgba(12, 12, 22, 0.18);
+}
+
+.coll-gamecard-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.coll-gamecard-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.coll-gamecard-txt > strong {
+  font-family: var(--font-display);
+  font-size: 0.98rem;
+  line-height: 1.2;
+}
+
+.coll-gamecard-txt em {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-style: normal;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+
+/* Les notes : le chiffre est ce qu'on lit, le mot dessous dit DE QUI il vient.
+   « 82 » tout seul ne dit pas si c'est la presse ou les joueurs, et les deux ne
+   racontent pas la même chose. */
+.coll-gamecard-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.coll-gamecard-stats > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.16rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.coll-gamecard-stats i {
+  font-style: normal;
+  font-size: 0.66rem;
+  font-weight: 500;
+  color: var(--text-soft);
+}
+
+.coll-gamecard-stats svg {
+  color: var(--accent-ink);
+}
+
+/* Les captures : une bande qui défile plutôt qu'une grille. Une grille de six
+   vignettes sur un téléphone donne six timbres-poste ; une bande en donne deux
+   qu'on voit vraiment, et le geste pour voir les autres est naturel. */
+.coll-gamecard-shots {
+  min-width: 0;
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 0.2rem;
+  scrollbar-width: thin;
+}
+
+.coll-gamecard-shots a {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  width: 168px;
+  aspect-ratio: 16 / 9;
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.coll-gamecard-shots img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.coll-gamecard-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+.coll-gamecard-tags > span {
+  padding: 0.14rem 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+/* ======================================================================
+   La fiche sur un téléphone
+   ======================================================================
+   LE BANDEAU EST UNE IMAGE, ET LE TEXTE EST DESSUS. Sur un grand écran le
+   texte occupe la moitié gauche et l'image respire à droite ; sur 390 pixels,
+   tout se superpose — le résumé se lisait par-dessus un Sonic géant. On
+   n'enlève pas l'image (c'est elle qui fait l'objet), on ASSOMBRIT davantage :
+   la même mise en scène, lisible. */
+@media (max-width: 760px) {
+  .coll-hero-scrim {
+    background: linear-gradient(
+        180deg,
+        rgba(8, 8, 12, 0.72) 0%,
+        rgba(8, 8, 12, 0.93) 46%,
+        var(--bg) 100%
+      ),
+      radial-gradient(
+        90% 70% at 30% 22%,
+        color-mix(in srgb, var(--tint) 30%, transparent),
+        transparent 72%
+      );
+  }
+
+  .coll-hero-bg {
+    /* Plus flou et moins présent : à cette taille, l'image ne sert plus qu'à
+       donner une couleur et une texture — la lire n'a plus de sens. */
+    filter: saturate(1.05) blur(6px) brightness(0.85);
+    transform: scale(1.12);
+  }
+
+  /* LE SÉPARATEUR TOMBAIT EN DÉBUT DE LIGNE. Chaque mention porte un « · »
+     devant elle ; dès que la liste passe à la ligne, la nouvelle commence donc
+     par un point orphelin — visible sur toutes les fiches. À cette largeur, on
+     s'en passe : l'espace suffit à séparer, et rien ne pend. */
+  .coll-hero-meta {
+    gap: 0.32rem 0.7rem;
+    font-size: 0.76rem;
+  }
+
+  .coll-hero-meta > span + span::before {
+    content: none;
+  }
+
+  /* Le boîtier de tête : plus petit, et à plat. La perspective lui faisait
+     dépasser son ombre du cadre. */
+  .coll-hero-poster {
+    width: clamp(104px, 32vw, 140px);
+    transform: none;
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+
+  .coll-hero-body {
+    gap: 1rem;
+  }
+
+  /* Les actions passent en colonne pleine largeur : trois boutons à moitié
+     larges sur deux lignes, c'est une cible sur deux qu'on rate. */
+  .coll-hero-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .coll-hero-actions .btn {
+    justify-content: center;
+    width: 100%;
+  }
+
+  /* LES BOUTONS SECONDAIRES SONT BLANCS SUR FOND SOMBRE — sauf qu'ici le fond
+     n'est plus sombre. Le voile du bandeau finit sur la couleur de la page, et
+     sur un téléphone les actions arrivent pile dans cette zone : « Watchparty »
+     s'écrivait en blanc sur blanc. On leur redonne un fond à eux. */
+  .coll-hero-actions .btn-ghost {
+    background: rgba(10, 11, 18, 0.62);
+    border-color: rgba(255, 255, 255, 0.28);
+  }
+
+  /* LA MENTION SOUS LE BOUTON TOMBAIT DANS LE CLAIR. Le voile du bandeau finit
+     sur la couleur de la page ; sur un grand écran cette mention est encore dans
+     le sombre, sur un téléphone le bandeau est deux fois plus court et elle
+     arrive pile sur le blanc — texte gris clair sur fond blanc, illisible. Une
+     pastille la rend lisible des deux côtés, quelle que soit la hauteur. */
+  /* ET ELLE RESTE UNE MENTION, pas un bouton. Les actions passent en colonne
+     étirée ; sans ça la pastille prenait toute la largeur et se lisait comme un
+     second bouton, juste sous le vrai. */
+  .coll-hero-channel {
+    align-self: center;
+    justify-content: center;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    background: rgba(10, 11, 18, 0.6);
+    color: rgba(255, 255, 255, 0.88);
+  }
+
+  /* LES CARTES D'INFORMATION DÉBORDAIENT. « Flash 512 Kb · 8 » se terminait
+     dans le vide : un enfant de flex ne rétrécit pas sous son contenu sans
+     qu'on le lui dise. */
+  .coll-cart,
+  .coll-gamecard-body {
+    flex-wrap: wrap;
+  }
+
+  .coll-cart-text,
+  .coll-gamecard-txt {
+    min-width: 0;
+    flex: 1 1 60%;
+  }
+
+  .coll-gamecard-shots a {
+    width: 148px;
+  }
+
+  /* Un titre de section et son compteur ne tiennent pas toujours côte à côte. */
+  .coll-section-title {
+    flex-wrap: wrap;
+  }
+}
+
+/* Très petits écrans : le boîtier passe au-dessus du titre plutôt que de lui
+   laisser cent pixels de large. */
+@media (max-width: 420px) {
+  .coll-hero-body {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.9rem;
+  }
+
+  .coll-hero-poster {
+    width: 118px;
+  }
+}

@@ -1,0 +1,704 @@
+/* ======================================================================
+   Activité — les deux fils, et le direct
+   ======================================================================
+   DEUX COLONNES, ET LA PLUS ÉTROITE EST LA PLUS IMPORTANTE. Le fil se lit en
+   descendant, il peut attendre ; le rail « en ce moment » se lit d'un coup d'œil
+   et appelle une action tout de suite — il est donc COLLANT, toujours à l'écran,
+   alors que le fil défile sous lui.
+
+   SUR TÉLÉPHONE, LE RAIL PASSE AU-DESSUS DU FIL. C'est le seul ordre honnête :
+   il tient en trois lignes quand le fil en fait cinq cents, et personne ne
+   remonte un fil pour voir qui est en ligne. Le balisage, lui, garde l'ordre de
+   lecture naturel (le fil d'abord, le rail ensuite) : c'est `order` qui le
+   remonte sur petit écran, pas une seconde copie du composant. */
+
+.acty {
+  display: grid;
+  grid-template-columns: minmax(0, 640px) 340px;
+  gap: 1.8rem;
+  justify-content: center;
+  align-items: start;
+}
+
+.acty-main {
+  min-width: 0;
+}
+
+/* ------------------------------------------------------------- l'en-tête -- */
+
+.acty-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.1rem;
+}
+
+.acty-title {
+  min-width: 0;
+}
+
+.acty-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-ink, #b98407);
+}
+
+.acty-title h1 {
+  margin: 0.15rem 0 0.1rem;
+  font-family: var(--font-display);
+  font-size: 1.85rem;
+  line-height: 1.1;
+}
+
+.acty-title p {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--text-soft);
+}
+
+/* --- les deux onglets ---
+   UN INTERRUPTEUR À DEUX POSITIONS, pas une barre de navigation : il n'y a que
+   deux fils, et la pastille qui glisse dit lequel est ouvert mieux qu'un
+   soulignement. */
+.acty-tabs {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.acty-tabs-ink {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  height: calc(100% - 8px);
+  border-radius: 999px;
+  background: var(--accent-grad);
+  box-shadow: 0 4px 12px rgba(234, 169, 8, 0.28);
+  transition: transform 0.24s cubic-bezier(0.2, 1, 0.3, 1);
+}
+
+.acty-tab {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.52rem 1.1rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.88rem;
+  white-space: nowrap;
+  color: var(--text-soft);
+  transition: color 0.18s ease;
+}
+
+.acty-tab.on {
+  color: #23180a;
+}
+
+.acty-tab:not(.on):hover {
+  color: var(--text);
+}
+
+/* La rangée d'avatars du filtre : elle n'appartient qu'au fil des amis. */
+.acty-filter:not(:empty) {
+  margin-bottom: 0.9rem;
+}
+
+/* Le fil du profil réutilisé ici n'a pas besoin de son rail de statistiques :
+   la colonne de droite est déjà prise par le direct, et deux rails côte à côte
+   écraseraient le fil à trois cents pixels. */
+.acty-main .pff-rail {
+  display: none;
+}
+
+.acty-main .pff-layout {
+  display: block;
+}
+
+/* ==================================================== en ce moment (rail) ==
+   COLLANT, parce que c'est la seule partie de la page qui parle du PRÉSENT :
+   elle doit rester sous les yeux pendant qu'on lit le passé. */
+.fnow {
+  position: sticky;
+  top: 84px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 0.95rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  min-width: 0;
+}
+
+.fnow-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.fnow-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+}
+
+/* Le point qui bat : c'est ce qui distingue un rail vivant d'une liste figée.
+   Deux couches — un point plein, un halo qui s'échappe — plutôt qu'une opacité
+   qui clignote, qui se lit comme un défaut d'affichage. */
+.fnow-pulse {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: #22c55e;
+}
+
+.fnow-pulse::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid #22c55e;
+  animation: fnow-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes fnow-ping {
+  from {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+.fnow-refresh {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-soft);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.fnow-refresh:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.fnow-load {
+  display: grid;
+  place-items: center;
+  min-height: 90px;
+  color: var(--text-soft);
+}
+
+.fnow-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.2rem 0.2rem;
+  text-align: center;
+  color: var(--text-soft);
+}
+
+.fnow-empty svg {
+  color: var(--border-strong);
+}
+
+.fnow-empty p {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+/* --- un groupe (jouent / regardent / lisent) --- */
+.fnow-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.fnow-group-title {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.15rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.fnow-group-title em {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 0.68rem;
+  letter-spacing: 0;
+  color: var(--text-soft);
+}
+
+/* Chaque famille a sa couleur, portée par l'icône du titre et la pastille des
+   avatars : on repère « qui joue » sans lire le mot. */
+.fnow-group.fam-play .fnow-group-title svg {
+  color: var(--accent-ink, #b98407);
+}
+
+.fnow-group.fam-watch .fnow-group-title svg {
+  color: #7c6ef2;
+}
+
+.fnow-group.fam-read .fnow-group-title svg {
+  color: #2fa4a0;
+}
+
+/* --- EN DIRECT : la seule ligne du rail qui se rejoint en tant que PUBLIC ---
+   D'où la jaquette et la pleine largeur : les autres lignes disent « il joue de
+   son côté », celle-ci dit « il y a quelque chose à regarder tout de suite ». */
+.fnow-group.fam-live .fnow-group-title svg {
+  color: #e0342b;
+}
+
+.fnow-live {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem;
+  border-radius: 12px;
+  text-decoration: none;
+  color: inherit;
+  background: color-mix(in srgb, #e0342b 8%, transparent);
+  border: 1px solid color-mix(in srgb, #e0342b 22%, transparent);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.fnow-live:hover {
+  background: color-mix(in srgb, #e0342b 14%, transparent);
+  transform: translateY(-1px);
+}
+
+.fnow-live-art {
+  position: relative;
+  width: 38px;
+  height: 52px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.fnow-live-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fnow-live-dot {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e0342b;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
+  animation: fnow-blink 1.6s ease-in-out infinite;
+}
+
+@keyframes fnow-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.fnow-live-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.fnow-live-txt strong {
+  font-size: 0.84rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fnow-live-txt em {
+  font-style: normal;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fnow-live-n {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: none;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #e0342b;
+  background: color-mix(in srgb, #e0342b 14%, transparent);
+}
+
+/* --- une personne --- */
+.fnow-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem;
+  border-radius: 10px;
+  transition: background 0.15s ease;
+}
+
+.fnow-row:hover {
+  background: var(--surface-2);
+}
+
+.fnow-who {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  flex: 1;
+  color: inherit;
+  text-decoration: none;
+}
+
+.fnow-av {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  flex: none;
+}
+
+.fnow-av img,
+.fnow-av-fb {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.fnow-av-fb {
+  display: grid;
+  place-items: center;
+  background: var(--accent-grad);
+  color: #23180a;
+  font-weight: 800;
+  font-size: 0.82rem;
+}
+
+/* La pastille verte est POSÉE SUR L'AVATAR, pas à côté : elle qualifie la
+   personne, pas la ligne. */
+.fnow-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 2px solid var(--surface);
+}
+
+.fnow-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fnow-txt strong {
+  font-size: 0.84rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fnow-txt em {
+  font-style: normal;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* LE BOUTON EST LA RAISON D'ÊTRE DU RAIL. Il ne sort pas au survol : sur
+   téléphone rien ne se survole, et c'est justement là qu'on rejoint. */
+.fnow-join {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: none;
+  padding: 0.32rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--accent-ink, #b98407);
+  background: color-mix(in srgb, var(--accent-ink, #eaa908) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-ink, #eaa908) 26%, transparent);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.fnow-join:hover {
+  background: var(--accent-grad);
+  color: #23180a;
+  border-color: transparent;
+}
+
+.fnow-since {
+  flex: none;
+  font-size: 0.68rem;
+  color: var(--text-soft);
+}
+
+/* --- ceux dont on ne sait rien : une rangée d'avatars, pas des lignes --- */
+.fnow-idle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding: 0.1rem 0.35rem;
+}
+
+.fnow-idle-av {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  overflow: hidden;
+  text-decoration: none;
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--border);
+  transition: transform 0.15s ease;
+}
+
+.fnow-idle-av:hover {
+  transform: translateY(-2px);
+}
+
+.fnow-idle-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fnow-idle-av span {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-weight: 700;
+  font-size: 0.76rem;
+}
+
+/* ============================================================ petit écran ==
+   Le rail passe AU-DESSUS du fil (il est premier dans le DOM), cesse d'être
+   collant — un bloc collant en tête d'une page qui défile mange l'écran — et
+   les groupes se serrent. */
+@media (max-width: 1080px) {
+  .acty {
+    grid-template-columns: minmax(0, 640px);
+  }
+
+  .fnow {
+    position: static;
+    order: -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .acty {
+    gap: 1.1rem;
+  }
+
+  .acty-head {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+
+  .acty-tabs {
+    width: 100%;
+  }
+
+  .acty-title h1 {
+    font-size: 1.5rem;
+  }
+
+  .fnow {
+    padding: 0.8rem;
+  }
+}
+
+/* ======================================================================
+   Les séances d'écoute dans le rail
+   ======================================================================
+   MÊME RANG QUE « EN DIRECT », AUTRE GESTE. Les deux se rejoignent tout de
+   suite, mais la diffusion GBA EMMÈNE sur une page (il y a une image à
+   regarder) là où une séance d'écoute ne fait que changer ce qui sort des
+   enceintes : on reste où l'on est, et c'est la barre de lecture qui prend le
+   relais. D'où un bouton qui agit sur place au lieu d'un lien. */
+.fnow-group.fam-listen .fnow-group-title svg {
+  color: #4bb3f5;
+}
+
+.fnow-sess {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.45rem;
+  border-radius: 12px;
+  background: color-mix(in srgb, #4bb3f5 8%, transparent);
+  border: 1px solid color-mix(in srgb, #4bb3f5 20%, transparent);
+  transition: background 0.15s ease;
+}
+
+.fnow-sess:hover {
+  background: color-mix(in srgb, #4bb3f5 13%, transparent);
+}
+
+/* Celle qu'on écoute déjà : cerclée, pour la retrouver dans une liste. */
+.fnow-sess.on {
+  border-color: color-mix(in srgb, #4bb3f5 55%, transparent);
+  background: color-mix(in srgb, #4bb3f5 16%, transparent);
+}
+
+/* La pochette tourne comme un disque — et seulement quand ça joue : arrêtée,
+   elle dit « en pause » sans un mot. */
+.fnow-sess-art {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.fnow-sess-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fnow-sess-art.spin img {
+  animation: fnow-disc 7s linear infinite;
+}
+
+@keyframes fnow-disc {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.fnow-sess-hole {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25) inset;
+}
+
+.fnow-sess-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  text-decoration: none;
+  color: inherit;
+}
+
+.fnow-sess-txt strong {
+  font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fnow-sess-txt em {
+  font-style: normal;
+  font-size: 0.71rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fnow-sess-n {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex: none;
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #2f8fd0;
+  background: color-mix(in srgb, #4bb3f5 16%, transparent);
+}
+
+/* Le même bouton que « Rejoindre », mais qui sort d'une séance : gris plutôt
+   que doré, parce que partir n'est pas l'action qu'on met en avant. */
+.fnow-join.leave {
+  color: var(--text-soft);
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+.fnow-join.leave:hover {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.fnow-join:disabled {
+  opacity: 0.55;
+}

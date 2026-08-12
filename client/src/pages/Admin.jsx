@@ -45,8 +45,10 @@ import {
   ScrollText,
   BellRing,
   Wrench,
+  Bell,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
+import AdminRingtones from "../components/AdminRingtones";
 import { applyGeoGlobe } from "../lib/geoGlobe";
 import { rarityColor, rarityLabel } from "../lib/rarity";
 import { useAuth } from "../context/AuthContext";
@@ -64,6 +66,10 @@ import PerroquetPanel from "../components/AdminPerroquet";
 // ======================================================================
 //  Page Admin — shell à onglets verticaux (façon Discord).
 // ======================================================================
+// ⚠️ AJOUTER UN ONGLET = L'AJOUTER ICI AUSSI. Cette liste blanche filtre le
+// `?tab=` de l'URL ; un onglet absent est silencieusement remplacé par
+// « users ». Le symptôme est déroutant — le bouton s'affiche, le clic change
+// bien l'adresse, et l'écran ne bouge pas.
 const TAB_KEYS = [
   "users",
   "push",
@@ -75,6 +81,7 @@ const TAB_KEYS = [
   "perroquet",
   "events",
   "collection",
+  "ringtones",
   "system",
   "logs",
   "secrets",
@@ -110,6 +117,7 @@ export default function Admin() {
     { key: "perroquet", label: "Perroquet", Icon: Mic2 },
     { key: "events", label: "Événements", Icon: CalendarDays },
     { key: "collection", label: "Collection", Icon: Library },
+    { key: "ringtones", label: "Sonneries", Icon: Bell },
     { key: "system", label: "Système", Icon: Activity },
     { key: "logs", label: "Logs", Icon: ScrollText },
     ...(isSuper ? [{ key: "secrets", label: "Secrets", Icon: KeyRound }] : []),
@@ -186,6 +194,7 @@ export default function Admin() {
           {safeTab === "perroquet" && <PerroquetPanel token={token} />}
           {safeTab === "events" && <EventsPanel token={token} />}
           {safeTab === "collection" && <CollectionPanel token={token} />}
+          {safeTab === "ringtones" && <AdminRingtones token={token} />}
           {safeTab === "system" && <SystemPanel token={token} />}
           {safeTab === "logs" && <LogsPanel token={token} isSuper={isSuper} />}
           {safeTab === "secrets" && isSuper && <SecretsPanel token={token} />}

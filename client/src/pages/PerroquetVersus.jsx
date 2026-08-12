@@ -24,10 +24,13 @@ import { useClipReel } from "../lib/clipReel";
 import { useEffectedUrls } from "../lib/clipFx";
 import { FxTag } from "../components/VoiceFxPicker";
 import { VersusInvite } from "../components/VersusRoom";
+import GameChat from "../components/GameChat";
 import PerroquetHold from "../components/PerroquetHold";
 import ContourChart from "../components/ContourChart";
 import SoundLibrary from "../components/SoundLibrary";
 import PerroquetDecor from "../components/PerroquetDecor";
+import VoiceCallBar from "../components/VoiceCallBar";
+import useVoiceCall from "../hooks/useVoiceCall";
 
 // ======================================================================
 //  Le Perroquet — versus
@@ -45,6 +48,17 @@ import PerroquetDecor from "../components/PerroquetDecor";
 // Le compte à rebours affiché est donc purement décoratif. Il se cale sur
 // `phaseEndsAt` corrigé de l'écart d'horloge (`now` du serveur), et quand il
 // atteint zéro… il ne se passe rien. C'est le serveur qui envoie la suite.
+//
+// ------------------------------------------------------------- L'APPEL VOCAL
+// Tout le monde est dans le même appel, et LE JEU COUPE LES MICROS AU BON
+// MOMENT (hooks/useVoiceCall.js). C'est la seule chose qui manquait pour que ce
+// mode se joue sans rien à côté : jusqu'ici il fallait un Discord ouvert, et
+// surtout se couper le micro à la main avant chaque imitation puis le rouvrir
+// pour la révélation — soixante gestes dans une partie de dix minutes, et il
+// suffisait d'un joueur distrait pour gâcher la manche de toute la table.
+//
+// La page ne fait qu'une chose là-dedans : dire QUAND on se tait, parce qu'elle
+// est la seule à connaître la phase.
 
 const PHASE_LABEL = {
   listen: "Écoute bien",
@@ -84,6 +98,30 @@ export default function PerroquetVersus() {
   const phase = room?.phase || "lobby";
   const round = room?.round || null;
   const me = room?.players?.find((p) => p.isMe) || null;
+
+  // ---------- L'appel vocal ----------
+  // Voir hooks/useVoiceCall.js. La SEULE chose qui se décide ici, c'est QUAND
+  // personne ne doit s'entendre — parce que c'est la page qui connaît la phase :
+  //
+  //   listen  le son à imiter passe dans les haut-parleurs. Un commentaire par
+  //           dessus, et la moitié de la table l'a mal entendu — sans recours,
+  //           la fenêtre ne se rejoue pas.
+  //   record  le moment pour lequel ce mode existe. Chacun crie dans sa cabine :
+  //           s'entendre imiter d'avance donnerait le ton aux suivants, et le
+  //           micro de l'imitation capte la pièce — la voix d'un autre sortie
+  //           des haut-parleurs finirait dans le fichier que le serveur note.
+  //
+  // Et surtout : à la RÉVÉLATION, tout se rouvre. C'est là qu'on rit, c'est le
+  // moment qu'on venait chercher.
+  const silent = phase === "listen" || phase === "record";
+  const call = useVoiceCall({
+    base: `/perroquet/versus/${code}/voice`,
+    room: code,
+    channel: "pqvoice",
+    token,
+    subscribe,
+    silent,
+  });
 
   const applyRoom = useCallback((r) => {
     if (!r) return;
@@ -433,6 +471,17 @@ export default function PerroquetVersus() {
         )}
 
         {phase === "done" && <Final room={room} onQuit={() => navigate("/arcade")} />}
+
+        {/* L'appel reste au même endroit d'un bout à l'autre de la partie : un
+            bouton de micro qui change de place est un bouton qu'on cherche
+            précisément au moment où on en a besoin. */}
+        <VoiceCallBar
+          call={call}
+          silent={silent}
+          silentLabel={
+            phase === "listen" ? "Silence, on écoute" : "Chacun dans sa cabine"
+          }
+        />
       </div>
 
       {/* La modale d'invitation est celle des quatre autres salons
@@ -446,6 +495,21 @@ export default function PerroquetVersus() {
           endpoint={`/perroquet/versus/${room.code}/invite`}
           title="Inviter au Perroquet"
           onClose={() => setShowInvite(false)}
+        />
+      )}
+
+      {/* Le chat du salon, EN PLUS du vocal : on n'a pas toujours un micro
+          ouvert, et pendant qu'un son passe tout le monde est coupé (voir plus
+          haut) — l'écrit est alors le seul moyen de réagir. Réservé à ceux qui
+          jouent, comme dans les trois autres salons. */}
+      {room && me && (
+        <GameChat
+          token={token}
+          code={code}
+          event="pqversus"
+          endpoint="/perroquet/versus"
+          players={room.players || []}
+          meId={user?.id ? String(user.id) : ""}
         />
       )}
 

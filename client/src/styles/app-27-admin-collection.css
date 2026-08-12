@@ -1956,3 +1956,194 @@
   color: #fff;
   font-size: 0.86rem;
 }
+
+/* ======================================================================
+   Désigner le jeu sur IGDB
+   ======================================================================
+   Une cartouche ne sait pas ce qu'elle contient (code de jeu, région, douze
+   caractères en capitales) : tout le reste — jaquette, résumé, éditeur, année —
+   se tapait à la main, fiche par fiche. On désigne le titre dans une liste, et
+   la fiche se remplit. Voir AdminIgdbPicker. */
+
+.adm-igdb {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.adm-igdb-search svg:last-child {
+  color: var(--text-soft);
+}
+
+.adm-igdb-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.adm-igdb-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.45rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  text-align: left;
+  background: var(--surface-2);
+  color: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.adm-igdb-row:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent-ink) 40%, transparent);
+  background: var(--surface);
+}
+
+.adm-igdb-row:disabled {
+  opacity: 0.5;
+}
+
+/* La jaquette EST le repère : à trois « Sonic Advance » de suite, c'est elle
+   qu'on reconnaît, pas l'année. */
+.adm-igdb-cover {
+  width: 40px;
+  height: 54px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--text-soft);
+}
+
+.adm-igdb-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.adm-igdb-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.adm-igdb-txt strong {
+  font-size: 0.86rem;
+}
+
+.adm-igdb-txt em {
+  font-style: normal;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+.adm-igdb-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex: none;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+
+.adm-igdb-picked {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent-ink) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-ink) 26%, transparent);
+}
+
+.adm-igdb-picked > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.adm-igdb-picked strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.86rem;
+}
+
+.adm-igdb-picked em {
+  font-style: normal;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+.adm-igdb-picked > button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-soft);
+}
+
+.adm-igdb-picked > button:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* Le bloc du tiroir d'édition : rattachement + remplissage au même endroit,
+   parce que l'un ne va pas sans l'autre. */
+.adm-igdb-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.9rem;
+  padding: 0.8rem;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.adm-igdb-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.adm-igdb-head strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.84rem;
+}
+
+/* « Tout réécrire » est un interrupteur DANGEREUX (il écrase un synopsis tapé à
+   la main) : il se lit en petit, à côté du titre, jamais à côté du bouton qui
+   déclenche — on ne le coche pas par réflexe. */
+.adm-igdb-force {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  cursor: pointer;
+}
+
+.adm-rom-cover-igdb {
+  opacity: 0.75;
+}

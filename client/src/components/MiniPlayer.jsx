@@ -19,8 +19,11 @@ import {
   Volume2,
   Volume1,
   VolumeX,
+  Radio,
+  LogOut,
 } from "lucide-react";
 import { usePlayer, usePlayerProgress } from "../context/PlayerContext";
+import { useListenParty } from "../context/ListenPartyContext";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
 import AddToPlaylistModal from "./AddToPlaylistModal";
@@ -51,6 +54,14 @@ export default function MiniPlayer() {
   // Contexte séparé : le mini-lecteur est le seul à se re-rendre au rythme de
   // la lecture (voir PlayerContext).
   const progress = usePlayerProgress();
+  // L'écoute en groupe. QUAND ON SUIT QUELQU'UN, LES COMMANDES SE VERROUILLENT :
+  // c'est l'hôte qui mène, et un bouton qui répond à moitié (on met en pause,
+  // le recalage relance trois secondes plus tard) serait pire qu'un bouton
+  // désactivé. Le bouton « quitter » est juste à côté, à un clic.
+  const listen = useListenParty();
+  const party = listen.party;
+  const following = listen.following;
+  const listeners = party?.listeners || [];
   const barRef = useRef(null);
   const [showQueue, setShowQueue] = useState(false);
   // Réduit en « bulle » façon Messenger : le son continue, on rouvre au clic.
@@ -226,6 +237,20 @@ export default function MiniPlayer() {
             {current.name}
           </span>
           <span className="mp-sub">
+            {/* La séance passe AVANT l'artiste : quand on écoute avec quelqu'un,
+                c'est l'information qui explique tout le reste — pourquoi la
+                piste a changé toute seule, pourquoi les boutons ne répondent
+                plus. */}
+            {party && (
+              <span className={`mp-party-tag ${following ? "guest" : ""}`}>
+                <Radio size={11} />
+                {following
+                  ? `Avec ${party.host?.username || "quelqu'un"}`
+                  : listeners.length
+                  ? `${listeners.length} à l'écoute`
+                  : "Séance ouverte"}
+              </span>
+            )}
             {current.artist && <span className="mp-artist">{current.artist}</span>}
             {current.gameId && (
               <Link to={`/game/${current.gameId}`} className="mp-game clickable">
@@ -236,12 +261,12 @@ export default function MiniPlayer() {
           </span>
         </div>
 
-        <div className="mp-controls">
+        <div className={`mp-controls ${following ? "locked" : ""}`}>
           <button
             className="mp-btn clickable"
             onClick={player.prev}
-            disabled={!hasPrev && progress.current < 3}
-            title="Précédent"
+            disabled={following || (!hasPrev && progress.current < 3)}
+            title={following ? "C'est l'hôte qui mène" : "Précédent"}
             aria-label="Précédent"
           >
             <SkipBack size={18} fill="currentColor" strokeWidth={0} />
@@ -249,7 +274,16 @@ export default function MiniPlayer() {
           <button
             className="mp-btn mp-play clickable"
             onClick={player.toggle}
-            title={playing ? "Pause" : loading ? "Chargement…" : "Lecture"}
+            disabled={following}
+            title={
+              following
+                ? `C'est ${party?.host?.username || "l'hôte"} qui mène la séance`
+                : playing
+                ? "Pause"
+                : loading
+                ? "Chargement…"
+                : "Lecture"
+            }
             aria-label={playing ? "Pause" : loading ? "Chargement" : "Lecture"}
           >
             {playing ? (
@@ -263,17 +297,21 @@ export default function MiniPlayer() {
           <button
             className="mp-btn clickable"
             onClick={player.next}
-            disabled={!hasNext}
-            title="Suivant"
+            disabled={following || !hasNext}
+            title={following ? "C'est l'hôte qui mène" : "Suivant"}
             aria-label="Suivant"
           >
             <SkipForward size={18} fill="currentColor" strokeWidth={0} />
           </button>
         </div>
 
-        <div className="mp-seek">
+        <div className={`mp-seek ${following ? "locked" : ""}`}>
           <span className="mp-time">{fmt(progress.current)}</span>
-          <div className="mp-bar" ref={barRef} onClick={onSeek}>
+          <div
+            className="mp-bar"
+            ref={barRef}
+            onClick={following ? undefined : onSeek}
+          >
             <div className="mp-bar-fill" style={{ width: `${pct}%` }}>
               <span className="mp-bar-knob" />
             </div>
@@ -282,6 +320,43 @@ export default function MiniPlayer() {
         </div>
 
         <div className="mp-actions">
+          {/* ---------------------- ÉCOUTER À PLUSIEURS ----------------------
+              Un seul bouton, trois états : ouvrir ma séance, la fermer (avec le
+              nombre de gens branchés dessus), ou quitter celle où je suis. Il
+              est ICI et pas ailleurs parce que la question ne se pose qu'une
+              fois la musique lancée — et que c'est le seul endroit de l'app qui
+              existe sur toutes les pages en même temps qu'elle. */}
+          {token &&
+            (following ? (
+              <button
+                className="mp-icon-btn mp-party leave clickable"
+                onClick={listen.stop}
+                title={`Quitter la séance de ${party?.host?.username || "l'hôte"}`}
+                aria-label="Quitter la séance d'écoute"
+              >
+                <LogOut size={17} />
+              </button>
+            ) : (
+              <button
+                className={`mp-icon-btn mp-party clickable ${party ? "on" : ""}`}
+                onClick={party ? listen.stop : listen.start}
+                disabled={listen.busy}
+                title={
+                  party
+                    ? listeners.length
+                      ? `Fermer la séance (${listeners.length} à l'écoute)`
+                      : "Fermer la séance d'écoute"
+                    : "Écouter à plusieurs : ouvrir une séance"
+                }
+                aria-label="Séance d'écoute"
+              >
+                <Radio size={17} />
+                {party && listeners.length > 0 && (
+                  <em className="mp-party-n">{listeners.length}</em>
+                )}
+              </button>
+            ))}
+
           {/* Cœur : définir cette piste comme OST favorite du jeu. */}
           {canLike && (
             <button

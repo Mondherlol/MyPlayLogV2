@@ -45,9 +45,11 @@ import {
   Send,
   ChevronDown,
   ChevronRight,
+  PhoneCall,
 } from "lucide-react";
 import { apiFetch, API_BASE } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import RingtonePicker from "../components/RingtonePicker";
 import { useLibrary } from "../context/LibraryContext";
 import SteamIcon from "../components/SteamIcon";
 import SteamImportModal from "../components/SteamImportModal";
@@ -75,6 +77,7 @@ const TAB_KEYS = [
   "appearance",
   "notifications",
   "privacy",
+  "calls",
 ];
 
 // Onglets de la page Paramètres (façon Discord / Steam). Les onglets marqués
@@ -84,6 +87,7 @@ const TABS = [
   { key: "tracking", label: "Tracking", Icon: Swords },
   { key: "feed", label: "Fil d'accueil", Icon: Newspaper },
   { key: "privacy", label: "Confidentialité", Icon: ShieldCheck },
+  { key: "calls", label: "Appels", Icon: PhoneCall },
   { key: "account", label: "Compte", Icon: UserCog, soon: true },
   { key: "appearance", label: "Apparence", Icon: Palette, soon: true },
   { key: "notifications", label: "Notifications", Icon: Bell, soon: true },
@@ -156,6 +160,7 @@ export default function Settings() {
           {tab === "tracking" && <TrackingPanel />}
           {tab === "feed" && <FeedPanel />}
           {tab === "privacy" && <PrivacyPanel onCount={setRequestCount} />}
+          {tab === "calls" && <CallsPanel />}
         </section>
       </div>
     </div>
@@ -176,6 +181,28 @@ function ImportsPanel() {
         <SteamCard />
         <PsnCard />
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+//  Appels — la sonnerie
+// ============================================================
+// Un onglet à part plutôt qu'une ligne noyée dans « Notifications » : une
+// sonnerie ne se règle pas comme on coche une case, ça s'ÉCOUTE, et il faut la
+// place pour une liste avec un bouton d'aperçu sur chaque ligne.
+function CallsPanel() {
+  return (
+    <div className="settings-section">
+      <h2 className="settings-section-title">
+        <PhoneCall size={20} /> Appels
+      </h2>
+      <p className="settings-section-sub">
+        Choisis ce que tu entends quand quelqu'un t'appelle — en privé comme dans
+        un groupe. Écoute avant de choisir : le bouton de gauche joue la sonnerie
+        exactement comme elle sonnera.
+      </p>
+      <RingtonePicker />
     </div>
   );
 }

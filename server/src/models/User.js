@@ -243,6 +243,43 @@ const userSchema = new mongoose.Schema(
       hideReviews: { type: Boolean, default: false }, // reviews hors des pages de jeux
     },
 
+    // --- Sonnerie d'appel ---
+    // Ce qu'ON entend quand quelqu'un nous appelle. C'est un réglage de
+    // RÉCEPTION, jamais d'émission : l'appelant n'impose pas sa sonnerie, sinon
+    // le premier plaisantin venu réveillerait la moitié du site avec un cri de
+    // Wilhelm.
+    //
+    //   default la sonnerie par défaut de l'app — celle que l'administrateur a
+    //           désignée dans la banque (models/Ringtone.js) ;
+    //   preset  une autre sonnerie de la banque, choisie explicitement ;
+    //   custom  son propre fichier, `url` porte alors son chemin.
+    //
+    // « synth » est l'ancien nom de `default`, du temps où la sonnerie d'origine
+    // était fabriquée par oscillateurs. Il reste accepté pour ne pas invalider
+    // les comptes créés avant, et se lit partout comme `default`.
+    //
+    // DEUX URLS, ET C'EST VOULU :
+    //
+    //   `url`   ce qui JOUE. Recopiée depuis la banque quand on choisit une
+    //           sonnerie commune — ainsi une sonnerie retirée de la banque
+    //           continue de sonner chez ceux qui l'avaient prise, au lieu de les
+    //           rendre muets sans prévenir.
+    //   `file`  MON fichier à moi, gardé même quand je n'écoute pas avec.
+    //           Sans lui, essayer une sonnerie de la banque effacerait le
+    //           fichier qu'on vient d'envoyer, et il faudrait le renvoyer pour
+    //           revenir dessus.
+    ringtone: {
+      source: {
+        type: String,
+        enum: ["default", "preset", "custom", "synth"],
+        default: "default",
+      },
+      preset: { type: mongoose.Schema.Types.ObjectId, ref: "Ringtone", default: null },
+      url: { type: String, default: null },
+      file: { type: String, default: null },
+      name: { type: String, default: "" },
+    },
+
     // --- Personnalisation du fil d'accueil ---
     // Familles de cartes que ce joueur ne veut PAS voir dans son fil (clés de
     // FEED_CATEGORIES, cf. lib/feedCategories.js). On garde la liste des
@@ -370,6 +407,15 @@ userSchema.methods.toPublic = function () {
       ornament: this.equipped?.ornament || null,
       badge: this.equipped?.badge || null,
       theme: this.equipped?.theme || null,
+    },
+    // La sonnerie voyage avec le compte : le client en a besoin AVANT le
+    // premier appel (on ne va pas charger un réglage pendant que ça sonne).
+    ringtone: {
+      source: this.ringtone?.source === "synth" ? "default" : this.ringtone?.source || "default",
+      preset: this.ringtone?.preset ? String(this.ringtone.preset) : null,
+      url: this.ringtone?.url || null,
+      file: this.ringtone?.file || null,
+      name: this.ringtone?.name || "",
     },
     followingCount: (this.following || []).length,
     privacy: {

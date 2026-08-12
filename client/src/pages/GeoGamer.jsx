@@ -170,6 +170,7 @@ export default function GeoGamer() {
   // discute (cf. lib/presence.js). Rien à nettoyer : le hook s'éteint seul.
   useLiveStatus("geo", rounds.length ? `manche ${idx + 1}/${rounds.length}` : "", {
     token,
+    path: "/geo",
   });
   const [score, setScore] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);

@@ -1,0 +1,558 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { apiFetch } from "../lib/api";
+import {
+  playCallEndSound,
+  playCallJoinSound,
+  playCallLeaveSound,
+  playCallStartSound,
+  playMicToggleSound,
+} from "../lib/sfx";
+import {
+  applyVoiceSignal,
+  connectPeer,
+  makePeerId,
+  makeSpeakingWatch,
+  makeVoiceSignaller,
+  openCallMic,
+} from "../lib/voiceCall";
+
+// ======================================================================
+//  Un appel vocal — de salon de jeu, de messagerie
+// ======================================================================
+// Ce hook tient le maillage (lib/voiceCall.js), la liste de qui est en ligne,
+// et une règle que la messagerie n'utilise pas mais qui est la raison d'être de
+// l'appel du Perroquet :
+//
+//   `silent` — un temps de la partie où PERSONNE ne s'entend.
+//
+// C'est la raison d'être du mode. Sur Discord, imiter un son à six demande de se
+// couper le micro, imiter, se remettre, écouter les autres, recommencer : soixante
+// gestes dans une partie de dix minutes, et il suffit d'un joueur qui oublie
+// pour que la manche soit gâchée — soit qu'on entende son cri d'avance, soit que
+// son commentaire couvre l'original. Ici la coupure suit la phase de jeu, donc
+// personne n'a rien à faire, et personne ne peut oublier.
+//
+// LA COUPURE SE FAIT AUX DEUX BOUTS, et ce n'est pas de la ceinture-bretelles :
+//   - on coupe SA PISTE SORTANTE  → les autres ne nous entendent pas ;
+//   - on coupe LES SONS ENTRANTS → nos haut-parleurs se taisent, et c'est
+//     indispensable pour une raison propre à ce jeu : le micro de l'imitation
+//     capte la pièce. Un participant dont le client n'aurait pas coupé sa piste
+//     se retrouverait dans NOTRE fichier, et le serveur noterait un mélange de
+//     deux voix.
+//
+// LA COUPURE N'EST PAS UN MUTE : `track.enabled = false` envoie du silence sur
+// une connexion qui reste debout. Retirer la piste demanderait de renégocier
+// toute la connexion à chaque manche — une seconde de blanc à chaque reprise de
+// parole, cinq fois par partie, pour six personnes.
+
+const PING_MS = 30_000;
+
+// ----------------------------------------------------------------------
+//  Le journal de l'appel
+// ----------------------------------------------------------------------
+// Un appel qui ne marche pas ne dit RIEN : les connexions échouent en silence,
+// et il n'y a aucun endroit où regarder. Ces lignes sont le seul moyen de
+// répondre à « je ne l'entends pas » autrement qu'en devinant — elles nomment
+// l'étape exacte qui a manqué (l'offre est-elle partie ? la piste est-elle
+// arrivée ? la connexion est-elle passée en `failed` ?).
+//
+// Elles ne sortent qu'en développement : en production, ce serait du bruit dans
+// la console de tout le monde, et elles n'apprendraient rien à personne.
+const log = import.meta.env.DEV
+  ? (...a) => console.info("%c[appel]", "color:#16a34a;font-weight:700", ...a)
+  : () => {};
+
+// Pourquoi le micro n'a pas marché, en une phrase qui dit quoi FAIRE. « Erreur :
+// NotAllowedError » n'aide personne ; les trois cas ci-dessous couvrent la
+// quasi-totalité des échecs réels et appellent trois gestes différents.
+function micProblem(e) {
+  if (e.name === "NotFoundError")
+    return "Aucun micro détecté. Branche un casque ou un micro, puis réessaie.";
+  if (e.name === "NotReadableError")
+    return "Le micro est déjà pris par une autre application (Discord, un autre onglet…).";
+  return "Micro refusé. Clique sur l'icône de caméra ou de cadenas dans la barre d'adresse pour l'autoriser.";
+}
+
+// ----------------------------------------------------------------------
+//  Un seul maillage, deux usages
+// ----------------------------------------------------------------------
+// Ce hook sert l'appel d'un salon du Perroquet ET les appels de la messagerie
+// (privés et de groupe). Rien de ce qui suit ne connaît l'un ou l'autre : ce
+// qui change entre les deux tient en trois valeurs.
+//
+//   base     le préfixe des routes (`/calls/<id>`, `/perroquet/versus/X/voice`)
+//   channel  le nom de l'évènement SSE à écouter (`call`, `pqvoice`)
+//   room     la valeur que porte le champ `code` des messages, pour ne pas
+//            appliquer à un appel les poignées de main d'un autre — deux appels
+//            ouverts en même temps dans deux onglets, c'est courant.
+//
+// `base` à `null` = pas d'appel : le hook existe (les règles de React
+// l'exigent) mais ne fait rien. C'est ce qui permet à la messagerie de le
+// monter une fois pour toutes, au-dessus des routes, sans savoir d'avance à qui
+// l'on parlera.
+export default function useVoiceCall({
+  base,
+  room,
+  channel = "pqvoice",
+  token,
+  subscribe,
+  silent = false,
+}) {
+  const [inCall, setInCall] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  // L'AUTORISATION DU MICRO EST UN ÉTAT À PART, pas un simple « ça charge ».
+  // C'est le seul moment où l'app attend un geste dans une fenêtre qu'elle ne
+  // dessine pas et qui n'est parfois même pas visible (elle s'ouvre en haut du
+  // navigateur, loin du bouton qu'on vient de cliquer). Sans le distinguer, on
+  // affiche un rond qui tourne pendant que l'utilisateur attend que l'app
+  // fasse quelque chose, et les deux s'attendent.
+  //   asking  la fenêtre du navigateur est ouverte, on attend le clic
+  //   denied  refusé (ou aucun micro) : il faut le rouvrir à la main
+  const [micState, setMicState] = useState("idle");
+  const [error, setError] = useState("");
+  const [muted, setMuted] = useState(false);
+  const [roster, setRoster] = useState([]); // les AUTRES : [{ peerId, userId, username, avatar, muted, state }]
+  const [speaking, setSpeaking] = useState({}); // peerId → parle en ce moment
+
+  const meRef = useRef(makePeerId());
+  const streamRef = useRef(null);
+  const signalRef = useRef(null);
+  const peersRef = useRef(new Map()); // peerId → { pc, session, info, audio }
+  const watchRef = useRef(null);
+  // peerId → { username, avatar, userId } : l'annuaire de la salle.
+  //
+  // Il existe parce que les deux informations n'arrivent pas par le même canal
+  // et pas dans l'ordre qui arrange : le SERVEUR annonce qui décroche (avec son
+  // nom et sa tête), le PAIR envoie son offre juste après. Sans annuaire, la
+  // connexion se crée sur l'offre — donc sans nom — et l'écran afficherait un
+  // rond gris anonyme jusqu'au battement suivant, trente secondes plus tard.
+  const idsRef = useRef(new Map());
+  const silentRef = useRef(silent);
+  const mutedRef = useRef(false);
+  const inCallRef = useRef(false);
+  // Les arrivées des premières secondes ne font PAS de bruit : entrer dans un
+  // appel où trois personnes discutent déclencherait trois « quelqu'un est
+  // arrivé » d'affilée, alors que personne n'est arrivé — c'est nous.
+  const settledAtRef = useRef(0);
+
+  // La liste affichée est reconstruite depuis la table des connexions : une
+  // seule source de vérité, sinon un pair fermé reste à l'écran en « Connexion… »
+  // pour toujours.
+  const sync = useCallback(() => {
+    setRoster(
+      [...peersRef.current.entries()].map(([peerId, p]) => ({
+        peerId,
+        ...(idsRef.current.get(peerId) || {}),
+        ...p.info,
+        state: p.state || "new",
+      }))
+    );
+  }, []);
+
+  // L'annuaire se remplit dès qu'une identité passe, d'où qu'elle vienne.
+  const remember = useCallback((peer) => {
+    if (!peer?.peerId) return;
+    idsRef.current.set(peer.peerId, {
+      userId: peer.userId,
+      username: peer.username,
+      avatar: peer.avatar,
+      muted: !!peer.muted,
+    });
+  }, []);
+
+  // ---------- Le son entrant ----------
+  // Une balise par pair, posée dans le document. `new Audio()` détaché suffit
+  // sur Chrome mais pas partout : une balise réellement attachée est le seul
+  // montage que tous les navigateurs jouent sans discuter.
+  const attachAudio = useCallback((peerId, stream) => {
+    const p = peersRef.current.get(peerId);
+    if (!p) return;
+    let el = p.audio;
+    if (!el) {
+      el = document.createElement("audio");
+      el.autoplay = true;
+      el.playsInline = true;
+      el.style.display = "none";
+      document.body.appendChild(el);
+      p.audio = el;
+    }
+    const first = !el.srcObject;
+    log("piste reçue de", peerId, "· pistes audio:", stream?.getAudioTracks?.().length);
+    el.srcObject = stream;
+    el.muted = silentRef.current;
+    if (first && Date.now() > settledAtRef.current) playCallJoinSound();
+    el.play().catch(() => {
+      // L'autoplay est normalement acquis (on entre dans un appel par un clic),
+      // mais un onglet en arrière-plan au moment où le flux arrive peut le
+      // refuser. Le prochain geste sur la page relance la lecture — sans ce
+      // rattrapage, la personne reste muette jusqu'à ce qu'on raccroche.
+      const retry = () => {
+        el.play().catch(() => {});
+        document.removeEventListener("pointerdown", retry);
+      };
+      document.addEventListener("pointerdown", retry, { once: true });
+    });
+    watchRef.current?.add(peerId, stream);
+  }, []);
+
+  const dropPeer = useCallback(
+    (peerId) => {
+      const p = peersRef.current.get(peerId);
+      if (!p) return;
+      try {
+        p.pc.close();
+      } catch {
+        /* déjà fermée */
+      }
+      if (p.audio) {
+        // Le son de départ ne se joue que pour quelqu'un qu'on ENTENDAIT :
+        // une connexion qui échoue avant d'aboutir n'est pas un départ.
+        if (p.audio.srcObject && inCallRef.current) playCallLeaveSound();
+        p.audio.srcObject = null;
+        p.audio.remove();
+      }
+      watchRef.current?.remove(peerId);
+      peersRef.current.delete(peerId);
+      sync();
+    },
+    [sync]
+  );
+
+  // ---------- Une connexion vers quelqu'un ----------
+  const link = useCallback(
+    (info, offer = null, session = null) => {
+      const to = info.peerId;
+      if (!streamRef.current || !signalRef.current) return;
+      if (info.username) remember(info);
+      const existing = peersRef.current.get(to);
+      if (existing) {
+        // Une offre sous le MÊME numéro est un doublon (l'évènement est passé
+        // deux fois) : la rejouer ferait tomber une connexion qui marche.
+        if (!offer || existing.session === session) return;
+        // Sous un AUTRE numéro, c'est le même pair qui revient (rechargement,
+        // changement de réseau) : l'ancienne est morte, on ne la sauve pas.
+        dropPeer(to);
+      }
+
+      // Pas d'identité recopiée dans l'entrée : `sync` la relit dans l'annuaire
+      // à chaque passage, donc un nom qui arrive après la connexion apparaît
+      // tout seul.
+      // `initiator` : est-ce NOUS qui avons lancé cette connexion ? C'est ce
+      // qui décide qui a le droit de retenter en cas d'échec (voir plus bas).
+      log(offer ? "je réponds à" : "j'appelle", to);
+      const entry = { info: {}, state: "connecting", audio: null, initiator: !offer };
+      peersRef.current.set(to, entry);
+      const { pc, session: sid } = connectPeer({
+        stream: streamRef.current,
+        to,
+        offer,
+        session,
+        signal: signalRef.current,
+        onStream: (stream) => attachAudio(to, stream),
+        onState: (state) => {
+          const cur = peersRef.current.get(to);
+          if (!cur) return;
+          cur.state = state;
+          log("connexion avec", to, "→", state);
+
+          // ⚠️ UNE CONNEXION QUI ÉCHOUE NE FAIT PLUS DISPARAÎTRE LA PERSONNE.
+          //
+          // On la retirait, et c'était le pire choix possible : à l'écran, elle
+          // repassait en « pas encore décroché » alors qu'elle avait décroché,
+          // et on cherchait pourquoi on ne l'entendait pas sans le moindre
+          // indice. Elle reste maintenant affichée, marquée en échec — et on
+          // retente UNE fois.
+          //
+          // Seul CELUI QUI A APPELÉ retente : si les deux côtés refaisaient une
+          // offre, elles se croiseraient et la réparation empêcherait la
+          // reconnexion qu'elle cherche à obtenir.
+          if (state === "failed" && cur.initiator && !cur.retried) {
+            cur.retried = true;
+            const info = idsRef.current.get(to);
+            setTimeout(() => {
+              if (!inCallRef.current || !peersRef.current.has(to)) return;
+              dropPeer(to);
+              link({ peerId: to, ...(info || {}) });
+            }, 1200);
+          }
+          // « closed » est notre propre fermeture (on a raccroché avec ce pair) :
+          // là, la ligne n'a plus de raison d'être.
+          if (state === "closed") dropPeer(to);
+          else sync();
+        },
+      });
+      entry.pc = pc;
+      entry.session = sid;
+      sync();
+    },
+    [attachAudio, dropPeer, sync]
+  );
+
+  // ---------- Décrocher ----------
+  const join = useCallback(async () => {
+    if (inCallRef.current || connecting || !base) return;
+    setConnecting(true);
+    setError("");
+    // L'ÉCRAN « AUTORISE TON MICRO » NE S'AFFICHE PAS TOUT DE SUITE, et c'est
+    // tout l'intérêt de ce minuteur : quand l'autorisation est DÉJÀ accordée,
+    // `getUserMedia` répond en quelques dizaines de millisecondes et le
+    // navigateur n'affiche rien du tout. Passer en « asking » sans attendre
+    // faisait clignoter un panneau d'explication d'une demi-seconde à chaque
+    // appel, pour une fenêtre qui ne s'est jamais ouverte.
+    //
+    // Au-delà de ce délai, en revanche, c'est que le navigateur POSE la
+    // question — et là il faut dire où regarder.
+    const ask = setTimeout(() => setMicState("asking"), 400);
+    try {
+      streamRef.current = await openCallMic();
+      clearTimeout(ask);
+      setMicState("ready");
+      // Le micro de l'appel démarre coupé si la partie est déjà dans une phase
+      // silencieuse : décrocher au milieu d'une fenêtre d'enregistrement ne doit
+      // pas lâcher un « allô ? » dans le fichier de cinq personnes.
+      for (const t of streamRef.current.getAudioTracks()) t.enabled = !silentRef.current;
+
+      signalRef.current = makeVoiceSignaller({
+        base,
+        token,
+        peerId: meRef.current,
+      });
+      watchRef.current = makeSpeakingWatch(setSpeaking);
+      watchRef.current.add(meRef.current, streamRef.current);
+
+      const d = await apiFetch(`${base}/join`, {
+        method: "POST",
+        token,
+        body: { peerId: meRef.current },
+      });
+      log("entré dans l'appel · pairs déjà présents:", (d.peers || []).length);
+      inCallRef.current = true;
+      // Une seconde et demie de grâce : le temps que les connexions déjà en
+      // place s'ouvrent sans être annoncées comme des arrivées.
+      settledAtRef.current = Date.now() + 1500;
+      setInCall(true);
+      playCallStartSound();
+      // C'est L'ARRIVANT qui offre, à chacun de ceux qui étaient déjà là.
+      for (const peer of d.peers || []) {
+        remember(peer);
+        link(peer);
+      }
+    } catch (e) {
+      streamRef.current?.getTracks?.().forEach((t) => t.stop());
+      streamRef.current = null;
+      signalRef.current?.stop();
+      signalRef.current = null;
+      watchRef.current?.stop();
+      watchRef.current = null;
+      clearTimeout(ask);
+      const refused =
+        e.name === "NotAllowedError" ||
+        e.name === "NotFoundError" ||
+        e.name === "NotReadableError";
+      setMicState(refused ? "denied" : "idle");
+      setError(
+        refused
+          ? micProblem(e)
+          : e.message || "Impossible de rejoindre l'appel."
+      );
+    } finally {
+      setConnecting(false);
+    }
+  }, [base, token, connecting, link, remember]);
+
+  // ---------- Raccrocher ----------
+  const leave = useCallback(() => {
+    if (!inCallRef.current || !base) return;
+    inCallRef.current = false;
+    // Le mot de départ part sans qu'on attende la réponse : on est peut-être en
+    // train de fermer l'onglet, et de toute façon le battement finirait par
+    // faire le ménage (server/src/lib/voiceRooms.js).
+    apiFetch(`${base}/leave`, {
+      method: "POST",
+      token,
+      body: { peerId: meRef.current },
+    }).catch(() => {});
+    for (const peerId of [...peersRef.current.keys()]) dropPeer(peerId);
+    streamRef.current?.getTracks?.().forEach((t) => t.stop());
+    streamRef.current = null;
+    signalRef.current?.stop();
+    signalRef.current = null;
+    watchRef.current?.stop();
+    watchRef.current = null;
+    setInCall(false);
+    setSpeaking({});
+    // Le micro coupé ne se garde PAS d'un appel à l'autre : arriver muet dans
+    // l'appel suivant sans l'avoir demandé, c'est parler deux minutes dans le
+    // vide avant de comprendre.
+    mutedRef.current = false;
+    setMuted(false);
+    setMicState("idle");
+    playCallEndSound();
+  }, [base, token, dropPeer]);
+
+  // On raccroche en quittant la page : un onglet qui garde le micro ouvert
+  // après qu'on soit parti est un comportement qu'on n'accepterait de personne.
+  useEffect(() => () => leave(), [leave]);
+
+  // ---------- La coupure, et le bouton de micro ----------
+  // Le même effet pour les deux : ce que la piste sortante doit faire ne dépend
+  // que de « la phase me fait taire » OU « j'ai coupé mon micro ».
+  useEffect(() => {
+    silentRef.current = silent;
+    const on = !silent && !mutedRef.current;
+    for (const t of streamRef.current?.getAudioTracks?.() || []) t.enabled = on;
+    for (const p of peersRef.current.values()) if (p.audio) p.audio.muted = silent;
+  }, [silent]);
+
+  const toggleMute = useCallback(() => {
+    const next = !mutedRef.current;
+    mutedRef.current = next;
+    setMuted(next);
+    playMicToggleSound(!next);
+    for (const t of streamRef.current?.getAudioTracks?.() || [])
+      t.enabled = !next && !silentRef.current;
+    apiFetch(`${base}/mute`, {
+      method: "POST",
+      token,
+      body: { peerId: meRef.current, muted: next },
+    }).catch(() => {
+      /* l'état partagé n'a pas suivi : ma piste, elle, est bien coupée */
+    });
+  }, [base, token]);
+
+  // ---------- Le direct ----------
+  useEffect(() => {
+    if (!subscribe || !room) return undefined;
+    return subscribe((event, data) => {
+      if (event !== channel || String(data?.code) !== String(room)) return;
+      if (!inCallRef.current) return;
+
+      if (data.kind === "joined") {
+        // On n'offre PAS : c'est l'arrivant qui appelle. On retient juste son
+        // nom, qui arrive AVANT son offre — c'est tout l'objet de l'annuaire.
+        if (data.peer?.peerId !== meRef.current) {
+          remember(data.peer);
+          sync();
+        }
+        return;
+      }
+
+      if (data.kind === "left") {
+        if (data.peerId !== meRef.current) {
+          idsRef.current.delete(data.peerId);
+          dropPeer(data.peerId);
+        }
+        return;
+      }
+
+      if (data.kind === "peers") {
+        for (const peer of data.peers || []) remember(peer);
+        sync();
+        return;
+      }
+
+      if (data.kind !== "signal" || data.to !== meRef.current) return;
+      const from = data.from;
+      const payload = data.data || {};
+      const existing = peersRef.current.get(from);
+
+      if (payload.sdp?.type === "offer") {
+        link({ peerId: from }, payload.sdp, payload.session);
+        return;
+      }
+      // Réponse ou candidats : ils n'ont de sens que sur la connexion en cours.
+      // Tout ce qui porte un autre numéro de session appartient à une poignée de
+      // main périmée — l'appliquer casserait la bonne, en silence.
+      if (!existing || (payload.session && existing.session !== payload.session)) return;
+      applyVoiceSignal(existing.pc, payload).catch(() => {
+        // Description arrivée dans un état qui ne l'attend plus : la connexion
+        // se rétablira au battement suivant plutôt que de laisser tomber une
+        // promesse dans le vide.
+      });
+    });
+  }, [subscribe, room, channel, link, dropPeer, sync, remember]);
+
+  // ---------- Le chien de garde de la lecture ----------
+  // UNE BALISE <audio> PEUT S'ARRÊTER TOUTE SEULE, et sans rien dire : onglet
+  // passé en arrière-plan, système qui reprend la main sur la sortie audio,
+  // périphérique débranché, politique d'économie d'énergie. La piste continue
+  // d'arriver, l'indicateur « qui parle » s'allume — et on n'entend rien.
+  // C'est exactement le « par moments on n'entend plus » qu'on ne sait jamais
+  // reproduire.
+  //
+  // Trois secondes : assez rare pour ne rien coûter, assez fréquent pour que le
+  // trou ne dure pas plus d'une phrase.
+  useEffect(() => {
+    if (!inCall) return undefined;
+    const id = setInterval(() => {
+      for (const p of peersRef.current.values()) {
+        if (p.audio?.srcObject && p.audio.paused) p.audio.play().catch(() => {});
+      }
+    }, 3000);
+    return () => clearInterval(id);
+  }, [inCall]);
+
+  // ---------- Le battement ----------
+  // Il dit « je suis toujours là » ET sert de rattrapage : si un pair est dans
+  // la salle sans qu'on soit reliés (un évènement perdu, une connexion tombée
+  // au mauvais moment), on rétablit. UN SEUL DES DEUX appelle — celui dont
+  // l'identifiant est le plus grand — sinon les deux offres se croiseraient et
+  // la réparation ne réparerait rien.
+  useEffect(() => {
+    if (!inCall) return undefined;
+    const id = setInterval(async () => {
+      try {
+        const d = await apiFetch(`${base}/ping`, {
+          method: "POST",
+          token,
+          body: { peerId: meRef.current },
+        });
+        for (const peer of d.peers || []) {
+          if (peer.peerId === meRef.current) continue;
+          remember(peer);
+          if (!peersRef.current.has(peer.peerId) && meRef.current > peer.peerId) link(peer);
+        }
+        sync();
+      } catch {
+        /* le salon est clos ou le réseau a sauté : le prochain battement dira */
+      }
+    }, PING_MS);
+    return () => clearInterval(id);
+  }, [inCall, base, token, link, sync, remember]);
+
+  // Ce qu'on affiche : moi d'abord, puis les autres. Un micro coupé ne « parle »
+  // jamais, quoi que dise l'analyseur — pendant la coupure, l'indicateur
+  // continuerait sinon à s'allumer sur quelqu'un que personne n'entend, ce qui
+  // est exactement le contresens que ce mode vient corriger.
+  const participants = useMemo(() => {
+    const quiet = silent || muted;
+    return [
+      {
+        peerId: meRef.current,
+        isMe: true,
+        muted,
+        state: "connected",
+        speaking: !quiet && !!speaking[meRef.current],
+      },
+      ...roster.map((p) => ({
+        ...p,
+        isMe: false,
+        speaking: !silent && !p.muted && !!speaking[p.peerId],
+      })),
+    ];
+  }, [roster, speaking, muted, silent]);
+
+  return {
+    inCall,
+    connecting,
+    micState,
+    error,
+    muted,
+    silent,
+    participants,
+    others: roster.length,
+    join,
+    leave,
+    toggleMute,
+  };
+}

@@ -20,6 +20,7 @@ import {
   allIds,
   findPlayer,
 } from "../lib/versusRoom.js";
+import { mountGameChat, gameChatSystem, gameChatReset } from "../lib/gameChat.js";
 
 // ======================================================================
 //  Pixel Rush VERSUS
@@ -425,6 +426,7 @@ router.post("/:code/join", async (req, res) => {
       await room.save();
       await room.populate(POPULATE);
       toEachRoom(room, "lobby");
+      gameChatSystem("pxversus", room, "join", findPlayer(room, req.userId)?.user);
       return { room };
     });
     if (!out) return res.status(404).json({ error: "Ce salon n'existe plus." });
@@ -460,6 +462,7 @@ router.post("/:code/leave", async (req, res) => {
       await room.save();
       await room.populate(POPULATE);
       toEachRoom(room, "lobby");
+      gameChatSystem("pxversus", room, "leave", me.user);
       const round = curRound(room);
       if (room.phase === "round" && round && shouldEndEarly(room, round))
         return endRound(room);
@@ -729,6 +732,9 @@ router.post("/:code/again", async (req, res) => {
       touch(room);
       await room.save();
       await room.populate(POPULATE);
+      // Nouvelle partie, fil neuf : les vannes de la précédente n'ont plus de
+      // contexte une fois le tableau des scores effacé.
+      gameChatReset("pxversus", room.code);
       toEachRoom(room, "lobby");
       return { room };
     });
@@ -739,6 +745,9 @@ router.post("/:code/again", async (req, res) => {
     res.status(500).json({ error: "Erreur." });
   }
 });
+
+// Le chat du salon (lib/gameChat.js) : GET/POST /:code/chat.
+mountGameChat(router, { event: "pxversus", load: loadRoom });
 
 // ============================================================
 //  Inviter

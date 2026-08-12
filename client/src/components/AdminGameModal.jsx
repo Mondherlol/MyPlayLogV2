@@ -14,6 +14,7 @@ import {
 import { apiUpload } from "../lib/api";
 import { CONSOLE, LICENCES } from "../lib/collection";
 import { Modal, Section } from "./AdminSheet";
+import IgdbPicker from "./AdminIgdbPicker";
 import { shrinkImageFile, fmtBytes } from "../lib/imageFile";
 
 // ======================================================================
@@ -52,6 +53,7 @@ export default function GameModal({ token, onClose, onDone }) {
     licence: "official",
     color: "#f2b70b",
   });
+  const [game, setGame] = useState(null); // le jeu désigné sur IGDB
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [read, setRead] = useState(null); // ce que la cartouche a dit d'elle
@@ -86,6 +88,30 @@ export default function GameModal({ token, onClose, onDone }) {
     );
   }
 
+  // ------------------------------------------------------------ IGDB --
+  //
+  // ON REMPLIT LE FORMULAIRE, ON N'ENVOIE PAS DIRECTEMENT. L'admin voit ce qui
+  // va être écrit et peut le corriger avant de poser le boîtier — un titre
+  // français, un synopsis qu'on préfère plus court, une année de réédition. Un
+  // enrichissement qui saute cette étape écrit des fiches que personne n'a lues.
+  //
+  // ET ON N'ÉCRASE PAS CE QUI EST DÉJÀ TAPÉ : si l'admin a commencé à écrire, ce
+  // qu'il a mis gagne. IGDB comble les trous.
+  function takeGame(g) {
+    setGame(g);
+    setDraft((d) => ({
+      ...d,
+      title: d.title || g.name || "",
+      // Le résumé traduit s'il existe déjà en cache (voir /games/:id/full) :
+      // une fiche française mérite un texte français.
+      synopsis: d.synopsis || g.summaryFr || g.summary || "",
+      franchise: d.franchise || g.franchise || "",
+      publisher: d.publisher || (g.publishers || [])[0] || "",
+      authors: d.authors || (g.developers || []).join(", "),
+      year: d.year || (g.year ? String(g.year) : ""),
+    }));
+  }
+
   // La jaquette est fortement conseillée : rien dans le fichier ne pourra la
   // remplacer. Elle est allégée avant l'envoi comme partout ailleurs — un scan de
   // jaquette pèse couramment plusieurs mégaoctets.
@@ -110,6 +136,19 @@ export default function GameModal({ token, onClose, onDone }) {
       const fd = new FormData();
       fd.append("rom", file, file.name);
       if (cover) fd.append("cover", cover.file, cover.file.name || "cover.jpg");
+      if (game) {
+        // Le rattachement : c'est lui qui relie ce boîtier à la vraie fiche du
+        // jeu (note, avis, OST, listes) — voir la fiche de l'étagère.
+        fd.append("igdbId", String(game.id));
+        fd.append("igdbName", game.name || "");
+        fd.append("genres", (game.genres || []).map((x) => x.name || x).join(", "));
+        if (game.rating != null) fd.append("rating", String(game.rating / 10));
+        // Les adresses des visuels : le serveur les télécharge chez nous. Une
+        // jaquette déposée à la main reste prioritaire (il ne va la chercher que
+        // si aucun fichier n'est joint).
+        if (game.cover) fd.append("coverUrl", game.cover);
+        if (game.backdrop) fd.append("backdrop", game.backdrop);
+      }
       for (const [k, v] of Object.entries(draft)) {
         if (v === "" || v === null) continue;
         fd.append(k, String(v));
@@ -271,16 +310,45 @@ export default function GameModal({ token, onClose, onDone }) {
 
       <Section
         step={2}
+        title="Le jeu"
+        hint="Désigne-le sur IGDB : jaquette, résumé, éditeur, année et saga se remplissent seuls — et le boîtier devient cliquable vers la fiche du jeu."
+      >
+        <IgdbPicker
+          token={token}
+          current={game}
+          onPick={takeGame}
+          onClear={() => setGame(null)}
+        />
+        {game && (
+          <p className="adm-coll-hint">
+            La fiche ci-dessous a été pré-remplie ; corrige ce que tu veux, rien
+            n'est encore écrit. La jaquette et le bandeau viendront d'IGDB si tu
+            n'en déposes pas.
+          </p>
+        )}
+      </Section>
+
+      <Section
+        step={3}
         title="La jaquette"
-        hint="À déposer : une cartouche GBA ne porte aucune icône, contrairement à une cartouche DS. Sans jaquette, le boîtier est peint à partir de sa seule teinte."
+        hint="Facultative dès qu'un jeu IGDB est désigné : la sienne fera l'affaire. À déposer sinon — une cartouche GBA ne porte aucune icône, et sans jaquette le boîtier est peint à partir de sa seule teinte."
       >
         <div className="adm-rom-cover">
           <button
             type="button"
             className="adm-rom-cover-slot clickable"
             onClick={() => coverRef.current?.click()}
+            title={cover ? "Remplacer la jaquette" : "Déposer une jaquette"}
           >
-            {cover ? <img src={cover.url} alt="" /> : <ImagePlus size={20} />}
+            {cover ? (
+              <img src={cover.url} alt="" />
+            ) : game?.cover ? (
+              /* Celle d'IGDB, en attendant : c'est elle qui sera posée si l'on
+                 ne dépose rien. La montrer évite de croire le boîtier nu. */
+              <img src={game.cover} alt="" className="adm-rom-cover-igdb" />
+            ) : (
+              <ImagePlus size={20} />
+            )}
           </button>
           <div>
             <p className="adm-coll-hint">
@@ -312,9 +380,9 @@ export default function GameModal({ token, onClose, onDone }) {
       </Section>
 
       <Section
-        step={3}
+        step={4}
         title="La fiche"
-        hint="Le titre est proposé d'après le nom du fichier — corrige-le. Le reste est facultatif et se rattrape depuis le tiroir d'édition."
+        hint="Pré-remplie par IGDB quand un jeu est désigné, sinon par le nom du fichier. Tout se rattrape ensuite depuis le tiroir d'édition."
       >
         <label className="adm-coll-field">
           <span>Titre</span>

@@ -35,6 +35,8 @@ import perroquetSoundRoutes from "./routes/perroquetSounds.js";
 import perroquetAdminRoutes from "./routes/perroquetAdmin.js";
 import imposteurRoutes from "./routes/imposteur.js";
 import presenceRoutes from "./routes/presence.js";
+import gbaStreamRoutes from "./routes/gbaStream.js";
+import listenRoutes from "./routes/listen.js";
 import arcadeRoutes from "./routes/arcade.js";
 import steamRoutes from "./routes/steam.js";
 import psnRoutes from "./routes/psn.js";
@@ -49,6 +51,8 @@ import downloadRoutes from "./routes/downloads.js";
 import trackerRoutes, { startTrackerAutoSync } from "./routes/trackers.js";
 import missionRoutes from "./routes/missions.js";
 import chatRoutes from "./routes/chat.js";
+import callRoutes from "./routes/calls.js";
+import ringtoneRoutes from "./routes/ringtones.js";
 import collectionRoutes from "./routes/collection.js";
 import watchPartyRoutes from "./routes/watchparty.js";
 import settingsRoutes from "./routes/settings.js";
@@ -140,6 +144,12 @@ app.use("/api/perroquet", perroquetRoutes);
 // L'INTÉRIEUR du routeur, où `GET /leaderboard` doit passer avant `GET /:code`.
 app.use("/api/imposteur", imposteurRoutes);
 app.use("/api/presence", presenceRoutes);
+// Diffuser sa partie GBA : signalisation WebRTC + la manette qu'on passe.
+app.use("/api/gba-stream", gbaStreamRoutes);
+// Écouter à plusieurs : l'hôte pose des repères de lecture, les autres suivent.
+// Aucun audio ne transite ici (voir lib/listenRooms.js), d'où l'absence de
+// drapeau de section — c'est le mini-lecteur, qui existe partout.
+app.use("/api/listen", listenRoutes);
 app.use("/api/arcade", arcadeRoutes);
 app.use("/api/steam", steamRoutes);
 app.use("/api/psn", psnRoutes);
@@ -179,6 +189,10 @@ app.use(
 app.use("/api/watchparty", watchPartyRoutes);
 // Messagerie (DM + groupes). Contient le flux temps réel SSE /api/chat/stream.
 app.use("/api/chat", chatRoutes);
+// Les appels vocaux de la messagerie. À part de /api/chat, dont le routeur
+// porte des chemins à deux segments qui happeraient les nôtres.
+app.use("/api/calls", callRoutes);
+app.use("/api/ringtones", ringtoneRoutes);
 // Remontée des crashs du front (voir routes/clientErrors.js).
 app.use("/api/client-errors", clientErrorRoutes);
 

@@ -30,6 +30,7 @@ import { useChat } from "../context/ChatContext";
 import { apiFetch } from "../lib/api";
 import { useLiveStatus } from "../lib/presence";
 import { playHeatTick, playRejectSound, playRewardSound } from "../lib/sfx";
+import GameChat from "../components/GameChat";
 
 // ======================================================================
 //  Mot du jour — devine le mot par la proximité de sens.
@@ -402,7 +403,7 @@ export default function MotDuJour() {
   useLiveStatus(
     "mot",
     done ? "" : best ? `${Math.round(best.temp)}°${inSession ? " · à plusieurs" : ""}` : "",
-    { token, active: !done }
+    { token, active: !done, path: "/mot" }
   );
 
   // Diffusion de ce que je tape, à cadence bornée.
@@ -896,6 +897,22 @@ export default function MotDuJour() {
           meId={user?.id}
           session={session}
           onClose={() => setShowInvite(false)}
+        />
+      )}
+
+      {/* Le chat de la table — seulement à plusieurs : en solo il n'y a
+          personne à qui parler. Les membres arrivent enveloppés (`m.user`),
+          d'où la mise à plat pour le tiroir, qui attend des joueurs. */}
+      {session?.joined && (
+        <GameChat
+          token={token}
+          code={session.code}
+          event="mot"
+          endpoint="/mot/session"
+          players={(session.members || [])
+            .filter((m) => m.active)
+            .map((m) => m.user)}
+          meId={user?.id ? String(user.id) : ""}
         />
       )}
     </div>

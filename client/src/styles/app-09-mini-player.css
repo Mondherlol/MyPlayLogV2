@@ -800,3 +800,99 @@ body.mpl-open .app-content {
 .mp-confirm-text strong {
   color: var(--text);
 }
+
+/* ======================================================================
+   Écouter à plusieurs
+   ======================================================================
+   LA SÉANCE SE MONTRE DANS LA BARRE, PAS DANS UNE PAGE. Rejoindre quelqu'un ne
+   change rien à l'écran — c'est le son qui change — donc tout ce qui la
+   raconte tient ici : avec qui on écoute, combien sont branchés, et comment on
+   s'en va. */
+
+/* L'étiquette de séance, dans la ligne du sous-titre. Elle passe AVANT
+   l'artiste : c'est elle qui explique pourquoi la piste a changé toute seule. */
+.mp-party-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  flex: none;
+  padding: 0.1rem 0.42rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: #ffd24a;
+  background: rgba(255, 210, 74, 0.14);
+}
+
+/* Invité : une autre couleur que la sienne, pour distinguer d'un coup d'œil
+   « ma séance » de « la séance de quelqu'un d'autre ». */
+.mp-party-tag.guest {
+  color: #8fd9ff;
+  background: rgba(143, 217, 255, 0.16);
+}
+
+.mp-party {
+  position: relative;
+}
+
+/* Séance ouverte : le bouton reste allumé tant qu'on diffuse. Le point qui
+   respire dit que ça vit — un bouton simplement coloré passerait pour un état
+   décoratif de plus. */
+.mp-party.on {
+  color: #ffd24a;
+}
+
+.mp-party.on::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 210, 74, 0.5);
+  animation: mp-party-pulse 2s ease-in-out infinite;
+}
+
+@keyframes mp-party-pulse {
+  50% {
+    opacity: 0.25;
+    transform: scale(1.12);
+  }
+}
+
+.mp-party.leave {
+  color: #8fd9ff;
+}
+
+/* Le compteur d'auditeurs, collé au bouton. */
+.mp-party-n {
+  position: absolute;
+  top: -1px;
+  right: -2px;
+  min-width: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  font-style: normal;
+  font-size: 0.6rem;
+  font-weight: 800;
+  line-height: 14px;
+  text-align: center;
+  color: #1a1204;
+  background: #ffd24a;
+}
+
+/* ---------- Quand on suit quelqu'un : les commandes se verrouillent ----------
+   Elles restent VISIBLES et grisées plutôt que masquées : un lecteur amputé de
+   ses boutons ressemble à un lecteur cassé, alors qu'un bouton éteint dit qu'il
+   y a une raison — que l'info-bulle et l'étiquette « Avec untel » donnent. */
+.mp-controls.locked .mp-btn:disabled {
+  opacity: 0.3;
+}
+
+.mp-seek.locked .mp-bar {
+  cursor: var(--cursor-default), auto;
+  opacity: 0.75;
+}
+
+.mp-seek.locked .mp-bar-knob {
+  display: none;
+}

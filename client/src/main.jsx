@@ -12,6 +12,8 @@ import { LibraryProvider } from "./context/LibraryContext.jsx";
 import { PlayerProvider } from "./context/PlayerContext.jsx";
 import { CosmeticsProvider } from "./context/CosmeticsContext.jsx";
 import { ChatProvider } from "./context/ChatContext.jsx";
+import { CallProvider } from "./context/CallContext.jsx";
+import { ListenPartyProvider } from "./context/ListenPartyContext.jsx";
 
 // Capture les erreurs non-rattrapées (hors rendu React) et les remonte au
 // backend, pour diagnostiquer les crashs qui n'arrivent que sur certains
@@ -31,6 +33,11 @@ createRoot(document.getElementById("root")).render(
                 pour que le son et les pop-up de message marchent partout dans
                 l'app, pas seulement sur /messages. */}
             <ChatProvider>
+              {/* Les appels vocaux (privés et de groupe) : juste sous la
+                  messagerie, dont ils empruntent le flux temps réel. Au-dessus
+                  des routes parce qu'un appel n'est pas une page — ça sonne
+                  n'importe où, et on continue de naviguer en parlant. */}
+              <CallProvider>
               {/* Curseur & cosmétiques gagnés à l'arcade : au-dessus des routes,
                   l'apparence équipée vaut pour toute l'app. */}
               <CosmeticsProvider>
@@ -39,10 +46,16 @@ createRoot(document.getElementById("root")).render(
                       routes pour survivre à TOUTE navigation (y compris /game/:id
                       et /u/:username, servis hors du layout connecté). */}
                   <PlayerProvider>
-                    <App />
+                    {/* Écouter à plusieurs : au-dessus des routes comme le
+                        lecteur qu'il pilote — une séance d'écoute n'est pas une
+                        page, elle continue pendant qu'on navigue. */}
+                    <ListenPartyProvider>
+                      <App />
+                    </ListenPartyProvider>
                   </PlayerProvider>
                 </LibraryProvider>
               </CosmeticsProvider>
+              </CallProvider>
             </ChatProvider>
           </AuthProvider>
         </ThemeProvider>

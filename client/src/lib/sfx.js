@@ -721,3 +721,103 @@ export function playRewardSound() {
     /* le son est un bonus : jamais bloquant */
   }
 }
+
+// ======================================================================
+//  Les appels vocaux
+// ======================================================================
+// Cinq bruitages pour la messagerie et l'appel du Perroquet. Ils forment une
+// FAMILLE, et c'est la seule chose qui compte ici : mêmes timbres, mêmes
+// durées, et une grammaire qu'on n'a pas besoin d'apprendre —
+//
+//   ÇA MONTE = quelqu'un arrive, on se connecte ;
+//   ÇA DESCEND = quelqu'un part, ça se termine.
+//
+// Sans cette règle, deux notes dans un appel ne veulent rien dire : on tourne la
+// tête vers l'écran à chaque fois pour savoir ce qui vient de se passer. Avec,
+// on sait sans regarder si le troisième larron vient d'arriver ou de partir.
+//
+// TOUS EN RETRAIT (gain 0.05–0.09). Ils se jouent PENDANT une conversation :
+// un bruitage qui couvre la voix de quelqu'un est un bruitage raté, et on les
+// entend beaucoup plus souvent qu'un son de récompense.
+
+// L'appel est décroché, la connexion est établie. Une quinte montante : le
+// « allô » de l'interface.
+export function playCallStartSound() {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    const t = ac.currentTime + 0.01;
+    note(ac, { freq: 523.25, start: t, dur: 0.12, gain: 0.07, type: "sine" });
+    note(ac, { freq: 783.99, start: t + 0.1, dur: 0.26, gain: 0.075, type: "sine" });
+  } catch {
+    /* le son est un bonus : jamais bloquant */
+  }
+}
+
+// On a raccroché. La même quinte, à l'envers et plus grave : la fin de quelque
+// chose, pas une erreur — d'où l'absence de dissonance.
+export function playCallEndSound() {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    const t = ac.currentTime + 0.01;
+    note(ac, { freq: 587.33, start: t, dur: 0.12, gain: 0.06, type: "sine" });
+    note(ac, { freq: 392, start: t + 0.1, dur: 0.3, gain: 0.065, type: "sine" });
+  } catch {
+    /* idem */
+  }
+}
+
+// Quelqu'un d'autre vient d'entrer dans l'appel. Deux notes brèves qui montent,
+// plus courtes et plus hautes que le décrochage : c'est un évènement de fond,
+// il ne doit pas être confondu avec sa propre connexion.
+export function playCallJoinSound() {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    const t = ac.currentTime + 0.01;
+    note(ac, { freq: 880, start: t, dur: 0.08, gain: 0.055, type: "sine" });
+    note(ac, { freq: 1174.66, start: t + 0.07, dur: 0.16, gain: 0.05, type: "sine" });
+  } catch {
+    /* idem */
+  }
+}
+
+// Quelqu'un est parti. Le miroir exact du précédent.
+export function playCallLeaveSound() {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    const t = ac.currentTime + 0.01;
+    note(ac, { freq: 1174.66, start: t, dur: 0.08, gain: 0.05, type: "sine" });
+    note(ac, { freq: 880, start: t + 0.07, dur: 0.16, gain: 0.045, type: "sine" });
+  } catch {
+    /* idem */
+  }
+}
+
+// Le micro qu'on coupe et qu'on rouvre. Presque rien — une seule note très
+// courte, sourde quand on coupe, claire quand on rouvre. Ce n'est pas de la
+// coquetterie : c'est ce qui confirme le geste quand le bouton est hors du
+// regard (panneau replié, appel en arrière-plan).
+export function playMicToggleSound(on) {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (!ac) return;
+    const t = ac.currentTime + 0.005;
+    note(ac, {
+      freq: on ? 740 : 415.3,
+      start: t,
+      dur: 0.07,
+      gain: 0.05,
+      type: "sine",
+    });
+  } catch {
+    /* idem */
+  }
+}

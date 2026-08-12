@@ -18,6 +18,7 @@ import { triggerMissionCheck } from "../lib/missions.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { geminiJson, isGeminiConfigured } from "../lib/gemini.js";
 import { IMG, person } from "./blindtest.js";
+import { mountGameChat, gameChatSystem } from "../lib/gameChat.js";
 import {
   isReady,
   load,
@@ -1114,6 +1115,7 @@ router.post("/session/:code/join", requireAuth, async (req, res) => {
     const full = await MotSession.findById(session._id).populate(SESSION_POPULATE);
     const me = await User.findById(req.userId).select("username avatar").lean();
     broadcast(full, "members", { joined: person(me), tries: full.tries });
+    gameChatSystem("mot", full, "join", me);
     res.json({ session: publicSession(full, day, req.userId) });
   } catch (err) {
     console.error("mot session join error:", err.message);
@@ -1144,6 +1146,7 @@ async function leaveSession(session, userId, play, { save = true } = {}) {
   // n'apprend rien, « Marine est repartie en solo » si.
   const who = await User.findById(userId).select("username avatar").lean();
   broadcast(session, "members", { left: person(who) });
+  gameChatSystem("mot", session, "leave", who);
   return true;
 }
 
@@ -1379,6 +1382,24 @@ router.post("/session/:code/typing", requireAuth, async (req, res) => {
     // Un indicateur de frappe qui échoue ne doit jamais remonter à l'écran.
     res.json({ ok: true });
   }
+});
+
+// Le chat de la table (lib/gameChat.js) : GET/POST /session/:code/chat.
+//
+// Il ne fait pas doublon avec les propositions, qui s'affichent déjà pour tout
+// le monde : un mot proposé n'est pas une phrase, et c'est justement autour de
+// la table qu'on veut dire « arrête avec les animaux, c'est plus froid ».
+//
+// Les membres vivent dans `members[]` et non dans `players[]`, et
+// l'authentification est posée route par route dans ce fichier : d'où les deux
+// réglages ci-dessous.
+mountGameChat(router, {
+  event: "mot",
+  base: "/session/:code",
+  load: loadSession,
+  memberIds: (s) => activeMembers(s).map((m) => String(m.user?._id || m.user)),
+  find: memberOf,
+  auth: requireAuth,
 });
 
 // POST /api/mot/session/:code/invite — les cartes d'invitation.

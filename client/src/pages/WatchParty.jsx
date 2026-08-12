@@ -27,6 +27,7 @@ import WatchPartyStage from "../components/WatchPartyStage";
 import WatchPartyChat from "../components/WatchPartyChat";
 import WatchPartyPicker from "../components/WatchPartyPicker";
 import WatchPartyInvite from "../components/WatchPartyInvite";
+import { useLiveStatus } from "../lib/presence";
 
 // ======================================================================
 //  /watchparty/:code — la salle
@@ -71,6 +72,15 @@ export default function WatchParty() {
   // puisque le lecteur branché n'est connu que de la séance vidéo.
   const [mode, setMode] = useState(null); // { piloted, label, host }
   const onMode = useCallback((m) => setMode(m), []);
+
+  // « Regarde une séance · <titre> » dans le rail des gens qui me suivent.
+  // SANS LIEN DE REJOINTE, et c'est délibéré : le code de la salle EST
+  // l'invitation (voir routes/watchparty.js). Le publier auprès de tous ses
+  // abonnés ferait entrer dans le salon des gens que personne n'a invités.
+  useLiveStatus("watchparty", media?.title || "", {
+    token,
+    active: status === "ready" && !ended,
+  });
 
   useEffect(() => {
     if (params.get("invite") !== "1" || status !== "ready") return;

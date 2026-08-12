@@ -100,6 +100,10 @@ export function PlayerProvider({ children }) {
   const ytDivRef = useRef(null);
   const ytPromiseRef = useRef(null);
   const loadedRef = useRef(null); // videoId actuellement chargé
+  // Position de DÉPART de la prochaine piste chargée, en secondes. Sert à
+  // l'écoute en groupe : celui qui se branche en cours de route doit tomber là
+  // où en est l'hôte, pas au début du morceau (voir ListenPartyContext).
+  const startAtRef = useRef(0);
   const queueRef = useRef(queue);
   const indexRef = useRef(index);
   const playingRef = useRef(playing);
@@ -411,11 +415,19 @@ export function PlayerProvider({ children }) {
   // instantané), et sur mobile la bascule vers le flux extrait est armée.
   useEffect(() => {
     if (!current) return;
-    if (loadedRef.current === current.videoId) return;
+    if (loadedRef.current === current.videoId) {
+      // Relancée sur la piste DÉJÀ chargée : rien à charger, mais la position de
+      // départ demandée doit être oubliée — sinon elle s'appliquerait au
+      // morceau suivant, qui démarrerait mystérieusement en plein milieu.
+      startAtRef.current = 0;
+      return;
+    }
     loadedRef.current = current.videoId;
     setLoading(true);
-    setProgress({ current: 0, duration: 0 });
-    loadInYT(current.videoId);
+    const from = startAtRef.current;
+    startAtRef.current = 0; // ne vaut que pour CE chargement
+    setProgress({ current: from, duration: 0 });
+    loadInYT(current.videoId, from);
     if (IS_MOBILE && !failedRef.current.has(current.videoId))
       armSwap(current.videoId);
   }, [current, loadInYT, armSwap]);
@@ -475,6 +487,8 @@ export function PlayerProvider({ children }) {
   // Lance une piste en construisant une file à partir d'une liste (les pistes
   // injouables sont filtrées). L'index pointe sur la piste cliquée.
   // meta.source (optionnel) : origine de la file, affichée par le mini-lecteur.
+  // meta.startAt (optionnel, secondes) : démarrer en cours de piste — l'écoute
+  // en groupe s'en sert pour faire tomber l'arrivant là où en est l'hôte.
   const playFromList = useCallback(
     (track, list, meta = {}) => {
       const items = (Array.isArray(list) && list.length ? list : [track])
@@ -489,10 +503,11 @@ export function PlayerProvider({ children }) {
         ? items.findIndex((t) => t.videoId === target.videoId)
         : 0;
       if (start < 0) start = 0;
+      startAtRef.current = Math.max(0, Number(meta.startAt) || 0);
       setQueue(items);
       setIndex(start);
       setSource(meta.source || null);
-      setProgress({ current: 0, duration: 0 });
+      setProgress({ current: startAtRef.current, duration: 0 });
     },
     [unlockAudio]
   );
@@ -727,6 +742,12 @@ export function PlayerProvider({ children }) {
       toggleTrack,
       toggle,
       pause,
+      // `play` et `seekTo` ne servaient qu'en interne : l'écoute en groupe les
+      // demande explicitement (« l'hôte a repris », « l'hôte a sauté à 2:14 »),
+      // là où `toggle` ne dit qu'« inverse », ce qui désynchronise dès qu'un des
+      // deux côtés s'est trompé d'un cran.
+      play: playActive,
+      seekTo,
       next,
       prev,
       seekFraction,
@@ -749,6 +770,8 @@ export function PlayerProvider({ children }) {
       toggleTrack,
       toggle,
       pause,
+      playActive,
+      seekTo,
       next,
       prev,
       seekFraction,

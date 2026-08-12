@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Loader2, Users, VenetianMask } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useLiveStatus } from "../lib/presence";
 import { apiFetch } from "../lib/api";
 
 // ======================================================================
@@ -19,6 +20,11 @@ import { apiFetch } from "../lib/api";
 
 export default function Imposteur() {
   const { token } = useAuth();
+
+  // Le HALL s'annonce, pas le salon : un code de salon est une invitation
+  // privée, le publier à tous ses abonnés reviendrait à ouvrir la porte à des
+  // gens qu'on n'a pas invités. Ici on dit seulement « je cherche une partie ».
+  useLiveStatus("imposteur", "cherche une partie", { token, path: "/imposteur" });
   const navigate = useNavigate();
   const [rounds, setRounds] = useState(3);
   const [code, setCode] = useState("");

@@ -4099,3 +4099,747 @@ body.mpl-open .chat-dock {
     width: 100%;
   }
 }
+
+/* ======================================================================
+   Les appels vocaux
+   ======================================================================
+   Trois morceaux : la modale qui sonne, le panneau d'appel en cours, et le
+   bandeau « appel en cours » d'une conversation. */
+
+/* ---------------------------------------------------------- ça sonne */
+.ring-veil {
+  position: fixed;
+  inset: 0;
+  /* Au-dessus de TOUT, modales de jeu comprises : un appel qu'on ne voit pas
+     est un appel raté. */
+  z-index: 6000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: color-mix(in srgb, #000 62%, transparent);
+  backdrop-filter: blur(3px);
+  animation: ring-in 0.18s ease;
+}
+@keyframes ring-in {
+  from { opacity: 0; }
+}
+.ring-card {
+  width: min(340px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 22px 20px;
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  text-align: center;
+}
+
+.ring-av {
+  position: relative;
+  width: 92px;
+  height: 92px;
+  margin-bottom: 10px;
+  display: grid;
+  place-items: center;
+}
+.ring-av img,
+.ring-ph {
+  position: relative;
+  z-index: 1;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2, var(--surface));
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+}
+/* Les ondes partent DE la photo et se dissipent. Décalées d'un tiers de cycle
+   chacune : c'est le décalage qui fait « ça sonne » plutôt que « ça clignote ». */
+.ring-wave {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--orange);
+  opacity: 0;
+  animation: ring-wave 2.1s ease-out infinite;
+}
+.ring-wave.w2 { animation-delay: 0.7s; }
+.ring-wave.w3 { animation-delay: 1.4s; }
+@keyframes ring-wave {
+  0% { transform: scale(1); opacity: 0.55; }
+  100% { transform: scale(1.75); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ring-wave { animation: none; opacity: 0.3; }
+}
+
+.ring-who {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  color: var(--text);
+}
+.ring-what {
+  font-size: 0.84rem;
+  color: var(--text-soft);
+  margin-bottom: 18px;
+}
+
+.ring-actions {
+  display: flex;
+  gap: 28px;
+}
+.ring-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  border: none;
+  background: transparent;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+}
+.ring-btn svg {
+  width: 56px;
+  height: 56px;
+  padding: 17px;
+  border-radius: 50%;
+  color: #fff;
+  transition: transform 0.12s ease;
+}
+.ring-btn:hover svg { transform: scale(1.06); }
+.ring-btn.no svg { background: #dc2626; }
+.ring-btn.yes svg {
+  background: #16a34a;
+  /* Le bouton vert respire : dans une pièce, c'est ce qu'on cherche des yeux. */
+  animation: ring-pulse 1.6s ease-in-out infinite;
+}
+@keyframes ring-pulse {
+  50% { box-shadow: 0 0 0 10px rgba(22, 163, 74, 0.16); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ring-btn.yes svg { animation: none; }
+}
+.ring-btn em { font-style: normal; }
+
+/* ------------------------------------------------ l'appel en cours */
+.call-panel {
+  position: fixed;
+  /* La position vient du JS (hooks/useDraggable.js) : on ne fixe donc NI
+     `right` NI `bottom` ici, sinon le panneau serait tiré des deux côtés à la
+     fois et refuserait de bouger. */
+  z-index: 5200; /* sous la sonnerie, au-dessus des fenêtres de discussion */
+  width: min(288px, calc(100vw - 20px));
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  /* AUCUN DÉGRADÉ. Il y en a eu un, vert, en tête de panneau : il salissait le
+     thème clair et jurait avec le doré du site en thème sombre. Le panneau vit
+     sur la surface de l'app comme les fenêtres de discussion ; la couleur de
+     l'appel se joue sur la pastille d'état et les boutons, là où elle porte une
+     information. */
+  background: var(--surface);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.26);
+  overflow: hidden;
+  /* Le déplacement ne doit jamais sélectionner le texte du panneau au passage. */
+  user-select: none;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+/* Pendant le déplacement la fenêtre se soulève : c'est le seul retour qui dit
+   « tu la tiens » sur un écran tactile, où il n'y a pas de curseur. */
+.call-panel.dragging {
+  box-shadow: 0 26px 60px rgba(0, 0, 0, 0.36);
+  transform: scale(1.015);
+  transition: none;
+}
+.call-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 10px 9px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: grab;
+}
+.call-panel.dragging .call-head { cursor: grabbing; }
+/* La poignée : discrète au repos, elle s'affirme au survol. Sa seule raison
+   d'être est de DIRE que la fenêtre se déplace — sans elle, personne n'essaie. */
+.call-grip {
+  flex: 0 0 auto;
+  color: var(--text-soft);
+  opacity: 0.4;
+  transition: opacity 0.15s ease;
+}
+.call-head:hover .call-grip { opacity: 0.9; }
+.call-fold {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-soft);
+}
+.call-fold:hover { background: var(--surface-2, var(--surface)); color: var(--text); }
+.call-body { display: flex; flex-direction: column; }
+.call-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #16a34a;
+  animation: call-blink 2s ease-in-out infinite;
+}
+/* Personne au bout pour l'instant : la pastille passe à l'orange et bat plus
+   vite. Vert = quelqu'un parle avec toi, orange = ça sonne encore. */
+.call-dot.wait { background: var(--orange); animation-duration: 1s; }
+@keyframes call-blink {
+  50% { opacity: 0.3; }
+}
+.call-title {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Le décompte, dans la barre de titre. Une pastille et pas du texte : elle
+   tient dans la largeur d'un chiffre, donc elle survit au titre le plus long
+   sans jamais le pousser hors de la fenêtre. */
+.call-count {
+  flex: 0 0 auto;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, #16a34a 18%, transparent);
+  color: #16a34a;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.call-time {
+  flex: 0 0 auto;
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-soft);
+}
+
+/* CENTRÉ, et pas aligné à gauche : à deux — le cas le plus fréquent, un appel
+   privé — deux têtes collées dans le coin gauche laissent un grand vide à
+   droite. Au centre, l'appel a l'air d'être entre ces deux personnes. */
+.call-people {
+  list-style: none;
+  margin: 0;
+  padding: 6px 11px 8px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px 12px;
+}
+.call-people li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 52px;
+  font-size: 0.66rem;
+  color: var(--text-soft);
+}
+.call-people li em {
+  font-style: normal;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.call-av {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  /* L'anneau est TOUJOURS là, transparent au repos : le faire apparaître ferait
+     sauter les têtes de deux pixels à chaque syllabe. */
+  box-shadow: 0 0 0 2px transparent;
+  transition: box-shadow 0.12s ease;
+}
+.call-av img,
+.call-av i {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2, var(--surface));
+  color: var(--text-soft);
+  font-style: normal;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.call-people li.talking .call-av {
+  box-shadow: 0 0 0 2px #16a34a, 0 0 0 6px rgba(22, 163, 74, 0.16);
+}
+.call-people li.talking em { color: var(--text); }
+
+/* ---- CEUX QUI N'ONT PAS ENCORE DÉCROCHÉ ----
+   En creux, et ça respire doucement. Le mouvement est LENT et de faible
+   amplitude : c'est une attente, pas une alerte — un rebond marqué donnerait
+   l'impression qu'il faut faire quelque chose, alors qu'il n'y a qu'à
+   patienter. Le contour en pointillés dit « la place est réservée ». */
+.call-people li.ghost { opacity: 0.45; }
+.call-people li.ghost .call-av {
+  outline: 1.5px dashed var(--border-strong);
+  outline-offset: 2px;
+  animation: call-ghost 2.4s ease-in-out infinite;
+}
+.call-people li.ghost img,
+.call-people li.ghost i { filter: grayscale(0.65); }
+@keyframes call-ghost {
+  0%, 100% { transform: translateY(0); opacity: 0.75; }
+  50% { transform: translateY(-4px); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .call-people li.ghost .call-av { animation: none; }
+}
+/* Un pair encore en cours de connexion respire : « ça arrive » plutôt que
+   « c'est cassé ». */
+.call-people li.wait .call-av { animation: call-blink 1.2s ease-in-out infinite; }
+/* PRÉSENT, MAIS PAS ENCORE ENTENDU. La personne a décroché (le serveur la
+   compte) et le son n'arrive pas encore : c'est un état à part entière, très
+   différent d'un fantôme qui n'a pas répondu. Un anneau doré qui tourne le dit
+   sans un mot — il ne dure normalement qu'une seconde ou deux. */
+.call-people li.linking .call-av {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--orange) 60%, transparent);
+  animation: call-blink 1.1s ease-in-out infinite;
+}
+/* Connexion perdue : rouge et immobile. Pas d'animation — ça ne « travaille »
+   plus, et un halo qui pulse ferait croire que si. */
+.call-people li.broken .call-av { box-shadow: 0 0 0 2px #dc2626; }
+.call-people li.broken em { color: #dc2626; }
+.call-people li.wait { opacity: 0.5; }
+/* LE BADGE « MICRO COUPÉ » PASSE DEVANT LA PHOTO.
+   Il se retrouvait dessous, donc invisible : la photo est peinte après lui dans
+   l'ordre du document, et sans `z-index` sur une pile où tout est au même
+   niveau, c'est le dernier qui gagne. Il porte aussi un cercle plein aux
+   couleurs du panneau — posé à même une photo, un pictogramme rouge se perd
+   dans n'importe quelle image un peu chargée. */
+.call-av-off {
+  position: absolute;
+  z-index: 2;
+  right: -4px;
+  bottom: -4px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  background: #dc2626;
+  color: #fff;
+}
+
+.call-note {
+  margin: 0;
+  padding: 0 11px 9px;
+  font-size: 0.73rem;
+  color: var(--text-soft);
+}
+.call-note.bad { color: #dc2626; }
+
+.call-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 9px;
+  border-top: 1px solid var(--border);
+}
+.call-btn {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.call-btn:hover { border-color: var(--orange); color: var(--accent-ink); }
+.call-btn.off { border-color: #dc2626; color: #dc2626; }
+.call-btn:disabled { opacity: 0.45; }
+.call-btn.hang { background: #dc2626; border-color: #dc2626; color: #fff; }
+.call-btn.hang:hover { background: #b91c1c; border-color: #b91c1c; }
+
+/* ---------------------------- « autorise ton micro » ---------------------- */
+.call-gate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 16px 12px;
+  text-align: center;
+}
+.call-gate b { font-family: var(--font-display); font-size: 0.92rem; }
+.call-gate p {
+  margin: 0;
+  font-size: 0.73rem;
+  line-height: 1.4;
+  color: var(--text-soft);
+}
+.call-gate-ico {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  color: var(--accent-ink);
+}
+.call-gate.bad .call-gate-ico {
+  background: color-mix(in srgb, #dc2626 13%, transparent);
+  color: #dc2626;
+}
+/* Ça pulse tant qu'on attend le clic : le panneau doit avoir l'air d'attendre
+   quelque chose, pas d'être planté. */
+.call-gate-ping {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--orange);
+  opacity: 0;
+  animation: ring-wave 1.8s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .call-gate-ping { animation: none; opacity: 0.35; }
+}
+.call-gate-retry {
+  margin-top: 2px;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--text);
+}
+.call-gate-retry:hover { border-color: var(--orange); color: var(--accent-ink); }
+
+/* Replié, on ne garde que la barre de titre et les deux boutons : de quoi
+   raccrocher et se couper le micro sans déplier. */
+.call-panel.folded .call-actions { border-top: none; padding-top: 0; }
+
+/* ------------------------------------ « un appel tourne dans ce fil » */
+.chat-callbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, #16a34a 10%, transparent);
+  color: var(--text);
+  font-size: 0.8rem;
+  text-align: left;
+}
+.chat-callbar:hover { background: color-mix(in srgb, #16a34a 16%, transparent); }
+.chat-callbar-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #16a34a;
+  animation: call-blink 2s ease-in-out infinite;
+}
+.chat-callbar b { font-family: var(--font-display); }
+.chat-callbar em {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-style: normal;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-callbar-go {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: #16a34a;
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Le bouton d'appel de l'en-tête passe au vert quand il y a quelqu'un au bout :
+   c'est ce qui transforme « appeler » en « rejoindre » sans un mot de plus. */
+.chat-head-btn.ringing { color: #16a34a; }
+
+/* Sur téléphone on ne REPOSITIONNE plus rien : la fenêtre se déplace au doigt,
+   et lui imposer une place ici la rendrait immobile (une position fixée en CSS
+   gagne contre le style en ligne du déplacement). On se contente de la
+   rétrécir, pour qu'elle laisse voir la page derrière. */
+@media (max-width: 560px) {
+  .call-panel { width: min(240px, calc(100vw - 20px)); }
+  .call-people li { width: 46px; }
+  .call-av { width: 38px; height: 38px; }
+}
+
+/* Le bouton d'appel de la fenêtre flottante passe au vert quand il y a
+   quelqu'un au bout : « appeler » devient « rejoindre » sans un mot de plus. */
+.chat-win-btn.ringing { color: #16a34a; }
+
+
+/* ======================================================================
+   Les sonneries
+   ======================================================================
+   Le même bloc sert l'écran du joueur (Paramètres → Appels) et celui de
+   l'administration (banque commune) : c'est la même liste, avec deux boutons de
+   plus à droite côté admin. Deux feuilles pour deux variantes d'une même liste
+   auraient dérivé au premier ajustement. */
+.rt-wrap { display: flex; flex-direction: column; gap: 14px; }
+.rt-state { display: grid; place-items: center; padding: 26px; color: var(--text-soft); }
+.rt-err { margin: 0; font-size: 0.82rem; color: #dc2626; }
+.rt-empty {
+  margin: 0;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px dashed var(--border);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-soft);
+}
+
+.rt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rt-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 6px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.rt-row.picked {
+  border-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 7%, transparent);
+}
+/* Une sonnerie retirée de la banque reste lisible : elle sonne encore chez
+   ceux qui l'avaient prise, la griser complètement laisserait croire l'inverse. */
+.rt-row.off { opacity: 0.6; }
+
+.rt-play {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text);
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.rt-play:hover { border-color: var(--orange); color: var(--accent-ink); }
+/* SUR UN APLAT DORÉ, L'ENCRE EST TOUJOURS SOMBRE — jamais `--accent-ink`, qui
+   passe au doré vif en thème sombre et rendrait l'icône illisible sur son propre
+   fond. C'est l'encre des aplats dorés du reste de l'app. */
+.rt-play.on { background: var(--orange); border-color: var(--orange); color: #1a1204; }
+
+/* Toute la ligne choisit, pas seulement une case : la cible d'un réglage unique
+   doit être aussi large que la ligne qui le décrit. */
+.rt-pick {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 4px 2px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+.rt-ico {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--surface-2, var(--surface));
+  color: var(--text-soft);
+}
+.rt-row.picked .rt-ico { background: var(--orange); color: #1a1204; }
+.rt-txt {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.rt-txt b {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rt-txt em {
+  font-style: normal;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+}
+.rt-mark { flex: 0 0 auto; color: var(--accent-ink); }
+
+.rt-del {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+}
+.rt-del:hover { background: color-mix(in srgb, #dc2626 12%, transparent); color: #dc2626; }
+.rt-del.yes { color: #dc2626; }
+.rt-confirm { display: inline-flex; gap: 2px; }
+
+.rt-upload {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.rt-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.95rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.83rem;
+  color: var(--text);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.rt-upload-btn:hover:not(:disabled) {
+  border-color: var(--orange);
+  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--orange) 8%, transparent);
+}
+.rt-upload-btn:disabled { opacity: 0.6; }
+.rt-upload-hint {
+  flex: 1 1 220px;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: var(--text-soft);
+}
+
+.rt-note {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: var(--text-soft);
+}
+
+/* ---------------------------------------------------- côté administration */
+.rt-txt.admin { gap: 2px; }
+.rt-name {
+  width: 100%;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+}
+/* Le champ ne se donne à voir qu'au survol : la liste doit d'abord se LIRE.
+   Un écran d'admin couvert de cadres de saisie est illisible au premier coup
+   d'oeil, alors qu'on vient surtout y vérifier ce qui est en ligne. */
+.rt-name:hover { border-color: var(--border); }
+.rt-name:focus { border-color: var(--orange); outline: none; background: var(--surface); }
+
+.rt-sw {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 22px;
+  padding: 2px;
+  border-radius: 999px;
+  border: none;
+  background: var(--border-strong);
+  transition: background 0.18s ease;
+}
+.rt-sw i {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.18s ease;
+}
+.rt-sw.on { background: #16a34a; }
+.rt-sw.on i { transform: translateX(16px); }
+
+/* L'étoile « sonnerie de l'app » : discrète tant qu'elle n'est pas décernée,
+   pleine et dorée sur celle qui la porte. Une seule ligne l'a jamais. */
+.rt-star {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-soft);
+  opacity: 0.5;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+.rt-star:hover:not(:disabled) { opacity: 1; color: var(--accent-ink); }
+.rt-star.on {
+  opacity: 1;
+  color: var(--orange);
+  fill: var(--orange);
+}
+.rt-star.on svg { fill: currentColor; }

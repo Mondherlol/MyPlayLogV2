@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
-import { X, Minus, Users, Maximize2, Loader2 } from "lucide-react";
+import { X, Minus, Users, Maximize2, Loader2, Phone } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useChat } from "../context/ChatContext";
+import { useCall } from "../context/CallContext";
 import { apiFetch } from "../lib/api";
 import { presenceText, isPlaying } from "../lib/presence";
 import ChatThread from "./ChatThread";
@@ -102,6 +103,12 @@ function Avatar({ conv, online, className = "" }) {
 
 function DockWindow({ id, token, conversations, online, statuses, onMinimize, onClose }) {
   const { registerActive, markRead, typing, isWindowFocused } = useChat();
+  // Appeler depuis la fenêtre flottante. C'était le manque le plus bête de la
+  // première version : la moitié des conversations se lisent ici, sans jamais
+  // ouvrir /messages — proposer l'appel uniquement sur la page revenait à le
+  // cacher à ceux qui s'en serviraient le plus.
+  const { startCall, callIn, activeId } = useCall();
+  const live = callIn?.(id) || null;
   const conv = useDockConversation(id, conversations, token);
 
   // Fenêtre ouverte = fil lu (sauf onglet en arrière-plan : le ChatThread lira
@@ -137,6 +144,19 @@ function DockWindow({ id, token, conversations, online, statuses, onMinimize, on
             </span>
           )}
         </span>
+        {/* Le même bouton lance l'appel et rejoint celui qui tourne déjà :
+            côté serveur c'est la même route, côté utilisateur la même intention
+            — « je veux être dans l'appel de cette conversation ». */}
+        <button
+          type="button"
+          className={`chat-win-btn clickable ${live ? "ringing" : ""}`}
+          onClick={() => startCall(id)}
+          disabled={String(activeId || "") === String(id)}
+          title={live ? "Rejoindre l'appel" : "Appeler"}
+          aria-label="Appeler"
+        >
+          <Phone size={15} />
+        </button>
         <button
           type="button"
           className="chat-win-btn clickable"

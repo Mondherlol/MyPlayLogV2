@@ -15,6 +15,7 @@ import PerroquetTake from "../models/PerroquetTake.js";
 import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { emitTo, onlineAmong } from "../lib/realtime.js";
+import * as voice from "../lib/voiceRooms.js";
 import { recordActivity } from "../lib/activity.js";
 import { grantPoints } from "../lib/points.js";
 import { contourOf, compare } from "../lib/soundContour.js";
@@ -32,6 +33,7 @@ import {
   allIds,
   findPlayer,
 } from "../lib/versusRoom.js";
+import { mountGameChat, gameChatSystem } from "../lib/gameChat.js";
 
 // ======================================================================
 //  Le Perroquet — salons de versus
@@ -473,6 +475,11 @@ router.post("/:code/join", async (req, res) => {
         return { status: 410, body: { error: "Cette partie est terminée." } };
 
       const existing = findPlayer(room, req.userId);
+      // Le client repasse par /join à CHAQUE montage de la page — actualiser
+      // suffit. Seule une vraie arrivée (nouveau joueur, ou retour après un
+      // départ) mérite donc sa ligne dans le chat, sinon le fil se remplit de
+      // « a rejoint » fantômes à chaque F5.
+      const fresh = !existing || !!existing.leftAt;
       if (existing) {
         // Retour après une déconnexion : on le remet en jeu plutôt que de le
         // refuser. Un tunnel qui saute ne doit pas exclure de la partie.
@@ -488,6 +495,7 @@ router.post("/:code/join", async (req, res) => {
       await room.save();
       await room.populate(POPULATE);
       toEachRoom(room, "lobby");
+      if (fresh) gameChatSystem("pqversus", room, "join", findPlayer(room, req.userId)?.user);
       return { status: 200, body: { room: serializeRoom(room, req.userId) } };
     });
     if (!out) return res.status(404).json({ error: "Salon introuvable." });
@@ -792,6 +800,153 @@ router.post("/:code/next", async (req, res) => {
   }
 });
 
+// ============================================================
+//  L'appel vocal du salon
+// ============================================================
+// LE PROBLÈME QU'ON RÈGLE : jouer au Perroquet à plusieurs demandait un Discord
+// à côté, et surtout de se couper le micro à la main avant chaque imitation
+// puis de le rouvrir pour la révélation. Cinq manches, six joueurs : soixante
+// gestes de mute dans une partie de dix minutes. Le jeu tient dans le
+// navigateur, l'appel aussi — et c'est LE JEU qui coupe les micros au bon
+// moment, puisqu'il est le seul à savoir quand la fenêtre d'enregistrement
+// s'ouvre.
+//
+// LE SERVEUR N'ENTEND RIEN. Il ne relaie que les poignées de main (voir
+// lib/voiceRooms.js) ; la voix va d'un navigateur à l'autre.
+//
+// LA COUPURE N'EST PAS APPLIQUÉE ICI, et ce n'est pas un oubli : le serveur ne
+// tient aucun flux, il n'a rien à couper. Ce sont les clients qui désactivent
+// leur piste sortante en phase d'écoute et d'enregistrement — l'état de la
+// partie qu'ils reçoivent déjà (`phase`) suffit à le décider, sans un ordre de
+// plus à faire circuler. Un client trafiqué pourrait donc parler pendant la
+// fenêtre : c'est du chahut entre amis dans un salon où l'on est entré sur
+// invitation, pas une faille — et le serveur, lui, note toujours sur le fichier
+// rendu.
+
+// Le peer qui parle : un ONGLET, pas un compte (cf. lib/voiceRooms.js).
+const voicePeer = (req) => String(req.body?.peerId || req.query?.peerId || "").slice(0, 40);
+
+// Membre du salon ? On le vérifie en base à l'entrée dans l'appel, une fois — le
+// reste du bavardage (offres, candidats, battements) se contente du registre en
+// mémoire, sinon chaque candidat ICE coûterait une requête Mongo.
+async function callerOf(code, userId) {
+  const room = await PerroquetVersus.findOne({ code: String(code) })
+    .select("players")
+    .lean();
+  if (!room) return null;
+  const p = (room.players || []).find((q) => idOf(q.user) === String(userId) && !q.leftAt);
+  return p ? room : null;
+}
+
+const toCall = (code, kind, payload = {}) =>
+  emitTo(voice.listeners(code), "pqvoice", { code: String(code), kind, ...payload });
+
+// POST /:code/voice/join — je décroche
+//
+// La réponse porte CEUX QUI ÉTAIENT DÉJÀ LÀ, et c'est l'arrivant qui leur fait
+// une offre à chacun. Les anciens ne font que répondre : si les deux côtés
+// offraient, deux offres se croiseraient sur la même paire et la connexion ne
+// s'établirait jamais.
+router.post("/:code/voice/join", async (req, res) => {
+  try {
+    const code = String(req.params.code);
+    const peerId = voicePeer(req);
+    if (!peerId) return res.status(400).json({ error: "Onglet non identifié." });
+    if (!(await callerOf(code, req.userId)))
+      return res.status(403).json({ error: "Rejoins le salon avant l'appel." });
+
+    const me = await User.findById(req.userId).select("username avatar").lean();
+    const others = voice.join(code, peerId, {
+      id: req.userId,
+      username: me?.username || "?",
+      avatar: me?.avatar || null,
+    });
+    if (!others)
+      return res.status(409).json({ error: "L'appel est complet." });
+
+    toCall(code, "joined", {
+      peerId,
+      peer: {
+        peerId,
+        userId: String(req.userId),
+        username: me?.username || "?",
+        avatar: me?.avatar || null,
+        muted: false,
+      },
+    });
+    res.json({ peers: others, me: peerId });
+  } catch (err) {
+    console.error("pqvoice join error:", err.message);
+    res.status(500).json({ error: "Impossible de rejoindre l'appel." });
+  }
+});
+
+// Le battement. À PART de `join`, qui lui déclenche des offres : un `join`
+// toutes les trente secondes referait toute la salle toutes les trente
+// secondes.
+router.post("/:code/voice/ping", (req, res) => {
+  const code = String(req.params.code);
+  // La lecture fait le ménage : si elle a emporté quelqu'un, l'appel doit
+  // l'apprendre — c'est le seul moment où l'on repasse régulièrement par ici.
+  const dropped = voice.prune(code);
+  for (const gone of dropped) toCall(code, "left", { peerId: gone });
+  if (!voice.touch(code, voicePeer(req)))
+    return res.status(409).json({ error: "Tu n'es plus dans l'appel." });
+  res.json({ peers: voice.peers(code) });
+});
+
+// POST /:code/voice/mute — micro coupé / rouvert, vu de tous
+router.post("/:code/voice/mute", (req, res) => {
+  const code = String(req.params.code);
+  const peerId = voicePeer(req);
+  const p = voice.peerOf(code, peerId);
+  // On ne coupe le micro que le SIEN : sans cette ligne, n'importe quel
+  // participant pourrait afficher les autres comme muets.
+  if (!p || p.userId !== String(req.userId))
+    return res.status(403).json({ error: "Hors de l'appel." });
+  voice.setMuted(code, peerId, req.body?.muted !== false);
+  toCall(code, "peers", { peers: voice.peers(code) });
+  res.json({ ok: true });
+});
+
+// POST /:code/voice/signal — la poignée de main, relayée telle quelle
+//
+// On ne lit pas le contenu (c'est du SDP, ça ne nous regarde pas), mais on
+// vérifie que les DEUX bouts sont dans l'appel. Sans quoi le salon deviendrait
+// un relais de messages arbitraires entre comptes.
+router.post("/:code/voice/signal", (req, res) => {
+  const code = String(req.params.code);
+  const from = voicePeer(req);
+  const to = String(req.body?.to || "").slice(0, 40);
+  const mine = voice.peerOf(code, from);
+  if (!mine || mine.userId !== String(req.userId))
+    return res.status(403).json({ error: "Hors de l'appel." });
+  const target = voice.peerOf(code, to);
+  if (!target) return res.status(404).json({ error: "Ce participant a raccroché." });
+
+  emitTo([target.userId], "pqvoice", {
+    code,
+    kind: "signal",
+    from,
+    to,
+    data: req.body?.data ?? null,
+  });
+  res.json({ ok: true });
+});
+
+// POST /:code/voice/leave — je raccroche
+router.post("/:code/voice/leave", (req, res) => {
+  const code = String(req.params.code);
+  const peerId = voicePeer(req);
+  const p = voice.peerOf(code, peerId);
+  if (!p || p.userId !== String(req.userId)) return res.json({ ok: true });
+  // Le mot part AVANT le retrait : après, l'expéditeur ne serait plus dans la
+  // liste des destinataires et ne saurait pas que son propre départ est passé.
+  toCall(code, "left", { peerId });
+  voice.leave(code, peerId);
+  res.json({ ok: true });
+});
+
 // POST /:code/leave
 router.post("/:code/leave", async (req, res) => {
   try {
@@ -813,6 +968,7 @@ router.post("/:code/leave", async (req, res) => {
         clock.stop(room.code);
       } else {
         toEachRoom(room, "lobby");
+        gameChatSystem("pqversus", room, "leave", p.user);
       }
     });
     res.json({ ok: true });
@@ -843,6 +999,17 @@ router.get("/:code/results", async (req, res) => {
     console.error("pqversus results error:", err.message);
     res.status(500).json({ error: "Erreur de chargement." });
   }
+});
+
+// Le chat du salon (lib/gameChat.js) : GET/POST /:code/chat. Il vient EN PLUS
+// du vocal, il ne le remplace pas — on n'a pas toujours un micro sous la main,
+// et une manche du Perroquet se joue justement micro coupé pour les autres.
+mountGameChat(router, {
+  event: "pqversus",
+  load: (code) =>
+    !/^[a-z0-9]{4,12}$/.test(String(code))
+      ? null
+      : PerroquetVersus.findOne({ code: String(code) }).populate(POPULATE),
 });
 
 // ============================================================

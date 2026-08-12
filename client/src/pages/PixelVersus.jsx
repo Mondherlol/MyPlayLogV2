@@ -35,6 +35,7 @@ import { dedupeCandidates, searchCandidates } from "../lib/guessGame";
 import { useGameSfx } from "../lib/useGameSfx";
 import PixelCanvas from "../components/PixelCanvas";
 import { VersusFace, VersusRail, VersusInvite, HUES } from "../components/VersusRoom";
+import GameChat from "../components/GameChat";
 
 // ======================================================================
 //  Pixel Rush VERSUS — le buzzer visuel
@@ -1013,6 +1014,19 @@ export default function PixelVersus() {
           endpoint={`/pixel/versus/${room.code}/invite`}
           title="Inviter à Pixel Rush"
           onClose={() => setShowInvite(false)}
+        />
+      )}
+
+      {/* Le chat du salon : réservé à ceux qui jouent (un curieux muni du lien
+          n'a rien à souffler à la table). */}
+      {room && me && (
+        <GameChat
+          token={token}
+          code={code}
+          event="pxversus"
+          endpoint="/pixel/versus"
+          players={players}
+          meId={meId}
         />
       )}
     </div>

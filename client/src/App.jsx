@@ -6,6 +6,8 @@ import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Welcome from "./pages/Welcome";
+import Activity from "./pages/Activity";
+import GbaWatch from "./pages/GbaWatch";
 import BlindTest from "./pages/BlindTest";
 import PixelRush from "./pages/PixelRush";
 import GeoGamer from "./pages/GeoGamer";
@@ -154,6 +156,14 @@ export default function App() {
         }
       >
         <Route path="/app" element={<Welcome />} />
+        {/* L'onglet Activité : le fil des amis et le mien, plus le direct. */}
+        <Route path="/activity" element={<Activity />} />
+        {/* Regarder quelqu'un jouer sur GBA, en direct. Le code de la salle est
+            le lien d'invitation ; la diffusion s'ouvre depuis la console. */}
+        <Route
+          path="/gba/:code"
+          element={<FeatureRoute name="collection" element={<GbaWatch />} />}
+        />
         <Route path="/arcade" element={<Arcade />} />
         <Route path="/blindtest" element={<BlindTest />} />
         {/* Salon de versus musical : adresse des liens d'invitation. */}

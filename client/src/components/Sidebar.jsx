@@ -5,6 +5,7 @@ import {
   Home,
   Compass,
   CalendarDays,
+  Activity,
   MessagesSquare,
   List,
   Library,
@@ -31,6 +32,7 @@ const APP_VERSION = "1.1";
 
 const NAV = [
   { to: "/app", label: "Accueil", Icon: Home, end: true },
+  // { to: "/activity", label: "Activité", Icon: Activity },
   { to: "/explore", label: "Explorer", Icon: Compass },
   { to: "/releases", label: "Sorties", Icon: CalendarDays },
   // `badge` : la pastille de non-lus vient du contexte de messagerie.

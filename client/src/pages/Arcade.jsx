@@ -38,6 +38,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useCosmetics } from "../context/CosmeticsContext";
 import { apiFetch } from "../lib/api";
+import { useLiveStatus } from "../lib/presence";
 import { applyGeoGlobe } from "../lib/geoGlobe";
 import { makeCache } from "../lib/cache";
 import { rarityColor, rarityLabel, rarityRank } from "../lib/rarity";
@@ -194,6 +195,11 @@ const boardCache = makeCache("mpl_arcboard_", 5 * 60 * 1000);
 export default function Arcade() {
   const { token, user, updateUser, hasFeature } = useAuth();
   const { setCosmetic, previewTheme, endPreview } = useCosmetics();
+
+  // « Traîne à l'arcade » : c'est le hall, donc l'endroit où l'on se croise
+  // avant de lancer quoi que ce soit. C'est justement là qu'un ami qui passe
+  // peut décider de jouer AVEC — d'où le lien.
+  useLiveStatus("arcade", "", { token, path: "/arcade" });
 
   // Clé de cache : le compte courant. `null` tant que /auth/me n'a pas répondu —
   // et dans ce cas on ne lit ni n'écrit RIEN : une entrée « anonyme » partagée

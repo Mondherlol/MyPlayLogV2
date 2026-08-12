@@ -20,16 +20,26 @@ import {
   Loader2,
   Unplug,
   Cpu,
-  LayoutGrid,
   Check,
   Save,
   Keyboard,
   Gamepad2,
+  Camera,
+  FastForward,
+  MonitorCog,
+  MoreHorizontal,
+  AlertTriangle,
+  Radio,
+  Settings,
+  X,
 } from "lucide-react";
 import { useScrollLock } from "../hooks/useScrollLock";
 import { useBackClose } from "../hooks/useBackClose";
-import GbaConsole from "./GbaConsole";
+import { useLiveStatus } from "../lib/presence";
+import GbaPad from "./GbaPad";
 import GbaSaves from "./GbaSaves";
+import GbaBroadcast, { LiveBadge, StartingBadge } from "./GbaBroadcast";
+import { useGbaBroadcast } from "../hooks/useGbaBroadcast";
 import {
   CORES,
   CORE_KEY,
@@ -39,7 +49,6 @@ import {
   muteKeys,
   EJS_DATA,
 } from "../lib/gbaEmulator";
-import { LAYOUT_KEY, layoutOf, savedLayout } from "../lib/gbaShell";
 import {
   BUTTONS,
   PRESETS,
@@ -54,49 +63,59 @@ import {
   saveKeys,
 } from "../lib/gbaInput";
 import {
+  applyVideo,
+  fitScreen,
+  loadView,
+  padByDefault,
+  saveView,
+} from "../lib/gbaView";
+import {
   AUTO_SLOT,
   deleteSave,
   listSaves,
   readSave,
   writeSave,
 } from "../lib/gbaSaves";
+import { fmtDuration } from "../lib/collection";
 
 // ======================================================================
-//  La console de la Collection
+//  Le lecteur Game Boy Advance
 // ======================================================================
-// MÊME PARTI PRIS QU'AVANT : on ne lance pas un émulateur dans un cadre, ON
-// ALLUME UNE CONSOLE. Ce qui a changé, c'est la machine — et ce n'est pas un
-// détail cosmétique.
+// LA COQUE DESSINÉE A ÉTÉ RETIRÉE, ET C'EST LE SUJET DE CETTE VERSION.
 //
-// LE RAYON NINTENDO DS A ÉTÉ RETIRÉ, ET VOICI POURQUOI. Émuler une DS dans un
-// navigateur demande une machine : deux écrans, un tactile, une puce 3D. Le
-// mécanisme qu'il fallait pour ça — lire le canvas du cœur à chaque image,
-// découper ses deux moitiés, les recopier dans les trous d'un gabarit, plus une
-// iframe invisible posée sur l'écran du bas pour attraper le tactile, plus un
-// détecteur de « recopie qui ne ramène que du noir » — se traînait sur un
-// portable honnête. Une console qui rame n'est pas une console.
+// Il y avait une Game Boy Advance en SVG : coque grise, croix, A et B, gâchettes,
+// sérigraphie. C'était fidèle, c'était beau une fois — et à chaque partie, ça
+// coûtait les DEUX TIERS DE LA FENÊTRE pour montrer du plastique. Un écran de
+// 240 × 160 finissait affiché dans un timbre-poste au milieu d'un dessin, et
+// c'est l'écran qu'on est venu regarder.
 //
-// LA GBA N'A QU'UN ÉCRAN, en 3/2 exactement comme la fenêtre découpée dans la
-// coque. On montre donc L'IFRAME ELLE-MÊME, à sa place, et tout ce mécanisme
-// disparaît : pas de recopie, pas de boucle d'animation à nous, pas de tactile à
-// simuler, pas de panne muette possible. mGBA tourne à pleine vitesse jusque sur
-// téléphone. C'est le même objet, en état de marche.
+// CE QUI LE REMPLACE N'EST PAS « LA MÊME CHOSE EN PLUS SOBRE » :
 //
-// ET LA PARTIE EST CHEZ NOUS. C'est l'autre moitié du travail : un état de
-// machine par emplacement, sur le serveur, à ton nom (voir GbaSaves et
-// lib/gbaSaves.js). On se reconnecte du téléphone et on reprend où on en était.
+//   • L'ÉCRAN PREND TOUTE LA PLACE, et sa taille est CALCULÉE, pas subie :
+//     on cherche le plus grand multiple entier de 240 × 160 qui tienne dans la
+//     fenêtre (voir gbaView.js). Chaque pixel du jeu devient un carré exact —
+//     c'est ce qui fait la différence entre une image de jeu rétro et une bouillie
+//     interpolée.
+//   • LES COMMANDES S'EFFACENT. Une seconde sans un geste et il ne reste que le
+//     jeu. Le moindre mouvement les rappelle. On ne joue pas dans un cockpit.
+//   • LA MANETTE À L'ÉCRAN EST UNE VRAIE MANETTE (voir GbaPad) : croix à huit
+//     directions — la coque n'en faisait que quatre, donc pas de diagonale, donc
+//     pas de Zelda —, glissement entre A et B, vibration à l'appui.
+//   • CE QUI MANQUAIT EST ARRIVÉ : avance rapide, capture d'écran, volume,
+//     sauvegarde et reprise au clavier (F5 / F8), verrouillage en paysage sur
+//     téléphone.
 //
-// CE QUI RESTE DE L'ANCIEN, parce que c'était juste :
+// CE QUI RESTE DE L'ANCIEN, PARCE QUE C'ÉTAIT JUSTE :
 //
-//   • le TEMPS DE JEU compté par tranches, et seulement ce qui est VRAIMENT
-//     joué (console en marche, onglet visible) — un compteur qui tourne pendant
-//     une pause déjeuner ne raconte rien ;
+//   • la PARTIE EST CHEZ NOUS — un état de machine par emplacement, sur le
+//     serveur, à ton nom (GbaSaves et lib/gbaSaves.js) ;
+//   • le TEMPS DE JEU compté par tranches, et seulement ce qui est VRAIMENT joué
+//     (console en marche, onglet visible) ;
 //   • l'écoute du clavier SUR LES DEUX FENÊTRES, et le silence imposé à celui
 //     d'EmulatorJS (`muteKeys`) : l'iframe est cliquable (il lui faut le premier
-//     clic pour débloquer son contexte audio), donc elle peut prendre le focus,
-//     et sans ces deux précautions une touche enfoncerait deux boutons ;
-//   • les COMMANDES EN COLONNE contre le bord droit : c'est la seule place qui ne
-//     retire pas un pixel de hauteur à l'objet.
+//     clic pour débloquer son contexte audio), donc elle peut prendre le focus, et
+//     sans ces deux précautions une touche enfoncerait deux boutons ;
+//   • l'iframe qui EST l'écran, jamais démontée en cours de partie.
 
 const TICK = 5; // secondes entre deux relevés
 const FLUSH = 60; // on n'écrit le temps de jeu au serveur qu'à la minute
@@ -104,25 +123,41 @@ const AUTOSAVE = 120; // secondes entre deux sauvegardes automatiques
 const BOOT_TIMEOUT = 30000; // au-delà, les cœurs ne viendront pas
 const ASK_TIMEOUT = 8000; // une console qui ne répond pas a un problème
 const CLOSE_TIMEOUT = 2500; // on n'attend pas huit secondes pour éteindre
+// Sans un geste, les commandes s'effacent. UNE SECONDE : c'est court, et c'est
+// voulu — la barre revient au moindre mouvement, donc le vrai coût d'un délai
+// trop long n'est pas de la rappeler, c'est de la voir traîner sur le jeu à
+// chaque fois qu'on a bougé la souris pour rien. Tant qu'on la survole, elle
+// reste (voir `overDock`) : ce n'est pas de l'inactivité, c'est une hésitation
+// devant un bouton.
+const IDLE = 1000;
+
+// On rend l'orientation au téléphone en sortant : la garder verrouillée en
+// paysage après la partie coucherait le reste du site.
+function unlockOrientation() {
+  try {
+    window.screen?.orientation?.unlock?.();
+  } catch {
+    /* rien à rendre */
+  }
+}
 
 export default function GbaPlayer({ media, token, onClose, onPlayed }) {
   const [core, setCore] = useState(savedCore);
   const [phase, setPhase] = useState("boot"); // boot | on | nodata | slow
   const [paused, setPaused] = useState(false);
-  const [muted, setMuted] = useState(false);
   const [full, setFull] = useState(false);
   const [raw, setRaw] = useState(false); // panneau de l'émulateur ouvert
-  const [menu, setMenu] = useState(null); // "core" | "keys" | "saves" | null
-  const [layout, setLayout] = useState(savedLayout);
+  const [sheet, setSheet] = useState(null); // "saves" | "keys" | "view" | "more"
   const [keys, setKeys] = useState(loadKeys);
-  // DEUX ÉTATS POUR UNE MÊME IDÉE, et ils ne se confondent pas : `capturing`
-  // est l'identifiant du bouton qu'on réapprend DANS LE PANNEAU, `tuning` dit
-  // seulement que la coque, elle, en réapprend un dans sa bulle. Les mélanger
-  // faisait assigner une touche à un bouton nommé « spot ».
-  const [capturing, setCapturing] = useState(null);
-  const [tuning, setTuning] = useState(false);
+  const [view, setView] = useState(loadView);
+  const [pad, setPad] = useState(() => loadView().pad ?? padByDefault());
+  const [capturing, setCapturing] = useState(null); // bouton en réapprentissage
   const [deaf, setDeaf] = useState(false); // le cœur n'écoute pas nos boutons
-  const [screen, setScreen] = useState(null); // la boîte mesurée de la dalle
+  const [ff, setFf] = useState(false); // avance rapide en cours
+  const [ffOk, setFfOk] = useState(false); // ce cœur sait-il accélérer ?
+  const [box, setBox] = useState(null); // la boîte calculée de l'écran
+  const [awake, setAwake] = useState(true); // les commandes sont-elles visibles ?
+  const [overDock, setOverDock] = useState(false); // le pointeur est sur la barre
 
   // --- les sauvegardes ---
   const [saves, setSaves] = useState([]);
@@ -133,28 +168,28 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
   const [closing, setClosing] = useState(false);
   const [flash, setFlash] = useState(null);
 
-  // Le temps de jeu TOTAL, celui qui s'écrit sous une vignette. Parti de ce que
-  // le serveur sait déjà, augmenté au fil de la partie.
+  // Le temps de jeu TOTAL, celui qui s'écrit sous une vignette. Parti de ce que le
+  // serveur sait déjà, augmenté au fil de la partie.
   //
   // DOUBLÉ EN RÉF, et ce n'est pas de la redondance. La sauvegarde a besoin de le
-  // LIRE ; si elle en dépendait, elle serait reconstruite toutes les cinq
-  // secondes — et le minuteur de la sauvegarde automatique, qui dépend d'elle,
-  // repartirait de zéro à chaque top. Il ne se déclencherait jamais.
+  // LIRE ; si elle en dépendait, elle serait reconstruite toutes les cinq secondes
+  // — et le minuteur de la sauvegarde automatique, qui dépend d'elle, repartirait
+  // de zéro à chaque top. Il ne se déclencherait jamais.
   const totalRef = useRef(media.progress?.playSeconds || 0);
   const [total, setTotal] = useState(totalRef.current);
 
   const frame = useRef(null);
   const shell = useRef(null);
-  const body = useRef(null);
+  const viewport = useRef(null);
   const pending = useRef(0); // secondes jouées, pas encore envoyées
   const busy = useRef(false); // une sauvegarde est en vol
   const gone = useRef(false); // on est en train d'éteindre
+  const sleeper = useRef(null); // le minuteur qui efface les commandes
 
   useScrollLock(true);
 
   const rom = media.cartridge?.rom;
   const tint = media.color || "#f2b70b";
-  const shape = layoutOf(layout);
   const engine = coreOf(core);
 
   // Le document de la console. Recalculé au changement de moteur SEULEMENT :
@@ -165,8 +200,8 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
   );
 
   // L'émulateur, quand il est là. Toujours par cette fonction : le contenu de
-  // l'iframe disparaît entre deux rendus (changement de moteur, fermeture), et
-  // une référence gardée de côté pointerait alors dans le vide.
+  // l'iframe disparaît entre deux rendus (changement de moteur, fermeture), et une
+  // référence gardée de côté pointerait alors dans le vide.
   const emu = useCallback(() => {
     try {
       return frame.current?.contentWindow?.EJS_emulator || null;
@@ -183,8 +218,17 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
     }
   }, []);
 
-  const say = useCallback((msg) => {
-    setFlash({ msg, at: Date.now() });
+  // Les deux fenêtres qui peuvent recevoir une touche : la page, et le document du
+  // jeu quand il a le focus. Tout ce qui écoute le clavier passe par là — n'en
+  // écouter qu'une fait une console qui s'arrête de répondre dès qu'on a cliqué
+  // l'écran une fois.
+  const bothWindows = useCallback(() => {
+    const inner = win();
+    return inner && inner !== window ? [window, inner] : [window];
+  }, [win]);
+
+  const say = useCallback((msg, ok = true) => {
+    setFlash({ msg, ok, at: Date.now() });
   }, []);
 
   useEffect(() => {
@@ -193,30 +237,38 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
     return () => clearTimeout(t);
   }, [flash]);
 
-  // ------------------------------------------------- où poser l'écran --
-  // La dalle est placée par la coque : dans le trou du dessin, ou seule au
-  // milieu. Sa boîte se MESURE, elle ne se calcule pas — et l'iframe vient s'y
-  // coller.
+
+  // ------------------------------------------------------ les préférences --
+  const setPref = useCallback((patch) => {
+    setView((v) => {
+      const next = { ...v, ...patch };
+      saveView(next);
+      return next;
+    });
+  }, []);
+
+  const togglePad = useCallback(() => {
+    const next = !pad;
+    setPad(next);
+    setPref({ pad: next });
+  }, [pad, setPref]);
+
+  // ---------------------------------------------------- la taille de l'écran --
   //
-  // C'EST CE DÉTOUR QUI PERMET DE CHANGER DE DISPOSITION EN PLEINE PARTIE.
-  // L'iframe n'est enfant ni de la coque ni de l'écran seul : elle est posée
-  // par-dessus, en absolu. Enfant de l'un des deux, elle serait démontée au
-  // changement — et le jeu redémarrerait.
+  // ELLE SE CALCULE, ET C'EST TOUT LE PROPOS DE CETTE VERSION. `aspect-ratio` en
+  // CSS aurait suffi à ne pas déformer l'image, mais pas à la rendre NETTE : à
+  // l'échelle 2,7, une ligne de pixels sur trois est plus épaisse que les autres,
+  // et ça scintille dès que le décor défile. On cherche donc la plus grande boîte
+  // qui tienne — au multiple entier près quand le réglage le demande.
   useLayoutEffect(() => {
-    const host = body.current;
+    const host = viewport.current;
     if (!host) return undefined;
     const measure = () => {
-      const slot = host.querySelector(".gba-screen-slot");
-      if (!slot) return setScreen(null);
-      const a = slot.getBoundingClientRect();
-      const b = host.getBoundingClientRect();
-      if (!a.width || !a.height) return undefined;
-      return setScreen({
-        left: a.left - b.left,
-        top: a.top - b.top,
-        width: a.width,
-        height: a.height,
-      });
+      const fit = fitScreen(
+        { width: host.clientWidth, height: host.clientHeight },
+        { integer: view.integer }
+      );
+      if (fit) setBox(fit);
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -226,16 +278,16 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
       ro.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [layout, phase]);
+  }, [view.integer]);
 
   // ------------------------------------------------------------- le temps --
   //
   // Le rapporteur est gardé EN RÉF, et `flushTime` ne dépend de rien. Sans ça, un
-  // parent qui passe une fonction anonyme (le cas courant : `onPlayed={(s) =>
-  // …}`) en fabrique une nouvelle à chaque rendu — et le relevé du temps, dont
-  // le nettoyage envoie ce qui reste, se démonterait et se remonterait avec
-  // elle. Le minuteur repartirait de zéro à chaque fois : une partie entière
-  // pourrait ne jamais atteindre son premier top.
+  // parent qui passe une fonction anonyme (le cas courant : `onPlayed={(s) => …}`)
+  // en fabrique une nouvelle à chaque rendu — et le relevé du temps, dont le
+  // nettoyage envoie ce qui reste, se démonterait et se remonterait avec elle. Le
+  // minuteur repartirait de zéro à chaque fois : une partie entière pourrait ne
+  // jamais atteindre son premier top.
   const report = useRef(onPlayed);
   report.current = onPlayed;
 
@@ -256,8 +308,8 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
     return () => clearInterval(id);
   }, [phase, paused, flushTime]);
 
-  // Le reliquat part à la fermeture : sans ça, une partie de cinquante secondes
-  // ne compterait jamais pour rien.
+  // Le reliquat part à la fermeture : sans ça, une partie de cinquante secondes ne
+  // compterait jamais pour rien.
   useEffect(() => () => flushTime(), [flushTime]);
 
   // ============================================================ le dialogue ==
@@ -267,8 +319,7 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
   //
   // AVEC UN DÉLAI DE GARDE, et c'est indispensable : le seul cas où l'on parle à
   // l'iframe est la sauvegarde, donc le seul cas où une absence de réponse ferait
-  // ATTENDRE quelqu'un devant un bouton qui tourne. Au bout de huit secondes on
-  // le dit, plutôt que de tourner indéfiniment.
+  // ATTENDRE quelqu'un devant un bouton qui tourne.
   const waiting = useRef(new Map());
   const nextId = useRef(1);
 
@@ -290,10 +341,6 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
   );
 
   useEffect(() => {
-    // La table est prise DANS l'effet, alors qu'elle vit dans une réf. Elle ne
-    // change jamais d'identité (elle est créée une fois pour toute la vie du
-    // composant), donc c'est strictement équivalent — mais ça dit à qui lit le
-    // nettoyage qu'on parle bien de la table de CE montage.
     const asks = waiting.current;
     function onMessage(e) {
       if (e.source !== frame.current?.contentWindow) return;
@@ -307,7 +354,6 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
         setPhase("nodata");
         return;
       }
-      // Une réponse à une question numérotée.
       const slot = asks.get(e.data?.id);
       if (slot) {
         asks.delete(e.data.id);
@@ -333,17 +379,68 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
     return () => clearTimeout(t);
   }, [phase, core]);
 
-  // Le cœur accepte-t-il qu'on lui pousse des boutons ? Et accepte-t-il de se
-  // taire côté clavier ? Les deux se posent une fois la partie lancée, et une
-  // fois le panneau refermé — il y remet parfois ses touches.
+  // Ce que le cœur accepte : nos boutons, le silence côté clavier, l'accélération.
+  // Les trois se demandent une fois la partie lancée, et une fois le panneau
+  // refermé — il y remet parfois ses touches.
+  //
+  // ON REDEMANDE PLUSIEURS FOIS AVANT DE CONCLURE. Le cœur annonce son démarrage
+  // AVANT d'avoir fini de s'installer : sur une machine lente (ou un téléphone),
+  // `gameManager` n'existe pas encore une demi-seconde plus tard. Une seule
+  // question, et l'on affichait « ce cœur n'accepte pas les commandes » sur une
+  // console parfaitement jouable — le bandeau restait là toute la partie,
+  // puisque rien ne le rouvrait.
   useEffect(() => {
     if (phase !== "on") return undefined;
-    const t = setTimeout(() => {
-      setDeaf(!canPress(win()));
-      muteKeys(win());
-    }, 600);
-    return () => clearTimeout(t);
+    let tries = 0;
+    const ask = () => {
+      const w = win();
+      const ok = canPress(w);
+      if (ok) {
+        setDeaf(false);
+        muteKeys(w);
+        try {
+          setFfOk(typeof w?.EJS_emulator?.gameManager?.toggleFastForward === "function");
+        } catch {
+          setFfOk(false);
+        }
+        clearInterval(id);
+        return;
+      }
+      // Dix secondes d'attente : au-delà, ce n'est plus un démarrage lent.
+      if ((tries += 1) >= 20) {
+        setDeaf(true);
+        clearInterval(id);
+      }
+    };
+    const id = setInterval(ask, 500);
+    return () => clearInterval(id);
   }, [phase, raw, win]);
+
+  // La netteté — et le pointeur — se règlent DANS le document du jeu : c'est là
+  // qu'est le canvas, et c'est au-dessus de lui que la souris passe son temps.
+  // Donc à chaque nouveau document, chaque nouveau réglage, et chaque fois que
+  // l'interface s'endort ou se réveille.
+  useEffect(() => {
+    if (phase !== "on") return undefined;
+    const t = setTimeout(
+      () => applyVideo(win(), { smooth: view.smooth, cursor: awake }),
+      120
+    );
+    return () => clearTimeout(t);
+  }, [phase, core, view.smooth, awake, win]);
+
+  // Le volume est une préférence, pas un état de séance : il se retrouve d'une
+  // partie à l'autre. On le pose dès que le moteur est là.
+  useEffect(() => {
+    if (phase !== "on") return;
+    try {
+      const e = emu();
+      if (e?.setVolume) e.setVolume(view.volume);
+      else if (e) e.volume = view.volume;
+    } catch {
+      /* moteur pas encore prêt : le réglage suivant repassera */
+    }
+  }, [phase, view.volume, emu]);
 
   // ============================================================ sauvegardes ==
 
@@ -404,9 +501,10 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
           );
         return true;
       } catch (e) {
-        // Une sauvegarde automatique qui échoue ne DÉRANGE pas — mais elle se
-        // dit quand même dans le tiroir, sinon on croit être à l'abri.
+        // Une sauvegarde automatique qui échoue ne DÉRANGE pas — mais elle se dit
+        // quand même dans le tiroir, sinon on croit être à l'abri.
         setSavesError(e.message);
+        if (!quiet) say(e.message, false);
         return false;
       } finally {
         busy.current = false;
@@ -432,11 +530,12 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
               : "Le moteur a refusé la sauvegarde."
           );
         setOffer(false);
-        setMenu(null);
+        setSheet(null);
         setPaused(false);
         say(slot === AUTO_SLOT ? "Partie reprise" : `Emplacement ${slot} chargé`);
       } catch (e) {
         setSavesError(e.message);
+        say(e.message, false);
       } finally {
         busy.current = false;
         setSavesBusy(null);
@@ -477,19 +576,41 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
   // ------------------------------------------------------------ les touches --
   // On écoute, et on POUSSE LE BOUTON. L'émulateur ne reçoit jamais une touche,
   // seulement des appuis de manette — la même porte que celle qu'emprunte la
-  // coque dessinée. Un seul chemin d'entrée, donc un seul à faire marcher.
-  //
-  // SUR LES DEUX FENÊTRES, et c'est indispensable : cliquer l'écran donne le
-  // focus à l'iframe, et à partir de là c'est ELLE qui reçoit les touches.
-  // N'écouter que la page ferait une console qui cesse de répondre au clavier dès
-  // qu'on a cliqué l'écran une fois.
-  //
-  // L'écoute se tait pendant qu'on apprend une touche, pendant la pause, et
-  // quand le panneau de l'émulateur est ouvert — là, c'est LUI qui commande.
+  // manette à l'écran. Un seul chemin d'entrée, donc un seul à faire marcher.
   const push = useCallback((index, down) => pressButton(win(), index, down), [win]);
 
+  // ============================================================ la diffusion ==
+  //
+  // « VIENS VOIR » : l'écran part en direct chez ceux à qui on donne le lien, et
+  // l'on peut leur PASSER LA MANETTE. Ce dernier point ne coûte presque rien
+  // ici, et c'est le dessin de ce fichier qui le permet : toute commande — le
+  // clavier, la manette à l'écran, et maintenant un spectateur à l'autre bout
+  // d'une connexion — emprunte la MÊME porte, `push`. Il n'y a jamais eu qu'un
+  // seul chemin d'entrée à faire marcher.
+  const cast = useGbaBroadcast({ token, slug: media.slug, win, onInput: push });
+
+  // Un ennui de diffusion se dit tout de suite : le panneau, lui, ne s'ouvre que
+  // si la diffusion a démarré — un échec au démarrage n'aurait donc nulle part
+  // où s'afficher, et le bouton semblerait ne rien faire.
   useEffect(() => {
-    if (capturing || tuning || raw || paused || phase !== "on") return undefined;
+    if (cast.error) say(cast.error, false);
+  }, [cast.error, say]);
+
+  // « Joue sur Game Boy Advance · Zelda » dans le rail « en ce moment » des gens
+  // qui me suivent. L'annonce est ICI et non dans la page de la fiche : la
+  // console s'ouvre aussi depuis l'étagère et depuis l'aperçu d'admin, et un
+  // statut posé sur la page raterait ces deux chemins.
+  //
+  // EN DIRECT, LE LIEN CHANGE : « Rejoindre » mène alors à la diffusion et non à
+  // la fiche du jeu — c'est tout l'intérêt d'avoir les deux au même endroit.
+  useLiveStatus("gba", media.title || "", {
+    token,
+    active: phase === "on",
+    path: cast.room ? `/gba/${cast.room.code}` : `/collection/${media.slug}`,
+  });
+
+  useEffect(() => {
+    if (capturing || raw || paused || phase !== "on") return undefined;
     const byCode = new Map();
     for (const b of BUTTONS) {
       const k = keys[b.id];
@@ -518,8 +639,7 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
       held.delete(e.code);
       push(index, false);
     }
-    const inner = win();
-    const targets = inner && inner !== window ? [window, inner] : [window];
+    const targets = bothWindows();
     for (const t of targets) {
       try {
         t.addEventListener("keydown", onDown);
@@ -541,9 +661,7 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
       }
       window.removeEventListener("blur", release);
     };
-  }, [keys, capturing, tuning, raw, paused, phase, push, win]);
-
-  const onSpot = useCallback((btn, down) => push(btn.index, down), [push]);
+  }, [keys, capturing, raw, paused, phase, push, bothWindows]);
 
   // Le clavier du joueur, tel qu'il est vraiment gravé (Chromium seulement) :
   // afficher « Z » sous un bouton quand la touche porte un W est le genre de
@@ -562,8 +680,8 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
 
   useEffect(() => saveKeys(keys), [keys]);
 
-  // La frappe qui apprend une touche depuis LE PANNEAU (la coque a la sienne,
-  // dans sa bulle). En capture, donc avant tout le reste, et arrêtée net.
+  // La frappe qui apprend une touche. En capture, donc AVANT tout le reste, et
+  // arrêtée net : une partie ne doit pas recevoir la touche qu'on lui assigne.
   useEffect(() => {
     if (!capturing) return undefined;
     function onKey(e) {
@@ -572,48 +690,99 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
       if (e.key !== "Escape") setKeys((k) => assign(k, capturing, e.code, keyLabel(e)));
       setCapturing(null);
     }
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [capturing]);
+    const targets = bothWindows();
+    for (const t of targets) {
+      try {
+        t.addEventListener("keydown", onKey, true);
+      } catch {
+        /* document jeté */
+      }
+    }
+    return () => {
+      for (const t of targets) {
+        try {
+          t.removeEventListener("keydown", onKey, true);
+        } catch {
+          /* rien à retirer */
+        }
+      }
+    };
+  }, [capturing, bothWindows]);
 
   // ------------------------------------------------------------ commandes --
-  function togglePause() {
-    const e = emu();
+  const togglePause = useCallback(() => {
     const next = !paused;
     try {
+      const e = emu();
       if (next) e?.pause?.();
       else e?.play?.();
     } catch {
       /* moteur pas encore prêt : l'état d'affichage suit quand même */
     }
     setPaused(next);
-  }
+  }, [emu, paused]);
 
-  function restart() {
+  const restart = useCallback(() => {
     try {
       emu()?.gameManager?.restart?.();
     } catch {
       /* rien : le panneau de l'émulateur offre la même chose */
     }
     setPaused(false);
-  }
+    say("Partie redémarrée");
+  }, [emu, say]);
 
-  function toggleSound() {
-    const e = emu();
-    const next = !muted;
+  // L'AVANCE RAPIDE, celle qui manquait le plus. Un RPG demande de traverser
+  // trois écrans de texte et deux couloirs vides ; sans elle, on les traverse en
+  // temps réel. Le cœur ne sait pas toujours le faire (d'où `ffOk`) : dans ce cas
+  // le bouton n'existe pas, plutôt que d'exister sans rien faire.
+  const toggleFf = useCallback(() => {
+    const next = !ff;
     try {
-      if (e?.setVolume) e.setVolume(next ? 0 : 1);
-      else if (e) e.volume = next ? 0 : 1;
+      const gm = emu()?.gameManager;
+      gm?.setFastForwardRatio?.(3);
+      gm?.toggleFastForward?.(next ? 1 : 0);
+      setFf(next);
     } catch {
-      /* sans effet : on ne prétend pas avoir coupé le son */
+      setFfOk(false);
     }
-    setMuted(next);
-  }
+  }, [emu, ff]);
+
+  const toggleSound = useCallback(() => {
+    setPref({ volume: view.volume > 0 ? 0 : 1 });
+  }, [setPref, view.volume]);
+
+  // LA CAPTURE PART DU CANVAS DU CŒUR, agrandie ×3 sans lissage : une image de
+  // 240 × 160 n'est pas partageable, et la même redimensionnée par le navigateur
+  // serait floue. On la rend en pixels francs, comme à l'écran.
+  const snap = useCallback(async () => {
+    try {
+      const src = emu()?.canvas;
+      if (!src?.width || !src?.height) throw new Error("Écran illisible.");
+      const cv = document.createElement("canvas");
+      cv.width = 720;
+      cv.height = 480;
+      const ctx = cv.getContext("2d");
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(src, 0, 0, src.width, src.height, 0, 0, cv.width, cv.height);
+      const blob = await new Promise((r) => cv.toBlob(r, "image/png"));
+      if (!blob) throw new Error("Image vide.");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${media.slug}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.png`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      say("Capture enregistrée");
+    } catch {
+      say("La capture n'a pas pu être prise.", false);
+    }
+  }, [emu, media.slug, say]);
 
   // Le panneau de l'émulateur : on révèle l'iframe en grand, barre d'EmulatorJS
   // comprise. Filtres, tricheurs, réglages du cœur y vivent — les réécrire
   // n'apporterait rien.
-  function toggleRaw() {
+  const toggleRaw = useCallback(() => {
     const next = !raw;
     try {
       frame.current?.contentWindow?.document?.body?.classList.toggle("bare", !next);
@@ -621,15 +790,35 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
       /* pas de document : rien à montrer */
     }
     setRaw(next);
-    setMenu(null);
-  }
+    setSheet(null);
+  }, [raw]);
 
-  function toggleFull() {
+  // LE PLEIN ÉCRAN COUCHE LE TÉLÉPHONE. Une GBA est un objet en paysage : sur un
+  // portable tenu debout, l'écran occupe le tiers de la dalle. On demande donc la
+  // rotation — et si le navigateur refuse (iOS ne l'expose pas), rien n'est perdu :
+  // la mise en page portrait existe.
+  const toggleFull = useCallback(() => {
     const node = shell.current;
     if (!node) return;
-    if (document.fullscreenElement) document.exitFullscreen?.();
-    else node.requestFullscreen?.().catch(() => {});
-  }
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.();
+      unlockOrientation();
+      return;
+    }
+    node
+      .requestFullscreen?.()
+      .then(() => {
+        try {
+          // La promesse est rejetée sur les navigateurs qui n'en veulent pas
+          // (iOS n'expose rien du tout) : sans ce `catch`, ça remonte en erreur
+          // non gérée dans la console pour un confort qu'on peut perdre.
+          window.screen?.orientation?.lock?.("landscape")?.catch?.(() => {});
+        } catch {
+          /* refusé : la mise en page portrait prend le relais */
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const onChange = () => setFull(!!document.fullscreenElement);
@@ -637,42 +826,93 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
-  // Un menu ouvert se referme dès qu'on regarde ailleurs : il sort d'un bouton
-  // de la colonne, il n'a pas à être congédié explicitement.
+  // ------------------------------------------------ le téléphone se couche --
+  //
+  // UNE GBA EST UN OBJET EN PAYSAGE. Sur un téléphone tenu debout, l'écran
+  // occupe le tiers de la dalle et les pouces se marchent dessus : la console
+  // s'ouvre donc COUCHÉE, sans qu'on ait à le demander.
+  //
+  // Le verrouillage d'orientation EXIGE le plein écran (règle des navigateurs),
+  // d'où l'enchaînement des deux. Et il ne marche qu'après un geste : ici on
+  // l'obtient du clic qui a lancé la console — d'où l'appel au montage, tant que
+  // ce clic « compte » encore. Si le navigateur refuse (iOS n'expose rien), rien
+  // n'est perdu : la mise en page portrait existe et prend le relais.
   useEffect(() => {
-    if (!menu) return undefined;
-    function onDown(e) {
-      if (!e.target.closest?.(".gba-pop, .gba-panel")) setMenu(null);
-    }
-    window.addEventListener("pointerdown", onDown);
-    return () => window.removeEventListener("pointerdown", onDown);
-  }, [menu]);
+    if (!padByDefault()) return; // appareil sans tactile : on ne touche à rien
+    const node = shell.current;
+    if (!node || document.fullscreenElement) return;
+    node
+      .requestFullscreen?.()
+      .then(() => window.screen?.orientation?.lock?.("landscape")?.catch?.(() => {}))
+      .catch(() => {
+        /* refusé (geste trop vieux, navigateur récalcitrant) : on joue debout */
+      });
+  }, []);
 
-  function toggleLayout() {
-    const next = layout === "console" ? "screen" : "console";
-    setLayout(next);
-    setMenu(null);
-    try {
-      localStorage.setItem(LAYOUT_KEY, next);
-    } catch {
-      /* navigation privée : le choix ne vaudra que pour cette partie */
+  // ------------------------------------------- les commandes qui s'effacent --
+  //
+  // TROIS SECONDES SANS UN GESTE ET IL NE RESTE QUE LE JEU. C'est ce qui remplace
+  // le mode « écran seul » de l'ancienne version : plus de disposition à choisir,
+  // l'interface se retire d'elle-même et revient au moindre mouvement.
+  //
+  // ON ÉCOUTE AUSSI DANS L'IFRAME : la souris passe le plus clair de son temps
+  // au-dessus de l'écran du jeu, et ces mouvements-là ne remontent pas à la page.
+  // Sans cette écoute, les commandes disparaîtraient pour ne jamais revenir.
+  const wake = useCallback(() => {
+    setAwake(true);
+    clearTimeout(sleeper.current);
+    sleeper.current = setTimeout(() => setAwake(false), IDLE);
+  }, []);
+
+  useEffect(() => {
+    // Le pointeur POSÉ SUR LA BARRE n'est pas de l'inactivité : c'est quelqu'un
+    // qui cherche un bouton, ou qui règle son volume sans bouger d'un pixel.
+    // Sans ce cas, la barre s'évanouissait sous le curseur au bout d'une
+    // seconde — et le réglage de volume, qui en sort, avec elle.
+    const busyNow =
+      phase !== "on" || paused || sheet || raw || offer || closing || overDock;
+    if (busyNow) {
+      clearTimeout(sleeper.current);
+      setAwake(true);
+      return undefined;
     }
-  }
+    wake();
+    const targets = bothWindows();
+    for (const t of targets) {
+      try {
+        t.addEventListener("pointermove", wake);
+        t.addEventListener("pointerdown", wake);
+        t.addEventListener("keydown", wake);
+      } catch {
+        /* document jeté */
+      }
+    }
+    return () => {
+      clearTimeout(sleeper.current);
+      for (const t of targets) {
+        try {
+          t.removeEventListener("pointermove", wake);
+          t.removeEventListener("pointerdown", wake);
+          t.removeEventListener("keydown", wake);
+        } catch {
+          /* rien à retirer */
+        }
+      }
+    };
+  }, [phase, paused, sheet, raw, offer, closing, overDock, core, wake, bothWindows]);
 
   // ------------------------------------------------------------ éteindre --
   //
   // ON SAUVEGARDE AVANT DE PARTIR, et on le montre. C'est la seule attente qu'on
-  // impose au joueur dans toute cette console, et elle est justifiée : sans elle,
-  // fermer l'onglet perdrait la partie — l'iframe est jetée avec le composant, et
-  // on ne peut plus rien lui demander après.
-  //
-  // BORNÉE À DEUX SECONDES ET DEMIE. Un cœur en panne ne doit pas pouvoir retenir
-  // quelqu'un qui veut sortir : passé ce délai on éteint quand même, et le temps
-  // de jeu, lui, est déjà parti.
+  // impose au joueur, et elle est justifiée : sans elle, fermer perdrait la partie
+  // — l'iframe est jetée avec le composant, et on ne peut plus rien lui demander
+  // après. BORNÉE À DEUX SECONDES ET DEMIE : un cœur en panne ne doit pas pouvoir
+  // retenir quelqu'un qui veut sortir.
   const close = useCallback(async () => {
     if (gone.current) return;
     gone.current = true;
     flushTime();
+    unlockOrientation();
     if (phase === "on" && !raw) {
       setClosing(true);
       await store(AUTO_SLOT, { quiet: true, timeout: CLOSE_TIMEOUT });
@@ -682,30 +922,72 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
 
   useBackClose(close, "gba");
 
+  // --------------------------------------------------- les raccourcis clavier --
+  //
+  // ILS S'EFFACENT DEVANT LA MANETTE : si F5 a été assigné au bouton A, c'est le
+  // bouton A qu'il fait. Un raccourci de confort ne prend jamais le pas sur une
+  // touche de jeu — sinon on sauvegarde en sautant.
+  useEffect(() => {
+    if (phase !== "on" || capturing) return undefined;
+    const taken = new Set(
+      BUTTONS.map((b) => keys[b.id]?.code).filter(Boolean)
+    );
+    function onKey(e) {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+      if (taken.has(e.code)) return;
+      if (e.code === "F5") {
+        e.preventDefault();
+        store(AUTO_SLOT);
+      } else if (e.code === "F8") {
+        e.preventDefault();
+        restore(AUTO_SLOT);
+      } else if (e.code === "F2") {
+        e.preventDefault();
+        snap();
+      } else if (e.code === "KeyP") {
+        e.preventDefault();
+        togglePause();
+      }
+    }
+    const targets = bothWindows();
+    for (const t of targets) {
+      try {
+        t.addEventListener("keydown", onKey);
+      } catch {
+        /* document jeté */
+      }
+    }
+    return () => {
+      for (const t of targets) {
+        try {
+          t.removeEventListener("keydown", onKey);
+        } catch {
+          /* rien à retirer */
+        }
+      }
+    };
+  }, [phase, capturing, keys, store, restore, snap, togglePause, bothWindows]);
+
+  // Échap sert d'abord à refermer ce qui est ouvert par-dessus.
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== "Escape" || document.fullscreenElement) return;
-      // Échap sert d'abord à refermer ce qui est ouvert par-dessus. Pendant un
-      // réapprentissage de touche, il annule celui-ci et rien d'autre : c'est
-      // l'écoute en capture qui s'en charge, on ne fait que ne pas éteindre.
-      if (capturing || tuning) return;
-      if (menu) return setMenu(null);
+      if (capturing) return; // c'est l'écoute en capture qui l'annule
+      if (sheet) return setSheet(null);
       if (raw) return toggleRaw();
       return close();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [close, menu, raw, capturing, tuning]);
+  }, [close, sheet, raw, capturing, toggleRaw]);
 
   function pickEngine(value) {
-    setMenu(null);
+    setSheet(null);
     if (value === core) return;
     flushTime();
     // Changer de moteur jette le document, donc la partie en cours. On la
-    // sauvegarde AVANT — sans ça, on perdrait exactement ce qu'on venait de
-    // jouer. Et comme un état appartient à son cœur (voir GbaSaves), la
-    // sauvegarde part sous l'ANCIEN nom de moteur : c'est elle qu'on retrouvera
+    // sauvegarde AVANT — et comme un état appartient à son cœur (voir GbaSaves),
+    // la sauvegarde part sous l'ANCIEN nom de moteur : c'est elle qu'on retrouvera
     // en revenant.
     store(AUTO_SLOT, { quiet: true, timeout: CLOSE_TIMEOUT }).finally(() => {
       try {
@@ -717,14 +999,15 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
       setPaused(false);
       setDeaf(false);
       setOffer(false);
+      setFf(false);
       setCore(value);
     });
   }
 
   if (!rom)
     return createPortal(
-      <div className="gba-stage" style={{ "--tint": tint }}>
-        <div className="gba-fail">
+      <div className="gbx-stage" style={{ "--tint": tint }}>
+        <div className="gbx-fail">
           <Unplug size={24} />
           <strong>Pas de cartouche dans ce boîtier.</strong>
           <p>Le titre est bien sur l'étagère, mais son fichier n'a pas été déposé.</p>
@@ -739,419 +1022,696 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
   const other = CORES.find((c) => c.value !== core);
   const autoSave = saves.find((s) => s.slot === AUTO_SLOT);
   const preset = presetOf(keys);
+  const muted = view.volume <= 0;
+  const chrome = awake || phase !== "on" || paused || !!sheet || raw || offer;
 
-  // La fenêtre de l'écran. Sans mesure encore (premier rendu), l'iframe reste
-  // dans son coin : invisible, mais TOUJOURS rendue — un document que le
-  // navigateur ne peint pas voit ses images étranglées, et le jeu tournerait au
-  // ralenti.
-  const frameStyle =
-    !raw && screen
-      ? {
-          left: `${screen.left}px`,
-          top: `${screen.top}px`,
-          width: `${screen.width}px`,
-          height: `${screen.height}px`,
-        }
-      : undefined;
+  // ------------------------------------------------------------ les actions --
+  //
+  // UNE SEULE LISTE, DEUX RENDUS. Les principales tiennent dans la barre sur
+  // n'importe quel téléphone ; les autres s'y ajoutent dès qu'il y a la place, et
+  // se retrouvent sinon derrière « … », en clair, avec leur nom. Deux listes à
+  // tenir en parallèle finiraient toujours par diverger.
+  const acts = [
+    {
+      id: "pause",
+      main: true,
+      icon: paused ? Play : Pause,
+      fill: paused,
+      label: paused ? "Reprendre" : "Pause",
+      onClick: togglePause,
+      disabled: phase !== "on",
+    },
+    {
+      id: "ff",
+      icon: FastForward,
+      label: "Avance rapide",
+      onClick: toggleFf,
+      on: ff,
+      hidden: !ffOk,
+      disabled: phase !== "on",
+    },
+    {
+      id: "restart",
+      icon: RotateCcw,
+      label: "Redémarrer",
+      onClick: restart,
+      disabled: phase !== "on",
+    },
+    {
+      id: "saves",
+      main: true,
+      icon: Save,
+      label: "Sauvegardes",
+      onClick: () => setSheet((s) => (s === "saves" ? null : "saves")),
+      on: sheet === "saves",
+      dot: saves.length > 0,
+      disabled: phase !== "on",
+    },
+    {
+      id: "snap",
+      icon: Camera,
+      label: "Capture d'écran",
+      onClick: snap,
+      disabled: phase !== "on",
+    },
+    {
+      id: "cast",
+      main: true,
+      icon: Radio,
+      label: cast.live ? "Diffusion en cours" : "Diffuser ma partie",
+      // Premier clic : on allume. Ensuite le bouton ouvre le panneau — on
+      // n'éteint pas une diffusion par mégarde en cherchant qui regarde.
+      onClick: () => (cast.live ? setSheet((s) => (s === "cast" ? null : "cast")) : cast.start()),
+      on: cast.live,
+      disabled: phase !== "on" || cast.starting,
+    },
+    {
+      id: "sound",
+      icon: muted ? VolumeX : Volume2,
+      label: muted ? "Remettre le son" : "Couper le son",
+      onClick: toggleSound,
+      on: muted,
+    },
+    {
+      id: "pad",
+      main: true,
+      icon: Gamepad2,
+      label: pad ? "Cacher la manette" : "Manette à l'écran",
+      onClick: togglePad,
+      on: pad,
+    },
+    {
+      id: "keys",
+      icon: Keyboard,
+      label: "Touches",
+      onClick: () => setSheet((s) => (s === "keys" ? null : "keys")),
+      on: sheet === "keys",
+    },
+    {
+      id: "view",
+      icon: MonitorCog,
+      label: "Image et moteur",
+      onClick: () => setSheet((s) => (s === "view" ? null : "view")),
+      on: sheet === "view",
+    },
+    {
+      id: "raw",
+      icon: SlidersHorizontal,
+      label: "Panneau de l'émulateur",
+      onClick: toggleRaw,
+      on: raw,
+    },
+    {
+      id: "full",
+      main: true,
+      icon: full ? Minimize2 : Maximize2,
+      label: full ? "Quitter le plein écran" : "Plein écran",
+      onClick: toggleFull,
+    },
+  ].filter((a) => !a.hidden);
+
+  // Un bouton de la barre. Une FONCTION, pas un composant imbriqué : un composant
+  // défini dans le rendu change d'identité à chaque passage, et React démonte puis
+  // remonte tous les boutons — le focus saute, et l'infobulle clignote.
+  const dockBtn = (act) => {
+    const Icon = act.icon;
+    return (
+      <button
+        key={act.id}
+        className={`gbx-btn clickable ${act.main ? "main" : ""} ${act.on ? "on" : ""} ${
+          act.dot ? "dot" : ""
+        }`}
+        onClick={act.onClick}
+        disabled={act.disabled}
+        data-tip={act.label}
+        aria-label={act.label}
+        aria-pressed={act.on === undefined ? undefined : !!act.on}
+      >
+        <Icon size={18} fill={act.fill ? "currentColor" : "none"} />
+      </button>
+    );
+  };
 
   return createPortal(
     <div
-      className={`gba-stage ${phase === "on" ? "lit" : ""} ${raw ? "raw" : ""} ${
-        capturing || tuning ? "tuning" : ""
-      }`}
+      className={`gbx-stage ${phase === "on" ? "lit" : ""} ${raw ? "raw" : ""} ${
+        chrome ? "" : "asleep"
+      } ${pad ? "padded" : ""} ${view.crt ? "crt" : ""}`}
       style={{ "--tint": tint }}
       role="dialog"
       aria-label={`${media.title} — Game Boy Advance`}
     >
-      <div className="gba-shell" ref={shell}>
-        <div className={`gba-body ${paused ? "held" : ""}`} ref={body}>
-          <GbaConsole
-            shell={shape.shell}
-            keys={keys}
-            onKeys={setKeys}
-            onPress={onSpot}
-            onCapture={setTuning}
-            lit={phase === "on" && !paused}
-            disabled={phase !== "on"}
-          />
-
-          {/* L'ÉCRAN. L'iframe elle-même, posée sur la dalle mesurée — pas une
-              recopie. C'est toute la différence avec le rayon d'avant. */}
-          <div className={`gba-frame ${frameStyle ? "fitted" : ""}`} style={frameStyle}>
+      <div className="gbx-shell" ref={shell}>
+        {/* ---------------- l'écran ----------------
+            IL EST L'IFRAME ELLE-MÊME, à la taille calculée : pas une recopie, pas
+            un canvas intermédiaire. Et il n'est JAMAIS démonté tant que le moteur
+            ne change pas — le démonter relancerait le jeu en pleine partie. */}
+        <div className="gbx-viewport" ref={viewport}>
+          <div
+            className={`gbx-screen ${paused ? "held" : ""}`}
+            style={
+              raw || !box
+                ? undefined
+                : { width: `${Math.round(box.width)}px`, height: `${Math.round(box.height)}px` }
+            }
+          >
             <iframe
               key={core}
               ref={frame}
-              className="gba-feed"
+              className="gbx-feed"
               title={`${media.title} — écran`}
               srcDoc={doc}
               // Le plein écran d'EmulatorJS part de SON document : sans cette
               // permission, son bouton ne fait rien du tout.
               allow="fullscreen; autoplay; gamepad"
             />
-          </div>
-
-          {phase !== "on" && (
-            <div className="gba-boot">
-              {phase === "boot" ? (
-                <>
-                  <Loader2 size={22} className="spin" />
-                  <strong>Insertion de la cartouche…</strong>
-                  <span>
-                    Le cœur {engine.label} se télécharge — c'est le plus long, et
-                    seulement la première fois.
-                  </span>
-                </>
-              ) : (
-                <>
-                  <Unplug size={22} />
-                  <strong>
-                    {phase === "nodata"
-                      ? "Les cœurs d'émulation sont injoignables."
-                      : "La console ne démarre pas."}
-                  </strong>
-                  <span>
-                    {phase === "nodata" ? (
-                      <>
-                        Rien n'a pu être téléchargé depuis <code>{EJS_DATA}</code>. Un
-                        bloqueur, une coupure — ou l'hébergement à régler (
-                        <code>VITE_EJS_DATA</code>).
-                      </>
-                    ) : (
-                      <>
-                        Le cœur {engine.label} n'a pas répondu. L'autre moteur
-                        démarre souvent là où celui-ci cale.
-                      </>
-                    )}
-                  </span>
-                  <button
-                    className="btn btn-ghost clickable"
-                    onClick={() => pickEngine(other?.value || core)}
-                  >
-                    <Cpu size={15} /> Essayer {other?.label}
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* ---------------- reprendre ta partie ? ----------------
-              LA VIGNETTE FAIT LA DÉCISION. On ne demande pas « veux-tu reprendre
-              ta sauvegarde du 12 mars » : on MONTRE l'écran sur lequel on s'est
-              arrêté, et le choix se fait tout seul.
-
-              Et on DEMANDE, plutôt que de reprendre d'office : quelqu'un qui
-              revient pour recommencer une partie ne doit pas voir la console
-              charger la précédente sous ses yeux. */}
-          {offer && phase === "on" && autoSave && (
-            <div className="gba-offer">
-              {autoSave.thumb && <img src={autoSave.thumb} alt="" />}
-              <div>
-                <strong>Reprendre ta partie ?</strong>
-                <span>
-                  {autoSave.playSeconds > 60
-                    ? `Tu en étais là, après ${Math.round(autoSave.playSeconds / 60)} minutes de jeu.`
-                    : "Tu en étais là."}
-                </span>
-                {savesError && <em>{savesError}</em>}
-              </div>
-              <div className="gba-offer-btns">
-                <button
-                  className="btn btn-primary clickable"
-                  onClick={() => restore(AUTO_SLOT)}
-                  disabled={savesBusy !== null}
-                >
-                  {savesBusy === AUTO_SLOT ? (
-                    <Loader2 size={15} className="spin" />
-                  ) : (
-                    <Play size={15} />
-                  )}
-                  Reprendre
-                </button>
-                <button
-                  className="btn btn-ghost clickable"
-                  onClick={() => setOffer(false)}
-                  disabled={savesBusy !== null}
-                >
-                  Nouvelle partie
-                </button>
-              </div>
-              {/* ON LE DIT AVANT, PAS APRÈS. Repartir de zéro veut dire que la
-                  sauvegarde automatique sera écrasée par la nouvelle partie dans
-                  les minutes qui suivent — c'est le contrat normal d'une reprise
-                  automatique, mais le découvrir après coup, c'est perdre une
-                  partie. Les emplacements, eux, ne bougent pas. */}
-              <em className="gba-offer-warn">
-                Une nouvelle partie remplacera cette reprise. Tes emplacements
-                gardés, eux, sont intacts.
-              </em>
-            </div>
-          )}
-
-          {closing && (
-            <div className="gba-boot">
-              <Loader2 size={22} className="spin" />
-              <strong>Sauvegarde de la partie…</strong>
-              <span>Elle t'attendra sur ton compte, où que tu reprennes.</span>
-            </div>
-          )}
-        </div>
-
-        {/* ---------------- l'étiquette ----------------
-            Le titre ne mérite pas une barre à lui : il se dit une fois, dans un
-            coin, et laisse la console tranquille. */}
-        <div className="gba-tag">
-          <span className="gba-led" aria-hidden="true" />
-          <div>
-            <strong>{media.title}</strong>
-            <em>
-              {["Game Boy Advance", media.cartridge?.region, engine.label]
-                .filter(Boolean)
-                .join(" · ")}
-            </em>
-          </div>
-        </div>
-
-        {flash && (
-          <p className="gba-flash" role="status">
-            <Check size={13} /> {flash.msg}
-          </p>
-        )}
-
-        {/* ---------------- la colonne de commandes ----------------
-            Contre le bord droit, en colonne : c'est la seule place qui ne
-            retire pas un pixel de hauteur à la console. Les libellés sortent au
-            survol, vers l'intérieur. */}
-        <div className="gba-rack">
-          <button
-            className="gba-btn clickable"
-            onClick={togglePause}
-            disabled={phase !== "on"}
-            data-tip={paused ? "Reprendre" : "Pause"}
-            aria-label={paused ? "Reprendre" : "Mettre en pause"}
-          >
-            {paused ? <Play size={17} fill="currentColor" /> : <Pause size={17} />}
-          </button>
-          <button
-            className="gba-btn clickable"
-            onClick={restart}
-            disabled={phase !== "on"}
-            data-tip="Redémarrer"
-            aria-label="Redémarrer la console"
-          >
-            <RotateCcw size={17} />
-          </button>
-          <button
-            className="gba-btn clickable"
-            onClick={toggleSound}
-            data-tip={muted ? "Remettre le son" : "Couper le son"}
-            aria-label={muted ? "Remettre le son" : "Couper le son"}
-          >
-            {muted ? <VolumeX size={17} /> : <Volume2 size={17} />}
-          </button>
-
-          <span className="gba-sep" aria-hidden="true" />
-
-          {/* Les sauvegardes en TÊTE de ce groupe, et avec une pastille quand il y
-              a une partie en réserve : c'est la commande qu'on vient chercher. */}
-          <div className="gba-pop">
-            <button
-              className={`gba-btn clickable ${menu === "saves" ? "on" : ""} ${
-                saves.length ? "dot" : ""
-              }`}
-              onClick={() => setMenu((m) => (m === "saves" ? null : "saves"))}
-              disabled={phase !== "on"}
-              data-tip="Sauvegardes"
-              aria-label="Sauvegardes"
-            >
-              <Save size={17} />
-            </button>
-          </div>
-
-          <div className="gba-pop">
-            <button
-              className={`gba-btn clickable ${menu === "keys" ? "on" : ""}`}
-              onClick={() => setMenu((m) => (m === "keys" ? null : "keys"))}
-              data-tip="Touches"
-              aria-label="Réglage des touches"
-            >
-              <Keyboard size={17} />
-            </button>
-          </div>
-
-          {/* Deux dispositions seulement : un interrupteur, pas un menu. */}
-          <button
-            className={`gba-btn clickable ${!shape.shell ? "on" : ""}`}
-            onClick={toggleLayout}
-            data-tip={shape.shell ? "Écran seul" : "Voir la console"}
-            aria-label={shape.shell ? "Afficher l'écran seul" : "Afficher la console"}
-            aria-pressed={!shape.shell}
-          >
-            <LayoutGrid size={17} />
-          </button>
-
-          <div className="gba-pop">
-            <button
-              className={`gba-btn clickable ${menu === "core" ? "on" : ""}`}
-              onClick={() => setMenu((m) => (m === "core" ? null : "core"))}
-              data-tip={`Moteur · ${engine.label}`}
-              aria-label="Changer de moteur d'émulation"
-            >
-              <Cpu size={17} />
-            </button>
-            {menu === "core" && (
-              <div className="gba-menu">
-                <p className="gba-menu-title">Moteur</p>
-                {CORES.map((c) => (
-                  <button
-                    key={c.value}
-                    className={`clickable ${c.value === core ? "on" : ""}`}
-                    onClick={() => pickEngine(c.value)}
-                  >
-                    <span>
-                      <strong>{c.label}</strong>
-                      <em>{c.hint}</em>
-                    </span>
-                    {c.value === core && <Check size={14} />}
-                  </button>
-                ))}
-                <p className="gba-menu-note">
-                  La partie en cours est sauvegardée avant de changer. Attention :
-                  une sauvegarde ne se relit que dans le moteur qui l'a écrite.
-                </p>
-              </div>
+            {view.crt && <span className="gbx-scan" aria-hidden="true" />}
+            {paused && phase === "on" && (
+              <button
+                className="gbx-resume clickable"
+                onClick={togglePause}
+                aria-label="Reprendre la partie"
+              >
+                <Play size={26} fill="currentColor" />
+                <span>En pause</span>
+              </button>
             )}
           </div>
+        </div>
 
+        {/* ---------------- la manette à l'écran ---------------- */}
+        {pad && !raw && (
+          <GbaPad
+            onPress={push}
+            stick={view.stick}
+            disabled={phase !== "on" || paused}
+          />
+        )}
+
+        {/* ---------------- EN DIRECT ----------------
+            HORS DE LA BARRE DU HAUT, et c'est la raison d'être de ces trois
+            lignes : la barre s'efface au bout de trois secondes, or savoir que
+            d'autres yeux sont sur son écran n'est pas une commande — c'est un
+            fait, et il doit rester vérifiable d'un regard à tout instant. (Un
+            enfant ne peut pas rattraper l'opacité de son parent : il fallait
+            qu'il en sorte.) */}
+        {cast.starting && <StartingBadge />}
+        {cast.room && (
+          <LiveBadge
+            room={cast.room}
+            onClick={() => setSheet((s) => (s === "cast" ? null : "cast"))}
+          />
+        )}
+
+        {/* ---------------- l'étiquette ----------------
+            Le titre se dit une fois, dans un coin, et laisse l'écran tranquille.
+            Il s'efface avec le reste des commandes. */}
+        <div className="gbx-top">
+          <div className="gbx-tag">
+            <span className="gbx-led" aria-hidden="true" />
+            <div>
+              <strong>{media.title}</strong>
+              <em>
+                {["Game Boy Advance", media.cartridge?.region, engine.label]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </em>
+            </div>
+          </div>
+          {total > 60 && (
+            <span className="gbx-clock" title="Temps passé sur cette cartouche">
+              {fmtDuration(total)}
+            </span>
+          )}
+          {/* SUR TÉLÉPHONE, LA BARRE DU BAS N'EXISTE PAS : elle mangeait le tiers
+              de l'écran et se retrouvait sous les pouces. Ses commandes passent
+              derrière ce bouton, en clair et avec leurs noms ; le plein écran,
+              lui, reste à portée immédiate — c'est le geste qu'on fait en
+              premier. Les deux ne s'affichent QUE sur petit écran (feuille de
+              style) : ailleurs la barre du bas fait déjà tout. */}
           <button
-            className={`gba-btn clickable ${raw ? "on" : ""}`}
-            onClick={toggleRaw}
-            data-tip="Panneau de l'émulateur"
-            aria-label="Panneau de l'émulateur"
-            aria-pressed={raw}
-          >
-            <SlidersHorizontal size={17} />
-          </button>
-
-          <span className="gba-sep" aria-hidden="true" />
-
-          <button
-            className="gba-btn clickable"
+            className="gbx-topbtn clickable"
             onClick={toggleFull}
-            data-tip={full ? "Quitter le plein écran" : "Plein écran"}
             aria-label={full ? "Quitter le plein écran" : "Plein écran"}
           >
             {full ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
           </button>
           <button
-            className="gba-btn power clickable"
+            className={`gbx-topbtn clickable ${sheet === "more" ? "on" : ""}`}
+            onClick={() => setSheet((v) => (v === "more" ? null : "more"))}
+            aria-label="Réglages"
+          >
+            <Settings size={17} />
+          </button>
+          <button
+            className="gbx-quit clickable"
             onClick={close}
             disabled={closing}
-            data-tip="Éteindre"
-            aria-label="Éteindre"
+            aria-label="Quitter"
           >
-            <Power size={17} />
+            <Power size={16} />
+            <span>Quitter</span>
           </button>
         </div>
 
-        {/* ---------------- les panneaux ---------------- */}
-        {menu === "saves" && (
-          <div className="gba-panel">
-            <GbaSaves
-              saves={saves}
-              slots={slots}
-              core={core}
-              busy={savesBusy}
-              error={savesError}
-              playSeconds={total}
-              onLoad={restore}
-              onSave={(slot) => store(slot)}
-              onDelete={forget}
-              onClose={() => setMenu(null)}
-            />
+        {flash && (
+          <p className={`gbx-flash ${flash.ok ? "" : "bad"}`} role="status">
+            {flash.ok ? <Check size={13} /> : <AlertTriangle size={13} />} {flash.msg}
+          </p>
+        )}
+
+        {/* ---------------- la barre de commandes ----------------
+            EN BAS, AU CENTRE, ET ELLE S'EFFACE. L'ancienne colonne contre le bord
+            droit existait pour ne pas rogner la hauteur de la coque dessinée ; il
+            n'y a plus de coque, et une barre qui disparaît ne coûte plus rien. */}
+        <div
+          className="gbx-dock"
+          // AU DOIGT, ON NE SURVOLE PAS : un `pointerenter` tactile ne se voit
+          // jamais suivi d'un `pointerleave`, et la barre resterait affichée
+          // pour toujours après le premier appui. Le survol n'existe qu'à la
+          // souris ; le doigt, lui, réveille la barre en touchant l'écran.
+          onPointerEnter={(e) => e.pointerType === "mouse" && setOverDock(true)}
+          onPointerLeave={() => setOverDock(false)}
+        >
+          {acts.map((a) =>
+            // LE SON EST LE SEUL BOUTON QUI CACHE UN RÉGLAGE, pas seulement une
+            // bascule : « couper » ne remplace pas « moins fort ». Le curseur
+            // sort au survol du bouton, au-dessus, et le clic garde son sens —
+            // deux gestes sur un seul bouton, sans rien ajouter à la barre.
+            a.id === "sound" ? (
+              <span key={a.id} className="gbx-volwrap">
+                {dockBtn(a)}
+                <span className="gbx-volpop">
+                  <em>{Math.round(view.volume * 100)}</em>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={view.volume}
+                    onChange={(e) => setPref({ volume: Number(e.target.value) })}
+                    aria-label="Volume"
+                  />
+                </span>
+              </span>
+            ) : (
+              dockBtn(a)
+            )
+          )}
+          <button
+            className={`gbx-btn more clickable ${sheet === "more" ? "on" : ""}`}
+            onClick={() => setSheet((s) => (s === "more" ? null : "more"))}
+            data-tip="Plus"
+            aria-label="Plus de commandes"
+          >
+            <MoreHorizontal size={18} />
+          </button>
+        </div>
+
+        {/* ---------------- démarrage et pannes ---------------- */}
+        {phase !== "on" && !closing && (
+          <div className="gbx-note">
+            {phase === "boot" ? (
+              <>
+                <Loader2 size={22} className="spin" />
+                <strong>Insertion de la cartouche…</strong>
+                <span>
+                  Le cœur {engine.label} se télécharge — c'est le plus long, et
+                  seulement la première fois.
+                </span>
+              </>
+            ) : (
+              <>
+                <Unplug size={22} />
+                <strong>
+                  {phase === "nodata"
+                    ? "Les cœurs d'émulation sont injoignables."
+                    : "La console ne démarre pas."}
+                </strong>
+                <span>
+                  {phase === "nodata" ? (
+                    <>
+                      Rien n'a pu être téléchargé depuis <code>{EJS_DATA}</code>. Un
+                      bloqueur, une coupure — ou l'hébergement à régler (
+                      <code>VITE_EJS_DATA</code>).
+                    </>
+                  ) : (
+                    <>
+                      Le cœur {engine.label} n'a pas répondu. L'autre moteur démarre
+                      souvent là où celui-ci cale.
+                    </>
+                  )}
+                </span>
+                <button
+                  className="btn btn-ghost clickable"
+                  onClick={() => pickEngine(other?.value || core)}
+                >
+                  <Cpu size={15} /> Essayer {other?.label}
+                </button>
+              </>
+            )}
           </div>
         )}
 
-        {menu === "keys" && (
-          <div className="gba-panel">
-            <div className="gba-keys" role="dialog" aria-label="Touches">
-              <header>
-                <div>
-                  <strong>Touches</strong>
-                  <em>
-                    Choisis une manette toute faite, ou clique une touche pour la
-                    changer.
-                  </em>
-                </div>
-                <button
-                  className="clickable"
-                  onClick={() => setMenu(null)}
-                  aria-label="Fermer"
-                >
-                  <Check size={15} />
-                </button>
-              </header>
-
-              {/* LES JEUX TOUT FAITS D'ABORD, et c'est le point. « Rends le
-                  mappage facile » ne veut pas dire « rends chaque touche
-                  réassignable » — ça l'était déjà, et personne n'y touchait. Ça
-                  veut dire : que la manette soit bonne en un clic. */}
-              <div className="gba-preset-row">
-                {PRESETS.map((p) => (
-                  <button
-                    key={p.value}
-                    className={`gba-preset clickable ${preset === p.value ? "on" : ""}`}
-                    onClick={() => setKeys({ ...p.keys })}
-                  >
-                    <strong>{presetLabel(p, keys)}</strong>
-                    <em>{p.hint}</em>
-                    {preset === p.value && <Check size={13} />}
-                  </button>
-                ))}
-              </div>
-
-              <div className="gba-keys-list">
-                {BUTTONS.map((b) => (
-                  <button
-                    key={b.id}
-                    className={`gba-keyrow clickable ${capturing === b.id ? "waiting" : ""}`}
-                    onClick={() => setCapturing(b.id)}
-                  >
-                    <span className="gba-keyrow-name">{b.label}</span>
-                    <kbd>
-                      {capturing === b.id
-                        ? "Appuie…"
-                        : keys[b.id]?.label || "non assignée"}
-                    </kbd>
-                  </button>
-                ))}
-              </div>
-
-              <footer>
-                <span>
-                  <Gamepad2 size={13} /> Une manette branchée marche telle quelle,
-                  sans rien régler.
-                </span>
-                {preset !== PRESETS[0].value && (
-                  <button
-                    className="btn btn-ghost clickable"
-                    onClick={() => setKeys({ ...PRESETS[0].keys })}
-                  >
-                    <RotateCcw size={14} /> Tout par défaut
-                  </button>
-                )}
-              </footer>
-            </div>
+        {closing && (
+          <div className="gbx-note">
+            <Loader2 size={22} className="spin" />
+            <strong>Sauvegarde de la partie…</strong>
+            <span>Elle t'attendra sur ton compte, où que tu reprennes.</span>
           </div>
+        )}
+
+        {/* ---------------- reprendre ta partie ? ----------------
+            LA VIGNETTE FAIT LA DÉCISION. On ne demande pas « veux-tu reprendre ta
+            sauvegarde du 12 mars » : on MONTRE l'écran sur lequel on s'est arrêté,
+            et le choix se fait tout seul. */}
+        {offer && phase === "on" && autoSave && (
+          <div className="gbx-offer">
+            {autoSave.thumb && <img src={autoSave.thumb} alt="" />}
+            <div>
+              <strong>Reprendre ta partie ?</strong>
+              <span>
+                {autoSave.playSeconds > 60
+                  ? `Tu en étais là, après ${Math.round(autoSave.playSeconds / 60)} minutes de jeu.`
+                  : "Tu en étais là."}
+              </span>
+              {savesError && <em>{savesError}</em>}
+            </div>
+            <div className="gbx-offer-btns">
+              <button
+                className="btn btn-primary clickable"
+                onClick={() => restore(AUTO_SLOT)}
+                disabled={savesBusy !== null}
+              >
+                {savesBusy === AUTO_SLOT ? (
+                  <Loader2 size={15} className="spin" />
+                ) : (
+                  <Play size={15} />
+                )}
+                Reprendre
+              </button>
+              <button
+                className="btn btn-ghost clickable"
+                onClick={() => setOffer(false)}
+                disabled={savesBusy !== null}
+              >
+                Nouvelle partie
+              </button>
+            </div>
+            {/* ON LE DIT AVANT, PAS APRÈS : repartir de zéro veut dire que la
+                reprise automatique sera écrasée dans les minutes qui suivent. */}
+            <em className="gbx-offer-warn">
+              Une nouvelle partie remplacera cette reprise. Tes emplacements gardés,
+              eux, sont intacts.
+            </em>
+          </div>
+        )}
+
+        {/* ================================================== les panneaux == */}
+        {sheet && (
+          <>
+            <div
+              className="gbx-veil"
+              onPointerDown={() => setSheet(null)}
+              aria-hidden="true"
+            />
+
+            {sheet === "saves" && (
+              <div className="gbx-sheet wide">
+                <GbaSaves
+                  saves={saves}
+                  slots={slots}
+                  core={core}
+                  busy={savesBusy}
+                  error={savesError}
+                  playSeconds={total}
+                  onLoad={restore}
+                  onSave={(slot) => store(slot)}
+                  onDelete={forget}
+                  onClose={() => setSheet(null)}
+                />
+              </div>
+            )}
+
+            {sheet === "keys" && (
+              <div className="gbx-sheet">
+                <div className="gba-keys" role="dialog" aria-label="Touches">
+                  <header>
+                    <div>
+                      <strong>Touches</strong>
+                      <em>
+                        Choisis une manette toute faite, ou clique une touche pour la
+                        changer.
+                      </em>
+                    </div>
+                    <button
+                      className="clickable"
+                      onClick={() => setSheet(null)}
+                      aria-label="Fermer"
+                    >
+                      <X size={15} />
+                    </button>
+                  </header>
+
+                  {/* LES JEUX TOUT FAITS D'ABORD : « rends le mappage facile » ne
+                      veut pas dire « rends chaque touche réassignable » — ça l'était
+                      déjà, et personne n'y touchait. Ça veut dire : que la manette
+                      soit bonne en un clic. */}
+                  <div className="gba-preset-row">
+                    {PRESETS.map((p) => (
+                      <button
+                        key={p.value}
+                        className={`gba-preset clickable ${preset === p.value ? "on" : ""}`}
+                        onClick={() => setKeys({ ...p.keys })}
+                      >
+                        <strong>{presetLabel(p, keys)}</strong>
+                        <em>{p.hint}</em>
+                        {preset === p.value && <Check size={13} />}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="gba-keys-list">
+                    {BUTTONS.map((b) => (
+                      <button
+                        key={b.id}
+                        className={`gba-keyrow clickable ${
+                          capturing === b.id ? "waiting" : ""
+                        }`}
+                        onClick={() => setCapturing(b.id)}
+                      >
+                        <span className="gba-keyrow-name">{b.label}</span>
+                        <kbd>
+                          {capturing === b.id
+                            ? "Appuie…"
+                            : keys[b.id]?.label || "non assignée"}
+                        </kbd>
+                      </button>
+                    ))}
+                  </div>
+
+                  <footer>
+                    <span>
+                      <Gamepad2 size={13} /> Une manette branchée marche telle quelle,
+                      sans rien régler.
+                    </span>
+                    <span className="gbx-shortcuts">
+                      <kbd>F5</kbd> sauvegarder · <kbd>F8</kbd> reprendre ·{" "}
+                      <kbd>F2</kbd> capture · <kbd>P</kbd> pause
+                    </span>
+                    {preset !== PRESETS[0].value && (
+                      <button
+                        className="btn btn-ghost clickable"
+                        onClick={() => setKeys({ ...PRESETS[0].keys })}
+                      >
+                        <RotateCcw size={14} /> Tout par défaut
+                      </button>
+                    )}
+                  </footer>
+                </div>
+              </div>
+            )}
+
+            {sheet === "view" && (
+              <div className="gbx-sheet">
+                <div className="gbx-panel" role="dialog" aria-label="Image et moteur">
+                  <header>
+                    <div>
+                      <strong>Image et moteur</strong>
+                      <em>
+                        Une dalle de 240 × 160 mérite qu'on la regarde correctement.
+                      </em>
+                    </div>
+                    <button
+                      className="clickable"
+                      onClick={() => setSheet(null)}
+                      aria-label="Fermer"
+                    >
+                      <X size={15} />
+                    </button>
+                  </header>
+
+                  <Toggle
+                    on={!view.smooth}
+                    onClick={() => setPref({ smooth: !view.smooth })}
+                    title="Pixels nets"
+                    hint="Chaque pixel du jeu reste un carré franc. Lissé, essaie sur les jeux en 3D (Mario Kart, F-Zero)."
+                  />
+                  <Toggle
+                    on={view.integer}
+                    onClick={() => setPref({ integer: !view.integer })}
+                    title="Agrandissement entier"
+                    hint={
+                      box?.k
+                        ? `L'écran est agrandi ×${box.k} exactement : aucune ligne de pixels plus épaisse qu'une autre.`
+                        : view.integer
+                          ? "Ici l'arrondi coûterait trop de place : l'écran prend tout ce qu'il peut. Il reprendra une taille entière dès qu'il y aura la place."
+                          : "L'écran s'arrête au multiple entier : aucune ligne de pixels plus épaisse qu'une autre."
+                    }
+                  />
+                  {/* LE CHOIX N'EXISTE QUE LÀ OÙ IL A UN SENS : sans manette à
+                      l'écran, croix ou joystick ne veut rien dire. */}
+                  {pad && (
+                    <Toggle
+                      on={view.stick}
+                      onClick={() => setPref({ stick: !view.stick })}
+                      title="Joystick plutôt que la croix"
+                      hint="Le champignon suit le pouce au lieu d'une croix fixe. Plus doux pour tourner, moins précis pour les sauts au pixel."
+                    />
+                  )}
+                  <Toggle
+                    on={view.crt}
+                    onClick={() => setPref({ crt: !view.crt })}
+                    title="Lignes de balayage"
+                    hint="Le grain d'un écran cathodique, par-dessus l'image."
+                  />
+
+                  <label className="gbx-vol">
+                    <span>
+                      {muted ? <VolumeX size={15} /> : <Volume2 size={15} />} Volume
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={view.volume}
+                      onChange={(e) => setPref({ volume: Number(e.target.value) })}
+                    />
+                  </label>
+
+                  <p className="gbx-panel-title">Moteur d'émulation</p>
+                  {CORES.map((c) => (
+                    <button
+                      key={c.value}
+                      className={`gbx-row clickable ${c.value === core ? "on" : ""}`}
+                      onClick={() => pickEngine(c.value)}
+                    >
+                      <span>
+                        <strong>{c.label}</strong>
+                        <em>{c.hint}</em>
+                      </span>
+                      {c.value === core && <Check size={15} />}
+                    </button>
+                  ))}
+                  <p className="gbx-panel-note">
+                    La partie en cours est sauvegardée avant de changer. Attention :
+                    une sauvegarde ne se relit que dans le moteur qui l'a écrite.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {sheet === "cast" && cast.room && (
+              <div className="gbx-sheet">
+                <GbaBroadcast
+                  room={cast.room}
+                  links={cast.links}
+                  error={cast.error}
+                  hasAudio={cast.hasAudio}
+                  max={cast.max}
+                  onGrant={cast.grantPad}
+                  onStop={() => {
+                    cast.stop();
+                    setSheet(null);
+                  }}
+                  onClose={() => setSheet(null)}
+                />
+              </div>
+            )}
+
+            {sheet === "more" && (
+              <div className="gbx-sheet">
+                <div className="gbx-panel" role="dialog" aria-label="Commandes">
+                  <header>
+                    <div>
+                      <strong>Commandes</strong>
+                      <em>Tout ce que la console sait faire, en toutes lettres.</em>
+                    </div>
+                    <button
+                      className="clickable"
+                      onClick={() => setSheet(null)}
+                      aria-label="Fermer"
+                    >
+                      <X size={15} />
+                    </button>
+                  </header>
+                  {acts.map((a) => {
+                    const Icon = a.icon;
+                    return (
+                      <button
+                        key={a.id}
+                        className={`gbx-row clickable ${a.on ? "on" : ""}`}
+                        onClick={() => {
+                          a.onClick();
+                          if (!["saves", "keys", "view"].includes(a.id)) setSheet(null);
+                        }}
+                        disabled={a.disabled}
+                      >
+                        <span className="gbx-row-icon">
+                          <Icon size={16} />
+                        </span>
+                        <span>
+                          <strong>{a.label}</strong>
+                        </span>
+                        {a.on && <Check size={15} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {deaf && (
-          <p className="gba-deaf">
-            Ce cœur n'accepte pas les commandes de la page — passe par le panneau
-            de l'émulateur pour jouer et remapper.
+          <p className="gbx-deaf">
+            Ce cœur n'accepte pas les commandes de la page — passe par le panneau de
+            l'émulateur pour jouer et remapper.
           </p>
         )}
       </div>
     </div>,
     document.body
+  );
+}
+
+// Un interrupteur nommé, avec sa raison d'être écrite dessous. Trois réglages
+// d'image dont personne ne devine l'effet au nom seul : la phrase compte autant
+// que le bouton.
+function Toggle({ on, onClick, title, hint }) {
+  return (
+    <button
+      className={`gbx-toggle clickable ${on ? "on" : ""}`}
+      onClick={onClick}
+      role="switch"
+      aria-checked={on}
+    >
+      <span>
+        <strong>{title}</strong>
+        <em>{hint}</em>
+      </span>
+      <span className="gbx-switch" aria-hidden="true" />
+    </button>
   );
 }

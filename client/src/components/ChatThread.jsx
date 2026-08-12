@@ -34,6 +34,7 @@ import {
   VenetianMask,
   BookOpen,
   BookMarked,
+  Phone,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { renderMessage, extractYouTubeIds, YouTubeEmbed } from "./ListComments";
@@ -42,6 +43,7 @@ import ChatComposer from "./ChatComposer";
 import ChatLightbox from "./ChatLightbox";
 import VoiceBubble from "./VoiceBubble";
 import { useChat } from "../context/ChatContext";
+import { useCall } from "../context/CallContext";
 import { useAuth } from "../context/AuthContext";
 import { usePlayer } from "../context/PlayerContext";
 // Les têtes des joueurs, exactement celles du salon : une invitation doit
@@ -126,6 +128,12 @@ function systemText(m) {
       return `${who} a renommé le groupe en « ${d.name} ».`;
     case "avatar":
       return `${who} a changé la photo du groupe.`;
+    // La trace d'un appel. On nomme l'appelant pour les appels manqués et
+    // seulement pour eux : « Untel a appelé, personne n'a décroché » se lit,
+    // alors que « Untel a appelé · 4 min » laisserait croire qu'il était seul.
+    case "call":
+      if (d.missed) return `${who} a appelé — personne n'a décroché.`;
+      return `Appel · ${d.duration || ""}`.trim();
     default:
       return "";
   }
@@ -136,7 +144,10 @@ function systemText(m) {
 // flottantes — on veut écrire tout de suite).
 export default function ChatThread({ conversation, token, compact, autoFocus }) {
   const { subscribe, typing, markRead, me, isWindowFocused } = useChat();
+  const { callIn, joinCall, activeId } = useCall();
   const convId = String(conversation.id);
+  const liveCall = callIn?.(convId) || null;
+  const inThisCall = String(activeId || "") === convId;
   // Chef de groupe : peut supprimer n'importe quel message du fil.
   const iOwnGroup =
     conversation.isGroup && String(conversation.ownerId) === String(me?.id);
@@ -535,6 +546,26 @@ export default function ChatThread({ conversation, token, compact, autoFocus }) 
 
   return (
     <div className={`chat-thread ${compact ? "is-compact" : ""}`}>
+      {/* ---------- L'appel en cours ----------
+          Il REMPLACE la sonnerie pour tout ce qu'on a raté : un appel de groupe
+          ne sonne qu'une fois (au lancement), donc sans ce bandeau, arriver
+          trois minutes après le début voudrait dire ne jamais savoir qu'il y a
+          un appel. Tant que la session vit, la porte reste ouverte. */}
+      {liveCall && !inThisCall && (
+        <button type="button" className="chat-callbar clickable" onClick={() => joinCall(convId)}>
+          <span className="chat-callbar-dot" aria-hidden="true" />
+          <b>Appel en cours</b>
+          <em>
+            {(liveCall.participants || [])
+              .map((p) => p.username)
+              .slice(0, 3)
+              .join(", ") || "…"}
+          </em>
+          <span className="chat-callbar-go">
+            <Phone size={14} /> Rejoindre
+          </span>
+        </button>
+      )}
       <div className="chat-scroll" ref={scrollRef} onScroll={onScroll}>
         {loadingMore && (
           <div className="chat-more">

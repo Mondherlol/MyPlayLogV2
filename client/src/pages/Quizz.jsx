@@ -297,7 +297,10 @@ export default function Quizz() {
   const [final, setFinal] = useState(null);
   const [copied, setCopied] = useState(false);
 
-  useLiveStatus("quiz", rounds.length ? `épreuve ${idx + 1}/${rounds.length}` : "", { token });
+  useLiveStatus("quiz", rounds.length ? `épreuve ${idx + 1}/${rounds.length}` : "", {
+    token,
+    path: "/quiz",
+  });
 
   // Refs de contrôle
   const answersRef = useRef([]);

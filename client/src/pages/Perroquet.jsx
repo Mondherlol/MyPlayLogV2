@@ -28,6 +28,7 @@ import { FxTag } from "../components/VoiceFxPicker";
 import PerroquetHold from "../components/PerroquetHold";
 import ContourChart from "../components/ContourChart";
 import SoundLibrary from "../components/SoundLibrary";
+import { useLiveStatus } from "../lib/presence";
 import PerroquetDecor from "../components/PerroquetDecor";
 
 // ======================================================================
@@ -85,6 +86,11 @@ const BAND_LABEL = {
 
 export default function Perroquet() {
   const { token, user } = useAuth();
+
+  // « Joue au Perroquet » chez ceux qui suivent — et le lien pour venir. Le
+  // détail viendrait de la manche en cours, mais le hall et la partie partagent
+  // la même page : le nom du jeu suffit à donner envie.
+  useLiveStatus("perroquet", "", { token, path: "/perroquet" });
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const challengeId = params.get("challenge");

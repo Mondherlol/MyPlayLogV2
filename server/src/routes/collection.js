@@ -49,6 +49,7 @@ import { extractComic, dropComic } from "../lib/comicArchive.js";
 import { comicLookup } from "../lib/comicMeta.js";
 import { searchJaquettes, jaquetteImages } from "../lib/cinemapassion.js";
 import { readGbaFile } from "../lib/gbaRom.js";
+import { igdbQuery } from "../lib/igdb.js";
 import * as tmdb from "../lib/tmdb.js";
 
 // ======================================================================
@@ -478,6 +479,11 @@ function serializeCard(req, m, progress) {
     // qui manquait, la cartouche restée sur le disque), et sans cette date le
     // titre de tout à l'heure est perdu au milieu de cent autres.
     createdAt: m.createdAt || null,
+    // LE RATTACHEMENT VOYAGE AVEC LA CARTE, et pas seulement avec la fiche
+    // complète : c'est deux nombres, et sans lui le panneau d'admin ne sait pas
+    // dire si un boîtier est relié à sa fiche de jeu (il travaille sur la liste,
+    // jamais sur les fiches une par une).
+    games: m.games || [],
     progress: progress
       ? {
           episodeIndex: progress.episodeIndex,
@@ -2393,6 +2399,159 @@ router.post("/:slug/bookmark", requireAuth, async (req, res) => {
 // au lieu de faire semblant de les deviner.
 
 // POST /api/collection/game — pose un jeu depuis sa cartouche.
+// ======================================================================
+//  IGDB : ce que la cartouche ne saura jamais dire
+// ======================================================================
+// Un fichier .gba porte un code de jeu, une région et douze caractères en
+// capitales. Pas de jaquette, pas de résumé, pas d'éditeur, pas d'année — tout
+// ce qui fait une fiche présentable manque, et le formulaire demandait donc à
+// l'admin de le taper à la main pour chaque titre.
+//
+// IGDB a tout ça, et l'app l'interroge déjà partout ailleurs. On choisit LE jeu
+// (l'admin le désigne dans une liste, on ne devine rien d'après un nom de
+// fichier) et la fiche se remplit — y compris son RATTACHEMENT, `games`, qui est
+// ce qui relie le boîtier de l'étagère à la vraie fiche du jeu.
+
+// Le lien vers la fiche du jeu, tel qu'il est stocké. Vide si rien n'a été
+// choisi : un boîtier sans rattachement reste parfaitement valable (homebrew,
+// traduction de fans, jeu absent d'IGDB).
+function igdbLink(body) {
+  const id = Number(body?.igdbId);
+  if (!Number.isFinite(id) || id <= 0) return [];
+  return [{ igdbId: id, name: String(body.igdbName || "").slice(0, 200) }];
+}
+
+const IGDB_IMG = "https://images.igdb.com/igdb/image/upload";
+
+// Les champs qu'on va chercher : exactement ceux qui remplissent une fiche de
+// l'étagère, pas un de plus.
+const IGDB_FIELDS = [
+  "name",
+  "summary",
+  "storyline",
+  "first_release_date",
+  "total_rating",
+  "cover.image_id",
+  "artworks.image_id",
+  "artworks.width",
+  "screenshots.image_id",
+  "screenshots.width",
+  "genres.name",
+  "franchises.name",
+  "collections.name",
+  "involved_companies.developer",
+  "involved_companies.publisher",
+  "involved_companies.company.name",
+].join(",");
+
+// Ce qu'IGDB sait du jeu, ramené au vocabulaire de l'étagère.
+async function igdbSheet(id) {
+  const rows = await igdbQuery("games", `fields ${IGDB_FIELDS}; where id = ${id};`);
+  const g = rows?.[0];
+  if (!g) return null;
+  const companies = g.involved_companies || [];
+  const named = (f) => [
+    ...new Set(companies.filter(f).map((c) => c.company?.name).filter(Boolean)),
+  ];
+  // LE PLUS GRAND VISUEL FAIT LE BANDEAU. Les artworks d'IGDB sont dessinés pour
+  // ça ; à défaut on prend une capture, qui vaut toujours mieux qu'un aplat.
+  const wide =
+    [...(g.artworks || []), ...(g.screenshots || [])]
+      .filter((a) => a.image_id)
+      .sort((a, b) => (b.width || 0) - (a.width || 0))[0] || null;
+  return {
+    name: g.name || "",
+    synopsis: g.summary || g.storyline || "",
+    year: g.first_release_date
+      ? new Date(g.first_release_date * 1000).getFullYear()
+      : null,
+    rating: g.total_rating ? Math.round(g.total_rating) / 10 : null,
+    genres: (g.genres || []).map((x) => x.name).filter(Boolean),
+    franchise: g.franchises?.[0]?.name || g.collections?.[0]?.name || "",
+    authors: named((c) => c.developer),
+    publisher: named((c) => c.publisher)[0] || "",
+    cover: g.cover?.image_id
+      ? `${IGDB_IMG}/t_cover_big_2x/${g.cover.image_id}.jpg`
+      : null,
+    backdrop: wide ? `${IGDB_IMG}/t_1080p/${wide.image_id}.jpg` : null,
+  };
+}
+
+// ----------------------------------------------------------------------
+//  POST /api/collection/:slug/igdb — rattacher une fiche à un jeu, et la
+//  remplir avec ce qu'IGDB en sait
+// ----------------------------------------------------------------------
+// ON N'ÉCRASE QUE CE QUI EST VIDE, sauf demande explicite (`force`). L'admin a
+// pu corriger un titre, écrire un synopsis à la main, poser une jaquette
+// scannée : un enrichissement automatique qui balaie tout ça se paie une fois et
+// se regrette longtemps. Le rattachement, lui, est toujours écrit — c'est ce
+// qu'on est venu chercher.
+router.post("/:slug/igdb", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const id = Number(req.body?.igdbId);
+    if (!Number.isFinite(id) || id <= 0)
+      return res.status(400).json({ error: "Il faut l'identifiant IGDB du jeu." });
+
+    const media = await CollectionMedia.findOne({ slug: req.params.slug });
+    if (!media) return res.status(404).json({ error: "Média introuvable." });
+
+    const sheet = await igdbSheet(id);
+    if (!sheet) return res.status(404).json({ error: "Jeu introuvable sur IGDB." });
+
+    const force = req.body?.force === true || req.body?.force === "true";
+    const filled = [];
+    const fill = (key, value, empty = (v) => !v) => {
+      if (!value) return;
+      if (!force && !empty(media[key])) return;
+      media[key] = value;
+      filled.push(key);
+    };
+
+    fill("synopsis", sheet.synopsis);
+    fill("franchise", sheet.franchise);
+    fill("publisher", sheet.publisher);
+    fill("authors", sheet.authors, (v) => !v?.length);
+    fill("genres", sheet.genres, (v) => !v?.length);
+    fill("year", sheet.year);
+    fill("rating", sheet.rating);
+    if (force && sheet.name) {
+      media.title = sheet.name;
+      filled.push("title");
+    }
+
+    // Les visuels se téléchargent CHEZ NOUS : une adresse d'IGDB dans une fiche,
+    // c'est une image qui disparaît le jour où ils rangent leur CDN — et le
+    // boîtier 3D, lui, ne peut de toute façon pas peindre une image d'un autre
+    // domaine (WebGL la refuse).
+    if (sheet.cover && (force || !media.artwork?.poster)) {
+      const local = await downloadArtwork(sheet.cover, `${media.slug}-cover`);
+      if (local) {
+        media.artwork.poster = local;
+        media.artwork.thumb = local;
+        filled.push("jaquette");
+      }
+    }
+    if (sheet.backdrop && (force || !media.artwork?.backdrop)) {
+      const local = await downloadArtwork(sheet.backdrop, `${media.slug}-back`);
+      if (local) {
+        media.artwork.backdrop = local;
+        filled.push("bandeau");
+      }
+    }
+
+    media.games = [{ igdbId: id, name: sheet.name }];
+    await media.save();
+
+    res.json({
+      media: serializeFull(req, media.toObject(), null),
+      filled,
+    });
+  } catch (err) {
+    console.error("collection igdb error:", err.message);
+    res.status(500).json({ error: "IGDB n'a pas répondu." });
+  }
+});
+
 router.post("/game", requireAuth, requireAdmin, romFields, async (req, res) => {
   const rom = req.files?.rom?.[0];
   const coverFile = req.files?.cover?.[0];
@@ -2467,6 +2626,11 @@ router.post("/game", requireAuth, requireAdmin, romFields, async (req, res) => {
       rating: numOrNull(req.body.rating),
       color: req.body.color || "#f2b70b",
       cartridge: { ...cartridge, players: numOrNull(req.body.players) },
+      // LE RATTACHEMENT À LA FICHE DU JEU. C'est ce qui fait qu'un boîtier de
+      // l'étagère n'est pas un cul-de-sac : depuis la cartouche, on ouvre la
+      // fiche complète du titre (note, jaquettes, avis, OST, listes…), et la
+      // fiche de l'étagère peut aller y chercher ce qu'elle n'a pas.
+      games: igdbLink(req.body),
       artwork: {
         poster: cover,
         thumb: cover,
