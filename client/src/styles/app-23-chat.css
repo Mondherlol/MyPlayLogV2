@@ -4843,3 +4843,65 @@ body.mpl-open .chat-dock {
   fill: var(--orange);
 }
 .rt-star.on svg { fill: currentColor; }
+
+
+/* ------------------------------- appel : « connexion en attente » --------- */
+/* La personne n'a PAS raccroché : son navigateur a disparu (onglet fermé,
+   réseau coupé, métro). Sa place est gardée trente secondes côté serveur, et
+   c'est cet état-là qu'on montre — très différent d'un départ, puisqu'elle
+   revient le plus souvent en deux secondes. Ambre, comme toute attente dans
+   l'app, et un halo qui respire lentement. */
+.call-people li.away { opacity: 0.7; }
+.call-people li.away .call-av {
+  box-shadow: 0 0 0 2px var(--orange);
+  animation: call-blink 1.8s ease-in-out infinite;
+}
+.call-people li.away em { color: var(--accent-ink); }
+
+/* Un fantôme qu'on vient de rappeler : il cesse de flotter et se met à battre,
+   pour qu'on voie que le clic a fait quelque chose. */
+.call-people li.recalled { opacity: 0.9; }
+.call-people li.recalled .call-av {
+  outline-color: var(--orange);
+  animation: call-blink 0.9s ease-in-out infinite;
+}
+
+/* ------------------------------------------- le menu du clic droit -------- */
+.call-menu {
+  position: fixed;
+  z-index: 5300; /* au-dessus du panneau, qui est déjà au-dessus de l'app */
+  min-width: 150px;
+  padding: 5px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+}
+.call-menu-who {
+  display: block;
+  padding: 4px 8px 6px;
+  font-size: 0.7rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.call-menu button {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.42rem 0.55rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+  text-align: left;
+}
+.call-menu button:hover {
+  background: color-mix(in srgb, #16a34a 14%, transparent);
+  color: #16a34a;
+}

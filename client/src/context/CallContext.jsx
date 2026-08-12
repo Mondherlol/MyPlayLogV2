@@ -252,7 +252,8 @@ export function CallProvider({ children }) {
           <CallPanel
             call={call}
             conversation={activeConv}
-            roster={live[String(activeId)]?.participants || null}
+            liveCall={live[String(activeId)] || null}
+            token={token}
             note={note}
             me={user}
             onHangUp={hangUp}

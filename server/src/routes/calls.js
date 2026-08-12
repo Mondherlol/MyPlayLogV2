@@ -299,14 +299,28 @@ router.post("/:convId/leave", async (req, res) => {
     voice.leave(key, peerId);
 
     const session = calls.get(convId);
-    // Le dernier éteint la lumière. « Dernier » se juge sur les gens DANS
-    // l'appel, pas sur ceux à qui ça sonne encore : un appel où il ne reste
-    // qu'une sonnerie sans personne au bout n'est plus un appel.
-    if (session && !voice.peers(key).length) {
-      await hangUp(convId);
-    } else if (session) {
-      const conv = await Conversation.findById(convId).select("participants").lean();
-      if (conv) toAll({ _id: convId, participants: conv.participants }, "live", {
+    if (!session) return res.json({ ok: true });
+
+    const conv = await Conversation.findById(convId)
+      .select("participants isGroup name avatar")
+      // Peuplée : `hangUp` dépose une ligne dans le fil, et l'aperçu de la
+      // conversation y lit le nom de l'auteur. Sans peuplement, la liste des
+      // discussions afficherait une ligne d'appel sans nom.
+      .populate("participants", "username avatar")
+      .lean();
+
+    // ⚠️ EN PRIVÉ, RACCROCHER MET FIN À L'APPEL POUR LES DEUX.
+    //
+    // C'est la différence de fond entre un appel à deux et un appel de groupe.
+    // À deux, celui qui reste n'a plus personne à attendre : le laisser devant
+    // une tonalité, avec un panneau qui dit « ça sonne… », c'est lui faire
+    // croire que l'autre va revenir. Dans un groupe, au contraire, la
+    // conversation continue sans celui qui part.
+    const alone = !voice.peers(key).length;
+    if (alone || !conv?.isGroup) {
+      await hangUp(convId, conv ? { _id: convId, ...conv } : null);
+    } else {
+      toAll({ _id: convId, participants: conv.participants }, "live", {
         call: calls.view(session),
       });
     }
@@ -314,6 +328,113 @@ router.post("/:convId/leave", async (req, res) => {
   } catch (err) {
     console.error("call leave error:", err.message);
     res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// ======================================================================
+//  Quand quelqu'un DISPARAÎT sans raccrocher
+// ======================================================================
+// Le sursis est décidé dans lib/callRooms.js, qui écoute la fermeture du flux
+// temps réel. Ce qu'il ne peut pas faire lui-même, c'est le RACONTER : diffuser
+// l'état aux autres et, le cas échéant, clore l'appel. On lui dépose donc les
+// trois réactions ici — un registre plutôt qu'un import croisé.
+//
+// Ce qui se voit à l'écran :
+//   onAway  la personne passe en « connexion en attente », sa place est gardée ;
+//   onBack  elle revient, tout reprend comme si de rien n'était ;
+//   onGone  trente secondes plus tard, elle est vraiment partie.
+const broadcastLive = async (convId) => {
+  const session = calls.get(convId);
+  if (!session) return;
+  const conv = await Conversation.findById(convId).select("participants").lean();
+  if (conv)
+    toAll({ _id: convId, participants: conv.participants }, "live", {
+      call: calls.view(session),
+    });
+};
+
+calls.onPresenceChange({
+  onAway: (convId) => broadcastLive(convId).catch(() => {}),
+  onBack: (convId) => broadcastLive(convId).catch(() => {}),
+  onGone: async (convId) => {
+    try {
+      const conv = await Conversation.findById(convId)
+        .select("participants isGroup name avatar")
+        .populate("participants", "username avatar")
+        .lean();
+      // Même règle qu'un raccrochage volontaire : à deux, l'appel s'arrête ;
+      // en groupe, il continue sans la personne partie.
+      if (!voice.peers(calls.keyOf(convId)).length || !conv?.isGroup)
+        await hangUp(convId, conv ? { _id: convId, ...conv } : null);
+      else await broadcastLive(convId);
+    } catch (err) {
+      console.error("call grace error:", err.message);
+    }
+  },
+});
+
+// ----------------------------------------------------------------------
+//  POST /:convId/ring — rappeler quelqu'un qui n'est pas (ou plus) là
+// ----------------------------------------------------------------------
+// Le clic droit sur une tête, dans un appel de groupe. Il existe parce qu'un
+// appel de groupe ne sonne QU'UNE FOIS, à son lancement : quelqu'un qui a raté
+// la sonnerie, refusé, ou quitté ne sera jamais rappelé autrement — il faudrait
+// lui écrire « reviens » et espérer qu'il regarde. Ici, son téléphone resonne.
+//
+// N'IMPORTE QUI DANS L'APPEL peut rappeler, pas seulement celui qui a lancé :
+// c'est une conversation entre gens qui se connaissent, et réserver le geste à
+// l'hôte n'empêcherait rien tout en agaçant tout le monde.
+router.post("/:convId/ring", async (req, res) => {
+  try {
+    const convId = String(req.params.convId);
+    const target = String(req.body?.userId || "");
+    const session = calls.get(convId);
+    if (!session) return res.status(409).json({ error: "Aucun appel en cours." });
+
+    const conv = await convOf(convId, req.userId);
+    if (!conv) return res.status(404).json({ error: "Conversation introuvable." });
+    // On ne fait sonner que les membres de la conversation, et jamais soi-même.
+    if (!idsOf(conv).includes(target) || target === String(req.userId))
+      return res.status(400).json({ error: "Personne à rappeler." });
+    // Déjà dans l'appel : le faire sonner serait absurde, il nous entend.
+    if (voice.peers(calls.keyOf(convId)).some((p) => p.userId === target))
+      return res.status(409).json({ error: "Cette personne est déjà dans l'appel." });
+
+    const me = (conv.participants || []).find(
+      (p) => String(p._id) === String(req.userId)
+    );
+    const from = {
+      id: String(req.userId),
+      username: me?.username || "?",
+      avatar: me?.avatar || null,
+    };
+
+    // Un refus précédent est effacé : rappeler quelqu'un qui avait dit non est
+    // le geste même qu'on vient de faire, il ne doit pas rester « refusé ».
+    session.ringing.add(target);
+    session.declined.delete(target);
+
+    emitTo([target], "call", {
+      code: convId,
+      conversationId: convId,
+      kind: "ring",
+      from,
+      group: !!conv.isGroup,
+      title: conv.isGroup ? conv.name || "Groupe" : from.username,
+      avatar: conv.isGroup ? conv.avatar || null : from.avatar,
+      members: idsOf(conv).length,
+    });
+    pushToUsers([target], {
+      title: conv.isGroup ? conv.name || "Groupe" : from.username,
+      body: `${from.username} te rappelle`,
+      data: { type: "call", conversationId: convId },
+    }).catch(() => {});
+
+    await broadcastLive(convId);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("call ring error:", err.message);
+    res.status(500).json({ error: "Impossible de rappeler." });
   }
 });
 

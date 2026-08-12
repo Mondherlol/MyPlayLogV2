@@ -22,6 +22,82 @@ export const keyOf = (convId) => `dm:${String(convId)}`;
 // dans une pièce vide et qu'on finit par détester. Quarante-cinq.
 export const RING_MS = 45_000;
 
+// ======================================================================
+//  RACCROCHER N'EST PAS DISPARAÎTRE
+// ======================================================================
+// Deux façons de quitter un appel, et elles n'appellent pas la même réaction :
+//
+//   RACCROCHER   un geste délibéré. En privé, l'appel est fini pour les deux —
+//                laisser l'autre seul devant une tonalité d'attente n'a aucun
+//                sens, il n'y a plus personne à attendre.
+//   DISPARAÎTRE  un onglet qui plante, un tunnel qui saute, un métro. La
+//                personne veut revenir, et souvent en quelques secondes. Couper
+//                immédiatement obligerait à tout relancer pour une coupure de
+//                réseau de trois secondes.
+//
+// D'où ce SURSIS : quand quelqu'un disparaît sans raccrocher, sa place est
+// gardée et son état passe à « connexion en attente » chez les autres. S'il
+// n'est pas revenu au bout de trente secondes, on considère qu'il est parti.
+export const GRACE_MS = 30_000;
+
+// Ce que la messagerie ne peut pas faire elle-même : elle sait qu'un flux s'est
+// fermé, pas ce que ça implique pour un appel. Les routes d'appel (routes/
+// calls.js) déposent ici ce qu'il faut faire — un registre plutôt qu'un import
+// direct, sinon `chat.js` importerait `calls.js` qui importe `chat.js`.
+let hooks = { onAway: null, onBack: null, onGone: null };
+export function onPresenceChange(next) {
+  hooks = { ...hooks, ...next };
+}
+
+// conversationId → Map(userId → minuteur)
+const graces = new Map();
+
+const graceOf = (convId) => {
+  const key = String(convId);
+  if (!graces.has(key)) graces.set(key, new Map());
+  return graces.get(key);
+};
+
+// Qui est en sursis dans cette conversation.
+export const awayIn = (convId) => [...(graces.get(String(convId))?.keys() || [])];
+
+// Le flux temps réel de quelqu'un vient de se fermer (dernier onglet). S'il est
+// dans un appel, sa place est gardée — pour l'instant.
+export function noteOffline(userId) {
+  const id = String(userId);
+  for (const session of sessions.values()) {
+    const inCall = voice
+      .peers(keyOf(session.conversationId))
+      .some((p) => p.userId === id);
+    if (!inCall) continue;
+
+    const convId = session.conversationId;
+    const map = graceOf(convId);
+    clearTimeout(map.get(id));
+    const timer = setTimeout(() => {
+      map.delete(id);
+      // On retire toutes ses connexions : il n'est plus là pour de bon.
+      for (const p of voice.peers(keyOf(convId)))
+        if (p.userId === id) voice.leave(keyOf(convId), p.peerId);
+      hooks.onGone?.(convId, id);
+    }, GRACE_MS);
+    timer.unref?.();
+    map.set(id, timer);
+    hooks.onAway?.(convId, id);
+  }
+}
+
+// Il est revenu avant la fin du sursis.
+export function noteOnline(userId) {
+  const id = String(userId);
+  for (const [convId, map] of graces) {
+    if (!map.has(id)) continue;
+    clearTimeout(map.get(id));
+    map.delete(id);
+    hooks.onBack?.(convId, id);
+  }
+}
+
 // conversationId → session
 const sessions = new Map();
 
@@ -84,6 +160,11 @@ export function close(convId) {
   const s = sessions.get(id);
   if (!s) return null;
   clearTimeout(s.timer);
+  // Les sursis en cours meurent avec la session : sans ça, un minuteur se
+  // réveille trente secondes plus tard pour retirer quelqu'un d'un appel qui
+  // n'existe plus, et rediffuse un état à des gens qui sont passés à autre chose.
+  for (const t of graces.get(id)?.values() || []) clearTimeout(t);
+  graces.delete(id);
   sessions.delete(id);
   // Le registre de pairs se vide avec : un onglet resté accroché à une session
   // fermée continuerait sinon à battre dans une salle qui n'existe plus.
@@ -109,6 +190,9 @@ export function view(session) {
     startedAt: session.startedAt,
     startedBy: session.startedBy,
     ringing: [...session.ringing],
+    // Ceux dont on garde la place le temps qu'ils reviennent. L'écran les
+    // affiche « connexion en attente » plutôt que de les faire disparaître.
+    away: awayIn(session.conversationId),
     participants: voice.peers(keyOf(session.conversationId)).map((p) => ({
       peerId: p.peerId,
       userId: p.userId,

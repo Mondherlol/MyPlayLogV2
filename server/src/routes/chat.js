@@ -22,6 +22,9 @@ import { pushToUsers, preview } from "../lib/push.js";
 // Les modèles seulement, là aussi (cf. WatchParty ci-dessus) : c'est le lien
 // collé dans le message qui redevient une invitation.
 import { cardFromLinks } from "../lib/inviteLinks.js";
+// Le flux temps réel est le SEUL signal fiable pour distinguer « a raccroché »
+// de « a disparu » dans un appel (lib/callRooms.js explique la différence).
+import { noteOffline, noteOnline } from "../lib/callRooms.js";
 
 const router = express.Router();
 
@@ -661,6 +664,8 @@ router.get("/stream", async (req, res) => {
   const first = addClient(userId, res) === 1;
   if (first) {
     notifyPresence(userId, true);
+    // De retour avant la fin du sursis : sa place dans l'appel est conservée.
+    noteOnline(userId);
     // Le journal du serveur date ici les ARRIVÉES. C'est le seul signal fiable
     // de présence : le jeton JWT vit un mois, donc « s'est connecté » ne se
     // reproduit pas à chaque visite — alors que ce flux s'ouvre à chaque fois
@@ -689,6 +694,9 @@ router.get("/stream", async (req, res) => {
     const left = removeClient(userId, res);
     if (!left) {
       notifyPresence(userId, false); // dernier onglet fermé
+      // Onglet fermé, plantage, réseau coupé : on ne le sort pas de l'appel
+      // tout de suite, on garde sa place trente secondes.
+      noteOffline(userId);
       logEvent({
         kind: "presence",
         label: "est reparti hors ligne",

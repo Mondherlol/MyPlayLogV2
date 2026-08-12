@@ -7,9 +7,11 @@ import {
   Mic,
   MicOff,
   PhoneOff,
+  PhoneOutgoing,
   ShieldQuestion,
   Users,
 } from "lucide-react";
+import { apiFetch } from "../lib/api";
 import useDraggable from "../hooks/useDraggable";
 import { startOutgoingTone } from "../lib/ringtone";
 
@@ -40,7 +42,7 @@ import { startOutgoingTone } from "../lib/ringtone";
 // LE CHRONO N'EST PAS DÉCORATIF : c'est la seule chose qui distingue « l'appel
 // se connecte » de « l'appel tourne depuis vingt minutes et tout le monde a
 // oublié de raccrocher ».
-export default function CallPanel({ call, conversation, roster, note, me, onHangUp }) {
+export default function CallPanel({ call, conversation, liveCall, token, note, me, onHangUp }) {
   const {
     participants,
     muted,
@@ -52,6 +54,14 @@ export default function CallPanel({ call, conversation, roster, note, me, onHang
     join,
   } = call;
   const [folded, setFolded] = useState(false);
+  // Le menu du clic droit : { x, y, user }. Fermé par un clic ailleurs ou Échap.
+  const [menu, setMenu] = useState(null);
+  const [ringing, setRinging] = useState("");
+  const roster = liveCall?.participants || null;
+  // Ceux dont on garde la place le temps qu'ils reviennent (server/src/lib/
+  // callRooms.js). Ils ne sont PAS partis : les afficher comme absents ferait
+  // croire à un départ alors qu'ils reviennent le plus souvent en deux secondes.
+  const away = new Set((liveCall?.away || []).map(String));
   const seconds = useElapsed(inCall);
   const drag = useDraggable({ storageKey: "mpl_call_pos", width: 288, height: 300 });
 
@@ -102,7 +112,13 @@ export default function CallPanel({ call, conversation, roster, note, me, onHang
         muted: mine ? muted : r.muted,
         speaking: mine ? myTile?.speaking : link?.speaking,
         // Moi, je m'entends toujours. Les autres : l'état du tuyau.
-        state: mine ? "connected" : link?.state || "connecting",
+        // « away » passe devant tout le reste : quelqu'un dont le navigateur a
+        // disparu n'a pas un problème de connexion audio, il n'est pas là.
+        state: mine
+          ? "connected"
+          : away.has(String(r.userId))
+          ? "away"
+          : link?.state || "connecting",
       };
     });
 
@@ -162,6 +178,43 @@ export default function CallPanel({ call, conversation, roster, note, me, onHang
 
   const asking = micState === "asking";
   const denied = micState === "denied";
+
+  // RAPPELER. Un appel de groupe ne sonne qu'UNE FOIS, à son lancement : sans
+  // ce geste, quelqu'un qui a raté la sonnerie ou refusé ne peut plus être
+  // joint autrement qu'en lui écrivant « reviens » et en espérant qu'il regarde.
+  const recall = async (userId) => {
+    setMenu(null);
+    setRinging(String(userId));
+    try {
+      await apiFetch(`/calls/${conversation?.id}/ring`, {
+        method: "POST",
+        token,
+        body: { userId: String(userId) },
+      });
+    } catch {
+      /* déjà dans l'appel, ou l'appel s'est terminé : l'écran le montrera */
+    } finally {
+      // On laisse la mention « ça sonne » un moment : la réponse du serveur est
+      // instantanée, la retirer aussitôt donnerait l'impression que le clic
+      // n'a rien fait.
+      setTimeout(() => setRinging(""), 4000);
+    }
+  };
+
+  // Un menu ouvert se ferme au premier geste ailleurs — c'est ce qu'on attend
+  // d'un menu contextuel, et ne pas le faire laisse un panneau fantôme à
+  // l'écran quand on clique à côté.
+  useEffect(() => {
+    if (!menu) return undefined;
+    const close = () => setMenu(null);
+    const esc = (e) => e.key === "Escape" && setMenu(null);
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", esc);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", esc);
+    };
+  }, [menu]);
 
   return (
     <section
@@ -237,7 +290,17 @@ export default function CallPanel({ call, conversation, roster, note, me, onHang
                 ))}
 
                 {ghosts.map((o) => (
-                  <li key={`ghost-${o.id}`} className="ghost">
+                  <li
+                    key={`ghost-${o.id}`}
+                    className={`ghost ${ringing === String(o.id) ? "recalled" : ""}`}
+                    // Le clic droit sur une tête : c'est là qu'on la regarde en
+                    // se disant « tiens, il n'est pas venu ».
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setMenu({ x: e.clientX, y: e.clientY, user: o });
+                    }}
+                    title={`${o.username || "…"} — clic droit pour rappeler`}
+                  >
                     <span className="call-av">
                       {o.avatar ? (
                         <img src={o.avatar} alt="" loading="lazy" />
@@ -245,7 +308,7 @@ export default function CallPanel({ call, conversation, roster, note, me, onHang
                         <i>{(o.username || "?")[0].toUpperCase()}</i>
                       )}
                     </span>
-                    <em>{o.username || "…"}</em>
+                    <em>{ringing === String(o.id) ? "ça sonne…" : o.username || "…"}</em>
                   </li>
                 ))}
               </ul>
@@ -268,6 +331,21 @@ export default function CallPanel({ call, conversation, roster, note, me, onHang
               )}
             </>
           )}
+        </div>
+      )}
+
+      {menu && (
+        <div
+          className="call-menu"
+          style={{ left: menu.x, top: menu.y }}
+          // Sans ça, le clic sur le menu remonterait jusqu'au gestionnaire qui
+          // le referme, et l'action ne partirait jamais.
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <span className="call-menu-who">{menu.user.username}</span>
+          <button type="button" className="clickable" onClick={() => recall(menu.user.id)}>
+            <PhoneOutgoing size={14} /> Rappeler
+          </button>
         </div>
       )}
 
