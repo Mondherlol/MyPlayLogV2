@@ -106,10 +106,17 @@ export default function CallPanel({ call, conversation, roster, note, me, onHang
       };
     });
 
+  // ⚠️ LE REPLI DOIT PARLER LA MÊME LANGUE QUE LES FANTÔMES.
+  //
+  // Il utilisait `peerId` comme clé — l'identifiant d'un ONGLET — alors que les
+  // fantômes se comparent sur l'identifiant de COMPTE. Les deux ensembles ne se
+  // croisaient donc jamais : quelqu'un pouvait être connecté ET rester affiché
+  // en « pas encore décroché », en même temps et indéfiniment. C'est exactement
+  // le fantôme qui rebondit alors que la personne a rejoint.
   const shown = tiles.length
     ? tiles
     : participants.map((p) => ({
-        key: p.peerId,
+        key: p.isMe ? meId : String(p.userId || p.peerId),
         isMe: p.isMe,
         username: p.username,
         avatar: p.isMe ? me?.avatar : p.avatar,
@@ -129,7 +136,15 @@ export default function CallPanel({ call, conversation, roster, note, me, onHang
   // aucune liste du serveur — ils ne sont pas dans l'appel, par définition.
   // Sans eux, un appel qui sonne n'affiche qu'une seule tête, la sienne, ce qui
   // ressemble à un appel raté plutôt qu'à un appel en cours.
-  const here = new Set(shown.map((p) => p.key));
+  // « Présent » = vu par le serveur OU relié en direct. Les deux, parce qu'aucun
+  // des deux n'est complet à lui seul : la liste du serveur peut n'être pas
+  // encore arrivée, et le maillage peut avoir une connexion que le dernier
+  // évènement de salon ne mentionne pas encore.
+  const here = new Set([
+    ...shown.map((p) => p.key),
+    ...participants.map((p) => p.userId).filter(Boolean).map(String),
+    meId,
+  ]);
   const ghosts = (conversation?.others || [])
     .filter((o) => !here.has(String(o.id)))
     // Plafonné : dans un groupe de douze, onze fantômes ne racontent plus rien

@@ -3,6 +3,40 @@ import { iceServers, makePeerId } from "./gbaStream";
 
 export { makePeerId };
 
+// ----------------------------------------------------------------------
+//  Où se donner rendez-vous : STUN, et le relais quand rien d'autre ne marche
+// ----------------------------------------------------------------------
+// La liste vient du SERVEUR (routes/ice.js), pas d'une constante, parce qu'elle
+// contient un identifiant de relais valable douze heures. Un identifiant fixe
+// écrit dans le code du site serait public par construction : n'importe qui le
+// recopierait pour faire passer son propre trafic sur la bande passante du VPS.
+//
+// GARDÉE EN MÉMOIRE le temps de sa validité : un aller-retour au serveur avant
+// CHAQUE connexion, dans un appel de groupe où l'on ouvre cinq connexions à la
+// seconde, c'est cinq requêtes pour la même réponse.
+let iceCache = null;
+
+export async function fetchIceServers(token) {
+  if (iceCache && iceCache.until > Date.now()) return iceCache.servers;
+  try {
+    const d = await apiFetch("/ice", { token });
+    const servers = d?.iceServers?.length ? d.iceServers : iceServers();
+    iceCache = {
+      servers,
+      // On périme la liste bien AVANT l'expiration réelle des identifiants :
+      // découvrir qu'ils sont morts au milieu d'un appel n'est pas rattrapable,
+      // alors que redemander trop tôt ne coûte qu'une requête.
+      until: Date.now() + Math.max(60, (d?.expiresIn || 3600) / 2) * 1000,
+    };
+    return servers;
+  } catch {
+    // Le serveur n'a pas répondu : on retombe sur les STUN publics. Sans relais
+    // l'appel échouera peut-être, mais il sera TENTÉ — et il aboutit dans la
+    // grande majorité des cas.
+    return iceServers();
+  }
+}
+
 // ======================================================================
 //  L'appel vocal d'un salon — la plomberie
 // ======================================================================
@@ -45,6 +79,13 @@ export function openCallMic() {
   });
 }
 
+// Le journal de la plomberie, en développement seulement. Il suit ce que le
+// hook ne voit pas : les candidats ICE qui partent, ceux qui arrivent, et les
+// envois qui échouent.
+const log = import.meta.env.DEV
+  ? (...a) => console.info("%c[ice]", "color:#2563eb;font-weight:700", ...a)
+  : () => {};
+
 const newSession = () => Math.random().toString(36).slice(2, 10);
 
 // Le bavardage avec le serveur. Les candidats ICE arrivent en rafale juste
@@ -56,13 +97,17 @@ export function makeVoiceSignaller({ base, token, peerId }) {
   const queues = new Map();
   const timers = new Map();
 
+  // ⚠️ UN ENVOI QUI ÉCHOUE SE DIT. Il était avalé sans un mot, et c'est la
+  // pire chose à taire ici : un refus du serveur (le pair a raccroché, la
+  // session a expiré, l'autorisation est tombée) fait perdre des candidats,
+  // donc la connexion — sans que rien nulle part ne le signale.
   const post = (to, data) =>
     apiFetch(`${base}/signal`, {
       method: "POST",
       token,
       body: { peerId, to, data },
-    }).catch(() => {
-      /* le pair a raccroché : sa connexion s'éteindra d'elle-même */
+    }).catch((e) => {
+      log("ENVOI REFUSÉ vers", to, "·", e?.message || e);
     });
 
   return {
@@ -78,7 +123,22 @@ export function makeVoiceSignaller({ base, token, peerId }) {
           timers.delete(to);
           const batch = queues.get(to) || [];
           queues.delete(to);
-          if (batch.length) post(to, { candidates: batch, session });
+          if (batch.length) {
+            // Le TYPE des candidats est ce qui explique la plupart des échecs :
+            // `host` = même machine ou même réseau local, `srflx` = vu à travers
+            // la box (STUN), `relay` = par un serveur TURN. N'avoir que des
+            // `host` en `.local` (Chrome masque les adresses locales derrière du
+            // mDNS) et rien d'autre, c'est la panne classique en développement.
+            log(
+              "j'envoie",
+              batch.length,
+              "candidat(s) à",
+              to,
+              "·",
+              batch.map((c) => c.candidate?.split(" ")[7] || "?").join(", ")
+            );
+            post(to, { candidates: batch, session });
+          }
         }, 120)
       );
     },
@@ -98,13 +158,51 @@ export function makeVoiceSignaller({ base, token, peerId }) {
 // debout. Retirer la piste obligerait à renégocier toute la connexion à chaque
 // bascule du bouton — une seconde de blanc à chaque fois qu'on reprend la
 // parole.
-export function connectPeer({ stream, to, offer, session, signal, onStream, onState }) {
+export function connectPeer({
+  stream,
+  to,
+  offer,
+  session,
+  signal,
+  servers,
+  onStream,
+  onState,
+}) {
   const sid = session || newSession();
-  const pc = new RTCPeerConnection({ iceServers: iceServers() });
+  const pc = new RTCPeerConnection({ iceServers: servers || iceServers() });
   for (const track of stream.getTracks()) pc.addTrack(track, stream);
 
-  pc.onicecandidate = (e) => e.candidate && signal.ice(to, e.candidate, sid);
+  // ----------------------------------------------------------------
+  //  Les chemins réseau trouvés — et le cas où il n'y en a AUCUN
+  // ----------------------------------------------------------------
+  // Une collecte qui se termine sans le moindre candidat est une panne à part
+  // entière, et elle était parfaitement muette : ICE ne démarre alors même pas,
+  // donc aucun état ne change, donc rien ne signale l'échec. L'appel semble
+  // établi — la piste arrive, la lecture démarre — et pas un son ne circule.
+  //
+  // On la nomme (`nocandidates`) pour que l'écran puisse enfin dire ce qui se
+  // passe au lieu de laisser croire à une panne de micro.
+  let found = 0;
+  pc.onicecandidate = (e) => {
+    if (!e.candidate) {
+      log("fin de collecte pour", to, "·", found, "candidat(s) au total");
+      if (!found) onState?.("nocandidates");
+      return;
+    }
+    found += 1;
+    signal.ice(to, e.candidate, sid);
+  };
   pc.onconnectionstatechange = () => onState?.(pc.connectionState);
+  // L'ÉTAT ICE EN PLUS DE L'ÉTAT DE CONNEXION, et ce n'est pas un doublon :
+  // `connectionState` reste parfois muet sur les navigateurs plus anciens,
+  // alors que `iceConnectionState` dit toujours si les deux machines ont trouvé
+  // un chemin l'une vers l'autre. C'est LA question quand la piste arrive mais
+  // qu'aucun son n'en sort : la négociation a réussi, le tuyau non.
+  pc.oniceconnectionstatechange = () => {
+    log("état ICE avec", to, "→", pc.iceConnectionState);
+    onState?.(`ice:${pc.iceConnectionState}`);
+  };
+  pc.onicegatheringstatechange = () => log("collecte ICE", to, "→", pc.iceGatheringState);
   // `e.streams[0]` N'EST PAS GARANTI. Il n'existe que si le pair d'en face a
   // associé sa piste à un flux (`addTrack(track, stream)`) ; certaines piles —
   // un navigateur plus ancien, un client tiers, une renégociation — livrent une
@@ -171,6 +269,7 @@ export function applyVoiceSignal(pc, data) {
 }
 
 async function applyOne(pc, data) {
+  if (data.candidates?.length) log("je reçois", data.candidates.length, "candidat(s)");
   if (data.sdp) {
     await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
     // La description est là : on rejoue ce qu'on avait mis de côté.
@@ -198,8 +297,11 @@ async function flushParked(pc) {
 async function addCandidate(pc, c) {
   try {
     await pc.addIceCandidate(new RTCIceCandidate(c));
-  } catch {
-    /* candidat périmé (la connexion a déjà changé de route) : sans effet */
+  } catch (e) {
+    // Un candidat refusé n'est normalement pas grave (il est périmé, la
+    // connexion a changé de route). Mais si TOUS le sont, c'est la panne — et
+    // sans cette ligne, elle reste invisible.
+    log("candidat refusé:", e?.message || e);
   }
 }
 

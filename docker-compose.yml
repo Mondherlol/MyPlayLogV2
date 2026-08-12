@@ -59,6 +59,68 @@ services:
     networks:
       - myplaylog
 
+  # ====================================================================
+  #  coturn — le relais des appels vocaux, en dernier recours
+  # ====================================================================
+  # La voix va normalement d'un navigateur à l'autre. Ce service n'existe que
+  # pour les cas où AUCUN chemin direct n'est possible (réseau d'entreprise,
+  # 4G, hôtel, pare-feu qui bloque l'UDP sortant) : sans lui, l'appel a l'air
+  # établi et reste silencieux.
+  #
+  # ------------------------------------------------ pourquoi `network_mode: host`
+  # C'EST LA SEULE CONFIGURATION QUI MARCHE SIMPLEMENT. Un relais annonce aux
+  # navigateurs l'adresse et le port par lesquels le joindre ; derrière la
+  # traduction d'adresses de Docker, il annonce une adresse interne que personne
+  # ne peut atteindre, ou il faudrait publier cent ports un par un. En réseau
+  # hôte, il voit l'IP publique du VPS directement et tout fonctionne.
+  #
+  # Conséquence assumée : ce conteneur n'est pas isolé du réseau de la machine.
+  # C'est précisément pour ça que `turnserver.conf` interdit explicitement toutes
+  # les plages d'adresses privées — sans quoi le relais deviendrait un moyen de
+  # parler aux services internes du VPS depuis l'extérieur.
+  coturn:
+    image: coturn/coturn:4.6-alpine
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
+    env_file:
+      - ./server/.env
+    # LE SECRET PASSE EN ARGUMENT, pas par un gabarit de fichier. La première
+    # version substituait des ${...} avec `envsubst` — qui n'existe pas dans
+    # l'image Alpine de coturn, donc le conteneur n'aurait jamais démarré.
+    # Les options de la ligne de commande complètent le fichier de configuration,
+    # ce qui garde le secret hors du dépôt sans outil supplémentaire.
+    #
+    # Le `$$` est une échappée de Compose : il produit un `$` littéral, pour que
+    # la variable soit lue par le shell DU CONTENEUR (qui a le .env) et non par
+    # Compose sur la machine de déploiement (qui ne l'a pas).
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        # ⚠️ PAS DE SECRET, PAS DE RELAIS. Sans `TURN_SECRET`, coturn démarrerait
+        # SANS authentification, c'est-à-dire en relais ouvert : quelques jours
+        # plus tard, des inconnus font passer leur trafic par le VPS et son IP
+        # se retrouve sur des listes noires. Mieux vaut un service qui refuse de
+        # démarrer en disant pourquoi.
+        if [ -z "$$TURN_SECRET" ]; then
+          echo "coturn: TURN_SECRET absent de server/.env — le relais NE DÉMARRE PAS."
+          echo "coturn: genere-le avec  openssl rand -hex 32  puis relance la pile."
+          # On patiente plutôt que de sortir en boucle : `restart: unless-stopped`
+          # relancerait le conteneur toutes les secondes et noierait les journaux
+          # de la pile entière sous le même message.
+          sleep 3600
+          exit 1
+        fi
+        # `--external-ip` n'est ajouté QUE s'il est renseigné : sur un VPS dont
+        # l'adresse publique est portée directement par l'interface (c'est le cas
+        # ici, en réseau hôte), coturn la détecte seul. Passer une valeur vide,
+        # en revanche, est une erreur de syntaxe qui l'empêche de démarrer.
+        exec turnserver -c /etc/coturn/turnserver.conf \
+          --static-auth-secret="$$TURN_SECRET" \
+          --realm="$${TURN_REALM:-myplaylog.cc}" \
+          $${TURN_PUBLIC_IP:+--external-ip="$$TURN_PUBLIC_IP"}
+
   web:
     build:
       context: .

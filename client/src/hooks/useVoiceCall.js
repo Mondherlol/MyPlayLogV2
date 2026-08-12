@@ -10,6 +10,7 @@ import {
 import {
   applyVoiceSignal,
   connectPeer,
+  fetchIceServers,
   makePeerId,
   makeSpeakingWatch,
   makeVoiceSignaller,
@@ -112,7 +113,20 @@ export default function useVoiceCall({
   const [error, setError] = useState("");
   const [muted, setMuted] = useState(false);
   const [roster, setRoster] = useState([]); // les AUTRES : [{ peerId, userId, username, avatar, muted, state }]
-  const [speaking, setSpeaking] = useState({}); // peerId → parle en ce moment
+  // « QUI PARLE » VIENT DE DEUX ENDROITS, et il faut les séparer.
+  //
+  //   MOI       un analyseur WebAudio sur mon propre micro. C'est une piste
+  //             LOCALE, l'y brancher ne pose aucun problème.
+  //   LES AUTRES  les statistiques de la connexion (`getStats`), PAS WebAudio.
+  //
+  // Cette distinction n'est pas une élégance : brancher une piste DISTANTE dans
+  // un AudioContext est un cas de figure où Chrome détourne le son de la balise
+  // <audio> qui devait le jouer. L'indicateur « qui parle » rendait donc muet le
+  // son qu'il servait à illustrer — la balise jouait bel et bien, à plein
+  // volume, dans le vide. Les statistiques donnent la même information sans
+  // jamais toucher au flux.
+  const [localSpeaking, setLocalSpeaking] = useState({});
+  const [remoteSpeaking, setRemoteSpeaking] = useState({});
 
   const meRef = useRef(makePeerId());
   const streamRef = useRef(null);
@@ -127,6 +141,10 @@ export default function useVoiceCall({
   // connexion se crée sur l'offre — donc sans nom — et l'écran afficherait un
   // rond gris anonyme jusqu'au battement suivant, trente secondes plus tard.
   const idsRef = useRef(new Map());
+  // Les serveurs de rendez-vous, chargés UNE FOIS à l'entrée dans l'appel. Les
+  // charger au moment de chaque connexion ferait une requête par pair, et
+  // surtout retarderait la poignée de main du temps de l'aller-retour.
+  const iceRef = useRef(null);
   const silentRef = useRef(silent);
   const mutedRef = useRef(false);
   const inCallRef = useRef(false);
@@ -181,7 +199,9 @@ export default function useVoiceCall({
     el.srcObject = stream;
     el.muted = silentRef.current;
     if (first && Date.now() > settledAtRef.current) playCallJoinSound();
-    el.play().catch(() => {
+    el.play()
+      .then(() => log("lecture démarrée pour", peerId, "· volume:", el.volume))
+      .catch(() => {
       // L'autoplay est normalement acquis (on entre dans un appel par un clic),
       // mais un onglet en arrière-plan au moment où le flux arrive peut le
       // refuser. Le prochain geste sur la page relance la lecture — sans ce
@@ -192,13 +212,18 @@ export default function useVoiceCall({
       };
       document.addEventListener("pointerdown", retry, { once: true });
     });
-    watchRef.current?.add(peerId, stream);
+    // ⚠️ AUCUN ANALYSEUR SUR CE FLUX, et c'était LA panne : brancher une piste
+    // distante dans un AudioContext fait détourner le son par Chrome, qui ne
+    // sort alors plus de la balise <audio> — laquelle affiche pourtant qu'elle
+    // joue, à plein volume. Le niveau sonore des autres se lit désormais dans
+    // les statistiques de la connexion, qui ne touchent pas au flux.
   }, []);
 
   const dropPeer = useCallback(
     (peerId) => {
       const p = peersRef.current.get(peerId);
       if (!p) return;
+      log("je retire", peerId, "· dernier état:", p.state);
       try {
         p.pc.close();
       } catch {
@@ -211,7 +236,6 @@ export default function useVoiceCall({
         p.audio.srcObject = null;
         p.audio.remove();
       }
-      watchRef.current?.remove(peerId);
       peersRef.current.delete(peerId);
       sync();
     },
@@ -248,12 +272,30 @@ export default function useVoiceCall({
         offer,
         session,
         signal: signalRef.current,
+        servers: iceRef.current,
         onStream: (stream) => attachAudio(to, stream),
         onState: (state) => {
           const cur = peersRef.current.get(to);
           if (!cur) return;
-          cur.state = state;
           log("connexion avec", to, "→", state);
+
+          // AUCUN CHEMIN RÉSEAU. Ce n'est pas un incident passager : sans
+          // candidat, la connexion ne sera jamais tentée. On le DIT, parce que
+          // le symptôme (tout a l'air branché, personne ne s'entend) envoie
+          // chercher du côté du micro pendant une demi-heure.
+          if (state === "nocandidates") {
+            cur.state = "failed";
+            setError(
+              "Aucun chemin réseau trouvé : ton navigateur ou ton réseau bloque les connexions directes."
+            );
+            sync();
+            return;
+          }
+
+          // Les états ICE ne servent QU'AU JOURNAL : les mêler à l'état affiché
+          // ferait apparaître « ice:checking » sur une tuile.
+          if (String(state).startsWith("ice:")) return;
+          cur.state = state;
 
           // ⚠️ UNE CONNEXION QUI ÉCHOUE NE FAIT PLUS DISPARAÎTRE LA PERSONNE.
           //
@@ -307,6 +349,10 @@ export default function useVoiceCall({
       streamRef.current = await openCallMic();
       clearTimeout(ask);
       setMicState("ready");
+      // AVANT d'entrer dans la salle : la première offre part dans la seconde
+      // qui suit, et elle a besoin de cette liste. La charger après, c'est
+      // ouvrir la première connexion sans relais.
+      iceRef.current = await fetchIceServers(token);
       // Le micro de l'appel démarre coupé si la partie est déjà dans une phase
       // silencieuse : décrocher au milieu d'une fenêtre d'enregistrement ne doit
       // pas lâcher un « allô ? » dans le fichier de cinq personnes.
@@ -317,7 +363,7 @@ export default function useVoiceCall({
         token,
         peerId: meRef.current,
       });
-      watchRef.current = makeSpeakingWatch(setSpeaking);
+      watchRef.current = makeSpeakingWatch(setLocalSpeaking);
       watchRef.current.add(meRef.current, streamRef.current);
 
       const d = await apiFetch(`${base}/join`, {
@@ -380,7 +426,8 @@ export default function useVoiceCall({
     watchRef.current?.stop();
     watchRef.current = null;
     setInCall(false);
-    setSpeaking({});
+    setLocalSpeaking({});
+    setRemoteSpeaking({});
     // Le micro coupé ne se garde PAS d'un appel à l'autre : arriver muet dans
     // l'appel suivant sans l'avoir demandé, c'est parler deux minutes dans le
     // vide avant de comprendre.
@@ -472,6 +519,59 @@ export default function useVoiceCall({
     });
   }, [subscribe, room, channel, link, dropPeer, sync, remember]);
 
+  // ---------- Qui parle, chez les autres ----------
+  // `getStats` rend le niveau sonore reçu pour chaque pair, sans jamais toucher
+  // au flux. Quatre fois par seconde : assez pour que la pastille suive la
+  // parole, assez peu pour ne rien coûter.
+  //
+  // Ces mêmes statistiques répondent à LA question qu'on ne pouvait pas trancher
+  // autrement — « le son circule-t-il vraiment ? ». `packetsReceived` à zéro
+  // après plusieurs secondes, c'est un tuyau qui n'est pas passé ; on le dit une
+  // fois dans le journal plutôt que de laisser chercher.
+  useEffect(() => {
+    if (!inCall) return undefined;
+    const warned = new Set();
+    const since = Date.now();
+
+    const id = setInterval(async () => {
+      const out = {};
+      for (const [peerId, p] of peersRef.current) {
+        if (!p.pc) continue;
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const stats = await p.pc.getStats();
+          let level = 0;
+          let packets = 0;
+          stats.forEach((r) => {
+            if (r.type === "inbound-rtp" && r.kind === "audio") {
+              packets = r.packetsReceived || 0;
+              if (typeof r.audioLevel === "number") level = Math.max(level, r.audioLevel);
+            }
+            // Les navigateurs plus anciens rangent le niveau sur le rapport de
+            // piste : on lit les deux plutôt que d'avoir un indicateur mort
+            // selon la version.
+            if (r.type === "track" && typeof r.audioLevel === "number")
+              level = Math.max(level, r.audioLevel);
+          });
+          out[peerId] = level > 0.006;
+
+          if (!warned.has(peerId) && Date.now() - since > 4000) {
+            warned.add(peerId);
+            log(
+              packets > 0
+                ? `le son circule avec ${peerId} · ${packets} paquets reçus`
+                : `AUCUN PAQUET reçu de ${peerId} après 4 s — le flux ne passe pas`
+            );
+          }
+        } catch {
+          /* connexion fermée entre-temps : le tour suivant l'aura oubliée */
+        }
+      }
+      setRemoteSpeaking(out);
+    }, 250);
+    return () => clearInterval(id);
+  }, [inCall]);
+
   // ---------- Le chien de garde de la lecture ----------
   // UNE BALISE <audio> PEUT S'ARRÊTER TOUTE SEULE, et sans rien dire : onglet
   // passé en arrière-plan, système qui reprend la main sur la sortie audio,
@@ -532,15 +632,15 @@ export default function useVoiceCall({
         isMe: true,
         muted,
         state: "connected",
-        speaking: !quiet && !!speaking[meRef.current],
+        speaking: !quiet && !!localSpeaking[meRef.current],
       },
       ...roster.map((p) => ({
         ...p,
         isMe: false,
-        speaking: !silent && !p.muted && !!speaking[p.peerId],
+        speaking: !silent && !p.muted && !!remoteSpeaking[p.peerId],
       })),
     ];
-  }, [roster, speaking, muted, silent]);
+  }, [roster, localSpeaking, remoteSpeaking, muted, silent]);
 
   return {
     inCall,

@@ -53,6 +53,7 @@ import missionRoutes from "./routes/missions.js";
 import chatRoutes from "./routes/chat.js";
 import callRoutes from "./routes/calls.js";
 import ringtoneRoutes from "./routes/ringtones.js";
+import iceRoutes from "./routes/ice.js";
 import collectionRoutes from "./routes/collection.js";
 import watchPartyRoutes from "./routes/watchparty.js";
 import settingsRoutes from "./routes/settings.js";
@@ -193,6 +194,9 @@ app.use("/api/chat", chatRoutes);
 // porte des chemins à deux segments qui happeraient les nôtres.
 app.use("/api/calls", callRoutes);
 app.use("/api/ringtones", ringtoneRoutes);
+// Les serveurs de rendez-vous des appels, avec des identifiants de relais
+// éphémères : ils ne peuvent pas vivre dans le client (cf. routes/ice.js).
+app.use("/api/ice", iceRoutes);
 // Remontée des crashs du front (voir routes/clientErrors.js).
 app.use("/api/client-errors", clientErrorRoutes);
 
