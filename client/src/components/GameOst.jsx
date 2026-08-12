@@ -13,11 +13,14 @@ import {
   RotateCcw,
   TextCursorInput,
   ListPlus,
+  ListEnd,
+  Check,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { makeCache } from "../lib/cache";
 import { useAuth } from "../context/AuthContext";
 import { usePlayer } from "../context/PlayerContext";
+import { useListenParty } from "../context/ListenPartyContext";
 import AddOstModal from "./AddOstModal";
 import MassRenameOstModal from "./MassRenameOstModal";
 import AddToPlaylistModal from "./AddToPlaylistModal";
@@ -56,6 +59,9 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
 
   // Lecture déléguée au mini-lecteur global.
   const player = usePlayer();
+  const listen = useListenParty();
+  // id de piste → "ok" | "dup", le temps d'un clin d'oeil.
+  const [queued, setQueued] = useState({});
 
   // L'OST est commune à tout le site : seul le staff (et les admins) peut
   // l'éditer. Le serveur refuse de toute façon les routes correspondantes —
@@ -100,6 +106,38 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
   // Lance/bascule une piste dans le mini-lecteur global (file = pistes visibles).
   function toggle(t) {
     player.toggleTrack(t, filtered, { gameId, gameName });
+  }
+
+  // ------------------------------------------------------------------
+  //  « À la suite » — le même bouton pour soi et pour la séance
+  // ------------------------------------------------------------------
+  // C'EST ICI QUE L'INVITÉ D'UNE ÉCOUTE PARTAGÉE PROPOSE SES MORCEAUX, et ce
+  // n'est pas un hasard : on écoute avec quelqu'un, on navigue, on tombe sur
+  // une BO — c'est exactement l'instant où l'on veut dire « mets celle-là
+  // après ». Le bouton ne sait pas s'il ajoute à sa propre file ou s'il
+  // envoie une proposition à l'hôte ; `addToQueue` tranche (voir
+  // ListenPartyContext), et le retour dit ce qui s'est passé.
+  async function queueTrack(t) {
+    try {
+      const r = await listen.addToQueue(
+        { ...t, gameId, gameName },
+        { gameId, gameName }
+      );
+      setQueued((q) => ({ ...q, [t.id]: r === "duplicate" ? "dup" : "ok" }));
+    } catch (err) {
+      // « Déjà dans la file » n'est pas une erreur, c'est une réponse : elle se
+      // dit sur le bouton, pas dans une pop-up qu'il faut fermer.
+      if (/déjà/i.test(err.message || "")) setQueued((q) => ({ ...q, [t.id]: "dup" }));
+      else {
+        alert(err.message);
+        return;
+      }
+    }
+    // La coche retombe : c'est un accusé de réception, pas un état de la piste.
+    setTimeout(
+      () => setQueued((q) => ({ ...q, [t.id]: undefined })),
+      2000
+    );
   }
 
   async function hide(ids) {
@@ -321,6 +359,27 @@ export default function GameOst({ gameId, gameName, token, favorite, onFavorite 
                     >
                       <ListPlus size={14} />
                     </button>
+
+                    {/* En séance, le bouton disparaît si l'hôte a gardé sa file
+                        pour lui : mieux vaut pas de bouton qu'un bouton qui
+                        répond « non ». */}
+                    {listen.canQueue && (
+                      <button
+                        className={`gp-vinyl-queue clickable ${
+                          queued[t.id] ? "done" : ""
+                        }`}
+                        onClick={() => queueTrack(t)}
+                        title={
+                          queued[t.id] === "dup"
+                            ? "Déjà dans la file"
+                            : listen.following
+                              ? `Proposer à ${listen.party?.host?.username || "l'hôte"}`
+                              : "Ajouter à la file"
+                        }
+                      >
+                        {queued[t.id] ? <Check size={14} /> : <ListEnd size={14} />}
+                      </button>
+                    )}
                   </div>
 
                   <div className="gp-ost-meta">

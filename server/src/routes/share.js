@@ -7,6 +7,9 @@ import GameMedia from "../models/GameMedia.js";
 import MotSession from "../models/MotSession.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { gameDay } from "../lib/mots.js";
+// Les séances d'écoute vivent en mémoire dans CE processus : l'aperçu se lit
+// donc directement dans le magasin, sans passer par l'API (voir listenRooms).
+import { get as listenRoom } from "../lib/listenRooms.js";
 
 // Rendu HTML "Open Graph" pour les aperçus de partage (WhatsApp, Facebook,
 // Twitter/X, Discord, Telegram, iMessage…). Ces robots ne lisent QUE le <head>
@@ -307,6 +310,69 @@ router.get("/clip/:id", async (req, res) => {
     );
   } catch (err) {
     console.error("share clip og error:", err.message);
+    sendHtml(res, genericPage(url));
+  }
+});
+
+// ============================================================
+//  Écoute en groupe — GET /listen/:code
+// ============================================================
+// LE LIEN D'UNE SÉANCE EST FAIT POUR SORTIR DE L'APP : on le colle dans un
+// salon Discord pour dire « viens ». Sans ces balises, le salon n'affiche que
+// les méta génériques du site — et personne ne clique sur « MyPlayLog » quand
+// on lui a promis un morceau.
+//
+// L'APERÇU DIT SURTOUT UNE CHOSE : est-ce que ça vit encore. Une séance meurt
+// avec l'onglet de son hôte (voir lib/listenRooms.js), une invitation d'il y a
+// deux heures ne mène donc probablement plus nulle part — et Discord garde son
+// aperçu en cache. D'où le cache très court : soixante secondes, pas plus.
+router.get("/listen/:code", (req, res) => {
+  const code = String(req.params.code || "").toUpperCase();
+  const url = `${SITE_URL}/listen/${encodeURIComponent(code)}`;
+  res.set("Cache-Control", "public, max-age=60");
+  try {
+    const room = listenRoom(code);
+    if (!room || !room.track)
+      return sendHtml(
+        res,
+        renderOgPage({
+          title: `Séance terminée · ${SITE_NAME}`,
+          description:
+            "Cette écoute en groupe est finie. Sur MyPlayLog, on écoute les BO de jeux à plusieurs — même piste, même seconde.",
+          image: DEFAULT_IMAGE,
+          url,
+          imageSize: { w: 1200, h: 630 },
+          color: "#6b7280", // gris : l'aperçu dit « c'est passé » avant d'être lu
+        })
+      );
+
+    const host = room.host?.username ? `@${room.host.username}` : "Quelqu'un";
+    const t = room.track;
+    const piece = t.artist ? `${t.name} — ${t.artist}` : t.name;
+    const n = room.listeners.size;
+
+    const bits = [
+      room.playing ? "En cours" : "En pause",
+      n ? `${n} à l'écoute` : null,
+      t.gameName || null,
+    ].filter(Boolean);
+
+    sendHtml(
+      res,
+      renderOgPage({
+        title: `${host} écoute ${piece}`,
+        description: `${bits.join(" · ")}. Clique pour écouter la même chose, à la même seconde — la séance suit ${host} de piste en piste.`,
+        // La pochette du morceau : c'est elle qu'on reconnaît dans un salon,
+        // pas un logo de site.
+        image: t.artwork || DEFAULT_IMAGE,
+        url,
+        type: "music.song",
+        card: "summary_large_image",
+        imageSize: t.artwork ? null : { w: 1200, h: 630 },
+      })
+    );
+  } catch (err) {
+    console.error("share listen og error:", err.message);
     sendHtml(res, genericPage(url));
   }
 });

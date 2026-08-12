@@ -2998,10 +2998,15 @@
 
 /* ---------- colonne latérale ---------- */
 
+/* `min-width: 0` n'est pas décoratif : les noms du casting sont coupés à
+   l'ellipse (nowrap), donc la largeur min-content de cette colonne vaut celle
+   du plus long d'entre eux. Sans ça, sur une grille en `1fr`, la colonne
+   latérale pousse la page hors de l'écran au lieu de tronquer. */
 .coll-aside {
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
+  min-width: 0;
 }
 
 .coll-aside section {
@@ -3085,7 +3090,7 @@
 
 .coll-facts dl {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 0.35rem 0.7rem;
   margin: 0;
   font-size: 0.8rem;
@@ -3099,6 +3104,7 @@
 .coll-facts dd {
   margin: 0;
   text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .coll-sources {
@@ -3125,7 +3131,9 @@
 
 @media (max-width: 1000px) {
   .coll-detail-body {
-    grid-template-columns: 1fr;
+    /* `1fr` seul vaut `minmax(auto, 1fr)` : la colonne ne descend jamais sous
+       la largeur min-content de son contenu, et la page déborde à droite. */
+    grid-template-columns: minmax(0, 1fr);
   }
 
   /* Une seule colonne : plus rien à combler à droite, et « remonter » le fil le

@@ -136,6 +136,31 @@ const versusCardSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// Carte « viens écouter ça » : le code de la séance d'écoute, et le morceau qui
+// passait au moment de l'invitation. La plus périssable de toutes — une séance
+// meurt avec l'onglet de son hôte (voir lib/listenRooms.js), là où un salon de
+// versus survit deux heures. D'où la vérification à l'affichage : la carte
+// demande au serveur si la séance vit encore, et se grise sinon.
+//
+// On garde quand même le morceau : « il t'avait invité à écouter Aerith's Theme »
+// reste lisible six mois plus tard, alors qu'un code seul ne dirait plus rien.
+const listenCardSchema = new mongoose.Schema(
+  {
+    code: { type: String, required: true },
+    hostName: { type: String, default: "" },
+    trackName: { type: String, default: "" },
+    artist: { type: String, default: "" },
+    artwork: { type: String, default: null },
+    gameName: { type: String, default: "" },
+    // `people` et pas `listeners` : ce dernier est un nom RÉSERVÉ par Mongoose
+    // (les documents héritent d'un EventEmitter, qui a déjà sa méthode
+    // `listeners`). Le schéma passe quand même, avec un avertissement, et
+    // casse silencieusement le jour où quelque chose lit ce champ.
+    people: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
 // Carte « regarde cette planche » : une capture prise DANS le volume ouvert
 // (lecture guidée), le titre d'où elle sort et la planche exacte. C'est la
 // seule carte qui porte une image faite sur place plutôt qu'une jaquette de
@@ -209,6 +234,7 @@ const messageSchema = new mongoose.Schema(
     party: { type: partyCardSchema, default: null },
     mot: { type: motCardSchema, default: null },
     versus: { type: versusCardSchema, default: null },
+    listen: { type: listenCardSchema, default: null },
     book: { type: bookCardSchema, default: null },
 
     // Message de service (« X a créé le groupe », « Y a rejoint »…) : rendu en

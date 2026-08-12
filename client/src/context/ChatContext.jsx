@@ -71,6 +71,7 @@ function previewOf(m) {
   if (m.party) return m.text || `Watchparty : ${m.party.title}`;
   if (m.mot) return m.text || "Mot du jour : rejoins la partie";
   if (m.versus) return m.text || "Versus : rejoins le salon";
+  if (m.listen) return m.text || `Écoute : ${m.listen.trackName || "rejoins la séance"}`;
   if (m.book) return m.text || `Planche ${(m.book.page || 0) + 1} — ${m.book.title}`;
   if (m.text) return m.text;
   if (m.media?.length) return m.media[0].kind === "gif" ? "GIF" : "Photo";
@@ -83,6 +84,7 @@ function kindOf(m) {
   if (m.party) return "party";
   if (m.mot) return "mot";
   if (m.versus) return "versus";
+  if (m.listen) return "listen";
   if (m.book) return "book";
   if (m.media?.length) return m.media[0].kind;
   return "text";
@@ -101,6 +103,14 @@ function toastTextOf(m) {
   // temps pour y être.
   if (m.versus)
     return m.text || `t'invite à un versus ${m.versus.kind === "blindtest" ? "blind test" : "GeoGamer"}`;
+  // Aussi périssable qu'une invitation de versus, et même davantage : une
+  // séance d'écoute meurt avec l'onglet de son hôte. La pop-up est souvent le
+  // seul endroit où elle sera lue à temps.
+  if (m.listen)
+    return (
+      m.text ||
+      `t'invite à écouter${m.listen.trackName ? ` « ${m.listen.trackName} »` : ""}`
+    );
   if (m.book) return m.text || `t'a partagé une planche de « ${m.book.title} »`;
   if (m.text) return m.text;
   if (m.media?.length)

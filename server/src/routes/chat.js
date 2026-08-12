@@ -131,6 +131,8 @@ function quoteOf(m) {
               ? "🌡️ Mot du jour"
               : m.versus
                 ? "⚔️ Versus"
+                : m.listen
+                  ? `🎧 ${m.listen.trackName || "Écoute en groupe"}`
                 : m.book
                   ? `📖 ${m.book.title}`
                   : "");
@@ -150,6 +152,8 @@ function quoteOf(m) {
             ? "mot"
             : m.versus
               ? "versus"
+              : m.listen
+                ? "listen"
               : m.book
                 ? "book"
                 : m.media?.length
@@ -190,6 +194,7 @@ function serializeMessage(m, meId) {
     party: deleted ? null : m.party || null,
     mot: deleted ? null : m.mot || null,
     versus: deleted ? null : m.versus || null,
+    listen: deleted ? null : m.listen || null,
     book: deleted ? null : m.book || null,
     system: m.system || null,
     systemData: m.systemData || null,
@@ -251,7 +256,7 @@ const POPULATE_MESSAGE = [
   { path: "author", select: "username avatar" },
   {
     path: "replyTo",
-    select: "text author media deletedAt game ost party mot versus book",
+    select: "text author media deletedAt game ost party mot versus listen book",
     populate: { path: "author", select: "username avatar" },
   },
 ];
@@ -383,6 +388,8 @@ function previewText(msg) {
   if (msg.party) return msg.text || `Watchparty : ${msg.party.title}`;
   if (msg.mot) return msg.text || "Mot du jour : rejoins la partie";
   if (msg.versus) return msg.text || "Versus : rejoins le salon";
+  if (msg.listen)
+    return msg.text || `Écoute : ${msg.listen.trackName || "rejoins la séance"}`;
   if (msg.book)
     return msg.text || `Planche ${(msg.book.page || 0) + 1} — ${msg.book.title}`;
   if (msg.text) return msg.text.slice(0, 120);
@@ -399,6 +406,7 @@ function previewKind(msg) {
   if (msg.party) return "party";
   if (msg.mot) return "mot";
   if (msg.versus) return "versus";
+  if (msg.listen) return "listen";
   if (msg.book) return "book";
   if (msg.media?.length) return msg.media[0].kind;
   return "text";
@@ -583,6 +591,7 @@ export async function deliverCard({
   party = null,
   mot = null,
   versus = null,
+  listen = null,
   book = null,
 }) {
   const conv = await getOrCreateDm(fromId, toId);
@@ -594,6 +603,7 @@ export async function deliverCard({
     party,
     mot,
     versus,
+    listen,
     book,
   });
   broadcastMessage(conv, msg);
@@ -620,6 +630,7 @@ export async function deliverCardToConversation({
   party = null,
   mot = null,
   versus = null,
+  listen = null,
   book = null,
 }) {
   const conv = await loadConversation(conversationId, fromId);
@@ -632,6 +643,7 @@ export async function deliverCardToConversation({
     party,
     mot,
     versus,
+    listen,
     book,
   });
   broadcastMessage(conv, msg);

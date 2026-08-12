@@ -98,6 +98,11 @@ function cleanSource(src) {
   };
 }
 
+// Nettoie une piste venue d'un invité (proposition d'ajout à la file). Même
+// filtre que pour l'hôte — c'est le seul endroit où un client qui n'est PAS le
+// maître de la séance écrit quelque chose que tous les autres verront.
+export const cleanProposal = cleanTrack;
+
 // L'état de lecture posé par l'hôte. Rend `true` si quelque chose a changé
 // AUTREMENT QUE PAR L'ÉCOULEMENT DU TEMPS — c'est ce qui décide si l'on
 // réveille les auditeurs ou si le battement passe en silence.
@@ -153,6 +158,11 @@ export function open({ hostId, host, state }) {
     positionMs: 0,
     sampledAt: Date.now(),
     source: null,
+    // « Les invités peuvent-ils ajouter à la file ? » — fermé par défaut, et
+    // c'est le bon défaut : ouvrir sa séance, c'est déjà accepter que des gens
+    // écoutent ce qu'on choisit ; leur donner la main sur la suite est une
+    // seconde décision, qui se prend exprès.
+    openQueue: false,
     listeners: new Map(), // userId → { username, avatar, at }
   };
   rooms.set(code, room);
@@ -229,6 +239,7 @@ export function serialize(room) {
     playing: room.playing,
     positionMs: positionAt(room),
     source: room.source,
+    openQueue: !!room.openQueue,
     startedAt: room.at,
     listeners: [...room.listeners.entries()].map(([id, l]) => ({
       id,
@@ -254,6 +265,7 @@ export function liveAmong(userIds) {
       track: room.track,
       playing: room.playing,
       source: room.source,
+      openQueue: !!room.openQueue,
       listeners: room.listeners.size,
       startedAt: room.at,
     });

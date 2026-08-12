@@ -896,3 +896,793 @@ body.mpl-open .app-content {
 .mp-seek.locked .mp-bar-knob {
   display: none;
 }
+
+/* ======================================================================
+   Le panneau de la séance (ancré au bouton radio)
+   ======================================================================
+   ANCRÉ, PAS PLEIN ÉCRAN. On l'ouvre PENDANT qu'on écoute, souvent pour
+   inviter quelqu'un sans perdre le fil de ce qu'on lisait : une modale à fond
+   noir couperait la page en deux pour trois boutons. */
+.lpp {
+  position: fixed;
+  right: 16px;
+  bottom: 86px;
+  z-index: 1400;
+  width: min(340px, calc(100vw - 24px));
+  max-height: min(70vh, 620px);
+  overflow-y: auto;
+  padding: 0.85rem;
+  border-radius: 16px;
+  background: #14161c;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+  color: #e6e8ee;
+  animation: lpp-in 0.16s ease-out;
+}
+
+@keyframes lpp-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.lpp-head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.7rem;
+}
+
+.lpp-head-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  color: #ffd24a;
+  background: rgba(255, 210, 74, 0.14);
+}
+
+.lpp-head-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.lpp-head-txt strong {
+  font-size: 0.88rem;
+}
+
+.lpp-head-txt span {
+  font-size: 0.72rem;
+  color: #a6acba;
+}
+
+.lpp-x {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #8c92a0;
+}
+
+.lpp-x:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f3f4f7;
+}
+
+/* Ce qui passe : la même ligne que dans la barre, en plus calme. */
+.lpp-track {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.45rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.lpp-track-art {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  color: #8c92a0;
+}
+
+.lpp-track-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lpp-track-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lpp-track-txt strong {
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lpp-track-txt em {
+  font-style: normal;
+  font-size: 0.72rem;
+  color: #a6acba;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lpp-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.7rem 0;
+}
+
+.lpp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.07);
+  color: #e6e8ee;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.lpp-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.lpp-btn:disabled {
+  opacity: 0.45;
+}
+
+.lpp-btn.primary {
+  background: linear-gradient(135deg, #ffd24a, #f2b70b);
+  color: #1a1204;
+}
+
+.lpp-btn.primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ffdd6b, #ffc21f);
+}
+
+.lpp-btn.danger {
+  color: #ff9a8f;
+  background: rgba(224, 52, 43, 0.12);
+  border-color: rgba(224, 52, 43, 0.28);
+}
+
+.lpp-btn.danger:hover {
+  background: rgba(224, 52, 43, 0.2);
+}
+
+.lpp-error {
+  margin: 0.2rem 0 0;
+  font-size: 0.74rem;
+  color: #ff9a8f;
+}
+
+.lpp-label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8c92a0;
+}
+
+.lpp-people {
+  margin-bottom: 0.7rem;
+}
+
+.lpp-faces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.lpp-face {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.lpp-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lpp-face i {
+  font-style: normal;
+}
+
+/* --- Le lien à coller ailleurs --- */
+.lpp-link {
+  margin-bottom: 0.7rem;
+}
+
+.lpp-link-row {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.lpp-link-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.3);
+  color: #c9ced9;
+  font-size: 0.72rem;
+}
+
+.lpp-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: none;
+  padding: 0.45rem 0.6rem;
+  border: none;
+  border-radius: 9px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #1a1204;
+  background: linear-gradient(135deg, #ffd24a, #f2b70b);
+}
+
+/* --- Inviter --- */
+.lpp-search {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.55rem;
+  margin-bottom: 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.25);
+  color: #8c92a0;
+}
+
+.lpp-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: #e6e8ee;
+  font-size: 0.78rem;
+  outline: none;
+}
+
+.lpp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-height: 190px;
+  overflow-y: auto;
+}
+
+.lpp-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.35rem;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: #e6e8ee;
+  text-align: left;
+}
+
+.lpp-row:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.lpp-row:disabled {
+  opacity: 0.6;
+}
+
+.lpp-row-av {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  color: #a6acba;
+}
+
+.lpp-row-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lpp-row-av.group {
+  border-radius: 8px;
+}
+
+.lpp-row-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lpp-row-do {
+  flex: none;
+  color: #ffd24a;
+}
+
+.lpp-empty {
+  display: grid;
+  place-items: center;
+  padding: 0.8rem;
+  color: #8c92a0;
+}
+
+.lpp-empty-txt {
+  margin: 0.2rem 0 0;
+  font-size: 0.73rem;
+  line-height: 1.5;
+  color: #8c92a0;
+}
+
+/* Sur petit écran, le panneau prend toute la largeur au-dessus de la barre. */
+@media (max-width: 760px) {
+  .lpp {
+    right: 8px;
+    left: 8px;
+    bottom: 78px;
+    width: auto;
+  }
+}
+
+/* ======================================================================
+   /listen/:code — la page au bout du lien de séance
+   ======================================================================
+   Une carte, une phrase, un bouton. C'est une page d'ARRIVÉE : celui qui la
+   voit vient de Discord, il ne connaît peut-être même pas le site — tout ce
+   qu'il doit comprendre, c'est ce qui passe et comment l'entendre. */
+.linv {
+  display: grid;
+  place-items: center;
+  min-height: 60vh;
+  padding: 2rem 1rem;
+}
+
+.linv-card {
+  width: min(460px, 100%);
+  padding: 1.6rem;
+  border-radius: 20px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+}
+
+.linv-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-ink, #b98407);
+}
+
+.linv-card h1 {
+  margin: 0.8rem 0 0.4rem;
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  line-height: 1.25;
+}
+
+.linv-card p {
+  margin: 0 0 1.1rem;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--text-soft);
+}
+
+.linv-host {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  vertical-align: middle;
+}
+
+.linv-host img {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.linv-track {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-top: 1.1rem;
+  padding: 0.7rem;
+  border-radius: 14px;
+  text-align: left;
+  background: var(--surface-2);
+}
+
+.linv-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  flex: none;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--text-soft);
+}
+
+.linv-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.linv-art.spin img {
+  animation: fnow-disc 7s linear infinite;
+}
+
+.linv-hole {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2) inset;
+}
+
+.linv-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.linv-meta strong {
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.linv-meta em {
+  font-style: normal;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+.linv-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #2f8fd0;
+}
+
+.linv-live i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4bb3f5;
+  animation: fnow-blink 1.6s ease-in-out infinite;
+}
+
+.linv-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.7rem 1rem;
+  border: none;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: #23180a;
+  background: var(--accent-grad);
+}
+
+.linv-btn:disabled {
+  opacity: 0.6;
+}
+
+.linv-btn.ghost {
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.linv-sub {
+  display: inline-block;
+  margin-top: 0.7rem;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+.linv-done {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #2f8fd0;
+}
+
+.linv-error {
+  margin-top: 0.6rem !important;
+  color: #e0342b !important;
+}
+
+.linv-card.off .linv-kicker {
+  color: var(--text-soft);
+}
+
+/* --- L'interrupteur « les invités peuvent ajouter » --- */
+.lpp-switch {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin-bottom: 0.7rem;
+  padding: 0.5rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.045);
+  cursor: var(--cursor-pointer), pointer;
+}
+
+.lpp-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lpp-switch-box {
+  position: relative;
+  width: 34px;
+  height: 19px;
+  flex: none;
+  margin-top: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  transition: background 0.16s ease;
+}
+
+.lpp-switch-box::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #e6e8ee;
+  transition: transform 0.16s ease, background 0.16s ease;
+}
+
+.lpp-switch input:checked + .lpp-switch-box {
+  background: linear-gradient(135deg, #ffd24a, #f2b70b);
+}
+
+.lpp-switch input:checked + .lpp-switch-box::after {
+  transform: translateX(15px);
+  background: #1a1204;
+}
+
+.lpp-switch-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lpp-switch-txt strong {
+  font-size: 0.79rem;
+}
+
+.lpp-switch-txt em {
+  font-style: normal;
+  font-size: 0.71rem;
+  line-height: 1.4;
+  color: #8c92a0;
+}
+
+.lpp-note,
+.lpp-add {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin: 0 0 0.7rem;
+  font-size: 0.73rem;
+  line-height: 1.45;
+  color: #8c92a0;
+}
+
+.lpp-add {
+  color: #9fe0a8;
+}
+
+.lpp-add strong {
+  color: #d8f5dc;
+}
+
+/* ======================================================================
+   File de lecture : les gestes
+   ====================================================================== */
+.mpq-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.mpq-tools-ask {
+  flex: 1;
+  min-width: 140px;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+
+.mpq-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.32rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  background: transparent;
+  color: var(--text-soft);
+}
+
+.mpq-tool:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.mpq-tool.danger {
+  color: #fff;
+  background: #e0342b;
+  border-color: transparent;
+}
+
+.mpq-locked {
+  margin: 0 0 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 10px;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: var(--text-soft);
+  background: var(--surface-2);
+}
+
+/* Une ligne = le bouton de lecture (qui prend toute la place) + les actions.
+   Les actions restent VISIBLES sur petit écran : au doigt, rien ne se survole,
+   et c'est justement là qu'on trie sa file. */
+.mpq-row {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  border-radius: 10px;
+}
+
+.mpq-row.dragging {
+  opacity: 0.45;
+}
+
+.mpq-row.over {
+  box-shadow: inset 0 2px 0 var(--accent-ink, #eaa908);
+}
+
+.mpq-play {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1;
+  min-width: 0;
+  padding: 0.4rem 0.45rem;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.mpq-play:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.mpq-acts {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  flex: none;
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+
+.mpq-row:hover .mpq-acts {
+  opacity: 1;
+}
+
+.mpq-act {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-soft);
+}
+
+.mpq-act:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.mpq-act:disabled {
+  opacity: 0.25;
+}
+
+.mpq-act.del:hover {
+  color: #e0342b;
+}
+
+@media (hover: none) {
+  .mpq-acts {
+    opacity: 1;
+  }
+}

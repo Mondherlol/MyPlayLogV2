@@ -494,45 +494,104 @@
   color: var(--text-soft);
 }
 
-/* --- ceux dont on ne sait rien : une rangée d'avatars, pas des lignes --- */
-.fnow-idle {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  padding: 0.1rem 0.35rem;
+/* --- ceux qui ne font rien : disponibles, puis absents ---------------------
+   MÊME LIGNE QUE LES AUTRES, EN PLUS SOURD. Ils étaient une rangée d'avatars
+   nus : une tête sans nom ne se lit pas, elle ressemble à un chargement resté
+   en route. Ils gardent donc le gabarit des lignes vivantes (avatar, nom,
+   sous-titre) et se distinguent par le ton — pastille grise, texte estompé —
+   plutôt que par une forme à part. */
+.fnow-group.fam-idle .fnow-group-title svg {
+  color: #22c55e;
 }
 
-.fnow-idle-av {
-  position: relative;
-  width: 30px;
-  height: 30px;
+.fnow-group.fam-away .fnow-group-title svg {
+  color: var(--text-soft);
+}
+
+/* La pastille grise dit « il n'est pas là » aussi vite que la verte disait le
+   contraire — creuse plutôt que pleine, pour ne pas la confondre au coin de
+   l'œil. */
+.fnow-dot.off {
+  background: transparent;
+  border: 2px solid var(--border-strong);
+  box-shadow: inset 0 0 0 1px var(--surface);
+}
+
+/* Les absents s'effacent : l'avatar perd ses couleurs, le nom son contraste.
+   Ils restent lisibles — c'est le but — mais ne se disputent plus l'œil avec
+   les lignes qu'on peut rejoindre. */
+.fnow-row.off .fnow-av img {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
+.fnow-row.off .fnow-av-fb {
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.fnow-row.off .fnow-txt strong {
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.fnow-row.off:hover .fnow-av img {
+  filter: none;
+  opacity: 1;
+}
+
+/* Écrire : la seule chose à faire de quelqu'un qui ne joue à rien. Discret
+   (une icône, pas un mot) parce qu'il ne doit jamais concurrencer
+   « Rejoindre » — mais toujours visible, jamais au survol : sur téléphone rien
+   ne se survole. */
+.fnow-write {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
   border-radius: 50%;
-  overflow: hidden;
-  text-decoration: none;
-  border: 2px solid var(--surface);
-  box-shadow: 0 0 0 1px var(--border);
+  background: transparent;
+  color: var(--text-soft);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.fnow-write:hover {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+/* Le repli des absents : un lien, pas un bouton — il ne fait qu'allonger une
+   liste déjà là. */
+.fnow-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  margin-top: 0.15rem;
+  padding: 0.35rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.fnow-more:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.fnow-more svg {
   transition: transform 0.15s ease;
 }
 
-.fnow-idle-av:hover {
-  transform: translateY(-2px);
-}
-
-.fnow-idle-av img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.fnow-idle-av span {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 100%;
-  background: var(--surface-2);
-  color: var(--text-soft);
-  font-weight: 700;
-  font-size: 0.76rem;
+.fnow-more svg.up {
+  transform: rotate(180deg);
 }
 
 /* ============================================================ petit écran ==

@@ -48,6 +48,43 @@ import {
 
 const PING_MS = 30_000;
 
+// ======================================================================
+//  LE VOLUME DE CHAQUE PERSONNE
+// ======================================================================
+// Tout le monde n'a pas le même micro ni la même voix : quelqu'un qu'on entend
+// à peine gâche un appel entier, et monter le volume général monte aussi ceux
+// qui étaient déjà trop forts. D'où un réglage PAR PERSONNE.
+//
+// ------------------------------------------------------ DEUX CHEMINS, ET POURQUOI
+// Une balise <audio> plafonne à 100 % : `volume` ne dépasse pas 1. Amplifier
+// au-delà oblige à passer par WebAudio — or c'est exactement ce qui avait rendu
+// les appels muets (brancher une piste distante dans un AudioContext fait
+// détourner le son par Chrome, cf. `attachAudio`).
+//
+// On ne prend donc ce risque QUE SI ON LE DEMANDE :
+//
+//   jusqu'à 100 %  la balise et rien d'autre. C'est le cas de tout le monde par
+//                  défaut, et ce chemin reste intact.
+//   au-delà        un amplificateur WebAudio s'intercale, la balise est coupée
+//                  pour ne pas jouer deux fois. Réversible : redescendre sous
+//                  100 % démonte l'amplificateur et rend la main à la balise.
+//
+// Ainsi, si l'amplification se comporte mal sur un navigateur, elle n'affecte
+// que la personne pour qui on l'a explicitement demandée — et il suffit de
+// redescendre le curseur.
+const MAX_GAIN = 2;
+const VOL_KEY = "mpl_call_volumes";
+
+// Le réglage SURVIT AUX APPELS. Quelqu'un qui parle trop bas parle trop bas à
+// chaque fois : refaire le geste à chaque appel serait une corvée.
+function loadVolumes() {
+  try {
+    return JSON.parse(localStorage.getItem(VOL_KEY) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+
 // ----------------------------------------------------------------------
 //  Le journal de l'appel
 // ----------------------------------------------------------------------
@@ -125,6 +162,7 @@ export default function useVoiceCall({
   // son qu'il servait à illustrer — la balise jouait bel et bien, à plein
   // volume, dans le vide. Les statistiques donnent la même information sans
   // jamais toucher au flux.
+  const [volumes, setVolumes] = useState(() => loadVolumes());
   const [localSpeaking, setLocalSpeaking] = useState({});
   const [remoteSpeaking, setRemoteSpeaking] = useState({});
 
@@ -145,6 +183,11 @@ export default function useVoiceCall({
   // charger au moment de chaque connexion ferait une requête par pair, et
   // surtout retarderait la poignée de main du temps de l'aller-retour.
   const iceRef = useRef(null);
+  // userId → facteur de volume (1 = normal). Lu au montage, écrit à chaque
+  // changement.
+  const volRef = useRef(loadVolumes());
+  // L'amplificateur WebAudio, monté à la demande seulement (voir MAX_GAIN).
+  const boostRef = useRef({ ctx: null, nodes: new Map() });
   const silentRef = useRef(silent);
   const mutedRef = useRef(false);
   const inCallRef = useRef(false);
@@ -177,6 +220,85 @@ export default function useVoiceCall({
       muted: !!peer.muted,
     });
   }, []);
+
+  // Applique le réglage à UNE connexion. Appelée à chaque changement, et à
+  // l'arrivée d'un flux — sans quoi une personne qui se reconnecte reviendrait
+  // au volume par défaut alors qu'on l'avait montée.
+  const applyVolume = useCallback((peerId) => {
+    const p = peersRef.current.get(peerId);
+    if (!p?.audio) return;
+    const el = p.audio;
+    const userId = String(idsRef.current.get(peerId)?.userId || "");
+    const wanted = Math.min(MAX_GAIN, Math.max(0, volRef.current[userId] ?? 1));
+    const boost = boostRef.current;
+    const node = boost.nodes.get(peerId);
+
+    // --- chemin simple : la balise suffit ---
+    if (wanted <= 1) {
+      if (node) {
+        try {
+          node.src.disconnect();
+          node.gain.disconnect();
+        } catch {
+          /* déjà détaché */
+        }
+        boost.nodes.delete(peerId);
+      }
+      el.muted = silentRef.current;
+      el.volume = wanted;
+      return;
+    }
+
+    // --- amplification : un gain s'intercale, la balise se tait ---
+    if (!boost.ctx) {
+      try {
+        boost.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      } catch {
+        // Pas de WebAudio : on fait au mieux, c'est-à-dire 100 %.
+        el.volume = 1;
+        return;
+      }
+    }
+    boost.ctx.resume?.().catch(() => {});
+    let n = node;
+    if (!n && el.srcObject) {
+      try {
+        const src = boost.ctx.createMediaStreamSource(el.srcObject);
+        const gain = boost.ctx.createGain();
+        src.connect(gain).connect(boost.ctx.destination);
+        n = { src, gain };
+        boost.nodes.set(peerId, n);
+      } catch {
+        el.volume = 1;
+        return;
+      }
+    }
+    if (!n) return;
+    // La coupure du jeu (Perroquet) passe AUSSI par ici : le `muted` de la
+    // balise ne coupe plus rien quand le son sort de l'amplificateur.
+    n.gain.gain.value = silentRef.current ? 0 : wanted;
+    el.muted = true;
+    el.volume = 1;
+  }, []);
+
+  // Le réglage d'une personne, quel que soit le nombre d'onglets qu'elle a
+  // ouverts : on l'applique à toutes ses connexions.
+  const setUserVolume = useCallback(
+    (userId, value) => {
+      const v = Math.min(MAX_GAIN, Math.max(0, Number(value) || 0));
+      const id = String(userId);
+      volRef.current = { ...volRef.current, [id]: v };
+      setVolumes(volRef.current);
+      try {
+        localStorage.setItem(VOL_KEY, JSON.stringify(volRef.current));
+      } catch {
+        /* stockage plein : le réglage vaut pour cet appel */
+      }
+      for (const [peerId] of peersRef.current)
+        if (String(idsRef.current.get(peerId)?.userId || "") === id) applyVolume(peerId);
+    },
+    [applyVolume]
+  );
 
   // ---------- Le son entrant ----------
   // Une balise par pair, posée dans le document. `new Audio()` détaché suffit
@@ -212,12 +334,13 @@ export default function useVoiceCall({
       };
       document.addEventListener("pointerdown", retry, { once: true });
     });
+    applyVolume(peerId);
     // ⚠️ AUCUN ANALYSEUR SUR CE FLUX, et c'était LA panne : brancher une piste
     // distante dans un AudioContext fait détourner le son par Chrome, qui ne
     // sort alors plus de la balise <audio> — laquelle affiche pourtant qu'elle
     // joue, à plein volume. Le niveau sonore des autres se lit désormais dans
     // les statistiques de la connexion, qui ne touchent pas au flux.
-  }, []);
+  }, [applyVolume]);
 
   const dropPeer = useCallback(
     (peerId) => {
@@ -228,6 +351,16 @@ export default function useVoiceCall({
         p.pc.close();
       } catch {
         /* déjà fermée */
+      }
+      const node = boostRef.current.nodes.get(peerId);
+      if (node) {
+        try {
+          node.src.disconnect();
+          node.gain.disconnect();
+        } catch {
+          /* déjà détaché */
+        }
+        boostRef.current.nodes.delete(peerId);
       }
       if (p.audio) {
         // Le son de départ ne se joue que pour quelqu'un qu'on ENTENDAIT :
@@ -425,6 +558,8 @@ export default function useVoiceCall({
     signalRef.current = null;
     watchRef.current?.stop();
     watchRef.current = null;
+    boostRef.current.ctx?.close().catch(() => {});
+    boostRef.current = { ctx: null, nodes: new Map() };
     setInCall(false);
     setLocalSpeaking({});
     setRemoteSpeaking({});
@@ -448,8 +583,10 @@ export default function useVoiceCall({
     silentRef.current = silent;
     const on = !silent && !mutedRef.current;
     for (const t of streamRef.current?.getAudioTracks?.() || []) t.enabled = on;
-    for (const p of peersRef.current.values()) if (p.audio) p.audio.muted = silent;
-  }, [silent]);
+    // `applyVolume` remet chaque connexion d'aplomb : il sait couper la balise
+    // OU l'amplificateur selon le chemin emprunté par cette personne-là.
+    for (const [peerId] of peersRef.current) applyVolume(peerId);
+  }, [silent, applyVolume]);
 
   const toggleMute = useCallback(() => {
     const next = !mutedRef.current;
@@ -643,6 +780,9 @@ export default function useVoiceCall({
   }, [roster, localSpeaking, remoteSpeaking, muted, silent]);
 
   return {
+    volumes,
+    setUserVolume,
+    maxGain: MAX_GAIN,
     inCall,
     connecting,
     micState,

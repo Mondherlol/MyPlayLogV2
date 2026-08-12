@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Gamepad2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import ThemeToggle from "../components/ThemeToggle";
@@ -7,6 +7,14 @@ import ThemeToggle from "../components/ThemeToggle";
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  // `?next=` : où retourner une fois connecté. Un lien partagé (une séance
+  // d'écoute, un profil) qui traverse l'écran de connexion doit revenir à ce
+  // qu'on était venu voir — atterrir sur l'accueil, c'est perdre l'invitation.
+  // Chemin interne uniquement : un `next` libre ferait de la page de connexion
+  // un tremplin vers n'importe quel site.
+  const [params] = useSearchParams();
+  const raw = params.get("next") || "";
+  const next = raw.startsWith("/") && !raw.startsWith("//") ? raw : "/app";
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
@@ -19,7 +27,7 @@ export default function Login() {
     setBusy(true);
     try {
       await login(identifier, password, remember);
-      navigate("/app");
+      navigate(next);
     } catch (err) {
       setError(err.message);
     } finally {

@@ -7,12 +7,12 @@ import {
   Mic,
   MicOff,
   PhoneOff,
-  PhoneOutgoing,
   ShieldQuestion,
   Users,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import useDraggable from "../hooks/useDraggable";
+import PeerMenu, { usePeerMenu } from "./CallPeerMenu";
 import { startOutgoingTone } from "../lib/ringtone";
 
 // ======================================================================
@@ -52,10 +52,14 @@ export default function CallPanel({ call, conversation, liveCall, token, note, m
     error,
     inCall,
     join,
+    volumes,
+    setUserVolume,
+    maxGain,
   } = call;
   const [folded, setFolded] = useState(false);
-  // Le menu du clic droit : { x, y, user }. Fermé par un clic ailleurs ou Échap.
-  const [menu, setMenu] = useState(null);
+  // Le menu d'une tête (volume, rappeler) : partagé avec l'appel du Perroquet,
+  // cf. components/CallPeerMenu.jsx.
+  const { menu, close: closeMenu, tileProps } = usePeerMenu();
   const [ringing, setRinging] = useState("");
   const roster = liveCall?.participants || null;
   // Ceux dont on garde la place le temps qu'ils reviennent (server/src/lib/
@@ -183,7 +187,7 @@ export default function CallPanel({ call, conversation, liveCall, token, note, m
   // ce geste, quelqu'un qui a raté la sonnerie ou refusé ne peut plus être
   // joint autrement qu'en lui écrivant « reviens » et en espérant qu'il regarde.
   const recall = async (userId) => {
-    setMenu(null);
+    closeMenu();
     setRinging(String(userId));
     try {
       await apiFetch(`/calls/${conversation?.id}/ring`, {
@@ -201,20 +205,8 @@ export default function CallPanel({ call, conversation, liveCall, token, note, m
     }
   };
 
-  // Un menu ouvert se ferme au premier geste ailleurs — c'est ce qu'on attend
-  // d'un menu contextuel, et ne pas le faire laisse un panneau fantôme à
-  // l'écran quand on clique à côté.
-  useEffect(() => {
-    if (!menu) return undefined;
-    const close = () => setMenu(null);
-    const esc = (e) => e.key === "Escape" && setMenu(null);
-    window.addEventListener("pointerdown", close);
-    window.addEventListener("keydown", esc);
-    return () => {
-      window.removeEventListener("pointerdown", close);
-      window.removeEventListener("keydown", esc);
-    };
-  }, [menu]);
+  // (La fermeture du menu — clic ailleurs, touche Échap — est tenue par
+  // `usePeerMenu`, partagé avec l'appel du Perroquet.)
 
   return (
     <section
@@ -275,7 +267,14 @@ export default function CallPanel({ call, conversation, liveCall, token, note, m
                     // L'état brut du tuyau, au survol. Invisible au quotidien,
                     // mais c'est la première chose qu'on veut savoir quand
                     // quelqu'un est là sans qu'on l'entende.
-                    title={p.isMe ? "toi" : `${p.username || "…"} · ${p.state}`}
+                    title={
+                      p.isMe
+                        ? "toi"
+                        : `${p.username || "…"} · ${p.state} — clic droit pour le volume`
+                    }
+                    // Régler SON PROPRE volume n'aurait aucun sens : on ne
+                    // s'écoute pas soi-même.
+                    {...(p.isMe ? {} : tileProps({ id: p.key, username: p.username }))}
                   >
                     <span className="call-av">
                       {p.avatar ? (
@@ -293,12 +292,9 @@ export default function CallPanel({ call, conversation, liveCall, token, note, m
                   <li
                     key={`ghost-${o.id}`}
                     className={`ghost ${ringing === String(o.id) ? "recalled" : ""}`}
-                    // Le clic droit sur une tête : c'est là qu'on la regarde en
-                    // se disant « tiens, il n'est pas venu ».
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      setMenu({ x: e.clientX, y: e.clientY, user: o });
-                    }}
+                    // Le clic droit (ou l'appui long) sur une tête : c'est là
+                    // qu'on la regarde en se disant « tiens, il n'est pas venu ».
+                    {...tileProps(o, "recall")}
                     title={`${o.username || "…"} — clic droit pour rappeler`}
                   >
                     <span className="call-av">
@@ -334,20 +330,13 @@ export default function CallPanel({ call, conversation, liveCall, token, note, m
         </div>
       )}
 
-      {menu && (
-        <div
-          className="call-menu"
-          style={{ left: menu.x, top: menu.y }}
-          // Sans ça, le clic sur le menu remonterait jusqu'au gestionnaire qui
-          // le referme, et l'action ne partirait jamais.
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <span className="call-menu-who">{menu.user.username}</span>
-          <button type="button" className="clickable" onClick={() => recall(menu.user.id)}>
-            <PhoneOutgoing size={14} /> Rappeler
-          </button>
-        </div>
-      )}
+      <PeerMenu
+        menu={menu}
+        volumes={volumes}
+        maxGain={maxGain}
+        onVolume={setUserVolume}
+        onRecall={recall}
+      />
 
       <div className="call-actions">
         <button

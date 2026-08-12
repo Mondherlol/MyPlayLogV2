@@ -13,12 +13,19 @@
 // userId -> Set<res>. Un même compte peut avoir plusieurs onglets/appareils.
 const clients = new Map();
 
+// userId -> instant du PREMIER flux ouvert, pour dire « en ligne depuis 12 min ».
+// On ne le remet pas à zéro quand un deuxième onglet s'ouvre — c'est la personne
+// qui est arrivée à ce moment-là, pas l'onglet. En revanche il disparaît avec le
+// dernier flux : une reconnexion après une vraie déconnexion repart de zéro.
+const arrivals = new Map();
+
 export function addClient(userId, res) {
   const key = String(userId);
   let set = clients.get(key);
   if (!set) {
     set = new Set();
     clients.set(key, set);
+    arrivals.set(key, Date.now());
   }
   set.add(res);
   return set.size;
@@ -29,8 +36,17 @@ export function removeClient(userId, res) {
   const set = clients.get(key);
   if (!set) return 0;
   set.delete(res);
-  if (!set.size) clients.delete(key);
+  if (!set.size) {
+    clients.delete(key);
+    arrivals.delete(key);
+  }
   return set.size;
+}
+
+// Depuis quand cette personne est en ligne (ms epoch), ou null si elle ne l'est
+// pas. Une simple lecture du hub : rien de tout ça ne touche la base.
+export function onlineSince(userId) {
+  return arrivals.get(String(userId)) || null;
 }
 
 // Un flux mort (onglet fermé sans `close`, réseau coupé) fait lever `write` :

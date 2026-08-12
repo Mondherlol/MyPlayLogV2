@@ -2121,3 +2121,49 @@ body.mpl-open .pld-done {
   font-weight: 700;
   color: var(--accent-ink);
 }
+
+/* « À la suite » : le second bouton d'un vinyle, à gauche du « + playlist ».
+   C'est par lui qu'un invité d'une séance d'écoute propose un morceau à
+   l'hôte — d'où sa place sur la pochette elle-même, là où l'envie arrive. */
+.gp-vinyl-queue {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 10, 15, 0.6);
+  color: #fff;
+  z-index: 3;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.15s ease;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.gp-vinyl:hover .gp-vinyl-queue {
+  opacity: 1;
+}
+
+.gp-vinyl-queue:hover {
+  transform: scale(1.12);
+  background: var(--accent-grad);
+  color: #1a1204;
+}
+
+/* Ajouté : la coche reste visible le temps qu'on la lise, même sans survol. */
+.gp-vinyl-queue.done {
+  opacity: 1;
+  background: #2fa45f;
+  color: #fff;
+}
+
+@media (hover: none) {
+  .gp-vinyl-queue,
+  .gp-vinyl-playlist {
+    opacity: 1;
+  }
+}

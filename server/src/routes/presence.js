@@ -2,7 +2,7 @@ import express from "express";
 import Conversation from "../models/Conversation.js";
 import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
-import { emitTo, onlineAmong } from "../lib/realtime.js";
+import { emitTo, onlineAmong, onlineSince } from "../lib/realtime.js";
 import { setStatus, clearStatus, statusOf } from "../lib/liveStatus.js";
 
 // ======================================================================
@@ -96,32 +96,56 @@ router.get("/following", requireAuth, async (req, res) => {
   try {
     const me = await User.findById(req.userId).select("following").lean();
     const ids = (me?.following || []).map(String);
-    if (!ids.length) return res.json({ people: [], onlineCount: 0 });
+    if (!ids.length)
+      return res.json({ people: [], offline: [], onlineCount: 0 });
 
-    // On ne rend QUE ceux qui ont quelque chose à montrer : en ligne, ou en
-    // train de faire quelque chose. Une liste d'abonnements hors ligne n'est pas
-    // une activité, c'est un répertoire — et le fil est juste à côté pour ça.
+    // CEUX QUI SONT LÀ, ET CEUX QUI NE LE SONT PAS. Le rail rendait autrefois
+    // les seuls connectés ; un rail vide ne disait alors RIEN — ni qui existe,
+    // ni depuis quand personne n'est passé. Les absents sont donc rendus aussi,
+    // mais à part (`offline`) et avec leur dernier passage : c'est le bas du
+    // rail, pas son sujet.
     const online = onlineAmong(ids);
     const live = new Map();
     for (const id of ids) {
       const status = statusOf(id);
       if (status || online.has(id)) live.set(id, status);
     }
-    if (!live.size) return res.json({ people: [], onlineCount: 0 });
 
-    const users = await User.find({ _id: { $in: [...live.keys()] } })
-      .select("username avatar")
+    const users = await User.find({ _id: { $in: ids } })
+      .select("username avatar lastSeenAt")
       .lean();
 
-    const people = users.map((u) => ({
-      user: {
-        id: String(u._id),
-        username: u.username,
-        avatar: u.avatar || null,
-      },
-      online: online.has(String(u._id)),
-      status: live.get(String(u._id)) || null,
-    }));
+    const card = (u) => ({
+      id: String(u._id),
+      username: u.username,
+      avatar: u.avatar || null,
+    });
+
+    const people = users
+      .filter((u) => live.has(String(u._id)))
+      .map((u) => ({
+        user: card(u),
+        online: online.has(String(u._id)),
+        // « En ligne depuis 12 min » : sans ça, quelqu'un qui ne fait rien
+        // n'était qu'un avatar muet. Le statut, quand il existe, porte déjà son
+        // propre `since` (l'heure où il a lancé CETTE partie) — les deux ne
+        // disent pas la même chose et cohabitent.
+        since: onlineSince(u._id),
+        status: live.get(String(u._id)) || null,
+      }));
+
+    // Les absents, du plus récemment vu au plus ancien : « hors ligne depuis
+    // 3 h » se lit, « hors ligne depuis 8 mois » est du remplissage. On en rend
+    // une trentaine au plus, le client n'en montre qu'une poignée.
+    const offline = users
+      .filter((u) => !live.has(String(u._id)))
+      .map((u) => ({ user: card(u), lastSeenAt: u.lastSeenAt || null }))
+      .sort(
+        (a, b) =>
+          new Date(b.lastSeenAt || 0) - new Date(a.lastSeenAt || 0) ||
+          a.user.username.localeCompare(b.user.username)
+      )
+      .slice(0, 30);
 
     // Ceux qui font quelque chose d'abord, puis les plus récemment arrivés
     // dessus : le haut du rail est toujours ce qu'on peut rejoindre tout de
@@ -133,7 +157,7 @@ router.get("/following", requireAuth, async (req, res) => {
         a.user.username.localeCompare(b.user.username)
     );
 
-    res.json({ people, onlineCount: online.size });
+    res.json({ people, offline, onlineCount: online.size });
   } catch (err) {
     console.error("presence following error:", err.message);
     res.status(500).json({ error: "Impossible de lire l'activité en cours." });

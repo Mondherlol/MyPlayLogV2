@@ -13,9 +13,13 @@ import {
   Music,
   Headphones,
   LogOut,
+  MessageCircle,
+  MoonStar,
+  ChevronDown,
   Loader2 as Spinner,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
+import { timeAgo } from "../lib/lists";
 import { useChat } from "../context/ChatContext";
 import { useListenParty } from "../context/ListenPartyContext";
 
@@ -68,12 +72,23 @@ function since(at) {
   return `depuis ${h} h`;
 }
 
+// « En ligne depuis 12 min ». Sous la minute on ne compte pas — « En ligne à
+// l'instant » se lit mal — on dit qu'il vient d'arriver, ce qui est justement
+// le moment où l'on a envie de lui écrire.
+function onlineNote(at) {
+  const t = at ? since(at) : "";
+  if (!t) return "En ligne";
+  return t === "à l'instant" ? "Vient d'arriver" : `En ligne ${t}`;
+}
+
 export default function FriendsNow({ token }) {
   const [people, setPeople] = useState(null); // null = premier chargement
+  const [away, setAway] = useState([]); // les abonnements hors ligne
+  const [allAway, setAllAway] = useState(false); // « voir tout » du bas du rail
   const [streams, setStreams] = useState([]); // les diffusions GBA en cours
   const [sessions, setSessions] = useState([]); // les séances d'écoute ouvertes
   const [refreshing, setRefreshing] = useState(false);
-  const { statuses } = useChat();
+  const { statuses, openWith } = useChat();
   const listen = useListenParty();
   const alive = useRef(true);
 
@@ -99,7 +114,10 @@ export default function FriendsNow({ token }) {
         });
       try {
         const d = await apiFetch("/presence/following", { token });
-        if (alive.current) setPeople(d.people || []);
+        if (alive.current) {
+          setPeople(d.people || []);
+          setAway(d.offline || []);
+        }
       } catch {
         // Un relevé raté ne vide pas le rail : on garde le dernier connu et on
         // retentera dans 25 secondes. Un rail qui clignote à chaque hoquet
@@ -241,14 +259,19 @@ export default function FriendsNow({ token }) {
       )}
 
       {!merged.length && !streams.length && !sessions.length ? (
-        <div className="fnow-empty">
-          <Users size={20} />
-          <p>
-            Personne en ligne parmi les joueurs que tu suis. Dès que l'un d'eux
-            lance une partie, ouvre une séance ou une lecture, il apparaît ici —
-            avec de quoi le rejoindre.
-          </p>
-        </div>
+        // Le vide n'est vide QUE s'il n'y a personne à suivre : dès qu'on suit
+        // quelqu'un, la liste des absents (plus bas) tient lieu de contenu, et
+        // ce pavé de texte ferait doublon au-dessus d'elle.
+        !away.length && (
+          <div className="fnow-empty">
+            <Users size={20} />
+            <p>
+              Personne en ligne parmi les joueurs que tu suis. Dès que l'un
+              d'eux lance une partie, ouvre une séance ou une lecture, il
+              apparaît ici — avec de quoi le rejoindre.
+            </p>
+          </div>
+        )
       ) : (
         <>
           {FAMILIES.map(({ key, label, Icon }) => {
@@ -267,37 +290,104 @@ export default function FriendsNow({ token }) {
             );
           })}
 
-          {/* Les autres : en ligne, mais on ne sait pas ce qu'ils font. Ils
-              tiennent en une rangée d'avatars — les nommer un par un donnerait
-              autant de place à « il est là » qu'à « il joue à ça », alors que
-              seul le second se rejoint. */}
+          {/* Les autres : en ligne, mais on ne sait pas ce qu'ils font.
+              C'ÉTAIT UNE RANGÉE D'AVATARS MUETS, et ça ne se lisait pas : une
+              tête sans nom ni rien à côté ressemble à une erreur d'affichage
+              plus qu'à une personne. Ils ont donc la même ligne que les autres
+              — nom, « en ligne depuis 12 min », et un bouton pour leur écrire,
+              qui est la seule chose qu'on puisse faire d'un ami disponible qui
+              ne joue à rien. */}
           {idle.length > 0 && (
-            <section className="fnow-group">
+            <section className="fnow-group fam-idle">
               <h3 className="fnow-group-title">
-                <Users size={13} /> En ligne
+                <Users size={13} /> Disponibles
                 <em>{idle.length}</em>
               </h3>
-              <div className="fnow-idle">
-                {idle.map((p) => (
-                  <Link
-                    key={p.user.id}
-                    to={`/u/${p.user.username}`}
-                    className="fnow-idle-av clickable"
-                    title={p.user.username}
-                  >
-                    {p.user.avatar ? (
-                      <img src={p.user.avatar} alt={p.user.username} loading="lazy" />
-                    ) : (
-                      <span>{p.user.username[0].toUpperCase()}</span>
-                    )}
-                  </Link>
-                ))}
-              </div>
+              {idle.map((p) => (
+                <QuietRow
+                  key={p.user.id}
+                  user={p.user}
+                  note={onlineNote(p.since)}
+                  onWrite={() => openWith(p.user.id).catch(() => {})}
+                />
+              ))}
             </section>
           )}
         </>
       )}
+
+      {/* ------------------------- LES ABSENTS -----------------------------
+          Un rail qui ne montre que les présents ne dit rien quand personne
+          n'est là — ni qui on suit, ni si ça vient de se vider ou si c'est
+          désert depuis trois jours. Les absents sont donc rendus, en dernier,
+          en gris, avec la seule chose qui les concerne : leur dernier passage.
+          Repliés au-delà de cinq, sinon ils prendraient plus de place que le
+          direct. */}
+      {away.length > 0 && (
+        <section className="fnow-group fam-away">
+          <h3 className="fnow-group-title">
+            <MoonStar size={13} /> Hors ligne
+            <em>{away.length}</em>
+          </h3>
+          {(allAway ? away : away.slice(0, 5)).map((p) => (
+            <QuietRow
+              key={p.user.id}
+              user={p.user}
+              note={p.lastSeenAt ? `Vu ${timeAgo(p.lastSeenAt)}` : "Jamais vu"}
+              muted
+              onWrite={() => openWith(p.user.id).catch(() => {})}
+            />
+          ))}
+          {away.length > 5 && (
+            <button
+              type="button"
+              className="fnow-more clickable"
+              onClick={() => setAllAway((v) => !v)}
+            >
+              {allAway ? "Réduire" : `Voir les ${away.length - 5} autres`}
+              <ChevronDown size={13} className={allAway ? "up" : ""} />
+            </button>
+          )}
+        </section>
+      )}
     </aside>
+  );
+}
+
+// ----------------------------------------------------------------------
+//  Quelqu'un qui ne fait rien (en ligne sans activité, ou hors ligne)
+// ----------------------------------------------------------------------
+// MÊME LIGNE QUE CEUX QUI JOUENT, AUTRE FIN. Le bouton n'est plus « Rejoindre »
+// — il n'y a rien à rejoindre — mais « écrire », qui ouvre la conversation sur
+// place (pop-up sur grand écran, page sur téléphone) sans quitter le fil qu'on
+// était en train de lire.
+function QuietRow({ user, note, muted = false, onWrite }) {
+  return (
+    <div className={`fnow-row ${muted ? "off" : ""}`}>
+      <Link to={`/u/${user.username}`} className="fnow-who clickable">
+        <span className="fnow-av">
+          {user.avatar ? (
+            <img src={user.avatar} alt="" loading="lazy" draggable="false" />
+          ) : (
+            <span className="fnow-av-fb">{user.username[0].toUpperCase()}</span>
+          )}
+          <i className={`fnow-dot ${muted ? "off" : ""}`} aria-hidden="true" />
+        </span>
+        <span className="fnow-txt">
+          <strong>{user.username}</strong>
+          <em title={note}>{note}</em>
+        </span>
+      </Link>
+      <button
+        type="button"
+        className="fnow-write clickable"
+        onClick={onWrite}
+        title={`Écrire à ${user.username}`}
+        aria-label={`Écrire à ${user.username}`}
+      >
+        <MessageCircle size={14} />
+      </button>
+    </div>
   );
 }
 

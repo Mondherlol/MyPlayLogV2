@@ -27,6 +27,7 @@ import Explorer from "./pages/Explorer";
 import Releases from "./pages/Releases";
 import GamePage from "./pages/GamePage";
 import ClipPage from "./pages/ClipPage";
+import ListenInvite from "./pages/ListenInvite";
 import CompanyPage from "./pages/CompanyPage";
 import PlatformPage from "./pages/PlatformPage";
 import Profile from "./pages/Profile";
@@ -143,6 +144,17 @@ export default function App() {
         element={
           <PublicOrApp>
             <ClipPage />
+          </PublicOrApp>
+        }
+      />
+      {/* Le lien d'une séance d'écoute. Partageable HORS de l'app (Discord,
+          SMS) : il doit donc s'ouvrir sans être connecté — on montre ce qui
+          passe, et la connexion ramène ici même (`?next=`). */}
+      <Route
+        path="/listen/:code"
+        element={
+          <PublicOrApp>
+            <ListenInvite />
           </PublicOrApp>
         }
       />

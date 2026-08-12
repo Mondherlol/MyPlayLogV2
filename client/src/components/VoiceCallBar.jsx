@@ -1,4 +1,5 @@
 import { Loader2, Mic, MicOff, PhoneCall, PhoneOff, Volume2, VolumeX } from "lucide-react";
+import PeerMenu, { usePeerMenu } from "./CallPeerMenu";
 
 // ======================================================================
 //  La barre d'appel — « on est tous dedans »
@@ -17,7 +18,24 @@ import { Loader2, Mic, MicOff, PhoneCall, PhoneOff, Volume2, VolumeX } from "luc
 // où l'on ne voit personne, c'est ce qui remplace le fait de se regarder : sans
 // ça, à six, on se coupe la parole en permanence.
 export default function VoiceCallBar({ call, silent, silentLabel }) {
-  const { inCall, connecting, error, muted, participants, join, leave, toggleMute } = call;
+  const {
+    inCall,
+    connecting,
+    error,
+    muted,
+    participants,
+    join,
+    leave,
+    toggleMute,
+    volumes,
+    setUserVolume,
+    maxGain,
+  } = call;
+  // LE VOLUME PAR JOUEUR, ici aussi. C'est même le mode où il sert le plus :
+  // une partie de Perroquet consiste à écouter les autres crier, et quelqu'un
+  // dont le micro est trop bas rend sa manche inaudible — donc invisible dans
+  // le classement, puisqu'on n'a rien entendu de sa performance.
+  const { menu, tileProps } = usePeerMenu();
 
   if (!inCall)
     return (
@@ -47,7 +65,15 @@ export default function VoiceCallBar({ call, silent, silentLabel }) {
             className={`${p.speaking ? "talking" : ""} ${p.muted ? "muted" : ""} ${
               p.isMe ? "me" : ""
             } ${p.state === "connecting" ? "wait" : ""}`}
-            title={p.isMe ? "toi" : p.username || "…"}
+            title={
+              p.isMe
+                ? "toi"
+                : `${p.username || "…"} — clic droit (ou appui long) pour le volume`
+            }
+            // On ne règle pas son propre volume : on ne s'écoute pas soi-même.
+            {...(p.isMe || !p.userId
+              ? {}
+              : tileProps({ id: p.userId, username: p.username }))}
           >
             {p.avatar ? (
               <img src={p.avatar} alt="" loading="lazy" />
@@ -72,6 +98,13 @@ export default function VoiceCallBar({ call, silent, silentLabel }) {
       </button>
 
       {error && <span className="pq-call-err">{error}</span>}
+
+      <PeerMenu
+        menu={menu}
+        volumes={volumes}
+        maxGain={maxGain}
+        onVolume={setUserVolume}
+      />
     </div>
   );
 }

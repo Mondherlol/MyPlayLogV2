@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { loadYT, extractVideoId } from "../lib/youtube";
+import { useAuth } from "./AuthContext";
 import { API_BASE } from "../lib/api";
 
 // Lecteur audio global de l'app, monté une fois (dans AppLayout), qui survit
@@ -64,6 +65,9 @@ function toPlayable(raw, meta = {}) {
 }
 
 export function PlayerProvider({ children }) {
+  // Le jeton ne sert qu'à savoir si quelqu'un est connecté : on ne précharge le
+  // script YouTube que dans ce cas (voir plus bas).
+  const { token } = useAuth();
   const [queue, setQueue] = useState([]);
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -258,6 +262,44 @@ export function PlayerProvider({ children }) {
         unlockRef.current = "done";
       });
   }, []);
+
+  // ----------------------------------------------------------------------
+  //  Préparer le terrain AVANT le clic — le geste ne se rattrape pas
+  // ----------------------------------------------------------------------
+  // C'EST LE BOGUE DU « PREMIER MORCEAU MUET » QUAND ON REJOINT UNE ÉCOUTE.
+  //
+  // L'iframe YouTube est d'un AUTRE DOMAINE : le navigateur ne l'autorise à
+  // démarrer avec du son que si elle existait au moment où l'utilisateur a
+  // cliqué (l'autorisation se propage aux cadres présents, elle n'est jamais
+  // rétroactive). Or `ensureYT` la crée à la première lecture — c'est-à-dire
+  // APRÈS le clic, une fois le script de l'API téléchargé. En lecture normale
+  // ça passe inaperçu (on reclique, on relance) ; en écoute partagée, la piste
+  // se chargeait et restait muette jusqu'au morceau suivant.
+  //
+  // On charge donc le SCRIPT tout de suite (au repos, ~50 ko), sans créer de
+  // lecteur. Ainsi, quand le clic arrive, `ensureYT` fabrique l'iframe dans la
+  // foulée immédiate du geste — donc avec son autorisation.
+  //
+  // AU REPOS ET SEULEMENT UNE FOIS CONNECTÉ : une page d'accueil visitée puis
+  // quittée n'a aucune raison d'aller chercher un script chez YouTube.
+  useEffect(() => {
+    if (!token) return undefined;
+    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500));
+    const id = idle(() => {
+      loadYT().catch(() => {
+        /* hors ligne, ou YouTube bloqué : la lecture retentera d'elle-même */
+      });
+    });
+    return () => window.cancelIdleCallback?.(id);
+  }, [token]);
+
+  // À appeler DANS un clic, avant toute navigation ou requête : elle réserve
+  // les deux moteurs pendant que l'autorisation du geste est encore valable.
+  // L'écoute en groupe s'en sert au moment où l'on rejoint quelqu'un.
+  const prime = useCallback(() => {
+    unlockAudio();
+    ensureYT();
+  }, [unlockAudio, ensureYT]);
 
   // --- L'élément <audio> unique et ses événements ---
   useEffect(() => {
@@ -663,6 +705,131 @@ export function PlayerProvider({ children }) {
     }
   }, []);
 
+  // ======================================================================
+  //  La file : ajouter, retirer, réordonner, vider
+  // ======================================================================
+  // JUSQU'ICI LA FILE ÉTAIT EN LECTURE SEULE : on la remplaçait entièrement en
+  // lançant une playlist, et c'était tout. On ne pouvait ni sortir le morceau
+  // qu'on ne voulait plus, ni remonter celui qu'on attendait — la seule issue
+  // était de tout relancer autrement.
+  //
+  // TOUT PASSE PAR LES REFS, jamais par l'état : ces fonctions sont appelées
+  // depuis des gestionnaires de clic qui, eux, ont capturé un `queue` d'il y a
+  // trois rendus. Lire `queueRef.current` garantit qu'on modifie la file telle
+  // qu'elle est à cet instant, pas telle qu'elle était à l'affichage.
+  //
+  // ET L'INDEX SUIT LA PISTE, pas sa position : `loadedRef` est indexé sur le
+  // videoId, donc tant que la piste en cours reste la même, RIEN NE SE
+  // RECHARGE. C'est ce qui permet de réordonner la file pendant l'écoute sans
+  // que le morceau ne reparte à zéro.
+
+  // Ajoute à la fin. Rend "added" | "duplicate" | "started" — l'appelant s'en
+  // sert pour dire ce qui s'est passé (« déjà dans la file » est une réponse,
+  // un bouton qui ne fait rien n'en est pas une).
+  const enqueue = useCallback(
+    (raw, meta = {}) => {
+      const track = toPlayable(raw, meta);
+      if (!track) return "invalid";
+      const q = queueRef.current;
+      // File vide = il n'y a rien à faire la queue : on lance.
+      if (!q.length) {
+        unlockAudio();
+        startAtRef.current = 0;
+        setQueue([track]);
+        setIndex(0);
+        setSource(meta.source || null);
+        setProgress({ current: 0, duration: 0 });
+        return "started";
+      }
+      if (q.some((t) => t.videoId === track.videoId)) return "duplicate";
+      setQueue([...q, track]);
+      return "added";
+    },
+    [unlockAudio]
+  );
+
+  // « Juste après celle-ci » — l'autre façon d'ajouter, et la seule qui compte
+  // quand la file fait trente titres.
+  const playNext = useCallback((raw, meta = {}) => {
+    const track = toPlayable(raw, meta);
+    if (!track) return "invalid";
+    const q = queueRef.current;
+    if (!q.length) return "empty";
+    const k = indexRef.current;
+    // On ne déduplique QU'EN AVAL. Un même morceau plus loin dans la file, c'est
+    // le doublon qu'on veut éviter ; le même DÉJÀ ÉCOUTÉ ne gêne personne, et le
+    // retirer ferait glisser l'index de la piste en cours pour rien.
+    const cleaned = q.filter((t, i) => i <= k || t.videoId !== track.videoId);
+    setQueue([...cleaned.slice(0, k + 1), track, ...cleaned.slice(k + 1)]);
+    return "added";
+  }, []);
+
+  const removeAt = useCallback(
+    (i) => {
+      const q = queueRef.current;
+      const k = indexRef.current;
+      if (i < 0 || i >= q.length) return;
+      const next = q.filter((_, j) => j !== i);
+      if (!next.length) return close(); // la file vidée, c'est le lecteur fermé
+      if (i < k) {
+        setQueue(next);
+        setIndex(k - 1);
+        return;
+      }
+      if (i > k) {
+        setQueue(next);
+        return;
+      }
+      // ON RETIRE LA PISTE EN COURS. Si c'était la dernière, il n'y a rien
+      // après : on ferme, plutôt que de repartir en arrière sur un morceau
+      // qu'on venait d'écouter.
+      if (k > next.length - 1) return close();
+      setQueue(next);
+      setIndex(k); // même index = la suivante prend sa place, et démarre
+    },
+    [close]
+  );
+
+  const moveTrack = useCallback((from, to) => {
+    const q = [...queueRef.current];
+    if (from === to || from < 0 || to < 0 || from >= q.length || to >= q.length) return;
+    const current = q[indexRef.current];
+    const [item] = q.splice(from, 1);
+    q.splice(to, 0, item);
+    setQueue(q);
+    // On retrouve la piste en cours à sa NOUVELLE place : c'est ce qui évite le
+    // rechargement (l'identité de l'objet n'a pas changé, son index si).
+    const k = q.indexOf(current);
+    if (k >= 0) setIndex(k);
+  }, []);
+
+  // Vider = ne garder que ce qui joue. Une file « vidée » qui couperait aussi
+  // le son serait un bouton fermer déguisé, et celui-ci existe déjà.
+  const clearQueue = useCallback(() => {
+    const current = queueRef.current[indexRef.current];
+    if (!current) return close();
+    setQueue([current]);
+    setIndex(0);
+  }, [close]);
+
+  // Remplace la file SANS toucher à la lecture. C'est l'écoute en groupe qui
+  // s'en sert : l'invité doit voir la file de l'hôte évoluer (un morceau ajouté,
+  // un autre retiré) alors même que la piste en cours, elle, ne bouge pas.
+  const syncQueue = useCallback((list) => {
+    const items = (list || []).map((t) => toPlayable(t)).filter(Boolean);
+    if (!items.length) return;
+    const current = queueRef.current[indexRef.current];
+    if (!current) return;
+    const k = items.findIndex((t) => t.videoId === current.videoId);
+    // La piste en cours n'est plus dans la file reçue : on ne touche à rien.
+    // Le prochain repère de l'hôte fera autorité, et d'ici là on continue à
+    // écouter ce qu'on écoutait plutôt que de sauter dans le vide.
+    if (k < 0) return;
+    setQueue(items);
+    setIndex(k);
+  }, []);
+
+
   // --- Media Session : métadonnées + contrôles écran de verrouillage ---
   useEffect(() => {
     if (!("mediaSession" in navigator) || !current) return;
@@ -748,6 +915,16 @@ export function PlayerProvider({ children }) {
       // deux côtés s'est trompé d'un cran.
       play: playActive,
       seekTo,
+      prime,
+      // La file, modifiable : ajouter, retirer, réordonner, vider (voir plus
+      // haut). `syncQueue` n'est pas pour l'interface — c'est l'écoute en
+      // groupe qui recopie la file de l'hôte sans toucher à la lecture.
+      enqueue,
+      playNext,
+      removeAt,
+      moveTrack,
+      clearQueue,
+      syncQueue,
       next,
       prev,
       seekFraction,
@@ -772,6 +949,13 @@ export function PlayerProvider({ children }) {
       pause,
       playActive,
       seekTo,
+      prime,
+      enqueue,
+      playNext,
+      removeAt,
+      moveTrack,
+      clearQueue,
+      syncQueue,
       next,
       prev,
       seekFraction,

@@ -4905,3 +4905,150 @@ body.mpl-open .chat-dock {
   background: color-mix(in srgb, #16a34a 14%, transparent);
   color: #16a34a;
 }
+
+
+/* ---------------------------------- le volume d'une personne -------------- */
+.call-menu { min-width: 186px; }
+.call-vol {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 4px 8px 7px;
+}
+.call-vol-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+.call-vol-head b {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+/* Au-delà de 100 %, le chiffre change de couleur : on n'augmente plus un
+   volume, on amplifie — et ça s'entend sur le souffle autant que sur la voix. */
+.call-vol-head b.boost { color: var(--accent-ink); }
+.call-vol-reset {
+  margin-left: auto;
+  padding: 1px 6px;
+  border: none;
+  border-radius: 999px;
+  background: var(--surface-2, var(--surface));
+  font-size: 0.66rem;
+  color: var(--text-soft);
+}
+.call-vol-reset:hover { color: var(--text); }
+
+.call-vol-slider {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 999px;
+  /* Le repère des 100 % est PEINT DANS LA PISTE : la moitié basse est neutre,
+     la moitié haute prend l'accent. On voit donc où l'on bascule dans
+     l'amplification sans avoir à lire le pourcentage. */
+  background: linear-gradient(
+    to right,
+    var(--border-strong) 0 50%,
+    color-mix(in srgb, var(--orange) 45%, transparent) 50% 100%
+  );
+}
+.call-vol-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  background: var(--text);
+  cursor: pointer;
+}
+.call-vol-slider.boost::-webkit-slider-thumb { background: var(--orange); }
+.call-vol-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  background: var(--text);
+  cursor: pointer;
+}
+.call-vol-slider.boost::-moz-range-thumb { background: var(--orange); }
+
+.call-vol-hint {
+  font-size: 0.66rem;
+  line-height: 1.3;
+  color: var(--text-soft);
+}
+
+/* Une tête dont le volume a été touché reste discrètement marquée : sinon on
+   oublie qu'on a baissé quelqu'un et on cherche pourquoi on ne l'entend plus. */
+.call-people li .call-av { cursor: context-menu; }
+
+/* --- Carte « viens écouter ça » (invitation à une séance d'écoute) ---
+   Elle emprunte tout à la carte de versus (états `open` / `live` / `off`,
+   même gabarit) : ce sont les mêmes objets — une invitation périssable vers
+   quelque chose qui se rejoint. Seule la couleur change, celle de l'écoute. */
+.chat-card-listen {
+  width: 100%;
+  border: none;
+  text-align: left;
+  background: color-mix(in srgb, #4bb3f5 8%, transparent);
+  border: 1px solid color-mix(in srgb, #4bb3f5 22%, transparent);
+}
+
+.chat-card-listen.off {
+  opacity: 0.75;
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+.chat-card-listen .chat-card-kicker {
+  color: #2f8fd0;
+}
+
+.lc-card-art {
+  border-radius: 50% !important;
+  overflow: hidden;
+  background: var(--surface-2);
+  color: #2f8fd0;
+}
+
+.lc-card-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Le disque ne tourne que si ça joue : arrêté, il dit « en pause » sans mot. */
+.lc-card-art.spin img {
+  animation: fnow-disc 7s linear infinite;
+}
+
+/* « À la suite » sur une OST partagée : discret, à droite de la carte — c'est
+   un geste de plus, pas le geste principal (qui reste : écouter). */
+.chat-card-queue {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  align-self: center;
+  margin-left: auto;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-soft);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.chat-card-queue:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.chat-card-queue.done {
+  color: #2fa45f;
+}

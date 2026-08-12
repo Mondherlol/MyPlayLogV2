@@ -34,6 +34,9 @@ import {
   VenetianMask,
   BookOpen,
   BookMarked,
+  Headphones,
+  ListEnd,
+  Check,
   Phone,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
@@ -46,6 +49,7 @@ import { useChat } from "../context/ChatContext";
 import { useCall } from "../context/CallContext";
 import { useAuth } from "../context/AuthContext";
 import { usePlayer } from "../context/PlayerContext";
+import { useListenParty } from "../context/ListenPartyContext";
 // Les têtes des joueurs, exactement celles du salon : une invitation doit
 // montrer la même bande que la page qu'elle ouvre.
 import { VersusFace, hueOf } from "./VersusRoom";
@@ -964,6 +968,7 @@ const MessageRow = memo(function MessageRow({
     m.party ||
     m.mot ||
     m.versus ||
+    m.listen ||
     m.book ||
     m.voice
       ? 0
@@ -1195,7 +1200,9 @@ const MessageRow = memo(function MessageRow({
 
           <div
             className={`chat-bubble ${m.deleted ? "is-deleted" : ""} ${
-              m.game || m.ost || m.party || m.mot || m.versus || m.book ? "has-card" : ""
+              m.game || m.ost || m.party || m.mot || m.versus || m.listen || m.book
+                ? "has-card"
+                : ""
             } ${m.voice ? "has-voice" : ""} ${
               emojiLvl ? `chat-emoji-only lvl-${emojiLvl}` : ""
             }`}
@@ -1209,6 +1216,7 @@ const MessageRow = memo(function MessageRow({
                 {m.party && <PartyCard party={m.party} />}
                 {m.mot && <MotCard mot={m.mot} />}
                 {m.versus && <VersusCard versus={m.versus} />}
+                {m.listen && <ListenCard listen={m.listen} />}
                 {m.book && <BookCard book={m.book} />}
                 {m.voice && <VoiceBubble voice={m.voice} mine={m.mine} />}
                 {m.text && <p>{renderMessage(m.text, m.mentions)}</p>}
@@ -1723,6 +1731,94 @@ function VersusCard({ versus }) {
   );
 }
 
+// --- Carte « viens écouter ça » ---
+// LA PLUS PÉRISSABLE DE TOUTES : une séance d'écoute meurt avec l'onglet de son
+// hôte (il n'y a rien à sauvegarder, cf. lib/listenRooms.js). La carte demande
+// donc au serveur si elle vit encore — et le dit franchement quand ce n'est
+// plus le cas, plutôt que de laisser cliquer dans le vide.
+//
+// ET ELLE NE NAVIGUE PAS. C'est la seule carte du fil qui agit sur place : se
+// brancher ne change pas d'écran, ça change ce qui sort des enceintes. On reste
+// donc dans la conversation, et c'est le mini-lecteur en bas qui prend le
+// relais — ce qui est exactement ce qu'on veut quand on écoute à deux en
+// continuant à discuter.
+function ListenCard({ listen: card }) {
+  const { token } = useAuth();
+  const party = useListenParty();
+  const [live, setLive] = useState(undefined); // undefined = on demande
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    apiFetch(`/listen/${card.code}/preview`, { token })
+      .then((d) => alive && setLive(d))
+      .catch(() => alive && setLive({ state: "gone" }));
+    return () => {
+      alive = false;
+    };
+  }, [card.code, token]);
+
+  const mine = party.party?.code === card.code;
+  const gone = live?.state === "gone";
+  const name = live?.track?.name || card.trackName || "Écoute en groupe";
+  const artist = live?.track?.artist || card.artist || "";
+  const artwork = live?.track?.artwork || card.artwork || null;
+  const host = live?.host?.username || card.hostName || "";
+  const n = live?.listeners ?? card.people ?? 0;
+
+  const status =
+    live === undefined
+      ? { tone: "wait", label: "Séance…" }
+      : gone
+        ? { tone: "off", label: "Séance terminée" }
+        : mine
+          ? { tone: "live", label: "Tu écoutes avec lui" }
+          : { tone: "open", label: `Écouter avec ${host || "lui"}` };
+
+  const body = (
+    <>
+      <span className={`chat-card-cover lc-card-art ${live?.playing ? "spin" : ""}`}>
+        {artwork ? <img src={artwork} alt="" /> : <Headphones size={22} />}
+      </span>
+      <span className="chat-card-body">
+        <span className="chat-card-kicker">
+          <Headphones size={12} /> Écoute en groupe
+          {n > 0 && <i className="gv-card-mode">{n} à l'écoute</i>}
+        </span>
+        <span className="chat-card-title">{name}</span>
+        {(artist || card.gameName) && (
+          <span className="chat-card-sub">{artist || card.gameName}</span>
+        )}
+        <span className={`gv-card-state ${status.tone}`}>
+          {status.tone === "live" && <i className="gv-card-dot" aria-hidden="true" />}
+          {status.label}
+          {status.tone === "open" && <b aria-hidden="true">→</b>}
+        </span>
+      </span>
+    </>
+  );
+
+  const cls = `chat-card chat-card-listen ${status.tone}`;
+  if (gone || live === undefined || mine) return <span className={cls}>{body}</span>;
+  return (
+    <button
+      type="button"
+      className={`${cls} clickable`}
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          await party.join(card.code);
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {body}
+    </button>
+  );
+}
+
 // --- Carte « rejoins ma partie du Mot du jour » ---
 // Comme l'invitation de watchparty, c'est le seul morceau d'une partie qui
 // survit dans la messagerie. Une carte de SESSION est périssable : le mot change
@@ -1796,6 +1892,8 @@ function MotCard({ mot }) {
 // --- Carte « OST partagée » : jouable directement dans le fil ---
 function OstCard({ ost }) {
   const player = usePlayer();
+  const listen = useListenParty();
+  const [queued, setQueued] = useState(null);
   const track = {
     id: ost.videoId ? `v-${ost.videoId}` : ost.url,
     videoId: ost.videoId,
@@ -1846,6 +1944,40 @@ function OstCard({ ost }) {
           </Link>
         )}
       </div>
+
+      {/* « À la suite » — la même porte que sur une fiche de jeu. Une piste
+          partagée dans une conversation PENDANT une écoute en groupe, c'est
+          exactement le morceau qu'on veut proposer à l'hôte ; l'obliger à
+          rouvrir la page du jeu pour ça n'aurait pas de sens. */}
+      {playable && listen.canQueue && (
+        <button
+          type="button"
+          className={`chat-card-queue clickable ${queued ? "done" : ""}`}
+          onClick={async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+              const r = await listen.addToQueue(track);
+              setQueued(r === "duplicate" ? "dup" : "ok");
+            } catch (err) {
+              if (/déjà/i.test(err.message || "")) setQueued("dup");
+              else alert(err.message);
+              return;
+            }
+            setTimeout(() => setQueued(null), 2000);
+          }}
+          title={
+            queued === "dup"
+              ? "Déjà dans la file"
+              : listen.following
+                ? `Proposer à ${listen.party?.host?.username || "l'hôte"}`
+                : "Ajouter à la file"
+          }
+          aria-label="Ajouter à la file"
+        >
+          {queued ? <Check size={15} /> : <ListEnd size={15} />}
+        </button>
+      )}
     </div>
   );
 }

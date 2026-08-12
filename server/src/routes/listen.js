@@ -2,10 +2,12 @@ import express from "express";
 import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { emitTo } from "../lib/realtime.js";
+import { deliverCard, deliverCardToConversation } from "./chat.js";
 import {
   open,
   get,
   setState,
+  cleanProposal,
   close,
   codeOfHost,
   join,
@@ -38,7 +40,10 @@ import {
 // les salons de versus :
 //
 //   kind: state     la lecture a changé (piste, pause, saut) → à rattraper ;
-//   kind: room      la liste des auditeurs a bougé ;
+//   kind: room      la liste des auditeurs (ou le réglage de file) a bougé ;
+//   kind: add       une piste proposée, POUR L'HÔTE SEUL — c'est lui qui
+//                   l'ajoute à sa file, le serveur n'en tient pas ;
+//   kind: added     la même nouvelle, pour tout le monde (accusé de réception) ;
 //   kind: end       l'hôte a fermé la séance.
 //
 // ------------------------------------------------------------ qui mène
@@ -46,8 +51,44 @@ import {
 // serait une bonne idée sur le papier et un cauchemar à trois personnes : on ne
 // saurait jamais qui vient d'arrêter la musique. Ici la règle tient en une
 // phrase — c'est sa séance, il choisit ; les autres suivent ou s'en vont.
+//
+// LA FILE EST LA SEULE EXCEPTION, et elle se demande : l'hôte peut l'ouvrir aux
+// invités (`openQueue`), qui PROPOSENT alors des morceaux — ajoutés à la fin,
+// jamais à la place de ce qui joue. Proposer la suite n'est pas prendre le
+// volant, et c'est précisément la nuance qui rend la chose vivable.
 
 const router = express.Router();
+
+// ----------------------------------------------------------------------
+//  GET /:code/preview — ce qu'on peut dire d'une séance SANS être connecté
+// ----------------------------------------------------------------------
+// AVANT `requireAuth`, et c'est tout l'intérêt : le lien d'une séance se colle
+// dans un salon Discord, donc il tombe entre les mains de gens qui n'ont pas
+// de compte. Leur répondre 401 ferait une page morte ; on leur montre ce qui
+// se joue et l'invitation à ouvrir un compte pour écouter.
+//
+// On ne rend QUE le nécessaire à cet aperçu : l'hôte, la piste, l'état. Ni la
+// file, ni la position, ni la liste des auditeurs — un lien transféré ne donne
+// pas le droit de savoir qui écoute.
+router.get("/:code/preview", (req, res) => {
+  const room = get(req.params.code);
+  if (!room || !room.track) return res.json({ state: "gone" });
+  res.json({
+    state: "live",
+    code: room.code,
+    host: room.host,
+    track: {
+      name: room.track.name,
+      artist: room.track.artist,
+      artwork: room.track.artwork,
+      gameName: room.track.gameName,
+    },
+    playing: room.playing,
+    listeners: room.listeners.size,
+    startedAt: room.at,
+  });
+});
+
 router.use(requireAuth);
 
 const toRoom = (room, kind, payload = {}) =>
@@ -175,6 +216,148 @@ router.post("/:code/leave", (req, res) => {
   if (!room) return res.json({ ok: true });
   if (leave(room, req.userId)) toRoom(room, "room", { room: serialize(room) });
   res.json({ ok: true });
+});
+
+// ----------------------------------------------------------------------
+//  POST /:code/open-queue — l'hôte ouvre (ou referme) sa file
+// ----------------------------------------------------------------------
+// DEUX DÉCISIONS SÉPARÉES, et il fallait qu'elles le restent : ouvrir une
+// séance, c'est accepter qu'on écoute ce que je choisis ; ouvrir la FILE, c'est
+// accepter qu'on choisisse à ma place. La seconde ne doit jamais être un effet
+// de bord de la première — d'où ce réglage à part, fermé par défaut.
+router.post("/:code/open-queue", (req, res) => {
+  const room = get(req.params.code);
+  if (!room) return res.status(404).json({ error: "Cette séance est terminée." });
+  if (room.hostId !== String(req.userId))
+    return res.status(403).json({ error: "Seul l'hôte ouvre sa file." });
+  room.openQueue = req.body?.open !== false;
+  toRoom(room, "room", { room: serialize(room) });
+  res.json({ ok: true, openQueue: room.openQueue });
+});
+
+// ----------------------------------------------------------------------
+//  POST /:code/queue — un invité propose une piste
+// ----------------------------------------------------------------------
+// LE SERVEUR NE TIENT PAS LA FILE, et c'est délibéré : la file EST celle du
+// lecteur de l'hôte (son navigateur), la seule qui joue vraiment. En tenir une
+// copie ici ferait deux vérités à réconcilier — celle qui décide et celle qui
+// croit décider — pour le plaisir d'avoir un état de plus à maintenir.
+//
+// On se contente donc de FAIRE PASSER la demande à l'hôte, qui l'ajoute à sa
+// file et la rediffuse dans son prochain repère (kind: state). Ce qu'on vérifie
+// ici, c'est le droit : être dans la séance, et que l'hôte ait ouvert sa file.
+router.post("/:code/queue", async (req, res) => {
+  try {
+    const room = get(req.params.code);
+    if (!room) return res.status(404).json({ error: "Cette séance est terminée." });
+
+    const me = String(req.userId);
+    const isHost = room.hostId === me;
+    if (!isHost && !room.listeners.has(me))
+      return res.status(403).json({ error: "Rejoins la séance pour proposer une piste." });
+    if (!isHost && !room.openQueue)
+      return res
+        .status(403)
+        .json({ error: "L'hôte n'a pas ouvert sa file aux invités." });
+
+    const track = cleanProposal(req.body?.track);
+    if (!track) return res.status(400).json({ error: "Piste illisible." });
+    if ((room.queue || []).some((t) => t.videoId === track.videoId))
+      return res.status(409).json({ error: "Déjà dans la file." });
+
+    const who = room.listeners.get(me);
+    const by = {
+      id: me,
+      username: isHost ? room.host?.username || "" : who?.username || "",
+    };
+    // À L'HÔTE POUR QU'IL L'AJOUTE, à tout le monde pour que ça se voie. Les
+    // deux messages partent ensemble : l'ajout réel n'arrivera qu'au repère
+    // suivant, et sans le second, celui qui vient de proposer resterait devant
+    // un bouton qui n'a rien répondu.
+    emitTo([room.hostId], "listen", { code: room.code, kind: "add", track, by });
+    toRoom(room, "added", { track, by });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("listen queue error:", err.message);
+    res.status(500).json({ error: "Proposition non transmise." });
+  }
+});
+
+// ----------------------------------------------------------------------
+//  POST /:code/invite — « viens écouter ça »
+// ----------------------------------------------------------------------
+// Deux destinations d'un seul geste, comme les invitations de versus : des
+// personnes (carte en message privé) et des groupes de discussion (carte dans
+// le fil commun). On ne peut écrire qu'à ses abonnés — c'est la règle de la
+// messagerie, pas une règle de l'écoute.
+//
+// LA CARTE EST REMPLIE ICI, jamais par le client : c'est le serveur qui sait
+// ce qui passe dans la séance à la seconde où l'invitation part, et une carte
+// est du contenu que d'autres vont lire.
+router.post("/:code/invite", async (req, res) => {
+  try {
+    const room = get(req.params.code);
+    if (!room) return res.status(404).json({ error: "Cette séance est terminée." });
+    // Inviter chez quelqu'un d'autre, non : on n'invite qu'à une séance dont on
+    // fait partie (la sienne, ou celle qu'on écoute).
+    const inside =
+      room.hostId === String(req.userId) || room.listeners.has(String(req.userId));
+    if (!inside)
+      return res.status(403).json({ error: "Rejoins la séance avant d'inviter." });
+
+    const userIds = [...new Set((req.body?.userIds || []).map(String))].slice(0, 10);
+    const conversationIds = [
+      ...new Set((req.body?.conversationIds || []).map(String)),
+    ].slice(0, 10);
+    if (!userIds.length && !conversationIds.length)
+      return res.status(400).json({ error: "Personne à inviter." });
+
+    const targets = await User.find({ _id: { $in: userIds } })
+      .select("username following")
+      .lean();
+
+    const card = {
+      code: room.code,
+      hostName: room.host?.username || "",
+      trackName: room.track?.name || "",
+      artist: room.track?.artist || "",
+      artwork: room.track?.artwork || null,
+      gameName: room.track?.gameName || "",
+      people: room.listeners.size,
+    };
+    const text = String(req.body?.text || "").slice(0, 300);
+
+    const sent = [];
+    const skipped = [];
+    for (const target of targets) {
+      const allowed = (target.following || []).some(
+        (id) => String(id) === String(req.userId)
+      );
+      if (!allowed) {
+        skipped.push({ id: String(target._id), username: target.username });
+        continue;
+      }
+      // eslint-disable-next-line no-await-in-loop
+      await deliverCard({ fromId: req.userId, toId: target._id, text, listen: card });
+      sent.push({ id: String(target._id), username: target.username });
+    }
+    const groups = [];
+    for (const cid of conversationIds) {
+      // eslint-disable-next-line no-await-in-loop
+      const ok = await deliverCardToConversation({
+        fromId: req.userId,
+        conversationId: cid,
+        text,
+        listen: card,
+      });
+      if (ok) groups.push(cid);
+    }
+
+    res.json({ sent, skipped, groups });
+  } catch (err) {
+    console.error("listen invite error:", err.message);
+    res.status(500).json({ error: "Invitation non envoyée." });
+  }
 });
 
 router.post("/:code/end", (req, res) => {

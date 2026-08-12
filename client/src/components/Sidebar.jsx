@@ -19,6 +19,7 @@ import {
   Moon,
   Palette,
   Check,
+  Sparkles,
   ChevronUp,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
@@ -32,7 +33,7 @@ const APP_VERSION = "1.1";
 
 const NAV = [
   { to: "/app", label: "Accueil", Icon: Home, end: true },
-  // { to: "/activity", label: "Activité", Icon: Activity },
+  { to: "/activity", label: "Activité", Icon: Sparkles },
   { to: "/explore", label: "Explorer", Icon: Compass },
   { to: "/releases", label: "Sorties", Icon: CalendarDays },
   // `badge` : la pastille de non-lus vient du contexte de messagerie.

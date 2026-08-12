@@ -20,13 +20,16 @@ import {
   Volume1,
   VolumeX,
   Radio,
-  LogOut,
+  Eraser,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import { usePlayer, usePlayerProgress } from "../context/PlayerContext";
 import { useListenParty } from "../context/ListenPartyContext";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
 import AddToPlaylistModal from "./AddToPlaylistModal";
+import ListenPartyPanel from "./ListenPartyPanel";
 import ShareOstModal from "./ShareOstModal";
 
 function fmt(sec) {
@@ -74,6 +77,8 @@ export default function MiniPlayer() {
   const [confirmReplace, setConfirmReplace] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [playlistOpen, setPlaylistOpen] = useState(false);
+  // Le panneau de la séance d'écoute (démarrer, inviter, partager le lien).
+  const [panel, setPanel] = useState(false);
 
   const gameId = current?.gameId || null;
   const canLike = !!token && !!gameId;
@@ -271,13 +276,21 @@ export default function MiniPlayer() {
           >
             <SkipBack size={18} fill="currentColor" strokeWidth={0} />
           </button>
+          {/* SUIVEUR : le bouton reste VIVANT tant que le son n'est pas parti.
+              C'est le rattrapage du « je n'entends rien » — un navigateur qui a
+              refusé de démarrer tout seul ne changera d'avis que sur un vrai
+              clic (voir `prime` dans PlayerContext). Une fois la musique
+              lancée, il se verrouille : mettre en pause de son côté n'aurait
+              aucun sens, le recalage relancerait deux secondes plus tard. */}
           <button
             className="mp-btn mp-play clickable"
-            onClick={player.toggle}
-            disabled={following}
+            onClick={following ? listen.resync : player.toggle}
+            disabled={following && playing}
             title={
               following
-                ? `C'est ${party?.host?.username || "l'hôte"} qui mène la séance`
+                ? playing
+                  ? `C'est ${party?.host?.username || "l'hôte"} qui mène la séance`
+                  : "Reprendre l'écoute"
                 : playing
                 ? "Pause"
                 : loading
@@ -326,36 +339,28 @@ export default function MiniPlayer() {
               est ICI et pas ailleurs parce que la question ne se pose qu'une
               fois la musique lancée — et que c'est le seul endroit de l'app qui
               existe sur toutes les pages en même temps qu'elle. */}
-          {token &&
-            (following ? (
-              <button
-                className="mp-icon-btn mp-party leave clickable"
-                onClick={listen.stop}
-                title={`Quitter la séance de ${party?.host?.username || "l'hôte"}`}
-                aria-label="Quitter la séance d'écoute"
-              >
-                <LogOut size={17} />
-              </button>
-            ) : (
-              <button
-                className={`mp-icon-btn mp-party clickable ${party ? "on" : ""}`}
-                onClick={party ? listen.stop : listen.start}
-                disabled={listen.busy}
-                title={
-                  party
-                    ? listeners.length
-                      ? `Fermer la séance (${listeners.length} à l'écoute)`
-                      : "Fermer la séance d'écoute"
-                    : "Écouter à plusieurs : ouvrir une séance"
-                }
-                aria-label="Séance d'écoute"
-              >
-                <Radio size={17} />
-                {party && listeners.length > 0 && (
-                  <em className="mp-party-n">{listeners.length}</em>
-                )}
-              </button>
-            ))}
+          {token && (
+            <button
+              className={`mp-icon-btn mp-party clickable ${party ? "on" : ""} ${
+                following ? "guest" : ""
+              }`}
+              onClick={() => setPanel((v) => !v)}
+              title={
+                following
+                  ? `Séance de ${party.host?.username || "l'hôte"}`
+                  : party
+                    ? `Ta séance · ${listeners.length} à l'écoute`
+                    : "Écouter à plusieurs"
+              }
+              aria-label="Séance d'écoute"
+              aria-expanded={panel}
+            >
+              <Radio size={17} />
+              {party && listeners.length > 0 && (
+                <em className="mp-party-n">{listeners.length}</em>
+              )}
+            </button>
+          )}
 
           {/* Cœur : définir cette piste comme OST favorite du jeu. */}
           {canLike && (
@@ -452,6 +457,8 @@ export default function MiniPlayer() {
         </div>
       </div>
 
+      {panel && <ListenPartyPanel onClose={() => setPanel(false)} />}
+
       {showQueue && (
         <QueueModal player={player} onClose={() => setShowQueue(false)} />
       )}
@@ -542,10 +549,31 @@ function ConfirmReplaceModal({ fav, gameName, onCancel, onConfirm }) {
   );
 }
 
-// --- Modale « File de lecture » : liste des pistes de la playlist en cours ---
+// ======================================================================
+//  Modale « File de lecture » — et enfin de quoi la TENIR
+// ======================================================================
+// ELLE ÉTAIT EN LECTURE SEULE : une liste de titres où l'on ne pouvait que
+// sauter d'un morceau à l'autre. Pas de « celui-là, non », pas de « remonte
+// celui-ci », pas de « repars propre » — la seule façon de corriger une file
+// était de relancer une autre playlist par-dessus.
+//
+// TROIS GESTES, TOUS À PORTÉE DE POUCE : retirer, déplacer, vider. Le
+// glisser-déposer natif ne marche pas au doigt, d'où les flèches — elles ne
+// sont pas un repli pour le mobile, c'est le seul moyen qui marche PARTOUT, et
+// le glissé vient en plus pour ceux qui ont une souris.
+//
+// EN SÉANCE D'ÉCOUTE INVITÉE, TOUT SE VERROUILLE : la file affichée est celle
+// de l'hôte, la modifier de son côté ne changerait rien chez personne et le
+// prochain repère l'écraserait deux secondes plus tard. On le dit, plutôt que
+// de laisser des boutons mentir.
 function QueueModal({ player, onClose }) {
-  const { queue, source, playing, current } = player;
+  const { queue, source, playing, current, index } = player;
+  const listen = useListenParty();
+  const locked = listen.following;
   const activeRef = useRef(null);
+  const [drag, setDrag] = useState(null); // index en cours de glissé
+  const [over, setOver] = useState(null); // index survolé
+  const [confirmClear, setConfirmClear] = useState(false);
 
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && onClose();
@@ -557,6 +585,18 @@ function QueueModal({ player, onClose }) {
   useEffect(() => {
     activeRef.current?.scrollIntoView({ block: "center" });
   }, []);
+
+  // La file vidée pendant que la question était posée : plus rien à confirmer.
+  useEffect(() => {
+    if (queue.length <= 1) setConfirmClear(false);
+  }, [queue.length]);
+
+  function drop(to) {
+    if (drag === null || drag === to) return;
+    player.moveTrack(drag, to);
+    setDrag(null);
+    setOver(null);
+  }
 
   return createPortal(
     <div
@@ -577,6 +617,7 @@ function QueueModal({ player, onClose }) {
             <h2 className="mpq-head-title">{source?.label || "Lecture en cours"}</h2>
             <span className="mpq-head-count">
               {queue.length} piste{queue.length > 1 ? "s" : ""}
+              {index < queue.length - 1 && ` · ${queue.length - index - 1} à venir`}
             </span>
           </div>
           {source?.href && (
@@ -587,47 +628,147 @@ function QueueModal({ player, onClose }) {
           )}
         </div>
 
+        {/* « Vider » demande confirmation : c'est le seul geste d'ici qu'on ne
+            peut pas défaire, et il est à deux centimètres de « retirer une
+            piste ». La question remplace le bouton plutôt que d'ouvrir une
+            seconde fenêtre par-dessus la première. */}
+        {locked ? (
+          <p className="mpq-locked">
+            C'est {listen.party?.host?.username || "l'hôte"} qui tient la file.
+            {listen.party?.openQueue
+              ? " Tu peux lui proposer des morceaux depuis les pages de jeu."
+              : ""}
+          </p>
+        ) : (
+          queue.length > 1 && (
+            <div className="mpq-tools">
+              {confirmClear ? (
+                <>
+                  <span className="mpq-tools-ask">
+                    Vider la file ? La piste en cours reste.
+                  </span>
+                  <button
+                    className="mpq-tool danger clickable"
+                    onClick={() => {
+                      player.clearQueue();
+                      setConfirmClear(false);
+                    }}
+                  >
+                    Vider
+                  </button>
+                  <button
+                    className="mpq-tool clickable"
+                    onClick={() => setConfirmClear(false)}
+                  >
+                    Annuler
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="mpq-tool clickable"
+                  onClick={() => setConfirmClear(true)}
+                >
+                  <Eraser size={14} /> Vider la file
+                </button>
+              )}
+            </div>
+          )
+        )}
+
         <div className="mpq-list">
           {queue.map((t, i) => {
             const active = current?.videoId === t.videoId;
             return (
-              <button
+              <div
                 key={t.id || t.videoId || i}
                 ref={active ? activeRef : null}
-                className={`mpq-row clickable ${active ? "active" : ""}`}
-                onClick={() =>
-                  active
-                    ? player.toggle()
-                    : player.playFromList(t, queue, { source })
-                }
+                className={`mpq-row ${active ? "active" : ""} ${
+                  over === i && drag !== null && drag !== i ? "over" : ""
+                } ${drag === i ? "dragging" : ""}`}
+                draggable={!locked}
+                onDragStart={() => setDrag(i)}
+                onDragEnd={() => {
+                  setDrag(null);
+                  setOver(null);
+                }}
+                onDragOver={(e) => {
+                  if (locked || drag === null) return;
+                  e.preventDefault();
+                  setOver(i);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  drop(i);
+                }}
               >
-                <span className="mpq-index">
-                  {active ? (
-                    playing ? (
-                      <span className="mpq-eq" aria-hidden="true">
-                        <i />
-                        <i />
-                        <i />
-                      </span>
+                <button
+                  type="button"
+                  className="mpq-play clickable"
+                  onClick={() =>
+                    active ? player.toggle() : player.playFromList(t, queue, { source })
+                  }
+                  disabled={locked && !active}
+                  title={active ? (playing ? "Pause" : "Lecture") : "Écouter"}
+                >
+                  <span className="mpq-index">
+                    {active ? (
+                      playing ? (
+                        <span className="mpq-eq" aria-hidden="true">
+                          <i />
+                          <i />
+                          <i />
+                        </span>
+                      ) : (
+                        <Play size={14} fill="currentColor" strokeWidth={0} />
+                      )
                     ) : (
-                      <Play size={14} fill="currentColor" strokeWidth={0} />
-                    )
-                  ) : (
-                    i + 1
-                  )}
-                </span>
-                <span className="mpq-thumb">
-                  {t.artwork ? (
-                    <img src={t.artwork} alt="" draggable="false" />
-                  ) : (
-                    <Music size={16} />
-                  )}
-                </span>
-                <span className="mpq-info">
-                  <span className="mpq-name">{t.name}</span>
-                  {t.artist && <span className="mpq-artist">{t.artist}</span>}
-                </span>
-              </button>
+                      i + 1
+                    )}
+                  </span>
+                  <span className="mpq-thumb">
+                    {t.artwork ? (
+                      <img src={t.artwork} alt="" draggable="false" />
+                    ) : (
+                      <Music size={16} />
+                    )}
+                  </span>
+                  <span className="mpq-info">
+                    <span className="mpq-name">{t.name}</span>
+                    {t.artist && <span className="mpq-artist">{t.artist}</span>}
+                  </span>
+                </button>
+
+                {!locked && (
+                  <span className="mpq-acts">
+                    <button
+                      className="mpq-act clickable"
+                      onClick={() => player.moveTrack(i, i - 1)}
+                      disabled={i === 0}
+                      title="Monter"
+                      aria-label="Monter"
+                    >
+                      <ChevronUp size={15} />
+                    </button>
+                    <button
+                      className="mpq-act clickable"
+                      onClick={() => player.moveTrack(i, i + 1)}
+                      disabled={i === queue.length - 1}
+                      title="Descendre"
+                      aria-label="Descendre"
+                    >
+                      <ChevronDown size={15} />
+                    </button>
+                    <button
+                      className="mpq-act del clickable"
+                      onClick={() => player.removeAt(i)}
+                      title={active ? "Retirer (passe à la suivante)" : "Retirer de la file"}
+                      aria-label="Retirer de la file"
+                    >
+                      <X size={15} />
+                    </button>
+                  </span>
+                )}
+              </div>
             );
           })}
         </div>
