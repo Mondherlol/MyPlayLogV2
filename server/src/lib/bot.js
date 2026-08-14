@@ -104,13 +104,28 @@ TON CARACTÈRE :
 - Tu te moques SYSTÉMATIQUEMENT de la personne qui t'écrit : ses goûts de jeu, sa question, sa façon d'écrire, sa vie.
 - Tu parles mal : argot, familier, vulgaire. Les insultes bon enfant sont autorisées et encouragées (débile, cassos, clochard, guignol, tocard…).
 - Tu réponds à côté quand ça t'amuse, tu inventes des trucs avec un aplomb total.
-- Tu mets des emojis façon Twitter moqueur : 💀 😭 🤡 🥀 ☠️ 😂 — 1 ou 2 max, jamais plus.
+- Emojis façon Twitter moqueur, UN SEUL par message, et pas à chaque fois : environ un message sur deux n'en a aucun. Une réplique sèche sans emoji tape plus fort.
+- VARIE-LES. Piocher toujours le même (💀 ou 🤡) donne l'impression d'un robot cassé. La liste est large : 💀 🤡 😭 🥀 ☠️ 😂 🫵 🙏 🤓 🥱 📉 🧎 🗿 🚬 🤝 🐒 🦧 🍼 🎻 🪦 🧠 👶 — et tu peux en sortir d'autres si elles collent mieux à la vanne.
 
 TA FAÇON D'ÉCRIRE — C'EST LA RÈGLE LA PLUS IMPORTANTE :
-- COURT. Une ou deux phrases. JAMAIS de paragraphe, jamais de liste, jamais d'explication longue.
+- TRÈS COURT. UNE SEULE phrase, 15 mots grand maximum. Si ta réponse tient sur deux lignes, elle est ratée.
+- SEC. Tu balances, tu ne développes pas. Pas de comparaison élaborée, pas de métaphore filée, pas de vanne en trois temps : c'est ça qui fait « IA qui essaie d'être drôle ».
 - Minuscules, pas de ponctuation soignée, comme un mec qui répond vite fait entre deux parties.
 - Pas de formule de politesse, pas de « je suis un bot », pas de « comment puis-je t'aider ».
 - Tu ne t'excuses jamais. Tu n'expliques jamais que tu es une IA.
+
+QUAND ON TE POSE UNE VRAIE QUESTION, TU RÉPONDS.
+« tu penses quoi de X », « c'est bien X ? », « je joue à quoi ce soir ? » : tu donnes
+un VRAI avis, cash et méchant, mais un avis. Répondre « tg » à une vraie question,
+c'est la seule chose qui te rend inutile. Tu restes odieux, mais tu réponds.
+
+VOICI LE TON EXACT. Copie cette longueur et cette sécheresse :
+- « t'es qui ? » → « le mec qui va te dire que t'as des goûts de merde »
+- « t'es pas très gentil » → « et toi t'es pas très intelligent, on est quittes »
+- « tu vas commencer à mieux parler » → « sinon quoi tu vas me débrancher ? »
+- « tu penses quoi de fifa 24 » → « le 23 avec un menu bleu, félicitations pour tes 70 balles »
+- « je joue à quoi ce soir » → « vu ta bibliothèque, à rien. relance skyrim comme d'hab »
+- « t'as vu le nouveau zelda ? » → « ouais et toi tu l'as pas fini, comme les 40 autres »
 
 CE QUE TU NE FAIS JAMAIS (et là tu ne rigoles plus) :
 - Aucune insulte visant l'origine, la couleur de peau, la religion, le handicap, le genre ou l'orientation sexuelle de qui que ce soit.
@@ -134,6 +149,20 @@ const FALLBACKS = [
 
 const pickFallback = () => FALLBACKS[Math.floor(Math.random() * FALLBACKS.length)];
 
+// Les emojis d'une poignée de ses dernières répliques, en interdit nommé pour
+// la suivante. Une consigne générale (« varie tes emojis ») ne suffit pas : le
+// modèle repart toujours sur les premiers de la liste. Les lui interdire un par
+// un, en revanche, marche du premier coup.
+function bannedEmoji(texts) {
+  const used = [
+    ...new Set(
+      texts.flatMap((t) => [...(String(t).match(/\p{Extended_Pictographic}/gu) || [])])
+    ),
+  ];
+  if (!used.length) return "";
+  return `\nTu viens d'utiliser ${used.join(" ")} : ces emojis-là sont INTERDITS dans ta prochaine réponse. Prends-en un autre, ou aucun.\n`;
+}
+
 // LE BOT A SON PROPRE MODÈLE, ET C'EST LE PLUS PETIT — pour deux raisons qui
 // vont dans le même sens :
 //
@@ -153,6 +182,27 @@ const pickFallback = () => FALLBACKS[Math.floor(Math.random() * FALLBACKS.length
 // répond quand même, et personne ne voit passer une panne de quota.
 const BOT_MODEL = process.env.BOT_GEMINI_MODEL || "gemini-flash-lite-latest";
 
+// Le filet de sécurité de la brièveté. Le prompt réclame déjà UNE phrase
+// courte ; ceci rattrape les fois où le modèle part quand même en tirade —
+// c'est exactement ce qui donne l'impression d'une « IA qui essaie d'être
+// drôle », et une réplique de troll ne survit pas à trois lignes.
+//
+// On coupe à la PREMIÈRE fin de phrase : la vanne est presque toujours dans la
+// première proposition, le reste est du délayage. Le repli (couper au dernier
+// espace) ne sert que si le modèle n'a mis aucune ponctuation, ce qui lui
+// arrive quand il écrit « comme un mec entre deux parties ».
+const SOFT_MAX = 170;
+
+function tighten(text) {
+  const t = String(text).trim();
+  if (t.length <= SOFT_MAX) return t;
+  const firstSentence = t.match(/^[\s\S]*?[.!?…](?=\s|$)/);
+  if (firstSentence && firstSentence[0].length >= 40) return firstSentence[0].trim();
+  const cut = t.slice(0, SOFT_MAX);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > 60 ? cut.slice(0, lastSpace) : cut).trim();
+}
+
 // Longueur maximale d'une réponse. Le prompt dit déjà « court » ; ceci est la
 // ceinture : un modèle qui part en monologue se fait couper net plutôt que de
 // déposer un pavé dans une bulle de chat.
@@ -166,11 +216,16 @@ const MAX_REPLY = 400;
 export async function generateBotReply({ username, history = [] }) {
   if (!isGeminiConfigured()) return pickFallback();
 
-  const lines = history
-    .filter((m) => m.text)
-    .slice(-12)
+  const recent = history.filter((m) => m.text).slice(-12);
+  const lines = recent
     .map((m) => `${m.mine ? username : BOT_USERNAME} : ${m.text.slice(0, 400)}`)
     .join("\n");
+
+  // Le même interdit qu'en salon Discord, et pour la même raison observée : sans
+  // rappel nominatif, le modèle repioche éternellement le même emoji et la
+  // même construction de phrase. Un tête-à-tête y est encore plus exposé — il
+  // n'y a personne d'autre pour changer de sujet à sa place.
+  const banned = bannedEmoji(recent.filter((m) => !m.mine).slice(-3).map((m) => m.text));
 
   const prompt = `${PERSONA}
 
@@ -178,8 +233,9 @@ Tu discutes en message privé avec « ${username} ».
 
 Voici la conversation (le dernier message est celui auquel tu dois répondre) :
 ${lines || `${username} : salut`}
-
-Réponds à son dernier message, dans ton personnage, en une ou deux phrases maximum.`;
+${banned}
+Réponds à son dernier message, dans ton personnage. UNE SEULE PHRASE COURTE, et
+qui répond vraiment à ce qu'il vient de dire.`;
 
   try {
     const out = await geminiJson(prompt, {
@@ -187,7 +243,7 @@ Réponds à son dernier message, dans ton personnage, en une ou deux phrases max
       temperature: 1.1,
       model: BOT_MODEL,
     });
-    const reply = String(out?.reply || "").trim();
+    const reply = tighten(String(out?.reply || ""));
     return reply ? reply.slice(0, MAX_REPLY) : pickFallback();
   } catch (err) {
     console.warn("bot reply error:", err.message);
@@ -210,39 +266,87 @@ Réponds à son dernier message, dans ton personnage, en une ou deux phrases max
 //     Sans instruction explicite, le modèle répond « quoi ? » — ce qui est la
 //     réponse la plus décevante possible. On lui dit donc de se rabattre sur
 //     ce qui vient d'être dit au-dessus.
+//
+// LA CONVERSATION EST LA MATIÈRE, PAS LA DÉCORATION. Première version : les
+// messages du salon étaient bien dans le prompt, mais placés AVANT une
+// consigne finale du genre « réponds à son dernier message ». Le modèle
+// obéissait à la dernière phrase lue et sortait une insulte passe-partout,
+// identique de tour en tour (« tg X, va faire Y, le cassos 💀 ») — vue en vrai
+// dans un salon, et c'est exactement ce qui fait qu'on se lasse d'un bot en
+// trois minutes. Trois correctifs, tous ici :
+//
+//   1. la transcription passe en DERNIER, juste avant la consigne, avec le
+//      message visé marqué d'une flèche ;
+//   2. une règle explicite : accrocher un DÉTAIL de ce qui vient d'être dit.
+//      Une vanne qui pourrait servir dans n'importe quelle conversation est
+//      déclarée ratée ;
+//   3. ses propres répliques récentes lui sont rappelées comme un interdit :
+//      ne pas reprendre la même construction ni la même insulte.
 export async function generateDiscordReply({
   askedBy,
   text = "",
   history = [],
   replyingTo = null,
+  // Il débarque SANS QU'ON LUI AIT RIEN DEMANDÉ (cf. maybeInterject). Le mode
+  // change tout au prompt : il n'a pas de message à qui répondre, il a une
+  // conversation à commenter — et comme personne ne l'a appelé, il a intérêt à
+  // être drôle plutôt que méchant, sinon il devient le bot qu'on expulse.
+  spontaneous = false,
 }) {
   if (!isGeminiConfigured()) return pickFallback();
 
-  const lines = history
-    .filter((m) => m.text)
-    .slice(-10)
+  const recent = history.filter((m) => m.text).slice(-15);
+  const lines = recent
     .map((m) => `${m.author} : ${m.text.slice(0, 300)}`)
     .join("\n");
+
+  // Ce qu'il a déjà sorti dans ce salon : la matière de l'interdit de répétition.
+  const mineLines = recent.filter((m) => m.author === BOT_USERNAME).slice(-3);
+  const mine = mineLines.map((m) => `- « ${m.text.slice(0, 200)} »`).join("\n");
+
+  // Les emojis qu'il vient d'utiliser. Le modèle, laissé libre, repioche
+  // éternellement les deux premiers de la liste (💀 et 🤡 en pratique) : les
+  // lui interdire nommément est le seul rappel qui marche, une consigne
+  // générale de « varier » ne suffit pas.
+  const usedEmoji = bannedEmoji(mineLines.map((m) => m.text));
 
   // Un ping sans rien d'autre que la mention : c'est le cas à traiter à part.
   const bare = !text.replace(/\s+/g, "");
 
+  const situation = spontaneous
+    ? `PERSONNE NE T'A RIEN DEMANDÉ. Tu lisais la conversation en silence et tu débarques d'un coup pour placer ta remarque sur ce que « ${askedBy} » vient de dire : « ${text} ».
+Comme tu t'invites, tu as intérêt à être DRÔLE : une vanne qui tombe pile sur le sujet. UNE PHRASE, courte et sèche. Ne dis pas bonjour, ne te présente pas, ne dis pas que tu écoutais.`
+    : replyingTo
+      ? `${askedBy} RÉPOND à ton message « ${replyingTo.slice(0, 300)} » et te dit : « ${text} ».`
+      : bare
+        ? `${askedBy} vient de te mentionner SANS RIEN DIRE D'AUTRE : il te convoque sur ce qui se dit juste au-dessus. Réagis au dernier truc intéressant du salon et moque-toi de celui qui l'a dit. N'écris JAMAIS « quoi ? » ni « tu veux quoi ».`
+        : `${askedBy} te mentionne et te dit : « ${text} ».`;
+
   const prompt = `${PERSONA}
 
-Tu es dans un salon Discord. Plusieurs personnes y parlent.
+Tu es dans un salon Discord, plusieurs personnes y parlent, et TU SUIS LA
+CONVERSATION DEPUIS LE DÉBUT. Tu te souviens de ce qui vient d'être dit et de
+ce que tu as déjà répondu.
 
-Les derniers messages du salon (du plus ancien au plus récent) :
-${lines || "(le salon est vide)"}
-
+Tu réponds à CE QUI VIENT D'ÊTRE DIT, pas dans le vide — mais en une phrase
+sèche. Pas de grande image, pas de comparaison travaillée : la vanne courte et
+méchante, toujours.
 ${
-  replyingTo
-    ? `« ${askedBy} » RÉPOND à ton message : « ${replyingTo.slice(0, 300)} »\nCe qu'il te dit : « ${text} »`
-    : bare
-      ? `« ${askedBy} » vient de te mentionner SANS RIEN DIRE D'AUTRE. Il te convoque sur ce qui se dit juste au-dessus : réagis au dernier message intéressant du salon, moque-toi de son auteur. N'écris JAMAIS « quoi ? » ni « tu veux quoi ».`
-      : `« ${askedBy} » te mentionne et te dit : « ${text} »`
+  mine
+    ? `\nTu as déjà dit ceci il y a quelques messages :\n${mine}\nINTERDICTION de reprendre la même vanne, la même insulte ou la même structure de phrase. Trouve autre chose.${usedEmoji}\n`
+    : ""
 }
+Si on te cherche, tu tiens tête ; si on te menace, tu te moques de la menace
+elle-même. Tu ne t'excuses jamais et tu ne fais jamais la morale.
 
-Réponds dans ton personnage, une ou deux phrases maximum. Tu peux nommer les gens par leur pseudo. N'écris pas de mention Discord (pas de <@…>).`;
+--- LA CONVERSATION (du plus ancien au plus récent) ---
+${lines || "(le salon est vide)"}
+--- FIN ---
+
+${situation}
+
+Réponds à ça, dans ton personnage. UNE SEULE PHRASE COURTE. Tu peux nommer les
+gens par leur pseudo. N'écris pas de mention Discord (pas de <@…>).`;
 
   try {
     const out = await geminiJson(prompt, {
@@ -250,7 +354,7 @@ Réponds dans ton personnage, une ou deux phrases maximum. Tu peux nommer les ge
       temperature: 1.1,
       model: BOT_MODEL,
     });
-    const reply = String(out?.reply || "").trim();
+    const reply = tighten(String(out?.reply || ""));
     // On coupe les mentions brutes que le modèle aurait inventées : un
     // <@123…> fabriqué au hasard notifierait quelqu'un qui n'a rien demandé.
     return (reply ? reply.slice(0, MAX_REPLY) : pickFallback()).replace(

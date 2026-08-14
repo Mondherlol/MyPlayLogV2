@@ -39,15 +39,20 @@ import {
 //
 // QUAND IL PARLE — et c'est volontairement étroit :
 //
-//   1. on le MENTIONNE (@Gérard) ;
+//   1. on le MENTIONNE (@Gérard) — ou on dit simplement son NOM dans la phrase
+//      (« gérard il raconte n'importe quoi »), ce qui est de loin le cas le
+//      plus fréquent : personne n'écrit une vraie mention pour parler de
+//      quelqu'un ;
 //   2. on RÉPOND à un de ses messages ;
 //   3. on lui écrit en message privé Discord (là, tout message compte : il n'y
 //      a personne d'autre dans le fil, exiger un ping serait absurde).
 //
-// Il ne réagit donc JAMAIS à la conversation générale. C'est ce qui fait la
-// différence entre un bot qu'on invite et un bot qu'on expulse au bout d'une
-// heure : sur un serveur actif, un troll qui s'invite tout seul dans chaque
-// discussion devient insupportable en une soirée.
+//   4. et, DE TEMPS EN TEMPS ET SANS PRÉVENIR, il s'invite tout seul dans la
+//      conversation (voir shouldInterject plus bas).
+//
+// Le point 4 est la seule entorse au principe, et elle est calibrée pour ça :
+// un troll qui commenterait chaque message serait expulsé du serveur en une
+// soirée, un troll qui débarque une fois par heure est un membre du serveur.
 //
 // LE CAS QUI COMPTE VRAIMENT est le ping nu. « @Gérard » sans autre mot n'est
 // pas une erreur de manipulation : c'est quelqu'un qui lit une bêtise et qui
@@ -98,6 +103,73 @@ export function inviteUrl() {
   return `https://discord.com/oauth2/authorize?${params}`;
 }
 
+// ============================================================
+//  L'intrusion : il s'invite tout seul, de temps en temps
+// ============================================================
+// Un bot qui n'ouvre la bouche que sur commande est un distributeur. Celui-ci
+// débarque sans prévenir dans une conversation en cours pour placer sa
+// remarque — c'est ce qui le fait passer pour un membre du serveur plutôt que
+// pour un outil.
+//
+// TOUTE LA DIFFICULTÉ EST DANS LA FRÉQUENCE, et elle se règle en trois nombres :
+//
+//   • UN SEUIL TIRÉ AU HASARD à chaque fois (entre 25 et 90 messages). Un seuil
+//     fixe se repère en une soirée — « il parle tous les 30 messages » — et la
+//     surprise, qui est tout l'intérêt, disparaît.
+//   • UN PLANCHER DE TEMPS (20 min). Sans lui, un salon de dix personnes qui
+//     s'emballe atteint 90 messages en dix minutes et le bot devient le
+//     bavard qu'on coupe.
+//   • UN FILET QUOTIDIEN (20 h). C'est la demande explicite : au moins une fois
+//     par jour. Dans un salon calme qui ne fera jamais 25 messages, c'est ce
+//     filet qui le fait parler — dès qu'il y a un minimum de vie (5 messages),
+//     pour ne pas répondre dans le vide à un salon mort depuis un mois.
+const INTRUSION_MIN = 25;
+const INTRUSION_MAX = 90;
+const INTRUSION_QUIET_MS = 20 * 60 * 1000;
+const INTRUSION_DAILY_MS = 20 * 60 * 60 * 1000;
+const INTRUSION_DAILY_MIN_MSG = 5;
+
+// channelId -> { seen, target, lastAt }
+const intrusion = new Map();
+
+const nextTarget = () =>
+  INTRUSION_MIN + Math.floor(Math.random() * (INTRUSION_MAX - INTRUSION_MIN + 1));
+
+// Compte le message qui passe et dit s'il faut s'inviter maintenant.
+//
+// L'état est en MÉMOIRE et pas en base : ce n'est qu'un compteur d'ambiance,
+// le perdre à un redéploiement ne coûte rien. On initialise `lastAt` à
+// l'instant présent au premier message vu, sinon chaque redémarrage
+// déclencherait aussitôt le filet quotidien dans tous les salons à la fois.
+function shouldInterject(channelId) {
+  const now = Date.now();
+  let st = intrusion.get(channelId);
+  if (!st) {
+    st = { seen: 0, target: nextTarget(), lastAt: now };
+    intrusion.set(channelId, st);
+  }
+  st.seen += 1;
+
+  const quiet = now - st.lastAt;
+  const reached = st.seen >= st.target && quiet >= INTRUSION_QUIET_MS;
+  const daily = quiet >= INTRUSION_DAILY_MS && st.seen >= INTRUSION_DAILY_MIN_MSG;
+  if (!reached && !daily) return false;
+
+  st.seen = 0;
+  st.target = nextTarget();
+  st.lastAt = now;
+  return true;
+}
+
+// Le bot vient de parler, quelle qu'en soit la raison (on l'a mentionné, il a
+// annoncé une manche gagnée…). Ça repousse l'intrusion suivante : s'inviter
+// dans une conversation où l'on vient déjà de prendre la parole, ce n'est plus
+// une surprise, c'est de la présence permanente.
+function noteBotSpoke(channelId) {
+  const st = intrusion.get(channelId);
+  if (st) st.lastAt = Date.now();
+}
+
 // Le texte utile d'un message : on retire les mentions, sinon le modèle reçoit
 // « <@1537…> ferme la » et croit que c'est un mot du vocabulaire.
 const clean = (msg) =>
@@ -108,6 +180,35 @@ const clean = (msg) =>
 
 const nameOf = (msg) =>
   msg.member?.displayName || msg.author?.globalName || msg.author?.username || "quelqu'un";
+
+// --- « Gérard », dit à voix haute, vaut une mention ---
+// Personne n'écrit « @Gérard » quand il parle DE quelqu'un : on dit « gérard il
+// raconte n'importe quoi », et le bot restait muet alors qu'on venait
+// littéralement de l'appeler par son nom. C'est le cas le plus naturel de tous,
+// et c'était le seul qu'il ne voyait pas.
+//
+// Deux précautions dans cette regex :
+//   • les ACCENTS SONT NEUTRALISÉS des deux côtés (personne ne tape « Gérard »
+//     avec son accent dans un salon) ;
+//   • des LIMITES DE MOT, sinon « bot » attraperait « robot », « botte » ou
+//     « sabotage » et il s'inviterait dans une conversation sur rien.
+const deaccent = (s) =>
+  String(s || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const NAME_RE = new RegExp(
+  `(^|[^\\p{L}])(${escapeRe(deaccent(BOT_USERNAME))}|le bot|ce bot)($|[^\\p{L}])`,
+  "u"
+);
+
+// Exportée : c'est le genre de règle qui se trompe en silence (un « robot » pris
+// pour un appel, un « Gérard » manqué à cause d'un accent), et on veut pouvoir
+// la vérifier sur une liste de phrases sans lancer de bot.
+export const calledByName = (text) => NAME_RE.test(deaccent(text));
 
 // ============================================================
 //  Les lettres mêlées
@@ -375,7 +476,8 @@ async function onMessage(msg) {
 
     const meId = client.user.id;
     const isDm = !msg.guild;
-    const mentioned = msg.mentions.users.has(meId);
+    // Une vraie mention Discord, OU son nom prononcé dans la phrase.
+    const mentioned = msg.mentions.users.has(meId) || calledByName(msg.content);
     // @everyone / @here ne sont PAS une convocation : le bot n'a pas à répondre
     // à chaque annonce du serveur.
     const everyone = msg.mentions.everyone;
@@ -388,7 +490,16 @@ async function onMessage(msg) {
       if (parent?.author?.id === meId) replyingTo = clean(parent);
     }
 
-    if (!isDm && (everyone || (!mentioned && replyingTo === null))) return;
+    // Personne ne l'appelle : c'est peut-être le moment où il s'invite quand
+    // même. Le compteur n'avance QUE sur les messages ordinaires — une salve
+    // de commandes ou de propositions de jeu ne doit pas précipiter
+    // l'intrusion, ce n'est pas de la conversation.
+    let spontaneous = false;
+    if (!isDm && (everyone || (!mentioned && replyingTo === null))) {
+      if (!msg.guild || everyone || !clean(msg)) return;
+      if (!shouldInterject(msg.channelId)) return;
+      spontaneous = true;
+    }
 
     const now = Date.now();
     const key = msg.channelId;
@@ -419,14 +530,18 @@ async function onMessage(msg) {
         text: clean(msg),
         history,
         replyingTo,
+        spontaneous,
       });
 
       await msg.reply({
         content: reply,
         // On répond EN CITANT sans re-notifier : la citation suffit à savoir à
         // qui il parle, et une notification de plus pour une vanne agace.
+        // C'est encore plus vrai quand il s'invite : se faire notifier par un
+        // bot qu'on n'a pas appelé, c'est le début de la fin.
         allowedMentions: { repliedUser: false, parse: [] },
       });
+      noteBotSpoke(key);
     } finally {
       busy.delete(key);
     }
