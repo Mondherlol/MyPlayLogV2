@@ -41,6 +41,15 @@ import {
   resolveName,
   savePerson,
 } from "./discordNames.js";
+import { banterFor, handleSilence, isMuted } from "./discordBanter.js";
+import {
+  HARASS_CHANCE,
+  RENAME_CHANCE,
+  announceVictim,
+  currentVictim,
+  pickVictim,
+  victimNickname,
+} from "./discordVictim.js";
 
 // ======================================================================
 //  Le bot, côté Discord
@@ -107,6 +116,11 @@ export function inviteUrl() {
     PermissionsBitField.Flags.SendMessages,
     PermissionsBitField.Flags.SendMessagesInThreads,
     PermissionsBitField.Flags.ReadMessageHistory,
+    // Pour renommer la victime du jour. C'est la seule permission « qui touche
+    // aux membres » qu'il demande, et elle reste inoffensive : Discord
+    // l'empêche de toucher à quiconque a un rôle au-dessus du sien — donc aux
+    // administrateurs, quoi qu'il arrive.
+    PermissionsBitField.Flags.ManageNicknames,
   ]);
   const params = new URLSearchParams({
     client_id: id,
@@ -294,9 +308,16 @@ function helpEmbed() {
         name: "🎮 MyPlayLog",
         value: [
           `\`${PREFIX}resume\` — ce qui s'est dit pendant que t'étais pas là`,
+          `\`${PREFIX}victime\` — qui se fait harceler aujourd'hui`,
           `\`${PREFIX}add <jeu>\` — ajoute un jeu à ta liste de souhaits`,
           `\`${PREFIX}noms\` — comment je dois vous appeler (vrais noms, surnoms)`,
         ].join("\n"),
+      },
+      {
+        name: "🤐 Quand j'abuse",
+        value:
+          "`silence` — je la ferme 5 min dans ce salon (si je suis d'accord)\n" +
+          "`parle` — je reviens",
       },
       {
         name: "💬 Sur le site",
@@ -673,6 +694,87 @@ async function cmdSummary(msg) {
   noteBotSpoke(msg.channelId);
 }
 
+// ============================================================
+//  La victime du jour
+// ============================================================
+// Deux gestes distincts, tirés au sort séparément à chaque message de la
+// victime : une vanne (15 %) et un renommage d'office (6 %).
+//
+// LE RENOMMAGE PEUT ÉCHOUER, et c'est normal : Discord refuse qu'un bot touche
+// au pseudo de quelqu'un dont le rôle est au-dessus du sien (donc les
+// administrateurs, et le propriétaire du serveur — TOUJOURS, même en lui
+// donnant toutes les permissions du monde). On avale l'erreur en silence
+// plutôt que d'annoncer un renommage qui n'a pas eu lieu.
+async function cmdVictim(msg) {
+  const v = await currentVictim(msg.guildId);
+  await msg.channel.send(
+    v ? `la victime du jour c'est <@${v.discordId}> 🔪` : "personne a encore parlé aujourdhui"
+  );
+}
+
+async function harassVictim(msg) {
+  if (!msg.guildId) return false;
+  const v = await currentVictim(msg.guildId);
+  if (!v || v.discordId !== msg.author.id) return false;
+
+  // Le renommage d'abord : quand les deux tombent, le message qui suit prend
+  // tout son sens (« accepte ton nouveau nom »).
+  if (Math.random() < RENAME_CHANCE) {
+    const nick = victimNickname();
+    const ok = await msg.member
+      ?.setNickname(nick)
+      .then(() => true)
+      .catch(() => false);
+    if (ok) {
+      await msg.reply({
+        content: `et maintenant tu tappelles **${nick}**, remercie moi`,
+        allowedMentions: { repliedUser: false, parse: [] },
+      });
+      noteBotSpoke(msg.channelId);
+      return true;
+    }
+  }
+
+  if (Math.random() >= HARASS_CHANCE) return false;
+  // La vanne passe par le modèle, avec le contexte du salon : une insulte
+  // générique tirée d'une liste se repère en deux jours quand elle tombe
+  // quinze fois par jour sur la même personne.
+  if (busy.has(msg.channelId)) return false;
+  busy.add(msg.channelId);
+  try {
+    const fetched = await msg.channel.messages
+      .fetch({ limit: CONTEXT_MESSAGES, before: msg.id })
+      .catch(() => null);
+    const history = fetched
+      ? await Promise.all(
+          [...fetched.values()].reverse().map(async (m) => ({
+            author:
+              m.author?.id === client.user.id
+                ? BOT_USERNAME
+                : await nicknameFor(msg.guildId, m.author?.id, nameOf(m)),
+            text: clean(m),
+          }))
+        )
+      : [];
+
+    const reply = await generateDiscordReply({
+      askedBy: await nicknameFor(msg.guildId, msg.author.id, nameOf(msg)),
+      text: clean(msg),
+      history,
+      people: await glossary(msg.guildId),
+      spontaneous: true,
+    });
+    await msg.reply({
+      content: reply,
+      allowedMentions: { repliedUser: false, parse: [] },
+    });
+    noteBotSpoke(msg.channelId);
+    return true;
+  } finally {
+    busy.delete(msg.channelId);
+  }
+}
+
 // Une proposition pendant une manche. Rend `true` si le message a été « pris »
 // par le jeu (bonne réponse) — auquel cas le bot n'a plus à faire autre chose.
 async function handleGuess(msg) {
@@ -729,6 +831,31 @@ async function onMessage(msg) {
     // quota de Gemini, et qu'une bonne réponse ne se fasse pas manger par le
     // cooldown des réponses trollesques (deux compteurs séparés, exprès).
     const raw = (msg.content || "").trim();
+
+    // --- « silence » / « parle » : ça passe AVANT tout le reste ---
+    // Une commande pour le faire taire qu'il n'écouterait qu'après avoir
+    // répondu n'en serait pas une.
+    const silence = handleSilence(msg.channelId, raw);
+    if (silence) return void (await msg.channel.send(silence));
+    // Il boude : plus un mot, sauf pour « parle » (traité juste au-dessus).
+    if (isMuted(msg.channelId)) return;
+
+    // --- La victime du jour ---
+    // Le premier qui parle est désigné. Ensuite, il se fait vanner au hasard
+    // toute la journée (voir plus bas, après les commandes : une commande ne
+    // doit pas déclencher de brimade, sinon jouer devient pénible).
+    if (msg.guildId) {
+      const fresh = await pickVictim(msg.guildId, {
+        discordId: msg.author.id,
+        username: nameOf(msg),
+      });
+      if (fresh) {
+        await msg.channel.send(announceVictim(fresh.username));
+        noteBotSpoke(msg.channelId);
+        return;
+      }
+    }
+
     if (raw.startsWith(PREFIX)) {
       const cmd = raw.slice(PREFIX.length).split(/\s+/)[0].toLowerCase();
       if (cmd === "jeu" || cmd === "mot") return void (await cmdPuzzle(msg));
@@ -743,8 +870,25 @@ async function onMessage(msg) {
         return void (await msg.channel.send({ embeds: [helpEmbed()] }));
       // Commande inconnue : on ne dit rien. Le salon n'est pas à nous, et un
       // « commande inconnue » à chaque « !truc » d'un autre bot serait pénible.
+      if (cmd === "victime") return void (await cmdVictim(msg));
+      // Commande inconnue : on ne dit rien (voir plus bas).
     } else if (await handleGuess(msg)) {
       return;
+    } else if (await harassVictim(msg)) {
+      return;
+    } else {
+      // Les réflexes : instantanés, sans modèle de langage. Ils passent avant
+      // la génération, sinon un « tg » attendrait deux secondes une réponse
+      // fabriquée alors qu'une réplique toute prête est bien plus drôle.
+      const reflex = banterFor(raw);
+      if (reflex) {
+        await msg.reply({
+          content: reflex,
+          allowedMentions: { repliedUser: false, parse: [] },
+        });
+        noteBotSpoke(msg.channelId);
+        return;
+      }
     }
 
     const meId = client.user.id;
