@@ -1993,6 +1993,9 @@ function BotCard() {
   const { token } = useAuth();
   const navigate = useNavigate();
   const [info, setInfo] = useState(null); // { exists, allowed, bot }
+  // L'état du bot côté Discord : allumé ou non, et le lien d'ajout (fabriqué
+  // par le serveur, cf. lib/discordBot.js).
+  const [dc, setDc] = useState(null); // { configured, online, guilds, invite }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -2000,6 +2003,9 @@ function BotCard() {
     apiFetch("/chat/bot", { token })
       .then(setInfo)
       .catch(() => setInfo({ exists: false, allowed: false, bot: null }));
+    apiFetch("/discord/bot", { token })
+      .then(setDc)
+      .catch(() => setDc({ configured: false, online: false, invite: null }));
   }, [token]);
 
   // Ouvre (ou retrouve) le fil avec le bot, puis va dessus : la messagerie sait
@@ -2049,9 +2055,16 @@ function BotCard() {
             {!info.exists
               ? "Le bot n'est pas encore installé sur ce serveur."
               : info.allowed
-                ? "Tu peux lui écrire en message privé. Il répond mal, c'est prévu."
+                ? "Ajoute-le à ton serveur Discord : il répond quand on le mentionne ou qu'on répond à un de ses messages. Il répond mal, c'est prévu."
                 : "L'accès au bot se donne compte par compte, par un administrateur. Demande-lui si tu veux te faire insulter."}
           </p>
+          {/* Combien de serveurs l'ont déjà : la seule façon de savoir, depuis
+              le site, que l'ajout a bien marché. */}
+          {info.allowed && dc?.online && (
+            <p className="import-card-desc bot-guilds">
+              En ligne sur {dc.guilds} serveur{dc.guilds > 1 ? "s" : ""} Discord.
+            </p>
+          )}
         </div>
       </div>
 
@@ -2061,11 +2074,32 @@ function BotCard() {
         </div>
       )}
 
+      {info.exists && info.allowed && !dc?.configured && (
+        <div className="import-error">
+          <AlertTriangle size={15} /> Le bot Discord n'est pas démarré côté serveur
+          (DISCORD_BOT_TOKEN). Il ne répond que sur le site pour l'instant.
+        </div>
+      )}
+
       {info.exists && info.allowed && (
         <div className="import-actions">
-          <button className="btn-discord-primary clickable" onClick={talk} disabled={busy}>
-            {busy ? <Loader2 className="spin" size={17} /> : <MessageCircle size={17} />}
-            Lui écrire
+          {/* L'action principale : l'emmener sur un serveur. Le lien ouvre la
+              page d'autorisation de Discord, qui demande sur quel serveur
+              l'installer — on ne peut pas le faire à sa place. */}
+          <a
+            className={`btn-discord-primary clickable ${dc?.invite ? "" : "disabled"}`}
+            href={dc?.invite || "#"}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => !dc?.invite && e.preventDefault()}
+          >
+            <DiscordIcon size={17} /> Ajouter le bot à un serveur
+          </a>
+          {/* Le fil sur le site reste accessible : c'est là qu'il vit d'abord,
+              et sans ce lien il n'y aurait plus aucun moyen de l'ouvrir. */}
+          <button className="btn-ghost-link clickable" onClick={talk} disabled={busy}>
+            {busy ? <Loader2 className="spin" size={15} /> : <MessageCircle size={15} />}
+            ou lui écrire ici
           </button>
         </div>
       )}

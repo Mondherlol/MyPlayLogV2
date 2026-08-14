@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { isConfigured, buildAuthUrl, exchangeCode, fetchMe } from "../lib/discord.js";
+import { discordBotStatus } from "../lib/discordBot.js";
 
 // ======================================================================
 //  Liaison du compte Discord
@@ -55,6 +56,15 @@ router.get("/status", requireAuth, async (req, res) => {
     console.error("discord status error:", err.message);
     res.status(500).json({ error: "Erreur." });
   }
+});
+
+// GET /api/discord/bot — l'état du bot Discord et le lien pour l'ajouter à un
+// serveur. Le lien vient du SERVEUR et n'est pas fabriqué côté client : il
+// dépend de l'identifiant d'application et des permissions demandées, deux
+// choses que le client n'a aucune raison de connaître (et qu'on ne veut pas
+// avoir à changer à deux endroits).
+router.get("/bot", requireAuth, (_req, res) => {
+  res.json(discordBotStatus());
 });
 
 // GET /api/discord/login?token=… — départ vers Discord (ouvert en pop-up).

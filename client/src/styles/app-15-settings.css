@@ -2215,3 +2215,18 @@
   opacity: 0.6;
   cursor: var(--cursor-default), auto;
 }
+
+/* Un lien deguise en bouton : sans ca, l'ancre d'ajout du bot ne s'aligne pas
+   avec les vrais boutons de la meme rangee. */
+a.btn-discord-primary {
+  text-decoration: none;
+}
+a.btn-discord-primary.disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.import-card-desc.bot-guilds {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}

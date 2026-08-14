@@ -195,6 +195,74 @@ Réponds à son dernier message, dans ton personnage, en une ou deux phrases max
   }
 }
 
+// ============================================================
+//  La même tête, mais sur Discord
+// ============================================================
+// Le personnage est le MÊME (une seule définition de PERSONA, sinon les deux
+// versions divergent au premier ajustement) ; ce qui change est la situation,
+// et elle change assez pour mériter sa fonction :
+//
+//   • ON N'EST PLUS EN TÊTE-À-TÊTE. Un salon a dix personnes qui parlent, il
+//     faut donc que le modèle voie QUI dit quoi, sinon il répond à la mauvaise
+//     personne — d'où les noms d'auteur devant chaque ligne.
+//   • ON PEUT ÊTRE APPELÉ POUR RIEN. « @Gérard » tout seul est le cas normal,
+//     pas l'exception : quelqu'un lit une bêtise et convoque le bot dessus.
+//     Sans instruction explicite, le modèle répond « quoi ? » — ce qui est la
+//     réponse la plus décevante possible. On lui dit donc de se rabattre sur
+//     ce qui vient d'être dit au-dessus.
+export async function generateDiscordReply({
+  askedBy,
+  text = "",
+  history = [],
+  replyingTo = null,
+}) {
+  if (!isGeminiConfigured()) return pickFallback();
+
+  const lines = history
+    .filter((m) => m.text)
+    .slice(-10)
+    .map((m) => `${m.author} : ${m.text.slice(0, 300)}`)
+    .join("\n");
+
+  // Un ping sans rien d'autre que la mention : c'est le cas à traiter à part.
+  const bare = !text.replace(/\s+/g, "");
+
+  const prompt = `${PERSONA}
+
+Tu es dans un salon Discord. Plusieurs personnes y parlent.
+
+Les derniers messages du salon (du plus ancien au plus récent) :
+${lines || "(le salon est vide)"}
+
+${
+  replyingTo
+    ? `« ${askedBy} » RÉPOND à ton message : « ${replyingTo.slice(0, 300)} »\nCe qu'il te dit : « ${text} »`
+    : bare
+      ? `« ${askedBy} » vient de te mentionner SANS RIEN DIRE D'AUTRE. Il te convoque sur ce qui se dit juste au-dessus : réagis au dernier message intéressant du salon, moque-toi de son auteur. N'écris JAMAIS « quoi ? » ni « tu veux quoi ».`
+      : `« ${askedBy} » te mentionne et te dit : « ${text} »`
+}
+
+Réponds dans ton personnage, une ou deux phrases maximum. Tu peux nommer les gens par leur pseudo. N'écris pas de mention Discord (pas de <@…>).`;
+
+  try {
+    const out = await geminiJson(prompt, {
+      timeoutMs: 20_000,
+      temperature: 1.1,
+      model: BOT_MODEL,
+    });
+    const reply = String(out?.reply || "").trim();
+    // On coupe les mentions brutes que le modèle aurait inventées : un
+    // <@123…> fabriqué au hasard notifierait quelqu'un qui n'a rien demandé.
+    return (reply ? reply.slice(0, MAX_REPLY) : pickFallback()).replace(
+      /<@[!&]?\d+>/g,
+      ""
+    );
+  } catch (err) {
+    console.warn("bot discord reply error:", err.message);
+    return pickFallback();
+  }
+}
+
 // Le mot d'accueil, envoyé quand un admin vient d'ouvrir l'accès à quelqu'un.
 // En dur et non généré : c'est le PREMIER message, il doit partir même si
 // Gemini est éteint, et il sert de mode d'emploi (« écris-moi »).

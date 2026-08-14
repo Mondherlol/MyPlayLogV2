@@ -59,6 +59,7 @@ import watchPartyRoutes from "./routes/watchparty.js";
 import settingsRoutes from "./routes/settings.js";
 import discordRoutes from "./routes/discord.js";
 import { ensureBotUser } from "./lib/bot.js";
+import { startDiscordBot } from "./lib/discordBot.js";
 import { requireFeature } from "./lib/features.js";
 import { optionalAuth } from "./middleware/auth.js";
 import { avatarPrivacy } from "./middleware/avatarPrivacy.js";
@@ -263,6 +264,10 @@ async function start() {
     // Le compte du bot, créé au premier démarrage : sans lui, ouvrir l'accès à
     // quelqu'un depuis le panel n'aurait personne à qui faire écrire.
     await ensureBotUser().catch((err) => console.error("ensureBotUser:", err.message));
+    // Le bot sur Discord : sans jeton, la fonction ne fait rien et le site
+    // tourne exactement pareil. Sans await — une Gateway lente n'a aucune
+    // raison de retarder l'ouverture du port HTTP.
+    startDiscordBot().catch((err) => console.error("startDiscordBot:", err.message));
     await migrateTrackerSlots();
     // Synchro automatique des comptes de tracking (League of Legends).
     startTrackerAutoSync();
