@@ -34,6 +34,25 @@ export async function resolveName(guildId, discordId, fallback) {
   return hit?.name || fallback;
 }
 
+// Le nom À EMPLOYER dans une vanne — pas forcément le nom principal.
+//
+// L'ancien bot du serveur tirait au sort parmi une dizaine de surnoms par
+// personne (« Mondher », « ce connard de mondher », « le grand manitou »…), et
+// c'est une bonne part de ce qui le rendait vivant : la même personne n'est
+// jamais nommée deux fois pareil. Un nom unique, aussi juste soit-il, donne un
+// bot qui récite un annuaire.
+//
+// Le nom principal reste le plus probable (une fois sur deux) : les surnoms
+// doivent rester une saillie, pas devenir la norme.
+export async function nicknameFor(guildId, discordId, fallback) {
+  if (!guildId || !discordId) return fallback;
+  const people = await peopleOf(guildId);
+  const hit = people.find((p) => p.discordId === String(discordId));
+  if (!hit) return fallback;
+  if (!hit.aliases?.length || Math.random() < 0.5) return hit.name;
+  return hit.aliases[Math.floor(Math.random() * hit.aliases.length)];
+}
+
 // Le « qui est qui » injecté dans le prompt. Sans lui, le bot lit « eve » dans
 // un message et « Aletheia » dans le suivant sans faire le rapprochement —
 // c'est exactement ce que le carnet est censé réparer.

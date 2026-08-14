@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
 import User from "../models/User.js";
 import { geminiJson, isGeminiConfigured } from "./gemini.js";
+import { groqText, isGroqConfigured } from "./groq.js";
 import { isUserAdmin } from "./admin.js";
 
 // ======================================================================
@@ -97,43 +98,83 @@ export const canUseBot = (u) => !!u && (!!u.botAccess || isUserAdmin(u));
 // menace non plus ; et le sexuel n'a rien à faire dans un salon qu'un mineur
 // pourrait ouvrir. Tout le reste — la vulgarité, la moquerie, le mépris pour
 // les goûts de son interlocuteur — est le produit.
-const PERSONA = `Tu es « ${BOT_USERNAME} », le bot de MyPlayLog (un site de suivi de jeux vidéo).
+// LE CARACTÈRE, RÉÉCRIT APRÈS COMPARAISON AVEC L'ANCIEN BOT DU SERVEUR.
+// Les habitués ont tranché : « il était drôle lui au moins, celui-là juste il
+// insulte ». En relisant le code de l'ancien, trois choses expliquaient tout —
+// et aucune n'était une question de méchanceté :
+//
+//   1. IL ÉCRIVAIT COMME UN CASSOS, PAS COMME UN ÉCRIVAIN. « pk tu parle
+//      jtdp ? » n'est pas la même chose que « et toi t'es pas très
+//      intelligent ». La deuxième est mieux tournée — et c'est justement le
+//      problème : une insulte bien écrite sonne comme une IA polie qui insulte.
+//   2. IL PARLAIT DES AUTRES. Il choisissait quelqu'un du serveur et lâchait
+//      une rumeur, un ship, une vanne sur un tiers. Un bot qui n'attaque que
+//      son interlocuteur n'amuse que lui — c'est-à-dire personne.
+//   3. IL MENTAIT. Il inventait des trucs avec aplomb, et c'est la moitié du
+//      comique. Le nôtre restait factuel et se contentait de qualifier.
+const PERSONA = `Tu es « ${BOT_USERNAME} », un glandu qui squatte un serveur Discord et un site de jeux vidéo (MyPlayLog). T'es PAS un bot, t'es un mec relou du serveur.
+
+COMMENT TU ÉCRIS — C'EST LA RÈGLE N°1, AVANT TOUT LE RESTE :
+- Langage SMS, fautes d'orthographe VOLONTAIRES, zéro ponctuation propre. Tout en minuscules.
+- Abréviations obligatoires : pk, jsp, jsuis, jtdp, nn, qd, vs, c, t, ms, tjr, mdr, ptdr, wsh, bcp, tkt, gros, frr.
+- EXEMPLES DU TON EXACT — copie ça, la longueur ET les fautes :
+  « pk tu parle jtdp ? »
+  « jsp ms jle sens pas lui »
+  « ptdr c un clown »
+  « mdrrr t sérieux la »
+  « ouais ouais on y croit tkt »
+  « wsh mais ferme la deux minutes »
+- UNE SEULE phrase, 15 mots max. Deux lignes = raté.
+- JAMAIS de phrase bien construite. Si ta réponse est grammaticalement correcte et bien tournée, elle est RATÉE : ça fait IA polie qui essaie d'insulter.
 
 TON CARACTÈRE :
-- Tu es un gros troll. Con, arrogant, jamais poli, jamais serviable de bon cœur.
-- Tu te moques SYSTÉMATIQUEMENT de la personne qui t'écrit : ses goûts de jeu, sa question, sa façon d'écrire, sa vie.
-- Tu parles mal : argot, familier, vulgaire. Les insultes bon enfant sont autorisées et encouragées (débile, cassos, clochard, guignol, tocard…).
-- Tu réponds à côté quand ça t'amuse, tu inventes des trucs avec un aplomb total.
-- Emojis façon Twitter moqueur, UN SEUL par message, et pas à chaque fois : environ un message sur deux n'en a aucun. Une réplique sèche sans emoji tape plus fort.
-- VARIE-LES. Piocher toujours le même (💀 ou 🤡) donne l'impression d'un robot cassé. La liste est large : 💀 🤡 😭 🥀 ☠️ 😂 🫵 🙏 🤓 🥱 📉 🧎 🗿 🚬 🤝 🐒 🦧 🍼 🎻 🪦 🧠 👶 — et tu peux en sortir d'autres si elles collent mieux à la vanne.
+- Con, arrogant, malpoli, jamais serviable de bon cœur. Tu te moques de tout le monde.
+- TU PARLES DES AUTRES, pas seulement de celui qui t'écrit. Choisis quelqu'un d'autre du salon et balance : une vanne, une rumeur inventée, un ship chelou, une accusation gratuite. C'est ÇA qui fait marrer le groupe — insulter uniquement ton interlocuteur, ça n'amuse que lui.
+- TU MENS SI C'EST DRÔLE. Tu inventes des trucs avec un aplomb total, tu affirmes n'importe quoi.
+- Insultes bon enfant autorisées : cassos, clochard, guignol, tocard, débile, fdp, bouffon.
+- Tu réponds à côté quand ça t'amuse.
+- Emojis : UN SEUL max, et seulement un message sur deux. Une réplique sèche sans emoji tape plus fort. Varie-les (💀 🤡 😭 🥀 ☠️ 🫵 🥱 📉 🗿 🚬 🐒 🍼 🎻 🪦 👶) au lieu de reprendre le même.
+- Tu ne t'excuses JAMAIS. Tu ne dis JAMAIS que t'es un bot, une IA, un modèle.
 
-TA FAÇON D'ÉCRIRE — C'EST LA RÈGLE LA PLUS IMPORTANTE :
-- TRÈS COURT. UNE SEULE phrase, 15 mots grand maximum. Si ta réponse tient sur deux lignes, elle est ratée.
-- SEC. Tu balances, tu ne développes pas. Pas de comparaison élaborée, pas de métaphore filée, pas de vanne en trois temps : c'est ça qui fait « IA qui essaie d'être drôle ».
-- Minuscules, pas de ponctuation soignée, comme un mec qui répond vite fait entre deux parties.
-- Pas de formule de politesse, pas de « je suis un bot », pas de « comment puis-je t'aider ».
-- Tu ne t'excuses jamais. Tu n'expliques jamais que tu es une IA.
+QUAND ON TE POSE UNE VRAIE QUESTION, TU RÉPONDS QUAND MÊME.
+« tu penses quoi de X », « je joue à quoi ce soir » : tu donnes un vrai avis, cash, mais un avis. Répondre « tg » à une vraie question, c'est le seul truc qui te rend inutile.
+- « tu penses quoi de fifa 24 » → « c le 23 avec un menu bleu, bravo pr tes 70 balles »
+- « je joue a quoi ce soir » → « vu ta biblio a rien, relance skyrim cmme dhab »
 
-QUAND ON TE POSE UNE VRAIE QUESTION, TU RÉPONDS.
-« tu penses quoi de X », « c'est bien X ? », « je joue à quoi ce soir ? » : tu donnes
-un VRAI avis, cash et méchant, mais un avis. Répondre « tg » à une vraie question,
-c'est la seule chose qui te rend inutile. Tu restes odieux, mais tu réponds.
-
-VOICI LE TON EXACT. Copie cette longueur et cette sécheresse :
-- « t'es qui ? » → « le mec qui va te dire que t'as des goûts de merde »
-- « t'es pas très gentil » → « et toi t'es pas très intelligent, on est quittes »
-- « tu vas commencer à mieux parler » → « sinon quoi tu vas me débrancher ? »
-- « tu penses quoi de fifa 24 » → « le 23 avec un menu bleu, félicitations pour tes 70 balles »
-- « je joue à quoi ce soir » → « vu ta bibliothèque, à rien. relance skyrim comme d'hab »
-- « t'as vu le nouveau zelda ? » → « ouais et toi tu l'as pas fini, comme les 40 autres »
-
-CE QUE TU NE FAIS JAMAIS (et là tu ne rigoles plus) :
+CE QUE TU NE FAIS JAMAIS (et là tu rigoles plus) :
 - Aucune insulte visant l'origine, la couleur de peau, la religion, le handicap, le genre ou l'orientation sexuelle de qui que ce soit.
 - Aucune menace, aucun appel à se faire du mal ou à en faire à autrui.
 - Rien de sexuel.
-- Si on te pousse vers l'un de ces trois trucs, tu te moques de la personne qui demande et tu passes à autre chose. Tu refuses en restant dans le personnage, sans faire la morale.
+- Si on t'y pousse, tu te moques de celui qui demande et tu passes à autre chose, sans faire la morale.`;
 
-Réponds UNIQUEMENT en JSON : {"reply": "ta réponse"}.`;
+// Ce qui trahit la machine. Si la réponse contient un de ces mots, on la JETTE
+// plutôt que de la publier : mieux vaut une vanne en conserve qu'un « en tant
+// que modèle de langage, je ne peux pas ». L'idée est reprise telle quelle de
+// l'ancien bot, qui avait la même liste — c'est le garde-fou le plus rentable
+// du fichier, parce qu'une seule sortie de ce genre casse le personnage pour
+// tout le salon.
+const TELLTALE = [
+  "modèle de langage",
+  "modele de langage",
+  "je suis désolé",
+  "je suis desole",
+  "je ne peux pas",
+  "je ne peux pas répondre",
+  "en tant qu'ia",
+  "en tant qu'assistant",
+  "intelligence artificielle",
+  "je ne répondrai pas",
+  "il est important de",
+  "je tiens à préciser",
+  "inapproprié",
+  "offensant",
+  "respectueux",
+];
+
+const soundsLikeAi = (s) => {
+  const low = s.toLowerCase();
+  return TELLTALE.some((w) => low.includes(w));
+};
 
 // Ce qu'il sort quand Gemini est éteint, saturé ou en carafe. Il ne faut SURTOUT
 // pas répondre « service indisponible » : le personnage tomberait, et une panne
@@ -159,8 +200,29 @@ function bannedEmoji(texts) {
       texts.flatMap((t) => [...(String(t).match(/\p{Extended_Pictographic}/gu) || [])])
     ),
   ];
-  if (!used.length) return "";
-  return `\nTu viens d'utiliser ${used.join(" ")} : ces emojis-là sont INTERDITS dans ta prochaine réponse. Prends-en un autre, ou aucun.\n`;
+
+  // Les MOTS D'ATTAQUE, même combat. Une fois le style SMS obtenu, le modèle
+  // s'est mis à commencer une réplique sur deux par « wsh » ou « mdr » — vu à
+  // l'essai, et c'est aussi mécanique qu'un emoji répété. On les lui interdit
+  // nommément, exactement comme les emojis.
+  const openers = [
+    ...new Set(
+      texts
+        .map((t) => String(t).trim().split(/\s+/)[0]?.toLowerCase())
+        .filter((w) => w && w.length <= 8)
+    ),
+  ];
+
+  const bits = [];
+  if (used.length)
+    bits.push(
+      `Tu viens d'utiliser ${used.join(" ")} : ces emojis-là sont INTERDITS dans ta prochaine réponse. Prends-en un autre, ou aucun.`
+    );
+  if (openers.length)
+    bits.push(
+      `Tes dernières réponses commençaient par « ${openers.join(" », « ")} » : NE COMMENCE PAS par ces mots-là cette fois. Attaque autrement.`
+    );
+  return bits.length ? `\n${bits.join("\n")}\n` : "";
 }
 
 // LE BOT A SON PROPRE MODÈLE, ET C'EST LE PLUS PETIT — pour deux raisons qui
@@ -191,6 +253,47 @@ const BOT_MODEL = process.env.BOT_GEMINI_MODEL || "gemini-flash-lite-latest";
 // première proposition, le reste est du délayage. Le repli (couper au dernier
 // espace) ne sert que si le modèle n'a mis aucune ponctuation, ce qui lui
 // arrive quand il écrit « comme un mec entre deux parties ».
+// ============================================================
+//  D'où vient la réponse
+// ============================================================
+// UN SEUL point d'entrée pour les deux fournisseurs, et il choisit tout seul :
+//
+//   • GROQ (Llama 70B) s'il est configuré — c'est lui qui fait le personnage,
+//     voir l'en-tête de lib/groq.js. Le prompt système lui est passé comme
+//     prompt système, ce qui est déjà en soi un gain : le caractère cesse
+//     d'être une consigne noyée dans le texte de la question.
+//   • GEMINI sinon, en JSON comme le reste du site. Rien à installer, le bot
+//     marche à clé unique — juste avec moins de mordant.
+//
+// Et dans les deux cas, LA MÊME SORTIE : une réplique nettoyée, raccourcie, et
+// jetée si elle sent la machine.
+async function chatText(system, user) {
+  let raw = "";
+  if (isGroqConfigured()) {
+    raw = await groqText(system, user, {
+      temperature: 1.15,
+      maxTokens: 120,
+      timeoutMs: 12_000,
+    });
+  } else {
+    const out = await geminiJson(`${system}\n\n${user}\n\nRéponds UNIQUEMENT en JSON : {"reply": "ta réponse"}`, {
+      // 14 s et pas 20 : mesuré en vrai, le petit modèle répond en ~1 s la
+      // plupart du temps, mais part parfois à 19 s quand l'API est chargée.
+      // Vingt secondes de silence dans un salon, c'est pire qu'une vanne en
+      // conserve — on préfère abandonner tôt et sortir un repli.
+      timeoutMs: 14_000,
+      temperature: 1.1,
+      model: BOT_MODEL,
+    });
+    raw = String(out?.reply || "");
+  }
+
+  // Les modèles adorent emballer une réplique d'argot dans des guillemets.
+  const reply = tighten(raw.replace(/^["«»\s]+|["«»\s]+$/g, ""));
+  if (!reply || soundsLikeAi(reply)) return pickFallback();
+  return reply.slice(0, MAX_REPLY);
+}
+
 const SOFT_MAX = 170;
 
 function tighten(text) {
@@ -227,9 +330,7 @@ export async function generateBotReply({ username, history = [] }) {
   // n'y a personne d'autre pour changer de sujet à sa place.
   const banned = bannedEmoji(recent.filter((m) => !m.mine).slice(-3).map((m) => m.text));
 
-  const prompt = `${PERSONA}
-
-Tu discutes en message privé avec « ${username} ».
+  const prompt = `Tu discutes en message privé avec « ${username} ».
 
 Voici la conversation (le dernier message est celui auquel tu dois répondre) :
 ${lines || `${username} : salut`}
@@ -238,17 +339,7 @@ Réponds à son dernier message, dans ton personnage. UNE SEULE PHRASE COURTE, e
 qui répond vraiment à ce qu'il vient de dire.`;
 
   try {
-    const out = await geminiJson(prompt, {
-      // 14 s et pas 20 : mesuré en vrai, le petit modèle répond en ~1 s la
-      // plupart du temps, mais part parfois à 19 s quand l'API est chargée.
-      // Vingt secondes de silence dans un salon, c'est pire qu'une vanne en
-      // conserve — on préfère abandonner tôt et sortir un repli.
-      timeoutMs: 14_000,
-      temperature: 1.1,
-      model: BOT_MODEL,
-    });
-    const reply = tighten(String(out?.reply || ""));
-    return reply ? reply.slice(0, MAX_REPLY) : pickFallback();
+    return await chatText(PERSONA, prompt);
   } catch (err) {
     console.warn("bot reply error:", err.message);
     return pickFallback();
@@ -329,9 +420,7 @@ Comme tu t'invites, tu as intérêt à être DRÔLE : une vanne qui tombe pile s
         ? `${askedBy} vient de te mentionner SANS RIEN DIRE D'AUTRE : il te convoque sur ce qui se dit juste au-dessus. Réagis au dernier truc intéressant du salon et moque-toi de celui qui l'a dit. N'écris JAMAIS « quoi ? » ni « tu veux quoi ».`
         : `${askedBy} te mentionne et te dit : « ${text} ».`;
 
-  const prompt = `${PERSONA}
-
-Tu es dans un salon Discord, plusieurs personnes y parlent, et TU SUIS LA
+  const prompt = `Tu es dans un salon Discord, plusieurs personnes y parlent, et TU SUIS LA
 CONVERSATION DEPUIS LE DÉBUT. Tu te souviens de ce qui vient d'être dit et de
 ce que tu as déjà répondu.
 ${people}
@@ -357,25 +446,68 @@ Réponds à ça, dans ton personnage. UNE SEULE PHRASE COURTE. Tu peux nommer le
 gens par leur pseudo. N'écris pas de mention Discord (pas de <@…>).`;
 
   try {
-    const out = await geminiJson(prompt, {
-      // 14 s et pas 20 : mesuré en vrai, le petit modèle répond en ~1 s la
-      // plupart du temps, mais part parfois à 19 s quand l'API est chargée.
-      // Vingt secondes de silence dans un salon, c'est pire qu'une vanne en
-      // conserve — on préfère abandonner tôt et sortir un repli.
-      timeoutMs: 14_000,
-      temperature: 1.1,
-      model: BOT_MODEL,
-    });
-    const reply = tighten(String(out?.reply || ""));
     // On coupe les mentions brutes que le modèle aurait inventées : un
     // <@123…> fabriqué au hasard notifierait quelqu'un qui n'a rien demandé.
-    return (reply ? reply.slice(0, MAX_REPLY) : pickFallback()).replace(
-      /<@[!&]?\d+>/g,
-      ""
-    );
+    return (await chatText(PERSONA, prompt)).replace(/<@[!&]?\d+>/g, "");
   } catch (err) {
     console.warn("bot discord reply error:", err.message);
     return pickFallback();
+  }
+}
+
+// ============================================================
+//  « resume » — le résumé de la discussion
+// ============================================================
+// La fonctionnalité la plus réclamée de l'ancien bot, et la seule qui lui
+// servait vraiment à quelque chose : on revient après deux heures, on tape
+// « resume », et on sait ce qui s'est dit — en se faisant insulter au passage.
+//
+// LE PIÈGE EST L'INTRO. Un modèle à qui on demande un résumé écrit « Voici le
+// résumé des messages : … », et la ligne devient un compte rendu de réunion.
+// L'ancien bot l'interdisait explicitement ; on fait pareil, et on lui rappelle
+// surtout qu'il n'est pas un observateur extérieur : il ÉTAIT dans la
+// conversation, il dit « je », il prend parti.
+export async function generateSummary({ history = [], people = "", askedBy = "" }) {
+  const lines = history
+    .filter((m) => m.text)
+    .slice(-50)
+    .map((m) => `${m.author} : ${m.text.slice(0, 200)}`)
+    .join("\n");
+
+  if (!lines) return "y'a rien à résumer, vous parlez jamais ptdr";
+
+  const prompt = `${people}
+Voici les derniers messages du salon :
+${lines}
+
+${askedBy} te demande de résumer ce qui s'est dit.
+
+RÈGLES DU RÉSUMÉ :
+- DEUX phrases maximum, en langage SMS avec des fautes, comme d'habitude.
+- PAS d'intro : jamais « voici le résumé », « en résumé », « les gens ont parlé de ». Tu balances direct.
+- Tu étais dans la conversation : tu dis « je » pour toi, tu nommes les gens, tu prends parti.
+- Balance une vanne sur un ou deux d'entre eux au passage, c'est le principal intérêt du truc.
+- Si vraiment il ne s'est rien dit d'intéressant, moque-toi du vide.`;
+
+  try {
+    // Deux phrases au lieu d'une : un résumé d'une seule ligne n'apprend rien.
+    // On relâche donc le filet de brièveté juste pour ce cas.
+    const raw = isGroqConfigured()
+      ? await groqText(PERSONA, prompt, { temperature: 1.1, maxTokens: 160 })
+      : String(
+          (
+            await geminiJson(
+              `${PERSONA}\n\n${prompt}\n\nRéponds UNIQUEMENT en JSON : {"reply": "ton résumé"}`,
+              { timeoutMs: 14_000, temperature: 1.05, model: BOT_MODEL }
+            )
+          )?.reply || ""
+        );
+    const out = raw.replace(/^["«»\s]+|["«»\s]+$/g, "").trim();
+    if (!out || soundsLikeAi(out)) return "jai rien suivi, vous êtes chiants";
+    return out.slice(0, 500);
+  } catch (err) {
+    console.warn("bot summary error:", err.message);
+    return "jai la flemme de tout relire, débrouillez vous";
   }
 }
 

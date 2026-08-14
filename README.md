@@ -60,6 +60,6 @@ client/   App React (Vite)
 - Liaison Discord : `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` (application créée
   sur <https://discord.com/developers>, avec `<domaine>/api/discord/return` déclarée
   comme URL de redirection OAuth2)
-- Bot du site : `GEMINI_API_KEY` pour ses réponses, `BOT_USERNAME` pour le rebaptiser.
+- Bot du site : `GROQ_API_KEY` (gratuit, Llama 70B — c'est lui qui lui donne son caractère ; à défaut `GEMINI_API_KEY`, en moins mordant), `BOT_USERNAME` pour le rebaptiser.
   Le droit de lui parler se donne compte par compte depuis le panel d'admin.
 - `client/.env` : `VITE_API_URL` (URL de l'API)

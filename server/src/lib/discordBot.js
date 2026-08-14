@@ -14,7 +14,7 @@ import {
   TextInputStyle,
   UserSelectMenuBuilder,
 } from "discord.js";
-import { generateDiscordReply, BOT_USERNAME } from "./bot.js";
+import { generateDiscordReply, generateSummary, BOT_USERNAME } from "./bot.js";
 import {
   DAILY_WINS,
   WIN_POINTS,
@@ -36,6 +36,7 @@ import {
   MAX_ALIASES,
   glossary,
   listPeople,
+  nicknameFor,
   personOf,
   resolveName,
   savePerson,
@@ -124,28 +125,24 @@ export function inviteUrl() {
 // pour un outil.
 //
 // TOUTE LA DIFFICULTÉ EST DANS LA FRÉQUENCE, et elle se règle en trois nombres :
+// un tirage par message, un temps de repos, et un filet quotidien (au moins une
+// fois par jour, même dans un salon calme, dès qu'il y a un minimum de vie).
 //
-//   • UN SEUIL TIRÉ AU HASARD à chaque fois (entre 25 et 90 messages). Un seuil
-//     fixe se repère en une soirée — « il parle tous les 30 messages » — et la
-//     surprise, qui est tout l'intérêt, disparaît.
-//   • UN PLANCHER DE TEMPS (20 min). Sans lui, un salon de dix personnes qui
-//     s'emballe atteint 90 messages en dix minutes et le bot devient le
-//     bavard qu'on coupe.
-//   • UN FILET QUOTIDIEN (20 h). C'est la demande explicite : au moins une fois
-//     par jour. Dans un salon calme qui ne fera jamais 25 messages, c'est ce
-//     filet qui le fait parler — dès qu'il y a un minimum de vie (5 messages),
-//     pour ne pas répondre dans le vide à un salon mort depuis un mois.
-const INTRUSION_MIN = 25;
-const INTRUSION_MAX = 90;
-const INTRUSION_QUIET_MS = 20 * 60 * 1000;
+// 6 % par message, exactement comme l'ancien bot du serveur — c'est le réglage
+// qui avait fait ses preuves : environ une intrusion tous les seize messages,
+// donc plusieurs par soirée animée, et le sentiment qu'il « traîne » là plutôt
+// qu'il n'intervient. Notre premier réglage (un seuil entre 25 et 90 messages)
+// était trois à quatre fois trop timide : il ne parlait jamais, et personne ne
+// remarquait la fonctionnalité.
+const INTRUSION_CHANCE = 0.06;
+// Le garde-fou qui manquait à l'ancien : un salon qui s'emballe atteint vite
+// dix intrusions à l'heure. Huit minutes de repos minimum entre deux.
+const INTRUSION_QUIET_MS = 8 * 60 * 1000;
 const INTRUSION_DAILY_MS = 20 * 60 * 60 * 1000;
 const INTRUSION_DAILY_MIN_MSG = 5;
 
-// channelId -> { seen, target, lastAt }
+// channelId -> { seen, lastAt }
 const intrusion = new Map();
-
-const nextTarget = () =>
-  INTRUSION_MIN + Math.floor(Math.random() * (INTRUSION_MAX - INTRUSION_MIN + 1));
 
 // Compte le message qui passe et dit s'il faut s'inviter maintenant.
 //
@@ -157,18 +154,19 @@ function shouldInterject(channelId) {
   const now = Date.now();
   let st = intrusion.get(channelId);
   if (!st) {
-    st = { seen: 0, target: nextTarget(), lastAt: now };
+    st = { seen: 0, lastAt: now };
     intrusion.set(channelId, st);
   }
   st.seen += 1;
 
   const quiet = now - st.lastAt;
-  const reached = st.seen >= st.target && quiet >= INTRUSION_QUIET_MS;
+  // Le tirage d'abord, le repos ensuite : c'est le hasard qui décide, la durée
+  // ne fait que l'empêcher de se répéter trop vite.
+  const rolled = quiet >= INTRUSION_QUIET_MS && Math.random() < INTRUSION_CHANCE;
   const daily = quiet >= INTRUSION_DAILY_MS && st.seen >= INTRUSION_DAILY_MIN_MSG;
-  if (!reached && !daily) return false;
+  if (!rolled && !daily) return false;
 
   st.seen = 0;
-  st.target = nextTarget();
   st.lastAt = now;
   return true;
 }
@@ -295,6 +293,7 @@ function helpEmbed() {
       {
         name: "🎮 MyPlayLog",
         value: [
+          `\`${PREFIX}resume\` — ce qui s'est dit pendant que t'étais pas là`,
           `\`${PREFIX}add <jeu>\` — ajoute un jeu à ta liste de souhaits`,
           `\`${PREFIX}noms\` — comment je dois vous appeler (vrais noms, surnoms)`,
         ].join("\n"),
@@ -631,6 +630,49 @@ async function onNameModal(inter) {
   });
 }
 
+// ============================================================
+//  « !resume » — ce qui s'est dit pendant ton absence
+// ============================================================
+// La fonctionnalité la plus utilisée de l'ancien bot. On remonte 50 messages
+// (contre 10 pour une simple réponse) : un résumé sur dix messages, c'est une
+// paraphrase du dernier, ça n'apprend rien à quelqu'un qui revient après deux
+// heures.
+const SUMMARY_MESSAGES = 50;
+
+async function cmdSummary(msg) {
+  const fetched = await msg.channel.messages
+    .fetch({ limit: SUMMARY_MESSAGES, before: msg.id })
+    .catch(() => null);
+  if (!fetched?.size) {
+    await msg.channel.send("y'a rien à résumer, vous parlez jamais ptdr");
+    return;
+  }
+
+  msg.channel.sendTyping().catch(() => {});
+
+  const meId = client.user.id;
+  const history = await Promise.all(
+    [...fetched.values()]
+      .reverse()
+      .filter((m) => !m.author?.bot || m.author?.id === meId)
+      .map(async (m) => ({
+        author:
+          m.author?.id === meId
+            ? BOT_USERNAME
+            : await nicknameFor(msg.guildId, m.author?.id, nameOf(m)),
+        text: clean(m),
+      }))
+  );
+
+  const summary = await generateSummary({
+    history,
+    people: await glossary(msg.guildId),
+    askedBy: await resolveName(msg.guildId, msg.author.id, nameOf(msg)),
+  });
+  await msg.channel.send(summary);
+  noteBotSpoke(msg.channelId);
+}
+
 // Une proposition pendant une manche. Rend `true` si le message a été « pris »
 // par le jeu (bonne réponse) — auquel cas le bot n'a plus à faire autre chose.
 async function handleGuess(msg) {
@@ -695,6 +737,8 @@ async function onMessage(msg) {
       if (cmd === "add" || cmd === "souhait")
         return void (await cmdAdd(msg, raw.slice(PREFIX.length + cmd.length).trim()));
       if (cmd === "noms" || cmd === "nom") return void (await cmdNames(msg));
+      if (cmd === "resume" || cmd === "résumé" || cmd === "resumé")
+        return void (await cmdSummary(msg));
       if (cmd === "aide" || cmd === "help" || cmd === "commandes")
         return void (await msg.channel.send({ embeds: [helpEmbed()] }));
       // Commande inconnue : on ne dit rien. Le salon n'est pas à nous, et un
@@ -755,7 +799,9 @@ async function onMessage(msg) {
               author:
                 m.author?.id === meId
                   ? BOT_USERNAME
-                  : await resolveName(msg.guildId, m.author?.id, nameOf(m)),
+                  // Un surnom au hasard plutôt que toujours le même nom :
+                  // c'est ce qui empêche le bot de réciter un annuaire.
+                  : await nicknameFor(msg.guildId, m.author?.id, nameOf(m)),
               text: clean(m),
             }))
           )
