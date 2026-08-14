@@ -1941,7 +1941,9 @@
   .side-toggle,
   .sidebar-head,
   .side-bottom,
-  .side-row-admin {
+  .side-row-admin,
+  /* Entrées marquées `noMobile` dans Sidebar.jsx (Activité, Sorties) */
+  .side-row-no-mobile {
     display: none;
   }
 

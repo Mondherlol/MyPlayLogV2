@@ -33,9 +33,10 @@ const APP_VERSION = "1.1";
 
 const NAV = [
   { to: "/app", label: "Accueil", Icon: Home, end: true },
-  { to: "/activity", label: "Activité", Icon: Sparkles },
+  // `noMobile` : entrée gardée sur la sidebar desktop, retirée de la bottom bar.
+  { to: "/activity", label: "Activité", Icon: Sparkles, noMobile: true },
   { to: "/explore", label: "Explorer", Icon: Compass },
-  { to: "/releases", label: "Sorties", Icon: CalendarDays },
+  { to: "/releases", label: "Sorties", Icon: CalendarDays, noMobile: true },
   // `badge` : la pastille de non-lus vient du contexte de messagerie.
   { to: "/messages", label: "Messages", Icon: MessagesSquare, badge: "chat" },
   { to: "/lists", label: "Listes", Icon: List },
@@ -90,7 +91,7 @@ export default function Sidebar({ collapsed, onToggle }) {
           (n) =>
             (!n.adminOnly || user?.isAdmin) && (!n.feature || hasFeature(n.feature))
         ).map(
-          ({ to, label, Icon, end, adminOnly, badge }) => {
+          ({ to, label, Icon, end, adminOnly, badge, noMobile }) => {
             const count = badge === "chat" ? unread : 0;
             return (
               <NavLink
@@ -100,7 +101,9 @@ export default function Sidebar({ collapsed, onToggle }) {
                 className={({ isActive }) =>
                   `side-row clickable ${isActive ? "active" : ""} ${
                     adminOnly ? "side-row-admin" : ""
-                  } ${badge === "chat" ? "side-row-chat" : ""}`
+                  } ${badge === "chat" ? "side-row-chat" : ""} ${
+                    noMobile ? "side-row-no-mobile" : ""
+                  }`
                 }
                 title={label}
               >

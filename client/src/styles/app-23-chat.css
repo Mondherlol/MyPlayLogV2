@@ -2184,6 +2184,14 @@ a.chat-card:hover {
   color: var(--text-soft);
 }
 
+/* La pastille du bot : il n'est ni ami ni abonné, et sans marque il aurait
+   l'air d'un inconnu tombé au milieu de la liste. */
+.chat-rel.bot {
+  background: rgba(124, 92, 240, 0.16);
+  border-color: rgba(124, 92, 240, 0.4);
+  color: #a78bfa;
+}
+
 .chat-contact-check {
   flex: 0 0 auto;
   color: var(--accent-ink);

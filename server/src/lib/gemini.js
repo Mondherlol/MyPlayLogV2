@@ -56,13 +56,21 @@ async function callModel(model, prompt, timeoutMs, temperature) {
 // `responseMimeType: application/json` force le modèle à ne produire QUE du
 // JSON valide (pas de prose ni de ```json autour). Si le modèle principal
 // est indisponible (503/404/429), on retente une fois sur le modèle de secours.
-export async function geminiJson(prompt, { timeoutMs = 25_000, temperature = 0.9 } = {}) {
+// `model` : à surcharger quand un appelant a des besoins DIFFÉRENTS du reste du
+// site. Le quota gratuit se compte PAR MODÈLE : un bavard (le bot, qui répond à
+// chaque message) posé sur le même modèle que les Pépites ou les traductions
+// leur mange leur journée. Le mettre sur le petit modèle, c'est autant de
+// requêtes qui ne sont plus prises au gros — les deux compteurs sont séparés.
+export async function geminiJson(
+  prompt,
+  { timeoutMs = 25_000, temperature = 0.9, model: forced = null } = {}
+) {
   if (!isGeminiConfigured()) {
     const err = new Error("GEMINI_API_KEY manquant dans server/.env.");
     err.status = 503;
     throw err;
   }
-  const model = process.env.GEMINI_MODEL || "gemini-flash-latest";
+  const model = forced || process.env.GEMINI_MODEL || "gemini-flash-latest";
 
   try {
     return await callModel(model, prompt, timeoutMs, temperature);

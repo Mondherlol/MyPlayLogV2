@@ -37,6 +37,8 @@ import {
   resetMissionConfig,
 } from "../lib/missions.js";
 import { defaultSince, syncEventLists } from "../lib/eventSync.js";
+import { ensureBotUser, canUseBot, WELCOME, BOT_USERNAME } from "../lib/bot.js";
+import { botSay } from "./chat.js";
 
 const router = express.Router();
 
@@ -59,7 +61,7 @@ router.get("/users", async (req, res) => {
     // lastSeenAt) retombent en fin de liste, départagés par date d'inscription.
     const users = await User.find(filter)
       .select(
-        "username email avatar createdAt lastSeenAt following isAdmin isSuperAdmin isStaff points canDownload"
+        "username email avatar createdAt lastSeenAt following isAdmin isSuperAdmin isStaff points canDownload botAccess discord"
       )
       .sort({ lastSeenAt: -1, createdAt: -1 })
       .limit(500)
@@ -96,6 +98,13 @@ router.get("/users", async (req, res) => {
         // cocher doit refléter ce qui est réellement stocké, sinon décocher un
         // admin donnerait l'illusion de n'avoir aucun effet.
         downloadFlag: !!u.canDownload,
+        // Droit de parler au bot. Même distinction que ci-dessus entre le
+        // drapeau brut et l'accès effectif (les admins l'ont par leur rôle).
+        botAccess: canUseBot(u),
+        botFlag: !!u.botAccess,
+        discord: u.discord?.discordId
+          ? { username: u.discord.username || null, id: u.discord.discordId }
+          : null,
         gameCount: gameCount.get(String(u._id)) || 0,
         points: u.points || 0, // solde d'arcade, ajustable depuis la fiche
         followingCount: (u.following || []).length,
@@ -262,6 +271,49 @@ router.patch("/users/:id/staff", async (req, res) => {
   }
 });
 
+// --- Droit de parler au bot (interrupteur de la fiche) ---
+// C'est ICI que se joue le contrôle d'accès au personnage : le bot est
+// volontairement grossier, il ne parle qu'aux comptes qu'un administrateur a
+// autorisés — d'où un droit fermé par défaut, accordé un par un et
+// révocable à tout moment (le fil déjà ouvert reste, le bot s'y tait).
+//
+// L'ouverture déclenche deux choses : la création du compte du bot s'il
+// n'existe pas encore (personne ne devrait avoir à lancer un script pour ça),
+// et son mot d'accueil en message privé — sans quoi il faudrait deviner qu'on
+// a le droit de lui écrire et le chercher dans les contacts.
+router.patch("/users/:id/bot", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id))
+      return res.status(404).json({ error: "Utilisateur introuvable." });
+    const botAccess = req.body?.botAccess === true;
+
+    const before = await User.findById(id).select("botAccess isAdmin isSuperAdmin isBot");
+    if (!before) return res.status(404).json({ error: "Utilisateur introuvable." });
+    if (before.isBot)
+      return res.status(400).json({ error: `${BOT_USERNAME} n'a pas à se parler à lui-même.` });
+
+    const u = await User.findByIdAndUpdate(
+      id,
+      { $set: { botAccess } },
+      { new: true, timestamps: false }
+    ).select("isAdmin isSuperAdmin botAccess");
+
+    if (botAccess && !before.botAccess) {
+      // Sans await : la fiche doit se rafraîchir tout de suite, le bonjour du
+      // bot n'a aucune raison de la retarder (ni de la faire échouer).
+      ensureBotUser()
+        .then(() => botSay(id, WELCOME))
+        .catch((err) => console.error("bot welcome error:", err.message));
+    }
+
+    res.json({ botFlag: !!u.botAccess, botAccess: canUseBot(u) });
+  } catch (err) {
+    console.error("admin user bot error:", err.message);
+    res.status(500).json({ error: "Erreur lors de la mise à jour." });
+  }
+});
+
 // Carte légère d'un utilisateur pour les listes d'abonnés / abonnements.
 function userCard(u) {
   return {
@@ -282,7 +334,7 @@ router.get("/users/:id", async (req, res) => {
 
     const user = await User.findById(id)
       .select(
-        "username email avatar bio createdAt lastSeenAt following isAdmin isSuperAdmin isStaff canDownload points equipped inventory"
+        "username email avatar bio createdAt lastSeenAt following isAdmin isSuperAdmin isStaff canDownload botAccess discord points equipped inventory"
       )
       .populate("following", "username avatar isAdmin isSuperAdmin")
       .lean();
@@ -341,6 +393,17 @@ router.get("/users/:id", async (req, res) => {
         staffFlag: !!user.isStaff,
         canDownload: canUserDownload(user),
         downloadFlag: !!user.canDownload,
+        botAccess: canUseBot(user),
+        botFlag: !!user.botAccess,
+        discord: user.discord?.discordId
+          ? {
+              id: user.discord.discordId,
+              username: user.discord.username || null,
+              globalName: user.discord.globalName || null,
+              avatar: user.discord.avatar || null,
+              connectedAt: user.discord.connectedAt || null,
+            }
+          : null,
         gameCount,
         points: user.points || 0,
       },

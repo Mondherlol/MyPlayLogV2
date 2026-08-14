@@ -199,6 +199,9 @@ export default function NewChatModal({
                     <span className="chat-contact-name">{u.username}</span>
                     {u.relation === "mutual" && <span className="chat-rel">Ami</span>}
                     {u.relation === "follower" && <span className="chat-rel">Abonné</span>}
+                    {/* Le bot n'est abonné à personne : sans cette pastille, il
+                        apparaîtrait comme un inconnu au milieu des amis. */}
+                    {u.relation === "bot" && <span className="chat-rel bot">Bot</span>}
                     {on && <Check size={16} className="chat-contact-check" />}
                   </button>
                 );

@@ -25,6 +25,10 @@ import { cardFromLinks } from "../lib/inviteLinks.js";
 // Le flux temps réel est le SEUL signal fiable pour distinguer « a raccroché »
 // de « a disparu » dans un appel (lib/callRooms.js explique la différence).
 import { noteOffline, noteOnline } from "../lib/callRooms.js";
+// Le bot est un participant comme un autre : la messagerie ne connaît de lui
+// que son id et son caractère (lib/bot.js). Tout ce qui est ci-dessous marche
+// exactement pareil qu'avec un humain — il écrit juste tout seul.
+import { botId, canUseBot, generateBotReply, BOT_USERNAME } from "../lib/bot.js";
 
 const router = express.Router();
 
@@ -284,12 +288,19 @@ const participantIds = (c) =>
 function canMessage(me, target) {
   if (!me || !target) return false;
   if (String(me._id) === String(target._id)) return false;
+  // Le bot ne s'abonne à personne : c'est le droit d'accès accordé par un
+  // administrateur qui tient lieu d'abonnement (cf. lib/bot.js). Sans cette
+  // exception il serait injoignable, et lui faire suivre tout le site pour
+  // contourner la règle reviendrait à ouvrir le personnage à tout le monde.
+  if (target.isBot) return canUseBot(me);
   return (target.following || []).some((id) => String(id) === String(me._id));
 }
 
 // Message d'erreur commun (sans genre : le pseudo peut désigner n'importe qui).
-const notAllowed = (username) =>
-  `${username} n'est pas abonné(e) à toi : impossible d'ouvrir une discussion.`;
+const notAllowed = (username, isBot = false) =>
+  isBot
+    ? `${username} ne parle qu'aux comptes autorisés par un administrateur.`
+    : `${username} n'est pas abonné(e) à toi : impossible d'ouvrir une discussion.`;
 
 // Nettoie la liste des médias reçus du client (mêmes sources que les
 // commentaires : notre upload ou GIPHY).
@@ -652,6 +663,111 @@ export async function deliverCardToConversation({
 }
 
 // ============================================================
+//  Le bot : il écrit dans le fil comme n'importe qui
+// ============================================================
+// Rien de tout ceci n'est un « canal bot ». Le bot est un participant, sa
+// réponse passe par persistMessage + broadcastMessage exactement comme celle
+// d'un humain — la messagerie n'a donc RIEN de spécial à savoir, et tout ce
+// qu'elle sait déjà faire (accusés de lecture, réactions, notifications push,
+// mode hors-ligne) marche gratuitement avec lui.
+//
+// TROIS PRÉCAUTIONS, et elles ont chacune leur raison :
+//
+//   1. UN VERROU PAR CONVERSATION. Sans lui, dix messages envoyés d'affilée
+//      lancent dix appels à Gemini en parallèle, qui reviennent dans le
+//      désordre et se répondent entre eux. Un seul à la fois : les messages
+//      arrivés pendant la réflexion seront de toute façon lus dans
+//      l'historique de la réponse suivante.
+//   2. IL « ÉCRIT… ». Une réponse de modèle met deux à cinq secondes ; sans le
+//      témoin de frappe, ce silence ressemble à un bot cassé. L'événement est
+//      celui de la messagerie, le client n'a rien à apprendre.
+//   3. L'ACCÈS EST REVÉRIFIÉ ICI. Le droit peut avoir été retiré depuis que la
+//      conversation a été ouverte, et une conversation déjà ouverte reste
+//      ouverte : c'est le silence du bot qui applique le retrait.
+const botBusy = new Set();
+
+async function maybeBotReply(conv, senderId) {
+  try {
+    if (conv.isGroup) return;
+    const bot = await botId();
+    if (!bot) return;
+    const ids = participantIds(conv);
+    if (ids.length !== 2 || !ids.includes(bot) || String(senderId) === bot) return;
+
+    const key = String(conv._id);
+    if (botBusy.has(key)) return;
+
+    const sender = await User.findById(senderId)
+      .select("username botAccess isAdmin isSuperAdmin")
+      .lean();
+    if (!canUseBot(sender)) return;
+
+    botBusy.add(key);
+    try {
+      emitTo([String(senderId)], "typing", {
+        conversationId: key,
+        user: userCard(
+          (conv.participants || []).find((p) => String(p._id) === bot)
+        ),
+        stopped: false,
+      });
+
+      const history = await Message.find({ conversation: conv._id, deletedAt: null })
+        .sort({ createdAt: -1 })
+        .limit(12)
+        .select("text author voice media")
+        .lean();
+
+      const reply = await generateBotReply({
+        username: sender.username,
+        history: history
+          .reverse()
+          .map((m) => ({
+            mine: String(m.author) !== bot,
+            // Un vocal ou une image n'a pas de texte : on le DIT au modèle
+            // plutôt que de lui passer une ligne vide, sinon il répond à côté
+            // en croyant que la personne n'a rien dit.
+            text:
+              m.text ||
+              (m.voice ? "[message vocal]" : m.media?.length ? "[image]" : ""),
+          })),
+      });
+
+      const msg = await persistMessage(conv, bot, { author: bot, text: reply });
+      broadcastMessage(conv, msg);
+      await broadcastConversation(conv._id);
+      notifyPush(conv, msg, bot);
+    } finally {
+      botBusy.delete(key);
+      emitTo([String(senderId)], "typing", {
+        conversationId: key,
+        user: userCard((conv.participants || []).find((p) => String(p._id) === bot)),
+        stopped: true,
+      });
+    }
+  } catch (err) {
+    console.error("bot reply error:", err.message);
+  }
+}
+
+// Le bot écrit à quelqu'un DE LUI-MÊME (il n'attend pas qu'on lui parle).
+// Sert au mot de bienvenue quand un administrateur vient d'ouvrir l'accès, et
+// servira à « va dire ça à untel ». Renvoie false si le bot n'existe pas.
+export async function botSay(toUserId, text) {
+  const bot = await botId();
+  if (!bot || !text) return false;
+  const conv = await getOrCreateDm(bot, toUserId);
+  const msg = await persistMessage(conv, bot, {
+    author: bot,
+    text: String(text).slice(0, MAX_TEXT),
+  });
+  broadcastMessage(conv, msg);
+  await broadcastConversation(conv._id);
+  notifyPush(conv, msg, bot);
+  return true;
+}
+
+// ============================================================
 //  Flux temps réel (SSE)
 // ============================================================
 // `EventSource` ne sait pas poser d'en-tête Authorization : le jeton passe donc
@@ -863,12 +979,37 @@ router.get("/unread-count", requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/chat/bot — qui est le bot, et ai-je le droit de lui parler ?
+// Une route à part plutôt qu'un champ de /auth/me : le client n'a besoin de
+// son id QUE pour ouvrir le fil (bouton « Lui écrire » des paramètres), et
+// c'est aussi ce qui dit à la page si le bot existe du tout sur ce serveur.
+router.get("/bot", requireAuth, async (req, res) => {
+  try {
+    const [me, bot] = await Promise.all([
+      User.findById(req.userId).select("botAccess isAdmin isSuperAdmin").lean(),
+      User.findOne({ isBot: true }).select("username avatar bio").lean(),
+    ]);
+    res.json({
+      exists: !!bot,
+      allowed: canUseBot(me),
+      bot: bot
+        ? { id: String(bot._id), username: bot.username, avatar: bot.avatar || null, bio: bot.bio || "" }
+        : null,
+    });
+  } catch (err) {
+    console.error("chat bot status error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
 // GET /api/chat/contacts?q= — à qui puis-je écrire ? Mes abonnements et mes
 // abonnés d'abord (les plus probables), puis la recherche ouverte.
 router.get("/contacts", requireAuth, async (req, res) => {
   try {
     const q = String(req.query.q || "").trim();
-    const me = await User.findById(req.userId).select("following").lean();
+    const me = await User.findById(req.userId)
+      .select("following botAccess isAdmin isSuperAdmin")
+      .lean();
     const followingIds = (me?.following || []).map(String);
 
     const [following, followers] = await Promise.all([
@@ -907,9 +1048,29 @@ router.get("/contacts", requireAuth, async (req, res) => {
       found.forEach((u) => add(u, "none"));
     }
 
-    const meDoc = { _id: req.userId, following: followingIds };
+    // Le bot, s'il existe et qu'on a le droit de lui parler. Il est proposé
+    // MÊME SANS RECHERCHE et en tête de liste : c'est le seul « contact » que
+    // personne ne connaît d'avance, il faut donc le montrer pour qu'on sache
+    // qu'on peut lui écrire.
+    let botCard = null;
+    if (canUseBot(me)) {
+      const bot = await User.findOne({ isBot: true })
+        .select("username avatar privacy following isBot")
+        .lean();
+      if (bot && (!q || bot.username.toLowerCase().includes(q.toLowerCase())))
+        botCard = { ...userCard(bot), relation: "bot", isBot: true };
+    }
+
+    const meDoc = {
+      _id: req.userId,
+      following: followingIds,
+      botAccess: me?.botAccess,
+      isAdmin: me?.isAdmin,
+      isSuperAdmin: me?.isSuperAdmin,
+    };
     const lower = q.toLowerCase();
     const contacts = [...pool.values()]
+      .filter(({ user }) => !user.isBot) // ajouté à part, toujours en tête
       .filter(({ user }) => canMessage(meDoc, user))
       .filter(({ user }) => !q || user.username.toLowerCase().includes(lower))
       .sort((a, b) => {
@@ -922,7 +1083,7 @@ router.get("/contacts", requireAuth, async (req, res) => {
       .slice(0, 40)
       .map(({ user, relation }) => ({ ...userCard(user), relation }));
 
-    res.json({ contacts });
+    res.json({ contacts: botCard ? [botCard, ...contacts] : contacts });
   } catch (err) {
     console.error("chat contacts error:", err.message);
     res.status(500).json({ error: "Erreur." });
@@ -943,9 +1104,11 @@ router.post("/conversations", requireAuth, async (req, res) => {
     if (!ids.length)
       return res.status(400).json({ error: "Choisis au moins une personne." });
 
-    const me = await User.findById(req.userId).select("following username").lean();
+    const me = await User.findById(req.userId)
+      .select("following username botAccess isAdmin isSuperAdmin")
+      .lean();
     const targets = await User.find({ _id: { $in: ids } })
-      .select("username avatar privacy following")
+      .select("username avatar privacy following isBot")
       .lean();
     if (targets.length !== ids.length)
       return res.status(404).json({ error: "Utilisateur introuvable." });
@@ -953,10 +1116,16 @@ router.post("/conversations", requireAuth, async (req, res) => {
     const refused = targets.find((t) => !canMessage(me, t));
     if (refused)
       return res.status(403).json({
-        error: notAllowed(refused.username),
+        error: notAllowed(refused.username, refused.isBot),
       });
 
     const isGroup = ids.length > 1 || !!String(req.body?.name || "").trim();
+    // Le bot ne se met pas dans un groupe : il ne répond qu'en tête-à-tête (il
+    // n'a aucun moyen de savoir à qui il parle quand ils sont six), et un
+    // groupe où il figurerait sans jamais parler ferait passer ça pour une
+    // panne.
+    if (isGroup && targets.some((t) => t.isBot))
+      return res.status(400).json({ error: `${BOT_USERNAME} ne parle qu'en privé.` });
     const members = [String(req.userId), ...ids];
 
     // DM : clé déterministe → on retombe toujours sur le même fil.
@@ -1276,6 +1445,12 @@ router.post("/conversations/:id/messages", requireAuth, async (req, res) => {
     broadcastMessage(conv, msg);
     await broadcastConversation(conv._id);
     notifyPush(conv, msg, req.userId);
+
+    // Si le fil est celui du bot, il répond — SANS `await` : la réponse arrive
+    // par le flux temps réel comme n'importe quel message, et faire patienter
+    // l'expéditeur pendant que le modèle réfléchit bloquerait son interface
+    // trois secondes pour rien.
+    maybeBotReply(conv, req.userId);
 
     // Journal : le message est tracé AVEC son destinataire et sa conversation,
     // ce que le middleware générique ne saurait pas dire. Le texte, lui, n'est

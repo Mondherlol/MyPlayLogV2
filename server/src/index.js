@@ -57,6 +57,8 @@ import iceRoutes from "./routes/ice.js";
 import collectionRoutes from "./routes/collection.js";
 import watchPartyRoutes from "./routes/watchparty.js";
 import settingsRoutes from "./routes/settings.js";
+import discordRoutes from "./routes/discord.js";
+import { ensureBotUser } from "./lib/bot.js";
 import { requireFeature } from "./lib/features.js";
 import { optionalAuth } from "./middleware/auth.js";
 import { avatarPrivacy } from "./middleware/avatarPrivacy.js";
@@ -153,6 +155,9 @@ app.use("/api/gba-stream", gbaStreamRoutes);
 app.use("/api/listen", listenRoutes);
 app.use("/api/arcade", arcadeRoutes);
 app.use("/api/steam", steamRoutes);
+// Liaison du compte Discord (OAuth2 « identify ») : c'est elle qui permettra
+// au bot de reconnaître un joueur du site depuis un serveur Discord.
+app.use("/api/discord", discordRoutes);
 app.use("/api/psn", psnRoutes);
 app.use("/api/patchnotes", patchnoteRoutes);
 // La relecture de la banque du quiz, avant le routeur d'admin général : ce
@@ -255,6 +260,9 @@ async function start() {
     await mongoose.connect(MONGODB_URI);
     console.log("✅ Connecté à MongoDB");
     await ensureSuperAdmin();
+    // Le compte du bot, créé au premier démarrage : sans lui, ouvrir l'accès à
+    // quelqu'un depuis le panel n'aurait personne à qui faire écrire.
+    await ensureBotUser().catch((err) => console.error("ensureBotUser:", err.message));
     await migrateTrackerSlots();
     // Synchro automatique des comptes de tracking (League of Legends).
     startTrackerAutoSync();

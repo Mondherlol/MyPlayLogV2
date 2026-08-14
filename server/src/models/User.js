@@ -38,6 +38,15 @@ const userSchema = new mongoose.Schema(
     // passe aléatoire jamais communiqué. Le drapeau sert surtout à l'afficher
     // avec sa pastille de compte vérifié.
     isSystem: { type: Boolean, default: false },
+    // Le bot du site (un seul compte porte ce drapeau, cf. lib/bot.js). C'est
+    // LUI et non le pseudo qui identifie le bot : on peut le rebaptiser sans
+    // rien casser, et un plaisantin qui créerait un compte « Gérard » ne se
+    // ferait pas passer pour lui.
+    isBot: { type: Boolean, default: false },
+    // Droit de PARLER au bot. Fermé par défaut, ouvert compte par compte depuis
+    // le panel admin : le personnage est volontairement grossier, il n'a rien à
+    // faire dans les mains de n'importe qui (mineurs, comptes de passage).
+    botAccess: { type: Boolean, default: false },
     // Accès à l'onglet « Téléchargements » des fiches de jeu. Fermé par défaut :
     // il s'ouvre compte par compte depuis le panel admin (voir canUserDownload,
     // lib/admin.js — les administrateurs l'ont sans le drapeau).
@@ -154,6 +163,19 @@ const userSchema = new mongoose.Schema(
       avatar: { type: String, default: null },
       connectedAt: { type: Date, default: null },
       lastSyncAt: { type: Date, default: null }, // dernière synchro (bouton)
+    },
+
+    // --- Connexion Discord (OAuth2 « identify ») ---
+    // On ne garde que l'identité publique : l'id Discord (immuable, c'est LUI
+    // la clé — un pseudo Discord se change), le pseudo affiché et l'avatar.
+    // Aucun jeton n'est stocké : on n'a besoin d'aucune permission après la
+    // liaison, le bot parle aux gens par leur id.
+    discord: {
+      discordId: { type: String, default: null },
+      username: { type: String, default: null }, // pseudo global (@toto)
+      globalName: { type: String, default: null }, // nom affiché
+      avatar: { type: String, default: null }, // URL complète (cdn.discordapp.com)
+      connectedAt: { type: Date, default: null },
     },
 
     // --- Passkey C411 personnel (onglet Pack HD) ---
@@ -391,6 +413,18 @@ userSchema.methods.toPublic = function () {
           connectedAt: this.steam.connectedAt || null,
         }
       : null,
+    discordConnected: !!(this.discord && this.discord.discordId),
+    discord: this.discord?.discordId
+      ? {
+          username: this.discord.username || null,
+          globalName: this.discord.globalName || null,
+          avatar: this.discord.avatar || null,
+          connectedAt: this.discord.connectedAt || null,
+        }
+      : null,
+    // Le droit de parler au bot : le client s'en sert pour montrer (ou non) le
+    // bot dans la messagerie. Le serveur revérifie à chaque message.
+    botAccess: !!this.isSuperAdmin || !!this.isAdmin || !!this.botAccess,
     isAdmin: !!this.isSuperAdmin || !!this.isAdmin,
     isSuperAdmin: !!this.isSuperAdmin,
     // Pilote l'affichage des outils d'édition de l'OST et des personnages ; les

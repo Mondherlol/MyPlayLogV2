@@ -45,6 +45,7 @@ import {
   ScrollText,
   BellRing,
   Wrench,
+  Bot,
   Bell,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
@@ -681,6 +682,10 @@ function UserDrawer({ token, userId, me, onClose, onDirty }) {
                 <StaffToggle token={token} user={u} onSaved={load} onDirty={onDirty} />
               )}
 
+              {/* Droit de parler au bot. Fermé par défaut, et c'est le point
+                  entier de l'interrupteur : le personnage est grossier. */}
+              <BotToggle token={token} user={u} onSaved={load} onDirty={onDirty} />
+
               {isSuperMe && !u.isSuper && (
                 <AdminToggle token={token} user={u} onSaved={load} onDirty={onDirty} />
               )}
@@ -1117,6 +1122,64 @@ function StaffToggle({ token, user, onSaved, onDirty }) {
           disabled={busy}
           role="switch"
           aria-checked={user.staffFlag}
+        >
+          <span className="admin-switch-knob">
+            {busy && <Loader2 size={11} className="spin" />}
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// --- Droit de parler au bot du site ---
+// L'interrupteur qui décide QUI a le droit de se faire insulter par le bot. Il
+// est fermé par défaut : le personnage est volontairement grossier, et c'est
+// ici — et nulle part ailleurs — qu'on choisit à qui on l'ouvre.
+//
+// L'ouverture envoie au passage son mot de bienvenue en message privé (côté
+// serveur), de sorte que la personne n'a rien à chercher : la conversation est
+// déjà là la prochaine fois qu'elle ouvre sa messagerie.
+function BotToggle({ token, user, onSaved, onDirty }) {
+  const [busy, setBusy] = useState(false);
+  const viaRole = user.isAdmin && !user.botFlag;
+
+  async function toggle() {
+    setBusy(true);
+    try {
+      await apiFetch(`/admin/users/${user.id}/bot`, {
+        method: "PATCH",
+        token,
+        body: { botAccess: !user.botFlag },
+      });
+      onSaved();
+      onDirty();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="admin-field">
+      <label>
+        <Bot size={14} /> Accès au bot
+      </label>
+      <div className="admin-toggle-row">
+        <span>
+          {user.botFlag
+            ? "Peut discuter avec le bot en message privé."
+            : viaRole
+              ? "Ouvert d'office : c'est un administrateur."
+              : "Le bot refuse de lui parler (et n'apparaît pas dans ses contacts)."}
+        </span>
+        <button
+          className={`admin-switch clickable ${user.botFlag ? "on" : ""}`}
+          onClick={toggle}
+          disabled={busy}
+          role="switch"
+          aria-checked={user.botFlag}
         >
           <span className="admin-switch-knob">
             {busy && <Loader2 size={11} className="spin" />}

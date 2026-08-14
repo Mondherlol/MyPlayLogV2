@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   DownloadCloud,
   UserCog,
@@ -46,12 +46,15 @@ import {
   ChevronDown,
   ChevronRight,
   PhoneCall,
+  Bot,
+  MessageCircle,
 } from "lucide-react";
 import { apiFetch, API_BASE } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import RingtonePicker from "../components/RingtonePicker";
 import { useLibrary } from "../context/LibraryContext";
 import SteamIcon from "../components/SteamIcon";
+import DiscordIcon from "../components/DiscordIcon";
 import SteamImportModal from "../components/SteamImportModal";
 import PsnIcon from "../components/PsnIcon";
 import PsnImportModal, {
@@ -78,6 +81,7 @@ const TAB_KEYS = [
   "notifications",
   "privacy",
   "calls",
+  "discord",
 ];
 
 // Onglets de la page Paramètres (façon Discord / Steam). Les onglets marqués
@@ -88,18 +92,19 @@ const TABS = [
   { key: "feed", label: "Fil d'accueil", Icon: Newspaper },
   { key: "privacy", label: "Confidentialité", Icon: ShieldCheck },
   { key: "calls", label: "Appels", Icon: PhoneCall },
+  { key: "discord", label: "Discord & bot", Icon: Bot },
   { key: "account", label: "Compte", Icon: UserCog, soon: true },
   { key: "appearance", label: "Apparence", Icon: Palette, soon: true },
   { key: "notifications", label: "Notifications", Icon: Bell, soon: true },
 ];
 
 // Ouvre une pop-up centrée (flux OpenID « Sign in through Steam »).
-function openCentered(url, w = 720, h = 720) {
+function openCentered(url, w = 720, h = 720, name = "mpl-oauth") {
   const y = window.top.outerHeight / 2 + window.top.screenY - h / 2;
   const x = window.top.outerWidth / 2 + window.top.screenX - w / 2;
   return window.open(
     url,
-    "steam-login",
+    name,
     `width=${w},height=${h},left=${x},top=${y}`
   );
 }
@@ -161,6 +166,7 @@ export default function Settings() {
           {tab === "feed" && <FeedPanel />}
           {tab === "privacy" && <PrivacyPanel onCount={setRequestCount} />}
           {tab === "calls" && <CallsPanel />}
+          {tab === "discord" && <DiscordPanel />}
         </section>
       </div>
     </div>
@@ -1767,6 +1773,300 @@ function PendingCard({ p, busy, token, onValidate, onIgnore }) {
             token={token}
             onPick={pickGame}
           />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+//  Discord & bot
+// ============================================================
+// Deux choses différentes dans le même onglet, et c'est volontaire : lier son
+// Discord ne sert À RIEN aujourd'hui si ce n'est pour le bot (points des
+// mini-jeux Discord, messages privés depuis un serveur). Les séparer aurait
+// donné un onglet « Discord » dont personne ne comprend l'intérêt, et un onglet
+// « Bot » qui renvoie au premier.
+function DiscordPanel() {
+  return (
+    <div className="settings-section">
+      <h2 className="settings-section-title">
+        <Bot size={20} /> Discord & bot
+      </h2>
+      <p className="settings-section-sub">
+        Relie ton compte Discord à MyPlayLog, et discute avec le bot du site.
+        Prévenu : il n'est pas gentil.
+      </p>
+      <div className="import-cards">
+        <DiscordCard />
+        <BotCard />
+      </div>
+    </div>
+  );
+}
+
+// La liaison Discord. Même chorégraphie que Steam : une pop-up part chez le
+// fournisseur et prévient la page au retour (voir routes/discord.js).
+function DiscordCard() {
+  const { token, updateUser } = useAuth();
+  const [status, setStatus] = useState(null); // { configured, connected, discord }
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [unlinkOpen, setUnlinkOpen] = useState(false);
+  const popupRef = useRef(null);
+
+  async function load() {
+    try {
+      setStatus(await apiFetch("/discord/status", { token }));
+    } catch {
+      setStatus({ configured: true, connected: false });
+    }
+  }
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    function onMsg(e) {
+      if (e.data?.type !== "mpl-discord") return;
+      setBusy(false);
+      if (e.data.ok) {
+        setError(null);
+        load();
+        updateUser({ discordConnected: true });
+      } else {
+        setError(e.data.error || "La liaison Discord a échoué.");
+      }
+    }
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function connect() {
+    setError(null);
+    setBusy(true);
+    popupRef.current = openCentered(
+      `${API_BASE}/discord/login?token=${encodeURIComponent(token)}`,
+      720,
+      820,
+      "discord-login"
+    );
+    // Pop-up fermée en cours de route : on relâche l'état occupé.
+    const timer = setInterval(() => {
+      if (popupRef.current?.closed) {
+        clearInterval(timer);
+        setBusy((b) => {
+          if (b) load();
+          return false;
+        });
+      }
+    }, 700);
+  }
+
+  async function unlink() {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiFetch("/discord", { method: "DELETE", token });
+      setUnlinkOpen(false);
+      updateUser({ discordConnected: false, discord: null });
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!status) {
+    return (
+      <div className="import-card">
+        <Loader2 className="spin" size={20} /> Chargement…
+      </div>
+    );
+  }
+
+  const { connected, discord } = status;
+
+  return (
+    <div className={`import-card discord ${connected ? "connected" : ""}`}>
+      <div className="import-card-glow" />
+      <div className="import-card-main">
+        <div className="import-logo discord-logo">
+          <DiscordIcon size={30} />
+        </div>
+        <div className="import-card-info">
+          <div className="import-card-title">
+            Discord
+            {connected && (
+              <span className="import-badge">
+                <CheckCircle2 size={13} /> Lié
+              </span>
+            )}
+          </div>
+          {connected && discord ? (
+            <div className="import-steam-user">
+              {discord.avatar && <img src={discord.avatar} alt="" />}
+              <div>
+                <strong>{discord.globalName || discord.username || "Compte Discord"}</strong>
+                <span>
+                  {discord.username ? `@${discord.username} · ` : ""}
+                  Lié{" "}
+                  {discord.connectedAt
+                    ? new Date(discord.connectedAt).toLocaleDateString("fr-FR")
+                    : ""}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <p className="import-card-desc">
+              Relie ton Discord pour que le bot te reconnaisse depuis un serveur :
+              les points gagnés aux mini-jeux Discord tomberont sur ce compte-ci.
+              Seuls ton pseudo et ton avatar sont récupérés.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {error && (
+        <div className="import-error">
+          <AlertTriangle size={15} /> {error}
+        </div>
+      )}
+
+      {!status.configured && (
+        <div className="import-error">
+          <AlertTriangle size={15} /> Discord n'est pas configuré côté serveur
+          (DISCORD_CLIENT_ID / DISCORD_CLIENT_SECRET).
+        </div>
+      )}
+
+      <div className="import-actions">
+        {connected ? (
+          <button
+            className="btn-ghost-danger clickable"
+            onClick={() => setUnlinkOpen(true)}
+            disabled={busy}
+          >
+            <Link2Off size={16} /> Délier
+          </button>
+        ) : (
+          <button
+            className="btn-discord-primary clickable"
+            onClick={connect}
+            disabled={busy || !status.configured}
+          >
+            {busy ? <Loader2 className="spin" size={17} /> : <Link2 size={17} />}
+            Lier mon compte Discord
+          </button>
+        )}
+      </div>
+
+      {unlinkOpen && (
+        <div className="import-unlink">
+          <p>Délier ton compte Discord ?</p>
+          <div className="import-unlink-actions">
+            <button className="btn-ghost clickable" onClick={() => setUnlinkOpen(false)}>
+              Annuler
+            </button>
+            <button className="btn-ghost-danger clickable" onClick={unlink} disabled={busy}>
+              {busy ? <Loader2 className="spin" size={15} /> : <Link2Off size={15} />}
+              Délier
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Le bot : ai-je le droit de lui parler, et le raccourci pour ouvrir le fil.
+//
+// L'ACCÈS NE SE DEMANDE PAS ICI, et il n'y a volontairement aucun bouton pour
+// ça : le droit se donne depuis le panel d'administration, compte par compte
+// (le personnage est grossier — voir server/src/lib/bot.js). Cette carte se
+// contente de dire où on en est, parce qu'un bot dont on ignore l'existence
+// passerait pour une panne le jour où quelqu'un en entend parler.
+function BotCard() {
+  const { token } = useAuth();
+  const navigate = useNavigate();
+  const [info, setInfo] = useState(null); // { exists, allowed, bot }
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    apiFetch("/chat/bot", { token })
+      .then(setInfo)
+      .catch(() => setInfo({ exists: false, allowed: false, bot: null }));
+  }, [token]);
+
+  // Ouvre (ou retrouve) le fil avec le bot, puis va dessus : la messagerie sait
+  // déjà faire les deux, on ne réimplémente rien.
+  async function talk() {
+    if (!info?.bot) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const d = await apiFetch("/chat/conversations", {
+        method: "POST",
+        token,
+        body: { userIds: [info.bot.id] },
+      });
+      navigate(`/messages?c=${d.conversation.id}`);
+    } catch (e) {
+      setError(e.message);
+      setBusy(false);
+    }
+  }
+
+  if (!info) {
+    return (
+      <div className="import-card">
+        <Loader2 className="spin" size={20} /> Chargement…
+      </div>
+    );
+  }
+
+  return (
+    <div className={`import-card bot ${info.allowed ? "connected" : ""}`}>
+      <div className="import-card-glow" />
+      <div className="import-card-main">
+        <div className="import-logo bot-logo">
+          {info.bot?.avatar ? <img src={info.bot.avatar} alt="" /> : <Bot size={30} />}
+        </div>
+        <div className="import-card-info">
+          <div className="import-card-title">
+            {info.bot?.username || "Le bot"}
+            {info.allowed && (
+              <span className="import-badge">
+                <CheckCircle2 size={13} /> Accès ouvert
+              </span>
+            )}
+          </div>
+          <p className="import-card-desc">
+            {!info.exists
+              ? "Le bot n'est pas encore installé sur ce serveur."
+              : info.allowed
+                ? "Tu peux lui écrire en message privé. Il répond mal, c'est prévu."
+                : "L'accès au bot se donne compte par compte, par un administrateur. Demande-lui si tu veux te faire insulter."}
+          </p>
+        </div>
+      </div>
+
+      {error && (
+        <div className="import-error">
+          <AlertTriangle size={15} /> {error}
+        </div>
+      )}
+
+      {info.exists && info.allowed && (
+        <div className="import-actions">
+          <button className="btn-discord-primary clickable" onClick={talk} disabled={busy}>
+            {busy ? <Loader2 className="spin" size={17} /> : <MessageCircle size={17} />}
+            Lui écrire
+          </button>
         </div>
       )}
     </div>
