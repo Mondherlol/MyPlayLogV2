@@ -5,6 +5,7 @@ import Topbar from "./Topbar";
 import PatchnotePopup from "./PatchnotePopup";
 import MiniPlayer from "./MiniPlayer";
 import ChatDock from "./ChatDock";
+import BotShout from "./BotShout";
 
 export default function AppLayout({ children }) {
   const [collapsed, setCollapsed] = useState(
@@ -45,6 +46,9 @@ export default function AppLayout({ children }) {
       {/* Fenêtres de discussion flottantes : disponibles sur toutes les pages
           de l'espace connecté. */}
       <ChatDock />
+      {/* Ce que le bot vient de gueuler à voix haute (« untel te dit : … ») :
+          écrit à l'écran en plus d'être prononcé, cf. BotShout. */}
+      <BotShout />
     </div>
   );
 }

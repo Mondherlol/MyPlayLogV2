@@ -29,6 +29,8 @@ import { noteOffline, noteOnline } from "../lib/callRooms.js";
 // que son id et son caractère (lib/bot.js). Tout ce qui est ci-dessous marche
 // exactement pareil qu'avec un humain — il écrit juste tout seul.
 import { botId, canUseBot, generateBotReply, BOT_USERNAME } from "../lib/bot.js";
+// « TTS @machin … » : le bot va le dire à voix haute chez quelqu'un d'autre.
+import { parseTts, sendTts, flushPendingTts } from "../lib/botTts.js";
 
 const router = express.Router();
 
@@ -686,7 +688,7 @@ export async function deliverCardToConversation({
 //      ouverte : c'est le silence du bot qui applique le retrait.
 const botBusy = new Set();
 
-async function maybeBotReply(conv, senderId) {
+async function maybeBotReply(conv, senderId, text = "") {
   try {
     if (conv.isGroup) return;
     const bot = await botId();
@@ -701,6 +703,28 @@ async function maybeBotReply(conv, senderId) {
       .select("username botAccess isAdmin isSuperAdmin")
       .lean();
     if (!canUseBot(sender)) return;
+
+    // Une commande AVANT toute chose : « TTS @machin … » ne passe pas par le
+    // modèle de langage, c'est une instruction, pas une conversation. La
+    // traiter d'abord évite aussi qu'un « tts » mal formé parte en vanne.
+    const cmd = parseTts(text);
+    if (cmd) {
+      botBusy.add(key);
+      try {
+        const answer = await sendTts({
+          fromUser: sender,
+          targetName: cmd.target,
+          message: cmd.message,
+        });
+        const msg = await persistMessage(conv, bot, { author: bot, text: answer });
+        broadcastMessage(conv, msg);
+        await broadcastConversation(conv._id);
+        notifyPush(conv, msg, bot);
+      } finally {
+        botBusy.delete(key);
+      }
+      return;
+    }
 
     botBusy.add(key);
     try {
@@ -788,6 +812,10 @@ router.get("/stream", async (req, res) => {
   });
   res.write("retry: 4000\n\n");
   res.write(`event: ready\ndata: ${JSON.stringify({ ok: true })}\n\n`);
+
+  // Les insultes vocales qui l'attendaient : elles partent avec un léger
+  // décalage (cf. flushPendingTts), le temps que la page soit prête à parler.
+  flushPendingTts(userId);
 
   const first = addClient(userId, res) === 1;
   if (first) {
@@ -1450,7 +1478,7 @@ router.post("/conversations/:id/messages", requireAuth, async (req, res) => {
     // par le flux temps réel comme n'importe quel message, et faire patienter
     // l'expéditeur pendant que le modèle réfléchit bloquerait son interface
     // trois secondes pour rien.
-    maybeBotReply(conv, req.userId);
+    maybeBotReply(conv, req.userId, text);
 
     // Journal : le message est tracé AVEC son destinataire et sa conversation,
     // ce que le middleware générique ne saurait pas dire. Le texte, lui, n'est

@@ -5243,3 +5243,71 @@ body.mpl-open .chat-dock {
 .chat-card-queue.done {
   color: #2fa45f;
 }
+
+/* ======================================================================
+   Ce que le bot gueule (TTS) — bannière en haut à droite
+   ====================================================================== */
+/* Elle double la voix : un navigateur qui refuse de parler (aucun clic
+   préalable, voix système absentes) laisserait sinon le message se perdre. */
+.bot-shout {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  right: 14px;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: min(380px, calc(100vw - 28px));
+  padding: 0.7rem 0.8rem;
+  border-radius: 14px;
+  background: var(--surface-1);
+  border: 1px solid rgba(124, 92, 240, 0.45);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+  animation: bot-shout-in 0.24s ease-out;
+}
+@keyframes bot-shout-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+.bot-shout-replay {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(150deg, #3b2a6b, #7c5cf0);
+  color: #fff;
+}
+.bot-shout-body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.bot-shout-text {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.bot-shout-remark {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  font-style: italic;
+}
+.bot-shout-late {
+  display: inline-block;
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--text-soft);
+}
+.bot-shout-close {
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  padding: 0.2rem;
+}

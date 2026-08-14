@@ -13,6 +13,7 @@ import { MessageCircle, X } from "lucide-react";
 import { useAuth } from "./AuthContext";
 import { apiFetch, API_BASE } from "../lib/api";
 import { playMessageSound } from "../lib/sfx";
+import { speakTts } from "../lib/botVoice";
 
 const ChatContext = createContext(null);
 
@@ -416,6 +417,17 @@ export function ChatProvider({ children }) {
     // l'onglet « Logs » du panel admin qui décide quoi en faire.
     es.addEventListener("adminlog", (e) => {
       emit("adminlog", JSON.parse(e.data));
+    });
+
+    // Le bot gueule dans le navigateur (« untel te dit : … »). Le serveur
+    // n'envoie QUE du texte, la voix est celle de la machine (lib/botVoice.js).
+    // On rediffuse aussi l'évènement : une bannière l'affiche à l'écran, sans
+    // quoi un navigateur qui refuse de parler (aucun geste préalable, voix
+    // absentes) laisserait le message se perdre en silence.
+    es.addEventListener("tts", (e) => {
+      const data = JSON.parse(e.data);
+      emit("tts", data);
+      speakTts(data);
     });
 
     es.addEventListener("presence", (e) => {

@@ -272,15 +272,42 @@ const siteUrl = () =>
     .trim()
     .replace(/\/$/, "");
 
-const HELP = [
-  `**${BOT_USERNAME}**, à votre service (façon de parler).`,
-  `\`${PREFIX}jeu\` — une nouvelle grille de lettres mêlées (${WIN_POINTS} pts au premier qui trouve)`,
-  `\`${PREFIX}indice\` — une lettre de plus, pour les faibles`,
-  `\`${PREFIX}classement\` — le classement du serveur`,
-  `\`${PREFIX}add <jeu>\` — ajoute un jeu à ta liste de souhaits sur MyPlayLog`,
-  `\`${PREFIX}noms\` — dis-moi comment vous appeler (vrais noms et surnoms)`,
-  `Mentionne-moi ou réponds à un de mes messages si tu veux te faire insulter.`,
-].join("\n");
+// Les commandes, GROUPÉES par ce à quoi elles servent plutôt qu'en liste à
+// plat : un bloc « jeu », un bloc « compte », et une phrase pour dire comment
+// lui parler — ce que personne ne devine tout seul et qui est pourtant
+// l'essentiel de ce qu'il sait faire.
+function helpEmbed() {
+  return new EmbedBuilder()
+    .setColor(0x7c5cf0)
+    .setTitle(`${BOT_USERNAME}, à votre service (façon de parler)`)
+    .setDescription(
+      "Je réponds quand on me mentionne, quand on dit mon nom, ou quand on répond à un de mes messages. Et je m'invite tout seul de temps en temps."
+    )
+    .addFields(
+      {
+        name: "🔤 Lettres mêlées",
+        value: [
+          `\`${PREFIX}jeu\` — une grille (${WIN_POINTS} pts au premier qui trouve)`,
+          `\`${PREFIX}indice\` — une lettre de plus, pour les faibles`,
+          `\`${PREFIX}classement\` — le classement du serveur`,
+        ].join("\n"),
+      },
+      {
+        name: "🎮 MyPlayLog",
+        value: [
+          `\`${PREFIX}add <jeu>\` — ajoute un jeu à ta liste de souhaits`,
+          `\`${PREFIX}noms\` — comment je dois vous appeler (vrais noms, surnoms)`,
+        ].join("\n"),
+      },
+      {
+        name: "💬 Sur le site",
+        value:
+          `En message privé sur ${siteUrl() || "le site"}, dicte-moi ` +
+          "`TTS @pseudo ton message` : je le gueule à voix haute dans son navigateur.",
+      }
+    )
+    .setFooter({ text: `${DAILY_WINS} grilles payantes par jour et par personne` });
+}
 
 // Poser une manche. Si une est déjà en cours dans ce salon, on la RAPPELLE au
 // lieu d'en tirer une autre : sinon il suffit de spammer la commande pour faire
@@ -668,7 +695,8 @@ async function onMessage(msg) {
       if (cmd === "add" || cmd === "souhait")
         return void (await cmdAdd(msg, raw.slice(PREFIX.length + cmd.length).trim()));
       if (cmd === "noms" || cmd === "nom") return void (await cmdNames(msg));
-      if (cmd === "aide" || cmd === "help") return void (await msg.channel.send(HELP));
+      if (cmd === "aide" || cmd === "help" || cmd === "commandes")
+        return void (await msg.channel.send({ embeds: [helpEmbed()] }));
       // Commande inconnue : on ne dit rien. Le salon n'est pas à nous, et un
       // « commande inconnue » à chaque « !truc » d'un autre bot serait pénible.
     } else if (await handleGuess(msg)) {
