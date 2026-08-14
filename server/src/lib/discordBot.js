@@ -193,6 +193,30 @@ const clean = (msg) =>
 const nameOf = (msg) =>
   msg.member?.displayName || msg.author?.globalName || msg.author?.username || "quelqu'un";
 
+// --- Citer, ou pas ---
+// Personne, dans une conversation, ne « répond » au message d'il y a trois
+// secondes : on parle, c'est tout, et chacun comprend à quoi ça se rapporte.
+// Un bot qui cite systématiquement se trahit là-dessus — c'est le petit détail
+// qui fait « machine ».
+//
+// La citation redevient utile dans un seul cas : la conversation a AVANCÉ
+// pendant qu'il réfléchissait (une à deux secondes, parfois plus quand l'API
+// traîne). Sans le rappel, sa vanne atterrit sous trois messages qui parlent
+// d'autre chose et devient incompréhensible.
+//
+// D'où la règle : on regarde s'il s'est dit quelque chose depuis, et on ne cite
+// que dans ce cas-là. Jamais de notification dans les deux cas — se faire
+// notifier par un bot pour une vanne, c'est ce qui le fait couper.
+export async function sendLikeAHuman(msg, content) {
+  const since = await msg.channel.messages
+    .fetch({ after: msg.id, limit: 1 })
+    .catch(() => null);
+  const movedOn = !!since?.size;
+
+  const payload = { content, allowedMentions: { repliedUser: false, parse: [] } };
+  return movedOn ? msg.reply(payload) : msg.channel.send(payload);
+}
+
 // --- « Gérard », dit à voix haute, vaut une mention ---
 // Personne n'écrit « @Gérard » quand il parle DE quelqu'un : on dit « gérard il
 // raconte n'importe quoi », et le bot restait muet alors qu'on venait
@@ -720,14 +744,7 @@ async function onMessage(msg) {
         people: await glossary(msg.guildId),
       });
 
-      await msg.reply({
-        content: reply,
-        // On répond EN CITANT sans re-notifier : la citation suffit à savoir à
-        // qui il parle, et une notification de plus pour une vanne agace.
-        // C'est encore plus vrai quand il s'invite : se faire notifier par un
-        // bot qu'on n'a pas appelé, c'est le début de la fin.
-        allowedMentions: { repliedUser: false, parse: [] },
-      });
+      await sendLikeAHuman(msg, reply);
       noteBotSpoke(key);
     } finally {
       busy.delete(key);
