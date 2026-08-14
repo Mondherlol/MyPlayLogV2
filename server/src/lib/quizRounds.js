@@ -813,7 +813,9 @@ const ANAGRAM_MIN = 6;
 const ANAGRAM_MAX = 14;
 
 // Les lettres d'un titre, sans accent ni ponctuation, en capitales.
-const lettersOf = (name) =>
+// Exportée avec `scramble` : le même jeu se joue sur Discord (lib/discordPuzzle.js),
+// et deux fabriques d'anagrammes finiraient par ne plus mélanger pareil.
+export const lettersOf = (name) =>
   [
     ...String(name || "")
       .normalize("NFD")
@@ -823,7 +825,7 @@ const lettersOf = (name) =>
 
 // Mélange qui garantit de NE PAS retomber sur l'ordre d'origine : une
 // « anagramme » qui affiche le titre en clair est le seul résultat inacceptable.
-function scramble(letters) {
+export function scramble(letters) {
   const joined = letters.join("");
   for (let i = 0; i < 12; i += 1) {
     const out = shuffle(letters);

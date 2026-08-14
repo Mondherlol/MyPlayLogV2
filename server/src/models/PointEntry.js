@@ -20,6 +20,7 @@ export const POINT_SOURCES = {
   perroquet: "Le Perroquet",
   perroquetversus: "Le Perroquet — versus",
   imposteur: "L'Imposteur",
+  discordmot: "Lettres mêlées — Discord",
   case: "Ouverture de caisse",
   gacha: "Machine à capsules",
   duplicate: "Doublon reconverti",

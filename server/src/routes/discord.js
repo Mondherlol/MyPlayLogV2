@@ -4,6 +4,7 @@ import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { isConfigured, buildAuthUrl, exchangeCode, fetchMe } from "../lib/discord.js";
 import { discordBotStatus } from "../lib/discordBot.js";
+import { claimPendingPoints } from "../lib/discordPuzzle.js";
 
 // ======================================================================
 //  Liaison du compte Discord
@@ -19,7 +20,7 @@ import { discordBotStatus } from "../lib/discordBot.js";
 const router = express.Router();
 
 // Petite page servie dans la pop-up : prévient l'app parente puis se ferme.
-function closerPage(ok, error) {
+function closerPage(ok, error, note = "") {
   const payload = JSON.stringify({ type: "mpl-discord", ok, error: error || null });
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Discord</title>
 <style>body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;
@@ -28,7 +29,7 @@ background:#0c0d11;color:#f2f3f6;font-family:system-ui,Arial,sans-serif;text-ali
 background:${ok ? "#5865F2" : "#c0392b"};display:flex;align-items:center;justify-content:center;font-size:24px}
 </style></head><body><div class="box"><div class="dot">${ok ? "✓" : "!"}</div>
 <h2 style="margin:.2em 0">${ok ? "Compte Discord lié" : "Échec de la liaison"}</h2>
-<p style="color:#9a9dab">${ok ? "Tu peux fermer cette fenêtre." : error || "Réessaie depuis les paramètres."}</p></div>
+<p style="color:#9a9dab">${ok ? note || "Tu peux fermer cette fenêtre." : error || "Réessaie depuis les paramètres."}</p></div>
 <script>try{window.opener&&window.opener.postMessage(${payload},"*");}catch(e){}
 setTimeout(function(){window.close();},${ok ? 800 : 2500});</script></body></html>`;
 }
@@ -120,7 +121,21 @@ router.get("/return", async (req, res) => {
 
     user.discord = { ...profile, connectedAt: new Date() };
     await user.save();
-    res.send(closerPage(true));
+
+    // L'ardoise des lettres mêlées : les manches gagnées sur Discord AVANT
+    // d'avoir lié son compte sont créditées maintenant. C'est la promesse que
+    // le bot a faite dans le salon — elle se tient ici, et on le DIT dans la
+    // pop-up, sinon les points arrivent sans que personne ne fasse le lien.
+    const claimed = await claimPendingPoints(profile.discordId, user._id);
+    res.send(
+      closerPage(
+        true,
+        null,
+        claimed.points > 0
+          ? `+${claimed.points} points récupérés (${claimed.wins} grille${claimed.wins > 1 ? "s" : ""} gagnée${claimed.wins > 1 ? "s" : ""} sur Discord).`
+          : ""
+      )
+    );
   } catch (err) {
     console.error("discord return error:", err.message);
     res.status(500).send(closerPage(false, "Erreur serveur."));
@@ -157,7 +172,8 @@ router.post("/link-manual", requireAuth, async (req, res) => {
       connectedAt: new Date(),
     };
     await me.save();
-    res.json({ connected: true, discord: publicDiscord(me.discord) });
+    const claimed = await claimPendingPoints(id, me._id);
+    res.json({ connected: true, discord: publicDiscord(me.discord), claimed });
   } catch (err) {
     console.error("discord link-manual error:", err.message);
     res.status(500).json({ error: "Erreur lors de la liaison." });
