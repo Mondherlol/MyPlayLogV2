@@ -7,8 +7,12 @@ import {
   Events,
   GatewayIntentBits,
   MessageFlags,
+  ModalBuilder,
   Partials,
   PermissionsBitField,
+  TextInputBuilder,
+  TextInputStyle,
+  UserSelectMenuBuilder,
 } from "discord.js";
 import { generateDiscordReply, BOT_USERNAME } from "./bot.js";
 import {
@@ -28,6 +32,14 @@ import {
   userOfDiscord,
   wishlistCount,
 } from "./discordLibrary.js";
+import {
+  MAX_ALIASES,
+  glossary,
+  listPeople,
+  personOf,
+  resolveName,
+  savePerson,
+} from "./discordNames.js";
 
 // ======================================================================
 //  Le bot, côté Discord
@@ -242,6 +254,7 @@ const HELP = [
   `\`${PREFIX}indice\` — une lettre de plus, pour les faibles`,
   `\`${PREFIX}classement\` — le classement du serveur`,
   `\`${PREFIX}add <jeu>\` — ajoute un jeu à ta liste de souhaits sur MyPlayLog`,
+  `\`${PREFIX}noms\` — dis-moi comment vous appeler (vrais noms et surnoms)`,
   `Mentionne-moi ou réponds à un de mes messages si tu veux te faire insulter.`,
 ].join("\n");
 
@@ -404,6 +417,169 @@ async function onWishButton(inter) {
   await inter.editReply({ content: "", embeds: [embed], components: [] });
 }
 
+// ============================================================
+//  « !noms » — le carnet d'adresses du serveur
+// ============================================================
+// Une vraie petite interface plutôt qu'une commande à arguments : on choisit la
+// personne dans un menu déroulant Discord (qui connaît déjà tous les membres),
+// puis on remplit un formulaire. Taper `!nom @machin "Aletheia" "eve,evie"`
+// aurait demandé de retenir une syntaxe, et se serait trompé un coup sur deux
+// sur les pseudos à espaces.
+//
+// QUI A LE DROIT DE MODIFIER QUOI : chacun peut configurer SON propre nom, et
+// il faut la permission « Gérer le serveur » pour toucher à celui des autres.
+// Sans cette règle, le premier farceur venu rebaptise tout le monde — et comme
+// le bot emploie ces noms dans ses vannes, ça se voit tout de suite.
+const NAMES_SELECT = "mplnames-pick";
+const NAMES_EXTERN = "mplnames-extern";
+const NAMES_MODAL = "mplnames-modal";
+
+const canManageNames = (msgOrInter) =>
+  !!msgOrInter.member?.permissions?.has(PermissionsBitField.Flags.ManageGuild);
+
+async function cmdNames(msg) {
+  if (!msg.guildId) {
+    await msg.channel.send("le carnet d'adresses, c'est par serveur.");
+    return;
+  }
+  const people = await listPeople(msg.guildId);
+
+  const embed = new EmbedBuilder()
+    .setColor(0x7c5cf0)
+    .setTitle("Qui est qui")
+    .setDescription(
+      people.length
+        ? people
+            .map(
+              (p) =>
+                `**${p.name}**${p.aliases?.length ? ` — alias ${p.aliases.join(", ")}` : ""}` +
+                (p.discordId ? "" : " *(pas sur le serveur)*")
+            )
+            .join("\n")
+        : "Personne n'est configuré. Choisis quelqu'un ci-dessous."
+    )
+    .setFooter({
+      text: "J'emploierai le nom principal, et je reconnaîtrai les surnoms quand vous les écrivez.",
+    });
+
+  const rows = [
+    new ActionRowBuilder().addComponents(
+      new UserSelectMenuBuilder()
+        .setCustomId(NAMES_SELECT)
+        .setPlaceholder("Configurer un membre du serveur…")
+        .setMaxValues(1)
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(NAMES_EXTERN)
+        .setLabel("Quelqu'un qui n'est pas sur le serveur")
+        .setStyle(ButtonStyle.Secondary)
+    ),
+  ];
+
+  await msg.channel.send({ embeds: [embed], components: rows });
+}
+
+// Le formulaire, prérempli avec ce qui existe déjà — sans quoi « modifier »
+// voudrait dire « tout retaper », et personne ne corrigerait jamais un surnom.
+async function openNameModal(inter, targetId, defaultName) {
+  const existing = targetId ? await personOf(inter.guildId, targetId) : null;
+
+  const modal = new ModalBuilder()
+    .setCustomId(`${NAMES_MODAL}:${targetId || ""}`)
+    .setTitle("Comment je l'appelle ?");
+
+  const name = new TextInputBuilder()
+    .setCustomId("name")
+    .setLabel("Nom principal")
+    .setPlaceholder("Aletheia")
+    .setStyle(TextInputStyle.Short)
+    .setMaxLength(60)
+    .setRequired(false)
+    .setValue(existing?.name || defaultName || "");
+
+  const aliases = new TextInputBuilder()
+    .setCustomId("aliases")
+    .setLabel(`Surnoms, séparés par des virgules (max ${MAX_ALIASES})`)
+    .setPlaceholder("eve, evie, la reine du gacha")
+    .setStyle(TextInputStyle.Short)
+    .setMaxLength(200)
+    .setRequired(false)
+    .setValue((existing?.aliases || []).join(", "));
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(name),
+    new ActionRowBuilder().addComponents(aliases)
+  );
+  await inter.showModal(modal);
+}
+
+// Choix d'un membre dans le menu déroulant.
+async function onNameSelect(inter) {
+  const targetId = inter.values[0];
+  if (targetId !== inter.user.id && !canManageNames(inter)) {
+    await inter.reply({
+      content: "tu peux configurer que ton propre nom, chef 🫵",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  const member = await inter.guild.members.fetch(targetId).catch(() => null);
+  await openNameModal(inter, targetId, member?.displayName || member?.user?.username || "");
+}
+
+async function onNameExtern(inter) {
+  if (!canManageNames(inter)) {
+    await inter.reply({
+      content: "faut la permission « Gérer le serveur » pour ajouter des gens de l'extérieur.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  await openNameModal(inter, null, "");
+}
+
+// Envoi du formulaire.
+async function onNameModal(inter) {
+  const targetId = inter.customId.split(":")[1] || null;
+  if (targetId && targetId !== inter.user.id && !canManageNames(inter)) {
+    await inter.reply({ content: "non.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+
+  const name = inter.fields.getTextInputValue("name").trim();
+  const aliases = inter.fields
+    .getTextInputValue("aliases")
+    .split(/[,;]/)
+    .map((a) => a.trim())
+    .filter(Boolean);
+
+  const res = await savePerson({
+    guildId: inter.guildId,
+    discordId: targetId || null,
+    name,
+    aliases,
+    by: inter.user.id,
+  });
+
+  if (!name) {
+    await inter.reply({
+      content: res.removed ? "effacé, il repart dans l'anonymat." : "y'avait rien à effacer.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  await inter.reply({
+    content:
+      `ok, c'est **${res.person.name}**` +
+      (res.person.aliases.length
+        ? ` — et je comprends « ${res.person.aliases.join(" », « ")} » comme étant elle/lui.`
+        : "."),
+    flags: MessageFlags.Ephemeral,
+  });
+}
+
 // Une proposition pendant une manche. Rend `true` si le message a été « pris »
 // par le jeu (bonne réponse) — auquel cas le bot n'a plus à faire autre chose.
 async function handleGuess(msg) {
@@ -467,6 +643,7 @@ async function onMessage(msg) {
       if (cmd === "classement" || cmd === "leaderboard") return void (await cmdBoard(msg));
       if (cmd === "add" || cmd === "souhait")
         return void (await cmdAdd(msg, raw.slice(PREFIX.length + cmd.length).trim()));
+      if (cmd === "noms" || cmd === "nom") return void (await cmdNames(msg));
       if (cmd === "aide" || cmd === "help") return void (await msg.channel.send(HELP));
       // Commande inconnue : on ne dit rien. Le salon n'est pas à nous, et un
       // « commande inconnue » à chaque « !truc » d'un autre bot serait pénible.
@@ -516,21 +693,31 @@ async function onMessage(msg) {
       const fetched = await msg.channel.messages
         .fetch({ limit: CONTEXT_MESSAGES, before: msg.id })
         .catch(() => null);
+      // Chaque ligne de la transcription porte le nom CONFIGURÉ de son auteur
+      // (« Aletheia » et pas « Eve ») : c'est ce qui fait que le bot parle
+      // d'eux comme leurs copains le font. Le carnet est en cache, ces
+      // résolutions ne coûtent rien.
       const history = fetched
-        ? [...fetched.values()]
-            .reverse()
-            .map((m) => ({
-              author: m.author?.id === meId ? BOT_USERNAME : nameOf(m),
+        ? await Promise.all(
+            [...fetched.values()].reverse().map(async (m) => ({
+              author:
+                m.author?.id === meId
+                  ? BOT_USERNAME
+                  : await resolveName(msg.guildId, m.author?.id, nameOf(m)),
               text: clean(m),
             }))
+          )
         : [];
 
       const reply = await generateDiscordReply({
-        askedBy: nameOf(msg),
+        askedBy: await resolveName(msg.guildId, msg.author.id, nameOf(msg)),
         text: clean(msg),
         history,
         replyingTo,
         spontaneous,
+        // Le « qui est qui » : sans lui, un surnom écrit par quelqu'un d'autre
+        // dans le salon reste une inconnue pour le modèle.
+        people: await glossary(msg.guildId),
       });
 
       await msg.reply({
@@ -581,10 +768,15 @@ export async function startDiscordBot() {
   // Les boutons de « !add ». Aucune portée `applications.commands` nécessaire :
   // les composants de message arrivent par la Gateway comme le reste.
   client.on(Events.InteractionCreate, (inter) => {
-    if (!inter.isButton() || !inter.customId.startsWith(`${WISH_PREFIX}:`)) return;
-    onWishButton(inter).catch((err) =>
-      console.error("discord wish button error:", err.message)
-    );
+    const fail = (err) => console.error("discord interaction error:", err.message);
+    if (inter.isButton() && inter.customId.startsWith(`${WISH_PREFIX}:`))
+      return void onWishButton(inter).catch(fail);
+    if (inter.isButton() && inter.customId === NAMES_EXTERN)
+      return void onNameExtern(inter).catch(fail);
+    if (inter.isUserSelectMenu?.() && inter.customId === NAMES_SELECT)
+      return void onNameSelect(inter).catch(fail);
+    if (inter.isModalSubmit?.() && inter.customId.startsWith(`${NAMES_MODAL}:`))
+      return void onNameModal(inter).catch(fail);
   });
   client.on(Events.Error, (err) => console.error("discord bot error:", err.message));
 

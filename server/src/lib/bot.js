@@ -239,7 +239,11 @@ qui répond vraiment à ce qu'il vient de dire.`;
 
   try {
     const out = await geminiJson(prompt, {
-      timeoutMs: 20_000,
+      // 14 s et pas 20 : mesuré en vrai, le petit modèle répond en ~1 s la
+      // plupart du temps, mais part parfois à 19 s quand l'API est chargée.
+      // Vingt secondes de silence dans un salon, c'est pire qu'une vanne en
+      // conserve — on préfère abandonner tôt et sortir un repli.
+      timeoutMs: 14_000,
       temperature: 1.1,
       model: BOT_MODEL,
     });
@@ -287,6 +291,9 @@ export async function generateDiscordReply({
   text = "",
   history = [],
   replyingTo = null,
+  // Le carnet d'adresses du serveur (« Aletheia, aussi appelée Eve »), déjà
+  // mis en forme par lib/discordNames.js. Vide quand rien n'est configuré.
+  people = "",
   // Il débarque SANS QU'ON LUI AIT RIEN DEMANDÉ (cf. maybeInterject). Le mode
   // change tout au prompt : il n'a pas de message à qui répondre, il a une
   // conversation à commenter — et comme personne ne l'a appelé, il a intérêt à
@@ -327,6 +334,7 @@ Comme tu t'invites, tu as intérêt à être DRÔLE : une vanne qui tombe pile s
 Tu es dans un salon Discord, plusieurs personnes y parlent, et TU SUIS LA
 CONVERSATION DEPUIS LE DÉBUT. Tu te souviens de ce qui vient d'être dit et de
 ce que tu as déjà répondu.
+${people}
 
 Tu réponds à CE QUI VIENT D'ÊTRE DIT, pas dans le vide — mais en une phrase
 sèche. Pas de grande image, pas de comparaison travaillée : la vanne courte et
@@ -350,7 +358,11 @@ gens par leur pseudo. N'écris pas de mention Discord (pas de <@…>).`;
 
   try {
     const out = await geminiJson(prompt, {
-      timeoutMs: 20_000,
+      // 14 s et pas 20 : mesuré en vrai, le petit modèle répond en ~1 s la
+      // plupart du temps, mais part parfois à 19 s quand l'API est chargée.
+      // Vingt secondes de silence dans un salon, c'est pire qu'une vanne en
+      // conserve — on préfère abandonner tôt et sortir un repli.
+      timeoutMs: 14_000,
       temperature: 1.1,
       model: BOT_MODEL,
     });
