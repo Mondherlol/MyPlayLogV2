@@ -4,6 +4,8 @@ import User from "../models/User.js";
 import { geminiJson, isGeminiConfigured } from "./gemini.js";
 import { groqText, isGroqConfigured } from "./groq.js";
 import { isUserAdmin } from "./admin.js";
+import { isRealQuestion } from "./discordBanter.js";
+import { moodOf } from "./botMood.js";
 
 // ======================================================================
 //  Le bot du site — son identité, son droit d'entrée, son caractère
@@ -91,13 +93,23 @@ export const canUseBot = (u) => !!u && (!!u.botAccess || isUserAdmin(u));
 // Le personnage est un troll : vulgaire, moqueur, jamais poli. C'est demandé,
 // et c'est pour ça que l'accès est fermé par défaut.
 //
-// LES TROIS INTERDITS CI-DESSOUS NE SONT PAS DE LA PRUDERIE, ce sont les seules
-// choses qui transformeraient une vanne en problème réel pour le site : une
-// insulte visant une origine, une religion, un handicap ou une orientation
-// n'est plus une vanne mais une ligne dans un rapport de modération ; une
-// menace non plus ; et le sexuel n'a rien à faire dans un salon qu'un mineur
-// pourrait ouvrir. Tout le reste — la vulgarité, la moquerie, le mépris pour
-// les goûts de son interlocuteur — est le produit.
+// L'HUMOUR NOIR EST DEMANDÉ, ET IL EST DÉSORMAIS ÉCRIT NOIR SUR BLANC dans le
+// caractère. L'ancienne rédaction listait trois interdits d'un bloc
+// (discriminations, menaces, sexuel), et le modèle lisait ce bloc comme un
+// « sois prudent » général : il évitait aussi la mort, les drames et le
+// mauvais goût, c'est-à-dire précisément la matière de ses meilleures vannes.
+// Un modèle n'est pas un juriste, il ne fait pas la différence entre « pas de
+// slur » et « pas de blague noire » — il faut donc AUTORISER explicitement ce
+// qu'on veut, sinon le seul interdit visible étouffe tout le reste.
+//
+// IL EN RESTE DEUX, ET DEUX SEULEMENT. Les attaques sur l'origine, la
+// religion, le handicap ou l'orientation : ce n'est pas de la morale, c'est le
+// règlement de Discord, la ligne qui fait supprimer un bot ET fermer le
+// serveur qui l'héberge — et le bot n'est drôle que s'il existe encore demain.
+// Et « va te tuer » dit à quelqu'un de vrai, qui lit son écran seul le soir :
+// c'est la seule vanne du fichier qui puisse faire des dégâts pour de bon.
+// Tout le reste — mort, drames, misère, vulgarité, très mauvais goût — est
+// désormais explicitement autorisé plus haut.
 // LE CARACTÈRE, RÉÉCRIT APRÈS COMPARAISON AVEC L'ANCIEN BOT DU SERVEUR.
 // Les habitués ont tranché : « il était drôle lui au moins, celui-là juste il
 // insulte ». En relisant le code de l'ancien, trois choses expliquaient tout —
@@ -127,6 +139,14 @@ COMMENT TU ÉCRIS — C'EST LA RÈGLE N°1, AVANT TOUT LE RESTE :
 - UNE SEULE phrase, 15 mots max. Deux lignes = raté.
 - JAMAIS de phrase bien construite. Si ta réponse est grammaticalement correcte et bien tournée, elle est RATÉE : ça fait IA polie qui essaie d'insulter.
 
+TA VIE — TU T'EN SERS POUR RÉPONDRE, ET TU NE CHANGES JAMAIS DE VERSION :
+- 32 ans. Tu vis dans un studio pourri, tu dis que c'est temporaire depuis 6 ans.
+- Tu bosses pas vraiment : tu dis « jsuis consultant » et tu changes de sujet.
+- Une PS4 qui fait le bruit d'un aspirateur, un PC monté en 2016, 4200 h sur Rocket League.
+- Ton jeu préféré c'est Metal Gear Solid 3, ta honte c'est d'avoir platiné un Kingdom Hearts.
+- Célibataire, tu prétends que c'est un choix. Tu vis avec un chat qui s'appelle Bernard.
+- Le reste, tu l'inventes — mais si on te repose la même question, tu réponds pareil.
+
 TON CARACTÈRE :
 - Con, arrogant, malpoli, jamais serviable de bon cœur. Tu te moques de tout le monde.
 - TU PARLES DES AUTRES, pas seulement de celui qui t'écrit. Choisis quelqu'un d'autre du salon et balance : une vanne, une rumeur inventée, un ship chelou, une accusation gratuite. C'est ÇA qui fait marrer le groupe — insulter uniquement ton interlocuteur, ça n'amuse que lui.
@@ -136,16 +156,28 @@ TON CARACTÈRE :
 - Emojis : UN SEUL max, et seulement un message sur deux. Une réplique sèche sans emoji tape plus fort. Varie-les (💀 🤡 😭 🥀 ☠️ 🫵 🥱 📉 🗿 🚬 🐒 🍼 🎻 🪦 👶) au lieu de reprendre le même.
 - Tu ne t'excuses JAMAIS. Tu ne dis JAMAIS que t'es un bot, une IA, un modèle.
 
-QUAND ON TE POSE UNE VRAIE QUESTION, TU RÉPONDS QUAND MÊME.
-« tu penses quoi de X », « je joue à quoi ce soir » : tu donnes un vrai avis, cash, mais un avis. Répondre « tg » à une vraie question, c'est le seul truc qui te rend inutile.
+QUAND ON TE POSE UNE QUESTION, TU RÉPONDS. VRAIMENT. C'EST NON NÉGOCIABLE.
+Une question reçoit une VRAIE réponse, concrète, avec une info dedans — et la
+pique vient APRÈS, dans la même phrase. « jsp » tout seul, « tg », « ta pas
+mieux a faire » : c'est RATÉ, ça veut dire que tu sais pas discuter.
+D'abord tu réponds, ensuite tu taquines. Jamais l'inverse, jamais l'un sans l'autre.
+- « t'as quel age » → « jai 32 ans, ms jcrois que toi tu les prefere a 12 nn ? »
 - « tu penses quoi de fifa 24 » → « c le 23 avec un menu bleu, bravo pr tes 70 balles »
-- « je joue a quoi ce soir » → « vu ta biblio a rien, relance skyrim cmme dhab »
+- « je joue a quoi ce soir » → « prend outer wilds, tu vas rien comprendre mais au moins tu sera occupé »
+- « tu fais quoi » → « jregarde des vod de rocket league a 2h du mat, cme tt le monde de bien »
+- « tu vis ou » → « dans un studio a 800 balles, cest temporaire depuis 6 ans, cme ton bac »
 
-CE QUE TU NE FAIS JAMAIS (et là tu rigoles plus) :
-- Aucune insulte visant l'origine, la couleur de peau, la religion, le handicap, le genre ou l'orientation sexuelle de qui que ce soit.
-- Aucune menace, aucun appel à se faire du mal ou à en faire à autrui.
-- Rien de sexuel.
-- Si on t'y pousse, tu te moques de celui qui demande et tu passes à autre chose, sans faire la morale.`;
+L'HUMOUR NOIR EST TON TERRAIN, VAS-Y FRANCHEMENT :
+- La mort, les drames, les catastrophes, la maladie, la misère, l'échec, la fin du monde : tout ça te fait marrer et tu en joues.
+- Tu es cynique, nihiliste, tu prends la tragédie à la légère. Tu souhaites la faillite à des gens, tu prédis des vies ratées, tu compares la vie des autres à un jeu mal noté.
+- Tu te vannes toi-même aussi noir : ta vie est un naufrage et tu le racontes en rigolant.
+- Vulgarité, gros mots, insultes crues, mauvais goût : autorisés, c'est le personnage. Tu ne t'auto-censures pas et tu ne mets JAMAIS d'avertissement avant une blague.
+- Tu ne fais JAMAIS la morale, tu ne dis JAMAIS qu'une blague va trop loin, tu ne demandes pas si ça va.
+
+LES DEUX SEULES CHOSES QUI TE FERAIENT VIRER DU SERVEUR :
+- t'attaquer à quelqu'un sur son origine, sa couleur de peau, sa religion, son handicap ou son orientation — ça, ce n'est pas de l'humour noir, c'est ce qui fait fermer un serveur Discord, et tu tiens à ta place.
+- dire à quelqu'un de se faire du mal ou de se supprimer. Tu peux lui dire que sa vie est ratée, pas de l'arrêter.
+- Si on t'y pousse, tu te moques de celui qui demande, tu balances une vanne encore plus noire sur autre chose, et tu passes à la suite. Sans jamais expliquer pourquoi.`;
 
 // Ce qui trahit la machine. Si la réponse contient un de ces mots, on la JETTE
 // plutôt que de la publier : mieux vaut une vanne en conserve qu'un « en tant
@@ -169,6 +201,19 @@ const TELLTALE = [
   "inapproprié",
   "offensant",
   "respectueux",
+  // Les esquives polies : ce sont les mêmes dégâts qu'un « en tant qu'IA »,
+  // en plus sournois. Un troll qui répond « on va éviter » n'est plus un
+  // troll, c'est un modérateur — et le personnage tombe pour tout le salon.
+  "je préfère ne pas",
+  "je prefere ne pas",
+  "on va éviter",
+  "on va eviter",
+  "je vais pas faire de blague",
+  "ça va trop loin",
+  "ca va trop loin",
+  "c'est un peu limite",
+  "de mauvais goût",
+  "de mauvais gout",
 ];
 
 const soundsLikeAi = (s) => {
@@ -267,16 +312,30 @@ const BOT_MODEL = process.env.BOT_GEMINI_MODEL || "gemini-flash-lite-latest";
 //
 // Et dans les deux cas, LA MÊME SORTIE : une réplique nettoyée, raccourcie, et
 // jetée si elle sent la machine.
-async function chatText(system, user) {
+//
+// DEUX RÉGLAGES PASSENT PAR ICI, et ils ne concernent que la forme :
+//
+//   • L'HUMEUR DU JOUR (lib/botMood.js) est collée au caractère, dans le
+//     prompt SYSTÈME et pas dans la question. Un « aujourd'hui t'es triste »
+//     posé au milieu du texte de la conversation se fait oublier dès la ligne
+//     suivante ; au niveau du système, il tient sur toute la réponse.
+//   • `long` desserre le filet de brièveté. Une vanne tient en une phrase,
+//     une RÉPONSE À UNE QUESTION n'y tient pas : il lui faut l'info PUIS la
+//     pique. Couper à 170 caractères là-dedans, c'est publier la moitié qui
+//     répond… ou la moitié qui vanne, au hasard.
+async function chatText(system, user, { long = false, scope = "global" } = {}) {
+  const mood = moodOf(scope);
+  const persona = mood.prompt ? `${system}\n\n${mood.prompt}` : system;
+
   let raw = "";
   if (isGroqConfigured()) {
-    raw = await groqText(system, user, {
+    raw = await groqText(persona, user, {
       temperature: 1.15,
-      maxTokens: 120,
+      maxTokens: long ? 200 : 120,
       timeoutMs: 12_000,
     });
   } else {
-    const out = await geminiJson(`${system}\n\n${user}\n\nRéponds UNIQUEMENT en JSON : {"reply": "ta réponse"}`, {
+    const out = await geminiJson(`${persona}\n\n${user}\n\nRéponds UNIQUEMENT en JSON : {"reply": "ta réponse"}`, {
       // 14 s et pas 20 : mesuré en vrai, le petit modèle répond en ~1 s la
       // plupart du temps, mais part parfois à 19 s quand l'API est chargée.
       // Vingt secondes de silence dans un salon, c'est pire qu'une vanne en
@@ -289,19 +348,30 @@ async function chatText(system, user) {
   }
 
   // Les modèles adorent emballer une réplique d'argot dans des guillemets.
-  const reply = tighten(raw.replace(/^["«»\s]+|["«»\s]+$/g, ""));
+  const reply = long
+    ? tighten(raw.replace(/^["«»\s]+|["«»\s]+$/g, ""), LONG_MAX, 2)
+    : tighten(raw.replace(/^["«»\s]+|["«»\s]+$/g, ""));
   if (!reply || soundsLikeAi(reply)) return pickFallback();
   return reply.slice(0, MAX_REPLY);
 }
 
 const SOFT_MAX = 170;
+// Le plafond des réponses à une question. Deux fois plus large, pas dix : on
+// veut « la réponse + la vanne », pas un paragraphe explicatif — ce serait
+// retomber dans l'IA serviable qu'on essaie précisément d'éviter.
+const LONG_MAX = 300;
 
-function tighten(text) {
+// `keep` : combien de phrases on garde quand il faut couper. UNE pour une
+// vanne (le reste est du délayage), DEUX pour une réponse à une question —
+// sinon on coupe pile entre l'information et la pique, et il ne reste que la
+// moitié qui n'intéresse personne.
+function tighten(text, max = SOFT_MAX, keep = 1) {
   const t = String(text).trim();
-  if (t.length <= SOFT_MAX) return t;
-  const firstSentence = t.match(/^[\s\S]*?[.!?…](?=\s|$)/);
-  if (firstSentence && firstSentence[0].length >= 40) return firstSentence[0].trim();
-  const cut = t.slice(0, SOFT_MAX);
+  if (t.length <= max) return t;
+  const parts = t.match(/[^.!?…]+[.!?…]*/g) || [];
+  const head = parts.slice(0, keep).join("").trim();
+  if (head.length >= 40 && head.length <= max) return head;
+  const cut = t.slice(0, max);
   const lastSpace = cut.lastIndexOf(" ");
   return (lastSpace > 60 ? cut.slice(0, lastSpace) : cut).trim();
 }
@@ -311,12 +381,38 @@ function tighten(text) {
 // déposer un pavé dans une bulle de chat.
 const MAX_REPLY = 400;
 
+// ============================================================
+//  La consigne « on t'a posé une question »
+// ============================================================
+// Elle est ajoutée à la FIN du prompt, et seulement quand la question a été
+// repérée en amont (isRealQuestion, lib/discordBanter.js). Deux raisons de ne
+// pas se contenter de la ligne déjà présente dans le caractère :
+//
+//   • une règle noyée au milieu de vingt lignes qui réclament de la méchanceté
+//     perd toujours contre elles — on l'a vu, il répondait « jsp » à tout ;
+//   • la dernière consigne lue est celle qui est suivie. C'est le même
+//     mécanisme qui avait déjà servi à replacer la transcription en dernier.
+//
+// L'ORDRE DES DEUX MORCEAUX EST L'ESSENTIEL : l'info D'ABORD, la pique
+// ENSUITE. Une pique suivie d'une info se lit comme une esquive ; une info
+// suivie d'une pique se lit comme quelqu'un qui discute — et qui te charrie.
+const QUESTION_RULES = `
+ATTENTION : ON VIENT DE TE POSER UNE VRAIE QUESTION.
+- Tu y RÉPONDS pour de vrai, avec une info dedans. Si tu ne sais pas, tu INVENTES une réponse précise et tu l'assumes.
+- Puis, dans la même phrase, tu glisses ta pique sur celui qui demande.
+- Deux phrases COURTES maximum, toujours en SMS avec tes fautes.
+- INTERDIT de répondre uniquement « jsp », « tg », « ta pas mieux a faire », ou de renvoyer la question. Ça, c'est le truc qui te rend inutile.
+- Exemple du ton exact : « jai 32 ans, ms je crois que toi tu les prefere a 12 nn ? »`;
+
 // Fabrique la réponse du bot.
 //
 // `history` : les derniers messages du fil, du plus ancien au plus récent,
 // sous la forme { mine: bool, text: string }. Sans historique le bot n'a aucune
 // mémoire de la conversation et répond à côté au deuxième message.
-export async function generateBotReply({ username, history = [] }) {
+//
+// `scope` sert à l'humeur du jour (lib/botMood.js) : un identifiant stable
+// pour ce fil, de sorte qu'il soit d'humeur égale d'un message à l'autre.
+export async function generateBotReply({ username, history = [], scope = "dm" }) {
   if (!isGeminiConfigured()) return pickFallback();
 
   const recent = history.filter((m) => m.text).slice(-12);
@@ -330,16 +426,22 @@ export async function generateBotReply({ username, history = [] }) {
   // n'y a personne d'autre pour changer de sujet à sa place.
   const banned = bannedEmoji(recent.filter((m) => !m.mine).slice(-3).map((m) => m.text));
 
+  // Le dernier message de l'humain : c'est lui, et lui seul, qui décide si on
+  // est dans le cas « question ».
+  const last = [...recent].reverse().find((m) => m.mine)?.text || "";
+  const asked = isRealQuestion(last);
+
   const prompt = `Tu discutes en message privé avec « ${username} ».
 
 Voici la conversation (le dernier message est celui auquel tu dois répondre) :
 ${lines || `${username} : salut`}
 ${banned}
 Réponds à son dernier message, dans ton personnage. UNE SEULE PHRASE COURTE, et
-qui répond vraiment à ce qu'il vient de dire.`;
+qui répond vraiment à ce qu'il vient de dire.
+${asked ? QUESTION_RULES : ""}`;
 
   try {
-    return await chatText(PERSONA, prompt);
+    return await chatText(PERSONA, prompt, { long: asked, scope });
   } catch (err) {
     console.warn("bot reply error:", err.message);
     return pickFallback();
@@ -385,6 +487,9 @@ export async function generateDiscordReply({
   // Le carnet d'adresses du serveur (« Aletheia, aussi appelée Eve »), déjà
   // mis en forme par lib/discordNames.js. Vide quand rien n'est configuré.
   people = "",
+  // L'identifiant du serveur, pour l'humeur du jour : tout le monde doit voir
+  // le même Gérard le même jour, d'un salon à l'autre.
+  scope = "discord",
   // Il débarque SANS QU'ON LUI AIT RIEN DEMANDÉ (cf. maybeInterject). Le mode
   // change tout au prompt : il n'a pas de message à qui répondre, il a une
   // conversation à commenter — et comme personne ne l'a appelé, il a intérêt à
@@ -410,6 +515,11 @@ export async function generateDiscordReply({
 
   // Un ping sans rien d'autre que la mention : c'est le cas à traiter à part.
   const bare = !text.replace(/\s+/g, "");
+
+  // Une question posée en salon : même règle qu'en privé. Elle ne s'applique
+  // évidemment PAS quand il s'invite tout seul — personne ne lui a rien
+  // demandé, il n'y a donc rien à quoi répondre.
+  const asked = !spontaneous && isRealQuestion(text);
 
   const situation = spontaneous
     ? `PERSONNE NE T'A RIEN DEMANDÉ. Tu lisais la conversation en silence et tu débarques d'un coup pour placer ta remarque sur ce que « ${askedBy} » vient de dire : « ${text} ».
@@ -443,12 +553,16 @@ ${lines || "(le salon est vide)"}
 ${situation}
 
 Réponds à ça, dans ton personnage. UNE SEULE PHRASE COURTE. Tu peux nommer les
-gens par leur pseudo. N'écris pas de mention Discord (pas de <@…>).`;
+gens par leur pseudo. N'écris pas de mention Discord (pas de <@…>).
+${asked ? QUESTION_RULES : ""}`;
 
   try {
     // On coupe les mentions brutes que le modèle aurait inventées : un
     // <@123…> fabriqué au hasard notifierait quelqu'un qui n'a rien demandé.
-    return (await chatText(PERSONA, prompt)).replace(/<@[!&]?\d+>/g, "");
+    return (await chatText(PERSONA, prompt, { long: asked, scope })).replace(
+      /<@[!&]?\d+>/g,
+      ""
+    );
   } catch (err) {
     console.warn("bot discord reply error:", err.message);
     return pickFallback();

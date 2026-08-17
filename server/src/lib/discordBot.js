@@ -41,7 +41,8 @@ import {
   resolveName,
   savePerson,
 } from "./discordNames.js";
-import { banterFor, handleSilence, isMuted } from "./discordBanter.js";
+import { banterFor, handleSilence, isJustLaughing, isMuted } from "./discordBanter.js";
+import { moodOf, moodQuip } from "./botMood.js";
 import {
   HARASS_CHANCE,
   RENAME_CHANCE,
@@ -164,7 +165,13 @@ const intrusion = new Map();
 // le perdre à un redéploiement ne coûte rien. On initialise `lastAt` à
 // l'instant présent au premier message vu, sinon chaque redémarrage
 // déclencherait aussitôt le filet quotidien dans tous les salons à la fois.
-function shouldInterject(channelId) {
+// L'humeur du jour pèse sur la fréquence, et c'est ce qui la rend visible :
+// un Gérard déprimé qui s'invite autant que d'habitude n'a pas l'air déprimé,
+// il a l'air incohérent. Il se fait donc rare les jours de blues et collant
+// les jours d'euphorie.
+const MOOD_INTRUSION = { triste: 0.4, calme: 0.7, hype: 1.6, parano: 1.3 };
+
+function shouldInterject(channelId, scope) {
   const now = Date.now();
   let st = intrusion.get(channelId);
   if (!st) {
@@ -176,7 +183,8 @@ function shouldInterject(channelId) {
   const quiet = now - st.lastAt;
   // Le tirage d'abord, le repos ensuite : c'est le hasard qui décide, la durée
   // ne fait que l'empêcher de se répéter trop vite.
-  const rolled = quiet >= INTRUSION_QUIET_MS && Math.random() < INTRUSION_CHANCE;
+  const chance = INTRUSION_CHANCE * (MOOD_INTRUSION[moodOf(scope).key] ?? 1);
+  const rolled = quiet >= INTRUSION_QUIET_MS && Math.random() < chance;
   const daily = quiet >= INTRUSION_DAILY_MS && st.seen >= INTRUSION_DAILY_MIN_MSG;
   if (!rolled && !daily) return false;
 
@@ -258,6 +266,11 @@ const NAME_RE = new RegExp(
 // la vérifier sur une liste de phrases sans lancer de bot.
 export const calledByName = (text) => NAME_RE.test(deaccent(text));
 
+// L'humeur du jour se joue par SERVEUR (et par fil en message privé) : deux
+// salons du même Discord doivent voir le même bonhomme, sinon il est triste
+// ici et euphorique à côté — et l'illusion tombe.
+const moodScope = (msg) => (msg.guildId ? `guild:${msg.guildId}` : `dm:${msg.channelId}`);
+
 // ============================================================
 //  Les lettres mêlées
 // ============================================================
@@ -309,6 +322,7 @@ function helpEmbed() {
         value: [
           `\`${PREFIX}resume\` — ce qui s'est dit pendant que t'étais pas là`,
           `\`${PREFIX}victime\` — qui se fait harceler aujourd'hui`,
+          `\`${PREFIX}humeur\` — dans quel état je me suis levé`,
           `\`${PREFIX}add <jeu>\` — ajoute un jeu à ta liste de souhaits`,
           `\`${PREFIX}noms\` — comment je dois vous appeler (vrais noms, surnoms)`,
         ].join("\n"),
@@ -763,6 +777,7 @@ async function harassVictim(msg) {
       history,
       people: await glossary(msg.guildId),
       spontaneous: true,
+      scope: moodScope(msg),
     });
     await msg.reply({
       content: reply,
@@ -856,6 +871,15 @@ async function onMessage(msg) {
       }
     }
 
+    // --- ON NE RÉPOND PAS À UN RIRE ---
+    // « MDRRRR », « jss mort 😭 », « ahahah » : c'est une réaction, pas une
+    // prise de parole, et c'est le plus souvent une réaction À LUI — donc en
+    // citant son message, donc en le convoquant. Sans ce filtre, il commente
+    // les rires qu'il vient de provoquer, ce qui tue la vanne qui marchait.
+    // Placé après la victime du jour (le rituel reste quotidien) mais avant
+    // tout le reste : ni réponse, ni réflexe, ni compteur d'intrusion.
+    if (isJustLaughing(raw)) return;
+
     if (raw.startsWith(PREFIX)) {
       const cmd = raw.slice(PREFIX.length).split(/\s+/)[0].toLowerCase();
       if (cmd === "jeu" || cmd === "mot") return void (await cmdPuzzle(msg));
@@ -866,6 +890,8 @@ async function onMessage(msg) {
       if (cmd === "noms" || cmd === "nom") return void (await cmdNames(msg));
       if (cmd === "resume" || cmd === "résumé" || cmd === "resumé")
         return void (await cmdSummary(msg));
+      if (cmd === "humeur" || cmd === "cava" || cmd === "mood")
+        return void (await msg.channel.send(moodQuip(moodScope(msg))));
       if (cmd === "aide" || cmd === "help" || cmd === "commandes")
         return void (await msg.channel.send({ embeds: [helpEmbed()] }));
       // Commande inconnue : on ne dit rien. Le salon n'est pas à nous, et un
@@ -914,7 +940,7 @@ async function onMessage(msg) {
     let spontaneous = false;
     if (!isDm && (everyone || (!mentioned && replyingTo === null))) {
       if (!msg.guild || everyone || !clean(msg)) return;
-      if (!shouldInterject(msg.channelId)) return;
+      if (!shouldInterject(msg.channelId, moodScope(msg))) return;
       spontaneous = true;
     }
 
@@ -960,6 +986,7 @@ async function onMessage(msg) {
         // Le « qui est qui » : sans lui, un surnom écrit par quelqu'un d'autre
         // dans le salon reste une inconnue pour le modèle.
         people: await glossary(msg.guildId),
+        scope: moodScope(msg),
       });
 
       await sendLikeAHuman(msg, reply);

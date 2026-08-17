@@ -29,6 +29,7 @@ import { noteOffline, noteOnline } from "../lib/callRooms.js";
 // que son id et son caractère (lib/bot.js). Tout ce qui est ci-dessous marche
 // exactement pareil qu'avec un humain — il écrit juste tout seul.
 import { botId, canUseBot, generateBotReply, BOT_USERNAME } from "../lib/bot.js";
+import { isJustLaughing } from "../lib/discordBanter.js";
 // « TTS @machin … » : le bot va le dire à voix haute chez quelqu'un d'autre.
 import { parseTts, sendTts, flushPendingTts } from "../lib/botTts.js";
 
@@ -726,6 +727,11 @@ async function maybeBotReply(conv, senderId, text = "") {
       return;
     }
 
+    // Un rire n'appelle pas de réponse — ni ici ni sur Discord (voir
+    // isJustLaughing). En tête-à-tête c'est encore plus net : répondre à un
+    // « mdrrrr » revient à commenter sa propre blague.
+    if (isJustLaughing(text)) return;
+
     botBusy.add(key);
     try {
       emitTo([String(senderId)], "typing", {
@@ -744,6 +750,8 @@ async function maybeBotReply(conv, senderId, text = "") {
 
       const reply = await generateBotReply({
         username: sender.username,
+        // L'humeur du jour, stable sur toute la conversation : voir botMood.js.
+        scope: `dm:${key}`,
         history: history
           .reverse()
           .map((m) => ({
