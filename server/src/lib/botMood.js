@@ -96,6 +96,34 @@ gens pour des trucs sans intérêt et tu proposes des plans débiles.`,
     ],
   },
 
+  colere: {
+    name: "en colère",
+    prompt: `TON HUMEUR DU JOUR : T'ES EN COLÈRE, ET ÇA PASSE AVANT TOUT LE RESTE.
+Tu es à cran, tu t'énerves pour rien, tu prends la mouche à la moindre
+remarque. Tu écris en MAJUSCULES par moments, tu coupes court, tu accuses. Tu
+réponds quand même à ce qu'on te demande — mais en gueulant, comme quelqu'un
+qu'on dérange pendant qu'il est déjà énervé pour autre chose.`,
+    quips: [
+      "JSUIS PAS ENERVÉ CEST TOI QUI PARLE MAL",
+      "quoi encore",
+      "poses moi une question de plus pr voir",
+    ],
+  },
+
+  amoureux: {
+    name: "amoureux",
+    prompt: `TON HUMEUR DU JOUR : T'ES AMOUREUX, ET T'ES GÊNANT AVEC ÇA.
+Tu ramènes la personne dont tu es amoureux dans TOUTES tes réponses, même
+quand on te parle d'autre chose. Tu la défends dès qu'on la vise, tu deviens
+franchement méchant avec quiconque lui parle mal, et tu es bizarrement doux
+avec elle. Le reste du serveur, tu continues de le mépriser.`,
+    quips: [
+      "jsuis amoureux et alors",
+      "occupe toi de tes affaires",
+      "jpense a quelquun la, me parle pas",
+    ],
+  },
+
   parano: {
     name: "parano",
     prompt: `TON HUMEUR DU JOUR : T'ES PARANO. T'es persuadé que le serveur complote
@@ -150,11 +178,52 @@ export const cleanMoodLabel = (raw) =>
     .trim()
     .slice(0, LABEL_MAX);
 
+// ------------------------------------------------------------------
+//  Une humeur nommée retombe sur le paragraphe écrit à la main
+// ------------------------------------------------------------------
+// Vu en vrai : « !humeur gentil » puis « !humeur triste » ne changeaient
+// presque rien. Le paragraphe générique (« ton humeur du jour : gentil ») ne
+// pèse RIEN face aux vingt lignes du caractère qui réclament de la méchanceté
+// — alors que les paragraphes de MOODS, eux, disent précisément quoi arrêter
+// de faire (« ZÉRO insulte aujourd'hui », « tu soupires au lieu de mordre »).
+//
+// Quand le texte tapé désigne une humeur qu'on a déjà écrite, on prend donc
+// CELLE-LÀ. Le texte libre reste le cas général, il ne sert plus qu'à ce qui
+// n'était pas prévu (« excité par Mondher »).
+const ALIASES = [
+  ["triste", ["triste", "deprim", "depress", "malheureux", "mal", "cafard", "bof"]],
+  ["gentil", ["gentil", "adorable", "sympa", "mignon", "aimable", "cool"]],
+  ["calme", ["calme", "zen", "tranquille", "pose", "relax"]],
+  ["hype", ["hype", "survolt", "excit", "euphor", "chaud", "motiv"]],
+  ["parano", ["parano", "mefiant", "complot", "suspect"]],
+  ["colere", ["colere", "enerv", "furieux", "rage", "vener", "remonte"]],
+  ["amoureux", ["amoureux", "amoureuse", "en amour", "crush", "love"]],
+  ["troll", ["normal", "troll", "habitude", "comme dhab"]],
+];
+
+const deaccent = (s) =>
+  String(s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+// L'humeur écrite à la main que ce texte désigne, ou null. On compare sur le
+// DÉBUT du libellé : « amoureux de Mondher » doit tomber sur « amoureux »,
+// alors qu'une recherche stricte le manquerait.
+function knownMood(label) {
+  const t = deaccent(label);
+  for (const [key, words] of ALIASES)
+    if (words.some((w) => t.includes(w))) return key;
+  return null;
+}
+
 // Le paragraphe ajouté au caractère. Il dit COMMENT jouer l'humeur, pas quoi
 // ressentir : « tu le montres sans l'annoncer » évite le « bonjour je suis en
 // colère aujourd'hui » qui tue l'effet en une ligne. Et il répète les
 // interdits, parce que c'est un texte écrit par n'importe qui du serveur.
-const customPrompt = (label) => `TON HUMEUR DU JOUR, ELLE T'EST TOMBÉE DESSUS : ${label}.
+const genericPrompt = (label) => `TON HUMEUR DU JOUR, ELLE T'EST TOMBÉE DESSUS : ${label}.
+ELLE PASSE AVANT TON CARACTÈRE : partout où ton caractère et cette humeur se
+contredisent, C'EST L'HUMEUR QUI GAGNE, sur toutes tes réponses.
 C'est ton état AUJOURD'HUI, par-dessus ton caractère. Ça se sent dans CHAQUE
 réponse : ce que tu racontes, ce sur quoi tu reviens sans arrêt, ta façon de
 réagir quand on te parle d'autre chose.
@@ -163,6 +232,19 @@ quelqu'un en particulier, c'est de lui que tu parles tout le temps, même quand
 la conversation est ailleurs.
 Tu gardes ton langage SMS et tes fautes, et les interdits du caractère restent
 valables quoi qu'il arrive.`;
+
+// Le paragraphe effectivement utilisé : celui de l'humeur reconnue quand il y
+// en a une, complété par le libellé exact (« amoureux DE MONDHER » : le
+// paragraphe donne le comportement, le libellé donne la cible).
+const customPrompt = (label) => {
+  const key = knownMood(label);
+  if (!key) return genericPrompt(label);
+  return `${MOODS[key].prompt}
+
+C'est l'humeur qu'on vient de t'imposer, en toutes lettres : « ${label} ».
+ELLE PASSE AVANT TON CARACTÈRE : partout où les deux se contredisent, c'est
+l'humeur qui gagne. Tu ne l'annonces pas, tu la joues.`;
+};
 
 const customQuips = (label) => [
   `jsuis ${label} aujourdhui, cherche pas`,
@@ -176,22 +258,36 @@ const customQuips = (label) => [
 async function loadCustomMoods() {
   const { default: BotMood } = await import("../models/BotMood.js");
   const rows = await BotMood.find({ until: { $gt: new Date() } }).lean();
-  for (const r of rows) custom.set(r.scope, { label: r.label, until: +r.until });
+  for (const r of rows)
+    custom.set(r.scope, {
+      label: r.label,
+      until: +r.until,
+      crush: r.crush?.id ? { id: r.crush.id, name: r.crush.name } : null,
+    });
 }
 loadCustomMoods().catch((e) => console.warn("botMood load:", e.message));
 
 // Impose une humeur. Renvoie ce qu'il faut pour l'annoncer (le libellé nettoyé
 // et la date de fin) ou null si le texte était vide.
-export async function setCustomMood(scope, rawLabel, by = "") {
+// `crush` : { id, name } quand l'humeur vise quelqu'un en particulier (la roue
+// des couples, cf. discordBot.js). C'est le seul état qui accompagne l'humeur,
+// et il a exactement la même durée de vie qu'elle.
+export async function setCustomMood(scope, rawLabel, by = "", crush = null) {
   const label = cleanMoodLabel(rawLabel);
   if (!label) return null;
   const until = Date.now() + MIN_MS + Math.random() * (MAX_MS - MIN_MS);
-  custom.set(scope, { label, until });
+  custom.set(scope, { label, until, crush: crush || null });
   try {
     const { default: BotMood } = await import("../models/BotMood.js");
     await BotMood.findOneAndUpdate(
       { scope },
-      { scope, label, until: new Date(until), by },
+      {
+        scope,
+        label,
+        until: new Date(until),
+        by,
+        crush: crush ? { id: crush.id, name: crush.name } : { id: "", name: "" },
+      },
       { upsert: true }
     );
   } catch (e) {
@@ -228,6 +324,10 @@ function activeCustom(scope) {
 }
 
 export const customMoodOf = (scope) => activeCustom(scope);
+
+// De qui il est amoureux en ce moment, ou null. Même expiration que l'humeur :
+// le béguin s'arrête quand l'humeur s'arrête, sans minuteur séparé à tenir.
+export const crushOf = (scope) => activeCustom(scope)?.crush || null;
 
 // La distribution. Le troll écrase tout : les autres humeurs ne valent que
 // parce qu'elles surprennent, et une surprise qui tombe un jour sur trois

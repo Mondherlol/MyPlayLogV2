@@ -395,6 +395,29 @@ const TRIGGERS = [
   },
 ];
 
+// ======================================================================
+//  « on parle mal à quelqu'un »
+// ======================================================================
+// Sert au béguin de la roue des couples (cf. discordBot.js) : quand le bot est
+// amoureux de quelqu'un, il doit pouvoir REPÉRER qu'on s'en prend à cette
+// personne pour lui sauter dessus. C'est volontairement gros comme une maison
+// — une liste de mots — parce que la finesse ne sert à rien ici : rater une
+// pique ne coûte qu'une intervention en moins, et en inventer une donne juste
+// un Gérard un peu trop protecteur, ce qui est exactement le personnage.
+const MEAN_WORDS = [
+  "connard", "batard", "abruti", "debile", "cretin", "clown", "nul", "naze",
+  "bouffon", "fdp", "encule", "tocard", "cassos", "clochard", "pd", "pute",
+  "merde", "chiant", "moche", "relou", "tg", "ta gueule", "ferme la", "degage",
+  "pathetique", "ridicule", "loser", "boloss", "puceau", "guignol", "tarlouze",
+  "mytho", "menteur", "nullos", "sale",
+  // Le féminin et le pluriel comptent autant : « aletheia est nulle » est
+  // exactement le message qu'on veut attraper.
+  "nulle", "nuls", "nulles", "conne", "connasse", "salope", "idiot", "idiote",
+  "debiles", "relous", "chiante", "grosse", "batarde",
+];
+
+export const soundsMean = (text) => has(norm(text), MEAN_WORDS);
+
 // La réplique réflexe pour ce message, ou null. La PREMIÈRE famille qui
 // correspond gagne — pas de cumul : deux réponses coup sur coup au même
 // message, ça ne ressemble plus à quelqu'un qui parle.

@@ -14,7 +14,12 @@ import {
   TextInputStyle,
   UserSelectMenuBuilder,
 } from "discord.js";
-import { generateDiscordReply, generateSummary, BOT_USERNAME } from "./bot.js";
+import {
+  BOT_USERNAME,
+  generateCouple,
+  generateDiscordReply,
+  generateSummary,
+} from "./bot.js";
 import {
   DAILY_WINS,
   WIN_POINTS,
@@ -47,9 +52,11 @@ import {
   isJustLaughing,
   isMuted,
   isRealQuestion,
+  soundsMean,
 } from "./discordBanter.js";
 import {
   clearCustomMood,
+  crushOf,
   customMoodOf,
   moodOf,
   moodQuip,
@@ -334,6 +341,7 @@ function helpEmbed() {
         value: [
           `\`${PREFIX}resume\` — ce qui s'est dit pendant que t'étais pas là`,
           `\`${PREFIX}victime\` — qui se fait harceler aujourd'hui`,
+          `\`${PREFIX}roue\` — la roue des couples (je marie deux d'entre vous)`,
           `\`${PREFIX}humeur\` — dans quel état je me suis levé`,
           `\`${PREFIX}humeur <humeur>\` — vous m'en imposez une (quelques heures)`,
           `\`${PREFIX}add <jeu>\` — ajoute un jeu à ta liste de souhaits`,
@@ -740,6 +748,221 @@ async function cmdVictim(msg) {
 }
 
 // ============================================================
+//  « !roue » — la roue des couples
+// ============================================================
+// Il tire deux personnes du salon et annonce qu'elles sont ensemble. Le tirage
+// n'est PAS la blague : la blague est la JUSTIFICATION, et c'est pour ça qu'on
+// lui passe de vrais messages des deux (cf. generateCouple, lib/bot.js). « il a
+// dit qu'il perdait tout le temps, elle a dit qu'elle aimait les causes
+// perdues » fait rire parce que les deux morceaux sont vrais.
+//
+// TROIS RÉSULTATS POSSIBLES, et c'est le mélange qui fait durer le truc :
+//
+//   • LE COUPLE NORMAL (le cas courant) : deux personnes du salon.
+//   • LE TAQUIN : « sleep et LA MÈRE d'aletheia ». Une seule des deux est une
+//     vraie personne, l'autre est un truc qui appartient à quelqu'un — c'est la
+//     vanne de cour de récré, et elle marche toujours.
+//   • LUI-MÊME : il tombe amoureux pour de bon. Ça ne s'arrête pas à l'annonce
+//     — il PASSE EN HUMEUR AMOUREUSE (lib/botMood.js), met des cœurs sous les
+//     messages de la personne, et saute à la gorge de qui lui parle mal. C'est
+//     le seul résultat qui laisse une trace, donc le plus rare.
+const WHEEL_SELF_CHANCE = 0.15;
+const WHEEL_TEASE_CHANCE = 0.22;
+const WHEEL_COOLDOWN_MS = 60 * 1000;
+
+// « et la mère de » : le deuxième membre du couple n'est pas toujours une
+// personne. Volontairement bête — c'est le registre.
+const TEASE_OF = [
+  "la mère de",
+  "le père de",
+  "la grand-mère de",
+  "la sœur de",
+  "le frère de",
+  "le chat de",
+  "le chien de",
+  "l'ex de",
+  "la PS4 de",
+  "le PC de",
+  "le voisin du dessus de",
+  "le prof de maths de",
+];
+
+const HEARTS = ["❤️", "💘", "😍", "🥰", "💖", "💍", "😳", "🫦"];
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+
+// Dernier tirage par salon : la roue est trop drôle pour ne pas être spammée.
+const wheelAt = new Map();
+
+// Qui a parlé récemment dans ce salon, avec ce qu'ils ont dit. C'est la matière
+// du tirage ET de la justification : quelqu'un qui n'a rien écrit ne peut pas
+// être marié, on n'aurait rien à raconter sur lui.
+async function chattersOf(msg, limit = 60) {
+  const fetched = await msg.channel.messages
+    .fetch({ limit, before: msg.id })
+    .catch(() => null);
+  const people = new Map();
+  for (const m of [...(fetched?.values() || [])]) {
+    if (m.author?.bot || !m.author) continue;
+    const text = clean(m);
+    if (!text || text.startsWith(PREFIX)) continue;
+    const cur = people.get(m.author.id) || { id: m.author.id, raw: nameOf(m), lines: [] };
+    if (cur.lines.length < 6) cur.lines.push(text);
+    people.set(m.author.id, cur);
+  }
+  // Celui qui lance la roue en fait partie, même s'il n'a rien dit d'autre :
+  // se faire marier soi-même en tapant la commande est la moitié du plaisir.
+  if (!people.has(msg.author.id))
+    people.set(msg.author.id, { id: msg.author.id, raw: nameOf(msg), lines: [] });
+  return [...people.values()];
+}
+
+async function cmdWheel(msg) {
+  if (!msg.guildId)
+    return void (await msg.channel.send("la roue en prive ca marche pas, faut du monde"));
+
+  const since = Date.now() - (wheelAt.get(msg.channelId) || 0);
+  if (since < WHEEL_COOLDOWN_MS)
+    return void (await msg.channel.send("calme toi, la roue chauffe"));
+  wheelAt.set(msg.channelId, Date.now());
+
+  const people = await chattersOf(msg);
+  if (people.length < 2)
+    return void (await msg.channel.send("vous etes pas assez a parler pour que je vous marie"));
+
+  msg.channel.sendTyping().catch(() => {});
+
+  // Les noms configurés (`!noms`) plutôt que les pseudos Discord : c'est comme
+  // ça que leurs copains les appellent, et donc comme ça que la vanne sonne.
+  const named = await Promise.all(
+    people.map(async (p) => ({
+      ...p,
+      name: await resolveName(msg.guildId, p.id, p.raw),
+    }))
+  );
+
+  const scope = moodScope(msg);
+  const roll = Math.random();
+
+  // --- Il se tire lui-même ---
+  if (roll < WHEEL_SELF_CHANCE) {
+    const love = pick(named);
+    const reply = await generateCouple({
+      a: BOT_USERNAME,
+      b: love.name,
+      bLines: love.lines,
+      self: true,
+    });
+    await setCustomMood(scope, `amoureux de ${love.name}`, msg.author.id, {
+      id: love.id,
+      name: love.name,
+    });
+    await msg.channel.send({
+      content: `🎡 la roue des couples a parlé : **${BOT_USERNAME}** ❤️ <@${love.id}>\n${reply}`,
+      allowedMentions: { users: [love.id] },
+    });
+    noteBotSpoke(msg.channelId);
+    return;
+  }
+
+  // --- Deux personnes (ou une personne et la mère de l'autre) ---
+  const a = pick(named);
+  const others = named.filter((p) => p.id !== a.id);
+  const b = pick(others);
+  const teaseOf = roll < WHEEL_SELF_CHANCE + WHEEL_TEASE_CHANCE ? pick(TEASE_OF) : "";
+
+  const reply = await generateCouple({
+    a: a.name,
+    b: b.name,
+    aLines: a.lines,
+    bLines: b.lines,
+    tease: teaseOf ? `${teaseOf} ${b.name}` : "",
+  });
+
+  const right = teaseOf ? `${teaseOf} <@${b.id}>` : `<@${b.id}>`;
+  await msg.channel.send({
+    content: `🎡 la roue des couples a parlé : <@${a.id}> ❤️ ${right}\n${reply}`,
+    allowedMentions: { users: [a.id, b.id] },
+  });
+  noteBotSpoke(msg.channelId);
+}
+
+// ------------------------------------------------------------------
+//  Quand il est amoureux : les cœurs, et la défense
+// ------------------------------------------------------------------
+// L'humeur amoureuse (posée par la roue) ne suffit pas : elle ne se voit que
+// quand il parle, et il ne parle pas souvent. Deux gestes la rendent VISIBLE
+// entre deux prises de parole, et ils ne coûtent aucun jeton :
+//
+//   • UN CŒUR SOUS LES MESSAGES DE LA PERSONNE, une fois sur trois. Pas à
+//     chaque message : un bot qui réagit à tout est un robot, un bot qui
+//     réagit parfois est un type qui la regarde.
+//   • IL LA DÉFEND. Dès que quelqu'un lui parle mal (soundsMean), il s'invite
+//     sans qu'on l'appelle — c'est le seul cas où il prend parti pour
+//     quelqu'un d'autre que lui, et ça vaut tous les rappels.
+const HEART_CHANCE = 0.33;
+
+// Est-ce que ce message s'en prend à la personne ? Mention explicite ou nom
+// prononcé : les deux comptent, on s'en prend rarement à quelqu'un en le
+// mentionnant proprement.
+const targets = (msg, crush) => {
+  if (msg.mentions?.users?.has(crush.id)) return true;
+  const name = deaccent(crush.name);
+  if (name.length <= 2) return false;
+  return new RegExp(`(^|[^\\p{L}])${escapeRe(name)}($|[^\\p{L}])`, "u").test(
+    deaccent(clean(msg))
+  );
+};
+
+async function crushReacts(msg) {
+  if (!msg.guildId) return false;
+  const crush = crushOf(moodScope(msg));
+  if (!crush) return false;
+
+  if (crush.id === msg.author.id) {
+    if (Math.random() < HEART_CHANCE) await msg.react(pick(HEARTS)).catch(() => {});
+    return false; // il la regarde, il ne l'interrompt pas
+  }
+
+  if (!soundsMean(clean(msg)) || !targets(msg, crush)) return false;
+  if (busy.has(msg.channelId)) return false;
+  if (Date.now() - (lastReplyAt.get(msg.channelId) || 0) < CHANNEL_COOLDOWN_MS) return false;
+
+  busy.add(msg.channelId);
+  lastReplyAt.set(msg.channelId, Date.now());
+  try {
+    msg.channel.sendTyping().catch(() => {});
+    const fetched = await msg.channel.messages
+      .fetch({ limit: CONTEXT_MESSAGES, before: msg.id })
+      .catch(() => null);
+    const history = fetched
+      ? await Promise.all(
+          [...fetched.values()].reverse().map(async (m) => ({
+            author:
+              m.author?.id === client.user.id
+                ? BOT_USERNAME
+                : await nicknameFor(msg.guildId, m.author?.id, nameOf(m)),
+            text: clean(m),
+          }))
+        )
+      : [];
+
+    const reply = await generateDiscordReply({
+      askedBy: await resolveName(msg.guildId, msg.author.id, nameOf(msg)),
+      text: clean(msg),
+      history,
+      people: await glossary(msg.guildId),
+      defend: crush.name,
+      scope: moodScope(msg),
+    });
+    await sendLikeAHuman(msg, reply);
+    noteBotSpoke(msg.channelId);
+    return true;
+  } finally {
+    busy.delete(msg.channelId);
+  }
+}
+
+// ============================================================
 //  « !humeur » — lui imposer un état
 // ============================================================
 // Sans argument, il dit dans quel état il s'est levé (le tirage du jour).
@@ -930,6 +1153,12 @@ async function onMessage(msg) {
     // tout le reste : ni réponse, ni réflexe, ni compteur d'intrusion.
     if (isJustLaughing(raw)) return;
 
+    // --- Il est amoureux (la roue est tombée sur lui) ---
+    // Un cœur sous les messages de l'élue, et une intervention si quelqu'un
+    // lui parle mal. Placé avant les commandes : défendre quelqu'un ne peut
+    // pas attendre qu'on ait fini de jouer aux lettres mêlées.
+    if (await crushReacts(msg)) return;
+
     if (raw.startsWith(PREFIX)) {
       const cmd = raw.slice(PREFIX.length).split(/\s+/)[0].toLowerCase();
       if (cmd === "jeu" || cmd === "mot") return void (await cmdPuzzle(msg));
@@ -940,6 +1169,8 @@ async function onMessage(msg) {
       if (cmd === "noms" || cmd === "nom") return void (await cmdNames(msg));
       if (cmd === "resume" || cmd === "résumé" || cmd === "resumé")
         return void (await cmdSummary(msg));
+      if (cmd === "roue" || cmd === "couple" || cmd === "ship")
+        return void (await cmdWheel(msg));
       if (cmd === "humeur" || cmd === "cava" || cmd === "mood")
         return void (await cmdMood(msg, raw.slice(PREFIX.length + cmd.length)));
       if (cmd === "aide" || cmd === "help" || cmd === "commandes")

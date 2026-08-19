@@ -26,6 +26,15 @@ const botMoodSchema = new mongoose.Schema(
     label: { type: String, required: true },
     until: { type: Date, required: true, index: { expireAfterSeconds: 0 } },
     by: { type: String, default: "" },
+    // Le « béguin » de la roue des couples (`!roue`) : quand le bot se tire
+    // lui-même, il tombe amoureux de quelqu'un et il faut savoir DE QUI pour
+    // mettre des cœurs sous ses messages et lui sauter dessus quand on lui
+    // parle mal. Ça vit ici plutôt que dans un coin à part parce que c'est la
+    // MÊME chose que l'humeur : ça commence et ça finit en même temps.
+    crush: {
+      id: { type: String, default: "" },
+      name: { type: String, default: "" },
+    },
   },
   { timestamps: true }
 );

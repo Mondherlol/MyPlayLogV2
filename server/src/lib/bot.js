@@ -334,31 +334,55 @@ async function chatText(system, user, { long = false, scope = "global" } = {}) {
   const mood = moodOf(scope);
   const persona = mood.prompt ? `${system}\n\n${mood.prompt}` : system;
 
+  // GROQ D'ABORD, GEMINI EN SECOURS — et pas « l'un ou l'autre ».
+  // Vu en vrai dans le salon : Groq répond 429 (quota gratuit) ou met plus de
+  // 12 s, la génération lève, et le bot sort la même vanne en conserve trois
+  // fois de suite (« nan mais tu t'entends parler ? »). De loin, ça ne
+  // ressemble pas à une panne, ça ressemble à un bot cassé qui esquive.
+  // Gemini est déjà là, il est plus fade mais il RÉPOND : on s'y rabat au lieu
+  // de tomber directement sur la réplique en boîte.
+  const askGemini = async () => {
+    const out = await geminiJson(
+      `${persona}\n\n${user}\n\nRéponds UNIQUEMENT en JSON : {"reply": "ta réponse"}`,
+      {
+        // 14 s et pas 20 : mesuré en vrai, le petit modèle répond en ~1 s la
+        // plupart du temps, mais part parfois à 19 s quand l'API est chargée.
+        // Vingt secondes de silence dans un salon, c'est pire qu'une vanne en
+        // conserve — on préfère abandonner tôt et sortir un repli.
+        timeoutMs: 14_000,
+        temperature: 1.1,
+        model: BOT_MODEL,
+      }
+    );
+    return String(out?.reply || "");
+  };
+
   let raw = "";
   if (isGroqConfigured()) {
-    raw = await groqText(persona, user, {
-      temperature: 1.15,
-      maxTokens: long ? 200 : 120,
-      timeoutMs: 12_000,
-    });
+    try {
+      raw = await groqText(persona, user, {
+        temperature: 1.15,
+        maxTokens: long ? 200 : 120,
+        timeoutMs: 12_000,
+      });
+    } catch (err) {
+      // Tracé, sinon un quota Groq épuisé est indiscernable d'un bot boudeur
+      // quand on lit le salon — et c'est exactement ce qui s'est passé.
+      console.warn("bot groq ko, repli gemini:", err.message);
+      raw = await askGemini();
+    }
   } else {
-    const out = await geminiJson(`${persona}\n\n${user}\n\nRéponds UNIQUEMENT en JSON : {"reply": "ta réponse"}`, {
-      // 14 s et pas 20 : mesuré en vrai, le petit modèle répond en ~1 s la
-      // plupart du temps, mais part parfois à 19 s quand l'API est chargée.
-      // Vingt secondes de silence dans un salon, c'est pire qu'une vanne en
-      // conserve — on préfère abandonner tôt et sortir un repli.
-      timeoutMs: 14_000,
-      temperature: 1.1,
-      model: BOT_MODEL,
-    });
-    raw = String(out?.reply || "");
+    raw = await askGemini();
   }
 
   // Les modèles adorent emballer une réplique d'argot dans des guillemets.
   const reply = long
     ? tighten(raw.replace(/^["«»\s]+|["«»\s]+$/g, ""), LONG_MAX, 2)
     : tighten(raw.replace(/^["«»\s]+|["«»\s]+$/g, ""));
-  if (!reply || soundsLikeAi(reply)) return pickFallback();
+  if (!reply || soundsLikeAi(reply)) {
+    console.warn("bot reponse jetee:", reply ? reply.slice(0, 80) : "(vide)");
+    return pickFallback();
+  }
   return reply.slice(0, MAX_REPLY);
 }
 
@@ -368,7 +392,11 @@ async function chatText(system, user, { long = false, scope = "global" } = {}) {
 // pour une vanne.
 async function chatAnswer(system, user, { asked = false, scope = "global" } = {}) {
   const first = await chatText(system, user, { long: asked, scope });
-  if (!asked || !looksLikeDodge(first)) return first;
+  // Une vanne en conserve RESSEMBLE à une esquive, forcément : elle en est
+  // une. Mais elle veut dire que le fournisseur est tombé — relancer, c'est
+  // taper une deuxième fois sur une API qui vient de refuser, donc empirer la
+  // panne au lieu de la corriger.
+  if (!asked || FALLBACKS.includes(first) || !looksLikeDodge(first)) return first;
   const second = await chatText(system, `${user}\n${DODGE_RETRY(first)}`, {
     long: true,
     scope,
@@ -568,6 +596,10 @@ export async function generateDiscordReply({
   // L'identifiant du serveur, pour l'humeur du jour : tout le monde doit voir
   // le même Gérard le même jour, d'un salon à l'autre.
   scope = "discord",
+  // Quelqu'un vient de parler mal à la personne dont il est amoureux (la roue
+  // des couples, cf. discordBot.js). Il s'invite pour la défendre : c'est le
+  // seul cas où il prend parti pour quelqu'un d'autre que lui.
+  defend = "",
   // Il débarque SANS QU'ON LUI AIT RIEN DEMANDÉ (cf. maybeInterject). Le mode
   // change tout au prompt : il n'a pas de message à qui répondre, il a une
   // conversation à commenter — et comme personne ne l'a appelé, il a intérêt à
@@ -597,9 +629,14 @@ export async function generateDiscordReply({
   // Une question posée en salon : même règle qu'en privé. Elle ne s'applique
   // évidemment PAS quand il s'invite tout seul — personne ne lui a rien
   // demandé, il n'y a donc rien à quoi répondre.
-  const asked = !spontaneous && isRealQuestion(text);
+  const asked = !spontaneous && !defend && isRealQuestion(text);
 
-  const situation = spontaneous
+  const situation = defend
+    ? `TU ES AMOUREUX DE « ${defend} », TOUT LE SERVEUR EST AU COURANT, ET « ${askedBy} » VIENT DE LUI PARLER MAL : « ${text} ».
+Tu débarques pour le/la défendre. Tu t'en prends à ${askedBy}, tu prends la
+défense de ${defend} sur le point PRÉCIS qui vient d'être dit, et tu en fais
+trop — c'est gênant pour ${defend} et c'est exactement le but. UNE PHRASE.`
+    : spontaneous
     ? `PERSONNE NE T'A RIEN DEMANDÉ. Tu lisais la conversation en silence et tu débarques d'un coup pour placer ta remarque sur ce que « ${askedBy} » vient de dire : « ${text} ».
 Comme tu t'invites, tu as intérêt à être DRÔLE : une vanne qui tombe pile sur le sujet. UNE PHRASE, courte et sèche. Ne dis pas bonjour, ne te présente pas, ne dis pas que tu écoutais.`
     : replyingTo
@@ -644,6 +681,82 @@ ${asked ? QUESTION_RULES : ""}`;
   } catch (err) {
     console.warn("bot discord reply error:", err.message);
     return pickFallback();
+  }
+}
+
+// ============================================================
+//  La roue des couples (« !roue »)
+// ============================================================
+// Le principe : il tire deux personnes du salon au hasard et annonce qu'elles
+// sont ensemble. Ce qui fait la blague, ce n'est PAS le tirage — c'est la
+// JUSTIFICATION : il doit expliquer pourquoi ces deux-là vont bien ensemble en
+// s'appuyant sur des trucs qu'ils ont vraiment écrits.
+//
+// D'où le choix de lui passer des MESSAGES AU HASARD de chacun, et pas un
+// résumé : « il a dit qu'il avait perdu 8 fois de suite, elle a dit qu'elle
+// aimait les projets sans avenir » est drôle parce que les deux morceaux sont
+// vrais. Une justification inventée de zéro serait tiède et interchangeable.
+//
+// Les mentions sont écrites par l'APPELANT (discordBot.js) après coup : on ne
+// laisse jamais un modèle fabriquer un <@id>, il notifierait n'importe qui.
+export async function generateCouple({
+  a,
+  b,
+  aLines = [],
+  bLines = [],
+  // Le mode taquin : « sleep et LA MÈRE d'aletheia ». Le deuxième membre n'est
+  // plus une personne mais un truc qui lui appartient, et il faut le dire au
+  // modèle, sinon il écrit la justification comme si c'était elle.
+  tease = "",
+  // Le bot s'est tiré LUI-MÊME. Ce n'est plus une annonce, c'est une
+  // déclaration : il est amoureux, il assume, et c'est gênant pour tout le
+  // monde.
+  self = false,
+}) {
+  const quote = (name, lines) =>
+    lines.length
+      ? `Ce que ${name} a écrit récemment :\n${lines.map((l) => `- « ${l.slice(0, 200)} »`).join("\n")}`
+      : `${name} n'a pas écrit grand chose récemment.`;
+
+  const prompt = self
+    ? `LA ROUE DES COUPLES EST TOMBÉE SUR TOI ET SUR « ${b} ». Tu es donc en couple avec ${b}, à partir de maintenant.
+
+${quote(b, bLines)}
+
+Annonce-le au salon. Tu es sincèrement amoureux et ça se voit trop : tu t'appuies sur UN truc précis qu'il/elle a écrit pour expliquer pourquoi c'était écrit d'avance. Tu es gênant, un peu trop intense, et tu préviens les autres de ne pas s'approcher.
+DEUX phrases maximum, en SMS avec tes fautes. Un seul cœur maximum.`
+    : `LA ROUE DES COUPLES EST TOMBÉE SUR « ${a} » ET « ${tease || b} ».${
+        tease
+          ? `\n(Oui, sur ${tease} : c'est une vanne, assume-la à fond et parle vraiment de ${tease} comme si c'était une vraie personne du serveur.)`
+          : ""
+      }
+
+${quote(a, aLines)}
+${tease ? "" : `\n${quote(b, bLines)}`}
+
+Annonce le couple au salon et EXPLIQUE POURQUOI ils vont trop bien ensemble, en t'appuyant sur ce qu'ils ont écrit : une raison précise, tirée de leurs messages, tordue à ton avantage. Tu peux inventer la suite de l'histoire (les vacances, le mariage, le divorce).
+DEUX phrases maximum, en SMS avec tes fautes. N'écris PAS de mention Discord (pas de <@…>), juste leurs prénoms.`;
+
+  try {
+    const raw = isGroqConfigured()
+      ? await groqText(PERSONA, prompt, { temperature: 1.2, maxTokens: 170 })
+      : String(
+          (
+            await geminiJson(
+              `${PERSONA}\n\n${prompt}\n\nRéponds UNIQUEMENT en JSON : {"reply": "ton annonce"}`,
+              { timeoutMs: 14_000, temperature: 1.15, model: BOT_MODEL }
+            )
+          )?.reply || ""
+        );
+    const out = tighten(raw.replace(/^["«»\s]+|["«»\s]+$/g, ""), 320, 2).replace(
+      /<@[!&]?\d+>/g,
+      ""
+    );
+    if (!out || soundsLikeAi(out)) return "vous allez trop bien ensemble, jsp pourquoi mais ça se voit";
+    return out;
+  } catch (err) {
+    console.warn("bot couple error:", err.message);
+    return "la roue a plante, ms vous etes ensemble quand meme, felicitations";
   }
 }
 
