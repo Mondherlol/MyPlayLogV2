@@ -127,8 +127,8 @@ const RIM = BOX_H / 2;
 // range le tas bien à l'intérieur, quitte à ce qu'il paraisse un rien plus
 // étroit que l'ouverture. Un tas légèrement trop petit ne se remarque pas ;
 // une boule qui traverse une paroi, si.
-const IN_W = BOX_W * 0.76;
-const IN_D = BOX_D * 0.68;
+const IN_W = BOX_W * 0.84;
+const IN_D = BOX_D * 0.76;
 const IN_H = BOX_H * 0.8;
 // Le couvercle grand ouvert, en plus de sa pose d'origine. 1,85 rad de plus que
 // les 30° du fichier, soit ~136° : une caisse qui s'ouvre à plat se referme
@@ -250,10 +250,15 @@ function pileSeats(balls) {
 
   const seats = left.map((b, i) => {
     const h = hashOf(b.slug);
-    // La dernière couche encaisse le trop-plein s'il y en a un (catalogue
-    // énorme, boule au rayon plancher) : mieux vaut deux boules qui se serrent
-    // qu'une qui flotte au-dessus de la caisse.
-    const layer = Math.min(ny - 1, Math.floor(i / (nx * nz)));
+    // ON REMPLIT LA COUCHE DU HAUT EN PREMIER, et c'est tout le sujet : la
+    // dernière couche servie est forcément incomplète (40 boules dans une
+    // grille de 15, c'est deux couches pleines et une aux deux tiers), et si
+    // c'est celle du dessus, il manque des boules PILE là où on regarde — des
+    // trous sur les côtés, en haut, par le jour du couvercle. Servie en
+    // premier, la couche du dessus est toujours pleine et c'est la couche du
+    // FOND qui est trouée : personne ne la verra jamais.
+    const deep = Math.floor(i / (nx * nz));
+    const layer = Math.max(0, Math.min(ny - 1, used - 1 - deep));
     const k = i % (nx * nz);
     // Une couche sur deux est décalée d'une demi-case : des boules empilées en
     // colonnes bien droites, ça se voit tout de suite, et ça ne ressemble à

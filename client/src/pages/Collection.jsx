@@ -103,8 +103,9 @@ const TIDY = [
 // animés, comics, cartouches) est garni par l'admin et il est le même pour
 // tout le monde — mais on ne le reçoit pas, on le GAGNE, boîtier par boîtier,
 // en faisant sauter des caisses à l'arcade. Cette page ne montre donc que ce
-// qu'on possède, et le reste du catalogue est une promesse : c'est le compteur
-// « 12 / 40 » en tête de page, et le bouton qui ouvre une caisse.
+// qu'on possède, et le reste du catalogue est une promesse — une promesse SANS
+// CHIFFRE : le bouton qui ouvre une caisse, et rien qui dise combien de
+// boîtiers il reste à sortir.
 //
 // La même page sert à regarder celle de quelqu'un d'autre (`/collection/u/:
 // pseudo`) : mêmes boîtiers, mêmes vues, mais en lecture seule — on ne range
@@ -118,7 +119,7 @@ const KIND_FILTERS = [
   { value: "series", label: "Séries" },
   { value: "film", label: "Films" },
   { value: "comic", label: "Comics & mangas" },
-  { value: "game", label: "Jeux GBA" },
+  { value: "game", label: "Jeux" },
 ];
 
 export default function Collection() {
@@ -138,8 +139,9 @@ export default function Collection() {
   const [media, setMedia] = useState([]);
   const [status, setStatus] = useState("loading"); // loading | ready | error
   const [attempt, setAttempt] = useState(0); // « Réessayer » : relance la requête
-  // Combien de boîtiers on possède sur combien il en existe : la jauge de
-  // complétion, et la seule chose qui donne un sens à une étagère à moitié vide.
+  // Combien de boîtiers on possède sur combien il en existe. PLUS AFFICHÉ NULLE
+  // PART côté joueur : il ne sert qu'à savoir si la collection est complète, si
+  // la machine a encore quelque chose à sortir, et à l'établi d'admin.
   const [tally, setTally] = useState({ owned: 0, total: 0, price: 0 });
   const [showGacha, setShowGacha] = useState(false);
   // L'établi de mise au point (admin) : replié par défaut, il n'a rien à faire
@@ -488,12 +490,19 @@ export default function Collection() {
           </div>
         </div>
 
-        {/* LE CHEMIN VERS LA MACHINE EST DANS L'EN-TÊTE. Il tenait avant dans un
-            bandeau de complétion posé sous le titre, qui poussait l'étagère
-            d'une bande entière vers le bas pour redire ce que la pastille
-            « 6 / 39 » dit en quatre caractères. Le bouton monte donc ici, au
-            même niveau que le nom du rayon, et les compteurs se rangent
-            dessous. */}
+        {/* LE CHEMIN VERS LA MACHINE EST DANS L'EN-TÊTE, au même niveau que le
+            nom du rayon ; les compteurs se rangent dessous. Il tenait avant
+            dans un bandeau de complétion posé sous le titre, qui poussait
+            l'étagère d'une bande entière vers le bas.
+
+            ON N'Y ANNONCE PLUS « 6 / 39 ». Le rayon complet est une donnée
+            d'exploitation, pas une information de joueur : dire combien de
+            boîtiers existent, c'est donner la taille exacte de ce qui reste à
+            gagner — et transformer une étagère qu'on garnit en une liste qu'on
+            coche. Le catalogue s'agrandit, personne n'a à savoir de combien.
+            Le compte reste connu de la page (`tally`) : il décide encore de
+            l'état « collection complète » et sert l'établi d'admin, il ne
+            s'écrit simplement plus nulle part. */}
         <div className="coll-head-side">
           {status === "ready" &&
             (visiting ? (
@@ -545,7 +554,7 @@ export default function Collection() {
                 )}
                 {counts.game > 0 && (
                   <span>
-                    <strong>{counts.game}</strong> jeu{counts.game > 1 ? "x" : ""} GBA
+                    <strong>{counts.game}</strong> jeu{counts.game > 1 ? "x" : ""}
                   </span>
                 )}
                 {/* CE QU'IL A ET QUE JE N'AI PAS. Sur l'étagère de quelqu'un
@@ -554,11 +563,6 @@ export default function Collection() {
                   <span className="coll-head-envy">
                     <Lock size={12} /> <strong>{counts.envy}</strong> qui te manque
                     {counts.envy > 1 ? "nt" : ""}
-                  </span>
-                )}
-                {tally.total > 0 && (
-                  <span className="coll-head-tally" title="Boîtiers débloqués sur le rayon complet">
-                    <strong>{tally.owned}</strong> / {tally.total}
                   </span>
                 )}
               </>
@@ -739,7 +743,7 @@ export default function Collection() {
               ? visiting
                 ? `${owner?.username || username} n'a pas encore sorti de boîtier de la machine.`
                 : tally.total > 0
-                  ? `${tally.total} boîtiers attendent au fond des caisses. Fais-en sauter une pour sortir le premier.`
+                  ? "Des boîtiers attendent au fond des caisses. Fais-en sauter une pour sortir le premier."
                   : "Aucun boîtier n'a encore été posé au rayon."
               : "Aucun titre ne correspond à cette recherche."}
           </p>
@@ -901,7 +905,7 @@ export default function Collection() {
       {!visiting && resuming.play.length > 0 && (
         <section className="coll-resume coll-play">
           <h2 className="coll-section-title">
-            <Gamepad2 size={15} /> Console encore chaude <em>Jeux GBA</em>
+            <Gamepad2 size={15} /> Console encore chaude <em>Jeux</em>
           </h2>
           <div className="coll-play-row">
             {resuming.play.map((m) => (

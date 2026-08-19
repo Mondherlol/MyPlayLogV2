@@ -144,17 +144,6 @@
   justify-content: flex-end;
 }
 
-/* La pastille de complétion : tout ce qui reste de la jauge, et il n'en faut
-   pas plus — « 6 / 39 », ce sont trente-trois boîtiers qui manquent. */
-.coll-head-stats .coll-head-tally {
-  color: var(--accent-ink);
-  border-color: color-mix(in srgb, var(--orange) 40%, var(--border));
-  background: color-mix(in srgb, var(--orange) 10%, var(--surface-2));
-}
-.coll-head-stats .coll-head-tally strong {
-  color: var(--accent-ink);
-}
-
 /* Le seul chemin vers la manivelle depuis cette page : il se voit de loin. */
 .coll-open-btn {
   display: inline-flex;

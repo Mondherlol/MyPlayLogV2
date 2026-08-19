@@ -646,6 +646,27 @@ function lockSources(full) {
   };
 }
 
+// CE QUI EST DANS LA MACHINE. Le même filtre partout : les fiches d'avant le
+// champ n'ont pas la clé, donc `$ne: false` et jamais `true` — sinon un ajout
+// de colonne aurait vidé le dôme d'un coup.
+const LOOTABLE = { lootable: { $ne: false } };
+
+// Le compteur de la machine (« 12 / 40 »), et il ne se compte PAS sur le
+// catalogue entier : un boîtier retiré du tirage n'en sortira jamais, donc
+// l'inclure afficherait un objectif inatteignable. Ce qu'on POSSÈDE se compte
+// dans le même ensemble, sans quoi celui qui a tiré un titre depuis retiré
+// lirait « 41 / 40 ».
+async function gachaCounts(owner) {
+  const slugs = (owner.ownedCases || []).map((c) => c.slug);
+  const [total, owned] = await Promise.all([
+    CollectionMedia.countDocuments(LOOTABLE),
+    slugs.length
+      ? CollectionMedia.countDocuments({ ...LOOTABLE, slug: { $in: slugs } })
+      : 0,
+  ]);
+  return { owned, total };
+}
+
 // L'étagère de quelqu'un, prête à peindre. Facteur commun de ma page et de
 // celle d'un autre joueur : seule la progression change de main (on ne montre
 // jamais la sienne sur l'étagère d'autrui — c'est la mienne qui m'intéresse
@@ -675,16 +696,13 @@ async function shelfOf(req, owner, { withProgress }) {
 // GET /api/collection — MON étagère + ma progression + MON rangement.
 router.get("/", requireAuth, async (req, res) => {
   try {
-    const [me, total] = await Promise.all([
-      // Les réglages du meuble partent AVEC le rayon, et non par une seconde
-      // requête : l'ordre des boîtiers décide de la première image de la page —
-      // le demander à part, c'est une étagère qui se range sous les yeux juste
-      // après s'être affichée.
-      User.findById(req.userId)
-        .select("shelfOrder shelfSkin shelfPerPlank ownedCases")
-        .lean(),
-      CollectionMedia.countDocuments(),
-    ]);
+    // Les réglages du meuble partent AVEC le rayon, et non par une seconde
+    // requête : l'ordre des boîtiers décide de la première image de la page —
+    // le demander à part, c'est une étagère qui se range sous les yeux juste
+    // après s'être affichée.
+    const me = await User.findById(req.userId)
+      .select("shelfOrder shelfSkin shelfPerPlank ownedCases")
+      .lean();
     if (!me) return res.status(404).json({ error: "Compte introuvable." });
     res.json({
       media: await shelfOf(req, me, { withProgress: true }),
@@ -695,11 +713,7 @@ router.get("/", requireAuth, async (req, res) => {
       },
       // Ce qu'il reste à débloquer : une étagère à moitié pleine doit le dire,
       // et une étagère vide doit pouvoir annoncer ce qui l'attend.
-      gacha: {
-        owned: (me.ownedCases || []).length,
-        total,
-        price: await gachaPrice(),
-      },
+      gacha: { ...(await gachaCounts(me)), price: await gachaPrice() },
     });
   } catch (err) {
     console.error("collection list error:", err.message);
@@ -724,9 +738,9 @@ router.get("/u/:username", requireAuth, async (req, res) => {
     if (!owner) return res.status(404).json({ error: "Joueur introuvable." });
     if (await blockIfPrivate(res, owner, req.userId)) return;
 
-    const [media, total, me] = await Promise.all([
+    const [media, counts, me] = await Promise.all([
       shelfOf(req, owner, { withProgress: false }),
-      CollectionMedia.countDocuments(),
+      gachaCounts(owner),
       User.findById(req.userId).select("ownedCases").lean(),
     ]);
     const mine = ownedSlugs(me);
@@ -745,7 +759,7 @@ router.get("/u/:username", requireAuth, async (req, res) => {
         skin: owner.shelfSkin || "",
         perPlank: owner.shelfPerPlank || 0,
       },
-      gacha: { owned: (owner.ownedCases || []).length, total },
+      gacha: counts,
     });
   } catch (err) {
     console.error("collection user shelf error:", err.message);
@@ -877,10 +891,7 @@ const gachaBall = (req, m) => ({
 // voient les mêmes boules dans le même ordre, ce qui rend la grille des
 // manquants comparable d'une collection à l'autre.
 function gachaPool() {
-  // `$ne: false` et non `true` : les fiches d'avant le champ n'ont pas la clé,
-  // et un `{ lootable: true }` les aurait toutes sorties de la machine d'un
-  // coup — une base entière vidée par un ajout de colonne.
-  return CollectionMedia.find({ lootable: { $ne: false } })
+  return CollectionMedia.find(LOOTABLE)
     .select("slug title kind color franchise year artwork")
     .slice("pages", 1)
     .sort({ order: 1, createdAt: 1 })
@@ -1074,7 +1085,10 @@ router.delete("/gacha/mine", requireAuth, requireAdmin, async (req, res) => {
 router.post("/gacha/mine/fill", requireAuth, requireAdmin, async (req, res) => {
   try {
     const [pool, me] = await Promise.all([
-      CollectionMedia.find().select("slug").sort({ order: 1, createdAt: 1 }).lean(),
+      // Le MÊME dôme que la machine : se remplir l'étagère sert à voir ce
+      // qu'un joueur verra, et un joueur ne peut pas tirer ce qui en a été
+      // retiré.
+      CollectionMedia.find(LOOTABLE).select("slug").sort({ order: 1, createdAt: 1 }).lean(),
       User.findById(req.userId).select("ownedCases").lean(),
     ]);
     if (!me) return res.status(404).json({ error: "Compte introuvable." });

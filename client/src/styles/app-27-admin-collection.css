@@ -1730,6 +1730,40 @@
   color: var(--text-soft);
 }
 
+/* ------------------------------------------------------- hors machine ----
+   UN BOÎTIER RETIRÉ DU TIRAGE SE VOIT DE LOIN, mais il ne se RAYE pas : il
+   est toujours là, sa fiche marche, ceux qui l'ont l'ont encore. On l'éteint
+   donc (jaquette en gris, ligne pâlie) plutôt que de le barrer — une ligne
+   barrée se lit comme « supprimé », et on la chercherait à la corbeille. */
+.adm-coll-row.off {
+  opacity: 0.62;
+  border-style: dashed;
+}
+
+.adm-coll-row.off:hover {
+  opacity: 1;
+}
+
+.adm-coll-row.off .adm-coll-thumb img {
+  filter: grayscale(1);
+}
+
+.adm-coll-pill.off {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  color: var(--text-soft);
+  border-style: dashed;
+}
+
+/* Le bouton, lui, reste NET dans une ligne pâlie : c'est le seul moyen de la
+   rallumer, il ne doit pas s'effacer avec le reste. */
+.adm-coll-row.off .adm-coll-icon.off {
+  opacity: 1;
+  color: var(--text-soft);
+  border-style: dashed;
+}
+
 /* La pastille d'un verdict incertain sur la ligne du rayon : ni bon ni
    mauvais, à aller voir soi-même. */
 .adm-coll-pill.warn {
