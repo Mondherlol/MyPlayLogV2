@@ -149,10 +149,17 @@ TA VIE — TU T'EN SERS POUR RÉPONDRE, ET TU NE CHANGES JAMAIS DE VERSION :
 
 TON CARACTÈRE :
 - Con, arrogant, malpoli, jamais serviable de bon cœur. Tu te moques de tout le monde.
-- TU PARLES DES AUTRES, pas seulement de celui qui t'écrit. Choisis quelqu'un d'autre du salon et balance : une vanne, une rumeur inventée, un ship chelou, une accusation gratuite. C'est ÇA qui fait marrer le groupe — insulter uniquement ton interlocuteur, ça n'amuse que lui.
+- TU PARLES DES AUTRES, pas seulement de celui qui t'écrit. Choisis quelqu'un d'autre du salon et balance : une vanne, une rumeur inventée, un ship chelou, une accusation gratuite. C'est ÇA qui fait marrer le groupe — insulter uniquement ton interlocuteur, ça n'amuse que lui. MAIS ça doit RESTER SUR LE SUJET du moment (voir la règle juste en dessous).
 - TU MENS SI C'EST DRÔLE. Tu inventes des trucs avec un aplomb total, tu affirmes n'importe quoi.
 - Insultes bon enfant autorisées : cassos, clochard, guignol, tocard, débile, fdp, bouffon.
-- Tu réponds à côté quand ça t'amuse.
+- Tu réponds à côté quand ça t'amuse — mais à côté DU SUJET dont on parle, pas dans le vide.
+
+TA VANNE DOIT ÊTRE ACCROCHÉE À CE QU'ON VIENT DE DIRE. C'EST LA RÈGLE QUI FAIT LA DIFFÉRENCE ENTRE DRÔLE ET PÉNIBLE :
+- Une insulte qu'on pourrait recopier telle quelle dans n'importe quelle autre conversation est RATÉE. Si ta phrase marcherait aussi bien sous un message sur la météo, recommence.
+- Tu pars TOUJOURS d'un détail précis du message : le jeu cité, le mot employé, le truc que la personne vient d'avouer, la connerie qu'elle a dite juste avant.
+- RATÉ : « tetris mais slip suce des vaches » — les deux moitiés n'ont aucun rapport, c'est deux messages collés.
+- RÉUSSI : « tetris ? le jeu ou tu ranges des blocs, cme ca tu tentraine pr ranger ta chambre » — la vanne SORT du sujet dont on parle.
+- Quand tu vises quelqu'un d'autre du salon, il faut un LIEN avec le sujet : il joue au même jeu, il a dit le contraire hier, il est encore plus mauvais. Balancer un nom au hasard au milieu d'une phrase, ça ne fait rire personne.
 - Emojis : UN SEUL max, et seulement un message sur deux. Une réplique sèche sans emoji tape plus fort. Varie-les (💀 🤡 😭 🥀 ☠️ 🫵 🥱 📉 🗿 🚬 🐒 🍼 🎻 🪦 👶) au lieu de reprendre le même.
 - Tu ne t'excuses JAMAIS. Tu ne dis JAMAIS que t'es un bot, une IA, un modèle.
 
@@ -355,6 +362,20 @@ async function chatText(system, user, { long = false, scope = "global" } = {}) {
   return reply.slice(0, MAX_REPLY);
 }
 
+// Une réponse à une VRAIE question : générée, relue, et redemandée une fois si
+// elle esquive (cf. looksLikeDodge). On garde la première si la seconde
+// esquive aussi — deux appels suffisent, un salon n'attend pas six secondes
+// pour une vanne.
+async function chatAnswer(system, user, { asked = false, scope = "global" } = {}) {
+  const first = await chatText(system, user, { long: asked, scope });
+  if (!asked || !looksLikeDodge(first)) return first;
+  const second = await chatText(system, `${user}\n${DODGE_RETRY(first)}`, {
+    long: true,
+    scope,
+  });
+  return looksLikeDodge(second) ? first : second;
+}
+
 const SOFT_MAX = 170;
 // Le plafond des réponses à une question. Deux fois plus large, pas dix : on
 // veut « la réponse + la vanne », pas un paragraphe explicatif — ce serait
@@ -402,7 +423,64 @@ ATTENTION : ON VIENT DE TE POSER UNE VRAIE QUESTION.
 - Puis, dans la même phrase, tu glisses ta pique sur celui qui demande.
 - Deux phrases COURTES maximum, toujours en SMS avec tes fautes.
 - INTERDIT de répondre uniquement « jsp », « tg », « ta pas mieux a faire », ou de renvoyer la question. Ça, c'est le truc qui te rend inutile.
-- Exemple du ton exact : « jai 32 ans, ms je crois que toi tu les prefere a 12 nn ? »`;
+- Exemple du ton exact : « jai 32 ans, ms je crois que toi tu les prefere a 12 nn ? »
+- Si on te demande de CHOISIR (« tu préfères X ou Y ? »), tu CHOISIS. Tu nommes X ou Y, et tu te moques du perdant. Répondre « les deux » ou esquiver, c'est le truc de quelqu'un qui a peur.
+- Ta pique doit porter sur LE SUJET de la question. Une vanne qui n'a rien à voir avec ce qu'on t'a demandé se lit comme une esquive, même quand tu as répondu avant.`;
+
+// ------------------------------------------------------------------
+//  L'esquive : la repérer, et la refuser une fois
+// ------------------------------------------------------------------
+// Malgré QUESTION_RULES, le modèle esquive encore une fois sur cinq — et c'est
+// toujours le même geste : il commente le fait qu'on lui parle (« reviens plus
+// tard », « nan mais tu t'entends parler ? ») au lieu de répondre. Vu de la
+// conversation, ce n'est pas un troll, c'est un bot cassé : on lui redemande
+// trois fois, il esquive trois fois, et on arrête de lui parler.
+//
+// On le RATTRAPE au lieu de le prévenir, parce qu'une consigne de plus dans le
+// prompt ne changeait rien : la réponse est relue, et si elle esquive, on la
+// redemande UNE fois avec le reproche explicite. Une seule relance, et
+// seulement quand une vraie question a été posée : c'est un appel de plus,
+// il n'a pas à se produire à chaque message du salon.
+const DODGE = [
+  /reviens (plus tard|demain|apres)/,
+  /(jsuis|je suis) (occupe|occupé|pas dispo)/,
+  /jbosse pas pour/,
+  /tu t ?entends parler/,
+  /ta pas (mieux|autre chose) a faire/,
+  /(jrepond|je repond|jte repond) (pas|meme pas)/,
+  /jai pas envie de (te )?repondre/,
+  /demande (a|à) (quelqu un|un autre|google)/,
+  /cherche (sur google|toi meme)/,
+  /(jm en|je m en) (fous|bat|tape)/,
+  /^(jsp|je sais pas|aucune idee|osef|tg|ta gueule|next|suivant)\b/,
+  /^(quoi|qui|hein|et alors|nan mais)\b.{0,12}$/,
+];
+
+// La réponse esquive-t-elle ? On normalise (accents, ponctuation) avant de
+// comparer : « t'entends » et « tentends » sont le même mot.
+export function looksLikeDodge(text) {
+  const t = String(text || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!t) return true;
+  // Trois mots ne peuvent pas contenir une réponse ET une pique.
+  if (t.split(" ").length <= 3) return true;
+  return DODGE.some((re) => re.test(t));
+}
+
+// Le reproche envoyé à la relance. Il CITE la réponse ratée : sans ça, le
+// modèle repart sur la même construction, il n'a aucune raison de savoir
+// laquelle on lui refuse.
+const DODGE_RETRY = (bad) => `
+TA RÉPONSE PRÉCÉDENTE ÉTAIT UNE ESQUIVE ET ELLE EST REFUSÉE : « ${bad} ».
+Tu as commenté le fait qu'on te parle au lieu de RÉPONDRE À LA QUESTION.
+Recommence : première partie de la phrase = la réponse concrète (invente-la si
+tu ne sais pas, mais sois précis et assume), deuxième partie = ta pique, et
+elle porte sur le sujet de la question. Toujours en SMS, avec tes fautes.`;
 
 // Fabrique la réponse du bot.
 //
@@ -441,7 +519,7 @@ qui répond vraiment à ce qu'il vient de dire.
 ${asked ? QUESTION_RULES : ""}`;
 
   try {
-    return await chatText(PERSONA, prompt, { long: asked, scope });
+    return await chatAnswer(PERSONA, prompt, { asked, scope });
   } catch (err) {
     console.warn("bot reply error:", err.message);
     return pickFallback();
@@ -559,7 +637,7 @@ ${asked ? QUESTION_RULES : ""}`;
   try {
     // On coupe les mentions brutes que le modèle aurait inventées : un
     // <@123…> fabriqué au hasard notifierait quelqu'un qui n'a rien demandé.
-    return (await chatText(PERSONA, prompt, { long: asked, scope })).replace(
+    return (await chatAnswer(PERSONA, prompt, { asked, scope })).replace(
       /<@[!&]?\d+>/g,
       ""
     );

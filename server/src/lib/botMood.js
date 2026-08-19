@@ -111,6 +111,124 @@ c'est ça qui est drôle.`,
   },
 };
 
+// ======================================================================
+//  L'humeur IMPOSÉE (« !humeur en colère »)
+// ======================================================================
+// Le tirage du jour donne un Gérard cohérent mais subi : on ne peut pas
+// décider qu'aujourd'hui il est « triste » ou « excité par Mondher ». Or c'est
+// la moitié du jeu — l'humeur est ce qu'on a envie de manipuler.
+//
+// TROIS CHOIX, ET ILS SE TIENNENT :
+//
+//   1. L'HUMEUR EST DU TEXTE LIBRE, pas une liste. « en colère » marche, mais
+//      « excité par Mondher » aussi, et c'est justement celle-là qu'on veut :
+//      une liste de six humeurs prévues d'avance n'aurait aucune surprise.
+//      On recopie donc la phrase telle quelle dans le prompt.
+//   2. ELLE DURE ENTRE 10 MIN ET 10 H, tiré au sort. Une durée annoncée
+//      (« 1 h ») transforme le bot en minuteur ; une durée inconnue laisse le
+//      doute (« il est encore comme ça ? »), et c'est ce doute qui fait la
+//      blague. La borne haute est courte exprès : une humeur imposée pour
+//      toujours, ce n'est plus une humeur, c'est un nouveau personnage.
+//   3. ELLE EST EN BASE (models/BotMood.js) ET EN MÉMOIRE. En base pour
+//      survivre à un redéploiement ; en mémoire parce que `moodOf` est appelé
+//      sur le chemin de CHAQUE message — le rendre asynchrone contaminerait
+//      tout l'appel, jusqu'au compteur d'intrusions.
+const MIN_MS = 10 * 60 * 1000;
+const MAX_MS = 10 * 60 * 60 * 1000;
+const LABEL_MAX = 120;
+
+// scope -> { label, until }
+const custom = new Map();
+
+// Le texte est recopié dans un prompt : on retire ce qui pourrait le refermer
+// ou lui ajouter des consignes (retours à la ligne, guillemets, backticks).
+export const cleanMoodLabel = (raw) =>
+  String(raw || "")
+    .replace(/[`\r\n]+/g, " ")
+    .replace(/["«»]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, LABEL_MAX);
+
+// Le paragraphe ajouté au caractère. Il dit COMMENT jouer l'humeur, pas quoi
+// ressentir : « tu le montres sans l'annoncer » évite le « bonjour je suis en
+// colère aujourd'hui » qui tue l'effet en une ligne. Et il répète les
+// interdits, parce que c'est un texte écrit par n'importe qui du serveur.
+const customPrompt = (label) => `TON HUMEUR DU JOUR, ELLE T'EST TOMBÉE DESSUS : ${label}.
+C'est ton état AUJOURD'HUI, par-dessus ton caractère. Ça se sent dans CHAQUE
+réponse : ce que tu racontes, ce sur quoi tu reviens sans arrêt, ta façon de
+réagir quand on te parle d'autre chose.
+Tu ne l'ANNONCES jamais (« jsuis ${label} ») : tu le JOUES. Si ça vise
+quelqu'un en particulier, c'est de lui que tu parles tout le temps, même quand
+la conversation est ailleurs.
+Tu gardes ton langage SMS et tes fautes, et les interdits du caractère restent
+valables quoi qu'il arrive.`;
+
+const customQuips = (label) => [
+  `jsuis ${label} aujourdhui, cherche pas`,
+  `${label}. voila. des questions ?`,
+  `jme suis levé ${label}, cest cme ca`,
+];
+
+// Charge ce qui est encore valable au démarrage. Fait une fois, au chargement
+// du module : mongoose met la requête en file d'attente si la connexion n'est
+// pas encore ouverte, il n'y a donc rien à orchestrer.
+async function loadCustomMoods() {
+  const { default: BotMood } = await import("../models/BotMood.js");
+  const rows = await BotMood.find({ until: { $gt: new Date() } }).lean();
+  for (const r of rows) custom.set(r.scope, { label: r.label, until: +r.until });
+}
+loadCustomMoods().catch((e) => console.warn("botMood load:", e.message));
+
+// Impose une humeur. Renvoie ce qu'il faut pour l'annoncer (le libellé nettoyé
+// et la date de fin) ou null si le texte était vide.
+export async function setCustomMood(scope, rawLabel, by = "") {
+  const label = cleanMoodLabel(rawLabel);
+  if (!label) return null;
+  const until = Date.now() + MIN_MS + Math.random() * (MAX_MS - MIN_MS);
+  custom.set(scope, { label, until });
+  try {
+    const { default: BotMood } = await import("../models/BotMood.js");
+    await BotMood.findOneAndUpdate(
+      { scope },
+      { scope, label, until: new Date(until), by },
+      { upsert: true }
+    );
+  } catch (e) {
+    // La base peut refuser : l'humeur tient quand même jusqu'au prochain
+    // redémarrage, ce qui vaut mieux que de renvoyer une erreur pour une vanne.
+    console.warn("botMood save:", e.message);
+  }
+  return { label, until };
+}
+
+// Le remettre comme avant, sans attendre la fin du minuteur.
+export async function clearCustomMood(scope) {
+  const had = custom.delete(scope);
+  try {
+    const { default: BotMood } = await import("../models/BotMood.js");
+    await BotMood.deleteOne({ scope });
+  } catch (e) {
+    console.warn("botMood clear:", e.message);
+  }
+  return had;
+}
+
+// L'humeur imposée encore en cours pour ce scope, ou null. L'expiration est
+// vérifiée ICI plutôt que par un minuteur : un `setTimeout` de dix heures ne
+// survit pas au redéploiement, une comparaison de dates si.
+function activeCustom(scope) {
+  const c = custom.get(scope);
+  if (!c) return null;
+  if (Date.now() > c.until) {
+    custom.delete(scope);
+    return null;
+  }
+  return c;
+}
+
+export const customMoodOf = (scope) => activeCustom(scope);
+
 // La distribution. Le troll écrase tout : les autres humeurs ne valent que
 // parce qu'elles surprennent, et une surprise qui tombe un jour sur trois
 // n'en est plus une.
@@ -146,6 +264,15 @@ const dayKey = () =>
 // serveurs peuvent tomber sur deux humeurs différentes, mais un serveur donné
 // est cohérent d'un salon à l'autre et d'un message à l'autre.
 export function moodOf(scope = "global") {
+  const forced = activeCustom(scope);
+  if (forced)
+    return {
+      key: "custom",
+      name: forced.label,
+      prompt: customPrompt(forced.label),
+      quips: customQuips(forced.label),
+      until: forced.until,
+    };
   const r = hash(`${dayKey()}|${scope}`) / 2 ** 32;
   let acc = 0;
   const total = WEIGHTS.reduce((s, [, w]) => s + w, 0);

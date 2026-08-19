@@ -41,8 +41,20 @@ import {
   resolveName,
   savePerson,
 } from "./discordNames.js";
-import { banterFor, handleSilence, isJustLaughing, isMuted } from "./discordBanter.js";
-import { moodOf, moodQuip } from "./botMood.js";
+import {
+  banterFor,
+  handleSilence,
+  isJustLaughing,
+  isMuted,
+  isRealQuestion,
+} from "./discordBanter.js";
+import {
+  clearCustomMood,
+  customMoodOf,
+  moodOf,
+  moodQuip,
+  setCustomMood,
+} from "./botMood.js";
 import {
   HARASS_CHANCE,
   RENAME_CHANCE,
@@ -323,6 +335,7 @@ function helpEmbed() {
           `\`${PREFIX}resume\` — ce qui s'est dit pendant que t'étais pas là`,
           `\`${PREFIX}victime\` — qui se fait harceler aujourd'hui`,
           `\`${PREFIX}humeur\` — dans quel état je me suis levé`,
+          `\`${PREFIX}humeur <humeur>\` — vous m'en imposez une (quelques heures)`,
           `\`${PREFIX}add <jeu>\` — ajoute un jeu à ta liste de souhaits`,
           `\`${PREFIX}noms\` — comment je dois vous appeler (vrais noms, surnoms)`,
         ].join("\n"),
@@ -726,6 +739,43 @@ async function cmdVictim(msg) {
   );
 }
 
+// ============================================================
+//  « !humeur » — lui imposer un état
+// ============================================================
+// Sans argument, il dit dans quel état il s'est levé (le tirage du jour).
+// AVEC un argument, on le lui IMPOSE : « !humeur en colère », « !humeur triste
+// », « !humeur excité par Mondher ». C'est du texte libre exprès — une liste
+// d'humeurs prévues d'avance n'aurait aucune surprise, et la moitié du plaisir
+// est de lui coller un état que personne n'avait anticipé.
+//
+// LA DURÉE EST TIRÉE AU SORT ET N'EST PAS ANNONCÉE (entre 10 min et 10 h, cf.
+// lib/botMood.js). Annoncer « pendant 3 h 27 » ferait de lui un minuteur ;
+// ne rien dire laisse le doute — « il est encore comme ça ? » — et c'est ce
+// doute qui fait durer la blague toute la soirée.
+async function cmdMood(msg, arg) {
+  const scope = moodScope(msg);
+  const text = arg.trim();
+
+  if (!text) {
+    const forced = customMoodOf(scope);
+    await msg.channel.send(
+      forced ? `jsuis ${forced.label}, on ma pas laissé le choix` : moodQuip(scope)
+    );
+    return;
+  }
+
+  // De quoi le remettre d'aplomb sans attendre la fin du minuteur.
+  if (/^(stop|reset|normal|fini|arrete|arrête)$/i.test(text)) {
+    const had = await clearCustomMood(scope);
+    await msg.channel.send(had ? "bon ok jredeviens moi meme" : "jsuis déjà normal wsh");
+    return;
+  }
+
+  const set = await setCustomMood(scope, text, msg.author.id);
+  if (!set) return void (await msg.channel.send("cest quoi cette humeur de merde"));
+  await msg.channel.send(`ok. jsuis ${set.label} maintenant. vous lavez voulu 🗿`);
+}
+
 async function harassVictim(msg) {
   if (!msg.guildId) return false;
   const v = await currentVictim(msg.guildId);
@@ -891,7 +941,7 @@ async function onMessage(msg) {
       if (cmd === "resume" || cmd === "résumé" || cmd === "resumé")
         return void (await cmdSummary(msg));
       if (cmd === "humeur" || cmd === "cava" || cmd === "mood")
-        return void (await msg.channel.send(moodQuip(moodScope(msg))));
+        return void (await cmdMood(msg, raw.slice(PREFIX.length + cmd.length)));
       if (cmd === "aide" || cmd === "help" || cmd === "commandes")
         return void (await msg.channel.send({ embeds: [helpEmbed()] }));
       // Commande inconnue : on ne dit rien. Le salon n'est pas à nous, et un
@@ -906,7 +956,10 @@ async function onMessage(msg) {
       // Les réflexes : instantanés, sans modèle de langage. Ils passent avant
       // la génération, sinon un « tg » attendrait deux secondes une réponse
       // fabriquée alors qu'une réplique toute prête est bien plus drôle.
-      const reflex = banterFor(raw);
+      // Une VRAIE question ne prend jamais un réflexe : « wsh Gérard tu joues
+      // à quoi ? » recevrait « ouais salut » et la question resterait sans
+      // réponse — exactement le défaut qu'on lui reproche.
+      const reflex = isRealQuestion(raw) ? null : banterFor(raw);
       if (reflex) {
         await msg.reply({
           content: reflex,

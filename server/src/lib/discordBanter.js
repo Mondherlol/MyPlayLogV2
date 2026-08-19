@@ -151,26 +151,139 @@ const QUESTION_ENDS = [
   "pourquoi", "qui", "non", "nn",
 ];
 
+// ======================================================================
+//  Ce qui entoure la question sans en faire partie
+// ======================================================================
+// Observé en vrai, et c'est le cas le PLUS courant du salon :
+//
+//     « mais tu préfères aletheia ou mondher Gérard »
+//
+// Une vraie question, à laquelle le bot a répondu « nan mais tu t'entends
+// parler ? » — parce qu'elle ne commençait pas par une tournure interrogative
+// (elle commençait par « mais ») et ne finissait pas par un mot interrogatif
+// (elle finissait par son propre nom). Elle passait donc pour une affirmation,
+// la consigne « réponds pour de vrai » n'était pas ajoutée, et il esquivait.
+//
+// Deux petits ménages suffisent à rattraper l'essentiel :
+//   • LES CONNECTEURS DE TÊTE. En français parlé, une question sur deux
+//     commence par « mais », « et », « alors », « du coup », « wsh ».
+//   • L'APOSTROPHE DE FIN. On interpelle en fin de phrase (« …, Gérard »,
+//     « …, frr »), ce qui masquait le mot interrogatif final.
+const LEAD_FILLER = [
+  "mais", "et", "alors", "donc", "du coup", "bon", "bah", "ba", "bref", "sinon",
+  "au fait", "dis", "dis moi", "eh", "hey", "yo", "wsh", "franchement", "serieux",
+  "attend", "attends", "genre", "sinon toi", "ok", "oe", "ouais", "nan mais",
+  "hé", "he", "tiens", "svp", "stp",
+];
+
+const TAIL_FILLER = new Set([
+  "stp", "svp", "frr", "frere", "gros", "wsh", "mdr", "ptdr", "quoi", "hein",
+  "la", "toi", "please", "plz",
+]);
+
+// Le nom du bot est un cas à part : c'est le mot qui termine le plus souvent
+// une question qu'on lui pose, et il n'appartient pas à la question.
+const botNames = () =>
+  new Set(
+    [process.env.BOT_USERNAME || "Gérard", "gerard", "bot"].map((n) =>
+      norm(n)
+    )
+  );
+
+// Retire ce décor, en tête comme en fin, pour ne garder que la question.
+function strip(t) {
+  let out = t;
+  const names = botNames();
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const f of LEAD_FILLER) {
+      if (out === f) return "";
+      if (out.startsWith(`${f} `)) {
+        out = out.slice(f.length + 1);
+        changed = true;
+      }
+    }
+    const words = out.split(" ");
+    const last = words[words.length - 1];
+    if (words.length > 1 && (TAIL_FILLER.has(last) || names.has(last))) {
+      // « tu fais quoi » : le « quoi » final EST la question, on ne le retire
+      // que s'il reste une tournure interrogative derrière lui.
+      const rest = words.slice(0, -1).join(" ");
+      if (last !== "quoi" || QUESTION_ENDS.includes(words[words.length - 2])) {
+        out = rest;
+        changed = true;
+      }
+    }
+    const first = out.split(" ")[0];
+    if (names.has(first) && out.split(" ").length > 1) {
+      out = out.split(" ").slice(1).join(" ");
+      changed = true;
+    }
+  }
+  return out.trim();
+}
+
+// « tu préfères X ou Y », « c'est mieux X ou Y » : l'alternative est une
+// question à elle seule, sans mot interrogatif ni point d'interrogation. On
+// exige un « tu » (ou un « c'est ») pour ne pas attraper « jai pris un café ou
+// deux ».
+const ALTERNATIVE = /\b(tu|t|c|cest|cetait|vous)\b.*\bou\b\s+\S+/;
+
+// Une tournure qui reste interrogative où qu'elle soit dans la phrase — donc
+// cherchée PARTOUT, pas seulement en tête. Les mots courts et ambigus
+// (« qui », « quel », « ou ») n'y sont pas : « je sais pas qui a gagné » n'est
+// pas une question, et les attraper rendrait le bot pénible de sérieux.
+const QUESTION_ANYWHERE = [
+  "est ce que", "es ce que", "c quoi", "cest quoi", "c koi", "ct quoi",
+  "tu prefere", "tu preferes", "tu penses quoi", "tu pense quoi", "ton avis",
+  "t davis", "dis moi", "tu crois quoi", "tu connais", "tu sais",
+  "ca veut dire quoi", "ca sert a quoi",
+];
+
+// Les mots interrogatifs qui gardent leur sens AU MILIEU d'une phrase. « ou »
+// et « non » n'y sont pas : ils y sont le plus souvent une simple conjonction
+// ou une négation, et ils feraient passer la moitié du salon pour des questions.
+const MID_QUESTION = new Set([
+  "quoi", "koi", "comment", "combien", "cb", "quand", "pk", "pq", "pourquoi",
+]);
+
+// Le cœur du test, appliqué à UNE proposition déjà débarrassée de son décor.
+function clauseIsQuestion(t) {
+  if (!t) return false;
+  if (/^(jsp|je sais pas|jss? sais pas|aucune idee)\b/.test(t)) return false;
+  if (QUESTION_STARTS.some((q) => t === q || t.startsWith(`${q} `))) return true;
+  if (QUESTION_ANYWHERE.some((q) => t.includes(q))) return true;
+  if (ALTERNATIVE.test(t)) return true;
+  const words = t.split(" ");
+  const last = words[words.length - 1];
+  if (QUESTION_ENDS.includes(last) && words.length >= 3) {
+    if (last === "non" || last === "nn") return /\bt(u|as|es)?\b/.test(t);
+    return true;
+  }
+  // « je joue à quoi ce soir », « on part quand demain » : le mot interrogatif
+  // est AU MILIEU, suivi d'un complément. C'est la forme parlée la plus
+  // courante après celle qui le met en fin de phrase.
+  return words.length >= 3 && words.slice(1, -1).some((w) => MID_QUESTION.has(w));
+}
+
 // Une vraie question : un point d'interrogation, ou une tournure interrogative
-// en tête ou en fin de phrase (le point d'interrogation se perd très souvent
-// en SMS).
+// dans l'une des propositions du message (le point d'interrogation se perd
+// très souvent en SMS).
+//
+// LE MESSAGE EST DÉCOUPÉ EN PROPOSITIONS avant d'être testé : « ok jvois, et
+// toi tu joues à quoi » est une question, alors que la phrase entière ne
+// ressemble à rien de reconnaissable. La virgule sert de coupure au même titre
+// que le point — à l'écrit SMS, elle en tient lieu.
 export function isRealQuestion(text) {
   const raw = String(text || "").trim();
   if (!raw || raw.length < 3) return false;
   if (isJustLaughing(raw)) return false;
   if (raw.includes("?")) return true;
-  const t = norm(raw);
-  if (QUESTION_STARTS.some((q) => t === q || t.startsWith(`${q} `))) return true;
-  // « … non » / « … nn » ne compte qu'avec un « tu » devant : sinon « ah bah
-  // non » deviendrait une question.
-  // « jsp où », « je sais pas quoi faire » : la tournure interrogative est là,
-  // mais c'est un aveu d'ignorance, pas une question posée.
-  if (/^(jsp|je sais pas|jss? sais pas|aucune idee)\b/.test(t)) return false;
-  const words = t.split(" ");
-  const last = words[words.length - 1];
-  if (!QUESTION_ENDS.includes(last) || words.length < 3) return false;
-  if (last === "non" || last === "nn") return /\bt(u|as|es)?\b/.test(t);
-  return true;
+  return raw
+    .split(/[.!;\n,]+/)
+    .map((part) => strip(norm(part)))
+    .some(clauseIsQuestion);
 }
 
 // ------------------------------------------------------------------
