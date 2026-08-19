@@ -8,7 +8,6 @@ import {
   X,
   Play,
   Sparkles,
-  Info,
   RotateCw,
   Unplug,
   BookOpen,
@@ -23,6 +22,7 @@ import {
   PartyPopper,
   Bug,
   PackagePlus,
+  PackageOpen,
   Dices,
   Trash2,
   Coins,
@@ -35,7 +35,7 @@ import useMediaQuery from "../hooks/useMediaQuery";
 import CollectionCase from "../components/CollectionCase";
 import GachaModal from "../components/GachaModal";
 import { ShelfSkeleton, GridSkeleton } from "../components/CollectionSkeleton";
-import { KINDS, isComic, resumeLabel, fmtDuration } from "../lib/collection";
+import { isComic, resumeLabel, fmtDuration } from "../lib/collection";
 
 // L'étagère 3D (three.js + R3F) ne part que si on la demande : même politique
 // que Playtopia, le bundle principal ne doit pas la porter.
@@ -102,9 +102,9 @@ const TIDY = [
 // LE RAYON EST COMMUN, L'ÉTAGÈRE EST À MOI. Le catalogue (séries, films,
 // animés, comics, cartouches) est garni par l'admin et il est le même pour
 // tout le monde — mais on ne le reçoit pas, on le GAGNE, boîtier par boîtier,
-// à la machine à capsules de l'arcade. Cette page ne montre donc que ce qu'on
-// possède, et le reste du catalogue est une promesse : c'est le compteur
-// « 12 / 40 » en tête de page, et le bouton qui mène à la sphère.
+// en faisant sauter des caisses à l'arcade. Cette page ne montre donc que ce
+// qu'on possède, et le reste du catalogue est une promesse : c'est le compteur
+// « 12 / 40 » en tête de page, et le bouton qui ouvre une caisse.
 //
 // La même page sert à regarder celle de quelqu'un d'autre (`/collection/u/:
 // pseudo`) : mêmes boîtiers, mêmes vues, mais en lecture seule — on ne range
@@ -311,6 +311,16 @@ export default function Collection() {
     // qui le lâchait faisait réapparaître l'ordre d'origine.
   }, [ordered, kind, query]);
 
+  // CE QUE LE FILTRE RETIENT, pour l'étagère. Elle, ne reçoit pas la liste
+  // filtrée : elle porte TOUTE la collection et éteint le reste (voir GHOST
+  // dans CollectionShelf) — un meuble qui se recompose à chaque clic de filtre
+  // fait sauter les rangées et la pagination, alors qu'on lui pose simplement
+  // une question. `null` quand il n'y a rien à éteindre.
+  const match = useMemo(
+    () => (kind || query.trim() ? new Set(shown.map((m) => m.slug)) : null),
+    [shown, kind, query]
+  );
+
   // LES REPRISES, EN TROIS RAYONS SÉPARÉS. Une seule rangée mélangée mentait
   // sur ce qu'elle proposait : « Reprendre » à côté d'un manga veut dire ouvrir
   // un volume, à côté d'une cartouche rallumer une console, et les trois gestes
@@ -358,8 +368,7 @@ export default function Collection() {
     [media]
   );
 
-  const left = Math.max(0, (tally.total || 0) - (tally.owned || 0));
-  const complete = tally.total > 0 && left === 0;
+  const complete = tally.total > 0 && tally.owned >= tally.total;
 
   // L'ÉTABLI PREND LA PLACE DE L'EN-TÊTE. Pendant qu'on range, la carte de
   // visite du rayon (« Rayon vidéo », le titre, la phrase de présentation, les
@@ -473,109 +482,90 @@ export default function Collection() {
             </h1>
             <p className="coll-head-sub">
               {visiting
-                ? "Les boîtiers qu'il ou elle a sortis de la machine — séries, films, comics et cartouches."
-                : "Les boîtiers que tu as sortis de la machine à capsules, rangés comme au vidéoclub et jouables sur place."}
+                ? "Les boîtiers qu'il ou elle a sortis des caisses — séries, films, comics et cartouches."
+                : "Les boîtiers que tu as sortis des caisses, rangés comme au vidéoclub et jouables sur place."}
             </p>
           </div>
         </div>
 
-        {/* Les compteurs ne se remplissent qu'une fois le rayon connu : d'ici
-            là, trois pastilles vides plutôt que trois zéros — un « 0 film »
-            fugace se lit comme une collection vide. */}
-        <div className="coll-head-stats">
-          {status === "loading" ? (
-            <>
-              <span className="coll-skel-pill" />
-              <span className="coll-skel-pill" />
-              <span className="coll-skel-pill wide" />
-            </>
-          ) : (
-            <>
-              {counts.series > 0 && (
-                <span>
-                  <strong>{counts.series}</strong> série{counts.series > 1 ? "s" : ""}
-                </span>
-              )}
-              {counts.film > 0 && (
-                <span>
-                  <strong>{counts.film}</strong> film{counts.film > 1 ? "s" : ""}
-                </span>
-              )}
-              {counts.comic > 0 && (
-                <span>
-                  <strong>{counts.comic}</strong> comic{counts.comic > 1 ? "s" : ""}
-                </span>
-              )}
-              {counts.game > 0 && (
-                <span>
-                  <strong>{counts.game}</strong> jeu{counts.game > 1 ? "x" : ""} GBA
-                </span>
-              )}
-              {/* CE QU'IL A ET QUE JE N'AI PAS. Sur l'étagère de quelqu'un
-                  d'autre, c'est LE chiffre — celui pour lequel on est venu. */}
-              {visiting && counts.envy > 0 && (
-                <span className="coll-head-envy">
-                  <Lock size={12} /> <strong>{counts.envy}</strong> qui te manque
-                  {counts.envy > 1 ? "nt" : ""}
-                </span>
-              )}
-            </>
-          )}
+        {/* LE CHEMIN VERS LA MACHINE EST DANS L'EN-TÊTE. Il tenait avant dans un
+            bandeau de complétion posé sous le titre, qui poussait l'étagère
+            d'une bande entière vers le bas pour redire ce que la pastille
+            « 6 / 39 » dit en quatre caractères. Le bouton monte donc ici, au
+            même niveau que le nom du rayon, et les compteurs se rangent
+            dessous. */}
+        <div className="coll-head-side">
+          {status === "ready" &&
+            (visiting ? (
+              <Link to="/collection" className="coll-open-btn clickable">
+                <Library size={15} /> Mon étagère
+              </Link>
+            ) : complete ? (
+              <span className="coll-open-done">
+                <PartyPopper size={14} /> Collection complète
+              </span>
+            ) : (
+              tally.total > 0 && (
+                <button
+                  className="coll-open-btn clickable"
+                  onClick={() => setShowGacha(true)}
+                >
+                  <PackageOpen size={15} /> Ouvrir une caisse
+                  {tally.price > 0 && <em>{tally.price} pts</em>}
+                </button>
+              )
+            ))}
+
+          {/* Les compteurs ne se remplissent qu'une fois le rayon connu : d'ici
+              là, trois pastilles vides plutôt que trois zéros — un « 0 film »
+              fugace se lit comme une collection vide. */}
+          <div className="coll-head-stats">
+            {status === "loading" ? (
+              <>
+                <span className="coll-skel-pill" />
+                <span className="coll-skel-pill" />
+                <span className="coll-skel-pill wide" />
+              </>
+            ) : (
+              <>
+                {counts.series > 0 && (
+                  <span>
+                    <strong>{counts.series}</strong> série{counts.series > 1 ? "s" : ""}
+                  </span>
+                )}
+                {counts.film > 0 && (
+                  <span>
+                    <strong>{counts.film}</strong> film{counts.film > 1 ? "s" : ""}
+                  </span>
+                )}
+                {counts.comic > 0 && (
+                  <span>
+                    <strong>{counts.comic}</strong> comic{counts.comic > 1 ? "s" : ""}
+                  </span>
+                )}
+                {counts.game > 0 && (
+                  <span>
+                    <strong>{counts.game}</strong> jeu{counts.game > 1 ? "x" : ""} GBA
+                  </span>
+                )}
+                {/* CE QU'IL A ET QUE JE N'AI PAS. Sur l'étagère de quelqu'un
+                    d'autre, c'est LE chiffre — celui pour lequel on est venu. */}
+                {visiting && counts.envy > 0 && (
+                  <span className="coll-head-envy">
+                    <Lock size={12} /> <strong>{counts.envy}</strong> qui te manque
+                    {counts.envy > 1 ? "nt" : ""}
+                  </span>
+                )}
+                {tally.total > 0 && (
+                  <span className="coll-head-tally" title="Boîtiers débloqués sur le rayon complet">
+                    <strong>{tally.owned}</strong> / {tally.total}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </header>
-      )}
-
-      {/* ---------------- la jauge de complétion ----------------
-          UNE COLLECTION SE MESURE. Sans ce bandeau, une étagère de douze
-          boîtiers est juste une étagère de douze boîtiers ; avec, c'est
-          « 12 sur 40 », et les vingt-huit qui manquent existent. C'est aussi
-          le seul chemin vers la machine depuis cette page — et il doit être
-          là, parce que c'est ici qu'on se rend compte qu'il manque quelque
-          chose. */}
-      {status === "ready" && tally.total > 0 && !workbench && (
-        <section className={`coll-quest ${complete ? "done" : ""}`}>
-          <div className="coll-quest-text">
-            <strong>
-              {complete ? (
-                <>
-                  <PartyPopper size={15} /> Collection complète
-                </>
-              ) : (
-                <>
-                  {tally.owned} boîtier{tally.owned > 1 ? "s" : ""} sur {tally.total}
-                </>
-              )}
-            </strong>
-            <span>
-              {complete
-                ? visiting
-                  ? "Tous les boîtiers du rayon sont sur cette étagère."
-                  : "Tu as sorti tous les boîtiers du rayon. Rien ne manque."
-                : visiting
-                  ? `Il lui reste ${left} boîtier${left > 1 ? "s" : ""} à débloquer.`
-                  : `Encore ${left} boîtier${left > 1 ? "s" : ""} dans la machine.`}
-            </span>
-          </div>
-          <span className="coll-quest-gauge" aria-hidden="true">
-            <i
-              style={{
-                width: tally.total ? `${(tally.owned / tally.total) * 100}%` : 0,
-              }}
-            />
-          </span>
-          {visiting ? (
-            <Link to="/collection" className="coll-quest-btn clickable">
-              <Library size={15} /> Mon étagère
-            </Link>
-          ) : (
-            !complete && (
-              <button className="coll-quest-btn clickable" onClick={() => setShowGacha(true)}>
-                <Sparkles size={15} /> Tourner la sphère
-                {tally.price > 0 && <em>{tally.price} pts</em>}
-              </button>
-            )
-          )}
-        </section>
       )}
 
       {/* ---------------- filtres + bascule de vue ---------------- */}
@@ -724,7 +714,15 @@ export default function Collection() {
           machine : c'est le seul écran où l'appel à jouer a vraiment sa
           place. Chez quelqu'un d'autre, en revanche, il n'y a rien à proposer —
           c'est son étagère, pas la nôtre. */}
-      {status === "ready" && shown.length === 0 && (
+      {/* PAS DE « RIEN SOUS CE FILTRE » DEVANT L'ÉTAGÈRE. Le meuble entier est
+          là, éteint : c'est déjà la réponse, et elle se voit — un bloc de texte
+          par-dessus ne fait que redire ce que la rangée grise montre. Ce mot ne
+          reste donc que pour la grille, où il n'y aurait sinon rien du tout à
+          l'écran, et pour l'étagère VRAIMENT vide (aucun boîtier gagné), qui
+          n'est pas un filtre sans résultat mais un départ. */}
+      {status === "ready" &&
+        shown.length === 0 &&
+        (media.length === 0 || effectiveView === "grid") && (
         <div className="coll-state">
           <span className="coll-state-icon">
             <Sparkles size={22} />
@@ -741,13 +739,13 @@ export default function Collection() {
               ? visiting
                 ? `${owner?.username || username} n'a pas encore sorti de boîtier de la machine.`
                 : tally.total > 0
-                  ? `${tally.total} boîtiers attendent dans la machine à capsules. Fais-la tourner pour en sortir un premier.`
+                  ? `${tally.total} boîtiers attendent au fond des caisses. Fais-en sauter une pour sortir le premier.`
                   : "Aucun boîtier n'a encore été posé au rayon."
               : "Aucun titre ne correspond à cette recherche."}
           </p>
           {media.length === 0 && !visiting && tally.total > 0 && (
             <button className="btn btn-primary clickable" onClick={() => setShowGacha(true)}>
-              <Sparkles size={15} /> Tourner la sphère
+              <PackageOpen size={15} /> Ouvrir une caisse
               {tally.price > 0 && ` — ${tally.price} points`}
             </button>
           )}
@@ -762,15 +760,13 @@ export default function Collection() {
         </div>
       )}
 
-      {status === "ready" && shown.length > 0 && effectiveView === "shelf" && (
+      {status === "ready" && media.length > 0 && effectiveView === "shelf" && (
         <Suspense fallback={<ShelfSkeleton label="Chargement de l'étagère…" />}>
           <CollectionShelf
-            media={shown}
-            // TOUT le rayon, en plus de ce qu'on en montre : une fois l'étagère
-            // habillée, la scène va peindre au ralenti les titres que le filtre
-            // écarte, pour que les retirer n'attende plus rien. Elle seule peut
-            // s'en charger — la peinture vit dans le paquet de three.js, et la
-            // page n'a pas à le faire descendre pour une grille CSS.
+            // TOUTE la collection, filtre ou pas : le meuble ne se vide pas, il
+            // s'éteint. `match` dit ce qui reste allumé.
+            media={ordered}
+            match={match}
             all={ordered}
             theme={theme}
             skin={shelf.skin}
@@ -947,24 +943,13 @@ export default function Collection() {
         <p className="coll-note">
           <ArrowLeft size={13} />
           <Link to="/collection">Revenir à ton étagère</Link> — les boîtiers se
-          débloquent un par un à la machine à capsules de l'arcade.
+          débloquent un par un, une caisse à la fois, à l'arcade.
         </p>
       )}
 
-      {status === "ready" && !visiting && media.length > 0 && (
-        <p className="coll-note">
-          <Info size={13} />
-          Chaque titre est lu depuis sa source d'origine (chaîne officielle,
-          diffusion promotionnelle, œuvre du domaine public) — rien n'est
-          rehébergé ici. {KINDS.series.plural} et {KINDS.film.plural.toLowerCase()}{" "}
-          s'ouvrent dans le poste cathodique ; les {KINDS.game.plural.toLowerCase()}{" "}
-          se lancent dans une console émulée, directement dans le navigateur.
-        </p>
-      )}
-
-      {/* La machine, depuis l'étagère : c'est ici qu'on se rend compte qu'il
-          manque quelque chose, donc ici qu'il faut pouvoir tourner. Le boîtier
-          gagné rejoint la page sans rechargement. */}
+      {/* La caisse, depuis l'étagère : c'est ici qu'on se rend compte qu'il
+          manque quelque chose, donc ici qu'il faut pouvoir en ouvrir une. Le
+          boîtier gagné rejoint la page sans rechargement. */}
       {showGacha && (
         <GachaModal
           token={token}

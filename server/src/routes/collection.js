@@ -305,6 +305,9 @@ const EDITABLE = [
   "rating",
   "games",
   "featured",
+  // Dans la machine à capsules, ou non (voir le modèle). Éditable comme le
+  // reste : c'est un interrupteur de la fiche, pas un geste à part.
+  "lootable",
   "order",
 ];
 
@@ -429,6 +432,7 @@ function serializeCard(req, m, progress) {
     franchise: m.franchise,
     color: m.color,
     rating: m.rating,
+    lootable: m.lootable !== false,
     // Ce qui s'imprime au dos du boîtier (peint dans un canvas côté client,
     // voir lib/collection.js) : visa d'âge, langue d'origine, pistes annoncées.
     certification: m.certification || null,
@@ -873,7 +877,10 @@ const gachaBall = (req, m) => ({
 // voient les mêmes boules dans le même ordre, ce qui rend la grille des
 // manquants comparable d'une collection à l'autre.
 function gachaPool() {
-  return CollectionMedia.find()
+  // `$ne: false` et non `true` : les fiches d'avant le champ n'ont pas la clé,
+  // et un `{ lootable: true }` les aurait toutes sorties de la machine d'un
+  // coup — une base entière vidée par un ajout de colonne.
+  return CollectionMedia.find({ lootable: { $ne: false } })
     .select("slug title kind color franchise year artwork")
     .slice("pages", 1)
     .sort({ order: 1, createdAt: 1 })
@@ -894,7 +901,7 @@ router.get("/gacha", requireAuth, async (req, res) => {
     res.json({
       price,
       points: me.points || 0,
-      owned: mine.size,
+      owned: pool.filter((m) => mine.has(m.slug)).length,
       total: pool.length,
       balls: pool.map((m) => ({ ...gachaBall(req, m), owned: mine.has(m.slug) })),
     });
@@ -993,7 +1000,9 @@ router.post("/gacha/draw", requireAuth, async (req, res) => {
     });
     triggerMissionCheck(req.userId);
 
-    const owned = (me.ownedCases || []).length + 1;
+    // Idem : ce qu'on possède DE LA MACHINE, sans compter les boîtiers qu'on
+    // a tirés avant qu'ils n'en soient retirés.
+    const owned = pool.filter((m) => mine.has(m.slug)).length + 1;
     res.json({
       media: media ? { ...serializeCard(req, media, null), owned: true } : null,
       points: balance,
@@ -1831,6 +1840,55 @@ router.put("/:slug/case-art", requireAuth, requireAdmin, async (req, res) => {
     if (!["image", "flat", "fade"].includes(spineBg))
       return res.status(400).json({ error: "Fond de tranche inconnu." });
     caseArt.spineBg = spineBg;
+
+    // ---------------------------------------------- la tranche, bloc à bloc --
+    // Les interrupteurs à trois états et les modes de pied. Validés un par un
+    // comme le reste : une valeur inconnue ne lève rien côté peintre, elle
+    // retombe simplement sur l'automatique — et on chercherait longtemps
+    // pourquoi le réglage « ne prend pas ».
+    const enums = {
+      spineArt: ["auto", "on", "off"],
+      spineLogo: ["auto", "on", "off"],
+      spineSaga: ["auto", "on", "off"],
+      spineFoot: ["auto", "year", "count", "custom", "none"],
+      spineMark: ["auto", "none"],
+      spineArtPos: ["top", "bottom"],
+    };
+    for (const [key, allowed] of Object.entries(enums)) {
+      const v = String(body[key] || allowed[0]);
+      if (!allowed.includes(v))
+        return res.status(400).json({ error: `Réglage « ${key} » inconnu.` });
+      caseArt[key] = v;
+    }
+
+    const spineColor = String(body.spineColor || "").trim();
+    if (spineColor && !/^#[\da-f]{6}$/i.test(spineColor))
+      return res.status(400).json({ error: "Couleur de tranche invalide." });
+    caseArt.spineColor = spineColor.toLowerCase();
+
+    // « Vide » doit rester VIDE : `Number("")` vaut 0, que la borne remonterait
+    // à 4 % — une vignette jamais réglée se serait retrouvée réduite à un trait.
+    const rawH = body.spineArtH;
+    const artH = Number(rawH);
+    caseArt.spineArtH =
+      rawH === "" || rawH === null || rawH === undefined || !Number.isFinite(artH)
+        ? null
+        : Math.max(4, Math.min(60, Math.round(artH)));
+
+    caseArt.spineFootText = String(body.spineFootText || "").slice(0, 30);
+
+    const spineLogoPick = String(body.spineLogoPick || "");
+    if (spineLogoPick && !/^(auto|logos:\d{1,2})$/.test(spineLogoPick))
+      return res.status(400).json({ error: "Logo de tranche inconnu." });
+    caseArt.spineLogoPick = spineLogoPick;
+
+    // L'ordre des blocs : on ne garde que des clés connues, sans doublon. Le
+    // peintre complète ce qui manque, donc une liste partielle est valide —
+    // c'est même ce qui arrive quand un bloc est éteint côté studio.
+    const BLOCKS = ["saga", "title", "foot"];
+    caseArt.spineOrder = [
+      ...new Set((Array.isArray(body.spineOrder) ? body.spineOrder : []).map(String)),
+    ].filter((k) => BLOCKS.includes(k));
 
     // La place et la taille du logo. Bornées ici plutôt que dans le curseur :
     // une valeur inventée peindrait un logo hors de la face, et l'admin ne

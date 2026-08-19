@@ -134,6 +134,22 @@ const HOVER = { lift: 0.015, out: 0.05, tilt: 0.22 };
 // à peine — juste ce qu'il faut pour qu'il ait l'air décollé et non posé.
 const CARRY = { lift: 0.05, out: 0.42, tilt: 0.1 };
 
+// LE FILTRE N'ENLÈVE PLUS LES BOÎTIERS, IL LES ÉTEINT. Filtrer en retirant de
+// la rangée ce qui ne correspond pas, c'est refaire toute la mise en place à
+// chaque clic : les rangées se recomposent, la pagination change sous les
+// pieds, et les boîtiers qui restent sautent à leur nouvelle place — de loin
+// l'impression d'un rayon qui se casse plutôt que d'un rayon qu'on interroge.
+//
+// Ici, RIEN NE BOUGE : le meuble reste exactement le même, et ce qui n'est pas
+// concerné s'efface — la tranche recule dans l'ombre de l'étagère et devient
+// translucide, comme un boîtier laissé au fond. Ce sont donc les autres qui
+// ressortent, sans qu'on ait eu à les déplacer.
+const GHOST = {
+  back: 0.14, // ce que la tranche recule dans le meuble
+  alpha: 0.13, // ce qu'il en reste à voir
+  speed: 5, // vitesse du fondu (par seconde)
+};
+
 // Cadrage du rayon. Le vide autour de la pile de planches est une MARGE FIXE,
 // en unités de scène — jamais une fraction de la hauteur.
 //
@@ -143,10 +159,16 @@ const CARRY = { lift: 0.05, out: 0.42, tilt: 0.1 };
 // tranches partaient au loin. Une marge fixe ne dépend pas du nombre de
 // rangées, donc un boîtier fait la même taille qu'il y en ait une ou six.
 //
-// SKY est le ciel au-dessus de la rangée du haut : c'est là que sort la bulle
-// de survol, elle a juste besoin de sa hauteur. FLOOR est le peu d'air sous la
-// planche du bas, pour son ombre portée.
-const SKY = 0.42;
+// SKY est le ciel au-dessus de la rangée du haut. Il était taillé pour la bulle
+// de survol, qui sort par là — mais une bulle ne se montre qu'au survol, alors
+// que ce vide-là, lui, est TOUJOURS à l'écran : une bande grande comme le tiers
+// d'un boîtier, au-dessus des tranches, qui repoussait toute l'étagère vers le
+// bas de la page. Il est donc réduit à ce qu'il faut pour que la rangée du haut
+// ne touche pas le bord du cadre (≈ 0,22 unité, soit 3,5 cm à l'échelle), et
+// la bulle déborde du cadre quand elle sort — elle flotte au-dessus de la page,
+// ne reçoit pas le curseur (`pointer-events: none`) et ne masque donc rien.
+// FLOOR est le peu d'air sous la planche du bas, pour son ombre portée.
+const SKY = 0.22;
 const FLOOR = 0.18;
 
 // La planche suit le thème de la page : claire sur fond blanc, sombre sur fond
@@ -304,21 +326,18 @@ function shelfFit(media, density, availPx, viewH) {
     perPage: f.per,
     pageCount,
     height: Math.round((stack + SKY + FLOOR) * f.unit),
-    // La largeur ne dépasse jamais ce que la rangée occupe vraiment : six
-    // titres dans un cadre pleine page seraient perdus au milieu du vide.
-    // Plancher à MIN_W, la largeur cadrée minimale de la scène : en dessous,
-    // c'est elle qui commanderait le recul de la caméra et les deux boîtiers
-    // d'un rayon presque vide repartiraient au fond.
+    // TOUJOURS TOUTE LA LARGEUR. Un cadre taillé au plus juste sur le contenu
+    // faisait respirer le meuble à chaque changement : la dernière page, à
+    // moitié pleine, rétrécissait la scène et rapprochait les flèches d'un
+    // cran ; un filtre qui ne laissait que trois titres réduisait l'étagère à
+    // une vignette au milieu de la page. Un meuble, ça ne change pas de taille
+    // selon ce qu'on pose dessus — c'est un décor, pas un contenant.
     //
-    // Dès qu'il y a des pages, en revanche, c'est TOUTE la largeur : un cadre
-    // taillé au plus juste rétrécirait sur la dernière page, à moitié pleine,
-    // et les flèches se rapprocheraient d'un cran à chaque tour.
-    width: paged
-      ? availPx
-      : Math.min(
-          availPx,
-          Math.round(Math.max(f.per * step + EDGE * 2, MIN_W) * 1.06 * f.unit)
-        ),
+    // Le boîtier, lui, garde sa taille : le cadre plus large fait grandir
+    // l'aspect, donc c'est la HAUTEUR qui commande le recul de la caméra (voir
+    // `useFraming`), et le vide en trop se répartit de part et d'autre de la
+    // rangée, qui reste centrée.
+    width: availPx,
   };
 }
 
@@ -409,6 +428,7 @@ function ShelfCase({
   held,
   taken,
   arranging,
+  ghost,
   carry,
   onHover,
   onPick,
@@ -465,6 +485,11 @@ function ShelfCase({
     };
   }
 
+  // L'ÉTAT D'EXTINCTION, HORS DE REACT. Un fondu se joue image par image ; le
+  // faire vivre dans un état React, c'est un rendu de toute la scène par image
+  // et par boîtier. `fade` est la valeur courante : 0 = plein, 1 = éteint.
+  const fade = useRef(ghost ? 1 : 0);
+
   useFrame((_, dt) => {
     const g = group.current;
     // Pris en main : sa pose est GELÉE sur celle du clic. Sans ça, il se
@@ -472,6 +497,47 @@ function ShelfCase({
     // rentrer dans l'étagère avant d'en sortir.
     if (!g || held) return;
     const k = Math.min(1, dt * 8);
+
+    const want = ghost ? 1 : 0;
+    fade.current +=
+      Math.abs(want - fade.current) < 0.002
+        ? want - fade.current
+        : (want - fade.current) * Math.min(1, dt * GHOST.speed);
+    // ON INTERROGE LA MATIÈRE, ON NE SE SOUVIENT PAS DE CE QU'ON LUI A DIT.
+    // Retenir la dernière valeur peinte pour ne repasser que sur les écarts
+    // paraît économique, mais les matières de ce boîtier ne vivent pas aussi
+    // longtemps que lui : la jaquette est REFAITE quand la peinture arrive
+    // (`useCasePaper`), la coque quand le boîtier change de taille — et la
+    // neuve naît opaque. Le fondu était alors terminé, la valeur retenue à
+    // jour, donc plus rien ne repassait : le boîtier reculait dans le meuble
+    // sans jamais s'éteindre, et c'est exactement ce qu'on voyait en changeant
+    // de filtre. Comparer à l'état RÉEL de chaque matière rattrape toute
+    // matière neuve à l'image suivante — et ne coûte qu'une comparaison, les
+    // écritures (donc les recompilations de shader) restant aux seuls écarts.
+    const a = 1 - fade.current * (1 - GHOST.alpha);
+    g.traverse((o) => {
+      if (!o.material) return;
+      for (const mat of Array.isArray(o.material) ? o.material : [o.material]) {
+        if (mat.opacity !== a) mat.opacity = a;
+        // `transparent` N'EST PAS UN RÉGLAGE, C'EST UNE RECOMPILATION. Le
+        // programme GPU d'une matière est bâti pour un mode et un seul : passer
+        // le drapeau à `true` sur une matière déjà compilée en opaque ne change
+        // rien à ce qui est dessiné — l'opacité (elle, un simple uniforme) est
+        // bien reçue, mais le mélange reste désactivé, et le boîtier recule
+        // dans le meuble sans jamais s'éteindre. D'où le comportement qui
+        // paraissait capricieux : seules s'effaçaient les matières nées APRÈS
+        // le passage du filtre (une jaquette qui finissait de se peindre), les
+        // autres restaient pleines. `needsUpdate` demande la recompilation.
+        if (mat.transparent !== a < 0.999) {
+          mat.transparent = a < 0.999;
+          mat.needsUpdate = true;
+        }
+        // Un fantôme qui écrit encore dans le tampon de profondeur découpe un
+        // trou dans les boîtiers pleins qui passent derrière lui : on verrait
+        // le rayon à travers ce qu'on cherche.
+        if (mat.depthWrite !== a > 0.5) mat.depthWrite = a > 0.5;
+      }
+    });
 
     // AU BOUT DES DOIGTS. Le boîtier qu'on déplace ne rejoint rien : il EST au
     // curseur, sans amorti — un objet qu'on tient et qui traîne derrière la main
@@ -486,7 +552,14 @@ function ShelfCase({
     }
 
     g.position.x += (homeX - g.position.x) * k;
-    g.position.z += (baseZ + (hovered && !arranging ? HOVER.out : 0) - g.position.z) * k;
+    // Éteint, il RECULE dans le meuble : c'est ce léger décrochage, plus encore
+    // que la transparence, qui fait ressortir la rangée qu'on cherche.
+    g.position.z +=
+      (baseZ +
+        (hovered && !arranging ? HOVER.out : 0) -
+        fade.current * GHOST.back -
+        g.position.z) *
+      k;
     g.position.y +=
       (baseY + (hovered ? (arranging ? CARRY.lift : HOVER.lift) : 0) - g.position.y) * k;
     // Penché vers nous en pivotant sur son arête du bas — le geste du doigt
@@ -499,17 +572,23 @@ function ShelfCase({
   return (
     <group
       ref={group}
-      onPointerOver={(e) => {
-        e.stopPropagation();
-        onHover(media.slug);
-      }}
-      onPointerOut={() => onHover(null)}
+      // Éteint, le boîtier n'est plus qu'un décor : il ne s'allume pas au
+      // passage et ne s'ouvre pas — le filtre serait sinon purement décoratif.
+      onPointerOver={
+        ghost
+          ? undefined
+          : (e) => {
+              e.stopPropagation();
+              onHover(media.slug);
+            }
+      }
+      onPointerOut={ghost ? undefined : () => onHover(null)}
       // En rangement, le boîtier ne s'ouvre plus : il se prend. Le geste part au
       // DOIGT POSÉ et non au clic — attendre le relâchement pour commencer à
       // déplacer, c'est un premier centimètre de glissement perdu, et l'objet
       // qui saute pour rattraper la main.
       onPointerDown={
-        arranging
+        arranging && !ghost
           ? (e) => {
               e.stopPropagation();
               onGrab(media, e);
@@ -517,7 +596,7 @@ function ShelfCase({
           : undefined
       }
       onClick={
-        arranging
+        arranging || ghost
           ? undefined
           : (e) => {
               e.stopPropagation();
@@ -766,6 +845,9 @@ function Warmer({ queue }) {
 const ShelfScene = memo(function ShelfScene({
   media,
   art,
+  // Les slugs ÉTEINTS par le filtre. Un ensemble, pas une liste : la question
+  // se pose une fois par boîtier et par rendu.
+  ghosts,
   hovered,
   held,
   taken,
@@ -1042,6 +1124,7 @@ const ShelfScene = memo(function ShelfScene({
             held={held === m.slug}
             taken={taken === m.slug}
             arranging={arranging}
+            ghost={!!ghosts?.has(m.slug)}
             // Le même objet à chaque rendu, et muté hors de React : c'est ce
             // qui permet au boîtier de suivre le curseur sans rendu.
             carry={carrying === m.slug ? carried.current : null}
@@ -1642,6 +1725,11 @@ export default function CollectionShelf({
   // La collection entière, filtre compris — `media` n'en est que la part
   // visible. Elle ne sert qu'au préchargement des jaquettes masquées.
   all,
+  // CE QUE LE FILTRE RETIENT, quand il y en a un — un ensemble de slugs, ou
+  // `null` si le rayon est montré en entier. L'étagère porte TOUJOURS toute la
+  // collection : ce qui n'est pas là-dedans n'est pas retiré du meuble, il s'y
+  // éteint (voir GHOST).
+  match = null,
   onSelect,
   theme = "light",
   // Le rayon RÉGLÉ : le meuble, la densité, et le mode rangement. Trois réglages
@@ -1734,6 +1822,28 @@ export default function CollectionShelf({
     () => media.slice(at * fit.perPage, at * fit.perPage + fit.perPage),
     [media, at, fit.perPage]
   );
+
+  // LE FILTRE VA CHERCHER SA PAGE. Le meuble ne se recompose plus quand on
+  // filtre — mais si les trois films sont rangés sur la quatrième planche,
+  // cliquer « Films » laisserait sous les yeux une page entièrement éteinte,
+  // ce qui se lit comme « rien trouvé ». On se pose donc sur la première page
+  // qui en porte un.
+  const firstHit = useMemo(
+    () => (match ? media.findIndex((m) => match.has(m.slug)) : -1),
+    [match, media]
+  );
+  useEffect(() => {
+    if (firstHit >= 0 && fit.perPage) setPage(Math.floor(firstHit / fit.perPage));
+  }, [firstHit, fit.perPage]);
+
+  // Les éteints de la page courante. Calculé ici plutôt que dans la scène : la
+  // scène est derrière un `memo`, et une nouvelle identité par rendu le lèverait.
+  const ghosts = useMemo(() => {
+    if (!match) return null;
+    const set = new Set();
+    for (const m of onPage) if (!match.has(m.slug)) set.add(m.slug);
+    return set;
+  }, [match, onPage]);
 
   const turn = useCallback(
     (dir) => {
@@ -2009,9 +2119,9 @@ export default function CollectionShelf({
   }, [dressed]);
 
   return (
-    // Le cadre est TAILLÉ pour le rayon (voir `shelfFit`) : sa largeur ne
-    // dépasse pas ce que la rangée occupe, et sa hauteur vaut une rangée —
-    // deux, trois… — à taille de boîtier constante.
+    // Le cadre prend TOUTE la largeur qu'on lui donne (voir `shelfFit`), quel
+    // que soit le nombre de boîtiers posés dessus ; seule sa hauteur suit le
+    // contenu — une rangée, deux, trois… — à taille de boîtier constante.
     <div
       ref={wrapRef}
       className={`coll-shelf3d ${hovered ? "is-hover" : ""} ${
@@ -2051,6 +2161,7 @@ export default function CollectionShelf({
           // qu'elle peut tenir.
           media={onPage}
           art={art}
+          ghosts={ghosts}
           hovered={hovered}
           held={inspected?.media.slug || reading?.media.slug}
           taken={taken}

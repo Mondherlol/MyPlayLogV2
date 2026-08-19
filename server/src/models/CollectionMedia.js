@@ -255,6 +255,59 @@ const caseArtSchema = new mongoose.Schema(
     // qui se perd dans la couleur du boîtier.
     spineBg: { type: String, enum: ["image", "flat", "fade"], default: "image" },
 
+    // ------------------------------------------------------------------
+    //  LA TRANCHE, RÉGLÉE BLOC PAR BLOC
+    // ------------------------------------------------------------------
+    // C'est la face qu'on VOIT dans le rayon — les deux autres ne se
+    // regardent qu'une fois l'objet en main. Elle n'avait pourtant qu'un
+    // seul réglage (le fond) là où la couverture en a dix : tout le reste
+    // (la vignette, la saga, le pied, la marque) était décidé par le
+    // gabarit, et la seule façon de retirer un bloc était de saboter la
+    // donnée qui le nourrit.
+    //
+    // Chaque bloc a donc ici son interrupteur à trois états : « auto »
+    // garde EXACTEMENT le comportement du gabarit (donc rien à migrer sur
+    // les fiches existantes), « on » et « off » forcent la main.
+
+    // Le fond de la tranche seule. Une rangée de boîtiers se range à la
+    // couleur, et cette couleur-là n'a aucune raison d'être celle du dos.
+    // Vide = l'encre du boîtier (`color`).
+    spineColor: { type: String, default: "" },
+
+    // La vignette de tête : l'afficher ou non, sa hauteur en pour-cent de la
+    // tranche, et de quel côté elle se pose.
+    spineArt: { type: String, enum: ["auto", "on", "off"], default: "auto" },
+    spineArtH: { type: Number, default: null },
+    spineArtPos: { type: String, enum: ["top", "bottom"], default: "top" },
+
+    // Le logo du titre à la place de la didone — INDÉPENDAMMENT de la
+    // couverture : un logo large tient sur une couverture et se retrouve
+    // illisible dans une colonne de 55 px, et l'inverse est vrai aussi.
+    // `spineLogoPick` vide = celui de la couverture (`logoPick`).
+    spineLogo: { type: String, enum: ["auto", "on", "off"], default: "auto" },
+    spineLogoPick: { type: String, default: "" },
+
+    // La saga, en petites capitales sous le filet de tête.
+    spineSaga: { type: String, enum: ["auto", "on", "off"], default: "auto" },
+
+    // Ce qui s'imprime en pied : l'année (le défaut du gabarit), le compte
+    // d'épisodes / de planches, un texte à soi, ou rien.
+    spineFoot: {
+      type: String,
+      enum: ["auto", "year", "count", "custom", "none"],
+      default: "auto",
+    },
+    spineFootText: { type: String, default: "" },
+
+    // Le losange de collection (ou le logo du support) tout en bas.
+    spineMark: { type: String, enum: ["auto", "none"], default: "auto" },
+
+    // L'ORDRE DES BLOCS DE TEXTE, du haut vers le bas. Vide = celui du
+    // gabarit (saga, titre, pied). Ce sont des clés, pas des positions : un
+    // bloc absent de la liste reprend simplement sa place d'origine, donc
+    // une valeur incomplète ne peut pas faire disparaître un texte.
+    spineOrder: { type: [String], default: [] },
+
     // La place du logo sur la couverture, en pour-cent de la face, et sa taille
     // en pour-cent de la taille de référence. Le bon endroit dépend entièrement
     // de l'image dessous : aucun gabarit ne peut le deviner.
@@ -522,6 +575,27 @@ const collectionMediaSchema = new mongoose.Schema(
     sources: { type: [String], default: [] },
 
     featured: { type: Boolean, default: false },
+
+    // DANS LA MACHINE, OU RANGÉ AU DÉPÔT.
+    //
+    // Un boîtier peut exister sans être TIRABLE : une fiche en cours de
+    // montage (jaquette pas finie, épisodes pas encore relevés), un titre
+    // retiré de la rotation, une exclusivité gardée pour plus tard. Jusqu'ici
+    // la seule façon de le sortir du gacha était de le SUPPRIMER — donc de
+    // perdre la fiche, les visuels rapatriés et le travail de jaquette avec.
+    //
+    // Ce qui se passe quand on l'éteint : il quitte le dôme de la machine à
+    // capsules (`gachaPool`), et c'est TOUT. Ceux qui l'ont déjà tiré le
+    // gardent, sa fiche s'ouvre, il reste sur leur étagère. Retirer un objet
+    // du tirage ne doit jamais déposséder qui que ce soit — un joueur qui
+    // verrait un boîtier disparaître de son rayon n'y comprendrait rien, et
+    // aurait raison.
+    //
+    // `default: true` et la lecture en `!== false` vont ensemble : les fiches
+    // d'avant ce champ n'ont pas la clé du tout, et elles doivent rester
+    // tirables sans qu'on ait à repasser sur la base.
+    lootable: { type: Boolean, default: true },
+
     order: { type: Number, default: 0 },
     enrichedAt: { type: Date, default: null },
   },

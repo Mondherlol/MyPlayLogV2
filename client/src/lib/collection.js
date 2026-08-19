@@ -536,44 +536,86 @@ export function paintShade(h = 64) {
 // (voir `makeField`). Sur une étagère, les tranches s'alignent donc en une
 // suite de tons sourds, chacun venant de SON visuel — au lieu d'une rangée de
 // rectangles fluo.
+// LES BLOCS DE LA TRANCHE, dans leur ordre d'origine. Ce sont des CLÉS et non
+// des positions : une liste incomplète (ou salie par une vieille valeur) se
+// complète toute seule avec ce qui manque, donc aucun réglage ne peut faire
+// disparaître un texte.
+const SPINE_BLOCKS = ["saga", "title", "foot"];
+
+function spineOrder(list) {
+  const keep = (list || []).filter((k) => SPINE_BLOCKS.includes(k));
+  const seen = new Set(keep);
+  return [...new Set([...keep, ...SPINE_BLOCKS.filter((k) => !seen.has(k))])];
+}
+
+// Un texte tourné, resserré pour tenir dans SA COURSE, centré dedans. La saga
+// et le pied ne diffèrent que par la casse et la graisse : leur donner le même
+// geste est exactement ce qui permet de les réordonner sans que rien d'autre
+// ne bouge que le `top` qu'on leur passe.
+function spineTracked(S, text, top, run, { size, min, track, fill }) {
+  const { ctx, w, mid, px } = S;
+  ctx.save();
+  ctx.translate(mid, top + run / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = fill;
+  const fit = fitTracked(
+    ctx,
+    text,
+    run,
+    (s) => `700 ${s}px ${SANS}`,
+    px(w * size),
+    px(w * min),
+    track
+  );
+  trackedText(ctx, fit.text, 0, 0, fit.track, "center");
+  ctx.restore();
+}
+
 function paintSpine(media, art, width, height) {
   const canvas = canvasOf(width, height);
   const w = canvas.width;
   const h = canvas.height;
   const ctx = canvas.getContext("2d");
+  const CA = media.caseArt || {};
+
+  // LES INTERRUPTEURS À TROIS ÉTATS DU STUDIO. « auto » rend la main au
+  // gabarit, et c'est ce qui fait qu'aucune fiche d'avant n'a bougé : tant que
+  // personne n'a touché à un bouton, cette fonction peint ce qu'elle peignait.
+  const on = (v, auto) => (v === "on" ? true : v === "off" ? false : auto);
+
   // LA VIGNETTE DE TRANCHE SE CHOISIT, elle aussi. Par défaut l'affiche (c'est
   // le cadrage portrait le plus proche d'une colonne de 55 px), mais tel titre
   // n'est reconnaissable que sur une photo, et tel autre a une affiche que ce
   // recadrage massacre.
-  const img =
-    pickImage(media.caseArt?.spine, art) === "none"
-      ? null
-      : pickImage(media.caseArt?.spine, art) || art.poster || art.backdrop;
-  const color = media.caseArt?.color || media.color || "#f2b70b";
+  const spec = pickImage(CA.spine, art);
+  const img = spec === "none" ? null : spec || art.poster || art.backdrop;
+
+  // LA TRANCHE A SA PROPRE COULEUR. Une étagère se range à la couleur des
+  // tranches — c'est même la seule chose qu'on en voie — et rien n'oblige
+  // cette couleur-là à être l'encre du dos. Chez la plupart des éditeurs c'est
+  // justement le contraire : dos noir, tranche aux couleurs de la saga.
+  const color = CA.spineColor || CA.color || media.color || "#f2b70b";
+  // LE FOND DE LA TRANCHE, TROIS FAÇONS :
+  //   image  la vignette floutée (défaut)
+  //   flat   la couleur unie, telle quelle
+  //   fade   la vignette en tête, qui se perd dans la couleur vers le bas
+  const spineBg = CA.spineBg || "image";
+  const flat = !img || spineBg === "flat";
+  const bg = CA.spineColor || CA.color || null;
   // Même règle que sur les deux autres faces : une tranche sans vignette EST la
   // couleur choisie dans le studio, servie telle quelle, et son encre bascule au
   // noir si cette couleur est claire.
-  // LE FOND DE LA TRANCHE, TROIS FAÇONS. C'est la face qu'on voit dans le
-  // rayon, alignée sur trente autres : le champ tiré du visuel donne une rangée
-  // de tons sourds, mais une collection se range aussi très bien en aplats
-  // francs — et un dégradé qui part de la vignette pour finir dans la couleur
-  // du boîtier est ce que fait la moitié des éditeurs.
-  //
-  //   image  la vignette floutée, comme avant (défaut)
-  //   flat   la couleur unie, telle quelle
-  //   fade   la vignette en tête, qui se perd dans la couleur vers le bas
-  const spineBg = media.caseArt?.spineBg || "image";
-  const flat = !img || spineBg === "flat";
-  const bg = media.caseArt?.color || null;
   const ink = flat ? inkOn(bg) : "#ffffff";
   const accent = flat && bg ? shade(bg, luminanceOf(bg) > 0.56 ? -0.55 : 0.55) : accentInk(color);
   const px = (v) => Math.max(1, Math.round(v));
   const mid = w / 2;
   const HAIR = alpha(ink, 0.16);
+  const S = { ctx, w, h, mid, px };
 
   // --- Le champ, gardé sous la main : c'est lui qui remontera par-dessus le
-  //     bas de l'affiche pour l'y fondre sans couture. Le voile est dosé pour le
-  //     CAS DÉFAVORABLE — une affiche à fond blanc : sans lui, la tranche
+  //     bord de la vignette pour l'y fondre sans couture. Le voile est dosé pour
+  //     le CAS DÉFAVORABLE — une affiche à fond blanc : sans lui, la tranche
   //     virait au gris clair et le titre blanc s'y noyait.
   const field = makeField(w, h, color, flat ? null : img, {
     light: 0.62,
@@ -598,34 +640,35 @@ function paintSpine(media, art, width, height) {
   //     fait qu'on repère une rangée de jeux d'un bout à l'autre d'une étagère,
   //     sans lire un seul titre. Il n'appartient qu'aux jeux — sur un film, ce
   //     serait une décoration de plus.
-  //
-  //     Sa hauteur n'est pas décorative : le nom de la machine est TOURNÉ comme
-  //     le reste, donc sa longueur court à la verticale. Un bandeau court le
-  //     ferait rétrécir puis tronquer (« NINTEND… »), ce qui est pire que pas
-  //     de bandeau du tout.
   const capH = isGame(media) ? h * 0.15 : 0;
 
-  // --- 1. L'affiche, à fond perdu en tête. Aucun voile par-dessus : c'est la
-  //     seule chose qu'on reconnaît de loin. Elle s'éteint dans le champ sur son
-  //     dernier tiers, comme une impression qui se perd dans le fond.
+  // --- 1. LA VIGNETTE, à fond perdu, EN TÊTE OU EN PIED. Aucun voile
+  //     par-dessus : c'est la seule chose qu'on reconnaisse de loin. Elle
+  //     s'éteint dans le champ sur son dernier tiers, comme une impression qui
+  //     se perd dans le fond.
   //
-  //     PAS SUR UN JEU. Une tranche de boîte de jeu ne porte pas de vignette :
-  //     le bandeau de la console, le titre, et c'est tout. Et la boîte GBA est
-  //     déjà d'un tiers plus courte qu'un DVD — lui prendre en plus un quart de
-  //     sa hauteur laisserait au titre une course où plus rien ne tient.
-  const artH = img && !flat && !isGame(media) ? h * 0.22 : 0;
+  //     Sa hauteur se règle (`spineArtH`) parce qu'elle dépend entièrement du
+  //     visuel : un gros plan tient en 12 % de la tranche, un plan large n'est
+  //     lisible qu'à 35 %. Le gabarit en donnait 22 % à tout le monde.
+  const showArt = !!img && on(CA.spineArt, !flat && !isGame(media));
+  const artH = showArt ? (h * Math.max(4, Math.min(60, CA.spineArtH ?? 22))) / 100 : 0;
+  const atBottom = artH > 0 && CA.spineArtPos === "bottom";
+  const artY = atBottom ? h - artH : capH;
   if (artH) {
     ctx.save();
     ctx.beginPath();
-    ctx.rect(0, capH, w, artH);
+    ctx.rect(0, artY, w, artH);
     ctx.clip();
     // Cadrée haut : sur une affiche portrait réduite à une colonne, le sujet
     // est dans le premier tiers.
-    drawCover(ctx, img, 0, capH, w, artH, 0.5, 0.3);
+    drawCover(ctx, img, 0, artY, w, artH, 0.5, 0.3);
     ctx.restore();
     // En mode « fade », le dégradé posé plus haut fait déjà l'extinction : la
     // fondre une seconde fois dans le champ la salirait.
-    if (spineBg !== "fade") fadeInto(ctx, field, 0, capH + artH * 0.6, w, artH * 0.4);
+    if (spineBg !== "fade") {
+      if (atBottom) fadeInto(ctx, field, 0, artY, w, artH * 0.4, true);
+      else fadeInto(ctx, field, 0, artY + artH * 0.6, w, artH * 0.4);
+    }
   }
 
   if (capH) paintSpineCap(ctx, w, capH);
@@ -637,115 +680,133 @@ function paintSpine(media, art, width, height) {
   //     dans un bandeau trop court débordait des deux côtés, par-dessus le
   //     titre. C'est ce qui faisait la bouillie de l'ancienne tranche.
   //
-  //     On alloue donc à chaque bloc sa course en pixels, du haut vers le bas,
-  //     et chaque texte est RÉDUIT pour y tenir. Le titre prend tout le reste —
-  //     et récupère la course de la saga quand il n'y en a pas.
-  const hasSaga =
-    media.franchise && media.franchise.toLowerCase() !== media.title.toLowerCase();
-  const topRule = capH + artH + h * 0.026;
-  const sagaTop = topRule + h * 0.022;
-  const sagaRun = hasSaga ? h * 0.115 : 0;
-  const markY = h - h * 0.028; // le losange de collection, tout en bas
-  const yearRun = h * 0.09;
-  const yearTop = markY - h * 0.022 - yearRun;
-  const footRule = yearTop - h * 0.024;
-  const titleTop = sagaTop + sagaRun;
-  const titleRun = footRule - h * 0.028 - titleTop;
+  //     Chaque bloc reçoit donc sa course en pixels, du haut vers le bas, et
+  //     son texte est RÉDUIT pour y tenir. Le titre prend tout le reste — et
+  //     récupère la course des blocs qu'on éteint.
+  //
+  //     LES TROIS BLOCS SE RÉORDONNENT (`spineOrder`) : c'est le seul endroit
+  //     du fichier qui décide d'une position verticale, donc le seul à changer
+  //     pour que « le pied avant le titre » veuille dire quelque chose.
+  const zoneTop = capH + (atBottom ? 0 : artH);
+  const zoneBot = h - (atBottom ? artH : 0);
 
-  // --- 2. Le filet de tête et la saga. Le filet ne barre pas toute la largeur :
-  //     un trait qui touche les deux bords ferme la tranche, un trait court la
-  //     rythme.
+  const hasSaga =
+    !!media.franchise && media.franchise.toLowerCase() !== media.title.toLowerCase();
+  const showSaga = !!media.franchise && on(CA.spineSaga, hasSaga);
+  const markShown = (CA.spineMark || "auto") !== "none";
+
+  // CE QUI S'IMPRIME EN PIED. L'année seule est le défaut : le compte
+  // d'épisodes vivait ici aussi, et à cette course les deux mentions bout à
+  // bout sortaient de la tranche. Les deux restent proposées séparément, plus
+  // un texte à soi — un numéro de volume, une mention d'édition, un éditeur.
+  const count = isComic(media)
+    ? media.pageCount
+      ? `${media.pageCount} PLANCHES`
+      : ""
+    : isGame(media)
+      ? media.cartridge?.region?.toUpperCase() || ""
+      : media.episodeCount
+        ? `${media.episodeCount} ÉPISODES`
+        : "";
+  const footMode = CA.spineFoot || "auto";
+  const footText =
+    footMode === "none"
+      ? ""
+      : footMode === "year"
+        ? fmtYears(media) || ""
+        : footMode === "count"
+          ? count
+          : footMode === "custom"
+            ? String(CA.spineFootText || "").toUpperCase()
+            : fmtYears(media) || count;
+
+  const shown = { saga: showSaga, title: true, foot: !!footText };
+  const blocks = spineOrder(CA.spineOrder).filter((k) => shown[k]);
+
+  const topRule = zoneTop + h * 0.026;
+  const start = topRule + h * 0.022;
+  const markY = zoneBot - h * 0.028;
+  const end = markShown ? markY - h * 0.03 : zoneBot - h * 0.02;
+  const GAP = h * 0.026;
+  const RUN = { saga: h * 0.115, foot: h * 0.09, title: 0 };
+  const fixed = blocks.reduce((n, k) => n + RUN[k], 0);
+  // Un plancher sur la course du titre : à trois blocs allumés sur une boîte de
+  // jeu (déjà d'un tiers plus courte), le calcul pouvait tomber sous zéro et le
+  // titre disparaissait sans un mot.
+  const titleRun = Math.max(
+    h * 0.18,
+    end - start - fixed - GAP * Math.max(0, blocks.length - 1)
+  );
+
+  // --- 2. Le filet de tête. Il ne barre pas toute la largeur : un trait qui
+  //     touche les deux bords ferme la tranche, un trait court la rythme.
   rule(ctx, w * 0.3, topRule, w * 0.4, HAIR, px(h * 0.0014));
 
-  if (hasSaga) {
-    ctx.save();
-    ctx.translate(mid, sagaTop + sagaRun / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.textBaseline = "middle";
-    ctx.fillStyle = alpha(accent, 0.88);
-    const saga = fitTracked(
-      ctx,
-      media.franchise.toUpperCase(),
-      sagaRun,
-      (s) => `700 ${s}px ${SANS}`,
-      px(w * 0.145),
-      px(w * 0.1),
-      0.34
-    );
-    trackedText(ctx, saga.text, 0, 0, saga.track, "center");
-    ctx.restore();
-  }
+  let y = start;
+  blocks.forEach((key, i) => {
+    const run = key === "title" ? titleRun : RUN[key];
 
-  // --- 3. Le titre, plein champ. LE LOGO PASSE DEVANT LA DIDONE quand on en a
-  //     un : c'est la face qu'on voit dans le rayon, et une rangée de tranches
-  //     portant chacune sa vraie typo, c'est très exactement ce à quoi ressemble
-  //     une étagère de DVD. La didone reprend la main dès que le logo ne tient
-  //     pas dans la course — écrasé, il ferait moins bien qu'un titre bien posé.
-  if (
-    media.caseArt?.logo !== false &&
-    paintSpineLogo(ctx, art.logo, mid, titleTop, titleRun, w)
-  ) {
-    // Le logo occupe tout le bloc de titre : rien d'autre à poser ici.
-  } else {
-    ctx.save();
-    ctx.translate(mid, titleTop + titleRun / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    const title = fitOneLine(
-      ctx,
-      media.title,
-      titleRun,
-      (s) => `600 ${s}px ${SERIF}`,
-      px(w * 0.52),
-      px(w * 0.24)
-    );
-    // Une ombre COURTE et sombre : la didone a des déliés fins, il leur faut de
-    // quoi se détacher du champ sans qu'on voie l'ombre elle-même.
-    ctx.shadowColor = "rgba(0,0,0,0.6)";
-    ctx.shadowOffsetX = px(w * 0.015);
-    ctx.shadowBlur = px(w * 0.07);
-    ctx.fillStyle = ink;
-    ctx.fillText(title, 0, 0);
-    ctx.restore();
-  }
+    if (key === "saga") {
+      spineTracked(S, media.franchise.toUpperCase(), y, run, {
+        size: 0.145,
+        min: 0.1,
+        track: 0.34,
+        fill: alpha(accent, 0.88),
+      });
+    } else if (key === "foot") {
+      spineTracked(S, footText, y, run, {
+        size: 0.16,
+        min: 0.1,
+        track: 0.2,
+        fill: alpha(ink, 0.8),
+      });
+    } else if (
+      // --- LE TITRE, plein champ. LE LOGO PASSE DEVANT LA DIDONE quand on en a
+      //     un : c'est la face qu'on voit dans le rayon, et une rangée de
+      //     tranches portant chacune sa vraie typo, c'est très exactement ce à
+      //     quoi ressemble une étagère de DVD. La didone reprend la main dès
+      //     que le logo ne tient pas dans la course — écrasé, il ferait moins
+      //     bien qu'un titre bien posé.
+      //
+      //     LE LOGO DE TRANCHE EST CELUI DE LA TRANCHE : un lettrage large tient
+      //     sur une couverture et devient un trait gris dans une colonne de
+      //     55 px. D'où un interrupteur et un choix de logo à elle.
+      on(CA.spineLogo, CA.logo !== false) &&
+      paintSpineLogo(ctx, art.spineLogo || art.logo, mid, y, run, w)
+    ) {
+      // Le logo occupe tout le bloc de titre : rien d'autre à poser ici.
+    } else {
+      ctx.save();
+      ctx.translate(mid, y + run / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const title = fitOneLine(
+        ctx,
+        media.title,
+        run,
+        (s) => `600 ${s}px ${SERIF}`,
+        px(w * 0.52),
+        px(w * 0.24)
+      );
+      // Une ombre COURTE et sombre : la didone a des déliés fins, il leur faut
+      // de quoi se détacher du champ sans qu'on voie l'ombre elle-même.
+      ctx.shadowColor = "rgba(0,0,0,0.6)";
+      ctx.shadowOffsetX = px(w * 0.015);
+      ctx.shadowBlur = px(w * 0.07);
+      ctx.fillStyle = ink;
+      ctx.fillText(title, 0, 0);
+      ctx.restore();
+    }
 
-  // --- 4. Le pied : un filet, la date. Plus de bandeau sombre — c'est le
-  //     vignettage du champ qui assied déjà l'objet sur la planche.
-  rule(ctx, w * 0.3, footRule, w * 0.4, HAIR, px(h * 0.0014));
-
-  // La date seule. Le nombre d'épisodes vivait ici avant : à cette course, les
-  // deux mentions bout à bout sortaient de la tranche — et le compte se lit de
-  // toute façon dans la bulle de survol comme au dos.
-  const foot =
-    fmtYears(media) ||
-    (isComic(media)
-      ? media.pageCount
-        ? `${media.pageCount} PLANCHES`
-        : ""
-      : isGame(media)
-        ? media.cartridge?.region?.toUpperCase() || ""
-        : media.episodeCount
-          ? `${media.episodeCount} ÉPISODES`
-          : "");
-  if (foot) {
-    ctx.save();
-    ctx.translate(mid, yearTop + yearRun / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.textBaseline = "middle";
-    ctx.fillStyle = alpha(ink, 0.8);
-    const year = fitTracked(
-      ctx,
-      foot,
-      yearRun,
-      (s) => `600 ${s}px ${SANS}`,
-      px(w * 0.16),
-      px(w * 0.1),
-      0.2
-    );
-    trackedText(ctx, year.text, 0, 0, year.track, "center");
-    ctx.restore();
-  }
+    y += run;
+    // Le filet de pied SUIT LE TITRE où qu'il aille : c'est lui qui sépare le
+    // bloc principal des mentions, et le poser à une hauteur fixe le mettait au
+    // milieu du titre dès qu'on changeait l'ordre.
+    if (key === "title" && i < blocks.length - 1)
+      rule(ctx, w * 0.3, y + GAP * 0.45, w * 0.4, HAIR, px(h * 0.0014));
+    y += GAP;
+  });
 
   // LA MARQUE DE PIED. Sur un boîtier vidéo, c'est le logo du support (voir
   // `paintSpineMark`) : déposé dans `client/public/case/`, il court alors d'un
@@ -757,16 +818,18 @@ function paintSpine(media, art, width, height) {
   // course de 100 px qu'on volerait au titre, et à cette taille il ne serait
   // qu'un trait gris ; le losange se pose en 6 px et suffit à ranger l'objet
   // dans une série.
-  const marked =
-    !isComic(media) && !isGame(media) && paintSpineMark(ctx, art, media, mid, markY, w, ink);
-  if (!marked) {
-    ctx.save();
-    ctx.translate(mid, markY);
-    ctx.rotate(Math.PI / 4);
-    ctx.fillStyle = alpha(accent, 0.7);
-    const m = w * 0.075;
-    ctx.fillRect(-m / 2, -m / 2, m, m);
-    ctx.restore();
+  if (markShown) {
+    const marked =
+      !isComic(media) && !isGame(media) && paintSpineMark(ctx, art, media, mid, markY, w, ink);
+    if (!marked) {
+      ctx.save();
+      ctx.translate(mid, markY);
+      ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = alpha(accent, 0.7);
+      const m = w * 0.075;
+      ctx.fillRect(-m / 2, -m / 2, m, m);
+      ctx.restore();
+    }
   }
 
   foldShading(ctx, w, h);
@@ -1319,9 +1382,18 @@ export async function paintCase(media, quality = 1024) {
 // LEQUEL DES LOGOS. `artwork.logo` est le dernier arrivé ; le fonds les garde
 // tous, et le studio peut en désigner un autre — TMDB rend parfois le logo
 // d'une édition étrangère là où celui d'avant était le bon.
-function logoUrl(media) {
-  const m = /^logos:(\d+)$/.exec(media.caseArt?.logoPick || "");
+function logoUrl(media, pick) {
+  const m = /^logos:(\d+)$/.exec(pick || media.caseArt?.logoPick || "");
   return (m && media.logos?.[Number(m[1])]) || media.logo || null;
+}
+
+// LE LOGO DE LA TRANCHE, quand ce n'est pas celui de la couverture. Cherché
+// SEULEMENT s'il en désigne un autre : sans ce test, chaque boîtier paierait un
+// décodage d'image de plus pour rien — la tranche reprend le logo de la
+// couverture dans la quasi-totalité des cas.
+function spineLogoUrl(media) {
+  const pick = media.caseArt?.spineLogoPick || "";
+  return pick && pick !== (media.caseArt?.logoPick || "auto") ? logoUrl(media, pick) : null;
 }
 
 async function loadArt(media) {
@@ -1348,17 +1420,19 @@ async function loadArt(media) {
   }
   const poolRanks = [...wanted];
 
-  const [poster, backdrop, logo, stillImgs, studioImgs, markImgs, poolImgs] = await Promise.all([
-    loadImage(media.poster),
-    // Chargé seulement s'il existe ET s'il diffère de l'affiche : sur la
-    // moitié du rayon, les deux pointent le même fichier.
-    media.backdrop && media.backdrop !== media.poster ? loadImage(media.backdrop) : null,
-    wantsPrint ? loadImage(logoUrl(media)) : null,
-    Promise.all(stills.map((s) => loadImage(s))),
-    Promise.all(studios.map((s) => loadImage(s.logo))),
-    Promise.all(markKeys.map((k) => loadImage(MARK_FILES[k]))),
-    Promise.all(poolRanks.map((i) => loadImage(media.pool?.[i]))),
-  ]);
+  const [poster, backdrop, logo, spineLogo, stillImgs, studioImgs, markImgs, poolImgs] =
+    await Promise.all([
+      loadImage(media.poster),
+      // Chargé seulement s'il existe ET s'il diffère de l'affiche : sur la
+      // moitié du rayon, les deux pointent le même fichier.
+      media.backdrop && media.backdrop !== media.poster ? loadImage(media.backdrop) : null,
+      wantsPrint ? loadImage(logoUrl(media)) : null,
+      loadImage(spineLogoUrl(media)),
+      Promise.all(stills.map((s) => loadImage(s))),
+      Promise.all(studios.map((s) => loadImage(s.logo))),
+      Promise.all(markKeys.map((k) => loadImage(MARK_FILES[k]))),
+      Promise.all(poolRanks.map((i) => loadImage(media.pool?.[i]))),
+    ]);
 
   const marks = {};
   markKeys.forEach((k, i) => {
@@ -1383,6 +1457,9 @@ async function loadArt(media) {
     // Un logo noir sur transparent (c'est le cas de la plupart) disparaîtrait
     // sur une jaquette de nuit : on le détoure en blanc s'il est sombre.
     logo: logo ? tintLogo(logo) : null,
+    // Nul tant que la tranche n'en désigne pas un autre : le peintre retombe
+    // alors sur `logo` (voir paintSpine).
+    spineLogo: spineLogo ? tintLogo(spineLogo) : null,
     stills: stillImgs.filter(Boolean),
     // Les marques de studio, elles, sont détourées SANS condition : elles se
     // posent toujours sur un pied sombre, et les servir en noir n'a jamais de

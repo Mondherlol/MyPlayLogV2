@@ -171,7 +171,7 @@ const MODES = [
   { key: "total", label: "Total", pick: (e) => e.score ?? 0, hint: "Total cumulé de toutes les parties" },
 ];
 
-// La porte d'entrée de la machine à capsules, masquée pour l'instant.
+// La porte d'entrée des caisses de collection, masquée pour l'instant.
 // RIEN N'EST SUPPRIMÉ : le bandeau, la modale et toute la mécanique serveur
 // restent en place — repasser cette constante à `true` les fait réapparaître
 // tels quels. C'est aussi ce drapeau qui évite d'aller interroger
@@ -285,10 +285,10 @@ export default function Arcade() {
     };
   }, [token, meId, commitData]);
 
-  // L'état de la machine à capsules : combien de boîtiers j'ai, combien il en
-  // reste, ce que coûte un tour. Chargé à part du reste de l'arcade — c'est le
-  // rayon vidéo qui le sait, pas les caisses — et seulement si la section est
-  // ouverte (le drapeau d'admin, voir lib/features.js côté serveur).
+  // L'état des caisses de collection : combien de boîtiers j'ai, combien il en
+  // reste, ce que coûte une caisse. Chargé à part du reste de l'arcade — c'est
+  // le rayon vidéo qui le sait, pas les caisses de curseurs — et seulement si
+  // la section est ouverte (le drapeau d'admin, voir lib/features.js).
   const gachaOn = SHOW_GACHA && hasFeature("collection");
   const loadGacha = useCallback(() => {
     if (!token || !gachaOn) return;
@@ -488,10 +488,10 @@ export default function Arcade() {
           <MysteryCard />
         </div>
 
-        {/* ---------- La machine à capsules ----------
-            AU-DESSUS DES CAISSES, et c'est délibéré : une caisse donne un
-            cosmétique, la machine donne un OBJET qu'on range sur une étagère.
-            C'est la plus grosse dépense de la salle et la seule qui se
+        {/* ---------- La caisse de collection ----------
+            AU-DESSUS DES CAISSES DE CURSEURS, et c'est délibéré : celles-là
+            donnent un cosmétique, celle-ci donne un OBJET qu'on range sur une
+            étagère. C'est la plus grosse dépense de la salle et la seule qui se
             collectionne — elle prend donc le haut de l'affiche. */}
         {gachaOn && gacha?.total > 0 && (
           <GachaBanner
@@ -1183,12 +1183,12 @@ function CursorsModal({
   );
 }
 
-// ---------- La machine à capsules, vue depuis l'arcade ----------
-// Une PORTE, pas la machine : la sphère de verre et son tas de bonbons
-// vivent dans la modale (GachaModal), qui prend tout l'écran parce que c'est un
-// moment. Ici on montre juste de quoi donner envie de pousser la porte — un
-// aperçu du dôme, où l'on doit voir d'un coup d'œil combien il reste de boules
-// colorées, et les dernières jaquettes qui manquent.
+// ---------- La caisse de collection, vue depuis l'arcade ----------
+// Une PORTE, pas la caisse : la vraie, celle qui tremble et qui claque, vit
+// dans la modale (GachaModal) et prend tout l'écran parce que c'est un moment.
+// Ici on montre juste de quoi donner envie de pousser la porte — une caisse en
+// miniature, entrebâillée sur les boules qu'elle contient encore, et les
+// dernières jaquettes qui manquent.
 function GachaBanner({ gacha, points, onOpen }) {
   const { owned, total, price, balls = [] } = gacha;
   const left = Math.max(0, total - owned);
@@ -1202,27 +1202,31 @@ function GachaBanner({ gacha, points, onOpen }) {
     <article className={`arc-gacha ${complete ? "done" : ""} ${afford ? "" : "poor"}`}>
       <span className="arc-gacha-glow" aria-hidden="true" />
 
-      {/* Le dôme en miniature : les mêmes boules que dans la machine, éteintes
-          quand on les a. Douze au plus — au-delà ce n'est plus un aperçu. */}
-      <div className="arc-gacha-dome" aria-hidden="true">
-        {balls.slice(0, 12).map((b, i) => (
-          <i
-            key={b.slug}
-            className={`arc-gacha-pip ${b.owned ? "got" : ""}`}
-            style={{ "--i": i }}
-          />
-        ))}
+      {/* LA CAISSE EN MINIATURE, entrebâillée. Le couvercle est soulevé, la
+          couture rougeoie, et cinq boules dépassent de l'ouverture : celles
+          qu'on n'a pas encore. Tout est en CSS — c'est un aperçu, il n'a pas à
+          coûter une scène 3D de plus dans la page. */}
+      <div className="arc-gacha-box" aria-hidden="true">
+        <span className="arc-gacha-lid" />
+        <span className="arc-gacha-balls">
+          {(complete ? balls : balls.filter((b) => !b.owned)).slice(0, 5).map((b, i) => (
+            <i key={b.slug} style={{ "--i": i }} />
+          ))}
+        </span>
+        <span className="arc-gacha-body-box">
+          <span className="arc-gacha-seam" />
+        </span>
       </div>
 
       <div className="arc-gacha-body">
         <span className="arc-gacha-kicker">
           <Library size={12} /> La collection
         </span>
-        <h3 className="arc-gacha-name">Machine à capsules</h3>
+        <h3 className="arc-gacha-name">Caisse de collection</h3>
         <p className="arc-gacha-pitch">
           {complete
             ? "Tu as sorti tous les boîtiers du rayon. L'étagère est complète."
-            : "Une boule, un boîtier — série, film, comic ou cartouche. Jamais deux fois le même."}
+            : "Une caisse, une boule — série, film, comic ou cartouche. Jamais deux fois la même."}
         </p>
 
         <div className="arc-gacha-progress">
@@ -1231,7 +1235,7 @@ function GachaBanner({ gacha, points, onOpen }) {
           </span>
           <em>
             <strong>{fmt(owned)}</strong> / {fmt(total)} boîtiers
-            {!complete && ` · ${fmt(left)} dans la machine`}
+            {!complete && ` · ${fmt(left)} encore en caisse`}
           </em>
         </div>
 
@@ -1260,10 +1264,10 @@ function GachaBanner({ gacha, points, onOpen }) {
           </Link>
         ) : (
           <>
-            {/* Solde insuffisant : on laisse cliquable (voir le contenu de la
-                machine a de l'intérêt) mais on ne le fait plus briller. */}
+            {/* Solde insuffisant : on laisse cliquable (voir ce qu'il reste
+                dedans a de l'intérêt) mais on ne le fait plus briller. */}
             <button className="arc-gacha-btn clickable" onClick={onOpen}>
-              <Sparkles size={15} /> Tourner
+              <PackageOpen size={15} /> Ouvrir
               <span className="arc-gacha-price">
                 <Coins size={12} /> {fmt(price)}
               </span>

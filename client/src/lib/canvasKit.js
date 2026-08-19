@@ -445,14 +445,18 @@ export function makeField(
 // d'opacité. Recouvrir avec un dégradé « couleur du fond » approché laissait
 // toujours une couture — ici c'est le fond lui-même qui remonte, donc le
 // raccord est invisible par construction.
-export function fadeInto(ctx, field, x, y, w, h) {
+// `up` renverse le sens : le champ recouvre le HAUT de la zone au lieu du bas.
+// C'est ce qu'il faut à une vignette posée en pied de tranche — elle doit se
+// perdre vers le haut, sinon la fondue mange précisément le bord qu'on voulait
+// voir net.
+export function fadeInto(ctx, field, x, y, w, h, up = false) {
   const patch = canvasOf(w, h);
   const p = patch.getContext("2d");
   p.drawImage(field, x, y, w, h, 0, 0, patch.width, patch.height);
   p.globalCompositeOperation = "destination-in";
   const g = p.createLinearGradient(0, 0, 0, patch.height);
-  g.addColorStop(0, "rgba(0,0,0,0)");
-  g.addColorStop(1, "rgba(0,0,0,1)");
+  g.addColorStop(0, up ? "rgba(0,0,0,1)" : "rgba(0,0,0,0)");
+  g.addColorStop(1, up ? "rgba(0,0,0,0)" : "rgba(0,0,0,1)");
   p.fillStyle = g;
   p.fillRect(0, 0, patch.width, patch.height);
   ctx.drawImage(patch, x, y, w, h);

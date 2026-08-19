@@ -43,6 +43,8 @@ import {
   Coins,
   Hand,
   Disc3,
+  Dices,
+  PackageX,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -882,6 +884,32 @@ function Row({ media, token, onEdit, onChanged }) {
   // lui aussi une jaquette à composer, donc pas le même test que ci-dessus.
   const printable = WATCHABLE.includes(media.kind);
   const check = media.sourceCheck;
+  // DANS LA MACHINE, OU NON. Lu en `!== false` : les fiches d'avant ce champ
+  // n'ont pas la clé et doivent rester tirables.
+  const lootable = media.lootable !== false;
+
+  // L'ALLUMER OU L'ÉTEINDRE. Un seul champ change, donc un PATCH ordinaire —
+  // et surtout PAS une route à part : c'est un réglage de la fiche, au même
+  // titre que sa licence ou sa saga.
+  //
+  // Aucune confirmation : le geste est réversible d'un clic, et demander
+  // « êtes-vous sûr ? » pour quelque chose qu'on peut défaire aussitôt est le
+  // meilleur moyen de rendre pénible ce qu'on va faire vingt fois.
+  async function toggleLoot() {
+    setBusy("loot");
+    try {
+      await apiFetch(`/collection/${media.slug}`, {
+        method: "PATCH",
+        token,
+        body: { lootable: !lootable },
+      });
+      onChanged();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function refresh() {
     setBusy("refresh");
@@ -913,7 +941,10 @@ function Row({ media, token, onEdit, onChanged }) {
   }
 
   return (
-    <li className="adm-coll-row" style={{ "--tint": media.color }}>
+    <li
+      className={`adm-coll-row ${lootable ? "" : "off"}`}
+      style={{ "--tint": media.color }}
+    >
       <span className="adm-coll-thumb">
         {media.poster ? <img src={media.poster} alt="" /> : <Library size={18} />}
         <i className="adm-coll-spine" />
@@ -970,6 +1001,17 @@ function Row({ media, token, onEdit, onChanged }) {
               <AlertTriangle size={11} /> Sans cartouche
             </em>
           )}
+          {/* HORS MACHINE. La pastille passe AVANT la saga et le compte : ce
+              n'est pas un détail de la fiche, c'est ce qui décide si le
+              boîtier existe pour les joueurs qui ne l'ont pas encore. */}
+          {!lootable && (
+            <em
+              className="adm-coll-pill off"
+              title="Retiré de la machine à capsules : plus personne ne peut le tirer. Ceux qui l'ont déjà le gardent."
+            >
+              <PackageX size={11} /> Hors machine
+            </em>
+          )}
           {media.franchise && <span>{media.franchise}</span>}
           <span>
             {media.kind === "comic"
@@ -990,6 +1032,28 @@ function Row({ media, token, onEdit, onChanged }) {
       </div>
 
       <div className="adm-coll-actions">
+        {/* DANS LA MACHINE, OU AU DÉPÔT. Le premier bouton de la rangée parce
+            que c'est l'état de l'objet, pas une opération qu'on lui fait
+            subir — et parce qu'il faut pouvoir sortir un titre du tirage sans
+            avoir à ouvrir quoi que ce soit. */}
+        <button
+          className={`adm-coll-icon clickable ${lootable ? "" : "off"}`}
+          onClick={toggleLoot}
+          disabled={!!busy}
+          title={
+            lootable
+              ? "Dans la machine à capsules — cliquer pour l'en retirer"
+              : "Hors machine : plus personne ne peut le tirer. Cliquer pour l'y remettre."
+          }
+        >
+          {busy === "loot" ? (
+            <Loader2 size={15} className="spin" />
+          ) : lootable ? (
+            <Dices size={15} />
+          ) : (
+            <PackageX size={15} />
+          )}
+        </button>
         {/* TESTER — prendre le boîtier en main, sans quitter le panneau et sans
             avoir à le posséder. C'est le seul endroit où l'on voit ce qu'on
             vient de faire : la jaquette pliée sur ses trois faces, la tranche

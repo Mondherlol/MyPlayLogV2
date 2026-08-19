@@ -1498,12 +1498,12 @@
 }
 
 /* ======================================================================
-   La machine à capsules — la porte, pas la machine
+   La caisse de collection — la porte, pas la caisse
    ======================================================================
-   Elle est posée AU-DESSUS des caisses et doit se distinguer d'elles au
-   premier coup d'œil : une caisse donne un cosmétique, celle-ci donne un
+   Elle est posée AU-DESSUS des caisses de curseurs et doit s'en distinguer au
+   premier coup d'œil : celles-là donnent un cosmétique, celle-ci donne un
    objet qu'on range sur une étagère. D'où le rouge de gashapon plutôt que
-   le doré de l'arcade, et une jauge de complétion que les caisses n'ont pas
+   le doré de l'arcade, et une jauge de complétion que les autres n'ont pas
    — c'est le seul lot de la salle qui se COMPLÈTE. */
 .arc-gacha {
   position: relative;
@@ -1548,48 +1548,148 @@
   background: radial-gradient(circle, rgba(80, 200, 120, 0.22), transparent 68%);
 }
 
-/* Le dôme en miniature. Les boules sont posées sur deux couronnes par un
-   `nth-child` plutôt qu'en JS : c'est un décor, il n'a pas à coûter un
-   calcul de placement. */
-.arc-gacha-dome {
+/* LA CAISSE EN MINIATURE. Le couvercle soulevé, la couture qui rougeoie, et
+   les boules qu'on n'a pas encore qui dépassent de l'ouverture. Trois éléments
+   et deux dégradés : c'est un aperçu de 84 pixels, il ne mérite ni une image ni
+   une scène 3D. La perspective vient d'un simple `skew` sur le couvercle —
+   suffisant à cette taille, et gratuit. */
+.arc-gacha-box {
   position: relative;
   width: 84px;
   height: 84px;
-  border-radius: 50% 50% 44% 44%;
-  overflow: hidden;
-  background:
-    radial-gradient(70% 60% at 32% 24%, rgba(255, 255, 255, 0.35), transparent 55%),
-    linear-gradient(180deg, rgba(150, 175, 205, 0.24), rgba(90, 110, 140, 0.18));
-  box-shadow:
-    inset 0 0 18px rgba(0, 0, 0, 0.3),
-    inset 0 0 0 2px rgba(255, 255, 255, 0.12);
 }
-.arc-gacha-pip {
+
+/* Le corps : laque sombre, coins adoucis, un liseré doré en haut qui joue le
+   collier de l'ouverture. */
+.arc-gacha-body-box {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 16px;
-  height: 16px;
+  left: 4px;
+  right: 4px;
+  bottom: 6px;
+  height: 46px;
+  border-radius: 6px 6px 9px 9px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 40%),
+    linear-gradient(160deg, #2a1f38, #14101d);
+  box-shadow:
+    inset 0 2px 0 rgba(242, 183, 11, 0.55),
+    0 6px 14px rgba(0, 0, 0, 0.35);
+}
+
+/* La couture : une barre de lumière posée sur le bord supérieur, qui respire.
+   C'est elle qui dit que la caisse est vivante et qu'il y a quelque chose
+   dedans. */
+.arc-gacha-seam {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: -2px;
+  height: 3px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, transparent, #ffd98a, transparent);
+  filter: drop-shadow(0 0 6px rgba(255, 200, 90, 0.9));
+  animation: arc-gacha-seam 2.6s ease-in-out infinite;
+}
+@keyframes arc-gacha-seam {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Le couvercle, soulevé et légèrement de biais : une caisse fermée ne promet
+   rien, une caisse entrebâillée promet ce qu'il y a dedans. */
+.arc-gacha-lid {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 4px;
+  height: 15px;
+  border-radius: 6px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 60%),
+    linear-gradient(160deg, #32253f, #1a1425);
+  box-shadow:
+    inset 0 -2px 0 rgba(242, 183, 11, 0.45),
+    0 4px 10px rgba(0, 0, 0, 0.4);
+  transform: rotate(-7deg) skewX(-8deg);
+  transform-origin: 20% 100%;
+}
+.arc-gacha.done .arc-gacha-lid {
+  transform: rotate(-3deg);
+}
+
+/* Les boules qui dépassent : celles qui MANQUENT, c'est-à-dire ce qu'on vient
+   chercher. Posées à la main sur cinq positions plutôt qu'en JS — c'est un
+   décor, il n'a pas à coûter un calcul de placement. */
+.arc-gacha-balls {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 20px;
+  height: 26px;
+}
+.arc-gacha-balls i {
+  position: absolute;
+  bottom: 0;
+  width: 17px;
+  height: 17px;
   border-radius: 50%;
-  translate: -50% -50%;
-  /* Une couronne de six, puis une seconde plus serrée : douze boules
-     suffisent à faire un dôme plein. */
-  transform: rotate(calc(var(--i) * 62deg)) translateY(-22px);
   background: linear-gradient(
     150deg,
-    hsl(calc(var(--i) * 47deg) 88% 66%),
-    hsl(calc(var(--i) * 47deg) 74% 50%)
+    hsl(calc(var(--i) * 67deg + 20deg) 88% 68%),
+    hsl(calc(var(--i) * 67deg + 20deg) 76% 48%)
   );
-  box-shadow: inset 0 -2px 3px rgba(0, 0, 0, 0.25);
+  box-shadow:
+    inset 0 -3px 4px rgba(0, 0, 0, 0.25),
+    inset 0 2px 3px rgba(255, 255, 255, 0.4);
+  animation: arc-gacha-bob 3.2s ease-in-out infinite;
+  animation-delay: calc(var(--i) * -0.5s);
 }
-.arc-gacha-pip:nth-child(n + 7) {
-  transform: rotate(calc(var(--i) * 62deg)) translateY(-9px);
-  width: 13px;
-  height: 13px;
+.arc-gacha-balls i:nth-child(1) {
+  left: 2px;
+  bottom: 2px;
 }
-.arc-gacha-pip.got {
-  filter: grayscale(1) brightness(0.6);
-  opacity: 0.45;
+.arc-gacha-balls i:nth-child(2) {
+  left: 17px;
+  bottom: 9px;
+  width: 20px;
+  height: 20px;
+}
+.arc-gacha-balls i:nth-child(3) {
+  left: 36px;
+  bottom: 1px;
+}
+.arc-gacha-balls i:nth-child(4) {
+  left: 26px;
+  bottom: -4px;
+  width: 14px;
+  height: 14px;
+}
+.arc-gacha-balls i:nth-child(5) {
+  left: 46px;
+  bottom: 8px;
+  width: 15px;
+  height: 15px;
+}
+@keyframes arc-gacha-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+/* Collection complète : plus rien à faire sauter, la caisse s'éteint. */
+.arc-gacha.done .arc-gacha-seam {
+  animation: none;
+  opacity: 0.35;
+  background: linear-gradient(90deg, transparent, #6fe3a0, transparent);
 }
 
 .arc-gacha-body {

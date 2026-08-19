@@ -29,7 +29,7 @@ param(
   [string]$Kind = "",
   # Le VPS. Modifiables ici une fois pour toutes, ou passés en argument.
   [string]$VpsHost = "149.202.227.174",
-  [string]$VpsUser = "root",
+  [string]$VpsUser = "ubuntu",
   [string]$VpsPort = "22",
   [string]$VpsPath = "~/myplaylog"
 )

@@ -1,11 +1,11 @@
 /* ======================================================================
-   La machine à capsules — tout est dans la 3D, presque rien ici
+   La caisse — tout est dans la 3D, presque rien ici
    ======================================================================
    IL N'Y A PAS DE MODALE. Pas de panneau, pas de cadre, pas de fond gris :
-   la page est floutée et assombrie, et la machine est POSÉE DESSUS. Ce
+   la page est floutée et assombrie, et la caisse est POSÉE DESSUS. Ce
    fichier ne dessine donc que quatre choses — le voile, la croix, la
    pastille de prix, et le nom de ce qu'on vient de sortir. Tout le reste
-   (machine, boule, éclat, boîtier) est de la géométrie, dans GachaScene.jsx.
+   (caisse, boule, éclat, boîtier) est de la géométrie, dans GachaScene.jsx.
 
    La règle, si un jour on est tenté d'ajouter quelque chose ici : si ça peut
    être un objet dans la scène, ça n'a rien à faire en HTML. */
@@ -135,7 +135,10 @@
   font-weight: 800;
 }
 
-/* Le solde, en retrait sous le bouton : une information, pas une action. */
+/* Le solde, en retrait sous le bouton : une information, pas une action.
+   Et à côté, le rappel que la caisse elle-même se clique — un objet cliquable
+   qui n'a que le survol pour le dire n'est cliquable que pour la moitié des
+   gens (l'autre est sur un écran tactile). */
 .gch-purse {
   display: inline-flex;
   align-items: center;
@@ -146,6 +149,12 @@
 }
 .gch-purse.short {
   color: #ff9080;
+}
+.gch-purse i {
+  font-style: normal;
+  padding-left: 0.45rem;
+  border-left: 1px solid rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.34);
 }
 
 @keyframes gch-up {
@@ -206,9 +215,9 @@
   }
 }
 
-/* L'invite de la manivelle a disparu avec le geste : on ne tourne plus la
-   sphère, on paie et le mécanisme sert. Il ne reste qu'une épreuve dans la
-   séance — secouer la capsule — et c'est celle-ci qui suit. */
+/* Il n'y a plus qu'une épreuve dans la séance : la caisse se clique, elle
+   claque toute seule, et le seul geste demandé est de secouer la boule qui en
+   sort. Deux secondes de poignet — c'était cinq, et ça se sentait. */
 
 .gch-shake-ring {
   position: relative;
@@ -259,116 +268,155 @@
   cursor: grab;
 }
 
-/* ------------------------------------------------- ce qu'on a sorti ---- */
-/* Sous l'objet, centré, en typographie fine et large : le nom respire au lieu
-   d'être annoncé. La jauge dit où en est la collection sans une phrase. */
+/* ------------------------------------------------- ce qu'on a sorti ----
+   LA MÊME CARTE QUE DANS LA VITRINE DE L'ÉTAGÈRE. On vient de gagner un
+   objet : il doit se présenter exactement comme il se présentera quand on le
+   reprendra en main dans dix minutes — même carte, même filet de teinte sur
+   la tranche, même ligne « Volume · 117 planches », même bouton « Ouvrir ».
+   D'où la réutilisation littérale des classes `coll-inspect-*`
+   (app-26-collection.css) : deux copies de la même carte auraient divergé au
+   premier retouchage.
+
+   Ce fichier n'ajoute donc que ce que la vitrine n'a pas : la place de la
+   carte sur la scène, et la ligne « Relancer / Arrêter » dessous — qui ne
+   parle plus de l'objet mais de la caisse, et ne peut donc pas être dans la
+   carte de l'objet. */
 
 .gch-won {
   position: absolute;
   left: 50%;
-  bottom: clamp(20px, 5vh, 46px);
+  bottom: clamp(18px, 4vh, 40px);
   z-index: 3;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
-  width: min(560px, calc(100% - 40px));
+  gap: 0.7rem;
+  width: min(680px, calc(100% - 28px));
   translate: -50% 0;
   text-align: center;
+  /* Le bandeau ne capte rien : on attrape le boîtier au travers. Seules la
+     carte et les deux boutons se laissent cliquer (voir plus bas). */
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.2, 0.9, 0.3, 1);
-  transform: translateY(18px);
+  transform: translateY(14px);
+  /* En sortant (on relance), il part VITE : le boîtier glisse hors du cadre en
+     une demi-seconde, une carte qui met le double à s'effacer resterait
+     suspendue au-dessus d'une caisse déjà revenue. */
+  transition: opacity 0.26s ease, transform 0.26s ease;
 }
 /* Il n'apparaît qu'une fois l'objet POSÉ : le nom qui s'écrit pendant que la
    capsule s'ouvre volerait la vedette à l'éclat. */
 .gch-won.in {
   opacity: 1;
   transform: translateY(0);
+  transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 
-.gch-won em {
-  font-style: normal;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.42);
+/* La carte vient d'app-26 ; il n'y a ici que sa largeur, la scène étant plus
+   large que la vitrine. */
+.gch-won .coll-inspect-card {
+  width: 100%;
 }
-.gch-won h2 {
-  margin: 0;
+
+/* ---- les deux issues, dans la carte ----
+   « Relancer » et « Arrêter » habitent la ligne d'actions de la carte, à côté
+   de « La fiche ». Ils y sont à leur place : ce qu'on décide à cet instant
+   porte sur l'objet qu'on vient de sortir — le garder sous les yeux, ou en
+   refaire un.
+
+   Une seule des trois est un APPEL : « Relancer » porte l'accent et le prix,
+   les deux autres sont des sorties. Un « Arrêter » aussi voyant ferait hésiter
+   là où il n'y a rien à décider. */
+
+.gch-again {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.95rem;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ffd166, #f2960b 55%, #e0561c);
+  color: #2a1503;
   font-family: var(--font-display);
-  font-size: clamp(1.5rem, 4vw, 2.5rem);
-  font-weight: 300;
-  line-height: 1.1;
-  letter-spacing: -0.015em;
-  color: #fff;
-  text-shadow: 0 4px 30px rgba(0, 0, 0, 0.6);
+  font-size: 0.88rem;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow:
+    0 8px 22px rgba(226, 120, 20, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  transition: transform 0.16s, box-shadow 0.16s, filter 0.16s;
 }
-
-.gch-bar {
-  display: block;
-  width: min(220px, 60%);
-  height: 2px;
-  margin-top: 0.85rem;
-  border-radius: 2px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.14);
-}
-.gch-bar i {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, #ffc247, #ff8a3d);
-  transition: width 1s 0.3s cubic-bezier(0.2, 0.9, 0.3, 1);
-}
-.gch-count {
-  font-family: var(--font-display);
-  font-size: 0.76rem;
-  font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.45);
-}
-.gch-count s {
-  text-decoration: none;
-  opacity: 0.4;
-}
-
-/* Deux boutons ronds, sans un mot : relancer, et aller voir la fiche. */
-.gch-acts {
-  display: flex;
-  gap: 0.6rem;
-  margin-top: 0.9rem;
-  pointer-events: auto;
-}
-.gch-round {
-  display: grid;
-  place-items: center;
-  width: 50px;
-  height: 50px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.07);
-  backdrop-filter: blur(10px);
-  color: #fff;
-  transition: 0.18s;
-}
-.gch-round:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.16);
+.gch-again:hover:not(:disabled) {
   transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow:
+    0 13px 30px rgba(226, 120, 20, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
-.gch-round:disabled {
-  opacity: 0.3;
+.gch-again:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+.gch-again:disabled {
+  filter: grayscale(0.7) brightness(0.85);
+  box-shadow: none;
   cursor: not-allowed;
 }
-/* Le premier bouton est l'action principale : c'est lui qui porte l'accent. */
-.gch-acts .gch-round:first-child {
-  border-color: rgba(255, 194, 71, 0.45);
-  background: rgba(255, 194, 71, 0.16);
-  color: #ffd98a;
+.gch-again-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  padding: 0.14rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(60, 25, 0, 0.24);
+  font-size: 0.78rem;
+  font-weight: 800;
 }
-.gch-acts .gch-round:first-child:hover:not(:disabled) {
-  background: rgba(255, 194, 71, 0.28);
-  border-color: rgba(255, 194, 71, 0.7);
+
+/* Posé SUR LA CARTE et non sur le voile : ses couleurs suivent donc le thème
+   de la page, comme le reste de la carte. Un bouton en blanc translucide y
+   serait invisible en thème clair. */
+.gch-stop {
+  padding: 0.55rem 0.85rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.86rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: 0.16s;
+}
+.gch-stop:hover {
+  border-color: var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* La vitrine de l'étagère efface « La fiche » sous 560 px — chez elle c'est
+   sans conséquence, l'objet lui-même y mène d'un clic. Ici l'objet n'est qu'un
+   décor qui tourne : effacer le bouton, c'est n'avoir plus aucun chemin vers le
+   titre qu'on vient de gagner. On le rétablit. */
+@media (max-width: 560px) {
+  .gch-won .coll-inspect-acts .btn-ghost {
+    display: inline-flex;
+  }
+}
+
+/* Sur un petit écran, la carte s'empile : le titre au-dessus, les actions
+   dessous — la ligne unique y coupait le titre à trois mots. */
+@media (max-width: 620px) {
+  .gch-won .coll-inspect-card {
+    flex-wrap: wrap;
+    row-gap: 0.6rem;
+  }
+  .gch-won .coll-inspect-acts {
+    width: 100%;
+    margin-left: 0;
+    /* Les trois boutons se répartissent la ligne plutôt que de se serrer à
+       droite : à cette largeur, « Relancer » doit rester attrapable au pouce. */
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
 }
 
 /* ----------------------------------------------------------- pépin ----- */
@@ -396,12 +444,8 @@
     width: 38px;
     height: 38px;
   }
-  .gch-won h2 {
-    font-weight: 400; /* une graisse 300 se délave sur un petit écran */
-  }
-  .gch-round {
-    width: 46px;
-    height: 46px;
+  .gch-again {
+    padding: 0.5rem 0.8rem;
   }
 }
 

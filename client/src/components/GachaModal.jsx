@@ -5,6 +5,7 @@ import { X, Coins, Loader2, RotateCcw, ArrowRight, Sparkles } from "lucide-react
 import { apiFetch } from "../lib/api";
 import { useScrollLock } from "../hooks/useScrollLock";
 import { useBackClose } from "../hooks/useBackClose";
+import { isComic, isGame, CONSOLE, fmtYears } from "../lib/collection";
 import {
   playCoinDrop,
   playCrankRelease,
@@ -21,50 +22,85 @@ import {
 const GachaScene = lazy(() => import("./GachaScene"));
 
 // ======================================================================
-//  La machine à capsules — la coquille autour de la scène
+//  La caisse — la coquille autour de la scène
 // ======================================================================
-// IL N'Y A PAS DE MODALE : la page est floutée, la machine est POSÉE DESSUS en
+// IL N'Y A PAS DE MODALE : la page est floutée, la caisse est POSÉE DESSUS en
 // 3D. Ce fichier ne garde que la chronologie, l'aller-retour avec le serveur,
 // et trois éléments d'interface — le bouton qui lance, l'invite à secouer, et
 // le nom de ce qu'on a sorti.
 //
-// UN SEUL GESTE, ET C'EST LE BON. La sphère se tournait à la main avant de
-// lâcher sa boule : deux épreuves à la suite pour un seul tirage, et la
-// première n'était que du protocole — on paie, donc la machine doit servir.
-// Elle sert donc toute seule : on paie, ça clique, la capsule sort et roule
-// jusqu'à la main. Le joueur n'a plus qu'une chose à faire, mais elle compte.
+// ON CLIQUE LA CAISSE, ET C'EST TOUT LE GESTE. Elle est au milieu de l'écran,
+// elle s'allume quand la souris passe dessus, on clique, on paie. Le bouton du
+// bas reste — il porte le prix, et un écran tactile n'a pas de survol pour
+// deviner qu'un objet est cliquable — mais il n'est plus le seul chemin.
 //
-// LA BOULE NE S'OUVRE PAS TOUTE SEULE. Elle arrive dans la main, fermée, et
-// c'est le joueur qui la SECOUE pour la faire céder : la souris qu'on agite, le
-// téléphone qu'on remue, ou des clics répétés. Pendant qu'on secoue on entend
-// ce qu'il y a dedans — un boîtier claque, du papier froisse, une cartouche
-// cogne — et la couture s'allume à mesure qu'on approche. C'est le seul moment
-// où le joueur FAIT quelque chose, et c'est celui qu'on retient.
+// TROIS TEMPS, ET PAS UN DE PLUS : elle charge (elle tremble, la couture monte
+// au blanc), elle claque (le couvercle part, la lumière jaillit, les boules
+// giclent), une seule boule vient à l'œil. Le reste de la volée retombe hors
+// cadre — elle n'était là que pour dire « il y en avait plein ».
+//
+// LA BOULE NE S'OUVRE PAS TOUTE SEULE. Elle arrive fermée, et c'est le joueur
+// qui la SECOUE pour la faire céder : la souris qu'on agite, le téléphone qu'on
+// remue, ou des clics répétés. Pendant qu'on secoue on entend ce qu'il y a
+// dedans — un boîtier claque, du papier froisse, une cartouche cogne — et la
+// couture s'allume à mesure qu'on approche. C'est le seul moment où le joueur
+// FAIT quelque chose, et c'est celui qu'on retient.
 
-// `arm` : le temps que le mécanisme se mette en place avant de lâcher la boule.
-// Ce n'est pas une pause décorative — la capsule sort par un trajet FIXE, donc
-// la bouche de la sphère doit s'être remise face au spectateur avant qu'elle ne
-// s'y engage (voir la remise en place, côté scène). C'est aussi ce qui donne au
-// déclic le temps de s'entendre.
-const T = { arm: 340, fall: 1250, rise: 700, crack: 900 };
+// LA CHRONOLOGIE, RESSERRÉE. `arm` est le temps de charge de la caisse : assez
+// pour qu'on retienne son souffle (elle tremble de plus en plus fort), pas
+// assez pour qu'on se demande si le clic a été pris. `fall` est le claquement
+// et la volée, `rise` l'arrivée de la boule à l'œil.
+//
+// Le tout dure 2,1 s au lieu de 2,3 — mais surtout il ne contient plus une
+// seule seconde où l'on ne fait que REGARDER une bille rouler dans un tube.
+const T = { arm: 620, fall: 900, rise: 620, crack: 900 };
 
 // Ce qu'un geste ajoute à la jauge de secouage — et donc LA DURÉE DE
-// L'ÉPREUVE, qui se lit sur la différence entre ce gain et la fuite de 0,30/s
-// posée côté scène (`Clock`).
+// L'ÉPREUVE, qui se lit sur la différence entre ce gain et la fuite (0,20/s,
+// posée côté scène dans `Clock`).
 //
-// Le compte : on agite une souris à ~1200 px/s ; à 1/2400 ça remplit 0,50/s,
-// moins 0,30 de fuite = 0,20/s net, soit CINQ SECONDES d'agitation franche.
-// C'était trois avant, et trois ne se sentait pas — on a le temps d'entendre
-// ce qu'il y a dans la boule et de la voir cogner, ce qui est tout l'intérêt.
-const SHAKE_PER_PX = 1 / 2400;
-const SHAKE_PER_CLICK = 0.09;
-const SHAKE_PER_G = 0.04;
+// CINQ SECONDES, C'ÉTAIT TROP. Le compte d'avant : 1/2400 par pixel, soit
+// 0,50/s à la souris agitée franchement, moins 0,30 de fuite — cinq secondes de
+// poignet. Sur le papier c'était « on a le temps d'entendre ce qu'il y a
+// dedans » ; en vrai, au bout de deux secondes on a compris, et le reste est
+// une corvée qu'on fait en regardant ailleurs. Le nouveau compte : 0,75/s de
+// gain, 0,20 de fuite, DEUX SECONDES. Assez pour que ce soit un geste, trop
+// court pour qu'on s'en lasse.
+const SHAKE_PER_PX = 1 / 1600;
+// Le repli au clic doit rester une vraie option : sept ou huit clics, pas
+// quinze. C'est le chemin de qui joue au trackpad, ou n'a pas envie du geste.
+const SHAKE_PER_CLICK = 0.16;
+const SHAKE_PER_G = 0.07;
 
 // Deux bruits de contenu à moins de 90 ms l'un de l'autre, ce n'est plus un
 // objet qui remue : c'est un grésillement.
 const RATTLE_GAP = 90;
 
+// Le temps que met le boîtier à sortir de l'écran quand on relance. Doit rester
+// égal à la durée de rangement posée côté scène (`Clock`, phase « stowing ») :
+// tirer avant la fin ferait sauter l'objet, tirer trop tard laisserait un temps
+// mort devant une caisse déjà revenue.
+const STOW = 520;
+
 const fmt = (n) => Number(n || 0).toLocaleString("fr-FR");
+
+// LA SECONDE LIGNE DE LA CARTE, mot pour mot celle de la vitrine de l'étagère
+// (`CaseInspector`, CollectionShelf.jsx). C'est le même objet présenté de la
+// même façon : « Volume · 117 planches », « Game Boy Advance · PAL »,
+// « Série · 24 épisodes ». La recopier ici plutôt que d'extraire la fonction
+// est un choix — la vitrine peut faire évoluer sa ligne sans que la caisse
+// suive, ce sont deux moments différents.
+function metaOf(m) {
+  const head = isComic(m)
+    ? `Volume${m.pageCount ? ` · ${m.pageCount} planches` : ""}`
+    : isGame(m)
+      ? `${CONSOLE}${m.cartridge?.region ? ` · ${m.cartridge.region}` : ""}`
+      : m.kind === "series"
+        ? `Série · ${m.episodeCount} épisodes`
+        : "Film";
+  const years = fmtYears(m);
+  return years ? `${head} · ${years}` : head;
+}
 
 const prefersReducedMotion = () =>
   typeof window !== "undefined" &&
@@ -74,7 +110,6 @@ const prefersReducedMotion = () =>
 // image : le passer par React ferait ramer la 3D, et empêcherait surtout les
 // mouvements de se chevaucher (voir `Clock`, côté scène).
 const freshAnim = () => ({
-  shake: 0,
   capsule: 0,
   fall: 0,
   rise: 0,
@@ -87,13 +122,18 @@ const freshAnim = () => ({
   zoomView: 1,
   free: false,
   touched: 0,
+  // ON RANGE L'OBJET. Il glisse vers le bas pendant que la caisse revient au
+  // premier plan — c'est le mouvement de « Relancer ». Piloté à part du reste
+  // parce qu'il ne suit AUCUNE étape : il se joue entre deux tirages, sur un
+  // boîtier qui existe encore et une caisse qui n'est pas encore repartie.
+  away: 0,
 });
 
 export default function GachaModal({ token, onClose, onDrawn }) {
   useScrollLock(true);
   const navigate = useNavigate();
 
-  // idle | arming | falling | rising | waiting | cracking | revealed
+  // idle | arming | falling | rising | waiting | cracking | revealed | stowing
   const [phase, setPhase] = useState("idle");
   const [data, setData] = useState(null);
   const [result, setResult] = useState(null);
@@ -299,16 +339,19 @@ export default function GachaModal({ token, onClose, onDrawn }) {
       playCrankRelease();
       setPhase("waiting");
     } else {
-      // LE MÉCANISME SERT TOUT SEUL. Plus rien à tourner : le déclic, la
-      // capsule qui roule, la chute, la montée vers l'œil — et la main.
+      // ELLE CHARGE, PUIS ELLE CLAQUE. Le grondement de la charge est le bruit
+      // du mécanisme qui se tend ; le claquement emprunte celui d'une capsule
+      // qui se fend — sec, net, un peu creux, exactement ce qu'il faut — parce
+      // qu'un fichier de son de plus pour une demi-seconde ne se justifie pas.
+      after(Math.max(0, T.arm - 300), playCrankRelease);
       after(T.arm, () => {
-        anim.current.shake = 1; // la machine encaisse le déclic
-        playCrankRelease();
+        playCapsuleCrack();
         setPhase("falling");
       });
-      after(T.arm + 120, playCapsuleRoll);
-      after(T.arm + T.fall - 150, playCapsuleLand);
+      // La volée qui retombe, juste après le claquement.
+      after(T.arm + 130, playCapsuleRoll);
       after(T.arm + T.fall, () => setPhase("rising"));
+      after(T.arm + T.fall + T.rise - 120, playCapsuleLand);
       after(T.arm + T.fall + T.rise, () => setPhase("waiting"));
     }
 
@@ -335,25 +378,38 @@ export default function GachaModal({ token, onClose, onDrawn }) {
   // qu'il est venu faire ; seul le trajet de la capsule, qu'il ne fait que
   // regarder, s'abrège.
   //
-  // Pas pendant l'armement : ces trois dixièmes de seconde sont ceux du double
-  // clic sur « Lancer », et on ne saute pas la mise en scène en demandant à la
-  // lancer.
   function toHand() {
-    if (!busy || waiting || phase === "arming") return;
+    // Ni pendant l'armement (ce sont les trois dixièmes du double clic sur
+    // « Ouvrir »), ni pendant qu'on range (le boîtier est en train de sortir de
+    // l'écran, l'y ramener en pleine glissade n'a aucun sens).
+    if (!busy || waiting || phase === "arming" || phase === "stowing") return;
     clearTimers();
     const a = anim.current;
     a.fall = 1;
     a.rise = 1;
     a.back = 1;
-    a.shake = 0;
     setPhase("waiting");
+  }
+
+  // RELANCER, ET LE FAIRE VOIR. Repartir sec sur un nouveau tirage faisait
+  // disparaître le boîtier et réapparaître la caisse sur la même image : on
+  // range donc l'objet (il glisse par le bas) pendant que la caisse revient au
+  // premier plan, et le tour suivant ne part qu'après. Une demi-seconde, le
+  // temps d'un geste — c'est ce qui fait la différence entre « un autre » et
+  // « la page a changé ».
+  function relaunch() {
+    if (phase !== "revealed" || !canDraw) return;
+    setPhase("stowing");
+    // `draw` capturé ICI est celui du rendu « revealed », donc celui qui se
+    // croit libre de tirer : le lire depuis l'état « stowing » le ferait
+    // renoncer (voir `busy`).
+    after(STOW, draw);
   }
 
   const won = result?.media || null;
   const left = result?.left ?? Math.max(0, (data?.total || 0) - (data?.owned || 0));
   const price = result?.price ?? data?.price ?? 0;
   const points = result?.points ?? data?.points ?? 0;
-  const owned = result?.owned ?? data?.owned ?? 0;
   const total = data?.total ?? 0;
   const complete = total > 0 && left <= 0;
   const canDraw = !complete && total > 0 && points >= price;
@@ -364,7 +420,7 @@ export default function GachaModal({ token, onClose, onDrawn }) {
       className={`gch-veil ${revealed ? "revealed" : ""} ${waiting ? "shaking" : ""}`}
       role="dialog"
       aria-modal="true"
-      aria-label="Machine à capsules"
+      aria-label="Caisse de collection"
       onPointerMove={onMove}
       onPointerDown={(e) => {
         // Pendant l'attente, chaque clic secoue un peu : c'est le repli pour
@@ -391,6 +447,10 @@ export default function GachaModal({ token, onClose, onDrawn }) {
             won={won}
             hue={hue}
             anim={anim}
+            // LA CAISSE EST LE BOUTON. Elle ne s'allume et ne se clique que si
+            // le tirage est possible : une caisse qui appelle le clic et répond
+            // « il te manque 200 points » est une porte peinte sur un mur.
+            onLaunch={canDraw ? draw : undefined}
             onSettled={() => setPosed(true)}
           />
         )}
@@ -419,7 +479,7 @@ export default function GachaModal({ token, onClose, onDrawn }) {
             }
           >
             <Sparkles size={18} />
-            {complete ? "Collection complète" : "Lancer"}
+            {complete ? "Collection complète" : "Ouvrir la caisse"}
             {!complete && (
               <span className="gch-go-price">
                 <Coins size={14} /> {fmt(price)}
@@ -429,6 +489,7 @@ export default function GachaModal({ token, onClose, onDrawn }) {
           {data && !complete && (
             <span className={`gch-purse ${canDraw ? "" : "short"}`}>
               <Coins size={12} /> {fmt(points)}
+              {canDraw && <i>clique la caisse · attrape-la pour la tourner</i>}
             </span>
           )}
         </div>
@@ -458,44 +519,69 @@ export default function GachaModal({ token, onClose, onDrawn }) {
         </div>
       )}
 
-      {/* ---------------- CE QU'ON A SORTI ---------------- */}
-      {revealed && won && (
-        <div className={`gch-won ${posed ? "in" : ""}`}>
-          {won.franchise && <em>{won.franchise}</em>}
-          <h2>{won.title}</h2>
+      {/* ---------------- CE QU'ON A SORTI ----------------
+          LA MÊME CARTE QUE DANS LA VITRINE DE L'ÉTAGÈRE, aux mêmes classes
+          (`coll-inspect-card`) : on vient de gagner un objet, on doit le voir
+          comme on le verra en le reprenant en main dans dix minutes.
 
-          <span className="gch-bar" aria-label={`${owned} sur ${total}`}>
-            <i style={{ width: total ? `${(owned / total) * 100}%` : 0 }} />
-          </span>
-          <span className="gch-count">
-            {fmt(owned)} <s>/</s> {fmt(total)}
-          </span>
+          MAIS PAS LES MÊMES BOUTONS, et c'est la différence entre les deux
+          moments. Devant son étagère on vient CONSULTER : on ouvre le volume,
+          on lit ce qu'on en dit. Ici on vient TIRER — on regarde ce qu'on a
+          eu, et la seule question est « on en refait un ? ». Ne reste donc
+          qu'un chemin vers l'objet, sa fiche (qui porte de toute façon la
+          lecture et la discussion), et à côté les deux issues de la séance.
 
-          <div className="gch-acts">
-            {!complete && (
+          Pas de jauge « 10 / 39 » non plus : elle est sur la page qui a ouvert
+          la caisse, et elle y sera encore dans trois secondes. */}
+      {(revealed || phase === "stowing") && won && (
+        <footer
+          className={`gch-won ${posed && phase === "revealed" ? "in" : ""}`}
+          style={{ "--tint": won.color || "var(--orange)" }}
+        >
+          <div className="coll-inspect-card">
+            <div className="coll-inspect-text">
+              {won.franchise && (
+                <em className="coll-inspect-franchise">{won.franchise}</em>
+              )}
+              <strong>{won.title}</strong>
+              <span className="coll-inspect-meta">{metaOf(won)}</span>
+            </div>
+
+            <div className="coll-inspect-acts">
               <button
-                className="gch-round clickable"
-                onClick={draw}
-                disabled={!canDraw}
-                aria-label="Relancer"
-                title={canDraw ? "Relancer" : `Il te manque ${fmt(price - points)} points`}
+                className="btn btn-ghost clickable"
+                onClick={() => {
+                  close();
+                  navigate(`/collection/${won.slug}`);
+                }}
               >
-                <RotateCcw size={19} />
+                <ArrowRight size={16} /> La fiche
               </button>
-            )}
-            <button
-              className="gch-round clickable"
-              onClick={() => {
-                close();
-                navigate(`/collection/${won.slug}`);
-              }}
-              aria-label="Voir la fiche"
-              title="Voir la fiche"
-            >
-              <ArrowRight size={19} />
-            </button>
+
+              {!complete && (
+                <button
+                  className="gch-again clickable"
+                  onClick={relaunch}
+                  disabled={!canDraw}
+                  title={
+                    canDraw
+                      ? "Ranger celui-ci et rouvrir une caisse"
+                      : `Il te manque ${fmt(price - points)} points`
+                  }
+                >
+                  <RotateCcw size={15} /> Relancer
+                  <span className="gch-again-price">
+                    <Coins size={12} /> {fmt(price)}
+                  </span>
+                </button>
+              )}
+
+              <button className="gch-stop clickable" onClick={close}>
+                Arrêter
+              </button>
+            </div>
           </div>
-        </div>
+        </footer>
       )}
 
       {error && <p className="gch-oops">{error}</p>}

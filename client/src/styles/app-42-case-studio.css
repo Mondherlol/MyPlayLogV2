@@ -197,91 +197,13 @@
   color: #14151a;
 }
 
-/* ------------------------------------------- choisir une image par face -- */
-
-.casestudio-pick {
-  margin-bottom: 0.8rem;
-}
-
-.casestudio-pick-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.4rem;
-  font-size: 0.74rem;
-  font-weight: 700;
-  margin-bottom: 0.34rem;
-}
-
-/* Déposer sa propre image POUR CETTE FACE : le bouton vit dans l'intitulé du
-   choix d'image, là où l'on constate qu'aucune vignette ne convient. */
-.casestudio-drop {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.22rem;
-  padding: 0.14rem 0.44rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-soft);
-  font-size: 0.68rem;
-  font-weight: 700;
-}
-
-/* Deux réglages côte à côte quand ils vont par paire (x/y, deux polices). */
-.casestudio-duo {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
-}
-
-.casestudio-slider {
-  display: block;
-  margin-bottom: 0.7rem;
-}
-
-.casestudio-slider > span {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  font-size: 0.74rem;
-  font-weight: 700;
-  margin-bottom: 0.1rem;
-}
-
-.casestudio-slider b {
-  font-variant-numeric: tabular-nums;
-  color: var(--text-soft);
-  font-weight: 600;
-}
-
-.casestudio-slider input[type="range"] {
-  width: 100%;
-  accent-color: var(--accent);
-}
-
-.casestudio-slider em {
-  display: block;
-  margin-top: 0.16rem;
-  font-size: 0.7rem;
-  line-height: 1.4;
-  font-style: normal;
-  color: var(--text-soft);
-}
-
-.casestudio-field > span {
-  display: flex;
-  align-items: center;
-  gap: 0.26rem;
-}
-
-.casestudio-thumbs {
+.cs-thumbs {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(66px, 1fr));
   gap: 0.35rem;
 }
 
-.casestudio-thumb {
+.cs-thumb {
   position: relative;
   display: block;
   padding: 0;
@@ -292,7 +214,7 @@
   aspect-ratio: 4 / 3;
 }
 
-.casestudio-thumb img {
+.cs-thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -301,40 +223,20 @@
 
 /* « Auto » et « Aucune » n'ont pas d'image : une icône centrée, et le nom
    dessous plutôt qu'en surimpression. */
-.casestudio-thumb.flat {
+.cs-thumb.flat {
   display: grid;
   place-items: center;
   color: var(--text-soft);
 }
 
-.casestudio-thumb em {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 0.12rem 0.2rem;
-  font-size: 0.62rem;
-  font-style: normal;
-  font-weight: 700;
-  text-align: center;
-  color: #fff;
-  background: rgba(8, 9, 14, 0.72);
-}
-
-.casestudio-thumb.flat em {
-  background: transparent;
-  color: var(--text-soft);
-  bottom: 0.1rem;
-}
-
-.casestudio-thumb.on {
+.cs-thumb.on {
   border-color: var(--accent);
 }
 
 /* Les logos sont détourés sur fond transparent : un damier sombre derrière,
    sinon un logo blanc sur le fond clair du panneau est invisible. Et ils se
    voient ENTIERS (`contain`) — un logo recadré n'est plus un logo. */
-.casestudio-thumbs.logos .casestudio-thumb {
+.cs-thumbs.logos .cs-thumb {
   aspect-ratio: 16 / 7;
   background:
     repeating-conic-gradient(rgba(255, 255, 255, 0.06) 0% 25%, transparent 0% 50%) 50% / 12px
@@ -342,44 +244,11 @@
     #1b1c22;
 }
 
-.casestudio-thumbs.logos img {
+.cs-thumbs.logos img {
   object-fit: contain;
   padding: 0.2rem;
 }
 
-/* L'encre : la pastille de couleur, le champ hexa, et le retour à la teinte
-   de la fiche. */
-.casestudio-ink {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  flex-wrap: wrap;
-}
-
-.casestudio-ink input[type="color"] {
-  width: 34px;
-  height: 30px;
-  padding: 2px;
-  flex: none;
-  cursor: pointer;
-}
-
-.casestudio-ink input:not([type="color"]) {
-  flex: 1;
-  min-width: 80px;
-}
-
-.casestudio-ink .btn {
-  font-size: 0.7rem;
-  padding: 0.28rem 0.5rem;
-}
-
-.casestudio-panel code {
-  font-size: 0.68rem;
-  padding: 0.05rem 0.24rem;
-  border-radius: 4px;
-  background: rgba(128, 128, 128, 0.16);
-}
 
 .casestudio-panel section {
   padding: 0.8rem;
@@ -388,18 +257,6 @@
   background: var(--surface-2, rgba(128, 128, 128, 0.05));
 }
 
-.casestudio-panel h4 {
-  margin: 0 0 0.4rem;
-  font-size: 0.84rem;
-  font-family: var(--font-display);
-}
-
-.casestudio-hint {
-  margin: 0 0 0.6rem;
-  font-size: 0.74rem;
-  line-height: 1.45;
-  color: var(--text-soft);
-}
 
 .casestudio-stock {
   list-style: none;
@@ -447,75 +304,265 @@
   color: var(--accent);
 }
 
-.casestudio-field,
-.casestudio-check {
-  display: block;
-  margin-bottom: 0.7rem;
-}
-
-.casestudio-field:last-child,
-.casestudio-check:last-child {
-  margin-bottom: 0;
-}
-
-.casestudio-field > span {
-  display: block;
-  font-size: 0.74rem;
-  font-weight: 700;
-  margin-bottom: 0.22rem;
-}
-
-.casestudio-field select,
-.casestudio-field input {
-  width: 100%;
-  padding: 0.38rem 0.5rem;
-  border-radius: var(--radius-sm, 6px);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  font-size: 0.8rem;
-}
-
-.casestudio-field em,
-.casestudio-check em {
-  display: block;
-  margin-top: 0.22rem;
-  font-size: 0.7rem;
-  line-height: 1.4;
-  font-style: normal;
-  color: var(--text-soft);
-}
-
-.casestudio-check {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0 0.45rem;
-  align-items: center;
-  cursor: pointer;
-}
-
-.casestudio-check input {
-  grid-row: 1;
-}
-
-.casestudio-check > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-
-.casestudio-check em {
-  grid-column: 2;
-}
-
 .casestudio-foot {
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
   padding: 0.8rem 1rem;
   border-top: 1px solid var(--border);
+}
+
+/* ======================================================================
+   LES COMMANDES — un rang, un réglage
+   ======================================================================
+   La première version écrivait sous chaque commande un paragraphe expliquant
+   pourquoi elle existe. Mis bout à bout, ça faisait plus de texte que de
+   boutons : la colonne se lisait comme une notice, il fallait la parcourir
+   entière pour retrouver le curseur qu'on cherchait — dans un atelier où l'on
+   revient vingt fois régler le même détail.
+
+   Tout est passé en bulle (`title=`), et la règle de mise en page tient en une
+   ligne : INTITULÉ COURT À GAUCHE, COMMANDE À DROITE, UNE SEULE HAUTEUR DE
+   RANG. Des rangs de même hauteur s'alignent, et une colonne alignée se
+   parcourt d'un coup d'œil. */
+
+.cs-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 26px;
+}
+
+.cs-line + .cs-line,
+.cs-line + .cs-pick,
+.cs-pick + .cs-line,
+.cs-line + .cs-blocks,
+.cs-pick + .cs-blocks {
+  margin-top: 0.36rem;
+}
+
+.cs-lab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.cs-lab b {
+  font-weight: 600;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Le curseur prend la largeur : c'est la seule commande qui gagne vraiment à
+   être longue — la précision du geste est celle de la course. */
+.cs-line.slide {
+  display: block;
+}
+
+.cs-line.slide .cs-lab {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.cs-line.slide input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+  margin: 0;
+}
+
+.cs-line.check {
+  cursor: pointer;
+}
+
+.cs-line.check input {
+  accent-color: var(--accent);
+  flex: none;
+}
+
+.cs-line select,
+.cs-line input:not([type="range"]):not([type="checkbox"]):not([type="color"]) {
+  flex: 1;
+  min-width: 0;
+  max-width: 62%;
+  padding: 0.26rem 0.4rem;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.76rem;
+}
+
+/* ------------------------------------------------------ le choix segmenté --
+   Remplace les `<select>` des réglages à trois ou quatre valeurs : dérouler
+   une liste pour LIRE ce qu'elle contient coûte deux gestes là où trois
+   boutons visibles n'en coûtent aucun. */
+.cs-seg {
+  display: inline-flex;
+  padding: 0.12rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  flex: none;
+}
+
+.cs-seg button {
+  padding: 0.16rem 0.44rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.cs-seg button.on {
+  background: var(--accent);
+  color: #14151a;
+}
+
+.cs-seg.tiny button {
+  padding: 0.12rem 0.34rem;
+  font-size: 0.64rem;
+}
+
+/* ------------------------------------------------------------- la couleur --
+   Le bouton de retour compte autant que le nuancier : il n'y a pas de « vide »
+   dans un `<input type="color">`, donc sans lui poser une couleur est un aller
+   sans retour — et on n'ose plus y toucher. */
+.cs-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.cs-swatch input[type="color"] {
+  width: 30px;
+  height: 24px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.cs-undo {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-soft);
+}
+
+.cs-pick {
+  margin: 0.4rem 0;
+}
+
+.cs-pick .cs-lab {
+  display: block;
+  margin-bottom: 0.28rem;
+}
+
+/* ======================================================================
+   LA MAQUETTE DE LA TRANCHE
+   ======================================================================
+   C'est la face qu'on VOIT dans le rayon, et elle n'avait qu'un réglage — le
+   fond — là où la couverture en a dix. Elle se présente maintenant comme ce
+   qu'elle est : une pile de blocs, du haut vers le bas, dans l'ordre où ils
+   s'impriment.
+
+   TROIS CHOSES SUR CHAQUE RANG, ET PAS UNE DE PLUS : le nom du bloc (qui
+   déplie ses options), les deux flèches qui le déplacent, et son
+   interrupteur. L'interrupteur reste visible RANG FERMÉ — c'est le geste le
+   plus fréquent, il ne doit jamais coûter un clic de plus. */
+
+.cs-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+}
+
+.cs-block {
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.cs-block.open {
+  border-color: rgba(242, 183, 11, 0.4);
+}
+
+.cs-block-head {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.28rem 0.32rem;
+}
+
+.cs-block-name {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-align: left;
+}
+
+.cs-block-name:disabled {
+  cursor: default;
+}
+
+/* Les flèches sont DISCRÈTES tant qu'on ne survole pas le rang : sur cinq
+   blocs, dix boutons de déplacement font plus de bruit que la maquette
+   elle-même. */
+.cs-move {
+  display: inline-flex;
+  gap: 0.1rem;
+  opacity: 0.35;
+  transition: opacity 0.15s;
+}
+
+.cs-block:hover .cs-move,
+.cs-block.open .cs-move {
+  opacity: 1;
+}
+
+.cs-move button {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-soft);
+}
+
+.cs-block-body {
+  padding: 0.1rem 0.5rem 0.5rem;
+  border-top: 1px solid var(--border);
+  margin-top: 0.1rem;
+}
+
+/* Dans un bloc déplié, la grille d'images se resserre : la colonne fait
+   320 px de large, des vignettes de 66 px n'y tiennent plus à trois. */
+.cs-block-body .cs-thumbs {
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: 0.25rem;
 }
 
 @media (max-width: 900px) {
