@@ -14,6 +14,8 @@
     "gen:quiz": "node src/scripts/generateQuiz.js",
     "sync:events": "node src/scripts/syncEventLists.js",
     "seed:collection": "node src/scripts/seedCollection.js",
+    "collection:export": "node src/scripts/collectionCatalog.js --export",
+    "collection:import": "node src/scripts/collectionCatalog.js --import",
     "build:mots": "node src/scripts/buildMotsDict.js",
     "import:geo": "node src/scripts/importGeoPanoramas.js",
     "geo:export": "node src/scripts/geoCatalog.js --export",

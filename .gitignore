@@ -10,3 +10,8 @@
 /server/uploads
 /server/uploads-deploy
 *.tar
+# Le transfert de la Collection vers le VPS (upload-collection.bat)
+/server/collection-catalog.json
+/server/collection-catalog-files.txt
+/scripts/.upload-collection-state.json
+*.tgz
