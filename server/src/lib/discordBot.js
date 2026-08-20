@@ -16,6 +16,7 @@ import {
 } from "discord.js";
 import {
   BOT_USERNAME,
+  botHealth,
   generateCouple,
   generateDiscordReply,
   generateSummary,
@@ -954,6 +955,7 @@ async function crushReacts(msg) {
       defend: crush.name,
       scope: moodScope(msg),
     });
+    if (!reply) return false;
     await sendLikeAHuman(msg, reply);
     noteBotSpoke(msg.channelId);
     return true;
@@ -1052,6 +1054,9 @@ async function harassVictim(msg) {
       spontaneous: true,
       scope: moodScope(msg),
     });
+    // Rien à dire = rien envoyé (cf. lib/bot.js). La brimade du jour saute,
+    // c'est tout : elle est aléatoire de toute façon.
+    if (!reply) return false;
     await msg.reply({
       content: reply,
       allowedMentions: { repliedUser: false, parse: [] },
@@ -1273,8 +1278,13 @@ async function onMessage(msg) {
         scope: moodScope(msg),
       });
 
-      await sendLikeAHuman(msg, reply);
-      noteBotSpoke(key);
+      // RIEN À DIRE = RIEN ENVOYÉ. La génération renvoie une chaîne vide quand
+      // le fournisseur est tombé (cf. lib/bot.js) : le silence est la panne la
+      // moins visible, une vanne en conserve était la plus visible de toutes.
+      if (reply) {
+        await sendLikeAHuman(msg, reply);
+        noteBotSpoke(key);
+      }
     } finally {
       busy.delete(key);
     }
@@ -1342,5 +1352,9 @@ export function discordBotStatus() {
     tag: client?.user?.tag || null,
     guilds: client?.guilds?.cache?.size ?? 0,
     invite: inviteUrl(),
+    // La santé de la GÉNÉRATION, pas seulement celle de la connexion Discord :
+    // « il est en ligne mais il ne répond plus » est le vrai symptôme, et il
+    // ne se voyait nulle part.
+    ...botHealth(),
   };
 }

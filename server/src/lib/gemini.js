@@ -49,7 +49,65 @@ async function callModel(model, prompt, timeoutMs, temperature) {
   const text = (json.candidates?.[0]?.content?.parts || [])
     .map((p) => p.text || "")
     .join("");
-  return JSON.parse(text);
+  return parseLoose(text);
+}
+
+// ----------------------------------------------------------------------
+//  Le JSON du modèle n'est pas toujours du JSON
+// ----------------------------------------------------------------------
+// `responseMimeType: application/json` est censé garantir une sortie propre,
+// et il la garantit… la plupart du temps. Vu en vrai, dans les logs du bot :
+// « Unexpected non-whitespace character after JSON at position 65 » — le
+// modèle avait collé un deuxième objet (ou une phrase) derrière le premier.
+// `JSON.parse` lève, l'appelant croit à une panne, et pour le bot ça se
+// traduisait par un message perdu.
+//
+// On répare au lieu d'abandonner : on prend le PREMIER objet (ou tableau)
+// complet du texte et on ignore ce qui traîne derrière. Le découpage compte
+// les accolades en sautant ce qui est entre guillemets — sans ça, une accolade
+// à l'intérieur d'une chaîne (« il a dit { » ) fausserait le compte.
+function parseLoose(raw) {
+  const text = String(raw || "").trim();
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    const cut = firstJson(text.replace(/^```(?:json)?\s*|\s*```$/g, "").trim());
+    if (cut) {
+      try {
+        return JSON.parse(cut);
+      } catch {
+        /* on retombe sur l'erreur d'origine, plus parlante */
+      }
+    }
+    err.message = `${err.message} — réponse: ${text.slice(0, 200)}`;
+    throw err;
+  }
+}
+
+function firstJson(text) {
+  const start = text.search(/[[{]/);
+  if (start < 0) return null;
+  const open = text[start];
+  const close = open === "{" ? "}" : "]";
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (c === "\\") escaped = true;
+      else if (c === '"') inString = false;
+      continue;
+    }
+    if (c === '"') inString = true;
+    else if (c === open) depth += 1;
+    else if (c === close) {
+      depth -= 1;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
 }
 
 // Envoie un prompt et renvoie la réponse parsée en JSON.

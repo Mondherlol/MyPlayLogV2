@@ -228,19 +228,50 @@ const soundsLikeAi = (s) => {
   return TELLTALE.some((w) => low.includes(w));
 };
 
-// Ce qu'il sort quand Gemini est éteint, saturé ou en carafe. Il ne faut SURTOUT
-// pas répondre « service indisponible » : le personnage tomberait, et une panne
-// de quota est de toute façon invisible pour celui qui écrit.
-const FALLBACKS = [
-  "j'ai la flemme de te répondre là 💀",
-  "ouais ouais super, va jouer dehors",
-  "t'as vraiment écrit ça pour de vrai 😭",
-  "chef j'ai pas les moyens de traiter autant de bêtise d'un coup",
-  "nan mais tu t'entends parler ? 🤡",
-  "reviens plus tard, là je bosse pas pour les clochards",
-];
+// ======================================================================
+//  EN PANNE, IL SE TAIT. IL NE SORT PLUS DE VANNE EN CONSERVE.
+// ======================================================================
+// Il y avait ici six répliques en dur, servies quand le fournisseur tombait.
+// L'intention était bonne (ne jamais afficher « service indisponible ») et le
+// résultat était pire que la panne : « nan mais tu t'entends parler ? 🤡 »
+// trois fois d'affilée, toujours les mêmes phrases, toujours à côté de ce
+// qu'on venait d'écrire. Personne ne lit ça comme un quota épuisé — on lit ça
+// comme un bot qui refuse de répondre, et c'est la plainte qui est remontée.
+//
+// LE SILENCE EST LA MEILLEURE PANNE. Un type du serveur qui ne répond pas, ça
+// arrive tous les jours et ça ne se remarque même pas ; six phrases en boucle,
+// ça se remarque tout de suite. Les fonctions de génération renvoient donc une
+// CHAÎNE VIDE quand elles n'ont rien, et c'est aux appelants de ne rien
+// envoyer (discordBot.js, routes/chat.js).
+//
+// Les COMMANDES font exception (`!resume`, `!roue`) : on les a explicitement
+// appelées, un silence y passerait pour un bug de la commande. Elles gardent
+// leur phrase de secours, écrite pour ce cas précis.
 
-const pickFallback = () => FALLBACKS[Math.floor(Math.random() * FALLBACKS.length)];
+// La dernière panne de génération, pour le panel admin et les logs. Sans elle,
+// « il répond plus » est indiscernable de « il n'a rien à dire » — et c'est
+// exactement la question posée quand ça arrive.
+let lastFailure = null;
+
+const noteFailure = (why) => {
+  lastFailure = { at: new Date().toISOString(), why: String(why).slice(0, 200) };
+  console.warn("bot muet:", lastFailure.why);
+  return "";
+};
+
+// L'état de santé de la génération : le fournisseur utilisé, et la dernière
+// fois qu'il a lâché.
+export const botHealth = () => ({
+  // L'ordre d'essai, pas « le » fournisseur : c'est ce qu'on veut lire quand
+  // on se demande qui a répondu (ou qui a lâché).
+  provider:
+    [isGeminiConfigured() && "gemini", isGroqConfigured() && "groq"]
+      .filter(Boolean)
+      .join(" puis ") || "aucun",
+  gemini: isGeminiConfigured(),
+  groq: isGroqConfigured(),
+  lastFailure,
+});
 
 // Les emojis d'une poignée de ses dernières répliques, en interdit nommé pour
 // la suivante. Une consigne générale (« varie tes emojis ») ne suffit pas : le
@@ -330,59 +361,89 @@ const BOT_MODEL = process.env.BOT_GEMINI_MODEL || "gemini-flash-lite-latest";
 //     une RÉPONSE À UNE QUESTION n'y tient pas : il lui faut l'info PUIS la
 //     pique. Couper à 170 caractères là-dedans, c'est publier la moitié qui
 //     répond… ou la moitié qui vanne, au hasard.
+// ------------------------------------------------------------------
+//  L'ORDRE DES FOURNISSEURS : GEMINI D'ABORD, GROQ EN SECOURS
+// ------------------------------------------------------------------
+// Choix du propriétaire, et il tranche une question qui se posait vraiment :
+// Groq (Llama 70B) fait un meilleur personnage, mais son quota gratuit est
+// petit et il répond 429 en pleine soirée — c'est ce qui a produit les
+// réponses en conserve à la chaîne. Gemini est plus fade mais il tient la
+// charge, et c'est lui qui porte le reste du site.
+//
+// UN SEUL ENDROIT décide de cet ordre, et tout ce qui parle au modèle passe
+// par ici (les répliques, le résumé, la roue des couples) : deux ordres
+// différents dans deux fonctions, c'est la garantie qu'on en corrigera un seul
+// le jour où il changera.
+//
+// SI LES DEUX TOMBENT, ON LÈVE. C'est l'appelant qui décide ce que ça veut
+// dire : silence pour une réplique, phrase de secours pour une commande.
+async function askProviders(
+  system,
+  user,
+  { maxTokens = 120, temperature = 1.1, hint = "ta réponse" } = {}
+) {
+  const errs = [];
+
+  if (isGeminiConfigured()) {
+    try {
+      const out = await geminiJson(
+        `${system}\n\n${user}\n\nRéponds UNIQUEMENT en JSON : {"reply": "${hint}"}`,
+        {
+          // 14 s et pas 20 : mesuré en vrai, le petit modèle répond en ~1 s la
+          // plupart du temps, mais part parfois à 19 s quand l'API est
+          // chargée. Vingt secondes de silence dans un salon, c'est pire que
+          // pas de réponse du tout — on abandonne tôt et on passe à Groq.
+          timeoutMs: 14_000,
+          temperature,
+          model: BOT_MODEL,
+        }
+      );
+      const text = String(out?.reply || "").trim();
+      if (text) return text;
+      errs.push("gemini: réponse vide");
+    } catch (err) {
+      errs.push(`gemini: ${err.message}`);
+    }
+  }
+
+  if (isGroqConfigured()) {
+    try {
+      const text = await groqText(system, user, {
+        temperature: temperature + 0.05,
+        maxTokens,
+        timeoutMs: 12_000,
+      });
+      if (text) return text;
+      errs.push("groq: réponse vide");
+    } catch (err) {
+      errs.push(`groq: ${err.message}`);
+    }
+  }
+
+  throw new Error(errs.length ? errs.join(" | ") : "aucun fournisseur configuré");
+}
+
 async function chatText(system, user, { long = false, scope = "global" } = {}) {
   const mood = moodOf(scope);
   const persona = mood.prompt ? `${system}\n\n${mood.prompt}` : system;
 
-  // GROQ D'ABORD, GEMINI EN SECOURS — et pas « l'un ou l'autre ».
-  // Vu en vrai dans le salon : Groq répond 429 (quota gratuit) ou met plus de
-  // 12 s, la génération lève, et le bot sort la même vanne en conserve trois
-  // fois de suite (« nan mais tu t'entends parler ? »). De loin, ça ne
-  // ressemble pas à une panne, ça ressemble à un bot cassé qui esquive.
-  // Gemini est déjà là, il est plus fade mais il RÉPOND : on s'y rabat au lieu
-  // de tomber directement sur la réplique en boîte.
-  const askGemini = async () => {
-    const out = await geminiJson(
-      `${persona}\n\n${user}\n\nRéponds UNIQUEMENT en JSON : {"reply": "ta réponse"}`,
-      {
-        // 14 s et pas 20 : mesuré en vrai, le petit modèle répond en ~1 s la
-        // plupart du temps, mais part parfois à 19 s quand l'API est chargée.
-        // Vingt secondes de silence dans un salon, c'est pire qu'une vanne en
-        // conserve — on préfère abandonner tôt et sortir un repli.
-        timeoutMs: 14_000,
-        temperature: 1.1,
-        model: BOT_MODEL,
-      }
-    );
-    return String(out?.reply || "");
-  };
-
   let raw = "";
-  if (isGroqConfigured()) {
-    try {
-      raw = await groqText(persona, user, {
-        temperature: 1.15,
-        maxTokens: long ? 200 : 120,
-        timeoutMs: 12_000,
-      });
-    } catch (err) {
-      // Tracé, sinon un quota Groq épuisé est indiscernable d'un bot boudeur
-      // quand on lit le salon — et c'est exactement ce qui s'est passé.
-      console.warn("bot groq ko, repli gemini:", err.message);
-      raw = await askGemini();
-    }
-  } else {
-    raw = await askGemini();
+  try {
+    raw = await askProviders(persona, user, { maxTokens: long ? 200 : 120 });
+  } catch (err) {
+    return noteFailure(err.message);
   }
 
   // Les modèles adorent emballer une réplique d'argot dans des guillemets.
   const reply = long
     ? tighten(raw.replace(/^["«»\s]+|["«»\s]+$/g, ""), LONG_MAX, 2)
     : tighten(raw.replace(/^["«»\s]+|["«»\s]+$/g, ""));
-  if (!reply || soundsLikeAi(reply)) {
-    console.warn("bot reponse jetee:", reply ? reply.slice(0, 80) : "(vide)");
-    return pickFallback();
-  }
+  // Une réponse qui sent la machine (ou un refus poli du modèle sur un sujet
+  // qui le gêne) est jetée — et comme il n'y a plus de vanne de secours, ça
+  // veut dire silence. C'est la bonne issue : mieux vaut ne rien dire qu'un
+  // « en tant qu'IA » qui casse le personnage pour tout le salon.
+  if (!reply || soundsLikeAi(reply))
+    return noteFailure(`réponse jetée: ${reply ? reply.slice(0, 120) : "(vide)"}`);
   return reply.slice(0, MAX_REPLY);
 }
 
@@ -392,11 +453,9 @@ async function chatText(system, user, { long = false, scope = "global" } = {}) {
 // pour une vanne.
 async function chatAnswer(system, user, { asked = false, scope = "global" } = {}) {
   const first = await chatText(system, user, { long: asked, scope });
-  // Une vanne en conserve RESSEMBLE à une esquive, forcément : elle en est
-  // une. Mais elle veut dire que le fournisseur est tombé — relancer, c'est
-  // taper une deuxième fois sur une API qui vient de refuser, donc empirer la
-  // panne au lieu de la corriger.
-  if (!asked || FALLBACKS.includes(first) || !looksLikeDodge(first)) return first;
+  // Une réponse VIDE veut dire que le fournisseur est tombé : relancer, ce
+  // serait taper une deuxième fois sur une API qui vient de refuser.
+  if (!asked || !first || !looksLikeDodge(first)) return first;
   const second = await chatText(system, `${user}\n${DODGE_RETRY(first)}`, {
     long: true,
     scope,
@@ -519,7 +578,10 @@ elle porte sur le sujet de la question. Toujours en SMS, avec tes fautes.`;
 // `scope` sert à l'humeur du jour (lib/botMood.js) : un identifiant stable
 // pour ce fil, de sorte qu'il soit d'humeur égale d'un message à l'autre.
 export async function generateBotReply({ username, history = [], scope = "dm" }) {
-  if (!isGeminiConfigured()) return pickFallback();
+  // Groq suffit : l'ancien test ne regardait que Gemini et rendait le bot muet
+  // sur une installation Groq seule.
+  if (!isGeminiConfigured() && !isGroqConfigured())
+    return noteFailure("aucun fournisseur configuré");
 
   const recent = history.filter((m) => m.text).slice(-12);
   const lines = recent
@@ -549,8 +611,7 @@ ${asked ? QUESTION_RULES : ""}`;
   try {
     return await chatAnswer(PERSONA, prompt, { asked, scope });
   } catch (err) {
-    console.warn("bot reply error:", err.message);
-    return pickFallback();
+    return noteFailure(`dm: ${err.message}`);
   }
 }
 
@@ -606,7 +667,8 @@ export async function generateDiscordReply({
   // être drôle plutôt que méchant, sinon il devient le bot qu'on expulse.
   spontaneous = false,
 }) {
-  if (!isGeminiConfigured()) return pickFallback();
+  if (!isGeminiConfigured() && !isGroqConfigured())
+    return noteFailure("aucun fournisseur configuré");
 
   const recent = history.filter((m) => m.text).slice(-15);
   const lines = recent
@@ -679,8 +741,7 @@ ${asked ? QUESTION_RULES : ""}`;
       ""
     );
   } catch (err) {
-    console.warn("bot discord reply error:", err.message);
-    return pickFallback();
+    return noteFailure(`discord: ${err.message}`);
   }
 }
 
@@ -738,16 +799,11 @@ Annonce le couple au salon et EXPLIQUE POURQUOI ils vont trop bien ensemble, en 
 DEUX phrases maximum, en SMS avec tes fautes. N'écris PAS de mention Discord (pas de <@…>), juste leurs prénoms.`;
 
   try {
-    const raw = isGroqConfigured()
-      ? await groqText(PERSONA, prompt, { temperature: 1.2, maxTokens: 170 })
-      : String(
-          (
-            await geminiJson(
-              `${PERSONA}\n\n${prompt}\n\nRéponds UNIQUEMENT en JSON : {"reply": "ton annonce"}`,
-              { timeoutMs: 14_000, temperature: 1.15, model: BOT_MODEL }
-            )
-          )?.reply || ""
-        );
+    const raw = await askProviders(PERSONA, prompt, {
+      maxTokens: 170,
+      temperature: 1.15,
+      hint: "ton annonce",
+    });
     const out = tighten(raw.replace(/^["«»\s]+|["«»\s]+$/g, ""), 320, 2).replace(
       /<@[!&]?\d+>/g,
       ""
@@ -755,7 +811,9 @@ DEUX phrases maximum, en SMS avec tes fautes. N'écris PAS de mention Discord (p
     if (!out || soundsLikeAi(out)) return "vous allez trop bien ensemble, jsp pourquoi mais ça se voit";
     return out;
   } catch (err) {
-    console.warn("bot couple error:", err.message);
+    noteFailure(`roue: ${err.message}`);
+    // Une COMMANDE ne peut pas rester sans réponse : on l'a appelée exprès, un
+    // silence passerait pour une commande cassée.
     return "la roue a plante, ms vous etes ensemble quand meme, felicitations";
   }
 }
@@ -797,21 +855,16 @@ RÈGLES DU RÉSUMÉ :
   try {
     // Deux phrases au lieu d'une : un résumé d'une seule ligne n'apprend rien.
     // On relâche donc le filet de brièveté juste pour ce cas.
-    const raw = isGroqConfigured()
-      ? await groqText(PERSONA, prompt, { temperature: 1.1, maxTokens: 160 })
-      : String(
-          (
-            await geminiJson(
-              `${PERSONA}\n\n${prompt}\n\nRéponds UNIQUEMENT en JSON : {"reply": "ton résumé"}`,
-              { timeoutMs: 14_000, temperature: 1.05, model: BOT_MODEL }
-            )
-          )?.reply || ""
-        );
+    const raw = await askProviders(PERSONA, prompt, {
+      maxTokens: 160,
+      temperature: 1.05,
+      hint: "ton résumé",
+    });
     const out = raw.replace(/^["«»\s]+|["«»\s]+$/g, "").trim();
     if (!out || soundsLikeAi(out)) return "jai rien suivi, vous êtes chiants";
     return out.slice(0, 500);
   } catch (err) {
-    console.warn("bot summary error:", err.message);
+    noteFailure(`resume: ${err.message}`);
     return "jai la flemme de tout relire, débrouillez vous";
   }
 }

@@ -765,10 +765,15 @@ async function maybeBotReply(conv, senderId, text = "") {
           })),
       });
 
-      const msg = await persistMessage(conv, bot, { author: bot, text: reply });
-      broadcastMessage(conv, msg);
-      await broadcastConversation(conv._id);
-      notifyPush(conv, msg, bot);
+      // Vide = le fournisseur est tombé (cf. lib/bot.js). On ne publie rien :
+      // un message en conserve dans un tête-à-tête se repère encore plus vite
+      // qu'en salon, il n'y a personne d'autre pour couvrir.
+      if (reply) {
+        const msg = await persistMessage(conv, bot, { author: bot, text: reply });
+        broadcastMessage(conv, msg);
+        await broadcastConversation(conv._id);
+        notifyPush(conv, msg, bot);
+      }
     } finally {
       botBusy.delete(key);
       emitTo([String(senderId)], "typing", {
