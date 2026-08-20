@@ -33,9 +33,9 @@ const APP_VERSION = "1.1";
 
 const NAV = [
   { to: "/app", label: "Accueil", Icon: Home, end: true },
-  // `noMobile` : entrée gardée sur la sidebar desktop, retirée de la bottom bar.
-  { to: "/activity", label: "Activité", Icon: Sparkles, noMobile: true },
+  { to: "/activity", label: "Activité", Icon: Sparkles },
   { to: "/explore", label: "Explorer", Icon: Compass },
+  // `noMobile` : entrée gardée sur la sidebar desktop, retirée de la bottom bar.
   { to: "/releases", label: "Sorties", Icon: CalendarDays, noMobile: true },
   // `badge` : la pastille de non-lus vient du contexte de messagerie.
   { to: "/messages", label: "Messages", Icon: MessagesSquare, badge: "chat" },

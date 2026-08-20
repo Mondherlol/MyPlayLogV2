@@ -4211,6 +4211,17 @@
   .co-fade {
     width: 48px;
   }
+  /* Le bouton prend toute la largeur et le prix passe SOUS le libellé : sur une
+     seule ligne, « Ouvrir » et sa pastille se serraient au milieu d'un bouton
+     étroit, l'ensemble penchait à droite. */
+  .co-open-btn {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.3rem;
+    padding: 0.75rem 1rem;
+  }
   .arc-inv-grid {
     grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   }

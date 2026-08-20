@@ -70,7 +70,13 @@ const SHAKE_PER_PX = 1 / 1600;
 // Le repli au clic doit rester une vraie option : sept ou huit clics, pas
 // quinze. C'est le chemin de qui joue au trackpad, ou n'a pas envie du geste.
 const SHAKE_PER_CLICK = 0.16;
-const SHAKE_PER_G = 0.07;
+// Le téléphone, lui, se secoue DEUX FOIS PLUS LONGTEMPS que la souris ne
+// s'agite : le geste du bras est ample et amusant, il valait la peine de durer
+// (et il remplissait la jauge avant même qu'on ait senti la capsule bouger).
+// Gain par secousse et plafond par évènement divisés par deux — le seuil de
+// déclenchement, lui, ne bouge pas : marcher n'ouvre toujours rien.
+const SHAKE_PER_G = 0.035;
+const SHAKE_G_CAP = 0.07;
 
 // Deux bruits de contenu à moins de 90 ms l'un de l'autre, ce n'est plus un
 // objet qui remue : c'est un grésillement.
@@ -293,7 +299,7 @@ export default function GachaModal({ token, onClose, onDrawn }) {
       if (prev) {
         const d = Math.hypot((g.x || 0) - prev.x, (g.y || 0) - prev.y, (g.z || 0) - prev.z);
         // Seuil : marcher avec son téléphone ne doit pas ouvrir la capsule.
-        if (d > 2.2) bump(Math.min(0.14, d * SHAKE_PER_G));
+        if (d > 2.2) bump(Math.min(SHAKE_G_CAP, d * SHAKE_PER_G));
       }
       prev = { x: g.x || 0, y: g.y || 0, z: g.z || 0 };
     };

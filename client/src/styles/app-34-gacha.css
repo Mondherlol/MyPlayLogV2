@@ -404,18 +404,48 @@
 /* Sur un petit écran, la carte s'empile : le titre au-dessus, les actions
    dessous — la ligne unique y coupait le titre à trois mots. */
 @media (max-width: 620px) {
+  /* La carte tenait par un centrage `left: 50%` + `translate: -50%`. Dès que
+     son contenu (titre + trois boutons, tous en `nowrap`) dépassait la
+     largeur de l'écran, le débordement se répartissait des deux côtés et la
+     carte semblait commencer au milieu de l'écran, coupée à gauche. On
+     l'ancre donc aux deux bords : plus de largeur à deviner, donc plus de
+     débordement possible. */
+  .gch-won {
+    left: 12px;
+    right: 12px;
+    width: auto;
+    translate: none;
+  }
   .gch-won .coll-inspect-card {
-    flex-wrap: wrap;
-    row-gap: 0.6rem;
+    box-sizing: border-box;
+    max-width: 100%;
+    /* Empilée : le titre sur toute la largeur, les actions dessous. */
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+  }
+  /* Le liseré de teinte devient un filet horizontal en tête de carte : posé
+     debout dans une colonne, il se réduisait à un point de 3 px. */
+  .gch-won .coll-inspect-card::before {
+    width: auto;
+    height: 3px;
+  }
+  /* Un titre long se lit sur deux lignes plutôt que de pousser la carte. */
+  .gch-won .coll-inspect-text strong {
+    white-space: normal;
   }
   .gch-won .coll-inspect-acts {
     width: 100%;
     margin-left: 0;
     /* Les trois boutons se répartissent la ligne plutôt que de se serrer à
        droite : à cette largeur, « Relancer » doit rester attrapable au pouce. */
-    justify-content: space-between;
+    justify-content: center;
     flex-wrap: wrap;
     gap: 0.35rem;
+  }
+  .gch-won .coll-inspect-acts > * {
+    flex: 1 1 auto;
+    justify-content: center;
   }
 }
 
@@ -446,6 +476,24 @@
   }
   .gch-again {
     padding: 0.5rem 0.8rem;
+  }
+
+  /* Le bouton de lancement occupe la largeur, et le prix passe SOUS le
+     libellé : côte à côte sur un écran étroit, les deux se serraient au
+     milieu d'une pilule tassée. Les bords fixes remplacent le centrage par
+     `translate` — plus rien ne peut décaler la pilule d'une demi-largeur. */
+  .gch-launch {
+    left: 16px;
+    right: 16px;
+    width: auto;
+    translate: none;
+  }
+  .gch-go {
+    width: 100%;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.3rem;
+    padding: 0.85rem 1.2rem;
   }
 }
 

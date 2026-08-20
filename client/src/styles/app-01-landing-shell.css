@@ -1942,7 +1942,7 @@
   .sidebar-head,
   .side-bottom,
   .side-row-admin,
-  /* Entrées marquées `noMobile` dans Sidebar.jsx (Activité, Sorties) */
+  /* Entrées marquées `noMobile` dans Sidebar.jsx (Sorties) */
   .side-row-no-mobile {
     display: none;
   }
@@ -1981,7 +1981,9 @@
   /* Indicateur actif façon Material : pilule dorée derrière l'icône */
   .sidebar .side-icon {
     width: auto;
-    padding: 0.2rem 0.85rem;
+    /* Une entrée de plus depuis que « Activité » est ici : la pilule se
+       resserre pour que huit onglets tiennent sans écraser les libellés. */
+    padding: 0.2rem 0.6rem;
     border-radius: 999px;
     transition: background 0.15s ease, color 0.15s ease;
   }

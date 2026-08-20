@@ -858,6 +858,14 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
   // ON ÉCOUTE AUSSI DANS L'IFRAME : la souris passe le plus clair de son temps
   // au-dessus de l'écran du jeu, et ces mouvements-là ne remontent pas à la page.
   // Sans cette écoute, les commandes disparaîtraient pour ne jamais revenir.
+  //
+  // JOUER N'EST PAS « BOUGER ». La barre écoutait le clavier au même titre que
+  // la souris : chaque appui sur A, chaque pas vers la gauche rallumait
+  // l'interface ET le curseur par-dessus le jeu. Autrement dit, l'effacement ne
+  // marchait jamais pour la seule personne qui joue vraiment — celle qui appuie
+  // sur des touches. Les touches DE JEU ne réveillent donc plus rien (voir
+  // `wakeKey`) ; le reste du clavier, si, sinon on n'aurait plus aucun moyen de
+  // rappeler la barre sans souris.
   const wake = useCallback(() => {
     setAwake(true);
     clearTimeout(sleeper.current);
@@ -877,12 +885,27 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
       return undefined;
     }
     wake();
+    // Une touche assignée à un bouton de la console est un GESTE DE JEU : elle
+    // laisse l'interface endormie. Tout autre touche est quelqu'un qui cherche
+    // quelque chose, et mérite de revoir la barre.
+    const played = new Set(BUTTONS.map((b) => keys[b.id]?.code).filter(Boolean));
+    const wakeKey = (e) => {
+      if (played.has(e.code)) return;
+      wake();
+    };
+    // Même règle au doigt : appuyer sur la manette à l'écran, c'est jouer. Le
+    // reste de l'écran, lui, rappelle la barre — c'est le geste de qui n'a pas
+    // de souris.
+    const wakePointer = (e) => {
+      if (e.target?.closest?.(".gbx-pad")) return;
+      wake();
+    };
     const targets = bothWindows();
     for (const t of targets) {
       try {
         t.addEventListener("pointermove", wake);
-        t.addEventListener("pointerdown", wake);
-        t.addEventListener("keydown", wake);
+        t.addEventListener("pointerdown", wakePointer);
+        t.addEventListener("keydown", wakeKey);
       } catch {
         /* document jeté */
       }
@@ -892,14 +915,14 @@ export default function GbaPlayer({ media, token, onClose, onPlayed }) {
       for (const t of targets) {
         try {
           t.removeEventListener("pointermove", wake);
-          t.removeEventListener("pointerdown", wake);
-          t.removeEventListener("keydown", wake);
+          t.removeEventListener("pointerdown", wakePointer);
+          t.removeEventListener("keydown", wakeKey);
         } catch {
           /* rien à retirer */
         }
       }
     };
-  }, [phase, paused, sheet, raw, offer, closing, overDock, core, wake, bothWindows]);
+  }, [phase, paused, sheet, raw, offer, closing, overDock, core, keys, wake, bothWindows]);
 
   // ------------------------------------------------------------ éteindre --
   //
