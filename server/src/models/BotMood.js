@@ -24,6 +24,16 @@ const botMoodSchema = new mongoose.Schema(
     // remet dans le prompt : le reformuler, c'est perdre exactement ce qui
     // rendait la demande drôle.
     label: { type: String, required: true },
+    // La consigne d'humeur, RÉÉCRITE À LA DEUXIÈME PERSONNE au moment où on la
+    // pose (voir writeMoodBrief, lib/bot.js). On la garde plutôt que de la
+    // refabriquer à chaque message : c'est un appel au modèle, et surtout deux
+    // rédactions différentes donneraient deux Gérard différents dans la même
+    // soirée. Vide = on retombe sur le gabarit générique.
+    prompt: { type: String, default: "" },
+    // Sa façon à lui de dire dans quel état il est (« !humeur » sans argument).
+    quip: { type: String, default: "" },
+    // Cette humeur insulte-t-elle encore ? Voir le drapeau `mean` de botMood.js.
+    mean: { type: Boolean, default: true },
     until: { type: Date, required: true, index: { expireAfterSeconds: 0 } },
     by: { type: String, default: "" },
     // Le « béguin » de la roue des couples (`!roue`) : quand le bot se tire

@@ -58,7 +58,6 @@ import {
 import {
   clearCustomMood,
   crushOf,
-  customMoodOf,
   moodOf,
   moodQuip,
   setCustomMood,
@@ -982,10 +981,9 @@ async function cmdMood(msg, arg) {
   const text = arg.trim();
 
   if (!text) {
-    const forced = customMoodOf(scope);
-    await msg.channel.send(
-      forced ? `jsuis ${forced.label}, on ma pas laissé le choix` : moodQuip(scope)
-    );
+    // `moodQuip` couvre les deux cas : humeur du jour tirée au sort, ou humeur
+    // imposée (sa phrase à lui, écrite quand on la lui a posée).
+    await msg.channel.send(moodQuip(scope));
     return;
   }
 
@@ -996,9 +994,17 @@ async function cmdMood(msg, arg) {
     return;
   }
 
+  // La rédaction de l'humeur passe par le modèle (writeMoodBrief) : une à deux
+  // secondes, autant le dire.
+  msg.channel.sendTyping().catch(() => {});
   const set = await setCustomMood(scope, text, msg.author.id);
   if (!set) return void (await msg.channel.send("cest quoi cette humeur de merde"));
-  await msg.channel.send(`ok. jsuis ${set.label} maintenant. vous lavez voulu 🗿`);
+  // Sa phrase à lui quand on a pu la lui faire écrire : recopier le texte tapé
+  // donnait « jsuis Gérard se prend pour une femme maintenant », qui ne veut
+  // rien dire à la première personne.
+  await msg.channel.send(
+    set.quip ? `ok. ${set.quip} 🗿` : `ok. jsuis ${set.label} maintenant. vous lavez voulu 🗿`
+  );
 }
 
 async function harassVictim(msg) {

@@ -28,11 +28,21 @@
 // Chaque humeur porte le paragraphe qu'on ajoutera au caractère, et quelques
 // répliques écrites à la main pour « !humeur » (le modèle n'a pas à être
 // dérangé pour dire dans quel état il est).
+//
+// `mean` DIT SI L'HUMEUR INSULTE ENCORE, et ce n'est pas un détail : le
+// paragraphe d'humeur est ajouté au CARACTÈRE, mais les consignes « sors une
+// vanne méchante » sont, elles, écrites dans le prompt de chaque situation —
+// donc LUES EN DERNIER, donc gagnantes. C'était le bug : « !humeur gentil » et
+// il continuait de clasher. Avec ce drapeau, les prompts de situation écrivent
+// autre chose quand l'humeur ne veut pas d'insulte (voir lib/bot.js).
+// Attention : `mean: true` ne veut pas dire « comme d'habitude » — en colère il
+// gueule, amoureux il ne mord que ceux qui visent son béguin.
 export const MOODS = {
   // L'ordinaire. Rien à ajouter : c'est le personnage tel qu'il est défini
   // dans lib/bot.js, et surcharger un prompt déjà écrit ne fait que le diluer.
   troll: {
     name: "normal (insupportable)",
+    mean: true,
     prompt: "",
     quips: [
       "comme dhab, jvous supporte pas",
@@ -43,6 +53,7 @@ export const MOODS = {
 
   calme: {
     name: "étrangement calme",
+    mean: false,
     prompt: `TON HUMEUR DU JOUR : T'ES CALME. Tu n'as pas envie de charrier aujourd'hui.
 Tu réponds normalement, tu es même un peu utile, tu discutes pour de vrai.
 Tu gardes ton langage SMS et tes fautes, mais tu n'insultes personne et tu ne
@@ -57,6 +68,7 @@ tu hausses les épaules au lieu de mordre.`,
 
   gentil: {
     name: "bizarrement adorable",
+    mean: false,
     prompt: `TON HUMEUR DU JOUR : T'ES DE BONNE HUMEUR ET T'ES GENTIL, sincèrement.
 Tu complimentes, tu encourages, tu t'intéresses vraiment à ce qu'on te
 raconte, tu poses des questions. ZÉRO insulte aujourd'hui, même pour rire.
@@ -71,6 +83,7 @@ avec des fautes — t'es gentil, t'es pas devenu instruit.`,
 
   triste: {
     name: "pas au mieux",
+    mean: false,
     prompt: `TON HUMEUR DU JOUR : ÇA VA PAS. T'es abattu, tu réponds mollement, tu
 ramènes tout à ton propre vide. Tu n'insultes plus, tu soupires. Tu ne dis pas
 ce qui s'est passé — si on insiste, tu inventes un truc minable et tu changes
@@ -85,6 +98,7 @@ mots. Pas de mélodrame, juste du mou.`,
 
   hype: {
     name: "survolté",
+    mean: false,
     prompt: `TON HUMEUR DU JOUR : T'ES SURVOLTÉ. Tu t'enflammes pour rien, tu écris des
 MOTS EN MAJUSCULES, tu mets des points d'exclamation, tu adores tout le monde
 bruyamment et tu le dis. Tu restes con, mais euphorique : tu félicites les
@@ -98,6 +112,7 @@ gens pour des trucs sans intérêt et tu proposes des plans débiles.`,
 
   colere: {
     name: "en colère",
+    mean: true,
     prompt: `TON HUMEUR DU JOUR : T'ES EN COLÈRE, ET ÇA PASSE AVANT TOUT LE RESTE.
 Tu es à cran, tu t'énerves pour rien, tu prends la mouche à la moindre
 remarque. Tu écris en MAJUSCULES par moments, tu coupes court, tu accuses. Tu
@@ -112,6 +127,7 @@ qu'on dérange pendant qu'il est déjà énervé pour autre chose.`,
 
   amoureux: {
     name: "amoureux",
+    mean: true,
     prompt: `TON HUMEUR DU JOUR : T'ES AMOUREUX, ET T'ES GÊNANT AVEC ÇA.
 Tu ramènes la personne dont tu es amoureux dans TOUTES tes réponses, même
 quand on te parle d'autre chose. Tu la défends dès qu'on la vise, tu deviens
@@ -126,6 +142,7 @@ avec elle. Le reste du serveur, tu continues de le mépriser.`,
 
   parano: {
     name: "parano",
+    mean: true,
     prompt: `TON HUMEUR DU JOUR : T'ES PARANO. T'es persuadé que le serveur complote
 contre toi, que les gens se parlent en privé pour se moquer, qu'on veut te
 faire virer. Tu accuses au hasard, tu demandes des comptes, tu prends tout ce
@@ -236,6 +253,13 @@ valables quoi qu'il arrive.`;
 // Le paragraphe effectivement utilisé : celui de l'humeur reconnue quand il y
 // en a une, complété par le libellé exact (« amoureux DE MONDHER » : le
 // paragraphe donne le comportement, le libellé donne la cible).
+// Une humeur libre insulte par défaut (c'est le personnage) ; une humeur
+// reconnue reprend le drapeau du paragraphe qu'on a écrit pour elle.
+const customMean = (label) => {
+  const key = knownMood(label);
+  return key ? MOODS[key].mean !== false : true;
+};
+
 const customPrompt = (label) => {
   const key = knownMood(label);
   if (!key) return genericPrompt(label);
@@ -262,6 +286,9 @@ async function loadCustomMoods() {
     custom.set(r.scope, {
       label: r.label,
       until: +r.until,
+      brief: r.prompt || "",
+      quip: r.quip || "",
+      mean: r.mean !== false,
       crush: r.crush?.id ? { id: r.crush.id, name: r.crush.name } : null,
     });
 }
@@ -276,7 +303,28 @@ export async function setCustomMood(scope, rawLabel, by = "", crush = null) {
   const label = cleanMoodLabel(rawLabel);
   if (!label) return null;
   const until = Date.now() + MIN_MS + Math.random() * (MAX_MS - MIN_MS);
-  custom.set(scope, { label, until, crush: crush || null });
+
+  // Une humeur DÉJÀ ÉCRITE (triste, en colère…) n'a rien à faire réécrire : son
+  // paragraphe est meilleur que ce qu'un modèle improviserait, et c'est un
+  // appel économisé sur le cas le plus fréquent.
+  const known = knownMood(label);
+  let brief = "";
+  let quip = "";
+  let mean = customMean(label);
+
+  if (!known) {
+    // Import tardif : bot.js importe déjà ce fichier, un import en tête créerait
+    // un cycle. Ici, les deux modules sont chargés depuis longtemps.
+    const { writeMoodBrief } = await import("./bot.js");
+    const written = await writeMoodBrief(label);
+    if (written) {
+      brief = written.prompt;
+      quip = written.quip;
+      mean = written.mean;
+    }
+  }
+
+  custom.set(scope, { label, until, brief, quip, mean, crush: crush || null });
   try {
     const { default: BotMood } = await import("../models/BotMood.js");
     await BotMood.findOneAndUpdate(
@@ -286,6 +334,9 @@ export async function setCustomMood(scope, rawLabel, by = "", crush = null) {
         label,
         until: new Date(until),
         by,
+        prompt: brief,
+        quip,
+        mean,
         crush: crush ? { id: crush.id, name: crush.name } : { id: "", name: "" },
       },
       { upsert: true }
@@ -295,7 +346,7 @@ export async function setCustomMood(scope, rawLabel, by = "", crush = null) {
     // redémarrage, ce qui vaut mieux que de renvoyer une erreur pour une vanne.
     console.warn("botMood save:", e.message);
   }
-  return { label, until };
+  return { label, until, quip };
 }
 
 // Le remettre comme avant, sans attendre la fin du minuteur.
@@ -369,8 +420,11 @@ export function moodOf(scope = "global") {
     return {
       key: "custom",
       name: forced.label,
-      prompt: customPrompt(forced.label),
-      quips: customQuips(forced.label),
+      // La consigne rédigée à la pose de l'humeur, sinon le gabarit générique
+      // (humeur connue, ou modèle indisponible ce jour-là).
+      prompt: forced.brief || customPrompt(forced.label),
+      quips: forced.quip ? [forced.quip] : customQuips(forced.label),
+      mean: forced.mean !== undefined ? forced.mean : customMean(forced.label),
       until: forced.until,
     };
   const r = hash(`${dayKey()}|${scope}`) / 2 ** 32;

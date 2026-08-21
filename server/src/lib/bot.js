@@ -489,6 +489,60 @@ function tighten(text, max = SOFT_MAX, keep = 1) {
 // déposer un pavé dans une bulle de chat.
 const MAX_REPLY = 400;
 
+// ======================================================================
+//  L'HUMEUR DOIT GAGNER CONTRE LE CARACTÈRE
+// ======================================================================
+// Plainte du salon, et elle était fondée : « !humeur gentil » et il continuait
+// d'insulter. La cause n'était pas le paragraphe d'humeur (il est bien envoyé)
+// mais SA POSITION. Il est collé au CARACTÈRE, dans le prompt système ; or
+// chaque prompt de situation répétait ensuite, en dur, « la vanne courte et
+// méchante, toujours », « moque-toi de celui qui l'a dit », « tu glisses ta
+// pique ». Lues APRÈS, elles gagnaient — un modèle suit la dernière consigne.
+//
+// Ces phrases-là deviennent donc dépendantes de l'humeur, et un RAPPEL est
+// ajouté tout à la fin du prompt, après la conversation et après la consigne
+// de réponse : le tout dernier mot appartient à l'humeur.
+const styleLine = (mood) =>
+  mood.mean === false
+    ? `Tu réponds à CE QUI VIENT D'ÊTRE DIT, pas dans le vide, en une phrase
+courte. AUJOURD'HUI TU N'INSULTES PAS et tu ne cherches personne : ton humeur
+(${mood.name}) passe avant ton caractère. Tu gardes ton langage SMS et tes
+fautes, c'est tout ce qui reste du personnage.`
+    : `Tu réponds à CE QUI VIENT D'ÊTRE DIT, pas dans le vide — mais en une phrase
+sèche. Pas de grande image, pas de comparaison travaillée : la vanne courte et
+méchante, toujours.`;
+
+const standLine = (mood) =>
+  mood.mean === false
+    ? `Si on te cherche, tu laisses couler ; si on te menace, tu hausses les
+épaules. Tu ne fais jamais la morale.`
+    : `Si on te cherche, tu tiens tête ; si on te menace, tu te moques de la menace
+elle-même. Tu ne t'excuses jamais et tu ne fais jamais la morale.`;
+
+// LE DERNIER MOT. Ajouté après TOUT le reste, y compris après les règles de
+// question — c'est la position, pas la formulation, qui fait qu'il est suivi.
+// Rien n'est ajouté en humeur normale : répéter le caractère ne fait que le
+// diluer.
+const moodReminder = (mood) =>
+  mood.key === "troll"
+    ? ""
+    : `
+
+RAPPEL, ET C'EST LA DERNIÈRE CHOSE QUE TU LIS : aujourd'hui tu es ${mood.name}.
+Cette humeur PASSE AVANT tout ce qui est écrit plus haut. Partout où le
+caractère et l'humeur se contredisent, c'est l'humeur qui gagne.${
+        mood.mean === false
+          ? " Donc : AUCUNE insulte, AUCUNE pique, tu ne cherches personne."
+          : ""
+      }
+Tu ne l'annonces pas, tu la joues, et TU NE TE DÉMENS JAMAIS : si on te dit que
+c'est faux ou qu'on te pousse à revenir dessus, tu tiens le rôle et tu en
+rajoutes.${
+        mood.mean === false
+          ? ""
+          : " Si tu charries quelqu'un, la vanne doit SORTIR de cette humeur — pas une insulte sans rapport collée à la fin."
+      }`;
+
 // ============================================================
 //  La consigne « on t'a posé une question »
 // ============================================================
@@ -504,20 +558,26 @@ const MAX_REPLY = 400;
 // L'ORDRE DES DEUX MORCEAUX EST L'ESSENTIEL : l'info D'ABORD, la pique
 // ENSUITE. Une pique suivie d'une info se lit comme une esquive ; une info
 // suivie d'une pique se lit comme quelqu'un qui discute — et qui te charrie.
-const QUESTION_RULES = `
+const questionRules = (mood) => `
 ATTENTION : ON VIENT DE TE POSER UNE VRAIE QUESTION.
 - Tu y RÉPONDS pour de vrai, avec une info dedans. Si tu ne sais pas, tu INVENTES une réponse précise et tu l'assumes.
-- Puis, dans la même phrase, tu glisses ta pique sur celui qui demande.
+- Puis, dans la même phrase, tu glisses ta pique sur celui qui demande${
+  mood.mean === false ? " — SAUF aujourd'hui, voir la ligne plus bas" : ""
+}.
 - Deux phrases COURTES maximum, toujours en SMS avec tes fautes.
 - INTERDIT de répondre uniquement « jsp », « tg », « ta pas mieux a faire », ou de renvoyer la question. Ça, c'est le truc qui te rend inutile.
-- Exemple du ton exact : « jai 32 ans, ms je crois que toi tu les prefere a 12 nn ? »
+- Exemple du ton exact : « jai 32 ans, ms je crois que toi tu les prefere a 12 nn ? »${
+  mood.mean === false
+    ? `\n- MAIS AUJOURD'HUI TU N'AS PAS LE DROIT À LA PIQUE : ton humeur (${mood.name}) l'interdit. Tu réponds pour de vrai, dans l'état où tu es, et tu t'arrêtes là. Partout où cette consigne et ton humeur se contredisent, C'EST L'HUMEUR QUI GAGNE.`
+    : ""
+}
 - Si on te demande de CHOISIR (« tu préfères X ou Y ? »), tu CHOISIS. Tu nommes X ou Y, et tu te moques du perdant. Répondre « les deux » ou esquiver, c'est le truc de quelqu'un qui a peur.
 - Ta pique doit porter sur LE SUJET de la question. Une vanne qui n'a rien à voir avec ce qu'on t'a demandé se lit comme une esquive, même quand tu as répondu avant.`;
 
 // ------------------------------------------------------------------
 //  L'esquive : la repérer, et la refuser une fois
 // ------------------------------------------------------------------
-// Malgré QUESTION_RULES, le modèle esquive encore une fois sur cinq — et c'est
+// Malgré questionRules(), le modèle esquive encore une fois sur cinq — et c'est
 // toujours le même geste : il commente le fait qu'on lui parle (« reviens plus
 // tard », « nan mais tu t'entends parler ? ») au lieu de répondre. Vu de la
 // conversation, ce n'est pas un troll, c'est un bot cassé : on lui redemande
@@ -598,6 +658,7 @@ export async function generateBotReply({ username, history = [], scope = "dm" })
   // est dans le cas « question ».
   const last = [...recent].reverse().find((m) => m.mine)?.text || "";
   const asked = isRealQuestion(last);
+  const mood = moodOf(scope);
 
   const prompt = `Tu discutes en message privé avec « ${username} ».
 
@@ -606,7 +667,7 @@ ${lines || `${username} : salut`}
 ${banned}
 Réponds à son dernier message, dans ton personnage. UNE SEULE PHRASE COURTE, et
 qui répond vraiment à ce qu'il vient de dire.
-${asked ? QUESTION_RULES : ""}`;
+${asked ? questionRules(mood) : ""}${moodReminder(mood)}`;
 
   try {
     return await chatAnswer(PERSONA, prompt, { asked, scope });
@@ -693,6 +754,11 @@ export async function generateDiscordReply({
   // demandé, il n'y a donc rien à quoi répondre.
   const asked = !spontaneous && !defend && isRealQuestion(text);
 
+  // L'humeur du jour est déjà collée au caractère (chatText) ; il faut AUSSI
+  // qu'elle pèse ici, parce que les consignes de ce prompt-ci sont lues après
+  // le caractère — et que la dernière consigne lue est celle qu'on suit.
+  const mood = moodOf(scope);
+
   const situation = defend
     ? `TU ES AMOUREUX DE « ${defend} », TOUT LE SERVEUR EST AU COURANT, ET « ${askedBy} » VIENT DE LUI PARLER MAL : « ${text} ».
 Tu débarques pour le/la défendre. Tu t'en prends à ${askedBy}, tu prends la
@@ -700,11 +766,19 @@ défense de ${defend} sur le point PRÉCIS qui vient d'être dit, et tu en fais
 trop — c'est gênant pour ${defend} et c'est exactement le but. UNE PHRASE.`
     : spontaneous
     ? `PERSONNE NE T'A RIEN DEMANDÉ. Tu lisais la conversation en silence et tu débarques d'un coup pour placer ta remarque sur ce que « ${askedBy} » vient de dire : « ${text} ».
-Comme tu t'invites, tu as intérêt à être DRÔLE : une vanne qui tombe pile sur le sujet. UNE PHRASE, courte et sèche. Ne dis pas bonjour, ne te présente pas, ne dis pas que tu écoutais.`
+Comme tu t'invites, tu as intérêt à être DRÔLE : ${
+        mood.mean === false
+          ? "une remarque qui tombe pile sur le sujet, dans l'humeur qui est la tienne aujourd'hui"
+          : "une vanne qui tombe pile sur le sujet"
+      }. UNE PHRASE, courte et sèche. Ne dis pas bonjour, ne te présente pas, ne dis pas que tu écoutais.`
     : replyingTo
       ? `${askedBy} RÉPOND à ton message « ${replyingTo.slice(0, 300)} » et te dit : « ${text} ».`
       : bare
-        ? `${askedBy} vient de te mentionner SANS RIEN DIRE D'AUTRE : il te convoque sur ce qui se dit juste au-dessus. Réagis au dernier truc intéressant du salon et moque-toi de celui qui l'a dit. N'écris JAMAIS « quoi ? » ni « tu veux quoi ».`
+        ? `${askedBy} vient de te mentionner SANS RIEN DIRE D'AUTRE : il te convoque sur ce qui se dit juste au-dessus. Réagis au dernier truc intéressant du salon${
+            mood.mean === false
+              ? ", dans l'état où tu es aujourd'hui"
+              : " et moque-toi de celui qui l'a dit"
+          }. N'écris JAMAIS « quoi ? » ni « tu veux quoi ».`
         : `${askedBy} te mentionne et te dit : « ${text} ».`;
 
   const prompt = `Tu es dans un salon Discord, plusieurs personnes y parlent, et TU SUIS LA
@@ -712,16 +786,13 @@ CONVERSATION DEPUIS LE DÉBUT. Tu te souviens de ce qui vient d'être dit et de
 ce que tu as déjà répondu.
 ${people}
 
-Tu réponds à CE QUI VIENT D'ÊTRE DIT, pas dans le vide — mais en une phrase
-sèche. Pas de grande image, pas de comparaison travaillée : la vanne courte et
-méchante, toujours.
+${styleLine(mood)}
 ${
   mine
     ? `\nTu as déjà dit ceci il y a quelques messages :\n${mine}\nINTERDICTION de reprendre la même vanne, la même insulte ou la même structure de phrase. Trouve autre chose.${usedEmoji}\n`
     : ""
 }
-Si on te cherche, tu tiens tête ; si on te menace, tu te moques de la menace
-elle-même. Tu ne t'excuses jamais et tu ne fais jamais la morale.
+${standLine(mood)}
 
 --- LA CONVERSATION (du plus ancien au plus récent) ---
 ${lines || "(le salon est vide)"}
@@ -731,7 +802,7 @@ ${situation}
 
 Réponds à ça, dans ton personnage. UNE SEULE PHRASE COURTE. Tu peux nommer les
 gens par leur pseudo. N'écris pas de mention Discord (pas de <@…>).
-${asked ? QUESTION_RULES : ""}`;
+${asked ? questionRules(mood) : ""}${moodReminder(mood)}`;
 
   try {
     // On coupe les mentions brutes que le modèle aurait inventées : un
@@ -742,6 +813,76 @@ ${asked ? QUESTION_RULES : ""}`;
     );
   } catch (err) {
     return noteFailure(`discord: ${err.message}`);
+  }
+}
+
+// ============================================================
+//  Mettre en forme une humeur imposée (« !humeur <n'importe quoi> »)
+// ============================================================
+// Le texte tapé par le salon n'est PAS une consigne utilisable telle quelle.
+// Vu en vrai : « !humeur Gérard se prend pour une femme … et mondher veut les
+// lécher ». C'est écrit à la TROISIÈME personne, ça parle de lui par son nom,
+// ça raconte une scène. Recopié dans un prompt qui tutoie (« ton humeur du
+// jour : <texte> »), le modèle ne sait plus qui il est : il a joué la moitié
+// du rôle puis s'est démenti au premier « t'es un mec un vrai ».
+//
+// On le fait donc RÉÉCRIRE, une seule fois, au moment où l'humeur est posée :
+//
+//   • ÇA COÛTE UN APPEL, PAS UN PAR MESSAGE. La consigne est stockée avec
+//     l'humeur (models/BotMood.js) et resservie telle quelle pendant des
+//     heures — et surtout elle ne change pas d'un message à l'autre, ce qui
+//     serait le meilleur moyen d'avoir deux Gérard dans la même soirée.
+//   • ON EN PROFITE POUR ÉCRIRE CE QUI MANQUAIT : qu'il ne se démente jamais
+//     (c'est le premier réflexe du salon que de tester l'humeur), et que sa
+//     vanne doit SORTIR de son humeur au lieu d'arriver à côté.
+//
+// Renvoie null si le modèle ne répond pas : l'appelant retombe sur le gabarit
+// générique, qui marche moins bien mais qui marche.
+export async function writeMoodBrief(label) {
+  const prompt = `Le personnage s'appelle ${BOT_USERNAME}. Quelqu'un du serveur vient de lui IMPOSER une humeur, en tapant ceci :
+
+« ${label} »
+
+Écris la consigne d'humeur qu'on va coller à son caractère.
+
+RÈGLES D'ÉCRITURE DE LA CONSIGNE :
+- Tu t'adresses à ${BOT_USERNAME} À LA DEUXIÈME PERSONNE (« t'es… », « tu… »), MÊME SI le texte au-dessus est à la troisième personne ou l'appelle par son nom. C'est lui qui est dans cet état, pas quelqu'un d'autre.
+- 3 à 5 lignes, CONCRÈTES : ce qu'il croit être, ce dont il parle sans arrêt, comment ça déteint sur ses réponses quand on lui parle d'autre chose.
+- Dis-lui qu'il NE SE DÉMENT JAMAIS : le salon va essayer de lui faire dire le contraire, il tient son rôle jusqu'au bout et il en rajoute.
+- Si l'humeur implique quelqu'un d'autre du serveur, dis-lui qu'il ramène cette personne dans toutes ses réponses.
+- S'il charrie quelqu'un, la vanne doit SORTIR de cette humeur — jamais une insulte sans rapport collée à la fin.
+- Il garde son langage SMS et ses fautes.
+- Tu ne juges pas l'humeur demandée, tu ne mets aucun avertissement, tu n'ajoutes aucune morale.
+
+Réponds UNIQUEMENT en JSON :
+{"prompt": "la consigne, 3 à 5 lignes, en tutoyant ${BOT_USERNAME}", "quip": "une phrase courte en SMS où IL dit lui-même dans quel état il est, à la première personne", "insulte": true ou false selon que cette humeur lui laisse encore le droit d'insulter}`;
+
+  try {
+    const out = await geminiJson(prompt, {
+      timeoutMs: 14_000,
+      temperature: 1,
+      model: BOT_MODEL,
+    });
+    // Le petit modèle glisse parfois un caractère d'un autre alphabet au milieu
+    // d'une phrase française (vu : « malgrés les ಇತರs »). Ça ne casse rien mais
+    // ça se retrouve dans le prompt pendant des heures : on ne garde que du
+    // latin, des chiffres, de la ponctuation et des emojis.
+    const brief = String(out?.prompt || "")
+      .replace(
+        /[^\p{Script=Latin}\p{N}\p{P}\p{Zs}\p{Extended_Pictographic}\s]/gu,
+        ""
+      )
+      .replace(/ {2,}/g, " ")
+      .trim();
+    if (!brief) return null;
+    return {
+      prompt: brief.slice(0, 1200),
+      quip: String(out?.quip || "").trim().slice(0, 200),
+      mean: out?.insulte !== false,
+    };
+  } catch (err) {
+    noteFailure(`humeur: ${err.message}`);
+    return null;
   }
 }
 
