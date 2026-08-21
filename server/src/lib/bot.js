@@ -160,7 +160,7 @@ TA VANNE DOIT ÊTRE ACCROCHÉE À CE QU'ON VIENT DE DIRE. C'EST LA RÈGLE QUI FA
 - RATÉ : « tetris mais slip suce des vaches » — les deux moitiés n'ont aucun rapport, c'est deux messages collés.
 - RÉUSSI : « tetris ? le jeu ou tu ranges des blocs, cme ca tu tentraine pr ranger ta chambre » — la vanne SORT du sujet dont on parle.
 - Quand tu vises quelqu'un d'autre du salon, il faut un LIEN avec le sujet : il joue au même jeu, il a dit le contraire hier, il est encore plus mauvais. Balancer un nom au hasard au milieu d'une phrase, ça ne fait rire personne.
-- Emojis : UN SEUL max, et seulement un message sur deux. Une réplique sèche sans emoji tape plus fort. Varie-les (💀 🤡 😭 🥀 ☠️ 🫵 🥱 📉 🗿 🚬 🐒 🍼 🎻 🪦 👶) au lieu de reprendre le même.
+- Emojis : UN SEUL max, et seulement un message sur deux. Une réplique sèche sans emoji tape plus fort. Tu les prends dans la liste qu'on te donne plus bas et NULLE PART AILLEURS, et tu varies au lieu de reprendre le même.
 - Tu ne t'excuses JAMAIS. Tu ne dis JAMAIS que t'es un bot, une IA, un modèle.
 
 QUAND ON TE POSE UNE QUESTION, TU RÉPONDS. VRAIMENT. C'EST NON NÉGOCIABLE.
@@ -512,6 +512,15 @@ fautes, c'est tout ce qui reste du personnage.`
 sèche. Pas de grande image, pas de comparaison travaillée : la vanne courte et
 méchante, toujours.`;
 
+// LA PALETTE DU JOUR. Elle était en dur dans le caractère, et c'était le
+// détail qui trahissait le plus : quinze emojis de moquerie (💀 🤡 📉 🗿…)
+// servis quelle que soit l'humeur. D'où un Gérard qui se déclare amoureux et
+// signe 📉, ou qui joue un rôle et termine sur 🐒 — l'emoji dit le contraire de
+// la phrase, et c'est ce qu'on remarque en premier en lisant le salon.
+const emojiLine = (mood) =>
+  `Les SEULS emojis que tu as le droit d'utiliser aujourd'hui : ${(mood.emoji || [])
+    .join(" ")}. Aucun autre, jamais — ceux-là vont avec ton humeur, les autres la contredisent.`;
+
 const standLine = (mood) =>
   mood.mean === false
     ? `Si on te cherche, tu laisses couler ; si on te menace, tu hausses les
@@ -665,6 +674,7 @@ export async function generateBotReply({ username, history = [], scope = "dm" })
 Voici la conversation (le dernier message est celui auquel tu dois répondre) :
 ${lines || `${username} : salut`}
 ${banned}
+${emojiLine(mood)}
 Réponds à son dernier message, dans ton personnage. UNE SEULE PHRASE COURTE, et
 qui répond vraiment à ce qu'il vient de dire.
 ${asked ? questionRules(mood) : ""}${moodReminder(mood)}`;
@@ -800,6 +810,8 @@ ${lines || "(le salon est vide)"}
 
 ${situation}
 
+${emojiLine(mood)}
+
 Réponds à ça, dans ton personnage. UNE SEULE PHRASE COURTE. Tu peux nommer les
 gens par leur pseudo. N'écris pas de mention Discord (pas de <@…>).
 ${asked ? questionRules(mood) : ""}${moodReminder(mood)}`;
@@ -855,7 +867,7 @@ RÈGLES D'ÉCRITURE DE LA CONSIGNE :
 - Tu ne juges pas l'humeur demandée, tu ne mets aucun avertissement, tu n'ajoutes aucune morale.
 
 Réponds UNIQUEMENT en JSON :
-{"prompt": "la consigne, 3 à 5 lignes, en tutoyant ${BOT_USERNAME}", "quip": "une phrase courte en SMS où IL dit lui-même dans quel état il est, à la première personne", "insulte": true ou false selon que cette humeur lui laisse encore le droit d'insulter}`;
+{"prompt": "la consigne, 3 à 5 lignes, en tutoyant ${BOT_USERNAME}", "quip": "une phrase courte en SMS où IL dit lui-même dans quel état il est, à la première personne", "emoji": ["4 à 6 emojis qui collent à CETTE humeur-là, ce sont les seuls qu'il aura le droit d'utiliser"], "insulte": true ou false selon que cette humeur lui laisse encore le droit d'insulter}`;
 
   try {
     const out = await geminiJson(prompt, {
@@ -878,6 +890,12 @@ Réponds UNIQUEMENT en JSON :
     return {
       prompt: brief.slice(0, 1200),
       quip: String(out?.quip || "").trim().slice(0, 200),
+      // On ne garde que ce qui est VRAIMENT un emoji : le modèle renvoie
+      // parfois « :) » ou le nom de l'emoji, et une palette qui contient du
+      // texte se retrouverait recopiée telle quelle dans ses réponses.
+      emoji: (Array.isArray(out?.emoji) ? out.emoji : [])
+        .flatMap((e) => String(e).match(/\p{Extended_Pictographic}/gu) || [])
+        .slice(0, 6),
       mean: out?.insulte !== false,
     };
   } catch (err) {

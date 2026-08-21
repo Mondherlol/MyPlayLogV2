@@ -1002,8 +1002,14 @@ async function cmdMood(msg, arg) {
   // Sa phrase à lui quand on a pu la lui faire écrire : recopier le texte tapé
   // donnait « jsuis Gérard se prend pour une femme maintenant », qui ne veut
   // rien dire à la première personne.
+  // Même règle que pour ses réponses : l'emoji de l'annonce vient de la palette
+  // de la NOUVELLE humeur. Un 🗿 en dur sous une humeur amoureuse, c'est déjà
+  // la contredire dès la première ligne.
+  const mark = moodOf(scope).emoji?.[0] || "🗿";
   await msg.channel.send(
-    set.quip ? `ok. ${set.quip} 🗿` : `ok. jsuis ${set.label} maintenant. vous lavez voulu 🗿`
+    set.quip
+      ? `ok. ${set.quip} ${mark}`
+      : `ok. jsuis ${set.label} maintenant. vous lavez voulu ${mark}`
   );
 }
 

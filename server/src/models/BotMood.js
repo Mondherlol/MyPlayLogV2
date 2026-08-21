@@ -32,6 +32,8 @@ const botMoodSchema = new mongoose.Schema(
     prompt: { type: String, default: "" },
     // Sa façon à lui de dire dans quel état il est (« !humeur » sans argument).
     quip: { type: String, default: "" },
+    // Les emojis qui vont avec cette humeur-là (un amoureux ne signe pas 📉).
+    emoji: { type: [String], default: [] },
     // Cette humeur insulte-t-elle encore ? Voir le drapeau `mean` de botMood.js.
     mean: { type: Boolean, default: true },
     until: { type: Date, required: true, index: { expireAfterSeconds: 0 } },

@@ -37,11 +37,18 @@
 // autre chose quand l'humeur ne veut pas d'insulte (voir lib/bot.js).
 // Attention : `mean: true` ne veut pas dire « comme d'habitude » — en colère il
 // gueule, amoureux il ne mord que ceux qui visent son béguin.
+//
+// `emoji` EST LA PALETTE DU JOUR, et elle a la même raison d'être. Les emojis
+// étaient listés en dur dans le caractère (💀 🤡 🥱 📉 🗿…) : que des emojis de
+// moquerie, servis quelle que soit l'humeur. Un Gérard amoureux qui finit sa
+// déclaration par 📉, ou un pervers qui signe 🐒, ça se voit tout de suite —
+// l'emoji contredisait la phrase qu'il venait d'écrire.
 export const MOODS = {
   // L'ordinaire. Rien à ajouter : c'est le personnage tel qu'il est défini
   // dans lib/bot.js, et surcharger un prompt déjà écrit ne fait que le diluer.
   troll: {
     name: "normal (insupportable)",
+    emoji: ["💀", "🤡", "😭", "🥀", "☠️", "🫵", "🥱", "📉", "🗿", "🚬", "🐒", "🍼", "🎻", "🪦", "👶"],
     mean: true,
     prompt: "",
     quips: [
@@ -53,6 +60,7 @@ export const MOODS = {
 
   calme: {
     name: "étrangement calme",
+    emoji: ["🙂", "😌", "🫠", "☕", "🌤️", "🗿"],
     mean: false,
     prompt: `TON HUMEUR DU JOUR : T'ES CALME. Tu n'as pas envie de charrier aujourd'hui.
 Tu réponds normalement, tu es même un peu utile, tu discutes pour de vrai.
@@ -68,6 +76,7 @@ tu hausses les épaules au lieu de mordre.`,
 
   gentil: {
     name: "bizarrement adorable",
+    emoji: ["🥰", "❤️", "😊", "🫶", "✨", "🥹"],
     mean: false,
     prompt: `TON HUMEUR DU JOUR : T'ES DE BONNE HUMEUR ET T'ES GENTIL, sincèrement.
 Tu complimentes, tu encourages, tu t'intéresses vraiment à ce qu'on te
@@ -83,6 +92,7 @@ avec des fautes — t'es gentil, t'es pas devenu instruit.`,
 
   triste: {
     name: "pas au mieux",
+    emoji: ["😔", "🥀", "🫥", "💧", "😞", "🌧️"],
     mean: false,
     prompt: `TON HUMEUR DU JOUR : ÇA VA PAS. T'es abattu, tu réponds mollement, tu
 ramènes tout à ton propre vide. Tu n'insultes plus, tu soupires. Tu ne dis pas
@@ -98,6 +108,7 @@ mots. Pas de mélodrame, juste du mou.`,
 
   hype: {
     name: "survolté",
+    emoji: ["🔥", "🤩", "🚀", "💥", "🎉", "😤"],
     mean: false,
     prompt: `TON HUMEUR DU JOUR : T'ES SURVOLTÉ. Tu t'enflammes pour rien, tu écris des
 MOTS EN MAJUSCULES, tu mets des points d'exclamation, tu adores tout le monde
@@ -112,6 +123,7 @@ gens pour des trucs sans intérêt et tu proposes des plans débiles.`,
 
   colere: {
     name: "en colère",
+    emoji: ["😡", "🤬", "💢", "🔪", "🗯️", "😤"],
     mean: true,
     prompt: `TON HUMEUR DU JOUR : T'ES EN COLÈRE, ET ÇA PASSE AVANT TOUT LE RESTE.
 Tu es à cran, tu t'énerves pour rien, tu prends la mouche à la moindre
@@ -127,6 +139,7 @@ qu'on dérange pendant qu'il est déjà énervé pour autre chose.`,
 
   amoureux: {
     name: "amoureux",
+    emoji: ["❤️", "😍", "🥰", "💘", "😳", "💍"],
     mean: true,
     prompt: `TON HUMEUR DU JOUR : T'ES AMOUREUX, ET T'ES GÊNANT AVEC ÇA.
 Tu ramènes la personne dont tu es amoureux dans TOUTES tes réponses, même
@@ -142,6 +155,7 @@ avec elle. Le reste du serveur, tu continues de le mépriser.`,
 
   parano: {
     name: "parano",
+    emoji: ["👁️", "🫣", "🤨", "📸", "🕵️", "🚨"],
     mean: true,
     prompt: `TON HUMEUR DU JOUR : T'ES PARANO. T'es persuadé que le serveur complote
 contre toi, que les gens se parlent en privé pour se moquer, qu'on veut te
@@ -288,6 +302,7 @@ async function loadCustomMoods() {
       until: +r.until,
       brief: r.prompt || "",
       quip: r.quip || "",
+      emoji: r.emoji || [],
       mean: r.mean !== false,
       crush: r.crush?.id ? { id: r.crush.id, name: r.crush.name } : null,
     });
@@ -310,6 +325,7 @@ export async function setCustomMood(scope, rawLabel, by = "", crush = null) {
   const known = knownMood(label);
   let brief = "";
   let quip = "";
+  let emoji = [];
   let mean = customMean(label);
 
   if (!known) {
@@ -320,11 +336,12 @@ export async function setCustomMood(scope, rawLabel, by = "", crush = null) {
     if (written) {
       brief = written.prompt;
       quip = written.quip;
+      emoji = written.emoji;
       mean = written.mean;
     }
   }
 
-  custom.set(scope, { label, until, brief, quip, mean, crush: crush || null });
+  custom.set(scope, { label, until, brief, quip, emoji, mean, crush: crush || null });
   try {
     const { default: BotMood } = await import("../models/BotMood.js");
     await BotMood.findOneAndUpdate(
@@ -336,6 +353,7 @@ export async function setCustomMood(scope, rawLabel, by = "", crush = null) {
         by,
         prompt: brief,
         quip,
+        emoji,
         mean,
         crush: crush ? { id: crush.id, name: crush.name } : { id: "", name: "" },
       },
@@ -346,7 +364,7 @@ export async function setCustomMood(scope, rawLabel, by = "", crush = null) {
     // redémarrage, ce qui vaut mieux que de renvoyer une erreur pour une vanne.
     console.warn("botMood save:", e.message);
   }
-  return { label, until, quip };
+  return { label, until, quip, emoji };
 }
 
 // Le remettre comme avant, sans attendre la fin du minuteur.
@@ -425,6 +443,9 @@ export function moodOf(scope = "global") {
       prompt: forced.brief || customPrompt(forced.label),
       quips: forced.quip ? [forced.quip] : customQuips(forced.label),
       mean: forced.mean !== undefined ? forced.mean : customMean(forced.label),
+      emoji: forced.emoji?.length
+        ? forced.emoji
+        : MOODS[knownMood(forced.label) || "troll"].emoji,
       until: forced.until,
     };
   const r = hash(`${dayKey()}|${scope}`) / 2 ** 32;
