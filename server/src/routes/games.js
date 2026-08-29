@@ -17,6 +17,7 @@ import { notify } from "../lib/notify.js";
 import { recordActivity, removeActivity } from "../lib/activity.js";
 import { summarizeReactions, reviewComment } from "../lib/reviewSerialize.js";
 import { triggerMissionCheck } from "../lib/missions.js";
+import { ensureEntityLogos } from "../lib/entityLogos.js";
 import { reviewVisibility, privacyOf, isFollower } from "../lib/privacy.js";
 import User from "../models/User.js";
 import UserGame from "../models/UserGame.js";
@@ -890,10 +891,15 @@ router.get("/:id/ost", optionalAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
     const q = String(req.query.q || "").trim();
+    // `peek=1` : « montre ce que tu as déjà, ne va rien chercher ». C'est le
+    // mode de l'aperçu sur la fiche d'un jeu — sans lui, feuilleter vingt
+    // fiches lancerait vingt scrapings YouTube pour des OST que personne n'a
+    // demandé à écouter.
+    const peek = req.query.peek === "1";
     // Pistes déjà en base (auto par ordre de playlist, puis ajouts manuels).
     let customs = await CustomOst.find({ gameId: id }).sort({ order: 1, createdAt: 1 });
     // Première ouverture (aucune piste) : scraping auto d'une playlist YouTube.
-    if (!customs.length) {
+    if (!customs.length && !peek) {
       customs = await ensureScraped(id, q);
     }
     // Masquages / renommages sont propres à chaque utilisateur : rien pour un
@@ -914,7 +920,9 @@ router.get("/:id/ost", optionalAuth, async (req, res) => {
     // proposer de restaurer une piste retirée.
     const tracks = all.filter((t) => !hidden.has(t.id));
     const hiddenTracks = all.filter((t) => hidden.has(t.id));
-    res.json({ tracks, hiddenTracks });
+    // `pending` : rien en base ET on n'a pas cherché. Le client sait alors
+    // qu'il reste peut-être une OST à découvrir, et propose de l'ouvrir.
+    res.json({ tracks, hiddenTracks, pending: peek && !customs.length });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1388,6 +1396,17 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
       ...new Set(companies.filter((c) => c.publisher).map((c) => c.company?.name).filter(Boolean)),
     ];
 
+    // Logos des studios, par NOM (cache Mongo, IGDB au premier appel) — même
+    // mécanique que le profil d'un joueur (cf. routes/users.js). Un logo
+    // manquant vaut `null` : le client retombe alors sur le nom écrit.
+    let companyLogos = {};
+    try {
+      const found = await ensureEntityLogos("company", [...developers, ...publishers]);
+      companyLogos = Object.fromEntries(found);
+    } catch {
+      /* best-effort : une fiche sans logo reste une fiche */
+    }
+
     const websites = (g.websites || [])
       .map((w) => ({ url: w.url, kind: WEBSITE_KINDS[w.category] }))
       .filter((w) => w.kind);
@@ -1499,6 +1518,7 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
       languages,
       developers,
       publishers,
+      companyLogos,
       engines: (g.game_engines || []).map((e) => e.name).filter(Boolean),
       franchise: g.franchises?.[0]?.name || g.collections?.[0]?.name || null,
       relation,
