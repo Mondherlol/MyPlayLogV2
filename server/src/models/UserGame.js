@@ -96,6 +96,10 @@ const userGameSchema = new mongoose.Schema(
     platform: { type: String, default: null },
     // Format d'achat sur console : dématérialisé ou boîte physique.
     format: { type: String, enum: ["digital", "physical"], default: "digital" },
+    // Jeu terminé À 100 % (platine, complétion totale). Distinct du statut
+    // « terminé », qui dit seulement qu'on a vu la fin : beaucoup de joueurs
+    // finissent un jeu sans jamais le compléter.
+    platinum: { type: Boolean, default: false },
     // Origine « import Steam » : appid Steam rattaché, et vrai UNIQUEMENT si
     // l'entrée a été CRÉÉE par un import Steam (pas juste mise à jour). Sert à
     // proposer de retirer les jeux ajoutés lors d'une déliaison du compte Steam.

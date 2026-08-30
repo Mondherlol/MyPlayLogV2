@@ -53,6 +53,16 @@ async function convOf(convId, userId) {
   return idsOf(conv).includes(String(userId)) ? conv : null;
 }
 
+// L'appel s'arrête : les téléphones qui sonnent doivent le savoir, sinon leur
+// écran d'appel reste affiché après que tout le monde a raccroché.
+export function pushCallEnd(userIds, convId) {
+  return pushToUsers(userIds, {
+    channelId: "calls",
+    silent: true,
+    data: { type: "call:end", conversationId: convId },
+  }).catch(() => {});
+}
+
 const toRoom = (convId, kind, payload = {}) =>
   emitTo(voice.listeners(calls.keyOf(convId)), "call", {
     // `code` en plus de `conversationId` : le hook de maillage est partagé avec
@@ -98,6 +108,10 @@ async function hangUp(convId, conv = null) {
     conversationId: String(convId),
     kind: "ended",
   });
+
+  // Et sur les téléphones : ceux qui sonnaient encore doivent raccrocher leur
+  // écran d'appel, que l'app soit ouverte ou non.
+  pushCallEnd(idsOf(document), String(convId));
 
   // Personne d'autre que celui qui appelait n'est jamais entré : c'est un appel
   // manqué, et il compte pour non lu — c'est tout l'intérêt.
@@ -158,10 +172,22 @@ router.post("/:convId/join", async (req, res) => {
 
       // Le téléphone posé sur la table, app fermée : sans notification, un
       // appel n'atteint que les gens qui regardaient déjà leur écran.
+      // Le téléphone posé sur la table, app fermée : la notification est
+      // SILENCIEUSE et emporte tout ce qu'il faut pour dessiner l'appel
+      // (qui appelle, sa photo, groupe ou non). C'est l'app qui la transforme
+      // en écran d'appel qui sonne — une bannière ordinaire ne réveillerait
+      // rien et attendrait qu'on la touche.
       pushToUsers(targets, {
-        title: conv.isGroup ? conv.name || "Groupe" : starter.username,
-        body: conv.isGroup ? `${starter.username} lance un appel` : "Appel entrant",
-        data: { type: "call", conversationId: convId },
+        channelId: "calls",
+        silent: true,
+        data: {
+          type: "call",
+          conversationId: convId,
+          title: conv.isGroup ? conv.name || "Groupe" : starter.username,
+          avatar: conv.isGroup ? conv.avatar || null : starter.avatar || null,
+          group: !!conv.isGroup,
+          from: starter.username,
+        },
       }).catch(() => {
         /* best-effort : ça sonne déjà chez les onglets ouverts */
       });

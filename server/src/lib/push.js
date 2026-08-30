@@ -43,7 +43,7 @@ function chunk(arr, size) {
  */
 export async function sendPush(
   userIds,
-  { title, body, data = {}, channelId = "messages" } = {}
+  { title, body, data = {}, channelId = "messages", silent = false } = {}
 ) {
   const empty = { devices: 0, accepted: 0, failed: 0, removed: 0, errors: [] };
   const ids = [...new Set((userIds || []).map(String))].filter(Boolean);
@@ -63,12 +63,19 @@ export async function sendPush(
       owners.set(t.token, String(u._id));
       messages.push({
         to: t.token,
-        title,
-        body,
+        // ⚠️ `silent` : un message SANS titre ni corps. Android le remet alors
+        // à l'application au lieu de l'afficher lui-même — c'est la seule
+        // façon de réveiller du code quand l'app est fermée, et donc de faire
+        // sonner un appel entrant comme un vrai téléphone (cf. la tâche de
+        // fond de l'app mobile). Une notification ordinaire, elle, resterait
+        // sagement dans la barre d'état à attendre qu'on la touche.
+        ...(silent ? {} : { title, body, sound: "default" }),
         data,
-        sound: "default",
         channelId,
         priority: "high",
+        // iOS : réveille l'app en arrière-plan. Sans effet sur Android, sans
+        // danger non plus.
+        _contentAvailable: silent || undefined,
       });
     }
   }
