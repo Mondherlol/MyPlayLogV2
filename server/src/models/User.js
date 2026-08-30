@@ -86,6 +86,13 @@ const userSchema = new mongoose.Schema(
     // absents de la liste sont considérés comme « pas encore classés ».
     ostOrder: { type: [Number], default: [] },
 
+    // Ordre d'affichage de MES listes sur mon profil (identifiants de listes
+    // rangés à la main). Le reste — une liste créée depuis, une liste absente
+    // de ce rangement — vient à la suite, de la plus récemment modifiée à la
+    // plus ancienne. C'est un rangement de VITRINE : il ne change rien au
+    // contenu des listes, seulement à celles qu'on voit en premier.
+    listOrder: { type: [mongoose.Schema.Types.ObjectId], default: [] },
+
     // --- Personnalisation de l'onglet « Aperçu » du profil ---
     // Ordre des sections (favoris + statuts) glissées-déposées par le
     // propriétaire ; ex. ["favorites","playing","finished",…]. Vide = ordre par
@@ -390,6 +397,7 @@ userSchema.methods.toPublic = function () {
     tagline: this.tagline,
     taglineImage: this.taglineImage,
     ostOrder: this.ostOrder || [],
+    listOrder: (this.listOrder || []).map(String),
     overviewOrder: this.overviewOrder || [],
     overviewCards: this.overviewCards || [],
     overviewGameOrder: this.overviewGameOrder || {},

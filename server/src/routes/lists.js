@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import multer from "multer";
 import List from "../models/List.js";
 import Activity from "../models/Activity.js";
+import User from "../models/User.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { notify } from "../lib/notify.js";
 import {
@@ -288,6 +289,22 @@ router.get("/", optionalAuth, async (req, res) => {
       .limit(200)
       .lean();
     let cards = lists.map((l) => toCard(l, req.userId));
+
+    // Les listes d'UN auteur suivent le rangement de sa vitrine (User.listOrder,
+    // réglé depuis son profil). Celles qu'il n'a pas rangées — les dernières
+    // créées, le plus souvent — viennent après, la plus récente d'abord :
+    // l'ordre par défaut, qui reste celui de tout le monde tant que personne
+    // n'a rien rangé.
+    if (author) {
+      const owner = await User.findById(author).select("listOrder").lean();
+      const rank = new Map((owner?.listOrder || []).map((id, i) => [String(id), i]));
+      if (rank.size) {
+        cards = cards
+          .map((c, i) => ({ c, at: rank.has(String(c.id)) ? rank.get(String(c.id)) : 1e6 + i }))
+          .sort((a, b) => a.at - b.at)
+          .map((x) => x.c);
+      }
+    }
     if (req.query.sort === "likes") {
       cards = cards.sort((a, b) => b.likeCount - a.likeCount);
     }

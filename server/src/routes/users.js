@@ -597,6 +597,35 @@ router.put("/me/privacy", requireAuth, async (req, res) => {
   }
 });
 
+// --- Rangement de la vitrine des listes (profil > Listes) ---
+// Le client envoie la liste COMPLÈTE des identifiants, dans l'ordre voulu. On
+// ne garde que les listes qui lui appartiennent VRAIMENT : sans cette
+// vérification, n'importe qui pourrait épingler la liste d'un autre en tête de
+// son propre profil, et le rangement deviendrait un moyen de s'attribuer le
+// travail des autres.
+router.put("/me/list-order", requireAuth, async (req, res) => {
+  try {
+    if (!Array.isArray(req.body?.ids))
+      return res.status(400).json({ error: "Liste d'identifiants attendue." });
+    const wanted = req.body.ids
+      .map(String)
+      .filter((id) => mongoose.isValidObjectId(id))
+      .slice(0, 200);
+    const mine = await List.find({ _id: { $in: wanted }, user: req.userId })
+      .select("_id")
+      .lean();
+    const allowed = new Set(mine.map((l) => String(l._id)));
+    const seen = new Set();
+    const order = wanted.filter((id) => allowed.has(id) && !seen.has(id) && seen.add(id));
+    const user = await User.findByIdAndUpdate(req.userId, { listOrder: order }, { new: true });
+    if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
+    res.json({ listOrder: order });
+  } catch (err) {
+    console.error("list order error:", err.message);
+    res.status(500).json({ error: "Erreur lors de l'enregistrement." });
+  }
+});
+
 // --- Personnalisation du fil d'accueil (Paramètres > Fil d'accueil) ---
 // Le client envoie la liste COMPLÈTE des familles masquées : le réglage est
 // idempotent, et une clé inconnue (client et serveur de versions différentes)

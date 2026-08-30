@@ -179,7 +179,15 @@ router.post("/:convId/join", async (req, res) => {
       // rien et attendrait qu'on la touche.
       pushToUsers(targets, {
         channelId: "calls",
-        silent: true,
+        // ⚠️ PLUS SILENCIEUSE, ET C'EST VOULU. Elle l'était pour ne pas
+        // doubler l'écran d'appel du système ; mais quand celui-ci ne peut pas
+        // s'afficher — autorisation d'appel jamais accordée, constructeur qui
+        // tue l'app en fond — il ne restait qu'une bannière VIDE dans la barre
+        // d'état. Un titre et un corps ne coûtent rien, réveillent l'app
+        // exactement pareil (tout passe en données chez Expo), et l'app retire
+        // elle-même la bannière dès que l'écran d'appel a pris le relais.
+        title: conv.isGroup ? conv.name || "Groupe" : starter.username,
+        body: conv.isGroup ? "Appel de groupe en cours" : "Appel entrant",
         data: {
           type: "call",
           conversationId: convId,
