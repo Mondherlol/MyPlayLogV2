@@ -285,15 +285,17 @@ router.put("/me/overview", requireAuth, async (req, res) => {
     // les listes promises en section (« list:<id> »). Voir models/User.js.
     if (b.overviewLayout !== undefined) set.overviewLayout = cleanLayout(b.overviewLayout);
     if (b.overviewHidden !== undefined) set.overviewHidden = cleanLayout(b.overviewHidden);
-    // Emoji par section : une clé connue, une valeur courte. On ne vérifie pas
-    // que c'est « vraiment » un emoji — un caractère est un caractère, et huit
-    // octets suffisent au plus composé d'entre eux.
+    // L'icône d'une section : soit le nom d'une icône dessinée (« ic:swords »,
+    // que le client résout dans son registre), soit un emoji tapé au clavier.
+    // On ne valide que la forme — clé connue, valeur courte : ce que l'app sait
+    // dessiner est SON affaire, et un nom inconnu retombe sur l'icône par
+    // défaut plutôt que d'empêcher l'enregistrement.
     if (b.overviewIcons !== undefined) {
       const src = b.overviewIcons && typeof b.overviewIcons === "object" ? b.overviewIcons : {};
       const clean = {};
       for (const key of Object.keys(src).slice(0, 60)) {
         if (!cleanLayout([key]).length) continue;
-        const v = String(src[key] || "").slice(0, 8);
+        const v = String(src[key] || "").slice(0, 24);
         if (v) clean[key] = v;
       }
       set.overviewIcons = clean;
