@@ -376,17 +376,24 @@ function buildQuery(opts) {
     if (c) where.push(c);
   }
 
-  // Fenêtre de sortie. « À venir » ne se dit pas en années : c'est tout ce qui
-  // sort après maintenant — et on garde alors les jeux SANS date, qui sont
+  // Fenêtre de sortie. Trois cas, et « ce qui n'est pas sorti » n'est pas une
+  // année : c'est tout ce qui vient après maintenant, jeux SANS date compris —
   // souvent les plus attendus (annoncés, pas datés).
-  if (release?.upcoming) {
-    where.push(
-      `(first_release_date = null | first_release_date > ${Math.floor(Date.now() / 1000)})`
-    );
+  const rightNow = Math.floor(Date.now() / 1000);
+  const unreleased = `(first_release_date = null | first_release_date > ${rightNow})`;
+  if (release?.upcoming === "only") {
+    where.push(unreleased);
   } else if (release?.from || release?.to) {
-    where.push("first_release_date != null");
-    if (release.from) where.push(`first_release_date >= ${release.from}`);
-    if (release.to) where.push(`first_release_date <= ${release.to}`);
+    if (release.upcoming === "with") {
+      // La fenêtre monte jusqu'à « Futur » : ce qui n'est pas sorti en fait
+      // partie, avec ou sans date.
+      const lower = release.from ? `first_release_date >= ${release.from}` : null;
+      where.push(lower ? `(${lower} | first_release_date = null)` : unreleased);
+    } else {
+      where.push("first_release_date != null");
+      if (release.from) where.push(`first_release_date >= ${release.from}`);
+      if (release.to) where.push(`first_release_date <= ${release.to}`);
+    }
   }
 
   const field = SORT_FIELDS[sort] || SORT_FIELDS.popularity;
@@ -395,7 +402,12 @@ function buildQuery(opts) {
 
   // Filtres "qualité" uniquement en navigation : en recherche on ne veut pas
   // masquer un jeu peu noté / pas encore sorti que l'utilisateur cherche.
-  if (!search) {
+  //
+  // ⚠️ Ni quand une FENÊTRE DE SORTIE est demandée : « ce qui arrive » se
+  // heurterait à la clause `first_release_date <= maintenant` posée ici pour le
+  // tri par date, et la recherche ne rendrait rien du tout.
+  const windowed = !!(release?.upcoming || release?.from || release?.to);
+  if (!search && !windowed) {
     if (sort === "rating")
       where.push("total_rating != null", "total_rating_count > 80");
     else if (sort === "release") {
@@ -447,7 +459,10 @@ router.get("/", requireAuth, async (req, res) => {
     const yearFrom = parseInt(req.query.from, 10);
     const yearTo = parseInt(req.query.to, 10);
     const release = {
-      upcoming: req.query.upcoming === "1",
+      // "only" = seulement ce qui arrive ; "with" = la fenêtre l'inclut.
+      upcoming: req.query.upcoming === "only" || req.query.upcoming === "with"
+        ? req.query.upcoming
+        : null,
       from: yearFrom ? Math.floor(Date.UTC(yearFrom, 0, 1) / 1000) : null,
       to: yearTo ? Math.floor(Date.UTC(yearTo, 11, 31, 23, 59, 59) / 1000) : null,
     };
@@ -1458,16 +1473,16 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
       ...new Set(companies.filter((c) => c.publisher).map((c) => c.company?.name).filter(Boolean)),
     ];
 
-    // Logos des studios, par NOM (cache Mongo, IGDB au premier appel) — même
-    // mécanique que le profil d'un joueur (cf. routes/users.js). Un logo
-    // manquant vaut `null` : le client retombe alors sur le nom écrit.
-    let companyLogos = {};
-    try {
-      const found = await ensureEntityLogos("company", [...developers, ...publishers]);
-      companyLogos = Object.fromEntries(found);
-    } catch {
-      /* best-effort : une fiche sans logo reste une fiche */
-    }
+    // ⚠️ LES TROIS SOURCES LENTES PARTENT ENSEMBLE.
+    //
+    // Les logos des studios (Mongo, IGDB au premier appel), les temps de
+    // complétion (qui peuvent aller jusqu'à HowLongToBeat) et la traduction
+    // s'attendaient l'une l'autre : la fiche coûtait leur SOMME. Elles ne
+    // dépendent de rien l'une chez l'autre — elle coûte maintenant la plus
+    // lente des trois.
+    const logosPromise = ensureEntityLogos("company", [...developers, ...publishers])
+      .then((found) => Object.fromEntries(found))
+      .catch(() => ({})); // best-effort : une fiche sans logo reste une fiche
 
     const websites = (g.websites || [])
       .map((w) => ({ url: w.url, kind: WEBSITE_KINDS[w.category] }))
@@ -1508,7 +1523,9 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
     const released =
       (g.first_release_date && g.first_release_date <= nowSec) ||
       (!g.first_release_date && (g.total_rating_count || 0) > 0);
-    const timeToBeat = (await resolveTimeToBeat(id, g.name, released)).times;
+    const beatPromise = resolveTimeToBeat(id, g.name, released)
+      .then((r) => r.times)
+      .catch(() => null);
 
     // « Ce jeu est un remake / DLC / … de … » : type IGDB + jeu parent.
     const typeFr = GAME_TYPES_FR[g.game_type];
@@ -1532,10 +1549,13 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
 
     // Traduction FR du résumé/scénario si elle a déjà été demandée une fois
     // (best-effort, lecture Mongo seule — jamais d'appel Gemini ici).
-    const [translation, bundleGames] = await Promise.all([
-      getCachedTranslation(id, g.summary || null, g.storyline || null).catch(
-        () => ({ summaryFr: null, storylineFr: null })
-      ),
+    const [companyLogos, timeToBeat, translation, bundleGames] = await Promise.all([
+      logosPromise,
+      beatPromise,
+      getCachedTranslation(id, g.summary || null, g.storyline || null).catch(() => ({
+        summaryFr: null,
+        storylineFr: null,
+      })),
       // Bundle : les jeux inclus, affichés en section sur la fiche.
       g.game_type === 3 ? fetchBundleGames(id) : Promise.resolve([]),
     ]);
@@ -2271,7 +2291,7 @@ router.post("/:id/reviews/:userId/react", requireAuth, async (req, res) => {
     const { userId } = req.params;
     const { type } = req.body || {};
     if (!id) return res.status(400).json({ error: "id invalide." });
-    if (!["heart", "clap", "funny"].includes(type))
+    if (!["heart", "clap", "funny", "dislike"].includes(type))
       return res.status(400).json({ error: "type invalide." });
     // On ne réagit pas à sa propre review.
     if (String(userId) === String(req.userId))

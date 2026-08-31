@@ -3,7 +3,7 @@
 
 // Compte les réactions par type et repère celle de l'utilisateur courant.
 export function summarizeReactions(reactions, meId) {
-  const counts = { heart: 0, clap: 0, funny: 0 };
+  const counts = { heart: 0, clap: 0, funny: 0, dislike: 0 };
   let mine = null;
   for (const r of reactions || []) {
     if (counts[r.type] != null) counts[r.type]++;

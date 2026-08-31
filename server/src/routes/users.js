@@ -720,6 +720,20 @@ router.post("/me/follow-requests/:id/:action", requireAuth, async (req, res) => 
 });
 
 // --- Liste des abonnements d'un utilisateur ---
+// « Qui, parmi ces gens-là, me suit ? » — en UNE requête.
+//
+// L'information manquait aux listes d'abonnés et d'abonnements, alors qu'elle
+// est la première qu'on y cherche : savoir si l'on se suit déjà, et dans quel
+// sens. La demander compte par compte aurait fait une requête par ligne ; ici
+// on ne rapporte que les identifiants de ceux qui nous suivent.
+async function followersAmong(ids, viewerId) {
+  if (!viewerId || !ids.length) return new Set();
+  const rows = await User.find({ _id: { $in: ids }, following: viewerId })
+    .select("_id")
+    .lean();
+  return new Set(rows.map((r) => String(r._id)));
+}
+
 router.get("/:id/following", optionalAuth, async (req, res) => {
   try {
     const u = await User.findById(req.params.id).populate("following", "username avatar bio");
@@ -727,9 +741,14 @@ router.get("/:id/following", optionalAuth, async (req, res) => {
     if (await blockIfPrivate(res, u, req.userId)) return;
     const me = await User.findById(req.userId).select("following");
     const mine = new Set((me?.following || []).map(String));
+    const backs = await followersAmong(
+      (u.following || []).map((f) => f._id),
+      req.userId
+    );
     const users = (u.following || []).map((f) => ({
       ...f.toCard(),
       isFollowing: mine.has(String(f._id)),
+      followsMe: backs.has(String(f._id)),
       isMe: String(f._id) === String(req.userId),
     }));
     res.json({ users });
@@ -749,9 +768,14 @@ router.get("/:id/followers", optionalAuth, async (req, res) => {
     );
     const me = await User.findById(req.userId).select("following");
     const mine = new Set((me?.following || []).map(String));
+    const backs = await followersAmong(
+      followers.map((f) => f._id),
+      req.userId
+    );
     const users = followers.map((f) => ({
       ...f.toCard(),
       isFollowing: mine.has(String(f._id)),
+      followsMe: backs.has(String(f._id)),
       isMe: String(f._id) === String(req.userId),
     }));
     res.json({ users });

@@ -16,7 +16,14 @@ const reviewMediaSchema = new mongoose.Schema(
 const reviewReactionSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    type: { type: String, enum: ["heart", "clap", "funny"], required: true },
+    // « dislike » : le désaccord. Il manquait, et son absence forçait à
+    // réagir positivement ou pas du tout — un avis qu'on trouve à côté de la
+    // plaque ne se dit qu'en commentaire, ce que peu de gens font.
+    type: {
+      type: String,
+      enum: ["heart", "clap", "funny", "dislike"],
+      required: true,
+    },
   },
   { _id: false }
 );
