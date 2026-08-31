@@ -176,6 +176,14 @@ function toCard(l, userId) {
       .filter((i) => i.image)
       .slice(0, 8)
       .map((i) => i.image),
+    // Les entrées de l'aperçu au complet (identifiant, nom, image), dans
+    // l'ordre de la liste. L'app en fait une SECTION de profil — un rayon de
+    // jaquettes comme « Jeux favoris » —, ce qui demande le nom en plus de
+    // l'image. `preview` et `previewIds` restent pour le site et les cartes.
+    previewItems: items
+      .filter((i) => i.image)
+      .slice(0, 8)
+      .map((i) => ({ refId: i.refId ?? null, name: i.name || "", image: i.image })),
     // Les jeux DE cet aperçu, dans le même ordre. L'app mobile en a besoin
     // pour retrouver le fond d'écran d'un jeu (celui que le joueur a choisi,
     // sinon celui du catalogue) : sur une liste d'un ou deux jeux, elle

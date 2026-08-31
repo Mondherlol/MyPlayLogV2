@@ -255,6 +255,24 @@ function cleanKeys(arr, allowed) {
     .filter((s) => allowed.has(s) && !seen.has(s) && seen.add(s));
 }
 
+// Les clés de mise en page acceptées par l'app : les sections de statuts, les
+// deux rayons qui n'en sont pas (listes, avis), et une liste précise.
+const EXTRA_SECTIONS = new Set(["lists", "reviews"]);
+const LIST_SECTION = /^list:[0-9a-fA-F]{24}$/;
+
+function cleanLayout(value) {
+  const seen = new Set();
+  return (Array.isArray(value) ? value : [])
+    .map((x) => String(x))
+    .filter(
+      (k) =>
+        (OVERVIEW_SECTIONS.has(k) || EXTRA_SECTIONS.has(k) || LIST_SECTION.test(k)) &&
+        !seen.has(k) &&
+        seen.add(k)
+    )
+    .slice(0, 60);
+}
+
 router.put("/me/overview", requireAuth, async (req, res) => {
   try {
     const b = req.body || {};
@@ -263,6 +281,10 @@ router.put("/me/overview", requireAuth, async (req, res) => {
       set.overviewOrder = cleanKeys(b.overviewOrder, OVERVIEW_SECTIONS);
     if (b.overviewCards !== undefined)
       set.overviewCards = cleanKeys(b.overviewCards, OVERVIEW_CARD_FIELDS);
+    // Mise en page de l'app : mêmes sections, plus « lists », « reviews » et
+    // les listes promises en section (« list:<id> »). Voir models/User.js.
+    if (b.overviewLayout !== undefined) set.overviewLayout = cleanLayout(b.overviewLayout);
+    if (b.overviewHidden !== undefined) set.overviewHidden = cleanLayout(b.overviewHidden);
     // Colonne latérale : ordre des widgets + widgets masqués.
     if (b.asideOrder !== undefined)
       set.asideOrder = cleanKeys(b.asideOrder, ASIDE_WIDGETS);
@@ -2025,6 +2047,8 @@ router.get("/:username", optionalAuth, async (req, res) => {
         ostOrder: user.ostOrder || [],
         overviewOrder: user.overviewOrder || [],
         overviewCards: user.overviewCards || [],
+        overviewLayout: user.overviewLayout || [],
+        overviewHidden: user.overviewHidden || [],
         overviewGameOrder: user.overviewGameOrder || {},
         asideOrder: user.asideOrder || [],
         asideHidden: user.asideHidden || [],

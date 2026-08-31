@@ -99,6 +99,19 @@ const userSchema = new mongoose.Schema(
     // défaut. `overviewCards` : détails affichés sur les jaquettes (note, heures…).
     overviewOrder: { type: [String], default: [] },
     overviewCards: { type: [String], default: [] },
+    // --- Mise en page complète de l'aperçu (application mobile) ---
+    // `overviewOrder` ne connaît que les huit sections de statuts : le site les
+    // filtre à l'enregistrement, et n'importe quelle clé qu'il ne connaît pas
+    // y serait effacée au premier glisser-déposer. L'app, elle, range dans le
+    // même flux les listes de l'utilisateur promues en section, ses avis et
+    // ses listes — d'où un second champ, que le site ne touche jamais.
+    //
+    // Les clés : les huit statuts, « lists », « reviews », et « list:<id> »
+    // pour une liste montrée comme une section à part entière. Vide = on
+    // retombe sur `overviewOrder`, puis sur l'ordre par défaut.
+    overviewLayout: { type: [String], default: [] },
+    // Les sections que le propriétaire a masquées, mêmes clés que ci-dessus.
+    overviewHidden: { type: [String], default: [] },
     // Colonne latérale de l'aperçu : ordre des widgets (drag & drop) et widgets
     // masqués par le propriétaire. Vide = disposition par défaut. Clés alignées
     // avec le registre client (ProfileOverviewAside) / ASIDE_WIDGETS côté route.
@@ -400,6 +413,8 @@ userSchema.methods.toPublic = function () {
     listOrder: (this.listOrder || []).map(String),
     overviewOrder: this.overviewOrder || [],
     overviewCards: this.overviewCards || [],
+    overviewLayout: this.overviewLayout || [],
+    overviewHidden: this.overviewHidden || [],
     overviewGameOrder: this.overviewGameOrder || {},
     asideOrder: this.asideOrder || [],
     asideHidden: this.asideHidden || [],
