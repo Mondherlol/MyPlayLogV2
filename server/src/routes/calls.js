@@ -188,6 +188,10 @@ router.post("/:convId/join", async (req, res) => {
         // elle-même la bannière dès que l'écran d'appel a pris le relais.
         title: conv.isGroup ? conv.name || "Groupe" : starter.username,
         body: conv.isGroup ? "Appel de groupe en cours" : "Appel entrant",
+        // La notification porte « Répondre » et « Refuser » : c'est ce qui la
+        // rend utile quand l'écran d'appel du système n'a pas pu s'afficher
+        // (compte d'appel non autorisé sur le téléphone).
+        categoryId: "call",
         data: {
           type: "call",
           conversationId: convId,

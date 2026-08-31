@@ -43,7 +43,7 @@ function chunk(arr, size) {
  */
 export async function sendPush(
   userIds,
-  { title, body, data = {}, channelId = "messages", silent = false } = {}
+  { title, body, data = {}, channelId = "messages", silent = false, categoryId } = {}
 ) {
   const empty = { devices: 0, accepted: 0, failed: 0, removed: 0, errors: [] };
   const ids = [...new Set((userIds || []).map(String))].filter(Boolean);
@@ -72,6 +72,10 @@ export async function sendPush(
         ...(silent ? {} : { title, body, sound: "default" }),
         data,
         channelId,
+        // Les boutons de la notification (« Répondre »/« Refuser » d'un
+        // appel) : c'est le client qui les décrit, on ne fait que désigner
+        // laquelle de ses catégories s'applique.
+        ...(categoryId ? { categoryId } : {}),
         priority: "high",
         // iOS : réveille l'app en arrière-plan. Sans effet sur Android, sans
         // danger non plus.

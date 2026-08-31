@@ -353,7 +353,7 @@ function clause(field, ids, mode) {
 }
 
 function buildQuery(opts) {
-  const { search, sort, dir, limit, offset, filters, typeIds } = opts;
+  const { search, sort, dir, limit, offset, filters, typeIds, release } = opts;
   // version_parent = null : exclut les éditions/remasters "version de" (Deluxe,
   // Collector's, Ellie Edition…) qu'IGDB classe pourtant en game_type = 0.
   const where = ["cover != null", "version_parent = null"];
@@ -374,6 +374,19 @@ function buildQuery(opts) {
   for (const f of filters) {
     const c = clause(f.field, f.ids, f.mode);
     if (c) where.push(c);
+  }
+
+  // Fenêtre de sortie. « À venir » ne se dit pas en années : c'est tout ce qui
+  // sort après maintenant — et on garde alors les jeux SANS date, qui sont
+  // souvent les plus attendus (annoncés, pas datés).
+  if (release?.upcoming) {
+    where.push(
+      `(first_release_date = null | first_release_date > ${Math.floor(Date.now() / 1000)})`
+    );
+  } else if (release?.from || release?.to) {
+    where.push("first_release_date != null");
+    if (release.from) where.push(`first_release_date >= ${release.from}`);
+    if (release.to) where.push(`first_release_date <= ${release.to}`);
   }
 
   const field = SORT_FIELDS[sort] || SORT_FIELDS.popularity;
@@ -429,7 +442,17 @@ router.get("/", requireAuth, async (req, res) => {
       },
     ];
 
-    const query = buildQuery({ search, sort, dir, limit, offset, filters, typeIds });
+    // Fenêtre de sortie : deux années pleines (le 1er janvier de l'une au 31
+    // décembre de l'autre), ou le drapeau « pas encore sorti ».
+    const yearFrom = parseInt(req.query.from, 10);
+    const yearTo = parseInt(req.query.to, 10);
+    const release = {
+      upcoming: req.query.upcoming === "1",
+      from: yearFrom ? Math.floor(Date.UTC(yearFrom, 0, 1) / 1000) : null,
+      to: yearTo ? Math.floor(Date.UTC(yearTo, 11, 31, 23, 59, 59) / 1000) : null,
+    };
+
+    const query = buildQuery({ search, sort, dir, limit, offset, filters, typeIds, release });
     const raw = await igdbQuery("games", query);
     const games = raw.map(mapGame);
 
@@ -567,14 +590,53 @@ router.get("/genres", requireAuth, async (req, res) => {
 
 router.get("/platforms", requireAuth, async (req, res) => {
   try {
-    // Consoles/portables/ordinateurs, triés par génération décroissante
-    // (les plus récents d'abord — pas l'Amiga en tête !)
-    const platforms = await cachedList(
-      "platforms",
-      "platforms",
-      "fields name,abbreviation,generation; where platform_type = (1,5,6); sort generation desc; limit 80;",
-      (p) => ({ id: p.id, name: p.name, abbr: p.abbreviation || p.name })
-    );
+    // Consoles/portables/ordinateurs.
+    //
+    // On demande AUSSI la date de sortie, et pas seulement la génération : à
+    // génération égale (la Switch 2 et la PS5 sont toutes deux « 9 »), c'est
+    // elle qui départage, et c'est ce qu'on cherche — la machine qu'on a sous
+    // la main d'abord, l'Amiga tout en bas. IGDB ne la porte pas sur la
+    // plateforme elle-même mais sur ses RÉVISIONS matérielles : on prend la
+    // plus ancienne, qui est la sortie d'origine.
+    const mapPlatform = (p) => {
+      const dates = (p.versions || [])
+        .flatMap((v) => v.platform_version_release_dates || [])
+        .map((d) => d.date)
+        .filter((d) => typeof d === "number");
+      const released = dates.length ? Math.min(...dates) : null;
+      return {
+        id: p.id,
+        name: p.name,
+        abbr: p.abbreviation || p.name,
+        generation: p.generation || 0,
+        // En secondes, comme partout ailleurs chez IGDB.
+        released,
+        year: released ? new Date(released * 1000).getUTCFullYear() : null,
+      };
+    };
+
+    // ⚠️ REPLI SI L'EXPANSION IMBRIQUÉE PASSE MAL. `versions.…release_dates.date`
+    // descend de deux niveaux ; le jour où IGDB le refuse, la liste des consoles
+    // ne doit pas disparaître du panneau de filtres pour autant — on retombe sur
+    // la version d'avant, sans date, et le client trie alors par génération.
+    let platforms;
+    try {
+      platforms = await cachedList(
+        "platforms",
+        "platforms",
+        "fields name,abbreviation,generation,versions.platform_version_release_dates.date; " +
+          "where platform_type = (1,5,6); sort generation desc; limit 80;",
+        mapPlatform
+      );
+    } catch (err) {
+      console.warn("platforms: dates indisponibles, repli sans elles —", err.message);
+      platforms = await cachedList(
+        "platforms-plain",
+        "platforms",
+        "fields name,abbreviation,generation; where platform_type = (1,5,6); sort generation desc; limit 80;",
+        mapPlatform
+      );
+    }
     res.json({ platforms });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });

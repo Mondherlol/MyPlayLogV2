@@ -33,6 +33,7 @@ import {
   blockIfPrivate,
   hasPendingRequest,
   invalidateAvatarMask,
+  isFollower,
 } from "../lib/privacy.js";
 
 const router = express.Router();
@@ -831,6 +832,62 @@ function reviewCard(e, meId, author) {
     updatedAt: e.updatedAt,
   };
 }
+
+// ----------------------------------------------------------------------
+//  GET /:username/reviews — les avis d'un joueur, et rien d'autre
+// ----------------------------------------------------------------------
+// L'activité complète (`/activity`) les portait déjà, mais avec les
+// commentaires de listes, d'OST et de republications : cinq requêtes et un
+// gros objet pour afficher un rail d'avis sur un profil. Ici on ne va chercher
+// que ce qu'on montre.
+//
+// La note seule ne suffit PAS à faire un avis : il faut quelque chose d'écrit
+// (un texte, des points forts, des points faibles, une image). Un rail rempli
+// de cartes vides parce que le joueur a noté cinquante jeux sans jamais en
+// parler n'aurait rien à lire.
+router.get("/:username/reviews", optionalAuth, async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.params.username });
+    if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
+    if (await blockIfPrivate(res, user, req.userId)) return;
+
+    // « Masquer mes avis » : ils restent visibles pour l'intéressé et ses
+    // abonnés, invisibles pour les autres — sans erreur, la section disparaît
+    // simplement du profil.
+    if (privacyOf(user).hideReviews && !(await isFollower(user._id, req.userId))) {
+      return res.json({ reviews: [], hidden: true });
+    }
+
+    const entries = await UserGame.find({
+      user: user._id,
+      $or: [
+        { review: { $exists: true, $ne: "" } },
+        { "pros.0": { $exists: true } },
+        { "cons.0": { $exists: true } },
+        { "reviewMedia.0": { $exists: true } },
+      ],
+    })
+      .populate("comments.user", "username avatar")
+      .sort({ reviewedAt: -1, updatedAt: -1 })
+      .limit(300)
+      .lean();
+
+    const reviews = entries
+      .filter(
+        (e) =>
+          (e.review && e.review.trim()) ||
+          (e.pros && e.pros.length) ||
+          (e.cons && e.cons.length) ||
+          (e.reviewMedia && e.reviewMedia.length)
+      )
+      .map((e) => reviewCard(e, req.userId, user));
+
+    res.json({ reviews, hidden: false });
+  } catch (err) {
+    console.error("user reviews error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement des avis." });
+  }
+});
 
 router.get("/:username/activity", optionalAuth, async (req, res) => {
   try {
@@ -1908,7 +1965,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
         const ids = [...new Set(library.map((e) => e.gameId))].slice(0, 500);
         const raw = await igdbQuery(
           "games",
-          `fields genres,platforms,game_modes,themes; where id = (${ids.join(",")}); limit 500;`
+          `fields genres,platforms,game_modes,themes,first_release_date; where id = (${ids.join(",")}); limit 500;`
         );
         const meta = new Map(raw.map((g) => [g.id, g]));
         for (const e of library) {
@@ -1917,6 +1974,10 @@ router.get("/:username", optionalAuth, async (req, res) => {
           e.platforms = g.platforms || [];
           e.modes = g.game_modes || [];
           e.themes = g.themes || [];
+          // La date de sortie voyage avec le reste : c'est ce qui permet à
+          // l'app de filtrer une bibliothèque par fenêtre d'années sans une
+          // requête de plus.
+          e.releaseDate = g.first_release_date || null;
         }
       } catch (err) {
         console.error("profile igdb enrich error:", err.message);
