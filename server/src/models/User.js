@@ -112,6 +112,10 @@ const userSchema = new mongoose.Schema(
     overviewLayout: { type: [String], default: [] },
     // Les sections que le propriétaire a masquées, mêmes clés que ci-dessus.
     overviewHidden: { type: [String], default: [] },
+    // L'emoji choisi pour une section, par clé : { "list:65f…": "🎮" }. Les
+    // sections de statuts ont une icône dessinée ; une liste promue, elle, n'a
+    // que son titre — d'où le choix d'un emoji, qui tient la même place.
+    overviewIcons: { type: mongoose.Schema.Types.Mixed, default: {} },
     // Colonne latérale de l'aperçu : ordre des widgets (drag & drop) et widgets
     // masqués par le propriétaire. Vide = disposition par défaut. Clés alignées
     // avec le registre client (ProfileOverviewAside) / ASIDE_WIDGETS côté route.
@@ -415,6 +419,7 @@ userSchema.methods.toPublic = function () {
     overviewCards: this.overviewCards || [],
     overviewLayout: this.overviewLayout || [],
     overviewHidden: this.overviewHidden || [],
+    overviewIcons: this.overviewIcons || {},
     overviewGameOrder: this.overviewGameOrder || {},
     asideOrder: this.asideOrder || [],
     asideHidden: this.asideHidden || [],

@@ -285,6 +285,19 @@ router.put("/me/overview", requireAuth, async (req, res) => {
     // les listes promises en section (« list:<id> »). Voir models/User.js.
     if (b.overviewLayout !== undefined) set.overviewLayout = cleanLayout(b.overviewLayout);
     if (b.overviewHidden !== undefined) set.overviewHidden = cleanLayout(b.overviewHidden);
+    // Emoji par section : une clé connue, une valeur courte. On ne vérifie pas
+    // que c'est « vraiment » un emoji — un caractère est un caractère, et huit
+    // octets suffisent au plus composé d'entre eux.
+    if (b.overviewIcons !== undefined) {
+      const src = b.overviewIcons && typeof b.overviewIcons === "object" ? b.overviewIcons : {};
+      const clean = {};
+      for (const key of Object.keys(src).slice(0, 60)) {
+        if (!cleanLayout([key]).length) continue;
+        const v = String(src[key] || "").slice(0, 8);
+        if (v) clean[key] = v;
+      }
+      set.overviewIcons = clean;
+    }
     // Colonne latérale : ordre des widgets + widgets masqués.
     if (b.asideOrder !== undefined)
       set.asideOrder = cleanKeys(b.asideOrder, ASIDE_WIDGETS);
@@ -2049,6 +2062,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
         overviewCards: user.overviewCards || [],
         overviewLayout: user.overviewLayout || [],
         overviewHidden: user.overviewHidden || [],
+        overviewIcons: user.overviewIcons || {},
         overviewGameOrder: user.overviewGameOrder || {},
         asideOrder: user.asideOrder || [],
         asideHidden: user.asideHidden || [],
