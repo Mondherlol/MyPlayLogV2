@@ -176,6 +176,15 @@ function toCard(l, userId) {
       .filter((i) => i.image)
       .slice(0, 8)
       .map((i) => i.image),
+    // Les jeux DE cet aperçu, dans le même ordre. L'app mobile en a besoin
+    // pour retrouver le fond d'écran d'un jeu (celui que le joueur a choisi,
+    // sinon celui du catalogue) : sur une liste d'un ou deux jeux, elle
+    // montre les fonds plutôt que les jaquettes, qu'il faudrait sinon étirer
+    // au point de les rendre méconnaissables.
+    previewIds: items
+      .filter((i) => i.image)
+      .slice(0, 8)
+      .map((i) => i.refId ?? null),
     // Aperçu de tier list : quelques images regroupées par palier (dans
     // l'ordre des paliers), pour un mini-rendu de la grille sur la carte.
     ...(l.type === "tier"

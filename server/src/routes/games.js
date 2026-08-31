@@ -708,6 +708,46 @@ router.get("/languages", requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/games/backdrops?ids=1,2,3 — UNE image large par jeu, rien d'autre.
+//
+// Le strict nécessaire pour habiller une carte : l'artwork le plus grand,
+// sinon la capture la plus grande — c'est-à-dire exactement ce que `/:id/full`
+// choisit comme fond, mais sans les cinquante autres champs qu'il calcule.
+// `list-details` aurait pu servir, il rend aussi les langues, les genres, les
+// plateformes et douze captures par jeu : beaucoup de données pour poser une
+// image derrière un titre.
+const MAX_BACKDROPS = 40;
+
+router.get("/backdrops", optionalAuth, async (req, res) => {
+  try {
+    const ids = [...new Set(parseIds(req.query.ids))].slice(0, MAX_BACKDROPS);
+    if (!ids.length) return res.json({ backdrops: {} });
+
+    const rows = await igdbQuery(
+      "games",
+      `fields artworks.image_id,artworks.width,artworks.height,screenshots.image_id,` +
+        `screenshots.width,screenshots.height; where id = (${ids.join(",")}); limit ${ids.length};`
+    );
+
+    const byArea = (a, b) => (b.width || 0) * (b.height || 0) - (a.width || 0) * (a.height || 0);
+    const backdrops = {};
+    for (const g of rows) {
+      const best =
+        [...(g.artworks || [])].filter((a) => a.image_id).sort(byArea)[0] ||
+        [...(g.screenshots || [])].filter((s) => s.image_id).sort(byArea)[0];
+      // `t_720p` : ces images habillent une vignette, jamais un plein écran.
+      backdrops[g.id] = best ? `${IMG_BASE}/t_720p/${best.image_id}.jpg` : null;
+    }
+    // Les jeux sans image répondent `null` : le client saura qu'il a demandé
+    // et n'y reviendra pas à chaque affichage.
+    for (const id of ids) if (backdrops[id] === undefined) backdrops[id] = null;
+
+    res.json({ backdrops });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 // GET /api/games/list-details?ids=1,2,3 — fiche CONDENSÉE de plusieurs jeux en
 // une requête, pour la vue détaillée des listes (une ligne par jeu).
 //
