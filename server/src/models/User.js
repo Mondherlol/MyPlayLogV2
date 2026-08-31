@@ -116,6 +116,19 @@ const userSchema = new mongoose.Schema(
     // sections de statuts ont une icône dessinée ; une liste promue, elle, n'a
     // que son titre — d'où le choix d'un emoji, qui tient la même place.
     overviewIcons: { type: mongoose.Schema.Types.Mixed, default: {} },
+    // La RÈGLE de tri d'une section, par clé : { "favorites": "rating",
+    // "finished": "-release" }. Le tiret inverse le sens.
+    //
+    // ⚠️ UNE RÈGLE, PAS UN ORDRE FIGÉ. `overviewGameOrder` retient une suite
+    // d'identifiants — le rangement à la main, qui ne vaut que pour SA propre
+    // bibliothèque. Une règle, elle, s'applique à n'importe quelle liste de
+    // jeux : c'est ce qui permet de voir le profil des autres rangé comme le
+    // sien (cf. `overviewApplyToAll`).
+    overviewGameSort: { type: mongoose.Schema.Types.Mixed, default: {} },
+    // « Je veux voir les profils des autres comme le mien » : même ordre de
+    // sections, mêmes sections masquées, mêmes tris. Leurs listes promues en
+    // section restent affichées — ce sont leurs listes, pas ma disposition.
+    overviewApplyToAll: { type: Boolean, default: false },
     // Colonne latérale de l'aperçu : ordre des widgets (drag & drop) et widgets
     // masqués par le propriétaire. Vide = disposition par défaut. Clés alignées
     // avec le registre client (ProfileOverviewAside) / ASIDE_WIDGETS côté route.
@@ -420,6 +433,8 @@ userSchema.methods.toPublic = function () {
     overviewLayout: this.overviewLayout || [],
     overviewHidden: this.overviewHidden || [],
     overviewIcons: this.overviewIcons || {},
+    overviewGameSort: this.overviewGameSort || {},
+    overviewApplyToAll: !!this.overviewApplyToAll,
     overviewGameOrder: this.overviewGameOrder || {},
     asideOrder: this.asideOrder || [],
     asideHidden: this.asideHidden || [],

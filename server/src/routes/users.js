@@ -300,6 +300,19 @@ router.put("/me/overview", requireAuth, async (req, res) => {
       }
       set.overviewIcons = clean;
     }
+    // Règle de tri par section : une clé connue, un nom de règle court
+    // (éventuellement préfixé d'un tiret pour l'ordre inverse).
+    if (b.overviewGameSort !== undefined) {
+      const src = b.overviewGameSort && typeof b.overviewGameSort === "object" ? b.overviewGameSort : {};
+      const clean = {};
+      for (const key of Object.keys(src).slice(0, 60)) {
+        if (!cleanLayout([key]).length) continue;
+        const v = String(src[key] || "").slice(0, 24);
+        if (v) clean[key] = v;
+      }
+      set.overviewGameSort = clean;
+    }
+    if (b.overviewApplyToAll !== undefined) set.overviewApplyToAll = !!b.overviewApplyToAll;
     // Colonne latérale : ordre des widgets + widgets masqués.
     if (b.asideOrder !== undefined)
       set.asideOrder = cleanKeys(b.asideOrder, ASIDE_WIDGETS);
@@ -2065,6 +2078,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
         overviewLayout: user.overviewLayout || [],
         overviewHidden: user.overviewHidden || [],
         overviewIcons: user.overviewIcons || {},
+        overviewGameSort: user.overviewGameSort || {},
         overviewGameOrder: user.overviewGameOrder || {},
         asideOrder: user.asideOrder || [],
         asideHidden: user.asideHidden || [],

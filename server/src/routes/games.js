@@ -708,6 +708,58 @@ router.get("/languages", requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/games/yt-durations?ids=abc,def — la durée de vidéos YouTube.
+//
+// ⚠️ NI L'API DATA, NI OEMBED. La première demande une clé et un quota pour
+// une information qui ne change jamais ; la seconde ne donne pas la durée. On
+// lit donc la page de la vidéo, comme le scraping des OST le fait déjà
+// (lib/ostScrape) : `lengthSeconds` y est posé en clair dans le JSON du
+// lecteur.
+//
+// ⚠️ EN MÉMOIRE, ET C'EST SUFFISANT. La durée d'une vidéo est immuable : un
+// cache qui survit à la session du serveur n'apporterait rien qu'une table de
+// plus. Au pire, un redémarrage refait quelques requêtes.
+const ytDurations = new Map();
+const YT_ID = /^[A-Za-z0-9_-]{6,20}$/;
+
+async function ytDuration(videoId) {
+  if (ytDurations.has(videoId)) return ytDurations.get(videoId);
+  let seconds = null;
+  try {
+    const html = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36",
+        "Accept-Language": "en",
+      },
+    }).then((r) => r.text());
+    const m = html.match(/"lengthSeconds":"(\d+)"/);
+    if (m) seconds = Number(m[1]) || null;
+  } catch {
+    /* vidéo privée, réseau coupé : on retient `null` plutôt que de réessayer
+       à chaque affichage de la fiche. */
+  }
+  ytDurations.set(videoId, seconds);
+  return seconds;
+}
+
+router.get("/yt-durations", optionalAuth, async (req, res) => {
+  const ids = String(req.query.ids || "")
+    .split(",")
+    .map((x) => x.trim())
+    .filter((x) => YT_ID.test(x))
+    .slice(0, 12);
+  const out = {};
+  // En parallèle : douze pages de moins d'une seconde chacune, contre douze
+  // secondes à la file.
+  await Promise.all(
+    ids.map(async (id) => {
+      out[id] = await ytDuration(id);
+    })
+  );
+  res.json({ durations: out });
+});
+
 // GET /api/games/backdrops?ids=1,2,3 — UNE image large par jeu, rien d'autre.
 //
 // Le strict nécessaire pour habiller une carte : l'artwork le plus grand,
@@ -1000,6 +1052,12 @@ function ostFromCustom(c) {
     youtube: true,
     videoId: c.videoId,
     url: c.url,
+    // Relevés au scraping (cf. lib/ostScrape). Ils servaient au blind test ;
+    // ils servent aussi à trier et filtrer une bande originale de deux cents
+    // pistes — « les plus écoutées » et « les plus longues » sont les deux
+    // façons d'y entrer quand on ne connaît pas le jeu.
+    views: c.views ?? null,
+    durationSec: c.durationSec ?? null,
   };
 }
 
