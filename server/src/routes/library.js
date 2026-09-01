@@ -26,6 +26,8 @@ function toPublic(e) {
     plannedMonth: e.plannedMonth || null,
     bundleGames: e.bundleGames || [],
     playtimeHours: e.playtimeHours,
+    startedAt: e.startedAt || null,
+    finishedAt: e.finishedAt || null,
     note: e.note,
     review: e.review,
     reviewMedia: e.reviewMedia || [],
@@ -273,6 +275,22 @@ router.put("/:gameId", requireAuth, async (req, res) => {
         });
     }
 
+    // Dates de début / de fin : une date ISO, ou null pour l'effacer. On les
+    // convertit ici plutôt que de laisser Mongoose avaler n'importe quoi —
+    // une chaîne bancale y deviendrait silencieusement `Invalid Date`.
+    for (const key of ["startedAt", "finishedAt"]) {
+      if (b[key] === undefined) continue;
+      if (b[key] === null || b[key] === "") {
+        b[key] = null;
+        continue;
+      }
+      const d = new Date(b[key]);
+      if (Number.isNaN(d.getTime())) {
+        return res.status(400).json({ error: "Date invalide." });
+      }
+      b[key] = d;
+    }
+
     const update = { user: req.userId, gameId };
     // n'écrase que les champs fournis
     for (const key of [
@@ -283,6 +301,8 @@ router.put("/:gameId", requireAuth, async (req, res) => {
       "format",
       "platinum",
       "playtimeHours",
+      "startedAt",
+      "finishedAt",
       "note",
       "review",
       "reviewMedia",

@@ -1262,7 +1262,7 @@ router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
     const [gameArr, customCovers, charArr, customChars] = await Promise.all([
       igdbQuery(
         "games",
-        `fields name,game_type,cover.image_id,artworks.image_id,platforms.id,platforms.name,genres.id,genres.name,game_modes,first_release_date,total_rating_count; where id = ${id};`
+        `fields name,game_type,cover.image_id,artworks.image_id,platforms.id,platforms.name,platforms.abbreviation,release_dates.platform,release_dates.date,genres.id,genres.name,game_modes,first_release_date,total_rating_count; where id = ${id};`
       ),
       CustomCover.find({ gameId: id }).sort({ createdAt: -1 }),
       igdbQuery(
@@ -1336,8 +1336,26 @@ router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
     // royale (6) selon IGDB → la modale propose alors le statut « Sans fin ».
     const endlessHint = (g.game_modes || []).some((m) => [2, 5, 6].includes(m));
 
+    // Date de sortie PAR PLATEFORME : un jeu ne sort pas le même jour partout,
+    // et la feuille de suivi propose « commencé à la sortie » sur la console
+    // qu'on a cochée. On garde la plus ancienne date de chaque plateforme —
+    // IGDB en liste une par région, et c'est la première qui fait foi.
+    const releaseByPlatform = new Map();
+    for (const r of g.release_dates || []) {
+      if (!r?.platform || !r?.date) continue;
+      const known = releaseByPlatform.get(r.platform);
+      if (known == null || r.date < known) releaseByPlatform.set(r.platform, r.date);
+    }
+
     res.json({
-      platforms: (g.platforms || []).map((p) => ({ id: p.id, name: p.name })),
+      platforms: (g.platforms || []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        // Le nom court d'IGDB (« PS5 », « PC »…) : de quoi tenir dans une
+        // pastille sans réécrire « PC (Microsoft Windows) ».
+        abbr: p.abbreviation || null,
+        releaseDate: releaseByPlatform.get(p.id) ?? null,
+      })),
       covers,
       characters,
       timeToBeat: ttb.times,

@@ -127,6 +127,14 @@ const userGameSchema = new mongoose.Schema(
     // (uniquement si elle est restée vierge : pas de note/avis ajoutés à la main).
     bundleParentId: { type: Number, default: null },
     playtimeHours: { type: Number, default: null },
+    // Quand je m'y suis mis, et quand je l'ai fini. Deux dates saisies à la
+    // main (feuille de suivi) : le serveur ne les devine pas — un jeu ajouté
+    // aujourd'hui a très bien pu être terminé il y a dix ans.
+    // `finishedAt` n'a de sens que pour un jeu terminé, mais on ne l'efface
+    // PAS quand le statut change : repasser « en cours » pour un new game+ ne
+    // doit pas faire oublier la date de la première fin.
+    startedAt: { type: Date, default: null },
+    finishedAt: { type: Date, default: null },
     // Dernier temps de jeu RAPPORTÉ par PSN (à l'import / à la dernière synchro).
     // Sert à ne mettre à jour `playtimeHours` automatiquement que si l'utilisateur
     // ne l'a pas modifié à la main (playtimeHours === psnPlaytimeHours).
