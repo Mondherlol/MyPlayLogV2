@@ -103,6 +103,12 @@ const userGameSchema = new mongoose.Schema(
     platform: { type: String, default: null },
     // Format d'achat sur console : dématérialisé ou boîte physique.
     format: { type: String, enum: ["digital", "physical"], default: "digital" },
+    // Sur PC, mobile ou cloud, la question du support ne se pose pas — tout y
+    // est démat. Celle qui se pose, c'est OÙ : Steam, GOG, l'Epic Games Store,
+    // itch.io. Champ libre volontairement (une clé de boutique, cf.
+    // lib/storeIcons.js côté mobile) : le catalogue des boutiques bouge plus
+    // vite qu'un enum de schéma.
+    store: { type: String, default: null },
     // Jeu terminé À 100 % (platine, complétion totale). Distinct du statut
     // « terminé », qui dit seulement qu'on a vu la fin : beaucoup de joueurs
     // finissent un jeu sans jamais le compléter.

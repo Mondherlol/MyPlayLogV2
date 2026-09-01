@@ -1254,6 +1254,54 @@ async function fetchBundleGames(bundleId) {
     .sort((a, b) => (a.releaseDate || Infinity) - (b.releaseDate || Infinity));
 }
 
+// Les boutiques où un jeu se vend, telles qu'IGDB les connaît. La feuille de
+// suivi du mobile s'en sert pour remplacer « physique ou démat ? » — qui ne
+// veut rien dire sur PC — par « où l'as-tu pris ? ».
+//
+// ⚠️ DEUX LECTURES, PARCE QU'IGDB A CHANGÉ D'AVIS. L'ancien champ `category`
+// est devenu `external_game_source` ; on lit la source quand elle est là, et
+// on retombe sur l'URL du lien, qui, elle, ne bouge pas.
+const STORE_SOURCES = {
+  1: "steam",
+  5: "gog",
+  11: "microsoft",
+  13: "appstore",
+  15: "googleplay",
+  26: "epic",
+  30: "itch",
+  36: "playstation",
+};
+
+const STORE_URLS = [
+  [/steampowered.com|steamcommunity.com/i, "steam"],
+  [/gog.com/i, "gog"],
+  [/epicgames.com/i, "epic"],
+  [/itch.io/i, "itch"],
+  [/microsoft.com|xbox.com/i, "microsoft"],
+  [/play.google.com/i, "googleplay"],
+  [/apps.apple.com|itunes.apple.com/i, "appstore"],
+  [/playstation.com/i, "playstation"],
+];
+
+async function resolveStores(gameId) {
+  try {
+    const rows = await igdbQuery(
+      "external_games",
+      `fields external_game_source,url; where game = ${gameId}; limit 60;`
+    );
+    const found = new Set();
+    for (const r of rows || []) {
+      const bySource = STORE_SOURCES[r.external_game_source];
+      if (bySource) found.add(bySource);
+      const byUrl = STORE_URLS.find(([re]) => re.test(String(r.url || "")));
+      if (byUrl) found.add(byUrl[1]);
+    }
+    return [...found];
+  } catch {
+    return []; // IGDB indisponible : la rangée des boutiques ne s'affiche pas
+  }
+}
+
 router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -1311,11 +1359,12 @@ router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
     const released =
       (g.first_release_date && g.first_release_date <= nowSec) ||
       (!g.first_release_date && (g.total_rating_count || 0) > 0);
-    const [ttb, vnChars, bundleGames] = await Promise.all([
+    const [ttb, vnChars, bundleGames, stores] = await Promise.all([
       resolveTimeToBeat(id, g.name, released),
       isVn ? resolveVnCharacters(id, g.name) : Promise.resolve([]),
       // Bundle : la modale « joué » propose de cocher chaque jeu inclus.
       g.game_type === 3 ? fetchBundleGames(id) : Promise.resolve([]),
+      resolveStores(id),
     ]);
 
     // Dédoublonnage : on n'ajoute un perso VNDB que si son nom n'existe pas déjà.
@@ -1362,6 +1411,7 @@ router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
       // Scrape HLTB en cours : le client re-poll pour récupérer les temps.
       timeToBeatPending: ttb.pending,
       endlessHint,
+      stores,
       bundleGames,
     });
   } catch (err) {
