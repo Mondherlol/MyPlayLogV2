@@ -141,7 +141,12 @@ export default function ClipPage() {
 
         {main && (
           <div className="clip-main">
-            <GameVideoPlayer src={main.url} poster={main.thumbnail || undefined} autoPlay />
+            <GameVideoPlayer
+              src={main.url}
+              poster={main.thumbnail || undefined}
+              downloadName={`clip-${game?.name || post.author?.username || ""}`}
+              autoPlay
+            />
           </div>
         )}
 

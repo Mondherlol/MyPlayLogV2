@@ -86,8 +86,19 @@ app.use(
 // trophées de tout un compte) en un seul POST, ce qui dépasse les 100 ko par défaut.
 app.use(express.json({ limit: "25mb" }));
 
-// Fichiers uploadés (covers custom)
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+// Fichiers uploadés (covers custom, images de curseurs, médias…).
+// `immutable` + 30 jours : chaque nom de fichier porte un horodatage et un
+// aléa, un même chemin ne change donc JAMAIS de contenu. Sans ça, express
+// n'envoie qu'un ETag et le navigateur revalide à chaque affichage — ce qui
+// devenait un déluge de 304 avec les curseurs animés (une image par frame,
+// plusieurs fois par seconde).
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "../uploads"), {
+    maxAge: "30d",
+    immutable: true,
+  })
+);
 
 // Journal du serveur (onglet « Logs » du panel admin). Posé ICI, avant toutes
 // les routes : il n'écrit rien à l'aller, il pose un écouteur sur la fin de la

@@ -2331,6 +2331,25 @@
   background: rgba(255, 255, 255, 0.15);
   color: #ffd24a;
 }
+.gvp-btn:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+/* Bouton télécharger : le clip peut peser lourd, la roue tourne le temps que
+   le blob arrive — sans elle on croit que le clic n'a rien fait. */
+.gvp-spin {
+  animation: gvp-spin 0.9s linear infinite;
+}
+@keyframes gvp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gvp-spin {
+    animation-duration: 2.4s;
+  }
+}
 .gvp-volume {
   display: flex;
   align-items: center;

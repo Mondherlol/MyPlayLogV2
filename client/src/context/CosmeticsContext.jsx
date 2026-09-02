@@ -54,8 +54,39 @@ function setRoleVar(role, state, frameUrl) {
 // courant pour qu'on puisse tout couper au changement de curseur.
 let cursorAnims = [];
 function clearCursorAnims() {
-  cursorAnims.forEach((h) => clearTimeout(h.id));
+  cursorAnims.forEach((h) => {
+    h.dead = true;
+    clearTimeout(h.id);
+  });
   cursorAnims = [];
+}
+
+// ----------------------------------------------------------------------
+//  Pourquoi les images d'un curseur animé sont INLINÉES en data: URL
+// ----------------------------------------------------------------------
+// Un curseur .ani, c'est une variable CSS qu'on réécrit toutes les ~60 ms, et
+// à chaque réécriture le navigateur RE-DEMANDE l'image pointée par l'url().
+// Le cache mémoire des `new Image()` ne le couvre pas : on voyait des centaines
+// de requêtes par seconde vers /uploads/arcade (des 304, mais un aller-retour
+// réseau quand même), multipliées par le nombre de rôles animés.
+// En passant chaque image en data: URL, le cycle ne touche plus jamais le
+// réseau : une requête par image, une fois, à l'équipement du curseur.
+const dataUrlCache = new Map(); // url distante -> data: URL
+
+async function toDataUrl(url) {
+  const hit = dataUrlCache.get(url);
+  if (hit) return hit;
+  const res = await fetch(url, { mode: "cors", cache: "force-cache" });
+  if (!res.ok) throw new Error("fetch");
+  const blob = await res.blob();
+  const data = await new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result));
+    fr.onerror = reject;
+    fr.readAsDataURL(blob);
+  });
+  dataUrlCache.set(url, data);
+  return data;
 }
 
 function applyCursor(cursor) {
@@ -90,20 +121,28 @@ function applyCursor(cursor) {
       continue;
     }
     // Curseur animé (.ani) : on cycle la variable CSS d'une image à l'autre.
-    // Préchargement pour éviter tout clignotement au premier tour.
-    frames.forEach((u) => {
-      const im = new Image();
-      im.src = u;
-    });
     const durations =
       Array.isArray(state.durationsMs) && state.durationsMs.length === frames.length
         ? state.durationsMs
         : frames.map(() => 100);
-    const holder = { id: 0 };
+    const holder = { id: 0, dead: false };
     cursorAnims.push(holder);
+    // `srcs` démarre sur les URLs distantes (le curseur bouge tout de suite) et
+    // bascule sur les data: URLs dès qu'elles sont prêtes — après quoi plus
+    // aucune requête n'est émise. Si une image échoue, elle garde son URL.
+    const srcs = frames.slice();
+    Promise.all(
+      frames.map((u, k) =>
+        toDataUrl(u)
+          .then((d) => {
+            if (!holder.dead) srcs[k] = d;
+          })
+          .catch(() => {})
+      )
+    );
     let i = 0;
     const tick = () => {
-      setRoleVar(role, state, frames[i]);
+      setRoleVar(role, state, srcs[i]);
       const d = Math.max(16, durations[i] || 100);
       i = (i + 1) % frames.length;
       holder.id = setTimeout(tick, d);

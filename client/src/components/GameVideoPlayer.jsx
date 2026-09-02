@@ -10,7 +10,10 @@ import {
   RotateCcw,
   RotateCw,
   Clapperboard,
+  Download,
+  Loader2,
 } from "lucide-react";
+import { downloadFile } from "../lib/download";
 
 // ======================================================================
 //  Lecteur vidéo custom du mur média — remplace les contrôles natifs.
@@ -24,6 +27,13 @@ import {
 const SEEK_STEP = 10; // secondes par double-tap / flèche
 const playing = new Set(); // instances en lecture (pause mutuelle)
 
+// Nom de fichier de repli : le dernier segment de l'URL, sans extension ni
+// query — mieux qu'un « video.mp4 » générique quand on en enregistre plusieurs.
+function fileBase(url) {
+  const last = String(url).split("?")[0].split("/").pop() || "";
+  return last.replace(/\.[a-z0-9]{2,5}$/i, "") || "clip";
+}
+
 function fmt(s) {
   if (!isFinite(s)) return "0:00";
   const m = Math.floor(s / 60);
@@ -31,7 +41,13 @@ function fmt(s) {
   return `${m}:${String(sec).padStart(2, "0")}`;
 }
 
-export default function GameVideoPlayer({ src, poster, autoPlay = false, className = "" }) {
+export default function GameVideoPlayer({
+  src,
+  poster,
+  autoPlay = false,
+  downloadName = "",
+  className = "",
+}) {
   const wrapRef = useRef(null);
   const videoRef = useRef(null);
   const barRef = useRef(null);
@@ -51,6 +67,7 @@ export default function GameVideoPlayer({ src, poster, autoPlay = false, classNa
   // squelette plus bas. `false` au montage, vrai dès que la vignette est
   // décodée ou que la vidéo tient sa première image.
   const [painted, setPainted] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   // --- Synchro avec l'élément vidéo ---
   useEffect(() => {
@@ -236,6 +253,20 @@ export default function GameVideoPlayer({ src, poster, autoPlay = false, classNa
     if (!next && volume === 0) setVol(0.6);
   }
 
+  // Téléchargement du clip : on passe par le helper commun (fetch → blob →
+  // ancre `download`), qui retombe sur l'ouverture dans un onglet si le CORS
+  // du CDN refuse. Le clic ne doit pas atteindre la surface de tap (play/pause).
+  async function download(e) {
+    e.stopPropagation();
+    if (!src || saving) return;
+    setSaving(true);
+    try {
+      await downloadFile(src, downloadName || fileBase(src));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function toggleFullscreen(e) {
     e.stopPropagation();
     const el = wrapRef.current;
@@ -333,6 +364,15 @@ export default function GameVideoPlayer({ src, poster, autoPlay = false, classNa
             {fmt(cur)} <em>/ {fmt(duration)}</em>
           </span>
           <span className="gvp-spacer" />
+          <button
+            className="gvp-btn clickable"
+            onClick={download}
+            disabled={saving || !src}
+            aria-label="Télécharger le clip"
+            title="Télécharger"
+          >
+            {saving ? <Loader2 size={17} className="gvp-spin" /> : <Download size={17} />}
+          </button>
           <button className="gvp-btn clickable" onClick={toggleFullscreen} aria-label="Plein écran">
             {fullscreen ? <Minimize size={17} /> : <Maximize size={17} />}
           </button>
