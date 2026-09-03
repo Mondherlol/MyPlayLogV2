@@ -2342,6 +2342,264 @@ function gameReviewCard(e, meId, isAdmin = false) {
   };
 }
 
+// --- Les dates de sortie, console par console, et les autres versions -------
+// La fiche affiche UNE année. Or « quand est-ce sorti ? » n'a presque jamais
+// une seule réponse : un jeu sort sur PS4 en mars, sur Switch en novembre, et
+// se rejoue dix ans plus tard dans un remaster qui a sa propre date. Cette
+// route rassemble les trois : la date par console, les versions parentes et
+// dérivées (remakes, remasters, portages, éditions, bundles), et de quoi
+// afficher un compte à rebours pour ce qui n'est pas encore sorti.
+const REGIONS_FR = {
+  1: "Europe",
+  2: "Amérique du Nord",
+  3: "Australie",
+  4: "Nouvelle-Zélande",
+  5: "Japon",
+  6: "Chine",
+  7: "Asie",
+  8: "Mondial",
+  9: "Corée",
+  10: "Brésil",
+};
+
+// Statuts de sortie IGDB (endpoint release_date_statuses). ⚠️ LE 6 EST LA
+// SORTIE NORMALE — « Full Release » — et il n'est donc PAS affiché : le noter
+// sur chaque ligne remplirait la feuille d'une évidence. Seul ce qui s'écarte
+// d'une sortie ordinaire est dit.
+const RELEASE_STATUS_FR = {
+  1: "Alpha",
+  2: "Bêta",
+  3: "Accès anticipé",
+  4: "Hors ligne",
+  5: "Annulé",
+  34: "Accès anticipé (précommande)",
+  35: "Rétrocompatible",
+  36: "Patch nouvelle génération",
+};
+
+const VERSION_FIELDS = (rel) =>
+  [
+    `${rel}.id`,
+    `${rel}.name`,
+    `${rel}.cover.image_id`,
+    `${rel}.first_release_date`,
+    `${rel}.game_type`,
+    `${rel}.platforms.name`,
+    `${rel}.platforms.abbreviation`,
+  ].join(",");
+
+// Les liens de parenté qu'on remonte, dans l'ordre où on les montre.
+const VERSION_LINKS = [
+  ["remakes", "Remake"],
+  ["remasters", "Remaster"],
+  ["ports", "Portage"],
+  ["expansions", "Extension"],
+  ["standalone_expansions", "Extension autonome"],
+  ["dlcs", "DLC"],
+  ["bundles", "Bundle"],
+  ["expanded_games", "Jeu enrichi"],
+];
+
+router.get("/:id/releases", optionalAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+
+    const fields = [
+      "name",
+      "first_release_date",
+      "game_type",
+      "cover.image_id",
+      "platforms.id",
+      "platforms.name",
+      "platforms.abbreviation",
+      "release_dates.date",
+      "release_dates.human",
+      "release_dates.platform",
+      "release_dates.region",
+      "release_dates.status",
+      VERSION_FIELDS("parent_game"),
+      VERSION_FIELDS("version_parent"),
+      ...VERSION_LINKS.map(([rel]) => VERSION_FIELDS(rel)),
+    ].join(",");
+
+    const arr = await igdbQuery("games", `fields ${fields}; where id = ${id};`);
+    const g = arr[0];
+    if (!g) return res.status(404).json({ error: "Jeu introuvable." });
+
+    const platformName = new Map(
+      (g.platforms || []).map((p) => [p.id, { name: p.name, abbr: p.abbreviation || p.name }])
+    );
+
+    // Une console = UNE ligne, celle de sa sortie la plus ancienne. IGDB en
+    // liste souvent trois pour la même machine (Europe, Amérique, Japon) : les
+    // empiler donnerait un mur de dates qui disent toutes la même chose.
+    const byPlatform = new Map();
+    for (const r of g.release_dates || []) {
+      if (!r.platform || !r.date) continue;
+      const known = byPlatform.get(r.platform);
+      if (!known || r.date < known.date) {
+        byPlatform.set(r.platform, {
+          platform: r.platform,
+          name: platformName.get(r.platform)?.name || "Autre",
+          abbr: platformName.get(r.platform)?.abbr || null,
+          date: r.date,
+          human: r.human || null,
+          region: REGIONS_FR[r.region] || null,
+          status: RELEASE_STATUS_FR[r.status] || null,
+        });
+      }
+    }
+    const platforms = [...byPlatform.values()].sort((a, b) => a.date - b.date);
+
+    // Une console annoncée mais sans date connue reste une information : sans
+    // elle, la feuille laisserait croire que le jeu n'y sort pas.
+    for (const p of g.platforms || []) {
+      if (byPlatform.has(p.id)) continue;
+      platforms.push({
+        platform: p.id,
+        name: p.name,
+        abbr: p.abbreviation || p.name,
+        date: null,
+        human: null,
+        region: null,
+        status: null,
+      });
+    }
+
+    const slim = (x, label) => ({
+      id: x.id,
+      name: x.name,
+      cover: x.cover?.image_id ? `${IMG_BASE}/t_cover_small/${x.cover.image_id}.jpg` : null,
+      label: GAME_TYPES_FR[x.game_type]?.label || label,
+      date: x.first_release_date || null,
+      platforms: (x.platforms || []).map((p) => p.abbreviation || p.name).filter(Boolean),
+    });
+
+    const versions = [];
+    // Le jeu d'origine en tête : c'est lui qui date la série.
+    for (const [key, label] of [
+      ["parent_game", "Jeu d'origine"],
+      ["version_parent", "Édition d'origine"],
+    ]) {
+      if (g[key]) versions.push({ ...slim(g[key], label), label, origin: true });
+    }
+    for (const [rel, label] of VERSION_LINKS) {
+      for (const x of g[rel] || []) versions.push(slim(x, label));
+    }
+    // Une même édition peut être à la fois « port » et « bundle » chez IGDB.
+    const seen = new Set();
+    const uniqueVersions = versions
+      .filter((v) => v.id && !seen.has(v.id) && seen.add(v.id))
+      .sort((a, b) => (a.date || Infinity) - (b.date || Infinity));
+
+    res.json({
+      name: g.name,
+      releaseDate: g.first_release_date || null,
+      type: GAME_TYPES_FR[g.game_type]?.label || null,
+      platforms,
+      versions: uniqueVersions,
+    });
+  } catch (err) {
+    console.error("game releases error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement des dates de sortie." });
+  }
+});
+
+// --- Combien de temps pour en venir à bout ---------------------------------
+// La fiche donne « 58 h pour finir » et c'est tout. Ce nombre vient d'IGDB ou
+// de HowLongToBeat, c'est-à-dire de joueurs qu'on ne connaît pas — alors qu'on
+// a, ici, les heures VRAIES de gens qu'on suit sur exactement ce jeu. Cette
+// route met les deux côte à côte.
+router.get("/:id/howlong", optionalAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+
+    const [rows, entries, viewer] = await Promise.all([
+      igdbQuery("games", `fields name,first_release_date; where id = ${id};`).catch(() => []),
+      UserGame.find({ gameId: id, playtimeHours: { $gt: 0 } })
+        .select("user rating status platform playtimeHours platinum")
+        .populate("user", "username avatar privacy")
+        .lean(),
+      req.userId ? User.findById(req.userId).select("following").lean() : null,
+    ]);
+
+    const g = rows[0] || {};
+    const released = g.first_release_date
+      ? g.first_release_date * 1000 < Date.now()
+      : true;
+    const ttb = await resolveTimeToBeat(id, g.name, released).catch(() => ({
+      times: null,
+      pending: false,
+    }));
+
+    const hours = entries.map((e) => e.playtimeHours).sort((a, b) => a - b);
+    const median = (list) =>
+      list.length ? Math.round(list[Math.floor(list.length / 2)] * 10) / 10 : null;
+
+    // Paliers : la forme de la dispersion vaut mieux qu'une moyenne. Un jeu où
+    // tout le monde tourne autour de 40 h n'est pas un jeu qu'on lâche à 3 h ou
+    // qu'on use pendant 300.
+    const EDGES = [0, 5, 10, 20, 40, 60, 100, 200, Infinity];
+    const dist = EDGES.slice(0, -1).map((min, i) => ({
+      min,
+      max: EDGES[i + 1] === Infinity ? null : EDGES[i + 1],
+      count: hours.filter((h) => h >= min && h < EDGES[i + 1]).length,
+    }));
+
+    const groupMedian = (filter) => {
+      const list = entries
+        .filter(filter)
+        .map((e) => e.playtimeHours)
+        .sort((a, b) => a - b);
+      return { median: median(list), count: list.length };
+    };
+
+    // Les gens qu'on suit : leurs heures sur CE jeu, la seule mesure dont on
+    // connaît l'auteur.
+    const circle = new Set([
+      ...(viewer?.following || []).map(String),
+      ...(req.userId ? [String(req.userId)] : []),
+    ]);
+    const friends = entries
+      .filter((e) => e.user && circle.has(String(e.user._id)))
+      .map((e) => ({
+        id: String(e.user._id),
+        username: e.user.username,
+        avatar: e.user.avatar || null,
+        isMe: String(e.user._id) === String(req.userId),
+        hours: e.playtimeHours,
+        status: e.status,
+        rating: e.rating ?? null,
+        platinum: !!e.platinum,
+      }))
+      .sort((a, b) => (b.isMe ? 1 : 0) - (a.isMe ? 1 : 0) || b.hours - a.hours);
+
+    res.json({
+      igdb: ttb.times,
+      pending: ttb.pending,
+      community: {
+        count: hours.length,
+        median: median(hours),
+        avg: hours.length
+          ? Math.round((hours.reduce((s, h) => s + h, 0) / hours.length) * 10) / 10
+          : null,
+        min: hours[0] ?? null,
+        max: hours[hours.length - 1] ?? null,
+        dist,
+        finished: groupMedian((e) => e.status === "finished"),
+        dropped: groupMedian((e) => e.status === "dropped"),
+        platinum: groupMedian((e) => e.platinum),
+        friends,
+      },
+    });
+  } catch (err) {
+    console.error("game howlong error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement des temps de jeu." });
+  }
+});
+
 // --- Le détail derrière la note d'un jeu ----------------------------------
 // La fiche affiche « 90 · 1 388 avis » et s'arrête là. Ce chiffre recouvre
 // pourtant quatre choses différentes : la presse, les joueurs du monde, les
