@@ -1687,6 +1687,150 @@ router.get("/:username/stats", optionalAuth, async (req, res) => {
   }
 });
 
+// --- Classement entre amis : qui a le plus joué ? --------------------------
+// Le profil et les gens qu'il suit, rangés par temps de jeu. Les heures de
+// chacun existaient déjà, mais chacune dans son coin : il fallait ouvrir dix
+// profils pour savoir où l'on se situe. Ici tout le monde est sur la même
+// page, et les mêmes chiffres se relisent par console.
+//
+// Le tri N'EST PAS FAIT ICI : la réponse porte toutes les mesures (heures,
+// jeux, terminés, platines) pour chacun, globales et par console. Changer de
+// classement côté client est alors instantané, sans un aller-retour réseau à
+// chaque appui sur une pastille.
+const LEADERBOARD_CAP = 150; // abonnements pris en compte (les plus anciens)
+const LEADERBOARD_PLATFORMS = 8; // consoles retenues par joueur / au global
+
+router.get("/:username/leaderboard", optionalAuth, async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.params.username }).select(
+      "_id username avatar following privacy"
+    );
+    if (!user) return res.status(404).json({ error: "Profil introuvable." });
+    if (await blockIfPrivate(res, user, req.userId)) return;
+
+    const followingIds = (user.following || []).slice(0, LEADERBOARD_CAP);
+    const people = followingIds.length
+      ? await User.find({ _id: { $in: followingIds } })
+          .select("username avatar privacy")
+          .lean()
+      : [];
+
+    // ⚠️ Un compte privé ne se classe que devant ceux qui y ont accès. Sans ce
+    // filtre, le classement d'un tiers ferait fuiter les heures — et le jeu du
+    // moment — d'un profil verrouillé pour le lecteur.
+    const viewer = req.userId
+      ? await User.findById(req.userId).select("following").lean()
+      : null;
+    const viewerFollows = new Set((viewer?.following || []).map(String));
+    const guests = people.filter((p) => {
+      if (!privacyOf(p).isPrivate) return true;
+      if (!req.userId) return false;
+      return String(p._id) === String(req.userId) || viewerFollows.has(String(p._id));
+    });
+
+    const pool = [
+      { _id: user._id, username: user.username, avatar: user.avatar || null },
+      ...guests.map((p) => ({ _id: p._id, username: p.username, avatar: p.avatar || null })),
+    ];
+    const ids = pool.map((p) => new mongoose.Types.ObjectId(String(p._id)));
+
+    // Base commune : les jeux JOUÉS. La wishlist n'est pas du temps de jeu, et
+    // la compter donnerait le premier rang à qui collectionne les envies.
+    const played = { user: { $in: ids }, status: { $ne: "wishlist" } };
+    const measures = {
+      hours: { $sum: { $ifNull: ["$playtimeHours", 0] } },
+      games: { $sum: 1 },
+      finished: { $sum: { $cond: [{ $eq: ["$status", "finished"] }, 1, 0] } },
+      platinum: { $sum: { $cond: [{ $eq: ["$platinum", true] }, 1, 0] } },
+    };
+
+    const [totals, byPlatform, byTop] = await Promise.all([
+      UserGame.aggregate([{ $match: played }, { $group: { _id: "$user", ...measures } }]),
+      UserGame.aggregate([
+        { $match: { ...played, platform: { $nin: [null, ""] } } },
+        { $group: { _id: { user: "$user", platform: "$platform" }, ...measures } },
+        { $sort: { hours: -1, games: -1 } },
+      ]),
+      // Le podium personnel de chacun : les trois jeux qui pèsent le plus dans
+      // son total. C'est ce qui donne un visage à une ligne de chiffres.
+      UserGame.aggregate([
+        { $match: { ...played, playtimeHours: { $gt: 0 } } },
+        { $sort: { playtimeHours: -1 } },
+        {
+          $group: {
+            _id: "$user",
+            games: {
+              $push: {
+                gameId: "$gameId",
+                name: "$name",
+                cover: "$cover",
+                hours: "$playtimeHours",
+              },
+            },
+          },
+        },
+        { $project: { games: { $slice: ["$games", 3] } } },
+      ]),
+    ]);
+
+    const totalOf = new Map(totals.map((t) => [String(t._id), t]));
+    const topOf = new Map(byTop.map((t) => [String(t._id), t.games || []]));
+    const platsOf = new Map();
+    for (const row of byPlatform) {
+      const key = String(row._id.user);
+      if (!platsOf.has(key)) platsOf.set(key, []);
+      const list = platsOf.get(key);
+      if (list.length < LEADERBOARD_PLATFORMS)
+        list.push({
+          name: row._id.platform,
+          hours: Math.round(row.hours),
+          games: row.games,
+          finished: row.finished,
+          platinum: row.platinum,
+        });
+    }
+
+    // Consoles proposées en filtre : celles où il y a du monde. Une console
+    // jouée par une seule personne ne fait pas un classement.
+    const reach = new Map();
+    for (const [, list] of platsOf) {
+      for (const p of list) {
+        const r = reach.get(p.name) || { name: p.name, players: 0, hours: 0 };
+        r.players += 1;
+        r.hours += p.hours;
+        reach.set(p.name, r);
+      }
+    }
+    const platforms = [...reach.values()]
+      .filter((p) => p.players >= 2)
+      .sort((a, b) => b.players - a.players || b.hours - a.hours)
+      .slice(0, LEADERBOARD_PLATFORMS);
+
+    const users = pool.map((p) => {
+      const key = String(p._id);
+      const t = totalOf.get(key) || {};
+      return {
+        id: key,
+        username: p.username,
+        avatar: p.avatar,
+        isMe: !!req.userId && key === String(req.userId),
+        isOwner: key === String(user._id),
+        hours: Math.round(t.hours || 0),
+        games: t.games || 0,
+        finished: t.finished || 0,
+        platinum: t.platinum || 0,
+        topGames: topOf.get(key) || [],
+        platforms: platsOf.get(key) || [],
+      };
+    });
+
+    res.json({ users, platforms, capped: (user.following || []).length > LEADERBOARD_CAP });
+  } catch (err) {
+    console.error("leaderboard error:", err.message);
+    res.status(500).json({ error: "Erreur lors du calcul du classement." });
+  }
+});
+
 // --- Jeux en commun entre deux profils (détail de l'âme sœur gaming) ---
 // Renvoie l'intersection complète des deux bibliothèques, coups de cœur
 // partagés en tête puis meilleures notes, avec la note de chacun.
