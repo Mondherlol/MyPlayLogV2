@@ -16,11 +16,12 @@
 // faux) pour ne pas le refaire tout de suite, et on rend ce qu'on a.
 //
 // ⚠️ AJOUTER UNE SOURCE = AJOUTER UNE ENTRÉE DANS `SOURCES`. Rien d'autre à
-// toucher : la fraîcheur, le cache et la route sont génériques. Les sites
-// français (jeuxvideo.com, Gamekult, SensCritique) répondent 403 aux serveurs —
-// ils filtrent les IP de datacenter. Le jour où l'un d'eux passe, il n'y a
-// qu'une fonction à écrire ici.
+// toucher : la fraîcheur, le cache et la route sont génériques. Gamekult et
+// SensCritique répondent encore 403 aux serveurs (ils filtrent les IP de
+// datacenter) ; jeuxvideo.com aussi, mais on passe par l'API de son application
+// mobile plutôt que par ses pages — voir lib/jvcApi.js.
 import GameScores from "../models/GameScores.js";
+import { jvcGameScore } from "./jvcApi.js";
 
 const DAY = 24 * 60 * 60 * 1000;
 const UA =
@@ -135,6 +136,9 @@ async function opencritic({ name }) {
 export const SOURCES = {
   metacritic: { label: "Metacritic", fetch: metacritic },
   opencritic: { label: "OpenCritic", fetch: opencritic },
+  // jeuxvideo.com : la note des LECTEURS, sur 20 (cf. lib/jvcApi.js). Pas de
+  // scraping — le site bloque les serveurs — mais l'API de leur application.
+  jvc: { label: "JVC lecteurs", fetch: jvcGameScore },
 };
 
 /**
