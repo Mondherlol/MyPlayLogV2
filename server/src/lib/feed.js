@@ -9,6 +9,7 @@
 // qu'un service est indispo, le reste du feed s'affiche quand même.
 
 import { getTwitchToken, igdbQuery } from "./igdb.js";
+import { gameCore } from "./gameIgdb.js";
 
 const YT_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
@@ -471,15 +472,11 @@ async function fetchSocial(name) {
 // Résolution de l'appid Steam depuis IGDB (même logique que les succès Steam).
 async function resolveSteamAppId(gameId) {
   try {
-    let rows = await igdbQuery(
-      "external_games",
-      `fields uid,url; where game = ${gameId} & external_game_source = 1;`
-    );
+    // Les liens externes viennent de la fiche mise en cache (lib/gameIgdb.js) :
+    // l'onglet Reviews ne repart plus chez IGDB à chaque ouverture.
+    const all = (await gameCore(gameId))?.external_games || [];
+    let rows = all.filter((r) => r.external_game_source === 1);
     if (!rows.length) {
-      const all = await igdbQuery(
-        "external_games",
-        `fields uid,url; where game = ${gameId}; limit 50;`
-      );
       rows = all.filter((r) => /steampowered\.com\/app\//.test(String(r.url || "")));
     }
     for (const r of rows) {

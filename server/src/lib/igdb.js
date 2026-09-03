@@ -88,6 +88,75 @@ function invalidateToken() {
   }
 }
 
+// ---------------------------------------------------------------------------
+//  La file d'attente vers IGDB
+// ---------------------------------------------------------------------------
+// IGDB accepte QUATRE requêtes par seconde et huit simultanées par identifiant.
+// Au-delà, il répond 429 — et comme un 429 remontait ici en erreur 502, une
+// fiche ne s'affichait pas. Le cache (lib/gameIgdb.js) évite l'essentiel des
+// appels ; cette file s'occupe de ceux qui restent : remplissage initial du
+// cache, recherches, calendrier des sorties, scripts d'import.
+//
+// Deux garde-fous : un espacement minimum entre deux départs (donc ≤ 4/s), et
+// un plafond de requêtes en vol. Une file trop longue échoue vite plutôt que de
+// faire attendre tout le monde plusieurs minutes.
+const MIN_GAP_MS = 260; // un peu plus que 250 ms : marge sur la mesure d'IGDB
+const MAX_CONCURRENT = 6; // sous les 8 autorisées
+const MAX_QUEUE = 300;
+
+let active = 0;
+let lastStart = 0;
+let timer = null;
+const waiting = [];
+
+function pump() {
+  if (timer || !waiting.length || active >= MAX_CONCURRENT) return;
+  const wait = Math.max(0, lastStart + MIN_GAP_MS - Date.now());
+  timer = setTimeout(() => {
+    timer = null;
+    const next = waiting.shift();
+    if (next) {
+      active++;
+      lastStart = Date.now();
+      next();
+    }
+    pump();
+  }, wait);
+}
+
+// Prend un jeton de passage. Rendu par `release()`, quoi qu'il arrive.
+function acquire() {
+  if (waiting.length >= MAX_QUEUE) {
+    const err = new Error("IGDB est saturé (file d'attente pleine). Réessaie dans un instant.");
+    err.status = 503;
+    return Promise.reject(err);
+  }
+  return new Promise((resolve) => {
+    waiting.push(resolve);
+    pump();
+  });
+}
+
+function release() {
+  active = Math.max(0, active - 1);
+  pump();
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Combien attendre après un 429 : ce qu'IGDB demande s'il le dit, sinon un
+// recul qui double à chaque tentative.
+function backoffMs(res, attempt) {
+  const header = Number(res.headers.get("retry-after"));
+  if (Number.isFinite(header) && header > 0) return Math.min(header * 1000, 10_000);
+  return Math.min(500 * 2 ** attempt, 4_000);
+}
+
+/** L'état de la file, pour le panel admin / le diagnostic. */
+export function igdbQueueStats() {
+  return { active, waiting: waiting.length, maxConcurrent: MAX_CONCURRENT, maxQueue: MAX_QUEUE };
+}
+
 async function igdbFetch(endpoint, body, token) {
   return fetch(`https://api.igdb.com/v4/${endpoint}`, {
     method: "POST",
@@ -102,24 +171,40 @@ async function igdbFetch(endpoint, body, token) {
 }
 
 // Exécute une requête Apicalypse sur un endpoint IGDB (ex: "games").
+// Passe par la file : jamais plus de 4 départs par seconde, jamais plus de 6
+// requêtes en vol, et un 429 est attendu puis retenté au lieu d'échouer.
 export async function igdbQuery(endpoint, body) {
-  let token = await getToken();
-  let res = await igdbFetch(endpoint, body, token);
+  await acquire();
+  try {
+    let token = await getToken();
+    let res = await igdbFetch(endpoint, body, token);
 
-  // Token rejeté (révoqué) : on l'invalide et on réessaie une fois avec un neuf.
-  if (res.status === 401) {
-    invalidateToken();
-    token = await getToken();
-    res = await igdbFetch(endpoint, body, token);
-  }
+    // Token rejeté (révoqué) : on l'invalide et on réessaie une fois avec un neuf.
+    if (res.status === 401) {
+      invalidateToken();
+      token = await getToken();
+      res = await igdbFetch(endpoint, body, token);
+    }
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    const err = new Error(`Erreur IGDB (${res.status}). ${text}`.trim());
-    err.status = 502;
-    throw err;
+    // Trop de requêtes : on garde notre place dans la file (donc on freine tout
+    // le monde, c'est voulu) le temps qu'IGDB se calme.
+    for (let attempt = 0; res.status === 429 && attempt < 3; attempt++) {
+      await sleep(backoffMs(res, attempt));
+      res = await igdbFetch(endpoint, body, token);
+    }
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      const err = new Error(`Erreur IGDB (${res.status}). ${text}`.trim());
+      // 429 après trois tentatives : ce n'est pas « IGDB est cassé », c'est
+      // « on tape trop fort » — le 503 le dit, et invite à réessayer.
+      err.status = res.status === 429 ? 503 : 502;
+      throw err;
+    }
+    return res.json();
+  } finally {
+    release();
   }
-  return res.json();
 }
 
 // Jeton d'app Twitch (client_credentials) réutilisable pour l'API Helix

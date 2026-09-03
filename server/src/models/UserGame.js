@@ -179,6 +179,13 @@ const userGameSchema = new mongoose.Schema(
 
 // Un seul enregistrement par (utilisateur, jeu)
 userGameSchema.index({ user: 1, gameId: 1 }, { unique: true });
+// ⚠️ NE PAS SUPPRIMER EN CROYANT QUE L'INDEX DU DESSUS SUFFIT. Un index composé
+// ne sert qu'un filtre qui commence par sa PREMIÈRE clé : { user, gameId } ne
+// répond pas à `find({ gameId })`. Or toute la fiche d'un jeu interroge la
+// collection par gameId seul (les notes, les reviews, les temps de jeu) — sans
+// cette ligne, chacune de ces routes parcourt la collection ENTIÈRE, dont la
+// taille est le nombre de joueurs × la taille de leur bibliothèque.
+userGameSchema.index({ gameId: 1 });
 // « Dernières OST mises en favori », tous joueurs confondus (accueil) : sans
 // cet index, le tri par date se ferait en mémoire sur toute la collection —
 // qui grossit vite avec les imports Steam/PSN.

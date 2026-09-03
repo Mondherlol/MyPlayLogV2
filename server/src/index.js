@@ -64,6 +64,7 @@ import { requireFeature } from "./lib/features.js";
 import { optionalAuth } from "./middleware/auth.js";
 import { avatarPrivacy } from "./middleware/avatarPrivacy.js";
 import { auditLog, logEvent } from "./lib/audit.js";
+import { authLimiter, gamesLimiter } from "./middleware/rateLimit.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -71,7 +72,14 @@ const app = express();
 // Derrière le reverse-proxy Caddy : fait confiance à X-Forwarded-Proto/Host
 // pour que req.protocol vaille "https" et que les URLs d'uploads soient
 // construites en https://myplaylog.cc/... (et pas http://localhost).
-app.set("trust proxy", true);
+//
+// ⚠️ LE CHIFFRE EST LE NOMBRE DE PROXYS DEVANT NOUS, ET CE N'EST PAS UN DÉTAIL
+// DE STYLE. Avec `true`, express croit le premier X-Forwarded-For venu : on
+// peut alors s'inventer une IP à chaque requête et traverser les limites de
+// débit sans les voir (middleware/rateLimit.js). Avec `1`, seul le dernier
+// relais — Caddy — est cru, et l'IP obtenue est la vraie. Si un jour tu mets un
+// Cloudflare (ou un autre proxy) devant Caddy, passe à 2.
+app.set("trust proxy", 1);
 
 app.use(
   cors({
@@ -113,12 +121,14 @@ app.get("/api/health", (req, res) => {
 // Monté AVANT le filtre d'avatars : login/register répondent sans être
 // authentifiés (pas de req.userId), et le filtre prendrait alors la photo du
 // compte qui se connecte pour celle d'un tiers à masquer.
-app.use("/api/auth", authRoutes);
+app.use("/api/auth", authLimiter, authRoutes);
 
 // Retire les photos de profil masquées (comptes privés ayant coché « cacher ma
 // photo ») de toutes les réponses JSON qui suivent, quel que soit l'endpoint.
 app.use(avatarPrivacy);
-app.use("/api/games", gameRoutes);
+// Le seul endroit qui consomme le quota IGDB partagé : c'est celui qu'on
+// protège en priorité (cf. middleware/rateLimit.js).
+app.use("/api/games", gamesLimiter, gameRoutes);
 app.use("/api/game-media", gameMediaRoutes);
 app.use("/api/library", libraryRoutes);
 app.use("/api/lists", listRoutes);

@@ -39,6 +39,18 @@ import { fetchFitgirlRepacks } from "../lib/fitgirl.js";
 import { fetchZipertoGames } from "../lib/ziperto.js";
 import { getCachedTranslation, translateGameText } from "../lib/gameText.js";
 import { ensureGameScores } from "../lib/gameScores.js";
+// Le cache serveur d'IGDB : toutes les lectures « ce que sait IGDB du jeu X »
+// passent par ici et sont partagées par tous les visiteurs (cf. lib/gameIgdb.js).
+import { createTtlCache } from "../lib/ttlCache.js";
+import {
+  gameBundleContents,
+  gameCharacters,
+  gameCore,
+  gameEditions,
+  gameLinks,
+  gameSeries,
+  gameTimeToBeat,
+} from "../lib/gameIgdb.js";
 
 function youtubeId(url) {
   const m = String(url).match(
@@ -180,11 +192,10 @@ async function scheduleHltbScrape(id, name, cached) {
 // Renvoie `{ times, pending }` : `pending` est vrai quand un scrape HLTB tourne
 // en arrière-plan et qu'on n'a pas encore de valeurs → le client peut re-poller
 // pour afficher les temps dès qu'ils arrivent (sans avoir à rouvrir la modale).
-async function resolveTimeToBeat(id, name, released = true) {
-  const ttbArr = await igdbQuery(
-    "game_time_to_beats",
-    `fields hastily,normally,completely; where game_id = ${id};`
-  ).catch(() => []);
+// `releaseDate` (timestamp IGDB) ne sert qu'à dater l'entrée de cache : un jeu
+// à paraître se revoit toutes les 6 h, un vieux jeu tous les six mois.
+async function resolveTimeToBeat(id, name, released = true, releaseDate = null) {
+  const ttbArr = (await gameTimeToBeat(id, releaseDate).catch(() => [])) || [];
   const toH = (s) => (s ? Math.round(s / 3600) : null);
   const t = ttbArr[0];
   if (t) {
@@ -353,6 +364,17 @@ function clause(field, ids, mode) {
   return mode === "and" ? parts.join(" & ") : `(${parts.join(" | ")})`;
 }
 
+// Le catalogue et la recherche, partagés par tout le monde. Deux personnes qui
+// tapent « zelda » à une minute d'intervalle posaient deux fois la question à
+// IGDB — et une frappe, c'est une requête PAR LETTRE.
+//
+// Plafonné : l'espace des requêtes possibles est infini (n'importe quel texte,
+// n'importe quelle combinaison de filtres), donc c'est un LRU borné et non un
+// cache en base comme pour les fiches.
+const SEARCH_TTL = 10 * 60 * 1000;
+const BROWSE_TTL = 30 * 60 * 1000;
+const searchCache = createTtlCache({ name: "games:search", max: 600, ttl: SEARCH_TTL });
+
 function buildQuery(opts) {
   const { search, sort, dir, limit, offset, filters, typeIds, release } = opts;
   // version_parent = null : exclut les éditions/remasters "version de" (Deluxe,
@@ -468,9 +490,20 @@ router.get("/", requireAuth, async (req, res) => {
       to: yearTo ? Math.floor(Date.UTC(yearTo, 11, 31, 23, 59, 59) / 1000) : null,
     };
 
-    const query = buildQuery({ search, sort, dir, limit, offset, filters, typeIds, release });
-    const raw = await igdbQuery("games", query);
-    const games = raw.map(mapGame);
+    // On CLÉ SUR LES PARAMÈTRES, pas sur la requête Apicalypse : celle-ci
+    // contient l'instant présent (pour « déjà sorti »), donc elle change à
+    // chaque seconde et ne collerait jamais deux fois.
+    const key = JSON.stringify([search, sort, dir, limit, offset, typeIds, filters, release]);
+    // Une frappe de recherche vieillit vite (un jeu vient d'être ajouté chez
+    // IGDB), une page de catalogue beaucoup moins.
+    const games = await searchCache.remember(
+      key,
+      async () => {
+        const query = buildQuery({ search, sort, dir, limit, offset, filters, typeIds, release });
+        return (await igdbQuery("games", query)).map(mapGame);
+      },
+      search ? SEARCH_TTL : BROWSE_TTL
+    );
 
     res.json({
       page,
@@ -1234,11 +1267,8 @@ router.post("/:id/ost/rename", requireAuth, requireStaff, async (req, res) => {
 // Jeux inclus dans un bundle (game_type 3) : IGDB n'a pas de champ « contenu »
 // sur le bundle lui-même — on interroge les jeux qui le référencent dans LEUR
 // champ `bundles`. Ordre chronologique de sortie.
-async function fetchBundleGames(bundleId) {
-  const list = await igdbQuery(
-    "games",
-    `fields name,cover.image_id,total_rating,first_release_date; where bundles = (${bundleId}); limit 50;`
-  ).catch(() => []);
+async function fetchBundleGames(bundleId, releaseDate = null) {
+  const list = (await gameBundleContents(bundleId, releaseDate).catch(() => [])) || [];
   return list
     .map((g) => ({
       id: g.id,
@@ -1284,23 +1314,18 @@ const STORE_URLS = [
   [/playstation.com/i, "playstation"],
 ];
 
-async function resolveStores(gameId) {
-  try {
-    const rows = await igdbQuery(
-      "external_games",
-      `fields external_game_source,url; where game = ${gameId}; limit 60;`
-    );
-    const found = new Set();
-    for (const r of rows || []) {
-      const bySource = STORE_SOURCES[r.external_game_source];
-      if (bySource) found.add(bySource);
-      const byUrl = STORE_URLS.find(([re]) => re.test(String(r.url || "")));
-      if (byUrl) found.add(byUrl[1]);
-    }
-    return [...found];
-  } catch {
-    return []; // IGDB indisponible : la rangée des boutiques ne s'affiche pas
+//
+// Les liens externes viennent maintenant de la fiche elle-même (`external_games`
+// fait partie des champs demandés à IGDB en une fois) : plus de requête à part.
+function storesFrom(externalGames) {
+  const found = new Set();
+  for (const r of externalGames || []) {
+    const bySource = STORE_SOURCES[r.external_game_source];
+    if (bySource) found.add(bySource);
+    const byUrl = STORE_URLS.find(([re]) => re.test(String(r.url || "")));
+    if (byUrl) found.add(byUrl[1]);
   }
+  return [...found];
 }
 
 router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
@@ -1308,20 +1333,20 @@ router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
 
-    const [gameArr, customCovers, charArr, customChars] = await Promise.all([
-      igdbQuery(
-        "games",
-        `fields name,game_type,cover.image_id,artworks.image_id,platforms.id,platforms.name,platforms.abbreviation,release_dates.platform,release_dates.date,genres.id,genres.name,game_modes,first_release_date,total_rating_count; where id = ${id};`
-      ),
+    // La fiche part en premier, mais on n'attend PAS qu'elle arrive pour lancer
+    // le reste : les personnages n'ont besoin de sa date de sortie que pour
+    // dater leur entrée de cache, et ça se promet.
+    const corePromise = gameCore(id);
+    const datePromise = corePromise.then((g) => g?.first_release_date ?? null).catch(() => null);
+
+    const [core, customCovers, charArr, customChars] = await Promise.all([
+      corePromise,
       CustomCover.find({ gameId: id }).sort({ createdAt: -1 }),
-      igdbQuery(
-        "characters",
-        `fields name,mug_shot.image_id; where games = (${id}); limit 50;`
-      ).catch(() => []),
+      gameCharacters(id, datePromise).catch(() => []),
       CustomCharacter.find({ gameId: id }).sort({ createdAt: -1 }),
     ]);
 
-    const g = gameArr[0] || {};
+    const g = core || {};
     const covers = [];
     if (g.cover?.image_id)
       covers.push({ id: g.cover.image_id, url: `${IMG_BASE}/t_cover_big/${g.cover.image_id}.jpg` });
@@ -1360,12 +1385,14 @@ router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
     const released =
       (g.first_release_date && g.first_release_date <= nowSec) ||
       (!g.first_release_date && (g.total_rating_count || 0) > 0);
-    const [ttb, vnChars, bundleGames, stores] = await Promise.all([
-      resolveTimeToBeat(id, g.name, released),
+    const stores = storesFrom(g.external_games);
+    const [ttb, vnChars, bundleGames] = await Promise.all([
+      resolveTimeToBeat(id, g.name, released, g.first_release_date ?? null),
       isVn ? resolveVnCharacters(id, g.name) : Promise.resolve([]),
       // Bundle : la modale « joué » propose de cocher chaque jeu inclus.
-      g.game_type === 3 ? fetchBundleGames(id) : Promise.resolve([]),
-      resolveStores(id),
+      g.game_type === 3
+        ? fetchBundleGames(id, g.first_release_date ?? null)
+        : Promise.resolve([]),
     ]);
 
     // Dédoublonnage : on n'ajoute un perso VNDB que si son nom n'existe pas déjà.
@@ -1384,7 +1411,9 @@ router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
 
     // Jeux « sans fin » potentiels : multijoueur (2), MMO (5) ou battle
     // royale (6) selon IGDB → la modale propose alors le statut « Sans fin ».
-    const endlessHint = (g.game_modes || []).some((m) => [2, 5, 6].includes(m));
+    // (la fiche partagée développe `game_modes` en { id, name } — l'ancienne
+    // requête d'ici n'en demandait que les ids bruts.)
+    const endlessHint = (g.game_modes || []).some((m) => [2, 5, 6].includes(m?.id ?? m));
 
     // Date de sortie PAR PLATEFORME : un jeu ne sort pas le même jour partout,
     // et la feuille de suivi propose « commencé à la sortie » sur la console
@@ -1528,66 +1557,15 @@ const GAME_TYPES_FR = {
   14: { label: "Mise à jour", phrase: "une mise à jour" },
 };
 
-const FULL_FIELDS = [
-  "name",
-  "summary",
-  "storyline",
-  "game_type",
-  "parent_game.name",
-  "parent_game.cover.image_id",
-  "version_parent.name",
-  "version_parent.cover.image_id",
-  "cover.image_id",
-  "artworks.image_id",
-  "artworks.width",
-  "artworks.height",
-  "screenshots.image_id",
-  "screenshots.width",
-  "screenshots.height",
-  "genres.id",
-  "genres.name",
-  "themes.id",
-  "themes.name",
-  "game_modes.id",
-  "game_modes.name",
-  "player_perspectives.name",
-  "platforms.id",
-  "platforms.name",
-  "platforms.abbreviation",
-  "first_release_date",
-  "rating",
-  "rating_count",
-  "total_rating",
-  "total_rating_count",
-  "aggregated_rating",
-  "aggregated_rating_count",
-  "language_supports.language.name",
-  "language_supports.language.locale",
-  "involved_companies.company.name",
-  "involved_companies.developer",
-  "involved_companies.publisher",
-  "videos.video_id",
-  "videos.name",
-  "websites.url",
-  "websites.category",
-  "game_engines.name",
-  "franchises.name",
-  "collections.name",
-  "alternative_names.name",
-  "alternative_names.comment",
-  "similar_games.name",
-  "similar_games.cover.image_id",
-  "similar_games.total_rating",
-  "similar_games.first_release_date",
-].join(",");
+// (l'ancienne liste FULL_FIELDS est devenue CORE_FIELDS dans lib/gameIgdb.js,
+// partagée avec /details, /ratings, /related, /howlong… — une seule requête.)
 
 router.get("/:id/full", optionalAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
 
-    const arr = await igdbQuery("games", `fields ${FULL_FIELDS}; where id = ${id};`);
-    const g = arr[0];
+    const g = await gameCore(id);
     if (!g) return res.status(404).json({ error: "Jeu introuvable." });
 
     // Titre français si IGDB en a un
@@ -1690,7 +1668,7 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
     const released =
       (g.first_release_date && g.first_release_date <= nowSec) ||
       (!g.first_release_date && (g.total_rating_count || 0) > 0);
-    const beatPromise = resolveTimeToBeat(id, g.name, released)
+    const beatPromise = resolveTimeToBeat(id, g.name, released, g.first_release_date ?? null)
       .then((r) => r.times)
       .catch(() => null);
 
@@ -1724,7 +1702,9 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
         storylineFr: null,
       })),
       // Bundle : les jeux inclus, affichés en section sur la fiche.
-      g.game_type === 3 ? fetchBundleGames(id) : Promise.resolve([]),
+      g.game_type === 3
+        ? fetchBundleGames(id, g.first_release_date ?? null)
+        : Promise.resolve([]),
     ]);
 
     res.json({
@@ -1790,7 +1770,7 @@ router.post("/:id/translate", requireAuth, async (req, res) => {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
 
-    const arr = await igdbQuery("games", `fields summary,storyline; where id = ${id};`);
+    const arr = [await gameCore(id)].filter(Boolean);
     const g = arr[0];
     if (!g) return res.status(404).json({ error: "Jeu introuvable." });
     if (!g.summary && !g.storyline) {
@@ -1813,11 +1793,7 @@ router.get("/:id/patches", requireAuth, requireDownloadAccess, async (req, res) 
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
 
-    const arr = await igdbQuery(
-      "games",
-      `fields name,genres.id,genres.name,platforms.id,platforms.name,language_supports.language.name; where id = ${id};`
-    );
-    const g = arr[0];
+    const g = await gameCore(id);
     if (!g) return res.status(404).json({ error: "Jeu introuvable." });
 
     const isVn = (g.genres || []).some(
@@ -1870,11 +1846,7 @@ router.get("/:id/hd-packs", requireAuth, requireDownloadAccess, async (req, res)
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
 
-    const arr = await igdbQuery(
-      "games",
-      `fields name,cover.image_id; where id = ${id};`
-    );
-    const g = arr[0];
+    const g = await gameCore(id);
     if (!g) return res.status(404).json({ error: "Jeu introuvable." });
 
     const cover = g.cover?.image_id
@@ -1896,7 +1868,7 @@ router.get("/:id/fitgirl", requireAuth, requireDownloadAccess, async (req, res) 
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
 
-    const arr = await igdbQuery("games", `fields name; where id = ${id};`);
+    const arr = [await gameCore(id)].filter(Boolean);
     const g = arr[0];
     if (!g) return res.status(404).json({ error: "Jeu introuvable." });
 
@@ -1917,7 +1889,7 @@ router.get("/:id/ziperto", requireAuth, requireDownloadAccess, async (req, res) 
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
 
-    const arr = await igdbQuery("games", `fields name; where id = ${id};`);
+    const arr = [await gameCore(id)].filter(Boolean);
     const g = arr[0];
     if (!g) return res.status(404).json({ error: "Jeu introuvable." });
 
@@ -1964,9 +1936,6 @@ router.get("/:id/hd-packs/:torrentId/torrent", requireAuth, requireDownloadAcces
 
 // --- Contenus liés (onglet Univers) : DLC, remakes, remasters, éditions,
 // portages… + tous les jeux de la même licence en chronologie. ---
-const REL_SUBFIELDS = ["name", "cover.image_id", "total_rating", "first_release_date", "game_type"];
-const relFields = (f) => REL_SUBFIELDS.map((s) => `${f}.${s}`).join(",");
-
 function mapRelGame(g) {
   return {
     id: g.id,
@@ -1986,28 +1955,17 @@ router.get("/:id/related", optionalAuth, async (req, res) => {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
 
-    const fields = [
-      "name",
-      "game_type",
-      "first_release_date",
-      "franchises.name",
-      "collections.name",
-      relFields("parent_game"),
-      relFields("version_parent"),
-      relFields("dlcs"),
-      relFields("expansions"),
-      relFields("standalone_expansions"),
-      relFields("remakes"),
-      relFields("remasters"),
-      relFields("expanded_games"),
-      relFields("ports"),
-      relFields("bundles"),
-      relFields("forks"),
-    ].join(",");
-
-    const arr = await igdbQuery("games", `fields ${fields}; where id = ${id};`);
-    const g = arr[0];
-    if (!g) return res.status(404).json({ error: "Jeu introuvable." });
+    // La fiche (qui porte le parent et la franchise) et la parenté large sont
+    // deux entrées de cache distinctes : ouvrir une fiche ne paye pas les onze
+    // relations développées, que seul cet onglet regarde.
+    const corePromise = gameCore(id);
+    const datePromise = corePromise.then((x) => x?.first_release_date ?? null).catch(() => null);
+    const [core, links] = await Promise.all([
+      corePromise,
+      gameLinks(id, datePromise).catch(() => ({})),
+    ]);
+    if (!core) return res.status(404).json({ error: "Jeu introuvable." });
+    const g = { ...core, ...(links || {}) };
 
     const parent = g.parent_game || g.version_parent || null;
 
@@ -2030,10 +1988,8 @@ router.get("/:id/related", optionalAuth, async (req, res) => {
     ];
 
     // Éditions de CE jeu (Deluxe, GOTY…) : jeux dont il est le version_parent.
-    const editions = await igdbQuery(
-      "games",
-      `fields ${REL_SUBFIELDS.join(",")}; where version_parent = ${id}; limit 50;`
-    ).catch(() => []);
+    const editions =
+      (await gameEditions(id, g.first_release_date ?? null).catch(() => [])) || [];
     rawGroups.push({ id: "editions", items: editions });
 
     // Dédup + mapping ; on garde la trace des ids déjà casés pour la saga.
@@ -2061,10 +2017,8 @@ router.get("/:id/related", optionalAuth, async (req, res) => {
       const whereRel = fid ? `franchises = (${fid})` : `collections = (${cid})`;
       // limit 500 = maximum autorisé par IGDB ; tri desc pour garder les jeux
       // les plus récents si la licence dépasse quand même la limite.
-      const list = await igdbQuery(
-        "games",
-        `fields ${REL_SUBFIELDS.join(",")}; where ${whereRel} & id != ${id} & version_parent = null & cover != null; sort first_release_date desc; limit 500;`
-      ).catch(() => []);
+      const list =
+        (await gameSeries(id, whereRel, g.first_release_date ?? null).catch(() => [])) || [];
       series = list.filter((s) => !seen.has(s.id)).map(mapRelGame);
     }
 
@@ -2088,19 +2042,14 @@ const STEAM_ACH_TTL = 6 * 60 * 60 * 1000; // 6h
 
 async function resolveSteamAppId(gameId) {
   try {
+    // Les liens externes font partie de la fiche mise en cache : deux requêtes
+    // IGDB de moins, et zéro dès la deuxième visite.
+    const all = (await gameCore(gameId))?.external_games || [];
     // external_game_source = 1 → Steam (uid = appid). IGDB a remplacé l'ancien
-    // champ `category` par `external_game_source`.
-    let rows = await igdbQuery(
-      "external_games",
-      `fields uid,url; where game = ${gameId} & external_game_source = 1;`
-    );
-    // Filet de sécurité : si l'enum évolue encore, on scanne tous les liens
-    // externes et on garde ceux qui pointent vers le store Steam.
+    // champ `category` par `external_game_source` ; si l'enum évolue encore, on
+    // retombe sur les liens qui pointent vers le store Steam.
+    let rows = all.filter((r) => r.external_game_source === 1);
     if (!rows.length) {
-      const all = await igdbQuery(
-        "external_games",
-        `fields uid,url; where game = ${gameId}; limit 50;`
-      );
       rows = all.filter((r) => /steampowered\.com\/app\//.test(String(r.url || "")));
     }
     for (const r of rows) {
@@ -2377,16 +2326,7 @@ const RELEASE_STATUS_FR = {
   36: "Patch nouvelle génération",
 };
 
-const VERSION_FIELDS = (rel) =>
-  [
-    `${rel}.id`,
-    `${rel}.name`,
-    `${rel}.cover.image_id`,
-    `${rel}.first_release_date`,
-    `${rel}.game_type`,
-    `${rel}.platforms.name`,
-    `${rel}.platforms.abbreviation`,
-  ].join(",");
+// (les champs des jeux liés sont demandés par lib/gameIgdb.js.)
 
 // Les liens de parenté qu'on remonte, dans l'ordre où on les montre.
 const VERSION_LINKS = [
@@ -2405,27 +2345,14 @@ router.get("/:id/releases", optionalAuth, async (req, res) => {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
 
-    const fields = [
-      "name",
-      "first_release_date",
-      "game_type",
-      "cover.image_id",
-      "platforms.id",
-      "platforms.name",
-      "platforms.abbreviation",
-      "release_dates.date",
-      "release_dates.human",
-      "release_dates.platform",
-      "release_dates.region",
-      "release_dates.status",
-      VERSION_FIELDS("parent_game"),
-      VERSION_FIELDS("version_parent"),
-      ...VERSION_LINKS.map(([rel]) => VERSION_FIELDS(rel)),
-    ].join(",");
-
-    const arr = await igdbQuery("games", `fields ${fields}; where id = ${id};`);
-    const g = arr[0];
-    if (!g) return res.status(404).json({ error: "Jeu introuvable." });
+    const corePromise = gameCore(id);
+    const datePromise = corePromise.then((x) => x?.first_release_date ?? null).catch(() => null);
+    const [core, links] = await Promise.all([
+      corePromise,
+      gameLinks(id, datePromise).catch(() => ({})),
+    ]);
+    if (!core) return res.status(404).json({ error: "Jeu introuvable." });
+    const g = { ...core, ...(links || {}) };
 
     const platformName = new Map(
       (g.platforms || []).map((p) => [p.id, { name: p.name, abbr: p.abbreviation || p.name }])
@@ -2517,7 +2444,7 @@ router.get("/:id/howlong", optionalAuth, async (req, res) => {
     if (!id) return res.status(400).json({ error: "id invalide." });
 
     const [rows, entries, viewer] = await Promise.all([
-      igdbQuery("games", `fields name,first_release_date; where id = ${id};`).catch(() => []),
+      gameCore(id).catch(() => null),
       UserGame.find({ gameId: id, playtimeHours: { $gt: 0 } })
         .select("user rating status platform playtimeHours platinum")
         .populate("user", "username avatar privacy")
@@ -2525,7 +2452,7 @@ router.get("/:id/howlong", optionalAuth, async (req, res) => {
       req.userId ? User.findById(req.userId).select("following").lean() : null,
     ]);
 
-    const g = rows[0] || {};
+    const g = rows || {};
     const released = g.first_release_date
       ? g.first_release_date * 1000 < Date.now()
       : true;
@@ -2615,10 +2542,7 @@ router.get("/:id/ratings", optionalAuth, async (req, res) => {
     if (!id) return res.status(400).json({ error: "id invalide." });
 
     const [rows, entries, steam, viewer] = await Promise.all([
-      igdbQuery(
-        "games",
-        `fields name,first_release_date,rating,rating_count,aggregated_rating,aggregated_rating_count,total_rating,total_rating_count; where id = ${id};`
-      ).catch(() => []),
+      gameCore(id).catch(() => null),
       // Seules les entrées NOTÉES : une bibliothèque sans note ne dit rien
       // d'une note.
       UserGame.find({ gameId: id, rating: { $ne: null } })
@@ -2629,7 +2553,7 @@ router.get("/:id/ratings", optionalAuth, async (req, res) => {
       req.userId ? User.findById(req.userId).select("following").lean() : null,
     ]);
 
-    const g = rows[0] || {};
+    const g = rows || {};
     const year = g.first_release_date
       ? new Date(g.first_release_date * 1000).getFullYear()
       : null;
