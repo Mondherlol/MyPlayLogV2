@@ -1,4 +1,5 @@
 import express from "express";
+import { createTtlCache } from "../lib/ttlCache.js";
 import mongoose from "mongoose";
 import User from "../models/User.js";
 import UserGame from "../models/UserGame.js";
@@ -1891,9 +1892,15 @@ const DISCOVER_FIELDS =
 // « Jeux du moment » et « sorties marquantes » : identiques pour tout le
 // monde, mis en cache mémoire par jour (comme /games/releases).
 const sharedCache = { day: 0, hot: null, upcoming: null, indies: null };
-// Suggestions personnalisées : cache par utilisateur (6 h).
-const forYouCache = new Map();
-const FOR_YOU_TTL = 6 * 60 * 60 * 1000;
+// Suggestions personnalisées : cache par utilisateur (6 h), plafonné à 5 000
+// personnes — au-delà, la moins récemment vue repart (elle recalculera).
+// Sans plafond, c'était une entrée par compte ayant ouvert l'onglet depuis le
+// démarrage, gardée pour toujours.
+const forYouCache = createTtlCache({
+  name: "feed:for-you",
+  max: 5000,
+  ttl: 6 * 60 * 60 * 1000,
+});
 
 async function fetchHot(now) {
   // Sortis dans les 9 derniers mois, les plus joués/notés d'abord.
@@ -2009,18 +2016,15 @@ router.get("/discover", requireAuth, async (req, res) => {
       }
     }
 
-    const key = String(req.userId);
-    let forYou = forYouCache.get(key);
-    if (!forYou || Date.now() - forYou.at > FOR_YOU_TTL) {
-      forYou = { at: Date.now(), games: await fetchForYou(req.userId).catch(() => []) };
-      forYouCache.set(key, forYou);
-    }
+    const forYou = await forYouCache.remember(String(req.userId), () =>
+      fetchForYou(req.userId).catch(() => [])
+    );
 
     res.json({
       hot: sharedCache.hot || [],
       upcoming: sharedCache.upcoming || [],
       indies: sharedCache.indies || [],
-      forYou: forYou.games,
+      forYou,
     });
   } catch (err) {
     console.error("discover error:", err.message);

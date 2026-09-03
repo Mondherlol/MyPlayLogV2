@@ -16,7 +16,15 @@ myplaylog.cc {
     # L'API et les fichiers uploadés vont vers le backend Express.
     @backend path /api/* /uploads/*
     handle @backend {
-        reverse_proxy server:4000
+        reverse_proxy server:4000 {
+            # ÉCRASE X-Forwarded-For au lieu de compléter celui du client.
+            # Les limites de débit du backend comptent par IP (cf.
+            # server/src/middleware/rateLimit.js) : si on laissait passer
+            # l'en-tête envoyé par le client, il suffirait d'en changer à
+            # chaque requête pour ne jamais être compté. Ici, l'adresse vue
+            # par Express est celle de la connexion, point.
+            header_up X-Forwarded-For {remote_host}
+        }
     }
 
     # Robots sociaux (aperçus de partage) sur les pages partageables : le

@@ -2,12 +2,23 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import { canUserDownload, isUserAdmin, isUserStaff } from "../lib/admin.js";
 import { dayKey, touchStreak } from "../lib/streak.js";
+import { createTtlCache } from "../lib/ttlCache.js";
 
 // Présence : on note le dernier passage de chaque utilisateur (affiché sur son
 // profil) et, au passage, sa série de connexions. Throttlé en mémoire pour ne
 // pas écrire en base à chaque requête.
 const SEEN_THROTTLE = 3 * 60 * 1000; // 3 min
-const lastSeenWrites = new Map(); // userId -> { at, day } de la dernière écriture
+// ⚠️ LA DURÉE DE VIE EST DE 26 HEURES, PAS DE 3 MINUTES, ET C'EST VOULU : ce
+// qu'on retient ici, c'est aussi LE JOUR du dernier passage. L'oublier au bout
+// de 3 minutes ferait repasser tout le monde par la série de connexions
+// (une lecture en base de plus) toutes les 3 minutes. On garde donc l'entrée
+// une journée pleine, mais bornée en nombre — avant, elle n'était jamais
+// oubliée : un compte vu une fois occupait la mémoire jusqu'au redémarrage.
+const lastSeenWrites = createTtlCache({
+  name: "auth:last-seen",
+  max: 20000,
+  ttl: 26 * 60 * 60 * 1000,
+});
 
 function touchLastSeen(userId) {
   const now = Date.now();

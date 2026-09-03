@@ -10,6 +10,7 @@
 
 import { getTwitchToken, igdbQuery } from "./igdb.js";
 import { gameCore } from "./gameIgdb.js";
+import { createTtlCache } from "./ttlCache.js";
 
 const YT_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
@@ -492,16 +493,12 @@ async function resolveSteamAppId(gameId) {
 
 // Cache dédié (les avis Steam ne font plus partie du feed : ils alimentent
 // désormais l'onglet Reviews, appelé indépendamment).
-const steamCache = new Map(); // gameId -> { ts, data }
-const STEAM_TTL = 30 * 60 * 1000;
+// Plafonné : une entrée par jeu consulté depuis le démarrage, ça montait sans
+// jamais redescendre. 400 jeux tièdes suffisent largement.
+const steamCache = createTtlCache({ name: "steam:reviews", max: 400, ttl: 30 * 60 * 1000 });
 
-export async function fetchSteamReviews(gameId) {
-  const key = String(gameId);
-  const hit = steamCache.get(key);
-  if (hit && Date.now() - hit.ts < STEAM_TTL) return hit.data;
-  const data = await buildSteamReviews(gameId);
-  steamCache.set(key, { ts: Date.now(), data });
-  return data;
+export function fetchSteamReviews(gameId) {
+  return steamCache.remember(String(gameId), () => buildSteamReviews(gameId));
 }
 
 async function buildSteamReviews(gameId) {
@@ -636,23 +633,17 @@ async function fetchYouTube(name) {
 // ---------------------------------------------------------------------------
 // Agrégation + cache mémoire (30 min)
 // ---------------------------------------------------------------------------
-const cache = new Map(); // gameId -> { ts, data }
-const TTL = 30 * 60 * 1000;
+const cache = createTtlCache({ name: "game:feed", max: 300, ttl: 30 * 60 * 1000 });
 
 // v2 : plus de Twitch ni de YouTube (l'onglet Feed est désormais posts des
 // joueurs + fan arts). `altName` = nom original/international du jeu (IGDB),
 // décisif pour la recherche quand le titre affiché est localisé.
 export async function buildGameFeed(gameId, name, altName = null) {
-  const key = `v2-${gameId}`;
-  const hit = cache.get(key);
-  if (hit && Date.now() - hit.ts < TTL) return hit.data;
-
-  const [fanart, posts] = await Promise.all([
-    fetchFanartSmart(name, altName),
-    fetchSocial(name),
-  ]);
-
-  const data = { streams: [], fanart, posts, videos: [] };
-  cache.set(key, { ts: Date.now(), data });
-  return data;
+  return cache.remember(`v2-${gameId}`, async () => {
+    const [fanart, posts] = await Promise.all([
+      fetchFanartSmart(name, altName),
+      fetchSocial(name),
+    ]);
+    return { streams: [], fanart, posts, videos: [] };
+  });
 }

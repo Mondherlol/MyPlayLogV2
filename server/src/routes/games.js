@@ -530,9 +530,13 @@ router.get("/", requireAuth, async (req, res) => {
 // Les fenêtres passées (feed « jours précédents » de la page Sorties) sont
 // aussi partagées : cache par fenêtre from-to, TTL 6 h, plafonné.
 const releasesCache = { day: 0, games: null };
-const windowCache = new Map(); // "from-to" -> { at, games }
-const WINDOW_TTL = 6 * 60 * 60 * 1000;
-const WINDOW_MAX = 60;
+// (l'éviction et l'expiration sont désormais dans lib/ttlCache.js — c'était
+// un tri de toute la Map à chaque insertion.)
+const windowCache = createTtlCache({
+  name: "games:release-windows",
+  max: 60,
+  ttl: 6 * 60 * 60 * 1000,
+});
 
 router.get("/releases", optionalAuth, async (req, res) => {
   try {
@@ -552,9 +556,7 @@ router.get("/releases", optionalAuth, async (req, res) => {
     const windowKey = `${from}-${to}`;
     if (isWindow) {
       const hit = windowCache.get(windowKey);
-      if (hit && Date.now() - hit.at < WINDOW_TTL) {
-        return res.json({ games: hit.games });
-      }
+      if (hit !== undefined) return res.json({ games: hit });
     }
 
     const where = [
@@ -593,12 +595,7 @@ router.get("/releases", optionalAuth, async (req, res) => {
       releasesCache.games = games;
       releasesCache.day = startOfToday;
     } else if (isWindow) {
-      if (windowCache.size >= WINDOW_MAX) {
-        // Purge simple : on jette l'entrée la plus ancienne.
-        const oldest = [...windowCache.entries()].sort((a, b) => a[1].at - b[1].at)[0];
-        if (oldest) windowCache.delete(oldest[0]);
-      }
-      windowCache.set(windowKey, { at: Date.now(), games });
+      windowCache.set(windowKey, games);
     }
 
     res.json({ games });
@@ -753,11 +750,15 @@ router.get("/languages", requireAuth, async (req, res) => {
 // ⚠️ EN MÉMOIRE, ET C'EST SUFFISANT. La durée d'une vidéo est immuable : un
 // cache qui survit à la session du serveur n'apporterait rien qu'une table de
 // plus. Au pire, un redémarrage refait quelques requêtes.
-const ytDurations = new Map();
+// Une durée de vidéo ne change jamais : c'est une mémo, pas un cache. Elle a
+// quand même besoin d'un plafond — sinon elle retient chaque vidéo croisée
+// depuis le démarrage.
+const ytDurations = createTtlCache({ name: "yt:durations", max: 5000, ttl: 7 * 24 * 60 * 60 * 1000 });
 const YT_ID = /^[A-Za-z0-9_-]{6,20}$/;
 
 async function ytDuration(videoId) {
-  if (ytDurations.has(videoId)) return ytDurations.get(videoId);
+  const known = ytDurations.get(videoId);
+  if (known !== undefined) return known;
   let seconds = null;
   try {
     const html = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
@@ -2037,8 +2038,11 @@ router.get("/:id/related", optionalAuth, async (req, res) => {
 // L'appid Steam est déduit d'IGDB (external_games catégorie 1 = Steam, sinon
 // l'URL du site Steam). On liste ensuite les succès (schéma) + leur rareté
 // (pourcentage global de déblocage). Nécessite STEAM_API_KEY dans server/.env.
-const steamAchCache = new Map(); // appid -> { ts, data }
-const STEAM_ACH_TTL = 6 * 60 * 60 * 1000; // 6h
+const steamAchCache = createTtlCache({
+  name: "steam:achievements",
+  max: 300,
+  ttl: 6 * 60 * 60 * 1000,
+});
 
 async function resolveSteamAppId(gameId) {
   try {
@@ -2073,7 +2077,7 @@ router.get("/:id/achievements", optionalAuth, async (req, res) => {
     if (!appid) return res.json({ available: false, reason: "no_appid" });
 
     const cached = steamAchCache.get(appid);
-    if (cached && Date.now() - cached.ts < STEAM_ACH_TTL) return res.json(cached.data);
+    if (cached !== undefined) return res.json(cached);
 
     const key = process.env.STEAM_API_KEY;
     const [schemaRes, pctRes] = await Promise.all([
@@ -2112,7 +2116,7 @@ router.get("/:id/achievements", optionalAuth, async (req, res) => {
       count: achievements.length,
       achievements,
     };
-    steamAchCache.set(appid, { ts: Date.now(), data });
+    steamAchCache.set(appid, data);
     res.json(data);
   } catch (err) {
     console.error("steam achievements error:", err.message);
@@ -2245,6 +2249,18 @@ async function resolveReviewMentions(text) {
   const users = await User.find({ username: rx }).select("username").limit(20).lean();
   return users.map((u) => ({ user: u._id, username: u.username }));
 }
+
+// « Cette entrée de bibliothèque est-elle une review ? », version Mongo. Sert à
+// ne remonter QUE celles-là au lieu de filtrer après coup en mémoire.
+const HAS_REVIEW_CONTENT = {
+  $or: [
+    { review: { $type: "string", $ne: "" } },
+    { rating: { $ne: null } },
+    { "pros.0": { $exists: true } },
+    { "cons.0": { $exists: true } },
+    { "reviewMedia.0": { $exists: true } },
+  ],
+};
 
 function gameReviewCard(e, meId, isAdmin = false) {
   const { counts, mine } = summarizeReactions(e.reactions, meId);
@@ -2687,13 +2703,38 @@ router.get("/:id/reviews", optionalAuth, async (req, res) => {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
 
+    // Pagination facultative : sans `limit`, la route rend tout comme avant
+    // (le client actuel ne pagine pas). Le plafond, lui, s'applique toujours —
+    // c'est un garde-fou, pas une troncature : il faudrait des centaines
+    // d'avis sur un même jeu pour l'atteindre, et `hasMore` le dit alors.
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(500, Math.max(1, parseInt(req.query.limit, 10) || 500));
+    const skip = (page - 1) * limit;
+
     // Avis joueurs Steam en parallèle : complètent les reviews de nos users
     // (qui restent prioritaires). Échoue silencieusement en null.
-    const [entries, steam, viewerIsAdmin, canSee] = await Promise.all([
-      UserGame.find({ gameId: id })
+    const [entries, myEntry, steam, viewerIsAdmin, canSee] = await Promise.all([
+      // ⚠️ LE TRI SE FAIT EN BASE, PAS EN MÉMOIRE. `find({ gameId })` ramenait
+      // TOUTE la bibliothèque du jeu — y compris les milliers de gens qui l'ont
+      // juste ajouté sans écrire une ligne — puis jetait 95 % du résultat en
+      // JavaScript. On ne demande plus que les entrées qui ont quelque chose à
+      // dire, et `.lean()` évite de construire un document Mongoose complet
+      // (avec ses getters et son suivi de modifications) pour chacune.
+      UserGame.find({ gameId: id, ...HAS_REVIEW_CONTENT })
         .populate("user", "username avatar privacy")
         .populate("comments.user", "username avatar")
-        .sort({ updatedAt: -1 }),
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(limit + 1) // +1 : sert uniquement à savoir s'il y a une suite
+        .lean(),
+      // Ma propre review, cherchée à part : elle doit apparaître même si elle
+      // tombe hors de la page demandée.
+      req.userId
+        ? UserGame.findOne({ gameId: id, user: req.userId })
+            .populate("user", "username avatar privacy")
+            .populate("comments.user", "username avatar")
+            .lean()
+        : null,
       fetchSteamReviews(id).catch(() => null),
       isUserAdmin(req.userId),
       // Reviews des comptes privés ayant coché « masquer mes reviews » :
@@ -2701,7 +2742,13 @@ router.get("/:id/reviews", optionalAuth, async (req, res) => {
       reviewVisibility(req.userId),
     ]);
 
+    const hasMore = entries.length > limit;
+    const pageEntries = hasMore ? entries.slice(0, limit) : entries;
+
     // Une entrée compte comme review si elle a du contenu rédigé OU une note.
+    // Le filtre de la base est volontairement un peu plus large (il ne sait pas
+    // couper les espaces) : celui-ci tranche, et le résultat est identique à ce
+    // que la route rendait avant.
     const hasContent = (e) =>
       (e.review && e.review.trim()) ||
       (e.pros && e.pros.length) ||
@@ -2709,21 +2756,21 @@ router.get("/:id/reviews", optionalAuth, async (req, res) => {
       (e.reviewMedia && e.reviewMedia.length) ||
       e.rating != null;
 
-    const reviews = entries
+    const reviews = pageEntries
       .filter(hasContent)
       .filter((e) => canSee(e.user))
       .map((e) => gameReviewCard(e, req.userId, viewerIsAdmin));
     // Visiteur non connecté : pas de review « à moi ». (Le garde évite aussi
     // qu'une entrée orpheline — user supprimé, e.user null — matche req.userId
     // undefined et soit renvoyée à tort comme la review du lecteur.)
-    const mine = req.userId
-      ? entries.find((e) => String(e.user?._id) === String(req.userId))
-      : null;
+    const mine = myEntry && hasContent(myEntry) ? myEntry : null;
 
     res.json({
       reviews,
       mine: mine ? gameReviewCard(mine, req.userId, viewerIsAdmin) : null,
       steam,
+      page,
+      hasMore,
     });
   } catch (err) {
     console.error("game reviews error:", err.message);
