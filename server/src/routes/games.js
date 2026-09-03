@@ -38,6 +38,7 @@ import { fetchC411Packs, fetchC411Torrent, rewriteAnnounce } from "../lib/c411.j
 import { fetchFitgirlRepacks } from "../lib/fitgirl.js";
 import { fetchZipertoGames } from "../lib/ziperto.js";
 import { getCachedTranslation, translateGameText } from "../lib/gameText.js";
+import { ensureGameScores } from "../lib/gameScores.js";
 
 function youtubeId(url) {
   const m = String(url).match(
@@ -2340,6 +2341,164 @@ function gameReviewCard(e, meId, isAdmin = false) {
     updatedAt: e.updatedAt,
   };
 }
+
+// --- Le détail derrière la note d'un jeu ----------------------------------
+// La fiche affiche « 90 · 1 388 avis » et s'arrête là. Ce chiffre recouvre
+// pourtant quatre choses différentes : la presse, les joueurs du monde, les
+// joueurs D'ICI, et les gens qu'on suit. Cette route les sépare — et ajoute ce
+// qu'un chiffre unique ne dira jamais : la forme de la distribution, la note
+// par console, son évolution dans le temps.
+//
+// Tout est best-effort et parallèle : IGDB, Steam ou une source extérieure
+// indisponible laisse simplement son bloc vide.
+router.get("/:id/ratings", optionalAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+
+    const [rows, entries, steam, viewer] = await Promise.all([
+      igdbQuery(
+        "games",
+        `fields name,first_release_date,rating,rating_count,aggregated_rating,aggregated_rating_count,total_rating,total_rating_count; where id = ${id};`
+      ).catch(() => []),
+      // Seules les entrées NOTÉES : une bibliothèque sans note ne dit rien
+      // d'une note.
+      UserGame.find({ gameId: id, rating: { $ne: null } })
+        .select("user rating status platform playtimeHours review reviewedAt updatedAt")
+        .populate("user", "username avatar privacy")
+        .lean(),
+      fetchSteamReviews(id).catch(() => null),
+      req.userId ? User.findById(req.userId).select("following").lean() : null,
+    ]);
+
+    const g = rows[0] || {};
+    const year = g.first_release_date
+      ? new Date(g.first_release_date * 1000).getFullYear()
+      : null;
+
+    const igdb = {
+      total: g.total_rating
+        ? { score: Math.round(g.total_rating), count: g.total_rating_count || 0 }
+        : null,
+      players: g.rating ? { score: Math.round(g.rating), count: g.rating_count || 0 } : null,
+      critics: g.aggregated_rating
+        ? { score: Math.round(g.aggregated_rating), count: g.aggregated_rating_count || 0 }
+        : null,
+    };
+
+    // -- La communauté MyPlayLog : ce que le site sait et qu'aucun autre ne sait --
+    const notes = entries.map((e) => e.rating);
+    const count = notes.length;
+    const avg = count ? Math.round(notes.reduce((s, n) => s + n, 0) / count) : null;
+
+    // Distribution en 10 paliers, comme la page Statistiques : c'est la FORME
+    // qui parle — un 75 de consensus n'est pas un 75 de guerre civile.
+    const dist = Array.from({ length: 10 }, () => 0);
+    for (const n of notes) dist[Math.min(9, Math.floor(n / 10))] += 1;
+
+    const avgOf = (list) =>
+      list.length ? Math.round(list.reduce((s, e) => s + e.rating, 0) / list.length) : null;
+
+    // Par console : on ne joue pas au même jeu sur Switch et sur PC.
+    const platMap = new Map();
+    for (const e of entries) {
+      if (!e.platform) continue;
+      if (!platMap.has(e.platform)) platMap.set(e.platform, []);
+      platMap.get(e.platform).push(e);
+    }
+    const byPlatform = [...platMap.entries()]
+      .map(([name, list]) => ({ name, avg: avgOf(list), count: list.length }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+
+    // Dans le temps : la date de l'AVIS, pas celle du jeu. Un jeu peut vieillir
+    // en bien (une note qui monte) comme en mal.
+    const yearMap = new Map();
+    for (const e of entries) {
+      const d = e.reviewedAt || e.updatedAt;
+      const y = d ? new Date(d).getFullYear() : null;
+      if (!y) continue;
+      if (!yearMap.has(y)) yearMap.set(y, []);
+      yearMap.get(y).push(e);
+    }
+    const byYear = [...yearMap.entries()]
+      .map(([y, list]) => ({ year: y, avg: avgOf(list), count: list.length }))
+      .sort((a, b) => a.year - b.year)
+      .slice(-8);
+
+    // Par statut : ceux qui l'ont fini le notent-ils comme ceux qui l'ont lâché ?
+    const statusMap = new Map();
+    for (const e of entries) {
+      const k = e.status || "playing";
+      if (!statusMap.has(k)) statusMap.set(k, []);
+      statusMap.get(k).push(e);
+    }
+    const byStatus = [...statusMap.entries()]
+      .map(([key, list]) => ({ key, avg: avgOf(list), count: list.length }))
+      .sort((a, b) => b.count - a.count);
+
+    // -- Les gens qu'on suit : la seule note qui vaille vraiment --
+    // Un 82 de moyenne mondiale ne vaut pas le 60 d'un ami dont on connaît les
+    // goûts. Ils passent donc devant tout le reste dans la feuille.
+    const circle = new Set([
+      ...(viewer?.following || []).map(String),
+      ...(req.userId ? [String(req.userId)] : []),
+    ]);
+    const friends = entries
+      .filter((e) => e.user && circle.has(String(e.user._id)))
+      .map((e) => ({
+        id: String(e.user._id),
+        username: e.user.username,
+        avatar: e.user.avatar || null,
+        isMe: String(e.user._id) === String(req.userId),
+        rating: e.rating,
+        status: e.status,
+        hours: e.playtimeHours ?? null,
+        hasReview: !!(e.review || "").trim(),
+      }))
+      .sort((a, b) => (b.isMe ? 1 : 0) - (a.isMe ? 1 : 0) || b.rating - a.rating);
+
+    const hoursNoted = entries
+      .map((e) => e.playtimeHours)
+      .filter((h) => h != null && h > 0)
+      .sort((a, b) => a - b);
+
+    const external = await ensureGameScores(id, { name: g.name, year }).catch(() => []);
+
+    res.json({
+      igdb,
+      community: {
+        avg,
+        count,
+        dist,
+        byPlatform,
+        byYear,
+        byStatus,
+        friends,
+        reviews: entries.filter((e) => (e.review || "").trim()).length,
+        // Médiane, pas moyenne : un seul joueur à 900 h fausserait la moyenne
+        // d'une communauté qui tourne autour de 30.
+        medianHours: hoursNoted.length
+          ? Math.round(hoursNoted[Math.floor(hoursNoted.length / 2)])
+          : null,
+      },
+      steam: steam
+        ? {
+            positive: steam.positive,
+            negative: steam.negative,
+            total: steam.total,
+            percent: steam.total ? Math.round((steam.positive / steam.total) * 100) : null,
+            scoreDesc: steam.scoreDesc,
+            url: steam.storeUrl,
+          }
+        : null,
+      external,
+    });
+  } catch (err) {
+    console.error("game ratings error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement des notes." });
+  }
+});
 
 router.get("/:id/reviews", optionalAuth, async (req, res) => {
   try {
