@@ -1834,11 +1834,17 @@ router.get("/:username/leaderboard", optionalAuth, async (req, res) => {
 // --- Jeux en commun entre deux profils (détail de l'âme sœur gaming) ---
 // Renvoie l'intersection complète des deux bibliothèques, coups de cœur
 // partagés en tête puis meilleures notes, avec la note de chacun.
+//
+// Chaque jeu porte aussi, POUR LES DEUX, le temps passé et l'état : « on a
+// tous les deux Elden Ring » se dit mieux quand on voit que l'un l'a fini en
+// 120 h et que l'autre l'a lâché au bout de trois. Les deux fiches de profil
+// (pseudo + avatar) accompagnent la liste, pour que l'affichage puisse mettre
+// un visage sur chaque colonne sans une requête de plus.
 router.get("/:username/common/:other", optionalAuth, async (req, res) => {
   try {
     const [user, other] = await Promise.all([
-      User.findOne({ username: req.params.username }).select("_id privacy"),
-      User.findOne({ username: req.params.other }).select("_id privacy"),
+      User.findOne({ username: req.params.username }).select("_id username avatar privacy"),
+      User.findOne({ username: req.params.other }).select("_id username avatar privacy"),
     ]);
     if (!user || !other)
       return res.status(404).json({ error: "Profil introuvable." });
@@ -1847,10 +1853,10 @@ router.get("/:username/common/:other", optionalAuth, async (req, res) => {
 
     const [mine, theirs] = await Promise.all([
       UserGame.find({ user: user._id })
-        .select("gameId name cover rating favorite status")
+        .select("gameId name cover rating favorite status playtimeHours")
         .lean(),
       UserGame.find({ user: other._id })
-        .select("gameId rating favorite")
+        .select("gameId rating favorite status playtimeHours")
         .lean(),
     ]);
     const theirMap = new Map(theirs.map((g) => [g.gameId, g]));
@@ -1866,6 +1872,10 @@ router.get("/:username/common/:other", optionalAuth, async (req, res) => {
           theirRating: t.rating ?? null,
           myFav: Boolean(g.favorite),
           theirFav: Boolean(t.favorite),
+          myStatus: g.status || null,
+          theirStatus: t.status || null,
+          myHours: g.playtimeHours ?? null,
+          theirHours: t.playtimeHours ?? null,
         };
       })
       .sort(
@@ -1876,7 +1886,11 @@ router.get("/:username/common/:other", optionalAuth, async (req, res) => {
             ((a.myRating || 0) + (a.theirRating || 0))
       );
 
-    res.json({ games });
+    res.json({
+      games,
+      me: { id: user._id, username: user.username, avatar: user.avatar || null },
+      other: { id: other._id, username: other.username, avatar: other.avatar || null },
+    });
   } catch (err) {
     console.error("common games error:", err.message);
     res.status(500).json({ error: "Erreur lors du chargement des jeux en commun." });
