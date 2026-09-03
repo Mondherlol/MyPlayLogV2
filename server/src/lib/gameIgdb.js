@@ -137,6 +137,19 @@ const REL_EXPAND = (rel) =>
     `${rel}.platforms.abbreviation`,
   ].join(",");
 
+// Les jeux liés qu'on remonte : DLC, extensions, remakes, portages, bundles…
+const LINK_RELATIONS = [
+  "dlcs",
+  "expansions",
+  "standalone_expansions",
+  "remakes",
+  "remasters",
+  "expanded_games",
+  "ports",
+  "bundles",
+  "forks",
+];
+
 // LA fiche. C'est l'union de ce que demandaient séparément /full, /details,
 // /ratings, /howlong, /patches, /translate… — qui posaient quatre fois la même
 // question à IGDB pour le même jeu. Une seule requête, un seul cache.
@@ -202,24 +215,11 @@ export const CORE_FIELDS = [
   "external_games.uid",
   REL_EXPAND("parent_game"),
   REL_EXPAND("version_parent"),
+  // La parenté large vivait dans une requête à part, pour ne pas alourdir la
+  // fiche. Mesuré : elle coûte de 0 à 5 Ko de plus et RIEN en temps — la
+  // séparer coûtait donc un aller-retour IGDB entier pour rien.
+  ...LINK_RELATIONS.map(REL_EXPAND),
 ].join(",");
-
-// La parenté large : elle ne sert qu'aux onglets « Éditions & versions » et
-// « Sorties ». Séparée de la fiche exprès — onze relations développées, c'est
-// une grosse réponse qu'on n'a aucune raison de payer quand on ouvre une fiche.
-const LINK_RELATIONS = [
-  "dlcs",
-  "expansions",
-  "standalone_expansions",
-  "remakes",
-  "remasters",
-  "expanded_games",
-  "ports",
-  "bundles",
-  "forks",
-];
-
-export const LINK_FIELDS = LINK_RELATIONS.map(REL_EXPAND).join(",");
 
 // Les champs d'un jeu de la saga / d'une édition, dans les listes.
 export const REL_SUBFIELDS = [
@@ -232,13 +232,11 @@ export const REL_SUBFIELDS = [
 
 // Bumper une de ces versions invalide le morceau correspondant, partout.
 const VERSIONS = {
-  core: 1,
-  links: 1,
+  core: 2, // v2 : la parenté large a rejoint la fiche
   chars: 1,
   ttb: 1,
   bundle: 1,
-  editions: 1,
-  series: 1,
+  relatives: 1,
 };
 
 const one = (arr) => (Array.isArray(arr) && arr.length ? arr[0] : null);
@@ -265,18 +263,6 @@ export async function releaseDateOf(gameId) {
   } catch {
     return null;
   }
-}
-
-/** La parenté large (DLC, remakes, portages, bundles…). */
-export function gameLinks(gameId, releaseDate) {
-  return remember({
-    kind: "links",
-    gameId,
-    ver: VERSIONS.links,
-    releaseDate,
-    load: async () =>
-      one(await igdbQuery("games", `fields ${LINK_FIELDS}; where id = ${gameId};`)) || {},
-  });
 }
 
 /** Les personnages IGDB du jeu. */
@@ -324,36 +310,50 @@ export function gameBundleContents(gameId, releaseDate) {
   });
 }
 
-/** Les éditions de CE jeu (Deluxe, GOTY…) : celles dont il est le version_parent. */
-export function gameEditions(gameId, releaseDate) {
-  return remember({
-    kind: "editions",
-    gameId,
-    ver: VERSIONS.editions,
-    releaseDate,
-    load: () =>
-      igdbQuery(
-        "games",
-        `fields ${REL_SUBFIELDS.join(",")}; where version_parent = ${gameId}; limit 50;`
-      ),
-  });
-}
-
 /**
- * La saga : les jeux principaux de la même franchise (ou collection).
- * `whereRel` vient de l'appelant, qui sait laquelle des deux existe.
+ * Les ÉDITIONS de ce jeu (Deluxe, GOTY… : celles dont il est le version_parent)
+ * ET les jeux de sa SAGA, en UNE requête.
+ *
+ * C'étaient deux appels IGDB, parce que ce sont deux questions. Mais ce sont
+ * deux questions au même endpoint sur le même catalogue : un `|` les réunit, et
+ * `version_parent` dans la réponse dit de quel côté chaque jeu tombe.
+ *
+ * `whereRel` (franchise ou collection) est nul quand le jeu n'appartient à
+ * aucune licence : on ne demande alors que les éditions.
  */
-export function gameSeries(gameId, whereRel, releaseDate) {
+export function gameRelatives(gameId, whereRel, releaseDate) {
   return remember({
-    kind: "series",
+    kind: "relatives",
     gameId,
-    ver: VERSIONS.series,
+    ver: VERSIONS.relatives,
     releaseDate,
-    load: () =>
-      igdbQuery(
-        "games",
-        `fields ${REL_SUBFIELDS.join(",")}; where ${whereRel} & id != ${gameId} & version_parent = null & cover != null; sort first_release_date desc; limit 500;`
-      ),
+    load: async () => {
+      const fields = `fields ${REL_SUBFIELDS.join(",")},version_parent`;
+      const editionsClause = `version_parent = ${gameId}`;
+      const sagaClause = whereRel
+        ? `(${whereRel} & id != ${gameId} & version_parent = null & cover != null)`
+        : null;
+      const where = sagaClause ? `(${editionsClause}) | ${sagaClause}` : editionsClause;
+      const rows =
+        (await igdbQuery("games", `${fields}; where ${where}; sort first_release_date desc; limit 500;`)) || [];
+
+      let editions = rows.filter((g) => g.version_parent === gameId);
+      const series = rows.filter((g) => g.version_parent !== gameId);
+
+      // ⚠️ FILET POUR LES TRÈS GROSSES LICENCES. La limite de 500 est celle
+      // d'IGDB. Une saga qui la dépasse pourrait, en théorie, pousser les
+      // éditions de CE jeu hors de la réponse (le tri est chronologique, pas
+      // par parenté). Si la réponse est pleine ET qu'aucune édition n'y figure,
+      // on repose la question — mais seulement dans ce cas, jamais autrement.
+      if (!editions.length && rows.length >= 500) {
+        editions =
+          (await igdbQuery(
+            "games",
+            `${fields}; where ${editionsClause}; limit 50;`
+          ).catch(() => [])) || [];
+      }
+      return { editions: editions.slice(0, 50), series };
+    },
   });
 }
 

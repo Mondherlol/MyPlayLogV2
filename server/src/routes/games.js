@@ -46,9 +46,7 @@ import {
   gameBundleContents,
   gameCharacters,
   gameCore,
-  gameEditions,
-  gameLinks,
-  gameSeries,
+  gameRelatives,
   gameTimeToBeat,
 } from "../lib/gameIgdb.js";
 
@@ -1956,17 +1954,22 @@ router.get("/:id/related", optionalAuth, async (req, res) => {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
 
-    // La fiche (qui porte le parent et la franchise) et la parenté large sont
-    // deux entrées de cache distinctes : ouvrir une fiche ne paye pas les onze
-    // relations développées, que seul cet onglet regarde.
-    const corePromise = gameCore(id);
-    const datePromise = corePromise.then((x) => x?.first_release_date ?? null).catch(() => null);
-    const [core, links] = await Promise.all([
-      corePromise,
-      gameLinks(id, datePromise).catch(() => ({})),
-    ]);
-    if (!core) return res.status(404).json({ error: "Jeu introuvable." });
-    const g = { ...core, ...(links || {}) };
+    // La fiche porte déjà toute la parenté (DLC, remakes, portages, bundles…) :
+    // ce sont des champs du jeu, ils voyagent avec lui.
+    const g = await gameCore(id);
+    if (!g) return res.status(404).json({ error: "Jeu introuvable." });
+
+    // Ce qu'IGDB ne peut PAS dire depuis la fiche, parce que ce sont d'autres
+    // jeux qui pointent vers celui-ci (éditions) ou vers sa licence (saga) :
+    // une requête pour les deux (cf. lib/gameIgdb.js).
+    const fid = g.franchises?.[0]?.id;
+    const cid = g.collections?.[0]?.id;
+    const whereRel = fid ? `franchises = (${fid})` : cid ? `collections = (${cid})` : null;
+    const { editions, series: sagaPool } = (await gameRelatives(
+      id,
+      whereRel,
+      g.first_release_date ?? null
+    ).catch(() => null)) || { editions: [], series: [] };
 
     const parent = g.parent_game || g.version_parent || null;
 
@@ -1989,9 +1992,7 @@ router.get("/:id/related", optionalAuth, async (req, res) => {
     ];
 
     // Éditions de CE jeu (Deluxe, GOTY…) : jeux dont il est le version_parent.
-    const editions =
-      (await gameEditions(id, g.first_release_date ?? null).catch(() => [])) || [];
-    rawGroups.push({ id: "editions", items: editions });
+    rawGroups.push({ id: "editions", items: editions || [] });
 
     // Dédup + mapping ; on garde la trace des ids déjà casés pour la saga.
     const seen = new Set([id]);
@@ -2010,18 +2011,10 @@ router.get("/:id/related", optionalAuth, async (req, res) => {
     }
 
     // Saga : tous les jeux principaux de la même franchise (ou collection),
-    // hors éditions/remasters « version de », en ordre chronologique.
-    const fid = g.franchises?.[0]?.id;
-    const cid = g.collections?.[0]?.id;
-    let series = [];
-    if (fid || cid) {
-      const whereRel = fid ? `franchises = (${fid})` : `collections = (${cid})`;
-      // limit 500 = maximum autorisé par IGDB ; tri desc pour garder les jeux
-      // les plus récents si la licence dépasse quand même la limite.
-      const list =
-        (await gameSeries(id, whereRel, g.first_release_date ?? null).catch(() => [])) || [];
-      series = list.filter((s) => !seen.has(s.id)).map(mapRelGame);
-    }
+    // hors éditions/remasters « version de », en ordre chronologique. Le pool
+    // est déjà là (même requête que les éditions) ; il ne reste qu'à retirer ce
+    // qui a déjà trouvé sa place dans un groupe ci-dessus.
+    const series = (sagaPool || []).filter((x) => !seen.has(x.id)).map(mapRelGame);
 
     res.json({
       franchise: g.franchises?.[0]?.name || g.collections?.[0]?.name || null,
@@ -2361,14 +2354,8 @@ router.get("/:id/releases", optionalAuth, async (req, res) => {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "id invalide." });
 
-    const corePromise = gameCore(id);
-    const datePromise = corePromise.then((x) => x?.first_release_date ?? null).catch(() => null);
-    const [core, links] = await Promise.all([
-      corePromise,
-      gameLinks(id, datePromise).catch(() => ({})),
-    ]);
-    if (!core) return res.status(404).json({ error: "Jeu introuvable." });
-    const g = { ...core, ...(links || {}) };
+    const g = await gameCore(id);
+    if (!g) return res.status(404).json({ error: "Jeu introuvable." });
 
     const platformName = new Map(
       (g.platforms || []).map((p) => [p.id, { name: p.name, abbr: p.abbreviation || p.name }])
@@ -2663,8 +2650,66 @@ router.get("/:id/ratings", optionalAuth, async (req, res) => {
 
     const external = await ensureGameScores(id, { name: g.name, year }).catch(() => []);
 
+    // -- Où ce jeu se situe DANS SA SAGA --------------------------------------
+    // « 82 » ne dit rien tout seul. « 82, le deuxième mieux noté des sept
+    // Assassin's Creed » dit quelque chose. C'est la comparaison que les
+    // joueurs font de tête et qui manquait ici.
+    //
+    // On réutilise la requête de parenté (cf. lib/gameIgdb, `gameRelatives`) :
+    // elle est déjà en cache pour ce jeu, l'ajout ne coûte donc pas un appel
+    // IGDB de plus dans le cas courant. Et on ne compare QUE sur la note
+    // mondiale d'IGDB : c'est la seule dont on dispose pour tous les jeux de la
+    // saga, et comparer des notes venues d'échelles différentes serait faux.
+    let saga = null;
+    const fid = g.franchises?.[0]?.id;
+    const cid = g.collections?.[0]?.id;
+    const whereRel = fid ? `franchises = (${fid})` : cid ? `collections = (${cid})` : null;
+    if (whereRel && igdb.total) {
+      const { series } = (await gameRelatives(
+        id,
+        whereRel,
+        g.first_release_date ?? null
+      ).catch(() => null)) || { series: [] };
+
+      const siblings = (series || [])
+        // Sans note, un jeu ne se compare pas : le laisser à zéro le mettrait
+        // bon dernier, ce qui serait un jugement qu'on n'a pas.
+        .filter((x) => x?.id && x.total_rating)
+        // Jeu principal, remake, remaster (cf. `game_type` d'IGDB). Les DLC et
+        // les compilations feraient nombre sans rien comparer.
+        .filter((x) => [0, 8, 9].includes(x.game_type))
+        .map((x) => ({
+          id: x.id,
+          name: x.name,
+          cover: x.cover?.image_id ? `${IMG_BASE}/t_cover_big/${x.cover.image_id}.jpg` : null,
+          score: Math.round(x.total_rating),
+          year: x.first_release_date
+            ? new Date(x.first_release_date * 1000).getFullYear()
+            : null,
+        }));
+
+      // Seul dans sa saga : il n'y a rien à comparer, et un classement « 1er
+      // sur 1 » est une moquerie.
+      if (siblings.length >= 2) {
+        const all = [
+          ...siblings,
+          { id, name: g.name, cover: null, score: igdb.total.score, year, isThis: true },
+        ].sort((a, b) => b.score - a.score);
+        saga = {
+          name: g.franchises?.[0]?.name || g.collections?.[0]?.name || null,
+          total: all.length,
+          rank: all.findIndex((x) => x.isThis) + 1,
+          // Plafonné : au-delà, la liste devient un annuaire. Le rang, lui,
+          // reste calculé sur la saga ENTIÈRE — c'est l'affichage qu'on
+          // tronque, pas le classement.
+          games: all.slice(0, 12),
+        };
+      }
+    }
+
     res.json({
       igdb,
+      saga,
       community: {
         avg,
         count,

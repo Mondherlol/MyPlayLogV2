@@ -133,9 +133,51 @@ async function opencritic({ name }) {
   };
 }
 
+/**
+ * IGN — la note d'un seul testeur, et c'est justement l'intérêt.
+ *
+ * Metacritic et OpenCritic moyennent des dizaines de tests : on y perd le
+ * jugement au profit du consensus. IGN note en son nom, sur 10, et cette note
+ * pèse dans la conversation autour d'un jeu. Les deux lectures se complètent.
+ *
+ * ⚠️ ON LIT LE RÉSUMÉ STRUCTURÉ (schema.org), PAS LA PAGE. Le corps est du
+ * React rendu côté client, illisible et changeant ; le bloc JSON-LD, lui, est
+ * stable et posé pour être lu par des machines :
+ *
+ *   "review":{"@type":"Review","reviewRating":{"@type":"Rating",
+ *     "ratingValue":9,"bestRating":10,...},"author":{...,"name":"IGN"...}}
+ *
+ * L'ancre sur `"author"` … `"name":"IGN"` juste après la note n'est pas une
+ * précaution de style : une page IGN cite aussi les tests des jeux voisins, et
+ * prendre le premier `ratingValue` venu rendrait la note d'un autre jeu.
+ *
+ * La note peut avoir une décimale (8,7/10) : on ne l'arrondit PAS. Un 8,7
+ * arrondi à 9 est une note qu'IGN n'a pas donnée.
+ */
+async function ign({ name }) {
+  const slug = slugify(name);
+  if (!slug) return null;
+  const url = `https://www.ign.com/games/${slug}`;
+  const html = await getText(url);
+  if (!html) return null; // 404 : IGN ne connaît pas ce jeu sous ce nom
+
+  const m = html.match(
+    /"review":\{"@type":"Review","reviewRating":\{"@type":"Rating","ratingValue":([\d.]+),"bestRating":([\d.]+)[^}]*\}[^}]*,"author":\{[^}]*"name":"IGN"/
+  );
+  if (!m) return null; // page sans test signé IGN
+
+  const score = Number(m[1]);
+  const max = Number(m[2]) || 10;
+  if (!Number.isFinite(score) || score <= 0) return null;
+  // Une seule décimale : IGN n'en donne jamais deux, et le reste serait du
+  // bruit de virgule flottante.
+  return { score: Math.round(score * 10) / 10, max, count: 1, url };
+}
+
 export const SOURCES = {
   metacritic: { label: "Metacritic", fetch: metacritic },
   opencritic: { label: "OpenCritic", fetch: opencritic },
+  ign: { label: "IGN", fetch: ign },
   // jeuxvideo.com : la note des LECTEURS, sur 20 (cf. lib/jvcApi.js). Pas de
   // scraping — le site bloque les serveurs — mais l'API de leur application.
   jvc: { label: "JVC lecteurs", fetch: jvcGameScore },

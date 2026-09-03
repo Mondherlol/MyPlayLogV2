@@ -915,10 +915,21 @@ function reviewCard(e, meId, author) {
 // gros objet pour afficher un rail d'avis sur un profil. Ici on ne va chercher
 // que ce qu'on montre.
 //
-// La note seule ne suffit PAS à faire un avis : il faut quelque chose d'écrit
-// (un texte, des points forts, des points faibles, une image). Un rail rempli
-// de cartes vides parce que le joueur a noté cinquante jeux sans jamais en
-// parler n'aurait rien à lire.
+// ⚠️ DEUX LECTURES DE LA MÊME ROUTE, ET ELLES NE VEULENT PAS LA MÊME CHOSE.
+//
+// Par défaut, la note seule ne suffit pas à faire un avis : il faut quelque
+// chose d'écrit (un texte, des points forts, des points faibles, une image).
+// C'est ce que veut le RAIL d'un profil — un rail rempli de cartes vides parce
+// que le joueur a noté cinquante jeux sans jamais en parler n'aurait rien à
+// lire, et pousserait les vrais avis hors de l'écran.
+//
+// Mais la PAGE dédiée, elle, s'appelle « Avis & notes ». Une note posée sans
+// commentaire reste quelque chose à quoi on peut réagir et répondre : elle a
+// son entrée de bibliothèque, donc ses réactions et ses commentaires, et la
+// page d'avis sait déjà l'afficher (« Pas d'avis écrit — juste une note »).
+// La cacher revenait à interdire de commenter un 3/10 qu'on trouve sévère.
+//
+// D'où `?ratings=1` : la page le demande, le rail non.
 router.get("/:username/reviews", optionalAuth, async (req, res) => {
   try {
     const user = await User.findOne({ username: req.params.username });
@@ -932,14 +943,31 @@ router.get("/:username/reviews", optionalAuth, async (req, res) => {
       return res.json({ reviews: [], hidden: true });
     }
 
+    const withRatings = req.query.ratings === "1" || req.query.ratings === "true";
+
+    // Ce qui compte comme « écrit ». Le tri se fait en base ET en mémoire :
+    // les deux doivent dire la même chose, d'où cette fonction unique.
+    const written = (e) =>
+      !!(
+        (e.review && e.review.trim()) ||
+        (e.pros && e.pros.length) ||
+        (e.cons && e.cons.length) ||
+        (e.reviewMedia && e.reviewMedia.length)
+      );
+
+    const writtenClause = [
+      { review: { $exists: true, $ne: "" } },
+      { "pros.0": { $exists: true } },
+      { "cons.0": { $exists: true } },
+      { "reviewMedia.0": { $exists: true } },
+    ];
+
     const entries = await UserGame.find({
       user: user._id,
-      $or: [
-        { review: { $exists: true, $ne: "" } },
-        { "pros.0": { $exists: true } },
-        { "cons.0": { $exists: true } },
-        { "reviewMedia.0": { $exists: true } },
-      ],
+      // Avec `ratings=1`, une note suffit — mais il faut toujours QUELQUE
+      // CHOSE : un jeu simplement rangé dans la bibliothèque, sans note ni
+      // texte, n'est pas un avis et n'a rien à faire ici.
+      $or: withRatings ? [...writtenClause, { rating: { $ne: null } }] : writtenClause,
     })
       .populate("comments.user", "username avatar")
       .sort({ reviewedAt: -1, updatedAt: -1 })
@@ -947,13 +975,7 @@ router.get("/:username/reviews", optionalAuth, async (req, res) => {
       .lean();
 
     const reviews = entries
-      .filter(
-        (e) =>
-          (e.review && e.review.trim()) ||
-          (e.pros && e.pros.length) ||
-          (e.cons && e.cons.length) ||
-          (e.reviewMedia && e.reviewMedia.length)
-      )
+      .filter((e) => written(e) || (withRatings && e.rating != null))
       .map((e) => reviewCard(e, req.userId, user));
 
     res.json({ reviews, hidden: false });

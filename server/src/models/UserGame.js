@@ -191,4 +191,23 @@ userGameSchema.index({ gameId: 1 });
 // qui grossit vite avec les imports Steam/PSN.
 userGameSchema.index({ "favoriteOst.name": 1, updatedAt: -1 });
 
+// ⚠️ UN INDEX QUI NE PORTE PAS LE TRI NE FAIT QUE LA MOITIÉ DU TRAVAIL.
+// `{ user, gameId }` répond bien au FILTRE d'un `find({ user })`, mais le tri
+// qui suit — et il y en a un partout : bibliothèque, activité, avis — se fait
+// alors EN MÉMOIRE sur toute la bibliothèque du joueur. Mongo abandonne au-delà
+// de 32 Mo de tri, et bien avant ça il a déjà tout relu.
+//
+// Ces deux-là couvrent filtre ET tri d'un seul balayage.
+userGameSchema.index({ user: 1, updatedAt: -1 }); // bibliothèque, activité, réglages
+userGameSchema.index({ user: 1, reviewedAt: -1 }); // « Avis & notes » d'un profil
+
+// L'onglet activité d'un profil demande « où cette personne a-t-elle
+// commenté ? » — `find({ "comments.user": id })`. Sans index, c'est un
+// parcours de la collection ENTIÈRE (tous les joueurs × toute leur
+// bibliothèque) à chaque ouverture de profil.
+//
+// Index multiclé : `comments` est un tableau, Mongo indexe donc une entrée par
+// commentaire. C'est le prix à payer, et il est très inférieur au parcours.
+userGameSchema.index({ "comments.user": 1, updatedAt: -1 });
+
 export default mongoose.model("UserGame", userGameSchema);
