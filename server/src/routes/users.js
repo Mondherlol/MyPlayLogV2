@@ -1721,6 +1721,7 @@ router.get("/:username/stats", optionalAuth, async (req, res) => {
 // chaque appui sur une pastille.
 const LEADERBOARD_CAP = 150; // abonnements pris en compte (les plus anciens)
 const LEADERBOARD_PLATFORMS = 8; // consoles retenues par joueur / au global
+const LEADERBOARD_TOP = 10; // jeux détaillés par joueur (feuille de détail)
 
 router.get("/:username/leaderboard", optionalAuth, async (req, res) => {
   try {
@@ -1773,8 +1774,13 @@ router.get("/:username/leaderboard", optionalAuth, async (req, res) => {
         { $group: { _id: { user: "$user", platform: "$platform" }, ...measures } },
         { $sort: { hours: -1, games: -1 } },
       ]),
-      // Le podium personnel de chacun : les trois jeux qui pèsent le plus dans
-      // son total. C'est ce qui donne un visage à une ligne de chiffres.
+      // Le podium personnel de chacun : les jeux qui pèsent le plus dans son
+      // total. C'est ce qui donne un visage à une ligne de chiffres.
+      //
+      // ⚠️ DIX, PAS TROIS. La ligne du classement n'en montre toujours que
+      // trois, mais la feuille de détail (appui sur une ligne) déplie le top
+      // 10 avec la console et l'état de chaque jeu : tout est déjà chargé, on
+      // ne rappelle donc pas le serveur pour ouvrir un panneau.
       UserGame.aggregate([
         { $match: { ...played, playtimeHours: { $gt: 0 } } },
         { $sort: { playtimeHours: -1 } },
@@ -1787,11 +1793,14 @@ router.get("/:username/leaderboard", optionalAuth, async (req, res) => {
                 name: "$name",
                 cover: "$cover",
                 hours: "$playtimeHours",
+                platform: "$platform",
+                status: "$status",
+                platinum: "$platinum",
               },
             },
           },
         },
-        { $project: { games: { $slice: ["$games", 3] } } },
+        { $project: { games: { $slice: ["$games", LEADERBOARD_TOP] } } },
       ]),
     ]);
 
