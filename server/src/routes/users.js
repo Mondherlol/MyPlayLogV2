@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import multer from "multer";
 import mongoose from "mongoose";
-import User from "../models/User.js";
+import User, { publicPick } from "../models/User.js";
 import UserGame from "../models/UserGame.js";
 import List from "../models/List.js";
 import Recommendation from "../models/Recommendation.js";
@@ -17,6 +17,7 @@ import Notification from "../models/Notification.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { ensureGameMeta } from "../lib/gameMeta.js";
 import { ensureEntityLogos } from "../lib/entityLogos.js";
+import { ensurePlatformImages } from "../lib/platformImages.js";
 import { setServiceNpsso, getServiceStatus, clearServiceTokens } from "../lib/psn.js";
 import { isUserAdmin, isUserStaff } from "../lib/admin.js";
 import { isExpoPushToken } from "../lib/push.js";
@@ -187,6 +188,21 @@ function listCard(l, viewerId) {
 }
 
 // --- Mettre à jour son profil ---
+// Un choix « une entité » (console, studio) tel qu'on accepte de l'écrire :
+// un nom obligatoire, puis quelques URL/étiquettes recopiées telles quelles.
+// Rien d'autre ne passe — le corps de la requête vient du client, on n'y prend
+// que ce qu'on affiche, jamais l'objet entier.
+function pickEntity(value, extras = [], { platformId = false } = {}) {
+  const name = value && value.name ? String(value.name).trim().slice(0, 120) : "";
+  // ⚠️ TOUJOURS TOUTES LES CLÉS, MÊME POUR EFFACER. Sur un objet imbriqué,
+  // n'affecter que `name` laisserait l'ancienne image et l'ancien logo en base :
+  // le profil garderait la photo de la console qu'on vient de retirer.
+  const out = { name: name || null };
+  for (const k of extras) out[k] = name && value[k] ? String(value[k]).slice(0, 600) : null;
+  if (platformId) out.platformId = (name && Number(value.platformId)) || null;
+  return out;
+}
+
 router.put("/me", requireAuth, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
@@ -225,6 +241,15 @@ router.put("/me", requireAuth, async (req, res) => {
       user.coverPos = user.covers[0]?.pos || null;
     }
     if (b.avatar !== undefined) user.avatar = b.avatar ? String(b.avatar) : null;
+    // LA console / LE studio mis en avant (bannière du profil, app mobile).
+    // `null` efface le choix ; sinon on ne garde QUE les champs attendus, et on
+    // recopie le visuel tel qu'il était au moment du choix.
+    if (b.favoriteConsole !== undefined)
+      user.favoriteConsole = pickEntity(b.favoriteConsole, ["abbr", "image", "logo"], {
+        platformId: true,
+      });
+    if (b.favoriteStudio !== undefined)
+      user.favoriteStudio = pickEntity(b.favoriteStudio, ["logo"]);
     // Ordre de préférence des OST favorites (ids de jeux, dédoublonnés).
     if (b.ostOrder !== undefined) {
       const seen = new Set();
@@ -381,6 +406,79 @@ router.put("/me/overview", requireAuth, async (req, res) => {
 // L'app appelle cette route à chaque démarrage : le jeton peut changer après
 // une mise à jour ou une réinstallation. On dédoublonne donc plutôt que
 // d'empiler, sinon un même téléphone recevrait la notification deux fois.
+// --- GET /api/users/me/taste ---
+// « Ce que tu joues, d'après ta bibliothèque » : les consoles les plus jouées et
+// les studios avec lesquels tu as le plus d'affinité. Sert de PREMIÈRE PAGE aux
+// feuilles « ma console » / « mon studio » de l'app mobile — on propose avant de
+// faire chercher, parce que dans neuf cas sur dix la réponse est déjà là.
+//
+// Volontairement plus léger que /:username/stats : pas de listes de jeux, pas de
+// facettes, juste deux palmarès + leurs visuels (caches Mongo, IGDB au premier
+// appel seulement).
+router.get("/me/taste", requireAuth, async (req, res) => {
+  try {
+    const entries = await UserGame.find({ user: req.userId })
+      .select("gameId status platform playtimeHours")
+      .lean();
+
+    // Les jeux JOUÉS font foi : une wishlist ne dit pas sur quoi on joue. Un
+    // compte tout neuf n'a que ça — on retombe alors sur la bibliothèque entière
+    // plutôt que de renvoyer deux listes vides.
+    const played = entries.filter((e) => e.status !== "wishlist");
+    const base = played.length ? played : entries;
+
+    // -- Consoles : la plateforme déclarée sur chaque entrée --
+    const platMap = new Map();
+    for (const e of base) {
+      if (!e.platform) continue;
+      const p = platMap.get(e.platform) || { name: e.platform, count: 0, hours: 0 };
+      p.count += 1;
+      p.hours += e.playtimeHours || 0;
+      platMap.set(e.platform, p);
+    }
+    const platforms = [...platMap.values()]
+      .sort((a, b) => b.count - a.count || b.hours - a.hours)
+      .slice(0, 12);
+
+    // -- Studios : les développeurs du cache GameMeta, puis les éditeurs pour
+    //    combler (un jeu sans studio connu a souvent son éditeur). --
+    const meta = await ensureGameMeta(base.map((e) => e.gameId));
+    const tally = (names) => {
+      const m = new Map();
+      for (const n of names) if (n) m.set(n, (m.get(n) || 0) + 1);
+      return m;
+    };
+    const devs = tally(base.flatMap((e) => meta.get(e.gameId)?.developers || []));
+    const pubs = tally(base.flatMap((e) => meta.get(e.gameId)?.publishers || []));
+    const studios = [...devs.entries()]
+      .concat([...pubs.entries()].filter(([n]) => !devs.has(n)))
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12)
+      .map(([name, count]) => ({ name, count }));
+
+    // -- Visuels : logos IGDB pour tout le monde, vraie photo pour les consoles --
+    const [companyLogos, platformLogos, platformPhotos] = await Promise.all([
+      ensureEntityLogos("company", studios.map((s) => s.name)).catch(() => new Map()),
+      ensureEntityLogos("platform", platforms.map((p) => p.name)).catch(() => new Map()),
+      ensurePlatformImages(platforms.map((p) => p.name)).catch(() => new Map()),
+    ]);
+    const uploads = `${req.protocol}://${req.get("host")}/uploads/platforms/`;
+    for (const s of studios) s.logo = companyLogos.get(s.name) || null;
+    for (const p of platforms) {
+      p.logo = platformLogos.get(p.name) || null;
+      const file = platformPhotos.get(p.name);
+      p.image = file ? (/^https?:/i.test(file) ? file : uploads + file) : null;
+    }
+
+    res.json({ platforms, studios });
+  } catch (err) {
+    console.error("taste fetch error:", err.message);
+    // Une suggestion manquante ne doit pas casser la feuille : elle sait
+    // n'afficher que sa barre de recherche.
+    res.json({ platforms: [], studios: [] });
+  }
+});
+
 router.post("/me/push-token", requireAuth, async (req, res) => {
   try {
     const token = String(req.body?.token || "").trim();
@@ -2261,6 +2359,8 @@ router.get("/:username", optionalAuth, async (req, res) => {
         bio: user.bio,
         tagline: user.tagline,
         taglineImage: user.taglineImage,
+        favoriteConsole: publicPick(user.favoriteConsole),
+        favoriteStudio: publicPick(user.favoriteStudio),
         ostOrder: user.ostOrder || [],
         overviewOrder: user.overviewOrder || [],
         overviewCards: user.overviewCards || [],

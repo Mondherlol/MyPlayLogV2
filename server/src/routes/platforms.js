@@ -1,5 +1,6 @@
 import express from "express";
 import { requireAuth } from "../middleware/auth.js";
+import { igdbQuery } from "../lib/igdb.js";
 import { buildPlatformProfile, fetchPlatformGamesPage } from "../lib/platformProfile.js";
 import { ensureEntityLogos } from "../lib/entityLogos.js";
 import { ensurePlatformImages } from "../lib/platformImages.js";
@@ -54,6 +55,68 @@ router.post("/images", async (req, res) => {
   } catch (err) {
     console.error("platform images error:", err.message);
     res.json({ images: {} });
+  }
+});
+
+// GET /api/platforms/search?q= — recherche légère de consoles (IGDB) pour la
+// feuille « ma console » de l'app mobile. Pendant exact de /companies/search.
+//
+// ⚠️ PAS DE `search` APICALYPSE ICI NON PLUS : comme pour /companies, l'endpoint
+// /platforms d'IGDB n'y répond rien. On filtre donc par nom OU abréviation
+// (`~ *"…"*`, contient, insensible à la casse) et on classe la pertinence nous-
+// mêmes — sans quoi « PS » remonterait d'abord des consoles obscures.
+//
+// On ne renvoie QUE le logo : la vraie photo se demande ensuite pour le seul
+// nom choisi (POST /platforms/images), au lieu de scraper vingt pages Wikipedia
+// pour dix-neuf consoles qu'on ne retiendra pas.
+const norm = (s) =>
+  String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+router.get("/search", requireAuth, async (req, res) => {
+  try {
+    const q = String(req.query.q || "").trim();
+    if (q.length < 2) return res.json({ platforms: [] });
+    const esc = q.replace(/["\\*]/g, "");
+    const rows = await igdbQuery(
+      "platforms",
+      `fields name,abbreviation,generation,platform_logo.image_id;` +
+        ` where name ~ *"${esc}"* | abbreviation ~ *"${esc}"*; limit 50;`
+    ).catch(() => []);
+
+    const nq = norm(q);
+    // Exact > commence par > contient. À égalité, la console la plus récente
+    // (génération la plus haute) et celle qui a un logo passent devant : on
+    // cherche « PlayStation », on veut la PS5 avant la PSX.
+    const score = (row) => {
+      const n = norm(row.name);
+      const a = norm(row.abbreviation);
+      let s;
+      if (n === nq || a === nq) s = 1000;
+      else if (n.startsWith(nq) || a.startsWith(nq)) s = 700;
+      else if (n.includes(nq) || a.includes(nq)) s = 400;
+      else s = 200;
+      s -= Math.min(n.length, 80);
+      s += (row.generation || 0) * 3;
+      if (row.platform_logo?.image_id) s += 40;
+      return s;
+    };
+
+    const platforms = (rows || [])
+      .filter((p) => p.name)
+      .sort((a, b) => score(b) - score(a))
+      .slice(0, 24)
+      .map((p) => ({
+        platformId: p.id,
+        name: p.name,
+        abbr: p.abbreviation || null,
+        logo: p.platform_logo?.image_id
+          ? `https://images.igdb.com/igdb/image/upload/t_logo_med/${p.platform_logo.image_id}.png`
+          : null,
+      }));
+    res.json({ platforms });
+  } catch (err) {
+    console.error("platform search error:", err.message);
+    res.json({ platforms: [] });
   }
 });
 

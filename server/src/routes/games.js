@@ -49,6 +49,13 @@ import {
   gameRelatives,
   gameTimeToBeat,
 } from "../lib/gameIgdb.js";
+import {
+  decorateFranchises,
+  franchiseGames,
+  franchiseName,
+  franchisesOf,
+  mainFranchise,
+} from "../lib/franchises.js";
 
 function youtubeId(url) {
   const m = String(url).match(
@@ -1748,7 +1755,21 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
       publishers,
       companyLogos,
       engines: (g.game_engines || []).map((e) => e.name).filter(Boolean),
-      franchise: g.franchises?.[0]?.name || g.collections?.[0]?.name || null,
+      // ⚠️ PAS `franchises[0]`. IGDB range un crossover dans TOUTES les
+      // licences qu'il invite — Super Smash Bros. Ultimate est chez Metroid,
+      // Zelda, Kirby autant que chez lui —, et l'ordre du tableau n'est qu'un
+      // ordre d'identifiants. La fiche annonçait donc « Saga Metroid » sous
+      // Smash Bros. On choisit désormais celle dont le nom explique le titre
+      // (cf. lib/franchises.js), et on rend la liste entière : quand il y en a
+      // plusieurs, la fiche les montre toutes.
+      franchise: mainFranchise(g),
+      franchises: franchisesOf(g).map((f) => ({ id: f.id, kind: f.kind, name: f.name })),
+      // Les autres noms du jeu — japonais, coréen, romanisations, titres de
+      // travail. La fiche en fait une feuille où l'on peut adopter celui qu'on
+      // préfère (cf. components/game/TitlesSheet.jsx côté mobile).
+      titles: (g.alternative_names || [])
+        .map((a) => ({ name: String(a?.name || "").trim(), comment: a?.comment || null }))
+        .filter((a) => a.name && a.name !== g.name),
       relation,
       bundleGames,
       websites,
@@ -1946,8 +1967,65 @@ function mapRelGame(g) {
       : null,
     releaseDate: g.first_release_date || null,
     typeLabel: GAME_TYPES_FR[g.game_type]?.label || null,
+    // Les consoles étaient déjà demandées à IGDB (cf. REL_EXPAND) mais
+    // jetées ici. La page des extensions les affiche : sur un DLC, « sur
+    // quelle machine » est la question qui vient juste après « c'est quoi ».
+    platforms: (g.platforms || []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      abbr: p.abbreviation || p.name,
+    })),
   };
 }
+
+// ======================================================================
+//  Les licences d'un jeu, en cartes — et la page d'une licence
+// ======================================================================
+// Séparées de la fiche EXPRÈS. Habiller une licence coûte une requête IGDB de
+// plus (une licence n'a pas d'image à elle : elle emprunte la jaquette de son
+// jeu phare), et la fiche est la page la plus ouverte de l'app. Elle demande
+// donc ça à côté, quand elle a fini de s'afficher.
+
+router.get("/:id/franchises", optionalAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+    const g = await gameCore(id);
+    if (!g) return res.status(404).json({ error: "Jeu introuvable." });
+
+    const list = franchisesOf(g);
+    if (!list.length) return res.json({ franchises: [] });
+    res.json({ franchises: await decorateFranchises(list) });
+  } catch (err) {
+    console.error("game franchises error:", err.message);
+    res.status(err.status || 500).json({ error: err.message || "Erreur." });
+  }
+});
+
+// ⚠️ TROIS SEGMENTS, LE MILIEU LITTÉRAL : aucune route `/:id/...` déclarée
+// au-dessus ne peut l'attraper (leur deuxième segment est toujours un mot
+// fixe — « reviews », « character »… — et jamais « franchise »).
+router.get("/franchises/:kind/:fid", optionalAuth, async (req, res) => {
+  try {
+    const fid = Number(req.params.fid);
+    const kind = req.params.kind === "collection" ? "collection" : "franchise";
+    if (!fid) return res.status(400).json({ error: "licence invalide." });
+
+    const [rows, name] = await Promise.all([
+      franchiseGames(kind, fid),
+      franchiseName(kind, fid).catch(() => null),
+    ]);
+    res.json({
+      id: fid,
+      kind,
+      name: name || null,
+      games: (rows || []).map(mapRelGame),
+    });
+  } catch (err) {
+    console.error("franchise games error:", err.message);
+    res.status(err.status || 500).json({ error: err.message || "Erreur." });
+  }
+});
 
 router.get("/:id/related", optionalAuth, async (req, res) => {
   try {
@@ -1962,9 +2040,12 @@ router.get("/:id/related", optionalAuth, async (req, res) => {
     // Ce qu'IGDB ne peut PAS dire depuis la fiche, parce que ce sont d'autres
     // jeux qui pointent vers celui-ci (éditions) ou vers sa licence (saga) :
     // une requête pour les deux (cf. lib/gameIgdb.js).
-    const fid = g.franchises?.[0]?.id;
-    const cid = g.collections?.[0]?.id;
-    const whereRel = fid ? `franchises = (${fid})` : cid ? `collections = (${cid})` : null;
+    // La saga qu'on montre est celle qu'on ANNONCE — la mieux accordée au
+    // titre, pas la première de la liste d'IGDB (cf. lib/franchises.js).
+    const best = franchisesOf(g)[0] || null;
+    const whereRel = best
+      ? `${best.kind === "collection" ? "collections" : "franchises"} = (${best.id})`
+      : null;
     const { editions, series: sagaPool } = (await gameRelatives(
       id,
       whereRel,
@@ -2017,7 +2098,7 @@ router.get("/:id/related", optionalAuth, async (req, res) => {
     const series = (sagaPool || []).filter((x) => !seen.has(x.id)).map(mapRelGame);
 
     res.json({
-      franchise: g.franchises?.[0]?.name || g.collections?.[0]?.name || null,
+      franchise: mainFranchise(g),
       groups,
       series,
     });
@@ -2661,9 +2742,12 @@ router.get("/:id/ratings", optionalAuth, async (req, res) => {
     // mondiale d'IGDB : c'est la seule dont on dispose pour tous les jeux de la
     // saga, et comparer des notes venues d'échelles différentes serait faux.
     let saga = null;
-    const fid = g.franchises?.[0]?.id;
-    const cid = g.collections?.[0]?.id;
-    const whereRel = fid ? `franchises = (${fid})` : cid ? `collections = (${cid})` : null;
+    // La saga qu'on montre est celle qu'on ANNONCE — la mieux accordée au
+    // titre, pas la première de la liste d'IGDB (cf. lib/franchises.js).
+    const best = franchisesOf(g)[0] || null;
+    const whereRel = best
+      ? `${best.kind === "collection" ? "collections" : "franchises"} = (${best.id})`
+      : null;
     if (whereRel && igdb.total) {
       const { series } = (await gameRelatives(
         id,
@@ -2696,7 +2780,7 @@ router.get("/:id/ratings", optionalAuth, async (req, res) => {
           { id, name: g.name, cover: null, score: igdb.total.score, year, isThis: true },
         ].sort((a, b) => b.score - a.score);
         saga = {
-          name: g.franchises?.[0]?.name || g.collections?.[0]?.name || null,
+          name: mainFranchise(g),
           total: all.length,
           rank: all.findIndex((x) => x.isThis) + 1,
           // Plafonné : au-delà, la liste devient un annuaire. Le rang, lui,

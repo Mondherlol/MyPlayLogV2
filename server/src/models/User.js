@@ -255,6 +255,28 @@ const userSchema = new mongoose.Schema(
       default: [],
     },
 
+    // --- LA console et LE studio, ceux qu'on met en avant ---
+    // À ne pas confondre avec `favoritePlatforms` / `favoriteCompanies`, qui
+    // sont des ÉPINGLES (plusieurs, posées depuis les fiches console/studio et
+    // rangées dans la colonne latérale du site). Ici c'est un CHOIX UNIQUE,
+    // déclaré une fois dans les réglages du profil et affiché en grand sur la
+    // bannière de l'app mobile : « ma console », « mon studio ».
+    //
+    // On recopie le visuel (photo/logo) au moment du choix plutôt que de le
+    // rechercher à l'affichage : la bannière se peint alors sans un seul
+    // aller-retour, et un studio disparu d'IGDB garde son logo.
+    favoriteConsole: {
+      platformId: { type: Number, default: null },
+      name: { type: String, default: null },
+      abbr: { type: String, default: null },
+      image: { type: String, default: null }, // vraie photo de la console
+      logo: { type: String, default: null }, // logo IGDB (repli)
+    },
+    favoriteStudio: {
+      name: { type: String, default: null },
+      logo: { type: String, default: null },
+    },
+
     // --- Gamification : points, inventaire, cosmétiques équipés ---
     // `points` est le solde DÉPENSABLE (gagné au blind test, dépensé en
     // caisses) : c'est un porte-monnaie, à ne pas confondre avec le score
@@ -414,6 +436,19 @@ userSchema.methods.effectiveCovers = function () {
 };
 
 // Version "self" : renvoyée à l'utilisateur connecté (inclut l'email).
+// Un choix unique (console / studio) tel qu'il part vers les clients : `null`
+// tant qu'il n'a pas de nom. Mongoose matérialise TOUJOURS un sous-document
+// d'objet — sans ce filtre, un profil qui n'a rien choisi renverrait
+// `{ name: null, logo: null }`, et le client afficherait une carte vide.
+export function publicPick(doc) {
+  if (!doc || !doc.name) return null;
+  const out = { name: doc.name };
+  for (const k of ["abbr", "image", "logo", "platformId"]) {
+    if (doc[k] != null) out[k] = doc[k];
+  }
+  return out;
+}
+
 userSchema.methods.toPublic = function () {
   return {
     id: this._id,
@@ -426,6 +461,8 @@ userSchema.methods.toPublic = function () {
     bio: this.bio,
     tagline: this.tagline,
     taglineImage: this.taglineImage,
+    favoriteConsole: publicPick(this.favoriteConsole),
+    favoriteStudio: publicPick(this.favoriteStudio),
     ostOrder: this.ostOrder || [],
     listOrder: (this.listOrder || []).map(String),
     overviewOrder: this.overviewOrder || [],
