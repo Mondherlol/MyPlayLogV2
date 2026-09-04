@@ -543,6 +543,27 @@ const windowCache = createTtlCache({
   ttl: 6 * 60 * 60 * 1000,
 });
 
+// Quelle CONFIANCE accorder à `first_release_date` ? On retrouve la ligne de
+// `release_dates` qui l'a produite (celle dont la date est la même) et on lit
+// son libellé humain :
+//   « Dec 31, 2026 » → jour connu   « Dec 2026 » → mois seulement
+//   « Q4 2026 »      → trimestre    « 2026 »     → année seulement
+// Sans ligne correspondante (IGDB ne renvoie pas toujours le détail), on reste
+// prudent : « day », le comportement d'avant.
+function precisionOf(g) {
+  const ts = g.first_release_date || null;
+  if (!ts) return { precision: null, releaseHuman: null };
+  const row = (g.release_dates || []).find((r) => r?.date === ts);
+  const human = row?.human || null;
+  let precision = "day";
+  if (human) {
+    if (/^\d{4}$/.test(human)) precision = "year";
+    else if (/^Q[1-4]\s+\d{4}$/i.test(human)) precision = "quarter";
+    else if (/^[A-Za-z]{3,}\s+\d{4}$/.test(human)) precision = "month";
+  }
+  return { precision, releaseHuman: human };
+}
+
 router.get("/releases", optionalAuth, async (req, res) => {
   try {
     const now = Math.floor(Date.now() / 1000);
@@ -577,8 +598,21 @@ router.get("/releases", optionalAuth, async (req, res) => {
       where.push("game_type = (0,8,9)"); // jeu principal + remake + remaster
     }
 
+    // ⚠️ « 31 DÉCEMBRE » N'EST PRESQUE JAMAIS UNE DATE. Quand IGDB ne connaît
+    // que l'ANNÉE de sortie, `first_release_date` vaut le 31 décembre de cette
+    // année-là ; le trimestre donne le dernier jour du trimestre, le mois le
+    // dernier jour du mois. Un calendrier qui lit ce nombre au premier degré
+    // empile donc huit jeux « le 31 décembre » et ment à qui le regarde.
+    //
+    // La PRÉCISION se lit dans `release_dates.human` (« 2026 », « Q4 2026 »,
+    // « Dec 2026 », « Dec 31, 2026 ») — plus sûr que le champ `category`, qu'IGDB
+    // a renommé en cours de route. On ne la demande QUE pour une liste d'ids
+    // (les jeux attendus de quelqu'un) : sur les 500 lignes de la liste
+    // générale, cette expansion pèserait pour rien.
+    const wantPrecision = ids.length > 0;
     const fields =
-      "fields name,alternative_names.name,alternative_names.comment,cover.image_id,total_rating,total_rating_count,first_release_date,hypes,genres.name,platforms.abbreviation,platforms.name,keywords.name";
+      "fields name,alternative_names.name,alternative_names.comment,cover.image_id,total_rating,total_rating_count,first_release_date,hypes,genres.name,platforms.abbreviation,platforms.name,keywords.name" +
+      (wantPrecision ? ",release_dates.date,release_dates.human" : "");
     const query = `${fields}; where ${where.join(
       " & "
     )}; sort first_release_date asc; limit 500;`;
@@ -594,6 +628,7 @@ router.get("/releases", optionalAuth, async (req, res) => {
       hypes: g.hypes || 0,
       ratingCount: g.total_rating_count || 0,
       ai: (g.keywords || []).some((k) => AI_RE.test(k.name || "")),
+      ...(wantPrecision ? precisionOf(g) : null),
     }));
 
     if (isGeneral) {

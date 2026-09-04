@@ -306,6 +306,12 @@ const userSchema = new mongoose.Schema(
       theme: { type: String, default: null },
     },
 
+    // Le badge de mission mis en avant à côté du pseudo. Distinct de
+    // `equipped.badge`, qui désigne un cosmétique gagné à l'arcade : ici c'est
+    // la clé d'une mission du catalogue (cf. lib/missions.js), et le serveur
+    // vérifie qu'elle a bien été décrochée avant de l'épingler.
+    equippedBadge: { type: String, default: null },
+
     // --- Abonnements (qui JE suis) ---
     following: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
@@ -531,6 +537,9 @@ userSchema.methods.toPublic = function () {
       file: this.ringtone?.file || null,
       name: this.ringtone?.name || "",
     },
+    // Clé seulement : le dessin du badge (nom, icône, couleur) est résolu par
+    // le client depuis le catalogue, ou envoyé avec le profil (route users).
+    equippedBadge: this.equippedBadge || null,
     followingCount: (this.following || []).length,
     privacy: {
       isPrivate: !!this.privacy?.isPrivate,

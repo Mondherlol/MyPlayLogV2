@@ -25,7 +25,12 @@ import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { summarizeReactions, reviewComment } from "../lib/reviewSerialize.js";
 import { recordActivity, removeActivity } from "../lib/activity.js";
 import { FEED_KEYS } from "../lib/feedCategories.js";
-import { evaluateMissions, countBadges, triggerMissionCheck } from "../lib/missions.js";
+import {
+  evaluateMissions,
+  countBadges,
+  publicBadgeOf,
+  triggerMissionCheck,
+} from "../lib/missions.js";
 import { notify } from "../lib/notify.js";
 import { onlineAmong } from "../lib/realtime.js";
 import { shrinkImage } from "../lib/imageResize.js";
@@ -2246,6 +2251,9 @@ router.get("/:username", optionalAuth, async (req, res) => {
           // Le badge « Staff » s'affiche même sur une carte de visite verrouillée :
           // savoir à qui on a affaire ne dépend pas de l'abonnement.
           isStaff: isUserStaff(user),
+          // Le badge épinglé accompagne le pseudo jusque sur une carte de
+          // visite verrouillée : c'est une signature, pas du contenu.
+          badge: publicBadgeOf(user.equippedBadge),
           isMe: false,
           isFollowing: false,
           locked: true,
@@ -2381,6 +2389,8 @@ router.get("/:username", optionalAuth, async (req, res) => {
         online: onlineAmong([user._id]).has(String(user._id)),
         // Badge « Staff » à côté du pseudo (les admins en font partie).
         isStaff: isUserStaff(user),
+        // Le badge de mission mis en avant, dessiné à côté du pseudo.
+        badge: publicBadgeOf(user.equippedBadge),
         isMe,
         isFollowing,
         // Ce profil est-il abonné à MOI ? (autorise le bouton « Message » :
