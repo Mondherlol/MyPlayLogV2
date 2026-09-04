@@ -47,6 +47,7 @@ import {
   Wrench,
   Bot,
   Bell,
+  Terminal,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import AdminRingtones from "../components/AdminRingtones";
@@ -63,6 +64,7 @@ import CollectionPanel from "../components/AdminCollection";
 import LogsPanel from "../components/AdminLogs";
 import PushPanel from "../components/AdminPush";
 import PerroquetPanel from "../components/AdminPerroquet";
+import ScriptsPanel from "../components/AdminScripts";
 
 // ======================================================================
 //  Page Admin — shell à onglets verticaux (façon Discord).
@@ -85,6 +87,7 @@ const TAB_KEYS = [
   "ringtones",
   "system",
   "logs",
+  "scripts",
   "secrets",
   "patchnotes",
 ];
@@ -121,6 +124,7 @@ export default function Admin() {
     { key: "ringtones", label: "Sonneries", Icon: Bell },
     { key: "system", label: "Système", Icon: Activity },
     { key: "logs", label: "Logs", Icon: ScrollText },
+    { key: "scripts", label: "Scripts", Icon: Terminal },
     ...(isSuper ? [{ key: "secrets", label: "Secrets", Icon: KeyRound }] : []),
     { key: "patchnotes", label: "Patch notes", Icon: Sparkles },
   ];
@@ -198,6 +202,7 @@ export default function Admin() {
           {safeTab === "ringtones" && <AdminRingtones token={token} />}
           {safeTab === "system" && <SystemPanel token={token} />}
           {safeTab === "logs" && <LogsPanel token={token} isSuper={isSuper} />}
+          {safeTab === "scripts" && <ScriptsPanel token={token} />}
           {safeTab === "secrets" && isSuper && <SecretsPanel token={token} />}
           {safeTab === "patchnotes" && <PatchnoteManager token={token} />}
         </section>

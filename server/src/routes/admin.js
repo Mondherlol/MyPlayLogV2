@@ -37,6 +37,7 @@ import {
   resetMissionConfig,
 } from "../lib/missions.js";
 import { defaultSince, syncEventLists } from "../lib/eventSync.js";
+import { SCRIPTS, findScript } from "../lib/adminScripts.js";
 import { ensureBotUser, canUseBot, WELCOME, BOT_USERNAME } from "../lib/bot.js";
 import { botSay } from "./chat.js";
 
@@ -1590,6 +1591,58 @@ router.post("/push/send", async (req, res) => {
   } catch (err) {
     console.error("admin push send error:", err.message);
     res.status(500).json({ error: "Erreur lors de l'envoi." });
+  }
+});
+
+// ======================================================================
+//  Scripts de maintenance (onglet « Scripts »)
+// ======================================================================
+// La liste des scripts disponibles. Le `run` reste côté serveur : on n'expose
+// que de quoi afficher les cartes.
+router.get("/scripts", (_req, res) => {
+  res.json({
+    scripts: SCRIPTS.map(({ key, label, description, danger }) => ({
+      key,
+      label,
+      description,
+      danger: !!danger,
+    })),
+  });
+});
+
+// Exécution. `dryRun` simule sans rien écrire — c'est le mode par défaut si le
+// client ne dit rien, pour qu'un appel maladroit ne casse pas de données.
+router.post("/scripts/:key/run", async (req, res) => {
+  const script = findScript(req.params.key);
+  if (!script) return res.status(404).json({ error: "Script inconnu." });
+
+  const dryRun = req.body?.dryRun !== false;
+  const startedAt = Date.now();
+  try {
+    const out = (await script.run({ dryRun })) || {};
+    const ms = Date.now() - startedAt;
+
+    if (!dryRun) {
+      logEvent({
+        kind: "admin",
+        label: `a lancé le script « ${script.label} »`,
+        actor: req.userId,
+        method: "POST",
+        path: `/api/admin/scripts/${script.key}/run`,
+        meta: { key: script.key, summary: out.summary, ms },
+      });
+    }
+
+    res.json({
+      key: script.key,
+      dryRun,
+      ms,
+      summary: out.summary || "Terminé.",
+      log: out.log || [],
+    });
+  } catch (err) {
+    console.error(`admin script ${script.key} error:`, err.message);
+    res.status(500).json({ error: err.message || "Le script a échoué." });
   }
 });
 
