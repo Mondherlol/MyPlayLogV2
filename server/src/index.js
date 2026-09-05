@@ -19,6 +19,7 @@ import repostRoutes from "./routes/reposts.js";
 import videoRoutes from "./routes/videos.js";
 import feedRoutes from "./routes/feed.js";
 import freeGamesRoutes from "./routes/freeGames.js";
+import eventRoutes from "./routes/events.js";
 import blindtestRoutes from "./routes/blindtest.js";
 import blindtestVersusRoutes from "./routes/blindtestVersus.js";
 import pixelRoutes from "./routes/pixel.js";
@@ -49,6 +50,7 @@ import clientErrorRoutes from "./routes/clientErrors.js";
 import patchesRoutes from "./routes/patches.js";
 import downloadRoutes from "./routes/downloads.js";
 import trackerRoutes, { startTrackerAutoSync } from "./routes/trackers.js";
+import { startEventCalendarSync } from "./lib/eventCalendar.js";
 import missionRoutes from "./routes/missions.js";
 import chatRoutes from "./routes/chat.js";
 import callRoutes from "./routes/calls.js";
@@ -141,6 +143,7 @@ app.use("/api/reposts", repostRoutes);
 app.use("/api/videos", videoRoutes);
 app.use("/api/feed", feedRoutes);
 app.use("/api/free-games", freeGamesRoutes);
+app.use("/api/events", eventRoutes);
 // Même précaution que pour /api/geo/versus : monté AVANT le routeur solo.
 app.use("/api/blindtest/versus", blindtestVersusRoutes);
 app.use("/api/blindtest", blindtestRoutes);
@@ -292,6 +295,9 @@ async function start() {
     await migrateTrackerSlots();
     // Synchro automatique des comptes de tracking (League of Legends).
     startTrackerAutoSync();
+    // Le calendrier des rendez-vous à venir (Directs, showcases) : deux
+    // passages par jour, Wikipédia + IGDB. Cf. lib/eventCalendar.
+    startEventCalendarSync();
     const server = app.listen(PORT, () => {
       console.log(`🚀 API MyPlayLog sur http://localhost:${PORT}`);
       // Une ligne dans le journal : un redémarrage explique souvent, à lui

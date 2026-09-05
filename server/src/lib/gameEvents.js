@@ -152,6 +152,37 @@ export function isTrackedEvent(name) {
   return EVENT_PATTERNS.some((p) => p.re.test(String(name || "")));
 }
 
+/**
+ * La FAMILLE d'un événement — ce qui relie ses éditions successives.
+ *
+ * « Nintendo Direct - September », « Nintendo Direct 2026.06.09 » et
+ * « Nintendo Direct » sont trois écritures du même rendez-vous récurrent. Pour
+ * afficher « les jeux annoncés à la dernière édition », il faut pouvoir les
+ * rapprocher — et les rapprocher SANS se tromper : un State of Play n'est pas
+ * un Nintendo Direct, et « Xbox Partner Preview » n'est pas « Xbox Games
+ * Showcase ».
+ *
+ * On se sert des motifs qui servent déjà à trier les événements : celui qui
+ * accroche DONNE la famille. C'est stable (le motif ne change pas quand
+ * l'intitulé varie) et ça ne demande aucune liste de plus à tenir.
+ *
+ * ⚠️ LE RATTRAPAGE « … DIRECT » EST DÉLIBÉRÉ. « The Legend of Zelda 40th
+ * Anniversary Direct » n'accroche aucun motif : c'est un Direct thématique,
+ * qui ne portera jamais deux fois le même nom. Le rattacher aux Nintendo Direct
+ * est la seule chose utile à faire — c'est bien la série dont il fait partie,
+ * et c'est bien ce que quelqu'un veut voir en ouvrant sa fiche.
+ *
+ * Rend `null` quand on ne sait pas : la fiche n'affichera alors pas de
+ * « précédentes éditions », ce qui vaut mieux qu'un rapprochement inventé.
+ */
+export function eventFamily(name) {
+  const s = String(name || "");
+  const hit = EVENT_PATTERNS.find((p) => p.re.test(s));
+  if (hit) return hit.re.source;
+  if (/\bdirect\b/i.test(s)) return /nintendo direct/i.source;
+  return null;
+}
+
 // --- Récupération IGDB ------------------------------------------------
 
 // Les événements d'une période, du plus récent au plus ancien.

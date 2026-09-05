@@ -37,6 +37,8 @@ import {
   resetMissionConfig,
 } from "../lib/missions.js";
 import { defaultSince, syncEventLists } from "../lib/eventSync.js";
+import { syncEventCalendar } from "../lib/eventCalendar.js";
+import GameEvent from "../models/GameEvent.js";
 import { SCRIPTS, findScript } from "../lib/adminScripts.js";
 import { ensureBotUser, canUseBot, WELCOME, BOT_USERNAME } from "../lib/bot.js";
 import { botSay } from "./chat.js";
@@ -1425,6 +1427,116 @@ router.post("/events/sync", async (req, res) => {
     res.status(err.status || 500).json({ error: err.message, log });
   } finally {
     eventSyncRunning = false;
+  }
+});
+
+// ======================================================================
+//  Le CALENDRIER des rendez-vous à venir
+// ======================================================================
+// La synchro tourne toute seule deux fois par jour (cf. lib/eventCalendar),
+// mais un Direct s'annonce parfois la veille pour le lendemain : ce bouton
+// évite d'attendre le prochain passage.
+let calendarSyncRunning = false;
+
+router.post("/events/calendar/sync", async (_req, res) => {
+  if (calendarSyncRunning)
+    return res.status(409).json({ error: "Une synchro du calendrier est déjà en cours." });
+  calendarSyncRunning = true;
+  const log = [];
+  try {
+    const summary = await syncEventCalendar({ log: (line) => log.push(line) });
+    res.json({ summary, log });
+  } catch (err) {
+    console.error("admin calendar sync error:", err.message);
+    res.status(err.status || 500).json({ error: err.message, log });
+  } finally {
+    calendarSyncRunning = false;
+  }
+});
+
+// GET /api/admin/events/calendar — ce que le calendrier contient AUJOURD'HUI,
+// masqués compris : c'est la seule vue où l'on voit ce qu'on a caché.
+router.get("/events/calendar", async (_req, res) => {
+  try {
+    const events = await GameEvent.find({ startsAt: { $gte: new Date(Date.now() - 86400000) } })
+      .sort({ startsAt: 1 })
+      .lean();
+    res.json({
+      events: events.map((e) => ({
+        id: String(e._id),
+        name: e.name,
+        subtitle: e.subtitle,
+        startsAt: e.startsAt,
+        precision: e.precision,
+        source: e.source,
+        brand: e.brand,
+        hidden: !!e.hidden,
+        interestedCount: (e.interested || []).length,
+      })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/admin/events/calendar — poser un rendez-vous À LA MAIN.
+//
+// ⚠️ C'EST LE FILET, ET IL EST INDISPENSABLE. Aucune source automatique ne
+// connaît tout : un showcase d'éditeur sans page Wikipédia, un événement
+// annoncé sur X trois jours avant, une date corrigée. Une entrée « manual »
+// n'est jamais écrasée ni retirée par la synchro (cf. pruneStale).
+router.post("/events/calendar", async (req, res) => {
+  try {
+    const b = req.body || {};
+    const name = String(b.name || "").trim();
+    const when = b.startsAt ? new Date(b.startsAt) : null;
+    if (!name) return res.status(400).json({ error: "Le nom est requis." });
+    if (!when || Number.isNaN(when.getTime()))
+      return res.status(400).json({ error: "Date invalide." });
+
+    const ev = await GameEvent.create({
+      key: `manual:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      source: "manual",
+      name: name.slice(0, 160),
+      subtitle: String(b.subtitle || "").trim().slice(0, 240),
+      startsAt: when,
+      // L'admin a saisi une heure ou seulement un jour : on le croit sur
+      // parole plutôt que d'afficher un décompte à la seconde sur une date
+      // approximative.
+      precision: b.precision === "time" ? "time" : "day",
+      brand: b.brand || null,
+      liveUrl: b.liveUrl || null,
+      sourceUrl: b.sourceUrl || null,
+    });
+    res.status(201).json({ id: String(ev._id) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/admin/events/calendar/:id — masquer / réafficher.
+router.patch("/events/calendar/:id", async (req, res) => {
+  try {
+    const ev = await GameEvent.findByIdAndUpdate(
+      req.params.id,
+      { hidden: !!req.body?.hidden },
+      { new: true }
+    );
+    if (!ev) return res.status(404).json({ error: "Événement introuvable." });
+    res.json({ hidden: ev.hidden });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/admin/events/calendar/:id — pour de bon. Sur une entrée
+// automatique, la prochaine synchro la ramènera : c'est « masquer » qu'il faut.
+router.delete("/events/calendar/:id", async (req, res) => {
+  try {
+    await GameEvent.findByIdAndDelete(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

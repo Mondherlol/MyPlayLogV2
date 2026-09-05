@@ -13,6 +13,7 @@
     "seed:quiz": "node src/scripts/seedQuiz.js",
     "gen:quiz": "node src/scripts/generateQuiz.js",
     "sync:events": "node src/scripts/syncEventLists.js",
+    "sync:calendar": "node src/scripts/syncEventCalendar.js",
     "seed:collection": "node src/scripts/seedCollection.js",
     "collection:export": "node src/scripts/collectionCatalog.js --export",
     "collection:import": "node src/scripts/collectionCatalog.js --import",
