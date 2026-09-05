@@ -20,6 +20,7 @@ import videoRoutes from "./routes/videos.js";
 import feedRoutes from "./routes/feed.js";
 import freeGamesRoutes from "./routes/freeGames.js";
 import eventRoutes from "./routes/events.js";
+import journalRoutes from "./routes/journal.js";
 import blindtestRoutes from "./routes/blindtest.js";
 import blindtestVersusRoutes from "./routes/blindtestVersus.js";
 import pixelRoutes from "./routes/pixel.js";
@@ -144,6 +145,7 @@ app.use("/api/videos", videoRoutes);
 app.use("/api/feed", feedRoutes);
 app.use("/api/free-games", freeGamesRoutes);
 app.use("/api/events", eventRoutes);
+app.use("/api/journal", journalRoutes);
 // Même précaution que pour /api/geo/versus : monté AVANT le routeur solo.
 app.use("/api/blindtest/versus", blindtestVersusRoutes);
 app.use("/api/blindtest", blindtestRoutes);

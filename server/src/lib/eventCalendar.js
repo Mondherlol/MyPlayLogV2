@@ -29,8 +29,10 @@
 // corrigé à la source — on le retire (cf. `pruneStale`).
 
 import GameEvent from "../models/GameEvent.js";
+import List from "../models/List.js";
 import {
   cleanEventName,
+  eventFamily,
   fetchEvents,
   isTrackedEvent,
   youtubeId,
@@ -308,21 +310,112 @@ export async function fromGameConfGuide({ log = () => {} } = {}) {
     log(`· gameconfguide (${feed.kind}) : ${kept} à venir`);
   }
 
-  // ⚠️ LES MINIATURES SONT RÉSOLUES APRÈS COUP, ET EN PARALLÈLE. Chacune coûte
-  // une requête HEAD (`maxresdefault` n'existe pas pour toutes les vidéos, on
-  // retombe sur `hqdefault`) : les enchaîner dans la boucle ci-dessus
-  // rallongerait la synchro d'autant de allers-retours qu'il y a d'événements.
-  // Une image manquante n'est pas une erreur — la carte retombe sur le dégradé
-  // de marque.
+  await resolveImages(out, log);
+  return out;
+}
+
+// ----------------------------------------------------------------------
+//  L'affiche d'un événement, en trois recours
+// ----------------------------------------------------------------------
+// Un showcase sur trois n'est pas une vidéo YouTube : le Capcom Spotlight
+// renvoie vers capcom-games.com, la diffusion Xbox vers une CHAÎNE (pas une
+// vidéo). Ces cartes-là restaient sur le dégradé de marque pendant que leurs
+// voisines portaient une affiche — l'irrégularité se voyait plus que le
+// dégradé lui-même.
+//
+// D'où trois recours, du plus fidèle au plus approximatif :
+//
+//   1. la miniature de la vidéo programmée — l'affiche officielle ;
+//   2. l'`og:image` de la page de l'événement — c'est l'image que ses
+//      organisateurs ont choisie pour qu'on la partage, donc exactement une
+//      affiche (Capcom sert « share2026.png ») ;
+//   3. l'affiche de la DERNIÈRE ÉDITION du même rendez-vous, qu'on possède
+//      déjà (cf. lib/eventSync, qui garde la miniature de chaque conférence
+//      passée). Le Capcom Spotlight de septembre porte alors celle de juin.
+//
+// ⚠️ ET SURTOUT PAS DE QUATRIÈME RECOURS PAR MARQUE. Coller l'affiche du
+// dernier Xbox Games Showcase sur une diffusion Xbox au Tokyo Game Show ferait
+// croire que c'est le même rendez-vous. Sans famille, on garde le dégradé :
+// c'est honnête, et le logo entier y est propre.
+
+const OG_TIMEOUT = 6000;
+
+/** L'image de partage déclarée par une page. */
+export async function ogImage(url) {
+  if (!url || !/^https?:\/\//i.test(url)) return null;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), OG_TIMEOUT);
+  try {
+    const res = await fetch(url, {
+      headers: { "user-agent": "Mozilla/5.0 (compatible; MyPlayLogBot/1.0; +https://myplaylog.cc)" },
+      signal: ctrl.signal,
+    });
+    if (!res.ok) return null;
+    // Les balises `meta` sont dans l'en-tête : lire deux cent mille caractères
+    // suffit, et évite d'avaler une page de trois mégaoctets pour une URL.
+    const html = (await res.text()).slice(0, 200000);
+    const m =
+      html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+    const found = m?.[1];
+    if (!found) return null;
+    return found.startsWith("//") ? `https:${found}` : new URL(found, url).toString();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Une couverture générée par nos soins (le SVG de repli des listes
+// d'événements) n'est pas une affiche : c'est un rectangle coloré avec un
+// titre dessus. Sur une carte, le dégradé de marque fait mieux.
+const isRealArtwork = (url) => !!url && !/\.svg(\?|$)/i.test(String(url));
+
+async function resolveImages(events, log) {
+  // Les deux premiers recours ne dépendent que de l'événement : tous en même
+  // temps, sinon la synchro coûte un aller-retour par carte.
   await Promise.all(
-    out.map(async (ev) => {
+    events.map(async (ev) => {
       const vid = youtubeId(ev.liveUrl);
-      if (!vid) return;
-      ev.image = await youtubeThumb(vid).catch(() => null);
+      if (vid) {
+        ev.image = await youtubeThumb(vid).catch(() => null);
+        if (ev.image) return;
+      }
+      ev.image = await ogImage(ev.liveUrl);
     })
   );
 
-  return out;
+  const orphans = events.filter((e) => !e.image && eventFamily(e.name));
+  if (!orphans.length) return;
+
+  // UNE seule requête pour tout le monde : on range les affiches des
+  // conférences passées par famille, la plus récente gagne.
+  const lists = await List.find({
+    "event.igdbId": { $ne: null },
+    "event.startTime": { $ne: null, $lt: new Date() },
+  })
+    .sort({ "event.startTime": -1 })
+    .select("cover event")
+    .limit(200)
+    .lean()
+    .catch(() => []);
+
+  const byFamily = new Map();
+  for (const l of lists) {
+    const family = eventFamily(l.event?.name);
+    if (family && !byFamily.has(family) && isRealArtwork(l.cover)) byFamily.set(family, l.cover);
+  }
+
+  let reused = 0;
+  for (const ev of orphans) {
+    const hit = byFamily.get(eventFamily(ev.name));
+    if (hit) {
+      ev.image = hit;
+      reused += 1;
+    }
+  }
+  if (reused) log(`· ${reused} affiche(s) reprise(s) de l'édition précédente`);
 }
 
 // ----------------------------------------------------------------------
