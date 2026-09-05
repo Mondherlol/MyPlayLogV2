@@ -606,10 +606,16 @@ router.get("/releases", optionalAuth, async (req, res) => {
     //
     // La PRÉCISION se lit dans `release_dates.human` (« 2026 », « Q4 2026 »,
     // « Dec 2026 », « Dec 31, 2026 ») — plus sûr que le champ `category`, qu'IGDB
-    // a renommé en cours de route. On ne la demande QUE pour une liste d'ids
-    // (les jeux attendus de quelqu'un) : sur les 500 lignes de la liste
-    // générale, cette expansion pèserait pour rien.
-    const wantPrecision = ids.length > 0;
+    // a renommé en cours de route.
+    //
+    // On la demande pour une liste d'ids (les jeux attendus de quelqu'un) ET
+    // pour une FENÊTRE de dates : c'est ce que lit le fil des sorties du
+    // mobile, jour par jour, et sans précision il empilait quarante jeux sur le
+    // 31 décembre. Une fenêtre fait sept jours, soit quelques dizaines de
+    // lignes, et le résultat est gardé six heures — l'expansion s'y paie sans
+    // douleur. Seule la liste générale s'en passe : ses 500 lignes, elles,
+    // auraient coûté cher pour un affichage qui range par mois de toute façon.
+    const wantPrecision = ids.length > 0 || isWindow;
     const fields =
       "fields name,alternative_names.name,alternative_names.comment,cover.image_id,total_rating,total_rating_count,first_release_date,hypes,genres.name,platforms.abbreviation,platforms.name,keywords.name" +
       (wantPrecision ? ",release_dates.date,release_dates.human" : "");
