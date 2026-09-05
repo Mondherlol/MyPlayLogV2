@@ -38,6 +38,7 @@ import { fetchC411Packs, fetchC411Torrent, rewriteAnnounce } from "../lib/c411.j
 import { fetchFitgirlRepacks } from "../lib/fitgirl.js";
 import { fetchZipertoGames } from "../lib/ziperto.js";
 import { getCachedTranslation, translateGameText } from "../lib/gameText.js";
+import { ensureTrivia, reactToFact, serializeTrivia } from "../lib/gameTrivia.js";
 import { ensureGameScores } from "../lib/gameScores.js";
 // Le cache serveur d'IGDB : toutes les lectures « ce que sait IGDB du jeu X »
 // passent par ici et sont partagées par tous les visiteurs (cf. lib/gameIgdb.js).
@@ -1908,6 +1909,71 @@ router.post("/:id/translate", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("game translate error:", err.message);
     res.status(err.status || 500).json({ error: err.message || "Traduction impossible." });
+  }
+});
+
+// ----------------------------------------------------------------------
+//  Mode Trivia : les anecdotes de coulisses d'un jeu
+// ----------------------------------------------------------------------
+// Écrites une fois par jeu puis partagées par tout le monde (cf.
+// lib/gameTrivia.js). C'est un paquet de cartes qu'on fait défiler et sur
+// lesquelles on colle un émoji — pas une section de la fiche.
+
+// Le paquet. Sur un jeu froid, la réponse arrive VIDE avec `pending: true` :
+// l'écriture par l'IA dure plus longtemps que le mobile n'attend une réponse,
+// donc c'est l'écran qui redemande (cf. lib/gameTrivia.js). `?retry=1` relance
+// après une panne — un geste explicite, pas un sondage.
+router.get("/:id/trivia", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+
+    const g = await gameCore(id);
+    if (!g) return res.status(404).json({ error: "Jeu introuvable." });
+
+    const { doc, pending, error } = await ensureTrivia(id, g, {
+      retry: req.query.retry === "1",
+    });
+    res.json({ ...serializeTrivia(doc, req.userId), pending, failed: error });
+  } catch (err) {
+    console.error("game trivia error:", err.message);
+    res.status(err.status || 500).json({ error: err.message || "Anecdotes indisponibles." });
+  }
+});
+
+// « Encore » au bout du paquet : une fournée de plus, sans redire ce qui a
+// déjà été raconté. Bornée côté lib (un jeu n'a pas cinquante vraies histoires).
+router.post("/:id/trivia/more", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+
+    const g = await gameCore(id);
+    if (!g) return res.status(404).json({ error: "Jeu introuvable." });
+
+    const { doc, pending, error } = await ensureTrivia(id, g, { more: true, retry: true });
+    res.json({ ...serializeTrivia(doc, req.userId), pending, failed: error });
+  } catch (err) {
+    console.error("game trivia more error:", err.message);
+    res.status(err.status || 500).json({ error: err.message || "Anecdotes indisponibles." });
+  }
+});
+
+// Coller (ou décoller) un émoji sur une anecdote. `emoji: null` retire.
+router.post("/:id/trivia/react", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+
+    const key = String(req.body?.key || "").trim();
+    if (!key) return res.status(400).json({ error: "Anecdote manquante." });
+
+    const emoji = req.body?.emoji ? String(req.body.emoji) : null;
+    const doc = await reactToFact(id, key, emoji, req.userId);
+    res.json({ ...serializeTrivia(doc, req.userId), pending: false, failed: null });
+  } catch (err) {
+    console.error("game trivia react error:", err.message);
+    res.status(err.status || 500).json({ error: err.message || "Réaction impossible." });
   }
 });
 
