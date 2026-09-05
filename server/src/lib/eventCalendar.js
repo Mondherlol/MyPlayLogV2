@@ -29,7 +29,13 @@
 // corrigé à la source — on le retire (cf. `pruneStale`).
 
 import GameEvent from "../models/GameEvent.js";
-import { cleanEventName, fetchEvents, isTrackedEvent } from "./gameEvents.js";
+import {
+  cleanEventName,
+  fetchEvents,
+  isTrackedEvent,
+  youtubeId,
+  youtubeThumb,
+} from "./gameEvents.js";
 import { firstHref, parseIcs, parseIcsDate, prop, stripHtml, unescapeIcs } from "./ics.js";
 
 const IMG_BASE = "https://images.igdb.com/igdb/image/upload";
@@ -302,6 +308,20 @@ export async function fromGameConfGuide({ log = () => {} } = {}) {
     log(`· gameconfguide (${feed.kind}) : ${kept} à venir`);
   }
 
+  // ⚠️ LES MINIATURES SONT RÉSOLUES APRÈS COUP, ET EN PARALLÈLE. Chacune coûte
+  // une requête HEAD (`maxresdefault` n'existe pas pour toutes les vidéos, on
+  // retombe sur `hqdefault`) : les enchaîner dans la boucle ci-dessus
+  // rallongerait la synchro d'autant de allers-retours qu'il y a d'événements.
+  // Une image manquante n'est pas une erreur — la carte retombe sur le dégradé
+  // de marque.
+  await Promise.all(
+    out.map(async (ev) => {
+      const vid = youtubeId(ev.liveUrl);
+      if (!vid) return;
+      ev.image = await youtubeThumb(vid).catch(() => null);
+    })
+  );
+
   return out;
 }
 
@@ -327,6 +347,7 @@ export function mergeSources(gcg, igdb) {
       byDedupe.set(k, e);
       continue;
     }
+    if (!known.image && e.image) known.image = e.image;
     if (!known.logo && e.logo) known.logo = e.logo;
     if (!known.gameIds?.length && e.gameIds?.length) known.gameIds = e.gameIds;
     if (!known.liveUrl && e.liveUrl) known.liveUrl = e.liveUrl;

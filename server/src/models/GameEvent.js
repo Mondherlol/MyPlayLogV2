@@ -80,6 +80,14 @@ const gameEventSchema = new mongoose.Schema(
     // 2 h ne s'attendent pas de la même façon.
     durationMin: { type: Number, default: null },
 
+    // ⚠️ L'IMAGE DE LA CARTE, ET ELLE VAUT MIEUX QUE N'IMPORTE QUEL DÉCOR
+    // GÉNÉRÉ. Presque tous les showcases pointent vers une vidéo YouTube
+    // programmee : sa miniature est l'affiche officielle de l'événement, dessinée
+    // par ceux qui l'organisent. Aucun dégradé de marque ne fera mieux. Elle est
+    // résolue à la synchro (une requête HEAD, cf. youtubeThumb) et non à
+    // l'affichage : le téléphone ne doit pas deviner ce que le serveur sait.
+    image: { type: String, default: null },
+
     logo: { type: String, default: null },
     liveUrl: { type: String, default: null },
     // La page d'où l'information vient. Elle est AFFICHÉE : un compte à rebours

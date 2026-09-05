@@ -2,6 +2,7 @@ import express from "express";
 
 import GameEvent from "../models/GameEvent.js";
 import List from "../models/List.js";
+import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { upcomingFilter } from "../lib/eventCalendar.js";
 import { eventFamily } from "../lib/gameEvents.js";
@@ -25,6 +26,7 @@ function serialize(ev, userId) {
     // sans ça il inventerait des heures que la source ne donne pas.
     precision: ev.precision || "day",
     kind: ev.kind || "showcase",
+    image: ev.image || null,
     description: ev.description || "",
     location: ev.location || "",
     durationMin: ev.durationMin || null,
@@ -73,11 +75,39 @@ router.get("/upcoming", requireAuth, async (req, res) => {
 // ============================================================
 //  GET /api/events/:id — la fiche d'un rendez-vous
 // ============================================================
+// ⚠️ « 12 INTÉRESSÉS » NE DIT RIEN ; « MAXIME ET DEUX AUTRES » DIT TOUT.
+//
+// Un compteur anonyme est du décor. Ce qui donne envie de bloquer sa soirée,
+// c'est de voir que des gens qu'on suit y seront — et c'est aussi ce qui rend
+// la fiche sociale sans avoir à inventer quoi que ce soit : la liste des
+// intéressés est déjà là, il suffit de la croiser avec ses abonnements.
+//
+// On ne rend QUE les comptes suivis. Exposer les avatars de tous les inscrits
+// qui ont coché une case serait une fuite de plus, et n'apprendrait rien.
 router.get("/:id", requireAuth, async (req, res) => {
   try {
     const ev = await GameEvent.findById(req.params.id).lean();
     if (!ev) return res.status(404).json({ error: "Événement introuvable." });
-    res.json({ event: serialize(ev, req.userId) });
+
+    let friends = [];
+    const interested = (ev.interested || []).map(String);
+    if (interested.length) {
+      const me = await User.findById(req.userId).select("following").lean();
+      const followed = new Set((me?.following || []).map(String));
+      const ids = interested.filter((id) => followed.has(id)).slice(0, 12);
+      if (ids.length) {
+        const users = await User.find({ _id: { $in: ids } })
+          .select("username avatar")
+          .lean();
+        friends = users.map((u) => ({
+          id: String(u._id),
+          username: u.username,
+          avatar: u.avatar || null,
+        }));
+      }
+    }
+
+    res.json({ event: { ...serialize(ev, req.userId), friends } });
   } catch (err) {
     res.status(404).json({ error: "Événement introuvable." });
   }

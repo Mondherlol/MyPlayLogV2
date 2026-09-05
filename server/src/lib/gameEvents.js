@@ -166,21 +166,26 @@ export function isTrackedEvent(name) {
  * accroche DONNE la famille. C'est stable (le motif ne change pas quand
  * l'intitulé varie) et ça ne demande aucune liste de plus à tenir.
  *
- * ⚠️ LE RATTRAPAGE « … DIRECT » EST DÉLIBÉRÉ. « The Legend of Zelda 40th
- * Anniversary Direct » n'accroche aucun motif : c'est un Direct thématique,
- * qui ne portera jamais deux fois le même nom. Le rattacher aux Nintendo Direct
- * est la seule chose utile à faire — c'est bien la série dont il fait partie,
- * et c'est bien ce que quelqu'un veut voir en ouvrant sa fiche.
+ * ⚠️ PAS DE RATTRAPAGE APPROXIMATIF, ET C'EST UNE CORRECTION DE BUG.
  *
- * Rend `null` quand on ne sait pas : la fiche n'affichera alors pas de
- * « précédentes éditions », ce qui vaut mieux qu'un rapprochement inventé.
+ * La première version rattachait tout ce qui contenait « Direct » à la famille
+ * des Nintendo Direct, en se disant que c'était « la série dont il fait
+ * partie ». Résultat : la fiche du Legend of Zelda 40th Anniversary Direct
+ * annonçait « la dernière fois : 72 jeux annoncés » et alignait les jaquettes
+ * du Direct généraliste de juin — Stellar Blade, Onimusha, Lords of the Fallen.
+ * Aucun de ces jeux n'a jamais été montré à un Direct Zelda, et il n'y a jamais
+ * eu de Direct Zelda avant celui-ci.
+ *
+ * Un rapprochement à peu près juste est PIRE que pas de rapprochement du tout :
+ * il n'a pas l'air d'une erreur, il a l'air d'une information. Un événement
+ * thématique n'a pas d'édition précédente — c'est la vérité, et la fiche doit
+ * la dire en n'affichant rien.
+ *
+ * Rend donc `null` dès qu'aucun motif connu n'accroche.
  */
 export function eventFamily(name) {
-  const s = String(name || "");
-  const hit = EVENT_PATTERNS.find((p) => p.re.test(s));
-  if (hit) return hit.re.source;
-  if (/\bdirect\b/i.test(s)) return /nintendo direct/i.source;
-  return null;
+  const hit = EVENT_PATTERNS.find((p) => p.re.test(String(name || "")));
+  return hit ? hit.re.source : null;
 }
 
 // --- Récupération IGDB ------------------------------------------------
