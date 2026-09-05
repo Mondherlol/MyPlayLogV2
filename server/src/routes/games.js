@@ -616,9 +616,16 @@ router.get("/releases", optionalAuth, async (req, res) => {
     // douleur. Seule la liste générale s'en passe : ses 500 lignes, elles,
     // auraient coûté cher pour un affichage qui range par mois de toute façon.
     const wantPrecision = ids.length > 0 || isWindow;
+    // ⚠️ LES IDENTIFIANTS, PAS SEULEMENT LES NOMS. Le fil des sorties du mobile
+    // filtre ce qu'il a déjà chargé (console, genre, langue) sans repasser par
+    // le réseau : cocher « PS5 » doit répondre au doigt, pas en une seconde et
+    // demie. Or les noms ne s'y prêtent pas — les genres de `/games/genres`
+    // sont traduits en français, ceux d'ici sont ceux d'IGDB, et rien ne
+    // porte la langue. On envoie donc les ids bruts, en plus, sur les fenêtres.
     const fields =
-      "fields name,alternative_names.name,alternative_names.comment,cover.image_id,total_rating,total_rating_count,first_release_date,hypes,genres.name,platforms.abbreviation,platforms.name,keywords.name" +
-      (wantPrecision ? ",release_dates.date,release_dates.human" : "");
+      "fields name,alternative_names.name,alternative_names.comment,cover.image_id,total_rating,total_rating_count,first_release_date,hypes,genres.id,genres.name,platforms.id,platforms.abbreviation,platforms.name,keywords.name" +
+      (wantPrecision ? ",release_dates.date,release_dates.human" : "") +
+      (isWindow ? ",language_supports.language" : "");
     const query = `${fields}; where ${where.join(
       " & "
     )}; sort first_release_date asc; limit 500;`;
@@ -635,6 +642,18 @@ router.get("/releases", optionalAuth, async (req, res) => {
       ratingCount: g.total_rating_count || 0,
       ai: (g.keywords || []).some((k) => AI_RE.test(k.name || "")),
       ...(wantPrecision ? precisionOf(g) : null),
+      ...(isWindow
+        ? {
+            genreIds: (g.genres || []).map((x) => x.id).filter(Boolean),
+            platformIds: (g.platforms || []).map((x) => x.id).filter(Boolean),
+            // `language_supports` répète la même langue une fois par type de
+            // support (audio, sous-titres, interface) : on ne garde que la
+            // langue, une seule fois.
+            languageIds: [
+              ...new Set((g.language_supports || []).map((l) => l.language).filter(Boolean)),
+            ],
+          }
+        : null),
     }));
 
     if (isGeneral) {
