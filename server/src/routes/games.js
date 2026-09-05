@@ -105,8 +105,12 @@ const upload = multer({
     cb(null, /^image\/(jpe?g|png|webp|gif)$/.test(file.mimetype)),
 });
 
+// `game_type` voyage avec les résultats : c'est lui qui dit qu'un titre est un
+// DLC ou une extension, et le client ne propose pas de le « marquer comme
+// joué » — un contenu additionnel se coche sur son jeu de base (cf. lib/dlc.js
+// côté mobile).
 const FIELDS =
-  "fields name,alternative_names.name,alternative_names.comment,cover.image_id,total_rating,total_rating_count,first_release_date,genres.name,platforms.abbreviation,platforms.name";
+  "fields name,alternative_names.name,alternative_names.comment,cover.image_id,total_rating,total_rating_count,first_release_date,game_type,genres.name,platforms.abbreviation,platforms.name";
 
 // Champs de tri disponibles
 const SORT_FIELDS = {
@@ -124,6 +128,7 @@ function mapGame(g) {
   return {
     id: g.id,
     name: fr?.name || g.name,
+    gameType: g.game_type ?? null,
     cover: g.cover?.image_id
       ? `${IMG_BASE}/t_cover_big/${g.cover.image_id}.jpg`
       : null,
@@ -1351,6 +1356,45 @@ async function fetchBundleGames(bundleId, releaseDate = null) {
     .sort((a, b) => (a.releaseDate || Infinity) - (b.releaseDate || Infinity));
 }
 
+// ======================================================================
+//  Les contenus additionnels d'un jeu
+// ======================================================================
+// Un DLC n'est pas un jeu qu'on RANGE : c'est quelque chose qu'on a, ou pas,
+// SUR un jeu qu'on a déjà. Lui donner une entrée de bibliothèque à lui — avec
+// son statut, sa note, son temps de jeu — gonflait le compte de jeux de
+// quinze packs de skins et laissait « Blood and Wine » terminé à côté d'un
+// Sorceleur 3 en cours, comme deux titres sans rapport.
+//
+// La feuille de suivi du jeu de base les liste donc à cocher (cf. `dlcs` dans
+// server/src/routes/library.js). Ils viennent de la fiche déjà chargée — DLC,
+// extensions et extensions autonomes réunis —, sans une requête de plus.
+const DLC_RELATIONS = ["dlcs", "expansions", "standalone_expansions"];
+
+function gameDlcs(g) {
+  const seen = new Set();
+  const out = [];
+  for (const rel of DLC_RELATIONS) {
+    for (const d of g?.[rel] || []) {
+      if (!d?.id || !d?.name || seen.has(d.id)) continue;
+      seen.add(d.id);
+      out.push({
+        id: d.id,
+        name: d.name,
+        cover: d.cover?.image_id ? `${IMG_BASE}/t_cover_big/${d.cover.image_id}.jpg` : null,
+        // Le type dit ce qu'on coche : une extension de trente heures et un
+        // pack d'armures ne se cochent pas du même cœur.
+        typeLabel: GAME_TYPES_FR[d.game_type]?.label || null,
+        year: d.first_release_date
+          ? new Date(d.first_release_date * 1000).getFullYear()
+          : null,
+        releaseDate: d.first_release_date || null,
+      });
+    }
+  }
+  // Du plus ancien au plus récent : c'est l'ordre où on les a joués.
+  return out.sort((a, b) => (a.releaseDate || Infinity) - (b.releaseDate || Infinity));
+}
+
 // Les boutiques où un jeu se vend, telles qu'IGDB les connaît. La feuille de
 // suivi du mobile s'en sert pour remplacer « physique ou démat ? » — qui ne
 // veut rien dire sur PC — par « où l'as-tu pris ? ».
@@ -1509,6 +1553,8 @@ router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
       endlessHint,
       stores,
       bundleGames,
+      // Les contenus additionnels, à cocher dans la feuille de suivi.
+      dlcs: gameDlcs(g),
     });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });

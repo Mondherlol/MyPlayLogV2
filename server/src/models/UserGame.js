@@ -74,6 +74,18 @@ const bundleGameSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// Les contenus additionnels qu'on POSSÈDE sur ce jeu. Un DLC n'est pas un jeu
+// à ranger à part — c'est une case cochée sur le jeu de base : ni statut, ni
+// note, ni temps de jeu, juste « je l'ai ». On n'enregistre QUE les cochés.
+const ownedDlcSchema = new mongoose.Schema(
+  {
+    id: { type: Number, required: true }, // id IGDB du contenu additionnel
+    name: { type: String, required: true },
+    cover: { type: String, default: null },
+  },
+  { _id: false }
+);
+
 // Une entrée de bibliothèque : le lien entre un utilisateur et un jeu IGDB.
 const userGameSchema = new mongoose.Schema(
   {
@@ -128,6 +140,9 @@ const userGameSchema = new mongoose.Schema(
     plannedMonth: { type: String, default: null },
     // Si le jeu est un bundle : progression jeu par jeu (cases de la modale).
     bundleGames: { type: [bundleGameSchema], default: [] },
+    // Les DLC et extensions de CE jeu que je possède (cases de la feuille de
+    // suivi). Ils ne créent aucune entrée à eux : ils vivent ici.
+    dlcs: { type: [ownedDlcSchema], default: [] },
     // Entrée créée/gérée via un bundle : id IGDB du bundle parent. Sert à
     // nettoyer l'entrée si son statut est décoché dans la modale du bundle
     // (uniquement si elle est restée vierge : pas de note/avis ajoutés à la main).

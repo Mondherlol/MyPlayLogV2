@@ -26,6 +26,7 @@ function toPublic(e) {
     platinum: !!e.platinum,
     plannedMonth: e.plannedMonth || null,
     bundleGames: e.bundleGames || [],
+    dlcs: e.dlcs || [],
     playtimeHours: e.playtimeHours,
     startedAt: e.startedAt || null,
     finishedAt: e.finishedAt || null,
@@ -276,6 +277,31 @@ router.put("/:gameId", requireAuth, async (req, res) => {
         });
     }
 
+    // Les contenus additionnels possédés : une liste de cochés, rien de plus.
+    // ⚠️ AUCUN STATUT ICI, ET C'EST VOULU. Un DLC ne se suit pas comme un jeu
+    // (pas de note, pas de temps de jeu, pas d'entrée à lui) : on l'a, ou on ne
+    // l'a pas. Ce que le client envoie est la liste COMPLÈTE des cochés — un
+    // DLC décoché disparaît simplement de la liste.
+    if (b.dlcs !== undefined) {
+      if (!Array.isArray(b.dlcs)) {
+        return res.status(400).json({ error: "dlcs invalide." });
+      }
+      const seenDlc = new Set();
+      b.dlcs = b.dlcs
+        .filter((d) => {
+          const id = Number(d?.id);
+          if (!id || !d?.name || seenDlc.has(id)) return false;
+          seenDlc.add(id);
+          return true;
+        })
+        .slice(0, 60)
+        .map((d) => ({
+          id: Number(d.id),
+          name: String(d.name).slice(0, 160),
+          cover: d.cover ? String(d.cover) : null,
+        }));
+    }
+
     // Dates de début / de fin : une date ISO, ou null pour l'effacer. On les
     // convertit ici plutôt que de laisser Mongoose avaler n'importe quoi —
     // une chaîne bancale y deviendrait silencieusement `Invalid Date`.
@@ -317,6 +343,7 @@ router.put("/:gameId", requireAuth, async (req, res) => {
       "favoriteOst",
       "plannedMonth",
       "bundleGames",
+      "dlcs",
     ]) {
       if (b[key] !== undefined) update[key] = b[key];
     }
