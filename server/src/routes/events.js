@@ -73,6 +73,52 @@ router.get("/upcoming", requireAuth, async (req, res) => {
 });
 
 // ============================================================
+//  GET /api/events/range?from=&to= — une fenêtre du calendrier
+// ============================================================
+// ⚠️ CELLE-CI RAMÈNE AUSSI LE PASSÉ, ET C'EST TOUTE LA DIFFÉRENCE AVEC
+// `/upcoming`. Un agenda répond à « qu'est-ce qui arrive ? » et n'a aucune
+// raison de regarder derrière. Un CALENDRIER, lui, se feuillette : on recule
+// d'un mois par réflexe, et un mois de septembre qui s'affiche vide parce que
+// la route refuse de rendre ce qui a eu lieu la semaine dernière, ce n'est pas
+// un calendrier, c'est un bug.
+//
+// Le volume ne pose pas de question : quelques dizaines d'entrées sur trois
+// ans. Le client charge sa fenêtre une fois et feuillette sans réseau.
+router.get("/range", requireAuth, async (req, res) => {
+  try {
+    const now = Date.now();
+    const parse = (v, fallback) => {
+      const d = v ? new Date(v) : null;
+      return d && !Number.isNaN(d.getTime()) ? d : fallback;
+    };
+    // Par défaut : un an derrière, deux devant. De quoi feuilleter sans jamais
+    // tomber sur un trou, sans charger l'histoire complète du jeu vidéo.
+    const from = parse(req.query.from, new Date(now - 365 * 86400000));
+    const to = parse(req.query.to, new Date(now + 730 * 86400000));
+    // Une fenêtre absurde (ou renversée) ne doit pas balayer la collection.
+    if (to <= from) return res.status(400).json({ error: "Fenêtre invalide." });
+    const capped = new Date(Math.min(to.getTime(), from.getTime() + 3 * 365 * 86400000));
+
+    const events = await GameEvent.find({
+      hidden: { $ne: true },
+      startsAt: { $gte: from, $lte: capped },
+    })
+      .sort({ startsAt: 1 })
+      .limit(400)
+      .lean();
+
+    res.json({
+      from: from.toISOString(),
+      to: capped.toISOString(),
+      events: events.map((e) => serialize(e, req.userId)),
+    });
+  } catch (err) {
+    console.error("events range error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement du calendrier." });
+  }
+});
+
+// ============================================================
 //  GET /api/events/:id — la fiche d'un rendez-vous
 // ============================================================
 // ⚠️ « 12 INTÉRESSÉS » NE DIT RIEN ; « MAXIME ET DEUX AUTRES » DIT TOUT.
