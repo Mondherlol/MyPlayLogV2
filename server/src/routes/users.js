@@ -287,7 +287,13 @@ function cleanKeys(arr, allowed) {
 
 // Les clés de mise en page acceptées par l'app : les sections de statuts, les
 // deux rayons qui n'en sont pas (listes, avis), et une liste précise.
-const EXTRA_SECTIONS = new Set(["lists", "reviews"]);
+// Les rayons de l'application qui ne sont pas des statuts de bibliothèque.
+//
+// ⚠️ CETTE LISTE EST LA PORTE D'ENTRÉE. `cleanLayout` jette toute clé qu'elle
+// ne connaît pas : une section ajoutée dans l'app et oubliée ici serait
+// silencieusement effacée de la mise en page au premier enregistrement, et le
+// joueur la verrait retomber à sa place par défaut sans comprendre pourquoi.
+const EXTRA_SECTIONS = new Set(["lists", "reviews", "stats", "ost", "badges"]);
 const LIST_SECTION = /^list:[0-9a-fA-F]{24}$/;
 
 function cleanLayout(value) {
@@ -314,6 +320,21 @@ router.put("/me/overview", requireAuth, async (req, res) => {
     // Mise en page de l'app : mêmes sections, plus « lists », « reviews » et
     // les listes promises en section (« list:<id> »). Voir models/User.js.
     if (b.overviewLayout !== undefined) set.overviewLayout = cleanLayout(b.overviewLayout);
+    // Les cartes du rayon « Statistiques » de l'app : leur ORDRE, et le fait
+    // qu'elles soient là. Une carte absente de la liste est masquée ; une liste
+    // vide veut dire « celles par défaut » (cf. l'app, lib/statCards).
+    //
+    // On ne valide que la FORME — des clés courtes, sans doublon, pas plus de
+    // trente. Le catalogue des cartes vit dans l'application, qui en ajoutera :
+    // une liste blanche ici obligerait à redéployer le serveur pour chaque
+    // nouvelle mesure, et effacerait celles qu'il ne connaîtrait pas encore.
+    if (b.overviewStats !== undefined) {
+      const seen = new Set();
+      set.overviewStats = (Array.isArray(b.overviewStats) ? b.overviewStats : [])
+        .map((x) => String(x).slice(0, 32))
+        .filter((k) => /^[a-z0-9_-]+$/i.test(k) && !seen.has(k) && seen.add(k))
+        .slice(0, 30);
+    }
     if (b.overviewHidden !== undefined) set.overviewHidden = cleanLayout(b.overviewHidden);
     // L'icône d'une section : soit le nom d'une icône dessinée (« ic:swords »,
     // que le client résout dans son registre), soit un emoji tapé au clavier.
@@ -2377,6 +2398,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
         overviewIcons: user.overviewIcons || {},
         overviewGameSort: user.overviewGameSort || {},
         overviewGameOrder: user.overviewGameOrder || {},
+        overviewStats: user.overviewStats || [],
         asideOrder: user.asideOrder || [],
         asideHidden: user.asideHidden || [],
         asideConfig: user.asideConfig || {},

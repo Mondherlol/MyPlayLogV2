@@ -110,6 +110,11 @@ const userSchema = new mongoose.Schema(
     // pour une liste montrée comme une section à part entière. Vide = on
     // retombe sur `overviewOrder`, puis sur l'ordre par défaut.
     overviewLayout: { type: [String], default: [] },
+    // Les cartes de mesures montrées sur le profil dans l'application, dans
+    // l'ordre voulu ; ce qui n'y figure pas est masqué. Vide = les cartes par
+    // défaut, dans l'ordre par défaut. Le catalogue des cartes vit dans l'app
+    // (lib/statCards) : le serveur ne fait que garder la liste.
+    overviewStats: { type: [String], default: [] },
     // Les sections que le propriétaire a masquées, mêmes clés que ci-dessus.
     overviewHidden: { type: [String], default: [] },
     // L'emoji choisi pour une section, par clé : { "list:65f…": "🎮" }. Les
@@ -479,6 +484,7 @@ userSchema.methods.toPublic = function () {
     overviewGameSort: this.overviewGameSort || {},
     overviewApplyToAll: !!this.overviewApplyToAll,
     overviewGameOrder: this.overviewGameOrder || {},
+    overviewStats: this.overviewStats || [],
     asideOrder: this.asideOrder || [],
     asideHidden: this.asideHidden || [],
     asideConfig: this.asideConfig || {},
