@@ -1809,7 +1809,7 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
       .catch(() => ({})); // best-effort : une fiche sans logo reste une fiche
 
     const websites = (g.websites || [])
-      .map((w) => ({ url: w.url, kind: WEBSITE_KINDS[w.category] }))
+      .map((w) => ({ url: w.url, kind: WEBSITE_KINDS[w.type] }))
       .filter((w) => w.kind);
 
     const similar = (g.similar_games || [])

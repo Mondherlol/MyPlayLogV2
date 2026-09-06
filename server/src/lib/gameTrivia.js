@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 
 import GameTrivia from "../models/GameTrivia.js";
 import { geminiJson, isGeminiConfigured } from "./gemini.js";
-import { collectLore, originalGame } from "./gameLore.js";
+import { collectLore, firstOfBundle, originalGame } from "./gameLore.js";
 
 // ======================================================================
 //  Le mode Trivia : les histoires derrière le jeu
@@ -254,9 +254,26 @@ function startBatch(gameId, game) {
     // ⚠️ LES ANECDOTES SONT CELLES DU JEU SOUCHE. Ouvrir un remake ou une
     // édition « Definitive » et recevoir les coulisses de l'original est
     // voulu : c'est là qu'est l'histoire (cf. lib/gameLore.js).
-    const og = await originalGame(game);
+    let og = await originalGame(game);
+    let lore = await collectLore(og);
+
+    // Personne n'a rien écrit ? Avant de conclure, on regarde si ce jeu en
+    // CONTIENT d'autres. Un recueil n'a pas de parent à qui remonter, mais il a
+    // des contenus où descendre — et c'est là que sont les histoires. Sans ce
+    // repli, « Ace Attorney Trilogy » répondait « pas d'anecdote » alors que
+    // trois articles entiers l'attendaient un cran plus bas.
+    if (!lore.length) {
+      const inside = await firstOfBundle(og);
+      if (inside) {
+        const deeper = await collectLore(inside);
+        if (deeper.length) {
+          og = inside;
+          lore = deeper;
+        }
+      }
+    }
+
     const name = og.name || game.name || "";
-    const lore = await collectLore(og);
 
     const out = await geminiJson(prompt(name, og, lore), {
       timeoutMs: 60_000,
@@ -335,10 +352,19 @@ export async function ensureTrivia(gameId, game, { retry = false } = {}) {
   const doc = await GameTrivia.findOne({ gameId });
   const lock = String(gameId);
 
-  // Une fournée déjà écrite ne se réécrit pas. Un document à zéro anecdote
-  // compte aussi : personne n'a rien écrit sur ce jeu, et refaire le tour des
-  // sources à chaque ouverture de sa fiche ne changerait rien.
-  if (doc?.batches > 0) return { doc, pending: false, error: null };
+  // Une fournée déjà écrite ne se réécrit pas : refaire le tour des sources à
+  // chaque ouverture d'une fiche ne changerait rien et brûlerait le quota.
+  //
+  // Un verdict VIDE compte pareil — à une exception près : `retry`, c'est-à-dire
+  // le bouton « réessayer ». Un « pas d'anecdote » est parfois notre faute
+  // (une source qui n'a pas répondu ce jour-là, un repli qu'on vient
+  // d'ajouter), et le figer pour toujours sur un accident serait pénible. Un
+  // paquet qui a des cartes, lui, ne se refait jamais : les réactions y sont
+  // accrochées.
+  const empty = (doc?.facts?.length || 0) === 0;
+  if (doc?.batches > 0 && !(retry && empty)) {
+    return { doc, pending: false, error: null };
+  }
 
   if (!isGeminiConfigured()) {
     if (doc) return { doc, pending: false, error: null };

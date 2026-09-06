@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
 
-import { gameCore } from "./gameIgdb.js";
+import { gameBundleContents, gameCore } from "./gameIgdb.js";
 
 // ======================================================================
 //  Où l'on va CHERCHER les histoires, au lieu de les inventer
@@ -97,6 +97,10 @@ const DERIVED = new Set([
   14, // mise à jour
 ]);
 
+// Les recueils : bundle et pack. Eux ne se remontent pas, ils se DESCENDENT
+// (cf. firstOfBundle).
+const BUNDLES = new Set([3, 13]);
+
 const MAX_HOPS = 3;
 
 /**
@@ -105,6 +109,20 @@ const MAX_HOPS = 3;
  */
 export async function originalGame(game) {
   let cur = game;
+
+  // ⚠️ UN RECUEIL, ON Y ENTRE. Sa page d'encyclopédie ne raconte que le
+  // portage — « sorti sur 3DS puis sur Switch » — pendant que les articles des
+  // jeux qu'il contient, eux, sont pleins d'histoires. Et comme il n'a aucun
+  // parent, la remontée ci-dessous ne peut rien pour lui : c'est ce qui faisait
+  // répondre « pas d'anecdote » sur Ace Attorney Trilogy.
+  //
+  // On descend AVANT de remonter : le jeu trouvé à l'intérieur peut lui-même
+  // être un remaster qui a son propre original.
+  if (BUNDLES.has(cur.game_type)) {
+    const inside = await firstOfBundle(cur);
+    if (inside) cur = inside;
+  }
+
   for (let i = 0; i < MAX_HOPS; i++) {
     // Une édition (« Game of the Year », « Definitive ») pend sous
     // `version_parent` ; un remake ou un DLC sous `parent_game`.
@@ -120,6 +138,29 @@ export async function originalGame(game) {
     cur = parent;
   }
   return cur;
+}
+
+/**
+ * Le premier jeu d'un recueil — trilogie, compilation, intégrale.
+ *
+ * ⚠️ CEUX-LÀ NE SE REMONTENT PAS, ILS SE DESCENDENT. Un recueil n'a pas de
+ * parent : il a des contenus. « Phoenix Wright: Ace Attorney Trilogy » n'est
+ * donc l'enfant de personne, et sa propre page d'encyclopédie ne raconte que
+ * son portage — pendant que trois articles entiers dorment un cran plus bas.
+ * Résultat vu en vrai : « pas d'anecdote » sur une trilogie qui en regorge.
+ *
+ * On prend le PREMIER paru : c'est là que commence l'histoire du recueil, et
+ * c'est presque toujours celui dont on a le plus écrit.
+ */
+export async function firstOfBundle(game) {
+  const members = await gameBundleContents(game.id).catch(() => null);
+  if (!Array.isArray(members) || !members.length) return null;
+
+  const first = members
+    .filter((m) => m?.id && m.id !== game.id)
+    .sort((a, b) => (a.first_release_date || Infinity) - (b.first_release_date || Infinity))[0];
+
+  return first ? gameCore(first.id).catch(() => null) : null;
 }
 
 // ----------------------------------------------------------------------
@@ -335,9 +376,11 @@ async function giantBombLore(name) {
  */
 export async function collectLore(game) {
   const sites = game.websites || [];
-  // IGDB range Wikipédia en catégorie 3 et Fandom (« wikia ») en catégorie 2.
-  const wiki = sites.find((w) => w.category === 3)?.url || null;
-  const fandom = sites.find((w) => w.category === 2)?.url || null;
+  // IGDB range Wikipédia en 3 et Fandom (« wikia ») en 2, dans `websites.type`
+  // (cf. lib/gameIgdb : le champ s'appelait `category` et le renommage était
+  // passé inaperçu, faute d'erreur).
+  const wiki = sites.find((w) => w.type === 3)?.url || null;
+  const fandom = sites.find((w) => w.type === 2)?.url || null;
   const name = game.name || "";
 
   const settled = await Promise.allSettled([

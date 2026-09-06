@@ -198,7 +198,13 @@ export const CORE_FIELDS = [
   "videos.video_id",
   "videos.name",
   "websites.url",
-  "websites.category",
+  // ⚠️ `type`, PAS `category` : IGDB a renommé le champ, et l'ancien nom ne
+  // fait pas d'erreur — il renvoie simplement des sites SANS leur nature. Les
+  // liens (Steam, officiel, Wikipédia…) disparaissaient donc en silence, et le
+  // mode Trivia cherchait ses sources à l'aveugle faute de trouver l'URL
+  // Wikipédia que la fiche avait pourtant sous la main. La numérotation, elle,
+  // n'a pas bougé (3 = Wikipédia, 2 = Fandom, 13 = Steam…).
+  "websites.type",
   "game_engines.name",
   "franchises.name",
   "collections.name",
@@ -232,7 +238,7 @@ export const REL_SUBFIELDS = [
 
 // Bumper une de ces versions invalide le morceau correspondant, partout.
 const VERSIONS = {
-  core: 2, // v2 : la parenté large a rejoint la fiche
+  core: 3, // v3 : websites.category renommé en websites.type
   chars: 1,
   ttb: 1,
   bundle: 1,
