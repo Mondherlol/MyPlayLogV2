@@ -203,23 +203,59 @@ function gameShots(g) {
     .map((id) => `${IMG}/t_1080p/${id}.jpg`);
 }
 
+// Quatre recherches d'image à la fois, pas quinze : Wikipédia tolère très bien
+// une poignée d'appels simultanés, et beaucoup moins une rafale. Elles
+// partaient une par une « par prudence » — quinze allers-retours en file
+// indienne, soit près de dix secondes ajoutées à l'attente pour rien.
+const IMAGE_LANES = 4;
+
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      for (let i = next++; i < items.length; i = next++) {
+        out[i] = await fn(items[i], i);
+      }
+    })
+  );
+  return out;
+}
+
 async function illustrate(facts, g) {
   const shots = gameShots(g);
-  let next = 0;
 
-  for (const fact of facts) {
-    if (fact.query) {
-      // eslint-disable-next-line no-await-in-loop -- en série exprès : une
-      // rafale de quinze requêtes vers Wikipédia se ferait jeter.
-      fact.image = await wikiImage(fact.query);
-    }
+  const found = await mapLimit(facts, IMAGE_LANES, (fact) =>
+    fact.query ? wikiImage(fact.query) : null
+  );
+
+  // Le repli se distribue APRÈS coup : deux cartes voisines sans photo propre
+  // ne doivent pas hériter de la même capture, et on ne le sait qu'une fois
+  // toutes les recherches revenues.
+  let next = 0;
+  facts.forEach((fact, i) => {
+    fact.image = found[i];
     if (!fact.image && shots.length) {
       fact.image = { url: shots[next % shots.length], credit: null, link: null };
       next += 1;
     }
     delete fact.query;
-  }
+  });
   return facts;
+}
+
+// Repose les images sur des cartes DÉJÀ enregistrées (cf. startBatch : le texte
+// part sans les attendre).
+async function applyImages(gameId, facts) {
+  const ops = facts
+    .filter((f) => f.image)
+    .map((f) => ({
+      updateOne: {
+        filter: { gameId, "facts.key": f.key },
+        update: { $set: { "facts.$.image": f.image } },
+      },
+    }));
+  if (ops.length) await GameTrivia.bulkWrite(ops, { ordered: false });
 }
 
 // ----------------------------------------------------------------------
@@ -245,10 +281,49 @@ const inflight = new Map();
 const failures = new Map();
 const RETRY_AFTER = 30_000;
 
+// Où en est chaque fournée, pour que l'écran puisse le DIRE au lieu de faire
+// tourner une roue muette pendant dix secondes.
+const progress = new Map();
+
+// ----------------------------------------------------------------------
+//  Deux fournées à la fois, pas plus
+// ----------------------------------------------------------------------
+// Le verrou `inflight` empêche déjà deux fournées sur LE MÊME jeu : dix
+// personnes qui ouvrent le Trivia de Zelda en même temps déclenchent un seul
+// travail, les neuf autres lisent son résultat.
+//
+// Restait le cas de dix personnes sur dix jeux DIFFÉRENTS : dix appels
+// simultanés à Gemini, dont l'offre gratuite n'accepte qu'une poignée par
+// minute. Les surnuméraires se faisaient jeter en 429 — c'est-à-dire que
+// l'utilisateur voyait « quota atteint » alors qu'il suffisait d'attendre trois
+// secondes.
+//
+// On fait donc la queue plutôt que de se faire refuser à la porte : le travail
+// aboutit, il arrive juste un peu plus tard. Et comme l'écran sonde en boucle,
+// une attente en file ne lui coûte rien de plus qu'une attente tout court — on
+// la lui dit, simplement (« beaucoup de monde en même temps »).
+const MAX_PARALLEL = 2;
+let running = 0;
+const queue = [];
+
+async function takeSlot() {
+  while (running >= MAX_PARALLEL) {
+    await new Promise((resolve) => queue.push(resolve));
+  }
+  running += 1;
+}
+
+function freeSlot() {
+  running -= 1;
+  const next = queue.shift();
+  if (next) next();
+}
+
 function startBatch(gameId, game) {
   const lock = String(gameId);
   if (inflight.has(lock)) return;
   failures.delete(lock);
+  progress.set(lock, "sources");
 
   const run = (async () => {
     // ⚠️ LES ANECDOTES SONT CELLES DU JEU SOUCHE. Ouvrir un remake ou une
@@ -275,11 +350,24 @@ function startBatch(gameId, game) {
 
     const name = og.name || game.name || "";
 
-    const out = await geminiJson(prompt(name, og, lore), {
-      timeoutMs: 60_000,
-      // Un découpage de sources ne veut pas d'imagination (cf. lib/gameText.js).
-      temperature: lore.length ? 0.35 : 0.5,
-    });
+    // La file ne protège QUE l'appel à l'IA : les wikis, eux, encaissent sans
+    // broncher, et les faire patienter allongerait l'attente pour rien.
+    progress.set(lock, "attente");
+    await takeSlot();
+    progress.set(lock, "redaction");
+
+    let out;
+    try {
+      out = await geminiJson(prompt(name, og, lore), {
+        timeoutMs: 60_000,
+        // Un découpage de sources ne veut pas d'imagination (cf. gameText.js).
+        temperature: lore.length ? 0.35 : 0.5,
+      });
+    } finally {
+      // Rendue dès que l'IA a répondu : la suite (les images) ne la concerne
+      // pas, et garder la place bloquerait le suivant pour rien.
+      freeSlot();
+    }
 
     const byLabel = new Map(lore.map((l) => [l.label.toLowerCase(), l]));
     const seen = new Set();
@@ -313,11 +401,21 @@ function startBatch(gameId, game) {
       });
     }
 
-    await illustrate(fresh, og);
-
+    // ⚠️ LE TEXTE PART SANS ATTENDRE LES IMAGES.
+    //
+    // Les illustrations coûtent plusieurs secondes de plus, et pendant ce
+    // temps-là le lecteur regardait une roue tourner alors que ses quatorze
+    // anecdotes étaient écrites, prêtes, et n'attendaient qu'une photo.
+    //
+    // On enregistre donc en DEUX temps : les cartes d'abord — l'écran les
+    // affiche aussitôt —, les photos ensuite, qui se posent dessus pendant
+    // qu'on lit la première. Tant que la seconde passe tourne, `ensureTrivia`
+    // continue d'annoncer « ça travaille », donc l'écran redemande et les
+    // images apparaissent d'elles-mêmes.
+    //
     // On compte la fournée MÊME VIDE : un jeu sur lequel personne n'a rien
     // écrit ne doit pas relancer tout ce travail à chaque ouverture.
-    return GameTrivia.findOneAndUpdate(
+    const saved = await GameTrivia.findOneAndUpdate(
       { gameId },
       {
         $set: {
@@ -325,17 +423,27 @@ function startBatch(gameId, game) {
           originalId: og.id,
           originalName: name,
         },
-        $push: { facts: { $each: fresh } },
+        // `query` n'est pas au schéma : c'est une note de travail pour
+        // `illustrate`, elle ne doit pas voyager jusqu'à la base.
+        $push: { facts: { $each: fresh.map(({ query, ...f }) => f) } },
         $inc: { batches: 1 },
       },
       { new: true, upsert: true }
     );
+
+    progress.set(lock, "images");
+    await illustrate(fresh, og);
+    await applyImages(gameId, fresh);
+    return saved;
   })()
     .catch((err) => {
       console.error(`trivia ${gameId} :`, err.message);
       failures.set(lock, { message: err.message, at: Date.now() });
     })
-    .finally(() => inflight.delete(lock));
+    .finally(() => {
+      inflight.delete(lock);
+      progress.delete(lock);
+    });
 
   inflight.set(lock, run);
 }
@@ -363,7 +471,10 @@ export async function ensureTrivia(gameId, game, { retry = false } = {}) {
   // accrochées.
   const empty = (doc?.facts?.length || 0) === 0;
   if (doc?.batches > 0 && !(retry && empty)) {
-    return { doc, pending: false, error: null };
+    // `pending` suit le travail EN COURS, pas l'existence du document : les
+    // cartes sont enregistrées avant leurs images (cf. startBatch), et c'est ce
+    // drapeau qui fait revenir l'écran chercher les photos manquantes.
+    return { doc, pending: inflight.has(lock), error: null, step: progress.get(lock) || null };
   }
 
   if (!isGeminiConfigured()) {
@@ -379,7 +490,7 @@ export async function ensureTrivia(gameId, game, { retry = false } = {}) {
   }
 
   startBatch(gameId, game);
-  return { doc, pending: true, error: null };
+  return { doc, pending: true, error: null, step: progress.get(lock) || null };
 }
 
 /** Le paquet tel que le mobile le lit : compteurs agrégés, ma réaction à part. */

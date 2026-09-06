@@ -18,6 +18,7 @@
     "collection:export": "node src/scripts/collectionCatalog.js --export",
     "collection:import": "node src/scripts/collectionCatalog.js --import",
     "build:mots": "node src/scripts/buildMotsDict.js",
+    "build:titles": "node src/scripts/buildGameTitles.js",
     "import:geo": "node src/scripts/importGeoPanoramas.js",
     "geo:export": "node src/scripts/geoCatalog.js --export",
     "geo:import": "node src/scripts/geoCatalog.js --import",

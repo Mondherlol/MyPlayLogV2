@@ -1722,6 +1722,106 @@ async function buildTimeline(
 //  GET /api/feed/home?limit&before — timeline de l'accueil
 // ============================================================
 // Curseur = date du dernier évènement affiché.
+// ============================================================
+//  GET /api/feed/circle — ce que jouent les gens qu'on suit
+// ============================================================
+// Un rail d'accueil : les jeux sur lesquels nos abonnements ont bougé
+// récemment, avec leurs visages dessous. C'est la question qu'on se pose en
+// ouvrant l'app — « ils jouent à quoi en ce moment ? » — et à laquelle le fil
+// répond mal : il raconte les actions une par une, alors qu'ici on veut le
+// JEU, avec tous ceux qui s'y trouvent d'un coup d'œil.
+//
+// ⚠️ ON REGARDE LES BIBLIOTHÈQUES, PAS LE JOURNAL D'ACTIVITÉ. Une entrée de
+// bibliothèque porte l'ÉTAT courant (statut, note, jaquette, date de dernier
+// changement) ; le journal, lui, porte des événements qu'il faudrait recoller
+// et qui s'effacent. Un `updatedAt` récent dit exactement ce qu'on cherche :
+// quelqu'un s'est occupé de ce jeu ces derniers temps.
+const CIRCLE_DAYS = 90;
+// Les statuts qui veulent dire « j'y ai joué ». On écarte les listes d'envies
+// (personne n'y a joué) et les abandons : un rail d'abandons ne donne envie à
+// personne, et ce n'est pas ce qu'on partage de sa semaine.
+const CIRCLE_STATUSES = ["playing", "finished", "endless", "paused"];
+
+router.get("/circle", requireAuth, async (req, res) => {
+  try {
+    const me = await User.findById(req.userId).select("following");
+    const following = me?.following || [];
+    // Personne à suivre : pas de section. Contrairement au fil, on ne bascule
+    // PAS sur la communauté — « ce que jouent tes abonnements » rempli
+    // d'inconnus serait un mensonge.
+    if (!following.length) return res.json({ items: [] });
+
+    const since = new Date(Date.now() - CIRCLE_DAYS * 24 * 60 * 60 * 1000);
+    const rows = await UserGame.aggregate([
+      {
+        $match: {
+          user: { $in: following },
+          status: { $in: CIRCLE_STATUSES },
+          updatedAt: { $gte: since },
+        },
+      },
+      { $sort: { updatedAt: -1 } },
+      {
+        $group: {
+          _id: "$gameId",
+          // La jaquette et le nom du plus récent : si quelqu'un a choisi une
+          // pochette personnalisée, c'est celle-là qu'on montre.
+          name: { $first: "$name" },
+          cover: { $first: "$cover" },
+          at: { $first: "$updatedAt" },
+          players: {
+            $push: { user: "$user", status: "$status", rating: "$rating", at: "$updatedAt" },
+          },
+        },
+      },
+      // Le plus de monde d'abord, puis le plus frais : un jeu où trois
+      // personnes se retrouvent vaut mieux qu'un jeu où une seule est passée
+      // hier.
+      { $addFields: { count: { $size: "$players" } } },
+      { $sort: { count: -1, at: -1 } },
+      { $limit: 20 },
+    ]);
+
+    // Les visages, en une requête pour tout le rail.
+    const ids = [...new Set(rows.flatMap((r) => r.players.map((p) => String(p.user))))];
+    const users = await User.find({ _id: { $in: ids } })
+      .select("username avatar")
+      .lean();
+    const byId = new Map(users.map((u) => [String(u._id), u]));
+
+    const items = rows
+      .map((r) => ({
+        id: r._id,
+        name: r.name,
+        cover: r.cover || null,
+        count: r.count,
+        players: r.players
+          .map((p) => {
+            const u = byId.get(String(p.user));
+            return u
+              ? {
+                  id: String(u._id),
+                  username: u.username,
+                  avatar: u.avatar || null,
+                  status: p.status,
+                  rating: p.rating ?? null,
+                }
+              : null;
+          })
+          .filter(Boolean)
+          // Quatre visages suffisent : au-delà, la pile devient une bouillie
+          // de vignettes de douze pixels.
+          .slice(0, 4),
+      }))
+      .filter((r) => r.players.length);
+
+    res.json({ items });
+  } catch (err) {
+    console.error("circle feed error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
 router.get("/home", requireAuth, async (req, res) => {
   try {
     const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 25);

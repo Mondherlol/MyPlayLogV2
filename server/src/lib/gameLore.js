@@ -228,11 +228,20 @@ async function wikipediaLore(pageUrl, name) {
     .filter((s) => Number(s.toclevel) <= 2)
     .slice(0, 4);
 
-  const blocks = [];
-  for (const s of picked) {
-    const text = await wikiSectionText(api, title, s.index).catch(() => "");
-    if (text.length > 200) blocks.push(`## ${plain(s.line)}\n${text.slice(0, 6000)}`);
-  }
+  // ⚠️ TOUTES LES SECTIONS EN MÊME TEMPS. Elles partaient l'une après
+  // l'autre : jusqu'à cinq allers-retours en file indienne pour un travail
+  // que rien n'oblige à ordonner — et autant de secondes ajoutées à
+  // l'attente de quelqu'un qui regarde une roue tourner.
+  const blocks = (
+    await Promise.all(
+      picked.map(async (s) => {
+        const text = await wikiSectionText(api, title, s.index).catch(() => "");
+        return text.length > 200
+          ? `## ${plain(s.line)}\n${text.slice(0, 6000)}`
+          : null;
+      })
+    )
+  ).filter(Boolean);
   if (!blocks.length) return null;
 
   return {
@@ -267,11 +276,16 @@ async function fandomLore(pageUrl) {
   const picked = sections.filter((s) => FANDOM_WANTED.test(plain(s.line))).slice(0, 3);
   if (!picked.length) return null;
 
-  const blocks = [];
-  for (const s of picked) {
-    const text = await wikiSectionText(api, title, s.index).catch(() => "");
-    if (text.length > 120) blocks.push(`## ${plain(s.line)}\n${text.slice(0, 5000)}`);
-  }
+  const blocks = (
+    await Promise.all(
+      picked.map(async (s) => {
+        const text = await wikiSectionText(api, title, s.index).catch(() => "");
+        return text.length > 120
+          ? `## ${plain(s.line)}\n${text.slice(0, 5000)}`
+          : null;
+      })
+    )
+  ).filter(Boolean);
   if (!blocks.length) return null;
 
   return {

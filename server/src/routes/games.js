@@ -39,10 +39,14 @@ import { fetchFitgirlRepacks } from "../lib/fitgirl.js";
 import { fetchZipertoGames } from "../lib/ziperto.js";
 import { getCachedTranslation, translateGameText } from "../lib/gameText.js";
 import { ensureTrivia, reactToFact, serializeTrivia } from "../lib/gameTrivia.js";
+import { gameCredits } from "../lib/gameCredits.js";
 import { ensureGameScores } from "../lib/gameScores.js";
 // Le cache serveur d'IGDB : toutes les lectures « ce que sait IGDB du jeu X »
 // passent par ici et sont partagées par tous les visiteurs (cf. lib/gameIgdb.js).
 import { createTtlCache } from "../lib/ttlCache.js";
+// « Vouliez-vous dire… » : IGDB ne tolère aucune faute de frappe, c'est donc
+// nous qui rattrapons (cf. lib/gameSpell.js).
+import { suggestTitles } from "../lib/gameSpell.js";
 import {
   gameBundleContents,
   gameCharacters,
@@ -516,12 +520,21 @@ router.get("/", requireAuth, async (req, res) => {
       search ? SEARCH_TTL : BROWSE_TTL
     );
 
+    // ZÉRO RÉSULTAT SUR UN NOM : c'est presque toujours une lettre de travers.
+    // IGDB cherche au caractère près et n'a rien à proposer, alors on cherche
+    // le titre le plus proche dans notre lexique. On ne remplace RIEN — on
+    // joint la proposition à une réponse vide, et l'app en fait ce qu'elle veut.
+    const suggestions =
+      search && !games.length && page === 1 ? suggestTitles(search, 3) : [];
+
     res.json({
       page,
       limit,
       count: games.length,
       hasMore: games.length === limit,
       games,
+      suggestion: suggestions[0] || null,
+      suggestions,
     });
   } catch (err) {
     console.error("games error:", err.message);
@@ -1986,6 +1999,21 @@ router.post("/:id/translate", requireAuth, async (req, res) => {
   }
 });
 
+// --- Qui a fait ce jeu : l'équipe et la distribution, personne par personne.
+// IGDB ne connaît que des sociétés ; ces gens-là viennent de l'infobox de
+// Wikipédia et de Wikidata (cf. lib/gameCredits.js). Écrit une fois par jeu,
+// puis servi à tout le monde — ces faits ne bougent plus. ---
+router.get("/:id/credits", optionalAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+    res.json(await gameCredits(id));
+  } catch (err) {
+    console.error("game credits error:", err.message);
+    res.status(err.status || 500).json({ error: err.message || "Équipe indisponible." });
+  }
+});
+
 // ----------------------------------------------------------------------
 //  Mode Trivia : les anecdotes de coulisses d'un jeu
 // ----------------------------------------------------------------------
@@ -2005,10 +2033,12 @@ router.get("/:id/trivia", requireAuth, async (req, res) => {
     const g = await gameCore(id);
     if (!g) return res.status(404).json({ error: "Jeu introuvable." });
 
-    const { doc, pending, error } = await ensureTrivia(id, g, {
+    const { doc, pending, error, step } = await ensureTrivia(id, g, {
       retry: req.query.retry === "1",
     });
-    res.json({ ...serializeTrivia(doc, req.userId), pending, failed: error });
+    // `step` dit OÙ EN EST le travail : l'écran d'attente l'annonce au lieu de
+    // faire tourner une roue muette (cf. mobile app/game/trivia.jsx).
+    res.json({ ...serializeTrivia(doc, req.userId), pending, failed: error, step: step || null });
   } catch (err) {
     console.error("game trivia error:", err.message);
     res.status(err.status || 500).json({ error: err.message || "Anecdotes indisponibles." });

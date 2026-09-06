@@ -2,11 +2,58 @@
 // Clé gratuite : https://aistudio.google.com/apikey → GEMINI_API_KEY dans
 // server/.env. Le modèle est surchargeable via GEMINI_MODEL ; l'alias
 // « gemini-flash-latest » pointe toujours vers le Flash stable le plus récent.
+//
+// ----------------------------------------------------------------------
+//  PLUSIEURS CLÉS, SI ON EN A
+// ----------------------------------------------------------------------
+// `GEMINI_API_KEYS` accepte une liste séparée par des virgules ; `GEMINI_API_KEY`
+// (une seule) continue de marcher exactement comme avant.
+//
+// Le quota gratuit se compte PAR PROJET : deux clés issues de deux projets,
+// c'est deux fois le débit. Ça ne sert à rien avec deux clés du même projet —
+// elles partagent le même compteur.
+//
+// Quand une clé prend un 429, on la met AU FRAIS une minute et on passe à la
+// suivante avec le même modèle : mieux vaut la même qualité sur une autre clé
+// que le petit modèle sur une clé saturée.
 
 const API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models";
 
+function apiKeys() {
+  const raw = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || "";
+  return raw
+    .split(",")
+    .map((k) => k.trim())
+    .filter(Boolean);
+}
+
 export function isGeminiConfigured() {
-  return Boolean(process.env.GEMINI_API_KEY);
+  return apiKeys().length > 0;
+}
+
+// Les clés à court de quota, avec l'heure à laquelle on pourra les reprendre.
+// La minute est le pas des quotas « par minute » de Gemini ; un quota
+// journalier épuisé se retrouvera au frais toutes les minutes, ce qui est le
+// comportement voulu — on retente, sans marteler.
+const cooling = new Map();
+const COOL_MS = 60_000;
+
+// Tourniquet : on ne repart pas systématiquement de la première clé, sinon
+// c'est toujours elle qui encaisse tout et les autres ne servent qu'en panne.
+let turn = 0;
+
+function nextKey(keys, tried) {
+  const now = Date.now();
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[(turn + i) % keys.length];
+    if (tried.has(key)) continue;
+    if ((cooling.get(key) || 0) > now) continue;
+    turn = (turn + i + 1) % keys.length;
+    return key;
+  }
+  // Toutes au frais ou déjà essayées : on rend la moins fraîche plutôt que de
+  // renoncer — le quota s'est peut-être libéré avant l'heure qu'on avait notée.
+  return keys.find((k) => !tried.has(k)) || null;
 }
 
 // Modèle de secours quand le principal est saturé (503 « high demand »),
@@ -14,11 +61,11 @@ export function isGeminiConfigured() {
 // est moins malin mais quasiment toujours disponible.
 const FALLBACK_MODEL = "gemini-flash-lite-latest";
 
-async function callModel(model, prompt, timeoutMs, temperature) {
+async function callModel(model, prompt, timeoutMs, temperature, apiKey) {
   const res = await fetch(`${API_ROOT}/${model}:generateContent`, {
     method: "POST",
     headers: {
-      "x-goog-api-key": process.env.GEMINI_API_KEY,
+      "x-goog-api-key": apiKey,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -123,21 +170,50 @@ export async function geminiJson(
   prompt,
   { timeoutMs = 25_000, temperature = 0.9, model: forced = null } = {}
 ) {
-  if (!isGeminiConfigured()) {
+  const keys = apiKeys();
+  if (!keys.length) {
     const err = new Error("GEMINI_API_KEY manquant dans server/.env.");
     err.status = 503;
     throw err;
   }
   const model = forced || process.env.GEMINI_MODEL || "gemini-flash-latest";
 
-  try {
-    return await callModel(model, prompt, timeoutMs, temperature);
-  } catch (err) {
-    const retryable = [429, 404, 503].includes(err.status);
-    if (!retryable || model === FALLBACK_MODEL) throw err;
-    console.warn(
-      `gemini: ${model} indisponible (${err.status}), repli sur ${FALLBACK_MODEL}`
-    );
-    return callModel(FALLBACK_MODEL, prompt, timeoutMs, temperature);
+  const tried = new Set();
+  let last = null;
+
+  // 1) Le modèle demandé, sur chaque clé encore disponible. Un 429 ne
+  //    condamne QUE la clé : une autre a son propre compteur.
+  while (tried.size < keys.length) {
+    const key = nextKey(keys, tried);
+    if (!key) break;
+    tried.add(key);
+
+    try {
+      return await callModel(model, prompt, timeoutMs, temperature, key);
+    } catch (err) {
+      last = err;
+      if (err.status === 429) {
+        cooling.set(key, Date.now() + COOL_MS);
+        if (keys.length > 1) {
+          console.warn(`gemini: clé saturée (429), on passe à la suivante`);
+          continue;
+        }
+      }
+      // 404 / 503 : c'est le MODÈLE qui est en cause, pas la clé — changer de
+      // clé n'y changerait rien, on descend d'un modèle.
+      if ([404, 503, 429].includes(err.status)) break;
+      throw err;
+    }
   }
+
+  // 2) Le modèle de secours : moins malin, mais quasiment toujours là.
+  if (model !== FALLBACK_MODEL && [429, 404, 503].includes(last?.status)) {
+    console.warn(
+      `gemini: ${model} indisponible (${last.status}), repli sur ${FALLBACK_MODEL}`
+    );
+    const key = nextKey(keys, new Set()) || keys[0];
+    return callModel(FALLBACK_MODEL, prompt, timeoutMs, temperature, key);
+  }
+
+  throw last;
 }
