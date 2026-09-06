@@ -27,6 +27,7 @@ function toPublic(e) {
     plannedMonth: e.plannedMonth || null,
     bundleGames: e.bundleGames || [],
     dlcs: e.dlcs || [],
+    edition: e.edition || null,
     playtimeHours: e.playtimeHours,
     startedAt: e.startedAt || null,
     finishedAt: e.finishedAt || null,
@@ -302,6 +303,23 @@ router.put("/:gameId", requireAuth, async (req, res) => {
         }));
     }
 
+    // L'édition jouée : un jeu du catalogue (Deluxe, GOTY, portage…), ou null
+    // pour la standard — qui est le défaut et ne s'enregistre pas autrement.
+    if (b.edition !== undefined) {
+      if (b.edition === null || b.edition === "") {
+        b.edition = null;
+      } else if (!b.edition?.id || !b.edition?.name) {
+        return res.status(400).json({ error: "edition invalide." });
+      } else {
+        b.edition = {
+          id: Number(b.edition.id),
+          name: String(b.edition.name).slice(0, 160),
+          cover: b.edition.cover ? String(b.edition.cover) : null,
+        };
+        if (!b.edition.id) return res.status(400).json({ error: "edition invalide." });
+      }
+    }
+
     // Dates de début / de fin : une date ISO, ou null pour l'effacer. On les
     // convertit ici plutôt que de laisser Mongoose avaler n'importe quoi —
     // une chaîne bancale y deviendrait silencieusement `Invalid Date`.
@@ -344,6 +362,7 @@ router.put("/:gameId", requireAuth, async (req, res) => {
       "plannedMonth",
       "bundleGames",
       "dlcs",
+      "edition",
     ]) {
       if (b[key] !== undefined) update[key] = b[key];
     }

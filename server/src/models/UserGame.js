@@ -86,6 +86,19 @@ const ownedDlcSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// L'ÉDITION à laquelle j'ai joué : Deluxe, GOTY, édition console, portage. Une
+// édition n'est pas un autre jeu — c'est le même, dans une autre boîte —, donc
+// pas d'entrée à elle : une ligne ici, et `null` veut dire « la standard »,
+// qui est le cas de l'immense majorité.
+const editionSchema = new mongoose.Schema(
+  {
+    id: { type: Number, required: true }, // id IGDB de l'édition
+    name: { type: String, required: true },
+    cover: { type: String, default: null },
+  },
+  { _id: false }
+);
+
 // Une entrée de bibliothèque : le lien entre un utilisateur et un jeu IGDB.
 const userGameSchema = new mongoose.Schema(
   {
@@ -140,9 +153,11 @@ const userGameSchema = new mongoose.Schema(
     plannedMonth: { type: String, default: null },
     // Si le jeu est un bundle : progression jeu par jeu (cases de la modale).
     bundleGames: { type: [bundleGameSchema], default: [] },
-    // Les DLC et extensions de CE jeu que je possède (cases de la feuille de
-    // suivi). Ils ne créent aucune entrée à eux : ils vivent ici.
+    // Les DLC de CE jeu que je possède (cases de la feuille de suivi). Ils ne
+    // créent aucune entrée à eux : ils vivent ici.
     dlcs: { type: [ownedDlcSchema], default: [] },
+    // L'édition jouée, ou null pour la standard.
+    edition: { type: editionSchema, default: null },
     // Entrée créée/gérée via un bundle : id IGDB du bundle parent. Sert à
     // nettoyer l'entrée si son statut est décoché dans la modale du bundle
     // (uniquement si elle est restée vierge : pas de note/avis ajoutés à la main).

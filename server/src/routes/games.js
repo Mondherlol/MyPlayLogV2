@@ -1367,9 +1367,16 @@ async function fetchBundleGames(bundleId, releaseDate = null) {
 // Sorceleur 3 en cours, comme deux titres sans rapport.
 //
 // La feuille de suivi du jeu de base les liste donc à cocher (cf. `dlcs` dans
-// server/src/routes/library.js). Ils viennent de la fiche déjà chargée — DLC,
-// extensions et extensions autonomes réunis —, sans une requête de plus.
+// server/src/routes/library.js). Ils viennent de la fiche déjà chargée, sans
+// une requête de plus.
+//
+// ⚠️ LES EXTENSIONS N'EN SONT PAS, ET C'EST VOLONTAIRE. Phantom Liberty,
+// Blood and Wine, Shadow of the Erdtree : ce sont des jeux qu'on lance, qu'on
+// finit, qu'on note — pas des cases à cocher. Seul le `game_type` 1 (DLC) est
+// retenu ; les extensions (2) et les extensions autonomes (4) gardent leur
+// fiche et leur suivi.
 const DLC_RELATIONS = ["dlcs", "expansions", "standalone_expansions"];
+const DLC_TYPE = 1;
 
 function gameDlcs(g) {
   const seen = new Set();
@@ -1377,6 +1384,7 @@ function gameDlcs(g) {
   for (const rel of DLC_RELATIONS) {
     for (const d of g?.[rel] || []) {
       if (!d?.id || !d?.name || seen.has(d.id)) continue;
+      if (d.game_type !== DLC_TYPE) continue;
       seen.add(d.id);
       out.push({
         id: d.id,
@@ -1393,6 +1401,52 @@ function gameDlcs(g) {
     }
   }
   // Du plus ancien au plus récent : c'est l'ordre où on les a joués.
+  return out.sort((a, b) => (a.releaseDate || Infinity) - (b.releaseDate || Infinity));
+}
+
+// ======================================================================
+//  Les éditions d'un jeu : la même partie, dans une autre boîte
+// ======================================================================
+// « Deluxe », « GOTY », « édition Nintendo Switch 2 », le portage PC d'un jeu
+// console : ce ne sont pas d'autres jeux. C'est LE jeu, acheté autrement. Leur
+// donner chacun une entrée de bibliothèque coupait la même partie en trois
+// lignes, avec trois notes et trois temps de jeu.
+//
+// La feuille de suivi pose donc UNE question à la place : à quelle édition
+// as-tu joué ? La réponse par défaut est « Standard » — c'est le cas de la
+// grande majorité —, et le client n'envoie que ce qui s'en écarte (cf. le
+// champ `edition` dans server/src/routes/library.js).
+//
+// ⚠️ REMAKES, REMASTERS ET VERSIONS ENRICHIES RESTENT DES JEUX. On ne note pas
+// Demon's Souls 2020 comme celui de 2009, et Persona 4 Golden a sa propre
+// histoire : eux gardent leur fiche et leur suivi.
+const EDITION_PORT_TYPE = 11;
+
+function editionRow(g, fallbackLabel) {
+  return {
+    id: g.id,
+    name: g.name,
+    cover: g.cover?.image_id ? `${IMG_BASE}/t_cover_big/${g.cover.image_id}.jpg` : null,
+    typeLabel: GAME_TYPES_FR[g.game_type]?.label || fallbackLabel,
+    year: g.first_release_date ? new Date(g.first_release_date * 1000).getFullYear() : null,
+    releaseDate: g.first_release_date || null,
+  };
+}
+
+/** Les éditions (dont ce jeu est le parent) et ses portages, en une liste. */
+function gameEditions(g, editions) {
+  const seen = new Set();
+  const out = [];
+  for (const e of editions || []) {
+    if (!e?.id || !e?.name || seen.has(e.id)) continue;
+    seen.add(e.id);
+    out.push(editionRow(e, "Édition"));
+  }
+  for (const p of g?.ports || []) {
+    if (!p?.id || !p?.name || seen.has(p.id)) continue;
+    seen.add(p.id);
+    out.push(editionRow(p, "Portage"));
+  }
   return out.sort((a, b) => (a.releaseDate || Infinity) - (b.releaseDate || Infinity));
 }
 
@@ -1497,13 +1551,23 @@ router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
       (g.first_release_date && g.first_release_date <= nowSec) ||
       (!g.first_release_date && (g.total_rating_count || 0) > 0);
     const stores = storesFrom(g.external_games);
-    const [ttb, vnChars, bundleGames] = await Promise.all([
+    // Les éditions de CE jeu (Deluxe, GOTY, édition console…) : ce sont
+    // d'AUTRES jeux qui le citent comme parent, IGDB ne les porte donc pas sur
+    // sa fiche. ⚠️ On repose la question EXACTEMENT comme /related (même saga
+    // en second membre) : la réponse est mise en cache sous la seule clé du
+    // jeu, et une question plus étroite priverait l'onglet Univers de sa saga.
+    const bestFranchise = franchisesOf(g)[0] || null;
+    const whereRel = bestFranchise
+      ? `${bestFranchise.kind === "collection" ? "collections" : "franchises"} = (${bestFranchise.id})`
+      : null;
+    const [ttb, vnChars, bundleGames, relatives] = await Promise.all([
       resolveTimeToBeat(id, g.name, released, g.first_release_date ?? null),
       isVn ? resolveVnCharacters(id, g.name) : Promise.resolve([]),
       // Bundle : la modale « joué » propose de cocher chaque jeu inclus.
       g.game_type === 3
         ? fetchBundleGames(id, g.first_release_date ?? null)
         : Promise.resolve([]),
+      gameRelatives(id, whereRel, g.first_release_date ?? null).catch(() => null),
     ]);
 
     // Dédoublonnage : on n'ajoute un perso VNDB que si son nom n'existe pas déjà.
@@ -1556,6 +1620,8 @@ router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
       bundleGames,
       // Les contenus additionnels, à cocher dans la feuille de suivi.
       dlcs: gameDlcs(g),
+      // Les éditions et portages : « à quelle édition as-tu joué ? »
+      editions: gameEditions(g, relatives?.editions),
     });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
@@ -1786,7 +1852,15 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
       .catch(() => null);
 
     // « Ce jeu est un remake / DLC / … de … » : type IGDB + jeu parent.
-    const typeFr = GAME_TYPES_FR[g.game_type];
+    //
+    // ⚠️ LES ÉDITIONS N'ONT PAS DE TYPE CHEZ IGDB. « Deluxe », « GOTY »,
+    // « édition Nintendo Switch 2 » sont des jeux de type 0 (jeu principal)
+    // qui désignent leur original par `version_parent` — et rien d'autre ne
+    // les distingue. Sans ce cas, la fiche d'une Deluxe ne disait pas de quoi
+    // elle est l'édition, et l'app la suivait comme un jeu séparé.
+    const typeFr =
+      GAME_TYPES_FR[g.game_type] ||
+      (g.version_parent ? { label: "Édition", phrase: "une édition" } : null);
     const relParent = g.parent_game || g.version_parent || null;
     const relation = typeFr
       ? {
@@ -1937,24 +2011,6 @@ router.get("/:id/trivia", requireAuth, async (req, res) => {
     res.json({ ...serializeTrivia(doc, req.userId), pending, failed: error });
   } catch (err) {
     console.error("game trivia error:", err.message);
-    res.status(err.status || 500).json({ error: err.message || "Anecdotes indisponibles." });
-  }
-});
-
-// « Encore » au bout du paquet : une fournée de plus, sans redire ce qui a
-// déjà été raconté. Bornée côté lib (un jeu n'a pas cinquante vraies histoires).
-router.post("/:id/trivia/more", requireAuth, async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!id) return res.status(400).json({ error: "id invalide." });
-
-    const g = await gameCore(id);
-    if (!g) return res.status(404).json({ error: "Jeu introuvable." });
-
-    const { doc, pending, error } = await ensureTrivia(id, g, { more: true, retry: true });
-    res.json({ ...serializeTrivia(doc, req.userId), pending, failed: error });
-  } catch (err) {
-    console.error("game trivia more error:", err.message);
     res.status(err.status || 500).json({ error: err.message || "Anecdotes indisponibles." });
   }
 });
