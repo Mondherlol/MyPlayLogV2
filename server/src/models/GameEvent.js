@@ -94,9 +94,36 @@ const gameEventSchema = new mongoose.Schema(
     // sur une date qu'on ne peut pas vérifier ne vaut pas grand-chose.
     sourceUrl: { type: String, default: null },
 
+    // ⚠️ L'IDENTIFIANT IGDB DE L'ÉVÉNEMENT, ET IL VAUT PLUS QUE LES QUELQUES
+    // CHAMPS QU'IGDB APPORTE. C'est LUI qui permet d'aller redemander, pendant
+    // la diffusion, la liste des jeux qu'IGDB y rattache au fur et à mesure
+    // (cf. lib/eventCalendar, `pollLiveEvents`). Il est donc conservé même
+    // quand l'entrée vient de l'agenda et qu'IGDB n'a servi qu'à ça.
+    igdbEventId: { type: Number, default: null },
+
     // Les jeux annoncés, quand la source les connaît (IGDB seulement, et donc
-    // presque jamais pour un événement à venir).
+    // presque jamais AVANT l'événement).
     gameIds: { type: [Number], default: [] },
+
+    // Ce qui a été montré PENDANT la diffusion, relevé au fil de l'eau. Chaque
+    // entrée porte l'heure à laquelle on l'a vue apparaître : c'est ce qui
+    // permet de montrer les dernières annonces en tête, et de dire « il y a
+    // deux minutes ».
+    liveGames: {
+      type: [
+        {
+          _id: false,
+          id: { type: Number, required: true },
+          name: { type: String, default: "" },
+          cover: { type: String, default: null },
+          addedAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
+    // Dernier relevé en direct. Sert à ne pas marteler IGDB et à dire au client
+    // si le direct est encore suivi.
+    liveCheckedAt: { type: Date, default: null },
 
     // Retiré à la main depuis l'admin : la synchro peut bien le retrouver
     // chaque jour, il ne remontera plus.
@@ -123,5 +150,8 @@ const gameEventSchema = new mongoose.Schema(
 gameEventSchema.index({ hidden: 1, startsAt: 1 });
 // « Sur quoi ai-je coché ? » — tableau, donc index multiclé.
 gameEventSchema.index({ interested: 1 });
+// Le relevé en direct interroge « quels événements IGDB sont en cours ? »
+// toutes les deux minutes : sans index, c'est un balayage à chaque passage.
+gameEventSchema.index({ igdbEventId: 1, startsAt: 1 });
 
 export default mongoose.model("GameEvent", gameEventSchema);

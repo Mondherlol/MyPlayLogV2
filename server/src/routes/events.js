@@ -36,6 +36,14 @@ function serialize(ev, userId) {
     sourceUrl: ev.sourceUrl || null,
     source: ev.source,
     gameIds: ev.gameIds || [],
+    // ⚠️ LES ANNONCES DU DIRECT, LES PLUS RÉCENTES EN TÊTE. C'est l'ordre dans
+    // lequel on veut les lire pendant une diffusion — « qu'est-ce qui vient
+    // d'être montré ? » — et l'inverse de l'ordre où on les a relevées.
+    liveGames: [...(ev.liveGames || [])]
+      .sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt))
+      .slice(0, 60)
+      .map((g) => ({ id: g.id, name: g.name, cover: g.cover, addedAt: g.addedAt })),
+    liveCheckedAt: ev.liveCheckedAt || null,
     interested: mine,
     interestedCount: (ev.interested || []).length,
   };

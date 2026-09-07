@@ -26,7 +26,7 @@ import { originalGame } from "./gameLore.js";
 
 // La version du format. ⚠️ LA BUMPER quand on change ce qu'on extrait, sinon
 // les fiches déjà en base répondront à l'ancienne pour toujours.
-const VER = 1;
+const VER = 2;
 
 const UA = "MyPlayLog/1.0 (credits; +https://myplaylog.cc)";
 const TIMEOUT = 10_000;
@@ -182,9 +182,20 @@ const ROLES = [
   ["producer", "Production"],
 ];
 
-// Découpe la première section d'un article en `{ champ: valeur }`.
-function infoboxFields(wikitext) {
+// ⚠️ L'INFOBOX S'ARRÊTE, PAS LE TEXTE. Sans cette borne, le DERNIER champ de
+// l'infobox avalait tout ce qui suit — c'est-à-dire le premier paragraphe de
+// l'article. Vu en vrai sur Breath of the Wild, où la ligne « compositeur »
+// finissait par créditer « Zelda timeline]], it follows [[Link... ». On coupe
+// donc au `}}` qui ferme l'infobox avant de lire quoi que ce soit.
+function infoboxOnly(wikitext) {
   const text = String(wikitext || "");
+  const at = text.search(/\{\{\s*infobox/i);
+  return at < 0 ? text : text.slice(at, closeBraces(text, at));
+}
+
+// Découpe l'infobox d'un article en `{ champ: valeur }`.
+function infoboxFields(wikitext) {
+  const text = infoboxOnly(wikitext);
   const out = {};
   const marks = [...text.matchAll(/^\s*\|\s*([a-z_ ]+?)\s*=\s*/gim)];
   marks.forEach((m, i) => {
@@ -204,29 +215,105 @@ const titleOf = (url) => {
   return m ? decodeURIComponent(m[1]) : null;
 };
 
-async function crewFromWikipedia(wikiUrl, name) {
-  let host = "en.wikipedia.org";
-  let title = titleOf(wikiUrl);
-  if (wikiUrl) {
-    const h = String(wikiUrl).match(/^https?:\/\/([^/]+)/);
-    if (h) host = h[1];
-  }
-  if (!title) {
-    const found = await getJson(
-      `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
-        `${name} video game`
-      )}&srlimit=1&format=json`
-    );
-    title = found?.query?.search?.[0]?.title || null;
-  }
-  if (!title) return { people: [], url: null, host, title: null };
+// ----------------------------------------------------------------------
+//  Trouver le BON article
+// ----------------------------------------------------------------------
+//
+// ⚠️ VU EN VRAI SUR ACE ATTORNEY TRILOGY : la fiche affichait les réalisateurs
+// du FILM. Quand IGDB ne donne pas de lien Wikipédia, on cherchait par nom et
+// on prenait le premier résultat sans jamais vérifier ce qu'il était — or « Ace
+// Attorney » tout court, sur Wikipédia, c'est le long-métrage de Takashi Miike.
+// Une fiche de jeu créditant une équipe de cinéma, ce n'est pas une donnée
+// approximative : c'est une donnée fausse, et elle a l'air vraie.
+//
+// Deux garde-fous, et il faut les deux :
+//
+//   • LE TITRE doit parler du même jeu — sinon la recherche part au loin (vu
+//     aussi : « List of video games listed among the best ») ;
+//   • L'INFOBOX doit être celle d'un jeu vidéo — c'est ce qui sépare le film de
+//     l'adaptation, la série télé du jeu, l'album de la bande originale.
+//
+// Le second est le plus sûr : un article de film porte `{{Infobox film}}`, et
+// aucun jeu ne porte ça.
 
+const GAME_INFOBOX = /\{\{\s*infobox[ _]+(video[ _]*game|vg\b|jeu vidéo)/i;
+
+const isGameArticle = (wikitext) => GAME_INFOBOX.test(String(wikitext || ""));
+
+// Les mots qui ne distinguent rien : ils sont dans un titre de jeu sur deux.
+const FILLER = /^(the|a|of|and|le|la|les|des|du|edition|remastered|hd|deluxe|definitive|complete|collection|trilogy|remake|remaster)$/i;
+
+const words = (s) =>
+  String(s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length > 2 && !FILLER.test(w));
+
+// Le titre trouvé parle-t-il bien de ce jeu ? On demande la moitié des mots
+// significatifs — un jeu s'appelle rarement pareil qu'un article sans rapport,
+// et une édition (« Definitive ») ne doit pas faire échouer la comparaison.
+function sameTitle(name, title) {
+  const want = words(name);
+  if (!want.length) return true;
+  const have = new Set(words(title));
+  const hits = want.filter((w) => have.has(w)).length;
+  return hits * 2 >= want.length;
+}
+
+// La section 0 d'un article : c'est là qu'est l'infobox, et donc l'équipe.
+async function sectionZero(host, title) {
   const parsed = await getJson(
     `https://${host}/w/api.php?action=parse&page=${encodeURIComponent(
       title
     )}&prop=wikitext&section=0&format=json&redirects=1`
-  );
-  const fields = infoboxFields(parsed?.parse?.wikitext?.["*"]);
+  ).catch(() => null);
+  return parsed?.parse?.wikitext?.["*"] || null;
+}
+
+/**
+ * L'article du jeu, ou rien.
+ *
+ * Rien est une réponse acceptable : la section disparaît de la fiche, ce qui
+ * vaut infiniment mieux que d'y afficher l'équipe de quelqu'un d'autre.
+ */
+async function findArticle(wikiUrl, name) {
+  // Le lien que porte la fiche IGDB, quand il y en a un. Il est presque
+  // toujours bon — mais « presque » se vérifie, comme le reste.
+  const linked = titleOf(wikiUrl);
+  if (linked) {
+    const host = String(wikiUrl).match(/^https?:\/\/([^/]+)/)?.[1] || "en.wikipedia.org";
+    const text = await sectionZero(host, linked);
+    if (text && isGameArticle(text)) return { host, title: linked, text };
+  }
+
+  // Sinon on cherche — et on regarde ce qu'on a trouvé avant de le croire.
+  const host = "en.wikipedia.org";
+  const found = await getJson(
+    `https://${host}/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
+      `${name} video game`
+    )}&srlimit=5&format=json`
+  ).catch(() => null);
+
+  const hits = (found?.query?.search || [])
+    .map((r) => r.title)
+    .filter((title) => sameTitle(name, title))
+    .slice(0, 3);
+
+  for (const title of hits) {
+    const text = await sectionZero(host, title);
+    if (text && isGameArticle(text)) return { host, title, text };
+  }
+  return null;
+}
+
+async function crewFromWikipedia(wikiUrl, name) {
+  const article = await findArticle(wikiUrl, name);
+  if (!article) return { people: [], url: null, host: "en.wikipedia.org", title: null };
+
+  const { host, title, text } = article;
+  const fields = infoboxFields(text);
 
   const people = [];
   ROLES.forEach(([field, label], rank) => {
@@ -374,8 +461,13 @@ async function build(game) {
     });
   }
 
+  // ⚠️ LES VISAGES D'ABORD, le rôle ensuite. Une liste qui s'ouvre sur six
+  // jetons d'initiales a l'air vide même quand elle ne l'est pas — alors que
+  // les mêmes six lignes, menées par trois portraits, se lisent comme une
+  // équipe. Le rang de rôle départage à photo égale, donc la réalisation reste
+  // devant la programmation.
   const people = [...merged.values()]
-    .sort((a, b) => a.rank - b.rank)
+    .sort((a, b) => (b.image ? 1 : 0) - (a.image ? 1 : 0) || a.rank - b.rank)
     .map(({ rank, ...p }) => p);
 
   // Pas de source affichée si on n'a trouvé personne : quand IGDB ne donne pas

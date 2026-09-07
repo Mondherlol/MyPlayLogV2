@@ -34,10 +34,12 @@ import {
   cleanEventName,
   eventFamily,
   fetchEvents,
+  fetchGames,
   isTrackedEvent,
   youtubeId,
   youtubeThumb,
 } from "./gameEvents.js";
+import { igdbQuery } from "./igdb.js";
 import { firstHref, parseIcs, parseIcsDate, prop, stripHtml, unescapeIcs } from "./ics.js";
 
 const IMG_BASE = "https://images.igdb.com/igdb/image/upload";
@@ -104,11 +106,55 @@ const slugify = (s) =>
     .replace(/^-|-$/g, "")
     .slice(0, 60);
 
-// Deux fournisseurs peuvent décrire le MÊME rendez-vous. On les rapproche sur
-// « le même nom, le même jour » — c'est ce qui distingue deux Directs à un jour
-// d'écart, et ce qui réunit la version IGDB et la version Wikipédia du même.
-const dedupeKey = (name, startsAt) =>
-  `${slugify(cleanEventName(name))}@${new Date(startsAt).toISOString().slice(0, 10)}`;
+// ======================================================================
+//  Reconnaître DEUX DESCRIPTIONS DU MÊME RENDEZ-VOUS
+// ======================================================================
+// ⚠️ « MÊME NOM, MÊME JOUR » NE SUFFIT PAS, ET ÇA A PRODUIT DES DOUBLONS.
+//
+// La règle d'origine comparait le nom nettoyé et la date au jour près. Le jour
+// où IGDB a fini par renseigner les Nintendo Direct de septembre, les deux
+// fournisseurs se sont mis à décrire les mêmes soirées avec :
+//
+//   • des NOMS différents — l'agenda dit « Nintendo Direct - September »,
+//     IGDB dit « Nintendo Direct 2026.09.09 + Nintendo Treehouse Live:
+//     September 2026 ». Nettoyés, ça donne « nintendo-direct-september » d'un
+//     côté et « nintendo-direct » de l'autre ;
+//   • et parfois des DATES différentes — le PLAYISM Game Show est daté du 10
+//     par l'agenda et du 11 par IGDB. Vingt-quatre heures d'écart : aucune
+//     comparaison au jour près ne les rapprochera jamais.
+//
+// D'où deux critères indépendants, et il suffit que l'un des deux accroche :
+// la FAMILLE (le motif d'événement récurrent, cf. lib/gameEvents), ou le fait
+// qu'un nom soit contenu dans l'autre. Le tout dans une fenêtre de trente
+// heures, qui absorbe le décalage d'un jour sans marier deux éditions
+// distinctes.
+
+// Trente heures : assez pour rattraper un jour d'écart entre deux sources,
+// trop peu pour confondre deux rendez-vous d'une même série à deux jours près.
+const SAME_EVENT_MS = 30 * 3600 * 1000;
+
+const normName = (name) =>
+  slugify(cleanEventName(name)).replace(/-/g, " ").trim();
+
+/** Ces deux descriptions parlent-elles du même rendez-vous ? */
+export function sameEvent(a, b) {
+  const gap = Math.abs(new Date(a.startsAt) - new Date(b.startsAt));
+  if (gap > SAME_EVENT_MS) return false;
+
+  // La famille d'abord : c'est le critère le plus sûr, puisqu'il vient de
+  // motifs écrits à la main pour désigner des séries précises.
+  const fa = eventFamily(a.name);
+  const fb = eventFamily(b.name);
+  if (fa && fb) return fa === fb;
+
+  // Sinon, l'un des deux noms contient l'autre. « playism game show » et
+  // « playism game show tgs 2026 preview » sont le même showcase ; « nintendo
+  // direct » et « the legend of zelda 40th anniversary direct » ne le sont pas.
+  const na = normName(a.name);
+  const nb = normName(b.name);
+  if (!na || !nb) return false;
+  return na === nb || na.startsWith(nb) || nb.startsWith(na);
+}
 
 // ----------------------------------------------------------------------
 //  Fournisseur 1 — IGDB
@@ -123,12 +169,26 @@ export async function fromIgdb({ log = () => {} } = {}) {
     return [];
   }
 
-  const kept = rows.filter((e) => e.start_time && isTrackedEvent(e.name));
-  log(`· IGDB : ${rows.length} événements à venir, ${kept.length} retenus`);
+  // ⚠️ ON NE FILTRE PLUS ICI, ON MARQUE. Le filtre « événement connu » servait
+  // à écarter la longue traîne de micro-showcases d'IGDB — mais il jetait aussi
+  // le Direct des 40 ans de Zelda, dont le nom ne correspond à aucun motif. Or
+  // l'entrée IGDB de cet événement-là porte quelque chose d'irremplaçable : son
+  // IDENTIFIANT, sans lequel on ne peut pas relever ses jeux pendant la
+  // diffusion. On garde donc tout le monde comme candidat à la fusion, et
+  // `mergeSources` ne fera entrer au calendrier, parmi ceux qui n'ont pas
+  // trouvé de jumeau, que les événements reconnus.
+  const kept = rows.filter((e) => e.start_time);
+  const tracked = kept.filter((e) => isTrackedEvent(e.name)).length;
+  log(`· IGDB : ${rows.length} événements à venir, ${tracked} reconnus (${kept.length} candidats)`);
 
   return kept.map((e) => ({
     key: `igdb:${e.id}`,
     source: "igdb",
+    // Gardé quoi qu'il arrive : c'est la clé du relevé en direct.
+    igdbEventId: e.id,
+    // Seuls les événements RECONNUS ont le droit d'entrer au calendrier par
+    // eux-mêmes ; les autres ne servent qu'à enrichir une entrée de l'agenda.
+    tracked: isTrackedEvent(e.name),
     name: cleanEventName(e.name),
     subtitle: "",
     startsAt: new Date(e.start_time * 1000),
@@ -431,21 +491,30 @@ async function resolveImages(events, log) {
  * quand il connaît le même rendez-vous.
  */
 export function mergeSources(gcg, igdb) {
-  const byDedupe = new Map();
-  for (const e of gcg) byDedupe.set(dedupeKey(e.name, e.startsAt), e);
+  const out = [...gcg];
+
   for (const e of igdb) {
-    const k = dedupeKey(e.name, e.startsAt);
-    const known = byDedupe.get(k);
+    const known = out.find((k) => sameEvent(k, e));
     if (!known) {
-      byDedupe.set(k, e);
+      // Pas de jumeau : il n'entre que si c'est un rendez-vous qu'on sait
+      // nommer. Sinon on le laisse tomber — c'est le filtre d'origine, déplacé
+      // ici pour que les autres aient quand même servi à quelque chose.
+      if (e.tracked) out.push(e);
       continue;
     }
+    // ⚠️ L'AGENDA GARDE LA MAIN SUR TOUT CE QUI S'AFFICHE — nom, heure, durée,
+    // affiche, lien pour regarder. Sa version est tenue par des humains et
+    // s'est révélée plus juste (IGDB date le PLAYISM d'un jour de trop, et
+    // nomme le Direct « Nintendo Direct 2026.09.09 + Nintendo Treehouse
+    // Live… »). D'IGDB on ne prend que ce qu'il est SEUL à avoir.
+    if (!known.igdbEventId && e.igdbEventId) known.igdbEventId = e.igdbEventId;
     if (!known.image && e.image) known.image = e.image;
     if (!known.logo && e.logo) known.logo = e.logo;
     if (!known.gameIds?.length && e.gameIds?.length) known.gameIds = e.gameIds;
     if (!known.liveUrl && e.liveUrl) known.liveUrl = e.liveUrl;
   }
-  return [...byDedupe.values()].sort((a, b) => a.startsAt - b.startsAt);
+
+  return out.sort((a, b) => a.startsAt - b.startsAt);
 }
 
 /**
@@ -481,7 +550,7 @@ export async function syncEventCalendar({ dry = false, log = () => {} } = {}) {
   summary.gcg = gcg.length;
   summary.igdb = igdb.length;
 
-  const events = mergeSources(gcg, igdb);
+  const events = mergeSources(gcg, igdb).map(({ tracked, ...ev }) => ev);
   summary.kept = events.length;
   log(`→ ${events.length} rendez-vous retenus`);
 
@@ -516,6 +585,144 @@ export async function syncEventCalendar({ dry = false, log = () => {} } = {}) {
     else log("  ! aucune source n'a répondu — ménage annulé, on garde l'existant");
   }
   return summary;
+}
+
+// ======================================================================
+//  Le relevé EN DIRECT — ce qui est annoncé pendant la diffusion
+// ======================================================================
+// Un Nintendo Direct dure quarante minutes et sort quinze jeux. IGDB rattache
+// ces jeux à son événement au fil de l'eau : la liste, vide à 16 h, se remplit
+// pendant l'émission. On la relève donc toutes les deux minutes tant que le
+// direct est en cours, et une heure après pour attraper les retardataires.
+//
+// ⚠️ CE QUE ÇA VAUT DÉPEND D'IGDB, PAS DE NOUS. S'ils saisissent pendant la
+// diffusion, la liste se remplit en direct ; s'ils saisissent le lendemain, on
+// ne fera que la récupérer plus tôt que la synchro quotidienne. Le mécanisme
+// est écrit pour ne rien coûter dans le second cas : quand rien n'est en cours,
+// c'est une requête Mongo indexée toutes les deux minutes, et zéro appel IGDB.
+
+// On ouvre cinq minutes avant : les diffusions commencent rarement à la
+// seconde, et être déjà en place quand ça démarre vaut mieux que de rater les
+// deux premières annonces.
+export const LIVE_LEAD_MS = 5 * 60 * 1000;
+// Et on reste une heure après la fin : c'est le moment où les bases se mettent
+// à jour, une fois que tout le monde a vu ce qui a été montré.
+export const LIVE_TAIL_MS = 60 * 60 * 1000;
+// Faute de durée annoncée, on table sur une heure et demie.
+const DEFAULT_DURATION_MIN = 90;
+// ⚠️ ET UN PLAFOND. Un salon de quatre jours a une `endsAt` à quatre jours :
+// sans borne, on interrogerait IGDB toutes les deux minutes pendant tout le
+// week-end. Douze heures couvrent n'importe quelle conférence réelle.
+const LIVE_MAX_MS = 12 * 3600 * 1000;
+
+const LIVE_POLL_MS = 2 * 60 * 1000;
+
+/** La fenêtre pendant laquelle on suit un événement minute par minute. */
+export function liveWindow(ev) {
+  const start = new Date(ev.startsAt).getTime();
+  const declared = ev.endsAt
+    ? new Date(ev.endsAt).getTime()
+    : start + (ev.durationMin || DEFAULT_DURATION_MIN) * 60000;
+  const end = Math.min(declared + LIVE_TAIL_MS, start + LIVE_MAX_MS);
+  return { start: start - LIVE_LEAD_MS, end };
+}
+
+export function isLive(ev, now = Date.now()) {
+  const { start, end } = liveWindow(ev);
+  return now >= start && now <= end;
+}
+
+/** Les jeux qu'IGDB rattache à CET événement, à l'instant présent. */
+async function fetchEventGames(igdbEventId) {
+  const rows = await igdbQuery("events", `fields games; where id = ${Number(igdbEventId)}; limit 1;`);
+  return rows?.[0]?.games || [];
+}
+
+/**
+ * Un passage de relevé.
+ *
+ * Rend le nombre de jeux NOUVELLEMENT vus, tous événements confondus.
+ */
+export async function pollLiveEvents({ log = () => {} } = {}) {
+  const now = Date.now();
+
+  // Pré-filtre en base, large mais indexé : tout ce qui a un identifiant IGDB
+  // et dont l'heure de début est dans les douze dernières heures ou l'heure qui
+  // vient. Le tri fin (la vraie fenêtre) se fait ensuite en mémoire, sur une
+  // poignée de documents.
+  const candidates = await GameEvent.find({
+    igdbEventId: { $ne: null },
+    hidden: { $ne: true },
+    startsAt: { $gte: new Date(now - LIVE_MAX_MS), $lte: new Date(now + LIVE_LEAD_MS) },
+  }).limit(20);
+
+  const live = candidates.filter((ev) => isLive(ev, now));
+  if (!live.length) return 0;
+
+  let discovered = 0;
+  for (const ev of live) {
+    let ids;
+    try {
+      ids = await fetchEventGames(ev.igdbEventId);
+    } catch (err) {
+      log(`  ! ${ev.name} — IGDB a refusé (${err.message})`);
+      continue;
+    }
+
+    const seen = new Set((ev.liveGames || []).map((g) => g.id));
+    const fresh = ids.filter((id) => !seen.has(id));
+
+    // Rien de neuf : on note quand même le passage, pour que le client sache
+    // que le direct est bien suivi.
+    if (!fresh.length) {
+      ev.liveCheckedAt = new Date();
+      await ev.save();
+      continue;
+    }
+
+    let details = [];
+    try {
+      details = await fetchGames(fresh);
+    } catch {
+      // IGDB connaît les identifiants mais pas encore les fiches : on garde
+      // quand même les ids, la prochaine synchro complétera les noms.
+      details = fresh.map((id) => ({ id, name: "", cover: null }));
+    }
+
+    const at = new Date();
+    for (const g of details) {
+      ev.liveGames.push({
+        id: g.id,
+        name: String(g.name || "").slice(0, 200),
+        cover: g.cover?.image_id ? `${IMG_BASE}/t_cover_big/${g.cover.image_id}.jpg` : null,
+        addedAt: at,
+      });
+    }
+    // `gameIds` reste le reflet complet de ce qu'IGDB rattache : c'est lui que
+    // lisent les écrans qui ne s'intéressent pas au direct.
+    ev.gameIds = [...new Set([...(ev.gameIds || []), ...ids])].slice(0, 200);
+    ev.liveCheckedAt = at;
+    await ev.save();
+
+    discovered += details.length;
+    log(`  ▶ ${ev.name} : ${details.length} jeu(x) de plus (${ev.liveGames.length} au total)`);
+  }
+
+  return discovered;
+}
+
+async function pollQuietly() {
+  try {
+    const n = await pollLiveEvents({ log: (l) => console.log(l) });
+    if (n) console.log(`🔴 Direct : ${n} jeu(x) relevé(s)`);
+  } catch (err) {
+    console.error("live event poll error:", err.message);
+  }
+}
+
+export function startLiveEventWatch() {
+  setInterval(pollQuietly, LIVE_POLL_MS);
+  console.log("🔴 Relevé des annonces en direct activé");
 }
 
 // ----------------------------------------------------------------------
