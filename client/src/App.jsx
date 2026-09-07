@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import Landing from "./pages/Landing";
+import DownloadApp from "./pages/DownloadApp";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -89,6 +90,10 @@ export default function App() {
       <ScrollManager />
       <Routes>
       <Route path="/" element={<Landing />} />
+      {/* Le téléchargement de l'app Android. Publique et hors de toute
+          coquille : on y arrive souvent depuis un lien partagé, sans compte,
+          et parfois sans avoir jamais vu le site. */}
+      <Route path="/download" element={<DownloadApp />} />
       <Route
         path="/login"
         element={

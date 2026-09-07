@@ -691,6 +691,68 @@ router.get("/releases", optionalAuth, async (req, res) => {
   }
 });
 
+// Les bornes du croisement « qui attend quoi » (cf. /releases/awaited) : on
+// suit rarement plus de quelques centaines de comptes, et une réponse doit
+// rester une réponse — pas un export de base.
+const FOLLOW_CAP = 300;
+const AWAITED_CAP = 8000;
+const FACES_CAP = 3;
+
+// GET /api/games/releases/awaited
+// Qui, parmi mes abonnements, attend quoi.
+//
+// Le fil des sorties sait dire ce que MOI j'attends (le signet de la liste
+// d'envies) ; il ne savait rien dire des autres. Or un calendrier se lit
+// autrement quand on voit que trois personnes qu'on suit guettent la même
+// sortie : ce n'est plus une date, c'est un rendez-vous.
+//
+// ⚠️ AUCUN APPEL IGDB ICI, ET C'EST LE POINT. On ne renvoie que des
+// identifiants et des visages : le fil a DÉJÀ les jeux de la fenêtre qu'il
+// affiche, il n'a besoin que de savoir lesquels sont attendus. Croiser côté
+// serveur voudrait dire redemander les mêmes jeux à IGDB pour rien.
+router.get("/releases/awaited", requireAuth, async (req, res) => {
+  try {
+    const me = await User.findById(req.userId).select("following").lean();
+    const following = (me?.following || []).slice(0, FOLLOW_CAP);
+    if (!following.length) return res.json({ games: [] });
+
+    const [people, rows] = await Promise.all([
+      User.find({ _id: { $in: following } }).select("username avatar").lean(),
+      UserGame.find({ user: { $in: following }, status: "wishlist" })
+        .select("user gameId")
+        .limit(AWAITED_CAP)
+        .lean(),
+    ]);
+
+    const byId = new Map(people.map((u) => [String(u._id), u]));
+    const byGame = new Map();
+    for (const r of rows) {
+      const u = byId.get(String(r.user));
+      if (!u || !r.gameId) continue;
+      if (!byGame.has(r.gameId)) byGame.set(r.gameId, []);
+      byGame.get(r.gameId).push(u);
+    }
+
+    const games = [...byGame.entries()].map(([gameId, users]) => ({
+      gameId,
+      count: users.length,
+      // Trois visages au maximum : au-delà, c'est le compte qui parle. Envoyer
+      // les cinquante abonnés d'un gros jeu ferait grossir la réponse pour des
+      // avatars que personne n'affichera.
+      users: users.slice(0, FACES_CAP).map((u) => ({
+        id: String(u._id),
+        username: u.username,
+        avatar: u.avatar || null,
+      })),
+    }));
+
+    res.json({ games });
+  } catch (err) {
+    console.error("awaited releases error:", err.message);
+    res.status(500).json({ error: "Erreur lors de la récupération des attentes." });
+  }
+});
+
 // --- Listes pour les filtres (mises en cache en mémoire) ---
 const cache = {};
 

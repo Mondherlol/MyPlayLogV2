@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Gamepad2, LogOut } from "lucide-react";
+import { Gamepad2, LogOut, Smartphone } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import ThemeToggle from "./ThemeToggle";
 
@@ -20,6 +20,11 @@ export default function Navbar() {
         </Link>
 
         <nav className="nav-actions">
+          {/* L'app Android ne se trouve dans aucun magasin : si le site n'en
+              parle pas, personne ne saura jamais qu'elle existe. */}
+          <Link to="/download" className="btn btn-ghost nav-app-link">
+            <Smartphone size={16} /> L'app
+          </Link>
           <ThemeToggle />
           {user ? (
             <>

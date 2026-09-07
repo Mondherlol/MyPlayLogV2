@@ -50,6 +50,7 @@ import shareRoutes from "./routes/share.js";
 import clientErrorRoutes from "./routes/clientErrors.js";
 import patchesRoutes from "./routes/patches.js";
 import downloadRoutes from "./routes/downloads.js";
+import appReleaseRoutes from "./routes/appRelease.js";
 import trackerRoutes, { startTrackerAutoSync } from "./routes/trackers.js";
 import { startEventCalendarSync } from "./lib/eventCalendar.js";
 import missionRoutes from "./routes/missions.js";
@@ -198,6 +199,9 @@ app.use("/api/companies", companyRoutes);
 app.use("/api/platforms", platformRoutes);
 app.use("/api/patches", patchesRoutes);
 app.use("/api/downloads", downloadRoutes);
+// La distribution de l'app Android : le manifeste que l'app interroge pour se
+// mettre a jour, l'APK lui-meme, et la publication d'un nouveau build.
+app.use("/api/app", appReleaseRoutes);
 app.use("/api/trackers", trackerRoutes);
 app.use("/api/missions", missionRoutes);
 // Réglages de l'app : les drapeaux qui allument ou éteignent des sections.

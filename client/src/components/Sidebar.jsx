@@ -13,6 +13,7 @@ import {
   User,
   Palmtree,
   Shield,
+  Smartphone,
   ChevronLeft,
   ChevronRight,
   Sun,
@@ -45,6 +46,9 @@ const NAV = [
   { to: "/collection", label: "Collection", Icon: Library, feature: "collection" },
   { to: "/arcade", label: "Arcade", Icon: Joystick },
   { to: "/profile", label: "Profil", Icon: User },
+  // L'app Android n'est dans aucun magasin : cette entrée est le seul chemin
+  // qu'un habitué du site ait pour découvrir qu'elle existe.
+  { to: "/download", label: "App mobile", Icon: Smartphone },
   { to: "/admin", label: "Admin", Icon: Shield, adminOnly: true },
 ];
 

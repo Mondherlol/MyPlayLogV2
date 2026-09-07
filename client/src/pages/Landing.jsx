@@ -16,6 +16,7 @@ import {
   Search,
   PenLine,
   Share2,
+  Smartphone,
 } from "lucide-react";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
@@ -136,6 +137,13 @@ export default function Landing() {
             J'ai déjà un compte
           </Link>
         </div>
+
+        {/* L'app Android, en une ligne sous les boutons : elle mérite d'être
+            annoncée dès l'accueil — aucun magasin ne le fera pour nous — mais
+            pas de disputer sa place au bouton d'inscription. */}
+        <Link to="/download" className="hero-android clickable">
+          <Smartphone size={15} /> Aussi sur Android — télécharger l'app
+        </Link>
 
         <div className="hero-stage">
           {/* Chips flottantes décoratives */}

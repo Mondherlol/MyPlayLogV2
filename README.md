@@ -63,3 +63,24 @@ client/   App React (Vite)
 - Bot du site : `GROQ_API_KEY` (gratuit, Llama 70B — c'est lui qui lui donne son caractère ; à défaut `GEMINI_API_KEY`, en moins mordant), `BOT_USERNAME` pour le rebaptiser.
   Le droit de lui parler se donne compte par compte depuis le panel d'admin.
 - `client/.env` : `VITE_API_URL` (URL de l'API)
+- `APP_RELEASE_TOKEN` (dans `server/.env`) : le secret qui autorise la
+  publication de l'APK Android. **Sans lui, `POST /api/app/release` répond 503
+  et aucune version ne peut être mise en ligne.** Il doit valoir exactement le
+  `MPL_RELEASE_TOKEN` du dépôt mobile, d'où part `npm run update`.
+
+## L'app Android
+
+MyPlayLog n'est pas sur le Play Store : c'est ce serveur qui fait office de
+magasin d'applications.
+
+- `POST /api/app/release` reçoit un build (dépôt mobile, `npm run update`) et le
+  range dans `uploads/app/` — donc dans le volume `uploads_data`, qui survit aux
+  redéploiements — avec un manifeste `latest.json` à côté.
+- `GET /api/app/latest` dit ce qui est publié. C'est ce que l'app interroge pour
+  savoir si elle est à jour, et ce que lit la page `/download` du site.
+- `GET /api/app/download` sert l'APK. **URL stable** : c'est elle qu'on partage,
+  elle rend toujours le dernier build.
+
+Côté site, la page publique `/download` (`client/src/pages/DownloadApp.jsx`)
+explique l'installation hors magasin — sans quoi la moitié des gens abandonnent
+devant l'avertissement d'Android.
