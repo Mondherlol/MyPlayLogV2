@@ -529,7 +529,12 @@ export function mergeSources(gcg, igdb) {
  */
 async function pruneStale(runAt) {
   const res = await GameEvent.deleteMany({
-    source: { $ne: "manual" },
+    // ⚠️ « manual » N'EST PLUS LE SEUL INTOUCHABLE. Les saisons sont écrites par
+    // une AUTRE synchro (cf. lib/gameSeasons), qui a ses propres sources et son
+    // propre élagage : celle-ci ne les voit jamais passer, donc sans cette
+    // exclusion elle les prendrait toutes pour des annulations et les
+    // effacerait à chaque passage.
+    source: { $nin: ["manual", "seasons"] },
     startsAt: { $gt: new Date(Date.now() - GRACE_MS) },
     seenAt: { $lt: runAt },
   });

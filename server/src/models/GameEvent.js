@@ -31,7 +31,7 @@ const gameEventSchema = new mongoose.Schema(
     // encore un rendez-vous dont on sait, nous, qu'il arrive.
     source: {
       type: String,
-      enum: ["igdb", "gameconfguide", "manual"],
+      enum: ["igdb", "gameconfguide", "seasons", "manual"],
       required: true,
     },
 
@@ -40,11 +40,21 @@ const gameEventSchema = new mongoose.Schema(
     // et un lien. Un salon se VISITE : il dure quatre jours, il a une ville.
     // L'accueil ne montre que ce qui se regarde (plus les quelques salons qui
     // parlent aux joueurs) ; l'agenda complet montre tout, et laisse filtrer.
+    // ⚠️ ET UNE SAISON N'EST NI L'UN NI L'AUTRE. Un showcase et un salon
+    // s'adressent à tout le monde ; une saison ne parle qu'à ceux qui jouent au
+    // jeu. Elle n'a donc rien à faire dans le rail des rendez-vous — d'où un
+    // troisième genre plutôt qu'un showcase déguisé, et le champ `gameId`
+    // ci-dessous, qui est ce qui permet de ne la montrer qu'aux joueurs
+    // concernés (cf. GET /api/events/seasons).
     kind: {
       type: String,
-      enum: ["showcase", "conference"],
+      enum: ["showcase", "conference", "season"],
       default: "showcase",
     },
+
+    // Le jeu dont c'est la saison (id IGDB). Nul pour un showcase : un Direct
+    // n'appartient à aucun jeu, c'est justement ce qu'on vient y découvrir.
+    gameId: { type: Number, default: null },
 
     name: { type: String, required: true, trim: true, maxlength: 160 },
     // Ce que l'événement va montrer : « The Legend of Zelda 40th anniversary »,
@@ -156,6 +166,9 @@ const gameEventSchema = new mongoose.Schema(
 
 // La question posée à chaque ouverture de l'accueil : « qu'est-ce qui arrive ? »
 gameEventSchema.index({ hidden: 1, startsAt: 1 });
+// « Quelles saisons arrivent dans MES jeux ? » — la question de l'accueil, qui
+// croise ce filtre avec les quelques centaines d'ids d'une bibliothèque.
+gameEventSchema.index({ kind: 1, gameId: 1, startsAt: 1 });
 // « Sur quoi ai-je coché ? » — tableau, donc index multiclé.
 gameEventSchema.index({ interested: 1 });
 // Le relevé en direct interroge « quels événements IGDB sont en cours ? »

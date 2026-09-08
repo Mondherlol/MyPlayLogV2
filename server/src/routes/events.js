@@ -2,6 +2,7 @@ import express from "express";
 
 import GameEvent from "../models/GameEvent.js";
 import List from "../models/List.js";
+import UserGame from "../models/UserGame.js";
 import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { upcomingFilter } from "../lib/eventCalendar.js";
@@ -26,6 +27,9 @@ function serialize(ev, userId) {
     // sans ça il inventerait des heures que la source ne donne pas.
     precision: ev.precision || "day",
     kind: ev.kind || "showcase",
+    // Renseigné pour une saison seulement : c'est le jeu dont elle est la
+    // saison, et ce qui permet au client d'ouvrir sa fiche.
+    gameId: ev.gameId || null,
     image: ev.image || null,
     description: ev.description || "",
     location: ev.location || "",
@@ -66,7 +70,11 @@ router.get("/upcoming", requireAuth, async (req, res) => {
 
     const events = await GameEvent.find({
       hidden: { $ne: true },
-      ...(kind ? { kind } : null),
+      // ⚠️ JAMAIS LES SAISONS ICI, MÊME SANS FILTRE. « Rien du tout » veut dire
+      // « tout l'agenda », et une saison n'est pas dans l'agenda de tout le
+      // monde : elle ne vaut que pour qui joue au jeu, et c'est
+      // `/seasons` ci-dessous qui sait le dire.
+      ...(kind ? { kind } : { kind: { $ne: "season" } }),
       ...upcomingFilter(),
     })
       .sort({ startsAt: 1 })
@@ -77,6 +85,52 @@ router.get("/upcoming", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("events upcoming error:", err.message);
     res.status(500).json({ error: "Erreur lors du chargement des événements." });
+  }
+});
+
+// ============================================================
+//  GET /api/events/seasons — les saisons À VENIR DANS MES JEUX
+// ============================================================
+// ⚠️ LE FILTRE PAR BIBLIOTHÈQUE N'EST PAS UN CONFORT, C'EST LE SUJET. « La
+// saison 10 de Marvel Rivals sort vendredi » n'intéresse que ceux qui y jouent ;
+// servi à tout le monde, c'est la ligne qu'on apprend à ne plus lire. On croise
+// donc les saisons connues avec les ids de la bibliothèque — TOUS statuts
+// confondus, la wishlist comprise : une nouvelle saison est justement une
+// raison de s'y mettre.
+//
+// Le croisement se fait en mémoire et c'est voulu : une bibliothèque, c'est
+// quelques centaines d'entiers, et les saisons à venir se comptent sur les
+// doigts d'une main. Un `$in` de 400 ids contre une collection minuscule
+// coûterait plus cher que la comparaison.
+router.get("/seasons", requireAuth, async (req, res) => {
+  try {
+    const limit = Math.min(MAX_LIMIT, Math.max(1, Number(req.query.limit) || DEFAULT_LIMIT));
+
+    const seasons = await GameEvent.find({
+      hidden: { $ne: true },
+      kind: "season",
+      gameId: { $ne: null },
+      ...upcomingFilter(),
+    })
+      .sort({ startsAt: 1 })
+      .limit(60)
+      .lean();
+    if (!seasons.length) return res.json({ events: [] });
+
+    // `distinct` plutôt qu'un `find` : on ne veut que les ids, et la
+    // bibliothèque d'un gros joueur pèse plusieurs centaines de documents dont
+    // on n'utiliserait rien.
+    const owned = new Set(await UserGame.distinct("gameId", { user: req.userId }));
+
+    res.json({
+      events: seasons
+        .filter((ev) => owned.has(ev.gameId))
+        .slice(0, limit)
+        .map((ev) => serialize(ev, req.userId)),
+    });
+  } catch (err) {
+    console.error("events seasons error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement des saisons." });
   }
 });
 
@@ -109,6 +163,9 @@ router.get("/range", requireAuth, async (req, res) => {
 
     const events = await GameEvent.find({
       hidden: { $ne: true },
+      // Comme pour `/upcoming` : le calendrier est commun, les saisons ne le
+      // sont pas.
+      kind: { $ne: "season" },
       startsAt: { $gte: from, $lte: capped },
     })
       .sort({ startsAt: 1 })

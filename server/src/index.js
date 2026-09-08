@@ -19,6 +19,7 @@ import repostRoutes from "./routes/reposts.js";
 import videoRoutes from "./routes/videos.js";
 import feedRoutes from "./routes/feed.js";
 import freeGamesRoutes from "./routes/freeGames.js";
+import gameStoreRoutes from "./routes/gameStore.js";
 import eventRoutes from "./routes/events.js";
 import journalRoutes from "./routes/journal.js";
 import blindtestRoutes from "./routes/blindtest.js";
@@ -57,6 +58,7 @@ import {
   startEventReminders,
   startLiveEventWatch,
 } from "./lib/eventCalendar.js";
+import { startGameSeasonSync } from "./lib/gameSeasons.js";
 import missionRoutes from "./routes/missions.js";
 import chatRoutes from "./routes/chat.js";
 import callRoutes from "./routes/calls.js";
@@ -149,6 +151,7 @@ app.use("/api/reposts", repostRoutes);
 app.use("/api/videos", videoRoutes);
 app.use("/api/feed", feedRoutes);
 app.use("/api/free-games", freeGamesRoutes);
+app.use("/api/game-store", gameStoreRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/journal", journalRoutes);
 // Même précaution que pour /api/geo/versus : monté AVANT le routeur solo.
@@ -313,6 +316,10 @@ async function start() {
     // Et, un quart d'heure avant, le rappel à ceux qui ont coché « ça
     // m'intéresse » — sans quoi cocher ne servirait qu'à décorer l'accueil.
     startEventReminders();
+    // Et les saisons des jeux-services, qui n'ont rien à voir avec les
+    // showcases : elles ne s'affichent qu'à ceux qui ont le jeu (cf.
+    // lib/gameSeasons).
+    startGameSeasonSync();
     const server = app.listen(PORT, () => {
       console.log(`🚀 API MyPlayLog sur http://localhost:${PORT}`);
       // Une ligne dans le journal : un redémarrage explique souvent, à lui

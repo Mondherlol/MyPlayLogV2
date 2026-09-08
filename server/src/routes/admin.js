@@ -1469,6 +1469,8 @@ router.get("/events/calendar", async (_req, res) => {
         startsAt: e.startsAt,
         precision: e.precision,
         source: e.source,
+        kind: e.kind || "showcase",
+        gameId: e.gameId || null,
         brand: e.brand,
         hidden: !!e.hidden,
         interestedCount: (e.interested || []).length,
@@ -1504,6 +1506,16 @@ router.post("/events/calendar", async (req, res) => {
       // parole plutôt que d'afficher un décompte à la seconde sur une date
       // approximative.
       precision: b.precision === "time" ? "time" : "day",
+      // ⚠️ ET C'EST AUSSI PAR ICI QUE PASSENT LES SAISONS QU'AUCUNE SOURCE NE
+      // CONNAÎT. Il n'existe pas d'API des saisons de jeux-services : celles de
+      // Marvel Rivals ou d'Apex s'annoncent sur X et nulle part ailleurs
+      // (cf. lib/gameSeasons, qui n'automatise que ce qui est automatisable).
+      // Une saison saisie ici doit porter son `gameId` IGDB, sinon elle ne
+      // s'affichera chez personne : c'est LUI qu'on croise avec la
+      // bibliothèque (cf. GET /api/events/seasons).
+      kind: ["showcase", "conference", "season"].includes(b.kind) ? b.kind : "showcase",
+      gameId: b.kind === "season" && Number(b.gameId) ? Number(b.gameId) : null,
+      image: b.image || null,
       brand: b.brand || null,
       liveUrl: b.liveUrl || null,
       sourceUrl: b.sourceUrl || null,
