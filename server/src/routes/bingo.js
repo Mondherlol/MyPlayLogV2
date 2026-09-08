@@ -76,6 +76,7 @@ function serializeCells(cells, size) {
       image: c?.image || null,
       gameId: c?.gameId ?? null,
       gameName: c?.gameName || "",
+      saga: c?.saga?.id ? { id: c.saga.id, kind: c.saga.kind, name: c.saga.name || "" } : null,
       pos: c?.pos || null,
       textStyle: c?.textStyle || "banner",
       free: !!c?.free,
@@ -94,7 +95,6 @@ function serialize(grid, userId, { withComments = false } = {}) {
     eventId: String(grid.event),
     title: grid.title || "",
     size: grid.size,
-    theme: grid.theme || "crimson",
     cells,
     filled,
     checked: cells.filter((c) => c.checked).length,
@@ -134,6 +134,17 @@ function sanitizeCells(raw, size) {
       image,
       gameId: Number.isFinite(Number(c.gameId)) && c.gameId != null ? Number(c.gameId) : null,
       gameName: String(c.gameName || "").slice(0, 120),
+      // La saga d'où vient l'image, quand elle en vient d'une. Les trois champs
+      // ou rien : un identifiant sans nature ne sait pas s'interroger.
+      saga:
+        Number.isFinite(Number(c.saga?.id)) &&
+        ["franchise", "collection", "game"].includes(c.saga?.kind)
+          ? {
+              id: Number(c.saga.id),
+              kind: c.saga.kind,
+              name: String(c.saga.name || "").slice(0, 120),
+            }
+          : null,
       // Deux pourcentages, ou rien : une chaîne libre partirait telle quelle
       // dans un style du client, où elle ne planterait pas mais ne ferait rien.
       pos: /^\d{1,3}% \d{1,3}%$/.test(String(c.pos || "")) ? String(c.pos) : null,
@@ -233,12 +244,6 @@ router.put("/event/:eventId", requireAuth, async (req, res) => {
     if (!cells.length) return res.status(400).json({ error: "Une grille vide ne se poste pas." });
 
     const title = String(req.body?.title || "").trim().slice(0, 80);
-    // Le décor n'est pas validé contre une liste : elle vit côté client, qui
-    // retombe de toute façon sur son défaut devant une clé qu'il ne connaît pas
-    // (cf. mobile lib/bingoThemes, `themeOf`). Valider ici obligerait à tenir la
-    // même liste à deux endroits, et à déployer le serveur pour ajouter une
-    // couleur.
-    const theme = String(req.body?.theme || "crimson").slice(0, 24);
     const published = req.body?.published === true;
 
     // ⚠️ `upsert` PLUTÔT QU'UN « CHERCHE PUIS CRÉE ». L'index unique
@@ -250,7 +255,6 @@ router.put("/event/:eventId", requireAuth, async (req, res) => {
       {
         $set: {
           title,
-          theme,
           size,
           cells,
           published,

@@ -193,6 +193,76 @@ export async function franchiseName(kind, id) {
 const escapeQuotes = (s) => String(s).replace(/["\\]/g, "");
 
 /** Les sagas dont le nom contient `q` — franchises et collections mêlées. */
+/**
+ * Les licences déduites des JEUX qui portent ce mot.
+ *
+ * Le filet des accents (cf. `searchSagas`). Deux requêtes : les jeux, puis les
+ * licences les mieux élues — on a besoin de leur nom et de leur nombre de jeux
+ * pour afficher la même ligne que la recherche directe.
+ */
+async function sagasFromGames(needle, limit) {
+  const games =
+    (await igdbQuery(
+      "games",
+      `search "${needle}"; fields name,franchises,collections,total_rating_count;` +
+        ` where version_parent = null & game_type = 0; limit 40;`
+    ).catch(() => [])) || [];
+  if (!games.length) return [];
+
+  // Le poids est plafonné : un seul jeu très noté ne doit pas élire à lui seul
+  // une licence que personne d'autre ne porte.
+  const score = new Map();
+  for (const g of games) {
+    const weight = 1 + Math.min(50, g.total_rating_count || 0);
+    for (const id of g.franchises || [])
+      score.set(`franchise:${id}`, (score.get(`franchise:${id}`) || 0) + weight);
+    for (const id of g.collections || [])
+      score.set(`collection:${id}`, (score.get(`collection:${id}`) || 0) + weight);
+  }
+  if (!score.size) return [];
+
+  const top = [...score.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, Math.min(limit, 8))
+    .map(([key]) => key.split(":"));
+
+  const byKind = { franchise: [], collection: [] };
+  for (const [kind, id] of top) byKind[kind].push(Number(id));
+
+  const ask = (endpoint, ids) =>
+    ids.length
+      ? igdbQuery(endpoint, `fields name,games; where id = (${ids.join(",")}); limit 10;`).catch(
+          () => []
+        )
+      : Promise.resolve([]);
+
+  const [franchises, collections] = await Promise.all([
+    ask("franchises", byKind.franchise),
+    ask("collections", byKind.collection),
+  ]);
+
+  const named = new Map();
+  for (const [rows, kind] of [
+    [franchises, "franchise"],
+    [collections, "collection"],
+  ]) {
+    for (const r of rows || []) named.set(`${kind}:${r.id}`, { row: r, kind });
+  }
+
+  // On rend dans l'ordre des votes, pas dans celui d'IGDB : c'est le classement
+  // qui fait tout l'intérêt de ce détour.
+  return top
+    .map(([kind, id]) => named.get(`${kind}:${id}`))
+    .filter(Boolean)
+    .map(({ row, kind }) => ({
+      id: row.id,
+      kind,
+      name: row.name,
+      gameCount: (row.games || []).length,
+    }))
+    .filter((s) => s.gameCount > 0);
+}
+
 export async function searchSagas(q, limit = 20) {
   const needle = escapeQuotes(String(q || "").trim());
   if (needle.length < 2) return [];
@@ -225,6 +295,13 @@ export async function searchSagas(q, limit = 20) {
 
   const needleNorm = norm(needle);
   const sagas = [...best.values()]
+    // ⚠️ UNE SAGA SANS JEU N'EST PAS UNE SAGA, C'EST UNE LIGNE QUI DÉÇOIT.
+    // IGDB est un catalogue contributif : il porte des collections vides créées
+    // par erreur ou en double. Taper « pokemon » sans accent tombait pile
+    // dessus — deux collections « pokemon » et « pokemon rom hack », zéro jeu
+    // chacune — et la vraie licence « Pokémon », elle, ne sortait pas. On
+    // ouvrait donc une saga vide en croyant ouvrir Pokémon.
+    .filter(({ count }) => count > 0)
     .map(({ row, count }) => ({
       id: row.id,
       kind: row.kind,
@@ -253,6 +330,19 @@ export async function searchSagas(q, limit = 20) {
   // On ne mélange donc pas les deux : on descend d'un cran quand l'étage du
   // dessus est vide.
   if (sagas.length) return sagas;
+
+  // ⚠️ AVANT DE DESCENDRE, UN DÉTOUR PAR LES ACCENTS. La recherche par nom
+  // d'IGDB (`name ~ *"..."*`) est un « contient » brut : « pokemon » n'y
+  // rencontre jamais « Pokémon », et l'utilisateur qui tape sans accent —
+  // c'est-à-dire à peu près tout le monde sur un clavier de téléphone —
+  // n'obtenait rien de la plus grosse licence du catalogue.
+  //
+  // La recherche de JEUX, elle, est floue et se moque des accents. On lui
+  // demande donc les jeux qui portent ce mot, et on remonte à leurs licences.
+  // Chaque jeu vote pour les siennes, pondéré par sa notoriété : sans ce poids,
+  // vingt ROM hacks amateurs pèseraient plus lourd que Pokémon Rouge.
+  const derived = await sagasFromGames(needle, limit);
+  if (derived.length) return derived;
 
   const games =
     (await igdbQuery(
@@ -284,9 +374,35 @@ export async function searchSagas(q, limit = 20) {
  * titre du jeu. Les jaquettes restent en dernier recours parce que certains
  * jeux n'ont que ça.
  */
+// ⚠️ POURQUOI LA SAGA POKÉMON ÉTAIT PLEINE DE SUPER SMASH BROS.
+//
+// Ce n'est pas une erreur d'IGDB : Smash Bros porte VRAIMENT la licence
+// Pokémon, puisque Pikachu y joue. Il porte aussi Mario, Zelda, Metroid, Fire
+// Emblem, Street Fighter… Super Smash Bros. Ultimate est rattaché à 27
+// licences. Et comme le tri se fait par notoriété et que Smash est un des jeux
+// les mieux notés du catalogue, il raflait les premières places de CHACUNE de
+// ces vingt-sept sagas.
+//
+// Le repère est donc le nombre de licences que porte le jeu : les vrais jeux
+// Pokémon en portent UNE, les crossovers en portent douze à vingt-sept.
+//
+// ⚠️ MAIS ON NE LES JETTE PAS AVEUGLÉMENT. Quelqu'un qui ouvre la saga « Super
+// Smash Bros. » veut précisément ces jeux-là — et ils sont crossovers par
+// nature. On ne retire donc les crossovers QUE s'il reste de quoi remplir la
+// grille sans eux ; sinon c'est qu'on est justement dans leur saga.
+const CROSSOVER_FRANCHISES = 5;
+const ENOUGH_WITHOUT = 6;
+
+function withoutCrossovers(rows, kind) {
+  if (kind === "game") return rows;
+  const core = rows.filter((g) => (g.franchises || []).length < CROSSOVER_FRANCHISES);
+  return core.length >= ENOUGH_WITHOUT ? core : rows;
+}
+
 export async function sagaImages(kind, id, limit = 60) {
   const FIELDS =
-    "fields name,first_release_date,total_rating_count,cover.image_id,artworks.image_id,screenshots.image_id;";
+    "fields name,first_release_date,total_rating_count,franchises,collections," +
+    "cover.image_id,artworks.image_id,screenshots.image_id;";
   // ⚠️ « game » N'EST PAS UNE LICENCE D'UN SEUL JEU, C'EST UN AUTRE `where`.
   // Le repli de `searchSagas` peut rendre un jeu isolé (« Katana Zero ») ; on
   // interroge alors ce jeu-là, pas une franchise qui n'existe pas — sans ce
@@ -298,11 +414,12 @@ export async function sagaImages(kind, id, limit = 60) {
       : `where ${kind === "collection" ? "collections" : "franchises"} = (${id}) & version_parent = null;`;
 
   const rows =
-    (await igdbQuery("games", `${FIELDS} ${where} sort total_rating_count desc; limit 40;`).catch(
+    (await igdbQuery("games", `${FIELDS} ${where} sort total_rating_count desc; limit 60;`).catch(
       () => []
     )) || [];
 
   const out = [];
+  const games = withoutCrossovers(rows, kind);
   const seen = new Set();
   const push = (imageId, game, size, thumbSize) => {
     if (!imageId || seen.has(imageId) || out.length >= limit) return;
@@ -318,9 +435,9 @@ export async function sagaImages(kind, id, limit = 60) {
 
   // Trois passes plutôt qu'un tri : on veut TOUS les artworks de la saga avant
   // la première capture, pas les artworks de chaque jeu à la suite.
-  for (const g of rows) for (const a of g.artworks || []) push(a.image_id, g, "720p", "screenshot_med");
-  for (const g of rows) for (const s of g.screenshots || []) push(s.image_id, g, "720p", "screenshot_med");
-  for (const g of rows) push(g.cover?.image_id, g, "cover_big", "cover_small");
+  for (const g of games) for (const a of g.artworks || []) push(a.image_id, g, "720p", "screenshot_med");
+  for (const g of games) for (const s of g.screenshots || []) push(s.image_id, g, "720p", "screenshot_med");
+  for (const g of games) push(g.cover?.image_id, g, "cover_big", "cover_small");
 
   return out.slice(0, limit);
 }

@@ -43,6 +43,21 @@ const cellSchema = new mongoose.Schema(
     // Prime 4 ») et, un jour, à ouvrir la fiche depuis la case.
     gameId: { type: Number, default: null },
     gameName: { type: String, default: "", maxlength: 120 },
+    // ⚠️ D'OÙ VIENT L'IMAGE, AU SENS DE « QUEL RAYON ». `gameId` dit de quel
+    // JEU vient le visuel ; celui-ci dit dans quelle SAGA on était allé le
+    // chercher, ce qui n'est pas la même question. Il sert à rouvrir le
+    // sélecteur là où on l'avait laissé plutôt que sur une recherche vide :
+    // quand on change l'image d'une case, c'est neuf fois sur dix pour une
+    // autre image de la même saga (cf. mobile CellSheet).
+    saga: {
+      type: {
+        _id: false,
+        id: { type: Number, default: null },
+        kind: { type: String, enum: ["franchise", "collection", "game"], default: null },
+        name: { type: String, default: "", maxlength: 120 },
+      },
+      default: null,
+    },
     // Le recadrage de l'image dans la case, en deux pourcentages (« 50% 30% »)
     // — exactement la syntaxe de `background-position` du site, que le
     // téléphone sait déjà lire (cf. mobile lib/images, `contentPositionOf`).
@@ -82,11 +97,6 @@ const bingoSchema = new mongoose.Schema(
     // et personne ne trouve vingt-cinq pronostics à faire — c'est déjà beaucoup.
     size: { type: Number, default: 3, min: 2, max: 5 },
     cells: { type: [cellSchema], default: [] },
-    // Le décor : la couleur de fond et son motif (cf. mobile lib/bingoThemes).
-    // On ne stocke que la CLÉ — les couleurs vivent côté client, qui est le
-    // seul à les dessiner, et une palette qu'on retouche ne demande alors
-    // aucune migration.
-    theme: { type: String, default: "crimson", maxlength: 24 },
     // Publiée = visible par les autres. Une grille se compose souvent en
     // plusieurs fois : tant qu'elle n'est pas publiée, elle n'appartient qu'à
     // son auteur, et un brouillon à trois cases ne part pas dans le fil.
