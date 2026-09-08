@@ -52,7 +52,11 @@ import patchesRoutes from "./routes/patches.js";
 import downloadRoutes from "./routes/downloads.js";
 import appReleaseRoutes from "./routes/appRelease.js";
 import trackerRoutes, { startTrackerAutoSync } from "./routes/trackers.js";
-import { startEventCalendarSync, startLiveEventWatch } from "./lib/eventCalendar.js";
+import {
+  startEventCalendarSync,
+  startEventReminders,
+  startLiveEventWatch,
+} from "./lib/eventCalendar.js";
 import missionRoutes from "./routes/missions.js";
 import chatRoutes from "./routes/chat.js";
 import callRoutes from "./routes/calls.js";
@@ -306,6 +310,9 @@ async function start() {
     startEventCalendarSync();
     // Et, pendant les diffusions, le relevé des jeux annoncés au fil de l'eau.
     startLiveEventWatch();
+    // Et, un quart d'heure avant, le rappel à ceux qui ont coché « ça
+    // m'intéresse » — sans quoi cocher ne servirait qu'à décorer l'accueil.
+    startEventReminders();
     const server = app.listen(PORT, () => {
       console.log(`🚀 API MyPlayLog sur http://localhost:${PORT}`);
       // Une ligne dans le journal : un redémarrage explique souvent, à lui

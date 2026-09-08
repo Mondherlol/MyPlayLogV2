@@ -138,6 +138,14 @@ const gameEventSchema = new mongoose.Schema(
       default: [],
     },
 
+    // ⚠️ POUR QUELLE HEURE DE DÉBUT LE RAPPEL EST DÉJÀ PARTI — pas « est-ce
+    // qu'il est parti ». Un booléen se tromperait au premier report : un Direct
+    // repoussé d'une semaine garde la même clé, donc le même document, et son
+    // rappel a pourtant tout à refaire. En gardant l'heure pour laquelle on a
+    // prévenu, un changement de `startsAt` rouvre naturellement le rappel, et
+    // une heure inchangée l'empêche de repartir à chaque passage de la boucle.
+    remindedFor: { type: Date, default: null },
+
     // Dernier passage de synchro qui a revu cet événement. Ce qui n'a pas été
     // revu ET qui est encore à venir a disparu de sa source (annulé, corrigé) :
     // on le retire (cf. pruneStale).

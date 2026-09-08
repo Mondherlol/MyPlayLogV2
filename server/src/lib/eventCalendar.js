@@ -40,6 +40,7 @@ import {
   youtubeThumb,
 } from "./gameEvents.js";
 import { igdbQuery } from "./igdb.js";
+import { pushToUsers } from "./push.js";
 import { firstHref, parseIcs, parseIcsDate, prop, stripHtml, unescapeIcs } from "./ics.js";
 
 const IMG_BASE = "https://images.igdb.com/igdb/image/upload";
@@ -749,4 +750,92 @@ export function startEventCalendarSync() {
   setTimeout(runQuietly, FIRST_RUN_DELAY);
   setInterval(runQuietly, SYNC_INTERVAL);
   console.log("🔁 Synchro du calendrier des événements activée");
+}
+
+// ----------------------------------------------------------------------
+//  Le rappel avant le début : « ça commence dans un quart d'heure »
+// ----------------------------------------------------------------------
+// ⚠️ COCHER « ÇA M'INTÉRESSE » NE SERVAIT À RIEN JUSQU'ICI. L'événement était
+// noté, le compte à rebours tournait sur l'accueil — mais il fallait penser à
+// ouvrir l'app pile au bon moment. Un rendez-vous qu'on doit se rappeler tout
+// seul n'est pas un rendez-vous noté.
+//
+// Le rappel part donc du serveur, pas du téléphone : une notification locale
+// programmée à l'installation se perdrait au premier report de date, au premier
+// changement d'appareil, et ne saurait rien des événements cochés depuis le
+// site.
+
+// Un quart d'heure : de quoi lancer la diffusion sur la télé sans que la
+// notification arrive si tôt qu'on l'oublie avant le début.
+export const REMIND_LEAD_MS = 15 * 60 * 1000;
+
+// ⚠️ ET UNE BORNE BASSE. Si le serveur redémarre ou traîne, on ne veut pas
+// annoncer « ça commence » sur un événement commencé depuis vingt minutes :
+// passé le début, la notification n'est plus un rappel, c'est un regret. On
+// tolère la minute de retard d'un passage de boucle, pas plus.
+const REMIND_LATE_MS = 60 * 1000;
+
+const REMIND_POLL_MS = 60 * 1000;
+
+/**
+ * Un passage de rappel.
+ *
+ * Rend le nombre d'événements pour lesquels une notification est partie.
+ */
+export async function sendEventReminders({ log = () => {} } = {}) {
+  const now = Date.now();
+
+  const due = await GameEvent.find({
+    hidden: { $ne: true },
+    // ⚠️ SEULEMENT CE QUI A UNE HEURE. Un salon connu au jour près n'a pas de
+    // « dans quinze minutes » : son `startsAt` est un minuit de convention, et
+    // prévenir à 23 h 45 la veille serait un mensonge poli.
+    precision: "time",
+    startsAt: { $gte: new Date(now - REMIND_LATE_MS), $lte: new Date(now + REMIND_LEAD_MS) },
+    "interested.0": { $exists: true },
+  })
+    .select("name subtitle startsAt interested remindedFor")
+    .limit(20);
+
+  let sent = 0;
+  for (const ev of due) {
+    const start = new Date(ev.startsAt).getTime();
+    // Déjà prévenu POUR CETTE heure-là (cf. `remindedFor` dans le modèle).
+    if (ev.remindedFor && new Date(ev.remindedFor).getTime() === start) continue;
+
+    // Marqué AVANT l'envoi : si Expo est lent et que le passage suivant arrive
+    // entre-temps, mieux vaut un rappel perdu que le même rappel deux fois.
+    ev.remindedFor = ev.startsAt;
+    await ev.save();
+
+    const minutes = Math.max(0, Math.round((start - now) / 60000));
+    const when = minutes <= 1 ? "Ça commence maintenant" : `Ça commence dans ${minutes} min`;
+
+    const accepted = await pushToUsers(ev.interested, {
+      title: ev.name,
+      body: ev.subtitle ? `${when} — ${ev.subtitle}` : when,
+      // `path` : la fiche de l'événement s'ouvre d'une touche, c'est tout
+      // l'intérêt du rappel (cf. le routage des notifications côté mobile).
+      data: { type: "event", eventId: String(ev._id), path: `/event/${ev._id}` },
+      channelId: "events",
+    });
+
+    sent += 1;
+    log(`  ⏰ ${ev.name} — ${ev.interested.length} intéressé(s), ${accepted} appareil(s) touché(s)`);
+  }
+
+  return sent;
+}
+
+async function remindQuietly() {
+  try {
+    await sendEventReminders({ log: (l) => console.log(l) });
+  } catch (err) {
+    console.error("event reminder error:", err.message);
+  }
+}
+
+export function startEventReminders() {
+  setInterval(remindQuietly, REMIND_POLL_MS);
+  console.log("⏰ Rappels des événements cochés activés");
 }
