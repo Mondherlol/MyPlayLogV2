@@ -399,6 +399,31 @@ function withoutCrossovers(rows, kind) {
   return core.length >= ENOUGH_WITHOUT ? core : rows;
 }
 
+/** Le nom de la saga, qu'on ne reçoit pas : la route ne connaît que son id. */
+async function sagaTitle(kind, id) {
+  const endpoint = kind === "collection" ? "collections" : "franchises";
+  const rows = await igdbQuery(endpoint, `fields name; where id = ${id}; limit 1;`).catch(() => []);
+  return rows?.[0]?.name || null;
+}
+
+// ⚠️ « COMMENCE PAR », PAS « CONTIENT ». « Mario » contenu attraperait « Dr.
+// Robotnik contre Mario » ; « Mario »* attrape les jeux Mario. Et pas en
+// dessous de quatre lettres : un préfixe de trois caractères ramasse la moitié
+// du catalogue.
+const MIN_TITLE = 4;
+
+async function gamesNamedLike(name, FIELDS) {
+  const clean = escapeQuotes(String(name || "").trim());
+  if (clean.length < MIN_TITLE) return [];
+  return (
+    (await igdbQuery(
+      "games",
+      `${FIELDS} where name ~ "${clean}"* & version_parent = null;` +
+        ` sort total_rating_count desc; limit 20;`
+    ).catch(() => [])) || []
+  );
+}
+
 export async function sagaImages(kind, id, limit = 60) {
   const FIELDS =
     "fields name,first_release_date,total_rating_count,franchises,collections," +
@@ -413,16 +438,31 @@ export async function sagaImages(kind, id, limit = 60) {
       ? `where id = ${id};`
       : `where ${kind === "collection" ? "collections" : "franchises"} = (${id}) & version_parent = null;`;
 
-  const rows =
-    (await igdbQuery("games", `${FIELDS} ${where} sort total_rating_count desc; limit 60;`).catch(
-      () => []
-    )) || [];
+  // ⚠️ ET LE JEU QUI DONNE SON NOM À LA SAGA N'EST SOUVENT PAS DEDANS.
+  // Constaté sur Marvel Rivals : la collection « Marvel Rivals » d'IGDB ne
+  // contient QUE les trois fiches de saison (cinq artworks à elles toutes), et
+  // pas le jeu lui-même — qui est rangé sous la franchise « Marvel » et porte,
+  // lui, vingt-et-un artworks et sa jaquette. On ouvrait donc la saga sur cinq
+  // visuels de bandeaux de saison, sans une seule image du jeu.
+  //
+  // On complète donc par le NOM : les jeux dont le titre commence par celui de
+  // la saga en font partie, quoi qu'en dise le rangement d'IGDB. C'est aussi la
+  // convention de nommage du catalogue (« Marvel Rivals: Season 2 »), donc
+  // c'est sans surprise.
+  const [rows, byName] = await Promise.all([
+    igdbQuery("games", `${FIELDS} ${where} sort total_rating_count desc; limit 60;`).catch(() => []),
+    gamesNamedLike(kind === "game" ? null : await sagaTitle(kind, id), FIELDS),
+  ]);
+
+  const merged = [...(rows || [])];
+  const known = new Set(merged.map((g) => g.id));
+  for (const g of byName) if (!known.has(g.id)) merged.push(g);
 
   const out = [];
-  const games = withoutCrossovers(rows, kind);
+  const games = withoutCrossovers(merged, kind);
   const seen = new Set();
-  const push = (imageId, game, size, thumbSize) => {
-    if (!imageId || seen.has(imageId) || out.length >= limit) return;
+  const push = (imageId, game, size, thumbSize, cap) => {
+    if (!imageId || seen.has(imageId) || out.length >= cap) return;
     seen.add(imageId);
     out.push({
       id: imageId,
@@ -433,11 +473,34 @@ export async function sagaImages(kind, id, limit = 60) {
     });
   };
 
-  // Trois passes plutôt qu'un tri : on veut TOUS les artworks de la saga avant
+  // Trois paniers plutôt qu'un tri : on veut TOUS les artworks de la saga avant
   // la première capture, pas les artworks de chaque jeu à la suite.
-  for (const g of games) for (const a of g.artworks || []) push(a.image_id, g, "720p", "screenshot_med");
-  for (const g of games) for (const s of g.screenshots || []) push(s.image_id, g, "720p", "screenshot_med");
-  for (const g of games) push(g.cover?.image_id, g, "cover_big", "cover_small");
+  const art = [];
+  const shots = [];
+  const covers = [];
+  for (const g of games) {
+    for (const a of g.artworks || []) art.push([a.image_id, g, "720p", "screenshot_med"]);
+    for (const sc of g.screenshots || []) shots.push([sc.image_id, g, "720p", "screenshot_med"]);
+    if (g.cover?.image_id) covers.push([g.cover.image_id, g, "cover_big", "cover_small"]);
+  }
+
+  // ⚠️ ON RÉSERVE DE LA PLACE AUX JAQUETTES, SINON ELLES N'ARRIVENT JAMAIS.
+  // Les jaquettes passent en dernier — un carré de 90 pixels dont les trois
+  // quarts sont le titre du jeu fait un mauvais fond de case — mais « en
+  // dernier » voulait dire « jamais » : une saga un peu fournie remplit les
+  // soixante places en artworks et captures avant d'y arriver, et on se
+  // retrouvait sans une seule jaquette dans la grille alors que c'est parfois
+  // exactement l'image qu'on cherche.
+  //
+  // La réserve ne coûte rien quand il n'y a pas de jaquette à mettre dedans :
+  // elle est plafonnée par leur nombre réel.
+  const COVER_RESERVE = 14;
+  const reserve = Math.min(COVER_RESERVE, covers.length);
+  const bulkCap = Math.max(0, limit - reserve);
+
+  for (const e of art) push(e[0], e[1], e[2], e[3], bulkCap);
+  for (const e of shots) push(e[0], e[1], e[2], e[3], bulkCap);
+  for (const e of covers) push(e[0], e[1], e[2], e[3], limit);
 
   return out.slice(0, limit);
 }

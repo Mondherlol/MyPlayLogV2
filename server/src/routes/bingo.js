@@ -121,9 +121,24 @@ function sanitizeCells(raw, size) {
   const total = size * size;
   // Le centre d'une grille impaire, la case offerte du bingo.
   const center = size % 2 === 1 ? Math.floor(total / 2) : -1;
+  // ⚠️ LES DEUX FAÇONS DE LIRE LE TABLEAU NE SE MÉLANGENT PAS, ET LES MÉLANGER
+  // RECOPIAIT DES CASES.
+  //
+  // Le client n'envoie QUE les cases remplies, chacune portant son `index`
+  // (cf. mobile lib/bingo, `cellsForSave`) : vider la case 4 d'une grille de
+  // neuf fait donc partir un tableau de huit éléments, tassé. L'ancien
+  // `arr.find(...) || arr[i]` cherchait d'abord la case d'index 4 — absente,
+  // c'est le but — puis se rabattait sur le QUATRIÈME ÉLÉMENT DU TABLEAU
+  // TASSÉ, c'est-à-dire une autre case. La case vidée réapparaissait donc en
+  // double, remplie du contenu de sa voisine.
+  //
+  // Le repli par position n'existe que pour un tableau DENSE et sans index. On
+  // tranche une fois pour toutes, au lieu de laisser les deux se disputer case
+  // par case.
+  const indexed = arr.some((x) => Number.isFinite(Number(x?.index)));
   const out = [];
   for (let i = 0; i < total; i++) {
-    const c = arr.find((x) => Number(x?.index) === i) || arr[i] || {};
+    const c = (indexed ? arr.find((x) => Number(x?.index) === i) : arr[i]) || {};
     const free = i === center && !!c.free;
     const text = String(c.text || "").trim().slice(0, 120);
     const image = typeof c.image === "string" && c.image.trim() ? c.image.trim().slice(0, 1000) : null;
