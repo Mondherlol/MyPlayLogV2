@@ -173,3 +173,117 @@ export async function franchiseName(kind, id) {
   const rows = await igdbQuery(endpoint, `fields name; where id = ${id};`).catch(() => []);
   return rows?.[0]?.name || null;
 }
+
+// ======================================================================
+//  CHERCHER UNE SAGA, ET LUI PRENDRE SES IMAGES
+// ======================================================================
+// Sert au composeur de grilles de bingo (cf. routes/bingo.js) : on tape
+// « Metroid », on obtient la licence, et de la licence ses visuels — Samus en
+// armure pour la case « quelque chose Metroid ».
+//
+// ⚠️ ON CHERCHE DANS LES DEUX TIROIRS D'IGDB, franchises ET collections, pour
+// la raison expliquée en tête de ce fichier : la même idée y est rangée tantôt
+// dans l'un tantôt dans l'autre, et quelqu'un qui tape « Zelda » ne sait pas —
+// n'a pas à savoir — dans lequel Zelda est tombé.
+//
+// Et surtout PAS `search "…"` : l'endpoint `search` d'IGDB ne couvre pas les
+// franchises, et sur les collections il classe par pertinence globale plutôt
+// que par nom. Un `where name ~ *"…"*` fait exactement ce qu'on demande.
+
+const escapeQuotes = (s) => String(s).replace(/["\\]/g, "");
+
+/** Les sagas dont le nom contient `q` — franchises et collections mêlées. */
+export async function searchSagas(q, limit = 20) {
+  const needle = escapeQuotes(String(q || "").trim());
+  if (needle.length < 2) return [];
+
+  const ask = (endpoint) =>
+    igdbQuery(
+      endpoint,
+      `fields name,games; where name ~ *"${needle}"*; limit ${limit * 2};`
+    ).catch(() => []);
+
+  const [franchises, collections] = await Promise.all([ask("franchises"), ask("collections")]);
+
+  const rows = [
+    ...(franchises || []).map((f) => ({ ...f, kind: "franchise" })),
+    ...(collections || []).map((c) => ({ ...c, kind: "collection" })),
+  ];
+
+  // Dédoublonnage par NOM : « Metroid » existe des deux côtés, et deux lignes
+  // identiques dans une liste de résultats donnent l'impression d'un bug. On
+  // garde celle qui porte le plus de jeux — c'est la mieux remplie, donc celle
+  // qui donnera des images.
+  const best = new Map();
+  for (const r of rows) {
+    const key = norm(r.name);
+    if (!key) continue;
+    const count = (r.games || []).length;
+    const kept = best.get(key);
+    if (!kept || count > kept.count) best.set(key, { row: r, count });
+  }
+
+  const needleNorm = norm(needle);
+  return [...best.values()]
+    .map(({ row, count }) => ({
+      id: row.id,
+      kind: row.kind,
+      name: row.name,
+      gameCount: count,
+    }))
+    // Ce qu'on a tapé EN ENTIER d'abord, puis ce qui commence par, puis les
+    // sagas les plus fournies. Taper « mario » doit rendre « Mario » avant
+    // « Mario & Sonic aux Jeux olympiques ».
+    .sort((a, b) => {
+      const na = norm(a.name);
+      const nb = norm(b.name);
+      const score = (n) => (n === needleNorm ? 2 : n.startsWith(needleNorm) ? 1 : 0);
+      const d = score(nb) - score(na);
+      if (d) return d;
+      return b.gameCount - a.gameCount;
+    })
+    .slice(0, limit);
+}
+
+/**
+ * Les visuels d'une saga, prêts à devenir des fonds de case.
+ *
+ * ⚠️ LES ARTWORKS AVANT LES CAPTURES, ET LES JAQUETTES EN DERNIER. Une case de
+ * bingo est un carré de 90 pixels de côté sur lequel on pose du texte : il lui
+ * faut une image DESSINÉE pour être un fond — un artwork, justement — pas une
+ * capture d'écran d'inventaire ni une jaquette dont les trois quarts sont le
+ * titre du jeu. Les jaquettes restent en dernier recours parce que certains
+ * jeux n'ont que ça.
+ */
+export async function sagaImages(kind, id, limit = 60) {
+  const field = kind === "collection" ? "collections" : "franchises";
+  const rows =
+    (await igdbQuery(
+      "games",
+      `fields name,first_release_date,total_rating_count,cover.image_id,artworks.image_id,screenshots.image_id;` +
+        ` where ${field} = (${id}) & version_parent = null;` +
+        ` sort total_rating_count desc; limit 40;`
+    ).catch(() => [])) || [];
+
+  const out = [];
+  const seen = new Set();
+  const push = (imageId, game, size, thumbSize) => {
+    if (!imageId || seen.has(imageId) || out.length >= limit) return;
+    seen.add(imageId);
+    out.push({
+      id: imageId,
+      url: `${IMG_BASE}/t_${size}/${imageId}.jpg`,
+      thumb: `${IMG_BASE}/t_${thumbSize}/${imageId}.jpg`,
+      gameId: game.id,
+      gameName: game.name || "",
+    });
+  };
+
+  // Trois passes plutôt qu'un tri : on veut TOUS les artworks de la saga avant
+  // la première capture, pas les artworks de chaque jeu à la suite.
+  for (const g of rows) for (const a of g.artworks || []) push(a.image_id, g, "720p", "screenshot_med");
+  for (const g of rows) for (const s of g.screenshots || []) push(s.image_id, g, "720p", "screenshot_med");
+  for (const g of rows) push(g.cover?.image_id, g, "cover_big", "cover_small");
+
+  return out.slice(0, limit);
+}

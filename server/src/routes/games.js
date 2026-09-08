@@ -61,6 +61,8 @@ import {
   franchiseGames,
   franchiseName,
   franchisesOf,
+  sagaImages,
+  searchSagas,
   mainFranchise,
 } from "../lib/franchises.js";
 
@@ -2384,6 +2386,40 @@ router.get("/franchises/:kind/:fid", optionalAuth, async (req, res) => {
   } catch (err) {
     console.error("franchise games error:", err.message);
     res.status(err.status || 500).json({ error: err.message || "Erreur." });
+  }
+});
+
+// ============================================================
+//  GET /api/games/sagas?q= — chercher une licence par son nom
+// ============================================================
+// ⚠️ CETTE ROUTE N'EXISTE PAS POUR NAVIGUER, MAIS POUR ILLUSTRER. Elle sert au
+// composeur de grilles de bingo (cf. routes/bingo.js) : on cherche « Metroid »
+// pour habiller la case « quelque chose Metroid » d'une image de Samus. D'où
+// une réponse volontairement maigre — un nom, un identifiant, un tiroir — et
+// une seconde route pour les visuels, qu'on ne charge que sur la saga choisie.
+router.get("/sagas", requireAuth, async (req, res) => {
+  try {
+    const q = String(req.query.q || "").trim();
+    if (q.length < 2) return res.json({ sagas: [] });
+    res.json({ sagas: await searchSagas(q, 20) });
+  } catch (err) {
+    console.error("saga search error:", err.message);
+    res.status(502).json({ error: "Recherche de saga indisponible." });
+  }
+});
+
+// ============================================================
+//  GET /api/games/sagas/:kind/:sid/images — ses visuels
+// ============================================================
+router.get("/sagas/:kind/:sid/images", requireAuth, async (req, res) => {
+  try {
+    const sid = Number(req.params.sid);
+    const kind = req.params.kind === "collection" ? "collection" : "franchise";
+    if (!sid) return res.status(400).json({ error: "Licence invalide." });
+    res.json({ images: await sagaImages(kind, sid, 60) });
+  } catch (err) {
+    console.error("saga images error:", err.message);
+    res.status(502).json({ error: "Images indisponibles." });
   }
 });
 

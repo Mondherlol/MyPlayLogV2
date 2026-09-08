@@ -22,6 +22,10 @@ const notificationSchema = new mongoose.Schema(
         "comment_like", // like sur ton commentaire
         "list_comment", // commentaire sur ta liste
         "list_like", // like sur ta liste
+        "bingo_like", // like sur ta grille de bingo d'un rendez-vous
+        "bingo_comment", // commentaire sur ta grille de bingo
+        "bingo_comment_reply", // réponse à ton commentaire sous une grille
+        "bingo_comment_like", // like sur ton commentaire sous une grille
         "playlist_listen", // quelqu'un a écouté ta playlist d'OST
         "review_comment", // réponse à ta review
         "review_comment_reply", // réponse à ton commentaire sous une review
@@ -52,6 +56,9 @@ const notificationSchema = new mongoose.Schema(
     },
     // Cible « liste » (pour les notifs de listes/commentaires). Optionnel.
     list: { type: mongoose.Schema.Types.ObjectId, ref: "List", default: null },
+    // Cible « grille de bingo » : suffit à rouvrir la grille (/bingo/…), qui
+    // porte elle-même son événement.
+    bingo: { type: mongoose.Schema.Types.ObjectId, ref: "EventBingo", default: null },
     comment: { type: mongoose.Schema.Types.ObjectId, default: null },
     // Cible « OST » (commentaires d'OST) : propriétaire du profil dont vient
     // l'OST, combiné au champ `game` (gameId) pour reconstruire le lien.

@@ -21,6 +21,7 @@ import feedRoutes from "./routes/feed.js";
 import freeGamesRoutes from "./routes/freeGames.js";
 import gameStoreRoutes from "./routes/gameStore.js";
 import eventRoutes from "./routes/events.js";
+import bingoRoutes from "./routes/bingo.js";
 import journalRoutes from "./routes/journal.js";
 import blindtestRoutes from "./routes/blindtest.js";
 import blindtestVersusRoutes from "./routes/blindtestVersus.js";
@@ -153,6 +154,7 @@ app.use("/api/feed", feedRoutes);
 app.use("/api/free-games", freeGamesRoutes);
 app.use("/api/game-store", gameStoreRoutes);
 app.use("/api/events", eventRoutes);
+app.use("/api/bingo", bingoRoutes);
 app.use("/api/journal", journalRoutes);
 // Même précaution que pour /api/geo/versus : monté AVANT le routeur solo.
 app.use("/api/blindtest/versus", blindtestVersusRoutes);
