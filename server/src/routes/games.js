@@ -17,6 +17,8 @@ import { notify } from "../lib/notify.js";
 import { recordActivity, removeActivity } from "../lib/activity.js";
 import { summarizeReactions, reviewComment } from "../lib/reviewSerialize.js";
 import { triggerMissionCheck } from "../lib/missions.js";
+import { officialCharacters } from "../lib/gameCharacters.js";
+import { wikiCharacters } from "../lib/gameWiki.js";
 import { ensureEntityLogos } from "../lib/entityLogos.js";
 import { reviewVisibility, privacyOf, isFollower } from "../lib/privacy.js";
 import User from "../models/User.js";
@@ -1635,9 +1637,18 @@ router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
     const whereRel = bestFranchise
       ? `${bestFranchise.kind === "collection" ? "collections" : "franchises"} = (${bestFranchise.id})`
       : null;
-    const [ttb, vnChars, bundleGames, relatives] = await Promise.all([
+    const [ttb, vnChars, officialChars, wikiChars, bundleGames, relatives] = await Promise.all([
       resolveTimeToBeat(id, g.name, released, g.first_release_date ?? null),
       isVn ? resolveVnCharacters(id, g.name) : Promise.resolve([]),
+      // Le roster officiel du jeu, quand l'éditeur en publie un : c'est ce qui
+      // remplit les fiches où IGDB ne connaît AUCUN personnage — Overwatch,
+      // Valorant, Marvel Rivals (cf. lib/gameCharacters).
+      officialCharacters(g.name),
+      // Et pour les jeux solo à casting, dont aucun éditeur ne publie la
+      // liste (The Last of Us, Smash, Persona…), le wiki du jeu — trié par
+      // taille d'article, ce qui met les protagonistes devant
+      // (cf. lib/gameWiki).
+      wikiCharacters(id, g.name, g.websites, g.first_release_date ?? null),
       // Bundle : la modale « joué » propose de cocher chaque jeu inclus.
       g.game_type === 3
         ? fetchBundleGames(id, g.first_release_date ?? null)
@@ -1645,19 +1656,48 @@ router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
       gameRelatives(id, whereRel, g.first_release_date ?? null).catch(() => null),
     ]);
 
-    // Dédoublonnage : on n'ajoute un perso VNDB que si son nom n'existe pas déjà.
-    const seen = new Set([...igdbChars, ...communityChars].map((c) => normCharName(c.name)));
-    const vnAdd = vnChars.filter((c) => {
-      const k = normCharName(c.name);
-      if (!k || seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    });
+    // Dédoublonnage entre les quatre sources. Les personnages de la communauté
+    // sont posés en premier dans le crible : ils sont saisis à la main par le
+    // staff, ce sont eux qui font autorité si une source répète un nom.
+    const seen = new Set(communityChars.map((c) => normCharName(c.name)));
+    const dedupe = (list) =>
+      list.filter((c) => {
+        const k = normCharName(c.name);
+        if (!k || seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+    // ⚠️ LE ROSTER OFFICIEL PASSE AVANT IGDB, pas après. Quand les deux
+    // connaissent un personnage (les champions de League of Legends, par
+    // exemple), celui de l'éditeur porte le portrait officiel là où IGDB a
+    // souvent une vignette absente — ou celle d'un homonyme.
+    const officialAdd = dedupe(officialChars);
+    // Le wiki passe devant IGDB pour la même raison que le roster officiel :
+    // quand les deux connaissent le personnage, c'est le wiki qui a le
+    // portrait — et le bon, pas celui d'un homonyme.
+    const wikiAdd = dedupe(wikiChars);
+    const igdbAdd = dedupe(igdbChars);
+    const vnAdd = dedupe(vnChars);
 
-    // Personnages : IGDB + VNDB + communauté, portraits d'abord (tri stable).
-    const characters = [...igdbChars, ...vnAdd, ...communityChars].sort(
+    // Personnages : roster officiel + IGDB + VNDB + communauté, portraits
+    // d'abord (tri stable).
+    //
+    // ⚠️ CE TRI EST CE QUI SAUVE LES GROSSES FICHES. GTA V compte 209
+    // personnages chez IGDB dont trois seulement ont un portrait — et deux de
+    // ces trois sont Michael et Trevor. Sans le tri, la fiche s'ouvre sur des
+    // animateurs de radio ; avec, elle s'ouvre sur les protagonistes.
+    const sorted = [...officialAdd, ...wikiAdd, ...igdbAdd, ...vnAdd, ...communityChars].sort(
       (a, b) => (b.image ? 1 : 0) - (a.image ? 1 : 0)
     );
+    // ⚠️ ET ON S'ARRÊTE QUELQUE PART. Lire les 209 personnages de GTA V au lieu
+    // des 50 premiers était nécessaire pour TROUVER les protagonistes ; les
+    // envoyer tous au téléphone en est une autre : le rail des personnages
+    // n'est pas virtualisé, et 200 vignettes vides à faire défiler ne
+    // renseignent personne. On garde donc TOUS ceux qui ont un portrait, et on
+    // coupe la traîne des sans-image.
+    const NO_IMAGE_KEPT = 40;
+    let blanks = 0;
+    const characters = sorted.filter((c) => c.image || ++blanks <= NO_IMAGE_KEPT);
 
     // Jeux « sans fin » potentiels : multijoueur (2), MMO (5) ou battle
     // royale (6) selon IGDB → la modale propose alors le statut « Sans fin ».

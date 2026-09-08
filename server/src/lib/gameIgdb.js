@@ -239,7 +239,7 @@ export const REL_SUBFIELDS = [
 // Bumper une de ces versions invalide le morceau correspondant, partout.
 const VERSIONS = {
   core: 3, // v3 : websites.category renommé en websites.type
-  chars: 1,
+  chars: 2, // v2 : pagination complète + images des entrées fusionnées retirées
   ttb: 1,
   bundle: 1,
   relatives: 1,
@@ -271,18 +271,95 @@ export async function releaseDateOf(gameId) {
   }
 }
 
-/** Les personnages IGDB du jeu. */
+// ⚠️ 50 PERSONNAGES NE SUFFISAIENT PAS, ET LE PROBLÈME N'ÉTAIT PAS LE NOMBRE.
+// GTA V en a 209 chez IGDB. On en prenait les 50 PREMIERS, dans l'ordre des
+// identifiants — c'est-à-dire dans l'ordre où des contributeurs les ont saisis.
+// Résultat : une fiche remplie d'animateurs radio et de figurants d'émissions
+// télé, pendant que Michael et Trevor — les deux seuls du jeu à AVOIR un
+// portrait — attendaient au-delà de la limite. On lit donc tout, et on trie
+// après (les portraits d'abord, cf. routes/games.js).
+const CHARS_PAGE = 100;
+const CHARS_MAX = 300;
+
+// ⚠️ UN PERSONNAGE RATTACHÉ À SIX JEUX SANS RAPPORT EST UNE FICHE FUSIONNÉE,
+// ET SON PORTRAIT N'EST PAS LE SIEN.
+//
+// Le « Henry » de The Last of Us est chez IGDB une seule entrée partagée avec
+// Fire Emblem Awakening, No More Heroes 2, Firewatch et Kingdom Come — tous les
+// Henry du jeu vidéo réunis sous un même prénom. Sa vignette est celle de l'un
+// des autres : sur la fiche de The Last of Us, on affichait un personnage de
+// Fire Emblem. Idem pour « Sam », « Maria », « David »…
+//
+// Le NOM, lui, reste juste : Henry est bien dans The Last of Us. C'est donc
+// l'image qu'on retire, pas le personnage — supprimer l'entrée effacerait de
+// vrais personnages (Sarah, David, Sam sont tous dans le jeu) pour un problème
+// qui ne concerne que la vignette.
+//
+// Le repère est le nombre de FAMILLES distinctes (collection, saga ou jeu
+// parent) parmi les jeux du personnage, et pas le nombre de jeux : un
+// personnage de série apparaît légitimement dans cinq épisodes — c'est une
+// seule famille. Trois familles sans rapport, c'est une homonymie.
+const MERGED_FAMILIES = 3;
+
+/** La « famille » d'un jeu : sa collection, sa saga, son parent, ou lui-même. */
+function familyOf(g) {
+  return `f${g.collections?.[0] || g.franchises?.[0] || g.parent_game || g.version_parent || g.id}`;
+}
+
+async function familiesOf(gameIds) {
+  const out = new Map();
+  // On borne : un personnage très partagé peut traîner des centaines de jeux,
+  // et cette requête ne sert qu'à repérer des homonymies.
+  const ids = gameIds.slice(0, 300);
+  for (let i = 0; i < ids.length; i += 100) {
+    const rows = await igdbQuery(
+      "games",
+      `fields id,franchises,collections,parent_game,version_parent; where id = (${ids
+        .slice(i, i + 100)
+        .join(",")}); limit 100;`
+    );
+    for (const g of rows || []) out.set(g.id, familyOf(g));
+  }
+  return out;
+}
+
+// « Voice Over Cast » n'est pas un personnage, c'est une rubrique de générique.
+const NOT_A_CHARACTER = /voice[\s-]?over/i;
+
+/** Les personnages IGDB du jeu, au complet et débarrassés des vignettes fausses. */
 export function gameCharacters(gameId, releaseDate) {
   return remember({
     kind: "chars",
     gameId,
     ver: VERSIONS.chars,
     releaseDate,
-    load: () =>
-      igdbQuery(
-        "characters",
-        `fields name,mug_shot.image_id; where games = (${gameId}); limit 50;`
-      ),
+    load: async () => {
+      let chars = [];
+      for (let off = 0; off < CHARS_MAX; off += CHARS_PAGE) {
+        const page = await igdbQuery(
+          "characters",
+          `fields name,mug_shot.image_id,games; where games = (${gameId}); limit ${CHARS_PAGE}; offset ${off};`
+        );
+        chars = chars.concat(page || []);
+        if (!page || page.length < CHARS_PAGE) break;
+      }
+      chars = chars.filter((c) => c?.name && !NOT_A_CHARACTER.test(c.name));
+
+      // Le repérage des fusions ne vaut que pour ceux qui ont une image : c'est
+      // la seule chose qu'on leur retire, inutile de payer la requête pour les
+      // autres.
+      const withImage = chars.filter((c) => c.mug_shot?.image_id && (c.games?.length || 0) > 2);
+      if (withImage.length) {
+        const families = await familiesOf([
+          ...new Set(withImage.flatMap((c) => c.games || [])),
+        ]).catch(() => new Map());
+        for (const c of withImage) {
+          const distinct = new Set((c.games || []).map((g) => families.get(g)).filter(Boolean));
+          if (distinct.size >= MERGED_FAMILIES) c.mug_shot = null;
+        }
+      }
+      return chars;
+    },
   });
 }
 

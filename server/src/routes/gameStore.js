@@ -1,7 +1,7 @@
 import express from "express";
 
 import { requireAuth } from "../middleware/auth.js";
-import { resolveIgdbGame } from "../lib/gameSeasons.js";
+import { resolveIgdbGame } from "../lib/igdbLookup.js";
 import * as valorant from "../lib/valorantStore.js";
 
 const router = express.Router();

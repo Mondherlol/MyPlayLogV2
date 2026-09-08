@@ -27,66 +27,13 @@
 // le saisir à la main (`source: "manual"`, que la synchro ne touche jamais).
 
 import GameEvent from "../models/GameEvent.js";
-import { igdbQuery } from "./igdb.js";
-
-const IMG_BASE = "https://images.igdb.com/igdb/image/upload";
+import { resolveIgdbGame } from "./igdbLookup.js";
 
 // Au-delà, ce n'est plus une saison qui arrive, c'est une feuille de route.
 const HORIZON_MS = 200 * 86400000;
 
 // Le fournisseur donne des heures à la seconde ou rien du tout ; on ne prétend
 // pas savoir mieux (cf. `precision` dans le modèle).
-
-// ----------------------------------------------------------------------
-//  Le jeu, côté IGDB
-// ----------------------------------------------------------------------
-// ⚠️ ON NE CODE PAS D'IDENTIFIANTS EN DUR. Le rattachement doit être le MÊME
-// que celui de la bibliothèque, sinon la saison ne s'affichera chez personne :
-// une constante recopiée à la main est invérifiable et se trompe en silence. On
-// résout donc par recherche, une fois par jour, comme le fait déjà l'habillage
-// des trackers (cf. lib/marvelRivals, `getGameAssets`).
-const IGDB_TTL = 24 * 3600 * 1000;
-const _igdb = new Map(); // nom recherché -> { at, data }
-
-/**
- * La fiche IGDB d'un jeu désigné par son nom, résolue une fois par jour.
- *
- * Exportée parce qu'elle ne sert pas qu'ici : la boutique de Valorant a le même
- * besoin — savoir si LA fiche qu'on regarde est bien ce jeu-là — et deux tables
- * d'identifiants codées en dur finiraient par diverger (cf. routes/gameStore).
- */
-export async function resolveIgdbGame(name) {
-  const hit = _igdb.get(name);
-  if (hit && Date.now() - hit.at < IGDB_TTL) return hit.data;
-
-  let data = null;
-  try {
-    const rows = await igdbQuery(
-      "games",
-      `search "${name.replace(/"/g, "")}"; fields name, cover.image_id; limit 20;`
-    );
-    // Le nom EXACT d'abord : « Valorant » cherché en toutes lettres remonte
-    // aussi « Valorant: Champions », qui est une autre fiche et n'est dans la
-    // bibliothèque de personne.
-    const exact = (rows || []).find(
-      (g) => String(g.name || "").toLowerCase() === name.toLowerCase()
-    );
-    const g = exact || (rows || [])[0];
-    if (g?.id) {
-      data = {
-        id: g.id,
-        name: g.name,
-        cover: g.cover?.image_id ? `${IMG_BASE}/t_cover_big/${g.cover.image_id}.jpg` : null,
-      };
-    }
-  } catch {
-    // IGDB en panne : on garde le dernier rattachement connu plutôt que de
-    // réécrire toutes les saisons du jeu sans image ni `gameId`.
-    return hit?.data || null;
-  }
-  _igdb.set(name, { at: Date.now(), data });
-  return data;
-}
 
 // ----------------------------------------------------------------------
 //  Valorant — les actes, par l'API de contenu publique
