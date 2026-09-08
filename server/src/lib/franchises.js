@@ -224,7 +224,7 @@ export async function searchSagas(q, limit = 20) {
   }
 
   const needleNorm = norm(needle);
-  return [...best.values()]
+  const sagas = [...best.values()]
     .map(({ row, count }) => ({
       id: row.id,
       kind: row.kind,
@@ -243,6 +243,35 @@ export async function searchSagas(q, limit = 20) {
       return b.gameCount - a.gameCount;
     })
     .slice(0, limit);
+
+  // ⚠️ LE REPLI SUR LES JEUX, ET SEULEMENT EN REPLI. « Ace Attorney » rend
+  // trois licences — c'est la bonne réponse, et y ajouter les vingt jeux de la
+  // série noierait exactement ce qu'on cherchait. Mais « Katana Zero » n'est la
+  // licence de rien du tout : sans ce repli, la recherche répond « aucun
+  // résultat » sur un jeu qui existe, et on croit l'application cassée.
+  //
+  // On ne mélange donc pas les deux : on descend d'un cran quand l'étage du
+  // dessus est vide.
+  if (sagas.length) return sagas;
+
+  const games =
+    (await igdbQuery(
+      "games",
+      `search "${needle}"; fields name,first_release_date,total_rating_count;` +
+        ` where version_parent = null & game_type = 0; limit ${limit};`
+    ).catch(() => [])) || [];
+
+  return games.map((g) => ({
+    id: g.id,
+    kind: "game",
+    name: g.name,
+    // Un jeu n'a pas de « nombre de jeux » : la liste n'affiche donc rien à
+    // droite de son nom, et c'est ce qui le distingue d'une licence.
+    gameCount: 0,
+    year: g.first_release_date
+      ? new Date(g.first_release_date * 1000).getUTCFullYear()
+      : null,
+  }));
 }
 
 /**
@@ -256,14 +285,22 @@ export async function searchSagas(q, limit = 20) {
  * jeux n'ont que ça.
  */
 export async function sagaImages(kind, id, limit = 60) {
-  const field = kind === "collection" ? "collections" : "franchises";
+  const FIELDS =
+    "fields name,first_release_date,total_rating_count,cover.image_id,artworks.image_id,screenshots.image_id;";
+  // ⚠️ « game » N'EST PAS UNE LICENCE D'UN SEUL JEU, C'EST UN AUTRE `where`.
+  // Le repli de `searchSagas` peut rendre un jeu isolé (« Katana Zero ») ; on
+  // interroge alors ce jeu-là, pas une franchise qui n'existe pas — sans ce
+  // branchement, `franchises = (427520)` cherche la franchise numéro 427520 et
+  // rend une liste vide, sans erreur, ce qui est le pire des deux mondes.
+  const where =
+    kind === "game"
+      ? `where id = ${id};`
+      : `where ${kind === "collection" ? "collections" : "franchises"} = (${id}) & version_parent = null;`;
+
   const rows =
-    (await igdbQuery(
-      "games",
-      `fields name,first_release_date,total_rating_count,cover.image_id,artworks.image_id,screenshots.image_id;` +
-        ` where ${field} = (${id}) & version_parent = null;` +
-        ` sort total_rating_count desc; limit 40;`
-    ).catch(() => [])) || [];
+    (await igdbQuery("games", `${FIELDS} ${where} sort total_rating_count desc; limit 40;`).catch(
+      () => []
+    )) || [];
 
   const out = [];
   const seen = new Set();

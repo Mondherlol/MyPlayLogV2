@@ -43,6 +43,17 @@ const cellSchema = new mongoose.Schema(
     // Prime 4 ») et, un jour, à ouvrir la fiche depuis la case.
     gameId: { type: Number, default: null },
     gameName: { type: String, default: "", maxlength: 120 },
+    // Le recadrage de l'image dans la case, en deux pourcentages (« 50% 30% »)
+    // — exactement la syntaxe de `background-position` du site, que le
+    // téléphone sait déjà lire (cf. mobile lib/images, `contentPositionOf`).
+    // Une image de jeu est presque toujours en 16/9 posée dans un carré : sans
+    // ce réglage, c'est le hasard qui décide si on garde le personnage ou le
+    // mur derrière lui.
+    pos: { type: String, default: null, maxlength: 24 },
+    // Où se pose le texte quand il y a une image : « banner » (un bandeau clair
+    // en bas, la mise en page des grilles qui circulent) ou « overlay » (à même
+    // l'image, en blanc ombré).
+    textStyle: { type: String, enum: ["banner", "overlay"], default: "banner" },
     // La case offerte du milieu, celle qui est cochée d'avance. C'est la
     // convention du bingo et elle n'existe que sur les grilles impaires.
     free: { type: Boolean, default: false },
@@ -71,6 +82,11 @@ const bingoSchema = new mongoose.Schema(
     // et personne ne trouve vingt-cinq pronostics à faire — c'est déjà beaucoup.
     size: { type: Number, default: 3, min: 2, max: 5 },
     cells: { type: [cellSchema], default: [] },
+    // Le décor : la couleur de fond et son motif (cf. mobile lib/bingoThemes).
+    // On ne stocke que la CLÉ — les couleurs vivent côté client, qui est le
+    // seul à les dessiner, et une palette qu'on retouche ne demande alors
+    // aucune migration.
+    theme: { type: String, default: "crimson", maxlength: 24 },
     // Publiée = visible par les autres. Une grille se compose souvent en
     // plusieurs fois : tant qu'elle n'est pas publiée, elle n'appartient qu'à
     // son auteur, et un brouillon à trois cases ne part pas dans le fil.

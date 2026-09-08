@@ -2414,7 +2414,13 @@ router.get("/sagas", requireAuth, async (req, res) => {
 router.get("/sagas/:kind/:sid/images", requireAuth, async (req, res) => {
   try {
     const sid = Number(req.params.sid);
-    const kind = req.params.kind === "collection" ? "collection" : "franchise";
+    // Trois natures, pas deux : la recherche retombe sur un JEU isolé quand
+    // aucune licence ne porte ce nom (cf. lib/franchises, `searchSagas`), et
+    // ramener ce cas à « franchise » chercherait une franchise qui n'existe
+    // pas — sans erreur, avec zéro image.
+    const kind = ["collection", "game"].includes(req.params.kind)
+      ? req.params.kind
+      : "franchise";
     if (!sid) return res.status(400).json({ error: "Licence invalide." });
     res.json({ images: await sagaImages(kind, sid, 60) });
   } catch (err) {
@@ -3004,6 +3010,106 @@ router.get("/:id/howlong", optionalAuth, async (req, res) => {
   } catch (err) {
     console.error("game howlong error:", err.message);
     res.status(500).json({ error: "Erreur lors du chargement des temps de jeu." });
+  }
+});
+
+// --- Les chouchous : personnage et musique préférés -----------------------
+// Élire un personnage favori était jusqu'ici un geste sans retour : on cochait
+// un cœur, et rien ne revenait. Or c'est exactement le genre de choix dont la
+// réponse fait tout l'intérêt — « je suis dans les 4 % qui ont choisi
+// celui-là » vaut mieux que le choix lui-même.
+//
+// Cette route rend donc les deux dépouillements d'un coup (personnages et
+// bande originale) : le nombre de votants, le décompte par nom, et surtout QUI
+// — parmi les gens qu'on suit — a voté quoi. La liste d'abonnements est le
+// seul panel dont on connaît les goûts.
+//
+// ⚠️ ON REGROUPE PAR NOM NORMALISÉ, PAS PAR NOM BRUT. Le favori est recopié
+// sur l'entrée de bibliothèque au moment du clic, depuis des sources qui
+// n'écrivent pas toutes pareil (« Zelda » / « zelda » / « Princess Zelda » se
+// distinguent, mais les accents et la ponctuation, non). Sans normalisation,
+// un même personnage se retrouvait éparpillé sur trois lignes de 1 %.
+router.get("/:id/favorites", optionalAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+
+    const NON_EMPTY = { $nin: [null, ""] };
+    const [entries, viewer] = await Promise.all([
+      UserGame.find({
+        gameId: id,
+        $or: [
+          { "favoriteCharacter.name": NON_EMPTY },
+          { "favoriteOst.name": NON_EMPTY },
+        ],
+      })
+        .select("user favoriteCharacter favoriteOst")
+        .populate("user", "username avatar")
+        .lean(),
+      req.userId ? User.findById(req.userId).select("following").lean() : null,
+    ]);
+
+    // Les gens qu'on suit, plus soi-même : les seuls visages qu'on affiche.
+    const circle = new Set([
+      ...(viewer?.following || []).map(String),
+      ...(req.userId ? [String(req.userId)] : []),
+    ]);
+
+    // Un dépouillement, deux fois : `pick` dit où lire le favori dans l'entrée,
+    // `extra` ce qu'on garde du premier votant en plus du nom (le portrait, la
+    // pochette) — c'est la seule chose qui change entre les deux scrutins.
+    const tally = (pick, extra) => {
+      const byKey = new Map();
+      let voters = 0;
+      for (const e of entries) {
+        const fav = pick(e);
+        const name = String(fav?.name || "").trim();
+        if (!name) continue;
+        voters += 1;
+        const key = normCharName(name) || name.toLowerCase();
+        if (!byKey.has(key)) byKey.set(key, { name, ...extra(fav), count: 0, friends: [] });
+        const row = byKey.get(key);
+        row.count += 1;
+        // Le premier votant à en avoir une donne l'illustration : une entrée
+        // ancienne peut avoir été enregistrée sans portrait.
+        for (const [k, v] of Object.entries(extra(fav))) if (!row[k] && v) row[k] = v;
+        if (e.user && circle.has(String(e.user._id))) {
+          const isMe = String(e.user._id) === String(req.userId);
+          row.friends.push({
+            id: String(e.user._id),
+            username: e.user.username,
+            avatar: e.user.avatar || null,
+            isMe,
+          });
+        }
+      }
+      const items = [...byKey.values()]
+        .map((r) => ({
+          ...r,
+          // Arrondi au dixième : sur 1 388 votants, « 4 % » écrase des écarts
+          // que « 4,3 % » rend.
+          pct: voters ? Math.round((r.count / voters) * 1000) / 10 : 0,
+          // Soi d'abord, le reste par ordre d'arrivée : on se cherche en
+          // premier dans une rangée de visages.
+          friends: r.friends.sort((a, b) => (b.isMe ? 1 : 0) - (a.isMe ? 1 : 0)),
+        }))
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "fr"));
+      return { voters, items };
+    };
+
+    res.json({
+      characters: tally(
+        (e) => e.favoriteCharacter,
+        (fav) => ({ image: fav.image || null })
+      ),
+      osts: tally(
+        (e) => e.favoriteOst,
+        (fav) => ({ artist: fav.artist || null, artwork: fav.artwork || null })
+      ),
+    });
+  } catch (err) {
+    console.error("game favorites error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement des favoris." });
   }
 });
 
