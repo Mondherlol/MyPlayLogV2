@@ -80,7 +80,12 @@ function serializeCells(cells, size) {
       pos: c?.pos || null,
       textStyle: c?.textStyle || "banner",
       free: !!c?.free,
-      checked: !!c?.checked || !!c?.free,
+      // ⚠️ LA CASE OFFERTE N'EST PLUS COCHÉE D'OFFICE. Elle l'était — c'est la
+      // convention du bingo papier — mais dans une grille qu'on compose des
+      // jours à l'avance, ça voulait dire ouvrir sur une case déjà « gagnée »
+      // avant que l'émission existe. Elle porte son mot FREE, et c'est son
+      // propriétaire qui la coche quand ça commence, comme les autres.
+      checked: !!c?.checked,
       checkedAt: c?.checkedAt || null,
     };
   });
@@ -384,14 +389,13 @@ router.post("/:id/check", requireAuth, async (req, res) => {
 
     const cell = grid.cells.find((c) => c.index === index);
     if (!cell) return res.status(404).json({ error: "Case vide." });
-    if (cell.free) return res.json({ index, checked: true }); // la case offerte ne se décoche pas
 
     const want = req.body?.checked !== false;
     cell.checked = want;
     cell.checkedAt = want ? new Date() : null;
     await grid.save();
 
-    const checked = grid.cells.filter((c) => c.checked || c.free).length;
+    const checked = grid.cells.filter((c) => c.checked).length;
     res.json({ index, checked: want, checkedCount: checked });
   } catch (err) {
     console.error("bingo check error:", err.message);
