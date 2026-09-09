@@ -1,4 +1,5 @@
 import GameCredits from "../models/GameCredits.js";
+import { igdbQuery } from "./igdb.js";
 import { gameCore } from "./gameIgdb.js";
 import { originalGame } from "./gameLore.js";
 
@@ -26,7 +27,7 @@ import { originalGame } from "./gameLore.js";
 
 // La version du format. ⚠️ LA BUMPER quand on change ce qu'on extrait, sinon
 // les fiches déjà en base répondront à l'ancienne pour toujours.
-const VER = 2;
+const VER = 3; // v3 : l'identifiant Wikidata de chaque personne
 
 const UA = "MyPlayLog/1.0 (credits; +https://myplaylog.cc)";
 const TIMEOUT = 10_000;
@@ -381,6 +382,7 @@ async function castFromWikidata(host, title) {
       const wikiHost = e.sitelinks?.frwiki ? "fr.wikipedia.org" : "en.wikipedia.org";
       return {
         name,
+        qid: id,
         role: "Voix",
         // Après la réalisation et le scénario : ce sont les visages qu'on
         // reconnaît, et la raison pour laquelle on ouvre cette section.
@@ -399,10 +401,13 @@ async function portraits(host, people) {
   const titles = [...new Set(people.map((p) => p.page).filter(Boolean))].slice(0, 45);
   if (!titles.length) return new Map();
 
+  // `pageprops` vient en prime : c'est le pont vers Wikidata, et il ne coûte
+  // rien de plus — c'est la MÊME requête. Sans lui, on ne saurait jamais
+  // demander « quels autres jeux a-t-il faits ? » (cf. `creditsWorks`).
   const res = await getJson(
     `https://${host}/w/api.php?action=query&format=json&redirects=1&titles=${encodeURIComponent(
       titles.join("|")
-    )}&prop=pageimages|description&piprop=thumbnail&pithumbsize=320&inprop=url`
+    )}&prop=pageimages|description|pageprops&ppprop=wikibase_item&piprop=thumbnail&pithumbsize=320&inprop=url`
   ).catch(() => null);
 
   const out = new Map();
@@ -411,6 +416,7 @@ async function portraits(host, people) {
     out.set(page.title, {
       image: page.thumbnail?.source || null,
       note: page.description || null,
+      qid: page.pageprops?.wikibase_item || null,
       link: `https://${host}/wiki/${encodeURIComponent(page.title)}`,
     });
   }
@@ -449,6 +455,7 @@ async function build(game) {
       found.image = found.image || p.image || shot?.image || null;
       found.link = found.link || p.link || shot?.link || null;
       found.note = found.note || p.note || shot?.note || null;
+      found.qid = found.qid || p.qid || shot?.qid || null;
       continue;
     }
     merged.set(key, {
@@ -458,6 +465,7 @@ async function build(game) {
       image: p.image || shot?.image || null,
       link: p.link || shot?.link || null,
       note: p.note || shot?.note || null,
+      qid: p.qid || shot?.qid || null,
     });
   }
 
@@ -511,4 +519,173 @@ export async function gameCredits(gameId) {
     { upsert: true }
   );
   return built;
+}
+
+// ======================================================================
+//  « Il a aussi fait… » — les autres jeux d'une personne
+// ======================================================================
+//
+// C'est la question qui vient juste après « qui a fait ce jeu ». On lit
+// « Hidetaka Miyazaki, réalisation » et on veut savoir tout de suite quoi
+// d'autre — c'est comme ça qu'on remonte une filmographie, et c'est comme ça
+// qu'on trouve son prochain jeu.
+//
+// ⚠️ CALCULÉ À PART, ET APRÈS. La section « Qui l'a fait » de la fiche ne doit
+// pas attendre ça : Wikidata met une à trois secondes à répondre, parfois
+// davantage. L'équipe s'affiche donc avec `gameCredits`, et cette page-ci
+// demande le complément quand elle s'ouvre (cf. GET /games/:id/credits/works).
+//
+// ⚠️ ON INTERROGE PAR IDENTIFIANT, JAMAIS PAR NOM. Il existe deux Ryan
+// Reynolds, trois Chris Lee et un nombre déraisonnable de Tanaka : croiser des
+// crédits sur une chaîne de caractères, c'est attribuer à quelqu'un le travail
+// d'un homonyme. Le `qid` de chaque personne est écrit avec elle
+// (cf. `portraits` et `castFromWikidata`) ; sans lui, on ne propose rien.
+
+const WORKS_VER = 1;
+
+// Combien de jaquettes sous une carte. Au-delà, la ligne devient un rail qu'on
+// pousse du doigt — or ce n'est pas la question posée ici : on veut la
+// silhouette d'une carrière, pas son catalogue.
+const WORKS_PER_PERSON = 8;
+
+// Les liens qui font qu'on « a fait » un jeu, du plus déterminant au moins.
+// P178 (développeur) est volontairement absente : c'est une société.
+const MADE_BY = [
+  "wdt:P57", // réalisation
+  "wdt:P58", // scénario
+  "wdt:P86", // musique
+  "wdt:P162", // production
+  "wdt:P170", // création
+  "wdt:P287", // game design
+  "wdt:P725", // voix
+].join("|");
+
+const SPARQL = "https://query.wikidata.org/sparql";
+
+/** Les jeux liés à ces personnes, en UNE requête pour toute la page. */
+async function worksFromWikidata(qids) {
+  if (!qids.length) return new Map();
+
+  const query = `SELECT ?p ?gLabel WHERE {
+  VALUES ?p { ${qids.map((q) => `wd:${q}`).join(" ")} }
+  ?g wdt:P31/wdt:P279* wd:Q7889 .
+  ?g (${MADE_BY}) ?p .
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,fr". }
+} LIMIT 1500`;
+
+  const res = await fetch(`${SPARQL}?format=json&query=${encodeURIComponent(query)}`, {
+    headers: { "User-Agent": UA, Accept: "application/sparql-results+json" },
+    // Le service public de Wikidata coupe lui-même à 60 s ; on n'attend pas
+    // si longtemps pour une section secondaire.
+    signal: AbortSignal.timeout(25_000),
+  });
+  if (!res.ok) throw new Error(`${res.status} sur Wikidata`);
+  const json = await res.json();
+
+  const out = new Map();
+  for (const row of json?.results?.bindings || []) {
+    const qid = String(row.p?.value || "").split("/").pop();
+    const name = row.gLabel?.value;
+    // Sans libellé, le service rend le Q brut : ce n'est pas un titre de jeu,
+    // et ça ne trouvera jamais sa jaquette.
+    if (!qid || !name || /^Q\d+$/.test(name)) continue;
+    if (!out.has(qid)) out.set(qid, new Set());
+    out.get(qid).add(name);
+  }
+  return out;
+}
+
+const IMG_BASE = "https://images.igdb.com/igdb/image/upload";
+const quote = (s) => `"${String(s).replace(/["\\]/g, "")}"`;
+
+/**
+ * Les jaquettes de ces titres, par nom.
+ *
+ * Wikidata donne des NOMS, l'app affiche des JAQUETTES : il faut donc les
+ * retrouver dans le catalogue. `~` est l'égalité insensible à la casse
+ * d'apicalypse — pas une recherche floue : on ne veut surtout pas qu'un
+ * « Halo » ramène « Halo Wars 2 ».
+ */
+async function coversByName(names) {
+  const found = new Map();
+  const list = [...names];
+  for (let i = 0; i < list.length; i += 100) {
+    const chunk = list.slice(i, i + 100);
+    const rows =
+      (await igdbQuery(
+        "games",
+        `fields name,cover.image_id,first_release_date,total_rating_count;` +
+          ` where (${chunk.map((n) => `name ~ ${quote(n)}`).join(" | ")})` +
+          ` & version_parent = null & cover != null;` +
+          ` limit 500;`
+      ).catch(() => [])) || [];
+    for (const g of rows) {
+      const key = String(g.name).toLowerCase();
+      const prev = found.get(key);
+      // Deux jeux portent parfois le même nom (l'original et son remake muet).
+      // On garde le plus commenté : c'est celui que la personne qui lit
+      // reconnaîtra.
+      if (prev && (prev.count || 0) >= (g.total_rating_count || 0)) continue;
+      found.set(key, {
+        id: g.id,
+        name: g.name,
+        cover: g.cover?.image_id ? `${IMG_BASE}/t_cover_big/${g.cover.image_id}.jpg` : null,
+        year: g.first_release_date
+          ? new Date(g.first_release_date * 1000).getFullYear()
+          : null,
+        count: g.total_rating_count || 0,
+      });
+    }
+  }
+  return found;
+}
+
+/**
+ * « Il a aussi fait… », pour toute l'équipe d'un jeu.
+ *
+ * Rend `{ works: [{ qid, games: [...] }] }` — la carte d'une personne y pioche
+ * par son `qid`. Une personne sans identifiant Wikidata, ou dont on ne trouve
+ * aucun autre jeu, n'y figure tout simplement pas : sa carte s'affiche alors
+ * sans rangée de jaquettes, ce qui est la bonne façon de ne rien dire.
+ */
+export async function creditsWorks(gameId) {
+  const doc = await GameCredits.findOne({ gameId }).lean();
+  if (doc?.worksVer === WORKS_VER) return { works: doc.works || [] };
+
+  // L'équipe d'abord : c'est elle qui porte les identifiants. Elle est presque
+  // toujours déjà en base — la fiche l'a demandée avant d'ouvrir cette page.
+  const { people } = doc?.ver === VER ? doc : await gameCredits(gameId);
+
+  // Trente personnes au plus. Au-delà, la requête Wikidata devient longue pour
+  // des cartes que personne ne fera défiler jusqu'au bout.
+  const qids = [...new Set((people || []).map((p) => p.qid).filter(Boolean))].slice(0, 30);
+
+  const byPerson = await worksFromWikidata(qids).catch(() => new Map());
+  const titles = new Set();
+  for (const set of byPerson.values()) for (const n of set) titles.add(n);
+
+  const covers = await coversByName(titles).catch(() => new Map());
+
+  const works = [];
+  for (const [qid, names] of byPerson) {
+    const games = [...names]
+      .map((n) => covers.get(n.toLowerCase()))
+      .filter((g) => g && g.id !== gameId)
+      // Les plus connus devant : sous une vignette, huit jaquettes doivent
+      // dire « ah oui, lui », pas dérouler une bibliographie exhaustive.
+      .sort((a, b) => b.count - a.count)
+      .slice(0, WORKS_PER_PERSON)
+      .map(({ count, ...g }) => g);
+    if (games.length) works.push({ qid, games });
+  }
+
+  // ⚠️ ON N'ENTERRE PAS UNE PANNE. Wikidata tombe, met vingt-cinq secondes à
+  // répondre, ou renvoie une erreur de service : dans ces cas-là on n'a rien,
+  // et écrire ce rien avec le tampon `worksVer` le figerait pour toujours. On
+  // ne grave le résultat que quand la question a VRAIMENT reçu une réponse.
+  const answered = !qids.length || byPerson.size > 0;
+  if (answered) {
+    await GameCredits.updateOne({ gameId }, { $set: { works, worksVer: WORKS_VER } });
+  }
+  return { works };
 }

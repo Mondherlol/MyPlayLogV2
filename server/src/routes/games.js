@@ -41,7 +41,7 @@ import { fetchFitgirlRepacks } from "../lib/fitgirl.js";
 import { fetchZipertoGames } from "../lib/ziperto.js";
 import { getCachedTranslation, translateGameText } from "../lib/gameText.js";
 import { ensureTrivia, reactToFact, serializeTrivia } from "../lib/gameTrivia.js";
-import { gameCredits } from "../lib/gameCredits.js";
+import { gameCredits, creditsWorks } from "../lib/gameCredits.js";
 import { ensureGameScores } from "../lib/gameScores.js";
 // Le cache serveur d'IGDB : toutes les lectures « ce que sait IGDB du jeu X »
 // passent par ici et sont partagées par tous les visiteurs (cf. lib/gameIgdb.js).
@@ -2156,6 +2156,23 @@ router.get("/:id/credits", optionalAuth, async (req, res) => {
   }
 });
 
+// --- « Il a aussi fait… » : les autres jeux de chaque personne créditée.
+// ⚠️ UNE ROUTE À PART, ET C'EST VOULU. Ça part chez Wikidata puis chez IGDB —
+// deux à cinq secondes la première fois. La fiche affiche l'équipe sans
+// attendre ça ; seule la page « Qui l'a fait » demande le complément, et elle
+// le peuple carte par carte quand il arrive (cf. lib/gameCredits.js). ---
+router.get("/:id/credits/works", optionalAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+    res.json(await creditsWorks(id));
+  } catch (err) {
+    console.error("credits works error:", err.message);
+    // Un échec ici ne casse pas la page : elle sait vivre sans les jaquettes.
+    res.json({ works: [] });
+  }
+});
+
 // ----------------------------------------------------------------------
 //  Mode Trivia : les anecdotes de coulisses d'un jeu
 // ----------------------------------------------------------------------
@@ -2367,6 +2384,12 @@ function mapRelGame(g) {
       : null,
     releaseDate: g.first_release_date || null,
     typeLabel: GAME_TYPES_FR[g.game_type]?.label || null,
+    // ⚠️ LE CODE BRUT EN PLUS DU LIBELLÉ. Le libellé est du texte français
+    // d'affichage ; l'app, elle, a besoin de RANGER — les jeux principaux
+    // devant, les bundles et les DLC derrière (cf. mobile lib/related.js).
+    // Trier sur « Version enrichie » plutôt que sur `10`, c'est faire dépendre
+    // l'ordre d'une chaîne qu'on peut réécrire demain.
+    gameType: g.game_type ?? 0,
     // Les consoles étaient déjà demandées à IGDB (cf. REL_EXPAND) mais
     // jetées ici. La page des extensions les affiche : sur un DLC, « sur
     // quelle machine » est la question qui vient juste après « c'est quoi ».

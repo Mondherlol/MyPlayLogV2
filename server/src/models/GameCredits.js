@@ -15,7 +15,26 @@ const personSchema = new mongoose.Schema(
     link: { type: String, default: null },
     // La phrase de présentation (« compositeur polonais »).
     note: { type: String, default: null },
+    // Son identifiant Wikidata (Q…), quand on a su le trouver. C'est LA clé
+    // qui permet de demander « et quoi d'autre ? » : deux homonymes ont le
+    // même nom, jamais le même Q (cf. lib/gameCredits, `creditsWorks`).
+    qid: { type: String, default: null },
   },
+  { _id: false }
+);
+
+// Un jeu d'un autre jeu de la personne : juste de quoi poser une jaquette
+// cliquable sous sa carte.
+const workGameSchema = new mongoose.Schema(
+  { id: Number, name: String, cover: { type: String, default: null }, year: Number },
+  { _id: false }
+);
+
+// « Il a aussi fait… », par personne. Séparé des personnes elles-mêmes parce
+// que ça se calcule à part, plus tard et plus lentement : l'équipe s'affiche
+// sans attendre Wikidata (cf. GET /games/:id/credits/works).
+const workSchema = new mongoose.Schema(
+  { qid: String, games: { type: [workGameSchema], default: [] } },
   { _id: false }
 );
 
@@ -32,6 +51,8 @@ const gameCreditsSchema = new mongoose.Schema(
       url: { type: String, default: null },
     },
     ver: { type: Number, default: 0 },
+    works: { type: [workSchema], default: [] },
+    worksVer: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
