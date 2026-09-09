@@ -1572,6 +1572,42 @@ function storesFrom(externalGames) {
   return [...found];
 }
 
+// ======================================================================
+//  L'accès anticipé : jouable, mais pas sorti
+// ======================================================================
+// ⚠️ IGDB DATE UN JEU EN ACCÈS ANTICIPÉ AU JOUR DE SON ACCÈS ANTICIPÉ. Son
+// `first_release_date` — celui que la fiche affiche en gros — tombe donc le
+// jour où le jeu est devenu ACHETABLE, pas le jour où il est devenu FINI. Lu
+// tel quel, Hades annonçait « Sorti le 6 décembre 2018 » alors que la 1.0
+// n'est arrivée qu'en septembre 2020 : deux ans d'écart, et un joueur qui
+// croit acheter un jeu terminé.
+//
+// L'information n'a pas de champ à elle : elle est dans le STATUT des dates de
+// sortie (cf. RELEASE_STATUS_FR — 3 = accès anticipé, 34 = accès anticipé sur
+// précommande, 6 = sortie complète). On la remonte ici pour que la fiche
+// puisse le dire au lieu de le taire.
+const EARLY_ACCESS_STATUSES = new Set([3, 34]);
+
+/**
+ * `{ since, started, fullDate }` si le jeu est (ou sera) en accès anticipé,
+ * `null` sinon — y compris quand la 1.0 est déjà là : un jeu terminé n'a plus
+ * à porter l'étiquette de ce qu'il a été.
+ */
+function earlyAccessOf(g) {
+  const now = Math.floor(Date.now() / 1000);
+  let since = null;
+  let full = null;
+  for (const r of g?.release_dates || []) {
+    if (!r?.date) continue;
+    if (EARLY_ACCESS_STATUSES.has(r.status)) {
+      if (since == null || r.date < since) since = r.date;
+    } else if (full == null || r.date < full) full = r.date;
+  }
+  if (since == null) return null;
+  if (full != null && full <= now) return null;
+  return { since, started: since <= now, fullDate: full };
+}
+
 router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -2037,6 +2073,8 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
       year: g.first_release_date
         ? new Date(g.first_release_date * 1000).getFullYear()
         : null,
+      // Jouable sans être fini : la date ci-dessus ne veut pas dire « sorti ».
+      earlyAccess: earlyAccessOf(g),
       rating: g.total_rating ? Math.round(g.total_rating) : null,
       ratingCount: g.total_rating_count || 0,
       // Note des joueurs (IGDB) vs note des critiques (agrégée type Metacritic)
