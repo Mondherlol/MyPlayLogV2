@@ -1991,7 +1991,7 @@ const DISCOVER_FIELDS =
 
 // « Jeux du moment » et « sorties marquantes » : identiques pour tout le
 // monde, mis en cache mémoire par jour (comme /games/releases).
-const sharedCache = { day: 0, hot: null, upcoming: null, indies: null };
+const sharedCache = { day: 0, hot: null, upcoming: null, undated: null, indies: null };
 // Suggestions personnalisées : cache par utilisateur (6 h), plafonné à 5 000
 // personnes — au-delà, la moins récemment vue repart (elle recalculera).
 // Sans plafond, c'était une entrée par compte ayant ouvert l'onglet depuis le
@@ -2014,6 +2014,30 @@ async function fetchUpcoming(now) {
   const q = `${DISCOVER_FIELDS}; where cover != null & version_parent = null & game_type = (0,8,9) & first_release_date > ${now} & first_release_date <= ${now + 240 * 86400} & hypes > 5; sort hypes desc; limit 12;`;
   const games = (await igdbQuery("games", q)).map(discoverGame);
   return games.sort((a, b) => (a.releaseDate || 0) - (b.releaseDate || 0));
+}
+
+// ----------------------------------------------------------------------
+//  Les attendus SANS DATE
+// ----------------------------------------------------------------------
+// ⚠️ C'ÉTAIT LE TROU DU RAYON « LES PLUS ATTENDUS », ET IL LAISSAIT DEHORS LES
+// PLUS ATTENDUS DE TOUS. Un jeu annoncé à un showcase n'a presque jamais de
+// date le jour de son annonce — c'est même le moment où on l'attend le plus
+// fort. La requête exigeait `first_release_date > now` : tant qu'IGDB n'avait
+// pas de jour, le jeu n'existait nulle part sur l'accueil, et il y apparaissait
+// pour la première fois le jour où sa date tombait.
+//
+// ⚠️ DEUX GARDES, PARCE QUE « SANS DATE » RAMASSE AUSSI LES FANTÔMES. Le
+// catalogue est plein de fiches sans date qui n'attendent plus personne :
+// projets abandonnés, annonces de 2014 jamais suivies d'effet. On demande donc
+//   • de la HYPE (le même seuil que les datés : quelqu'un les attend vraiment) ;
+//   • une FICHE RÉCENTE — `created_at` dans les deux dernières années. C'est le
+//     seul témoin de fraîcheur dont on dispose quand il n'y a pas de date de
+//     sortie, et il sépare exactement « annoncé récemment » de « annoncé il y a
+//     dix ans et jamais sorti ».
+async function fetchUndated(now) {
+  const TWO_YEARS = 730 * 86400;
+  const q = `${DISCOVER_FIELDS}; where cover != null & version_parent = null & game_type = (0,8,9) & first_release_date = null & hypes > 5 & created_at > ${now - TWO_YEARS}; sort hypes desc; limit 8;`;
+  return (await igdbQuery("games", q)).map(discoverGame);
 }
 
 // « Sorties indés » : les meilleurs jeux indépendants juste sortis ET ceux qui
@@ -2101,9 +2125,10 @@ router.get("/discover", requireAuth, async (req, res) => {
     const day = now - (now % 86400);
 
     if (sharedCache.day !== day) {
-      const [hot, upcoming, indies] = await Promise.all([
+      const [hot, upcoming, undated, indies] = await Promise.all([
         fetchHot(now).catch(() => []),
         fetchUpcoming(now).catch(() => []),
+        fetchUndated(now).catch(() => []),
         fetchIndies(now).catch(() => []),
       ]);
       // On n'écrase le cache que si IGDB a répondu (sinon on retente au
@@ -2112,6 +2137,7 @@ router.get("/discover", requireAuth, async (req, res) => {
         sharedCache.day = day;
         sharedCache.hot = hot;
         sharedCache.upcoming = upcoming;
+        sharedCache.undated = undated;
         sharedCache.indies = indies;
       }
     }
@@ -2123,6 +2149,11 @@ router.get("/discover", requireAuth, async (req, res) => {
     res.json({
       hot: sharedCache.hot || [],
       upcoming: sharedCache.upcoming || [],
+      // ⚠️ UNE CLÉ À PART, PAS FONDUE DANS `upcoming`. Le client range les
+      // datés par date et n'a rien à ranger ici : mélangés, les sans-date
+      // seraient tombés en tête du tri (`releaseDate || 0`) et auraient ouvert
+      // le rayon sur ce qui n'a justement pas de date.
+      upcomingUndated: sharedCache.undated || [],
       indies: sharedCache.indies || [],
       forYou,
     });

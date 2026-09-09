@@ -9,6 +9,7 @@ import GameEvent from "../models/GameEvent.js";
 import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { resolveMentions, sanitizeMediaList, toComment } from "../lib/commentThread.js";
+import { gridsForEvent, serialize } from "../lib/eventGrids.js";
 import { notify } from "../lib/notify.js";
 import { privacyOf } from "../lib/privacy.js";
 
@@ -61,64 +62,6 @@ const hasStarted = (ev, now = Date.now()) => {
   const ts = startedAt(ev);
   return !Number.isNaN(ts) && now >= ts;
 };
-
-function serializeCells(cells, size) {
-  const byIndex = new Map((cells || []).map((c) => [c.index, c]));
-  // ⚠️ ON REND TOUJOURS UN TABLEAU DENSE. Le client dessine une grille : il lui
-  // faut `size * size` cases, y compris celles que personne n'a remplies. Lui
-  // laisser reconstituer les trous, c'est un `size` mal lu quelque part et une
-  // grille de travers.
-  return Array.from({ length: size * size }, (_, i) => {
-    const c = byIndex.get(i);
-    return {
-      index: i,
-      text: c?.text || "",
-      image: c?.image || null,
-      gameId: c?.gameId ?? null,
-      gameName: c?.gameName || "",
-      saga: c?.saga?.id ? { id: c.saga.id, kind: c.saga.kind, name: c.saga.name || "" } : null,
-      pos: c?.pos || null,
-      textStyle: c?.textStyle || "banner",
-      free: !!c?.free,
-      // ⚠️ LA CASE OFFERTE N'EST PLUS COCHÉE D'OFFICE. Elle l'était — c'est la
-      // convention du bingo papier — mais dans une grille qu'on compose des
-      // jours à l'avance, ça voulait dire ouvrir sur une case déjà « gagnée »
-      // avant que l'émission existe. Elle porte son mot FREE, et c'est son
-      // propriétaire qui la coche quand ça commence, comme les autres.
-      checked: !!c?.checked,
-      checkedAt: c?.checkedAt || null,
-    };
-  });
-}
-
-function serialize(grid, userId, { withComments = false } = {}) {
-  const cells = serializeCells(grid.cells, grid.size);
-  const filled = cells.filter((c) => c.text || c.image || c.free).length;
-  const author = grid.user && grid.user.username ? grid.user : null;
-  return {
-    id: String(grid._id),
-    eventId: String(grid.event),
-    title: grid.title || "",
-    size: grid.size,
-    cells,
-    filled,
-    checked: cells.filter((c) => c.checked).length,
-    published: !!grid.published,
-    publishedAt: grid.publishedAt || null,
-    createdAt: grid.createdAt,
-    updatedAt: grid.updatedAt,
-    author: author
-      ? { id: String(author._id), username: author.username, avatar: author.avatar || null }
-      : { id: String(grid.user), username: null, avatar: null },
-    mine: String(grid.user?._id || grid.user) === String(userId),
-    likeCount: (grid.likes || []).length,
-    liked: (grid.likes || []).some((u) => String(u) === String(userId)),
-    commentCount: (grid.comments || []).length,
-    ...(withComments
-      ? { comments: (grid.comments || []).map((c) => toComment(c, grid.comments || [], userId)) }
-      : null),
-  };
-}
 
 /** Normalise ce que le client envoie : on ne fait confiance à rien. */
 function sanitizeCells(raw, size) {
@@ -196,48 +139,16 @@ router.get("/event/:eventId", requireAuth, async (req, res) => {
     const ev = await GameEvent.findById(req.params.eventId).select("startsAt precision name").lean();
     if (!ev) return res.status(404).json({ error: "Événement introuvable." });
 
-    const [mine, others, me] = await Promise.all([
-      EventBingo.findOne({ event: ev._id, user: req.userId })
-        .populate("user", "username avatar")
-        .lean(),
-      EventBingo.find({ event: ev._id, published: true, user: { $ne: req.userId } })
-        .populate("user", "username avatar privacy")
-        .sort({ createdAt: -1 })
-        .limit(120)
-        .lean(),
-      User.findById(req.userId).select("following").lean(),
-    ]);
-
-    const following = new Set((me?.following || []).map(String));
-    const visible = others.filter((g) => {
-      // Un compte privé ne s'expose pas à toute l'application parce qu'il a
-      // rempli une grille : elle ne sort que vers ses abonnés.
-      if (!privacyOf(g.user).isPrivate) return true;
-      return following.has(String(g.user?._id));
-    });
-
-    // ⚠️ LE CERCLE D'ABORD, LES POPULAIRES ENSUITE. « Les grilles de mes amis »
-    // est la promesse de la section ; un classement par likes seul la
-    // remplacerait par un palmarès, où l'on ne retrouve jamais la grille de la
-    // personne pour qui on est venu.
-    visible.sort((a, b) => {
-      const fa = following.has(String(a.user?._id)) ? 1 : 0;
-      const fb = following.has(String(b.user?._id)) ? 1 : 0;
-      if (fa !== fb) return fb - fa;
-      const la = (a.likes || []).length;
-      const lb = (b.likes || []).length;
-      if (la !== lb) return lb - la;
-      return new Date(b.createdAt) - new Date(a.createdAt);
-    });
+    const { mine, grids, total } = await gridsForEvent(ev._id, req.userId);
 
     res.json({
       // Ce que le client a besoin de savoir pour dessiner les bons boutons,
       // sans avoir à refaire le calcul d'horloge de son côté.
       started: hasStarted(ev),
       startsAt: ev.startsAt,
-      mine: mine ? serialize(mine, req.userId) : null,
-      grids: visible.slice(0, 40).map((g) => serialize(g, req.userId)),
-      total: visible.length,
+      mine,
+      grids,
+      total,
     });
   } catch (err) {
     console.error("bingo list error:", err.message);

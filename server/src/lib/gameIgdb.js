@@ -239,10 +239,11 @@ export const REL_SUBFIELDS = [
 // Bumper une de ces versions invalide le morceau correspondant, partout.
 const VERSIONS = {
   core: 3, // v3 : websites.category renommé en websites.type
-  chars: 2, // v2 : pagination complète + images des entrées fusionnées retirées
+  chars: 3, // v3 : `akas` demandés, pour fusionner les doublons de langue
   ttb: 1,
   bundle: 1,
   relatives: 1,
+  announce: 1,
 };
 
 const one = (arr) => (Array.isArray(arr) && arr.length ? arr[0] : null);
@@ -259,6 +260,46 @@ export async function gameCore(gameId) {
       one(await igdbQuery("games", `fields ${CORE_FIELDS}; where id = ${gameId};`)),
   });
   return g || null;
+}
+
+/**
+ * Quand ce jeu est ENTRÉ AU CATALOGUE (secondes IGDB), ou `null`.
+ *
+ * ⚠️ CE N'EST PAS « LA DATE D'ANNONCE », ET IL NE FAUT PAS LE PRÉTENDRE. IGDB
+ * n'a pas de champ « annoncé le » : `created_at` dit quand la FICHE a été
+ * créée dans le catalogue, ce qui est deux choses très différentes selon le
+ * jeu.
+ *
+ *   • Un jeu annoncé après la création d'IGDB : la fiche naît dans les jours
+ *     qui suivent l'annonce, parce que c'est l'annonce qui la provoque. La
+ *     date vaut quelque chose.
+ *   • Un jeu de 1998 : la fiche a été saisie en 2013 par un contributeur, des
+ *     années APRÈS la sortie. La date ne vaut rien, et l'afficher comme une
+ *     annonce serait un mensonge net.
+ *
+ * D'où le tri fait par l'appelant (cf. routes/games.js) : on ne montre cette
+ * date que lorsqu'elle PRÉCÈDE la sortie — c'est la signature d'une fiche
+ * ouverte sur un jeu encore à venir, donc d'une vraie annonce.
+ *
+ * ⚠️ ET C'EST UNE REQUÊTE À PART, PAS UN CHAMP DE PLUS DANS `CORE_FIELDS`.
+ * L'ajouter à la fiche aurait obligé à bumper `VERSIONS.core`, c'est-à-dire à
+ * refaire tout le catalogue en cache chez IGDB — pour une ligne qu'on n'affiche
+ * que dans une feuille qu'on ouvre rarement.
+ */
+export function gameCreatedAt(gameId, releaseDate) {
+  return remember({
+    kind: "announce",
+    gameId,
+    ver: VERSIONS.announce,
+    releaseDate,
+    load: async () => {
+      const g = one(await igdbQuery("games", `fields created_at; where id = ${gameId};`));
+      // `remember` n'écrit jamais un « rien » : on renvoie donc un objet, même
+      // vide, sinon la requête repartirait à chaque ouverture de la feuille sur
+      // les jeux dont IGDB ne date pas la fiche.
+      return { createdAt: g?.created_at ?? null };
+    },
+  }).then((d) => d?.createdAt ?? null);
 }
 
 /** La date de sortie du jeu (secondes IGDB), pour dater les autres morceaux. */
@@ -338,7 +379,13 @@ export function gameCharacters(gameId, releaseDate) {
       for (let off = 0; off < CHARS_MAX; off += CHARS_PAGE) {
         const page = await igdbQuery(
           "characters",
-          `fields name,mug_shot.image_id,games; where games = (${gameId}); limit ${CHARS_PAGE}; offset ${off};`
+          // ⚠️ `akas` EST CE QUI PERMET DE RECOLLER LES DOUBLONS. IGDB tient
+          // souvent DEUX fiches pour le même personnage — le nom d'exploitation
+          // occidental et sa romanisation japonaise (« Phoenix Wright » et
+          // « Naruhodo Ryuichi »), avec deux portraits différents. Comparer les
+          // noms ne les rapproche pas ; c'est l'une des deux fiches qui cite
+          // l'autre en alias (cf. routes/games.js, `mergeByAlias`).
+          `fields name,akas,mug_shot.image_id,games; where games = (${gameId}); limit ${CHARS_PAGE}; offset ${off};`
         );
         chars = chars.concat(page || []);
         if (!page || page.length < CHARS_PAGE) break;

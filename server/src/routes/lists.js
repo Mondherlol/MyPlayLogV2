@@ -15,6 +15,9 @@ import {
   recordListItemsActivity,
 } from "../lib/activity.js";
 import { sanitizeMediaList, resolveMentions, toComment } from "../lib/commentThread.js";
+import EventBingo from "../models/EventBingo.js";
+import GameEvent from "../models/GameEvent.js";
+import { gridsForEvent } from "../lib/eventGrids.js";
 import { triggerMissionCheck } from "../lib/missions.js";
 
 const router = express.Router();
@@ -133,12 +136,34 @@ export function playlistDuration(items) {
 function toEvent(l) {
   if (!l.event?.igdbId) return null;
   return {
+    igdbId: l.event.igdbId,
     name: l.event.name || null,
     startTime: l.event.startTime || null,
     logo: l.event.logo || null,
     videoUrl: l.event.videoUrl || null,
     videoId: l.event.videoId || null,
+    // ⚠️ RENSEIGNÉS PAR LA SEULE PAGE DE DÉTAIL (cf. GET /:id). Les compter sur
+    // chaque carte d'un fil de listes ferait une requête de bingo par vignette,
+    // pour une pastille que la carte n'affiche pas.
+    eventId: null,
+    gridCount: 0,
   };
+}
+
+// ----------------------------------------------------------------------
+//  Les grilles de bingo d'une liste d'événement
+// ----------------------------------------------------------------------
+// ⚠️ LE RENDEZ-VOUS ET SA LISTE SONT DEUX DOCUMENTS, RELIÉS PAR L'ID IGDB.
+// `GameEvent` porte le compte à rebours et les grilles ; `List` porte les jeux
+// annoncés. Rien ne les liait : une fois l'émission finie, la fiche du
+// rendez-vous sort de l'accueil, et les grilles que tout le monde a remplies
+// devenaient introuvables — alors que la liste, elle, reste dans l'explorateur
+// pour toujours. C'est donc par elle qu'on y revient.
+async function eventOfList(list) {
+  if (!list?.event?.igdbId) return null;
+  return GameEvent.findOne({ igdbEventId: list.event.igdbId })
+    .select("_id name startsAt precision")
+    .lean();
 }
 
 // Auteur d'une liste. `isSystem` distingue le compte officiel du site pour lui
@@ -483,10 +508,61 @@ router.get("/:id", optionalAuth, async (req, res) => {
     const isOwner = String(l.user?._id || l.user) === String(req.userId);
     if (l.visibility === "private" && !isOwner)
       return res.status(403).json({ error: "Cette liste est privée." });
-    res.json({ list: toFull(l, req.userId) });
+
+    const full = toFull(l, req.userId);
+    // La porte vers les grilles ne s'ouvre que s'il y a quelque chose derrière :
+    // un bouton « les grilles » sur un événement où personne n'a joué mène à une
+    // page vide, et une page vide vaut moins que pas de bouton.
+    if (full.event) {
+      const ev = await eventOfList(l).catch(() => null);
+      if (ev) {
+        full.event.eventId = String(ev._id);
+        full.event.gridCount = await EventBingo.countDocuments({
+          event: ev._id,
+          published: true,
+        }).catch(() => 0);
+      }
+    }
+    res.json({ list: full });
   } catch (err) {
     console.error("list detail error:", err.message);
     res.status(500).json({ error: "Erreur lors du chargement de la liste." });
+  }
+});
+
+// ============================================================
+//  GET /api/lists/:id/grids — les grilles de bingo de l'événement
+// ============================================================
+// La MÊME lecture que la fiche du rendez-vous (cf. lib/eventGrids) : mêmes
+// règles de visibilité, même classement, mêmes grilles. Ce n'est pas une copie
+// des grilles dans la liste, c'est une seconde porte vers les mêmes documents —
+// une grille cochée pendant l'émission est la même vue des deux côtés.
+router.get("/:id/grids", requireAuth, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id))
+      return res.status(404).json({ error: "Liste introuvable." });
+    const l = await List.findById(req.params.id).select("visibility user event title").lean();
+    if (!l) return res.status(404).json({ error: "Liste introuvable." });
+    if (l.visibility === "private" && String(l.user) !== String(req.userId))
+      return res.status(403).json({ error: "Cette liste est privée." });
+
+    const ev = await eventOfList(l);
+    // Une liste de joueur n'a pas de rendez-vous, et un rendez-vous que le
+    // calendrier ne connaît plus n'a pas de grilles : dans les deux cas la
+    // réponse est vide, pas une erreur — le client n'a rien à afficher, c'est
+    // tout ce qu'il a besoin de savoir.
+    if (!ev) return res.json({ event: null, mine: null, grids: [], total: 0 });
+
+    const { mine, grids, total } = await gridsForEvent(ev._id, req.userId, { limit: 60 });
+    res.json({
+      event: { id: String(ev._id), name: ev.name, startsAt: ev.startsAt },
+      mine,
+      grids,
+      total,
+    });
+  } catch (err) {
+    console.error("list grids error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement des grilles." });
   }
 });
 

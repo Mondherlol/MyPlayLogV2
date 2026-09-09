@@ -31,6 +31,8 @@ import HiddenOst from "../models/HiddenOst.js";
 import OstRename from "../models/OstRename.js";
 import VnCache from "../models/VnCache.js";
 import SwitchPatchCache from "../models/SwitchPatchCache.js";
+import GameEvent from "../models/GameEvent.js";
+import List from "../models/List.js";
 import { fetchHltbTimes } from "../lib/hltb.js";
 import { buildGameFeed, fetchSteamReviews } from "../lib/feed.js";
 import { findVnId, fetchVnCharacters, fetchVnFrPatches } from "../lib/vndb.js";
@@ -53,6 +55,7 @@ import {
   gameBundleContents,
   gameCharacters,
   gameCore,
+  gameCreatedAt,
   gameRelatives,
   gameTimeToBeat,
 } from "../lib/gameIgdb.js";
@@ -375,9 +378,33 @@ function parseIds(str) {
     .filter((n) => Number.isInteger(n));
 }
 
-// Construit une clause pour une catégorie multi-valeurs avec mode ET/OU
+// Construit une clause pour une catégorie multi-valeurs avec mode ET / OU /
+// EXCLUSIF.
+//
+// ⚠️ LES TROIS PARENTHÉSAGES D'APICALYPSE NE VEULENT PAS DIRE LA MÊME CHOSE, ET
+// C'EST TOUT LE MÉCANISME :
+//
+//   • `= (a,b)` — le tableau CONTIENT a ou b        → le OU ;
+//   • `= {a,b}` — il contient a ET b                → le ET (on l'écrit ici en
+//                                                     clauses séparées, même
+//                                                     effet, plus lisible) ;
+//   • `= [a]`   — il vaut EXACTEMENT {a}, rien de plus → l'exclusivité.
+//
+// Le troisième est ce qui permet de répondre à « montre-moi les exclusivités
+// Switch » : un jeu sorti sur Switch ET sur PC a bien la Switch dans son
+// tableau, donc `= (Switch)` le garde ; seul `= [Switch]` l'écarte.
+//
+// ⚠️ ET AVEC PLUSIEURS CONSOLES COCHÉES, C'EST UN OU D'EXCLUSIVITÉS, PAS
+// L'EXCLUSIVITÉ DE L'ENSEMBLE. `= [ps5, switch]` demanderait les jeux sortis
+// sur les deux et nulle part ailleurs — un ensemble quasi vide, et surtout pas
+// ce qu'on veut dire en cochant deux consoles. « Les exclus PS5 ET les exclus
+// Switch » est la lecture naturelle, donc `(= [ps5] | = [switch])`.
 function clause(field, ids, mode) {
   if (!ids.length) return null;
+  if (mode === "only") {
+    const parts = ids.map((id) => `${field} = [${id}]`);
+    return parts.length === 1 ? parts[0] : `(${parts.join(" | ")})`;
+  }
   if (ids.length === 1) return `${field} = (${ids[0]})`;
   const parts = ids.map((id) => `${field} = (${id})`);
   return mode === "and" ? parts.join(" & ") : `(${parts.join(" | ")})`;
@@ -406,12 +433,37 @@ function buildQuery(opts) {
     where.push(parts.length === 1 ? parts[0] : `(${parts.join(" | ")})`);
   }
 
-  // Recherche par nom + titres alternatifs (toutes langues / régions).
-  // ~ *"..."* est compatible avec sort et les filtres (pas la commande `search`).
-  if (search)
-    where.push(
-      `(name ~ *"${search}"* | alternative_names.name ~ *"${search}"*)`
-    );
+  // ------------------------------------------------------------------
+  //  Recherche par nom + titres alternatifs (toutes langues / régions)
+  // ------------------------------------------------------------------
+  // ⚠️ MOT PAR MOT, PAS EN BLOC — ET C'EST UNE CORRECTION DE BUG.
+  //
+  // `name ~ *"zelda ocarina"*` demande cette SUITE DE CARACTÈRES-LÀ, espace
+  // compris. Le jeu s'appelle « The Legend of Zelda: Ocarina of Time » : entre
+  // « Zelda » et « Ocarina » il y a un deux-points, donc la chaîne cherchée n'y
+  // figure pas, et la recherche ne rendait RIEN. « ocarina of time », qui est
+  // un morceau contigu du titre, sortait au contraire tout de suite — d'où
+  // l'impression d'une recherche qui marche une fois sur deux.
+  //
+  // Or personne ne tape un titre en respectant sa ponctuation. On demande donc
+  // que CHAQUE MOT soit présent, où qu'il soit et dans n'importe quel ordre :
+  // « zelda ocarina », « ocarina zelda » et « zelda: ocarina » trouvent tous
+  // les trois. Le ET entre les mots garde la recherche serrée — un mot de plus
+  // restreint toujours, il n'élargit jamais.
+  //
+  // ⚠️ ET ON DÉCOUPE AUSSI SUR LA PONCTUATION DE CE QUI EST TAPÉ. Sinon
+  // « zelda, ocarina » chercherait le mot « zelda, » — virgule comprise — qui
+  // ne figure dans aucun titre.
+  const words = search
+    ? search
+        .split(/[^\p{L}\p{N}]+/u)
+        .filter(Boolean)
+        // Une poignée suffit : au-delà, la requête s'allonge sans plus rien
+        // restreindre (on a déjà désigné un seul jeu au quatrième mot).
+        .slice(0, 8)
+    : [];
+  for (const w of words)
+    where.push(`(name ~ *"${w}"* | alternative_names.name ~ *"${w}"*)`);
 
   for (const f of filters) {
     const c = clause(f.field, f.ids, f.mode);
@@ -1641,6 +1693,10 @@ router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
       image: c.mug_shot?.image_id
         ? `${IMG_BASE}/t_cover_big/${c.mug_shot.image_id}.jpg`
         : null,
+      // Les deux champs qui ne sortent PAS vers le client (cf. `strip` plus
+      // bas) : ils ne servent qu'à recoller les doublons de langue.
+      akas: c.akas || [],
+      gameCount: (c.games || []).length,
     }));
     const communityChars = (customChars || []).map((c) => ({
       id: String(c._id),
@@ -1694,15 +1750,79 @@ router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
       gameRelatives(id, whereRel, g.first_release_date ?? null).catch(() => null),
     ]);
 
+    // ------------------------------------------------------------------
+    //  Le même personnage, sous deux noms
+    // ------------------------------------------------------------------
+    // ⚠️ IGDB TIENT SOUVENT DEUX FICHES POUR UN SEUL PERSONNAGE, et la fiche
+    // d'Apollo Justice le montrait crûment : « Phoenix Wright » ET « Naruhodo
+    // Ryuichi » côte à côte, deux portraits différents, un seul avocat. C'est le
+    // catalogue qui est ainsi fait — le nom d'exploitation occidental et la
+    // romanisation japonaise sont deux entrées distinctes — et comparer les
+    // noms ne les rapprochera jamais, puisque justement ils diffèrent.
+    //
+    // Ce qui les relie, c'est `akas` : l'une des deux fiches cite l'autre en
+    // alias. On dédoublonne donc sur l'ENSEMBLE des noms d'un personnage, pas
+    // sur son seul intitulé.
+    //
+    // ⚠️ ET C'EST LE NOM LE PLUS PORTÉ QUI GAGNE. Entre deux fiches du même
+    // personnage, celle qui est rattachée au plus de jeux est celle sous
+    // laquelle la série entière a été publiée — « Phoenix Wright » est dans les
+    // quinze épisodes, « Naruhodo Ryuichi » dans les trois sortis au Japon
+    // seulement. Ce n'est pas une préférence de langue codée en dur, c'est le
+    // nom sous lequel le catalogue connaît majoritairement ce personnage, et il
+    // tombe du bon côté sans qu'on ait à décider pour l'anglais.
+    //
+    // ⚠️ CE QU'ON NE PEUT PAS FAIRE : si NI l'une NI l'autre des deux fiches ne
+    // cite l'autre en alias, rien ne les relie et le doublon reste. C'est une
+    // lacune de la source, pas du crible — on ne devine pas qu'un nom japonais
+    // et un nom anglais désignent la même personne.
+    const keysOf = (c) =>
+      [c.name, ...(c.akas || [])].map(normCharName).filter(Boolean);
+
+    // Le meilleur des deux : celui que le catalogue rattache au plus de jeux,
+    // et à égalité celui qui a un portrait.
+    const beats = (a, b) =>
+      (a.gameCount || 0) !== (b.gameCount || 0)
+        ? (a.gameCount || 0) > (b.gameCount || 0)
+        : !!a.image && !b.image;
+
+    // Fusion À L'INTÉRIEUR d'une source : le représentant garde la PLACE du
+    // premier de son groupe. Trier globalement par nombre de jeux ferait
+    // remonter les seconds rôles récurrents d'une saga devant le héros du jeu
+    // qu'on est en train de regarder.
+    const mergeByAlias = (list) => {
+      const byKey = new Map();
+      const groups = [];
+      for (const c of list) {
+        const keys = keysOf(c);
+        if (!keys.length) continue;
+        const hit = keys.map((k) => byKey.get(k)).find(Boolean);
+        const group = hit || { pick: c };
+        if (!hit) groups.push(group);
+        else {
+          // ⚠️ ON GARDE LE MEILLEUR NOM ET LE MEILLEUR PORTRAIT, PAS LA
+          // MEILLEURE FICHE. Les deux ne sont pas toujours du même côté : la
+          // fiche la plus rattachée peut être celle sans vignette. Jeter le
+          // portrait avec le doublon transformerait un personnage illustré en
+          // carré vide — et le tri par image plus bas l'enverrait en fin de rail.
+          const loser = beats(c, group.pick) ? group.pick : c;
+          if (beats(c, group.pick)) group.pick = c;
+          if (!group.pick.image && loser.image) group.pick = { ...group.pick, image: loser.image };
+        }
+        for (const k of keys) byKey.set(k, group);
+      }
+      return groups.map((g) => g.pick);
+    };
+
     // Dédoublonnage entre les quatre sources. Les personnages de la communauté
     // sont posés en premier dans le crible : ils sont saisis à la main par le
     // staff, ce sont eux qui font autorité si une source répète un nom.
-    const seen = new Set(communityChars.map((c) => normCharName(c.name)));
+    const seen = new Set(communityChars.flatMap(keysOf));
     const dedupe = (list) =>
       list.filter((c) => {
-        const k = normCharName(c.name);
-        if (!k || seen.has(k)) return false;
-        seen.add(k);
+        const keys = keysOf(c);
+        if (!keys.length || keys.some((k) => seen.has(k))) return false;
+        for (const k of keys) seen.add(k);
         return true;
       });
     // ⚠️ LE ROSTER OFFICIEL PASSE AVANT IGDB, pas après. Quand les deux
@@ -1714,7 +1834,7 @@ router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
     // quand les deux connaissent le personnage, c'est le wiki qui a le
     // portrait — et le bon, pas celui d'un homonyme.
     const wikiAdd = dedupe(wikiChars);
-    const igdbAdd = dedupe(igdbChars);
+    const igdbAdd = dedupe(mergeByAlias(igdbChars));
     const vnAdd = dedupe(vnChars);
 
     // Personnages : roster officiel + IGDB + VNDB + communauté, portraits
@@ -1735,7 +1855,12 @@ router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
     // coupe la traîne des sans-image.
     const NO_IMAGE_KEPT = 40;
     let blanks = 0;
-    const characters = sorted.filter((c) => c.image || ++blanks <= NO_IMAGE_KEPT);
+    const characters = sorted
+      .filter((c) => c.image || ++blanks <= NO_IMAGE_KEPT)
+      // `akas` et `gameCount` sont des outils de crible, pas de l'information :
+      // le téléphone n'en fait rien, et les envoyer grossirait la réponse d'une
+      // liste d'alias par personnage sur des fiches qui en comptent deux cents.
+      .map(({ akas, gameCount, ...c }) => c);
 
     // Jeux « sans fin » potentiels : multijoueur (2), MMO (5) ou battle
     // royale (6) selon IGDB → la modale propose alors le statut « Sans fin ».
@@ -2893,6 +3018,70 @@ const VERSION_LINKS = [
   ["expanded_games", "Jeu enrichi"],
 ];
 
+// ----------------------------------------------------------------------
+//  « Il a été annoncé quand ? »
+// ----------------------------------------------------------------------
+// ⚠️ LA FEUILLE DES DATES NE RÉPONDAIT QU'À LA MOITIÉ DE LA QUESTION. « Sorti
+// le 12 novembre » raconte la fin de l'histoire ; ce qu'on cherche souvent,
+// surtout sur un jeu qu'on attend depuis longtemps, c'est le DÉBUT — le
+// showcase où il est apparu, et depuis combien de temps on patiente.
+//
+// Deux sources, dans cet ordre de vérité :
+//
+//   1. LE RENDEZ-VOUS. On tient déjà le calendrier des conférences et la liste
+//      des jeux montrés à chacune (cf. models/GameEvent, lib/eventSync). Quand
+//      le jeu y figure, on ne date pas seulement l'annonce, on la NOMME :
+//      « Annoncé au State of Play du 12 février ». C'est la vraie réponse.
+//
+//   2. À DÉFAUT, L'ENTRÉE AU CATALOGUE, et seulement si elle précède la sortie
+//      (cf. lib/gameIgdb, `gameCreatedAt`). Une fiche créée AVANT la sortie a
+//      été ouverte parce que le jeu venait d'être annoncé ; une fiche créée
+//      après est une saisie rétroactive, et la donner pour une annonce serait
+//      inventer. Le client l'étiquette d'ailleurs autrement — « référencé »,
+//      pas « annoncé » : une approximation nommée reste une information, une
+//      approximation déguisée en fait est une erreur.
+async function announcementOf(gameId, releaseDate) {
+  const [ev, list, createdAt] = await Promise.all([
+    // Le calendrier des rendez-vous : il porte les annonces relevées en direct.
+    GameEvent.findOne({ gameIds: gameId, hidden: { $ne: true } })
+      .select("name startsAt")
+      .sort({ startsAt: 1 })
+      .lean()
+      .catch(() => null),
+    // Et les listes officielles, qui remontent aux conférences d'avant le
+    // calendrier. La requête part de `event.igdbId` (indexé) : elle ne balaie
+    // que les quelques centaines de listes d'événements, jamais celles des
+    // joueurs.
+    List.findOne({ "event.igdbId": { $ne: null }, "items.refId": String(gameId) })
+      .select("event.name event.startTime")
+      .sort({ "event.startTime": 1 })
+      .lean()
+      .catch(() => null),
+    gameCreatedAt(gameId, releaseDate).catch(() => null),
+  ]);
+
+  // La PLUS ANCIENNE des deux sources d'événement : un jeu montré à trois
+  // showcases a été annoncé au premier, les suivants n'étaient que des rappels.
+  const candidates = [
+    ev ? { name: ev.name, date: new Date(ev.startsAt).getTime() } : null,
+    list?.event?.startTime
+      ? { name: list.event.name, date: new Date(list.event.startTime).getTime() }
+      : null,
+  ].filter((x) => x && Number.isFinite(x.date));
+  candidates.sort((a, b) => a.date - b.date);
+  const event = candidates[0] || null;
+
+  // Le repli ne sort que s'il précède la sortie — voir le commentaire du bloc.
+  const catalogued =
+    createdAt && (!releaseDate || createdAt < releaseDate) ? createdAt : null;
+
+  if (!event && !catalogued) return null;
+  return {
+    event: event ? { name: event.name, date: Math.floor(event.date / 1000) } : null,
+    catalogued,
+  };
+}
+
 router.get("/:id/releases", optionalAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -2967,10 +3156,15 @@ router.get("/:id/releases", optionalAuth, async (req, res) => {
       .filter((v) => v.id && !seen.has(v.id) && seen.add(v.id))
       .sort((a, b) => (a.date || Infinity) - (b.date || Infinity));
 
+    // Ne fait pas échouer la feuille : les dates de sortie sont l'essentiel,
+    // l'annonce est le bonus.
+    const announced = await announcementOf(id, g.first_release_date ?? null).catch(() => null);
+
     res.json({
       name: g.name,
       releaseDate: g.first_release_date || null,
       type: GAME_TYPES_FR[g.game_type]?.label || null,
+      announced,
       platforms,
       versions: uniqueVersions,
     });

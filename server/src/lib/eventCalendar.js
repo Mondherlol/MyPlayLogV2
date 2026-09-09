@@ -32,13 +32,16 @@ import GameEvent from "../models/GameEvent.js";
 import List from "../models/List.js";
 import {
   cleanEventName,
+  eventDescription,
   eventFamily,
+  eventTitle,
   fetchEvents,
   fetchGames,
   isTrackedEvent,
   youtubeId,
   youtubeThumb,
 } from "./gameEvents.js";
+import { ensureSystemUser } from "./eventSync.js";
 import { igdbQuery } from "./igdb.js";
 import { pushToUsers } from "./push.js";
 import { firstHref, parseIcs, parseIcsDate, prop, stripHtml, unescapeIcs } from "./ics.js";
@@ -649,6 +652,93 @@ async function fetchEventGames(igdbEventId) {
  *
  * Rend le nombre de jeux NOUVELLEMENT vus, tous événements confondus.
  */
+// ----------------------------------------------------------------------
+//  La liste officielle, écrite PENDANT l'émission
+// ----------------------------------------------------------------------
+// ⚠️ ELLE N'ARRIVAIT QU'AU LENDEMAIN, ET C'ÉTAIT UN TROU. Le relevé en direct
+// remplissait `liveGames` — l'accueil et la fiche du rendez-vous montraient les
+// annonces tomber au fil de l'eau — mais l'onglet « Événements » de l'explorateur
+// restait vide jusqu'au passage de nuit de `syncEventLists`. Deux écrans de la
+// même application racontaient donc deux états du même Direct, à douze heures
+// d'écart, sans que rien n'explique pourquoi.
+//
+// La liste est écrite ici, au même moment et depuis les mêmes données. Elle est
+// posée sous LA MÊME CLÉ que la synchro de nuit (`event.igdbId`) : celle-ci la
+// retrouve, la complète avec ce qu'IGDB sait faire de mieux — le tri par hype,
+// les jeux qu'elle seule voit — et la corrige au lieu d'en créer une seconde.
+//
+// ⚠️ ET PAS DE SEUIL DE JEUX, contrairement à la synchro de nuit. Ses cinq jeux
+// minimum écartent les centaines de micro-événements mal renseignés du
+// catalogue IGDB ; ici l'événement est déjà retenu (il est au calendrier, on
+// suit sa diffusion à la minute), et attendre le cinquième jeu rendrait la
+// liste en retard sur l'accueil — soit exactement le décalage qu'on corrige.
+async function upsertLiveEventList(ev, { log = () => {} } = {}) {
+  if (!ev.igdbEventId) return;
+
+  const games = (ev.liveGames || []).filter((g) => g.name);
+  if (!games.length) return;
+
+  // L'ORDRE DE L'ANTENNE, pas un classement. Pendant un direct, « ce qui vient
+  // d'être montré » est l'information ; trier par popularité ferait remonter le
+  // gros jeu de la fin au-dessus de celui qu'on regarde à l'instant.
+  const items = games.slice(0, 200).map((g) => ({
+    kind: "game",
+    refId: String(g.id),
+    gameId: g.id,
+    gameName: null,
+    name: String(g.name).slice(0, 200),
+    image: g.cover || null,
+    note: "",
+    media: [],
+    rating: null,
+    tier: null,
+  }));
+
+  const startSec = ev.startsAt ? Math.floor(new Date(ev.startsAt).getTime() / 1000) : null;
+  const title = eventTitle(ev.name, startSec);
+  const event = {
+    igdbId: ev.igdbEventId,
+    slug: null,
+    name: cleanEventName(ev.name).slice(0, 200),
+    startTime: ev.startsAt || null,
+    logo: ev.logo || null,
+    videoUrl: ev.liveUrl || null,
+    videoId: youtubeId(ev.liveUrl),
+  };
+
+  const existing = await List.findOne({ "event.igdbId": ev.igdbEventId });
+  if (existing) {
+    // ⚠️ ON N'ÉCRASE QUE CE QU'ON APPORTE. Si la synchro de nuit est déjà
+    // passée, elle a une liste PLUS COMPLÈTE que le relevé en direct (IGDB
+    // rattache après coup des jeux qu'aucun relevé n'a vus) : la réécrire avec
+    // nos seules annonces la ferait rétrécir.
+    if ((existing.items || []).length >= items.length) return;
+    existing.items = items;
+    // La couverture et le titre ne se posent que s'ils manquent : la synchro de
+    // nuit sait faire mieux que nous (miniature testée, affiche générée).
+    if (!existing.cover && ev.image) existing.cover = ev.image;
+    await existing.save();
+    log(`  ≡ liste « ${existing.title} » portée à ${items.length} jeu(x)`);
+    return;
+  }
+
+  const system = await ensureSystemUser();
+  if (!system?._id) return;
+
+  const list = await List.create({
+    user: system._id,
+    title,
+    description: eventDescription(),
+    cover: ev.image || null,
+    type: "classic",
+    itemKind: "game",
+    visibility: "public",
+    items,
+    event,
+  });
+  log(`  + liste « ${list.title} » créée en direct (${items.length} jeu(x))`);
+}
+
 export async function pollLiveEvents({ log = () => {} } = {}) {
   const now = Date.now();
 
@@ -712,6 +802,13 @@ export async function pollLiveEvents({ log = () => {} } = {}) {
 
     discovered += details.length;
     log(`  ▶ ${ev.name} : ${details.length} jeu(x) de plus (${ev.liveGames.length} au total)`);
+
+    // La liste de l'explorateur suit le même battement que l'accueil. Elle ne
+    // fait pas échouer le relevé : les annonces sont enregistrées, c'est
+    // l'essentiel — la synchro de nuit rattraperait la liste de toute façon.
+    await upsertLiveEventList(ev, { log }).catch((err) =>
+      log(`  ! ${ev.name} — liste non écrite (${err.message})`)
+    );
   }
 
   return discovered;
