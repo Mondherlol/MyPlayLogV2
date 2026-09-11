@@ -43,7 +43,16 @@ const NAV = [
   { to: "/lists", label: "Listes", Icon: List },
   // `feature` : entrée soumise à un drapeau réglé dans le panneau d'admin.
   // Éteinte, elle n'apparaît que pour l'admin (qui prépare la page).
-  { to: "/collection", label: "Collection", Icon: Library, feature: "collection" },
+  // `right` : en plus du drapeau, un DROIT PERSONNEL — la Collection ne
+  // s'ouvre qu'aux comptes à qui on l'a donnée depuis le panel admin. Les deux
+  // conditions se cumulent : section allumée ET droit accordé.
+  {
+    to: "/collection",
+    label: "Collection",
+    Icon: Library,
+    feature: "collection",
+    right: "canCollection",
+  },
   { to: "/arcade", label: "Arcade", Icon: Joystick },
   { to: "/profile", label: "Profil", Icon: User },
   // L'app Android n'est dans aucun magasin : cette entrée est le seul chemin
@@ -93,7 +102,9 @@ export default function Sidebar({ collapsed, onToggle }) {
       <nav className="side-nav">
         {NAV.filter(
           (n) =>
-            (!n.adminOnly || user?.isAdmin) && (!n.feature || hasFeature(n.feature))
+            (!n.adminOnly || user?.isAdmin) &&
+            (!n.feature || hasFeature(n.feature)) &&
+            (!n.right || !!user?.[n.right])
         ).map(
           ({ to, label, Icon, end, adminOnly, badge, noMobile }) => {
             const count = badge === "chat" ? unread : 0;

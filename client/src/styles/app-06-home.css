@@ -7369,6 +7369,14 @@
   font-weight: 700;
 }
 
+/* La même pastille pour l'accès à la Collection, dans une autre teinte : deux
+   droits distincts ne doivent pas se ressembler dans une liste de comptes. */
+.au-dl-badge.collection {
+  border-color: color-mix(in srgb, #7d6cf0 50%, var(--border));
+  background: color-mix(in srgb, #7d6cf0 14%, transparent);
+  color: #8d7ef5;
+}
+
 /* --- Barre d'actions de masse --- */
 /* Toujours en place au-dessus de la liste (elle porte le « tout cocher »), et
    elle s'allume dès qu'au moins un compte est sélectionné. */

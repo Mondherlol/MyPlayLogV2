@@ -28,7 +28,7 @@ import Message from "../models/Message.js";
 import Conversation from "../models/Conversation.js";
 import { logEvent, forgetAdmins } from "../lib/audit.js";
 import { sendPush } from "../lib/push.js";
-import { canUserDownload, isUserAdmin, isUserStaff } from "../lib/admin.js";
+import { canUserCollection, canUserDownload, isUserAdmin, isUserStaff } from "../lib/admin.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { listEnv, setEnvVar, deleteEnvVar } from "../lib/envFile.js";
 import {
@@ -101,6 +101,9 @@ router.get("/users", async (req, res) => {
         // cocher doit refléter ce qui est réellement stocké, sinon décocher un
         // admin donnerait l'illusion de n'avoir aucun effet.
         downloadFlag: !!u.canDownload,
+        // Accès à la section « Collection », même distinction drapeau/rôle.
+        canCollection: canUserCollection(u),
+        collectionFlag: !!u.canCollection,
         // Droit de parler au bot. Même distinction que ci-dessus entre le
         // drapeau brut et l'accès effectif (les admins l'ont par leur rôle).
         botAccess: canUseBot(u),
@@ -252,6 +255,30 @@ router.patch("/users/:id/download", async (req, res) => {
   }
 });
 
+// --- Accès à la section « Collection » d'UN compte ---
+// Même contrat que le téléchargement : on écrit le DRAPEAU, et on renvoie à la
+// fois le drapeau et l'accès EFFECTIF (un administrateur l'a par son rôle,
+// éteindre le drapeau ne lui retire donc rien — l'interface le dit plutôt que
+// de laisser croire à une panne).
+router.patch("/users/:id/collection", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id))
+      return res.status(404).json({ error: "Utilisateur introuvable." });
+    const canCollection = req.body?.canCollection === true;
+    const u = await User.findByIdAndUpdate(
+      id,
+      { $set: { canCollection } },
+      { new: true, timestamps: false }
+    ).select("isAdmin isSuperAdmin canCollection");
+    if (!u) return res.status(404).json({ error: "Utilisateur introuvable." });
+    res.json({ collectionFlag: !!u.canCollection, canCollection: canUserCollection(u) });
+  } catch (err) {
+    console.error("admin user collection error:", err.message);
+    res.status(500).json({ error: "Erreur lors de la mise à jour." });
+  }
+});
+
 // --- Rôle staff d'UN compte (interrupteur de la fiche) ---
 // Ouvert à tous les administrateurs (pas seulement au super-admin) : nommer un
 // modérateur de catalogue n'engage pas les mêmes pouvoirs que nommer un admin.
@@ -396,6 +423,8 @@ router.get("/users/:id", async (req, res) => {
         staffFlag: !!user.isStaff,
         canDownload: canUserDownload(user),
         downloadFlag: !!user.canDownload,
+        canCollection: canUserCollection(user),
+        collectionFlag: !!user.canCollection,
         botAccess: canUseBot(user),
         botFlag: !!user.botAccess,
         discord: user.discord?.discordId

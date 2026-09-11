@@ -51,6 +51,11 @@ const userSchema = new mongoose.Schema(
     // il s'ouvre compte par compte depuis le panel admin (voir canUserDownload,
     // lib/admin.js — les administrateurs l'ont sans le drapeau).
     canDownload: { type: Boolean, default: false },
+    // Accès à la section « Collection » (les jeux jouables en ligne, les salles
+    // de projection, l'émulateur). Fermée par défaut et ouverte compte par
+    // compte depuis le panel admin, comme le téléchargement : ce qu'elle sert
+    // n'a pas à être à la portée du premier inscrit venu.
+    canCollection: { type: Boolean, default: false },
 
     // --- Réinitialisation de mot de passe ---
     // On stocke le HASH du token (jamais le token en clair) + son expiration.
@@ -525,6 +530,10 @@ userSchema.methods.toPublic = function () {
     // Pilote l'affichage de l'onglet « Téléchargements » ; le serveur refait le
     // contrôle sur chaque route concernée (masquer n'est pas protéger).
     canDownload: !!this.isSuperAdmin || !!this.isAdmin || !!this.canDownload,
+    // Pilote l'affichage de la section « Collection » (lien de la barre latérale
+    // et route du site). Le serveur refait le contrôle sur chacune de ses
+    // routes : masquer n'est pas protéger.
+    canCollection: !!this.isSuperAdmin || !!this.isAdmin || !!this.canCollection,
     points: this.points || 0,
     // Slugs seulement : le détail des lots équipés (image, rareté…) se récupère
     // via /api/arcade/cosmetics, qui sait résoudre les slugs en lots.

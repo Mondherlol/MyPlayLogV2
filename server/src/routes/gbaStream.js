@@ -1,7 +1,7 @@
 import express from "express";
 import User from "../models/User.js";
 import CollectionMedia from "../models/CollectionMedia.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireCollectionAccess } from "../middleware/auth.js";
 import { requireFeature } from "../lib/features.js";
 import { emitTo } from "../lib/realtime.js";
 import {
@@ -60,7 +60,10 @@ import {
 const router = express.Router();
 // Le rayon vidéo et ses diffusions s'allument ensemble : diffuser une cartouche
 // n'a de sens que si la collection est ouverte.
-router.use(requireAuth, requireFeature("collection"));
+// Le droit d'accès à la Collection vaut ici aussi : ces routes SERVENT son
+// contenu (une salle de projection, un émulateur). Laisser la porte de
+// derrière ouverte aurait rendu le barrage principal décoratif.
+router.use(requireAuth, requireFeature("collection"), requireCollectionAccess);
 
 // Les index de boutons acceptés : ceux de libretro pour une GBA (voir
 // client/src/lib/gbaInput.js). Tout le reste est refusé — on ne laisse pas un

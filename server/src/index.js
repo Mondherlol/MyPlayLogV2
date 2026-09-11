@@ -74,6 +74,7 @@ import discordRoutes from "./routes/discord.js";
 import { ensureBotUser } from "./lib/bot.js";
 import { startDiscordBot } from "./lib/discordBot.js";
 import { requireFeature } from "./lib/features.js";
+import { requireCollectionAccess } from "./middleware/auth.js";
 import { optionalAuth } from "./middleware/auth.js";
 import { avatarPrivacy } from "./middleware/avatarPrivacy.js";
 import { auditLog, logEvent } from "./lib/audit.js";
@@ -231,6 +232,10 @@ app.use(
   "/api/collection",
   optionalAuth,
   requireFeature("collection"),
+  // ⚠️ POSÉ ICI, ET C'EST LE POINT : les cinquante routes du routeur sont
+  // couvertes d'un coup. En protéger une par une, c'était s'exposer à en
+  // oublier une aujourd'hui — ou à en ajouter une demain sans y penser.
+  requireCollectionAccess,
   collectionRoutes
 );
 // Les salles de projection à plusieurs (watchparty). Même drapeau que la

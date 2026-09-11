@@ -2,7 +2,7 @@ import express from "express";
 import WatchParty, { makeCode, MAX_PARTY_MESSAGES } from "../models/WatchParty.js";
 import CollectionMedia from "../models/CollectionMedia.js";
 import User from "../models/User.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireCollectionAccess } from "../middleware/auth.js";
 import { requireFeature } from "../lib/features.js";
 import { emitTo, onlineAmong } from "../lib/realtime.js";
 import { deliverCard } from "./chat.js";
@@ -47,7 +47,10 @@ const router = express.Router();
 // Le rayon vidéo et ses salles s'allument ensemble : une watchparty n'est qu'une
 // façon de regarder la Collection à plusieurs. L'admin passe toujours (il
 // prépare la page pendant qu'elle est éteinte).
-router.use(requireAuth, requireFeature("collection"));
+// Le droit d'accès à la Collection vaut ici aussi : ces routes SERVENT son
+// contenu (une salle de projection, un émulateur). Laisser la porte de
+// derrière ouverte aurait rendu le barrage principal décoratif.
+router.use(requireAuth, requireFeature("collection"), requireCollectionAccess);
 
 const MAX_TEXT = 2000;
 const MAX_MEDIA = 4;

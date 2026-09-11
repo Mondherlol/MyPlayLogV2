@@ -71,10 +71,23 @@ function PublicOrApp({ children }) {
 // ou un message d'erreur. L'admin, lui, passe toujours — c'est lui qui prépare
 // la section pendant qu'elle est cachée (même règle que lib/features.js côté
 // serveur, qui refuse les requêtes de son côté).
-function FeatureRoute({ name, element }) {
-  const { hasFeature, loading } = useAuth();
+// Une page soumise à un drapeau de section (`name`, réglé dans le panel admin)
+// et, éventuellement, à un DROIT PERSONNEL (`right` : un champ du compte, par
+// exemple `canCollection`).
+//
+// Les deux ne disent pas la même chose : le drapeau ferme la section pour TOUT
+// LE MONDE, le droit l'ouvre à QUELQUES-UNS. La Collection a les deux — elle
+// peut être éteinte globalement, et sinon elle n'est visible que des comptes à
+// qui on l'a donnée.
+//
+// ⚠️ CE N'EST QU'UN AIGUILLAGE, PAS UNE PROTECTION. Le serveur refait le
+// contrôle sur chacune de ses routes (requireCollectionAccess) : cacher un
+// écran n'empêche personne d'appeler l'API.
+function FeatureRoute({ name, element, right = null }) {
+  const { hasFeature, loading, user } = useAuth();
   if (loading) return <div className="center-screen">Chargement…</div>;
-  return hasFeature(name) ? element : <Navigate to="/app" replace />;
+  const allowed = hasFeature(name) && (!right || !!user?.[right]);
+  return allowed ? element : <Navigate to="/app" replace />;
 }
 
 function GuestOnly({ children }) {
@@ -179,7 +192,7 @@ export default function App() {
             le lien d'invitation ; la diffusion s'ouvre depuis la console. */}
         <Route
           path="/gba/:code"
-          element={<FeatureRoute name="collection" element={<GbaWatch />} />}
+          element={<FeatureRoute name="collection" right="canCollection" element={<GbaWatch />} />}
         />
         <Route path="/arcade" element={<Arcade />} />
         <Route path="/blindtest" element={<BlindTest />} />
@@ -219,23 +232,23 @@ export default function App() {
             ramène à l'accueil pour tout le monde sauf l'admin — qui prépare la
             page pendant qu'elle est cachée. Le serveur refuse de son côté :
             masquer une route n'a jamais protégé une API. */}
-        <Route path="/collection" element={<FeatureRoute name="collection" element={<Collection />} />} />
+        <Route path="/collection" element={<FeatureRoute name="collection" right="canCollection" element={<Collection />} />} />
         {/* L'étagère de quelqu'un d'autre. Déclarée AVANT « /collection/:slug »,
             sinon « u » passerait pour le slug d'un boîtier. */}
         <Route
           path="/collection/u/:username"
-          element={<FeatureRoute name="collection" element={<Collection />} />}
+          element={<FeatureRoute name="collection" right="canCollection" element={<Collection />} />}
         />
         <Route
           path="/collection/:slug"
-          element={<FeatureRoute name="collection" element={<CollectionDetail />} />}
+          element={<FeatureRoute name="collection" right="canCollection" element={<CollectionDetail />} />}
         />
         {/* Une salle de projection à plusieurs. Même drapeau que le rayon : c'est
             une façon de le regarder. Le lien porte le code de la salle — qui l'a
             peut entrer, comme une invitation Discord. */}
         <Route
           path="/watchparty/:code"
-          element={<FeatureRoute name="collection" element={<WatchParty />} />}
+          element={<FeatureRoute name="collection" right="canCollection" element={<WatchParty />} />}
         />
         <Route path="/profile" element={<Profile />} />
         <Route path="/admin" element={<Admin />} />

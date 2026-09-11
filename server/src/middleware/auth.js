@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
-import { canUserDownload, isUserAdmin, isUserStaff } from "../lib/admin.js";
+import { canUserCollection, canUserDownload, isUserAdmin, isUserStaff } from "../lib/admin.js";
 import { dayKey, touchStreak } from "../lib/streak.js";
 import { createTtlCache } from "../lib/ttlCache.js";
 
@@ -134,6 +134,28 @@ export async function markStaff(req, _res, next) {
 // télécharger (User.canDownload, ou administrateur). C'est ICI que se joue la
 // restriction : le client se contente de cacher l'onglet, ce qui n'empêcherait
 // personne d'appeler l'API directement.
+// Même barrage pour la section « Collection ».
+//
+// ⚠️ ET IL RÉPOND 404, PAS 403. Pour qui n'y a pas droit, la section n'existe
+// pas — c'est déjà la réponse que fait `requireFeature` quand la section est
+// éteinte, et la demande était de la CACHER, pas d'annoncer une porte fermée.
+//
+// ⚠️ IL SE CHAÎNE APRÈS `optionalAuth` OU `requireAuth`, JAMAIS SEUL : sans
+// `req.userId`, il refuse tout le monde — ce qui est le bon réflexe, mais pas
+// un contrôle d'accès.
+export async function requireCollectionAccess(req, res, next) {
+  try {
+    const user = req.userId
+      ? await User.findById(req.userId).select("isAdmin isSuperAdmin canCollection")
+      : null;
+    if (!canUserCollection(user))
+      return res.status(404).json({ error: "Cette section n'est pas disponible." });
+    next();
+  } catch {
+    return res.status(500).json({ error: "Erreur d'authentification." });
+  }
+}
+
 export async function requireDownloadAccess(req, res, next) {
   try {
     const user = await User.findById(req.userId).select("isAdmin isSuperAdmin canDownload");

@@ -38,3 +38,12 @@ export function canUserDownload(user) {
   if (!user) return false;
   return isUserAdmin(user) || !!user.canDownload;
 }
+
+// La section « Collection » suit exactement la même règle que le
+// téléchargement : fermée à tous par défaut, ouverte à la main compte par
+// compte, et acquise d'office aux administrateurs — ce sont eux qui
+// distribuent le droit, et personne ne pourrait se l'accorder en premier.
+export function canUserCollection(user) {
+  if (!user) return false;
+  return isUserAdmin(user) || !!user.canCollection;
+}

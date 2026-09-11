@@ -232,6 +232,7 @@ const USER_FILTERS = [
   { key: "admin", label: "Admins" },
   { key: "staff", label: "Staff" },
   { key: "download", label: "Téléchargement" },
+  { key: "collection", label: "Collection" },
 ];
 
 // Les gestes de masse. `danger` colore le bouton et déclenche une confirmation
@@ -293,7 +294,9 @@ function UsersPanel({ token, me }) {
         ? u.isStaff
         : filter === "download"
           ? u.canDownload
-          : true
+          : filter === "collection"
+            ? u.canCollection
+            : true
   );
 
   // La sélection ne porte que sur ce qui est À L'ÉCRAN : cocher « tout » puis
@@ -524,6 +527,18 @@ function UsersPanel({ token, me }) {
                         <Download size={12} /> DL
                       </span>
                     )}
+                    {u.canCollection && (
+                      <span
+                        className="au-dl-badge collection"
+                        title={
+                          u.collectionFlag
+                            ? "Accès à la Collection accordé"
+                            : "Accès à la Collection (via le rôle admin)"
+                        }
+                      >
+                        <Library size={12} /> Collec
+                      </span>
+                    )}
                   </div>
                   <span className="au-email">{u.email}</span>
                   <span className="au-meta">
@@ -681,6 +696,11 @@ function UserDrawer({ token, userId, me, onClose, onDirty }) {
               {/* Accès au téléchargement : le seul moyen d'ouvrir l'onglet
                   « Téléchargements » d'une fiche de jeu. Fermé par défaut. */}
               <DownloadToggle token={token} user={u} onSaved={load} onDirty={onDirty} />
+
+              {/* Accès à la section « Collection » : fermée par défaut, elle
+                  n'apparaît (barre latérale et pages) que pour les comptes à
+                  qui on l'ouvre ici. */}
+              <CollectionToggle token={token} user={u} onSaved={load} onDirty={onDirty} />
 
               {/* Staff : édition des OST et des personnages des fiches de jeu. */}
               {!u.isSuper && (
@@ -1074,6 +1094,61 @@ function DownloadToggle({ token, user, onSaved, onDirty }) {
           disabled={busy}
           role="switch"
           aria-checked={user.downloadFlag}
+        >
+          <span className="admin-switch-knob">
+            {busy && <Loader2 size={11} className="spin" />}
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// --- Accès à la section « Collection » ---
+// Même contrat que le téléchargement : l'interrupteur porte sur le DRAPEAU
+// (`collectionFlag`), pas sur l'accès effectif — un administrateur y a droit
+// par son rôle, et l'éteindre ne lui retirerait rien. On le dit plutôt que de
+// laisser croire à une panne.
+function CollectionToggle({ token, user, onSaved, onDirty }) {
+  const [busy, setBusy] = useState(false);
+  const viaRole = user.isAdmin && !user.collectionFlag;
+
+  async function toggle() {
+    setBusy(true);
+    try {
+      await apiFetch(`/admin/users/${user.id}/collection`, {
+        method: "PATCH",
+        token,
+        body: { canCollection: !user.collectionFlag },
+      });
+      onSaved();
+      onDirty();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="admin-field">
+      <label>
+        <Library size={14} /> Accès à la Collection
+      </label>
+      <div className="admin-toggle-row">
+        <span>
+          {user.collectionFlag
+            ? "La section « Collection » lui est ouverte."
+            : viaRole
+              ? "Ouvert d'office : c'est un administrateur."
+              : "Section masquée (barre latérale et pages) et API refusée."}
+        </span>
+        <button
+          className={`admin-switch clickable ${user.collectionFlag ? "on" : ""}`}
+          onClick={toggle}
+          disabled={busy}
+          role="switch"
+          aria-checked={user.collectionFlag}
         >
           <span className="admin-switch-knob">
             {busy && <Loader2 size={11} className="spin" />}
