@@ -54,9 +54,7 @@ export default function Landing() {
 
   return (
     <div className="lp">
-      {/* Deux bandeaux : un en haut, un en bas, deux rangées chacun. Le texte
-          tient dans le vide qu'ils laissent au milieu. */}
-      <CoverDrift bands />
+      <CoverDrift />
 
       <header className="lp-top">
         <span className="brand">
