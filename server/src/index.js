@@ -43,6 +43,7 @@ import gbaStreamRoutes from "./routes/gbaStream.js";
 import listenRoutes from "./routes/listen.js";
 import arcadeRoutes from "./routes/arcade.js";
 import steamRoutes from "./routes/steam.js";
+import backloggdRoutes from "./routes/backloggd.js";
 import steamGameRoutes from "./routes/steamGames.js";
 import psnRoutes from "./routes/psn.js";
 import patchnoteRoutes from "./routes/patchnotes.js";
@@ -195,6 +196,8 @@ app.use("/api/gba-stream", gbaStreamRoutes);
 app.use("/api/listen", listenRoutes);
 app.use("/api/arcade", arcadeRoutes);
 app.use("/api/steam", steamRoutes);
+// Import d'une bibliothèque Backloggd (lecture des pages publiques du profil).
+app.use("/api/backloggd", backloggdRoutes);
 // Ajouter un jeu à partir de son lien Steam — y compris un jeu qu'IGDB ne
 // connaît pas encore (cf. routes/steamGames.js).
 app.use("/api/steam-games", steamGameRoutes);

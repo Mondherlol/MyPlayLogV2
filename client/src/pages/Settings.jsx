@@ -51,6 +51,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { apiFetch, API_BASE } from "../lib/api";
+import BackloggdImportModal from "../components/BackloggdImportModal";
 import {
   getRatingScale,
   setRatingScale,
@@ -195,8 +196,45 @@ function ImportsPanel() {
       <div className="import-cards">
         <SteamCard />
         <PsnCard />
+        <BackloggdCard />
       </div>
     </div>
+  );
+}
+
+// --- Backloggd : pas de liaison de compte, juste une adresse ---
+// Contrairement à Steam et PSN, il n'y a rien à relier : Backloggd n'a ni API
+// ni connexion tierce. On lit les pages PUBLIQUES du profil, ce qui veut dire
+// deux choses — l'utilisateur n'a aucun jeton à donner, et sa bibliothèque doit
+// être publique.
+function BackloggdCard() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <div className="import-card bl-card">
+        <div className="import-card-head">
+          <div className="import-card-main">
+            <span className="bl-logo">
+              <Gamepad2 size={26} />
+            </span>
+            <div className="import-card-info">
+              <div className="import-card-title">Backloggd</div>
+              <p className="import-card-desc">
+                Récupère ta bibliothèque, tes notes, ton avancement et tes avis
+                depuis ton profil Backloggd.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="import-card-actions">
+          <button className="btn btn-primary clickable" onClick={() => setOpen(true)}>
+            <DownloadCloud size={16} /> Importer
+          </button>
+        </div>
+      </div>
+      {open && <BackloggdImportModal onClose={() => setOpen(false)} />}
+    </>
   );
 }
 

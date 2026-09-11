@@ -1,0 +1,279 @@
+/* ======================================================================
+   Import Backloggd
+   ======================================================================
+   La modale reprend l'habillage de l'import Steam (.steam-modal, .steam-center,
+   .btn-steam-primary — cf. app-15-settings.css) : c'est le même geste, il doit
+   se reconnaître. Seules les parties propres à Backloggd sont ici.
+   ====================================================================== */
+
+.bl-logo {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  flex: 0 0 auto;
+  border-radius: 14px;
+  background: linear-gradient(140deg, #2b2440 0%, #4b3f6e 100%);
+  color: #cbb6ff;
+}
+.bl-card .import-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.9rem;
+}
+
+.bl-modal {
+  width: min(680px, 100%);
+}
+.bl-brand svg {
+  color: #a58bff;
+}
+.bl-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.1rem 1.35rem 1.5rem;
+}
+.bl-intro {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.bl-field {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 0.85rem;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+.bl-field:focus-within {
+  border-color: #a58bff;
+}
+.bl-field input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.7rem 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+}
+.bl-field input:focus {
+  outline: none;
+}
+.bl-error {
+  margin: 0;
+  color: #e05c5c;
+  font-size: 0.83rem;
+  line-height: 1.45;
+}
+.bl-error.px {
+  padding: 0 1.35rem;
+}
+.bl-hint {
+  margin: 0;
+  padding-top: 0.3rem;
+  border-top: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 0.79rem;
+  line-height: 1.5;
+}
+
+/* --- Le bandeau de résumé --- */
+.bl-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  padding: 0.8rem 1.35rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 0.84rem;
+}
+.bl-summary span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.bl-summary b {
+  color: var(--text);
+}
+.bl-already {
+  color: #26a96a;
+}
+
+.bl-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.6rem 1.35rem 0.4rem;
+}
+.bl-all {
+  padding: 0.28rem 0.7rem;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: var(--cursor-pointer), pointer;
+}
+.bl-all:hover {
+  border-color: #a58bff;
+}
+.bl-count {
+  color: var(--text-soft);
+  font-size: 0.8rem;
+}
+
+/* --- La liste --- */
+.bl-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.3rem 1.35rem;
+}
+.bl-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: var(--cursor-pointer), pointer;
+  /* Décoché : en retrait, pour que la sélection se lise d'un coup d'œil. */
+  opacity: 0.55;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+.bl-row.on {
+  opacity: 1;
+  border-color: #a58bff;
+}
+.bl-cover {
+  flex: 0 0 auto;
+  width: 32px;
+  aspect-ratio: 3 / 4;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-soft);
+}
+.bl-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.bl-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.bl-name {
+  font-size: 0.87rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bl-meta {
+  color: var(--text-soft);
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bl-status {
+  font-weight: 700;
+}
+.bl-status.st-finished { color: #26a96a; }
+.bl-status.st-playing { color: #3c8ed6; }
+.bl-status.st-paused { color: #c08c07; }
+.bl-status.st-dropped { color: #c0554d; }
+.bl-status.st-endless { color: #9b6dd6; }
+.bl-status.st-wishlist { color: #e0679b; }
+.bl-here {
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.7rem;
+}
+.bl-box {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 6px;
+  color: #1a1204;
+}
+.bl-row.on .bl-box {
+  border-color: transparent;
+  background: linear-gradient(140deg, #8d6bff 0%, #b79bff 100%);
+  color: #16102b;
+}
+
+/* --- Les écrasements, et le pied --- */
+.bl-overwrite {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.7rem 1.35rem;
+  border-top: 1px solid var(--border);
+}
+.bl-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  cursor: var(--cursor-pointer), pointer;
+}
+.bl-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.9rem 1.35rem 1.2rem;
+  border-top: 1px solid var(--border);
+}
+.bl-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-right: auto;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  text-decoration: none;
+}
+.bl-link:hover {
+  color: #a58bff;
+}
+
+@media (max-width: 560px) {
+  .bl-body,
+  .bl-summary,
+  .bl-tools,
+  .bl-list,
+  .bl-overwrite,
+  .bl-foot {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
