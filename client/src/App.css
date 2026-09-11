@@ -44,4 +44,8 @@
 @import "./styles/app-44-steam-link.css";
 @import "./styles/app-45-log-game.css";
 @import "./styles/app-46-backloggd.css";
+/* L'accueil v3 (rayons horizontaux). Il vient APRÈS app-06-home.css, qui garde
+   le fil (`hf-*`) utilisé par la page Activité. */
+@import "./styles/app-47-home.css";
+@import "./styles/app-48-datepicker.css";
 @import "./styles/app-99-mobile-perf.css";

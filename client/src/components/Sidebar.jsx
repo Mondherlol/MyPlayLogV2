@@ -28,6 +28,7 @@ import { useAuth } from "../context/AuthContext";
 import { useChat } from "../context/ChatContext";
 import { useCosmetics } from "../context/CosmeticsContext";
 import { useClickOutside } from "../hooks/useClickOutside";
+import { FlagEN, FlagFR } from "./Flags";
 
 // Version courante de l'app (affichée en bas de la sidebar).
 const APP_VERSION = "1.1";
@@ -60,11 +61,6 @@ const NAV = [
   { to: "/download", label: "App mobile", Icon: Smartphone },
   { to: "/admin", label: "Admin", Icon: Shield, adminOnly: true },
 ];
-
-// Petit drapeau FR en CSS (net, pas d'emoji)
-function FlagFR() {
-  return <span className="flag flag-fr" aria-hidden="true" />;
-}
 
 export default function Sidebar({ collapsed, onToggle }) {
   const { theme, toggle } = useTheme();
@@ -174,7 +170,7 @@ export default function Sidebar({ collapsed, onToggle }) {
                 <FlagFR /> Français <Check size={15} className="lang-check" />
               </button>
               <button className="lang-item disabled" disabled>
-                <span className="flag flag-en" aria-hidden="true" /> English
+                <FlagEN /> English
                 <span className="soon-pill">bientôt</span>
               </button>
             </div>

@@ -4751,63 +4751,64 @@
    manquaient au site : quand j'ai commencé, quand j'ai fini, et si j'ai tout
    fait. Ce sont des données que le serveur acceptait déjà.
    ====================================================================== */
-/* ⚠️ EN COLONNE, PAS CÔTE À CÔTE. Les deux dates tenaient sur une ligne tant
-   qu'elles n'étaient que deux champs ; avec leurs rangées de raccourcis, les
-   mettre côte à côte écrasait les pastilles à trois caractères. */
-.when-row {
+/* --- Quand : deux boutons qui ouvrent la feuille de dates --- */
+.when-btns {
   display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-  margin-top: 0.9rem;
+  flex-wrap: wrap;
+  gap: 0.6rem;
 }
-.when-col {
-  min-width: 0;
-}
-.when-col .input-group {
-  max-width: 240px;
-}
-.when-col .input-group {
-  padding: 0.12rem 0.9rem;
-}
-/* Un champ date natif se cale mal dans une boîte prévue pour du texte : il
-   s'étire tout seul et pousse l'icône de calendrier du navigateur hors cadre. */
-.when-col input[type="date"] {
-  width: 100%;
-  min-width: 0;
-  color-scheme: dark light;
-}
-.when-clear {
-  display: inline-flex;
+.when-btn {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--text-soft);
-}
-.when-clear:hover {
+  gap: 0.6rem;
+  flex: 1 1 190px;
+  min-width: 0;
+  padding: 0.55rem 0.8rem;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 13px;
   background: var(--surface-2);
+  color: var(--text-soft);
+  font: inherit;
+  text-align: left;
+  cursor: var(--cursor-pointer), pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.when-btn:hover {
+  border-color: var(--accent);
+}
+/* Renseigné : la date en clair, pour qu'on la lise sans ouvrir la feuille. */
+.when-btn.set {
   color: var(--text);
 }
-
-/* Frère du « Coup de cœur » : même forme, même place, même geste — on épingle
-   une marque sur le jeu. D'où la reprise exacte de ses mesures. */
-.hundred-btn {
+.when-btn-txt {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.72rem;
+  flex-direction: column;
+  min-width: 0;
+}
+.when-btn-label {
+  color: var(--text-soft);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.when-btn-value {
+  font-size: 0.87rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hundred-btn {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 46px;
   border-radius: 13px;
   border: 1.5px solid var(--border-strong);
   background: var(--surface);
   color: var(--text-soft);
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.92rem;
   cursor: var(--cursor-pointer), pointer;
   transition: all 0.18s ease;
 }
@@ -4822,64 +4823,6 @@
   border-color: #9fb2c8;
   color: #e6eef7;
   box-shadow: 0 8px 22px rgba(60, 80, 110, 0.35);
-}
-
-/* ======================================================================
-   Les raccourcis de date
-   ======================================================================
-   Une date de jeu se dit rarement au jour près : « à la sortie », « un mois
-   après l'avoir commencé », « il y a un an ». Une rangée par origine, pour
-   qu'on voie qu'il y a deux façons de répondre. Cf. lib/dateQuick.js.
-   ====================================================================== */
-.qd {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 0.55rem;
-}
-.qd-label {
-  display: block;
-  margin-bottom: 0.25rem;
-  color: var(--text-soft);
-  font-size: 0.71rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.qd-chip {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.1rem;
-  flex: 0 0 auto;
-  padding: 0.35rem 0.7rem;
-  border: 1.5px solid var(--border);
-  border-radius: 11px;
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-size: 0.78rem;
-  line-height: 1.25;
-  white-space: nowrap;
-  cursor: var(--cursor-pointer), pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
-}
-.qd-chip:hover {
-  border-color: var(--accent);
-}
-.qd-chip.active {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--text);
-}
-.qd-chip-label {
-  font-weight: 600;
-}
-/* La date que le raccourci désigne vraiment : « un mois après », d'accord,
-   mais quel jour ? */
-.qd-chip-hint {
-  color: var(--text-soft);
-  font-size: 0.68rem;
 }
 
 /* ======================================================================
@@ -5073,3 +5016,56 @@
   font-size: 0.78rem;
   font-weight: 600;
 }
+
+/* ======================================================================
+   Où je l'ai eu — la rangée des boutiques
+   ======================================================================
+   « Physique ou démat » ne veut rien dire sur PC : la question, c'est OÙ. Les
+   deux rangées sont exclusives (cf. PlayedModal). Tracés dans lib/storeIcons.
+   ====================================================================== */
+.store-row {
+  margin-top: 0.9rem;
+}
+.store-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.store-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.38rem 0.72rem;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 0.79rem;
+  font-weight: 600;
+  cursor: var(--cursor-pointer), pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.store-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+/* Chaque boutique reprend SA couleur une fois cochée : on la reconnaît au coin
+   de l'œil, sans lire le libellé. */
+.store-chip.active {
+  border-color: transparent;
+  color: #fff;
+}
+.store-chip.active.steam { background: #1b2838; }
+.store-chip.active.gog { background: #86328a; }
+.store-chip.active.epic { background: #2a2a2a; }
+.store-chip.active.itch { background: #fa5c5c; }
+.store-chip.active.googleplay { background: #01875f; }
+.store-chip.active.appstore { background: #0d84ff; }
+.store-chip.active.youtube { background: #ff0000; }
+.store-chip.active.twitch { background: #9146ff; }
+.store-chip.active.kick { background: #53fc18; color: #0b1a02; }
+.store-chip.active.gamepass { background: #107c10; }
+/* Hors boutique : un gris d'ardoise, ni honteux ni tapageur. C'est une
+   provenance parmi d'autres, pas une alerte. */
+.store-chip.active.unofficial { background: #4a4f58; }

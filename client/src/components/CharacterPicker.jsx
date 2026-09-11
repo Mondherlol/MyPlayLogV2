@@ -14,6 +14,9 @@ export default function CharacterPicker({
   token,
   characters,
   favChar,
+  // Le favori tel qu'il était À L'OUVERTURE de la modale. C'est LUI qui décide
+  // de l'ordre, pas `favChar` qui bouge à chaque clic.
+  pinnedFav = null,
   onSelect,
   onCharsChange,
 }) {
@@ -25,7 +28,7 @@ export default function CharacterPicker({
   const { user } = useAuth();
   const canEdit = !!user?.isStaff;
 
-  // ⚠️ LE FAVORI PASSE DEVANT, TOUJOURS.
+  // ⚠️ LE FAVORI PASSE DEVANT — MAIS CELUI D'HIER, PAS CELUI DE LA SECONDE.
   //
   // La galerie est rangée dans l'ordre d'IGDB, qui est celui où des
   // contributeurs ont saisi les personnages — autrement dit un ordre qui n'a
@@ -36,12 +39,21 @@ export default function CharacterPicker({
   // Et s'il ne figure PAS dans la galerie (personnage saisi ailleurs, ou fiche
   // retirée depuis), on l'affiche quand même : mieux vaut le montrer seul que
   // de laisser croire qu'il a disparu.
+  //
+  // ⚠️ ET L'ORDRE NE BOUGE PAS PENDANT QU'ON CLIQUE. Il se calcule sur le
+  // favori enregistré (`pinnedFav`), pas sur la sélection en cours : sinon le
+  // personnage qu'on vient de choisir sauterait en tête et décalerait toute la
+  // rangée sous le doigt. Le choix d'aujourd'hui sera en tête la prochaine
+  // fois — c'est-à-dire quand on rouvrira la modale.
   const ordered = useMemo(() => {
-    if (!favChar?.name) return characters;
-    const hit = characters.find((c) => c.name === favChar.name);
-    const rest = characters.filter((c) => c.name !== favChar.name);
-    return [hit || { id: `fav-${favChar.name}`, name: favChar.name, image: favChar.image }, ...rest];
-  }, [characters, favChar]);
+    if (!pinnedFav?.name) return characters;
+    const hit = characters.find((c) => c.name === pinnedFav.name);
+    const rest = characters.filter((c) => c.name !== pinnedFav.name);
+    return [
+      hit || { id: `fav-${pinnedFav.name}`, name: pinnedFav.name, image: pinnedFav.image },
+      ...rest,
+    ];
+  }, [characters, pinnedFav]);
 
   const filtered = query
     ? ordered.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()))

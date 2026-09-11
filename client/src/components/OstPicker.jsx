@@ -10,7 +10,7 @@ import AddOstModal from "./AddOstModal";
 
 // Liste l'OST du jeu (extraits iTunes + pistes YouTube jouées inline) avec
 // recherche texte, ajout, masquage (clic droit) et choix d'un favori.
-export default function OstPicker({ gameId, gameName, token, favorite, onSelect }) {
+export default function OstPicker({ gameId, gameName, token, favorite, pinnedFav = null, onSelect }) {
   const [tracks, setTracks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [playingId, setPlayingId] = useState(null);
@@ -139,34 +139,40 @@ export default function OstPicker({ gameId, gameName, token, favorite, onSelect 
   const isFav = (t) =>
     favorite && favorite.name === t.name && favorite.artist === t.artist;
 
-  // ⚠️ LA PISTE CHOISIE PASSE DEVANT, TOUJOURS — même raison que pour le
-  // personnage favori : l'OST d'un jeu fait couramment quarante pistes, et la
-  // sienne se retrouvait noyée au milieu d'une rangée qui défile. En rouvrant
-  // la modale, on ne voyait pas son propre choix.
+  // ⚠️ LA PISTE ENREGISTRÉE PASSE DEVANT — celle d'hier, pas celle de la
+  // seconde : l'ordre se fige à l'ouverture, sinon la piste qu'on vient de
+  // choisir sauterait en tête et décalerait la rangée sous le doigt. Même
+  // raison que pour le personnage favori.
+  //
+  // Sans cette remontée, la piste choisie se noyait au milieu d'une rangée de
+  // quarante : en rouvrant la modale, on ne voyait pas son propre choix.
   //
   // Si la piste favorite ne figure pas (ou plus) dans l'OST — masquée par le
   // staff, choisie depuis l'app mobile sur une autre source —, on l'affiche
   // quand même en tête, sinon elle semblerait effacée alors qu'elle est bien
   // enregistrée. Elle n'est simplement pas jouable (ni extrait, ni vidéo).
+  const isPinned = (t) =>
+    pinnedFav && pinnedFav.name === t.name && pinnedFav.artist === t.artist;
+
   const ordered = useMemo(() => {
-    if (!favorite?.name) return tracks;
-    const rest = tracks.filter((t) => !isFav(t));
+    if (!pinnedFav?.name) return tracks;
+    const rest = tracks.filter((t) => !isPinned(t));
     if (rest.length === tracks.length) {
       return [
         {
           id: "fav-orphan",
-          name: favorite.name,
-          artist: favorite.artist || "",
-          artwork: favorite.artwork || null,
-          preview: favorite.preview || null,
-          youtube: !!favorite.youtube,
-          url: favorite.url || null,
+          name: pinnedFav.name,
+          artist: pinnedFav.artist || "",
+          artwork: pinnedFav.artwork || null,
+          preview: pinnedFav.preview || null,
+          youtube: !!pinnedFav.youtube,
+          url: pinnedFav.url || null,
         },
         ...tracks,
       ];
     }
-    return [tracks.find(isFav), ...rest];
-  }, [tracks, favorite]); // eslint-disable-line react-hooks/exhaustive-deps
+    return [tracks.find(isPinned), ...rest];
+  }, [tracks, pinnedFav]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtered = query
     ? ordered.filter((t) =>

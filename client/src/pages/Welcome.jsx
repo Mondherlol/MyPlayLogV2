@@ -1,42 +1,82 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Clapperboard,
+  Compass,
+  Joystick,
+  Loader2,
+  Plus,
   Settings,
   Check,
-  Flame,
-  CalendarDays,
-  CalendarClock,
-  Gift,
-  Radar,
   Sparkles,
-  ChevronRight,
-  ChevronLeft,
-  Gamepad2,
-  Music2,
-  Joystick,
   Coins,
-  Clock,
-  Compass,
-  ExternalLink,
-  Rss,
-  Sprout,
-  Disc3,
-  Play,
-  Pause,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { usePlayer } from "../context/PlayerContext";
+import { useLibrary } from "../context/LibraryContext";
 import { useClickOutside } from "../hooks/useClickOutside";
-import useFollowingRail from "../hooks/useFollowingRail";
-import useMediaQuery from "../hooks/useMediaQuery";
-import { useTabSwipe } from "../hooks/useTabSwipe";
 import { apiFetch } from "../lib/api";
-import { extractVideoId } from "../lib/youtube";
 import DocumentaryModal from "../components/DocumentaryModal";
 import DiscoverGemsModal, { GEMS_RESUME_KEY } from "../components/DiscoverGemsModal";
-import HomeFeed, { FeedUserFilter } from "../components/HomeFeed";
-import { STORE_COLORS, freeEndsLabel } from "../components/FreeGameBanner";
+import Section from "../components/home/Rail";
+import NowPlayingCard from "../components/home/NowPlayingCard";
+import AnticipatedCard from "../components/home/AnticipatedCard";
+import EventCard from "../components/home/EventCard";
+import HoursModal from "../components/home/HoursModal";
+import OstRail from "../components/home/OstRail";
+import RadarStrip from "../components/home/RadarStrip";
+import ActivityPeek from "../components/home/ActivityPeek";
+import { MotStrip, TonightCard, WeekStrip } from "../components/home/Strips";
+import { CircleTile, FreeCard, GameTile } from "../components/home/Tiles";
+import { useGameBackdrops } from "../lib/backdrops";
+import {
+  dustyGames,
+  greeting,
+  lovedPoolSize,
+  lovedSeed,
+  nowPlaying,
+  sinceLabel,
+  todayLabel,
+  todayReleasesPath,
+  tonightPick,
+  weekRecap,
+} from "../lib/home";
+import { countdown, needsTicker, shortDate, useSecondsTicker } from "../lib/homeEvents";
+
+// ======================================================================
+//  L'accueil
+// ======================================================================
+// ⚠️ CE N'EST PAS UNE VITRINE, C'EST UN POINT DE REPRISE. La version
+// précédente ouvrait sur un fil d'actualité — ce que les AUTRES ont fait —
+// flanqué d'une colonne de dix widgets de découverte. On ouvrait donc le site
+// sur ce qui concerne le moins le joueur qui le lance, et le fil avait entre
+// temps gagné sa propre page (l'onglet Activité), où il vit beaucoup mieux :
+// avec ses cartes, ses images, ses commentaires et son défilement infini.
+//
+// La page part maintenant de SA bibliothèque, et descend par cercles
+// concentriques — la même progression que l'accueil du téléphone, dont elle
+// reprend les rayons un à un :
+//
+//   1. ce qu'il joue en ce moment, avec les deux gestes du soir (+ des heures,
+//      « terminé ») à portée de souris, sans ouvrir de fiche ;
+//   2. ce qu'il a fait de sa semaine, en jaquettes ;
+//   3. ce qui arrive — Directs et showcases, avec leur compte à rebours ;
+//   4. ce qui sort AUJOURD'HUI, du plus attendu au moins attendu ;
+//   5. ce qu'il attend déjà, croisé avec le calendrier (« sur ton radar ») ;
+//   6. les sorties les plus attendues, avec leur compte à rebours, le signet
+//      pour les mettre de côté et les visages de ceux qui les guettent aussi ;
+//   7. le mot du jour — le rendez-vous quotidien ;
+//   8. « tu joues à quoi ce soir ? », une proposition et un dé ;
+//   9. ce qu'il a laissé en plan ;
+//  10. le monde extérieur : les jeux offerts, ce que joue son cercle, ceux du
+//      moment, ceux qui pourraient lui plaire, l'indé, les OST ;
+//  11. « parce que tu as adoré … », la recommandation la plus lointaine de ce
+//      qu'on est venu faire, donc l'avant-dernière ;
+//  12. et tout en bas, cinq lignes de ce que font les autres, avec le chemin
+//      vers le fil complet.
+//
+// Chaque rayon disparaît quand il n'a rien à dire. Une bibliothèque vide ouvre
+// donc sur une invitation à ajouter un jeu, puis sur les rayons publics — et
+// l'accueil se remplit à mesure qu'on s'en sert.
 
 // Réglages par défaut du feed documentaire, persistés en localStorage.
 const PREFS_KEY = "mpl_doc_prefs";
@@ -52,77 +92,85 @@ function loadPrefs() {
   return DEFAULT_PREFS;
 }
 
-// Sous ce seuil, la page n'a plus qu'une colonne : le rail de découverte
-// passerait SOUS le fil, donc hors de portée (le fil est infini, et chaque
-// paquet chargé le repoussait plus bas). On bascule alors en deux onglets.
-// Même valeur que la bascule une colonne du CSS (app-06-home.css) : les deux
-// doivent changer ensemble.
-const COMPACT_QUERY = "(max-width: 1240px)";
-
-// "12 juil." — date courte FR pour les sorties.
-function shortDate(ts) {
-  if (!ts) return "";
-  return new Date(ts * 1000).toLocaleDateString("fr-FR", {
-    day: "numeric",
-    month: "short",
-  });
-}
+// L'accueil ne montre que ce qui SE REGARDE. Les salons (gamescom, TGS) sont
+// dans le calendrier complet : ils durent quatre jours et se visitent, ils n'ont
+// rien à faire dans un rail de comptes à rebours.
+const EVENTS_PATH = "/events/upcoming?kind=showcase&limit=8";
 
 export default function Welcome() {
   const { user, token } = useAuth();
+  const { upsertLocal, removeLocal } = useLibrary();
+
+  const [library, setLibrary] = useState([]);
+  const [discover, setDiscover] = useState(null);
+  const [free, setFree] = useState([]);
+  const [mot, setMot] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [circle, setCircle] = useState([]);
+  const [today, setToday] = useState([]);
+  // Qui, parmi les gens qu'on suit, attend quoi. Une seule requête pour tout le
+  // monde, et AUCUN appel IGDB — le serveur ne croise que des listes d'envies.
+  const [awaitedBy, setAwaitedBy] = useState([]);
+  const [similar, setSimilar] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Le jeu dont une écriture est en vol, pour que son bouton dise qu'il
+  // travaille au lieu de rester inerte.
+  const [busyId, setBusyId] = useState(null);
+  const [hoursFor, setHoursFor] = useState(null);
+  // Le coup de dé. Il ne change QUE la proposition du soir : le reste de la
+  // page n'a aucune raison de bouger parce qu'on cherche quoi lancer.
+  const [reroll, setReroll] = useState(0);
+  // Le cran du rayon « parce que tu as adoré » : le bouton d'actualisation
+  // avance d'un jeu dans la liste, sans changer la règle du jour.
+  const [lovedShift, setLovedShift] = useState(0);
+
+  // Les trois portes de côté, gardées de l'ancienne colonne de droite.
   const [prefs, setPrefs] = useState(loadPrefs);
   const [showDoc, setShowDoc] = useState(false);
-  // Rouvre le deck de pépites là où on l'avait laissé si on revient d'une
-  // fiche de jeu ouverte depuis le deck (état sauvé en sessionStorage).
+  const [showSettings, setShowSettings] = useState(false);
   const [showGems, setShowGems] = useState(
     () => !!sessionStorage.getItem(GEMS_RESUME_KEY)
   );
-  const [showSettings, setShowSettings] = useState(false);
-  const [discover, setDiscover] = useState(null);
-  // Filtre du fil : id du joueur suivi dont on veut voir l'activité (null = tous).
-  const [feedUser, setFeedUser] = useState(null);
   const settingsRef = useRef(null);
-  const railRef = useFollowingRail();
   useClickOutside(settingsRef, () => setShowSettings(false), showSettings);
 
-  // --- Une colonne = deux onglets ---
-  // Les deux panneaux restent MONTÉS (le CSS n'en cache qu'un) : revenir sur le
-  // fil ne relance ni sa requête ni sa pagination. On mémorise en revanche la
-  // position de défilement de chacun, sinon on retomberait au hasard dans un
-  // fil dont la hauteur a été rétablie entre-temps.
-  const compact = useMediaQuery(COMPACT_QUERY);
-  const [tab, setTab] = useState("feed");
-  const scrollMemo = useRef({ feed: 0, discover: 0 });
-  // Restaurer la position n'a de sens qu'après un VRAI changement d'onglet :
-  // au montage, on laisse la page où le navigateur l'a mise.
-  const switched = useRef(false);
-
-  const pickTab = useCallback((next) => {
-    setTab((cur) => {
-      if (cur === next) return cur;
-      scrollMemo.current[cur] = window.scrollY;
-      switched.current = true;
-      return next;
-    });
-  }, []);
-
+  // ------------------------------------------------------------------
+  //  Le chargement
+  // ------------------------------------------------------------------
+  // Les huit sources partent ENSEMBLE. `allSettled` fait qu'un service en panne
+  // (IGDB, Gemini) n'efface pas l'accueil entier — son rayon disparaît, le
+  // reste s'affiche.
   useEffect(() => {
-    if (!compact || !switched.current) return;
-    switched.current = false;
-    // Le panneau qui réapparaît (fil virtualisé) ne retrouve sa hauteur qu'au
-    // passage de layout suivant : restaurer tout de suite serait borné à zéro.
-    const id = requestAnimationFrame(() =>
-      window.scrollTo(0, scrollMemo.current[tab] || 0)
-    );
-    return () => cancelAnimationFrame(id);
-  }, [tab, compact]);
+    if (!token) return undefined;
+    let alive = true;
 
-  // Swipe horizontal entre les deux onglets (le hook ignore déjà les gestes
-  // partis d'un carrousel ou d'une modale).
-  const swipe = useTabSwipe({
-    onNext: () => pickTab("discover"),
-    onPrev: () => pickTab("feed"),
-  });
+    Promise.allSettled([
+      apiFetch("/library", { token }),
+      apiFetch("/feed/discover", { token }),
+      apiFetch("/free-games", { token }),
+      apiFetch("/mot/today", { token }),
+      apiFetch(EVENTS_PATH, { token }),
+      apiFetch("/feed/circle", { token }),
+      apiFetch("/games/releases/awaited", { token }),
+      apiFetch(todayReleasesPath(), { token }),
+    ]).then(([lib, disc, fg, m, evs, circ, awa, rel]) => {
+      if (!alive) return;
+      if (lib.status === "fulfilled") setLibrary(lib.value.entries || []);
+      if (disc.status === "fulfilled") setDiscover(disc.value);
+      if (fg.status === "fulfilled") setFree(fg.value.games || []);
+      if (m.status === "fulfilled") setMot(m.value);
+      if (evs.status === "fulfilled") setEvents(evs.value.events || []);
+      if (circ.status === "fulfilled") setCircle(circ.value.items || []);
+      if (awa.status === "fulfilled") setAwaitedBy(awa.value.games || []);
+      if (rel.status === "fulfilled") setToday(rel.value.games || []);
+      setLoading(false);
+    });
+
+    return () => {
+      alive = false;
+    };
+  }, [token]);
 
   // Le CTA « Chercher mes pépites aussi » des cartes du fil ouvre la modale.
   useEffect(() => {
@@ -131,943 +179,640 @@ export default function Welcome() {
     return () => window.removeEventListener("mpl:open-gems", open);
   }, []);
 
-  useEffect(() => {
-    let alive = true;
-    apiFetch("/feed/discover", { token })
-      .then((d) => alive && setDiscover(d))
-      .catch(() => alive && setDiscover({ hot: [], upcoming: [], forYou: [] }));
-    return () => {
-      alive = false;
-    };
-  }, [token]);
-
   function savePrefs(next) {
     setPrefs(next);
     localStorage.setItem(PREFS_KEY, JSON.stringify(next));
   }
 
-  function toggleEn() {
-    const hasEn = prefs.lang.includes("en");
-    savePrefs({ ...prefs, lang: hasEn ? ["fr"] : ["fr", "en"] });
+  // ------------------------------------------------------------------
+  //  Les lectures de la bibliothèque
+  // ------------------------------------------------------------------
+  const playing = useMemo(() => nowPlaying(library), [library]);
+  const dusty = useMemo(() => dustyGames(library), [library]);
+  const pick = useMemo(() => tonightPick(library, reroll), [library, reroll]);
+  const loved = useMemo(() => lovedSeed(library, Date.now(), lovedShift), [library, lovedShift]);
+  const lovedCount = useMemo(() => lovedPoolSize(library), [library]);
+  const recap = useMemo(() => weekRecap(library), [library]);
+  const owned = useMemo(() => new Set(library.map((e) => String(e.gameId))), [library]);
+  const wishlist = useMemo(
+    () => new Set(library.filter((e) => e.status === "wishlist").map((e) => String(e.gameId))),
+    [library]
+  );
+  const wishIds = useMemo(() => [...wishlist], [wishlist]);
+
+  // Une seule horloge pour toute la page, et seulement si au moins une carte
+  // affiche vraiment des secondes.
+  const tick = useSecondsTicker(useMemo(() => needsTicker(events), [events]));
+
+  // ⚠️ CE QUI EST FINI PASSE DERRIÈRE, MAIS NE DISPARAÎT PAS. Le serveur rend
+  // les rendez-vous du jour même une fois passés — c'est justement l'heure où
+  // l'on vient voir ce qui a été annoncé — et il les rend en tête, puisqu'il
+  // trie par date. Un rail qui s'ouvre sur une émission terminée fait douter de
+  // tout le reste : on la garde, marquée TERMINÉ, mais à la fin.
+  const sortedEvents = useMemo(() => {
+    const now = Date.now();
+    return [...events].sort(
+      (a, b) => Number(countdown(a, now).over) - Number(countdown(b, now).over)
+    );
+  }, [events]);
+
+  // ⚠️ ON NE GARDE QUE LES DATES AU JOUR PRÈS. Quand IGDB ne connaît que le MOIS
+  // de sortie, il date le jeu au dernier jour de ce mois : un 30 ou un 31,
+  // « sorties du jour » se remplirait de jeux qui ne sortent pas aujourd'hui.
+  const todayOut = useMemo(
+    () =>
+      (today || [])
+        .filter((g) => g.precision === "day")
+        .sort((a, b) => (b.hypes || 0) - (a.hypes || 0))
+        .slice(0, 16),
+    [today]
+  );
+
+  // ⚠️ LES DATÉS D'ABORD, ET SEULEMENT CEUX D'UN HORIZON RAISONNABLE. IGDB
+  // laisse passer des jeux datés au 31 décembre d'une année lointaine — un
+  // compte à rebours de 400 jours ne fait envie à personne.
+  //
+  // ⚠️ PUIS LES SANS-DATE, ET ILS ONT LEUR PLACE ICI : un jeu annoncé à un
+  // showcase n'a pas de date le jour de son annonce, c'est-à-dire le jour où on
+  // l'attend le plus fort.
+  const awaited = useMemo(() => {
+    const now = Date.now() / 1000;
+    const horizon = now + 400 * 86400;
+    const dated = (discover?.upcoming || []).filter(
+      (g) => g.releaseDate && g.releaseDate > now && g.releaseDate < horizon
+    );
+    const undated = (discover?.upcomingUndated || []).filter((g) => !g.releaseDate);
+    return [...dated, ...undated].slice(0, 14);
+  }, [discover]);
+
+  // Les visages, rangés par jeu : le composant ne doit pas fouiller un tableau
+  // à chaque rendu de chaque carte.
+  const awaitedFaces = useMemo(() => {
+    const map = new Map();
+    for (const row of awaitedBy) map.set(String(row.gameId), row.users || []);
+    return map;
+  }, [awaitedBy]);
+
+  // Les décors des jeux en cours ET des sorties attendues, demandés en UNE
+  // requête groupée.
+  const backdrops = useGameBackdrops(
+    useMemo(
+      () => [...playing.map((e) => e.gameId), ...awaited.map((g) => g.id)],
+      [playing, awaited]
+    ),
+    token
+  );
+
+  // « Parce que tu as adoré … ». On passe par la fiche complète du jeu adoré :
+  // c'est elle qui porte les jeux voisins selon IGDB, et la demander ici
+  // réchauffe au passage la page de ce jeu-là.
+  const lovedId = loved?.gameId;
+  useEffect(() => {
+    if (!lovedId) {
+      setSimilar([]);
+      return undefined;
+    }
+    let alive = true;
+    apiFetch(`/games/${lovedId}/full`, { token })
+      .then((d) => {
+        if (alive)
+          setSimilar((d?.similar || []).filter((g) => !owned.has(String(g.id))).slice(0, 14));
+      })
+      .catch(() => {
+        // Pas de voisins, pas de rayon : mieux que six cadres vides.
+        if (alive) setSimilar([]);
+      });
+    return () => {
+      alive = false;
+    };
+    // `owned` est volontairement hors dépendances : il change à chaque écriture
+    // dans la bibliothèque, et relancer la requête pour retirer une jaquette du
+    // rayon coûterait plus que de la laisser jusqu'au prochain passage.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lovedId, token]);
+
+  // ------------------------------------------------------------------
+  //  Écrire dans la bibliothèque, depuis l'accueil
+  // ------------------------------------------------------------------
+  /**
+   * Un champ de suivi modifié, tout de suite à l'écran.
+   *
+   * ⚠️ ON PEINT AVANT DE DEMANDER. Marquer un jeu terminé fait partir sa carte
+   * du haut de la page : attendre l'aller-retour serveur pour ça, c'est une
+   * demi-seconde pendant laquelle le clic n'a servi à rien et où l'on
+   * re-clique. En cas d'échec on remet la carte comme elle était — le seul cas
+   * où l'écran recule, et il est rare.
+   */
+  const patch = useCallback(
+    async (entry, body) => {
+      const next = { ...entry, ...body, updatedAt: new Date().toISOString() };
+      setBusyId(entry.gameId);
+      setLibrary((prev) => prev.map((e) => (e.gameId === entry.gameId ? next : e)));
+      // Le reste du site lit la carte légère du contexte : la tenir à jour
+      // évite qu'une fiche ouverte juste après affiche l'ancien statut.
+      upsertLocal(entry.gameId, { status: next.status, favorite: !!next.favorite });
+      try {
+        await apiFetch(`/library/${entry.gameId}`, {
+          method: "PUT",
+          token,
+          // Le nom est exigé à la création d'une entrée ; il ne coûte rien sur
+          // une mise à jour et évite d'avoir à savoir laquelle des deux c'est.
+          body: { name: entry.name, cover: entry.cover ?? null, ...body },
+        });
+      } catch {
+        setLibrary((prev) => prev.map((e) => (e.gameId === entry.gameId ? entry : e)));
+        upsertLocal(entry.gameId, { status: entry.status, favorite: !!entry.favorite });
+      }
+      setBusyId(null);
+    },
+    [token, upsertLocal]
+  );
+
+  const finish = useCallback(
+    (entry) =>
+      patch(entry, {
+        status: "finished",
+        // Une date de fin qu'on n'a pas saisie vaut mieux que pas de date : le
+        // profil range les jeux terminés par là, et « aujourd'hui » est vrai
+        // dans l'écrasante majorité des cas où l'on appuie sur ce bouton.
+        ...(entry.finishedAt ? null : { finishedAt: new Date().toISOString() }),
+      }),
+    [patch]
+  );
+
+  /**
+   * « Ça m'intéresse », sur un rendez-vous à venir.
+   *
+   * ⚠️ ON ENVOIE L'ÉTAT VOULU, PAS « INVERSE ». Deux clics rapides envoient
+   * `true` puis `false` : quel que soit l'ordre d'arrivée des réponses, le
+   * serveur finit sur ce qu'on voit.
+   */
+  const toggleInterest = useCallback(
+    async (event, want) => {
+      const before = event.interested;
+      const paint = (on, count) =>
+        setEvents((prev) =>
+          prev.map((e) =>
+            e.id === event.id ? { ...e, interested: on, interestedCount: count } : e
+          )
+        );
+      paint(want, Math.max(0, (event.interestedCount || 0) + (want ? 1 : -1)));
+      try {
+        const res = await apiFetch(`/events/${event.id}/interest`, {
+          method: "POST",
+          token,
+          body: { interested: want },
+        });
+        // Le serveur fait autorité sur le COMPTE : d'autres ont pu cocher
+        // pendant ce temps, et notre + 1 local ne le savait pas.
+        paint(res.interested, res.interestedCount ?? 0);
+      } catch {
+        paint(before, event.interestedCount || 0);
+      }
+    },
+    [token]
+  );
+
+  /**
+   * Le signet d'une sortie attendue.
+   *
+   * ⚠️ CE N'EST PAS `patch`. Celui-ci modifie une entrée QUI EXISTE ; ici le jeu
+   * n'est en général pas encore dans la bibliothèque, et c'est justement ce
+   * qu'on est en train de changer. Un `PUT` crée l'entrée au besoin, un `DELETE`
+   * la retire entièrement — parce qu'un jeu retiré des envies n'a aucune autre
+   * raison de rester.
+   */
+  const toggleWish = useCallback(
+    async (game, want) => {
+      const gameId = game.id;
+      const before = library;
+      setLibrary((prev) =>
+        want
+          ? [
+              {
+                gameId,
+                name: game.name,
+                cover: game.cover,
+                status: "wishlist",
+                updatedAt: new Date().toISOString(),
+              },
+              ...prev.filter((e) => e.gameId !== gameId),
+            ]
+          : prev.filter((e) => e.gameId !== gameId)
+      );
+      if (want) upsertLocal(gameId, { status: "wishlist" });
+      else removeLocal(gameId);
+      try {
+        if (want) {
+          await apiFetch(`/library/${gameId}`, {
+            method: "PUT",
+            token,
+            body: { name: game.name, cover: game.cover || null, status: "wishlist" },
+          });
+        } else {
+          await apiFetch(`/library/${gameId}`, { method: "DELETE", token });
+        }
+      } catch {
+        setLibrary(before);
+      }
+    },
+    [library, token, upsertLocal, removeLocal]
+  );
+
+  if (loading) {
+    return (
+      <div className="mh-loading">
+        <Loader2 size={26} className="spin" />
+      </div>
+    );
   }
 
-  const panelProps = (name) =>
-    compact
-      ? { role: "tabpanel", id: `hf-panel-${name}`, "aria-labelledby": `hf-tab-${name}` }
-      : {};
+  const hot = discover?.hot || [];
+  const forYou = discover?.forYou || [];
+  const indies = discover?.indies || [];
+  const now = Date.now() / 1000;
 
   return (
-    // `data-tab` pilote l'affichage des deux panneaux : sous 1240 px le CSS en
-    // masque un, au-dessus il les remet côte à côte et l'attribut ne sert plus.
-    <div className="home" data-tab={tab} {...(compact ? swipe : null)}>
-      {/* Colonne de gauche : le salut coiffe les deux onglets, donc il vit ici
-          plutôt que dans le panneau du fil. Ce regroupement est aussi ce qui
-          garde la grille sur UNE ligne (voir app-06-home.css). */}
-      <div className="home-col">
-        {/* --- En-tête : juste le salut. Points, mini-jeux, classements et
-            curseurs vivent désormais sur la page /arcade. --- */}
-        <header className="hf-hero">
-          <div className="hf-hello">
-            <h1 className="hf-hello-title">
-              Salut <span className="grad-text">{user?.username}</span>
-            </h1>
-            <p className="hf-hello-sub">
-              Voici ce qui se passe sur ton radar à jeux.
-            </p>
+    <div className="mh">
+      {/* --- L'en-tête. Deux lignes, pas plus : le nom de qui regarde, la date
+          du jour, et les deux gestes qu'on vient faire sans avoir rien lu. --- */}
+      <header className="mh-hero">
+        <div className="mh-hero-txt">
+          <h1 className="mh-hero-title">
+            {greeting()} <span className="grad-text">{user?.username}</span>
+          </h1>
+          <p className="mh-hero-sub">{todayLabel()}</p>
+        </div>
+        <div className="mh-hero-acts">
+          <Link to="/explore" className="mh-pill ghost clickable">
+            <Compass size={15} /> Explorer
+          </Link>
+          <Link to="/explore" className="mh-pill gold solid clickable">
+            <Plus size={15} /> Ajouter un jeu
+          </Link>
+        </div>
+      </header>
+
+      {/* --- 1. Tes jeux en cours ------------------------------------- */}
+      {playing.length > 0 ? (
+        <Section
+          kicker="Tu joues à"
+          title={
+            playing.length > 1 ? `${playing.length} parties en cours` : "Ta partie en cours"
+          }
+          className="mh-sec-np"
+          snap
+        >
+          {playing.map((e) => (
+            <NowPlayingCard
+              key={e.gameId}
+              entry={e}
+              backdrop={backdrops[String(e.gameId)]}
+              busy={busyId === e.gameId}
+              onHours={() => setHoursFor(e)}
+              onFinish={() => finish(e)}
+              onPause={() => patch(e, { status: "paused" })}
+              onDrop={() => patch(e, { status: "dropped" })}
+              onFavorite={(want) => patch(e, { favorite: want })}
+            />
+          ))}
+        </Section>
+      ) : (
+        <Link to="/explore" className="mh-empty clickable">
+          <span className="mh-empty-ic">
+            <Plus size={22} strokeWidth={2.8} />
+          </span>
+          <span className="mh-empty-txt">
+            <b>Aucune partie en cours</b>
+            <i>Ajoute un jeu à ta bibliothèque et il s'installera ici.</i>
+          </span>
+        </Link>
+      )}
+
+      {/* --- 2. Ce qu'on a fait de sa semaine -------------------------- */}
+      <WeekStrip recap={recap} />
+
+      {/* --- 3. Ce qui arrive ----------------------------------------- */}
+      {sortedEvents.length > 0 && (
+        <Section
+          kicker="Ce qui arrive"
+          title="Directs et showcases"
+          hint="Les rendez-vous à ne pas manquer"
+        >
+          {sortedEvents.map((ev) => (
+            <EventCard
+              key={ev.id}
+              event={ev}
+              now={tick}
+              onToggleInterest={(want) => toggleInterest(ev, want)}
+            />
+          ))}
+        </Section>
+      )}
+
+      {/* --- 4. Sorties du jour --------------------------------------- */}
+      {todayOut.length > 0 && (
+        <Section
+          kicker="Aujourd'hui"
+          title="Ça sort maintenant"
+          hint="Les sorties du jour, du plus attendu au moins attendu"
+          moreTo="/releases"
+          moreLabel="Calendrier"
+        >
+          {todayOut.map((g) => (
+            <GameTile key={g.id} game={g} sub={g.platforms?.[0] || null} />
+          ))}
+        </Section>
+      )}
+
+      {/* --- 5. Sur ton radar (mes envies × le calendrier) ------------- */}
+      <RadarStrip wishIds={wishIds} token={token} />
+
+      {/* --- 6. Les plus attendus ------------------------------------- */}
+      {awaited.length > 0 && (
+        <Section
+          kicker="Compte à rebours"
+          title="Les plus attendus"
+          hint="Mets-les de côté, tu seras prévenu"
+        >
+          {awaited.map((g) => (
+            <AnticipatedCard
+              key={g.id}
+              game={g}
+              backdrop={backdrops[String(g.id)]}
+              now={tick}
+              wished={wishlist.has(String(g.id))}
+              friends={awaitedFaces.get(String(g.id)) || []}
+              onToggleWish={(want) => toggleWish(g, want)}
+            />
+          ))}
+        </Section>
+      )}
+
+      {/* --- 7. Le rendez-vous du jour -------------------------------- */}
+      {!!mot && <MotStrip mot={mot} />}
+
+      {/* --- 8. Quoi jouer ce soir ------------------------------------ */}
+      {!!pick && (
+        <section className="mh-sec">
+          <div className="mh-head">
+            <div className="mh-head-main">
+              <span className="mh-head-text">
+                <span className="mh-kicker">Ce soir</span>
+                <span className="mh-head-title">Tu joues à quoi ?</span>
+                <span className="mh-head-hint">Une proposition, tirée de ce qui t'attend</span>
+              </span>
+            </div>
           </div>
-        </header>
+          <TonightCard
+            entry={pick}
+            busy={busyId === pick.gameId}
+            onStart={() => patch(pick, { status: "playing" })}
+            onReroll={() => setReroll((n) => n + 1)}
+          />
+        </section>
+      )}
 
-        {compact && (
-          <nav className="hf-tabs" role="tablist" aria-label="Sections de l'accueil">
-            <span className="hf-tabs-ink" aria-hidden="true" />
-            <button
-              id="hf-tab-feed"
-              className={`hf-tab clickable ${tab === "feed" ? "on" : ""}`}
-              role="tab"
-              aria-selected={tab === "feed"}
-              aria-controls="hf-panel-feed"
-              onClick={() => pickTab("feed")}
-            >
-              <Rss size={15} /> Fil
-            </button>
-            <button
-              id="hf-tab-discover"
-              className={`hf-tab clickable ${tab === "discover" ? "on" : ""}`}
-              role="tab"
-              aria-selected={tab === "discover"}
-              aria-controls="hf-panel-discover"
-              onClick={() => pickTab("discover")}
-            >
-              <Compass size={15} /> Découvrir
-            </button>
-          </nav>
-        )}
+      {/* --- 9. Le placard -------------------------------------------- */}
+      {dusty.length > 0 && (
+        <Section
+          kicker="Le placard"
+          title="Tu les avais commencés"
+          hint="Plus touchés depuis un moment"
+        >
+          {dusty.map((e) => (
+            <GameTile key={e.gameId} game={e} sub={sinceLabel(e.updatedAt)} />
+          ))}
+        </Section>
+      )}
 
-        <div className="home-main" {...panelProps("feed")}>
-          {/* --- Fil d'actualité --- */}
-          <section className="hf-sec">
-            <div className="hf-sec-head">
-              <h2 className="hf-sec-title">
-                <Sparkles size={17} /> Fil d'actualité
-              </h2>
-              {/* Avatars des joueurs suivis : filtre le fil sur un seul joueur */}
-              <FeedUserFilter
-                token={token}
-                myId={user?.id}
-                value={feedUser}
-                onChange={setFeedUser}
+      {/* --- 10. Le monde extérieur ----------------------------------- */}
+      {free.length > 0 && (
+        <Section
+          kicker="À récupérer"
+          title="Gratuit en ce moment"
+          hint={`${free.length} offre${free.length > 1 ? "s" : ""} · Epic · Steam · GOG · Prime…`}
+        >
+          {free.map((g) => (
+            <FreeCard key={g.id} game={g} />
+          ))}
+        </Section>
+      )}
+
+      {/* Le seul rail de l'accueil qui parle de GENS. Il se retire tout seul
+          quand on ne suit personne : « ce que jouent tes abonnements » rempli
+          d'inconnus serait un mensonge. */}
+      {circle.length > 0 && (
+        <Section
+          kicker="Ton cercle"
+          title="Ils y jouent en ce moment"
+          hint="Les parties en cours des joueurs que tu suis"
+          moreTo="/activity"
+          moreLabel="L'activité"
+        >
+          {circle.slice(0, 14).map((g) => (
+            <CircleTile key={g.id} game={g} />
+          ))}
+        </Section>
+      )}
+
+      {hot.length > 0 && (
+        <Section
+          kicker="En ce moment"
+          title="Les jeux du moment"
+          moreTo="/explore"
+          moreLabel="Explorer"
+        >
+          {hot.slice(0, 14).map((g) => (
+            <GameTile
+              key={g.id}
+              game={g}
+              sub={g.rating ? `${g.rating} %` : null}
+              subGold={!!g.rating && g.rating >= 85}
+            />
+          ))}
+        </Section>
+      )}
+
+      {forYou.length > 0 && (
+        <Section
+          kicker="Pour toi"
+          title="Ça devrait te plaire"
+          hint="Selon les genres de ta bibliothèque"
+        >
+          {forYou.slice(0, 14).map((g) => (
+            <GameTile key={g.id} game={g} sub={g.year ? String(g.year) : null} />
+          ))}
+        </Section>
+      )}
+
+      {indies.length > 0 && (
+        <Section
+          kicker="Hors des radars"
+          title="Sorties indés"
+          hint="Le meilleur de l'indé, juste sorti ou tout proche"
+          moreTo="/explore?gen=32"
+          moreLabel="Explorer"
+        >
+          {indies.slice(0, 14).map((g) => {
+            const soon = g.releaseDate && g.releaseDate > now;
+            return (
+              <GameTile
+                key={g.id}
+                game={g}
+                badge={
+                  g.releaseDate
+                    ? soon
+                      ? `J-${Math.ceil((g.releaseDate - now) / 86400)}`
+                      : shortDate(g.releaseDate)
+                    : null
+                }
               />
-            </div>
-            <HomeFeed token={token} me={user?.username} filterUser={feedUser} />
-          </section>
-        </div>
-      </div>
+            );
+          })}
+        </Section>
+      )}
 
-      {/* --- Rail de droite : classement en tête, puis découverte ---
-          Suit le scroll de la page et se fige sur son dernier widget
-          (voir useFollowingRail). En une colonne, c'est l'onglet Découvrir. */}
-      <div className="home-aside" {...panelProps("discover")}>
-        <div className="hf-rail" ref={railRef}>
-          {/* Porte d'entrée de l'arcade : le solde et un lien, rien de plus —
-              les classements et la collection vivent sur /arcade. */}
-          <ArcadeTeaser points={user?.points} />
+      <OstRail token={token} />
 
-          {/* Documentaire : juste sous le classement, avec ses réglages. */}
-          <div className="doc-cta">
-            <button className="doc-cta-btn clickable" onClick={() => setShowDoc(true)}>
-              <Clapperboard size={19} /> Lancer un documentaire
-            </button>
-            <div className="doc-cta-settings" ref={settingsRef}>
-              <button
-                className={`doc-cta-gear clickable ${showSettings ? "active" : ""}`}
-                onClick={() => setShowSettings((v) => !v)}
-                aria-label="Réglages du feed"
-                title="Réglages"
-              >
-                <Settings size={18} />
-              </button>
-              {showSettings && (
-                <div className="doc-settings card">
-                  <div className="doc-settings-group">
-                    <span className="doc-settings-label">Langue</span>
-                    <label className="doc-settings-opt disabled">
-                      <span className="doc-check on">
-                        <Check size={13} />
-                      </span>
-                      Français
-                    </label>
-                    <label className="doc-settings-opt clickable" onClick={toggleEn}>
-                      <span className={`doc-check ${prefs.lang.includes("en") ? "on" : ""}`}>
-                        {prefs.lang.includes("en") && <Check size={13} />}
-                      </span>
-                      Anglais
-                    </label>
-                  </div>
-                  <div className="doc-settings-group">
-                    <span className="doc-settings-label">Jeux</span>
-                    <label
-                      className="doc-settings-opt clickable"
-                      onClick={() => savePrefs({ ...prefs, scope: "played" })}
-                    >
-                      <span className={`doc-radio ${prefs.scope === "played" ? "on" : ""}`} />
-                      Jeux joués uniquement
-                    </label>
-                    <label
-                      className="doc-settings-opt clickable"
-                      onClick={() => savePrefs({ ...prefs, scope: "all" })}
-                    >
-                      <span className={`doc-radio ${prefs.scope === "all" ? "on" : ""}`} />
-                      Tous mes jeux
-                    </label>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+      {/* --- 11. Parce que tu as adoré … (le fond du rayon) ------------ */}
+      {similar.length > 0 && !!loved && (
+        <Section
+          kicker="Parce que tu as adoré"
+          title={loved.name}
+          hint="Des jeux de la même famille"
+          cover={loved.cover}
+          titleTo={`/game/${loved.gameId}`}
+          onRefresh={lovedCount > 1 ? () => setLovedShift((n) => n + 1) : null}
+          refreshLabel="Un autre de mes coups de cœur"
+        >
+          {similar.map((g) => (
+            <GameTile
+              key={g.id}
+              game={g}
+              sub={g.rating ? `${g.rating} %` : null}
+              subGold={!!g.rating && g.rating >= 85}
+            />
+          ))}
+        </Section>
+      )}
 
-          {/* Radar wishlist : jeux voulus déjà sortis / sorties imminentes */}
-          <WishlistRadar token={token} />
-
-          <FreeGamesWidget token={token} />
-          <UpcomingWidget games={discover?.upcoming} loading={discover === null} />
-          <HotGamesWidget games={discover?.hot} loading={discover === null} />
-
-          {/* La pépite indé ouvre le deck : juste avant « Pour toi », les deux
-              répondent à la même envie (« qu'est-ce que je joue ensuite ? »). */}
-          <button
-            className="hf-gems-btn rail clickable"
-            onClick={() => setShowGems(true)}
-            title="3 jeux que tu aimes → des pépites indés sur mesure"
-          >
-            <Sparkles size={18} /> Découvrir une pépite indé
+      {/* --- Les portes de côté ---------------------------------------
+          Trois envies qui ne sont pas des jeux à ouvrir : regarder un
+          documentaire, se faire sortir une pépite indé, aller jouer à l'arcade.
+          Elles vivaient dans la colonne de droite ; elles tiennent très bien en
+          une rangée, juste avant le fil. */}
+      <section className="mh-doors">
+        <div className="mh-door doc">
+          <button className="mh-door-main clickable" onClick={() => setShowDoc(true)}>
+            <span className="mh-door-ic">
+              <Clapperboard size={20} />
+            </span>
+            <span className="mh-door-txt">
+              <b>Lancer un documentaire</b>
+              <i>Sur les jeux que tu as joués</i>
+            </span>
           </button>
-
-          <ForYouWidget games={discover?.forYou} loading={discover === null} />
-          <IndieReleasesWidget games={discover?.indies} loading={discover === null} />
-          <RecentOstWidget token={token} />
+          <div className="mh-door-gear" ref={settingsRef}>
+            <button
+              className={`mh-round small clickable ${showSettings ? "on" : ""}`}
+              onClick={() => setShowSettings((v) => !v)}
+              aria-label="Réglages du feed documentaire"
+              title="Réglages"
+            >
+              <Settings size={16} />
+            </button>
+            {showSettings && (
+              <div className="doc-settings card">
+                <div className="doc-settings-group">
+                  <span className="doc-settings-label">Langue</span>
+                  <label className="doc-settings-opt disabled">
+                    <span className="doc-check on">
+                      <Check size={13} />
+                    </span>
+                    Français
+                  </label>
+                  <label
+                    className="doc-settings-opt clickable"
+                    onClick={() =>
+                      savePrefs({
+                        ...prefs,
+                        lang: prefs.lang.includes("en") ? ["fr"] : ["fr", "en"],
+                      })
+                    }
+                  >
+                    <span className={`doc-check ${prefs.lang.includes("en") ? "on" : ""}`}>
+                      {prefs.lang.includes("en") && <Check size={13} />}
+                    </span>
+                    Anglais
+                  </label>
+                </div>
+                <div className="doc-settings-group">
+                  <span className="doc-settings-label">Jeux</span>
+                  <label
+                    className="doc-settings-opt clickable"
+                    onClick={() => savePrefs({ ...prefs, scope: "played" })}
+                  >
+                    <span className={`doc-radio ${prefs.scope === "played" ? "on" : ""}`} />
+                    Jeux joués uniquement
+                  </label>
+                  <label
+                    className="doc-settings-opt clickable"
+                    onClick={() => savePrefs({ ...prefs, scope: "all" })}
+                  >
+                    <span className={`doc-radio ${prefs.scope === "all" ? "on" : ""}`} />
+                    Tous mes jeux
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+
+        <button className="mh-door gems clickable" onClick={() => setShowGems(true)}>
+          <span className="mh-door-ic">
+            <Sparkles size={20} />
+          </span>
+          <span className="mh-door-txt">
+            <b>Découvrir une pépite indé</b>
+            <i>3 jeux que tu aimes → des pépites sur mesure</i>
+          </span>
+        </button>
+
+        <Link to="/arcade" className="mh-door arcade clickable">
+          <span className="mh-door-ic">
+            <Joystick size={20} />
+          </span>
+          <span className="mh-door-txt">
+            <b>Arcade</b>
+            <i>Mini-jeux, classements et curseurs</i>
+          </span>
+          <span className="mh-door-points">
+            <Coins size={13} />
+            {Number(user?.points || 0).toLocaleString("fr-FR")}
+          </span>
+        </Link>
+      </section>
+
+      {/* --- 12. Et pendant ce temps, les autres ----------------------- */}
+      <ActivityPeek token={token} />
+
+      {!!hoursFor && (
+        <HoursModal
+          entry={hoursFor}
+          onClose={() => setHoursFor(null)}
+          onSave={(hours) => {
+            const target = hoursFor;
+            setHoursFor(null);
+            if (target) patch(target, { playtimeHours: hours });
+          }}
+        />
+      )}
 
       {showDoc && (
         <DocumentaryModal prefs={prefs} token={token} onClose={() => setShowDoc(false)} />
       )}
-      {showGems && (
-        <DiscoverGemsModal token={token} onClose={() => setShowGems(false)} />
-      )}
+      {showGems && <DiscoverGemsModal token={token} onClose={() => setShowGems(false)} />}
     </div>
   );
 }
-
-// Tous les blocs du rail sont mémoïsés : ils ne dépendent que de props stables
-// (jeton, listes figées une fois chargées), alors que la page, elle, se re-rend
-// à chaque bascule d'onglet ou changement de filtre du fil. Sans ça, chaque
-// clic repeignait les dix widgets de découverte pour rien.
-
-// Widget « Jeux du moment » : les sorties chaudes, en jaquettes cliquables —
-// même grille sobre que « Pour toi » (pas de bouton d'ajout : dans un rail de
-// découverte, on veut ouvrir la fiche, pas remplir sa biblio en un clic).
-const HotGamesWidget = memo(function HotGamesWidget({ games, loading }) {
-  if (loading) {
-    return (
-      <div className="hf-widget card" aria-busy="true">
-        <span className="gp-skel gp-skel-bar" style={{ width: "55%" }} />
-        <div className="hf-fy-grid">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <span key={i} className="gp-skel hf-fy-skel" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-  if (!games?.length) return null;
-  return (
-    <div className="hf-widget card">
-      <div className="hf-w-head">
-        <h3 className="hf-w-title">
-          <Flame size={15} /> Jeux du moment
-        </h3>
-        <Link to="/explore" className="hf-sec-link clickable">
-          Explorer <ChevronRight size={14} />
-        </Link>
-      </div>
-      <div className="hf-fy-grid">
-        {games.slice(0, 6).map((g) => (
-          <Link
-            key={g.id}
-            to={`/game/${g.id}`}
-            className="hf-fy-item clickable"
-            title={g.name}
-          >
-            {g.cover ? (
-              <img src={g.cover} alt={g.name} loading="lazy" draggable="false" />
-            ) : (
-              <span className="hf-fy-ph">
-                <Gamepad2 size={16} />
-              </span>
-            )}
-            <span className="hf-fy-name">{g.name}</span>
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
-});
-
-// Widget « Sorties indés » : les meilleurs jeux indépendants tout juste sortis
-// ET ceux qui arrivent (genre IGDB « Indie », voir fetchIndies côté serveur).
-// Chaque jaquette porte une pastille : compte à rebours pour l'à-venir, date
-// courte pour ce qui vient de sortir.
-const IndieReleasesWidget = memo(function IndieReleasesWidget({ games, loading }) {
-  if (loading) {
-    return (
-      <div className="hf-widget card" aria-busy="true">
-        <span className="gp-skel gp-skel-bar" style={{ width: "50%" }} />
-        <div className="hf-fy-grid">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <span key={i} className="gp-skel hf-fy-skel" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-  if (!games?.length) return null;
-  const now = Date.now() / 1000;
-  return (
-    <div className="hf-widget card">
-      <div className="hf-w-head">
-        <h3 className="hf-w-title">
-          <Sprout size={15} /> Sorties indés
-        </h3>
-        <Link to="/explore?gen=32" className="hf-sec-link clickable">
-          Explorer <ChevronRight size={14} />
-        </Link>
-      </div>
-      <p className="hf-w-sub">Le meilleur de l'indé, juste sorti ou tout proche</p>
-      <div className="hf-fy-grid">
-        {games.slice(0, 6).map((g) => {
-          const soon = g.releaseDate && g.releaseDate > now;
-          const days = soon ? Math.ceil((g.releaseDate - now) / 86400) : 0;
-          return (
-            <Link
-              key={g.id}
-              to={`/game/${g.id}`}
-              className="hf-fy-item clickable"
-              title={g.name}
-            >
-              {g.cover ? (
-                <img src={g.cover} alt={g.name} loading="lazy" draggable="false" />
-              ) : (
-                <span className="hf-fy-ph">
-                  <Gamepad2 size={16} />
-                </span>
-              )}
-              {g.releaseDate && (
-                <span className={`hf-indie-tag ${soon ? "soon" : ""}`}>
-                  {soon ? `J-${days}` : shortDate(g.releaseDate)}
-                </span>
-              )}
-              <span className="hf-fy-name">{g.name}</span>
-            </Link>
-          );
-        })}
-      </div>
-    </div>
-  );
-});
-
-// Widget « Coups de cœur OST » : les dernières bandes-son mises en favori par
-// N'IMPORTE QUEL joueur. On reprend telles quelles les cards pochette + CD de
-// l'onglet OST du profil (classes .pfo-*) — le CD sort au survol et tourne à
-// la lecture, pilotée par le mini-lecteur global.
-const RecentOstWidget = memo(function RecentOstWidget({ token }) {
-  const [items, setItems] = useState(null);
-  const player = usePlayer();
-
-  useEffect(() => {
-    let alive = true;
-    apiFetch("/ost/recent?limit=4", { token })
-      .then((d) => alive && setItems(d.items || []))
-      .catch(() => alive && setItems([]));
-    return () => {
-      alive = false;
-    };
-  }, [token]);
-
-  if (items !== null && items.length === 0) return null;
-
-  // Une piste n'est jouable que si on sait en tirer une vidéo YouTube.
-  const playable = (t) => !!(t?.videoId || extractVideoId(t?.url || ""));
-  // La file de lecture = les OST affichées, chacune enrichie de son jeu (le
-  // mini-lecteur en a besoin pour son lien « voir la fiche »).
-  const withGame = (i) => ({ ...i.ost, gameId: i.gameId, gameName: i.gameName });
-
-  return (
-    <div className="hf-widget card hf-ost">
-      <div className="hf-w-head">
-        <h3 className="hf-w-title">
-          <Disc3 size={15} /> Coups de cœur OST
-        </h3>
-      </div>
-      <p className="hf-w-sub">Les dernières bandes-son adoubées par la communauté</p>
-
-      {items === null ? (
-        <div className="pfo-grid" aria-busy="true">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <span key={i} className="gp-skel hf-ost-skel" />
-          ))}
-        </div>
-      ) : (
-        <div className="pfo-grid">
-          {items.map((item) => {
-            const t = item.ost;
-            const playing = player.isPlaying(t);
-            const canPlay = playable(t);
-            return (
-              <div key={item.gameId} className={`pfo-card ${playing ? "playing" : ""}`}>
-                <div className="pfo-sleeve">
-                  <div className="pfo-cd">
-                    <div className="pfo-disc">
-                      <span className="pfo-disc-label">
-                        {t.artwork ? (
-                          <img src={t.artwork} alt="" loading="lazy" draggable="false" />
-                        ) : (
-                          <Music2 size={18} />
-                        )}
-                        <span className="pfo-disc-hole" />
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="pfo-album">
-                    {item.cover ? (
-                      <img
-                        src={item.cover}
-                        alt={item.gameName}
-                        loading="lazy"
-                        draggable="false"
-                      />
-                    ) : (
-                      <span className="pfo-album-ph">{item.gameName?.[0] || "?"}</span>
-                    )}
-                    <span className="pfo-album-mouth" />
-                  </div>
-
-                  <button
-                    className={`pfo-play clickable ${canPlay ? "" : "mute"}`}
-                    onClick={
-                      canPlay
-                        ? () => player.toggleTrack(t, items.map(withGame), {})
-                        : undefined
-                    }
-                    disabled={!canPlay}
-                    title={
-                      canPlay ? (playing ? "Pause" : "Écouter") : "Extrait indisponible"
-                    }
-                  >
-                    {playing ? (
-                      <Pause size={18} />
-                    ) : (
-                      <Play size={18} fill="currentColor" strokeWidth={0} />
-                    )}
-                  </button>
-                </div>
-
-                <div className="pfo-body">
-                  <span className="pfo-name" title={t.name}>
-                    {t.name}
-                  </span>
-                  {t.artist && (
-                    <span className="pfo-artist" title={t.artist}>
-                      {t.artist}
-                    </span>
-                  )}
-                  <div className="pfo-foot">
-                    <Link
-                      to={`/game/${item.gameId}`}
-                      className="pfo-game clickable"
-                      title={item.gameName}
-                    >
-                      <Disc3 size={13} />
-                      <span className="pfo-game-name">{item.gameName}</span>
-                    </Link>
-                    {/* Qui l'a mise en favori — le clin d'œil « communauté ». */}
-                    <Link
-                      to={`/u/${item.user.username}?tab=ost`}
-                      className="hf-ost-by clickable"
-                      title={`Choisie par ${item.user.username}`}
-                    >
-                      {item.user.avatar ? (
-                        <img src={item.user.avatar} alt="" loading="lazy" />
-                      ) : (
-                        <span className="hf-ost-by-fb">
-                          {item.user.username[0].toUpperCase()}
-                        </span>
-                      )}
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-});
-
-// --- Radar wishlist ---
-// Croise la liste « à jouer » avec les dates de sortie IGDB : les jeux voulus
-// sortis ces 30 derniers jours (toujours pas lancés) et ceux qui sortent dans
-// les 30 jours, affichés en cards directement — avec un compte à rebours en
-// direct pour la sortie la plus proche. Masqué si rien à signaler.
-const RADAR_WINDOW = 30 * 86400; // fenêtre (secondes) avant/après aujourd'hui
-
-// « il y a 5 j » — recul depuis la sortie d'un jeu déjà dispo.
-function agoDays(ts) {
-  const d = Math.max(0, Math.floor((Date.now() - ts * 1000) / 86400000));
-  if (d === 0) return "aujourd'hui";
-  if (d === 1) return "hier";
-  return `il y a ${d} j`;
-}
-
-// Compte à rebours en direct (décrémente chaque seconde) jusqu'à un timestamp
-// unix : « J-13 · 07:42:19 », puis « 07:42:19 » le jour J.
-function LiveCountdown({ ts }) {
-  const [, tick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => tick((n) => n + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  let left = Math.max(0, Math.floor(ts - Date.now() / 1000));
-  const days = Math.floor(left / 86400);
-  left -= days * 86400;
-  const two = (n) => String(n).padStart(2, "0");
-  const clock = `${two(Math.floor(left / 3600))}:${two(Math.floor((left % 3600) / 60))}:${two(left % 60)}`;
-  return (
-    <span className="hf-up-date hf-cd" title="Temps restant avant la sortie">
-      {days > 0 ? `J-${days} · ${clock}` : clock}
-    </span>
-  );
-}
-
-const WishlistRadar = memo(function WishlistRadar({ token }) {
-  const [radar, setRadar] = useState(null);
-
-  useEffect(() => {
-    if (!token) return;
-    let alive = true;
-    // 1) ids de la wishlist → 2) dates de sortie (fenêtre : -30 j → futur).
-    apiFetch("/library?status=wishlist", { token })
-      .then((d) => {
-        const ids = (d.entries || []).map((e) => e.gameId);
-        if (!ids.length) return null;
-        const from = Math.floor(Date.now() / 1000) - RADAR_WINDOW;
-        return apiFetch(`/games/releases?ids=${ids.join(",")}&from=${from}`, { token });
-      })
-      .then((d) => {
-        if (!alive || !d) return;
-        const now = Math.floor(Date.now() / 1000);
-        const soon = [];
-        const out = [];
-        for (const g of d.games || []) {
-          if (!g.releaseDate) continue;
-          if (g.releaseDate <= now) out.push(g);
-          else if (g.releaseDate <= now + RADAR_WINDOW) soon.push(g);
-        }
-        soon.sort((a, b) => a.releaseDate - b.releaseDate);
-        out.sort((a, b) => b.releaseDate - a.releaseDate);
-        setRadar({ soon, out });
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [token]);
-
-  if (!radar || (!radar.soon.length && !radar.out.length)) return null;
-  const { soon, out } = radar;
-
-  return (
-    <div className="hf-widget card hf-radar">
-      <h3 className="hf-w-title">
-        <Radar size={15} /> Sur ton radar
-      </h3>
-
-      {out.length > 0 && (
-        <>
-          <p className="hf-radar-sec gold">
-            <Gift size={12} /> Déjà dispo — toujours pas lancé…
-          </p>
-          <ul className="hf-up-list">
-            {out.slice(0, 3).map((g) => (
-              <li key={g.id}>
-                <Link to={`/game/${g.id}`} className="hf-up-row clickable" title={g.name}>
-                  {g.cover ? (
-                    <img src={g.cover} alt="" loading="lazy" draggable="false" />
-                  ) : (
-                    <span className="hf-up-ph">
-                      <Gamepad2 size={14} />
-                    </span>
-                  )}
-                  <span className="hf-up-info">
-                    <span className="hf-up-name">{g.name}</span>
-                    <span className="hf-radar-ago">sorti {agoDays(g.releaseDate)}</span>
-                  </span>
-                  <span className="hf-up-date hf-radar-out">Dispo !</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-          {out.length > 3 && (
-            <Link to="/profile?tab=allgames&st=wishlist" className="hf-radar-more clickable">
-              +{out.length - 3} autre{out.length - 3 > 1 ? "s" : ""} dans ta wishlist
-            </Link>
-          )}
-        </>
-      )}
-
-      {soon.length > 0 && (
-        <>
-          <p className="hf-radar-sec">
-            <CalendarClock size={12} /> Sorties imminentes
-          </p>
-          <ul className="hf-up-list">
-            {soon.slice(0, 4).map((g, i) => (
-              <li key={g.id}>
-                <Link to={`/game/${g.id}`} className="hf-up-row clickable" title={g.name}>
-                  {g.cover ? (
-                    <img src={g.cover} alt="" loading="lazy" draggable="false" />
-                  ) : (
-                    <span className="hf-up-ph">
-                      <Gamepad2 size={14} />
-                    </span>
-                  )}
-                  <span className="hf-up-info">
-                    <span className="hf-up-name">{g.name}</span>
-                    <span className="hf-radar-ago">{shortDate(g.releaseDate)}</span>
-                  </span>
-                  {/* La plus proche : compte à rebours en direct ; les autres : J-x */}
-                  {i === 0 ? (
-                    <LiveCountdown ts={g.releaseDate} />
-                  ) : (
-                    <span className="hf-up-date">
-                      J-{Math.ceil((g.releaseDate * 1000 - Date.now()) / 86400000)}
-                    </span>
-                  )}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-
-      <Link to="/releases?wish=1" className="hf-w-more clickable">
-        Calendrier des sorties <ChevronRight size={14} />
-      </Link>
-    </div>
-  );
-});
-
-// --- Jeux gratuits de la semaine ---
-// Giveaways de jeux à récupérer (Epic, Steam, GOG, Prime…), agrégés côté
-// serveur depuis GamerPower (/free-games). Carrousel horizontal de cards
-// paysage : image du magasin, pastille de la boutique, prix barré + « Gratuit »
-// et le temps restant avant la fin de l'offre. Section masquée si rien en cours.
-
-function FreeGameCard({ game }) {
-  const ends = freeEndsLabel(game.endsAt);
-  const color = STORE_COLORS[game.store.slug] || STORE_COLORS.pc;
-  // Le serveur rattache le giveaway à sa fiche IGDB quand il reconnaît le
-  // titre : on reste alors sur le site (la page du jeu affiche une banderole
-  // flottante pour aller le récupérer). Sinon, lien direct vers l'offre.
-  const inside = !!game.gameId;
-  const body = (
-    <>
-      <div className="hf-free-thumb">
-        {game.image ? (
-          <img src={game.image} alt="" loading="lazy" draggable="false" />
-        ) : (
-          <span className="hf-free-noimg">
-            <Gamepad2 size={24} />
-          </span>
-        )}
-        <span className="hf-free-store" style={{ background: color }}>
-          {game.store.label}
-        </span>
-        {ends && (
-          <span className={`hf-free-ends ${ends.urgent ? "urgent" : ""}`}>
-            <Clock size={11} /> {ends.text}
-          </span>
-        )}
-        <span className="hf-free-get">
-          {inside ? (
-            <>
-              <Gamepad2 size={14} /> Voir la fiche
-            </>
-          ) : (
-            <>
-              <ExternalLink size={14} /> Récupérer
-            </>
-          )}
-        </span>
-      </div>
-      <div className="hf-free-body">
-        <span className="hf-free-title">{game.title}</span>
-        <span className="hf-free-meta">
-          {game.worth && <span className="hf-free-was">{game.worth}</span>}
-          <span className="hf-free-free">
-            <Gift size={12} /> Gratuit
-          </span>
-        </span>
-      </div>
-    </>
-  );
-
-  const title = `${game.title} — gratuit sur ${game.store.label}`;
-  return inside ? (
-    <Link className="hf-free-card clickable" to={`/game/${game.gameId}`} title={title}>
-      {body}
-    </Link>
-  ) : (
-    <a
-      className="hf-free-card clickable"
-      href={game.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={title}
-    >
-      {body}
-    </a>
-  );
-}
-
-const FreeGamesWidget = memo(function FreeGamesWidget({ token }) {
-  const [games, setGames] = useState(null);
-
-  useEffect(() => {
-    let alive = true;
-    apiFetch("/free-games", { token })
-      .then((d) => alive && setGames(d.games || []))
-      .catch(() => alive && setGames([]));
-    return () => {
-      alive = false;
-    };
-  }, [token]);
-
-  // Rien en cours (ou API en carafe) : on masque tout le widget.
-  if (games !== null && games.length === 0) return null;
-
-  return (
-    <div className="hf-widget card hf-free-w">
-      <div className="hf-w-head">
-        <h3 className="hf-w-title">
-          <Gift size={15} /> Jeux gratuits à récupérer
-        </h3>
-      </div>
-      <p className="hf-w-sub">Epic · Steam · GOG · Prime…</p>
-      {games === null ? (
-        <div className="hf-carousel" aria-busy="true">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <span key={i} className="gp-skel hf-free-skel" />
-          ))}
-        </div>
-      ) : (
-        <DragCarousel>
-          {games.map((g) => (
-            <div className="hf-free-item" key={g.id}>
-              <FreeGameCard game={g} />
-            </div>
-          ))}
-        </DragCarousel>
-      )}
-    </div>
-  );
-});
-
-// Porte d'entrée de l'arcade dans le rail : le solde et un lien. Tout le
-// reste (mini-jeux, classements, caisses, curseurs) vit sur la page /arcade —
-// l'accueil est un fil d'actualité, pas une salle de jeux.
-const ArcadeTeaser = memo(function ArcadeTeaser({ points }) {
-  return (
-    <Link to="/arcade" className="hf-arcade clickable">
-      <span className="hf-arcade-ic">
-        <Joystick size={20} />
-      </span>
-      <span className="hf-arcade-body">
-        <span className="hf-arcade-title">Arcade</span>
-        <span className="hf-arcade-sub">Mini-jeux, classements et curseurs</span>
-      </span>
-      <span className="hf-arcade-points">
-        <Coins size={13} />
-        {Number(points || 0).toLocaleString("fr-FR")}
-      </span>
-    </Link>
-  );
-});
-
-// Carrousel horizontal : drag à la souris + flèches gauche/droite.
-// Le tactile scrolle nativement ; à la souris on translate le scroll et on
-// avale le clic qui suit un drag pour ne pas ouvrir une fiche jeu par erreur.
-function DragCarousel({ children }) {
-  const ref = useRef(null);
-  const drag = useRef({ down: false, startX: 0, left: 0, moved: false });
-  const [dragging, setDragging] = useState(false);
-  const [canLeft, setCanLeft] = useState(false);
-  const [canRight, setCanRight] = useState(false);
-
-  const update = () => {
-    const el = ref.current;
-    if (!el) return;
-    setCanLeft(el.scrollLeft > 4);
-    setCanRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
-  };
-
-  useEffect(() => {
-    update();
-    const el = ref.current;
-    if (!el) return;
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [children]);
-
-  function onDown(e) {
-    drag.current = {
-      down: true,
-      startX: e.pageX,
-      left: ref.current.scrollLeft,
-      moved: false,
-    };
-  }
-
-  function onMove(e) {
-    const d = drag.current;
-    if (!d.down) return;
-    const dx = e.pageX - d.startX;
-    if (!d.moved && Math.abs(dx) > 6) {
-      d.moved = true;
-      setDragging(true);
-    }
-    if (d.moved) {
-      e.preventDefault();
-      ref.current.scrollLeft = d.left - dx;
-    }
-  }
-
-  function onUp() {
-    drag.current.down = false;
-    setDragging(false);
-  }
-
-  // Après un drag, le mouseup génère quand même un click sur la carte
-  // survolée : on l'intercepte en phase de capture.
-  function onClickCapture(e) {
-    if (drag.current.moved) {
-      e.preventDefault();
-      e.stopPropagation();
-      drag.current.moved = false;
-    }
-  }
-
-  const nudge = (dir) =>
-    ref.current?.scrollBy({
-      left: dir * ref.current.clientWidth * 0.75,
-      behavior: "smooth",
-    });
-
-  return (
-    <div className="hf-carousel-wrap">
-      <button
-        className={`hf-car-arrow left clickable ${canLeft ? "" : "off"}`}
-        onClick={() => nudge(-1)}
-        aria-label="Défiler vers la gauche"
-        tabIndex={canLeft ? 0 : -1}
-      >
-        <ChevronLeft size={20} />
-      </button>
-      <div
-        className={`hf-carousel ${dragging ? "dragging" : ""}`}
-        ref={ref}
-        onScroll={update}
-        onMouseDown={onDown}
-        onMouseMove={onMove}
-        onMouseUp={onUp}
-        onMouseLeave={onUp}
-        onClickCapture={onClickCapture}
-        onDragStart={(e) => e.preventDefault()}
-      >
-        {children}
-      </div>
-      <button
-        className={`hf-car-arrow right clickable ${canRight ? "" : "off"}`}
-        onClick={() => nudge(1)}
-        aria-label="Défiler vers la droite"
-        tabIndex={canRight ? 0 : -1}
-      >
-        <ChevronRight size={20} />
-      </button>
-    </div>
-  );
-}
-
-// Widget « Prochaines sorties » : les sorties les plus attendues, par date.
-const UpcomingWidget = memo(function UpcomingWidget({ games, loading }) {
-  if (loading) {
-    return (
-      <div className="hf-widget card" aria-busy="true">
-        <span className="gp-skel gp-skel-bar" style={{ width: "60%" }} />
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="hf-up-row">
-            <span className="gp-skel" style={{ width: 38, height: 50, borderRadius: 8 }} />
-            <div style={{ flex: 1, display: "grid", gap: 6 }}>
-              <span className="gp-skel gp-skel-bar" style={{ width: "80%" }} />
-              <span className="gp-skel gp-skel-bar sm" style={{ width: "35%" }} />
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-  if (!games?.length) return null;
-  return (
-    <div className="hf-widget card">
-      <h3 className="hf-w-title">
-        <CalendarDays size={15} /> Sorties à venir
-      </h3>
-      <ul className="hf-up-list">
-        {games.slice(0, 6).map((g) => (
-          <li key={g.id}>
-            <Link to={`/game/${g.id}`} className="hf-up-row clickable" title={g.name}>
-              {g.cover ? (
-                <img src={g.cover} alt="" loading="lazy" draggable="false" />
-              ) : (
-                <span className="hf-up-ph">
-                  <Gamepad2 size={14} />
-                </span>
-              )}
-              <span className="hf-up-info">
-                <span className="hf-up-name">{g.name}</span>
-                <span className="hf-up-meta">
-                  {g.hypes > 0 && (
-                    <i className="hf-up-hype">
-                      <Flame size={11} /> {g.hypes}
-                    </i>
-                  )}
-                </span>
-              </span>
-              <span className="hf-up-date">{shortDate(g.releaseDate)}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-      <Link to="/releases" className="hf-w-more clickable">
-        Calendrier des sorties <ChevronRight size={14} />
-      </Link>
-    </div>
-  );
-});
-
-// Widget « Pour toi » : suggestions selon les genres de la bibliothèque.
-const ForYouWidget = memo(function ForYouWidget({ games, loading }) {
-  if (loading) {
-    return (
-      <div className="hf-widget card" aria-busy="true">
-        <span className="gp-skel gp-skel-bar" style={{ width: "50%" }} />
-        <div className="hf-fy-grid">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <span key={i} className="gp-skel hf-fy-skel" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-  if (!games?.length) return null;
-  return (
-    <div className="hf-widget card">
-      <h3 className="hf-w-title">
-        <Sparkles size={15} /> Pour toi
-      </h3>
-      <p className="hf-w-sub">Selon les genres de ta bibliothèque</p>
-      <div className="hf-fy-grid">
-        {games.slice(0, 6).map((g) => (
-          <Link
-            key={g.id}
-            to={`/game/${g.id}`}
-            className="hf-fy-item clickable"
-            title={g.name}
-          >
-            {g.cover ? (
-              <img src={g.cover} alt={g.name} loading="lazy" draggable="false" />
-            ) : (
-              <span className="hf-fy-ph">
-                <Gamepad2 size={16} />
-              </span>
-            )}
-            <span className="hf-fy-name">{g.name}</span>
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
-});

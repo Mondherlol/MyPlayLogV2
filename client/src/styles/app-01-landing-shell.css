@@ -1068,25 +1068,23 @@
   border-radius: 999px;
 }
 
-/* Drapeaux (CSS, pas d'emoji) */
+/* Drapeaux — de VRAIS drapeaux, dessinés en SVG (voir components/Flags.jsx).
+   Ils étaient peints en dégradés CSS : le tricolore passait, mais « English »
+   n'était qu'un rectangle bleu uni, le drapeau d'aucun pays. Le cadre reste
+   ici, le dessin vient du composant. */
 .flag {
-  width: 18px;
-  height: 13px;
-  border-radius: 2px;
   display: inline-block;
   flex-shrink: 0;
+  border-radius: 2px;
   border: 1px solid var(--border);
+  /* Sur fond sombre comme sur fond clair, un drapeau doit garder son propre
+     blanc : c'est une image, pas une icône qui suit le texte. */
+  overflow: hidden;
+  vertical-align: middle;
 }
 
-.flag-fr {
-  background: linear-gradient(90deg,
-      #2b4bd6 0 33.33%,
-      #ffffff 33.33% 66.66%,
-      #ef4343 66.66% 100%);
-}
-
-.flag-en {
-  background: #2b4bd6;
+.flag-svg {
+  display: block;
 }
 
 /* ---------- Zone principale ---------- */

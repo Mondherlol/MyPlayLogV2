@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   X,
@@ -26,16 +26,19 @@ import {
   Gamepad2,
   CalendarDays,
   CalendarCheck,
-  Sparkles,
+  Medal,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
-import { startShortcuts, endShortcuts, toInputValue, dateLabel } from "../lib/dateQuick";
+import { startShortcuts, endShortcuts, dateLabel } from "../lib/dateQuick";
+import { STORES, storesFor } from "../lib/storeIcons";
 import { makeCache } from "../lib/cache";
 import { useAuth } from "../context/AuthContext";
 import { useLibrary } from "../context/LibraryContext";
 import { useBackClose } from "../hooks/useBackClose";
 import ScrollRow from "./ScrollRow";
 import AddToListModal from "./AddToListModal";
+import DatePickerModal from "./DatePickerModal";
+import StoreIcon from "./StoreIcon";
 import CharacterPicker from "./CharacterPicker";
 import OstPicker from "./OstPicker";
 import RatingInput from "./RatingInput";
@@ -73,6 +76,7 @@ const EMPTY_DETAILS = {
   endlessHint: false,
   bundleGames: [],
   dlcs: [],
+  stores: [],
 };
 
 // Au-delà, les DLC se replient : une saison de skins en compte quarante, et
@@ -88,43 +92,6 @@ const DLC_FOLD = 3;
 const toDateInput = (iso) => (iso ? String(iso).slice(0, 10) : "");
 const fromDateInput = (v) => (v ? new Date(`${v}T12:00:00.000Z`).toISOString() : null);
 
-/**
- * Les raccourcis de date, en rangées qui défilent.
- *
- * Une rangée par ORIGINE (« depuis la sortie », « depuis aujourd'hui ») : c'est
- * ce qui fait comprendre d'un coup d'œil qu'il y a deux façons de répondre.
- * La pastille correspondant à la date déjà saisie est marquée — on voit ainsi
- * qu'on avait répondu « un mois après la sortie », et pas seulement le jour.
- */
-function QuickDates({ rows, value, onPick }) {
-  if (!rows.length) return null;
-  return (
-    <div className="qd">
-      {rows.map((row) => (
-        <div key={row.key} className="qd-row">
-          <span className="qd-label">{row.label}</span>
-          <ScrollRow className="qd-chips">
-            {row.items.map((it) => (
-              <button
-                key={it.key}
-                type="button"
-                className={`qd-chip clickable ${
-                  value && toInputValue(it.date) === value ? "active" : ""
-                }`}
-                onClick={() => onPick(it.date)}
-                title={dateLabel(it.date)}
-              >
-                <span className="qd-chip-label">{it.label}</span>
-                {it.hint && <span className="qd-chip-hint">{it.hint}</span>}
-              </button>
-            ))}
-          </ScrollRow>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // Forme canonique des champs éditables, comparée par valeur (JSON) pour savoir
 // si l'utilisateur a des modifications non enregistrées. On plie `hasRating`
 // dans `rating` (null = pas de note) et on stringifie le temps de jeu pour que
@@ -134,6 +101,7 @@ function normalizeState(s) {
     status: s.status || "",
     platform: s.platform || "",
     format: s.format || "digital",
+    store: s.store || "",
     playtime: String(s.playtime ?? ""),
     favorite: !!s.favorite,
     rating: s.hasRating ? Number(s.rating) : null,
@@ -195,6 +163,11 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   // Instantané de TOUS les champs éditables au chargement, pour détecter une
   // modification non enregistrée et prévenir avant de fermer la modale.
   const initialSnapshot = useRef(null);
+  // Ce qui était choisi À L'OUVERTURE : sert UNIQUEMENT à ranger en tête de
+  // rangée (plateforme, personnage, OST). Volontairement dans un état à part
+  // des valeurs vivantes — c'est ce qui empêche les cartes de bouger sous le
+  // doigt pendant qu'on clique (voir `platformOptions`).
+  const [pinned, setPinned] = useState({ platform: "", favChar: null, favoriteOst: null });
 
   // Statut/favori initialisés depuis la map locale de la bibliothèque : le bon
   // bouton est coché dès l'ouverture. Pour un jeu pas encore dans la
@@ -206,6 +179,10 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   });
   const [platform, setPlatform] = useState("");
   const [format, setFormat] = useState("digital"); // digital | physical
+  // Sur PC, mobile ou cloud, la question du support ne se pose pas — tout y est
+  // démat. Celle qui se pose, c'est OÙ : Steam, l'Epic Games Store, le Game
+  // Pass… (cf. lib/storeIcons.js).
+  const [store, setStore] = useState(null);
   const [playtime, setPlaytime] = useState("");
   const [favorite, setFavorite] = useState(() => !!map[game.id]?.favorite);
   const [hasRating, setHasRating] = useState(false);
@@ -226,6 +203,8 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   const [startedAt, setStartedAt] = useState("");
   const [finishedAt, setFinishedAt] = useState("");
   const [showListModal, setShowListModal] = useState(false);
+  // Quelle date on est en train de choisir : "start", "end", ou rien.
+  const [dateSheet, setDateSheet] = useState(null);
   // Les contenus additionnels POSSÉDÉS : id -> { id, name, cover }. Un DLC n'a
   // ni statut ni note — c'est une case cochée sur le jeu de base, et on
   // n'enregistre que les cochées (cf. `dlcs` dans routes/library.js).
@@ -274,6 +253,12 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
         setStatus(PLAYED.includes(en.status) ? en.status : "");
         setPlatform(en.platform || "");
         setFormat(en.format || "digital");
+        setStore(en.store || null);
+        setPinned({
+          platform: en.platform || "",
+          favChar: en.favoriteCharacter || null,
+          favoriteOst: en.favoriteOst || null,
+        });
         setPlaytime(en.playtimeHours ?? "");
         setFavorite(!!en.favorite);
         if (en.rating != null) {
@@ -304,6 +289,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
           status: PLAYED.includes(en.status) ? en.status : "",
           platform: en.platform || "",
           format: en.format || "digital",
+          store: en.store || null,
           playtime: en.playtimeHours ?? "",
           favorite: !!en.favorite,
           hasRating: en.rating != null,
@@ -328,6 +314,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
           status: "",
           platform: "",
           format: "digital",
+          store: null,
           playtime: "",
           favorite: false,
           hasRating: false,
@@ -382,7 +369,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   // enregistré même depuis un handler capturé par un effet (touche Échap).
   const live = useRef(null);
   live.current = {
-    status, platform, format, playtime, favorite, hasRating, rating,
+    status, platform, format, store, playtime, favorite, hasRating, rating,
     review, reviewMedia, spoiler, pros, cons, favChar, favoriteOst, cover,
     platinum, startedAt, finishedAt, ownedDlcs,
     bundleStatus,
@@ -442,6 +429,9 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
         platform: platform || null,
         // Le format n'a de sens que sur console : on retombe sur digital sinon.
         format: showFormat ? format : "digital",
+        // La boutique n'a de sens QUE là où le support n'en a pas : sur une
+        // console physique-capable, c'est « Format » qui répond.
+        store: showFormat ? null : store,
         playtimeHours: playtime === "" ? null : Number(playtime),
         favorite,
         rating: hasRating ? Number(rating) : null,
@@ -540,7 +530,24 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
     { label: "100%", v: ttb.completely },
   ];
 
-  const platformOptions = [...details.platforms.map((p) => p.name), LETSPLAY];
+  // ⚠️ « CELLE QUI EST COCHÉE EN PREMIER » NE VEUT PAS DIRE « QUI REMONTE SOUS
+  // LE DOIGT ». Si l'ordre se recalculait à chaque clic, la carte qu'on vient
+  // de choisir sauterait en tête et emporterait ses voisines avec elle : on
+  // cliquerait sur la suivante sans l'avoir visée. L'ordre est donc figé sur ce
+  // que l'entrée disait À L'OUVERTURE (`pinned`), et ne rebouge plus tant que
+  // la modale est ouverte. La prochaine fois, le choix d'aujourd'hui sera en
+  // tête. Même règle pour le personnage et l'OST favoris.
+  const platformOptions = useMemo(() => {
+    const all = [...details.platforms.map((p) => p.name), LETSPLAY];
+    if (!pinned.platform) return all;
+    const rest = all.filter((p) => p !== pinned.platform);
+    return rest.length === all.length ? all : [pinned.platform, ...rest];
+  }, [details.platforms, pinned.platform]);
+
+  // Les boutiques possibles pour la plateforme cochée, parmi celles où le jeu
+  // est réellement sorti (le serveur les tire des liens externes d'IGDB) —
+  // plus le Game Pass et « hors boutique », qu'aucun catalogue ne connaît.
+  const storeOptions = storesFor(platform, details.stores || []);
   // Choix digital/physique : uniquement pour une console « physique-capable »
   // (ni PC/mobile/cloud, ni let's play).
   const showFormat =
@@ -661,46 +668,46 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                     </span>
                   </button>
 
-                  <button
-                    className={`fav-btn clickable ${favorite ? "active" : ""}`}
-                    onClick={() => setFavorite((v) => !v)}
-                  >
-                    <Heart size={18} fill={favorite ? "currentColor" : "none"} />
-                    Coup de cœur
-                  </button>
+                  {/* ⚠️ DEUX MARQUES SUR UNE LIGNE, ET LE 100 % N'EST QU'UNE
+                      ICÔNE. Ce sont des questions qui se répondent d'un clic :
+                      leur donner chacune un bouton pleine largeur les faisait
+                      peser autant que la note ou la review, qui, elles,
+                      demandent de réfléchir. Le coup de cœur garde son
+                      libellé — il s'adresse à tout le monde ; la complétion se
+                      réduit à sa médaille, que seuls cherchent ceux qui la
+                      visent.
 
-                  {/* ⚠️ LE 100 % EST UNE MARQUE, PAS UN CHAMP. Il était au
-                      milieu du formulaire, entre le temps de jeu et les
-                      personnages, où il coupait la saisie en deux pour une
-                      question qui se répond d'un clic. Sa place est ici, à côté
-                      du coup de cœur : ce sont les deux mêmes gestes — on
-                      épingle quelque chose sur le jeu.
-
-                      Et il ne se propose qu'à un jeu MENÉ AU BOUT : demander
+                      Elle ne se propose qu'à un jeu MENÉ AU BOUT : demander
                       « l'as-tu complété ? » d'un jeu en cours n'a pas de sens.
-                      Un jeu sans fin, si — c'est même là que le platine demande
-                      le plus de travail. */}
-                  {canComplete && (
+                      Un jeu sans fin, si — c'est même là que la complétion
+                      demande le plus de travail. */}
+                  <div className="marks-row">
                     <button
-                      type="button"
-                      role="switch"
-                      aria-checked={platinum}
-                      className={`hundred-btn clickable ${platinum ? "active" : ""}`}
-                      onClick={() => setPlatinum((v) => !v)}
-                      title="J'ai tout fait : succès, collectibles, fins"
+                      className={`fav-btn clickable ${favorite ? "active" : ""}`}
+                      onClick={() => setFavorite((v) => !v)}
                     >
-                      <Sparkles size={18} />
-                      Terminé à 100 %
+                      <Heart size={18} fill={favorite ? "currentColor" : "none"} />
+                      Coup de cœur
                     </button>
-                  )}
 
-                  <button
-                    className="list-btn clickable"
-                    onClick={() => setShowListModal(true)}
-                    title="Ajouter à une liste"
-                  >
-                    <ListPlus size={17} /> Ajouter à une liste
-                  </button>
+                    {canComplete && (
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={platinum}
+                        aria-label="Terminé à 100 %"
+                        className={`hundred-btn clickable ${platinum ? "active" : ""}`}
+                        onClick={() => setPlatinum((v) => !v)}
+                        title={
+                          platinum
+                            ? "Terminé à 100 % — clique pour retirer"
+                            : "Terminé à 100 % : succès, collectibles, fins"
+                        }
+                      >
+                        <Medal size={19} />
+                      </button>
+                    )}
+                  </div>
 
                   <div className="rating-block">
                     <span className="rating-block-label">Ma note</span>
@@ -721,6 +728,14 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                     onClick={() => setShowReview(true)}
                   >
                     <PenLine size={16} /> {hasReview ? "Ma review" : "Écrire une review"}
+                  </button>
+
+                  <button
+                    className="list-btn clickable"
+                    onClick={() => setShowListModal(true)}
+                    title="Ajouter à une liste"
+                  >
+                    <ListPlus size={17} /> Ajouter à une liste
                   </button>
 
                   {existing && (
@@ -928,6 +943,41 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                     </ScrollRow>
                   )}
 
+                  {/* --- Où je l'ai eu ----------------------------------
+                      ⚠️ SUR PC, « PHYSIQUE OU DÉMAT » NE VEUT RIEN DIRE : tout
+                      y est démat. La question qu'on se pose vraiment, c'est
+                      OÙ — et c'est celle-là qu'on remplace. Les deux rangées
+                      sont donc exclusives : « Format » sur une console
+                      physique-capable, « Boutique » partout ailleurs.
+
+                      Game Pass et « hors boutique » sont proposés sans passer
+                      par le catalogue : par définition, IGDB ne les connaît
+                      pas (cf. lib/storeIcons.js). */}
+                  {!showFormat && storeOptions.length > 0 && (
+                    <div className="store-row">
+                      <label className="field-label">
+                        {/let.s play/i.test(platform) ? "Vu sur" : "Boutique"}
+                      </label>
+                      <div className="store-chips">
+                        {storeOptions.map((k) => {
+                          const on = store === k;
+                          return (
+                            <button
+                              key={k}
+                              type="button"
+                              className={`store-chip clickable ${on ? "active" : ""} ${k}`}
+                              onClick={() => setStore(on ? null : k)}
+                              title={STORES[k].label}
+                            >
+                              <StoreIcon store={k} size={14} />
+                              <span>{STORES[k].label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Format d'achat (console uniquement) : démat ou boîte */}
                   {showFormat && (
                     <div className="format-row">
@@ -989,77 +1039,51 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                     </div>
                   </div>
 
-                  {/* --- Quand : deux dates saisies à la main ------------
-                      Le serveur ne les devine pas, et il ne faut pas qu'il
-                      essaie : un jeu ajouté aujourd'hui a très bien pu être
-                      terminé il y a dix ans. */}
-                  <div className={`when-row ${status === "finished" ? "two" : ""}`}>
-                    <div className="when-col">
-                      <label className="field-label" htmlFor="mpl-started">
-                        Commencé le
-                      </label>
-                      <div className="input-group">
-                        <CalendarDays size={17} className="input-icon" />
-                        <input
-                          id="mpl-started"
-                          className="modal-input"
-                          type="date"
-                          value={startedAt}
-                          max={finishedAt || undefined}
-                          onChange={(e) => setStartedAt(e.target.value)}
-                        />
-                        {startedAt && (
-                          <button
-                            type="button"
-                            className="when-clear clickable"
-                            onClick={() => setStartedAt("")}
-                            aria-label="Effacer la date de début"
-                          >
-                            <X size={14} />
-                          </button>
-                        )}
-                      </div>
-                      <QuickDates
-                        rows={startRows}
-                        value={startedAt}
-                        onPick={(d) => setStartedAt(toInputValue(d))}
-                      />
-                    </div>
+                  {/* --- Quand ------------------------------------------
+                      ⚠️ DEUX BOUTONS, PAS DEUX CHAMPS. Les dates étaient
+                      posées à plat au milieu du formulaire, chacune avec sa
+                      rangée de raccourcis : à elles deux, elles occupaient plus
+                      de place que tout le reste réuni, pour une question qu'on
+                      ne se pose pas à chaque fois. Elles se replient derrière
+                      un bouton qui affiche la réponse, et la feuille redevient
+                      lisible (les raccourcis et le calendrier sont dans
+                      components/DatePickerModal.jsx).
+
+                      Le serveur ne devine pas ces dates, et il ne faut pas
+                      qu'il essaie : un jeu ajouté aujourd'hui a très bien pu
+                      être terminé il y a dix ans. */}
+                  <label className="field-label">Quand</label>
+                  <div className="when-btns">
+                    <button
+                      type="button"
+                      className={`when-btn clickable ${startedAt ? "set" : ""}`}
+                      onClick={() => setDateSheet("start")}
+                    >
+                      <CalendarDays size={16} />
+                      <span className="when-btn-txt">
+                        <span className="when-btn-label">Commencé le</span>
+                        <span className="when-btn-value">
+                          {startedAt ? dateLabel(new Date(`${startedAt}T12:00:00`)) : "—"}
+                        </span>
+                      </span>
+                    </button>
 
                     {/* La date de fin ne se demande QU'À UN JEU TERMINÉ :
                         partout ailleurs, c'est une question sans réponse. */}
                     {status === "finished" && (
-                      <div className="when-col">
-                        <label className="field-label" htmlFor="mpl-finished">
-                          Terminé le
-                        </label>
-                        <div className="input-group">
-                          <CalendarCheck size={17} className="input-icon" />
-                          <input
-                            id="mpl-finished"
-                            className="modal-input"
-                            type="date"
-                            value={finishedAt}
-                            min={startedAt || undefined}
-                            onChange={(e) => setFinishedAt(e.target.value)}
-                          />
-                          {finishedAt && (
-                            <button
-                              type="button"
-                              className="when-clear clickable"
-                              onClick={() => setFinishedAt("")}
-                              aria-label="Effacer la date de fin"
-                            >
-                              <X size={14} />
-                            </button>
-                          )}
-                        </div>
-                        <QuickDates
-                          rows={endRows}
-                          value={finishedAt}
-                          onPick={(d) => setFinishedAt(toInputValue(d))}
-                        />
-                      </div>
+                      <button
+                        type="button"
+                        className={`when-btn clickable ${finishedAt ? "set" : ""}`}
+                        onClick={() => setDateSheet("end")}
+                      >
+                        <CalendarCheck size={16} />
+                        <span className="when-btn-txt">
+                          <span className="when-btn-label">Terminé le</span>
+                          <span className="when-btn-value">
+                            {finishedAt ? dateLabel(new Date(`${finishedAt}T12:00:00`)) : "—"}
+                          </span>
+                        </span>
+                      </button>
                     )}
                   </div>
 
@@ -1068,6 +1092,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                     token={token}
                     characters={details.characters}
                     favChar={favChar}
+                    pinnedFav={pinned.favChar}
                     onSelect={setFavChar}
                     onCharsChange={(chars) =>
                       setDetails((d) => ({ ...d, characters: chars }))
@@ -1079,6 +1104,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                     gameName={game.name}
                     token={token}
                     favorite={favoriteOst}
+                    pinnedFav={pinned.favoriteOst}
                     onSelect={(t) =>
                       setFavoriteOst(
                         t
@@ -1227,6 +1253,38 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
       {/* « Ajouter à une liste » : la même modale que depuis une vignette, en
           couche au-dessus (`sub`). Elle enregistre toute seule — rien à
           reprendre dans le corps d'enregistrement de la fiche. */}
+      {dateSheet === "start" && (
+        <DatePickerModal
+          title="Commencé le"
+          subtitle={game.name}
+          value={startedAt}
+          rows={startRows}
+          anchor={release}
+          min={release}
+          max={finishedAt ? new Date(`${finishedAt}T12:00:00`) : null}
+          onPick={setStartedAt}
+          onClear={() => setStartedAt("")}
+          onClose={() => setDateSheet(null)}
+        />
+      )}
+      {dateSheet === "end" && (
+        <DatePickerModal
+          title="Terminé le"
+          subtitle={
+            startedAt
+              ? `Commencé le ${dateLabel(new Date(`${startedAt}T12:00:00`))}`
+              : game.name
+          }
+          value={finishedAt}
+          rows={endRows}
+          anchor={startedAt ? new Date(`${startedAt}T12:00:00`) : release}
+          min={startedAt ? new Date(`${startedAt}T12:00:00`) : release}
+          onPick={setFinishedAt}
+          onClear={() => setFinishedAt("")}
+          onClose={() => setDateSheet(null)}
+        />
+      )}
+
       {showListModal && (
         <AddToListModal
           sub
