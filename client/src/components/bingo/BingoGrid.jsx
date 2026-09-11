@@ -24,6 +24,9 @@ export default function BingoGrid({
   onCell,
   className = "",
   compact = false,
+  // La case en cours d'édition, dans le composer : elle porte un anneau doré
+  // pour qu'on sache à laquelle s'appliquent les réglages de droite.
+  activeIndex = null,
 }) {
   const winning = winningIndexes(cells, size);
 
@@ -41,6 +44,7 @@ export default function BingoGrid({
             key={i}
             className={[
               "bg-cell",
+              i === activeIndex ? "sel" : "",
               c.checked ? "on" : "",
               c.free ? "free" : "",
               winning.has(i) ? "win" : "",

@@ -323,12 +323,18 @@ router.get("/", optionalAuth, async (req, res) => {
       const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
       filter.$and = [{ $or: [{ title: rx }, { description: rx }] }];
     }
+    // ⚠️ UN PLAFOND DEMANDABLE. L'accueil n'affiche qu'une rangée des
+    // dernières conférences : lui renvoyer deux cents listes peuplées pour en
+    // montrer douze, c'est deux cents `populate` et un JSON de plusieurs
+    // centaines de Ko à chaque ouverture du site. Sans `limit`, rien ne change
+    // pour la page Listes.
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 200));
     const lists = await List.find(filter)
       .populate("user", "username avatar isSystem")
       // Les événements se rangent par date de diffusion (la dernière
       // conférence en tête), pas par date de mise à jour de la liste.
       .sort(scope === "events" ? { "event.startTime": -1 } : { updatedAt: -1 })
-      .limit(200)
+      .limit(limit)
       .lean();
     let cards = lists.map((l) => toCard(l, req.userId));
 

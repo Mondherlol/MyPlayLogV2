@@ -52,4 +52,6 @@
 @import "./styles/app-50-event.css";
 /* Les pages publiques : accueil visiteur, connexion, inscription, mot de passe. */
 @import "./styles/app-49-welcome.css";
+/* Les pages légales : confidentialité et conditions d'utilisation. */
+@import "./styles/app-51-legal.css";
 @import "./styles/app-99-mobile-perf.css";

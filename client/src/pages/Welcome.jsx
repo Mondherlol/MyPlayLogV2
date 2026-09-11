@@ -26,7 +26,7 @@ import HoursModal from "../components/home/HoursModal";
 import OstRail from "../components/home/OstRail";
 import ActivityPeek from "../components/home/ActivityPeek";
 import { MotStrip, TonightCard, WeekStrip } from "../components/home/Strips";
-import { CircleRow, FreeCard, GameTile } from "../components/home/Tiles";
+import { CircleRow, EventListCard, FreeCard, GameTile } from "../components/home/Tiles";
 import { useGameBackdrops } from "../lib/backdrops";
 import {
   dustyGames,
@@ -115,6 +115,9 @@ export default function Welcome() {
   // monde, et AUCUN appel IGDB — le serveur ne croise que des listes d'envies.
   const [awaitedBy, setAwaitedBy] = useState([]);
   const [similar, setSimilar] = useState([]);
+  // Les listes officielles des derniers Directs et showcases : ce qui y a été
+  // annoncé, jeu par jeu (cf. GET /lists?scope=events).
+  const [eventLists, setEventLists] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Le jeu dont une écriture est en vol, pour que son bouton dise qu'il
@@ -174,6 +177,20 @@ export default function Welcome() {
       setLoading(false);
     });
 
+    return () => {
+      alive = false;
+    };
+  }, [token]);
+
+  // Les dernières conférences. À part du grand chargement, et c'est voulu :
+  // c'est un rayon de bas de bandeau, il n'a aucune raison de retarder
+  // l'affichage des parties en cours.
+  useEffect(() => {
+    if (!token) return undefined;
+    let alive = true;
+    apiFetch("/lists?scope=events&limit=12", { token })
+      .then((d) => alive && setEventLists((d.lists || []).slice(0, 12)))
+      .catch(() => {});
     return () => {
       alive = false;
     };
@@ -527,9 +544,7 @@ export default function Welcome() {
               playing.length > 1 ? `${playing.length} parties en cours` : "Ta partie en cours"
             }
             className="mh-sec-np"
-            rail={false}
           >
-            <div className="mh-play-grid">
               {playing.map((e) => (
                 <NowPlayingCard
                   key={e.gameId}
@@ -543,7 +558,6 @@ export default function Welcome() {
                   onFavorite={(want) => patch(e, { favorite: want })}
                 />
               ))}
-            </div>
           </Section>
         ) : (
           <Link to="/explore" className="mh-empty clickable">
@@ -557,12 +571,55 @@ export default function Welcome() {
           </Link>
         )}
 
-        {/* Le bilan de la semaine tient sous les parties en cours : c'est le
-            même sujet — ma bibliothèque — vu de la semaine plutôt que du soir. */}
-        <WeekStrip recap={recap} />
+        {/* --- Directs et showcases, juste sous ce qu'on joue ------------
+            ⚠️ DANS LE BANDEAU, PAS DANS LA COLONNE. Un rendez-vous a une
+            heure : c'est la deuxième chose qu'on vient vérifier en ouvrant la
+            page, et une colonne de raccourcis n'a rien à faire à côté d'un
+            compte à rebours. */}
+      {sortedEvents.length > 0 && (
+        <Section
+          kicker="Ce qui arrive"
+          title="Directs et showcases"
+          hint="Les rendez-vous à ne pas manquer"
+          className="s-events"
+        >
+          {sortedEvents.map((ev) => (
+            <EventCard
+              key={ev.id}
+              event={ev}
+              now={tick}
+              onToggleInterest={(want) => toggleInterest(ev, want)}
+            />
+          ))}
+        </Section>
+      )}
+
+        {/* --- Les dernières conférences ----------------------------------
+            ⚠️ JUSTE SOUS LES RENDEZ-VOUS, PARCE QUE C'EST LEUR SUITE. Le rail
+            du dessus dit ce qui arrive ; celui-ci dit ce qui est arrivé — la
+            liste de tous les jeux montrés au dernier Direct. Séparés, on
+            n'avait jamais les deux sous les yeux. */}
+        {eventLists.length > 0 && (
+          <Section
+            kicker="Ce qui a été annoncé"
+            title="Les dernières conférences"
+            hint="Chaque Direct, chaque showcase, et tous les jeux qu'on y a vus"
+            moreTo="/lists"
+            moreLabel="Toutes les listes"
+            className="s-elists"
+          >
+            {eventLists.map((l) => (
+              <EventListCard key={l.id} list={l} />
+            ))}
+          </Section>
+        )}
       </section>
 
       <div className="mh-col">
+        {/* Le bilan de la semaine ouvre la colonne : un regard en arrière sur
+            sa bibliothèque, avant les envies qui regardent devant. */}
+        <WeekStrip recap={recap} />
+
         {/* --- Tes envies ------------------------------------------------
             ⚠️ EN HAUT, ET PAS EN BAS AVEC LES RAYONS DE CATALOGUE. C'est une
             liste qu'on a écrite soi-même : elle a plus de raisons d'être lue
@@ -583,25 +640,6 @@ export default function Welcome() {
             ))}
           </Section>
         )}
-
-        {/* --- Ce qui arrive -------------------------------------------- */}
-      {sortedEvents.length > 0 && (
-        <Section
-          kicker="Ce qui arrive"
-          title="Directs et showcases"
-          hint="Les rendez-vous à ne pas manquer"
-          className="s-events"
-        >
-          {sortedEvents.map((ev) => (
-            <EventCard
-              key={ev.id}
-              event={ev}
-              now={tick}
-              onToggleInterest={(want) => toggleInterest(ev, want)}
-            />
-          ))}
-        </Section>
-      )}
 
       {/* --- 4. Sorties du jour --------------------------------------- */}
       {todayOut.length > 0 && (

@@ -108,6 +108,16 @@ export default function Landing() {
           <Smartphone size={14} /> Aussi sur Android
         </Link>
         <span className="lp-foot-dot">·</span>
+        {/* Google vérifie que la politique de confidentialité est atteignable
+            depuis la page d'accueil avant d'autoriser « Continuer avec Google ». */}
+        <Link to="/privacy" className="lp-foot-link clickable">
+          Confidentialité
+        </Link>
+        <span className="lp-foot-dot">·</span>
+        <Link to="/services" className="lp-foot-link clickable">
+          Conditions
+        </Link>
+        <span className="lp-foot-dot">·</span>
         <span>MyPlayLog {new Date().getFullYear()}</span>
       </footer>
     </div>

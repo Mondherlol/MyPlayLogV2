@@ -56,8 +56,8 @@
    n'ont plus aucun effet. */
 .mh-hero { order: 0; }
 .mh-top { order: 1; }
-.s-wish { order: 2; }
-.s-events { order: 3; }
+.mh-week { order: 2; }
+.s-wish { order: 3; }
 .s-today { order: 4; }
 .s-awaited { order: 5; }
 .mh-mot { order: 6; }
@@ -358,6 +358,14 @@ a.mh-head-main:hover .mh-head-title {
   overscroll-behavior-x: contain;
   padding: 0.35rem var(--bleed) 0.5rem;
   margin: -0.35rem calc(-1 * var(--bleed)) -0.5rem;
+  /* ⚠️ SANS ÇA, LA PREMIÈRE JAQUETTE SE COLLE AU BORD. Le calage (`scroll-snap`)
+     ne connaît pas le `padding` : il aligne chaque vignette sur le bord BRUT du
+     conteneur. Or le rail déborde de `--bleed` pour aller jusqu'au bord de
+     l'écran — le navigateur recalait donc la première jaquette contre ce bord,
+     et la marge gauche disparaissait (visible sur la fiche d'un événement).
+     `scroll-padding` décale la ligne de calage d'autant : elle retombe sous le
+     titre, là où elle doit être. */
+  scroll-padding-inline: var(--bleed);
   scrollbar-width: none;
 }
 .mh-rail::-webkit-scrollbar {
@@ -527,26 +535,14 @@ a.mh-head-main:hover .mh-head-title {
 /* ======================================================================
    1. La grande carte « tu joues à »
    ====================================================================== */
-/* ⚠️ UNE GRILLE, PAS UNE RANGÉE QUI DÉFILE. Sur un téléphone, un rail est la
-   seule façon de montrer trois grandes cartes ; sur un écran large, il laisse
-   les deux tiers de la page vides et cache la troisième partie derrière une
-   flèche. La grille remplit la largeur qu'elle a et retombe toute seule sur
-   deux, puis une colonne. */
-.mh-play-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
-  gap: 0.9rem;
-}
-.mh-play-grid .mh-np {
-  width: auto;
-}
 
 .mh-np {
   position: relative;
-  /* Trois cartes tiennent dans la page : c'est ce qu'il faut pour qu'un rail se
-     lise comme un rail. Sur une carte et demie, on ne voit pas qu'il continue. */
-  width: 398px;
-  height: 216px;
+  /* COMPACTE : quatre cartes tiennent dans la largeur, et la cinquième dépasse
+     juste assez pour dire que la rangée continue. Plus grande, on n'en voyait
+     que deux et demie, et le rail avait l'air d'une galerie de posters. */
+  width: 304px;
+  height: 172px;
   border-radius: var(--radius-lg);
   overflow: hidden;
   background: #15171d;
@@ -657,9 +653,9 @@ a.mh-head-main:hover .mh-head-title {
 .mh-np-body {
   position: relative;
   z-index: 1;
-  padding: 0.85rem 0.95rem;
+  padding: 0.7rem 0.8rem;
   display: grid;
-  gap: 0.6rem;
+  gap: 0.5rem;
 }
 .mh-np-row {
   display: flex;
@@ -668,8 +664,8 @@ a.mh-head-main:hover .mh-head-title {
   min-width: 0;
 }
 .mh-np-cover {
-  width: 46px;
-  height: 62px;
+  width: 38px;
+  height: 51px;
   border-radius: 9px;
   object-fit: cover;
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -683,7 +679,7 @@ a.mh-head-main:hover .mh-head-title {
 }
 .mh-np-name {
   font-family: var(--font-display);
-  font-size: 1.12rem;
+  font-size: 0.98rem;
   font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 1.12;
@@ -720,7 +716,14 @@ a.mh-head-main:hover .mh-head-title {
 }
 .mh-np-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.4rem;
+}
+/* Les pastilles de la carte suivent sa taille : à 172 px de haut, des boutons
+   de 33 px mangeaient un cinquième de l'affiche. */
+.mh-np .mh-pill {
+  height: 28px;
+  padding: 0 0.6rem;
+  font-size: 0.72rem;
 }
 .mh-np-actions .mh-pill:first-child {
   flex: 1;
@@ -1907,11 +1910,13 @@ a.mh-head-main:hover .mh-head-title {
   .mh-sec {
     margin-bottom: 2.1rem;
   }
-  .mh-play-grid {
-    grid-template-columns: 1fr;
-  }
   .mh-np {
-    height: 224px;
+    width: 80vw;
+    max-width: 320px;
+    height: 176px;
+  }
+  .mh-elist {
+    width: 208px;
   }
   .mh-np-name {
     font-size: 1.16rem;
@@ -1973,4 +1978,98 @@ a.mh-head-main:hover .mh-head-title {
 }
 :root:not([data-theme="dark"]) .mh-tab.on {
   box-shadow: 0 1px 4px rgba(20, 20, 40, 0.14);
+}
+
+
+/* ======================================================================
+   Les dernières conférences (listes d'événement)
+   ====================================================================== */
+.mh-elist {
+  display: grid;
+  gap: 0.3rem;
+  width: 236px;
+  align-content: start;
+}
+
+.mh-elist-art {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 10;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #15171d;
+  border: 1px solid var(--border);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+.mh-elist:hover .mh-elist-art {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow);
+}
+
+.mh-elist-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Quatre jaquettes côte à côte, séparées d'un filet sombre : une affiche de
+   ce qui a été montré, lisible d'un regard. */
+.mh-elist-strip {
+  display: flex;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  background: #0b0c10;
+}
+.mh-elist-strip img {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mh-elist-count,
+.mh-elist-replay {
+  position: absolute;
+  bottom: 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(6, 7, 10, 0.74);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+.mh-elist-count {
+  left: 0.4rem;
+}
+.mh-elist-replay {
+  right: 0.4rem;
+  background: var(--orange);
+  color: #3b2a02;
+}
+
+.mh-elist-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.mh-elist:hover .mh-elist-title {
+  color: var(--orange);
+}
+.mh-elist-date {
+  font-size: 0.7rem;
+  color: var(--text-soft);
+}
+
+:root:not([data-theme="dark"]) .mh-elist-art {
+  box-shadow: 0 3px 12px rgba(20, 20, 40, 0.1);
 }

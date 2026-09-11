@@ -93,6 +93,18 @@ export default function Register() {
             en crée un sinon — sans que personne ait à choisir le bon bouton. */}
         <OAuthButtons next="/app" busy={busy} />
 
+        <p className="auth-legal">
+          En créant un compte, tu acceptes les{" "}
+          <Link to="/services" className="link-accent clickable">
+            conditions d'utilisation
+          </Link>{" "}
+          et la{" "}
+          <Link to="/privacy" className="link-accent clickable">
+            politique de confidentialité
+          </Link>
+          .
+        </p>
+
         <p className="auth-switch">
           Déjà inscrit ?{" "}
           <Link to="/login" className="link-accent clickable">

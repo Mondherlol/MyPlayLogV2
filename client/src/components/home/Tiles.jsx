@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Clock, ExternalLink, Gamepad2, Gift, Heart } from "lucide-react";
+import { Clock, ExternalLink, Gamepad2, Gift, Heart, Play, Tv } from "lucide-react";
 import { STORE_COLORS, freeEndsLabel } from "../FreeGameBanner";
 
 // ======================================================================
@@ -163,5 +163,55 @@ export function FreeCard({ game }) {
     >
       {body}
     </a>
+  );
+}
+
+/**
+ * La liste officielle d'un Direct ou d'un showcase passé.
+ *
+ * ⚠️ ON MONTRE LES JEUX, PAS UN TITRE. « Nintendo Direct — 9 juin 2026 » ne dit
+ * rien de ce qui s'y est passé ; quatre jaquettes côte à côte, si. C'est
+ * l'aperçu que rend déjà le serveur (`preview`, les premières images de la
+ * liste) : on en fait une affiche plutôt qu'un montage en éventail, parce que
+ * dans une rangée, des affiches alignées se lisent d'un regard.
+ */
+export function EventListCard({ list }) {
+  const imgs = (list.preview || []).slice(0, 4);
+  const date = list.event?.startTime
+    ? new Date(list.event.startTime).toLocaleDateString("fr-FR", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : null;
+
+  return (
+    <Link to={`/lists/${list.id}`} className="mh-elist clickable" title={list.title}>
+      <span className="mh-elist-art">
+        {list.cover ? (
+          <img className="mh-elist-cover" src={list.cover} alt="" loading="lazy" draggable="false" />
+        ) : imgs.length ? (
+          <span className="mh-elist-strip">
+            {imgs.map((src, i) => (
+              <img key={i} src={src} alt="" loading="lazy" draggable="false" />
+            ))}
+          </span>
+        ) : (
+          <span className="mh-tile-ph">
+            <Tv size={26} />
+          </span>
+        )}
+        <span className="mh-elist-count">
+          {list.itemCount} jeu{list.itemCount > 1 ? "x" : ""}
+        </span>
+        {!!list.event?.videoId && (
+          <span className="mh-elist-replay">
+            <Play size={10} fill="currentColor" strokeWidth={0} /> Rediff
+          </span>
+        )}
+      </span>
+      <span className="mh-elist-title">{list.title}</span>
+      {!!date && <span className="mh-elist-date">{date}</span>}
+    </Link>
   );
 }

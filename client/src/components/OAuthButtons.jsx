@@ -80,11 +80,7 @@ export default function OAuthButtons({ next = "/app", remember = true, busy = fa
           {going === "discord" ? "Redirection…" : "Continuer avec Discord"}
         </button>
       )}
-
-      <p className="oauth-note">
-        Même adresse email = même compte. Ta bibliothèque te suit, quelle que
-        soit la façon dont tu te connectes.
-      </p>
+r
     </div>
   );
 }

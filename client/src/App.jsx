@@ -2,6 +2,8 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import Landing from "./pages/Landing";
 import DownloadApp from "./pages/DownloadApp";
+import Privacy from "./pages/Privacy";
+import Services from "./pages/Services";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -110,6 +112,12 @@ export default function App() {
           coquille : on y arrive souvent depuis un lien partagé, sans compte,
           et parfois sans avoir jamais vu le site. */}
       <Route path="/download" element={<DownloadApp />} />
+      {/* Les pages légales. Publiques et sans coquille, connecté ou non :
+          Google et Discord les ouvrent pour valider la connexion par
+          leurs comptes, et un visiteur doit pouvoir les lire AVANT de
+          s'inscrire. */}
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/services" element={<Services />} />
       <Route
         path="/login"
         element={
