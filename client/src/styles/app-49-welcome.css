@@ -23,7 +23,6 @@
   transform: rotate(-16deg);
   pointer-events: none;
   user-select: none;
-  opacity: 0.34;
   /* Les rangées s'éteignent vers les bords : sans ça, elles se coupent net au
      milieu d'une jaquette et le décor se lit comme une grille tronquée. */
   -webkit-mask-image: radial-gradient(
@@ -40,8 +39,15 @@
   );
 }
 
-:root[data-theme="dark"] .drift {
+:root[data-theme="dark"] .drift:not(.bands) {
   opacity: 0.42;
+}
+
+/* ⚠️ SEUL LE DÉCOR PENCHÉ S'EFFACE. Les bandeaux de l'accueil visiteur sont le
+   sujet de la page, pas son papier peint : leur voile se règle jaquette par
+   jaquette, plus bas. */
+.drift:not(.bands) {
+  opacity: 0.34;
 }
 
 .drift-row {
@@ -89,6 +95,81 @@
   background: linear-gradient(135deg, var(--surface-2), var(--surface));
 }
 
+/* ----------------------------------------------------------------------
+   La variante « bandeaux » : deux rangées en haut, deux en bas
+   ----------------------------------------------------------------------
+   ⚠️ ELLES NE SONT PAS DERRIÈRE LE TEXTE, ELLES L'ENCADRENT. Le décor penché
+   du dessous vit sous le titre, donc il faut l'éteindre pour qu'on puisse lire
+   — et à force de l'éteindre, on ne voit plus les jeux. Ici c'est l'inverse :
+   les jaquettes occupent le haut et le bas, à pleine présence, et le texte
+   tient dans la bande de vide qu'elles laissent au milieu. */
+.drift.bands {
+  inset: 0;
+  transform: none;
+  opacity: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0;
+  /* Le fondu LATÉRAL, sur le conteneur : les rangées ne se coupent pas net au
+     bord de l'écran. Le fondu VERTICAL est posé sur chaque bandeau — deux
+     masques sur deux éléments imbriqués, ce qui évite d'avoir à les composer. */
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    #000 14%,
+    #000 86%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    #000 14%,
+    #000 86%,
+    transparent 100%
+  );
+}
+
+.drift-band {
+  display: grid;
+  gap: clamp(0.5rem, 1.2vw, 0.9rem);
+  /* Un rien de travers : assez pour que ça ne ressemble pas à un tableau, pas
+     assez pour qu'on ait la tête penchée. Les bandeaux débordent donc un peu
+     de chaque côté, sinon le coin bas à gauche se viderait. */
+  width: 112%;
+  margin-left: -6%;
+}
+.drift-band.top {
+  transform: rotate(-2.5deg);
+  transform-origin: center;
+  /* Le bandeau s'éteint vers le centre, là où vit le texte. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 46%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 46%, transparent 100%);
+}
+.drift-band.bottom {
+  transform: rotate(-2.5deg);
+  transform-origin: center;
+  -webkit-mask-image: linear-gradient(to top, #000 46%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 46%, transparent 100%);
+}
+
+/* À pleine présence sur les bords, les jaquettes n'ont plus besoin d'être
+   effacées : c'est le voile central de la page qui protège le texte. */
+:root[data-theme="dark"] .drift.bands .drift-card {
+  opacity: 0.62;
+}
+:root:not([data-theme="dark"]) .drift.bands .drift-card {
+  opacity: 0.72;
+}
+
+/* Écran peu haut : les deux bandeaux se rapprochent du texte. On n'en garde
+   qu'une rangée de chaque côté plutôt que de tout empiler. */
+@media (max-height: 760px) {
+  .drift-band .drift-row:nth-child(2) {
+    display: none;
+  }
+}
+
 /* Un décor qui bouge tout seul n'a rien d'indispensable : pour qui a demandé
    moins de mouvement, il s'arrête et reste une belle image fixe. */
 @media (prefers-reduced-motion: reduce) {
@@ -119,9 +200,9 @@
   inset: 0;
   z-index: 1;
   background: radial-gradient(
-    62% 58% at 50% 50%,
-    var(--bg) 34%,
-    color-mix(in srgb, var(--bg) 72%, transparent) 62%,
+    64% 42% at 50% 50%,
+    var(--bg) 30%,
+    color-mix(in srgb, var(--bg) 70%, transparent) 62%,
     transparent 100%
   );
   pointer-events: none;
@@ -506,16 +587,16 @@
   /* Le voile s'éteint tôt : le texte reste net au centre, les jaquettes
      gardent leur couleur sur les bords. */
   background: radial-gradient(
-    58% 54% at 50% 50%,
-    rgba(255, 255, 255, 0.96) 30%,
-    rgba(250, 250, 252, 0.72) 58%,
+    64% 42% at 50% 50%,
+    rgba(255, 255, 255, 0.96) 28%,
+    rgba(250, 250, 252, 0.7) 60%,
     transparent 100%
   );
 }
 
 /* Sur fond clair, une jaquette a besoin d'OMBRE pour exister — sans elle, elle
    se dissout dans la page au lieu de flotter dessus. */
-:root:not([data-theme="dark"]) .drift {
+:root:not([data-theme="dark"]) .drift:not(.bands) {
   opacity: 0.52;
 }
 :root:not([data-theme="dark"]) .drift-card {
@@ -536,9 +617,9 @@
 }
 :root[data-theme="dark"] .lp::before {
   background: radial-gradient(
-    58% 54% at 50% 50%,
-    rgba(11, 12, 17, 0.94) 30%,
-    rgba(11, 12, 17, 0.7) 58%,
+    64% 42% at 50% 50%,
+    rgba(11, 12, 17, 0.94) 28%,
+    rgba(11, 12, 17, 0.7) 60%,
     transparent 100%
   );
 }
