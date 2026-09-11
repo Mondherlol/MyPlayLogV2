@@ -51,6 +51,8 @@ import { safeSetItem } from "../lib/storage";
 import { useAuth } from "../context/AuthContext";
 import { useLibrary } from "../context/LibraryContext";
 import ScrollRow from "../components/ScrollRow";
+// Jeu ajouté par lien Steam et pas encore référencé chez IGDB : sa fiche le dit.
+import LocalGameBanner from "../components/LocalGameBanner";
 import RatingGauge from "../components/RatingGauge";
 import PlayedModal from "../components/PlayedModal";
 import AddToListModal from "../components/AddToListModal";
@@ -337,10 +339,19 @@ export default function GamePage({
   // Les sous-sections (patch FR Switch, fan-trad VN) se masquent d'elles-mêmes
   // côté serveur si non pertinentes.
   const canDownload = !!user?.canDownload;
-  const tabs = useMemo(
-    () => (canDownload ? TABS : TABS.filter((t) => t.id !== "patches")),
-    [canDownload]
-  );
+  // Une fiche provisoire (jeu ajouté par lien Steam, absent d'IGDB) n'a ni
+  // saga, ni OST, ni personnages : ces onglets n'auraient RIEN à montrer, et un
+  // onglet vide se lit comme une panne. Les succès Steam, eux, fonctionnent —
+  // c'est justement un jeu Steam, on a son appid.
+  const isLocal = !!game?.local;
+  const tabs = useMemo(() => {
+    let list = canDownload ? TABS : TABS.filter((t) => t.id !== "patches");
+    if (isLocal) {
+      const empty = new Set(["related", "ost", "characters", "patches"]);
+      list = list.filter((t) => !empty.has(t.id));
+    }
+    return list;
+  }, [canDownload, isLocal]);
 
   // Onglet actif : vit dans l'URL (?tab=…) pour survivre au refresh et au
   // retour arrière (replace : changer d'onglet n'empile pas d'historique).
@@ -964,6 +975,14 @@ export default function GamePage({
                 </div>
               )}
             </header>
+
+            {game.local && (
+              <LocalGameBanner
+                game={game}
+                token={token}
+                onRefreshed={() => window.location.reload()}
+              />
+            )}
 
             {/* Onglets */}
             {/* Ancre (hors flux sticky) pour recaler le scroll au changement d'onglet. */}

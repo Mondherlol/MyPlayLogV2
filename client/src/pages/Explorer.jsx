@@ -19,6 +19,8 @@ import { reportMissionFlag } from "../lib/missionFlags";
 import { makeCache } from "../lib/cache";
 import { useAuth } from "../context/AuthContext";
 import GameCard from "../components/GameCard";
+import SteamIcon from "../components/SteamIcon";
+import SteamLinkModal from "../components/SteamLinkModal";
 import FilterSection from "../components/FilterSection";
 import MediaLightbox from "../components/MediaLightbox";
 import {
@@ -135,6 +137,10 @@ export default function Explorer() {
   const [error, setError] = useState(null);
   const [searchInput, setSearchInput] = useState(q);
   const [filtersOpen, setFiltersOpen] = useState(false); // mobile
+  // « J'ai le lien Steam » : la porte de sortie quand la recherche ne trouve
+  // rien — soit parce que la page Steam affiche un autre titre, soit parce que
+  // le jeu n'est pas encore au catalogue (cf. components/SteamLinkModal.jsx).
+  const [steamLinkOpen, setSteamLinkOpen] = useState(false);
   const [filterSearch, setFilterSearch] = useState(""); // recherche dans les filtres
   const [filterSearchOpen, setFilterSearchOpen] = useState(false);
   const [view, setView] = useState(
@@ -374,6 +380,7 @@ export default function Explorer() {
 
   return (
     <div className="explorer">
+      {steamLinkOpen && <SteamLinkModal onClose={() => setSteamLinkOpen(false)} />}
 
       <div className="explorer-layout">
         {/* Voile derrière le bottom sheet des filtres (mobile) */}
@@ -527,6 +534,15 @@ export default function Explorer() {
                   <X size={16} />
                 </button>
               )}
+              <button
+                type="button"
+                className="explorer-search-steam clickable"
+                onClick={() => setSteamLinkOpen(true)}
+                title="Ajouter un jeu par son lien Steam"
+                aria-label="Ajouter un jeu par son lien Steam"
+              >
+                <SteamIcon size={17} />
+              </button>
             </form>
 
             <div className="explorer-sort">
@@ -594,6 +610,20 @@ export default function Explorer() {
               {!loading && games.length === 0 && (
                 <div className="explorer-empty font-fun">
                   Aucun jeu ne correspond à ces critères.
+                  {/* C'EST ICI QUE LE BESOIN SE FAIT SENTIR, pas dans un menu :
+                      une recherche qui ne rend rien, c'est soit un jeu dont la
+                      page Steam porte un autre titre, soit un jeu pas encore
+                      référencé. Les deux se règlent avec son lien Steam. */}
+                  {q && (
+                    <button
+                      type="button"
+                      className="explorer-empty-steam clickable"
+                      onClick={() => setSteamLinkOpen(true)}
+                    >
+                      <SteamIcon size={16} />
+                      Tu as son lien Steam&nbsp;? Ajoute-le par là
+                    </button>
+                  )}
                 </div>
               )}
 

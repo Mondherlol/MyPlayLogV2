@@ -17,6 +17,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLibrary } from "../context/LibraryContext";
 import { useClickOutside } from "../hooks/useClickOutside";
 import { apiFetch } from "../lib/api";
+import SteamIcon from "./SteamIcon";
 import PlayedModal from "./PlayedModal";
 import AddToListModal from "./AddToListModal";
 
@@ -98,7 +99,16 @@ export default function GameCard({ game, variant = "grid" }) {
         </div>
 
         <div className="game-row-info">
-          <h3 className="game-row-title">{game.name}</h3>
+          <h3 className="game-row-title">
+            {game.name}
+            {game.local && (
+              <SteamIcon
+                size={12}
+                className="game-row-local"
+                aria-label="Fiche tirée de Steam"
+              />
+            )}
+          </h3>
           <p className="game-row-meta">
             {game.year && <span>{game.year}</span>}
             {genres.length > 0 && <span>{genres.slice(0, 3).join(", ")}</span>}
@@ -179,6 +189,14 @@ export default function GameCard({ game, variant = "grid" }) {
           <div className="game-nocover">
             <Gamepad2 size={30} />
           </div>
+        )}
+
+        {/* Fiche provisoire tirée de Steam (jeu pas encore chez IGDB) : on le
+            signale sur la vignette, sinon on croit à une fiche bâclée. */}
+        {game.local && (
+          <span className="game-local-tag" title="Fiche tirée de Steam — jeu pas encore référencé chez IGDB">
+            <SteamIcon size={11} />
+          </span>
         )}
 
         {game.rating != null && (

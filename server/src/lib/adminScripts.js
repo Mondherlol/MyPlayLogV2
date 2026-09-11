@@ -1,5 +1,6 @@
 import GameTrivia from "../models/GameTrivia.js";
 import UserGame from "../models/UserGame.js";
+import { runSteamIgdbSync } from "./steamIgdbSync.js";
 
 // ======================================================================
 //  Scripts de maintenance — onglet « Scripts » du panel admin
@@ -149,6 +150,17 @@ export const SCRIPTS = [
     description: `Remet à 0 tout temps de jeu déclaré au-dessus de ${HOURS_LIMIT} h — les « 1 000 000 000 000 heures » des trolls. Les valeurs plausibles ne sont pas touchées.`,
     danger: true,
     run: fixHours,
+  },
+  {
+    key: "steamIgdbSync",
+    label: "Rapprocher les jeux Steam du catalogue IGDB",
+    description:
+      "Redemande à IGDB si les jeux ajoutés par lien Steam — ceux qu'IGDB ne " +
+      "connaissait pas au moment de l'ajout — sont désormais au catalogue. " +
+      "Ceux qui y sont entrés voient leur fiche locale recollée sur la vraie : " +
+      "bibliothèques, avis, listes et succès suivent. La tâche tourne déjà " +
+      "toute seule toutes les six heures ; ce bouton force un passage.",
+    run: ({ dryRun }) => runSteamIgdbSync({ dryRun, limit: 100 }),
   },
 ];
 

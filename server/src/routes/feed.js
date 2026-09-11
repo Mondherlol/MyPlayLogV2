@@ -1143,7 +1143,12 @@ async function buildTimeline(
   // requête IGDB batchée résout les manquantes (+ backfill best-effort).
   const noCoverIds = [
     ...new Set(mediaPosts.filter((p) => p.user && !p.gameCover && p.gameId).map((p) => p.gameId)),
-  ];
+  ]
+    // ⚠️ Les jeux ajoutés par lien Steam portent un identifiant NÉGATIF (cf.
+    // lib/localGame.js) qu'IGDB ne sait pas lire — et qui ferait échouer la
+    // requête pour TOUS les autres jeux du lot. Leur jaquette est de toute
+    // façon déjà enregistrée sur le post.
+    .filter((id) => id > 0);
   const coverById = new Map();
   if (noCoverIds.length) {
     try {
@@ -2093,7 +2098,9 @@ async function fetchForYou(userId) {
   const ownedIds = owned.map((e) => e.gameId);
   if (!ownedIds.length) return [];
 
-  const sample = ownedIds.slice(-200); // les ajouts les plus récents pèsent
+  // Les fiches locales (identifiant négatif) n'ont pas de genres chez IGDB, et
+  // un identifiant négatif ferait échouer la requête entière : on les écarte.
+  const sample = ownedIds.filter((id) => id > 0).slice(-200); // les ajouts récents pèsent
   const raw = await igdbQuery(
     "games",
     `fields genres; where id = (${sample.join(",")}); limit 200;`
@@ -2402,11 +2409,18 @@ async function resolveOnIgdb(suggestions, { platClause, excludeSet }) {
 
 router.post("/recommend", requireAuth, async (req, res) => {
   try {
+    // `> 0` : un jeu ajouté par lien Steam (identifiant négatif, cf.
+    // lib/localGame.js) n'est pas au catalogue IGDB — il ne peut donc servir de
+    // point de départ à une recommandation, et l'y mettre ferait échouer la
+    // requête pour les autres jeux choisis.
     const seedIds = [
-      ...new Set((req.body.gameIds || []).map(Number).filter(Number.isInteger)),
+      ...new Set((req.body.gameIds || []).map(Number).filter((n) => Number.isInteger(n) && n > 0)),
     ].slice(0, 3);
     if (!seedIds.length) {
-      return res.status(400).json({ error: "Choisis au moins un jeu." });
+      return res.status(400).json({
+        error:
+          "Choisis au moins un jeu du catalogue. Un jeu ajouté par lien Steam et pas encore référencé chez IGDB ne peut pas servir de point de départ.",
+      });
     }
     const platIds = [
       ...new Set((req.body.platforms || []).map(Number).filter(Number.isInteger)),

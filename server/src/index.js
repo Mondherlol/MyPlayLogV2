@@ -43,6 +43,7 @@ import gbaStreamRoutes from "./routes/gbaStream.js";
 import listenRoutes from "./routes/listen.js";
 import arcadeRoutes from "./routes/arcade.js";
 import steamRoutes from "./routes/steam.js";
+import steamGameRoutes from "./routes/steamGames.js";
 import psnRoutes from "./routes/psn.js";
 import patchnoteRoutes from "./routes/patchnotes.js";
 import adminRoutes from "./routes/admin.js";
@@ -54,6 +55,7 @@ import patchesRoutes from "./routes/patches.js";
 import downloadRoutes from "./routes/downloads.js";
 import appReleaseRoutes from "./routes/appRelease.js";
 import trackerRoutes, { startTrackerAutoSync } from "./routes/trackers.js";
+import { startSteamIgdbSync } from "./lib/steamIgdbSync.js";
 import {
   startEventCalendarSync,
   startEventReminders,
@@ -192,6 +194,9 @@ app.use("/api/gba-stream", gbaStreamRoutes);
 app.use("/api/listen", listenRoutes);
 app.use("/api/arcade", arcadeRoutes);
 app.use("/api/steam", steamRoutes);
+// Ajouter un jeu à partir de son lien Steam — y compris un jeu qu'IGDB ne
+// connaît pas encore (cf. routes/steamGames.js).
+app.use("/api/steam-games", steamGameRoutes);
 // Liaison du compte Discord (OAuth2 « identify ») : c'est elle qui permettra
 // au bot de reconnaître un joueur du site depuis un serveur Discord.
 app.use("/api/discord", discordRoutes);
@@ -310,6 +315,10 @@ async function start() {
     await migrateTrackerSlots();
     // Synchro automatique des comptes de tracking (League of Legends).
     startTrackerAutoSync();
+    // Les jeux ajoutés par lien Steam alors qu'IGDB ne les connaissait pas :
+    // on redemande régulièrement, et le jour où IGDB les ajoute on recolle les
+    // bibliothèques sur la vraie fiche (cf. lib/steamIgdbSync.js).
+    startSteamIgdbSync();
     // Le calendrier des rendez-vous à venir (Directs, showcases) : deux
     // passages par jour, Wikipédia + IGDB. Cf. lib/eventCalendar.
     startEventCalendarSync();

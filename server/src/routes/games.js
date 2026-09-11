@@ -59,6 +59,10 @@ import {
   gameRelatives,
   gameTimeToBeat,
 } from "../lib/gameIgdb.js";
+// Les jeux ajoutés par lien Steam qu'IGDB ne connaît pas encore : identifiant
+// négatif, fiche tirée de leur page boutique (cf. lib/localGame.js).
+import { isLocalId, appIdOf, coreFromSteam } from "../lib/localGame.js";
+import SteamGame from "../models/SteamGame.js";
 import {
   decorateFranchises,
   franchiseGames,
@@ -97,6 +101,71 @@ async function ytOembed(videoId) {
 const router = express.Router();
 
 const IMG_BASE = "https://images.igdb.com/igdb/image/upload";
+
+// L'adresse d'une image IGDB, à la taille demandée.
+//
+// ⚠️ ET LE PASSE-DROIT POUR LES FICHES LOCALES. Un jeu absent d'IGDB (fiche
+// tirée de sa page Steam, cf. lib/localGame.js) n'a pas d'identifiant d'image
+// IGDB : il porte directement l'URL de l'image Steam à la place. Elle est déjà
+// absolue, donc on la rend telle quelle — c'est la seule chose que le reste de
+// ce fichier a besoin de savoir sur les fiches locales, et c'est cette ligne.
+const igdbImg = (size, imageId) =>
+  !imageId ? null : /^https?:\/\//.test(imageId) ? imageId : `${IMG_BASE}/${size}/${imageId}.jpg`;
+
+/**
+ * Les fiches locales d'une liste d'identifiants, à la forme d'une réponse IGDB.
+ *
+ * ⚠️ CE N'EST PAS UN LUXE, C'EST UNE PROTECTION. Un identifiant négatif glissé
+ * dans un `where id = (…)` ne rate pas seulement SA ligne : il fait échouer la
+ * requête ENTIÈRE. Une liste, une bibliothèque ou un feed contenant un seul jeu
+ * ajouté par lien Steam perdrait donc les soixante autres du même lot. Partout
+ * où l'on demande un paquet de jeux à IGDB, on écarte donc les identifiants
+ * locaux — et on les sert d'ici, au même format, pour ne rien perdre.
+ */
+/**
+ * Les fiches locales dont le nom ressemble à ce qu'on cherche.
+ *
+ * On interroge les DEUX titres — celui d'IGDB-à-venir et celui affiché par
+ * Steam : c'est tout l'intérêt, puisque le cas d'origine est un jeu dont la
+ * page s'affiche sous un titre qu'on ne tape pas.
+ *
+ * Les fiches déjà rattachées à IGDB (`igdbId` renseigné) sont exclues : leur
+ * vrai jeu est déjà dans les résultats, les montrer ferait un doublon.
+ */
+async function searchLocalGames(term) {
+  // Les caractères spéciaux d'une expression régulière sont neutralisés : un
+  // titre contenant « ( » ou « + » ferait sinon échouer la recherche.
+  const safe = String(term).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const rx = new RegExp(safe, "i");
+  const docs = await SteamGame.find({
+    igdbId: null,
+    $or: [{ name: rx }, { nameOriginal: rx }],
+  })
+    .limit(8)
+    .lean()
+    .catch(() => []);
+  return docs.map((d) => ({
+    id: -d.appid,
+    name: d.name,
+    gameType: 0,
+    cover: d.cover || d.header || null,
+    rating: null,
+    year: d.releaseDate ? new Date(d.releaseDate * 1000).getFullYear() : null,
+    genres: d.genres || [],
+    platforms: (d.oses || []).map(
+      (os) => ({ windows: "PC", mac: "Mac", linux: "Linux" })[os] || os
+    ),
+    // La carte s'en sert pour dire d'où vient la fiche.
+    local: true,
+  }));
+}
+
+async function localRows(ids) {
+  const appids = ids.filter(isLocalId).map(appIdOf);
+  if (!appids.length) return [];
+  const docs = await SteamGame.find({ appid: { $in: appids } }).lean();
+  return docs.map(coreFromSteam).filter(Boolean);
+}
 
 // --- Upload de covers custom ---
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -142,7 +211,7 @@ function mapGame(g) {
     name: fr?.name || g.name,
     gameType: g.game_type ?? null,
     cover: g.cover?.image_id
-      ? `${IMG_BASE}/t_cover_big/${g.cover.image_id}.jpg`
+      ? igdbImg("t_cover_big", g.cover.image_id)
       : null,
     rating: g.total_rating ? Math.round(g.total_rating) : null,
     year: g.first_release_date
@@ -381,33 +450,72 @@ function parseIds(str) {
 // Construit une clause pour une catégorie multi-valeurs avec mode ET / OU /
 // EXCLUSIF.
 //
-// ⚠️ LES TROIS PARENTHÉSAGES D'APICALYPSE NE VEULENT PAS DIRE LA MÊME CHOSE, ET
-// C'EST TOUT LE MÉCANISME :
+// ⚠️ LES TROIS PARENTHÉSAGES D'APICALYPSE, VÉRIFIÉS SUR L'API — PAS DEVINÉS.
+// La documentation d'IGDB les décrit dans des termes qui n'ont rien à voir avec
+// ce qu'ils font, et la première version de ce filtre s'est trompée à cause de
+// ça. Relevé réel sur `platforms`, id 508 = Switch 2 :
 //
-//   • `= (a,b)` — le tableau CONTIENT a ou b        → le OU ;
-//   • `= {a,b}` — il contient a ET b                → le ET (on l'écrit ici en
-//                                                     clauses séparées, même
-//                                                     effet, plus lisible) ;
-//   • `= [a]`   — il vaut EXACTEMENT {a}, rien de plus → l'exclusivité.
+//   • `= (508)`  → le tableau CONTIENT 508.
+//                  Elden Ring, Hollow Knight, Stardew Valley… → le OU.
+//   • `= [508]`  → CONTIENT AUSSI. Ce n'est PAS une égalité de tableau, quoi
+//                  qu'en dise la doc : la réponse est mot pour mot celle de
+//                  `= (508)`. Sur plusieurs ids, `[a,b]` veut dire « contient a
+//                  ET b » — c'est le ET, pas l'exclusivité.
+//   • `= {508}`  → ÉGALITÉ EXACTE DU TABLEAU. Mario Kart World, Donkey Kong
+//                  Bananza… uniquement des jeux dont la liste de consoles se
+//                  résume à Switch 2. C'est CELUI-LÀ qu'il faut, et l'ordre n'y
+//                  compte pas (`{130,508}` retrouve un jeu listé Switch 2 puis
+//                  Switch).
 //
-// Le troisième est ce qui permet de répondre à « montre-moi les exclusivités
-// Switch » : un jeu sorti sur Switch ET sur PC a bien la Switch dans son
-// tableau, donc `= (Switch)` le garde ; seul `= [Switch]` l'écarte.
-//
-// ⚠️ ET AVEC PLUSIEURS CONSOLES COCHÉES, C'EST UN OU D'EXCLUSIVITÉS, PAS
-// L'EXCLUSIVITÉ DE L'ENSEMBLE. `= [ps5, switch]` demanderait les jeux sortis
-// sur les deux et nulle part ailleurs — un ensemble quasi vide, et surtout pas
-// ce qu'on veut dire en cochant deux consoles. « Les exclus PS5 ET les exclus
-// Switch » est la lecture naturelle, donc `(= [ps5] | = [switch])`.
+// C'est tout le bug : le filtre « exclusif » écrivait `= [508]` et rendait donc
+// le catalogue entier — Elden Ring et Overwatch compris, qui sortent bien sur
+// Switch 2 mais aussi partout ailleurs.
 function clause(field, ids, mode) {
   if (!ids.length) return null;
-  if (mode === "only") {
-    const parts = ids.map((id) => `${field} = [${id}]`);
-    return parts.length === 1 ? parts[0] : `(${parts.join(" | ")})`;
-  }
+  if (mode === "only") return exclusiveClause(field, ids);
   if (ids.length === 1) return `${field} = (${ids[0]})`;
   const parts = ids.map((id) => `${field} = (${id})`);
   return mode === "and" ? parts.join(" & ") : `(${parts.join(" | ")})`;
+}
+
+// ⚠️ AU-DELÀ, ON N'ÉNUMÈRE PLUS (voir `exclusiveClause`). 2^n − 1 sous-ensembles :
+// quatre consoles font quinze clauses, ce qui passe ; huit en feraient 255.
+const EXCLUSIVE_MAX = 4;
+
+/**
+ * « Sorti sur ces consoles-là et NULLE PART AILLEURS. »
+ *
+ * ⚠️ UNE ÉGALITÉ EXACTE NE SUFFIT PAS DÈS QU'ON EN COCHE DEUX. `{130,508}`
+ * demande les jeux sortis sur Switch ET Switch 2 et rien d'autre — il laisse
+ * donc dehors les jeux Switch seulement, alors qu'ils sont eux aussi « sortis
+ * nulle part ailleurs ». Ce qu'on veut, c'est que la liste de consoles du jeu
+ * soit CONTENUE dans celles cochées, ce qu'Apicalypse ne sait pas dire.
+ *
+ * On l'écrit donc en clair : l'égalité exacte pour chaque sous-ensemble non
+ * vide. Avec Switch + Switch 2 cochées, ça donne « exactement Switch », OU
+ * « exactement Switch 2 », OU « exactement les deux » — c'est-à-dire les
+ * exclusivités Nintendo, Mario Kart 8 Deluxe compris.
+ *
+ * Au-delà de quatre consoles, on retombe sur les exclusivités STRICTES (une
+ * seule console chacune) : c'est la partie qui compte, et cocher six consoles
+ * pour demander des exclusivités ne veut plus dire grand-chose de toute façon.
+ */
+function exclusiveClause(field, ids) {
+  const parts =
+    ids.length > EXCLUSIVE_MAX
+      ? ids.map((id) => `${field} = {${id}}`)
+      : subsetsOf(ids).map((set) => `${field} = {${set.join(",")}}`);
+  return parts.length === 1 ? parts[0] : `(${parts.join(" | ")})`;
+}
+
+/** Tous les sous-ensembles non vides, du plus petit au plus grand. */
+function subsetsOf(ids) {
+  const out = [];
+  for (let mask = 1; mask < 1 << ids.length; mask++) {
+    const set = ids.filter((_, i) => mask & (1 << i));
+    out.push(set);
+  }
+  return out.sort((a, b) => a.length - b.length);
 }
 
 // Le catalogue et la recherche, partagés par tout le monde. Deux personnes qui
@@ -576,19 +684,32 @@ router.get("/", requireAuth, async (req, res) => {
       search ? SEARCH_TTL : BROWSE_TTL
     );
 
+    // LES JEUX AJOUTÉS PAR LIEN STEAM DOIVENT SE RETROUVER À LA RECHERCHE.
+    // Sans ça, quelqu'un ajoute un jeu indépendant, le met dans sa collection —
+    // puis ne le retrouve plus jamais en tapant son nom, parce que la recherche
+    // ne parle qu'à IGDB. Ils passent DEVANT : ce sont des jeux que l'on est
+    // seul à avoir, et ils sont peu nombreux (une recherche qui n'en trouve pas
+    // ne coûte qu'une lecture indexée).
+    const locals = search && page === 1 ? await searchLocalGames(search) : [];
+
     // ZÉRO RÉSULTAT SUR UN NOM : c'est presque toujours une lettre de travers.
     // IGDB cherche au caractère près et n'a rien à proposer, alors on cherche
     // le titre le plus proche dans notre lexique. On ne remplace RIEN — on
     // joint la proposition à une réponse vide, et l'app en fait ce qu'elle veut.
     const suggestions =
-      search && !games.length && page === 1 ? suggestTitles(search, 3) : [];
+      search && !games.length && !locals.length && page === 1 ? suggestTitles(search, 3) : [];
+
+    const merged = locals.length ? [...locals, ...games] : games;
 
     res.json({
       page,
       limit,
-      count: games.length,
+      count: merged.length,
+      // `games.length` et PAS `merged.length` : c'est la réponse d'IGDB qui dit
+      // s'il reste des pages. Les fiches locales ne sont servies qu'en page 1 ;
+      // les compter ici ferait croire à une page suivante qui n'existe pas.
       hasMore: games.length === limit,
-      games,
+      games: merged,
       suggestion: suggestions[0] || null,
       suggestions,
     });
@@ -1012,11 +1133,17 @@ router.get("/backdrops", optionalAuth, async (req, res) => {
     const ids = [...new Set(parseIds(req.query.ids))].slice(0, MAX_BACKDROPS);
     if (!ids.length) return res.json({ backdrops: {} });
 
-    const rows = await igdbQuery(
-      "games",
-      `fields artworks.image_id,artworks.width,artworks.height,screenshots.image_id,` +
-        `screenshots.width,screenshots.height; where id = (${ids.join(",")}); limit ${ids.length};`
-    );
+    const remote = ids.filter((id) => !isLocalId(id));
+    const rows = [
+      ...(remote.length
+        ? await igdbQuery(
+            "games",
+            `fields artworks.image_id,artworks.width,artworks.height,screenshots.image_id,` +
+              `screenshots.width,screenshots.height; where id = (${remote.join(",")}); limit ${remote.length};`
+          )
+        : []),
+      ...(await localRows(ids)),
+    ];
 
     const byArea = (a, b) => (b.width || 0) * (b.height || 0) - (a.width || 0) * (a.height || 0);
     const backdrops = {};
@@ -1025,7 +1152,7 @@ router.get("/backdrops", optionalAuth, async (req, res) => {
         [...(g.artworks || [])].filter((a) => a.image_id).sort(byArea)[0] ||
         [...(g.screenshots || [])].filter((s) => s.image_id).sort(byArea)[0];
       // `t_720p` : ces images habillent une vignette, jamais un plein écran.
-      backdrops[g.id] = best ? `${IMG_BASE}/t_720p/${best.image_id}.jpg` : null;
+      backdrops[g.id] = best ? igdbImg("t_720p", best.image_id) : null;
     }
     // Les jeux sans image répondent `null` : le client saura qu'il a demandé
     // et n'y reviendra pas à chaque affichage.
@@ -1114,10 +1241,16 @@ router.get("/list-details", optionalAuth, async (req, res) => {
     const ids = [...new Set(parseIds(req.query.ids))].slice(0, MAX_LIST_DETAILS);
     if (!ids.length) return res.json({ games: [] });
 
-    const rows = await igdbQuery(
-      "games",
-      `fields ${LIST_DETAIL_FIELDS}; where id = (${ids.join(",")}); limit ${ids.length};`
-    );
+    const remote = ids.filter((id) => !isLocalId(id));
+    const rows = [
+      ...(remote.length
+        ? await igdbQuery(
+            "games",
+            `fields ${LIST_DETAIL_FIELDS}; where id = (${remote.join(",")}); limit ${remote.length};`
+          )
+        : []),
+      ...(await localRows(ids)),
+    ];
 
     const byArea = (a, b) =>
       (b.width || 0) * (b.height || 0) - (a.width || 0) * (a.height || 0);
@@ -1161,7 +1294,7 @@ router.get("/list-details", optionalAuth, async (req, res) => {
         id: g.id,
         name: g.name,
         summary: g.summary ? String(g.summary).slice(0, 600) : null,
-        cover: g.cover?.image_id ? `${IMG_BASE}/t_cover_big/${g.cover.image_id}.jpg` : null,
+        cover: g.cover?.image_id ? igdbImg("t_cover_big", g.cover.image_id) : null,
         releaseDate: g.first_release_date || null,
         released: !!(g.first_release_date && g.first_release_date <= nowSec),
         rating: g.total_rating ? Math.round(g.total_rating) : null,
@@ -1191,8 +1324,8 @@ router.get("/list-details", optionalAuth, async (req, res) => {
           .slice(0, 12)
           .map((s) => ({
             id: s.image_id,
-            thumb: `${IMG_BASE}/t_screenshot_med/${s.image_id}.jpg`,
-            full: `${IMG_BASE}/t_1080p/${s.image_id}.jpg`,
+            thumb: igdbImg("t_screenshot_med", s.image_id),
+            full: igdbImg("t_1080p", s.image_id),
           })),
         trailer: trailer
           ? { videoId: trailer.video_id, name: trailer.name || "Bande-annonce" }
@@ -1268,7 +1401,7 @@ router.get("/characters-search", requireAuth, async (req, res) => {
         id: `igdb-${c.id}`,
         name: c.name,
         image: c.mug_shot?.image_id
-          ? `${IMG_BASE}/t_cover_big/${c.mug_shot.image_id}.jpg`
+          ? igdbImg("t_cover_big", c.mug_shot.image_id)
           : null,
         gameId: c.games?.[0]?.id ?? null,
         gameName: c.games?.[0]?.name || "",
@@ -1477,7 +1610,7 @@ async function fetchBundleGames(bundleId, releaseDate = null) {
       id: g.id,
       name: g.name,
       cover: g.cover?.image_id
-        ? `${IMG_BASE}/t_cover_big/${g.cover.image_id}.jpg`
+        ? igdbImg("t_cover_big", g.cover.image_id)
         : null,
       rating: g.total_rating ? Math.round(g.total_rating) : null,
       year: g.first_release_date
@@ -1520,7 +1653,7 @@ function gameDlcs(g) {
       out.push({
         id: d.id,
         name: d.name,
-        cover: d.cover?.image_id ? `${IMG_BASE}/t_cover_big/${d.cover.image_id}.jpg` : null,
+        cover: d.cover?.image_id ? igdbImg("t_cover_big", d.cover.image_id) : null,
         // Le type dit ce qu'on coche : une extension de trente heures et un
         // pack d'armures ne se cochent pas du même cœur.
         typeLabel: GAME_TYPES_FR[d.game_type]?.label || null,
@@ -1557,7 +1690,7 @@ function editionRow(g, fallbackLabel) {
   return {
     id: g.id,
     name: g.name,
-    cover: g.cover?.image_id ? `${IMG_BASE}/t_cover_big/${g.cover.image_id}.jpg` : null,
+    cover: g.cover?.image_id ? igdbImg("t_cover_big", g.cover.image_id) : null,
     typeLabel: GAME_TYPES_FR[g.game_type]?.label || fallbackLabel,
     year: g.first_release_date ? new Date(g.first_release_date * 1000).getFullYear() : null,
     releaseDate: g.first_release_date || null,
@@ -1681,9 +1814,9 @@ router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
     const g = core || {};
     const covers = [];
     if (g.cover?.image_id)
-      covers.push({ id: g.cover.image_id, url: `${IMG_BASE}/t_cover_big/${g.cover.image_id}.jpg` });
+      covers.push({ id: g.cover.image_id, url: igdbImg("t_cover_big", g.cover.image_id) });
     for (const a of g.artworks || [])
-      covers.push({ id: a.image_id, url: `${IMG_BASE}/t_720p/${a.image_id}.jpg` });
+      covers.push({ id: a.image_id, url: igdbImg("t_720p", a.image_id) });
     for (const c of customCovers)
       covers.push({ id: String(c._id), url: c.url, custom: true });
 
@@ -1691,7 +1824,7 @@ router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
       id: `igdb-${c.id}`,
       name: c.name,
       image: c.mug_shot?.image_id
-        ? `${IMG_BASE}/t_cover_big/${c.mug_shot.image_id}.jpg`
+        ? igdbImg("t_cover_big", c.mug_shot.image_id)
         : null,
       // Les deux champs qui ne sortent PAS vers le client (cf. `strip` plus
       // bas) : ils ne servent qu'à recoller les doublons de langue.
@@ -2031,8 +2164,8 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
     // Médias : artworks + captures en 1080p (fond/plein écran) avec vignette,
     // typés pour permettre le filtrage côté client. Triés par résolution
     // décroissante (les plus nettes d'abord — pour un beau fond de page).
-    const imgFull = (imgId) => `${IMG_BASE}/t_1080p/${imgId}.jpg`;
-    const imgThumb = (imgId) => `${IMG_BASE}/t_screenshot_med/${imgId}.jpg`;
+    const imgFull = (imgId) => igdbImg("t_1080p", imgId);
+    const imgThumb = (imgId) => igdbImg("t_screenshot_med", imgId);
     const byArea = (a, b) => (b.width || 0) * (b.height || 0) - (a.width || 0) * (a.height || 0);
     const artworks = (g.artworks || []).filter((a) => a.image_id).sort(byArea);
     const screenshots = (g.screenshots || []).filter((s) => s.image_id).sort(byArea);
@@ -2095,7 +2228,7 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
       .map((s) => ({
         id: s.id,
         name: s.name,
-        cover: `${IMG_BASE}/t_cover_big/${s.cover.image_id}.jpg`,
+        cover: igdbImg("t_cover_big", s.cover.image_id),
         rating: s.total_rating ? Math.round(s.total_rating) : null,
         year: s.first_release_date
           ? new Date(s.first_release_date * 1000).getFullYear()
@@ -2150,7 +2283,7 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
                 id: relParent.id,
                 name: relParent.name,
                 cover: relParent.cover?.image_id
-                  ? `${IMG_BASE}/t_cover_small/${relParent.cover.image_id}.jpg`
+                  ? igdbImg("t_cover_small", relParent.cover.image_id)
                   : null,
               }
             : null,
@@ -2180,7 +2313,7 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
       storyline: g.storyline || null,
       summaryFr: translation.summaryFr,
       storylineFr: translation.storylineFr,
-      cover: g.cover?.image_id ? `${IMG_BASE}/t_cover_big/${g.cover.image_id}.jpg` : null,
+      cover: g.cover?.image_id ? igdbImg("t_cover_big", g.cover.image_id) : null,
       backdrop,
       media,
       // { id, name } : l'id IGDB permet de rendre les puces cliquables côté
@@ -2236,6 +2369,18 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
       websites,
       similar,
       timeToBeat,
+      // --- Fiche provisoire (jeu ajouté par lien Steam, pas encore chez IGDB) ---
+      // Absent des fiches normales : le client ne teste que sa présence, et la
+      // réponse ne grossit pas d'un champ nul pour les 300 000 autres jeux.
+      ...(g.local
+        ? {
+            local: true,
+            steamAppId: g.steamAppId,
+            steamUrl: g.steamUrl,
+            comingSoon: g.comingSoon,
+            submittedToIgdb: g.submittedToIgdb,
+          }
+        : {}),
     });
   } catch (err) {
     console.error("game full error:", err.message);
@@ -2412,7 +2557,7 @@ router.get("/:id/hd-packs", requireAuth, requireDownloadAccess, async (req, res)
     if (!g) return res.status(404).json({ error: "Jeu introuvable." });
 
     const cover = g.cover?.image_id
-      ? `${IMG_BASE}/t_cover_small/${g.cover.image_id}.jpg`
+      ? igdbImg("t_cover_small", g.cover.image_id)
       : null;
     const packs = await fetchC411Packs(g.name);
     res.json({ name: g.name, cover, packs });
@@ -2502,7 +2647,7 @@ function mapRelGame(g) {
   return {
     id: g.id,
     name: g.name,
-    cover: g.cover?.image_id ? `${IMG_BASE}/t_cover_big/${g.cover.image_id}.jpg` : null,
+    cover: g.cover?.image_id ? igdbImg("t_cover_big", g.cover.image_id) : null,
     rating: g.total_rating ? Math.round(g.total_rating) : null,
     year: g.first_release_date
       ? new Date(g.first_release_date * 1000).getFullYear()
@@ -3133,7 +3278,7 @@ router.get("/:id/releases", optionalAuth, async (req, res) => {
     const slim = (x, label) => ({
       id: x.id,
       name: x.name,
-      cover: x.cover?.image_id ? `${IMG_BASE}/t_cover_small/${x.cover.image_id}.jpg` : null,
+      cover: x.cover?.image_id ? igdbImg("t_cover_small", x.cover.image_id) : null,
       label: GAME_TYPES_FR[x.game_type]?.label || label,
       date: x.first_release_date || null,
       platforms: (x.platforms || []).map((p) => p.abbreviation || p.name).filter(Boolean),
@@ -3522,7 +3667,7 @@ router.get("/:id/ratings", optionalAuth, async (req, res) => {
         .map((x) => ({
           id: x.id,
           name: x.name,
-          cover: x.cover?.image_id ? `${IMG_BASE}/t_cover_big/${x.cover.image_id}.jpg` : null,
+          cover: x.cover?.image_id ? igdbImg("t_cover_big", x.cover.image_id) : null,
           score: Math.round(x.total_rating),
           year: x.first_release_date
             ? new Date(x.first_release_date * 1000).getFullYear()

@@ -1,5 +1,7 @@
 import GameMeta from "../models/GameMeta.js";
+import SteamGame from "../models/SteamGame.js";
 import { igdbQuery } from "./igdb.js";
+import { isLocalId, appIdOf } from "./localGame.js";
 import { GENRES_FR, frName } from "./translations.js";
 
 const STALE_MS = 30 * 24 * 60 * 60 * 1000; // on re-rafraîchit passé 30 jours
@@ -44,8 +46,18 @@ export async function ensureGameMeta(gameIds) {
     return !m || now - new Date(m.updatedAt).getTime() > STALE_MS;
   });
 
-  for (let i = 0; i < missing.length; i += CHUNK) {
-    const chunk = missing.slice(i, i + CHUNK);
+  // ⚠️ LES FICHES LOCALES NE DOIVENT PAS PARTIR CHEZ IGDB, et pas seulement
+  // parce qu'il ne les connaît pas : un identifiant négatif dans un
+  // `where id = (…)` fait échouer LA REQUÊTE ENTIÈRE. Une bibliothèque
+  // contenant un seul jeu ajouté par lien Steam perdrait alors les métadonnées
+  // des 399 autres jeux du même lot. On les sépare donc, et on les remplit
+  // depuis leur page Steam.
+  const locals = missing.filter(isLocalId);
+  const remote = missing.filter((id) => !isLocalId(id));
+  if (locals.length) await fillLocalMeta(locals, byId);
+
+  for (let i = 0; i < remote.length; i += CHUNK) {
+    const chunk = remote.slice(i, i + CHUNK);
     try {
       const raw = await igdbQuery(
         "games",
@@ -64,6 +76,32 @@ export async function ensureGameMeta(gameIds) {
     }
   }
   return byId;
+}
+
+// Les métadonnées d'un jeu ajouté par lien Steam viennent de sa page boutique,
+// déjà enregistrée chez nous : aucune requête réseau ici.
+async function fillLocalMeta(ids, byId) {
+  try {
+    const docs = await SteamGame.find({ appid: { $in: ids.map(appIdOf) } }).lean();
+    const ops = [];
+    for (const d of docs) {
+      const gameId = -d.appid;
+      const doc = {
+        name: d.name || "",
+        genres: (d.genres || []).map((g) => frName(GENRES_FR, g)).filter(Boolean),
+        developers: d.developers || [],
+        publishers: d.publishers || [],
+        franchise: null,
+        year: d.releaseDate ? new Date(d.releaseDate * 1000).getFullYear() : null,
+        rating: null, // aucune note : le jeu n'est pas encore au catalogue
+      };
+      byId.set(gameId, { gameId, ...doc });
+      ops.push({ updateOne: { filter: { gameId }, update: { $set: doc }, upsert: true } });
+    }
+    if (ops.length) await GameMeta.bulkWrite(ops, { ordered: false });
+  } catch (err) {
+    console.error("game meta (local) error:", err.message);
+  }
 }
 
 // Pré-chauffe le cache pour un jeu (à l'ajout en bibliothèque), sans bloquer

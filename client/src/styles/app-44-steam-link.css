@@ -1,0 +1,291 @@
+/* ======================================================================
+   Ajouter un jeu par son lien Steam
+   ======================================================================
+   La modale réutilise volontairement l'habillage de l'import Steam
+   (.steam-modal, .btn-steam-primary — cf. app-15-settings.css) : c'est la même
+   fonctionnalité vue sous un autre angle, elle doit se reconnaître. Seuls les
+   morceaux qui n'existaient pas encore sont ici.
+   ====================================================================== */
+
+/* Le bouton logé dans la barre de recherche de l'explorateur. */
+.explorer-search-steam {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  margin-right: 0.25rem;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-soft);
+  cursor: var(--cursor-pointer), pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.explorer-search-steam:hover {
+  color: #66c0f4;
+  background: rgba(102, 192, 244, 0.12);
+}
+
+/* Le rappel sous une recherche qui n'a rien donné. */
+.explorer-empty-steam {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.9rem auto 0;
+  padding: 0.55rem 0.95rem;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.86rem;
+  cursor: var(--cursor-pointer), pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.explorer-empty-steam:hover {
+  border-color: #66c0f4;
+  color: #66c0f4;
+}
+.explorer-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* --- La modale --- */
+.steam-link-modal {
+  width: min(520px, 100%);
+}
+.steam-link-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.1rem 1.35rem 1.5rem;
+}
+.steam-link-intro {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.steam-link-field {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.15rem 0.8rem;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.steam-link-field:focus-within {
+  border-color: #66c0f4;
+}
+.steam-link-field-icon {
+  flex: 0 0 auto;
+  color: var(--text-soft);
+}
+.steam-link-field input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.62rem 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+}
+.steam-link-field input:focus {
+  outline: none;
+}
+.steam-link-error {
+  margin: -0.3rem 0 0;
+  color: #e05c5c;
+  font-size: 0.83rem;
+  line-height: 1.45;
+}
+.steam-link-hint {
+  margin: 0;
+  padding-top: 0.2rem;
+  border-top: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 0.79rem;
+  line-height: 1.5;
+}
+.steam-link-modal .btn-steam-primary {
+  justify-content: center;
+}
+
+/* Le jeu trouvé, juste avant d'ouvrir sa fiche. */
+.steam-link-found {
+  display: flex;
+  gap: 0.9rem;
+  align-items: center;
+}
+.steam-link-cover {
+  width: 72px;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: 10px;
+  box-shadow: var(--shadow-sm);
+}
+.steam-link-found-text {
+  min-width: 0;
+}
+.steam-link-found-text h3 {
+  margin: 0.35rem 0 0.15rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+.steam-link-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(102, 192, 244, 0.16);
+  color: #4aa3d8;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.steam-link-alt,
+.steam-link-meta {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.8rem;
+}
+.steam-link-alt {
+  font-style: italic;
+}
+.steam-link-store {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  text-decoration: none;
+}
+.steam-link-store:hover {
+  color: #66c0f4;
+}
+
+/* ======================================================================
+   La fiche provisoire, sur la page du jeu
+   ====================================================================== */
+.local-game-banner {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+  margin: 1rem 0;
+  padding: 0.95rem 1.1rem;
+  border: 1.5px solid var(--border-strong);
+  border-left: 4px solid #66c0f4;
+  border-radius: 14px;
+  background: var(--surface);
+}
+.local-game-banner-icon {
+  flex: 0 0 auto;
+  margin-top: 0.15rem;
+  color: #66c0f4;
+}
+.local-game-banner h4 {
+  margin: 0 0 0.3rem;
+  font-family: var(--font-display);
+  font-size: 0.98rem;
+}
+.local-game-banner p {
+  margin: 0 0 0.55rem;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.local-game-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.local-game-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.8rem;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  text-decoration: none;
+  cursor: var(--cursor-pointer), pointer;
+}
+.local-game-btn:hover {
+  border-color: #66c0f4;
+  color: #66c0f4;
+}
+.local-game-btn.done {
+  color: var(--text-soft);
+  cursor: var(--cursor-default), default;
+}
+
+/* Le dossier prêt à coller pour la soumission IGDB. */
+.igdb-submit-sheet {
+  margin-top: 0.75rem;
+  padding: 0.85rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.igdb-submit-sheet ol {
+  margin: 0 0 0.7rem;
+  padding-left: 1.15rem;
+  color: var(--text-soft);
+  font-size: 0.83rem;
+  line-height: 1.65;
+}
+.igdb-submit-pre {
+  max-height: 210px;
+  overflow: auto;
+  margin: 0 0 0.6rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.76rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 560px) {
+  .steam-link-body {
+    padding: 1rem 1rem 1.3rem;
+  }
+  .local-game-banner {
+    flex-direction: column;
+  }
+}
+
+/* Le repère « fiche tirée de Steam » sur une vignette de résultat. */
+.game-local-tag {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 21px;
+  height: 21px;
+  border-radius: 7px;
+  background: rgba(10, 14, 22, 0.78);
+  color: #66c0f4;
+  backdrop-filter: blur(3px);
+}
+.game-row-local {
+  margin-left: 0.4rem;
+  color: #66c0f4;
+  vertical-align: -1px;
+}

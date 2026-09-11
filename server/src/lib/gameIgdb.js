@@ -25,6 +25,10 @@
 
 import GameCache from "../models/GameCache.js";
 import { igdbQuery } from "./igdb.js";
+// Les fiches locales (jeux Steam absents d'IGDB) portent un identifiant
+// NÉGATIF. Elles n'ont rien à demander à IGDB : chaque morceau ci-dessous
+// commence donc par vérifier qu'on parle bien d'un jeu du catalogue.
+import { isLocalId, localCore } from "./localGame.js";
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -250,6 +254,11 @@ const one = (arr) => (Array.isArray(arr) && arr.length ? arr[0] : null);
 
 /** La fiche IGDB d'un jeu (ou null s'il n'existe pas). */
 export async function gameCore(gameId) {
+  // Fiche locale : elle vit dans notre base, pas dans le cache IGDB. Pas de
+  // `remember` non plus — il n'y a ni quota ni latence à ménager, et une fiche
+  // Steam qu'on vient de rafraîchir doit s'afficher à jour tout de suite.
+  if (isLocalId(gameId)) return localCore(gameId);
+
   const g = await remember({
     kind: "core",
     gameId,
@@ -287,6 +296,7 @@ export async function gameCore(gameId) {
  * que dans une feuille qu'on ouvre rarement.
  */
 export function gameCreatedAt(gameId, releaseDate) {
+  if (isLocalId(gameId)) return Promise.resolve(null);
   return remember({
     kind: "announce",
     gameId,
@@ -369,6 +379,7 @@ const NOT_A_CHARACTER = /voice[\s-]?over/i;
 
 /** Les personnages IGDB du jeu, au complet et débarrassés des vignettes fausses. */
 export function gameCharacters(gameId, releaseDate) {
+  if (isLocalId(gameId)) return Promise.resolve([]);
   return remember({
     kind: "chars",
     gameId,
@@ -412,6 +423,7 @@ export function gameCharacters(gameId, releaseDate) {
 
 /** Les temps de complétion mesurés par IGDB (avant tout repli sur HLTB). */
 export function gameTimeToBeat(gameId, releaseDate) {
+  if (isLocalId(gameId)) return Promise.resolve([]);
   return remember({
     kind: "ttb",
     gameId,
@@ -427,6 +439,7 @@ export function gameTimeToBeat(gameId, releaseDate) {
 
 /** Les jeux CONTENUS dans un bundle (ceux qui le citent dans leur champ `bundles`). */
 export function gameBundleContents(gameId, releaseDate) {
+  if (isLocalId(gameId)) return Promise.resolve([]);
   return remember({
     kind: "bundle",
     gameId,
@@ -452,6 +465,7 @@ export function gameBundleContents(gameId, releaseDate) {
  * aucune licence : on ne demande alors que les éditions.
  */
 export function gameRelatives(gameId, whereRel, releaseDate) {
+  if (isLocalId(gameId)) return Promise.resolve({ editions: [], series: [] });
   return remember({
     kind: "relatives",
     gameId,
