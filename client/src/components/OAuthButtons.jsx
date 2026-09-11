@@ -80,7 +80,6 @@ export default function OAuthButtons({ next = "/app", remember = true, busy = fa
           {going === "discord" ? "Redirection…" : "Continuer avec Discord"}
         </button>
       )}
-r
     </div>
   );
 }

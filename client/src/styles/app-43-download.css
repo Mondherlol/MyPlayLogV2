@@ -1,179 +1,293 @@
 /* ======================================================================
    La page /download — l'app Android
    ======================================================================
-   Elle réutilise volontairement la coquille de la landing (.page.landing,
-   .hero, .steps, .final-cta, .footer) : c'est la même promesse, la même
-   personne qui la lit, et une page qui se ressemble se lit sans réapprendre.
-   Ce fichier ne pose donc QUE ce qui lui est propre — le bloc d'appel à
-   l'action, la ligne de version, et les trois réponses du bas. */
+   Elle hérite de la coquille de l'accueil visiteur (`.lp`, cf.
+   app-49-welcome.css) : le décor de jaquettes, le voile, la vignette, le
+   comportement clair/sombre. Ce fichier ne pose QUE ce qui lui est propre :
+   l'icône, le bouton, les quatre chiffres et la frise des mises à jour.
 
-.dl-hero {
-  padding-bottom: 2.4rem;
-}
+   ⚠️ app-43 est importé AVANT app-49 : les règles `.dlp` qui doivent corriger
+   `.lp` portent donc les deux classes (`.lp.dlp`), sinon l'ordre d'import
+   leur donnerait tort.
+   ====================================================================== */
 
-.dl-cta {
+.dlp-main {
+  position: relative;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.7rem;
-  margin-top: 1.6rem;
-}
-
-/* Le bouton du téléchargement est LE geste de la page : il est plus gros que
-   les boutons d'appel à l'action habituels, et rien ne se dispute sa place. */
-.dl-btn {
-  font-size: 1.02rem;
-  padding: 0.95rem 2rem;
-}
-
-.dl-btn.is-disabled {
-  opacity: 0.6;
-  cursor: default;
-  pointer-events: none;
-}
-
-/* La version, la taille, la date : petites, mais présentes. On ne télécharge
-   pas cent mégaoctets à l'aveugle. */
-.dl-meta,
-.dl-status {
-  margin: 0;
-  font-size: 0.86rem;
-  color: var(--text-soft);
-}
-
-.dl-copy {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin-top: 0.3rem;
-  padding: 0.5rem 0.9rem;
-  font: inherit;
-  font-size: 0.84rem;
-  color: var(--text-soft);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
-
-.dl-copy:hover {
-  color: var(--text);
-  border-color: var(--border-strong);
-}
-
-.dl-perks {
-  display: flex;
-  flex-wrap: wrap;
   justify-content: center;
-  gap: 0.5rem 1.4rem;
-  margin: 1.5rem 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.dl-perks li {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.86rem;
-  color: var(--text-soft);
-}
-
-.dl-perks svg {
-  color: var(--accent-ink);
-}
-
-/* --- Les nouveautés de la version ------------------------------------- */
-.dl-notes-section {
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 0 1.2rem 1rem;
-}
-
-.dl-notes {
-  padding: 1.4rem 1.6rem;
-}
-
-.dl-notes h2 {
-  margin: 0 0 0.8rem;
-  font-size: 1.15rem;
-}
-
-/* Les notes arrivent telles que le script de publication les a écrites — une
-   liste de lignes. Un <pre> préserve ces retours à la ligne, mais on lui rend
-   la police et le retour à la ligne automatique du texte courant : sans ça,
-   une ligne longue déborderait de la carte sur téléphone. */
-.dl-notes-body {
-  margin: 0;
-  font: inherit;
-  font-size: 0.92rem;
-  line-height: 1.65;
-  color: var(--text-soft);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-/* --- Les trois questions ---------------------------------------------- */
-.dl-faq {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 1rem;
-  max-width: 1060px;
-  margin: 0 auto;
-  padding: 2rem 1.2rem 3rem;
+  padding: 1rem 0;
+  text-align: center;
 }
 
-.dl-faq-item {
-  padding: 1.3rem 1.4rem;
+/* ---------- L'icône ---------- */
+/* L'icône de l'app telle qu'elle apparaîtra sur le téléphone : un carré doré
+   aux coins d'icône Android, qui flotte doucement. C'est le seul élément
+   « illustration » de la page. */
+.dlp-icon {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 24px;
+  background: var(--accent-grad);
+  color: #1a0d02;
+  box-shadow:
+    0 18px 40px rgba(242, 183, 11, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  animation: dlp-float 5s ease-in-out infinite;
 }
-
-.dl-faq-item h3 {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0 0 0.6rem;
-  font-size: 1rem;
-}
-
-.dl-faq-item h3 svg {
-  color: var(--accent-ink);
-  flex: none;
-}
-
-.dl-faq-item p {
-  margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.6;
-  color: var(--text-soft);
-}
-
-@media (max-width: 640px) {
-  .dl-btn {
-    width: 100%;
-    justify-content: center;
+@keyframes dlp-float {
+  50% {
+    transform: translateY(-6px);
   }
 }
 
-/* --- Le rappel de l'app sur la page d'accueil -------------------------- */
-/* Sous les deux boutons du hero : présent, jamais concurrent. */
-.hero-android {
+.dlp-title {
+  margin: 0.2rem 0 0;
+  font-size: clamp(1.7rem, 4.6vw, 2.8rem);
+  line-height: 1.05;
+}
+
+/* ---------- Le bouton ---------- */
+.dlp-cta {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.5rem;
+}
+
+/* LE geste de la page : plus gros que tous les autres boutons du site, et rien
+   à côté ne se dispute sa place — le lien à copier n'est qu'une icône. */
+.dlp-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  margin-top: 1rem;
-  font-size: 0.87rem;
+  justify-content: center;
+  gap: 0.55rem;
+  min-width: 230px;
+  height: 56px;
+  padding: 0 2rem;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #3b2a02;
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+  font-weight: 700;
+  box-shadow: 0 14px 34px rgba(242, 183, 11, 0.34);
+  transition: transform 0.14s ease, box-shadow 0.2s ease;
+}
+.dlp-btn.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 40px rgba(242, 183, 11, 0.46);
+}
+.dlp-btn.clickable:active {
+  transform: translateY(0);
+}
+/* En attente, ou rien à télécharger : même forme, sans la promesse. */
+.dlp-btn.is-idle {
+  background: var(--surface-2);
   color: var(--text-soft);
-  text-decoration: none;
-  border-bottom: 1px dashed var(--border-strong);
-  padding-bottom: 2px;
-  transition: color 0.15s ease;
+  box-shadow: none;
+  font-size: 0.92rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
 }
 
-.hero-android:hover {
-  color: var(--accent-ink);
+.dlp-copy {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  backdrop-filter: blur(6px);
+  color: var(--text-soft);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.dlp-copy:hover {
+  color: var(--orange);
+  border-color: var(--orange);
 }
 
-.hero-android svg {
+/* ---------- Les quatre chiffres ---------- */
+/* Version, date, taille, téléchargements : une ligne de chiffres séparés par
+   des filets, comme la fiche technique au dos d'une boîte de jeu. */
+.dlp-facts {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 0.6rem 0 0;
+  padding: 0;
+}
+.dlp-facts li {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0 clamp(0.9rem, 2.4vw, 1.6rem);
+}
+.dlp-facts li + li {
+  border-left: 1px solid var(--border-strong);
+}
+.dlp-facts b {
+  font-family: var(--font-display);
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.dlp-facts i {
+  font-style: normal;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+/* ---------- La frise des mises à jour ---------- */
+.dlp-log {
+  position: relative;
+  width: min(460px, 100%);
+  margin-top: 1rem;
+  padding: 0.5rem 0.4rem;
+  text-align: left;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+  /* ⚠️ LA PAGE NE DÉFILE PAS : c'est la frise qui le fait, si elle déborde. */
+  max-height: min(34vh, 300px);
+  overflow-y: auto;
+}
+
+/* Le fil vertical qui relie les versions. */
+.dlp-log::before {
+  content: "";
+  position: absolute;
+  top: 1.35rem;
+  bottom: 1.35rem;
+  left: 1.2rem;
+  width: 1px;
+  background: var(--border-strong);
+}
+
+.dlp-rel-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.55rem 0.7rem 0.55rem 0.5rem;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  transition: background 0.15s ease;
+}
+.dlp-rel-head:hover {
+  background: var(--surface-2);
+}
+
+.dlp-rel-dot {
+  position: relative;
+  z-index: 1;
+  width: 11px;
+  height: 11px;
+  margin: 0 0.25rem;
+  border-radius: 999px;
+  border: 2px solid var(--border-strong);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+/* La version en ligne a son point doré, et il respire. */
+.dlp-rel-dot.now {
+  border-color: var(--orange);
+  background: var(--orange);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--orange) 22%, transparent);
+}
+
+.dlp-rel-ver {
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.dlp-rel-now {
+  padding: 0.08rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--orange) 16%, transparent);
   color: var(--accent-ink);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.dlp-rel-date {
+  margin-left: auto;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.dlp-rel-lines {
+  list-style: none;
+  margin: 0 0 0.35rem;
+  padding: 0 0.8rem 0 2.35rem;
+  display: grid;
+  gap: 0.3rem;
+}
+.dlp-rel-lines li {
+  position: relative;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-soft);
+}
+.dlp-rel-lines li::before {
+  content: "";
+  position: absolute;
+  left: -0.75rem;
+  top: 0.55em;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--text-soft);
+  opacity: 0.6;
+}
+.dlp-rel-lines li:first-letter {
+  text-transform: uppercase;
+}
+.dlp-rel-more {
+  font-style: italic;
+  opacity: 0.75;
+}
+.dlp-rel-more::before {
+  display: none;
+}
+
+/* ---------- Écrans ---------- */
+/* Le téléphone est LE public de cette page : là, on laisse défiler plutôt que
+   de comprimer la frise sous le bouton. */
+@media (max-width: 560px), (max-height: 700px) {
+  .lp.dlp {
+    overflow: auto;
+  }
+  .dlp-log {
+    max-height: none;
+  }
+  .dlp-facts li {
+    padding: 0.3rem 0.8rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dlp-icon {
+    animation: none;
+  }
 }

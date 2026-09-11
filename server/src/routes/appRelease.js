@@ -30,6 +30,11 @@ fs.mkdirSync(APP_DIR, { recursive: true });
 // minute par celui d'avant, sans rien recompiler.
 const KEEP = 3;
 
+// Combien de versions passées le manifeste raconte. C'est le « quoi de neuf »
+// de la page /download : au-delà de six, personne ne lit, et le fichier grossit
+// à chaque publication pour rien.
+const HISTORY = 6;
+
 const APK_MIME = "application/vnd.android.package-archive";
 
 function readManifest() {
@@ -82,6 +87,20 @@ function publicManifest(m, req) {
     sha256: m.sha256,
     publishedAt: m.publishedAt,
     downloads: m.downloads || 0,
+    // ⚠️ LE TOTAL, PAS LE COMPTEUR DU BUILD. `downloads` repart à zéro à chaque
+    // publication (il compte CE fichier) : affiché tel quel, la page annonçait
+    // « 3 téléchargements » le lendemain d'une mise à jour. Le total, lui,
+    // traverse les versions. Repli sur `downloads` pour un manifeste écrit
+    // avant l'existence de ce champ.
+    downloadsTotal: m.downloadsTotal ?? m.downloads ?? 0,
+    // Les versions précédentes, la plus récente d'abord — sans les noms de
+    // fichier ni les empreintes, qui ne regardent que le serveur.
+    history: (m.history || []).map((h) => ({
+      version: h.version,
+      versionCode: h.versionCode,
+      notes: h.notes || "",
+      publishedAt: h.publishedAt,
+    })),
     filename: m.filename,
     url: `${base}/api/app/download`,
   };
@@ -128,7 +147,11 @@ router.get("/download", (req, res) => {
   // Compteur best-effort, pour la page /download. Écrit AVANT l'envoi : après,
   // la réponse est close et une erreur d'écriture n'aurait plus où aller.
   try {
-    writeManifest({ ...m, downloads: (m.downloads || 0) + 1 });
+    writeManifest({
+      ...m,
+      downloads: (m.downloads || 0) + 1,
+      downloadsTotal: (m.downloadsTotal ?? m.downloads ?? 0) + 1,
+    });
   } catch {
     /* le compteur n'est pas une raison de refuser le téléchargement */
   }
@@ -201,6 +224,28 @@ router.post(
       const dest = path.join(APP_DIR, filename);
       fs.renameSync(temp, dest);
 
+      // ⚠️ LE MANIFESTE ÉTAIT ÉCRASÉ, ET AVEC LUI TOUT CE QUI S'ÉTAIT PASSÉ.
+      // Chaque publication effaçait les notes de la précédente : impossible de
+      // montrer « les dernières mises à jour », seulement la dernière. La
+      // version qu'on remplace entre donc dans l'historique avant de céder la
+      // place. (Un `force` qui republie le MÊME numéro ne s'y ajoute pas : ce
+      // serait deux fois la même version dans la liste.)
+      const history = current
+        ? [
+            ...(current.versionCode !== versionCode
+              ? [
+                  {
+                    version: current.version,
+                    versionCode: current.versionCode,
+                    notes: current.notes || "",
+                    publishedAt: current.publishedAt,
+                  },
+                ]
+              : []),
+            ...(current.history || []),
+          ].slice(0, HISTORY)
+        : [];
+
       const manifest = {
         version,
         versionCode,
@@ -211,6 +256,9 @@ router.post(
         sha256: await sha256(dest),
         publishedAt: new Date().toISOString(),
         downloads: 0,
+        // Le total survit à la publication ; le compteur du build, non.
+        downloadsTotal: current ? current.downloadsTotal ?? current.downloads ?? 0 : 0,
+        history,
       };
       writeManifest(manifest);
 

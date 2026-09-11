@@ -1,69 +1,79 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  ArrowRight,
-  Bell,
-  Check,
-  Copy,
-  Download,
-  Gamepad2,
-  RefreshCw,
-  ShieldCheck,
-  Smartphone,
-  Sparkles,
-} from "lucide-react";
-import Navbar from "../components/Navbar";
+import { Check, Download, Gamepad2, Link2, Loader2 } from "lucide-react";
+import CoverDrift from "../components/CoverDrift";
+import ThemeToggle from "../components/ThemeToggle";
 import { apiFetch } from "../lib/api";
 
+// ======================================================================
+//  La page de téléchargement de l'app Android
+// ======================================================================
+// ⚠️ UN BOUTON, PAS UNE NOTICE. La version précédente était une page de vente
+// complète — héros, trois étapes d'installation, trois questions fréquentes,
+// appel final — pour un geste qui tient en un appui. On arrive ici par un lien
+// qu'un ami a envoyé : on veut le fichier, pas une brochure.
+//
+// Il reste ce qui décide du clic, et rien d'autre :
+//   • le bouton ;
+//   • la version, sa taille, sa date — « est-ce que c'est à jour ? » ;
+//   • combien de gens l'ont déjà prise — « est-ce que c'est sérieux ? » ;
+//   • ce qui a changé récemment — « est-ce que ça bouge ? ».
+//
+// La mise en page est celle de l'accueil visiteur (`.lp`) : même décor de
+// jaquettes, même voile, même comportement clair/sombre. On passe de l'une à
+// l'autre sans changer de maison.
+
 // L'URL de l'API, telle qu'elle est câblée au build (VITE_API_URL vaut « /api »
-// en production). Le lien de téléchargement pointe dessus DIRECTEMENT plutôt
-// que de passer par du JavaScript : un vrai <a href> se partage, s'ouvre dans
-// un nouvel onglet, se reprend quand la connexion casse — un bouton qui
-// déclenche un fetch ne fait rien de tout ça.
+// en production). Le lien pointe dessus DIRECTEMENT plutôt que de passer par du
+// JavaScript : un vrai <a href> se partage, s'ouvre dans un nouvel onglet, se
+// reprend quand la connexion casse — un bouton qui déclenche un fetch ne fait
+// rien de tout ça.
 const API = (import.meta.env.VITE_API_URL || "http://localhost:4000/api").replace(/\/$/, "");
 const DOWNLOAD_URL = `${API}/app/download`;
+const PAGE_URL = "https://myplaylog.cc/download";
 
-const STEPS = [
-  {
-    Icon: Download,
-    title: "Télécharge le fichier",
-    text: "Un .apk d'une centaine de mégaoctets. Ton navigateur le range dans tes téléchargements.",
-  },
-  {
-    Icon: ShieldCheck,
-    title: "Autorise l'installation",
-    text: "Android demande la permission d'installer une app qui ne vient pas du Play Store. C'est un appui, et ça ne concerne que ce fichier.",
-  },
-  {
-    Icon: Gamepad2,
-    title: "Connecte-toi",
-    text: "Le même compte que sur le site : ta bibliothèque, tes listes et tes messages sont déjà là.",
-  },
-];
+// Combien de versions le changelog montre. Trois suffisent à dire « ça bouge
+// souvent » ; au-delà, c'est une archive, et elle ferait défiler la page.
+const SHOWN = 3;
+// Et combien de lignes par version avant de replier : les notes automatiques
+// reprennent jusqu'à quinze sujets de commit.
+const LINES = 4;
 
-const PERKS = [
-  { Icon: RefreshCw, text: "Se met à jour toute seule" },
-  { Icon: Bell, text: "Notifications de messages" },
-  { Icon: Smartphone, text: "Widgets sur l'écran d'accueil" },
-];
+const fmt = (n) => Number(n || 0).toLocaleString("fr-FR");
 
 function formatSize(bytes) {
   if (!bytes) return null;
-  return `${(bytes / 1024 / 1024).toFixed(1).replace(".", ",")} Mo`;
+  return `${Math.round(bytes / 1024 / 1024)} Mo`;
+}
+
+function formatDate(iso, long = false) {
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString(
+    "fr-FR",
+    long ? { day: "numeric", month: "long", year: "numeric" } : { day: "numeric", month: "short" }
+  );
 }
 
 /**
- * La page de téléchargement de l'app Android.
+ * Les notes d'une version, en lignes.
  *
- * MyPlayLog n'est pas sur le Play Store : cette page EST le magasin
- * d'applications. Elle doit donc en faire le travail — dire ce qu'on
- * télécharge, en quelle version, et pourquoi Android va rouspéter — sans quoi
- * la moitié des gens abandonnent devant l'avertissement de sécurité.
+ * Le script de publication les écrit « - sujet du commit » une par ligne (cf.
+ * myplaylog-mobile/scripts/release.mjs) ; un texte tapé à la main peut avoir
+ * n'importe quelle forme. On retire donc les puces quelles qu'elles soient, et
+ * chaque ligne non vide devient une entrée.
  */
+function noteLines(notes) {
+  return String(notes || "")
+    .split("\n")
+    .map((l) => l.replace(/^\s*[-•*]\s*/, "").trim())
+    .filter(Boolean);
+}
+
 export default function DownloadApp() {
   const [release, setRelease] = useState(null);
   const [state, setState] = useState("loading"); // loading | ready | none | error
   const [copied, setCopied] = useState(false);
+  const [open, setOpen] = useState(null); // version dépliée
 
   useEffect(() => {
     let alive = true;
@@ -79,189 +89,184 @@ export default function DownloadApp() {
     };
   }, []);
 
-  // Sur un ordinateur, le bouton ne sert pas à grand-chose : c'est le téléphone
-  // qui doit recevoir le fichier. On propose donc aussi l'adresse à recopier.
+  // Sur un ordinateur, c'est le téléphone qui doit recevoir le fichier : on
+  // propose en plus de copier l'adresse de la page, discrètement.
   const onPhone = /android/i.test(navigator.userAgent);
 
   function copyLink() {
-    navigator.clipboard?.writeText("https://myplaylog.cc/download").then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    navigator.clipboard
+      ?.writeText(PAGE_URL)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1800);
+      })
+      .catch(() => {});
   }
 
-  const published = release?.publishedAt
-    ? new Date(release.publishedAt).toLocaleDateString("fr-FR", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
-    : null;
+  // La version en ligne, puis les précédentes : un seul fil, du plus récent au
+  // plus ancien. Une version sans notes n'a rien à raconter, elle n'y est pas.
+  const versions = release
+    ? [
+        {
+          version: release.version,
+          versionCode: release.versionCode,
+          notes: release.notes,
+          publishedAt: release.publishedAt,
+          current: true,
+        },
+        ...(release.history || []),
+      ]
+        .filter((v) => noteLines(v.notes).length > 0)
+        .slice(0, SHOWN)
+    : [];
+
+  const total = release?.downloadsTotal ?? release?.downloads ?? 0;
 
   return (
-    <div className="page landing dl-page">
-      <Navbar />
+    <div className="lp dlp">
+      <CoverDrift />
 
-      <section className="hero dl-hero">
-        <div className="hero-glow" aria-hidden="true" />
+      <header className="lp-top">
+        <Link to="/" className="brand clickable">
+          <span className="brand-logo">
+            <Gamepad2 size={20} strokeWidth={2.5} />
+          </span>
+          <span className="brand-name">
+            My<span className="grad-text">PlayLog</span>
+          </span>
+        </Link>
+        <ThemeToggle />
+      </header>
 
-        <div className="hero-badge font-fun">
-          <Sparkles size={14} /> Android · gratuit · sans pub
-        </div>
-        <h1 className="hero-title">
-          MyPlayLog
-          <br />
-          <span className="grad-text">dans ta poche.</span>
+      <main className="dlp-main">
+        {/* L'icône de l'app : c'est elle qu'on retrouvera sur son téléphone,
+            autant la montrer tout de suite. */}
+        <span className="dlp-icon" aria-hidden="true">
+          <Gamepad2 size={40} strokeWidth={2.2} />
+        </span>
+
+        <h1 className="dlp-title">
+          MyPlayLog <span className="grad-text">pour Android</span>
         </h1>
-        <p className="hero-sub">
-          Ta bibliothèque, tes notes, tes listes et tes messages — la même chose
-          que sur le site, mais faite pour le pouce, avec les notifications et
-          les widgets en plus.
-        </p>
 
-        <div className="dl-cta">
+        <div className="dlp-cta">
           {state === "loading" && (
-            <span className="dl-status">Recherche de la dernière version…</span>
+            <span className="dlp-btn is-idle">
+              <Loader2 size={18} className="spin" />
+            </span>
           )}
 
           {state === "ready" && (
             <>
-              <a className="btn btn-primary dl-btn" href={DOWNLOAD_URL} download>
-                <Download size={18} /> Télécharger l'APK
+              <a className="dlp-btn clickable" href={DOWNLOAD_URL} download>
+                <Download size={19} strokeWidth={2.4} /> Télécharger
               </a>
-              <p className="dl-meta">
-                Version {release.version} (build {release.versionCode})
-                {formatSize(release.size) ? ` · ${formatSize(release.size)}` : ""}
-                {published ? ` · ${published}` : ""}
-              </p>
+              {!onPhone && (
+                <button
+                  type="button"
+                  className="dlp-copy clickable"
+                  onClick={copyLink}
+                  title="Copier le lien pour l'ouvrir sur ton téléphone"
+                  aria-label="Copier le lien de la page"
+                >
+                  {copied ? <Check size={17} /> : <Link2 size={17} />}
+                </button>
+              )}
             </>
           )}
 
-          {state === "none" && (
-            <>
-              <span className="btn btn-ghost dl-btn is-disabled">Bientôt disponible</span>
-              <p className="dl-meta">Aucune version n'est encore publiée. Reviens très vite.</p>
-            </>
-          )}
-
-          {state === "error" && (
-            <>
-              <span className="btn btn-ghost dl-btn is-disabled">Indisponible</span>
-              <p className="dl-meta">
-                Impossible de joindre le serveur pour le moment. Réessaie dans un instant.
-              </p>
-            </>
-          )}
-
-          {!onPhone && state === "ready" && (
-            <button type="button" className="dl-copy clickable" onClick={copyLink}>
-              {copied ? <Check size={15} /> : <Copy size={15} />}
-              {copied ? "Lien copié" : "Ouvre myplaylog.cc/download sur ton téléphone"}
-            </button>
+          {(state === "none" || state === "error") && (
+            <span className="dlp-btn is-idle">
+              {state === "none" ? "Bientôt disponible" : "Indisponible pour le moment"}
+            </span>
           )}
         </div>
 
-        <ul className="dl-perks">
-          {PERKS.map(({ Icon, text }) => (
-            <li key={text}>
-              <Icon size={15} /> {text}
+        {state === "ready" && (
+          <ul className="dlp-facts">
+            <li>
+              <b>v{release.version}</b>
+              <i>version</i>
             </li>
-          ))}
-        </ul>
-      </section>
+            {!!release.publishedAt && (
+              <li>
+                <b>{formatDate(release.publishedAt)}</b>
+                <i>mise à jour</i>
+              </li>
+            )}
+            {!!formatSize(release.size) && (
+              <li>
+                <b>{formatSize(release.size)}</b>
+                <i>taille</i>
+              </li>
+            )}
+            {total > 0 && (
+              <li>
+                <b>{fmt(total)}</b>
+                <i>téléchargements</i>
+              </li>
+            )}
+          </ul>
+        )}
 
-      {/* INSTALLATION */}
-      <section className="steps-section">
-        <h2 className="section-title">
-          Trois étapes, <span className="grad-text">deux minutes.</span>
-        </h2>
-        <p className="section-sub">
-          MyPlayLog n'est pas sur le Play Store : l'app s'installe directement
-          depuis ce site. Une fois posée, elle se met à jour toute seule.
-        </p>
-        <div className="steps">
-          {STEPS.map(({ Icon, title, text }, i) => (
-            <div className="step card" key={title}>
-              <span className="step-num font-fun">{i + 1}</span>
-              <div className="step-icon">
-                <Icon size={22} strokeWidth={2} />
-              </div>
-              <h3>{title}</h3>
-              <p>{text}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+        {/* --- Le changelog --------------------------------------------
+            ⚠️ UNE FRISE, PAS UN BLOC DE TEXTE. Les notes étaient affichées en
+            `<pre>` brut : quinze sujets de commit en police à chasse fixe, que
+            personne ne lisait. Ici chaque version a sa pastille et sa date, les
+            lignes sont des puces, et seules les quatre premières s'affichent —
+            la version en ligne dépliée, les précédentes repliées. */}
+        {versions.length > 0 && (
+          <section className="dlp-log" aria-label="Dernières mises à jour">
+            {versions.map((v, i) => {
+              const lines = noteLines(v.notes);
+              // ⚠️ LE NUMÉRO DE BUILD, PAS LA VERSION AFFICHÉE. Deux builds peuvent
+              // porter le même « 1.4 » (un correctif republié) : indexés sur ce
+              // libellé, ils auraient partagé leur clé et se seraient dépliés
+              // ensemble. Le numéro de build, lui, est unique par construction.
+              const id = String(v.versionCode ?? v.version);
+              const expanded = open === id || (open === null && i === 0);
+              const shown = expanded ? lines.slice(0, LINES) : [];
+              const more = expanded ? lines.length - shown.length : 0;
+              return (
+                <article key={id} className={`dlp-rel ${expanded ? "open" : ""}`}>
+                  <button
+                    type="button"
+                    className="dlp-rel-head clickable"
+                    onClick={() => setOpen(expanded ? "" : id)}
+                    aria-expanded={expanded}
+                  >
+                    <span className={`dlp-rel-dot ${v.current ? "now" : ""}`} />
+                    <span className="dlp-rel-ver">v{v.version}</span>
+                    {v.current && <span className="dlp-rel-now">Actuelle</span>}
+                    <span className="dlp-rel-date">{formatDate(v.publishedAt, true)}</span>
+                  </button>
 
-      {/* NOUVEAUTÉS DE LA VERSION */}
-      {state === "ready" && !!release.notes && (
-        <section className="dl-notes-section">
-          <div className="dl-notes card">
-            <h2>
-              Nouveautés <span className="grad-text">de la version {release.version}</span>
-            </h2>
-            <pre className="dl-notes-body">{release.notes}</pre>
-          </div>
-        </section>
-      )}
+                  {expanded && (
+                    <ul className="dlp-rel-lines">
+                      {shown.map((l, n) => (
+                        <li key={n}>{l}</li>
+                      ))}
+                      {more > 0 && (
+                        <li className="dlp-rel-more">
+                          + {more} autre{more > 1 ? "s" : ""} changement{more > 1 ? "s" : ""}
+                        </li>
+                      )}
+                    </ul>
+                  )}
+                </article>
+              );
+            })}
+          </section>
+        )}
+      </main>
 
-      {/* LES TROIS QUESTIONS QUE TOUT LE MONDE SE POSE */}
-      <section className="dl-faq">
-        <div className="dl-faq-item card">
-          <h3>
-            <ShieldCheck size={18} /> Pourquoi Android me met en garde&nbsp;?
-          </h3>
-          <p>
-            Parce que le fichier ne vient pas du Play Store. L'avertissement est
-            le même pour toute app installée hors magasin et ne dit rien de son
-            contenu : ici, le fichier est servi par myplaylog.cc — le serveur du
-            site sur lequel tu es en ce moment.
-          </p>
-        </div>
-        <div className="dl-faq-item card">
-          <h3>
-            <RefreshCw size={18} /> Et les mises à jour&nbsp;?
-          </h3>
-          <p>
-            L'app regarde d'elle-même, quelques secondes après son ouverture,
-            s'il existe une version plus récente — et propose de l'installer. Tu
-            peux aussi la chercher à la main dans{" "}
-            <em>Réglages &rsaquo; Mise à jour</em>, ou y couper la vérification
-            automatique.
-          </p>
-        </div>
-        <div className="dl-faq-item card">
-          <h3>
-            <Smartphone size={18} /> Et sur iPhone&nbsp;?
-          </h3>
-          <p>
-            Pas encore : iOS n'autorise pas l'installation hors App Store. En
-            attendant, le site fonctionne très bien depuis Safari, et s'ajoute à
-            l'écran d'accueil comme une app.
-          </p>
-        </div>
-      </section>
-
-      <section className="final-cta">
-        <div className="final-card">
-          <h2>Pas encore de compte&nbsp;?</h2>
-          <p>Il en faut un pour utiliser l'app — et il se crée en trente secondes.</p>
-          <Link to="/register" className="btn btn-primary">
-            Créer mon compte <ArrowRight size={18} />
-          </Link>
-        </div>
-      </section>
-
-      <footer className="footer">
-        <span className="brand-mini">
-          <Gamepad2 size={16} strokeWidth={2.5} style={{ color: "var(--accent-ink)" }} />
-          MyPlayLog — {new Date().getFullYear()}
-        </span>
-        <span className="footer-retro font-fun">
-          {release?.downloads
-            ? `${release.downloads} téléchargements`
-            : "fait avec ♥ et une pointe de nostalgie"}
-        </span>
+      <footer className="lp-foot">
+        {/* minSdk 24 dans le projet mobile (cf. android/gradle.properties) :
+            c'est Android 7.0, pas 8 — la page ne doit pas écarter des
+            téléphones qui peuvent l'installer. */}
+        <span>Android 7.0 et plus</span>
+        <span className="lp-foot-dot">·</span>
+        <span>Mises à jour automatiques</span>
       </footer>
     </div>
   );

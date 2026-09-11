@@ -102,6 +102,38 @@ function failLogin(res, message, next) {
 }
 
 // ----------------------------------------------------------------------
+//  L'application Android
+// ----------------------------------------------------------------------
+// L'app ouvre le même aller-retour dans un onglet de navigateur intégré, et
+// attend d'être rappelée sur son schéma. L'adresse est FIXE, jamais lue dans
+// la requête : sinon la connexion redeviendrait un tremplin vers n'importe où.
+//
+// ⚠️ PAS DE JETON DE SESSION DANS CE RAPPEL, MAIS UN CODE À ÉCHANGER. Un schéma
+// d'URL n'appartient à personne : une autre app installée peut déclarer
+// `myplaylog://` elle aussi et recevoir le rappel à notre place. On y met donc
+// un code court qui ne vaut rien seul. Pour l'échanger, il faut le `nonce` que
+// l'app a tiré au départ — il n'a transité que par le navigateur et notre
+// serveur, jamais par le rappel — et qui n'est stocké ici que haché.
+const APP_REDIRECT = "myplaylog://oauth";
+const APP_CODE_TTL = "3m";
+
+const hashNonce = (nonce) =>
+  crypto.createHash("sha256").update(String(nonce)).digest("hex");
+
+function backToApp(res, params) {
+  const query = new URLSearchParams();
+  for (const [k, v] of Object.entries(params || {})) {
+    if (v != null && v !== "") query.set(k, String(v));
+  }
+  res.redirect(`${APP_REDIRECT}?${query}`);
+}
+
+// Un échec rend la main à qui a lancé la demande : l'app, ou le site.
+function fail(res, message, { app, next } = {}) {
+  return app ? backToApp(res, { error: message }) : failLogin(res, message, next);
+}
+
+// ----------------------------------------------------------------------
 //  GET /api/auth/oauth/providers — ce qui est réellement branché
 // ----------------------------------------------------------------------
 // Le client s'en sert pour n'afficher QUE les boutons utilisables : un
@@ -120,10 +152,15 @@ router.get("/:provider/start", (req, res) => {
   const name = String(req.params.provider || "");
   const provider = getProvider(name);
   const next = safeNext(req.query.next);
+  // `app=1` : la demande vient de l'application, qui fournit son `nonce`.
+  const app = req.query.app === "1";
+  const nonce = String(req.query.nonce || "");
 
-  if (!provider) return failLogin(res, "Fournisseur inconnu.", next);
+  if (!provider) return fail(res, "Fournisseur inconnu.", { app, next });
   if (!provider.isConfigured())
-    return failLogin(res, `${provider.label} n'est pas configuré côté serveur.`, next);
+    return fail(res, `${provider.label} n'est pas configuré côté serveur.`, { app, next });
+  if (app && (nonce.length < 16 || nonce.length > 128))
+    return fail(res, "Demande de connexion invalide. Mets l'application à jour.", { app });
 
   // Mode liaison : il faut une session valide, et on la résout MAINTENANT — au
   // retour, le jeton pourrait avoir expiré pendant la visite chez le tiers.
