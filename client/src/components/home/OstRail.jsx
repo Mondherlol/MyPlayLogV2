@@ -42,6 +42,7 @@ export default function OstRail({ token }) {
       kicker="Dans les oreilles"
       title="Coups de cœur OST"
       hint="Les dernières bandes-son adoubées par la communauté"
+      className="s-ost"
     >
       {items.map((item) => {
         const t = item.ost;

@@ -453,14 +453,21 @@ export default function Welcome() {
         </div>
       </header>
 
-      {/* --- 1. Tes jeux en cours ------------------------------------- */}
+      {/* ⚠️ DEUX COLONNES, MAIS UN SEUL ORDRE DE LECTURE. Au-dessus de 1360 px,
+          `.mh-side` devient une colonne de droite ; en dessous, les deux
+          conteneurs passent en `display: contents` et la feuille de style
+          remet chaque rayon à sa place dans le fil (cf. app-47-home.css). Le
+          balisage, lui, ne bouge pas : c'est ce qui évite d'avoir deux
+          accueils à maintenir. */}
+      <div className="mh-col">
+        {/* --- 1. Tes jeux en cours ------------------------------------- */}
       {playing.length > 0 ? (
         <Section
           kicker="Tu joues à"
           title={
             playing.length > 1 ? `${playing.length} parties en cours` : "Ta partie en cours"
           }
-          className="mh-sec-np"
+          className="mh-sec-np s-play"
           snap
         >
           {playing.map((e) => (
@@ -478,7 +485,7 @@ export default function Welcome() {
           ))}
         </Section>
       ) : (
-        <Link to="/explore" className="mh-empty clickable">
+        <Link to="/explore" className="mh-empty s-play clickable">
           <span className="mh-empty-ic">
             <Plus size={22} strokeWidth={2.8} />
           </span>
@@ -498,6 +505,7 @@ export default function Welcome() {
           kicker="Ce qui arrive"
           title="Directs et showcases"
           hint="Les rendez-vous à ne pas manquer"
+          className="s-events"
         >
           {sortedEvents.map((ev) => (
             <EventCard
@@ -518,6 +526,7 @@ export default function Welcome() {
           hint="Les sorties du jour, du plus attendu au moins attendu"
           moreTo="/releases"
           moreLabel="Calendrier"
+          className="s-today"
         >
           {todayOut.map((g) => (
             <GameTile key={g.id} game={g} sub={g.platforms?.[0] || null} />
@@ -525,15 +534,13 @@ export default function Welcome() {
         </Section>
       )}
 
-      {/* --- 5. Sur ton radar (mes envies × le calendrier) ------------- */}
-      <RadarStrip wishIds={wishIds} token={token} />
-
       {/* --- 6. Les plus attendus ------------------------------------- */}
       {awaited.length > 0 && (
         <Section
           kicker="Compte à rebours"
           title="Les plus attendus"
           hint="Mets-les de côté, tu seras prévenu"
+          className="s-awaited"
         >
           {awaited.map((g) => (
             <AnticipatedCard
@@ -549,36 +556,13 @@ export default function Welcome() {
         </Section>
       )}
 
-      {/* --- 7. Le rendez-vous du jour -------------------------------- */}
-      {!!mot && <MotStrip mot={mot} />}
-
-      {/* --- 8. Quoi jouer ce soir ------------------------------------ */}
-      {!!pick && (
-        <section className="mh-sec">
-          <div className="mh-head">
-            <div className="mh-head-main">
-              <span className="mh-head-text">
-                <span className="mh-kicker">Ce soir</span>
-                <span className="mh-head-title">Tu joues à quoi ?</span>
-                <span className="mh-head-hint">Une proposition, tirée de ce qui t'attend</span>
-              </span>
-            </div>
-          </div>
-          <TonightCard
-            entry={pick}
-            busy={busyId === pick.gameId}
-            onStart={() => patch(pick, { status: "playing" })}
-            onReroll={() => setReroll((n) => n + 1)}
-          />
-        </section>
-      )}
-
       {/* --- 9. Le placard -------------------------------------------- */}
       {dusty.length > 0 && (
         <Section
           kicker="Le placard"
           title="Tu les avais commencés"
           hint="Plus touchés depuis un moment"
+          className="s-dusty"
         >
           {dusty.map((e) => (
             <GameTile key={e.gameId} game={e} sub={sinceLabel(e.updatedAt)} />
@@ -592,6 +576,7 @@ export default function Welcome() {
           kicker="À récupérer"
           title="Gratuit en ce moment"
           hint={`${free.length} offre${free.length > 1 ? "s" : ""} · Epic · Steam · GOG · Prime…`}
+          className="s-free"
         >
           {free.map((g) => (
             <FreeCard key={g.id} game={g} />
@@ -609,6 +594,7 @@ export default function Welcome() {
           hint="Les parties en cours des joueurs que tu suis"
           moreTo="/activity"
           moreLabel="L'activité"
+          className="s-circle"
         >
           {circle.slice(0, 14).map((g) => (
             <CircleTile key={g.id} game={g} />
@@ -622,6 +608,7 @@ export default function Welcome() {
           title="Les jeux du moment"
           moreTo="/explore"
           moreLabel="Explorer"
+          className="s-hot"
         >
           {hot.slice(0, 14).map((g) => (
             <GameTile
@@ -639,6 +626,7 @@ export default function Welcome() {
           kicker="Pour toi"
           title="Ça devrait te plaire"
           hint="Selon les genres de ta bibliothèque"
+          className="s-foryou"
         >
           {forYou.slice(0, 14).map((g) => (
             <GameTile key={g.id} game={g} sub={g.year ? String(g.year) : null} />
@@ -652,6 +640,7 @@ export default function Welcome() {
           title="Sorties indés"
           hint="Le meilleur de l'indé, juste sorti ou tout proche"
           moreTo="/explore?gen=32"
+          className="s-indies"
           moreLabel="Explorer"
         >
           {indies.slice(0, 14).map((g) => {
@@ -685,6 +674,7 @@ export default function Welcome() {
           titleTo={`/game/${loved.gameId}`}
           onRefresh={lovedCount > 1 ? () => setLovedShift((n) => n + 1) : null}
           refreshLabel="Un autre de mes coups de cœur"
+          className="s-similar"
         >
           {similar.map((g) => (
             <GameTile
@@ -697,12 +687,54 @@ export default function Welcome() {
         </Section>
       )}
 
-      {/* --- Les portes de côté ---------------------------------------
-          Trois envies qui ne sont pas des jeux à ouvrir : regarder un
-          documentaire, se faire sortir une pépite indé, aller jouer à l'arcade.
-          Elles vivaient dans la colonne de droite ; elles tiennent très bien en
-          une rangée, juste avant le fil. */}
-      <section className="mh-doors">
+      </div>
+
+      {/* ==================================================================
+          La colonne de droite : ce qui se lit d'un coup d'œil
+          ==================================================================
+          ⚠️ CE N'EST PAS UN DÉBARRAS. Un écran large laissait quatre cents
+          pixels de vide de chaque côté pendant que le radar, le mot du jour et
+          la proposition du soir descendaient le fil — on les découvrait après
+          douze rangées de jaquettes, c'est-à-dire jamais.
+
+          Ce qui vient ici partage une propriété : ça se lit SANS défiler et
+          ça tient dans une colonne étroite — une liste, une bande, une carte,
+          trois raccourcis. Les rayons de jaquettes, eux, restent à gauche :
+          un rail de six vignettes dans une colonne de 330 px n'est plus un
+          rail, c'est une file d'attente. */}
+      <aside className="mh-side">
+        {/* --- Sur ton radar (mes envies × le calendrier) --------------- */}
+        <RadarStrip wishIds={wishIds} token={token} />
+
+        {/* --- Le rendez-vous du jour ----------------------------------- */}
+        {!!mot && <MotStrip mot={mot} />}
+
+        {/* --- Quoi jouer ce soir --------------------------------------- */}
+        {!!pick && (
+          <section className="mh-sec s-tonight">
+            <div className="mh-head">
+              <div className="mh-head-main">
+                <span className="mh-head-text">
+                  <span className="mh-kicker">Ce soir</span>
+                  <span className="mh-head-title">Tu joues à quoi ?</span>
+                  <span className="mh-head-hint">Une proposition, tirée de ce qui t'attend</span>
+                </span>
+              </div>
+            </div>
+            <TonightCard
+              entry={pick}
+              busy={busyId === pick.gameId}
+              onStart={() => patch(pick, { status: "playing" })}
+              onReroll={() => setReroll((n) => n + 1)}
+            />
+          </section>
+        )}
+
+        {/* --- Les portes de côté ---------------------------------------
+            Trois envies qui ne sont pas des jeux à ouvrir : regarder un
+            documentaire, se faire sortir une pépite indé, aller jouer à
+            l'arcade. */}
+        <section className="mh-doors">
         <div className="mh-door doc">
           <button className="mh-door-main clickable" onClick={() => setShowDoc(true)}>
             <span className="mh-door-ic">
@@ -794,8 +826,9 @@ export default function Welcome() {
         </Link>
       </section>
 
-      {/* --- 12. Et pendant ce temps, les autres ----------------------- */}
-      <ActivityPeek token={token} />
+        {/* --- Et pendant ce temps, les autres ------------------------- */}
+        <ActivityPeek token={token} />
+      </aside>
 
       {!!hoursFor && (
         <HoursModal

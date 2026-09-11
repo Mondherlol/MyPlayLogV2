@@ -8,8 +8,12 @@
 
 .ep,
 .bgp {
-  --bleed: var(--content-pad, 1.6rem);
+  /* Les memes marges que l'accueil : ces pages s'ouvrent depuis lui, elles ne
+     doivent pas changer de cadre en chemin. */
+  --mh-pad: clamp(0.25rem, 1.8vw, 1.8rem);
+  --bleed: calc(var(--content-pad, 1.6rem) + var(--mh-pad));
   --mh-gap: 0.8rem;
+  padding-inline: var(--mh-pad);
   max-width: 1240px;
   margin: 0 auto;
   padding-block: 0.4rem 2rem;

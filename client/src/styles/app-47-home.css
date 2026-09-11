@@ -11,12 +11,21 @@
    ====================================================================== */
 
 .mh {
-  /* Le débord des rails. Les rangées vont jusqu'au bord de la zone de contenu,
-     mais leur PREMIÈRE vignette s'aligne sur le titre au-dessus : c'est ce
-     décalage qui fait lire une rangée comme « ça continue par là » plutôt que
-     comme une liste coupée. */
-  --bleed: var(--content-pad, 1.6rem);
+  /* La marge PROPRE a l'accueil, en plus de celle de la zone de contenu. Une
+     page de rayons collee aux bords se lit comme un tableau de bord
+     d'administration : c'est le blanc autour qui la fait respirer. */
+  --mh-pad: clamp(0.25rem, 1.8vw, 1.8rem);
+  /* Le debord des rails vaut TOUT ce qui separe la premiere vignette du bord
+     de l'ecran : la marge de la zone de contenu ET celle de la page. Si les
+     deux divergent, les rangees ne s'alignent plus sur les titres. */
+  --bleed: calc(var(--content-pad, 1.6rem) + var(--mh-pad));
   --mh-gap: 0.8rem;
+  padding-inline: var(--mh-pad);
+  /* Sous la bascule deux colonnes, `.mh-col` et `.mh-side` s'effacent
+     (`display: contents`) et leurs rayons redeviennent des enfants directs :
+     c'est ce qui permet de leur rendre leur place dans le fil avec `order`. */
+  display: flex;
+  flex-direction: column;
   /* PLUS ETROIT QUE L'ECRAN, ET C'EST VOLONTAIRE. Une page de rayons etalee sur
      1500 px oblige l'oeil a traverser tout le moniteur pour lire un titre puis
      revenir au debut de la rangee suivante. On se cale sur la largeur d'une
@@ -26,6 +35,110 @@
   margin: 0 auto;
   padding-block: 0.4rem 1.5rem;
   min-width: 0;
+}
+
+.mh-col,
+.mh-side {
+  display: contents;
+}
+
+/* Filet de securite : un rayon ne doit jamais pouvoir elargir la page. En
+   colonne, un element de flex part sur `min-width: auto` — c'est-a-dire la
+   largeur de son contenu, donc celle d'un rail entier. */
+.mh > *,
+.mh-col > *,
+.mh-side > * {
+  min-width: 0;
+}
+
+/* L'ordre de lecture du fil, celui du telephone. Il ne sert que tant qu'il n'y
+   a qu'une colonne — au-dela, la grille reprend la main et ces valeurs
+   n'ont plus aucun effet. */
+.mh-hero { order: 0; }
+.s-play { order: 1; }
+.mh-week { order: 2; }
+.s-events { order: 3; }
+.s-today { order: 4; }
+.mh-radar { order: 5; }
+.s-awaited { order: 6; }
+.mh-mot { order: 7; }
+.s-tonight { order: 8; }
+.s-dusty { order: 9; }
+.s-free { order: 10; }
+.s-circle { order: 11; }
+.s-hot { order: 12; }
+.s-foryou { order: 13; }
+.s-indies { order: 14; }
+.s-ost { order: 15; }
+.s-similar { order: 16; }
+.mh-doors { order: 17; }
+.mh-acty { order: 18; }
+
+/* ======================================================================
+   L'ECRAN LARGE : une colonne de plus
+   ======================================================================
+   ⚠️ LE SEUIL EST CELUI OU LA COLONNE DE DROITE TIENT SANS VOLER DE PLACE AUX
+   RAILS. En dessous, la retirer n'est pas un repli : c'est la bonne mise en
+   page — un rail de jaquettes a besoin de toute la largeur pour se lire comme
+   un rail, et une colonne de 330 px collee a cote le raccourcirait de moitie
+   pour y mettre des raccourcis qu'on peut tres bien lire plus bas. */
+@media (min-width: 1360px) {
+  .mh {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 332px;
+    gap: 0 2.4rem;
+    align-items: start;
+    max-width: 1560px;
+  }
+
+  /* Les deux conteneurs redeviennent de vraies boites : c'est ce qui range
+     chaque rayon dans SA colonne. */
+  .mh-col,
+  .mh-side {
+    display: block;
+    min-width: 0;
+  }
+
+  /* Le salut coiffe les deux colonnes. */
+  .mh-hero {
+    grid-column: 1 / -1;
+  }
+
+  /* ⚠️ PLUS DE DEBORD DANS UNE COLONNE. Un rail qui depasse de sa colonne
+     passerait sous la colonne d'a cote : les rangees s'arretent donc net au
+     bord, et ce sont les fleches qui disent que ca continue. */
+  .mh-col {
+    --bleed: 0px;
+  }
+
+  /* Les fleches se posent alors dans la gouttiere entre les deux colonnes
+     plutot que sur la premiere vignette : sans debord, leur place d'avant
+     tombait PAR-DESSUS le contenu du rail. */
+  .mh-col .mh-rail-arrow.left {
+    left: -0.7rem;
+  }
+  .mh-col .mh-rail-arrow.right {
+    right: -0.7rem;
+  }
+
+  /* La colonne de droite ne porte que des blocs pleine largeur : ils perdent
+     leur largeur maximale et leurs grilles internes passent sur une colonne. */
+  .mh-side > * {
+    margin-bottom: 1.1rem;
+  }
+  .mh-side .mh-tonight {
+    max-width: none;
+  }
+  .mh-side .mh-radar-cols,
+  .mh-side .mh-doors {
+    grid-template-columns: 1fr;
+  }
+  .mh-side .mh-sec {
+    margin-bottom: 1.1rem;
+  }
+  .mh-side .mh-acty {
+    padding-top: 1.1rem;
+  }
 }
 
 .mh-loading {
