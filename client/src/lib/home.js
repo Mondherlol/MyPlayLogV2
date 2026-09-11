@@ -242,3 +242,54 @@ export function todayReleasesPath() {
   const start = Math.floor(Date.now() / 1000 / 86400) * 86400;
   return `/games/releases?from=${start}&to=${start + 86399}`;
 }
+
+// ======================================================================
+//  Les bandes tirées de la bibliothèque
+// ======================================================================
+// ⚠️ AUCUNE DE CES TROIS NE COÛTE UNE REQUÊTE. `GET /library` est déjà chargé
+// pour les parties en cours, le placard et la proposition du soir : ce sont
+// trois LECTURES de plus de la même liste, donc trois rayons qui s'affichent
+// à la milliseconde où la page s'ouvre. C'est ce qui les distingue des rayons
+// de catalogue, qui attendent IGDB.
+
+/** Ce qu'on veut jouer, du plus récemment ajouté au plus ancien. */
+export function wishlistGames(entries, limit = 16) {
+  return (entries || [])
+    .filter((e) => e.status === "wishlist")
+    .sort((a, b) => timeOf(b) - timeOf(a))
+    .slice(0, limit);
+}
+
+/**
+ * Ce qu'on vient de terminer.
+ *
+ * ⚠️ TRIÉ SUR LA DATE DE FIN, PAS SUR LA DERNIÈRE MODIFICATION. Corriger la
+ * note d'un jeu fini il y a trois ans le ferait sinon remonter en tête d'un
+ * rayon qui raconte les dernières semaines.
+ */
+export function recentlyFinished(entries, limit = 16) {
+  const endOf = (e) => {
+    const ms = new Date(e?.finishedAt || e?.updatedAt || 0).getTime();
+    return Number.isNaN(ms) ? 0 : ms;
+  };
+  return (entries || [])
+    .filter((e) => e.status === "finished")
+    .sort((a, b) => endOf(b) - endOf(a))
+    .slice(0, limit);
+}
+
+/**
+ * Les coups de cœur — le cœur explicite d'abord, les très bien notés ensuite.
+ *
+ * Le même critère que `lovedSeed`, mais rendu en entier : celui-là choisit UN
+ * jeu pour en recommander d'autres, celui-ci montre l'étagère.
+ */
+export function favoriteGames(entries, limit = 16) {
+  return (entries || [])
+    .filter((e) => e.favorite || (e.rating ?? 0) >= 85)
+    .sort(
+      (a, b) =>
+        Number(b.favorite) - Number(a.favorite) || (b.rating ?? 0) - (a.rating ?? 0)
+    )
+    .slice(0, limit);
+}

@@ -484,3 +484,122 @@
     padding-top: 1.5rem;
   }
 }
+
+/* ======================================================================
+   Le clair, repris en main
+   ======================================================================
+   ⚠️ LE SOMBRE EST DÉSORMAIS LE THÈME PAR DÉFAUT (cf. context/ThemeContext).
+   Le clair n'est donc plus le décor de base qu'on subit, c'est un choix qu'on
+   fait — et il mérite d'être aussi tenu que l'autre. Ce qui l'abîmait ici :
+   un blanc pur d'un bord à l'autre, sur lequel des jaquettes à 34 % d'opacité
+   virent au gris sale et où le voile central mange tout le décor.
+   ====================================================================== */
+
+/* --- L'accueil visiteur --- */
+:root:not([data-theme="dark"]) .lp {
+  /* Blanc en haut, papier en bas. Aucune couleur : ce qui doit attirer l'œil
+     sur cette page, ce sont les jaquettes et le bouton doré — pas le fond. */
+  background: linear-gradient(180deg, #ffffff 0%, #f5f6f8 100%);
+}
+
+:root:not([data-theme="dark"]) .lp::before {
+  /* Le voile s'éteint tôt : le texte reste net au centre, les jaquettes
+     gardent leur couleur sur les bords. */
+  background: radial-gradient(
+    58% 54% at 50% 50%,
+    rgba(255, 255, 255, 0.96) 30%,
+    rgba(250, 250, 252, 0.72) 58%,
+    transparent 100%
+  );
+}
+
+/* Sur fond clair, une jaquette a besoin d'OMBRE pour exister — sans elle, elle
+   se dissout dans la page au lieu de flotter dessus. */
+:root:not([data-theme="dark"]) .drift {
+  opacity: 0.52;
+}
+:root:not([data-theme="dark"]) .drift-card {
+  border-color: rgba(20, 20, 40, 0.07);
+  box-shadow: 0 10px 22px rgba(20, 20, 40, 0.12);
+}
+:root:not([data-theme="dark"]) .lp-btn.ghost {
+  background: rgba(255, 255, 255, 0.86);
+  border-color: rgba(20, 20, 40, 0.14);
+  box-shadow: 0 2px 10px rgba(20, 20, 40, 0.06);
+}
+
+/* Le sombre est le thème par défaut : il a droit au même soin. */
+:root[data-theme="dark"] .lp {
+  background:
+    radial-gradient(1100px 520px at 50% -12%, rgba(242, 183, 11, 0.12), transparent 62%),
+    linear-gradient(180deg, #101219 0%, #0b0c11 58%, #08090d 100%);
+}
+:root[data-theme="dark"] .lp::before {
+  background: radial-gradient(
+    58% 54% at 50% 50%,
+    rgba(11, 12, 17, 0.94) 30%,
+    rgba(11, 12, 17, 0.7) 58%,
+    transparent 100%
+  );
+}
+
+/* ======================================================================
+   Le panneau des pages de compte : sombre dans LES DEUX thèmes
+   ======================================================================
+   ⚠️ CE N'EST PAS UN OUBLI DU MODE CLAIR. Un panneau gris clair à côté d'un
+   formulaire blanc, ce sont deux blancs qui se ressemblent sans se répondre :
+   la page n'a plus de sujet, juste une couture au milieu. Un panneau sombre
+   d'un côté et le formulaire en pleine lumière de l'autre, c'est la mise en
+   page de toutes les pages de connexion qu'on trouve nettes — et les jaquettes
+   y ressortent enfin, ce qui était toute leur raison d'être. */
+.mpl-auth-side {
+  background:
+    radial-gradient(620px 320px at 18% 0%, rgba(242, 183, 11, 0.18), transparent 66%),
+    linear-gradient(160deg, #161922 0%, #0a0b0f 100%);
+  border-right-color: rgba(255, 255, 255, 0.08);
+}
+
+.mpl-auth-side::after {
+  background: linear-gradient(
+    to top,
+    rgba(8, 9, 13, 0.96) 6%,
+    rgba(8, 9, 13, 0.55) 46%,
+    rgba(8, 9, 13, 0.12) 100%
+  );
+}
+
+.mpl-auth-side .drift {
+  opacity: 0.46;
+}
+.mpl-auth-side .drift-card {
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+
+/* Le texte du panneau ne suit plus le thème : il est sur du sombre, toujours. */
+.mpl-auth-side .brand-name,
+.mpl-auth-pitch {
+  color: #ffffff;
+}
+.mpl-auth-tag {
+  background: rgba(242, 183, 11, 0.16);
+  border-color: rgba(242, 183, 11, 0.45);
+  color: #ffd24a;
+}
+
+/* --- Le côté formulaire, en clair ---
+   Blanc franc contre le panneau sombre, et une carte qui respire. */
+:root:not([data-theme="dark"]) .mpl-auth-main {
+  /* Blanc franc contre le panneau sombre : c'est le contraste des deux qui
+     fait la page, pas un dégradé. */
+  background: #ffffff;
+}
+:root:not([data-theme="dark"]) .mpl-auth-card .field input {
+  background: #ffffff;
+  border-color: #dfe1e8;
+  box-shadow: inset 0 1px 2px rgba(20, 20, 40, 0.04);
+}
+:root:not([data-theme="dark"]) .mpl-auth-card .field input:focus {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 4px var(--ring);
+}

@@ -41,15 +41,16 @@ export function GameTile({ game, sub, subGold = false, badge = null }) {
 }
 
 /**
- * Une jaquette, et dessous les visages de ceux qui y jouent.
+ * Un jeu du cercle, en LIGNE.
  *
- * ⚠️ LES VISAGES SONT LE SUJET, pas une décoration. C'est la seule chose qui
- * distingue ce rail des cinq autres rails de jaquettes de l'accueil : ici on ne
- * montre pas un jeu, on montre QUI y est. D'où leur place — juste sous la
- * pochette, avant même le titre, comme sur les affiches de séries que se
- * partagent les gens.
+ * ⚠️ LES VISAGES SONT LE SUJET, PAS LA JAQUETTE. C'est la seule chose qui
+ * distinguait ce bloc des cinq autres rangées de jaquettes de l'accueil : on
+ * n'y montre pas un jeu, on montre QUI y est. En rangée, on lisait le jeu ; en
+ * liste — la forme qu'ont toutes les listes d'amis du web —, on lit la
+ * personne, et la jaquette devient ce qu'elle doit être : la réponse à « à quoi
+ * il joue ? ».
  */
-export function CircleTile({ game }) {
+export function CircleRow({ game }) {
   const players = game.players || [];
   const extra = (game.count || players.length) - players.length;
 
@@ -60,42 +61,37 @@ export function CircleTile({ game }) {
     players.length === 1
       ? players[0].username
       : nowCount > 1
-        ? `${nowCount} y jouent en ce moment`
+        ? `${nowCount} y jouent`
         : `${game.count} y sont passés`;
 
   return (
-    <div className="mh-circle">
-      <Link to={`/game/${game.id}`} className="mh-tile-art clickable" title={game.name}>
+    <Link to={`/game/${game.id}`} className="mh-circle-row clickable" title={game.name}>
+      <span className="mh-circle-art">
         {game.cover ? (
           <img src={game.cover} alt="" loading="lazy" draggable="false" />
         ) : (
           <span className="mh-tile-ph">
-            <Gamepad2 size={20} />
+            <Gamepad2 size={16} />
           </span>
         )}
-      </Link>
+      </span>
+      <span className="mh-circle-body">
+        <span className="mh-circle-who">{who}</span>
+        <span className="mh-circle-game">{game.name}</span>
+      </span>
       <span className="mh-faces">
-        {players.slice(0, 4).map((u) => (
-          <Link
-            key={u.id}
-            to={`/u/${u.username}`}
-            className="mh-face clickable"
-            title={u.username}
-          >
+        {players.slice(0, 3).map((u) => (
+          <span key={u.id} className="mh-face" title={u.username}>
             {u.avatar ? (
               <img src={u.avatar} alt="" loading="lazy" />
             ) : (
               (u.username || "?").charAt(0).toUpperCase()
             )}
-          </Link>
+          </span>
         ))}
         {extra > 0 && <span className="mh-face-extra">+{extra}</span>}
       </span>
-      <Link to={`/game/${game.id}`} className="mh-tile-name clickable">
-        {game.name}
-      </Link>
-      <span className="mh-tile-sub">{who}</span>
-    </div>
+    </Link>
   );
 }
 

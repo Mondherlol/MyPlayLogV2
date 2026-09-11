@@ -26,16 +26,24 @@
      sombres (les modales de l'admin Collection en étaient pleines). */
   color-scheme: light;
 
-  --bg: #ffffff;
+  /* ⚠️ LE FOND N'EST PLUS BLANC, ET LES CARTES LE SONT. C'est toute la
+     différence entre « une page web » et « une application » : sur un fond
+     blanc, une carte blanche n'existe que par sa bordure grise, et on se
+     retrouve à dessiner des traits partout pour rattraper ça. Un papier très
+     légèrement gris, des surfaces blanches posées dessus, une ombre douce :
+     les blocs se détachent tout seuls et il n'y a plus rien à souligner.
+     (C'est la recette du thème clair de TV Time, et c'est déjà l'intention de
+     la barre latérale, sombre même en clair.) */
+  --bg: #f5f6f8;
   --grid-line: rgba(20, 20, 40, 0.045);
   --surface: #ffffff;
-  --surface-2: #f6f6f8;
-  --border: #ececef;
-  --border-strong: #e0e0e5;
+  --surface-2: #eef0f4;
+  --border: #e4e6ec;
+  --border-strong: #d6d9e2;
   --text: #14151a;
   --text-soft: #6b6c76;
-  --shadow-sm: 0 1px 2px rgba(20, 20, 40, 0.05);
-  --shadow: 0 8px 30px rgba(20, 20, 40, 0.08);
+  --shadow-sm: 0 1px 2px rgba(20, 20, 40, 0.06);
+  --shadow: 0 10px 30px rgba(20, 20, 40, 0.09);
   --ring: rgba(242, 183, 11, 0.32);
 
   --font-display: "Space Grotesk", system-ui, sans-serif;
@@ -53,14 +61,16 @@
      puisse les remplacer (motif à carreaux → dégradé, cœurs, étoiles…). Le motif
      par défaut référence --grid-line, donc il suit le thème clair/sombre tout
      seul. CosmeticsContext surcharge ces variables en inline sur <html>. */
-  --app-bg-image: linear-gradient(var(--grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  /* ⚠️ NI GRILLE NI HALO EN CLAIR. Le quadrillage « bloc-note » et la lueur
+     dorée en haut de page étaient la signature du thème clair : deux effets
+     qui salissent un fond que l'on veut propre, et qui donnent à toutes les
+     pages le même voile jaune. Le clair est désormais plat — la couleur vient
+     du contenu, des jaquettes et des boutons, pas du papier. Les deux restent
+     en sombre, où ils donnent de la profondeur au lieu d'en enlever (voir plus
+     bas), et un thème gagné à l'arcade peut toujours les remplacer. */
+  --app-bg-image: none;
   --app-bg-size: 28px 28px;
-  --app-halo: radial-gradient(
-    900px 420px at 70% -15%,
-    rgba(242, 183, 11, 0.12),
-    transparent 65%
-  );
+  --app-halo: none;
 
   /* Curseur : valeurs PAR DÉFAUT, surchargées sur <html> par CosmeticsContext
      quand un thème gagné à l'arcade est équipé (un rôle par variable).
@@ -77,6 +87,16 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
+
+  /* La grille et le halo vivent ICI maintenant : sur fond sombre, ils creusent
+     la page au lieu de la salir. */
+  --app-bg-image: linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  --app-halo: radial-gradient(
+    900px 420px at 70% -15%,
+    rgba(242, 183, 11, 0.12),
+    transparent 65%
+  );
 
   /* Sur fond sombre, le doré vif ressort : l'encre d'accent redevient vive */
   --accent-ink: #ffd24a;

@@ -55,24 +55,23 @@
    a qu'une colonne — au-dela, la grille reprend la main et ces valeurs
    n'ont plus aucun effet. */
 .mh-hero { order: 0; }
-.s-play { order: 1; }
-.mh-week { order: 2; }
+.mh-top { order: 1; }
+.s-wish { order: 2; }
 .s-events { order: 3; }
 .s-today { order: 4; }
-.mh-radar { order: 5; }
-.s-awaited { order: 6; }
-.mh-mot { order: 7; }
-.s-tonight { order: 8; }
-.s-dusty { order: 9; }
-.s-free { order: 10; }
-.s-circle { order: 11; }
-.s-hot { order: 12; }
-.s-foryou { order: 13; }
-.s-indies { order: 14; }
-.s-ost { order: 15; }
-.s-similar { order: 16; }
-.mh-doors { order: 17; }
-.mh-acty { order: 18; }
+.s-awaited { order: 5; }
+.mh-mot { order: 6; }
+.s-tonight { order: 7; }
+.s-dusty { order: 8; }
+.s-free { order: 9; }
+.s-circle { order: 10; }
+.s-discover { order: 11; }
+.s-ost { order: 12; }
+.s-done { order: 13; }
+.s-fav { order: 14; }
+.s-similar { order: 15; }
+.mh-doors { order: 16; }
+.mh-acty { order: 17; }
 
 /* ======================================================================
    L'ECRAN LARGE : une colonne de plus
@@ -89,6 +88,13 @@
     gap: 0 2.4rem;
     align-items: start;
     max-width: 1560px;
+  }
+
+  /* ⚠️ CE QU'ON JOUE TRAVERSE LES DEUX COLONNES. C'est la seule chose pour
+     laquelle on ouvre la page : rien n'a le droit de passer par-dessus, et
+     surtout pas une colonne de raccourcis. */
+  .mh-top {
+    grid-column: 1 / -1;
   }
 
   /* Les deux conteneurs redeviennent de vraies boites : c'est ce qui range
@@ -185,8 +191,14 @@
 .mh-head {
   display: flex;
   align-items: flex-end;
-  gap: 0.8rem;
+  /* Un en-tete peut porter un titre, des onglets ET un lien : sur une colonne
+     etroite, ils passent a la ligne plutot que de se comprimer. */
+  flex-wrap: wrap;
+  gap: 0.5rem 0.8rem;
   margin-bottom: 0.7rem;
+}
+.mh-tabs {
+  flex-shrink: 0;
 }
 
 .mh-head-main {
@@ -194,7 +206,9 @@
   align-items: center;
   gap: 0.7rem;
   min-width: 0;
-  flex: 1;
+  /* Il prend la place restante, mais jamais moins de 14 rem : en dessous, le
+     titre passe a la ligne plutot que de se faire couper par les onglets. */
+  flex: 1 1 14rem;
 }
 
 a.mh-head-main:hover .mh-head-title {
@@ -254,6 +268,17 @@ a.mh-head-main:hover .mh-head-title {
   white-space: nowrap;
 }
 
+/* Le filet qui prolonge le titre jusqu'au bord. Un titre seul au-dessus d'une
+   rangée flotte ; le trait le pose, et c'est ce qui donne à la page son air de
+   magazine plutôt que de liste de dossiers. */
+.mh-head-main::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  min-width: 1.2rem;
+  background: var(--border);
+}
+
 .mh-head-more {
   display: inline-flex;
   align-items: center;
@@ -286,6 +311,38 @@ a.mh-head-main:hover .mh-head-title {
 }
 .mh-head-refresh span {
   transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Les onglets d'un rayon. Ils vivent DANS l'en-tête, entre le titre et le
+   lien : ce sont trois façons de remplir la même rangée, pas trois rayons. */
+.mh-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.mh-tab {
+  height: 26px;
+  padding: 0 0.7rem;
+  border-radius: 999px;
+  border: none;
+  background: none;
+  color: var(--text-soft);
+  font-family: var(--font-body);
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.mh-tab:hover {
+  color: var(--text);
+}
+.mh-tab.on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
 }
 
 /* ---------- Le rayon : la rangée ---------- */
@@ -470,8 +527,18 @@ a.mh-head-main:hover .mh-head-title {
 /* ======================================================================
    1. La grande carte « tu joues à »
    ====================================================================== */
-.mh-sec-np .mh-rail {
-  --mh-gap: 0.9rem;
+/* ⚠️ UNE GRILLE, PAS UNE RANGÉE QUI DÉFILE. Sur un téléphone, un rail est la
+   seule façon de montrer trois grandes cartes ; sur un écran large, il laisse
+   les deux tiers de la page vides et cache la troisième partie derrière une
+   flèche. La grille remplit la largeur qu'elle a et retombe toute seule sur
+   deux, puis une colonne. */
+.mh-play-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 0.9rem;
+}
+.mh-play-grid .mh-np {
+  width: auto;
 }
 
 .mh-np {
@@ -528,6 +595,12 @@ a.mh-head-main:hover .mh-head-title {
   );
 }
 
+/* ⚠️ LES OUTILS N'APPARAISSENT QU'AU SURVOL. Sur un téléphone il n'y a pas de
+   survol, donc ils sont toujours là ; à la souris, trois pastilles posées en
+   permanence sur l'affiche d'un jeu, c'est trois pastilles qui la salissent
+   pour un geste qu'on fait une fois par semaine. Ils reviennent dès que la
+   souris entre — et restent visibles au clavier, sinon ils deviendraient
+   inatteignables. */
 .mh-np-tools {
   position: absolute;
   top: 0.8rem;
@@ -536,6 +609,20 @@ a.mh-head-main:hover .mh-head-title {
   display: flex;
   align-items: center;
   gap: 0.35rem;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+.mh-np:hover .mh-np-tools,
+.mh-np:focus-within .mh-np-tools {
+  opacity: 1;
+  transform: none;
+}
+@media (hover: none) {
+  .mh-np-tools {
+    opacity: 1;
+    transform: none;
+  }
 }
 .mh-np-tool {
   display: grid;
@@ -1200,21 +1287,66 @@ a.mh-head-main:hover .mh-head-title {
   font-weight: 600;
 }
 
-/* Le cercle : les visages sont le SUJET, d'où leur place — juste sous la
-   pochette, avant même le titre. */
-.mh-circle {
+/* Le cercle, en liste : une ligne par jeu, les visages au bout. */
+.mh-circle-list {
   display: grid;
-  gap: 0.28rem;
-  width: 112px;
-  align-content: start;
+  gap: 0.15rem;
 }
-.mh-circle .mh-faces {
-  margin-top: 0.15rem;
+.mh-circle-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem;
+  border-radius: 10px;
+  transition: background 0.15s ease;
 }
-.mh-circle .mh-face {
+.mh-circle-row:hover {
+  background: var(--surface-2);
+}
+.mh-circle-art {
+  width: 34px;
+  height: 45px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.mh-circle-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.mh-circle-body {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+/* ⚠️ LE NOM DES GENS EN PREMIER, LE JEU EN DESSOUS. C'est l'ordre de la
+   question qu'on se pose : « qui joue ? », puis « à quoi ? ». */
+.mh-circle-who {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mh-circle-row:hover .mh-circle-who {
+  color: var(--orange);
+}
+.mh-circle-game {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mh-circle-row .mh-face {
+  width: 20px;
+  height: 20px;
   border-color: var(--bg);
-  width: 22px;
-  height: 22px;
 }
 
 /* ======================================================================
@@ -1443,98 +1575,6 @@ a.mh-head-main:hover .mh-head-title {
   transform: rotate(-18deg);
   border-color: var(--orange);
   color: var(--orange);
-}
-
-/* ======================================================================
-   9. Sur ton radar
-   ====================================================================== */
-.mh-radar {
-  border: 1px solid var(--border);
-  background: var(--surface);
-  border-radius: var(--radius-lg);
-  padding: 0.85rem 0.95rem;
-  margin-bottom: 2.1rem;
-}
-.mh-radar-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.8rem;
-  margin-bottom: 0.6rem;
-}
-.mh-radar-head .mh-kicker {
-  margin-bottom: 0;
-}
-.mh-radar-cols {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 0.4rem 1.6rem;
-}
-.mh-radar-title {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  margin: 0.4rem 0 0.3rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-soft);
-}
-.mh-radar-title.gold {
-  color: var(--accent-ink);
-}
-.mh-radar-row {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.35rem;
-  border-radius: 10px;
-  transition: background 0.15s ease;
-}
-.mh-radar-row:hover {
-  background: var(--surface-2);
-}
-.mh-radar-row img,
-.mh-radar-ph {
-  width: 34px;
-  height: 45px;
-  border-radius: 6px;
-  object-fit: cover;
-  background: var(--surface-2);
-  display: grid;
-  place-items: center;
-  color: var(--text-soft);
-  flex-shrink: 0;
-}
-.mh-radar-info {
-  flex: 1;
-  min-width: 0;
-  display: grid;
-}
-.mh-radar-name {
-  font-size: 0.84rem;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mh-radar-sub {
-  font-size: 0.72rem;
-  color: var(--text-soft);
-}
-.mh-radar-when {
-  font-size: 0.76rem;
-  font-weight: 700;
-  color: var(--text-soft);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.mh-radar-when.cd {
-  color: var(--accent-ink);
-}
-.mh-radar-when.out {
-  color: #3ecf8e;
 }
 
 /* ======================================================================
@@ -1867,8 +1907,10 @@ a.mh-head-main:hover .mh-head-title {
   .mh-sec {
     margin-bottom: 2.1rem;
   }
+  .mh-play-grid {
+    grid-template-columns: 1fr;
+  }
   .mh-np {
-    width: 84vw;
     height: 224px;
   }
   .mh-np-name {
@@ -1883,9 +1925,6 @@ a.mh-head-main:hover .mh-head-title {
   }
   .mh-tile {
     width: 98px;
-  }
-  .mh-circle {
-    width: 108px;
   }
   .mh-free {
     width: 208px;
@@ -1903,4 +1942,35 @@ a.mh-head-main:hover .mh-head-title {
   .mh-acty-cover {
     display: none;
   }
+}
+
+/* ======================================================================
+   Le thème clair, sur l'accueil
+   ======================================================================
+   Le sombre est devenu le thème par défaut : le clair est maintenant un choix,
+   et il souffrait d'un défaut qui ne se voit que là — les blocs en `surface-2`
+   (un gris à 3 % posé sur du blanc) ne se détachent de rien. Sur fond clair, ce
+   qui sépare une carte du papier, ce n'est pas une teinte de gris : c'est une
+   OMBRE. */
+:root:not([data-theme="dark"]) .mh-week,
+:root:not([data-theme="dark"]) .mh-tonight,
+:root:not([data-theme="dark"]) .mh-door,
+:root:not([data-theme="dark"]) .mh-empty {
+  background: #ffffff;
+  box-shadow: 0 2px 10px rgba(20, 20, 40, 0.05);
+}
+
+:root:not([data-theme="dark"]) .mh-tile-art,
+:root:not([data-theme="dark"]) .mh-free-art,
+:root:not([data-theme="dark"]) .mh-circle-art {
+  box-shadow: 0 3px 12px rgba(20, 20, 40, 0.1);
+}
+
+/* Les onglets : sur du blanc, c'est la pastille ACTIVE qui doit porter
+   l'ombre — l'inverse du sombre, où c'est elle qui s'éclaircit. */
+:root:not([data-theme="dark"]) .mh-tabs {
+  background: #f2f2f6;
+}
+:root:not([data-theme="dark"]) .mh-tab.on {
+  box-shadow: 0 1px 4px rgba(20, 20, 40, 0.14);
 }

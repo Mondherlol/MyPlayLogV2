@@ -175,7 +175,10 @@ function applyTheme(theme) {
   if (!vars || typeof vars !== "object") {
     // Plus de thème : on retire le marqueur et on rend son mode manuel au joueur.
     root.removeAttribute("data-arcade-theme");
-    root.setAttribute("data-theme", localStorage.getItem("mpl_theme") || "light");
+    // Le repli est le SOMBRE, comme partout ailleurs (cf. ThemeContext) : sans
+    // ça, retirer un thème d'arcade renvoyait le joueur en clair, quel que soit
+    // le thème qu'il avait avant.
+    root.setAttribute("data-theme", localStorage.getItem("mpl_theme") || "dark");
     return;
   }
   for (const [k, val] of Object.entries(vars)) {

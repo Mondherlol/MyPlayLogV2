@@ -30,6 +30,24 @@
     <meta name="apple-mobile-web-app-title" content="MyPlayLog" />
 
     <title>MyPlayLog — Ton journal de jeux vidéo</title>
+
+    <!-- Le thème, posé AVANT le premier pixel.
+         React ne monte qu'une fois le bundle chargé : sans ces trois lignes, la
+         page s'ouvre en clair puis bascule en sombre sous les yeux du visiteur.
+         La règle est la même que dans context/ThemeContext.jsx — sombre par
+         défaut, sauf si la personne a elle-même choisi (`mpl_theme_choice`). -->
+    <script>
+      (function () {
+        try {
+          var choice = localStorage.getItem("mpl_theme_choice") === "1";
+          var saved = localStorage.getItem("mpl_theme");
+          var theme = choice && (saved === "light" || saved === "dark") ? saved : "dark";
+          document.documentElement.setAttribute("data-theme", theme);
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "dark");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

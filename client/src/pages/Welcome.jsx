@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  ChevronRight,
   Clapperboard,
   Compass,
   Joystick,
@@ -17,28 +18,30 @@ import { useClickOutside } from "../hooks/useClickOutside";
 import { apiFetch } from "../lib/api";
 import DocumentaryModal from "../components/DocumentaryModal";
 import DiscoverGemsModal, { GEMS_RESUME_KEY } from "../components/DiscoverGemsModal";
-import Section from "../components/home/Rail";
+import Section, { Rail } from "../components/home/Rail";
 import NowPlayingCard from "../components/home/NowPlayingCard";
 import AnticipatedCard from "../components/home/AnticipatedCard";
 import EventCard from "../components/home/EventCard";
 import HoursModal from "../components/home/HoursModal";
 import OstRail from "../components/home/OstRail";
-import RadarStrip from "../components/home/RadarStrip";
 import ActivityPeek from "../components/home/ActivityPeek";
 import { MotStrip, TonightCard, WeekStrip } from "../components/home/Strips";
-import { CircleTile, FreeCard, GameTile } from "../components/home/Tiles";
+import { CircleRow, FreeCard, GameTile } from "../components/home/Tiles";
 import { useGameBackdrops } from "../lib/backdrops";
 import {
   dustyGames,
+  favoriteGames,
   greeting,
   lovedPoolSize,
   lovedSeed,
   nowPlaying,
+  recentlyFinished,
   sinceLabel,
   todayLabel,
   todayReleasesPath,
   tonightPick,
   weekRecap,
+  wishlistGames,
 } from "../lib/home";
 import { countdown, needsTicker, shortDate, useSecondsTicker } from "../lib/homeEvents";
 
@@ -121,6 +124,10 @@ export default function Welcome() {
   // Le coup de dé. Il ne change QUE la proposition du soir : le reste de la
   // page n'a aucune raison de bouger parce qu'on cherche quoi lancer.
   const [reroll, setReroll] = useState(0);
+  // L'onglet ouvert du rayon « Découvrir ». Il ne tient que le temps de la
+  // visite : un onglet de découverte mémorisé d'une session à l'autre finit par
+  // figer la page sur un rayon qu'on avait ouvert par curiosité une fois.
+  const [disc, setDisc] = useState("hot");
   // Le cran du rayon « parce que tu as adoré » : le bouton d'actualisation
   // avance d'un jeu dans la liste, sans changer la règle du jour.
   const [lovedShift, setLovedShift] = useState(0);
@@ -193,12 +200,16 @@ export default function Welcome() {
   const loved = useMemo(() => lovedSeed(library, Date.now(), lovedShift), [library, lovedShift]);
   const lovedCount = useMemo(() => lovedPoolSize(library), [library]);
   const recap = useMemo(() => weekRecap(library), [library]);
+  // Trois bandes de plus, tirées de la MÊME liste déjà chargée : elles
+  // s'affichent avant même qu'IGDB ait répondu (cf. lib/home).
+  const wanted = useMemo(() => wishlistGames(library), [library]);
+  const finished = useMemo(() => recentlyFinished(library), [library]);
+  const favorites = useMemo(() => favoriteGames(library), [library]);
   const owned = useMemo(() => new Set(library.map((e) => String(e.gameId))), [library]);
   const wishlist = useMemo(
     () => new Set(library.filter((e) => e.status === "wishlist").map((e) => String(e.gameId))),
     [library]
   );
-  const wishIds = useMemo(() => [...wishlist], [wishlist]);
 
   // Une seule horloge pour toute la page, et seulement si au moins une carte
   // affiche vraiment des secondes.
@@ -432,6 +443,50 @@ export default function Welcome() {
   const indies = discover?.indies || [];
   const now = Date.now() / 1000;
 
+  // Les trois façons de répondre à « je joue à quoi d'autre ? ». Un onglet qui
+  // n'a rien à montrer n'existe pas : mieux vaut deux onglets pleins que trois
+  // dont un ouvre sur du vide.
+  const discoverTabs = [
+    {
+      key: "hot",
+      label: "Du moment",
+      title: "Les jeux du moment",
+      hint: "Ce que tout le monde regarde en ce moment",
+      more: "/explore",
+      games: hot,
+      sub: (g) => (g.rating ? `${g.rating} %` : null),
+      badge: () => null,
+    },
+    {
+      key: "forYou",
+      label: "Pour toi",
+      title: "Ça devrait te plaire",
+      hint: "Selon les genres de ta bibliothèque",
+      more: "/explore",
+      games: forYou,
+      sub: (g) => (g.year ? String(g.year) : null),
+      badge: () => null,
+    },
+    {
+      key: "indies",
+      label: "Indés",
+      title: "Sorties indés",
+      hint: "Le meilleur de l'indé, juste sorti ou tout proche",
+      more: "/explore?gen=32",
+      games: indies,
+      sub: () => null,
+      badge: (g) =>
+        g.releaseDate
+          ? g.releaseDate > now
+            ? `J-${Math.ceil((g.releaseDate - now) / 86400)}`
+            : shortDate(g.releaseDate)
+          : null,
+    },
+  ].filter((t) => t.games.length > 0);
+  // L'onglet choisi peut avoir disparu entre deux chargements (un rayon qui se
+  // vide) : on retombe sur le premier plutôt que sur rien.
+  const current = discoverTabs.find((t) => t.key === disc) || discoverTabs[0];
+
   return (
     <div className="mh">
       {/* --- L'en-tête. Deux lignes, pas plus : le nom de qui regarde, la date
@@ -459,47 +514,77 @@ export default function Welcome() {
           remet chaque rayon à sa place dans le fil (cf. app-47-home.css). Le
           balisage, lui, ne bouge pas : c'est ce qui évite d'avoir deux
           accueils à maintenir. */}
+      {/* ⚠️ LE BANDEAU DU HAUT TRAVERSE LES DEUX COLONNES. Ce qu'on est en
+          train de jouer est la seule chose pour laquelle on ouvre la page : la
+          colonne de droite n'a rien à faire par-dessus, et une rangée qui
+          défile n'a pas de sens non plus quand on a deux parties en cours —
+          c'est une GRILLE, elle occupe la largeur qu'elle a. */}
+      <section className="mh-top">
+        {playing.length > 0 ? (
+          <Section
+            kicker="Tu joues à"
+            title={
+              playing.length > 1 ? `${playing.length} parties en cours` : "Ta partie en cours"
+            }
+            className="mh-sec-np"
+            rail={false}
+          >
+            <div className="mh-play-grid">
+              {playing.map((e) => (
+                <NowPlayingCard
+                  key={e.gameId}
+                  entry={e}
+                  backdrop={backdrops[String(e.gameId)]}
+                  busy={busyId === e.gameId}
+                  onHours={() => setHoursFor(e)}
+                  onFinish={() => finish(e)}
+                  onPause={() => patch(e, { status: "paused" })}
+                  onDrop={() => patch(e, { status: "dropped" })}
+                  onFavorite={(want) => patch(e, { favorite: want })}
+                />
+              ))}
+            </div>
+          </Section>
+        ) : (
+          <Link to="/explore" className="mh-empty clickable">
+            <span className="mh-empty-ic">
+              <Plus size={22} strokeWidth={2.8} />
+            </span>
+            <span className="mh-empty-txt">
+              <b>Aucune partie en cours</b>
+              <i>Ajoute un jeu à ta bibliothèque et il s'installera ici.</i>
+            </span>
+          </Link>
+        )}
+
+        {/* Le bilan de la semaine tient sous les parties en cours : c'est le
+            même sujet — ma bibliothèque — vu de la semaine plutôt que du soir. */}
+        <WeekStrip recap={recap} />
+      </section>
+
       <div className="mh-col">
-        {/* --- 1. Tes jeux en cours ------------------------------------- */}
-      {playing.length > 0 ? (
-        <Section
-          kicker="Tu joues à"
-          title={
-            playing.length > 1 ? `${playing.length} parties en cours` : "Ta partie en cours"
-          }
-          className="mh-sec-np s-play"
-          snap
-        >
-          {playing.map((e) => (
-            <NowPlayingCard
-              key={e.gameId}
-              entry={e}
-              backdrop={backdrops[String(e.gameId)]}
-              busy={busyId === e.gameId}
-              onHours={() => setHoursFor(e)}
-              onFinish={() => finish(e)}
-              onPause={() => patch(e, { status: "paused" })}
-              onDrop={() => patch(e, { status: "dropped" })}
-              onFavorite={(want) => patch(e, { favorite: want })}
-            />
-          ))}
-        </Section>
-      ) : (
-        <Link to="/explore" className="mh-empty s-play clickable">
-          <span className="mh-empty-ic">
-            <Plus size={22} strokeWidth={2.8} />
-          </span>
-          <span className="mh-empty-txt">
-            <b>Aucune partie en cours</b>
-            <i>Ajoute un jeu à ta bibliothèque et il s'installera ici.</i>
-          </span>
-        </Link>
-      )}
+        {/* --- Tes envies ------------------------------------------------
+            ⚠️ EN HAUT, ET PAS EN BAS AVEC LES RAYONS DE CATALOGUE. C'est une
+            liste qu'on a écrite soi-même : elle a plus de raisons d'être lue
+            que n'importe quelle recommandation, et c'est elle qui répond à
+            « bon, je prends quoi ensuite ? ». Elle vient donc juste après ce
+            qu'on est en train de jouer. */}
+        {wanted.length > 0 && (
+          <Section
+            kicker="Tes envies"
+            title="Ce que tu veux jouer"
+            hint={`${wanted.length} jeu${wanted.length > 1 ? "x" : ""} de côté`}
+            moreTo="/profile?tab=allgames&st=wishlist"
+            moreLabel="Tout voir"
+            className="s-wish"
+          >
+            {wanted.map((e) => (
+              <GameTile key={e.gameId} game={e} sub={sinceLabel(e.updatedAt)} />
+            ))}
+          </Section>
+        )}
 
-      {/* --- 2. Ce qu'on a fait de sa semaine -------------------------- */}
-      <WeekStrip recap={recap} />
-
-      {/* --- 3. Ce qui arrive ----------------------------------------- */}
+        {/* --- Ce qui arrive -------------------------------------------- */}
       {sortedEvents.length > 0 && (
         <Section
           kicker="Ce qui arrive"
@@ -584,85 +669,103 @@ export default function Welcome() {
         </Section>
       )}
 
-      {/* Le seul rail de l'accueil qui parle de GENS. Il se retire tout seul
-          quand on ne suit personne : « ce que jouent tes abonnements » rempli
-          d'inconnus serait un mensonge. */}
-      {circle.length > 0 && (
-        <Section
-          kicker="Ton cercle"
-          title="Ils y jouent en ce moment"
-          hint="Les parties en cours des joueurs que tu suis"
-          moreTo="/activity"
-          moreLabel="L'activité"
-          className="s-circle"
-        >
-          {circle.slice(0, 14).map((g) => (
-            <CircleTile key={g.id} game={g} />
-          ))}
-        </Section>
-      )}
+      {/* --- Découvrir : trois rayons, un seul rail -------------------
+          ⚠️ ILS ÉTAIENT TROIS RANGÉES DE JAQUETTES À LA SUITE — « du moment »,
+          « pour toi », « indés » —, c'est-à-dire trois fois la même image :
+          quarante-deux jaquettes empilées qu'on fait défiler sans les voir. Ce
+          sont trois RÉPONSES À LA MÊME QUESTION (« je joue à quoi d'autre ? »),
+          donc un seul rayon, et on choisit d'où vient la réponse. Trois écrans
+          de défilement en moins, et un rail qu'on regarde vraiment. */}
+      {discoverTabs.length > 0 && (
+        <section className="mh-sec s-discover">
+          <div className="mh-head">
+            <div className="mh-head-main">
+              <span className="mh-head-text">
+                <span className="mh-kicker">Découvrir</span>
+                <span className="mh-head-title">{current.title}</span>
+                <span className="mh-head-hint">{current.hint}</span>
+              </span>
+            </div>
 
-      {hot.length > 0 && (
-        <Section
-          kicker="En ce moment"
-          title="Les jeux du moment"
-          moreTo="/explore"
-          moreLabel="Explorer"
-          className="s-hot"
-        >
-          {hot.slice(0, 14).map((g) => (
-            <GameTile
-              key={g.id}
-              game={g}
-              sub={g.rating ? `${g.rating} %` : null}
-              subGold={!!g.rating && g.rating >= 85}
-            />
-          ))}
-        </Section>
-      )}
+            <div className="mh-tabs" role="tablist" aria-label="Découvrir">
+              {discoverTabs.map((t) => (
+                <button
+                  key={t.key}
+                  role="tab"
+                  aria-selected={t.key === current.key}
+                  className={`mh-tab clickable ${t.key === current.key ? "on" : ""}`}
+                  onClick={() => setDisc(t.key)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
 
-      {forYou.length > 0 && (
-        <Section
-          kicker="Pour toi"
-          title="Ça devrait te plaire"
-          hint="Selon les genres de ta bibliothèque"
-          className="s-foryou"
-        >
-          {forYou.slice(0, 14).map((g) => (
-            <GameTile key={g.id} game={g} sub={g.year ? String(g.year) : null} />
-          ))}
-        </Section>
-      )}
+            <Link to={current.more} className="mh-head-more clickable">
+              Explorer <ChevronRight size={15} />
+            </Link>
+          </div>
 
-      {indies.length > 0 && (
-        <Section
-          kicker="Hors des radars"
-          title="Sorties indés"
-          hint="Le meilleur de l'indé, juste sorti ou tout proche"
-          moreTo="/explore?gen=32"
-          className="s-indies"
-          moreLabel="Explorer"
-        >
-          {indies.slice(0, 14).map((g) => {
-            const soon = g.releaseDate && g.releaseDate > now;
-            return (
+          <Rail>
+            {current.games.slice(0, 16).map((g) => (
               <GameTile
                 key={g.id}
                 game={g}
-                badge={
-                  g.releaseDate
-                    ? soon
-                      ? `J-${Math.ceil((g.releaseDate - now) / 86400)}`
-                      : shortDate(g.releaseDate)
-                    : null
-                }
+                sub={current.sub(g)}
+                subGold={current.key === "hot" && !!g.rating && g.rating >= 85}
+                badge={current.badge(g)}
               />
-            );
-          })}
-        </Section>
+            ))}
+          </Rail>
+        </section>
       )}
 
       <OstRail token={token} />
+
+        {/* --- Tes derniers terminés -------------------------------------
+            ⚠️ LE BAS DE PAGE EST FAIT POUR REGARDER EN ARRIÈRE. Le haut sert à
+            reprendre une partie, le milieu à en trouver une nouvelle ; ici, on
+            ne cherche plus rien — on fait défiler ce qu'on a fait, et c'est
+            exactement ce qui donne envie de continuer à noter ses jeux. */}
+        {finished.length > 0 && (
+          <Section
+            kicker="Derrière toi"
+            title="Tes derniers terminés"
+            hint="Ce que tu as fini, du plus récent au plus ancien"
+            moreTo="/profile?tab=allgames&st=finished"
+            moreLabel="Tout voir"
+            className="s-done"
+          >
+            {finished.map((e) => (
+              <GameTile
+                key={e.gameId}
+                game={e}
+                sub={sinceLabel(e.finishedAt || e.updatedAt)}
+              />
+            ))}
+          </Section>
+        )}
+
+        {/* --- Tes coups de cœur ----------------------------------------- */}
+        {favorites.length > 0 && (
+          <Section
+            kicker="Ton étagère"
+            title="Tes coups de cœur"
+            hint="Les jeux que tu as aimés au point de les marquer"
+            moreTo="/profile"
+            moreLabel="Ton profil"
+            className="s-fav"
+          >
+            {favorites.map((e) => (
+              <GameTile
+                key={e.gameId}
+                game={e}
+                sub={e.rating ? `${e.rating} %` : null}
+                subGold={!!e.rating && e.rating >= 85}
+              />
+            ))}
+          </Section>
+        )}
 
       {/* --- 11. Parce que tu as adoré … (le fond du rayon) ------------ */}
       {similar.length > 0 && !!loved && (
@@ -703,8 +806,33 @@ export default function Welcome() {
           un rail de six vignettes dans une colonne de 330 px n'est plus un
           rail, c'est une file d'attente. */}
       <aside className="mh-side">
-        {/* --- Sur ton radar (mes envies × le calendrier) --------------- */}
-        <RadarStrip wishIds={wishIds} token={token} />
+        {/* --- Ton cercle -----------------------------------------------
+            ⚠️ LE SEUL BLOC DE LA PAGE QUI PARLE DE GENS, ET IL EST MIEUX ICI
+            QU'EN RAYON. En rangée de jaquettes, il ressemblait aux cinq autres
+            rangées de jaquettes et on lisait le jeu, pas la personne. En
+            colonne, c'est une LISTE DE GENS — la forme qu'ont toutes les listes
+            d'amis du web — et c'est la question qu'on se pose en ouvrant le
+            site : « ils jouent à quoi en ce moment ? ». */}
+        {circle.length > 0 && (
+          <section className="mh-sec s-circle">
+            <div className="mh-head">
+              <div className="mh-head-main">
+                <span className="mh-head-text">
+                  <span className="mh-kicker">Ton cercle</span>
+                  <span className="mh-head-title">Ils y jouent</span>
+                </span>
+              </div>
+              <Link to="/activity" className="mh-head-more clickable">
+                L'activité <ChevronRight size={15} />
+              </Link>
+            </div>
+            <div className="mh-circle-list">
+              {circle.slice(0, 6).map((g) => (
+                <CircleRow key={g.id} game={g} />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* --- Le rendez-vous du jour ----------------------------------- */}
         {!!mot && <MotStrip mot={mot} />}
