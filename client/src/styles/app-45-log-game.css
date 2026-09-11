@@ -1,0 +1,276 @@
+/* ======================================================================
+   « + Log un jeu » — le bouton et sa recherche plein écran
+   ======================================================================
+   Le geste le plus fréquent de l'app méritait un bouton à lui, visible partout.
+   Il ouvre une recherche centrée qui ne sert qu'à ça : trouver un jeu et le
+   noter. Voir components/LogGameOverlay.jsx.
+   ====================================================================== */
+
+.log-game-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 38px;
+  padding: 0 0.85rem;
+  border: none;
+  border-radius: 11px;
+  background: var(--accent-grad);
+  color: var(--accent-ink);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.86rem;
+  white-space: nowrap;
+  cursor: var(--cursor-pointer), pointer;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.12s ease, filter 0.15s ease;
+}
+.log-game-btn:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+.log-game-btn:active {
+  transform: translateY(0);
+}
+
+/* Sur un écran étroit la barre du haut est déjà pleine : le bouton garde son
+   icône et lâche son libellé plutôt que de pousser le reste dehors. */
+@media (max-width: 640px) {
+  .log-game-btn {
+    width: 38px;
+    padding: 0;
+    justify-content: center;
+  }
+  .log-game-btn span {
+    display: none;
+  }
+}
+
+/* ----------------------------------------------------------------------
+   Le voile et la boîte de recherche
+   ---------------------------------------------------------------------- */
+.logoverlay {
+  position: fixed;
+  inset: 0;
+  /* Sous la modale de notation (1000), au-dessus de tout le reste — la barre
+     du haut est à 140, les bulles de chat à 130. */
+  z-index: 950;
+  display: flex;
+  justify-content: center;
+  /* Pas de centrage vertical strict : la boîte grandit vers le bas au fil des
+     résultats, et un centrage la ferait remonter à chaque frappe. */
+  align-items: flex-start;
+  padding: clamp(1rem, 12vh, 8rem) 1rem 2rem;
+  background: rgba(8, 8, 12, 0.6);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  animation: logoverlay-fade 0.18s ease;
+}
+@keyframes logoverlay-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.logoverlay-box {
+  position: relative;
+  width: min(560px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 0.9rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  animation: logoverlay-rise 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+@keyframes logoverlay-rise {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.98);
+  }
+}
+
+.logoverlay-close {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-soft);
+  cursor: var(--cursor-pointer), pointer;
+}
+.logoverlay-close:hover {
+  color: var(--text);
+}
+
+.logoverlay-field {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0 0.9rem;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+.logoverlay-field:focus-within {
+  border-color: var(--accent);
+}
+.logoverlay-icon {
+  flex: 0 0 auto;
+  color: var(--text-soft);
+}
+.logoverlay-field input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.85rem 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+}
+.logoverlay-field input:focus {
+  outline: none;
+}
+.logoverlay-spin {
+  flex: 0 0 auto;
+  color: var(--text-soft);
+}
+
+/* ----------------------------------------------------------------------
+   Les résultats
+   ---------------------------------------------------------------------- */
+.logoverlay-results {
+  margin-top: 0.6rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.logoverlay-empty {
+  margin: 0;
+  padding: 1.1rem 0.3rem;
+  color: var(--text-soft);
+  font-size: 0.86rem;
+  text-align: center;
+}
+
+.logoverlay-res {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 12px;
+  cursor: var(--cursor-pointer), pointer;
+}
+/* Une seule ligne active à la fois : le survol et le clavier désignent la même
+   (`onMouseEnter` déplace le curseur), sinon deux lignes semblent choisies. */
+.logoverlay-res.on {
+  background: var(--surface-2);
+}
+
+.logoverlay-cover {
+  flex: 0 0 auto;
+  width: 34px;
+  aspect-ratio: 3 / 4;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+.logoverlay-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.logoverlay-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.logoverlay-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.logoverlay-meta {
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logoverlay-have {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 0 0 auto;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.logoverlay-wish {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-soft);
+  cursor: var(--cursor-pointer), pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.logoverlay-wish:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.logoverlay-wish.on {
+  border-color: transparent;
+  color: var(--accent);
+}
+.logoverlay-wish:disabled {
+  cursor: var(--cursor-default), default;
+}
+
+.logoverlay-hint {
+  margin: 0.7rem 0 0.2rem;
+  color: var(--text-soft);
+  font-size: 0.74rem;
+  text-align: center;
+}
+.logoverlay-hint kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.05rem 0.32rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  background: var(--surface-2);
+  font-family: inherit;
+  font-size: 0.72rem;
+}
+
+/* Le rappel des raccourcis n'a pas de sens sans clavier. */
+@media (hover: none) {
+  .logoverlay-hint {
+    display: none;
+  }
+}

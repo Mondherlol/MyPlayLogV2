@@ -267,25 +267,3 @@
     flex-direction: column;
   }
 }
-
-/* Le repère « fiche tirée de Steam » sur une vignette de résultat. */
-.game-local-tag {
-  position: absolute;
-  top: 7px;
-  left: 7px;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 21px;
-  height: 21px;
-  border-radius: 7px;
-  background: rgba(10, 14, 22, 0.78);
-  color: #66c0f4;
-  backdrop-filter: blur(3px);
-}
-.game-row-local {
-  margin-left: 0.4rem;
-  color: #66c0f4;
-  vertical-align: -1px;
-}

@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useChat } from "../context/ChatContext";
+import LogGameOverlay from "./LogGameOverlay";
 import { useTheme } from "../context/ThemeContext";
 import { useCosmetics } from "../context/CosmeticsContext";
 import { useClickOutside } from "../hooks/useClickOutside";
@@ -118,6 +119,9 @@ export default function Topbar() {
   const notifRef = useRef(null);
   const chatRef = useRef(null);
   const profileRef = useRef(null);
+  // « + Log un jeu » : la recherche plein écran qui mène droit à la modale de
+  // notation (cf. components/LogGameOverlay.jsx).
+  const [logOpen, setLogOpen] = useState(false);
 
   useClickOutside(searchRef, () => closeSearch(), searchOpen);
   useClickOutside(notifRef, () => setMenu(null), menu === "notif");
@@ -334,7 +338,20 @@ export default function Topbar() {
 
   return (
     <header className="topbar">
+      {logOpen && <LogGameOverlay onClose={() => setLogOpen(false)} />}
       <div className="topbar-actions">
+        {/* Le geste le plus courant de l'app — enregistrer un jeu auquel on
+            vient de jouer — demandait quatre écrans. Il tient ici en un
+            bouton, présent sur toutes les pages. */}
+        <button
+          className="log-game-btn clickable"
+          onClick={() => setLogOpen(true)}
+          title="Noter un jeu auquel tu as joué"
+        >
+          <Plus size={16} strokeWidth={2.6} />
+          <span>Log un jeu</span>
+        </button>
+
         {/* Thème (mobile uniquement : sur desktop il vit dans la sidebar).
             Masqué si un thème de l'arcade impose son mode : il se change alors
             depuis /arcade. */}

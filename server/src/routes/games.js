@@ -122,44 +122,6 @@ const igdbImg = (size, imageId) =>
  * où l'on demande un paquet de jeux à IGDB, on écarte donc les identifiants
  * locaux — et on les sert d'ici, au même format, pour ne rien perdre.
  */
-/**
- * Les fiches locales dont le nom ressemble à ce qu'on cherche.
- *
- * On interroge les DEUX titres — celui d'IGDB-à-venir et celui affiché par
- * Steam : c'est tout l'intérêt, puisque le cas d'origine est un jeu dont la
- * page s'affiche sous un titre qu'on ne tape pas.
- *
- * Les fiches déjà rattachées à IGDB (`igdbId` renseigné) sont exclues : leur
- * vrai jeu est déjà dans les résultats, les montrer ferait un doublon.
- */
-async function searchLocalGames(term) {
-  // Les caractères spéciaux d'une expression régulière sont neutralisés : un
-  // titre contenant « ( » ou « + » ferait sinon échouer la recherche.
-  const safe = String(term).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const rx = new RegExp(safe, "i");
-  const docs = await SteamGame.find({
-    igdbId: null,
-    $or: [{ name: rx }, { nameOriginal: rx }],
-  })
-    .limit(8)
-    .lean()
-    .catch(() => []);
-  return docs.map((d) => ({
-    id: -d.appid,
-    name: d.name,
-    gameType: 0,
-    cover: d.cover || d.header || null,
-    rating: null,
-    year: d.releaseDate ? new Date(d.releaseDate * 1000).getFullYear() : null,
-    genres: d.genres || [],
-    platforms: (d.oses || []).map(
-      (os) => ({ windows: "PC", mac: "Mac", linux: "Linux" })[os] || os
-    ),
-    // La carte s'en sert pour dire d'où vient la fiche.
-    local: true,
-  }));
-}
-
 async function localRows(ids) {
   const appids = ids.filter(isLocalId).map(appIdOf);
   if (!appids.length) return [];
@@ -684,32 +646,25 @@ router.get("/", requireAuth, async (req, res) => {
       search ? SEARCH_TTL : BROWSE_TTL
     );
 
-    // LES JEUX AJOUTÉS PAR LIEN STEAM DOIVENT SE RETROUVER À LA RECHERCHE.
-    // Sans ça, quelqu'un ajoute un jeu indépendant, le met dans sa collection —
-    // puis ne le retrouve plus jamais en tapant son nom, parce que la recherche
-    // ne parle qu'à IGDB. Ils passent DEVANT : ce sont des jeux que l'on est
-    // seul à avoir, et ils sont peu nombreux (une recherche qui n'en trouve pas
-    // ne coûte qu'une lecture indexée).
-    const locals = search && page === 1 ? await searchLocalGames(search) : [];
+    // ⚠️ LES FICHES STEAM LOCALES NE SONT PAS DANS LA RECHERCHE, ET C'EST VOULU.
+    // Elles l'ont été, et c'était pénible : un jeu ajouté par lien remontait en
+    // tête à chaque frappe qui l'approchait, devant le catalogue entier, alors
+    // qu'il n'intéresse qu'une poignée de gens. On y accède par son lien Steam,
+    // par sa fiche, par une liste ou par un profil — pas en tapant au hasard.
 
     // ZÉRO RÉSULTAT SUR UN NOM : c'est presque toujours une lettre de travers.
     // IGDB cherche au caractère près et n'a rien à proposer, alors on cherche
     // le titre le plus proche dans notre lexique. On ne remplace RIEN — on
     // joint la proposition à une réponse vide, et l'app en fait ce qu'elle veut.
     const suggestions =
-      search && !games.length && !locals.length && page === 1 ? suggestTitles(search, 3) : [];
-
-    const merged = locals.length ? [...locals, ...games] : games;
+      search && !games.length && page === 1 ? suggestTitles(search, 3) : [];
 
     res.json({
       page,
       limit,
-      count: merged.length,
-      // `games.length` et PAS `merged.length` : c'est la réponse d'IGDB qui dit
-      // s'il reste des pages. Les fiches locales ne sont servies qu'en page 1 ;
-      // les compter ici ferait croire à une page suivante qui n'existe pas.
+      count: games.length,
       hasMore: games.length === limit,
-      games: merged,
+      games,
       suggestion: suggestions[0] || null,
       suggestions,
     });
@@ -2006,21 +1961,52 @@ router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
     // qu'on a cochée. On garde la plus ancienne date de chaque plateforme —
     // IGDB en liste une par région, et c'est la première qui fait foi.
     const releaseByPlatform = new Map();
+    // Les plateformes pour lesquelles IGDB tient une ligne de sortie, DATÉE OU
+    // NON. C'est ce qui distingue « annoncé, sans date » de « pas d'info ».
+    const hasReleaseRow = new Set();
     for (const r of g.release_dates || []) {
-      if (!r?.platform || !r?.date) continue;
+      if (!r?.platform) continue;
+      hasReleaseRow.add(r.platform);
+      if (!r.date) continue;
       const known = releaseByPlatform.get(r.platform);
       if (known == null || r.date < known) releaseByPlatform.set(r.platform, r.date);
     }
 
+    // ⚠️ ON NE PROPOSE PAS DE JOUER SUR UNE CONSOLE OÙ LE JEU N'EST PAS SORTI.
+    //
+    // Le cas qui l'a montré : Marvel Rivals proposait « Nintendo Switch 2 »,
+    // annoncée mais pas encore sortie. Cocher une console sur laquelle on n'a
+    // PAS pu jouer n'est pas un petit détail d'affichage — c'est une donnée
+    // fausse qui part dans la bibliothèque, les statistiques et le profil.
+    //
+    // Et la marque de l'annonce N'EST PAS une date future : IGDB range Switch 2
+    // avec une ligne de sortie SANS DATE (« TBD »). Filtrer sur « date > maintenant »
+    // l'aurait donc laissée passer. Les trois cas :
+    //   • ligne datée, date passée      -> sorti, on propose ;
+    //   • ligne datée, date à venir     -> pas encore, on retire ;
+    //   • ligne SANS date (TBD)         -> annoncé seulement, on retire ;
+    //   • aucune ligne                  -> on ne sait pas, on PROPOSE quand même
+    //     (beaucoup de vieux jeux n'ont pas le détail par plateforme, et les
+    //     retirer amputerait la liste de consoles parfaitement jouables).
+    //
+    // ⚠️ SAUF SI ÇA NE LAISSE RIEN. Sur un jeu qui n'est sorti nulle part, tout
+    // serait filtré et le sélecteur se retrouverait vide — sans moyen de dire
+    // sur quoi on y joue (bêta, accès anticipé). Dans ce cas on rend la liste
+    // entière : mieux vaut une console de trop que pas de choix du tout.
+    const allPlatforms = (g.platforms || []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      // Le nom court d'IGDB (« PS5 », « PC »…) : de quoi tenir dans une
+      // pastille sans réécrire « PC (Microsoft Windows) ».
+      abbr: p.abbreviation || null,
+      releaseDate: releaseByPlatform.get(p.id) ?? null,
+    }));
+    const playablePlatforms = allPlatforms.filter((p) =>
+      p.releaseDate != null ? p.releaseDate <= nowSec : !hasReleaseRow.has(p.id)
+    );
+
     res.json({
-      platforms: (g.platforms || []).map((p) => ({
-        id: p.id,
-        name: p.name,
-        // Le nom court d'IGDB (« PS5 », « PC »…) : de quoi tenir dans une
-        // pastille sans réécrire « PC (Microsoft Windows) ».
-        abbr: p.abbreviation || null,
-        releaseDate: releaseByPlatform.get(p.id) ?? null,
-      })),
+      platforms: playablePlatforms.length ? playablePlatforms : allPlatforms,
       covers,
       characters,
       timeToBeat: ttb.times,
