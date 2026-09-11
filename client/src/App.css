@@ -48,6 +48,8 @@
    le fil (`hf-*`) utilisé par la page Activité. */
 @import "./styles/app-47-home.css";
 @import "./styles/app-48-datepicker.css";
+/* La fiche d'un rendez-vous et les grilles de bingo. */
+@import "./styles/app-50-event.css";
 /* Les pages publiques : accueil visiteur, connexion, inscription, mot de passe. */
 @import "./styles/app-49-welcome.css";
 @import "./styles/app-99-mobile-perf.css";

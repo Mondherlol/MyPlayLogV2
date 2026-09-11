@@ -16,9 +16,15 @@
      décalage qui fait lire une rangée comme « ça continue par là » plutôt que
      comme une liste coupée. */
   --bleed: var(--content-pad, 1.6rem);
-  --mh-gap: 0.95rem;
-  max-width: 1500px;
+  --mh-gap: 0.8rem;
+  /* PLUS ETROIT QUE L'ECRAN, ET C'EST VOLONTAIRE. Une page de rayons etalee sur
+     1500 px oblige l'oeil a traverser tout le moniteur pour lire un titre puis
+     revenir au debut de la rangee suivante. On se cale sur la largeur d'une
+     page de magazine : le reste est de la marge, et la marge fait partie du
+     dessin. */
+  max-width: 1240px;
   margin: 0 auto;
+  padding-block: 0.4rem 1.5rem;
   min-width: 0;
 }
 
@@ -36,11 +42,11 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 1rem;
-  padding: 0.2rem 0 1.7rem;
+  padding: 0.1rem 0 1.4rem;
 }
 
 .mh-hero-title {
-  font-size: clamp(1.7rem, 4vw, 2.4rem);
+  font-size: clamp(1.45rem, 2.6vw, 1.95rem);
   margin-bottom: 0.3rem;
 }
 
@@ -59,7 +65,7 @@
 
 /* ---------- Le rayon : en-tête ---------- */
 .mh-sec {
-  margin-bottom: 2.7rem;
+  margin-bottom: 2.1rem;
   min-width: 0;
 }
 
@@ -67,7 +73,7 @@
   display: flex;
   align-items: flex-end;
   gap: 0.8rem;
-  margin-bottom: 0.85rem;
+  margin-bottom: 0.7rem;
 }
 
 .mh-head-main {
@@ -83,8 +89,8 @@ a.mh-head-main:hover .mh-head-title {
 }
 
 .mh-head-cover {
-  width: 38px;
-  height: 51px;
+  width: 32px;
+  height: 43px;
   border-radius: 8px;
   object-fit: cover;
   background: var(--surface-2);
@@ -115,7 +121,7 @@ a.mh-head-main:hover .mh-head-title {
 
 .mh-head-title {
   font-family: var(--font-display);
-  font-size: clamp(1.15rem, 2.1vw, 1.42rem);
+  font-size: clamp(1rem, 1.5vw, 1.16rem);
   font-weight: 700;
   letter-spacing: -0.025em;
   line-height: 1.15;
@@ -127,7 +133,7 @@ a.mh-head-main:hover .mh-head-title {
 }
 
 .mh-head-hint {
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   color: var(--text-soft);
   margin-top: 0.18rem;
   overflow: hidden;
@@ -139,7 +145,7 @@ a.mh-head-main:hover .mh-head-title {
   display: inline-flex;
   align-items: center;
   gap: 0.1rem;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 600;
   color: var(--text-soft);
   white-space: nowrap;
@@ -153,8 +159,8 @@ a.mh-head-main:hover .mh-head-title {
 .mh-head-refresh {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface-2);
@@ -255,15 +261,15 @@ a.mh-head-main:hover .mh-head-title {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
-  height: 38px;
-  padding: 0 0.95rem;
+  gap: 0.38rem;
+  height: 33px;
+  padding: 0 0.8rem;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.14);
   color: #f5f6f9;
   font-family: var(--font-body);
-  font-size: 0.84rem;
+  font-size: 0.78rem;
   font-weight: 600;
   backdrop-filter: blur(6px);
   transition: background 0.15s ease, transform 0.12s ease, opacity 0.15s ease;
@@ -352,13 +358,15 @@ a.mh-head-main:hover .mh-head-title {
    1. La grande carte « tu joues à »
    ====================================================================== */
 .mh-sec-np .mh-rail {
-  --mh-gap: 1.1rem;
+  --mh-gap: 0.9rem;
 }
 
 .mh-np {
   position: relative;
-  width: min(620px, 82vw);
-  height: 288px;
+  /* Trois cartes tiennent dans la page : c'est ce qu'il faut pour qu'un rail se
+     lise comme un rail. Sur une carte et demie, on ne voit pas qu'il continue. */
+  width: 398px;
+  height: 216px;
   border-radius: var(--radius-lg);
   overflow: hidden;
   background: #15171d;
@@ -419,8 +427,8 @@ a.mh-head-main:hover .mh-head-title {
 .mh-np-tool {
   display: grid;
   place-items: center;
-  width: 33px;
-  height: 33px;
+  width: 29px;
+  height: 29px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(6, 7, 10, 0.45);
@@ -436,8 +444,8 @@ a.mh-head-main:hover .mh-head-title {
    avec plaisir. Le fond reste neutre même pris — c'est le cœur qui dit l'état,
    pas son socle. */
 .mh-np-tool.heart {
-  width: 38px;
-  height: 38px;
+  width: 33px;
+  height: 33px;
   margin-left: 0.15rem;
 }
 .mh-np-tool.heart.on {
@@ -449,9 +457,9 @@ a.mh-head-main:hover .mh-head-title {
 .mh-np-body {
   position: relative;
   z-index: 1;
-  padding: 1.1rem 1.2rem;
+  padding: 0.85rem 0.95rem;
   display: grid;
-  gap: 0.85rem;
+  gap: 0.6rem;
 }
 .mh-np-row {
   display: flex;
@@ -460,8 +468,8 @@ a.mh-head-main:hover .mh-head-title {
   min-width: 0;
 }
 .mh-np-cover {
-  width: 62px;
-  height: 83px;
+  width: 46px;
+  height: 62px;
   border-radius: 9px;
   object-fit: cover;
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -475,7 +483,7 @@ a.mh-head-main:hover .mh-head-title {
 }
 .mh-np-name {
   font-family: var(--font-display);
-  font-size: 1.5rem;
+  font-size: 1.12rem;
   font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 1.12;
@@ -489,7 +497,7 @@ a.mh-head-main:hover .mh-head-title {
   color: var(--amber);
 }
 .mh-np-meta {
-  font-size: 0.78rem;
+  font-size: 0.73rem;
   font-weight: 500;
   color: rgba(245, 246, 249, 0.78);
   display: flex;
@@ -507,7 +515,7 @@ a.mh-head-main:hover .mh-head-title {
   opacity: 0.5;
 }
 .mh-np-since {
-  font-size: 0.73rem;
+  font-size: 0.69rem;
   color: rgba(245, 246, 249, 0.56);
 }
 .mh-np-actions {
@@ -565,8 +573,8 @@ a.mh-head-main:hover .mh-head-title {
   border: 1px solid var(--border);
   background: var(--surface-2);
   border-radius: var(--radius);
-  padding: 0.85rem 0.9rem;
-  margin-bottom: 2.7rem;
+  padding: 0.7rem 0.8rem;
+  margin-bottom: 2.1rem;
   --bleed: 0.9rem;
 }
 
@@ -607,8 +615,8 @@ a.mh-head-main:hover .mh-head-title {
 .mh-week-tile {
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 64px;
+  width: 40px;
+  height: 54px;
   border-radius: 8px;
   overflow: hidden;
   border: 1.5px solid var(--tint);
@@ -635,7 +643,7 @@ a.mh-head-main:hover .mh-head-title {
    3. Les rendez-vous (Directs, showcases)
    ====================================================================== */
 .mh-ev {
-  width: 296px;
+  width: 244px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
@@ -701,8 +709,8 @@ a.mh-head-main:hover .mh-head-title {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  padding: 0.8rem 0.85rem 0.85rem;
+  gap: 0.26rem;
+  padding: 0.65rem 0.7rem 0.7rem;
 }
 .mh-ev-when {
   display: flex;
@@ -742,7 +750,7 @@ a.mh-head-main:hover .mh-head-title {
 }
 .mh-ev-name {
   font-family: var(--font-display);
-  font-size: 1rem;
+  font-size: 0.92rem;
   line-height: 1.25;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -767,12 +775,12 @@ a.mh-head-main:hover .mh-head-title {
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  height: 34px;
+  height: 30px;
   border-radius: 999px;
   border: 1px solid var(--border-strong);
   background: transparent;
   color: var(--text);
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   font-weight: 600;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
@@ -797,8 +805,8 @@ a.mh-head-main:hover .mh-head-title {
    ====================================================================== */
 .mh-antic {
   position: relative;
-  width: 310px;
-  height: 244px;
+  width: 250px;
+  height: 196px;
   border-radius: var(--radius-lg);
   overflow: hidden;
   background: #15171d;
@@ -845,13 +853,13 @@ a.mh-head-main:hover .mh-head-title {
 
 .mh-antic-wish {
   position: absolute;
-  top: 0.7rem;
-  right: 0.7rem;
+  top: 0.55rem;
+  right: 0.55rem;
   z-index: 2;
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 31px;
+  height: 31px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   background: rgba(6, 7, 10, 0.45);
@@ -871,13 +879,13 @@ a.mh-head-main:hover .mh-head-title {
 .mh-antic-body {
   position: relative;
   z-index: 1;
-  padding: 1rem 1.05rem;
+  padding: 0.75rem 0.85rem;
   display: grid;
   gap: 0.22rem;
 }
 .mh-antic-name {
   font-family: var(--font-display);
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: -0.025em;
   line-height: 1.18;
@@ -907,8 +915,8 @@ a.mh-head-main:hover .mh-head-title {
 .mh-antic-block {
   display: grid;
   place-items: center;
-  min-width: 52px;
-  padding: 0.25rem 0.45rem;
+  min-width: 42px;
+  padding: 0.18rem 0.38rem;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.14);
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -916,7 +924,7 @@ a.mh-head-main:hover .mh-head-title {
 }
 .mh-antic-block b {
   font-family: var(--font-display);
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: -0.03em;
   color: #fff;
@@ -996,8 +1004,8 @@ a.mh-head-main:hover .mh-head-title {
    ====================================================================== */
 .mh-tile {
   display: grid;
-  gap: 0.35rem;
-  width: 128px;
+  gap: 0.3rem;
+  width: 104px;
   align-content: start;
 }
 .mh-tile-art {
@@ -1054,7 +1062,7 @@ a.mh-head-main:hover .mh-head-title {
   color: #ff5470;
 }
 .mh-tile-name {
-  font-size: 0.79rem;
+  font-size: 0.75rem;
   font-weight: 600;
   line-height: 1.25;
   color: var(--text);
@@ -1068,7 +1076,7 @@ a.mh-head-main:hover .mh-head-title {
   color: var(--orange);
 }
 .mh-tile-sub {
-  font-size: 0.71rem;
+  font-size: 0.69rem;
   color: var(--text-soft);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1083,8 +1091,8 @@ a.mh-head-main:hover .mh-head-title {
    pochette, avant même le titre. */
 .mh-circle {
   display: grid;
-  gap: 0.3rem;
-  width: 140px;
+  gap: 0.28rem;
+  width: 112px;
   align-content: start;
 }
 .mh-circle .mh-faces {
@@ -1092,8 +1100,8 @@ a.mh-head-main:hover .mh-head-title {
 }
 .mh-circle .mh-face {
   border-color: var(--bg);
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
 }
 
 /* ======================================================================
@@ -1101,8 +1109,8 @@ a.mh-head-main:hover .mh-head-title {
    ====================================================================== */
 .mh-free {
   display: grid;
-  gap: 0.35rem;
-  width: 262px;
+  gap: 0.3rem;
+  width: 216px;
   align-content: start;
 }
 .mh-free-art {
@@ -1171,7 +1179,7 @@ a.mh-head-main:hover .mh-head-title {
   opacity: 1;
 }
 .mh-free-title {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 600;
   line-height: 1.25;
   display: -webkit-box;
@@ -1203,12 +1211,12 @@ a.mh-head-main:hover .mh-head-title {
 .mh-mot {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
-  padding: 0.85rem 1.1rem;
+  gap: 0.75rem;
+  padding: 0.7rem 0.95rem;
   border-radius: var(--radius);
   background: var(--accent-grad);
   color: #2e2101;
-  margin-bottom: 2.7rem;
+  margin-bottom: 2.1rem;
   box-shadow: 0 10px 30px rgba(242, 183, 11, 0.22);
   transition: transform 0.15s ease;
 }
@@ -1218,8 +1226,8 @@ a.mh-head-main:hover .mh-head-title {
 .mh-mot-ic {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.32);
   flex-shrink: 0;
@@ -1238,7 +1246,7 @@ a.mh-head-main:hover .mh-head-title {
 }
 .mh-mot-title {
   font-family: var(--font-display);
-  font-size: 1.02rem;
+  font-size: 0.94rem;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
@@ -1254,17 +1262,17 @@ a.mh-head-main:hover .mh-head-title {
    ====================================================================== */
 .mh-tonight {
   display: flex;
-  gap: 1.1rem;
-  padding: 1.1rem;
+  gap: 0.95rem;
+  padding: 0.9rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface-2);
-  max-width: 680px;
+  max-width: 540px;
 }
 .mh-tonight-art {
   display: block;
-  width: 104px;
-  height: 139px;
+  width: 82px;
+  height: 110px;
   border-radius: 11px;
   overflow: hidden;
   background: var(--surface);
@@ -1293,7 +1301,7 @@ a.mh-head-main:hover .mh-head-title {
 }
 .mh-tonight-name {
   font-family: var(--font-display);
-  font-size: 1.35rem;
+  font-size: 1.12rem;
   font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 1.15;
@@ -1310,8 +1318,8 @@ a.mh-head-main:hover .mh-head-title {
 .mh-tonight-dice {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 33px;
+  height: 33px;
   border-radius: 999px;
   border: 1px solid var(--border-strong);
   color: var(--text);
@@ -1331,8 +1339,8 @@ a.mh-head-main:hover .mh-head-title {
   border: 1px solid var(--border);
   background: var(--surface);
   border-radius: var(--radius-lg);
-  padding: 1rem 1.1rem;
-  margin-bottom: 2.7rem;
+  padding: 0.85rem 0.95rem;
+  margin-bottom: 2.1rem;
 }
 .mh-radar-head {
   display: flex;
@@ -1421,9 +1429,9 @@ a.mh-head-main:hover .mh-head-title {
    ====================================================================== */
 .mh-doors {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 0.8rem;
-  margin-bottom: 2.7rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.7rem;
+  margin-bottom: 2.1rem;
 }
 .mh-door {
   position: relative;
@@ -1456,8 +1464,8 @@ a.mh-head-main:hover .mh-head-title {
 .mh-door-ic {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   border-radius: 12px;
   background: var(--surface-2);
   color: var(--orange);
@@ -1705,7 +1713,7 @@ a.mh-head-main:hover .mh-head-title {
    une largeur (elle la tenait de la grille) et un peu d'air à droite, parce que
    son CD sort du cadre au survol. */
 .pfo-card.mh-ost {
-  width: 216px;
+  width: 178px;
   margin-right: 0.5rem;
 }
 .mh-ost-by {
@@ -1748,26 +1756,26 @@ a.mh-head-main:hover .mh-head-title {
   }
   .mh-np {
     width: 84vw;
-    height: 252px;
+    height: 224px;
   }
   .mh-np-name {
-    font-size: 1.28rem;
+    font-size: 1.16rem;
   }
   .mh-antic {
-    width: 268px;
-    height: 226px;
+    width: 244px;
+    height: 192px;
   }
   .mh-ev {
-    width: 264px;
+    width: 232px;
   }
   .mh-tile {
-    width: 112px;
+    width: 98px;
   }
   .mh-circle {
-    width: 124px;
+    width: 108px;
   }
   .mh-free {
-    width: 232px;
+    width: 208px;
   }
   .mh-tonight {
     flex-direction: column;

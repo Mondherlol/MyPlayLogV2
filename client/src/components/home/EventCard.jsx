@@ -1,4 +1,5 @@
-import { Bell, BellRing, ExternalLink, Radio, Tv } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Bell, BellRing, Radio, Tv } from "lucide-react";
 import {
   brandTheme,
   countdown,
@@ -34,19 +35,18 @@ export default function EventCard({ event, now, onToggleInterest }) {
     ? preciseCountdown(event.startsAt, event.precision, now || Date.now())
     : null;
 
-  // Le site n'a pas de fiche d'événement : le lien utile, c'est la diffusion
-  // elle-même (ou la source qui l'annonce). Sans aucun des deux, la carte reste
-  // une carte — la cloche, elle, marche toujours.
-  const href = event.liveUrl || event.sourceUrl || null;
-
+  // ⚠️ LA CARTE MÈNE À LA FICHE, PAS À LA DIFFUSION. Elle ouvrait le lien du
+  // live dans un onglet : on quittait le site pour une page YouTube qui, trois
+  // jours avant l'émission, ne montre qu'un compte à rebours. La fiche, elle, a
+  // le compte à rebours ET tout ce qu'on ne peut pas mettre sur une carte : la
+  // description, les grilles de bingo, ce qui avait été annoncé la dernière
+  // fois. Le lien du live y est, à un clic.
   return (
     <article className="mh-ev">
-      <a
-        className={`mh-ev-art ${href ? "clickable" : "flat"}`}
-        href={href || undefined}
-        target={href ? "_blank" : undefined}
-        rel={href ? "noopener noreferrer" : undefined}
-        title={href ? `${event.name} — regarder` : event.name}
+      <Link
+        className="mh-ev-art clickable"
+        to={`/event/${event.id}`}
+        title={event.name}
       >
         {event.image ? (
           <img src={event.image} alt="" loading="lazy" draggable="false" />
@@ -65,12 +65,8 @@ export default function EventCard({ event, now, onToggleInterest }) {
             )}
           </span>
         )}
-        {!!href && (
-          <span className="mh-ev-go">
-            <ExternalLink size={13} /> {live ? "Regarder" : "Voir"}
-          </span>
-        )}
-      </a>
+        <span className="mh-ev-go">{live ? "Regarder" : "Voir la fiche"}</span>
+      </Link>
 
       <div className="mh-ev-body">
         <div className="mh-ev-when">

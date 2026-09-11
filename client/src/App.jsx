@@ -8,6 +8,8 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Welcome from "./pages/Welcome";
 import Activity from "./pages/Activity";
+import EventPage from "./pages/EventPage";
+import BingoPage from "./pages/BingoPage";
 import GbaWatch from "./pages/GbaWatch";
 import BlindTest from "./pages/BlindTest";
 import PixelRush from "./pages/PixelRush";
@@ -188,6 +190,12 @@ export default function App() {
         <Route path="/app" element={<Welcome />} />
         {/* L'onglet Activité : le fil des amis et le mien, plus le direct. */}
         <Route path="/activity" element={<Activity />} />
+        {/* La fiche d'un rendez-vous (Direct, showcase) : ses infos, son bingo,
+            ce qui y a été annoncé, et les éditions précédentes. */}
+        <Route path="/event/:id" element={<EventPage />} />
+        {/* Une grille de bingo, en grand : la sienne qu'on coche, ou celle de
+            quelqu'un d'autre qu'on regarde. */}
+        <Route path="/bingo/:id" element={<BingoPage />} />
         {/* Regarder quelqu'un jouer sur GBA, en direct. Le code de la salle est
             le lien d'invitation ; la diffusion s'ouvre depuis la console. */}
         <Route

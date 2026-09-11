@@ -240,3 +240,60 @@ export function agoLabel(date) {
   if (days < 7) return `il y a ${days} j`;
   return new Date(ms).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
+
+/** « lundi 8 septembre, 16:00 » — la ligne complète d'une fiche. */
+export function fullWhen(startsAt, precision) {
+  const d = new Date(startsAt);
+  if (Number.isNaN(d.getTime())) return "";
+  const date = d.toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const time = localTime(startsAt, precision);
+  return time ? `${date}, ${time}` : date;
+}
+
+/**
+ * L'événement est-il dans sa fenêtre de diffusion ?
+ *
+ * ⚠️ PLUS LARGE QUE LE `live` DE `countdown()`, ET C'EST VOULU. Celui-ci dit
+ * « le serveur relève encore les annonces » — il commence cinq minutes avant
+ * l'heure et déborde d'une heure sur la fin, parce qu'un Direct déborde
+ * toujours un peu. Celui de `countdown()` dit ce qu'on ÉCRIT sur la carte, et
+ * là il ne faut pas déborder : « EN COURS » sur une émission finie est un
+ * mensonge.
+ */
+export function isEventLive(event, now = Date.now()) {
+  const end = eventEndMs(event);
+  if (end === null) return false;
+  const start = new Date(event.startsAt).getTime();
+  return now >= start - 5 * 60 * 1000 && now <= Math.min(end + 3600000, start + 12 * 3600000);
+}
+
+/** « Direct », « Conférence », « Saison » — ce que c'est, en un mot. */
+export function kindLabel(kind) {
+  if (kind === "conference") return "Conférence";
+  if (kind === "season") return "Saison";
+  return "Direct";
+}
+
+/**
+ * Depuis combien de minutes une annonce est tombée.
+ *
+ * Rend `null` au-delà d'une heure : passé ce délai, « il y a 73 min » n'aide
+ * plus personne, et la fraîcheur n'est plus l'information.
+ */
+export function announcedAgo(addedAt, now = Date.now()) {
+  const ts = new Date(addedAt || 0).getTime();
+  if (!ts || Number.isNaN(ts)) return null;
+  const mins = Math.floor((now - ts) / 60000);
+  return mins >= 0 && mins <= 60 ? mins : null;
+}
+
+/** « 12 intéressés » — et rien du tout quand personne ne l'est encore. */
+export function interestLabel(count) {
+  if (!count) return null;
+  return `${count} intéressé${count > 1 ? "s" : ""}`;
+}
