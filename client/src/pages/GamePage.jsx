@@ -53,7 +53,7 @@ import { useLibrary } from "../context/LibraryContext";
 import ScrollRow from "../components/ScrollRow";
 // Jeu ajouté par lien Steam et pas encore référencé chez IGDB : sa fiche le dit.
 import LocalGameBanner from "../components/LocalGameBanner";
-import RatingGauge from "../components/RatingGauge";
+import RatingInput from "../components/RatingInput";
 import PlayedModal from "../components/PlayedModal";
 import AddToListModal from "../components/AddToListModal";
 import GameReviews from "../components/GameReviews";
@@ -1476,7 +1476,7 @@ function InlineRating({ value, onSave }) {
   return (
     <div className="rating-block">
       <span className="rating-block-label">Ma note</span>
-      <RatingGauge
+      <RatingInput
         value={rating}
         active={hasRating}
         onEnable={() => {

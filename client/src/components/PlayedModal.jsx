@@ -29,6 +29,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
+import { startShortcuts, endShortcuts, toInputValue, dateLabel } from "../lib/dateQuick";
 import { makeCache } from "../lib/cache";
 import { useAuth } from "../context/AuthContext";
 import { useLibrary } from "../context/LibraryContext";
@@ -37,7 +38,7 @@ import ScrollRow from "./ScrollRow";
 import AddToListModal from "./AddToListModal";
 import CharacterPicker from "./CharacterPicker";
 import OstPicker from "./OstPicker";
-import RatingGauge from "./RatingGauge";
+import RatingInput from "./RatingInput";
 import { Composer } from "./ListComments";
 
 const STATUSES = [
@@ -71,7 +72,12 @@ const EMPTY_DETAILS = {
   timeToBeat: null,
   endlessHint: false,
   bundleGames: [],
+  dlcs: [],
 };
+
+// Au-delà, les DLC se replient : une saison de skins en compte quarante, et
+// déroulés d'office ils repoussent tout le reste de la modale hors de vue.
+const DLC_FOLD = 3;
 
 // ⚠️ LA DATE SE COUPE, ELLE NE SE CONVERTIT PAS. Un `<input type="date">` parle
 // en « AAAA-MM-JJ » sans fuseau, alors que le serveur renvoie un instant ISO en
@@ -81,6 +87,43 @@ const EMPTY_DETAILS = {
 // que soit le fuseau du navigateur.
 const toDateInput = (iso) => (iso ? String(iso).slice(0, 10) : "");
 const fromDateInput = (v) => (v ? new Date(`${v}T12:00:00.000Z`).toISOString() : null);
+
+/**
+ * Les raccourcis de date, en rangées qui défilent.
+ *
+ * Une rangée par ORIGINE (« depuis la sortie », « depuis aujourd'hui ») : c'est
+ * ce qui fait comprendre d'un coup d'œil qu'il y a deux façons de répondre.
+ * La pastille correspondant à la date déjà saisie est marquée — on voit ainsi
+ * qu'on avait répondu « un mois après la sortie », et pas seulement le jour.
+ */
+function QuickDates({ rows, value, onPick }) {
+  if (!rows.length) return null;
+  return (
+    <div className="qd">
+      {rows.map((row) => (
+        <div key={row.key} className="qd-row">
+          <span className="qd-label">{row.label}</span>
+          <ScrollRow className="qd-chips">
+            {row.items.map((it) => (
+              <button
+                key={it.key}
+                type="button"
+                className={`qd-chip clickable ${
+                  value && toInputValue(it.date) === value ? "active" : ""
+                }`}
+                onClick={() => onPick(it.date)}
+                title={dateLabel(it.date)}
+              >
+                <span className="qd-chip-label">{it.label}</span>
+                {it.hint && <span className="qd-chip-hint">{it.hint}</span>}
+              </button>
+            ))}
+          </ScrollRow>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // Forme canonique des champs éditables, comparée par valeur (JSON) pour savoir
 // si l'utilisateur a des modifications non enregistrées. On plie `hasRating`
@@ -105,6 +148,7 @@ function normalizeState(s) {
     platinum: !!s.platinum,
     startedAt: toDateInput(s.startedAt),
     finishedAt: toDateInput(s.finishedAt),
+    dlcs: Object.keys(s.ownedDlcs || {}).map(Number).sort((a, b) => a - b),
     // Progression bundle : "id:statut" triés (forme canonique, indépendante
     // de l'ordre des clics).
     bundle: Object.entries(s.bundleStatus || {})
@@ -182,6 +226,11 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   const [startedAt, setStartedAt] = useState("");
   const [finishedAt, setFinishedAt] = useState("");
   const [showListModal, setShowListModal] = useState(false);
+  // Les contenus additionnels POSSÉDÉS : id -> { id, name, cover }. Un DLC n'a
+  // ni statut ni note — c'est une case cochée sur le jeu de base, et on
+  // n'enregistre que les cochées (cf. `dlcs` dans routes/library.js).
+  const [ownedDlcs, setOwnedDlcs] = useState({});
+  const [allDlcs, setAllDlcs] = useState(false); // liste dépliée
   const [cover, setCover] = useState(game.cover);
   const [existing, setExisting] = useState(false);
   const [manualEndless, setManualEndless] = useState(false);
@@ -239,6 +288,9 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
         setFavChar(en.favoriteCharacter || null);
         setFavoriteOst(en.favoriteOst || null);
         setPlatinum(!!en.platinum);
+        const od = {};
+        for (const d of en.dlcs || []) od[d.id] = { id: d.id, name: d.name, cover: d.cover || null };
+        setOwnedDlcs(od);
         setStartedAt(toDateInput(en.startedAt));
         setFinishedAt(toDateInput(en.finishedAt));
         if (en.cover) setCover(en.cover);
@@ -266,6 +318,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
           platinum: !!en.platinum,
           startedAt: en.startedAt,
           finishedAt: en.finishedAt,
+          ownedDlcs: od,
           cover: en.cover || game.cover,
           bundleStatus: bd,
         });
@@ -289,6 +342,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
           platinum: false,
           startedAt: null,
           finishedAt: null,
+          ownedDlcs: {},
           cover: game.cover,
           bundleStatus: {},
         });
@@ -330,7 +384,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   live.current = {
     status, platform, format, playtime, favorite, hasRating, rating,
     review, reviewMedia, spoiler, pros, cons, favChar, favoriteOst, cover,
-    platinum, startedAt, finishedAt,
+    platinum, startedAt, finishedAt, ownedDlcs,
     bundleStatus,
   };
 
@@ -408,6 +462,12 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
         // oublier la date de la première fin (même règle que sur mobile).
         ...(status === "finished" ? { finishedAt: fromDateInput(finishedAt) } : {}),
       };
+      // On n'envoie les DLC que si on sait de quoi on parle (détails chargés)
+      // ou si l'entrée en portait déjà : sinon une modale ouverte pendant que
+      // le catalogue répond encore effacerait les cases déjà cochées.
+      if (details.dlcs?.length || Object.keys(ownedDlcs).length) {
+        body.dlcs = Object.values(ownedDlcs);
+      }
       // Bundle : on n'envoie la progression que si on connaît les jeux inclus
       // (détails chargés) — sinon on ne touche pas à l'existant côté serveur.
       if (details.bundleGames?.length) {
@@ -492,6 +552,47 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   // Le 100 % se pose à un jeu terminé — et à un jeu sans fin, qui n'a pas de
   // générique mais bien une liste de succès à vider.
   const canComplete = status === "finished" || status === "endless";
+
+  // La sortie qui nous intéresse : celle de LA console cochée. À défaut (aucune
+  // console, ou date inconnue), la toute première sortie du jeu — c'est elle qui
+  // datera les raccourcis « à la sortie », « un mois après »…
+  const chosenPlatform = details.platforms.find((p) => p.name === platform) || null;
+  const releaseTs =
+    chosenPlatform?.releaseDate ??
+    (() => {
+      const dates = details.platforms.map((p) => p.releaseDate).filter(Boolean);
+      return dates.length ? Math.min(...dates) : null;
+    })();
+  const release = releaseTs ? new Date(releaseTs * 1000) : null;
+  const startRows = startShortcuts(release);
+  const endRows = endShortcuts(startedAt ? new Date(`${startedAt}T12:00:00`) : null, release);
+
+  const dlcs = details.dlcs || [];
+  const dlcOwned = dlcs.filter((d) => ownedDlcs[d.id]).length;
+  const allDlcOwned = dlcs.length > 0 && dlcOwned === dlcs.length;
+
+  function toggleDlc(d) {
+    setOwnedDlcs((prev) => {
+      const next = { ...prev };
+      if (next[d.id]) delete next[d.id];
+      else next[d.id] = { id: d.id, name: d.name, cover: d.cover || null };
+      return next;
+    });
+  }
+
+  // « Tous » : celui qui coche des DLC les a le plus souvent tous.
+  function toggleAllDlcs() {
+    setOwnedDlcs((prev) => {
+      if (dlcs.every((d) => prev[d.id])) {
+        const next = { ...prev };
+        for (const d of dlcs) delete next[d.id];
+        return next;
+      }
+      const next = { ...prev };
+      for (const d of dlcs) next[d.id] = { id: d.id, name: d.name, cover: d.cover || null };
+      return next;
+    });
+  }
   const statusOptions = showEndless ? [...STATUSES, ENDLESS] : STATUSES;
 
   return createPortal(
@@ -568,6 +669,31 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                     Coup de cœur
                   </button>
 
+                  {/* ⚠️ LE 100 % EST UNE MARQUE, PAS UN CHAMP. Il était au
+                      milieu du formulaire, entre le temps de jeu et les
+                      personnages, où il coupait la saisie en deux pour une
+                      question qui se répond d'un clic. Sa place est ici, à côté
+                      du coup de cœur : ce sont les deux mêmes gestes — on
+                      épingle quelque chose sur le jeu.
+
+                      Et il ne se propose qu'à un jeu MENÉ AU BOUT : demander
+                      « l'as-tu complété ? » d'un jeu en cours n'a pas de sens.
+                      Un jeu sans fin, si — c'est même là que le platine demande
+                      le plus de travail. */}
+                  {canComplete && (
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={platinum}
+                      className={`hundred-btn clickable ${platinum ? "active" : ""}`}
+                      onClick={() => setPlatinum((v) => !v)}
+                      title="J'ai tout fait : succès, collectibles, fins"
+                    >
+                      <Sparkles size={18} />
+                      Terminé à 100 %
+                    </button>
+                  )}
+
                   <button
                     className="list-btn clickable"
                     onClick={() => setShowListModal(true)}
@@ -578,7 +704,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
 
                   <div className="rating-block">
                     <span className="rating-block-label">Ma note</span>
-                    <RatingGauge
+                    <RatingInput
                       value={rating}
                       active={hasRating}
                       onEnable={() => {
@@ -708,6 +834,75 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                     </div>
                   )}
 
+                  {/* --- Les DLC possédés ---------------------------------
+                      ⚠️ UN DLC N'EST PAS UN JEU À RANGER À PART. C'est une case
+                      cochée sur le jeu de base : ni statut, ni note, ni temps
+                      de jeu — juste « je l'ai ». Lui donner sa propre entrée
+                      couperait la même partie en deux lignes.
+
+                      Les extensions (Phantom Liberty, Blood and Wine) n'en sont
+                      PAS : ce sont des jeux qu'on lance et qu'on finit, et le
+                      serveur les écarte d'ici (cf. gameDlcs dans routes/games.js). */}
+                  {dlcs.length > 0 && (
+                    <div className="dlc-block">
+                      <label className="field-label">
+                        Contenus additionnels
+                        <span className="bundle-count">
+                          {dlcOwned}/{dlcs.length} possédés
+                        </span>
+                        <button
+                          type="button"
+                          className={`dlc-all clickable ${allDlcOwned ? "active" : ""}`}
+                          onClick={toggleAllDlcs}
+                        >
+                          <Check size={12} strokeWidth={3} /> Tous
+                        </button>
+                      </label>
+                      <div className="dlc-list">
+                        {(allDlcs ? dlcs : dlcs.slice(0, DLC_FOLD)).map((d) => {
+                          const on = !!ownedDlcs[d.id];
+                          const meta = [d.typeLabel, d.year].filter(Boolean).join(" · ");
+                          return (
+                            <button
+                              key={d.id}
+                              type="button"
+                              role="checkbox"
+                              aria-checked={on}
+                              className={`dlc-item clickable ${on ? "on" : ""}`}
+                              onClick={() => toggleDlc(d)}
+                            >
+                              <span className="dlc-cover">
+                                {d.cover ? (
+                                  <img src={d.cover} alt="" loading="lazy" draggable="false" />
+                                ) : (
+                                  <Gamepad2 size={15} />
+                                )}
+                              </span>
+                              <span className="dlc-body">
+                                <span className="dlc-name" title={d.name}>
+                                  {d.name}
+                                </span>
+                                {meta && <span className="dlc-meta">{meta}</span>}
+                              </span>
+                              <span className="dlc-box">{on && <Check size={13} strokeWidth={3} />}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {dlcs.length > DLC_FOLD && (
+                        <button
+                          type="button"
+                          className="dlc-more clickable"
+                          onClick={() => setAllDlcs((v) => !v)}
+                        >
+                          {allDlcs
+                            ? "Réduire"
+                            : `Voir les ${dlcs.length - DLC_FOLD} autres`}
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   <label className="field-label">Plateforme</label>
                   {detailsLoading ? (
                     <span className="mf-sk-row" />
@@ -798,7 +993,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                       Le serveur ne les devine pas, et il ne faut pas qu'il
                       essaie : un jeu ajouté aujourd'hui a très bien pu être
                       terminé il y a dix ans. */}
-                  <div className="when-row">
+                  <div className={`when-row ${status === "finished" ? "two" : ""}`}>
                     <div className="when-col">
                       <label className="field-label" htmlFor="mpl-started">
                         Commencé le
@@ -824,6 +1019,11 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                           </button>
                         )}
                       </div>
+                      <QuickDates
+                        rows={startRows}
+                        value={startedAt}
+                        onPick={(d) => setStartedAt(toInputValue(d))}
+                      />
                     </div>
 
                     {/* La date de fin ne se demande QU'À UN JEU TERMINÉ :
@@ -854,27 +1054,14 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                             </button>
                           )}
                         </div>
+                        <QuickDates
+                          rows={endRows}
+                          value={finishedAt}
+                          onPick={(d) => setFinishedAt(toInputValue(d))}
+                        />
                       </div>
                     )}
                   </div>
-
-                  {/* Le 100 % ne se propose qu'à un jeu qu'on a MENÉ AU BOUT :
-                      demander « l'as-tu complété ? » d'un jeu en cours n'a pas
-                      de sens. Un jeu sans fin, si — c'est même là que le
-                      platine demande le plus de travail. */}
-                  {canComplete && (
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={platinum}
-                      className={`hundred-btn clickable ${platinum ? "active" : ""}`}
-                      onClick={() => setPlatinum((v) => !v)}
-                    >
-                      <Sparkles size={17} />
-                      <span>Terminé à 100 %</span>
-                      {platinum && <span className="hundred-tag">PLATINE</span>}
-                    </button>
-                  )}
 
                   <CharacterPicker
                     gameId={game.id}

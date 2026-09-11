@@ -2230,3 +2230,104 @@ a.btn-discord-primary.disabled {
   font-size: 0.78rem;
   color: var(--text-soft);
 }
+
+/* ======================================================================
+   Apparence — l'échelle de notation
+   ====================================================================== */
+.settings-sub-title {
+  margin: 1.4rem 0 0.6rem;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+}
+.settings-hint {
+  margin: 0.9rem 0 0;
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.scale-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.7rem;
+}
+.scale-opt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.85rem 0.95rem;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 15px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: var(--cursor-pointer), pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.scale-opt:hover {
+  border-color: var(--accent);
+}
+.scale-opt.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+.scale-opt-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.scale-opt-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.scale-opt-check {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--accent-grad);
+  color: #1a1204; /* même raison : pas d'or sur l'or */
+}
+.scale-opt-desc {
+  color: var(--text-soft);
+  font-size: 0.81rem;
+  line-height: 1.45;
+}
+/* L'aperçu vaut mieux qu'une explication : on voit ce qu'on choisit. */
+.scale-opt-demo {
+  margin-top: 0.3rem;
+}
+.scale-demo-100,
+.scale-demo-stars {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #f2b70b;
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+.scale-demo-bar {
+  flex: 1;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  overflow: hidden;
+}
+.scale-demo-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #22a35a;
+}
+.scale-demo-100 b {
+  color: #22a35a;
+  font-size: 0.9rem;
+}
+.scale-demo-stars b {
+  margin-left: 0.2rem;
+  font-size: 0.9rem;
+}

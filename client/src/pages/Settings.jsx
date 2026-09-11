@@ -4,6 +4,7 @@ import {
   DownloadCloud,
   UserCog,
   Palette,
+  Star,
   Bell,
   ShieldCheck,
   Link2,
@@ -50,6 +51,12 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { apiFetch, API_BASE } from "../lib/api";
+import {
+  getRatingScale,
+  setRatingScale,
+  SCALE_100,
+  SCALE_STARS,
+} from "../lib/ratingScale";
 import { useAuth } from "../context/AuthContext";
 import RingtonePicker from "../components/RingtonePicker";
 import { useLibrary } from "../context/LibraryContext";
@@ -82,6 +89,7 @@ const TAB_KEYS = [
   "privacy",
   "calls",
   "discord",
+  "appearance",
 ];
 
 // Onglets de la page Paramètres (façon Discord / Steam). Les onglets marqués
@@ -94,7 +102,7 @@ const TABS = [
   { key: "calls", label: "Appels", Icon: PhoneCall },
   { key: "discord", label: "Discord & bot", Icon: Bot },
   { key: "account", label: "Compte", Icon: UserCog, soon: true },
-  { key: "appearance", label: "Apparence", Icon: Palette, soon: true },
+  { key: "appearance", label: "Apparence", Icon: Palette },
   { key: "notifications", label: "Notifications", Icon: Bell, soon: true },
 ];
 
@@ -167,6 +175,7 @@ export default function Settings() {
           {tab === "privacy" && <PrivacyPanel onCount={setRequestCount} />}
           {tab === "calls" && <CallsPanel />}
           {tab === "discord" && <DiscordPanel />}
+          {tab === "appearance" && <AppearancePanel />}
         </section>
       </div>
     </div>
@@ -497,6 +506,97 @@ function FeedGroup({ group, hidden, busyKey, onGroup, onLeaf }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// Onglet « Apparence » : pour l'instant une seule question, mais elle revient
+// à chaque note posée — sur 100, ou sur cinq étoiles.
+//
+// ⚠️ LE RÉGLAGE NE CONVERTIT RIEN. La note reste enregistrée sur 100 en base :
+// c'est une façon de l'afficher et de la saisir, pas une autre donnée (cf.
+// lib/ratingScale.js). Passer aux étoiles et revenir ne perd donc aucune
+// précision — un 83 reste un 83, même après l'avoir vu en 4,15 étoiles.
+function AppearancePanel() {
+  const [scale, setScale] = useState(getRatingScale);
+
+  function pick(next) {
+    setScale(next);
+    setRatingScale(next); // prévient les composants déjà à l'écran
+  }
+
+  const OPTIONS = [
+    {
+      value: SCALE_100,
+      title: "Sur 100",
+      desc: "La jauge à glisser, avec la valeur exacte au clavier. Le réglage le plus fin.",
+    },
+    {
+      value: SCALE_STARS,
+      title: "Sur 5 étoiles",
+      desc: "Cinq étoiles qu'on règle au glissé, par demies. Plus rapide, moins précis.",
+    },
+  ];
+
+  return (
+    <div className="settings-section">
+      <h2 className="settings-section-title">
+        <Palette size={20} /> Apparence
+      </h2>
+      <p className="settings-section-sub">
+        Ces réglages ne concernent que CET appareil : ils vivent dans ton navigateur,
+        pas dans ton compte.
+      </p>
+
+      <h3 className="settings-sub-title">Échelle de notation</h3>
+      <div className="scale-picker">
+        {OPTIONS.map((o) => (
+          <button
+            key={o.value}
+            className={`scale-opt clickable ${scale === o.value ? "active" : ""}`}
+            onClick={() => pick(o.value)}
+            aria-pressed={scale === o.value}
+          >
+            <span className="scale-opt-head">
+              <span className="scale-opt-title">{o.title}</span>
+              {scale === o.value && (
+                <span className="scale-opt-check">
+                  <Check size={14} strokeWidth={3} />
+                </span>
+              )}
+            </span>
+            <span className="scale-opt-desc">{o.desc}</span>
+            {/* L'aperçu vaut mieux qu'une explication : on voit ce qu'on choisit. */}
+            <span className="scale-opt-demo">
+              {o.value === SCALE_100 ? (
+                <span className="scale-demo-100">
+                  <span className="scale-demo-bar">
+                    <span style={{ width: "78%" }} />
+                  </span>
+                  <b>78</b>
+                </span>
+              ) : (
+                <span className="scale-demo-stars">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <Star
+                      key={i}
+                      size={16}
+                      fill={i < 4 ? "currentColor" : "none"}
+                      strokeWidth={i < 4 ? 0 : 2}
+                    />
+                  ))}
+                  <b>4</b>
+                </span>
+              )}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <p className="settings-hint">
+        Ta note reste enregistrée de la même façon : changer d'échelle n'efface et ne
+        convertit rien, et les autres joueurs voient tes notes dans LEUR échelle.
+      </p>
     </div>
   );
 }

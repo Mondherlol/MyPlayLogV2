@@ -32,7 +32,7 @@ import { useAuth } from "../context/AuthContext";
 import { timeAgo } from "../lib/lists";
 import { Composer, renderMessage } from "./ListComments";
 import ReviewComments from "./ReviewComments";
-import RatingGauge from "./RatingGauge";
+import RatingInput from "./RatingInput";
 
 const PLAYED = ["playing", "finished", "paused", "dropped", "endless"];
 
@@ -209,7 +209,7 @@ function ReviewEditor({ game, token, initial, isNew, onSaved }) {
         </div>
         <div className="rating-block grv-rating-block">
           <span className="rating-block-label">Ma note</span>
-          <RatingGauge
+          <RatingInput
             value={rating ?? 50}
             active={rating != null}
             onEnable={() => setRating(50)}

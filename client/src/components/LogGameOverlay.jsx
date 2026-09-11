@@ -16,7 +16,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Search, Loader2, Gamepad2, X, Bookmark, Check, CornerDownLeft } from "lucide-react";
+import {
+  Search,
+  Loader2,
+  Gamepad2,
+  X,
+  Bookmark,
+  CornerDownLeft,
+  Play,
+  Trophy,
+  Pause,
+  Infinity as InfinityIcon,
+} from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLibrary } from "../context/LibraryContext";
@@ -24,6 +35,17 @@ import { useBackClose } from "../hooks/useBackClose";
 import PlayedModal from "./PlayedModal";
 
 const LIMIT = 7;
+
+// Ce qu'on affiche sur un jeu DÉJÀ dans la bibliothèque. Mêmes libellés et
+// mêmes icônes que partout ailleurs (la fiche, les vignettes) : le statut d'un
+// jeu doit se reconnaître d'un coup d'œil, pas se relire.
+const STATUS_META = {
+  playing: { label: "En cours", Icon: Play },
+  finished: { label: "Terminé", Icon: Trophy },
+  paused: { label: "En pause", Icon: Pause },
+  dropped: { label: "Abandonné", Icon: X },
+  endless: { label: "Sans fin", Icon: InfinityIcon },
+};
 
 export default function LogGameOverlay({ onClose }) {
   const { token } = useAuth();
@@ -166,6 +188,12 @@ export default function LogGameOverlay({ onClose }) {
               {results.map((g, i) => {
                 const entry = map[g.id];
                 const isWish = entry?.status === "wishlist";
+                // ⚠️ UN JEU DÉJÀ NOTÉ NE SE PROPOSE PAS EN ENVIE. Lui montrer
+                // un signet, c'était proposer de vouloir jouer à ce qu'on a
+                // déjà fini. À sa place, son statut — et le bouton ouvre la
+                // modale pour le corriger, ce qui est la seule chose qu'on
+                // vienne y faire.
+                const played = STATUS_META[entry?.status] || null;
                 return (
                   <div
                     key={g.id}
@@ -193,27 +221,34 @@ export default function LogGameOverlay({ onClose }) {
                       </span>
                     </span>
 
-                    {/* Déjà dans la bibliothèque : on le dit, plutôt que de
-                        laisser rajouter à l'aveugle ce qu'on a déjà. */}
-                    {entry && !isWish && (
-                      <span className="logoverlay-have">
-                        <Check size={13} /> Déjà noté
-                      </span>
+                    {played ? (
+                      <button
+                        type="button"
+                        className={`logoverlay-status clickable st-${entry.status}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPicked(g);
+                        }}
+                        title="Modifier mon suivi de ce jeu"
+                      >
+                        <played.Icon size={13} />
+                        {played.label}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className={`logoverlay-wish clickable ${isWish ? "on" : ""}`}
+                        onClick={(e) => addToWishlist(e, g)}
+                        disabled={wishing === g.id || isWish}
+                        title={isWish ? "Déjà dans tes envies" : "Ajouter à mes envies"}
+                      >
+                        {wishing === g.id ? (
+                          <Loader2 size={15} className="spin" />
+                        ) : (
+                          <Bookmark size={15} fill={isWish ? "currentColor" : "none"} />
+                        )}
+                      </button>
                     )}
-
-                    <button
-                      type="button"
-                      className={`logoverlay-wish clickable ${isWish ? "on" : ""}`}
-                      onClick={(e) => addToWishlist(e, g)}
-                      disabled={wishing === g.id || isWish}
-                      title={isWish ? "Déjà dans tes envies" : "Ajouter à mes envies"}
-                    >
-                      {wishing === g.id ? (
-                        <Loader2 size={15} className="spin" />
-                      ) : (
-                        <Bookmark size={15} fill={isWish ? "currentColor" : "none"} />
-                      )}
-                    </button>
                   </div>
                 );
               })}

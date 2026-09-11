@@ -4751,16 +4751,20 @@
    manquaient au site : quand j'ai commencé, quand j'ai fini, et si j'ai tout
    fait. Ce sont des données que le serveur acceptait déjà.
    ====================================================================== */
+/* ⚠️ EN COLONNE, PAS CÔTE À CÔTE. Les deux dates tenaient sur une ligne tant
+   qu'elles n'étaient que deux champs ; avec leurs rangées de raccourcis, les
+   mettre côte à côte écrasait les pastilles à trois caractères. */
 .when-row {
   display: flex;
-  gap: 1rem;
-  align-items: flex-start;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 1.1rem;
   margin-top: 0.9rem;
 }
 .when-col {
-  flex: 1 1 168px;
   min-width: 0;
+}
+.when-col .input-group {
+  max-width: 240px;
 }
 .when-col .input-group {
   padding: 0.12rem 0.9rem;
@@ -4789,39 +4793,283 @@
   color: var(--text);
 }
 
+/* Frère du « Coup de cœur » : même forme, même place, même geste — on épingle
+   une marque sur le jeu. D'où la reprise exacte de ses mesures. */
 .hundred-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
-  width: 100%;
-  margin-top: 0.9rem;
-  padding: 0.65rem 0.9rem;
-  border: 1.5px solid var(--border-strong);
+  padding: 0.72rem;
   border-radius: 13px;
-  background: var(--surface-2);
-  color: var(--text);
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 0.87rem;
+  font-weight: 700;
+  font-size: 0.92rem;
   cursor: var(--cursor-pointer), pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition: all 0.18s ease;
 }
 .hundred-btn:hover {
   border-color: #9fb2c8;
+  color: #b9c9dc;
+  transform: translateY(-1px);
 }
 /* Actif : le gris-bleu du platine, le même repère que sur mobile. */
 .hundred-btn.active {
-  background: #1d2431;
+  background: linear-gradient(120deg, #1d2431 0%, #2b3647 100%);
   border-color: #9fb2c8;
   color: #e6eef7;
+  box-shadow: 0 8px 22px rgba(60, 80, 110, 0.35);
 }
-.hundred-tag {
-  margin-left: auto;
-  padding: 0.12rem 0.45rem;
-  border-radius: 999px;
-  background: rgba(159, 178, 200, 0.22);
-  color: #cfdcea;
+
+/* ======================================================================
+   Les raccourcis de date
+   ======================================================================
+   Une date de jeu se dit rarement au jour près : « à la sortie », « un mois
+   après l'avoir commencé », « il y a un an ». Une rangée par origine, pour
+   qu'on voie qu'il y a deux façons de répondre. Cf. lib/dateQuick.js.
+   ====================================================================== */
+.qd {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.55rem;
+}
+.qd-label {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--text-soft);
+  font-size: 0.71rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.qd-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  flex: 0 0 auto;
+  padding: 0.35rem 0.7rem;
+  border: 1.5px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  white-space: nowrap;
+  cursor: var(--cursor-pointer), pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.qd-chip:hover {
+  border-color: var(--accent);
+}
+.qd-chip.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text);
+}
+.qd-chip-label {
+  font-weight: 600;
+}
+/* La date que le raccourci désigne vraiment : « un mois après », d'accord,
+   mais quel jour ? */
+.qd-chip-hint {
+  color: var(--text-soft);
   font-size: 0.68rem;
+}
+
+/* ======================================================================
+   Les contenus additionnels à cocher
+   ======================================================================
+   Un DLC n'est pas un jeu à ranger à part : c'est une case cochée sur le jeu
+   de base. Même habillage que les jeux d'un bundle, dont c'est le voisin.
+   ====================================================================== */
+.dlc-block {
+  margin-top: 1rem;
+}
+.dlc-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+  padding: 0.18rem 0.55rem;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: normal;
+  cursor: var(--cursor-pointer), pointer;
+}
+.dlc-all.active {
+  border-color: transparent;
+  background: var(--accent-grad);
+  color: #1a1204; /* encre foncée : --accent-ink est doré, illisible ici */
+}
+.dlc-block .field-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dlc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.dlc-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: var(--cursor-pointer), pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.dlc-item:hover {
+  border-color: var(--border-strong);
+}
+.dlc-item.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.dlc-cover {
+  flex: 0 0 auto;
+  width: 30px;
+  aspect-ratio: 3 / 4;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  /* Pas encore coché : la jaquette reste en retrait, l'œil va aux cochés. */
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+.dlc-item.on .dlc-cover {
+  opacity: 1;
+}
+.dlc-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.dlc-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dlc-name {
+  font-size: 0.84rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dlc-meta {
+  color: var(--text-soft);
+  font-size: 0.72rem;
+}
+.dlc-box {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 6px;
+  color: #1a1204; /* la coche, une fois le fond doré posé ci-dessous */
+}
+.dlc-item.on .dlc-box {
+  border-color: transparent;
+  background: var(--accent-grad);
+}
+.dlc-more {
+  margin-top: 0.4rem;
+  padding: 0.3rem 0;
+  border: none;
+  background: none;
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 0.78rem;
+  text-decoration: underline;
+  cursor: var(--cursor-pointer), pointer;
+}
+.dlc-more:hover {
+  color: var(--text);
+}
+
+/* ======================================================================
+   La note en étoiles (échelle réglable — cf. lib/ratingScale.js)
+   ====================================================================== */
+.star-rating {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+.star-row {
+  display: flex;
+  gap: 0.15rem;
+  padding: 0.25rem 0.1rem;
+  border-radius: 10px;
+  color: var(--border-strong);
+  cursor: var(--cursor-pointer), pointer;
+  touch-action: none; /* le glissé règle la note, il ne fait pas défiler */
+}
+.star-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.star-row.on {
+  color: #f2b70b;
+}
+.star-cell {
+  position: relative;
+  display: block;
+  line-height: 0;
+}
+.star-bg {
+  color: var(--border-strong);
+}
+/* La moitié pleine, découpée à la largeur voulue : c'est ce qui permet les
+   demi-étoiles ET le remplissage continu d'une note posée sur 100. */
+.star-fg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  line-height: 0;
+  color: inherit;
+}
+.star-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.star-value {
+  font-family: var(--font-display);
   font-weight: 800;
-  letter-spacing: 0.04em;
+  font-size: 1.15rem;
+  color: #f2b70b;
+}
+.star-outof {
+  margin-left: 0.1rem;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 600;
 }
