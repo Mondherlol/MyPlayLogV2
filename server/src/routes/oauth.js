@@ -182,6 +182,10 @@ router.get("/:provider/start", (req, res) => {
     // Se souvenir de moi : coché par défaut sur les écrans de connexion, et un
     // aller-retour chez un tiers n'est pas le moment de redemander à l'écrit.
     remember: req.query.remember === "0" ? 0 : 1,
+    // L'app : où rappeler au retour, et le nonce — haché, puisque le state
+    // passe par le navigateur et par le fournisseur.
+    app: app && !uid ? 1 : undefined,
+    an: app && !uid ? hashNonce(nonce) : undefined,
   });
 
   res.redirect(provider.buildAuthUrl(serverBaseUrl(req), state));
@@ -200,9 +204,17 @@ router.get("/:provider/callback", async (req, res) => {
   try {
     state = readState(req.query.state);
   } catch {
-    return failLogin(res, "Demande d'autorisation expirée ou invalide. Réessaie.");
+    // Le state est illisible, mais il dit encore d'OÙ venait la demande : sans
+    // ça, quelqu'un parti de l'app finirait sur la page de connexion du site,
+    // dans un onglet de navigateur, sans chemin de retour. On ne lit que ce
+    // drapeau, pour choisir entre deux adresses fixes.
+    const fromApp = jwt.decode(String(req.query.state || ""))?.app === 1;
+    return fail(res, "Demande d'autorisation expirée ou invalide. Réessaie.", {
+      app: fromApp,
+    });
   }
   const next = safeNext(state.next);
+  const app = state.app === 1 && state.mode === "login";
   const backToSettings = (params) =>
     backToClient(res, "/settings", { tab: "account", ...params });
 
@@ -212,7 +224,7 @@ router.get("/:provider/callback", async (req, res) => {
     const message = "Autorisation refusée.";
     return state.mode === "link"
       ? backToSettings({ link_error: message })
-      : failLogin(res, message, next);
+      : fail(res, message, { app, next });
   }
 
   const code = String(req.query.code || "");
@@ -220,7 +232,7 @@ router.get("/:provider/callback", async (req, res) => {
     const message = "Code d'autorisation manquant.";
     return state.mode === "link"
       ? backToSettings({ link_error: message })
-      : failLogin(res, message, next);
+      : fail(res, message, { app, next });
   }
 
   try {
@@ -264,6 +276,24 @@ router.get("/:provider/callback", async (req, res) => {
       meta: { provider: name, merged },
     });
 
+    // L'app : un code à échanger, pas le jeton (cf. APP_REDIRECT plus haut).
+    // ⚠️ PAS DE `sub` DANS CE CODE : middleware/auth.js prend tout JWT signé
+    // portant un `sub` pour une session. Le code serait alors utilisable tel
+    // quel, sans nonce — exactement ce qu'on cherche à empêcher.
+    if (app) {
+      const appCode = jwt.sign(
+        {
+          kind: "oauth-app-code",
+          uid: user.id,
+          nh: state.an,
+          status: created ? "created" : merged ? "merged" : "ok",
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: APP_CODE_TTL }
+      );
+      return backToApp(res, { code: appCode, provider: name });
+    }
+
     // Le fragment : ce qui suit le « # » reste dans le navigateur.
     const url = new URL(clientBaseUrl() + "/auth/callback");
     const hash = new URLSearchParams({
@@ -282,7 +312,43 @@ router.get("/:provider/callback", async (req, res) => {
         : `La connexion avec ${provider.label} a échoué. Réessaie.`;
     return state.mode === "link"
       ? backToSettings({ link_error: message })
-      : failLogin(res, message, next);
+      : fail(res, message, { app, next });
+  }
+});
+
+// ----------------------------------------------------------------------
+//  POST /api/auth/oauth/app/exchange — l'app échange son code
+// ----------------------------------------------------------------------
+// { code, nonce } → { token, user }. Le code seul ne vaut rien : il faut le
+// nonce que l'app a tiré au départ, dont le state n'a gardé que le hachage.
+router.post("/app/exchange", async (req, res) => {
+  const expired = "Connexion expirée. Recommence depuis l'application.";
+  try {
+    let data;
+    try {
+      data = jwt.verify(String(req.body?.code || ""), process.env.JWT_SECRET);
+    } catch {
+      return res.status(400).json({ error: expired });
+    }
+    if (data.kind !== "oauth-app-code" || !data.nh || !req.body?.nonce) {
+      return res.status(400).json({ error: expired });
+    }
+
+    const given = Buffer.from(hashNonce(req.body.nonce));
+    const expected = Buffer.from(String(data.nh));
+    if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) {
+      return res.status(400).json({ error: expired });
+    }
+
+    const user = await User.findById(data.uid);
+    if (!user) return res.status(404).json({ error: "Compte introuvable." });
+
+    // Sur téléphone, « se souvenir de moi » va de soi : personne ne retape son
+    // mot de passe — ni ne repasse par Google — tous les matins.
+    res.json({ token: signSession(user.id, true), user: user.toPublic(), status: data.status });
+  } catch (err) {
+    console.error("oauth app exchange error:", err.message);
+    res.status(500).json({ error: "Erreur serveur." });
   }
 });
 
