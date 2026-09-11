@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Star, User, Plus, Search, X, Pencil, Trash2 } from "lucide-react";
 import { apiFetch } from "../lib/api";
@@ -25,9 +25,27 @@ export default function CharacterPicker({
   const { user } = useAuth();
   const canEdit = !!user?.isStaff;
 
+  // ⚠️ LE FAVORI PASSE DEVANT, TOUJOURS.
+  //
+  // La galerie est rangée dans l'ordre d'IGDB, qui est celui où des
+  // contributeurs ont saisi les personnages — autrement dit un ordre qui n'a
+  // rien à voir avec le nôtre. Le personnage qu'on a choisi pouvait donc se
+  // trouver au trentième rang d'une rangée qui défile : en rouvrant la modale,
+  // on ne voyait pas son propre choix, et on croyait ne pas en avoir fait.
+  //
+  // Et s'il ne figure PAS dans la galerie (personnage saisi ailleurs, ou fiche
+  // retirée depuis), on l'affiche quand même : mieux vaut le montrer seul que
+  // de laisser croire qu'il a disparu.
+  const ordered = useMemo(() => {
+    if (!favChar?.name) return characters;
+    const hit = characters.find((c) => c.name === favChar.name);
+    const rest = characters.filter((c) => c.name !== favChar.name);
+    return [hit || { id: `fav-${favChar.name}`, name: favChar.name, image: favChar.image }, ...rest];
+  }, [characters, favChar]);
+
   const filtered = query
-    ? characters.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()))
-    : characters;
+    ? ordered.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()))
+    : ordered;
 
   async function removeChar(c) {
     setMenu(null);

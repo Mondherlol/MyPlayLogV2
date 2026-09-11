@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Play, Pause, Star, Music, Loader2, Search, Plus, X, Trash2 } from "lucide-react";
 import { apiFetch } from "../lib/api";
@@ -79,6 +79,10 @@ export default function OstPicker({ gameId, gameName, token, favorite, onSelect 
   }, []);
 
   function toggle(t) {
+    // Une piste sans extrait ni vidéo : c'est le favori « orphelin » remis en
+    // tête alors qu'il ne figure plus dans l'OST du jeu. Il s'affiche, il se
+    // désélectionne — mais il n'y a rien à écouter.
+    if (!t.preview && !t.youtube) return;
     if (t.youtube) {
       audioRef.current?.pause();
       if (playingId === t.id) {
@@ -135,11 +139,40 @@ export default function OstPicker({ gameId, gameName, token, favorite, onSelect 
   const isFav = (t) =>
     favorite && favorite.name === t.name && favorite.artist === t.artist;
 
+  // ⚠️ LA PISTE CHOISIE PASSE DEVANT, TOUJOURS — même raison que pour le
+  // personnage favori : l'OST d'un jeu fait couramment quarante pistes, et la
+  // sienne se retrouvait noyée au milieu d'une rangée qui défile. En rouvrant
+  // la modale, on ne voyait pas son propre choix.
+  //
+  // Si la piste favorite ne figure pas (ou plus) dans l'OST — masquée par le
+  // staff, choisie depuis l'app mobile sur une autre source —, on l'affiche
+  // quand même en tête, sinon elle semblerait effacée alors qu'elle est bien
+  // enregistrée. Elle n'est simplement pas jouable (ni extrait, ni vidéo).
+  const ordered = useMemo(() => {
+    if (!favorite?.name) return tracks;
+    const rest = tracks.filter((t) => !isFav(t));
+    if (rest.length === tracks.length) {
+      return [
+        {
+          id: "fav-orphan",
+          name: favorite.name,
+          artist: favorite.artist || "",
+          artwork: favorite.artwork || null,
+          preview: favorite.preview || null,
+          youtube: !!favorite.youtube,
+          url: favorite.url || null,
+        },
+        ...tracks,
+      ];
+    }
+    return [tracks.find(isFav), ...rest];
+  }, [tracks, favorite]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const filtered = query
-    ? tracks.filter((t) =>
+    ? ordered.filter((t) =>
         `${t.name} ${t.artist}`.toLowerCase().includes(query.toLowerCase())
       )
-    : tracks;
+    : ordered;
 
   return (
     <>

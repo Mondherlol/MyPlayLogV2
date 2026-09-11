@@ -10,7 +10,10 @@ import CreateListModal from "./CreateListModal";
 // Modale « Ajouter à une liste » (quick-add depuis l'Explorer / une card).
 // Montre les listes de JEUX de l'utilisateur, permet d'ajouter/retirer le jeu,
 // et de créer une liste à la volée qui contiendra directement le jeu.
-export default function AddToListModal({ game, onClose }) {
+// `sub` : la modale est ouverte PAR-DESSUS une autre (depuis « J'y ai joué »).
+// Sans ça, les deux voiles se retrouvent au même plan et c'est l'ordre de
+// montage qui décide laquelle est devant — un hasard, pas une intention.
+export default function AddToListModal({ game, onClose, sub = false }) {
   const { token } = useAuth();
   const refId = String(game.id);
   const [lists, setLists] = useState([]);
@@ -130,7 +133,7 @@ export default function AddToListModal({ game, onClose }) {
   return createPortal(
     <>
       <div
-        className="modal-overlay"
+        className={`modal-overlay ${sub ? "sub" : ""}`}
         onMouseDown={(e) => e.target === e.currentTarget && onClose()}
         onClick={(e) => e.stopPropagation()}
       >

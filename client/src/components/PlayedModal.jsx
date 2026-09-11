@@ -24,6 +24,9 @@ import {
   AlertTriangle,
   Infinity as InfinityIcon,
   Gamepad2,
+  CalendarDays,
+  CalendarCheck,
+  Sparkles,
 } from "lucide-react";
 import { apiFetch, apiUpload } from "../lib/api";
 import { makeCache } from "../lib/cache";
@@ -31,6 +34,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLibrary } from "../context/LibraryContext";
 import { useBackClose } from "../hooks/useBackClose";
 import ScrollRow from "./ScrollRow";
+import AddToListModal from "./AddToListModal";
 import CharacterPicker from "./CharacterPicker";
 import OstPicker from "./OstPicker";
 import RatingGauge from "./RatingGauge";
@@ -69,6 +73,15 @@ const EMPTY_DETAILS = {
   bundleGames: [],
 };
 
+// ⚠️ LA DATE SE COUPE, ELLE NE SE CONVERTIT PAS. Un `<input type="date">` parle
+// en « AAAA-MM-JJ » sans fuseau, alors que le serveur renvoie un instant ISO en
+// UTC. Passer par `new Date()` pour l'afficher ferait reculer d'un jour toute
+// date enregistrée en soirée depuis la France — on lit donc les dix premiers
+// caractères, et on renvoie midi UTC pour que l'aller-retour soit stable quel
+// que soit le fuseau du navigateur.
+const toDateInput = (iso) => (iso ? String(iso).slice(0, 10) : "");
+const fromDateInput = (v) => (v ? new Date(`${v}T12:00:00.000Z`).toISOString() : null);
+
 // Forme canonique des champs éditables, comparée par valeur (JSON) pour savoir
 // si l'utilisateur a des modifications non enregistrées. On plie `hasRating`
 // dans `rating` (null = pas de note) et on stringifie le temps de jeu pour que
@@ -89,6 +102,9 @@ function normalizeState(s) {
     favChar: s.favChar || null,
     favoriteOst: s.favoriteOst || null,
     cover: s.cover || null,
+    platinum: !!s.platinum,
+    startedAt: toDateInput(s.startedAt),
+    finishedAt: toDateInput(s.finishedAt),
     // Progression bundle : "id:statut" triés (forme canonique, indépendante
     // de l'ordre des clics).
     bundle: Object.entries(s.bundleStatus || {})
@@ -156,6 +172,16 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   const [pros, setPros] = useState([]);
   const [cons, setCons] = useState([]);
   const [favoriteOst, setFavoriteOst] = useState(null);
+  // Terminé À 100 % : le statut « terminé » dit qu'on a vu la fin, pas qu'on a
+  // tout fait. Beaucoup de joueurs distinguent les deux (même champ que la
+  // feuille mobile, cf. QuickAddSheet).
+  const [platinum, setPlatinum] = useState(false);
+  // Quand je m'y suis mis, et quand je l'ai fini — deux dates saisies à la
+  // main : le serveur ne les devine pas, un jeu ajouté aujourd'hui a très bien
+  // pu être terminé il y a dix ans.
+  const [startedAt, setStartedAt] = useState("");
+  const [finishedAt, setFinishedAt] = useState("");
+  const [showListModal, setShowListModal] = useState(false);
   const [cover, setCover] = useState(game.cover);
   const [existing, setExisting] = useState(false);
   const [manualEndless, setManualEndless] = useState(false);
@@ -212,6 +238,9 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
         setCons(en.cons || []);
         setFavChar(en.favoriteCharacter || null);
         setFavoriteOst(en.favoriteOst || null);
+        setPlatinum(!!en.platinum);
+        setStartedAt(toDateInput(en.startedAt));
+        setFinishedAt(toDateInput(en.finishedAt));
         if (en.cover) setCover(en.cover);
         const bd = {};
         for (const g of en.bundleGames || []) {
@@ -234,6 +263,9 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
           cons: en.cons || [],
           favChar: en.favoriteCharacter || null,
           favoriteOst: en.favoriteOst || null,
+          platinum: !!en.platinum,
+          startedAt: en.startedAt,
+          finishedAt: en.finishedAt,
           cover: en.cover || game.cover,
           bundleStatus: bd,
         });
@@ -254,6 +286,9 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
           cons: [],
           favChar: null,
           favoriteOst: null,
+          platinum: false,
+          startedAt: null,
+          finishedAt: null,
           cover: game.cover,
           bundleStatus: {},
         });
@@ -295,6 +330,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   live.current = {
     status, platform, format, playtime, favorite, hasRating, rating,
     review, reviewMedia, spoiler, pros, cons, favChar, favoriteOst, cover,
+    platinum, startedAt, finishedAt,
     bundleStatus,
   };
 
@@ -362,6 +398,15 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
         cons,
         favoriteCharacter: favChar,
         favoriteOst,
+        // Le 100 % n'a de sens que sur un jeu mené au bout : on l'envoie à
+        // faux ailleurs, plutôt que de laisser traîner un platine sur un jeu
+        // repassé « en cours ».
+        platinum: canComplete ? platinum : false,
+        startedAt: fromDateInput(startedAt),
+        // ⚠️ ON N'EFFACE PAS LA DATE DE FIN quand le statut n'est plus
+        // « terminé » : repasser en cours pour un new game + ne doit pas faire
+        // oublier la date de la première fin (même règle que sur mobile).
+        ...(status === "finished" ? { finishedAt: fromDateInput(finishedAt) } : {}),
       };
       // Bundle : on n'envoie la progression que si on connaît les jeux inclus
       // (détails chargés) — sinon on ne touche pas à l'existant côté serveur.
@@ -444,6 +489,9 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   // « Sans fin » visible si le jeu est multi/service (IGDB), déjà dans ce
   // statut, ou activé à la main via le lien sous les statuts.
   const showEndless = details.endlessHint || status === "endless" || manualEndless;
+  // Le 100 % se pose à un jeu terminé — et à un jeu sans fin, qui n'a pas de
+  // générique mais bien une liste de succès à vider.
+  const canComplete = status === "finished" || status === "endless";
   const statusOptions = showEndless ? [...STATUSES, ENDLESS] : STATUSES;
 
   return createPortal(
@@ -520,7 +568,11 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                     Coup de cœur
                   </button>
 
-                  <button className="list-btn" disabled title="Ajouter à une liste (bientôt)">
+                  <button
+                    className="list-btn clickable"
+                    onClick={() => setShowListModal(true)}
+                    title="Ajouter à une liste"
+                  >
                     <ListPlus size={17} /> Ajouter à une liste
                   </button>
 
@@ -742,6 +794,88 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                     </div>
                   </div>
 
+                  {/* --- Quand : deux dates saisies à la main ------------
+                      Le serveur ne les devine pas, et il ne faut pas qu'il
+                      essaie : un jeu ajouté aujourd'hui a très bien pu être
+                      terminé il y a dix ans. */}
+                  <div className="when-row">
+                    <div className="when-col">
+                      <label className="field-label" htmlFor="mpl-started">
+                        Commencé le
+                      </label>
+                      <div className="input-group">
+                        <CalendarDays size={17} className="input-icon" />
+                        <input
+                          id="mpl-started"
+                          className="modal-input"
+                          type="date"
+                          value={startedAt}
+                          max={finishedAt || undefined}
+                          onChange={(e) => setStartedAt(e.target.value)}
+                        />
+                        {startedAt && (
+                          <button
+                            type="button"
+                            className="when-clear clickable"
+                            onClick={() => setStartedAt("")}
+                            aria-label="Effacer la date de début"
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* La date de fin ne se demande QU'À UN JEU TERMINÉ :
+                        partout ailleurs, c'est une question sans réponse. */}
+                    {status === "finished" && (
+                      <div className="when-col">
+                        <label className="field-label" htmlFor="mpl-finished">
+                          Terminé le
+                        </label>
+                        <div className="input-group">
+                          <CalendarCheck size={17} className="input-icon" />
+                          <input
+                            id="mpl-finished"
+                            className="modal-input"
+                            type="date"
+                            value={finishedAt}
+                            min={startedAt || undefined}
+                            onChange={(e) => setFinishedAt(e.target.value)}
+                          />
+                          {finishedAt && (
+                            <button
+                              type="button"
+                              className="when-clear clickable"
+                              onClick={() => setFinishedAt("")}
+                              aria-label="Effacer la date de fin"
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Le 100 % ne se propose qu'à un jeu qu'on a MENÉ AU BOUT :
+                      demander « l'as-tu complété ? » d'un jeu en cours n'a pas
+                      de sens. Un jeu sans fin, si — c'est même là que le
+                      platine demande le plus de travail. */}
+                  {canComplete && (
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={platinum}
+                      className={`hundred-btn clickable ${platinum ? "active" : ""}`}
+                      onClick={() => setPlatinum((v) => !v)}
+                    >
+                      <Sparkles size={17} />
+                      <span>Terminé à 100 %</span>
+                      {platinum && <span className="hundred-tag">PLATINE</span>}
+                    </button>
+                  )}
+
                   <CharacterPicker
                     gameId={game.id}
                     token={token}
@@ -901,6 +1035,17 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
             </div>
           </div>
         </div>
+      )}
+
+      {/* « Ajouter à une liste » : la même modale que depuis une vignette, en
+          couche au-dessus (`sub`). Elle enregistre toute seule — rien à
+          reprendre dans le corps d'enregistrement de la fiche. */}
+      {showListModal && (
+        <AddToListModal
+          sub
+          game={{ ...game, cover: cover || game.cover }}
+          onClose={() => setShowListModal(false)}
+        />
       )}
     </>,
     document.body
