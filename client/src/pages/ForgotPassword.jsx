@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Gamepad2, ArrowLeft, MailCheck, AlertTriangle } from "lucide-react";
+import { ArrowLeft, MailCheck, AlertTriangle } from "lucide-react";
 import { apiFetch } from "../lib/api";
-import ThemeToggle from "../components/ThemeToggle";
+import AuthShell from "../components/AuthShell";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -28,20 +28,7 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="auth-page center-screen">
-      <div className="auth-topbar">
-        <Link to="/" className="brand clickable">
-          <span className="brand-logo">
-            <Gamepad2 size={20} strokeWidth={2.5} />
-          </span>
-          <span className="brand-name">
-            My<span className="grad-text">PlayLog</span>
-          </span>
-        </Link>
-        <ThemeToggle />
-      </div>
-
-      <div className="auth-card card">
+    <AuthShell aside={"Ça arrive. On t'envoie un lien et tu reprends où tu en étais."}>
         {sent ? (
           <div className="auth-done">
             <div className="auth-done-icon">
@@ -102,7 +89,6 @@ export default function ForgotPassword() {
             </p>
           </>
         )}
-      </div>
-    </div>
+    </AuthShell>
   );
 }

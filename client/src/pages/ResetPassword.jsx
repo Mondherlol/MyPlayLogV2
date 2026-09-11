@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Gamepad2, ShieldAlert } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import ThemeToggle from "../components/ThemeToggle";
+import AuthShell from "../components/AuthShell";
 
 export default function ResetPassword() {
   const { resetPassword } = useAuth();
@@ -35,20 +35,7 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="auth-page center-screen">
-      <div className="auth-topbar">
-        <Link to="/" className="brand clickable">
-          <span className="brand-logo">
-            <Gamepad2 size={20} strokeWidth={2.5} />
-          </span>
-          <span className="brand-name">
-            My<span className="grad-text">PlayLog</span>
-          </span>
-        </Link>
-        <ThemeToggle />
-      </div>
-
-      <div className="auth-card card">
+    <AuthShell aside={"Un nouveau mot de passe, et on n'en parle plus."}>
         {!token ? (
           <div className="auth-done">
             <div className="auth-done-icon danger">
@@ -115,7 +102,6 @@ export default function ResetPassword() {
             </p>
           </>
         )}
-      </div>
-    </div>
+    </AuthShell>
   );
 }

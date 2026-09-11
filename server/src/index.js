@@ -71,6 +71,7 @@ import iceRoutes from "./routes/ice.js";
 import collectionRoutes from "./routes/collection.js";
 import watchPartyRoutes from "./routes/watchparty.js";
 import settingsRoutes from "./routes/settings.js";
+import statsRoutes from "./routes/stats.js";
 import discordRoutes from "./routes/discord.js";
 import { ensureBotUser } from "./lib/bot.js";
 import { startDiscordBot } from "./lib/discordBot.js";
@@ -224,6 +225,9 @@ app.use("/api/trackers", trackerRoutes);
 app.use("/api/missions", missionRoutes);
 // Réglages de l'app : les drapeaux qui allument ou éteignent des sections.
 app.use("/api/settings", settingsRoutes);
+// Les chiffres de la page d'accueil publique. SANS JETON — c'est la seule
+// route que voit un visiteur qui n'a pas de compte.
+app.use("/api/stats", statsRoutes);
 // Collection : séries / films / animés liés au jeu vidéo (l'étagère). Toute la
 // section est derrière son drapeau — éteinte, elle n'existe que pour l'admin.
 //

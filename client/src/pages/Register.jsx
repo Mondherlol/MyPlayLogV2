@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Gamepad2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import ThemeToggle from "../components/ThemeToggle";
+import AuthShell from "../components/AuthShell";
 
 export default function Register() {
   const { register } = useAuth();
@@ -32,20 +31,7 @@ export default function Register() {
   }
 
   return (
-    <div className="auth-page center-screen">
-      <div className="auth-topbar">
-        <Link to="/" className="brand clickable">
-          <span className="brand-logo">
-            <Gamepad2 size={20} strokeWidth={2.5} />
-          </span>
-          <span className="brand-name">
-            My<span className="grad-text">PlayLog</span>
-          </span>
-        </Link>
-        <ThemeToggle />
-      </div>
-
-      <div className="auth-card card">
+    <AuthShell aside={"Trois champs, et ta bibliothèque commence. Gratuit, sans pub."}>
         <h1 className="auth-title">Rejoins l'aventure</h1>
         <p className="auth-sub">Trois champs, et c'est parti.</p>
 
@@ -106,7 +92,6 @@ export default function Register() {
             Connecte-toi
           </Link>
         </p>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

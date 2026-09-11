@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Gamepad2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import ThemeToggle from "../components/ThemeToggle";
+import AuthShell from "../components/AuthShell";
 
 export default function Login() {
   const { login } = useAuth();
@@ -36,20 +35,7 @@ export default function Login() {
   }
 
   return (
-    <div className="auth-page center-screen">
-      <div className="auth-topbar">
-        <Link to="/" className="brand clickable">
-          <span className="brand-logo">
-            <Gamepad2 size={20} strokeWidth={2.5} />
-          </span>
-          <span className="brand-name">
-            My<span className="grad-text">PlayLog</span>
-          </span>
-        </Link>
-        <ThemeToggle />
-      </div>
-
-      <div className="auth-card card">
+    <AuthShell aside={"Ta bibliothèque, tes heures, tes notes — tout est resté là où tu l'as laissé."}>
         <h1 className="auth-title">Content de te revoir</h1>
         <p className="auth-sub">Connecte-toi pour retrouver ta bibliothèque.</p>
 
@@ -111,7 +97,6 @@ export default function Login() {
             Crée-le en 30 secondes
           </Link>
         </p>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

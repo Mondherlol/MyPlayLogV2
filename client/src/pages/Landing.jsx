@@ -1,294 +1,115 @@
+import { useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import {
-  Gamepad2,
-  Library,
-  Star,
-  Timer,
-  Trophy,
-  Users,
-  ListOrdered,
-  MessageCircle,
-  Download,
-  MonitorPlay,
-  Sparkles,
-  ArrowRight,
-  Check,
-  Search,
-  PenLine,
-  Share2,
-  Smartphone,
-} from "lucide-react";
-import Navbar from "../components/Navbar";
+import { ArrowRight, Gamepad2, Smartphone } from "lucide-react";
+import CoverDrift from "../components/CoverDrift";
+import ThemeToggle from "../components/ThemeToggle";
 import { useAuth } from "../context/AuthContext";
+import { loadPublicStats } from "../lib/publicStats";
 
-const FEATURES = [
-  {
-    Icon: Library,
-    title: "Track tes parties",
-    text: "En cours, terminés, à jouer, abandonnés — ta bibliothèque enfin rangée.",
-  },
-  {
-    Icon: Star,
-    title: "Note & ressens",
-    text: "Mets tes notes, écris tes ressentis, garde une trace de chaque jeu.",
-  },
-  {
-    Icon: Timer,
-    title: "Stats de temps de jeu",
-    text: "Combien d'heures sur ce RPG ? Tes stats parlent pour toi.",
-  },
-  {
-    Icon: Trophy,
-    title: "Trophées & succès",
-    text: "Suis ta progression et compare tes complétions.",
-  },
-  {
-    Icon: Users,
-    title: "Feed d'amis",
-    text: "Vois ce que tes potes jouent, notent et débloquent en temps réel.",
-  },
-  {
-    Icon: ListOrdered,
-    title: "Listes & tops",
-    text: "Crée tes classements, tes backlogs et tes tops de tous les temps.",
-  },
-  {
-    Icon: MessageCircle,
-    title: "Ressenti & chat",
-    text: "Discute solo ou en groupe autour d'un jeu, façon communauté.",
-  },
-  {
-    Icon: Download,
-    title: "Import PSN & Steam",
-    text: "Récupère ta bibliothèque et tes trophées automatiquement.",
-  },
-  {
-    Icon: MonitorPlay,
-    title: "Joue dans le navigateur",
-    text: "Certains jeux rétro se lancent direct depuis le web. Nostalgie garantie.",
-  },
-];
+// ======================================================================
+//  La page d'accueil des visiteurs
+// ======================================================================
+// ⚠️ UNE SEULE PAGE-ÉCRAN, ET RIEN À FAIRE DÉFILER. La version précédente était
+// une page de vente : héros, maquette, bandeau de mots-clés, neuf arguments,
+// trois étapes, appel à l'action final, pied de page. Six écrans de défilement
+// pour un site qui est encore en chantier et qu'on rejoint parce qu'un ami
+// envoie le lien — personne ne lit une brochure quand on lui a dit « tiens,
+// essaie ça ».
+//
+// Ce qu'il reste est ce qu'il faut : ce que c'est, où ça en est, et deux
+// boutons. Le décor fait le reste — des jaquettes qui glissent derrière le
+// texte, qui disent « des jeux » sans une ligne d'argumentaire.
+//
+// ⚠️ LES CHIFFRES SONT VRAIS ET VIENNENT DE LA BASE (GET /api/stats, publique).
+// C'est la seule chose sur cette page qui se vérifie, donc la seule qui mérite
+// d'être lue deux fois. Aucun ne s'affiche s'il vaut zéro : une page qui annonce
+// « 0 jeu suivi » n'inspire rien à personne.
 
-const MARQUEE = [
-  "RPG",
-  "Souls-like",
-  "Metroidvania",
-  "Rétro",
-  "Indé",
-  "Rogue-lite",
-  "JRPG",
-  "Pixel-art",
-  "Open world",
-  "Speedrun",
-  "Coop",
-  "Aventure",
-];
-
-const STEPS = [
-  {
-    Icon: Search,
-    title: "Ajoute tes jeux",
-    text: "Cherche un titre ou importe direct depuis Steam & PSN.",
-  },
-  {
-    Icon: PenLine,
-    title: "Note & log",
-    text: "Statut, heures, note, ressenti — capture chaque partie.",
-  },
-  {
-    Icon: Share2,
-    title: "Partage & compare",
-    text: "Suis tes potes, publie tes tops, grimpe au classement.",
-  },
-];
+const fmt = (n) => Number(n || 0).toLocaleString("fr-FR");
 
 export default function Landing() {
   const { user, loading } = useAuth();
+  const [stats, setStats] = useState(null);
+
+  // Une seule requête pour la page entière : elle porte les chiffres ET les
+  // jaquettes du fond (le décor lit le même dépôt, cf. lib/publicStats).
+  useEffect(() => {
+    let alive = true;
+    loadPublicStats().then((d) => alive && setStats(d));
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Déjà connecté → on file direct dans l'app.
   if (loading) return <div className="center-screen">Chargement…</div>;
   if (user) return <Navigate to="/app" replace />;
 
+  const numbers = [
+    { value: stats?.games, label: "jeux suivis" },
+    { value: stats?.osts, label: "bandes-son" },
+    { value: stats?.characters, label: "personnages" },
+    { value: stats?.hours, label: "heures de jeu" },
+  ].filter((n) => n.value > 0);
+
   return (
-    <div className="page landing">
-      <Navbar />
+    <div className="lp">
+      <CoverDrift />
 
-      {/* HERO */}
-      <section className="hero">
-        <div className="hero-glow" aria-hidden="true" />
+      <header className="lp-top">
+        <span className="brand">
+          <span className="brand-logo">
+            <Gamepad2 size={20} strokeWidth={2.5} />
+          </span>
+          <span className="brand-name">
+            My<span className="grad-text">PlayLog</span>
+          </span>
+        </span>
+        <ThemeToggle />
+      </header>
 
-        <div className="hero-badge font-fun">
-          <Sparkles size={14} /> Le journal de tes jeux vidéo
-        </div>
-        <h1 className="hero-title">
-          Tous tes jeux.
-          <br />
-          <span className="grad-text">Une seule place.</span>
+      <main className="lp-main">
+        <span className="lp-badge">Alpha</span>
+
+        <h1 className="lp-title">
+          Bienvenue dans la bêta de <span className="grad-text">MyPlayLog</span>
         </h1>
-        <p className="hero-sub">
-          MyPlayLog, c'est ton carnet de bord gaming : track, note, partage et
-          reviens sur tout ce que tu as joué. Que tu sois casual ou complétionniste, on s'occupe de tout.
+
+        <p className="lp-sub">
+          Le journal de tes jeux vidéo. C'est encore une alpha : ça bouge tous
+          les jours, et c'est déjà utilisable.
         </p>
-        <div className="hero-cta">
-          <Link to="/register" className="btn btn-primary">
-            Commencer gratuitement <ArrowRight size={18} />
+
+        <div className="lp-cta">
+          <Link to="/register" className="lp-btn primary clickable">
+            Créer un compte <ArrowRight size={17} />
           </Link>
-          <Link to="/login" className="btn btn-ghost">
-            J'ai déjà un compte
+          <Link to="/login" className="lp-btn ghost clickable">
+            Se connecter
           </Link>
         </div>
 
-        {/* L'app Android, en une ligne sous les boutons : elle mérite d'être
-            annoncée dès l'accueil — aucun magasin ne le fera pour nous — mais
-            pas de disputer sa place au bouton d'inscription. */}
-        <Link to="/download" className="hero-android clickable">
-          <Smartphone size={15} /> Aussi sur Android — télécharger l'app
+        {numbers.length > 0 && (
+          <ul className="lp-stats">
+            {numbers.map((n) => (
+              <li key={n.label}>
+                <b>{fmt(n.value)}</b>
+                <i>{n.label}</i>
+              </li>
+            ))}
+          </ul>
+        )}
+      </main>
+
+      <footer className="lp-foot">
+        {/* L'app Android n'est dans aucun magasin : cette ligne est le seul
+            chemin qu'un visiteur ait pour apprendre qu'elle existe. */}
+        <Link to="/download" className="lp-foot-link clickable">
+          <Smartphone size={14} /> Aussi sur Android
         </Link>
-
-        <div className="hero-stage">
-          {/* Chips flottantes décoratives */}
-          <span className="float-chip chip-1">
-            <Trophy size={14} /> +1 trophée
-          </span>
-          <span className="float-chip chip-2">
-            <Star size={14} /> ★★★★★
-          </span>
-          <span className="float-chip chip-3">
-            <Timer size={14} /> 47h de jeu
-          </span>
-
-          <div className="hero-mock card">
-            <div className="mock-head">
-              <span className="mock-dot" />
-              <span className="mock-dot" />
-              <span className="mock-dot" />
-              <span className="mock-head-label font-fun">ma bibliothèque</span>
-            </div>
-            <MockRow
-              Icon={Library}
-              title="Elden Ring"
-              meta="En cours · 47h · ★★★★½"
-              tag="Bientôt fini"
-            />
-            <MockRow
-              Icon={Trophy}
-              title="Hollow Knight"
-              meta="Terminé · 32h · ★★★★★"
-              tag="100%"
-              tone="done"
-            />
-            <MockRow
-              Icon={ListOrdered}
-              title="Celeste"
-              meta="À jouer · dans ta liste"
-              tag="Backlog"
-              tone="soon"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* MARQUEE nostalgique */}
-      <div className="marquee" aria-hidden="true">
-        <div className="marquee-track">
-          {[...MARQUEE, ...MARQUEE].map((word, i) => (
-            <span className="marquee-item" key={i}>
-              {word}
-              <Gamepad2 size={14} className="marquee-sep" />
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* COMMENT ÇA MARCHE */}
-      <section className="steps-section">
-        <h2 className="section-title">
-          Trois étapes, <span className="grad-text">simples comme tout.</span>
-        </h2>
-        <p className="section-sub">
-          Pas de config, pas de prise de tête. Tu logges, on s'occupe du reste.
-        </p>
-        <div className="steps">
-          {STEPS.map(({ Icon, title, text }, i) => (
-            <div className="step card" key={title}>
-              <span className="step-num font-fun">{i + 1}</span>
-              <div className="step-icon">
-                <Icon size={22} strokeWidth={2} />
-              </div>
-              <h3>{title}</h3>
-              <p>{text}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* FEATURES */}
-      <section className="features">
-        <h2 className="section-title">
-          Tout ce qu'un <span className="grad-text">gamer</span> veut suivre
-        </h2>
-        <p className="section-sub">
-          Une plateforme pensée pour les joueurs, du casual au complétionniste.
-        </p>
-        <div className="feature-grid">
-          {FEATURES.map(({ Icon, title, text }) => (
-            <div className="feature-card card clickable" key={title}>
-              <div className="feature-icon">
-                <Icon size={22} strokeWidth={2} />
-              </div>
-              <h3>{title}</h3>
-              <p>{text}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* CTA FINAL */}
-      <section className="final-cta">
-        <div className="final-card">
-          <h2>Prêt à écrire ta légende&nbsp;?</h2>
-          <p>Rejoins MyPlayLog et commence à logger tes parties dès ce soir.</p>
-          <Link to="/register" className="btn btn-primary">
-            Créer mon compte <ArrowRight size={18} />
-          </Link>
-          <div className="final-perks">
-            <span>
-              <Check size={15} /> Gratuit
-            </span>
-            <span>
-              <Check size={15} /> Sans pub
-            </span>
-            <span>
-              <Check size={15} /> 30 secondes
-            </span>
-          </div>
-        </div>
-      </section>
-
-      <footer className="footer">
-        <span className="brand-mini">
-          <Gamepad2 size={16} strokeWidth={2.5} style={{ color: "var(--accent-ink)" }} />
-          MyPlayLog — {new Date().getFullYear()}
-        </span>
-        <span className="footer-retro font-fun">
-          fait avec ♥ et une pointe de nostalgie
-        </span>
+        <span className="lp-foot-dot">·</span>
+        <span>MyPlayLog {new Date().getFullYear()}</span>
       </footer>
-    </div>
-  );
-}
-
-function MockRow({ Icon, title, meta, tag, tone }) {
-  return (
-    <div className="mock-row">
-      <span className="mock-cover">
-        <Icon size={20} strokeWidth={2} />
-      </span>
-      <div className="mock-info">
-        <strong>{title}</strong>
-        <span className="mock-meta">{meta}</span>
-      </div>
-      <span className={`mock-tag ${tone || ""}`}>{tag}</span>
     </div>
   );
 }
