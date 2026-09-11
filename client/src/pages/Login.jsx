@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import AuthShell from "../components/AuthShell";
+import OAuthButtons from "../components/OAuthButtons";
 
 export default function Login() {
   const { login } = useAuth();
@@ -17,7 +18,11 @@ export default function Login() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
-  const [error, setError] = useState("");
+  // Un aller-retour raté chez Google/Discord nous revient ici par une simple
+  // redirection : le serveur n'a aucun autre moyen de nous dire ce qui a
+  // coincé, et laisser quelqu'un retomber sur un formulaire muet après avoir
+  // cliqué « Continuer avec Google » est la pire des réponses.
+  const [error, setError] = useState(params.get("oauth_error") || "");
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e) {
@@ -90,6 +95,8 @@ export default function Login() {
             {busy ? "Connexion…" : "Se connecter"}
           </button>
         </form>
+
+        <OAuthButtons next={next} remember={remember} busy={busy} />
 
         <p className="auth-switch">
           Pas encore de compte ?{" "}

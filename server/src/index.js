@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import User from "./models/User.js";
 import authRoutes from "./routes/auth.js";
+import oauthRoutes from "./routes/oauth.js";
 import gameRoutes from "./routes/games.js";
 import gameMediaRoutes from "./routes/gameMedia.js";
 import libraryRoutes from "./routes/library.js";
@@ -137,6 +138,12 @@ app.get("/api/health", (req, res) => {
 // Monté AVANT le filtre d'avatars : login/register répondent sans être
 // authentifiés (pas de req.userId), et le filtre prendrait alors la photo du
 // compte qui se connecte pour celle d'un tiers à masquer.
+// « Continuer avec Google / Discord ». Monté AVANT /api/auth : les deux
+// routeurs se partagent le préfixe, et celui-ci doit voir /oauth/* en premier.
+// Il porte le même garde-fou de débit — l'aller-retour OAuth se fait en GET,
+// que `authLimiter` laisse passer (il ne compte que les écritures).
+app.use("/api/auth/oauth", authLimiter, oauthRoutes);
+
 app.use("/api/auth", authLimiter, authRoutes);
 
 // Retire les photos de profil masquées (comptes privés ayant coché « cacher ma

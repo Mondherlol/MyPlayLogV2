@@ -15,9 +15,18 @@ const userSchema = new mongoose.Schema(
       unique: true,
       trim: true,
     },
+    // ⚠️ PAS OBLIGATOIRE, ET C'EST VOULU. Un compte ouvert avec Google ou
+    // Discord n'a jamais eu de mot de passe : l'exiger obligerait à en inventer
+    // un que personne ne connaîtrait, et qui traînerait en base pour rien. Le
+    // jour où son propriétaire en veut un, « Mot de passe oublié » le lui pose
+    // (son adresse est déjà vérifiée chez le fournisseur).
+    //
+    // Conséquence pour tout code qui compare un mot de passe : `null` est un
+    // cas normal, et bcrypt.compare(x, null) n'est PAS un refus propre — il
+    // faut tester le hash avant (cf. routes/auth.js).
     passwordHash: {
       type: String,
-      required: true,
+      default: null,
     },
 
     // --- Rôles ---
@@ -218,10 +227,27 @@ const userSchema = new mongoose.Schema(
     // Aucun jeton n'est stocké : on n'a besoin d'aucune permission après la
     // liaison, le bot parle aux gens par leur id.
     discord: {
-      discordId: { type: String, default: null },
+      discordId: { type: String, default: null, index: true, sparse: true },
       username: { type: String, default: null }, // pseudo global (@toto)
       globalName: { type: String, default: null }, // nom affiché
       avatar: { type: String, default: null }, // URL complète (cdn.discordapp.com)
+      connectedAt: { type: Date, default: null },
+    },
+
+    // --- Connexion Google (OAuth2 « openid email profile ») ---
+    // Une CLÉ DE PLUS pour la même porte, pas un second compte : le
+    // rapprochement se fait sur l'adresse email vérifiée, si bien que le mot de
+    // passe, Google et Discord ouvrent tous les trois la même bibliothèque
+    // (cf. lib/oauthAccounts.js). `googleId` — le `sub` OpenID — est la vraie
+    // clé : il est immuable, là où une adresse Google peut changer.
+    //
+    // Aucun jeton conservé, comme pour Discord : on n'a besoin d'aucune
+    // permission une fois l'identité connue.
+    google: {
+      googleId: { type: String, default: null, index: true, sparse: true },
+      email: { type: String, default: null }, // l'adresse telle que Google la donne
+      name: { type: String, default: null }, // nom affiché
+      avatar: { type: String, default: null }, // URL de la photo Google
       connectedAt: { type: Date, default: null },
     },
 
@@ -519,6 +545,19 @@ userSchema.methods.toPublic = function () {
           connectedAt: this.discord.connectedAt || null,
         }
       : null,
+    googleConnected: !!(this.google && this.google.googleId),
+    google: this.google?.googleId
+      ? {
+          email: this.google.email || null,
+          name: this.google.name || null,
+          avatar: this.google.avatar || null,
+          connectedAt: this.google.connectedAt || null,
+        }
+      : null,
+    // Les clés qui ouvrent ce compte. Le client en a besoin pour deux écrans :
+    // les paramètres (« retirer Google » doit être grisé si c'est la seule) et
+    // l'invitation à se donner un mot de passe quand on n'en a pas.
+    hasPassword: !!this.passwordHash,
     // Le droit de parler au bot : le client s'en sert pour montrer (ou non) le
     // bot dans la messagerie. Le serveur revérifie à chaque message.
     botAccess: !!this.isSuperAdmin || !!this.isAdmin || !!this.botAccess,

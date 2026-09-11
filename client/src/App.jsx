@@ -6,6 +6,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import OAuthCallback from "./pages/OAuthCallback";
 import Welcome from "./pages/Welcome";
 import Activity from "./pages/Activity";
 import EventPage from "./pages/EventPage";
@@ -141,6 +142,12 @@ export default function App() {
           </GuestOnly>
         }
       />
+
+      {/* Le retour de Google / Discord. VOLONTAIREMENT HORS DE `GuestOnly` :
+          la page n'est traversée qu'en revenant du fournisseur, jeton en main,
+          et un garde « invités seulement » la renverrait ailleurs au moment
+          précis où la session vient d'être ouverte. */}
+      <Route path="/auth/callback" element={<OAuthCallback />} />
 
       {/* Pages publiques partageables : accessibles connecté OU en invité. */}
       <Route

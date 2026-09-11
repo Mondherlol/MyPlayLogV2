@@ -634,3 +634,103 @@
   border-color: var(--orange);
   box-shadow: 0 0 0 4px var(--ring);
 }
+
+/* ======================================================================
+   « Continuer avec Google / Discord » (components/OAuthButtons)
+   ======================================================================
+   SOUS le formulaire, jamais au-dessus, et c'est un choix : la grande majorité
+   des comptes existants ouvrent la porte avec un mot de passe. Mettre les
+   tiers en premier ferait passer le formulaire pour le repli, et ferait
+   scroller ceux qui viennent simplement taper leur mot de passe.
+
+   Les deux boutons ont la MÊME forme et le MÊME poids visuel que le bouton
+   principal (même hauteur, même rayon) : on choisit sa porte, on ne se fait
+   pas pousser vers l'une d'elles. */
+.mpl-auth-card .oauth-block {
+  margin-top: 1.4rem;
+  display: grid;
+  gap: 0.6rem;
+}
+
+/* Le séparateur « ou » : un trait de chaque côté, dessiné par la bordure des
+   pseudo-éléments plutôt que par une image. */
+.oauth-sep {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.2rem;
+}
+.oauth-sep::before,
+.oauth-sep::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.btn-oauth {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  width: 100%;
+  height: 46px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-weight: 650;
+  font-size: 0.92rem;
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.btn-oauth:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.btn-oauth:disabled {
+  opacity: 0.55;
+  cursor: var(--cursor-default), auto;
+  transform: none;
+}
+.btn-oauth.google:hover:not(:disabled) {
+  border-color: rgba(66, 133, 244, 0.55);
+  box-shadow: 0 6px 18px rgba(66, 133, 244, 0.16);
+}
+.btn-oauth.discord:hover:not(:disabled) {
+  border-color: rgba(88, 101, 242, 0.55);
+  box-shadow: 0 6px 18px rgba(88, 101, 242, 0.16);
+}
+.btn-oauth.discord .btn-oauth-logo {
+  color: #5865f2;
+}
+
+/* La pastille du logo. Blanche pour Google sur les DEUX thèmes : ses quatre
+   couleurs ne se recolorent pas, et son bleu se perd sur un fond sombre. */
+.btn-oauth-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  flex: none;
+}
+.btn-oauth.google .btn-oauth-logo {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* La promesse, écrite noir sur blanc : c'est la question que se pose quiconque
+   a déjà un compte et voit apparaître un bouton Google — « est-ce que ça va me
+   faire un deuxième compte ? ». Non, et il faut le lire AVANT de cliquer. */
+.oauth-note {
+  margin: 0.5rem 0 0;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  text-align: center;
+}

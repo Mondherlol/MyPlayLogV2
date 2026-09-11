@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import AuthShell from "../components/AuthShell";
+import OAuthButtons from "../components/OAuthButtons";
 
 export default function Register() {
   const { register } = useAuth();
@@ -85,6 +86,12 @@ export default function Register() {
             {busy ? "Création…" : "Créer mon compte"}
           </button>
         </form>
+
+        {/* Le même composant qu'à la connexion, et ce n'est pas un raccourci :
+            par un tiers, s'inscrire et se connecter sont le MÊME geste. Le
+            serveur ouvre le compte existant s'il y en a un à cette adresse, et
+            en crée un sinon — sans que personne ait à choisir le bon bouton. */}
+        <OAuthButtons next="/app" busy={busy} />
 
         <p className="auth-switch">
           Déjà inscrit ?{" "}

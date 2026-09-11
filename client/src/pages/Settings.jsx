@@ -49,6 +49,8 @@ import {
   PhoneCall,
   Bot,
   MessageCircle,
+  KeyRound,
+  Mail,
 } from "lucide-react";
 import { apiFetch, API_BASE } from "../lib/api";
 import BackloggdImportModal from "../components/BackloggdImportModal";
@@ -63,6 +65,7 @@ import RingtonePicker from "../components/RingtonePicker";
 import { useLibrary } from "../context/LibraryContext";
 import SteamIcon from "../components/SteamIcon";
 import DiscordIcon from "../components/DiscordIcon";
+import GoogleIcon from "../components/GoogleIcon";
 import SteamImportModal from "../components/SteamImportModal";
 import PsnIcon from "../components/PsnIcon";
 import PsnImportModal, {
@@ -102,7 +105,7 @@ const TABS = [
   { key: "privacy", label: "Confidentialité", Icon: ShieldCheck },
   { key: "calls", label: "Appels", Icon: PhoneCall },
   { key: "discord", label: "Discord & bot", Icon: Bot },
-  { key: "account", label: "Compte", Icon: UserCog, soon: true },
+  { key: "account", label: "Compte", Icon: UserCog },
   { key: "appearance", label: "Apparence", Icon: Palette },
   { key: "notifications", label: "Notifications", Icon: Bell, soon: true },
 ];
@@ -176,6 +179,7 @@ export default function Settings() {
           {tab === "privacy" && <PrivacyPanel onCount={setRequestCount} />}
           {tab === "calls" && <CallsPanel />}
           {tab === "discord" && <DiscordPanel />}
+          {tab === "account" && <ConnectionsPanel />}
           {tab === "appearance" && <AppearancePanel />}
         </section>
       </div>
@@ -1913,6 +1917,274 @@ function PendingCard({ p, busy, token, onValidate, onIgnore }) {
           />
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================================
+//  Compte — les clés qui ouvrent ce compte
+// ============================================================
+// UN COMPTE, PLUSIEURS CLÉS. Le mot de passe, Google et Discord ne sont pas
+// trois comptes : ce sont trois façons d'ouvrir la même porte, rapprochées par
+// l'adresse email (cf. server/src/lib/oauthAccounts.js). C'est exactement ce
+// que cet écran doit rendre évident — d'où une liste de clés, et non une page
+// de « connexions » où chaque ligne aurait l'air d'un service à part.
+//
+// ⚠️ ON NE RETIRE PAS SA DERNIÈRE CLÉ. Le serveur refuse (et c'est lui qui
+// fait foi) ; ici on grise le bouton et on dit pourquoi, parce qu'un refus
+// qu'on ne comprend qu'après avoir cliqué est un refus raté.
+const OAUTH_CARDS = [
+  {
+    key: "google",
+    label: "Google",
+    logoClass: "google-logo",
+    Logo: GoogleIcon,
+    btnClass: "btn-google-primary",
+    desc: "Connecte-toi en un clic avec ton compte Google. Seuls ton adresse, ton nom et ta photo sont récupérés.",
+    title: (info) => info?.name || info?.email || "Compte Google",
+    sub: (info) => info?.email || "",
+  },
+  {
+    key: "discord",
+    label: "Discord",
+    logoClass: "discord-logo",
+    Logo: DiscordIcon,
+    btnClass: "btn-discord-primary",
+    desc: "Connecte-toi avec Discord — et le bot du site te reconnaît depuis un serveur, avec les points qui vont avec.",
+    title: (info) => info?.globalName || info?.username || "Compte Discord",
+    sub: (info) => (info?.username ? "@" + info.username : ""),
+  },
+];
+
+function ConnectionsPanel() {
+  const { token, updateUser } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const [status, setStatus] = useState(null);
+  const [busy, setBusy] = useState("");
+  // Le retour de liaison arrive par une REDIRECTION, pas par un appel : le
+  // serveur nous repose ici avec ?linked= ou ?link_error=. On les lit une fois,
+  // on les affiche, et on les efface de l'URL — sinon le message ressusciterait
+  // à chaque retour en arrière du navigateur.
+  const [error, setError] = useState(params.get("link_error") || "");
+  const [linked, setLinked] = useState(params.get("linked") || "");
+
+  useEffect(() => {
+    if (!params.get("link_error") && !params.get("linked")) return;
+    setParams({ tab: "account" }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function load() {
+    try {
+      setStatus(await apiFetch("/auth/oauth/status", { token }));
+    } catch {
+      setStatus({ providers: {}, methods: {}, google: null, discord: null });
+    }
+  }
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Une vraie navigation : le départ est une redirection vers un autre domaine,
+  // qu'aucun fetch ne pourrait suivre. Au retour, le serveur nous ramène sur
+  // cet onglet — d'où la lecture de ?linked= plus haut.
+  function connect(provider) {
+    setError("");
+    setBusy(provider);
+    const url =
+      API_BASE +
+      "/auth/oauth/" +
+      provider +
+      "/start?token=" +
+      encodeURIComponent(token);
+    window.location.href = url;
+  }
+
+  async function unlink(provider) {
+    setBusy(provider);
+    setError("");
+    setLinked("");
+    try {
+      await apiFetch("/auth/oauth/" + provider, { method: "DELETE", token });
+      if (provider === "discord") updateUser({ discordConnected: false, discord: null });
+      else updateUser({ googleConnected: false, google: null });
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  if (!status) {
+    return (
+      <div className="settings-section">
+        <div className="import-card">
+          <Loader2 className="spin" size={20} /> Chargement…
+        </div>
+      </div>
+    );
+  }
+
+  const methods = status.methods || {};
+  const keyCount = Object.values(methods).filter(Boolean).length;
+
+  return (
+    <div className="settings-section">
+      <h2 className="settings-section-title">
+        <UserCog size={20} /> Compte & connexions
+      </h2>
+      <p className="settings-section-sub">
+        Les façons d'ouvrir ce compte. Tu peux en garder plusieurs : c'est la
+        même adresse, donc la même bibliothèque, quelle que soit celle que tu
+        utilises.
+      </p>
+
+      {linked && (
+        <div className="import-ok">
+          <CheckCircle2 size={15} /> Compte{" "}
+          {linked === "google" ? "Google" : "Discord"} lié. Tu peux maintenant
+          t'en servir pour te connecter.
+        </div>
+      )}
+      {error && (
+        <div className="import-error">
+          <AlertTriangle size={15} /> {error}
+        </div>
+      )}
+
+      <div className="import-cards">
+        {/* Le mot de passe est une clé comme les autres : le montrer dans la
+            même liste évite qu'on croie l'avoir perdu en liant Google. */}
+        <div className={"import-card " + (methods.password ? "connected" : "")}>
+          <div className="import-card-glow" />
+          <div className="import-card-main">
+            <div className="import-logo">
+              <KeyRound size={28} />
+            </div>
+            <div className="import-card-info">
+              <div className="import-card-title">
+                Email & mot de passe
+                {methods.password && (
+                  <span className="import-badge">
+                    <CheckCircle2 size={13} /> Actif
+                  </span>
+                )}
+              </div>
+              <p className="import-card-desc">
+                <Mail size={14} /> {status.email}
+                <br />
+                {methods.password
+                  ? "Tu peux te connecter avec cette adresse et ton mot de passe."
+                  : "Ce compte n'a pas encore de mot de passe. Passe par « Mot de passe oublié » pour t'en choisir un — le lien part sur cette adresse."}
+              </p>
+            </div>
+          </div>
+          {!methods.password && (
+            <div className="import-actions">
+              <a className="btn-ghost clickable" href="/forgot-password">
+                <KeyRound size={16} /> Me choisir un mot de passe
+              </a>
+            </div>
+          )}
+        </div>
+
+        {OAUTH_CARDS.map((card) => {
+          const configured = !!status.providers?.[card.key];
+          const info = status[card.key];
+          const connected = !!info;
+          // La dernière clé ne se retire pas : on le dit AVANT le clic.
+          const lastKey = connected && keyCount <= 1;
+          const Logo = card.Logo;
+          return (
+            <div
+              key={card.key}
+              className={
+                "import-card " + card.key + (connected ? " connected" : "")
+              }
+            >
+              <div className="import-card-glow" />
+              <div className="import-card-main">
+                <div className={"import-logo " + card.logoClass}>
+                  <Logo size={28} />
+                </div>
+                <div className="import-card-info">
+                  <div className="import-card-title">
+                    {card.label}
+                    {connected && (
+                      <span className="import-badge">
+                        <CheckCircle2 size={13} /> Lié
+                      </span>
+                    )}
+                  </div>
+                  {connected ? (
+                    <div className="import-steam-user">
+                      {info.avatar && <img src={info.avatar} alt="" />}
+                      <div>
+                        <strong>{card.title(info)}</strong>
+                        <span>
+                          {card.sub(info) ? card.sub(info) + " · " : ""}
+                          Lié{" "}
+                          {info.connectedAt
+                            ? new Date(info.connectedAt).toLocaleDateString("fr-FR")
+                            : ""}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="import-card-desc">{card.desc}</p>
+                  )}
+                </div>
+              </div>
+
+              {!configured && (
+                <div className="import-error">
+                  <AlertTriangle size={15} /> {card.label} n'est pas configuré
+                  côté serveur.
+                </div>
+              )}
+
+              {lastKey && (
+                <div className="import-hint">
+                  C'est ta seule façon de te connecter. Donne-toi d'abord un mot
+                  de passe si tu veux la retirer.
+                </div>
+              )}
+
+              <div className="import-actions">
+                {connected ? (
+                  <button
+                    className="btn-ghost-danger clickable"
+                    onClick={() => unlink(card.key)}
+                    disabled={busy === card.key || lastKey}
+                  >
+                    {busy === card.key ? (
+                      <Loader2 className="spin" size={16} />
+                    ) : (
+                      <Link2Off size={16} />
+                    )}
+                    Délier
+                  </button>
+                ) : (
+                  <button
+                    className={card.btnClass + " clickable"}
+                    onClick={() => connect(card.key)}
+                    disabled={!!busy || !configured}
+                  >
+                    {busy === card.key ? (
+                      <Loader2 className="spin" size={17} />
+                    ) : (
+                      <Link2 size={17} />
+                    )}
+                    Lier mon compte {card.label}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

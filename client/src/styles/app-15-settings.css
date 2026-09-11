@@ -2331,3 +2331,77 @@ a.btn-discord-primary.disabled {
   margin-left: 0.2rem;
   font-size: 0.9rem;
 }
+
+/* ---- Compte & connexions (onglet « Compte ») ---- */
+/* La carte Google. Sa pastille reste BLANCHE sur les deux thèmes, et c'est la
+   seule du lot dans ce cas : le logo Google garde ses quatre couleurs (on n'a
+   pas le droit de le recolorer), et sur un dégradé foncé son bleu disparaît. */
+.google-logo {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.import-card.google.connected {
+  border-color: rgba(66, 133, 244, 0.42);
+}
+.import-card.google .import-card-glow {
+  background: radial-gradient(circle, rgba(66, 133, 244, 0.18), transparent 70%);
+}
+
+.btn-google-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  padding: 0.62rem 1.1rem;
+  border-radius: 11px;
+  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+  text-decoration: none;
+}
+.btn-google-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(66, 133, 244, 0.6);
+  box-shadow: 0 6px 18px rgba(66, 133, 244, 0.18);
+}
+.btn-google-primary:disabled {
+  opacity: 0.6;
+  cursor: var(--cursor-default), auto;
+}
+
+/* Le pendant vert d'`.import-error` : une liaison qui vient de réussir mérite
+   d'être annoncée aussi clairement qu'un échec. */
+.import-ok {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  background: rgba(39, 174, 96, 0.12);
+  color: #1e8449;
+  font-size: 0.85rem;
+}
+:root[data-theme="dark"] .import-ok {
+  color: #6ee7a8;
+}
+
+/* « Tu ne peux pas retirer ta dernière clé » : une explication, pas une
+   alerte — le bouton est grisé, rien n'a échoué. */
+.import-hint {
+  margin-top: 1rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  background: var(--bg-soft, rgba(127, 127, 127, 0.08));
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.import-card-desc svg {
+  vertical-align: -2px;
+  margin-right: 0.25rem;
+}

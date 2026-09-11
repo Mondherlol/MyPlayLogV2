@@ -57,9 +57,23 @@ client/   App React (Vite)
 ## Config
 
 - `server/.env` : port, URI Mongo, secret JWT
-- Liaison Discord : `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` (application créée
-  sur <https://discord.com/developers>, avec `<domaine>/api/discord/return` déclarée
-  comme URL de redirection OAuth2)
+- Connexion par un tiers (« Continuer avec Google / Discord »). Le
+  rapprochement se fait sur l'**adresse email vérifiée** : mot de passe, Google
+  et Discord ouvrent le même compte dès lors que l'adresse est la même — jamais
+  un second compte (cf. `server/src/lib/oauthAccounts.js`).
+  - Google : `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (identifiants OAuth2
+    « Application Web » créés sur <https://console.cloud.google.com>), avec
+    `<domaine-api>/api/auth/oauth/google/callback` déclarée en URI de
+    redirection autorisée.
+  - Discord : `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` (application créée
+    sur <https://discord.com/developers>). **Deux** URLs de redirection à
+    déclarer dans son onglet OAuth2 : `<domaine-api>/api/auth/oauth/discord/callback`
+    (la connexion) et `<domaine-api>/api/discord/return` (la liaison
+    historique depuis les paramètres, qui reste en place).
+  - Sans ces clés, rien ne casse : les boutons ne s'affichent tout simplement
+    pas (`GET /api/auth/oauth/providers` dit ce qui est branché).
+  - `CLIENT_ORIGIN` doit être juste : c'est sa **première** origine qui sert de
+    base aux redirections de retour vers le site.
 - Bot du site : `GROQ_API_KEY` (gratuit, Llama 70B — c'est lui qui lui donne son caractère ; à défaut `GEMINI_API_KEY`, en moins mordant), `BOT_USERNAME` pour le rebaptiser.
   Le droit de lui parler se donne compte par compte depuis le panel d'admin.
 - `client/.env` : `VITE_API_URL` (URL de l'API)

@@ -81,6 +81,18 @@ export function AuthProvider({ children }) {
     return data.user;
   }
 
+  // Connexion par un tiers (Google, Discord) : le jeton nous revient DÉJÀ
+  // signé, dans le fragment de l'URL de retour (cf. pages/OAuthCallback). Il
+  // n'y a donc rien à envoyer — juste à le ranger et à aller chercher le profil
+  // qui va avec, features comprises, comme au démarrage.
+  async function loginWithToken(newToken, remember = true) {
+    const data = await apiFetch("/auth/me", { token: newToken });
+    persistToken(newToken, remember);
+    setUser(data.user);
+    setFeatures(data.features || {});
+    return data.user;
+  }
+
   async function register(email, username, password) {
     const data = await apiFetch("/auth/register", {
       method: "POST",
@@ -137,6 +149,7 @@ export function AuthProvider({ children }) {
         hasFeature,
         updateFeatures,
         login,
+        loginWithToken,
         register,
         resetPassword,
         logout,

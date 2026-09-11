@@ -123,6 +123,24 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Identifiants incorrects." });
     }
 
+    // Un compte ouvert avec Google ou Discord n'a pas de mot de passe. Sans ce
+    // test on tomberait dans bcrypt.compare(x, null), qui lève au lieu de
+    // refuser proprement — et surtout on dirait « identifiants incorrects » à
+    // quelqu'un qui n'a rien tapé de faux : la bonne porte est juste à côté.
+    if (!user.passwordHash) {
+      refuse("compte sans mot de passe (connexion par un tiers)");
+      const ways = [
+        user.google?.googleId && "Google",
+        user.discord?.discordId && "Discord",
+      ].filter(Boolean);
+      return res.status(401).json({
+        error: ways.length
+          ? `Ce compte se connecte avec ${ways.join(" ou ")}. Utilise ce bouton, ou donne-toi un mot de passe via « Mot de passe oublié ».`
+          : "Ce compte n'a pas de mot de passe. Passe par « Mot de passe oublié » pour en choisir un.",
+        providers: ways.map((w) => w.toLowerCase()),
+      });
+    }
+
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) {
       refuse("mot de passe faux");

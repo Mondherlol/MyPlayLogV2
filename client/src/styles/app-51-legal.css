@@ -1,0 +1,256 @@
+/* ======================================================================
+   Les pages légales — /privacy et /services (components/LegalPage)
+   ======================================================================
+   Un texte long qu'on vient consulter pour UNE réponse. Tout ici sert la
+   lecture : une colonne de largeur confortable (~70 caractères), un sommaire
+   qui reste à portée pendant qu'on défile, et des titres qui se repèrent d'un
+   coup d'œil. Pas de décor derrière le texte — la coquille de la landing
+   fournit la barre du haut et le pied de page, rien de plus. */
+
+.legal-head {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: clamp(2.2rem, 6vw, 4rem) 0 clamp(1.4rem, 3vw, 2.2rem);
+  border-bottom: 1px solid var(--border);
+}
+
+.legal-eyebrow {
+  display: inline-block;
+  margin-bottom: 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--orange);
+}
+
+.legal-title {
+  margin: 0 0 0.8rem;
+  font-size: clamp(1.9rem, 5vw, 2.8rem);
+  line-height: 1.1;
+}
+
+.legal-intro {
+  max-width: 62ch;
+  margin: 0 0 1rem;
+  font-size: clamp(1rem, 2.2vw, 1.12rem);
+  line-height: 1.6;
+  color: var(--text-soft);
+}
+
+.legal-updated {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+
+/* Sommaire à gauche, texte à droite. Sous 860px, le sommaire passe au-dessus
+   et cesse d'être collant : épinglé en haut d'un écran de téléphone, il
+   mangerait la moitié de la place du texte. */
+.legal-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: clamp(2rem, 5vw, 4rem);
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 2.2rem 0 3rem;
+}
+
+.legal-toc {
+  position: sticky;
+  top: 90px;
+  align-self: start;
+  max-height: calc(100vh - 110px);
+  overflow-y: auto;
+}
+
+.legal-toc-label {
+  display: block;
+  margin-bottom: 0.6rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.legal-toc ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-left: 1px solid var(--border);
+}
+
+.legal-toc a {
+  display: block;
+  padding: 0.34rem 0 0.34rem 0.85rem;
+  margin-left: -1px;
+  border-left: 2px solid transparent;
+  font-size: 0.86rem;
+  line-height: 1.35;
+  color: var(--text-soft);
+  text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.legal-toc a:hover {
+  color: var(--orange);
+  border-left-color: var(--orange);
+}
+
+.legal-body {
+  max-width: 70ch;
+  min-width: 0;
+}
+
+/* `scroll-margin-top` : sans lui, un clic dans le sommaire cache le titre de
+   la section sous la barre de navigation fixe. */
+.legal-section {
+  scroll-margin-top: 90px;
+  padding-bottom: 1.9rem;
+}
+
+.legal-section + .legal-section {
+  padding-top: 1.9rem;
+  border-top: 1px solid var(--border);
+}
+
+.legal-section h2 {
+  margin: 0 0 0.8rem;
+  font-size: clamp(1.15rem, 2.6vw, 1.35rem);
+  line-height: 1.3;
+}
+
+.legal-section p,
+.legal-section li {
+  font-size: 0.97rem;
+  line-height: 1.7;
+  color: var(--text);
+}
+
+.legal-section p {
+  margin: 0 0 0.85rem;
+}
+
+.legal-section p:last-child {
+  margin-bottom: 0;
+}
+
+.legal-section ul {
+  margin: 0 0 0.85rem;
+  padding-left: 1.2rem;
+}
+
+.legal-section li {
+  margin-bottom: 0.45rem;
+}
+
+.legal-section li::marker {
+  color: var(--orange);
+}
+
+.legal-section strong {
+  font-weight: 650;
+}
+
+/* Les noms de portées OAuth (`openid`, `email`…) : lisibles comme du code,
+   mais sans casser le rythme de la ligne. */
+.legal-section code {
+  padding: 0.08rem 0.4rem;
+  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.86em;
+  overflow-wrap: anywhere;
+}
+
+/* Les adresses et liens longs ne doivent jamais faire déborder la page sur
+   un téléphone. */
+.legal-body a {
+  overflow-wrap: anywhere;
+}
+
+.legal-contact {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 1rem;
+  padding: 1.1rem 1.2rem;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.93rem;
+  line-height: 1.55;
+}
+
+.legal-contact span {
+  color: var(--text-soft);
+}
+
+.legal-other {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 1.4rem;
+  font-weight: 650;
+  font-size: 0.93rem;
+  color: var(--orange);
+  text-decoration: none;
+}
+
+.legal-other:hover {
+  text-decoration: underline;
+}
+
+.legal-foot {
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 860px) {
+  .legal-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.6rem;
+    padding-top: 1.6rem;
+  }
+
+  .legal-toc {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    padding: 1rem 1.1rem;
+    border-radius: 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+  }
+
+  .legal-toc ol {
+    border-left: 0;
+    columns: 2;
+    column-gap: 1.2rem;
+  }
+
+  .legal-toc a {
+    padding-left: 0;
+    border-left: 0;
+    break-inside: avoid;
+  }
+
+  .legal-body {
+    max-width: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .legal-toc ol {
+    columns: 1;
+  }
+}
+
+/* Le lien vers les pages légales sous le formulaire d'inscription : présent,
+   mais discret — il ne doit pas concurrencer le bouton. */
+.mpl-auth-card .auth-legal {
+  margin: 1rem 0 0;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--text-soft);
+}
