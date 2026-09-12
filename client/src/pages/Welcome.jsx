@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   ChevronRight,
   Clapperboard,
+  Smartphone,
   Compass,
   Joystick,
   Loader2,
@@ -24,9 +25,8 @@ import AnticipatedCard from "../components/home/AnticipatedCard";
 import EventCard from "../components/home/EventCard";
 import HoursModal from "../components/home/HoursModal";
 import OstRail from "../components/home/OstRail";
-import ActivityPeek from "../components/home/ActivityPeek";
 import { MotStrip, TonightCard, WeekStrip } from "../components/home/Strips";
-import { CircleRow, EventListCard, FreeCard, GameTile } from "../components/home/Tiles";
+import { EventListCard, FreeCard, GameTile } from "../components/home/Tiles";
 import { useGameBackdrops } from "../lib/backdrops";
 import {
   dustyGames,
@@ -109,7 +109,6 @@ export default function Welcome() {
   const [free, setFree] = useState([]);
   const [mot, setMot] = useState(null);
   const [events, setEvents] = useState([]);
-  const [circle, setCircle] = useState([]);
   const [today, setToday] = useState([]);
   // Qui, parmi les gens qu'on suit, attend quoi. Une seule requête pour tout le
   // monde, et AUCUN appel IGDB — le serveur ne croise que des listes d'envies.
@@ -161,17 +160,15 @@ export default function Welcome() {
       apiFetch("/free-games", { token }),
       apiFetch("/mot/today", { token }),
       apiFetch(EVENTS_PATH, { token }),
-      apiFetch("/feed/circle", { token }),
       apiFetch("/games/releases/awaited", { token }),
       apiFetch(todayReleasesPath(), { token }),
-    ]).then(([lib, disc, fg, m, evs, circ, awa, rel]) => {
+    ]).then(([lib, disc, fg, m, evs, awa, rel]) => {
       if (!alive) return;
       if (lib.status === "fulfilled") setLibrary(lib.value.entries || []);
       if (disc.status === "fulfilled") setDiscover(disc.value);
       if (fg.status === "fulfilled") setFree(fg.value.games || []);
       if (m.status === "fulfilled") setMot(m.value);
       if (evs.status === "fulfilled") setEvents(evs.value.events || []);
-      if (circ.status === "fulfilled") setCircle(circ.value.items || []);
       if (awa.status === "fulfilled") setAwaitedBy(awa.value.games || []);
       if (rel.status === "fulfilled") setToday(rel.value.games || []);
       setLoading(false);
@@ -838,40 +835,13 @@ export default function Welcome() {
           la proposition du soir descendaient le fil — on les découvrait après
           douze rangées de jaquettes, c'est-à-dire jamais.
 
-          Ce qui vient ici partage une propriété : ça se lit SANS défiler et
-          ça tient dans une colonne étroite — une liste, une bande, une carte,
-          trois raccourcis. Les rayons de jaquettes, eux, restent à gauche :
-          un rail de six vignettes dans une colonne de 330 px n'est plus un
-          rail, c'est une file d'attente. */}
+          ⚠️ QUE DES ACTIONS. Tout ce qui vient ici est un GESTE à faire —
+          jouer au mot du jour, lancer la proposition du soir, un documentaire,
+          une pépite, l'arcade, l'app. Ce qui se LIT (le cercle, le fil des
+          autres) en est sorti : mélangé aux boutons, on ne savait plus ce qui
+          se cliquait et ce qui se regardait. Les rayons de jaquettes, eux,
+          restent à gauche. */}
       <aside className="mh-side">
-        {/* --- Ton cercle -----------------------------------------------
-            ⚠️ LE SEUL BLOC DE LA PAGE QUI PARLE DE GENS, ET IL EST MIEUX ICI
-            QU'EN RAYON. En rangée de jaquettes, il ressemblait aux cinq autres
-            rangées de jaquettes et on lisait le jeu, pas la personne. En
-            colonne, c'est une LISTE DE GENS — la forme qu'ont toutes les listes
-            d'amis du web — et c'est la question qu'on se pose en ouvrant le
-            site : « ils jouent à quoi en ce moment ? ». */}
-        {circle.length > 0 && (
-          <section className="mh-sec s-circle">
-            <div className="mh-head">
-              <div className="mh-head-main">
-                <span className="mh-head-text">
-                  <span className="mh-kicker">Ton cercle</span>
-                  <span className="mh-head-title">Ils y jouent</span>
-                </span>
-              </div>
-              <Link to="/activity" className="mh-head-more clickable">
-                L'activité <ChevronRight size={15} />
-              </Link>
-            </div>
-            <div className="mh-circle-list">
-              {circle.slice(0, 6).map((g) => (
-                <CircleRow key={g.id} game={g} />
-              ))}
-            </div>
-          </section>
-        )}
-
         {/* --- Le rendez-vous du jour ----------------------------------- */}
         {!!mot && <MotStrip mot={mot} />}
 
@@ -990,10 +960,21 @@ export default function Welcome() {
             {Number(user?.points || 0).toLocaleString("fr-FR")}
           </span>
         </Link>
-      </section>
 
-        {/* --- Et pendant ce temps, les autres ------------------------- */}
-        <ActivityPeek token={token} />
+        {/* L'app Android n'est dans aucun magasin : cette porte est, avec la
+            barre latérale, le seul endroit où un habitué du site apprend
+            qu'elle existe. Elle a sa place parmi les actions — c'est un geste,
+            pas une information. */}
+        <Link to="/download" className="mh-door android clickable">
+          <span className="mh-door-ic">
+            <Smartphone size={20} />
+          </span>
+          <span className="mh-door-txt">
+            <b>App Android</b>
+            <i>Ta bibliothèque dans ta poche</i>
+          </span>
+        </Link>
+      </section>
       </aside>
 
       {!!hoursFor && (

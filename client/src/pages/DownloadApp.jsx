@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Check, Download, Gamepad2, Link2, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, Download, Gamepad2, Link2, Loader2 } from "lucide-react";
 import CoverDrift from "../components/CoverDrift";
 import ThemeToggle from "../components/ThemeToggle";
+import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
 
 // ======================================================================
@@ -70,6 +71,9 @@ function noteLines(notes) {
 }
 
 export default function DownloadApp() {
+  // La page est publique : on y arrive connecté (depuis l'accueil, la barre
+  // latérale) comme sans compte (un lien partagé). Le haut à droite s'adapte.
+  const { user, loading: authLoading } = useAuth();
   const [release, setRelease] = useState(null);
   const [state, setState] = useState("loading"); // loading | ready | none | error
   const [copied, setCopied] = useState(false);
@@ -127,7 +131,7 @@ export default function DownloadApp() {
       <CoverDrift />
 
       <header className="lp-top">
-        <Link to="/" className="brand clickable">
+        <Link to={user ? "/app" : "/"} className="brand clickable">
           <span className="brand-logo">
             <Gamepad2 size={20} strokeWidth={2.5} />
           </span>
@@ -135,7 +139,45 @@ export default function DownloadApp() {
             My<span className="grad-text">PlayLog</span>
           </span>
         </Link>
-        <ThemeToggle />
+
+        <nav className="dlp-nav">
+          {/* ⚠️ UN VRAI LIEN « ACCUEIL », PAS SEULEMENT LE LOGO. Le logo mène
+              bien à l'accueil, mais personne ne le devine sur une page où il
+              n'y a rien d'autre à cliquer : on restait coincé sur le bouton de
+              téléchargement. Connecté, l'accueil c'est l'app. */}
+          <Link to={user ? "/app" : "/"} className="dlp-nav-link clickable">
+            <ArrowLeft size={15} /> Accueil
+          </Link>
+
+          {/* Tant qu'on ne sait pas qui est là, on ne montre rien : des boutons
+              « Se connecter » qui clignotent une demi-seconde avant l'avatar,
+              ça se voit. */}
+          {!authLoading &&
+            (user ? (
+              <Link
+                to="/profile"
+                className="dlp-me clickable"
+                title={`Connecté en tant que ${user.username}`}
+              >
+                {user.avatar ? (
+                  <img src={user.avatar} alt="" />
+                ) : (
+                  (user.username || "?").charAt(0).toUpperCase()
+                )}
+              </Link>
+            ) : (
+              <>
+                <Link to="/login" className="dlp-nav-link clickable">
+                  Se connecter
+                </Link>
+                <Link to="/register" className="dlp-nav-cta clickable">
+                  S'inscrire
+                </Link>
+              </>
+            ))}
+
+          <ThemeToggle />
+        </nav>
       </header>
 
       <main className="dlp-main">

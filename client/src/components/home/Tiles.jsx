@@ -41,61 +41,6 @@ export function GameTile({ game, sub, subGold = false, badge = null }) {
 }
 
 /**
- * Un jeu du cercle, en LIGNE.
- *
- * ⚠️ LES VISAGES SONT LE SUJET, PAS LA JAQUETTE. C'est la seule chose qui
- * distinguait ce bloc des cinq autres rangées de jaquettes de l'accueil : on
- * n'y montre pas un jeu, on montre QUI y est. En rangée, on lisait le jeu ; en
- * liste — la forme qu'ont toutes les listes d'amis du web —, on lit la
- * personne, et la jaquette devient ce qu'elle doit être : la réponse à « à quoi
- * il joue ? ».
- */
-export function CircleRow({ game }) {
-  const players = game.players || [];
-  const extra = (game.count || players.length) - players.length;
-
-  // La légende dit ce qui se passe VRAIMENT, au présent quand c'est le cas :
-  // une partie en cours n'est pas un souvenir.
-  const nowCount = players.filter((p) => p.status === "playing").length;
-  const who =
-    players.length === 1
-      ? players[0].username
-      : nowCount > 1
-        ? `${nowCount} y jouent`
-        : `${game.count} y sont passés`;
-
-  return (
-    <Link to={`/game/${game.id}`} className="mh-circle-row clickable" title={game.name}>
-      <span className="mh-circle-art">
-        {game.cover ? (
-          <img src={game.cover} alt="" loading="lazy" draggable="false" />
-        ) : (
-          <span className="mh-tile-ph">
-            <Gamepad2 size={16} />
-          </span>
-        )}
-      </span>
-      <span className="mh-circle-body">
-        <span className="mh-circle-who">{who}</span>
-        <span className="mh-circle-game">{game.name}</span>
-      </span>
-      <span className="mh-faces">
-        {players.slice(0, 3).map((u) => (
-          <span key={u.id} className="mh-face" title={u.username}>
-            {u.avatar ? (
-              <img src={u.avatar} alt="" loading="lazy" />
-            ) : (
-              (u.username || "?").charAt(0).toUpperCase()
-            )}
-          </span>
-        ))}
-        {extra > 0 && <span className="mh-face-extra">+{extra}</span>}
-      </span>
-    </Link>
-  );
-}
-
-/**
  * Une offre gratuite.
  *
  * ⚠️ ELLE MÈNE À LA FICHE, PAS AU MAGASIN — quand le serveur a reconnu le titre

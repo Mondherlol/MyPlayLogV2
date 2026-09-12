@@ -11,6 +11,85 @@
    leur donnerait tort.
    ====================================================================== */
 
+/* ---------- La barre du haut ---------- */
+.dlp-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.dlp-nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 36px;
+  padding: 0 0.8rem;
+  border-radius: 999px;
+  color: var(--text-soft);
+  font-size: 0.86rem;
+  font-weight: 600;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.dlp-nav-link:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+
+.dlp-nav-cta {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 1rem;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #3b2a02;
+  font-size: 0.86rem;
+  font-weight: 700;
+  box-shadow: 0 6px 16px rgba(242, 183, 11, 0.28);
+  transition: transform 0.14s ease;
+}
+.dlp-nav-cta:hover {
+  transform: translateY(-1px);
+}
+
+/* L'avatar : c'est lui qui dit « tu es connecté », sans un mot. */
+.dlp-me {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 2px solid var(--orange);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 700;
+  transition: transform 0.14s ease;
+}
+.dlp-me:hover {
+  transform: scale(1.06);
+}
+.dlp-me img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Sur un téléphone, « Accueil » perd son texte : le logo et la flèche
+   suffisent, et la place va aux boutons de compte. */
+@media (max-width: 520px) {
+  .dlp-nav-link:first-child {
+    padding: 0 0.55rem;
+    font-size: 0;
+    gap: 0;
+  }
+  .dlp-nav-link:first-child svg {
+    width: 17px;
+    height: 17px;
+  }
+}
+
 .dlp-main {
   position: relative;
   z-index: 2;

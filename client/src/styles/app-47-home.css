@@ -64,14 +64,12 @@
 .s-tonight { order: 7; }
 .s-dusty { order: 8; }
 .s-free { order: 9; }
-.s-circle { order: 10; }
-.s-discover { order: 11; }
-.s-ost { order: 12; }
-.s-done { order: 13; }
-.s-fav { order: 14; }
-.s-similar { order: 15; }
-.mh-doors { order: 16; }
-.mh-acty { order: 17; }
+.s-discover { order: 10; }
+.s-ost { order: 11; }
+.s-done { order: 12; }
+.s-fav { order: 13; }
+.s-similar { order: 14; }
+.mh-doors { order: 15; }
 
 /* ======================================================================
    L'ECRAN LARGE : une colonne de plus
@@ -110,6 +108,20 @@
     grid-column: 1 / -1;
   }
 
+  /* ⚠️ LES VALEURS `order` DU FIL EN UNE COLONNE S'APPLIQUENT AUSSI À LA
+     GRILLE, ET C'ÉTAIT TOUT LE BUG. `order` ne sert pas qu'aux boîtes flex :
+     il décide aussi de l'ordre de placement automatique d'une grille. Le
+     bandeau du haut gardait son `order: 1` alors que les deux colonnes, qui
+     n'en déclarent pas, restaient à 0 — la grille les plaçait donc AVANT lui,
+     et les parties en cours finissaient tout en bas de la page. En deux
+     colonnes, on revient à l'ordre du balisage. */
+  .mh > .mh-hero,
+  .mh > .mh-top,
+  .mh > .mh-col,
+  .mh > .mh-side {
+    order: 0;
+  }
+
   /* ⚠️ PLUS DE DEBORD DANS UNE COLONNE. Un rail qui depasse de sa colonne
      passerait sous la colonne d'a cote : les rangees s'arretent donc net au
      bord, et ce sont les fleches qui disent que ca continue. */
@@ -141,9 +153,6 @@
   }
   .mh-side .mh-sec {
     margin-bottom: 1.1rem;
-  }
-  .mh-side .mh-acty {
-    padding-top: 1.1rem;
   }
 }
 
@@ -1223,8 +1232,7 @@ a.mh-head-main:hover .mh-head-title {
   box-shadow: var(--shadow-sm);
   transition: transform 0.16s ease, box-shadow 0.16s ease;
 }
-.mh-tile:hover .mh-tile-art,
-.mh-circle:hover .mh-tile-art {
+.mh-tile:hover .mh-tile-art {
   transform: translateY(-4px);
   box-shadow: var(--shadow);
 }
@@ -1274,8 +1282,7 @@ a.mh-head-main:hover .mh-head-title {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.mh-tile:hover .mh-tile-name,
-.mh-circle .mh-tile-name:hover {
+.mh-tile:hover .mh-tile-name {
   color: var(--orange);
 }
 .mh-tile-sub {
@@ -1290,67 +1297,6 @@ a.mh-head-main:hover .mh-head-title {
   font-weight: 600;
 }
 
-/* Le cercle, en liste : une ligne par jeu, les visages au bout. */
-.mh-circle-list {
-  display: grid;
-  gap: 0.15rem;
-}
-.mh-circle-row {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.35rem;
-  border-radius: 10px;
-  transition: background 0.15s ease;
-}
-.mh-circle-row:hover {
-  background: var(--surface-2);
-}
-.mh-circle-art {
-  width: 34px;
-  height: 45px;
-  border-radius: 6px;
-  overflow: hidden;
-  background: var(--surface-2);
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-}
-.mh-circle-art img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.mh-circle-body {
-  flex: 1;
-  min-width: 0;
-  display: grid;
-}
-/* ⚠️ LE NOM DES GENS EN PREMIER, LE JEU EN DESSOUS. C'est l'ordre de la
-   question qu'on se pose : « qui joue ? », puis « à quoi ? ». */
-.mh-circle-who {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mh-circle-row:hover .mh-circle-who {
-  color: var(--orange);
-}
-.mh-circle-game {
-  font-size: 0.72rem;
-  color: var(--text-soft);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mh-circle-row .mh-face {
-  width: 20px;
-  height: 20px;
-  border-color: var(--bg);
-}
 
 /* ======================================================================
    6. Les jeux gratuits
@@ -1628,7 +1574,8 @@ a.mh-head-main:hover .mh-head-title {
   flex-shrink: 0;
 }
 .mh-door.arcade .mh-door-ic,
-.mh-door.gems .mh-door-ic {
+.mh-door.gems .mh-door-ic,
+.mh-door.android .mh-door-ic {
   background: rgba(242, 183, 11, 0.14);
 }
 .mh-door-txt {
@@ -1672,99 +1619,6 @@ a.mh-head-main:hover .mh-head-title {
   top: auto;
   left: auto;
   right: 0;
-}
-
-/* ======================================================================
-   11. L'aperçu du fil
-   ====================================================================== */
-.mh-acty {
-  border-top: 1px solid var(--border);
-  padding-top: 1.4rem;
-  margin-bottom: 1rem;
-}
-.mh-acty-head {
-  display: flex;
-  align-items: baseline;
-  gap: 0.7rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.7rem;
-}
-.mh-acty-head .mh-kicker {
-  margin-bottom: 0;
-}
-.mh-acty-head .mh-head-more {
-  margin-left: auto;
-}
-.mh-acty-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-}
-.mh-acty-row {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.55rem 0.4rem;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.87rem;
-}
-.mh-acty-row:last-child {
-  border-bottom: none;
-}
-.mh-acty-av {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: var(--surface-2);
-  font-size: 0.75rem;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-.mh-acty-av img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.mh-acty-txt {
-  flex: 1;
-  min-width: 0;
-  color: var(--text-soft);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mh-acty-who {
-  font-weight: 700;
-  color: var(--text);
-}
-.mh-acty-who:hover,
-.mh-acty-what:hover {
-  color: var(--orange);
-}
-.mh-acty-what {
-  font-weight: 600;
-  color: var(--text);
-}
-.mh-acty-ago {
-  font-size: 0.73rem;
-  color: var(--text-soft);
-  white-space: nowrap;
-}
-.mh-acty-cover {
-  width: 26px;
-  height: 35px;
-  border-radius: 5px;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-.mh-acty-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 /* ======================================================================
@@ -1944,9 +1798,6 @@ a.mh-head-main:hover .mh-head-title {
   .mh-mot-tail {
     display: none;
   }
-  .mh-acty-cover {
-    display: none;
-  }
 }
 
 /* ======================================================================
@@ -1966,8 +1817,7 @@ a.mh-head-main:hover .mh-head-title {
 }
 
 :root:not([data-theme="dark"]) .mh-tile-art,
-:root:not([data-theme="dark"]) .mh-free-art,
-:root:not([data-theme="dark"]) .mh-circle-art {
+:root:not([data-theme="dark"]) .mh-free-art {
   box-shadow: 0 3px 12px rgba(20, 20, 40, 0.1);
 }
 
