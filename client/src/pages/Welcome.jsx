@@ -25,7 +25,7 @@ import AnticipatedCard from "../components/home/AnticipatedCard";
 import EventCard from "../components/home/EventCard";
 import HoursModal from "../components/home/HoursModal";
 import OstRail from "../components/home/OstRail";
-import { MotStrip, TonightCard, WeekStrip } from "../components/home/Strips";
+import { MotStrip, TonightCard } from "../components/home/Strips";
 import { EventListCard, FreeCard, GameTile } from "../components/home/Tiles";
 import { useGameBackdrops } from "../lib/backdrops";
 import {
@@ -40,7 +40,6 @@ import {
   todayLabel,
   todayReleasesPath,
   tonightPick,
-  weekRecap,
   wishlistGames,
 } from "../lib/home";
 import { countdown, needsTicker, shortDate, useSecondsTicker } from "../lib/homeEvents";
@@ -213,7 +212,6 @@ export default function Welcome() {
   const pick = useMemo(() => tonightPick(library, reroll), [library, reroll]);
   const loved = useMemo(() => lovedSeed(library, Date.now(), lovedShift), [library, lovedShift]);
   const lovedCount = useMemo(() => lovedPoolSize(library), [library]);
-  const recap = useMemo(() => weekRecap(library), [library]);
   // Trois bandes de plus, tirées de la MÊME liste déjà chargée : elles
   // s'affichent avant même qu'IGDB ait répondu (cf. lib/home).
   const wanted = useMemo(() => wishlistGames(library), [library]);
@@ -568,11 +566,15 @@ export default function Welcome() {
           </Link>
         )}
 
-        {/* --- Directs et showcases, juste sous ce qu'on joue ------------
-            ⚠️ DANS LE BANDEAU, PAS DANS LA COLONNE. Un rendez-vous a une
-            heure : c'est la deuxième chose qu'on vient vérifier en ouvrant la
-            page, et une colonne de raccourcis n'a rien à faire à côté d'un
-            compte à rebours. */}
+      </section>
+
+      <div className="mh-col">
+        {/* --- Directs et showcases, en tête de colonne ------------------
+            Un rendez-vous a une heure : c'est la deuxième chose qu'on vient
+            vérifier en ouvrant la page, juste après ce qu'on joue. Il ouvre
+            donc la colonne, à côté des actions — le bandeau du dessus reste
+            aux seules parties en cours, les seules à mériter toute la
+            largeur. */}
       {sortedEvents.length > 0 && (
         <Section
           kicker="Ce qui arrive"
@@ -610,12 +612,6 @@ export default function Welcome() {
             ))}
           </Section>
         )}
-      </section>
-
-      <div className="mh-col">
-        {/* Le bilan de la semaine ouvre la colonne : un regard en arrière sur
-            sa bibliothèque, avant les envies qui regardent devant. */}
-        <WeekStrip recap={recap} />
 
         {/* --- Tes envies ------------------------------------------------
             ⚠️ EN HAUT, ET PAS EN BAS AVEC LES RAYONS DE CATALOGUE. C'est une

@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { Bell, BellRing, Radio, Tv } from "lucide-react";
+import { Bell, BellRing, Radio } from "lucide-react";
+import PlatformMark from "../PlatformMark";
 import {
   brandTheme,
   countdown,
@@ -61,7 +62,14 @@ export default function EventCard({ event, now, onToggleInterest }) {
             {event.logo ? (
               <img className="mh-ev-logo" src={event.logo} alt="" loading="lazy" />
             ) : (
-              <Tv size={44} />
+              // Pas de logo en base : celui de la marque, dessiné — comme sur
+              // le téléphone. Une télé générique faisait croire à une image
+              // qui n'avait pas chargé.
+              <PlatformMark
+                name={theme.label || event.name}
+                size={46}
+                color="rgba(255, 255, 255, 0.32)"
+              />
             )}
           </span>
         )}

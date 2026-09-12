@@ -11,8 +11,8 @@ import {
   Loader2,
   Play,
   Radio,
-  Tv,
 } from "lucide-react";
+import PlatformMark from "../components/PlatformMark";
 import Section, { Rail } from "../components/home/Rail";
 import { GameTile } from "../components/home/Tiles";
 import BingoCard from "../components/bingo/BingoCard";
@@ -192,7 +192,16 @@ export default function EventPage() {
               className="ep-poster-fb"
               style={{ background: `linear-gradient(135deg, ${theme.from}, ${theme.to})` }}
             >
-              {event.logo ? <img className="ep-logo" src={event.logo} alt="" /> : <Tv size={64} />}
+              {event.logo ? (
+                <img className="ep-logo" src={event.logo} alt="" />
+              ) : (
+                // Même repli que la carte : le logo de la marque, pas une télé.
+                <PlatformMark
+                  name={theme.label || event.name}
+                  size={96}
+                  color="rgba(255, 255, 255, 0.3)"
+                />
+              )}
             </span>
           )}
         </div>

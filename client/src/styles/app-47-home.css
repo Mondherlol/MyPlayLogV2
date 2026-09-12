@@ -56,20 +56,21 @@
    n'ont plus aucun effet. */
 .mh-hero { order: 0; }
 .mh-top { order: 1; }
-.mh-week { order: 2; }
-.s-wish { order: 3; }
-.s-today { order: 4; }
-.s-awaited { order: 5; }
-.mh-mot { order: 6; }
-.s-tonight { order: 7; }
-.s-dusty { order: 8; }
-.s-free { order: 9; }
-.s-discover { order: 10; }
-.s-ost { order: 11; }
-.s-done { order: 12; }
-.s-fav { order: 13; }
-.s-similar { order: 14; }
-.mh-doors { order: 15; }
+.s-events { order: 2; }
+.s-elists { order: 3; }
+.s-wish { order: 4; }
+.s-today { order: 5; }
+.s-awaited { order: 6; }
+.mh-mot { order: 7; }
+.s-tonight { order: 8; }
+.s-dusty { order: 9; }
+.s-free { order: 10; }
+.s-discover { order: 11; }
+.s-ost { order: 12; }
+.s-done { order: 13; }
+.s-fav { order: 14; }
+.s-similar { order: 15; }
+.mh-doors { order: 16; }
 
 /* ======================================================================
    L'ECRAN LARGE : une colonne de plus
@@ -776,79 +777,6 @@ a.mh-head-main:hover .mh-head-title {
   font-style: normal;
   font-size: 0.85rem;
   color: var(--text-soft);
-}
-
-/* ======================================================================
-   2. Cette semaine
-   ====================================================================== */
-.mh-week {
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  border-radius: var(--radius);
-  padding: 0.7rem 0.8rem;
-  margin-bottom: 2.1rem;
-  --bleed: 0.9rem;
-}
-
-.mh-week-head {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-  color: var(--text-soft);
-}
-.mh-week-head:hover {
-  color: var(--orange);
-}
-.mh-week-head .mh-kicker {
-  margin-bottom: 0;
-}
-.mh-week-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--orange);
-  flex-shrink: 0;
-}
-.mh-week-sum {
-  flex: 1;
-  text-align: right;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Minuscule à dessein : ce rayon n'est pas là pour qu'on choisisse un jeu — les
-   rails du dessus le font déjà —, il est là pour qu'on RECONNAISSE sa semaine.
-   Le liseré coloré porte l'information sans un mot. */
-.mh-week-tile {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 54px;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1.5px solid var(--tint);
-  background: var(--surface);
-  transition: transform 0.14s ease;
-}
-.mh-week-tile:hover {
-  transform: translateY(-3px);
-}
-.mh-week-tile img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.mh-week-blank {
-  font-size: 0.5rem;
-  text-align: center;
-  padding: 0.2rem;
-  color: var(--text-soft);
-  line-height: 1.15;
 }
 
 /* ======================================================================
@@ -1808,7 +1736,6 @@ a.mh-head-main:hover .mh-head-title {
    (un gris à 3 % posé sur du blanc) ne se détachent de rien. Sur fond clair, ce
    qui sépare une carte du papier, ce n'est pas une teinte de gris : c'est une
    OMBRE. */
-:root:not([data-theme="dark"]) .mh-week,
 :root:not([data-theme="dark"]) .mh-tonight,
 :root:not([data-theme="dark"]) .mh-door,
 :root:not([data-theme="dark"]) .mh-empty {

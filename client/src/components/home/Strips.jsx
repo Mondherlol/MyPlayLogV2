@@ -1,63 +1,19 @@
 import { Link } from "react-router-dom";
 import {
   Check,
-  ChevronRight,
   Dices,
   Gamepad2,
   Loader2,
   Play,
   Sparkles,
 } from "lucide-react";
-import { Rail } from "./Rail";
-import { STATUS_LABEL, STATUS_TINT, pickReason } from "../../lib/home";
+import { pickReason } from "../../lib/home";
 
 // ======================================================================
-//  Les bandes : la semaine, le mot du jour, la proposition du soir
+//  Les bandes : le mot du jour, la proposition du soir
 // ======================================================================
 // Trois blocs pleine largeur, posés entre les rails. Ils se lisent en une
 // seconde et ne réclament pas de titre à deux étages.
-
-/**
- * « Cette semaine ».
- *
- * Posé JUSTE SOUS les parties en cours, et pas en tête de page : c'est un
- * regard en arrière, il vient après ce qu'on est en train de faire.
- *
- * ⚠️ L'EN-TÊTE EST UN LIEN, PAS UN TITRE. Un résumé doit ouvrir ce qu'il
- * résume : « 2 terminés · 7 jeux » appelle la question « lesquels, et quand ? »,
- * à laquelle le journal personnel répond déjà.
- */
-export function WeekStrip({ recap }) {
-  if (!recap) return null;
-  return (
-    <section className="mh-week">
-      <Link to="/activity?t=mine" className="mh-week-head clickable">
-        <span className="mh-week-dot" />
-        <span className="mh-kicker">Cette semaine</span>
-        <span className="mh-week-sum">{recap.summary}</span>
-        <ChevronRight size={15} />
-      </Link>
-
-      <Rail snap={false} className="tight">
-        {recap.games.map((e) => (
-          <Link
-            key={e.gameId}
-            to={`/game/${e.gameId}`}
-            className="mh-week-tile clickable"
-            title={`${e.name} — ${STATUS_LABEL[e.status] || ""}`}
-            style={{ "--tint": STATUS_TINT[e.status] || "var(--border-strong)" }}
-          >
-            {e.cover ? (
-              <img src={e.cover} alt="" loading="lazy" draggable="false" />
-            ) : (
-              <span className="mh-week-blank">{e.name}</span>
-            )}
-          </Link>
-        ))}
-      </Rail>
-    </section>
-  );
-}
 
 /**
  * Le mot du jour, réduit à une bande.

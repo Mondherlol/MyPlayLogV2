@@ -155,36 +155,6 @@ export function pickReason(entry, now = Date.now()) {
     : `Plus touché depuis ${since}`;
 }
 
-/**
- * Le bilan de la semaine.
- *
- * ⚠️ CE N'EST PAS UNE PHRASE, CE SONT DES JEUX. Ce qui donne envie de la
- * regarder, ce sont les JAQUETTES : on reconnaît sa semaine d'un coup d'œil,
- * sans lire, et chacune est un chemin vers sa fiche.
- *
- * Rend `null` quand la semaine est vide — un bilan à zéro ne fait envie à
- * personne, et un rayon vide vaut mieux qu'un rayon qui dit « rien ».
- */
-export function weekRecap(entries, now = Date.now()) {
-  const from = now - 7 * DAY;
-  const games = (entries || [])
-    .filter((e) => timeOf(e) >= from && e.status)
-    .sort((a, b) => timeOf(b) - timeOf(a));
-  if (!games.length) return null;
-
-  const finished = games.filter((e) => e.status === "finished").length;
-  const started = games.filter((e) => e.status === "playing").length;
-
-  // Le titre dit CE QUI COMPTE en premier : une fin de jeu est un événement,
-  // « j'ai touché cinq jeux » ne l'est pas.
-  const bits = [];
-  if (finished) bits.push(`${finished} terminé${finished > 1 ? "s" : ""}`);
-  if (started) bits.push(`${started} en cours`);
-  bits.push(`${games.length} jeu${games.length > 1 ? "x" : ""}`);
-
-  return { games: games.slice(0, 14), finished, started, summary: bits.join(" · ") };
-}
-
 /** « 24 h » / « 1 h 30 » — lisible d'un coup d'œil. */
 export function hoursLabel(hours) {
   if (hours == null) return null;
