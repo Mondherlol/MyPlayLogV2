@@ -62,6 +62,7 @@ import {
 } from "../lib/ratingScale";
 import { useAuth } from "../context/AuthContext";
 import RingtonePicker from "../components/RingtonePicker";
+import FontPicker from "../components/FontPicker";
 import { useLibrary } from "../context/LibraryContext";
 import SteamIcon from "../components/SteamIcon";
 import DiscordIcon from "../components/DiscordIcon";
@@ -639,6 +640,14 @@ function AppearancePanel() {
         Ta note reste enregistrée de la même façon : changer d'échelle n'efface et ne
         convertit rien, et les autres joueurs voient tes notes dans LEUR échelle.
       </p>
+
+      {/* La police du site : texte et titres, appliquée dès le clic. */}
+      <h3 className="settings-sub-title">Police</h3>
+      <p className="settings-hint font-hint">
+        Clique sur une police pour l'appliquer à tout le site, ou enchaîne avec
+        « Suivante » (ou les flèches ← →) pour les essayer l'une après l'autre.
+      </p>
+      <FontPicker />
     </div>
   );
 }

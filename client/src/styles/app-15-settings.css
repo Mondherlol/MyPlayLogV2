@@ -2332,6 +2332,227 @@ a.btn-discord-primary.disabled {
   font-size: 0.9rem;
 }
 
+/* ======================================================================
+   Apparence — la police du site
+   ====================================================================== */
+.font-hint {
+  margin: 0 0 0.8rem;
+}
+.font-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+/* Texte / Titres : deux cibles, chacune rappelle sa police du moment. */
+.font-role {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.font-role-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.65rem 0.85rem;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 13px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: var(--cursor-pointer), pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.font-role-opt:hover {
+  border-color: var(--accent);
+}
+.font-role-opt.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+.font-role-opt em {
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  font-style: normal;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* L'aperçu : un vrai bout de page, dans les variables du site. */
+.font-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1.1rem 1.2rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.font-preview-kicker {
+  color: var(--accent-ink);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.font-preview-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.font-preview-body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+.font-preview-meta {
+  color: var(--text-soft);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+/* Précédente · n / N · Suivante — et le retour aux polices d'origine. */
+.font-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  position: sticky;
+  top: 0.5rem;
+  z-index: 2;
+  padding: 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(8px);
+}
+.font-bar-btn,
+.font-bar-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: var(--cursor-pointer), pointer;
+}
+.font-bar-btn:hover,
+.font-bar-reset:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.font-bar-count {
+  min-width: 4.5ch;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.font-bar-reset {
+  margin-left: auto;
+}
+.font-bar-reset:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.font-group-title {
+  margin: 0.4rem 0 0.5rem;
+  color: var(--text-soft);
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.font-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 0.6rem;
+}
+/* ⚠️ LA TUILE EST ÉCRITE DANS SA PROPRE POLICE (style en ligne) : tout ce
+   qu'elle contient hérite de `font-family`, rien ici ne doit la réimposer. */
+.font-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.75rem 0.85rem;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1rem;
+  text-align: left;
+  cursor: var(--cursor-pointer), pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+.font-tile:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.font-tile.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+.font-tile-head {
+  display: flex;
+  align-items: center;
+}
+.font-tile-aa {
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.font-tile-name {
+  overflow: hidden;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.font-tile-sample {
+  overflow: hidden;
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.font-tile-note {
+  align-self: flex-start;
+  margin-top: 0.25rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent-ink);
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+@media (max-width: 560px) {
+  .font-role {
+    grid-template-columns: 1fr;
+  }
+  .font-bar-reset {
+    margin-left: 0;
+  }
+}
+
 /* ---- Compte & connexions (onglet « Compte ») ---- */
 /* La carte Google. Sa pastille reste BLANCHE sur les deux thèmes, et c'est la
    seule du lot dans ce cas : le logo Google garde ses quatre couleurs (on n'a

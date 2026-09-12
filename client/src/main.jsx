@@ -14,6 +14,11 @@ import { CosmeticsProvider } from "./context/CosmeticsContext.jsx";
 import { ChatProvider } from "./context/ChatContext.jsx";
 import { CallProvider } from "./context/CallContext.jsx";
 import { ListenPartyProvider } from "./context/ListenPartyContext.jsx";
+import { applyFonts, getFontPrefs } from "./lib/fonts.js";
+
+// Les polices choisies dans Paramètres → Apparence, AVANT le premier rendu :
+// sinon chaque chargement afficherait d'abord Inter, puis sauterait.
+applyFonts(getFontPrefs());
 
 // Capture les erreurs non-rattrapées (hors rendu React) et les remonte au
 // backend, pour diagnostiquer les crashs qui n'arrivent que sur certains
