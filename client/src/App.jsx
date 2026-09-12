@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import Landing from "./pages/Landing";
 import DownloadApp from "./pages/DownloadApp";
@@ -69,6 +69,28 @@ function PublicOrApp({ children }) {
   ) : (
     <PublicShell>{children}</PublicShell>
   );
+}
+
+// ======================================================================
+//  /profile -> /u/pseudo
+// ======================================================================
+// ⚠️ SON PROPRE PROFIL A LA MÊME ADRESSE QUE CELUI DES AUTRES. Il vivait sur
+// /profile : une adresse qui ne dit pas QUI, et qu'on ne peut donc pas copier
+// pour la partager — collée ailleurs, elle ouvre le profil de celui qui clique.
+// La page savait déjà reconnaître son propriétaire sur /u/pseudo (`isMe`,
+// renvoyé par le serveur) : on y envoie donc tout le monde.
+//
+// /profile RESTE UNE ADRESSE VALIDE, et c'est voulu : les liens internes
+// (`?tab=badges`, `?tab=allgames&st=wishlist`…) et ceux déjà enregistrés
+// ou partagés continuent d'arriver au bon endroit. Les paramètres et l'ancre
+// suivent la redirection, et `replace` évite de laisser /profile dans
+// l'historique — sans quoi « précédent » y ramènerait, et relancerait la
+// redirection en boucle.
+function MyProfileRedirect() {
+  const { user } = useAuth();
+  const { search, hash } = useLocation();
+  if (!user?.username) return <div className="center-screen">Chargement…</div>;
+  return <Navigate to={`/u/${encodeURIComponent(user.username)}${search}${hash}`} replace />;
 }
 
 // Section soumise à un drapeau réglé dans le panneau d'admin. Éteinte, elle
@@ -273,7 +295,7 @@ export default function App() {
           path="/watchparty/:code"
           element={<FeatureRoute name="collection" right="canCollection" element={<WatchParty />} />}
         />
-        <Route path="/profile" element={<Profile />} />
+        <Route path="/profile" element={<MyProfileRedirect />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/settings" element={<Settings />} />
       </Route>

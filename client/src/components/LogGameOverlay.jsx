@@ -1,3 +1,4 @@
+import { platformLabel } from "../lib/platforms";
 // ======================================================================
 //  « + Log un jeu » — noter un jeu sans quitter la page où l'on est
 // ======================================================================
@@ -215,7 +216,7 @@ export default function LogGameOverlay({ onClose }) {
                     <span className="logoverlay-text">
                       <span className="logoverlay-name">{g.name}</span>
                       <span className="logoverlay-meta">
-                        {[g.year, g.platforms?.slice(0, 3).join(" · ")]
+                        {[g.year, g.platforms?.slice(0, 3).map(platformLabel).join(" · ")]
                           .filter(Boolean)
                           .join(" — ")}
                       </span>

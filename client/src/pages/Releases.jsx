@@ -1,3 +1,4 @@
+import { platformLabel } from "../lib/platforms";
 import {
   Fragment,
   forwardRef,
@@ -50,7 +51,10 @@ import MediaLightbox from "../components/MediaLightbox";
 // Menu déroulant multi-sélection tri-état (Console / Genre) avec recherche.
 // `selected` = objet { valeur: "include" | "exclude" }. Un clic fait défiler
 // neutre → inclure → exclure → neutre.
-function MultiDropdown({ label, options, selected, onCycle, onClear }) {
+// `format` ne change que le TEXTE d'une option : la clé, la sélection et ce
+// que reçoit `onCycle` restent la chaîne d'origine. Le même menu sert aux
+// genres, qu'on ne raccourcit pas.
+function MultiDropdown({ label, options, selected, onCycle, onClear, format = (o) => o }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const ref = useRef(null);
@@ -59,7 +63,9 @@ function MultiDropdown({ label, options, selected, onCycle, onClear }) {
   const count = Object.keys(selected).length;
   const term = q.trim().toLowerCase();
   const shown = term
-    ? options.filter((o) => o.toLowerCase().includes(term))
+    ? options.filter(
+        (o) => format(o).toLowerCase().includes(term) || o.toLowerCase().includes(term)
+      )
     : options;
 
   return (
@@ -115,7 +121,7 @@ function MultiDropdown({ label, options, selected, onCycle, onClear }) {
                       {state === "include" && <Check size={13} />}
                       {state === "exclude" && <Minus size={13} />}
                     </span>
-                    {o}
+                    {format(o)}
                   </button>
                 );
               })}
@@ -322,7 +328,7 @@ const RelCard = memo(function RelCard({ g, inWish, onOpen }) {
       </span>
       <span className="relc-name">{g.name}</span>
       {g.platforms?.length > 0 && (
-        <span className="relc-plats">{g.platforms.slice(0, 3).join(" · ")}</span>
+        <span className="relc-plats">{g.platforms.slice(0, 3).map(platformLabel).join(" · ")}</span>
       )}
     </div>
   );
@@ -1018,6 +1024,7 @@ export default function Releases() {
           <MultiDropdown
             label="Console"
             options={platformOpts}
+            format={platformLabel}
             selected={platformSel}
             onCycle={cycleIn(setPlatformSel)}
             onClear={() => setPlatformSel({})}

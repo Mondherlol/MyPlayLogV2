@@ -1,3 +1,4 @@
+import { platformLabel } from "../lib/platforms";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -645,7 +646,7 @@ export default function Welcome() {
           className="s-today"
         >
           {todayOut.map((g) => (
-            <GameTile key={g.id} game={g} sub={g.platforms?.[0] || null} />
+            <GameTile key={g.id} game={g} sub={g.platforms?.[0] ? platformLabel(g.platforms[0]) : null} />
           ))}
         </Section>
       )}

@@ -1,3 +1,4 @@
+import { platformLabel } from "../lib/platforms";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -1377,7 +1378,7 @@ function PsnTrophies({ gameId, token, gameName, altName }) {
         <div className="psn-title-info">
           <span className="psn-title-name">
             {t.name}
-            {t.platform ? ` · ${t.platform}` : ""}
+            {t.platform ? ` · ${platformLabel(t.platform)}` : ""}
           </span>
           <div className="psn-counts">
             {def.platinum > 0 && <TrophyCount type="platinum" n={def.platinum} />}
@@ -1919,9 +1920,9 @@ function InfosTab({ game, entry, onOpenImage, navigate }) {
                 key={p.id}
                 className="gp-chip gp-chip-plat clickable"
                 onClick={() => navigate(`/platform/${p.id}`)}
-                title={`Voir la console ${p.name}`}
+                title={`Voir la console ${platformLabel(p.name)}`}
               >
-                {p.name}
+                {platformLabel(p.name)}
                 <ChevronRight size={13} />
               </button>
             ))}

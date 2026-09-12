@@ -1,3 +1,4 @@
+import { platformLabel } from "../lib/platforms";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { VirtuosoGrid } from "react-virtuoso";
@@ -142,7 +143,7 @@ function GameTile({ entry, fields }) {
           )}
           {showPlatform && (
             <span className="pg-tile-chip">
-              <Joystick size={12} /> {entry.platform}
+              <Joystick size={12} /> {platformLabel(entry.platform)}
             </span>
           )}
           {showFormat && (
@@ -632,7 +633,7 @@ export default function ProfileAllGames({ library, onOpen }) {
                   className={`pg-chip clickable ${playedPlats.has(p) ? "active" : ""}`}
                   onClick={() => toggleInSet(setPlayedPlats, p)}
                 >
-                  {p}
+                  {platformLabel(p)}
                 </button>
               ))}
             </div>

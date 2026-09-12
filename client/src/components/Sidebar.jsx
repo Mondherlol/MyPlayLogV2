@@ -107,7 +107,11 @@ export default function Sidebar({ collapsed, onToggle }) {
             return (
               <NavLink
                 key={to}
-                to={to}
+                // ⚠️ LE PROFIL POINTE SUR SA VRAIE ADRESSE, /u/pseudo. `/profile`
+                // n'est plus qu'une redirection (cf. App.jsx) : un lien resté sur
+                // lui arriverait bien sur la page, mais l'entrée ne s'allumerait
+                // plus, puisque l'adresse affichée n'est plus la sienne.
+                to={to === "/profile" && user?.username ? `/u/${encodeURIComponent(user.username)}` : to}
                 end={end}
                 className={({ isActive }) =>
                   `side-row clickable ${isActive ? "active" : ""} ${

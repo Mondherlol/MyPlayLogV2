@@ -1,3 +1,4 @@
+import { platformLabel } from "../lib/platforms";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -107,7 +108,7 @@ export default function GameCard({ game, variant = "grid" }) {
             <div className="game-row-plats">
               {platforms.slice(0, 6).map((p, i) => (
                 <span className="game-row-plat" key={`${p}-${i}`}>
-                  {p}
+                  {platformLabel(p)}
                 </span>
               ))}
             </div>
@@ -198,7 +199,7 @@ export default function GameCard({ game, variant = "grid" }) {
               <div className={`game-chips-track ${platforms.length > 3 ? "scroll" : ""}`}>
                 {marquee.map((p, i) => (
                   <span className="game-chip" key={`${p}-${i}`}>
-                    {p}
+                    {platformLabel(p)}
                   </span>
                 ))}
               </div>

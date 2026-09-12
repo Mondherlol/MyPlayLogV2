@@ -1,3 +1,4 @@
+import { platformLabel } from "../lib/platforms";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
@@ -428,7 +429,7 @@ export function ReviewItem({
               )}
               {r.platform && (
                 <span className="rvc-tag">
-                  <Gamepad size={12} /> {r.platform}
+                  <Gamepad size={12} /> {platformLabel(r.platform)}
                 </span>
               )}
               {r.spoiler && (
@@ -856,7 +857,7 @@ export default function GameReviews({ game, viewerStatus, upcoming, onWantPlay }
                     <option value="">Toutes plateformes</option>
                     {platforms.map((p) => (
                       <option key={p} value={p}>
-                        {p}
+                        {platformLabel(p)}
                       </option>
                     ))}
                   </select>

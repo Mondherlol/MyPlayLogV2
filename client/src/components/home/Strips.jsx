@@ -33,13 +33,15 @@ export function MotStrip({ mot }) {
           {done ? `C'était « ${mot.word} »` : "Trouve le jeu du jour"}
         </span>
       </span>
-      <span className="mh-mot-tail">
-        {done
-          ? `${mot.tries} essai${mot.tries > 1 ? "s" : ""} · ${mot.score} pts`
-          : mot?.tries
-            ? `${mot.tries} essai${mot.tries > 1 ? "s" : ""}`
-            : "2 minutes, une fois par jour"}
-      </span>
+      {/* La traîne ne dit que ce qui a CHANGÉ aujourd'hui (essais, score) : pas
+          encore joué, il n'y a rien à ajouter au titre. */}
+      {(done || mot?.tries > 0) && (
+        <span className="mh-mot-tail">
+          {done
+            ? `${mot.tries} essai${mot.tries > 1 ? "s" : ""} · ${mot.score} pts`
+            : `${mot.tries} essai${mot.tries > 1 ? "s" : ""}`}
+        </span>
+      )}
     </Link>
   );
 }

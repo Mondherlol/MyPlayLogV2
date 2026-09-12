@@ -1,3 +1,4 @@
+import { platformLabel } from "../lib/platforms";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
@@ -248,7 +249,7 @@ export default function PlatformPage() {
 
   useEffect(() => {
     document.title = data?.profile?.name
-      ? `${data.profile.name} — MyPlayLog`
+      ? `${platformLabel(data.profile.name)} — MyPlayLog`
       : "Console — MyPlayLog";
   }, [data]);
 
@@ -408,10 +409,10 @@ export default function PlatformPage() {
                     onError={() => setLogoBroken(true)}
                   />
                 </span>
-                <h1 className="pv-hero-name sr">{profile.name}</h1>
+                <h1 className="pv-hero-name sr">{platformLabel(profile.name)}</h1>
               </>
             ) : (
-              <h1 className="pv-hero-name">{profile.name}</h1>
+              <h1 className="pv-hero-name">{platformLabel(profile.name)}</h1>
             )}
             {profile.manufacturer && (
               <span className="pv-hero-maker">

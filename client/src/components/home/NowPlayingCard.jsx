@@ -1,3 +1,4 @@
+import { platformLabel } from "../../lib/platforms";
 import { Link } from "react-router-dom";
 import { Clock, Gamepad2, Heart, Loader2, Pause, Trophy, X } from "lucide-react";
 import { hoursLabel, sinceLabel } from "../../lib/home";
@@ -108,11 +109,11 @@ export default function NowPlayingCard({
             <span className="mh-np-meta">
               {!!entry.platform && (
                 <>
-                  <span className="mh-np-plat">{entry.platform}</span>
+                  <span className="mh-np-plat">{platformLabel(entry.platform)}</span>
                   <span className="mh-np-dot">·</span>
                 </>
               )}
-              {hours ? `${hours} au compteur` : "Pas encore de temps noté"}
+              {hours ? `${hours} au compteur` : "- h"}
             </span>
             <span className="mh-np-since">
               Dernier point {sinceLabel(entry.updatedAt)}

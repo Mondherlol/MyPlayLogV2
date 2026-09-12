@@ -1,3 +1,4 @@
+import { platformLabel } from "../lib/platforms";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -139,8 +140,8 @@ function CoverTile({ entry, fav, fields, editing, releaseTs }) {
               </span>
             )}
             {showPlatform && (
-              <span className="cover-meta-chip" title={entry.platform}>
-                {entry.platform}
+              <span className="cover-meta-chip" title={platformLabel(entry.platform)}>
+                {platformLabel(entry.platform)}
               </span>
             )}
           </div>

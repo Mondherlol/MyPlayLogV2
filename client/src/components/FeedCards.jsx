@@ -1,3 +1,4 @@
+import { platformLabel } from "../lib/platforms";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
@@ -498,7 +499,7 @@ function GameEvent({ item, me, token }) {
                 <statusMeta.Icon size={11} /> {statusMeta.label}
               </span>
             )}
-            {item.platform && <span className="hf-chip">{item.platform}</span>}
+            {item.platform && <span className="hf-chip">{platformLabel(item.platform)}</span>}
             {item.bundle && (
               <span className={`hf-chip bundle ${kinds.has("bundle") ? "new" : ""}`}>
                 <Layers size={11} /> {item.bundle.done}/{item.bundle.total} terminés

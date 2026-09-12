@@ -1,3 +1,4 @@
+import { platformLabel } from "../lib/platforms";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -192,7 +193,7 @@ function ReviewCard({ review, isMe, viewerStatus, showSpoilers, onOpenGame, onEd
                   <Clock size={12} /> {review.playtimeHours}h
                 </span>
               )}
-              {review.platform && <span className="rv-meta-dot">{review.platform}</span>}
+              {review.platform && <span className="rv-meta-dot">{platformLabel(review.platform)}</span>}
               <span className="rv-meta-time">{timeAgo(review.updatedAt)}</span>
               {review.spoiler && (
                 <span className="rv-spoiler-tag" title="Cette review dévoile l'intrigue">

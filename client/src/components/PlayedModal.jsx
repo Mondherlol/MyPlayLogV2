@@ -1,3 +1,4 @@
+import { platformLabel } from "../lib/platforms";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -936,7 +937,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                                 <Check size={13} strokeWidth={3} />
                               </span>
                             )}
-                            {p}
+                            {platformLabel(p)}
                           </button>
                         );
                       })}

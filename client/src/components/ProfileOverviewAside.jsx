@@ -1,3 +1,4 @@
+import { platformLabel } from "../lib/platforms";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -664,7 +665,7 @@ export default function ProfileOverviewAside({
                 )}
               </span>
               <span className="pfa-console-body">
-                <span className="pfa-console-name">{consoleShown.platform}</span>
+                <span className="pfa-console-name">{platformLabel(consoleShown.platform)}</span>
                 <span className="pfa-console-sub">
                   {nf.format(consoleShown.count)} jeu{consoleShown.count > 1 ? "x" : ""}
                   {consoleShown.hours > 0 ? ` · ${fmtHours(consoleShown.hours)}` : ""}

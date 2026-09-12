@@ -1,3 +1,4 @@
+import { platformLabel } from "../lib/platforms";
 import { useEffect, useState } from "react";
 import {
   Wrench,
@@ -664,7 +665,7 @@ function ZipertoBlock({ gameId, token, game }) {
                 <div className="gp-hd-meta">
                   {r.platform && (
                     <span className="gp-hd-badge">
-                      <Gamepad2 size={11} /> {r.platform}
+                      <Gamepad2 size={11} /> {platformLabel(r.platform)}
                     </span>
                   )}
                   {r.date && <span className="gp-hd-age">{r.date}</span>}

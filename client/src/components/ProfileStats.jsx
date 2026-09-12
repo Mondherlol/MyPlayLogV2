@@ -1,3 +1,4 @@
+import { platformLabel } from "../lib/platforms";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
@@ -742,14 +743,14 @@ export default function ProfileStats({ username, token }) {
               onRowClick={(it) => openFacet(it.label, Joystick, it.games, it.value)}
               items={stats.platforms.map((p) => ({
                 key: p.name,
-                label: p.name,
+                label: platformLabel(p.name),
                 logo: p.logo ?? null,
                 value: p.count,
                 games: p.games,
                 right: p.hours
                   ? `${p.pct} % · ${fmtHours(p.hours)}`
                   : `${p.pct} %`,
-                title: `${p.name} : ${p.count} jeux${p.hours ? `, ${fmtHours(p.hours)}` : ""} — voir la liste`,
+                title: `${platformLabel(p.name)} : ${p.count} jeux${p.hours ? `, ${fmtHours(p.hours)}` : ""} — voir la liste`,
               }))}
             />
             <FormatSplit
