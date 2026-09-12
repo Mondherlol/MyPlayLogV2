@@ -953,6 +953,23 @@
   color: var(--bts-soft);
 }
 
+/* Versus : la même carte, avec les points de la table en dessous. Plus haute
+   qu'en solo, elle défile sur les petits écrans — sans que la capture ne se
+   fasse écraser par le flex. */
+.px-vs-reveal {
+  max-height: calc(100dvh - 2.4rem);
+  overflow: hidden auto;
+}
+.px-vs-reveal > * {
+  flex-shrink: 0;
+}
+.px-vs-reveal .gv-rv-table li {
+  background: color-mix(in srgb, var(--bts-text) 5%, transparent);
+}
+.px-vs-reveal .gv-rv-table li.me {
+  background: color-mix(in srgb, var(--bts-text) 11%, transparent);
+}
+
 /* ----------------------------------------------------------------------
    Scoreboard — pupitres du plateau
    ---------------------------------------------------------------------- */

@@ -33,7 +33,7 @@ import { apiFetch } from "../lib/api";
 import { useLiveStatus } from "../lib/presence";
 import { dedupeCandidates, searchCandidates } from "../lib/guessGame";
 import { useGameSfx } from "../lib/useGameSfx";
-import PixelCanvas from "../components/PixelCanvas";
+import PixelCanvas, { RevealShot } from "../components/PixelCanvas";
 import { VersusFace, VersusRail, VersusInvite, HUES } from "../components/VersusRoom";
 import GameChat from "../components/GameChat";
 
@@ -564,6 +564,10 @@ export default function PixelVersus() {
   // changements réels et pas dix fois par seconde.
   const progress = phase === "cue" ? 0 : Math.min(1, elapsedMs / roundMs);
   const blocks = Math.round(PIX_START + (PIX_END - PIX_START) * progress);
+  // Définition atteinte quand la manche s'arrête (buzz ou temps écoulé) : la
+  // révélation repart de là, comme en solo.
+  const lastBlocksRef = useRef(PIX_START);
+  if (phase === "round") lastBlocksRef.current = blocks;
 
   // Indices progressifs, synchrones pour toute la table.
   const hintDefs = useMemo(() => {
@@ -947,7 +951,14 @@ export default function PixelVersus() {
 
             {/* Révélation */}
             {phase === "reveal" && (
-              <Reveal round={round} players={players} meId={meId} hueById={hueById} />
+              <Reveal
+                round={round}
+                players={players}
+                meId={meId}
+                hueById={hueById}
+                from={lastBlocksRef.current}
+                msLeft={msLeft}
+              />
             )}
           </div>
         )}
@@ -1238,7 +1249,13 @@ function Lobby({ room, me, hueById, busy, err, onRounds, onReady, onStart, onInv
 // ============================================================
 //  La révélation
 // ============================================================
-function Reveal({ round, players, meId, hueById }) {
+// La carte du solo (.px-reveal) et pas celle du blind test : ce qu'on attend
+// ici, c'est de voir ENFIN la capture nette, en grand — la jaquette seule ne
+// dit pas « ah oui, c'était ça ».
+function Reveal({ round, players, meId, hueById, from, msLeft }) {
+  // La barre de décompte suit la vraie durée de la révélation côté serveur.
+  // Figée au montage : changer la durée d'une animation en cours la fait sauter.
+  const [countdownMs] = useState(msLeft);
   const results = round.results || [];
   const mine = results.find((r) => r.userId === meId);
   const champ = players.find((p) => p.id === round.winner);
@@ -1250,51 +1267,65 @@ function Reveal({ round, players, meId, hueById }) {
 
   return (
     <div className="bt-overlay" role="dialog" aria-modal="true">
-      <div className="bt-reveal-wrap">
-        <div className={`bt-reveal ${iBuzzed ? "good" : "bad"}`}>
-          <i className="bt-reveal-progress" aria-hidden="true" />
-          <span className="bt-reveal-verdict">
-            {iBuzzed
-              ? "Buzz gagnant !"
-              : champ
-                ? `${champ.username} a buzzé`
-                : "Personne n'a trouvé"}
-            <b className="bt-reveal-pts up">+{mine?.points || 0}</b>
-          </span>
-          <div className="bt-reveal-cover">
-            {round.cover ? (
-              <img src={round.cover} alt="" draggable="false" />
-            ) : (
-              <span className="bt-reveal-ph">
-                <Gamepad2 size={34} />
-              </span>
-            )}
-            <span className="bt-reveal-badge">
-              {mine?.correct ? <Check size={22} /> : <X size={22} />}
+      <div className={`px-reveal px-vs-reveal ${iBuzzed ? "good" : "bad"}`}>
+        <i
+          className="bt-reveal-progress"
+          aria-hidden="true"
+          style={countdownMs > 0 ? { animationDuration: `${countdownMs}ms` } : undefined}
+        />
+        {round.shot && (
+          <div className="px-reveal-shots n-1">
+            <RevealShot
+              src={round.shot}
+              from={from}
+              label={`Capture de ${round.gameName}`}
+            />
+            <span className="px-reveal-badge">
+              {mine?.correct ? <Check size={20} /> : <X size={20} />}
             </span>
           </div>
-          <span className="bt-reveal-game">{round.gameName}</span>
-
-          <ul className="gv-rv-table">
-            {rows.map(({ p, r }) => (
-              <li
-                key={p.id}
-                className={`${p.id === meId ? "me" : ""} ${r?.correct ? "ok" : ""}`}
-                style={{ "--hue": hueById.get(p.id) }}
-              >
-                <VersusFace user={p} size={20} hue={hueById.get(p.id)} />
-                <span className="gv-rv-name">{p.username}</span>
-                {p.id === round.winner && (
-                  <span className="gv-rv-tag" title="A buzzé">
-                    <Crown size={10} />
-                  </span>
-                )}
-                <span className="gv-rv-pts">+{r?.points || 0}</span>
-                <span className="gv-rv-total">{p.score}</span>
-              </li>
-            ))}
-          </ul>
+        )}
+        <span className="bt-reveal-verdict">
+          {iBuzzed
+            ? "Buzz gagnant !"
+            : champ
+              ? `${champ.username} a buzzé`
+              : "Personne n'a trouvé"}
+          <b className="bt-reveal-pts up">+{mine?.points || 0}</b>
+        </span>
+        <div className="px-reveal-game">
+          {round.cover ? (
+            <img src={round.cover} alt="" draggable="false" />
+          ) : (
+            <span className="bt-suggest-ph">
+              <Gamepad2 size={18} />
+            </span>
+          )}
+          <span>
+            {!mine?.correct && <em>La réponse était</em>}
+            <b>{round.gameName}</b>
+          </span>
         </div>
+
+        <ul className="gv-rv-table">
+          {rows.map(({ p, r }) => (
+            <li
+              key={p.id}
+              className={`${p.id === meId ? "me" : ""} ${r?.correct ? "ok" : ""}`}
+              style={{ "--hue": hueById.get(p.id) }}
+            >
+              <VersusFace user={p} size={20} hue={hueById.get(p.id)} />
+              <span className="gv-rv-name">{p.username}</span>
+              {p.id === round.winner && (
+                <span className="gv-rv-tag" title="A buzzé">
+                  <Crown size={10} />
+                </span>
+              )}
+              <span className="gv-rv-pts">+{r?.points || 0}</span>
+              <span className="gv-rv-total">{p.score}</span>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

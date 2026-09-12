@@ -30,7 +30,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../lib/api";
 import { useLiveStatus } from "../lib/presence";
-import PixelCanvas from "../components/PixelCanvas";
+import PixelCanvas, { RevealShot } from "../components/PixelCanvas";
 import ShotViewer from "../components/ShotViewer";
 import {
   dedupeCandidates,
@@ -76,49 +76,6 @@ const AUTO_NEXT_MS = 5000;
 
 // Fractions de la manche auxquelles les indices se dévoilent.
 const HINT_FRACS = [0.35, 0.55, 0.75];
-
-// La capture de la révélation : elle arrive dans son état pixelisé de fin de
-// manche, puis se « développe » comme une photo — les blocs fondent jusqu'à
-// l'image nette.
-const REVEAL_ANIM_MS = 700;
-
-function RevealShot({ src, from, delay = 0, label }) {
-  const [blocks, setBlocks] = useState(from);
-  const [sharp, setSharp] = useState(false);
-
-  useEffect(() => {
-    setBlocks(from);
-    setSharp(false);
-    let raf = 0;
-    let start = 0;
-    const step = (t) => {
-      if (!start) start = t;
-      const p = Math.min(1, (t - start) / REVEAL_ANIM_MS);
-      // Courbe douce, puis on passe au rendu net : au-delà de ~180 blocs, un
-      // cran de plus ne se voit plus, autant afficher la vraie image.
-      const eased = p * p;
-      const v = from + (200 - from) * eased;
-      // On ne repeint que si le palier bouge vraiment : sans ça, 4 canvas se
-      // redessineraient 60 fois par seconde pour un écart invisible.
-      setBlocks((prev) => (Math.abs(v - prev) >= 2 ? v : prev));
-      if (p < 1) raf = requestAnimationFrame(step);
-      else setSharp(true);
-    };
-    const timer = setTimeout(() => {
-      raf = requestAnimationFrame(step);
-    }, delay);
-    return () => {
-      clearTimeout(timer);
-      cancelAnimationFrame(raf);
-    };
-  }, [src, from, delay]);
-
-  return (
-    <span className="px-reveal-tile" style={{ animationDelay: `${delay}ms` }}>
-      <PixelCanvas src={src} blocks={blocks} reveal={sharp} label={label} />
-    </span>
-  );
-}
 
 // ============================================================
 //  La carte de l'écran d'accueil
