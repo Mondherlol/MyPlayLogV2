@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Disc3, Music2, Pause, Play } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
 import { usePlayer } from "../../context/PlayerContext";
-import { apiFetch } from "../../lib/api";
+import { apiCached, peekApi } from "../../lib/query";
 import { extractVideoId } from "../../lib/youtube";
 import Section from "./Rail";
+
+// Les coups de cœur OST changent au rythme où les gens choisissent une bande-son
+// favorite — quelques fois par jour, pas à chaque passage sur l'accueil.
+const MAX_AGE = 10 * 60 * 1000;
 
 /**
  * « Coups de cœur OST » — les dernières bandes-son mises en favori par
@@ -14,20 +19,26 @@ import Section from "./Rail";
  * (classes `.pfo-*`) : le CD sort au survol et tourne à la lecture, pilotée par
  * le mini-lecteur global. Un rail plutôt qu'une grille — c'est la grammaire de
  * toute la page maintenant.
+ *
+ * ⚠️ PAS DE SQUELETTE : le rayon est bien sous la ligne de flottaison. Il part
+ * de ce que le dépôt avait (cf. lib/query) et n'apparaît qu'avec sa donnée.
  */
-export default function OstRail({ token }) {
-  const [items, setItems] = useState(null);
+export default function OstRail({ token, limit = 8 }) {
+  const { user } = useAuth();
+  const scope = user?.id || user?.username || "me";
+  const path = `/ost/recent?limit=${limit}`;
+  const [items, setItems] = useState(() => peekApi(path, scope)?.items ?? null);
   const player = usePlayer();
 
   useEffect(() => {
     let alive = true;
-    apiFetch("/ost/recent?limit=8", { token })
+    apiCached(path, { token, scope, maxAge: MAX_AGE })
       .then((d) => alive && setItems(d.items || []))
-      .catch(() => alive && setItems([]));
+      .catch(() => alive && setItems((v) => v ?? []));
     return () => {
       alive = false;
     };
-  }, [token]);
+  }, [path, token, scope]);
 
   if (!items?.length) return null;
 
