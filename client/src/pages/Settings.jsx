@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   DownloadCloud,
@@ -50,7 +51,6 @@ import {
   Bot,
   MessageCircle,
   KeyRound,
-  Mail,
 } from "lucide-react";
 import { apiFetch, API_BASE } from "../lib/api";
 import BackloggdImportModal from "../components/BackloggdImportModal";
@@ -67,6 +67,7 @@ import { useLibrary } from "../context/LibraryContext";
 import SteamIcon from "../components/SteamIcon";
 import DiscordIcon from "../components/DiscordIcon";
 import GoogleIcon from "../components/GoogleIcon";
+import BackloggdIcon from "../components/BackloggdIcon";
 import SteamImportModal from "../components/SteamImportModal";
 import PsnIcon from "../components/PsnIcon";
 import PsnImportModal, {
@@ -148,7 +149,6 @@ export default function Settings() {
     <div className="settings-page">
       <header className="settings-head">
         <h1>Paramètres</h1>
-        <p>Gère tes imports, ton compte et l'apparence de MyPlayLog.</p>
       </header>
 
       <div className="settings-layout">
@@ -194,15 +194,23 @@ function ImportsPanel() {
       <h2 className="settings-section-title">
         <DownloadCloud size={20} /> Imports
       </h2>
-      <p className="settings-section-sub">
-        Relie tes plateformes pour importer ta bibliothèque et tes succès. Rien
-        n'est ajouté sans ta validation.
-      </p>
       <div className="import-cards">
         <SteamCard />
         <PsnCard />
         <BackloggdCard />
       </div>
+      <div className="import-soon-row">
+        <span className="import-soon-chip">Xbox · bientôt</span>
+      </div>
+    </div>
+  );
+}
+
+// Carte en cours de chargement : la place d'une ligne, sans texte.
+function CardLoading() {
+  return (
+    <div className="import-card is-loading">
+      <Loader2 className="spin" size={16} />
     </div>
   );
 }
@@ -217,28 +225,27 @@ function BackloggdCard() {
 
   return (
     <>
-      <div className="import-card bl-card">
-        <div className="import-card-head">
-          <div className="import-card-main">
-            <span className="bl-logo">
-              <Gamepad2 size={26} />
-            </span>
-            <div className="import-card-info">
-              <div className="import-card-title">Backloggd</div>
-              <p className="import-card-desc">
-                Récupère ta bibliothèque, tes notes, ton avancement et tes avis
-                depuis ton profil Backloggd.
-              </p>
-            </div>
+      <div className="import-card">
+        <div className="import-card-main">
+          <div className="import-logo bl-logo">
+            <BackloggdIcon size={22} />
+          </div>
+          <div className="import-card-info">
+            <div className="import-card-title">Backloggd</div>
+            <p className="import-card-desc">Notes, avancement et avis</p>
           </div>
         </div>
-        <div className="import-card-actions">
-          <button className="btn btn-primary clickable" onClick={() => setOpen(true)}>
-            <DownloadCloud size={16} /> Importer
+        <div className="import-actions">
+          <button className="btn-set-primary clickable" onClick={() => setOpen(true)}>
+            <DownloadCloud size={15} /> Importer
           </button>
         </div>
       </div>
-      {open && <BackloggdImportModal onClose={() => setOpen(false)} />}
+      {open &&
+        createPortal(
+          <BackloggdImportModal onClose={() => setOpen(false)} />,
+          document.body
+        )}
     </>
   );
 }
@@ -255,27 +262,25 @@ function CallsPanel() {
       <h2 className="settings-section-title">
         <PhoneCall size={20} /> Appels
       </h2>
-      <p className="settings-section-sub">
-        Choisis ce que tu entends quand quelqu'un t'appelle — en privé comme dans
-        un groupe. Écoute avant de choisir : le bouton de gauche joue la sonnerie
-        exactement comme elle sonnera.
-      </p>
       <RingtonePicker />
     </div>
   );
 }
 
 // Interrupteur (façon iOS) réutilisé par les onglets Confidentialité et Fil
-// d'accueil.
-function PrivacySwitch({ Icon, title, desc, checked, disabled, busy, onChange }) {
+// d'accueil. `desc` s'affiche sous le titre ; `hint` ne vit qu'en infobulle.
+function PrivacySwitch({ Icon, title, desc, hint, checked, disabled, busy, onChange }) {
   return (
-    <label className={`pv-row ${disabled ? "off" : ""} ${checked ? "on" : ""}`}>
+    <label
+      className={`pv-row ${disabled ? "off" : ""} ${checked ? "on" : ""}`}
+      title={hint}
+    >
       <span className="pv-row-icon">
-        <Icon size={18} />
+        <Icon size={16} />
       </span>
       <span className="pv-row-txt">
         <strong>{title}</strong>
-        <span>{desc}</span>
+        {desc && <span>{desc}</span>}
       </span>
       <span className="pv-switch">
         {busy && <Loader2 className="spin pv-row-busy" size={14} />}
@@ -495,23 +500,20 @@ function FeedGroup({ group, hidden, busyKey, onGroup, onLeaf }) {
           className="fg-open clickable"
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
+          title={group.desc}
         >
           <span className="pv-row-icon">
-            <group.Icon size={18} />
+            <group.Icon size={16} />
           </span>
           <span className="pv-row-txt">
             <strong>{group.title}</strong>
-            <span>
-              {on === 0
-                ? "Masqué de ton fil."
-                : partial
-                  ? `${on} famille${on > 1 ? "s" : ""} sur ${total} · ${group.desc}`
-                  : group.desc}
-            </span>
           </span>
+          {(on === 0 || partial) && (
+            <span className="fg-count">{on === 0 ? "Masqué" : `${on}/${total}`}</span>
+          )}
           {total > 1 && (
             <span className="fg-chev">
-              {open ? "Réduire" : "Détailler"} <Chevron size={16} />
+              <Chevron size={16} />
             </span>
           )}
         </button>
@@ -540,7 +542,7 @@ function FeedGroup({ group, hidden, busyKey, onGroup, onLeaf }) {
               key={it.key}
               Icon={it.Icon}
               title={it.title}
-              desc={it.desc}
+              hint={it.desc}
               checked={!hidden.includes(it.key)}
               busy={busyKey === it.key || busy}
               disabled={frozen}
@@ -569,16 +571,8 @@ function AppearancePanel() {
   }
 
   const OPTIONS = [
-    {
-      value: SCALE_100,
-      title: "Sur 100",
-      desc: "La jauge à glisser, avec la valeur exacte au clavier. Le réglage le plus fin.",
-    },
-    {
-      value: SCALE_STARS,
-      title: "Sur 5 étoiles",
-      desc: "Cinq étoiles qu'on règle au glissé, par demies. Plus rapide, moins précis.",
-    },
+    { value: SCALE_100, title: "Sur 100" },
+    { value: SCALE_STARS, title: "Sur 5 étoiles" },
   ];
 
   return (
@@ -586,12 +580,8 @@ function AppearancePanel() {
       <h2 className="settings-section-title">
         <Palette size={20} /> Apparence
       </h2>
-      <p className="settings-section-sub">
-        Ces réglages ne concernent que CET appareil : ils vivent dans ton navigateur,
-        pas dans ton compte.
-      </p>
 
-      <h3 className="settings-sub-title">Échelle de notation</h3>
+      <h3 className="settings-sub-title">Notation</h3>
       <div className="scale-picker">
         {OPTIONS.map((o) => (
           <button
@@ -608,7 +598,6 @@ function AppearancePanel() {
                 </span>
               )}
             </span>
-            <span className="scale-opt-desc">{o.desc}</span>
             {/* L'aperçu vaut mieux qu'une explication : on voit ce qu'on choisit. */}
             <span className="scale-opt-demo">
               {o.value === SCALE_100 ? (
@@ -636,17 +625,8 @@ function AppearancePanel() {
         ))}
       </div>
 
-      <p className="settings-hint">
-        Ta note reste enregistrée de la même façon : changer d'échelle n'efface et ne
-        convertit rien, et les autres joueurs voient tes notes dans LEUR échelle.
-      </p>
-
       {/* La police du site : texte et titres, appliquée dès le clic. */}
       <h3 className="settings-sub-title">Police</h3>
-      <p className="settings-hint font-hint">
-        Clique sur une police pour l'appliquer à tout le site, ou enchaîne avec
-        « Suivante » (ou les flèches ← →) pour les essayer l'une après l'autre.
-      </p>
       <FontPicker />
     </div>
   );
@@ -697,22 +677,10 @@ function FeedPanel() {
 
   return (
     <div className="settings-section">
-      <h2 className="settings-section-title">
-        <Newspaper size={20} /> Fil d'accueil
-      </h2>
-      <p className="settings-section-sub">
-        Choisis ce que ton fil te raconte. Coupe un domaine entier d'un geste, ou
-        déplie-le pour trier dans le détail. Ce que tu masques ne disparaît que de
-        TON fil : les autres continuent de le voir, et l'onglet Feed des profils
-        n'y touche pas.
-      </p>
-
-      <div className="fp-bar">
-        <span>
-          {off === 0
-            ? "Tu vois tout ce qui se passe."
-            : `${off} famille${off > 1 ? "s" : ""} masquée${off > 1 ? "s" : ""} sur ${FEED_KEYS.length}.`}
-        </span>
+      <div className="settings-section-head">
+        <h2 className="settings-section-title">
+          <Newspaper size={20} /> Fil d'accueil
+        </h2>
         {off > 0 && (
           <button
             className="fp-reset clickable"
@@ -720,9 +688,9 @@ function FeedPanel() {
             disabled={busyKey === "*"}
           >
             {busyKey === "*" ? (
-              <Loader2 className="spin" size={14} />
+              <Loader2 className="spin" size={13} />
             ) : (
-              <RotateCcw size={14} />
+              <RotateCcw size={13} />
             )}
             Tout réafficher
           </button>
@@ -731,8 +699,7 @@ function FeedPanel() {
 
       {allOff && (
         <p className="fp-warn">
-          <AlertTriangle size={15} /> Tout est coupé : ton fil d'accueil sera
-          vide.
+          <AlertTriangle size={14} /> Ton fil sera vide
         </p>
       )}
 
@@ -830,18 +797,16 @@ function PrivacyPanel({ onCount }) {
       <h2 className="settings-section-title">
         <ShieldCheck size={20} /> Confidentialité
       </h2>
-      <p className="settings-section-sub">
-        Choisis qui peut voir ton profil, tes jeux et tes reviews.
-      </p>
 
       <div className="pv-block">
         <PrivacySwitch
           Icon={priv ? Lock : Globe}
           title="Compte privé"
-          desc={
+          desc={priv ? "Abonnés uniquement" : "Visible par tous"}
+          hint={
             priv
-              ? "Seuls tes abonnés voient ton profil. S'abonner passe par une demande à valider."
-              : "Ton profil est visible par tout le monde, même sans compte."
+              ? "S'abonner passe par une demande à valider."
+              : "Ton profil est visible même sans compte."
           }
           checked={priv}
           busy={busyKey === "isPrivate"}
@@ -852,13 +817,13 @@ function PrivacyPanel({ onCount }) {
       {/* Sous-options : sans effet tant que le compte est public. */}
       <div className={`pv-block pv-sub ${priv ? "" : "locked"}`}>
         <div className="pv-sub-head">
-          <EyeOff size={15} /> Masquer aux non-abonnés
-          {!priv && <span className="pv-sub-hint">active le compte privé</span>}
+          <EyeOff size={14} /> Masquer aux non-abonnés
+          {!priv && <span className="pv-sub-hint">compte privé requis</span>}
         </div>
         <PrivacySwitch
           Icon={ImageOff}
-          title="Ma photo de profil"
-          desc="Les visiteurs non abonnés voient un avatar vide à la place."
+          title="Photo de profil"
+          hint="Les visiteurs non abonnés voient un avatar vide à la place."
           checked={!!privacy.hideAvatar}
           disabled={!priv}
           busy={busyKey === "hideAvatar"}
@@ -866,8 +831,8 @@ function PrivacyPanel({ onCount }) {
         />
         <PrivacySwitch
           Icon={ImageOff}
-          title="Ma bannière"
-          desc="La photo de couverture de ton profil reste réservée à tes abonnés."
+          title="Bannière"
+          hint="La photo de couverture de ton profil reste réservée à tes abonnés."
           checked={!!privacy.hideCover}
           disabled={!priv}
           busy={busyKey === "hideCover"}
@@ -875,8 +840,8 @@ function PrivacyPanel({ onCount }) {
         />
         <PrivacySwitch
           Icon={MessageSquareText}
-          title="Mes reviews"
-          desc="Tes avis disparaissent des pages de jeux pour qui ne te suit pas."
+          title="Reviews"
+          hint="Tes avis disparaissent des pages de jeux pour qui ne te suit pas."
           checked={!!privacy.hideReviews}
           disabled={!priv}
           busy={busyKey === "hideReviews"}
@@ -887,21 +852,17 @@ function PrivacyPanel({ onCount }) {
       {/* Demandes d'abonnement en attente (comptes privés). */}
       <div className="pv-block">
         <div className="pv-sub-head">
-          <Inbox size={15} /> Demandes d'abonnement
+          <Inbox size={14} /> Demandes d'abonnement
           {requests?.length > 0 && <span className="pv-count">{requests.length}</span>}
         </div>
         {requests === null ? (
           <div className="pv-empty">
-            <Loader2 className="spin" size={18} />
+            <Loader2 className="spin" size={16} />
           </div>
         ) : requests.length === 0 ? (
           <div className="pv-empty">
-            <UserPlus size={20} />
-            <p>
-              {priv
-                ? "Aucune demande en attente."
-                : "Ton compte est public : on s'abonne à toi sans demander."}
-            </p>
+            <UserPlus size={15} />
+            <p>{priv ? "Aucune demande" : "Compte public"}</p>
           </div>
         ) : (
           <div className="pv-req-list">
@@ -972,11 +933,8 @@ function TrackingPanel() {
   return (
     <div className="settings-section">
       <h2 className="settings-section-title">
-        <Swords size={20} /> Tracking in-game
+        <Swords size={20} /> Tracking
       </h2>
-      <p className="settings-section-sub">
-       Ton rang, champions et parties jouées sont synchronisés automatiquement.
-      </p>
       <div className="trk-cards">
         <MarvelRivalsCard
           status={status}
@@ -1003,7 +961,7 @@ function TrackerAccountRow({ tracker, onUnlink, busy }) {
   const avatar = snap?.icon || snap?.heroes?.[0]?.thumb || snap?.champions?.[0]?.thumb;
   return (
     <div className="trk-connected trk-acc-row">
-      <TrackerAvatar src={avatar} name={tracker.externalName} size={36} />
+      <TrackerAvatar src={avatar} name={tracker.externalName} size={28} />
       <div className="trk-connected-txt">
         <strong>
           {tracker.externalName || "Compte lié"}
@@ -1015,19 +973,19 @@ function TrackerAccountRow({ tracker, onUnlink, busy }) {
         </strong>
         {snap?.rank?.tier && (
           <span className="trk-connected-rank">
-            {snap.rank.image && <Emblem src={snap.rank.image} size={18} />}
+            {snap.rank.image && <Emblem src={snap.rank.image} size={16} />}
             {snap.rank.tier}
           </span>
         )}
       </div>
       <button
-        className="btn-ghost-danger clickable trk-unlink"
+        className="btn-ghost-danger set-icon clickable trk-unlink"
         onClick={onUnlink}
         disabled={busy}
         title="Délier ce compte"
+        aria-label="Délier ce compte"
       >
-        {busy ? <Loader2 className="spin" size={16} /> : <Link2Off size={16} />}
-        <span>Délier</span>
+        {busy ? <Loader2 className="spin" size={15} /> : <Link2Off size={15} />}
       </button>
     </div>
   );
@@ -1067,29 +1025,22 @@ function TrackerCard({ status, reload, cover, provider, name, desc, Form }) {
     }
   }
 
-  if (!status) {
-    return (
-      <div className="import-card">
-        <Loader2 className="spin" size={20} /> Chargement…
-      </div>
-    );
-  }
+  if (!status) return <CardLoading />;
 
   return (
     <div className={`import-card trk-card ${provider} ${connected ? "connected" : ""}`}>
-      <div className="import-card-glow" />
       <div className="import-card-head">
         <div className="import-card-main">
           <CoverLogo cover={cover} className={`${provider}-logo`}>
-            <Swords size={26} />
+            <Swords size={18} />
           </CoverLogo>
           <div className="import-card-info">
             <div className="import-card-title">
               {name}
               {connected && (
                 <span className="import-badge">
-                  <CheckCircle2 size={13} /> Lié
-                  {accounts.length > 1 && ` · ${accounts.length} comptes`}
+                  <CheckCircle2 size={12} /> Lié
+                  {accounts.length > 1 && ` · ${accounts.length}`}
                 </span>
               )}
             </div>
@@ -1158,7 +1109,7 @@ function MarvelRivalsCard({ status, reload, cover }) {
       cover={cover}
       provider="marvel-rivals"
       name="Marvel Rivals"
-      desc="Ton identifiant ou l'URL de ton profil rivalsmeta."
+      desc="Pseudo ou lien rivalsmeta"
       Form={MarvelLinkForm}
     />
   );
@@ -1172,7 +1123,7 @@ function LeagueCard({ status, reload, cover }) {
       cover={cover}
       provider="league-of-legends"
       name="League of Legends"
-      desc="Ton Riot ID (Pseudo#TAG) + ta région. Synchro automatique."
+      desc="Riot ID et région"
       Form={LeagueLinkForm}
     />
   );
@@ -1280,116 +1231,99 @@ function SteamCard() {
     }
   }
 
-  if (!status) {
-    return (
-      <div className="import-card">
-        <Loader2 className="spin" size={20} /> Chargement…
-      </div>
-    );
-  }
+  if (!status) return <CardLoading />;
 
   const connected = status.connected;
   const steam = status.steam;
 
   return (
     <div className={`import-card steam ${connected ? "connected" : ""}`}>
-      <div className="import-card-glow" />
       <div className="import-card-main">
         <div className="import-logo steam-logo">
-          <SteamIcon size={30} />
+          <SteamIcon size={22} />
         </div>
         <div className="import-card-info">
           <div className="import-card-title">
             Steam
             {connected && (
               <span className="import-badge">
-                <CheckCircle2 size={13} /> Lié
+                <CheckCircle2 size={12} /> Lié
               </span>
             )}
           </div>
           {connected && steam ? (
             <div className="import-steam-user">
               {steam.avatar && <img src={steam.avatar} alt="" />}
-              <div>
-                <strong>{steam.personaName || "Compte Steam"}</strong>
-                <span>
-                  Lié{" "}
-                  {steam.connectedAt
-                    ? new Date(steam.connectedAt).toLocaleDateString("fr-FR")
-                    : ""}
-                </span>
-              </div>
+              <strong>{steam.personaName || "Compte Steam"}</strong>
             </div>
           ) : (
-            <p className="import-card-desc">
-              Connecte-toi avec Steam pour importer tes jeux et tes succès. Ton
-              profil Steam doit être <strong>public</strong>.
-            </p>
+            <p className="import-card-desc">Jeux et succès · profil public</p>
           )}
         </div>
       </div>
-
-      {error && (
-        <div className="import-error">
-          <AlertTriangle size={15} /> {error}
-        </div>
-      )}
-
-      {!status.configured && (
-        <div className="import-error">
-          <AlertTriangle size={15} /> Steam n'est pas configuré côté serveur
-          (STEAM_API_KEY).
-        </div>
-      )}
 
       <div className="import-actions">
         {connected ? (
           <>
             <button
-              className="btn-steam-primary clickable"
+              className="btn-set-primary clickable"
               onClick={() => setImporting(true)}
               disabled={busy}
             >
-              <Gamepad2 size={17} /> Importer mes jeux
+              <DownloadCloud size={15} /> Importer
             </button>
             <button
-              className="btn-ghost-danger clickable"
+              className="btn-ghost-danger set-icon clickable"
               onClick={() => setUnlinkOpen(true)}
               disabled={busy}
+              title="Délier"
+              aria-label="Délier Steam"
             >
-              <Link2Off size={16} /> Délier
+              <Link2Off size={15} />
             </button>
           </>
         ) : (
           <>
             <button
-              className="btn-steam-primary clickable"
-              onClick={connectSteam}
-              disabled={busy || !status.configured}
-            >
-              {busy ? <Loader2 className="spin" size={17} /> : <Link2 size={17} />}
-              Se connecter avec Steam
-            </button>
-            <button
               className="btn-ghost-link clickable"
               onClick={() => setManualOpen((v) => !v)}
             >
-              ou coller mon profil
+              Lien manuel
+            </button>
+            <button
+              className="btn-set-primary clickable"
+              onClick={connectSteam}
+              disabled={busy || !status.configured}
+            >
+              {busy ? <Loader2 className="spin" size={15} /> : <Link2 size={15} />}
+              Connecter
             </button>
           </>
         )}
       </div>
 
+      {error && (
+        <div className="import-error">
+          <AlertTriangle size={14} /> {error}
+        </div>
+      )}
+
+      {!status.configured && (
+        <div className="import-error">
+          <AlertTriangle size={14} /> Steam non configuré sur le serveur
+        </div>
+      )}
+
       {manualOpen && !connected && (
         <div className="import-manual">
           <input
             type="text"
-            placeholder="steamcommunity.com/id/toi ou SteamID64"
+            placeholder="Lien du profil ou SteamID64"
             value={manualInput}
             onChange={(e) => setManualInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && linkManual()}
           />
-          <button className="btn-steam-primary clickable" onClick={linkManual} disabled={busy}>
+          <button className="btn-set-primary clickable" onClick={linkManual} disabled={busy}>
             Lier
           </button>
         </div>
@@ -1398,43 +1332,39 @@ function SteamCard() {
       {/* Confirmation de déliaison : retirer ou garder les jeux importés. */}
       {unlinkOpen && (
         <div className="import-unlink">
-          <p>Délier ton compte Steam ?</p>
-          <label className="import-check">
+          <label
+            className="import-check"
+            title="Tes jeux ajoutés ou modifiés à la main sont conservés."
+          >
             <input
               type="checkbox"
               checked={removeGames}
               onChange={(e) => setRemoveGames(e.target.checked)}
             />
-            <span>
-              Retirer aussi les jeux ajoutés par l'import Steam (tes jeux
-              existants et modifiés à la main sont conservés).
-            </span>
+            <span>Retirer aussi les jeux importés</span>
           </label>
           <div className="import-unlink-actions">
             <button className="btn-ghost clickable" onClick={() => setUnlinkOpen(false)}>
               Annuler
             </button>
             <button className="btn-ghost-danger clickable" onClick={unlink} disabled={busy}>
-              {busy ? <Loader2 className="spin" size={15} /> : <Link2Off size={15} />}
+              {busy ? <Loader2 className="spin" size={14} /> : <Link2Off size={14} />}
               Délier
             </button>
           </div>
         </div>
       )}
 
-      {/* Autres plateformes à venir */}
-      <div className="import-soon-row">
-        <div className="import-soon-chip">Xbox — bientôt</div>
-      </div>
-
-      {importing && (
-        <SteamImportModal
-          onClose={() => setImporting(false)}
-          onDone={async () => {
-            await refresh();
-          }}
-        />
-      )}
+      {importing &&
+        createPortal(
+          <SteamImportModal
+            onClose={() => setImporting(false)}
+            onDone={async () => {
+              await refresh();
+            }}
+          />,
+          document.body
+        )}
     </div>
   );
 }
@@ -1512,13 +1442,7 @@ function PsnCard() {
     }
   }
 
-  if (!status) {
-    return (
-      <div className="import-card">
-        <Loader2 className="spin" size={20} /> Chargement…
-      </div>
-    );
-  }
+  if (!status) return <CardLoading />;
 
   const connected = status.connected;
   const psn = status.psn;
@@ -1527,133 +1451,120 @@ function PsnCard() {
 
   return (
     <div className={`import-card psn ${connected ? "connected" : ""}`}>
-      <div className="import-card-glow psn-glow" />
       <div className="import-card-main">
         <div className="import-logo psn-logo">
-          <PsnIcon size={30} />
+          <PsnIcon size={22} />
         </div>
         <div className="import-card-info">
           <div className="import-card-title">
             PlayStation
             {connected && (
               <span className="import-badge">
-                <CheckCircle2 size={13} /> Lié
+                <CheckCircle2 size={12} /> Lié
               </span>
             )}
           </div>
           {connected && psn ? (
             <div className="import-steam-user">
               {psn.avatar && <img src={psn.avatar} alt="" />}
-              <div>
-                <strong>{psn.onlineId || "Compte PSN"}</strong>
-                <span>
-                  Lié{" "}
-                  {psn.connectedAt
-                    ? new Date(psn.connectedAt).toLocaleDateString("fr-FR")
-                    : ""}
+              <strong>{psn.onlineId || "Compte PSN"}</strong>
+              {psn.lastSyncAt && (
+                <span title="Dernière synchro">
+                  ·{" "}
+                  {new Date(psn.lastSyncAt).toLocaleDateString("fr-FR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                  })}
                 </span>
-              </div>
+              )}
             </div>
           ) : (
-            <p className="import-card-desc">
-              Relie ton compte PlayStation pour importer tes jeux, ton temps de
-              jeu et tes trophées.
-            </p>
+            <p className="import-card-desc">Jeux, heures et trophées</p>
           )}
         </div>
       </div>
-
-      {error && (
-        <div className="import-error">
-          <AlertTriangle size={15} /> {error}
-        </div>
-      )}
-
-      {/* Bannière : demande en attente / en cours de traitement par le worker. */}
-      {req ? (
-        <div className="psn-request-banner">
-          <Loader2 size={15} className="spin" />
-          {req.status === "processing"
-            ? "Synchro en cours de traitement…"
-            : "Demande envoyée — en attente de traitement. Tu recevras une notification quand ton import sera prêt."}
-        </div>
-      ) : sent ? (
-        <div className="psn-request-banner ok">
-          <CheckCircle2 size={15} /> Demande envoyée.
-        </div>
-      ) : null}
 
       <div className="import-actions">
         {connected ? (
           <>
             {scan && scan.total > 0 && !req && (
               <button
-                className="btn-psn-primary clickable"
+                className="btn-set-primary clickable"
                 onClick={() => setImporting(true)}
               >
-                <Gamepad2 size={17} /> Importer mes jeux ({scan.total})
+                <DownloadCloud size={15} /> Importer · {scan.total}
               </button>
             )}
             {!req && (
               <button
-                className="btn-ghost clickable"
+                className="btn-ghost set-icon clickable"
                 onClick={() => requestSync(false)}
                 disabled={busy}
-                title="Relancer un scan de ta bibliothèque PlayStation"
+                title="Relancer une synchro"
+                aria-label="Relancer une synchro PlayStation"
               >
-                {busy ? <Loader2 className="spin" size={16} /> : <RefreshCw size={16} />}{" "}
-                Actualiser
+                {busy ? <Loader2 className="spin" size={15} /> : <RefreshCw size={15} />}
               </button>
             )}
             <button
-              className="btn-ghost-danger clickable"
+              className="btn-ghost-danger set-icon clickable"
               onClick={() => setUnlinkOpen(true)}
               disabled={busy}
+              title="Délier"
+              aria-label="Délier PlayStation"
             >
-              <Link2Off size={16} /> Délier
+              <Link2Off size={15} />
             </button>
           </>
         ) : (
           !req && (
             <button
-              className="btn-psn-primary clickable"
+              className="btn-set-primary clickable"
               onClick={() => setConnectOpen((v) => !v)}
               disabled={busy}
             >
-              <Link2 size={17} /> Connecter mon compte PlayStation
+              <Link2 size={15} /> Connecter
             </button>
           )
         )}
       </div>
 
-      {connected && psn?.lastSyncAt && (
-        <div className="psn-sync-line">
-          <span>
-            Dernière synchro le{" "}
-            {new Date(psn.lastSyncAt).toLocaleString("fr-FR", {
-              day: "2-digit",
-              month: "2-digit",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </span>
+      {error && (
+        <div className="import-error">
+          <AlertTriangle size={14} /> {error}
         </div>
       )}
 
+      {/* Bannière : demande en attente / en cours de traitement par le worker. */}
+      {req ? (
+        <div className="psn-request-banner">
+          <Loader2 size={14} className="spin" />
+          {req.status === "processing"
+            ? "Synchro en cours…"
+            : "Demande envoyée · tu seras notifié"}
+        </div>
+      ) : sent ? (
+        <div className="psn-request-banner ok">
+          <CheckCircle2 size={14} /> Demande envoyée
+        </div>
+      ) : null}
+
       {/* Modale d'import : l'utilisateur valide jeu par jeu (statut, console,
           trophées). Alimentée par le scan mis en cache par le worker maison. */}
-      {importing && (
-        <PsnImportModal
-          onClose={() => {
-            setImporting(false);
-            load();
-          }}
-          onDone={async () => {
-            await refresh();
-            await load();
-          }}
-        />
-      )}
+      {importing &&
+        createPortal(
+          <PsnImportModal
+            onClose={() => {
+              setImporting(false);
+              load();
+            }}
+            onDone={async () => {
+              await refresh();
+              await load();
+            }}
+          />,
+          document.body
+        )}
 
       {/* Première liaison : on enregistre une DEMANDE (traitée par le worker). */}
       {connectOpen && !connected && !req && (
@@ -1661,55 +1572,49 @@ function PsnCard() {
           <div className="import-manual">
             <input
               type="text"
-              placeholder="Ton PSN ID (identifiant en ligne)"
+              placeholder="PSN ID"
               value={psnId}
               onChange={(e) => setPsnId(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && requestSync(true)}
             />
             <button
-              className="btn-psn-primary clickable"
+              className="btn-set-primary clickable"
               onClick={() => requestSync(true)}
               disabled={busy || !psnId.trim()}
             >
-              {busy ? <Loader2 className="spin" size={16} /> : <Link2 size={16} />}
-              Envoyer la demande
+              {busy ? <Loader2 className="spin" size={15} /> : <Send size={15} />}
+              Envoyer
             </button>
           </div>
-          <p className="psn-note">
-            Ton profil PlayStation et tes trophées doivent être <strong>publics</strong>{" "}
-            (réglages PSN → Confidentialité). Ta demande est traitée manuellement — tu
-            seras notifié dès que ton import est prêt.
-          </p>
+          <p className="psn-note">Profil et trophées publics requis.</p>
         </div>
       )}
 
       {/* Confirmation de déliaison : retirer ou garder les jeux importés. */}
       {unlinkOpen && (
         <div className="import-unlink">
-          <p>Délier ton compte PlayStation ?</p>
-          <label className="import-check">
+          <label
+            className="import-check"
+            title="Tes jeux ajoutés ou modifiés à la main sont conservés."
+          >
             <input
               type="checkbox"
               checked={removeGames}
               onChange={(e) => setRemoveGames(e.target.checked)}
             />
-            <span>
-              Retirer aussi les jeux ajoutés par l'import PSN (tes jeux existants
-              et modifiés à la main sont conservés).
-            </span>
+            <span>Retirer aussi les jeux importés</span>
           </label>
           <div className="import-unlink-actions">
             <button className="btn-ghost clickable" onClick={() => setUnlinkOpen(false)}>
               Annuler
             </button>
             <button className="btn-ghost-danger clickable" onClick={unlink} disabled={busy}>
-              {busy ? <Loader2 className="spin" size={15} /> : <Link2Off size={15} />}
+              {busy ? <Loader2 className="spin" size={14} /> : <Link2Off size={14} />}
               Délier
             </button>
           </div>
         </div>
       )}
-
     </div>
   );
 }
@@ -1948,8 +1853,6 @@ const OAUTH_CARDS = [
     label: "Google",
     logoClass: "google-logo",
     Logo: GoogleIcon,
-    btnClass: "btn-google-primary",
-    desc: "Connecte-toi en un clic avec ton compte Google. Seuls ton adresse, ton nom et ta photo sont récupérés.",
     title: (info) => info?.name || info?.email || "Compte Google",
     sub: (info) => info?.email || "",
   },
@@ -1958,8 +1861,6 @@ const OAUTH_CARDS = [
     label: "Discord",
     logoClass: "discord-logo",
     Logo: DiscordIcon,
-    btnClass: "btn-discord-primary",
-    desc: "Connecte-toi avec Discord — et le bot du site te reconnaît depuis un serveur, avec les points qui vont avec.",
     title: (info) => info?.globalName || info?.username || "Compte Discord",
     sub: (info) => (info?.username ? "@" + info.username : ""),
   },
@@ -2029,9 +1930,7 @@ function ConnectionsPanel() {
   if (!status) {
     return (
       <div className="settings-section">
-        <div className="import-card">
-          <Loader2 className="spin" size={20} /> Chargement…
-        </div>
+        <CardLoading />
       </div>
     );
   }
@@ -2042,24 +1941,17 @@ function ConnectionsPanel() {
   return (
     <div className="settings-section">
       <h2 className="settings-section-title">
-        <UserCog size={20} /> Compte & connexions
+        <UserCog size={20} /> Compte
       </h2>
-      <p className="settings-section-sub">
-        Les façons d'ouvrir ce compte. Tu peux en garder plusieurs : c'est la
-        même adresse, donc la même bibliothèque, quelle que soit celle que tu
-        utilises.
-      </p>
 
       {linked && (
         <div className="import-ok">
-          <CheckCircle2 size={15} /> Compte{" "}
-          {linked === "google" ? "Google" : "Discord"} lié. Tu peux maintenant
-          t'en servir pour te connecter.
+          <CheckCircle2 size={14} /> {linked === "google" ? "Google" : "Discord"} lié
         </div>
       )}
       {error && (
         <div className="import-error">
-          <AlertTriangle size={15} /> {error}
+          <AlertTriangle size={14} /> {error}
         </div>
       )}
 
@@ -2067,33 +1959,28 @@ function ConnectionsPanel() {
         {/* Le mot de passe est une clé comme les autres : le montrer dans la
             même liste évite qu'on croie l'avoir perdu en liant Google. */}
         <div className={"import-card " + (methods.password ? "connected" : "")}>
-          <div className="import-card-glow" />
           <div className="import-card-main">
             <div className="import-logo">
-              <KeyRound size={28} />
+              <KeyRound size={18} />
             </div>
             <div className="import-card-info">
               <div className="import-card-title">
-                Email & mot de passe
+                Mot de passe
                 {methods.password && (
                   <span className="import-badge">
-                    <CheckCircle2 size={13} /> Actif
+                    <CheckCircle2 size={12} /> Actif
                   </span>
                 )}
               </div>
-              <p className="import-card-desc">
-                <Mail size={14} /> {status.email}
-                <br />
-                {methods.password
-                  ? "Tu peux te connecter avec cette adresse et ton mot de passe."
-                  : "Ce compte n'a pas encore de mot de passe. Passe par « Mot de passe oublié » pour t'en choisir un — le lien part sur cette adresse."}
-              </p>
+              <p className="import-card-desc">{status.email}</p>
             </div>
           </div>
+          {/* Pas encore de mot de passe : on passe par « oublié », le lien
+              part sur l'adresse du compte. */}
           {!methods.password && (
             <div className="import-actions">
               <a className="btn-ghost clickable" href="/forgot-password">
-                <KeyRound size={16} /> Me choisir un mot de passe
+                Définir
               </a>
             </div>
           )}
@@ -2113,89 +2000,79 @@ function ConnectionsPanel() {
                 "import-card " + card.key + (connected ? " connected" : "")
               }
             >
-              <div className="import-card-glow" />
               <div className="import-card-main">
                 <div className={"import-logo " + card.logoClass}>
-                  <Logo size={28} />
+                  <Logo size={20} />
                 </div>
                 <div className="import-card-info">
                   <div className="import-card-title">
                     {card.label}
                     {connected && (
                       <span className="import-badge">
-                        <CheckCircle2 size={13} /> Lié
+                        <CheckCircle2 size={12} /> Lié
                       </span>
                     )}
                   </div>
                   {connected ? (
                     <div className="import-steam-user">
                       {info.avatar && <img src={info.avatar} alt="" />}
-                      <div>
-                        <strong>{card.title(info)}</strong>
-                        <span>
-                          {card.sub(info) ? card.sub(info) + " · " : ""}
-                          Lié{" "}
-                          {info.connectedAt
-                            ? new Date(info.connectedAt).toLocaleDateString("fr-FR")
-                            : ""}
-                        </span>
-                      </div>
+                      <strong>{card.title(info)}</strong>
+                      {card.sub(info) && <span>{card.sub(info)}</span>}
                     </div>
                   ) : (
-                    <p className="import-card-desc">{card.desc}</p>
+                    <p className="import-card-desc">Non lié</p>
                   )}
                 </div>
               </div>
 
+              <div className="import-actions">
+                {connected ? (
+                  <button
+                    className="btn-ghost-danger set-icon clickable"
+                    onClick={() => unlink(card.key)}
+                    disabled={busy === card.key || lastKey}
+                    title="Délier"
+                    aria-label={"Délier " + card.label}
+                  >
+                    {busy === card.key ? (
+                      <Loader2 className="spin" size={15} />
+                    ) : (
+                      <Link2Off size={15} />
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    className="btn-set-primary clickable"
+                    onClick={() => connect(card.key)}
+                    disabled={!!busy || !configured}
+                  >
+                    {busy === card.key ? (
+                      <Loader2 className="spin" size={15} />
+                    ) : (
+                      <Link2 size={15} />
+                    )}
+                    Lier
+                  </button>
+                )}
+              </div>
+
               {!configured && (
                 <div className="import-error">
-                  <AlertTriangle size={15} /> {card.label} n'est pas configuré
-                  côté serveur.
+                  <AlertTriangle size={14} /> {card.label} non configuré sur le serveur
                 </div>
               )}
 
               {lastKey && (
                 <div className="import-hint">
-                  C'est ta seule façon de te connecter. Donne-toi d'abord un mot
-                  de passe si tu veux la retirer.
+                  Seule méthode de connexion : ajoute un mot de passe pour la retirer.
                 </div>
               )}
-
-              <div className="import-actions">
-                {connected ? (
-                  <button
-                    className="btn-ghost-danger clickable"
-                    onClick={() => unlink(card.key)}
-                    disabled={busy === card.key || lastKey}
-                  >
-                    {busy === card.key ? (
-                      <Loader2 className="spin" size={16} />
-                    ) : (
-                      <Link2Off size={16} />
-                    )}
-                    Délier
-                  </button>
-                ) : (
-                  <button
-                    className={card.btnClass + " clickable"}
-                    onClick={() => connect(card.key)}
-                    disabled={!!busy || !configured}
-                  >
-                    {busy === card.key ? (
-                      <Loader2 className="spin" size={17} />
-                    ) : (
-                      <Link2 size={17} />
-                    )}
-                    Lier mon compte {card.label}
-                  </button>
-                )}
-              </div>
             </div>
           );
         })}
-      </div>
 
-      <ReplayIntroCard />
+        <ReplayIntroCard />
+      </div>
     </div>
   );
 }
@@ -2218,18 +2095,12 @@ function ReplayIntroCard() {
 
   return (
     <div className="import-card">
-      <div className="import-card-glow" />
       <div className="import-card-main">
         <div className="import-logo">
-          <Sparkles size={28} />
+          <Sparkles size={18} />
         </div>
         <div className="import-card-info">
-          <h3>Revoir l'intro</h3>
-          <p className="import-card-desc">
-            Le petit tour du propriétaire de l'inscription : la photo de profil,
-            les jeux à cocher, les imports et les trois gestes à connaître. Rien
-            n'est effacé au passage.
-          </p>
+          <div className="import-card-title">Revoir l'intro</div>
         </div>
       </div>
       <div className="import-actions">
@@ -2237,8 +2108,7 @@ function ReplayIntroCard() {
           className="btn-ghost clickable"
           onClick={() => navigate("/onboarding?replay=1")}
         >
-          <Sparkles size={16} />
-          Refaire le tour
+          Lancer
         </button>
       </div>
     </div>
@@ -2259,10 +2129,6 @@ function DiscordPanel() {
       <h2 className="settings-section-title">
         <Bot size={20} /> Discord & bot
       </h2>
-      <p className="settings-section-sub">
-        Relie ton compte Discord à MyPlayLog, et discute avec le bot du site.
-        Prévenu : il n'est pas gentil.
-      </p>
       <div className="import-cards">
         <DiscordCard />
         <BotCard />
@@ -2346,99 +2212,81 @@ function DiscordCard() {
     }
   }
 
-  if (!status) {
-    return (
-      <div className="import-card">
-        <Loader2 className="spin" size={20} /> Chargement…
-      </div>
-    );
-  }
+  if (!status) return <CardLoading />;
 
   const { connected, discord } = status;
 
   return (
     <div className={`import-card discord ${connected ? "connected" : ""}`}>
-      <div className="import-card-glow" />
       <div className="import-card-main">
         <div className="import-logo discord-logo">
-          <DiscordIcon size={30} />
+          <DiscordIcon size={20} />
         </div>
         <div className="import-card-info">
           <div className="import-card-title">
             Discord
             {connected && (
               <span className="import-badge">
-                <CheckCircle2 size={13} /> Lié
+                <CheckCircle2 size={12} /> Lié
               </span>
             )}
           </div>
           {connected && discord ? (
             <div className="import-steam-user">
               {discord.avatar && <img src={discord.avatar} alt="" />}
-              <div>
-                <strong>{discord.globalName || discord.username || "Compte Discord"}</strong>
-                <span>
-                  {discord.username ? `@${discord.username} · ` : ""}
-                  Lié{" "}
-                  {discord.connectedAt
-                    ? new Date(discord.connectedAt).toLocaleDateString("fr-FR")
-                    : ""}
-                </span>
-              </div>
+              <strong>{discord.globalName || discord.username || "Compte Discord"}</strong>
+              {discord.username && <span>@{discord.username}</span>}
             </div>
           ) : (
-            <p className="import-card-desc">
-              Relie ton Discord pour que le bot te reconnaisse depuis un serveur :
-              les points gagnés aux mini-jeux Discord tomberont sur ce compte-ci.
-              Seuls ton pseudo et ton avatar sont récupérés.
-            </p>
+            <p className="import-card-desc">Points des mini-jeux Discord</p>
           )}
         </div>
       </div>
 
+      <div className="import-actions">
+        {connected ? (
+          <button
+            className="btn-ghost-danger set-icon clickable"
+            onClick={() => setUnlinkOpen(true)}
+            disabled={busy}
+            title="Délier"
+            aria-label="Délier Discord"
+          >
+            <Link2Off size={15} />
+          </button>
+        ) : (
+          <button
+            className="btn-set-primary clickable"
+            onClick={connect}
+            disabled={busy || !status.configured}
+          >
+            {busy ? <Loader2 className="spin" size={15} /> : <Link2 size={15} />}
+            Lier
+          </button>
+        )}
+      </div>
+
       {error && (
         <div className="import-error">
-          <AlertTriangle size={15} /> {error}
+          <AlertTriangle size={14} /> {error}
         </div>
       )}
 
       {!status.configured && (
         <div className="import-error">
-          <AlertTriangle size={15} /> Discord n'est pas configuré côté serveur
-          (DISCORD_CLIENT_ID / DISCORD_CLIENT_SECRET).
+          <AlertTriangle size={14} /> Discord non configuré sur le serveur
         </div>
       )}
 
-      <div className="import-actions">
-        {connected ? (
-          <button
-            className="btn-ghost-danger clickable"
-            onClick={() => setUnlinkOpen(true)}
-            disabled={busy}
-          >
-            <Link2Off size={16} /> Délier
-          </button>
-        ) : (
-          <button
-            className="btn-discord-primary clickable"
-            onClick={connect}
-            disabled={busy || !status.configured}
-          >
-            {busy ? <Loader2 className="spin" size={17} /> : <Link2 size={17} />}
-            Lier mon compte Discord
-          </button>
-        )}
-      </div>
-
       {unlinkOpen && (
         <div className="import-unlink">
-          <p>Délier ton compte Discord ?</p>
+          <p>Délier Discord ?</p>
           <div className="import-unlink-actions">
             <button className="btn-ghost clickable" onClick={() => setUnlinkOpen(false)}>
               Annuler
             </button>
             <button className="btn-ghost-danger clickable" onClick={unlink} disabled={busy}>
-              {busy ? <Loader2 className="spin" size={15} /> : <Link2Off size={15} />}
+              {busy ? <Loader2 className="spin" size={14} /> : <Link2Off size={14} />}
               Délier
             </button>
           </div>
@@ -2459,9 +2307,6 @@ function BotCard() {
   const { token } = useAuth();
   const navigate = useNavigate();
   const [info, setInfo] = useState(null); // { exists, allowed, bot }
-  // L'état du bot côté Discord : allumé ou non, et le lien d'ajout (fabriqué
-  // par le serveur, cf. lib/discordBot.js).
-  const [dc, setDc] = useState(null); // { configured, online, guilds, invite }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -2469,9 +2314,6 @@ function BotCard() {
     apiFetch("/chat/bot", { token })
       .then(setInfo)
       .catch(() => setInfo({ exists: false, allowed: false, bot: null }));
-    apiFetch("/discord/bot", { token })
-      .then(setDc)
-      .catch(() => setDc({ configured: false, online: false, invite: null }));
   }, [token]);
 
   // Ouvre (ou retrouve) le fil avec le bot, puis va dessus : la messagerie sait
@@ -2493,80 +2335,44 @@ function BotCard() {
     }
   }
 
-  if (!info) {
-    return (
-      <div className="import-card">
-        <Loader2 className="spin" size={20} /> Chargement…
-      </div>
-    );
-  }
+  if (!info) return <CardLoading />;
 
   return (
     <div className={`import-card bot ${info.allowed ? "connected" : ""}`}>
-      <div className="import-card-glow" />
       <div className="import-card-main">
         <div className="import-logo bot-logo">
-          {info.bot?.avatar ? <img src={info.bot.avatar} alt="" /> : <Bot size={30} />}
+          {info.bot?.avatar ? <img src={info.bot.avatar} alt="" /> : <Bot size={20} />}
         </div>
         <div className="import-card-info">
           <div className="import-card-title">
             {info.bot?.username || "Le bot"}
             {info.allowed && (
               <span className="import-badge">
-                <CheckCircle2 size={13} /> Accès ouvert
+                <CheckCircle2 size={12} /> Accès ouvert
               </span>
             )}
           </div>
-          <p className="import-card-desc">
-            {!info.exists
-              ? "Le bot n'est pas encore installé sur ce serveur."
-              : info.allowed
-                ? "Ajoute-le à ton serveur Discord : il répond quand on le mentionne ou qu'on répond à un de ses messages. Il répond mal, c'est prévu."
-                : "L'accès au bot se donne compte par compte, par un administrateur. Demande-lui si tu veux te faire insulter."}
-          </p>
-          {/* Combien de serveurs l'ont déjà : la seule façon de savoir, depuis
-              le site, que l'ajout a bien marché. */}
-          {info.allowed && dc?.online && (
-            <p className="import-card-desc bot-guilds">
-              En ligne sur {dc.guilds} serveur{dc.guilds > 1 ? "s" : ""} Discord.
+          {!info.allowed && (
+            <p className="import-card-desc">
+              {info.exists ? "Accès sur demande à un admin" : "Indisponible"}
             </p>
           )}
         </div>
       </div>
 
-      {error && (
-        <div className="import-error">
-          <AlertTriangle size={15} /> {error}
-        </div>
-      )}
-
-      {info.exists && info.allowed && !dc?.configured && (
-        <div className="import-error">
-          <AlertTriangle size={15} /> Le bot Discord n'est pas démarré côté serveur
-          (DISCORD_BOT_TOKEN). Il ne répond que sur le site pour l'instant.
-        </div>
-      )}
-
+      {/* Le fil sur le site : c'est là que le bot vit d'abord. */}
       {info.exists && info.allowed && (
         <div className="import-actions">
-          {/* L'action principale : l'emmener sur un serveur. Le lien ouvre la
-              page d'autorisation de Discord, qui demande sur quel serveur
-              l'installer — on ne peut pas le faire à sa place. */}
-          <a
-            className={`btn-discord-primary clickable ${dc?.invite ? "" : "disabled"}`}
-            href={dc?.invite || "#"}
-            target="_blank"
-            rel="noreferrer"
-            onClick={(e) => !dc?.invite && e.preventDefault()}
-          >
-            <DiscordIcon size={17} /> Ajouter le bot à un serveur
-          </a>
-          {/* Le fil sur le site reste accessible : c'est là qu'il vit d'abord,
-              et sans ce lien il n'y aurait plus aucun moyen de l'ouvrir. */}
-          <button className="btn-ghost-link clickable" onClick={talk} disabled={busy}>
+          <button className="btn-set-primary clickable" onClick={talk} disabled={busy}>
             {busy ? <Loader2 className="spin" size={15} /> : <MessageCircle size={15} />}
-            ou lui écrire ici
+            Écrire
           </button>
+        </div>
+      )}
+
+      {error && (
+        <div className="import-error">
+          <AlertTriangle size={14} /> {error}
         </div>
       )}
     </div>

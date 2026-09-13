@@ -1,20 +1,84 @@
 /* ======================================================================
-   MyPlayLog — Design system (v2)
-   Épuré, moderne, nostalgique-sexy. Inspiré TV Time.
-   Light : blanc + grille "bloc-note" discrète.
-   Dark  : sombre profond + grille discrète, accents orange/ambre.
+   MyPlayLog — Design system (v3)
+   Sobre et vivant, esprit console (Xbox, Nintendo) : l'accent doré reste
+   l'identité, tout le reste s'efface derrière les jaquettes.
+   Light : gris très clair, surfaces blanches.
+   Dark  : presque noir, qui s'éclaircit à peine vers le bas, et un motif de
+           minuscules symboles en relief, à peine visibles (façon DualSense).
    ====================================================================== */
 
+/* Space Grotesk et Inter restent chargées : elles se choisissent encore dans
+   Paramètres → Apparence, et quelques rendus canvas (exports, jaquettes) les
+   dessinent. Une police déclarée mais pas utilisée ne se télécharge pas. */
 @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Fredoka:wght@500;600&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap");
+
+/* ⚠️ LA POLICE D'XBOX, C'EST SEGOE UI — ET ELLE N'EST PAS LIBRE. On la demande
+   d'abord au système (tout Windows l'a, Windows 11 dans sa version « Variable »,
+   celle de la console), puis on retombe sur Selawik : la jumelle open source
+   que Microsoft publie exprès, aux mêmes proportions. Un Mac ou un Android voit
+   donc presque la même page, sans que l'on serve la police propriétaire. */
+@font-face {
+  font-family: "Selawik";
+  src: url("/fonts/selawksl.woff2") format("woff2");
+  font-weight: 350;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Selawik";
+  src: url("/fonts/selawk.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Selawik";
+  src: url("/fonts/selawksb.woff2") format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Selawik";
+  src: url("/fonts/selawkb.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
 
 :root {
   /* Accent doré (esprit TV Time).
      --orange garde son nom (alias historique) mais vaut désormais un doré vif. */
   --orange: #f2b70b;
-  --amber: #ffd24a;
-  --accent-grad: linear-gradient(100deg, #eaa908 0%, #ffcf3a 100%);
-  --accent-ink: #97680a; /* doré profond : lisible en TEXTE sur fond clair */
-  --brand-grad: linear-gradient(100deg, #b07d08 0%, #d29e06 100%);
+  --amber: #ffc933; /* le même doré, un cran plus clair : le survol d'un bouton plein */
+  /* ⚠️ DEUX RÔLES QUE LE DORÉ TENAIT SEUL, ET QUI DIVERGENT EN CLAIR.
+     Sur du noir, un jaune vif est à la fois une bonne encre et un bon lavis.
+     Sur du blanc, ni l'un ni l'autre : le texte doré perd sa lisibilité et le
+     lavis doré donne ce doré-sur-doré qui fait « tout est surligné ».
+     --accent-ink  : le doré QUAND IL ÉCRIT (texte, icônes, chiffres).
+     --tint        : le doré QUAND IL TEINTE (fonds de puces, survols, halos).
+     En sombre les deux valent le doré : le thème sombre ne bouge pas d'un
+     pixel.
+     ⚠️ EN CLAIR, L'ENCRE EST NOIRE — PAS UN DORÉ ASSOMBRI. Un jaune qu'on
+     descend jusqu'à être lisible sur blanc n'est plus un jaune, c'est du brun :
+     on perd l'identité ET on gagne une couleur sale. C'est d'ailleurs ce que
+     fait TV Time en clair — l'encre est noire, et le doré passe du côté des
+     APLATS : le trait de l'onglet actif, la pastille pleine, le bouton, les
+     bordures. Il reste donc autant de doré sur la page, mais en signes, jamais
+     en texte.
+     --accent-mark : le doré QUAND IL DESSINE (icônes, pictos, glyphes). C'est
+     la nuance qui manquait : UNE ICÔNE N'EST PAS DU TEXTE. Noire dans une
+     tuile grise elle est juste triste, alors que le doré n'y pose plus aucun
+     problème — c'est le doré SUR DORÉ qui était laid, pas le doré. Le vrai
+     jaune du site, donc, dans les deux thèmes. */
+  --accent-mark: #f2b70b;
+  --tint: #3a3a42;
+  /* ⚠️ LE DORÉ EST UN APLAT, PARTOUT. Les « dégradés » gardent leur nom (des
+     centaines de règles s'en servent comme fond, et `.grad-text` a besoin
+     d'une image pour son découpage), mais ne dégradent plus rien : le jaune
+     foncé d'un bout de bouton et le jaune pâle de l'autre, ce n'était pas
+     notre jaune. */
+  --accent-grad: linear-gradient(#f2b70b, #f2b70b);
+  --accent-ink: #161618;
+  --brand-grad: linear-gradient(#f2b70b, #f2b70b);
+  /* Le rouge-rose des « j'aime » et des coups de cœur. */
+  --like: #ff5470;
 
   /* THEME CLAIR */
   /* On DÉCLARE le thème au navigateur, on ne fait pas que le peindre. Tout ce
@@ -34,20 +98,29 @@
      les blocs se détachent tout seuls et il n'y a plus rien à souligner.
      (C'est la recette du thème clair de TV Time, et c'est déjà l'intention de
      la barre latérale, sombre même en clair.) */
-  --bg: #f5f6f8;
-  --grid-line: rgba(20, 20, 40, 0.045);
+  --bg: #f2f2f3;
+  --grid-line: rgba(20, 20, 24, 0.045);
   --surface: #ffffff;
-  --surface-2: #eef0f4;
-  --border: #e4e6ec;
-  --border-strong: #d6d9e2;
-  --text: #14151a;
-  --text-soft: #6b6c76;
-  --shadow-sm: 0 1px 2px rgba(20, 20, 40, 0.06);
-  --shadow: 0 10px 30px rgba(20, 20, 40, 0.09);
+  --surface-2: #ebebed;
+  --border: #e2e2e5;
+  --border-strong: #d3d3d8;
+  --text: #161618;
+  --text-soft: #66666d;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow: 0 10px 28px rgba(0, 0, 0, 0.1);
   --ring: rgba(242, 183, 11, 0.32);
 
-  --font-display: "Space Grotesk", system-ui, sans-serif;
-  --font-body: "Inter", system-ui, sans-serif;
+  /* La barre latérale reste sombre en clair : c'est elle qui porte le logo
+     doré. Comme en sombre, elle est légèrement dégradée. */
+  --side-glass: #23252b;
+  --side-solid: #23252b;
+  --side-fill: linear-gradient(180deg, #282a31 0%, #1e2025 100%);
+
+  /* ⚠️ SEGOE UI D'ABORD, SELAWIK ENSUITE (cf. les @font-face plus haut). La
+     déclinaison « Display » est dessinée pour les grandes tailles, « Text »
+     pour la lecture : Windows 11 a les deux, les autres prennent Selawik. */
+  --font-display: "Segoe UI Variable Display", "Segoe UI", "Selawik", system-ui, sans-serif;
+  --font-body: "Segoe UI Variable Text", "Segoe UI", "Selawik", system-ui, sans-serif;
   --font-fun: "Fredoka", system-ui, sans-serif;
   /* Didone à fort contraste, réservée aux OBJETS de la collection (jaquettes
      peintes au canvas, cartouche de la vitrine) : c'est elle qui fait lire un
@@ -61,16 +134,18 @@
      puisse les remplacer (motif à carreaux → dégradé, cœurs, étoiles…). Le motif
      par défaut référence --grid-line, donc il suit le thème clair/sombre tout
      seul. CosmeticsContext surcharge ces variables en inline sur <html>. */
-  /* ⚠️ NI GRILLE NI HALO EN CLAIR. Le quadrillage « bloc-note » et la lueur
-     dorée en haut de page étaient la signature du thème clair : deux effets
-     qui salissent un fond que l'on veut propre, et qui donnent à toutes les
-     pages le même voile jaune. Le clair est désormais plat — la couleur vient
-     du contenu, des jaquettes et des boutons, pas du papier. Les deux restent
-     en sombre, où ils donnent de la profondeur au lieu d'en enlever (voir plus
-     bas), et un thème gagné à l'arcade peut toujours les remplacer. */
+  /* ⚠️ UN MOTIF QU'ON DEVINE, PAS UN MOTIF QU'ON VOIT. Comme la coque d'une
+     DualSense : de minuscules triangles, ronds, croix, carrés, flèches et
+     croix directionnelles, embossés, à la limite du visible. Le quadrillage
+     d'origine se lisait comme une feuille de tableur ; ceux-là donnent une
+     matière au fond sans rien dessiner dessus.
+     Il n'affleure qu'en HAUT et en BAS de l'écran, en fondu (`--app-motif`,
+     cf. body::after) : il ne défile pas, comme une texture, et s'efface sous
+     un thème de l'arcade. Doré en sombre, encre grise en clair. */
   --app-bg-image: none;
   --app-bg-size: 28px 28px;
   --app-halo: none;
+  --app-motif: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'182'%20height%3D'182'%20fill%3D'none'%20stroke%3D'rgba(18%2C18%2C22%2C0.11)'%20stroke-width%3D'1.1'%20stroke-linecap%3D'round'%20stroke-linejoin%3D'round'%3E%3Cg%20transform%3D'translate(11.7%2013.6)%20rotate(13)'%3E%3Crect%20x%3D'-3.8'%20y%3D'-3.8'%20width%3D'7.5'%20height%3D'7.5'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(35.5%208.9)%20rotate(204)'%3E%3Cpath%20d%3D'M-3.8%20-3.8L3.8%203.8M3.8%20-3.8L-3.8%203.8'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(65.3%209.7)%20rotate(335)'%3E%3Cpath%20d%3D'M0%20-4.1V4.1M-4.1%200H4.1'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(94.8%2013.0)%20rotate(51)'%3E%3Cpath%20d%3D'M-2.2%20-3.6L2.2%200L-2.2%203.6'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(118.5%2014.6)%20rotate(183)'%3E%3Ccircle%20r%3D'4.2'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(139.0%208.5)%20rotate(96)'%3E%3Cpath%20d%3D'M0%20-3.6V3.6M-3.6%200H3.6'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(170.5%2013.1)%20rotate(38)'%3E%3Cpath%20d%3D'M-3.4%20-3.4L3.4%203.4M3.4%20-3.4L-3.4%203.4'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(15.1%2036.4)%20rotate(95)'%3E%3Ccircle%20r%3D'4.2'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(42.4%2039.0)%20rotate(325)'%3E%3Cpath%20d%3D'M0%20-3.7V3.7M-3.7%200H3.7'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(63.1%2040.6)%20rotate(351)'%3E%3Cpath%20d%3D'M0%20-3.8V3.8M-3.8%200H3.8'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(87.0%2042.9)%20rotate(132)'%3E%3Crect%20x%3D'-4.4'%20y%3D'-4.4'%20width%3D'8.8'%20height%3D'8.8'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(120.0%2037.4)%20rotate(357)'%3E%3Cpath%20d%3D'M0%20-4.3V4.3M-4.3%200H4.3'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(145.8%2039.1)%20rotate(58)'%3E%3Cpath%20d%3D'M-4.3%20-4.3L4.3%204.3M4.3%20-4.3L-4.3%204.3'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(172.3%2034.2)%20rotate(293)'%3E%3Cpath%20d%3D'M-3.9%20-3.9L3.9%203.9M3.9%20-3.9L-3.9%203.9'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(14.0%2066.2)%20rotate(346)'%3E%3Cpath%20d%3D'M0%20-4.0V4.0M-4.0%200H4.0'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(36.9%2069.6)%20rotate(77)'%3E%3Cpath%20d%3D'M-2.7%20-4.5L2.7%200L-2.7%204.5'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(70.0%2065.3)%20rotate(111)'%3E%3Cpath%20d%3D'M0%20-4.2V4.2M-4.2%200H4.2'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(87.6%2069.0)%20rotate(26)'%3E%3Ccircle%20r%3D'3.5'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(113.4%2060.7)%20rotate(74)'%3E%3Cpath%20d%3D'M0%20-3.2L3.5%203.2L-3.5%203.2Z'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(147.3%2064.6)%20rotate(229)'%3E%3Cpath%20d%3D'M0%20-4.1V4.1M-4.1%200H4.1'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(171.9%2069.7)%20rotate(152)'%3E%3Cpath%20d%3D'M0%20-4.2V4.2M-4.2%200H4.2'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(9.3%2092.9)%20rotate(276)'%3E%3Cpath%20d%3D'M0%20-3.8V3.8M-3.8%200H3.8'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(40.0%2090.0)%20rotate(111)'%3E%3Cpath%20d%3D'M0%20-4.1V4.1M-4.1%200H4.1'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(67.3%2095.1)%20rotate(152)'%3E%3Cpath%20d%3D'M-3.7%20-3.7L3.7%203.7M3.7%20-3.7L-3.7%203.7'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(94.9%2086.8)%20rotate(335)'%3E%3Crect%20x%3D'-4.0'%20y%3D'-4.0'%20width%3D'7.9'%20height%3D'7.9'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(116.9%2087.2)%20rotate(95)'%3E%3Crect%20x%3D'-3.9'%20y%3D'-3.9'%20width%3D'7.7'%20height%3D'7.7'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(144.4%2093.5)%20rotate(253)'%3E%3Cpath%20d%3D'M0%20-3.5V3.5M-3.5%200H3.5'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(170.4%2094.3)%20rotate(4)'%3E%3Cpath%20d%3D'M-2.6%20-4.4L2.6%200L-2.6%204.4'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(16.8%20115.1)%20rotate(255)'%3E%3Cpath%20d%3D'M0%20-4.3V4.3M-4.3%200H4.3'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(43.2%20115.8)%20rotate(42)'%3E%3Ccircle%20r%3D'4.1'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(69.8%20112.7)%20rotate(8)'%3E%3Ccircle%20r%3D'4.4'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(94.5%20114.1)%20rotate(177)'%3E%3Cpath%20d%3D'M0%20-3.9L4.4%203.9L-4.4%203.9Z'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(112.0%20115.1)%20rotate(245)'%3E%3Cpath%20d%3D'M-3.3%20-3.3L3.3%203.3M3.3%20-3.3L-3.3%203.3'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(140.6%20118.9)%20rotate(169)'%3E%3Cpath%20d%3D'M-2.0%20-3.4L2.0%200L-2.0%203.4'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(166.0%20117.3)%20rotate(359)'%3E%3Cpath%20d%3D'M0%20-3.6V3.6M-3.6%200H3.6'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(12.7%20142.9)%20rotate(330)'%3E%3Cpath%20d%3D'M-4.2%20-4.2L4.2%204.2M4.2%20-4.2L-4.2%204.2'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(36.6%20143.0)%20rotate(314)'%3E%3Cpath%20d%3D'M0%20-3.6L4.1%203.6L-4.1%203.6Z'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(67.8%20142.0)%20rotate(258)'%3E%3Crect%20x%3D'-4.3'%20y%3D'-4.3'%20width%3D'8.6'%20height%3D'8.6'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(91.2%20139.0)%20rotate(329)'%3E%3Cpath%20d%3D'M-4.4%20-4.4L4.4%204.4M4.4%20-4.4L-4.4%204.4'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(121.9%20142.3)%20rotate(157)'%3E%3Cpath%20d%3D'M0%20-3.9V3.9M-3.9%200H3.9'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(145.7%20138.5)%20rotate(45)'%3E%3Cpath%20d%3D'M0%20-3.3V3.3M-3.3%200H3.3'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(173.5%20139.7)%20rotate(98)'%3E%3Cpath%20d%3D'M-2.3%20-3.8L2.3%200L-2.3%203.8'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(10.6%20171.0)%20rotate(133)'%3E%3Cpath%20d%3D'M0%20-3.3V3.3M-3.3%200H3.3'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(41.3%20170.9)%20rotate(66)'%3E%3Cpath%20d%3D'M0%20-3.2L3.5%203.2L-3.5%203.2Z'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(67.3%20170.0)%20rotate(329)'%3E%3Ccircle%20r%3D'3.3'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(87.8%20173.3)%20rotate(212)'%3E%3Cpath%20d%3D'M0%20-4.5V4.5M-4.5%200H4.5'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(121.7%20164.8)%20rotate(189)'%3E%3Cpath%20d%3D'M0%20-3.0L3.3%203.0L-3.3%203.0Z'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(146.6%20171.9)%20rotate(85)'%3E%3Cpath%20d%3D'M0%20-4.0L4.5%204.0L-4.5%204.0Z'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(171.1%20166.5)%20rotate(356)'%3E%3Cpath%20d%3D'M-4.3%20-4.3L4.3%204.3M4.3%20-4.3L-4.3%204.3'%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E");
 
   /* Curseur : valeurs PAR DÉFAUT, surchargées sur <html> par CosmeticsContext
      quand un thème gagné à l'arcade est équipé (un rôle par variable).
@@ -88,31 +163,41 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  /* La grille et le halo vivent ICI maintenant : sur fond sombre, ils creusent
-     la page au lieu de la salir. */
-  --app-bg-image: linear-gradient(var(--grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-  --app-halo: radial-gradient(
-    900px 420px at 70% -15%,
-    rgba(242, 183, 11, 0.12),
-    transparent 65%
-  );
+  /* ⚠️ PRESQUE NOIR, QUI S'ÉCLAIRCIT À PEINE. Le gris faisait terne, le noir
+     plat manquait de matière : un noir profond en haut, un cran plus clair
+     en bas de l'écran, où affleure le motif de symboles doré, comme en haut
+     (cf. plus haut).
+     `--bg` vaut le noir du haut : c'est là que vivent les barres collées
+     (topbar, en-têtes) qui se peignent avec lui. */
+  --app-bg-image: none;
+  --app-halo: linear-gradient(180deg, #111114 0%, #151519 50%, #1b1b20 100%);
+  --app-motif: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'182'%20height%3D'182'%20fill%3D'none'%20stroke%3D'rgba(242%2C183%2C11%2C0.14)'%20stroke-width%3D'1.1'%20stroke-linecap%3D'round'%20stroke-linejoin%3D'round'%3E%3Cg%20transform%3D'translate(11.7%2013.6)%20rotate(13)'%3E%3Crect%20x%3D'-3.8'%20y%3D'-3.8'%20width%3D'7.5'%20height%3D'7.5'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(35.5%208.9)%20rotate(204)'%3E%3Cpath%20d%3D'M-3.8%20-3.8L3.8%203.8M3.8%20-3.8L-3.8%203.8'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(65.3%209.7)%20rotate(335)'%3E%3Cpath%20d%3D'M0%20-4.1V4.1M-4.1%200H4.1'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(94.8%2013.0)%20rotate(51)'%3E%3Cpath%20d%3D'M-2.2%20-3.6L2.2%200L-2.2%203.6'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(118.5%2014.6)%20rotate(183)'%3E%3Ccircle%20r%3D'4.2'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(139.0%208.5)%20rotate(96)'%3E%3Cpath%20d%3D'M0%20-3.6V3.6M-3.6%200H3.6'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(170.5%2013.1)%20rotate(38)'%3E%3Cpath%20d%3D'M-3.4%20-3.4L3.4%203.4M3.4%20-3.4L-3.4%203.4'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(15.1%2036.4)%20rotate(95)'%3E%3Ccircle%20r%3D'4.2'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(42.4%2039.0)%20rotate(325)'%3E%3Cpath%20d%3D'M0%20-3.7V3.7M-3.7%200H3.7'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(63.1%2040.6)%20rotate(351)'%3E%3Cpath%20d%3D'M0%20-3.8V3.8M-3.8%200H3.8'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(87.0%2042.9)%20rotate(132)'%3E%3Crect%20x%3D'-4.4'%20y%3D'-4.4'%20width%3D'8.8'%20height%3D'8.8'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(120.0%2037.4)%20rotate(357)'%3E%3Cpath%20d%3D'M0%20-4.3V4.3M-4.3%200H4.3'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(145.8%2039.1)%20rotate(58)'%3E%3Cpath%20d%3D'M-4.3%20-4.3L4.3%204.3M4.3%20-4.3L-4.3%204.3'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(172.3%2034.2)%20rotate(293)'%3E%3Cpath%20d%3D'M-3.9%20-3.9L3.9%203.9M3.9%20-3.9L-3.9%203.9'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(14.0%2066.2)%20rotate(346)'%3E%3Cpath%20d%3D'M0%20-4.0V4.0M-4.0%200H4.0'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(36.9%2069.6)%20rotate(77)'%3E%3Cpath%20d%3D'M-2.7%20-4.5L2.7%200L-2.7%204.5'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(70.0%2065.3)%20rotate(111)'%3E%3Cpath%20d%3D'M0%20-4.2V4.2M-4.2%200H4.2'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(87.6%2069.0)%20rotate(26)'%3E%3Ccircle%20r%3D'3.5'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(113.4%2060.7)%20rotate(74)'%3E%3Cpath%20d%3D'M0%20-3.2L3.5%203.2L-3.5%203.2Z'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(147.3%2064.6)%20rotate(229)'%3E%3Cpath%20d%3D'M0%20-4.1V4.1M-4.1%200H4.1'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(171.9%2069.7)%20rotate(152)'%3E%3Cpath%20d%3D'M0%20-4.2V4.2M-4.2%200H4.2'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(9.3%2092.9)%20rotate(276)'%3E%3Cpath%20d%3D'M0%20-3.8V3.8M-3.8%200H3.8'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(40.0%2090.0)%20rotate(111)'%3E%3Cpath%20d%3D'M0%20-4.1V4.1M-4.1%200H4.1'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(67.3%2095.1)%20rotate(152)'%3E%3Cpath%20d%3D'M-3.7%20-3.7L3.7%203.7M3.7%20-3.7L-3.7%203.7'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(94.9%2086.8)%20rotate(335)'%3E%3Crect%20x%3D'-4.0'%20y%3D'-4.0'%20width%3D'7.9'%20height%3D'7.9'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(116.9%2087.2)%20rotate(95)'%3E%3Crect%20x%3D'-3.9'%20y%3D'-3.9'%20width%3D'7.7'%20height%3D'7.7'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(144.4%2093.5)%20rotate(253)'%3E%3Cpath%20d%3D'M0%20-3.5V3.5M-3.5%200H3.5'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(170.4%2094.3)%20rotate(4)'%3E%3Cpath%20d%3D'M-2.6%20-4.4L2.6%200L-2.6%204.4'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(16.8%20115.1)%20rotate(255)'%3E%3Cpath%20d%3D'M0%20-4.3V4.3M-4.3%200H4.3'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(43.2%20115.8)%20rotate(42)'%3E%3Ccircle%20r%3D'4.1'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(69.8%20112.7)%20rotate(8)'%3E%3Ccircle%20r%3D'4.4'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(94.5%20114.1)%20rotate(177)'%3E%3Cpath%20d%3D'M0%20-3.9L4.4%203.9L-4.4%203.9Z'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(112.0%20115.1)%20rotate(245)'%3E%3Cpath%20d%3D'M-3.3%20-3.3L3.3%203.3M3.3%20-3.3L-3.3%203.3'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(140.6%20118.9)%20rotate(169)'%3E%3Cpath%20d%3D'M-2.0%20-3.4L2.0%200L-2.0%203.4'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(166.0%20117.3)%20rotate(359)'%3E%3Cpath%20d%3D'M0%20-3.6V3.6M-3.6%200H3.6'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(12.7%20142.9)%20rotate(330)'%3E%3Cpath%20d%3D'M-4.2%20-4.2L4.2%204.2M4.2%20-4.2L-4.2%204.2'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(36.6%20143.0)%20rotate(314)'%3E%3Cpath%20d%3D'M0%20-3.6L4.1%203.6L-4.1%203.6Z'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(67.8%20142.0)%20rotate(258)'%3E%3Crect%20x%3D'-4.3'%20y%3D'-4.3'%20width%3D'8.6'%20height%3D'8.6'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(91.2%20139.0)%20rotate(329)'%3E%3Cpath%20d%3D'M-4.4%20-4.4L4.4%204.4M4.4%20-4.4L-4.4%204.4'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(121.9%20142.3)%20rotate(157)'%3E%3Cpath%20d%3D'M0%20-3.9V3.9M-3.9%200H3.9'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(145.7%20138.5)%20rotate(45)'%3E%3Cpath%20d%3D'M0%20-3.3V3.3M-3.3%200H3.3'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(173.5%20139.7)%20rotate(98)'%3E%3Cpath%20d%3D'M-2.3%20-3.8L2.3%200L-2.3%203.8'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(10.6%20171.0)%20rotate(133)'%3E%3Cpath%20d%3D'M0%20-3.3V3.3M-3.3%200H3.3'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(41.3%20170.9)%20rotate(66)'%3E%3Cpath%20d%3D'M0%20-3.2L3.5%203.2L-3.5%203.2Z'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(67.3%20170.0)%20rotate(329)'%3E%3Ccircle%20r%3D'3.3'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(87.8%20173.3)%20rotate(212)'%3E%3Cpath%20d%3D'M0%20-4.5V4.5M-4.5%200H4.5'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(121.7%20164.8)%20rotate(189)'%3E%3Cpath%20d%3D'M0%20-3.0L3.3%203.0L-3.3%203.0Z'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(146.6%20171.9)%20rotate(85)'%3E%3Cpath%20d%3D'M0%20-4.0L4.5%204.0L-4.5%204.0Z'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(171.1%20166.5)%20rotate(356)'%3E%3Cpath%20d%3D'M-4.3%20-4.3L4.3%204.3M4.3%20-4.3L-4.3%204.3'%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E");
 
-  /* Sur fond sombre, le doré vif ressort : l'encre d'accent redevient vive */
-  --accent-ink: #ffd24a;
-  --brand-grad: linear-gradient(100deg, #f0b012 0%, #ffd23f 100%);
+  /* Sur du noir, le doré est bon partout : les trois rôles se rejoignent. */
+  --accent-ink: #f2b70b;
+  --accent-mark: #f2b70b;
+  --tint: #f2b70b;
 
-  --bg: #0c0d11;
+  /* Un cran plus clair qu'avant : le noir précédent avalait les surfaces. */
+  --bg: #111114;
   --grid-line: rgba(255, 255, 255, 0.035);
-  --surface: #14161c;
-  --surface-2: #1b1e26;
-  --border: #23262f;
-  --border-strong: #2d313c;
-  --text: #f2f3f6;
-  --text-soft: #9a9dab;
+  --surface: #1b1b1f;
+  --surface-2: #232328;
+  --border: #2c2c32;
+  --border-strong: #3a3a41;
+  --text: #f2f2f3;
+  --text-soft: #9d9da5;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
-  --ring: rgba(255, 210, 74, 0.4);
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  --ring: rgba(242, 183, 11, 0.4);
+
+  /* ⚠️ LA BARRE EST PLUS CLAIRE QUE LA PAGE, PAS PLUS SOMBRE. Sous le noir de
+     la page, elle disparaissait ; au-dessus, elle redevient un meuble posé à
+     côté du contenu — avec son propre dégradé, du plus clair en haut (là où
+     vit le logo) au plus sombre en bas. */
+  --side-glass: #212228;
+  --side-solid: #212228;
+  --side-fill: linear-gradient(180deg, #282a31 0%, #1d1e23 100%);
 }
 
 * {
@@ -147,6 +232,41 @@ body::before {
   pointer-events: none;
 }
 
+/* ⚠️ LE MOTIF VIT AUX DEUX BOUTS DE L'ÉCRAN, ET S'Y FOND. Sur toute la hauteur
+   il finissait par se lire derrière le texte ; en haut et en bas, il affleure
+   puis disparaît en fondu, et le milieu de la page — là où on lit — reste
+   vierge. Un seul masque le dit : plein aux bords, transparent au centre. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--app-motif, none);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    rgba(0, 0, 0, 0.5) 12%,
+    transparent 32%,
+    transparent 64%,
+    rgba(0, 0, 0, 0.5) 88%,
+    #000 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    rgba(0, 0, 0, 0.5) 12%,
+    transparent 32%,
+    transparent 64%,
+    rgba(0, 0, 0, 0.5) 88%,
+    #000 100%
+  );
+  pointer-events: none;
+}
+/* Un thème de l'arcade apporte son propre fond : le motif s'efface. */
+:root[data-arcade-theme] body::after {
+  display: none;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -155,8 +275,10 @@ h1,
 h2,
 h3 {
   font-family: var(--font-display);
-  letter-spacing: -0.025em;
-  line-height: 1.06;
+  /* Segoe se lit à son interlettrage naturel : le -0,025 em hérité de Space
+     Grotesk collait ses lettres les unes aux autres. */
+  letter-spacing: -0.01em;
+  line-height: 1.08;
   margin: 0;
   font-weight: 700;
 }
@@ -189,6 +311,50 @@ h3 {
   [draggable="true"]:active {
     cursor: var(--cursor-grabbing);
   }
+}
+
+/* ======================================================================
+   LA TUILE À ICÔNE S'INVERSE EN CLAIR : APLAT DORÉ, ICÔNE SOMBRE
+   ======================================================================
+   ⚠️ CE BLOC NE VAUT QU'EN CLAIR, ET C'EST TOUT SON INTÉRÊT. En sombre, une
+   icône dorée dans un carré à peine teinté est parfaite : rien ne bouge.
+   En clair, la même tuile n'avait que de mauvaises options — doré sur doré
+   (illisible et criard), ou icône noire sur gris (triste). La troisième est
+   la bonne, et c'est celle de TV Time : on REMPLIT la tuile du vrai jaune et
+   on y pose l'icône en sombre. Le doré redevient un aplat — ce qu'il sait
+   faire sur blanc — et la tuile devient le point coloré de son écran.
+
+   La liste est explicite, pas un sélecteur attrape-tout : une tuile qui se
+   RÉPÈTE (une ligne de notification, une grille de stats, un sélecteur
+   d'effets) n'est pas concernée — trente carrés jaunes ne font pas un accent,
+   ils font un damier. Ne sont ici que les tuiles SEULES sur leur écran :
+   états vides, écrans de confirmation, cartes de fonctionnalité, bascules
+   allumées. */
+:root:not([data-theme="dark"]) :is(.feature-icon, .placeholder-icon, .auth-done-icon,
+    .hf-empty-icon, .pff-empty-icon, .trk-empty-ic, .trk-empty2-ic,
+    .wp-state-icon, .call-gate-ico, .grv-locked-ic, .gp-tbd-ic,
+    .adm-coll-sheet-icon, .adm-coll-gacha-ic,
+    .mdj-teamup-ic, .mdj-archive-ic, .mdj-board-ic, .mdj-team-ic.on,
+    .pfa-stat-plat-ic, .pfa-console-ic, .pac-mode-ic,
+    .gp-relation-ico, .hf-vact-ic, .pn-icon-current, .mh-door-ic,
+    .gp-vinyl-add-icon, .admin-head-icon, .admin-card-icon, .am-icon-preview),
+:root:not([data-theme="dark"]) .pv-row.on:not(.off) .pv-row-icon {
+  background: var(--orange);
+  /* L'encre des aplats dorés, la même que sur .btn-primary. */
+  color: #1a1204;
+  border-color: transparent;
+}
+/* Les tuiles qui recolorent leur propre <svg> : l'aplat doit gagner. */
+:root:not([data-theme="dark"]) :is(.feature-icon, .placeholder-icon, .auth-done-icon,
+    .hf-empty-icon, .pff-empty-icon, .trk-empty-ic, .trk-empty2-ic,
+    .wp-state-icon, .call-gate-ico, .grv-locked-ic, .gp-tbd-ic,
+    .adm-coll-sheet-icon, .adm-coll-gacha-ic,
+    .mdj-teamup-ic, .mdj-archive-ic, .mdj-board-ic, .mdj-team-ic.on,
+    .pfa-stat-plat-ic, .pfa-console-ic, .pac-mode-ic,
+    .gp-relation-ico, .hf-vact-ic, .pn-icon-current, .mh-door-ic,
+    .gp-vinyl-add-icon, .admin-head-icon, .admin-card-icon, .am-icon-preview) svg,
+:root:not([data-theme="dark"]) .pv-row.on:not(.off) .pv-row-icon svg {
+  color: inherit;
 }
 
 /* ---------- Typo utilitaires ---------- */
@@ -237,11 +403,9 @@ h3 {
 .btn-primary {
   background: var(--accent-grad);
   color: #1a1204;
-  box-shadow: 0 6px 18px rgba(242, 183, 11, 0.35);
 }
 .btn-primary:hover {
-  filter: brightness(1.05);
-  box-shadow: 0 8px 24px rgba(242, 183, 11, 0.5);
+  background: var(--amber);
 }
 .btn-ghost {
   background: var(--surface);

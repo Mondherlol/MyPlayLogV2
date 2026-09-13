@@ -54,13 +54,12 @@
 /* L'ordre de lecture du fil, celui du telephone. Il ne sert que tant qu'il n'y
    a qu'une colonne — au-dela, la grille reprend la main et ces valeurs
    n'ont plus aucun effet. */
-.mh-hero { order: 0; }
 .mh-top { order: 1; }
-.s-events { order: 2; }
-.s-elists { order: 3; }
-.s-wish { order: 4; }
-.s-today { order: 5; }
-.s-awaited { order: 6; }
+.s-wish { order: 2; }
+.s-awaited { order: 3; }
+.s-events { order: 4; }
+.s-elists { order: 5; }
+.s-today { order: 6; }
 .mh-mot { order: 7; }
 .s-tonight { order: 8; }
 .s-dusty { order: 9; }
@@ -104,11 +103,6 @@
     min-width: 0;
   }
 
-  /* Le salut coiffe les deux colonnes. */
-  .mh-hero {
-    grid-column: 1 / -1;
-  }
-
   /* ⚠️ LES VALEURS `order` DU FIL EN UNE COLONNE S'APPLIQUENT AUSSI À LA
      GRILLE, ET C'ÉTAIT TOUT LE BUG. `order` ne sert pas qu'aux boîtes flex :
      il décide aussi de l'ordre de placement automatique d'une grille. Le
@@ -116,7 +110,6 @@
      n'en déclarent pas, restaient à 0 — la grille les plaçait donc AVANT lui,
      et les parties en cours finissaient tout en bas de la page. En deux
      colonnes, on revient à l'ordre du balisage. */
-  .mh > .mh-hero,
   .mh > .mh-top,
   .mh > .mh-col,
   .mh > .mh-side {
@@ -161,35 +154,7 @@
   display: grid;
   place-items: center;
   min-height: 50vh;
-  color: var(--orange);
-}
-
-/* ---------- L'en-tête ---------- */
-.mh-hero {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 1rem;
-  padding: 0.1rem 0 1.4rem;
-}
-
-.mh-hero-title {
-  font-size: clamp(1.45rem, 2.6vw, 1.95rem);
-  margin-bottom: 0.3rem;
-}
-
-.mh-hero-sub {
-  margin: 0;
-  color: var(--text-soft);
-  font-size: 0.93rem;
-  text-transform: capitalize;
-}
-
-.mh-hero-acts {
-  display: flex;
-  gap: 0.55rem;
-  flex-wrap: wrap;
+  color: var(--accent-ink);
 }
 
 /* ---------- Le rayon : en-tête ---------- */
@@ -222,7 +187,7 @@
 }
 
 a.mh-head-main:hover .mh-head-title {
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 
 .mh-head-cover {
@@ -301,7 +266,7 @@ a.mh-head-main:hover .mh-head-title {
   transition: color 0.15s ease;
 }
 .mh-head-more:hover {
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 
 .mh-head-refresh {
@@ -316,7 +281,7 @@ a.mh-head-main:hover .mh-head-title {
   transition: color 0.15s ease, border-color 0.15s ease;
 }
 .mh-head-refresh:hover {
-  color: var(--orange);
+  color: var(--accent-ink);
   border-color: var(--orange);
 }
 .mh-head-refresh span {
@@ -435,7 +400,7 @@ a.mh-head-main:hover .mh-head-title {
 .mh-rail-arrow:hover {
   transform: translateY(-50%) scale(1.08);
   border-color: var(--orange);
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 /* Pas de flèches là où il n'y a pas de souris : le doigt fait déjà le travail. */
 @media (hover: none) {
@@ -487,7 +452,7 @@ a.mh-head-main:hover .mh-head-title {
   background: var(--accent-grad);
   border: none;
   color: #3b2a02;
-  box-shadow: 0 6px 18px rgba(242, 183, 11, 0.28);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--tint) 28%, transparent);
   backdrop-filter: none;
 }
 .mh-pill.ghost {
@@ -498,7 +463,7 @@ a.mh-head-main:hover .mh-head-title {
 }
 .mh-pill.ghost:hover {
   border-color: var(--orange);
-  color: var(--orange);
+  color: var(--accent-ink);
   background: var(--surface);
 }
 .mh-pill.wide {
@@ -523,7 +488,7 @@ a.mh-head-main:hover .mh-head-title {
 .mh-round:hover,
 .mh-round.on {
   border-color: var(--orange);
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 
 .mh-chip {
@@ -539,7 +504,7 @@ a.mh-head-main:hover .mh-head-title {
 }
 .mh-chip:hover {
   border-color: var(--orange);
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 
 /* ======================================================================
@@ -588,7 +553,7 @@ a.mh-head-main:hover .mh-head-title {
 .mh-np-veil {
   position: absolute;
   inset: 0;
-  background: rgba(6, 7, 10, 0.2);
+  background: rgba(6, 7, 10, 0.34);
 }
 .mh-np-fade {
   position: absolute;
@@ -864,7 +829,7 @@ a.mh-head-main:hover .mh-head-title {
   gap: 0.25rem;
   padding: 0.16rem 0.5rem;
   border-radius: 999px;
-  background: rgba(242, 183, 11, 0.16);
+  background: color-mix(in srgb, var(--tint) 16%, transparent);
   color: var(--accent-ink);
   font-size: 0.73rem;
   font-weight: 800;
@@ -926,7 +891,7 @@ a.mh-head-main:hover .mh-head-title {
 }
 .mh-ev-bell:hover {
   border-color: var(--orange);
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 .mh-ev-bell.on {
   background: var(--orange);
@@ -1211,7 +1176,7 @@ a.mh-head-main:hover .mh-head-title {
   overflow: hidden;
 }
 .mh-tile:hover .mh-tile-name {
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 .mh-tile-sub {
   font-size: 0.69rem;
@@ -1223,6 +1188,44 @@ a.mh-head-main:hover .mh-head-title {
 .mh-tile-sub.gold {
   color: var(--accent-ink);
   font-weight: 600;
+}
+
+/* Le « + » d'ajout rapide (GameAddFan), posé sur la jaquette du rail — comme
+   sur les Sorties et les grilles du profil. Il se cale sur le coin haut droit
+   de la vignette, donc elle doit être son repère. */
+.mh-tile {
+  position: relative;
+}
+/* ⚠️ AU SURVOL SEULEMENT, ET SEULEMENT À LA SOURIS. Sur un écran tactile il n'y
+   a pas de survol : le bouton resterait affiché en permanence sur chaque
+   jaquette de chaque rangée, et l'accueil du téléphone n'a pas demandé ça. */
+@media (hover: hover) {
+  .mh-tile:hover .add-fan.hover-only,
+  .mh-tile .add-fan.hover-only:focus-within {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+/* Une jaquette de rail fait 104 px de large : le bouton de 42 px des grandes
+   grilles y mangeait le tiers de l'affiche. */
+.mh-tile .add-fan,
+.mh-tile .game-add,
+.mh-tile .fan-btn {
+  width: 34px;
+  height: 34px;
+}
+.mh-tile .add-fan {
+  top: 6px;
+  right: 6px;
+}
+.mh-tile .game-add {
+  border-radius: 10px;
+}
+/* Le coin haut droit revient au « + » : le cœur des coups de cœur se range en
+   haut à GAUCHE plutôt que dessous. */
+.mh-tile .mh-tile-fav {
+  right: auto;
+  left: 0.35rem;
 }
 
 
@@ -1310,7 +1313,7 @@ a.mh-head-main:hover .mh-head-title {
   overflow: hidden;
 }
 .mh-free:hover .mh-free-title {
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 .mh-free-meta {
   display: flex;
@@ -1339,7 +1342,7 @@ a.mh-head-main:hover .mh-head-title {
   background: var(--accent-grad);
   color: #2e2101;
   margin-bottom: 2.1rem;
-  box-shadow: 0 10px 30px rgba(242, 183, 11, 0.22);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--tint) 22%, transparent);
   transition: transform 0.15s ease;
 }
 .mh-mot:hover {
@@ -1429,7 +1432,7 @@ a.mh-head-main:hover .mh-head-title {
   line-height: 1.15;
 }
 .mh-tonight-name:hover {
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 .mh-tonight-actions {
   margin-top: auto;
@@ -1451,7 +1454,7 @@ a.mh-head-main:hover .mh-head-title {
 .mh-tonight-dice:hover {
   transform: rotate(-18deg);
   border-color: var(--orange);
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 
 /* ======================================================================
@@ -1498,13 +1501,13 @@ a.mh-head-main:hover .mh-head-title {
   height: 34px;
   border-radius: 12px;
   background: var(--surface-2);
-  color: var(--orange);
+  color: var(--accent-mark);
   flex-shrink: 0;
 }
 .mh-door.arcade .mh-door-ic,
 .mh-door.gems .mh-door-ic,
 .mh-door.android .mh-door-ic {
-  background: rgba(242, 183, 11, 0.14);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
 }
 .mh-door-txt {
   display: grid;
@@ -1530,7 +1533,7 @@ a.mh-head-main:hover .mh-head-title {
   gap: 0.25rem;
   padding: 0.2rem 0.5rem;
   border-radius: 999px;
-  background: rgba(242, 183, 11, 0.16);
+  background: color-mix(in srgb, var(--tint) 16%, transparent);
   color: var(--accent-ink);
   font-size: 0.76rem;
   font-weight: 700;
@@ -1590,7 +1593,7 @@ a.mh-head-main:hover .mh-head-title {
   color: var(--text-soft);
 }
 .mh-modal-x:hover {
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 .mh-modal-head {
   display: flex;
@@ -1620,7 +1623,9 @@ a.mh-head-main:hover .mh-head-title {
   gap: 0.3rem;
 }
 .mh-hours-figure input {
-  width: 100px;
+  /* La largeur vient du composant (en `ch`, sur la longueur de la valeur) :
+     ici on ne pose que le plancher, pour qu'un champ vidé garde sa place. */
+  min-width: 2ch;
   border: none;
   background: none;
   text-align: center;
@@ -1679,15 +1684,6 @@ a.mh-head-main:hover .mh-head-title {
 @media (max-width: 720px) {
   .mh {
     --mh-gap: 0.7rem;
-  }
-  .mh-hero {
-    padding-bottom: 1.3rem;
-  }
-  .mh-hero-acts {
-    width: 100%;
-  }
-  .mh-hero-acts .mh-pill {
-    flex: 1;
   }
   .mh-sec {
     margin-bottom: 2.1rem;
@@ -1840,7 +1836,7 @@ a.mh-head-main:hover .mh-head-title {
   overflow: hidden;
 }
 .mh-elist:hover .mh-elist-title {
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 .mh-elist-date {
   font-size: 0.7rem;
@@ -1959,3 +1955,93 @@ a.mh-head-main:hover .mh-head-title {
     animation: none;
   }
 }
+
+/* ======================================================================
+   L'accueil sur ordinateur
+   ======================================================================
+   ⚠️ TOUT CE QUI SUIT EST RÉSERVÉ AUX GRANDS ÉCRANS, ET PLACÉ EN FIN DE
+   FICHIER EXPRÈS. Le téléphone ne doit rien en voir ; et en fin de feuille,
+   ces règles passent devant celles du thème clair à spécificité égale, sans
+   avoir à les surenchérir.
+
+   Ce que l'écran large change :
+   • la colonne de droite SUIT le défilement — elle s'arrêtait au premier
+     écran et laissait 370 px de vide sur trois mille de hauteur ;
+   • les raccourcis passent en grille 2 × 2, chacun avec sa couleur ;
+   • les titres de rayon et les jaquettes prennent la taille d'un écran. */
+
+/* ---------- Les titres de rayon, sur grand écran ---------- */
+@media (min-width: 1100px) {
+  .mh-head {
+    margin-bottom: 0.9rem;
+  }
+  .mh-kicker {
+    font-size: 0.66rem;
+  }
+  .mh-head-title {
+    font-size: 1.32rem;
+  }
+  .mh-sec {
+    margin-bottom: 2.7rem;
+  }
+}
+
+/* ---------- Deux colonnes ---------- */
+@media (min-width: 1360px) {
+  /* ⚠️ LA COLONNE DE DROITE SUIT LE DÉFILEMENT. Elle mesure un écran, la page
+     en mesure quatre : immobile, elle laissait une bande vide tout du long. */
+  .mh-side {
+    position: sticky;
+    top: calc(var(--topbar-h, 60px) + 1.2rem);
+  }
+
+  /* Des jaquettes à la taille de l'écran : à 104 px, douze côte à côte
+     faisaient un mur de timbres-poste. */
+  .mh-col .mh-tile {
+    width: 124px;
+  }
+  .mh-col .mh-tile-name {
+    font-size: 0.8rem;
+  }
+
+  /* ⚠️ UNE RANGÉE QUI CONTINUE S'EFFACE AU BORD AU LIEU D'ÊTRE COUPÉE NET.
+     Les classes viennent du rail (qui sait s'il reste de quoi défiler) : une
+     rangée arrivée au bout ne s'efface plus, sinon sa dernière jaquette
+     resterait à moitié voilée. */
+  .mh-col .mh-rail {
+    --fade-l: 0px;
+    --fade-r: 0px;
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 var(--fade-l),
+      #000 calc(100% - var(--fade-r)),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 var(--fade-l),
+      #000 calc(100% - var(--fade-r)),
+      transparent 100%
+    );
+  }
+  .mh-col .mh-rail.more-l {
+    --fade-l: 64px;
+  }
+  .mh-col .mh-rail.more-r {
+    --fade-r: 64px;
+  }
+
+  /* ⚠️ EN CLAIR, LE FONDU SE RÉDUIT À UN LISERÉ. Le masque efface la jaquette
+     vers le fond de la page : sur du sombre, elle s'éteint doucement ; sur du
+     blanc, 64 px de jaquette délavée font une tache. On garde juste de quoi
+     adoucir la coupe. */
+  :root:not([data-theme="dark"]) .mh-col .mh-rail.more-l {
+    --fade-l: 16px;
+  }
+  :root:not([data-theme="dark"]) .mh-col .mh-rail.more-r {
+    --fade-r: 16px;
+  }
+}
+

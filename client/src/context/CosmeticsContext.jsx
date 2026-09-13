@@ -188,6 +188,26 @@ function applyTheme(theme) {
       themeVars.push(k);
     }
   }
+  // ⚠️ UN THÈME ÉCRIT AVANT --tint N'EN A PAS. Les lavis (fonds de puces,
+  // survols) passent désormais par --tint, qui vaut le doré en sombre et un
+  // gris neutre en clair (cf. index.css). Un thème d'arcade repeint --orange
+  // sans connaître ce rôle : sans ce repli, un thème rose garderait des lavis
+  // dorés ou gris. On lui donne donc son propre accent comme teinte.
+  if (vars["--orange"] && !vars["--tint"]) {
+    root.style.setProperty("--tint", String(vars["--orange"]));
+    themeVars.push("--tint");
+  }
+  // Même histoire pour --accent-mark (le doré des icônes) : un thème écrit
+  // avant lui n'a que --accent-ink, qui suffisait quand les deux se
+  // confondaient. On lui rend son propre accent plutôt que notre jaune.
+  if (!vars["--accent-mark"]) {
+    const mark = vars["--accent-ink"] || vars["--orange"];
+    if (mark) {
+      root.style.setProperty("--accent-mark", String(mark));
+      themeVars.push("--accent-mark");
+    }
+  }
+
   const mode = theme.data?.mode;
   if (mode === "light" || mode === "dark") root.setAttribute("data-theme", mode);
   root.setAttribute("data-arcade-theme", theme.key || "on");

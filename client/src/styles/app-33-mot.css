@@ -306,10 +306,10 @@
   justify-content: center;
   background: linear-gradient(
     150deg,
-    color-mix(in srgb, var(--orange) 28%, var(--surface-2)),
+    color-mix(in srgb, var(--tint) 28%, var(--surface-2)),
     var(--surface-2)
   );
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--orange) 22%, var(--border));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tint) 22%, var(--border));
   font-weight: 800;
   line-height: 1;
   text-transform: uppercase;
@@ -354,7 +354,7 @@
   border-radius: var(--radius-lg);
   background: linear-gradient(
     150deg,
-    color-mix(in srgb, var(--orange) 10%, var(--mdj-panel)),
+    color-mix(in srgb, var(--tint) 10%, var(--mdj-panel)),
     var(--mdj-panel)
   );
   box-shadow: var(--shadow-sm);
@@ -592,8 +592,8 @@
   flex: 0 0 34px;
   height: 34px;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--orange) 14%, transparent);
-  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
+  color: var(--accent-mark);
 }
 
 .mdj-teamup-txt {
@@ -731,7 +731,7 @@
   padding: 8px 9px;
   margin: -8px -9px;
   border-radius: 11px;
-  background: color-mix(in srgb, var(--orange) 9%, transparent);
+  background: color-mix(in srgb, var(--tint) 9%, transparent);
 }
 
 .mdj-team-txt {
@@ -799,13 +799,13 @@
 
 .mdj-team-ic:hover:not(:disabled) {
   border-color: var(--orange);
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .mdj-team-ic.on {
   border-color: var(--orange);
-  color: var(--accent-ink);
-  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  color: var(--accent-mark);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
 }
 
 /* --- Le trombinoscope, pour sortir quelqu'un ---
@@ -895,7 +895,7 @@
   height: 200px;
   background: radial-gradient(
     50% 50% at 50% 50%,
-    color-mix(in srgb, var(--orange) 30%, transparent),
+    color-mix(in srgb, var(--tint) 30%, transparent),
     transparent 70%
   );
   pointer-events: none;
@@ -970,7 +970,7 @@
 }
 
 .mdj-join-n.total b {
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 
 .mdj-join-n.total em {
@@ -1175,7 +1175,7 @@
 
 .mdj-inv-row.on {
   border-color: var(--orange);
-  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
   color: var(--accent-ink);
 }
 
@@ -1512,7 +1512,7 @@
 .mdj-best i {
   font-style: normal;
   font-variant-numeric: tabular-nums;
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .mdj-best.empty {
@@ -1778,7 +1778,7 @@
 
 .mdj-row-rank b {
   font-size: 0.95rem;
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 
 .mdj-row-temp {
@@ -1809,7 +1809,7 @@
 }
 
 .mdj-row.win {
-  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
 }
 
 .mdj-row.win .mdj-row-word {
@@ -1855,8 +1855,8 @@
   flex: 0 0 34px;
   height: 34px;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--orange) 14%, transparent);
-  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
+  color: var(--accent-mark);
 }
 
 .mdj-archive-txt {
@@ -1897,8 +1897,8 @@
   width: 29px;
   height: 29px;
   border-radius: 9px;
-  background: color-mix(in srgb, var(--orange) 14%, transparent);
-  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
+  color: var(--accent-mark);
 }
 
 .mdj-board-head h2 {
@@ -1968,7 +1968,7 @@
 }
 
 .mdj-board-row.me {
-  background: color-mix(in srgb, var(--orange) 11%, transparent);
+  background: color-mix(in srgb, var(--tint) 11%, transparent);
 }
 
 .mdj-rank {
@@ -2079,7 +2079,7 @@
 }
 
 .mdj-live-row.me {
-  background: color-mix(in srgb, var(--orange) 9%, transparent);
+  background: color-mix(in srgb, var(--tint) 9%, transparent);
 }
 
 .mdj-live-row.out {
@@ -2477,7 +2477,7 @@ a.mdj-live-who:hover {
 }
 
 .mdj-arch-me.ok {
-  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
   color: var(--accent-ink);
 }
 

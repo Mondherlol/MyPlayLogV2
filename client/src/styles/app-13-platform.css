@@ -106,7 +106,7 @@
   letter-spacing: 0.09em;
   text-transform: uppercase;
   font-weight: 700;
-  color: var(--orange);
+  color: var(--accent-ink);
   background: rgba(200, 146, 11, 0.14);
   border: 1px solid rgba(200, 146, 11, 0.35);
   padding: 0.25rem 0.65rem;
@@ -312,7 +312,7 @@
   color: var(--text-soft);
 }
 .pv-stat-ic {
-  color: var(--orange);
+  color: var(--accent-mark);
   margin-bottom: 0.2rem;
 }
 .pv-stat-val {
@@ -402,7 +402,7 @@
 }
 .pv-sec-head h2 svg,
 .pv-panel-h svg {
-  color: var(--orange);
+  color: var(--accent-mark);
 }
 .pv-sec-hint {
   text-transform: none;
@@ -422,7 +422,7 @@
   background: none;
   cursor: var(--cursor-pointer), pointer;
   font-size: 0.8rem;
-  color: var(--orange);
+  color: var(--accent-ink);
   font-weight: 600;
 }
 
@@ -629,7 +629,7 @@
   place-items: center;
   padding: 1.1rem;
   background:
-    radial-gradient(130% 90% at 50% 0%, rgba(242, 183, 11, 0.14), transparent 72%),
+    radial-gradient(130% 90% at 50% 0%, color-mix(in srgb, var(--tint) 14%, transparent), transparent 72%),
     var(--surface-2);
   overflow: hidden;
 }
@@ -749,7 +749,7 @@
   min-width: 3.2rem;
 }
 .pv-ver-specs svg {
-  color: var(--orange);
+  color: var(--accent-mark);
   flex-shrink: 0;
 }
 .pv-ver-foot {
@@ -766,7 +766,7 @@
 }
 .pv-ver-foot span {
   font-size: 0.78rem;
-  color: var(--orange);
+  color: var(--accent-ink);
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -804,7 +804,7 @@
   flex-shrink: 0;
 }
 .pv-lead-row.top3 .pv-lead-rank {
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 .pv-lead-cover {
   width: 40px;
@@ -1031,7 +1031,7 @@
 }
 .pv-aff-part-pts {
   font-family: var(--font-display);
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 .pv-aff-bar {
   height: 8px;

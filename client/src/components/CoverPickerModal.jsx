@@ -4,6 +4,33 @@ import { X, ArrowLeft, Loader2, Gamepad2, Search, Check, Upload } from "lucide-r
 import { apiFetch, apiUpload } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 
+// Une image qui s'annonce avant d'arriver : la tuile scintille tant que le
+// fichier n'est pas là, puis l'image se fond dedans.
+//
+// ⚠️ CHAQUE TUILE TIENT SON PROPRE ÉTAT. Un seul drapeau pour toute la grille
+// aurait éteint le scintillement des vingt autres dès la première image
+// reçue — or ce sont des artworks en pleine résolution, elles n'arrivent pas
+// ensemble.
+function CoverImg({ url }) {
+  const [ready, setReady] = useState(false);
+  const done = () => setReady(true);
+  return (
+    <>
+      {!ready && <span className="coverpick-skel" aria-hidden="true" />}
+      <img
+        src={url}
+        alt=""
+        loading="lazy"
+        draggable="false"
+        className={ready ? "is-ready" : ""}
+        onLoad={done}
+        // Une image morte ne doit pas scintiller pour l'éternité.
+        onError={done}
+      />
+    </>
+  );
+}
+
 // Choisir une photo de couverture : on cherche un jeu dans TOUT le catalogue
 // (ou parmi ses jeux quand la recherche est vide), puis on pioche une de ses
 // images (jaquette ou artwork).
@@ -107,8 +134,16 @@ export default function CoverPickerModal({ entries, current, count = 0, onPick, 
               <span className="crumb-current">{game.name}</span>
             </div>
             {loading ? (
-              <div className="additems-loading">
-                <Loader2 size={18} className="spin" /> Chargement des images…
+              // ⚠️ LA FORME DE CE QUI ARRIVE, PAS UNE ROULETTE. Une ligne
+              // « Chargement… » ne dit rien de ce qu'on va recevoir, et la
+              // grille apparaissait d'un coup en repoussant tout. Les tuiles
+              // sont là AVANT les images, à leur taille définitive.
+              <div className="coverpick-grid">
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <span key={i} className="coverpick-img coverpick-ghost" aria-hidden="true">
+                    <span className="coverpick-skel" />
+                  </span>
+                ))}
               </div>
             ) : images.length === 0 ? (
               <p className="additems-hint font-fun">Aucune image pour ce jeu.</p>
@@ -120,7 +155,7 @@ export default function CoverPickerModal({ entries, current, count = 0, onPick, 
                     className={`coverpick-img clickable ${current === url ? "active" : ""}`}
                     onClick={() => onPick(url)}
                   >
-                    <img src={url} alt="" loading="lazy" draggable="false" />
+                    <CoverImg url={url} />
                     <span className="coverpick-check">
                       <Check size={16} />
                     </span>

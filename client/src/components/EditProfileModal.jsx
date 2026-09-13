@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Check, Loader2, AtSign, Sparkles, Smile, Search, User } from "lucide-react";
+import { X, Check, Loader2, AtSign, Sparkles, Smile, User } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useClickOutside } from "../hooks/useClickOutside";
+import AddItemsModal from "./AddItemsModal";
 import EmojiPanel from "./EmojiPanel";
 
 const BIO_MAX = 50;
@@ -23,38 +24,19 @@ export default function EditProfileModal({ profile, onSaved, onClose }) {
   const emojiRef = useRef(null);
   useClickOutside(emojiRef, () => setShowEmoji(false), showEmoji);
 
-  // Recherche de personnage (débouncée) pour l'alter ego.
-  const [charQuery, setCharQuery] = useState("");
-  const [charResults, setCharResults] = useState([]);
-  const [charLoading, setCharLoading] = useState(false);
-  const [charOpen, setCharOpen] = useState(false);
-  const charRef = useRef(null);
-  const reqRef = useRef(0);
-  useClickOutside(charRef, () => setCharOpen(false), charOpen);
+  // ⚠️ L'ALTER EGO SE CHOISIT DANS LA MÊME MODALE QUE PARTOUT AILLEURS.
+  // Il y avait ici un champ d'auto-complétion maison : une ligne de texte, une
+  // liste déroulante de noms. Chercher un personnage dont on ne retient que le
+  // visage — ou le jeu — n'y marchait pas. `AddItemsModal` le fait déjà, avec
+  // les portraits et la recherche par jeu (c'est celle de l'appli mobile), et
+  // son mode « un seul » se referme au premier clic.
+  const [picking, setPicking] = useState(false);
 
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
-
-  useEffect(() => {
-    const term = charQuery.trim();
-    if (!term) {
-      setCharResults([]);
-      setCharLoading(false);
-      return;
-    }
-    const id = ++reqRef.current;
-    setCharLoading(true);
-    const t = setTimeout(() => {
-      apiFetch(`/games/characters-search?q=${encodeURIComponent(term)}`, { token })
-        .then((d) => id === reqRef.current && setCharResults(d.characters || []))
-        .catch(() => id === reqRef.current && setCharResults([]))
-        .finally(() => id === reqRef.current && setCharLoading(false));
-    }, 300);
-    return () => clearTimeout(t);
-  }, [charQuery, token]);
 
   // Insère un émoji à la position du curseur, en respectant la limite.
   function insertEmoji(emoji) {
@@ -73,9 +55,7 @@ export default function EditProfileModal({ profile, onSaved, onClose }) {
   function selectChar(c) {
     setTagline(c.name);
     setTaglineImg(c.image || null);
-    setCharQuery("");
-    setCharResults([]);
-    setCharOpen(false);
+    setPicking(false);
   }
 
   async function submit(e) {
@@ -155,14 +135,24 @@ export default function EditProfileModal({ profile, onSaved, onClose }) {
               <Sparkles size={13} style={{ verticalAlign: "-2px" }} /> Si j'étais un perso de
               jeu vidéo, je serais…
             </label>
-            {tagline ? (
-              <div className="ep-char-selected">
-                <span className="ep-char-chip">
-                  <span className="ep-char-chip-img">
-                    {taglineImg ? <img src={taglineImg} alt="" /> : <User size={15} />}
-                  </span>
-                  {tagline}
+            {/* ⚠️ LE PERSONNAGE EST LE BOUTON. Un « Changer » posé à côté de
+                lui disait deux fois la même chose : on clique le visage qu'on
+                veut remplacer, c'est le geste qu'on fait de toute façon en
+                premier. Le seul bouton qui reste est celui qui fait autre
+                chose — retirer. */}
+            <div className="ep-char-selected">
+              <button
+                type="button"
+                className={`ep-char-chip clickable ${tagline ? "" : "is-empty"}`}
+                onClick={() => setPicking(true)}
+                title={tagline ? "Changer de personnage" : "Choisir un personnage"}
+              >
+                <span className="ep-char-chip-img">
+                  {taglineImg ? <img src={taglineImg} alt="" /> : <User size={15} />}
                 </span>
+                {tagline || "Choisir un personnage"}
+              </button>
+              {tagline && (
                 <button
                   type="button"
                   className="ep-char-clear clickable"
@@ -171,50 +161,10 @@ export default function EditProfileModal({ profile, onSaved, onClose }) {
                     setTaglineImg(null);
                   }}
                 >
-                  <X size={14} /> Changer
+                  <X size={14} /> Retirer
                 </button>
-              </div>
-            ) : (
-              <div className="ep-char-search" ref={charRef}>
-                <div className="ep-input-icon">
-                  <Search size={16} />
-                  <input
-                    placeholder="Cherche un personnage de jeu vidéo…"
-                    value={charQuery}
-                    onChange={(e) => {
-                      setCharQuery(e.target.value);
-                      setCharOpen(true);
-                    }}
-                    onFocus={() => setCharOpen(true)}
-                  />
-                  {charLoading && <Loader2 size={15} className="spin" />}
-                </div>
-                {charOpen && charQuery.trim() && (
-                  <div className="ep-char-results">
-                    {charResults.length === 0 && !charLoading ? (
-                      <p className="ep-char-empty font-fun">Aucun personnage trouvé.</p>
-                    ) : (
-                      charResults.map((c) => (
-                        <button
-                          type="button"
-                          key={c.id}
-                          className="ep-char-opt clickable"
-                          onClick={() => selectChar(c)}
-                        >
-                          <span className="ep-char-opt-img">
-                            {c.image ? <img src={c.image} alt="" loading="lazy" /> : <User size={16} />}
-                          </span>
-                          <span className="ep-char-opt-txt">
-                            <b>{c.name}</b>
-                            {c.gameName && <small>{c.gameName}</small>}
-                          </span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           <div className="modal-actions">
@@ -227,6 +177,17 @@ export default function EditProfileModal({ profile, onSaved, onClose }) {
           </div>
         </form>
       </div>
+
+      {picking && (
+        <AddItemsModal
+          kind="character"
+          single
+          title="Si j'étais un perso…"
+          existing={new Set()}
+          onToggle={selectChar}
+          onClose={() => setPicking(false)}
+        />
+      )}
     </div>,
     document.body
   );

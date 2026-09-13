@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Building2, Check, Gamepad2, X } from "lucide-react";
+import { Code2, Check, Gamepad2, X } from "lucide-react";
 import GameSearch from "./GameSearch";
 
 // ======================================================================
@@ -93,7 +93,7 @@ export default function RoundStudio({
         {round.logo ? (
           <img className="qz-studio-logo" src={round.logo} alt="" draggable="false" />
         ) : (
-          <Building2 size={22} />
+          <Code2 size={22} />
         )}
         <b>{round.studio}</b>
         <em>

@@ -122,9 +122,13 @@ function mkTheme(mode, s) {
     "--text-soft": s.textSoft,
     "--grid-line": s.grid,
     "--orange": s.accent,
+    // Le doré « qui teinte » (lavis, survols) : l'accent du thème (cf. index.css).
+    "--tint": s.tint || s.accent,
     "--amber": s.accent2 || s.accent,
     "--accent-grad": grad,
     "--accent-ink": s.ink,
+    // Le doré « qui dessine » (icônes) : l'encre du thème par défaut.
+    "--accent-mark": s.mark || s.ink,
     "--brand-grad": grad,
     "--ring": s.ring,
     "--app-halo": s.halo,

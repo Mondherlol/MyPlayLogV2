@@ -930,7 +930,7 @@ function PostCard({ post, token, focus, forceReveal, onLike, onLikeById, onDelet
         ))}
 
         <div className="gm-post-actions">
-          <button className={`gm-act clickable ${post.liked ? "liked" : ""}`} onClick={onLike} title="J'aime">
+          <button className={`gm-act like clickable ${post.liked ? "liked" : ""}`} onClick={onLike} title="J'aime">
             <Heart size={17} fill={post.liked ? "currentColor" : "none"} />
             {post.likeCount > 0 && <span>{post.likeCount}</span>}
           </button>
@@ -1249,7 +1249,7 @@ export function Lightbox({ media, index, post, onIndex, onClose, onLike }) {
             )}
             {media.length > 1 && <span className="gm-lb-caption">{index + 1} / {media.length}</span>}
           </div>
-          <button className={`gm-act clickable ${post.liked ? "liked" : ""}`} onClick={onLike}>
+          <button className={`gm-act like clickable ${post.liked ? "liked" : ""}`} onClick={onLike}>
             <Heart size={16} fill={post.liked ? "currentColor" : "none"} />
             {post.likeCount > 0 && <span>{post.likeCount}</span>}
           </button>

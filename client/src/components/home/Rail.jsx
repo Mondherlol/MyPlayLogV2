@@ -149,7 +149,9 @@ export function Rail({ children, className = "", snap = true }) {
 
       <div
         ref={ref}
-        className={`mh-rail ${snap ? "snap" : ""} ${dragging ? "dragging" : ""} ${className}`}
+        className={`mh-rail ${snap ? "snap" : ""} ${dragging ? "dragging" : ""} ${
+          edges.left ? "more-l" : ""
+        } ${edges.right ? "more-r" : ""} ${className}`}
         onScroll={update}
         onMouseDown={(e) => {
           drag.current = {

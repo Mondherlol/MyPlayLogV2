@@ -92,6 +92,21 @@ function PublicOrApp({ children }) {
   );
 }
 
+// La page de téléchargement : dans l'app quand on est connecté, nue sinon.
+// Elle ne passe pas par `PublicOrApp` — la coquille publique (bandeau + appel
+// à l'inscription) doublerait la page, qui porte déjà les siens.
+function DownloadOrApp() {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="center-screen">Chargement…</div>;
+  return user ? (
+    <AppLayout>
+      <DownloadApp embedded />
+    </AppLayout>
+  ) : (
+    <DownloadApp />
+  );
+}
+
 // ======================================================================
 //  /profile -> /u/pseudo
 // ======================================================================
@@ -151,10 +166,15 @@ export default function App() {
       <ScrollManager />
       <Routes>
       <Route path="/" element={<Landing />} />
-      {/* Le téléchargement de l'app Android. Publique et hors de toute
-          coquille : on y arrive souvent depuis un lien partagé, sans compte,
-          et parfois sans avoir jamais vu le site. */}
-      <Route path="/download" element={<DownloadApp />} />
+      {/* Le téléchargement de l'app Android. Publique : on y arrive souvent
+          depuis un lien partagé, sans compte, et parfois sans avoir jamais vu
+          le site — ce visiteur-là n'a donc aucune coquille autour, juste la
+          page et son bouton.
+          ⚠️ MAIS CONNECTÉ, ON NE SORT PAS DE L'APP. La page s'ouvre depuis la
+          barre latérale : la voir remplacer d'un coup la barre latérale ET la
+          barre du haut donnait l'impression d'avoir quitté le site, et il
+          fallait retrouver le lien « Accueil » pour y revenir. */}
+      <Route path="/download" element={<DownloadOrApp />} />
       {/* Les pages légales. Publiques et sans coquille, connecté ou non :
           Google et Discord les ouvrent pour valider la connexion par
           leurs comptes, et un visiteur doit pouvoir les lire AVANT de

@@ -382,7 +382,7 @@
   color: var(--text-soft);
   padding: 0.4rem 0.5rem;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
 }
 
 /* ---------- réglages ---------- */
@@ -433,7 +433,7 @@
 
 .wrapcrop-std.on {
   border-color: var(--orange);
-  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
 }
 
 .wrapcrop-cm {
@@ -548,7 +548,7 @@
 
 .pdfpick-page.on {
   border-color: var(--orange);
-  background: color-mix(in srgb, var(--orange) 8%, transparent);
+  background: color-mix(in srgb, var(--tint) 8%, transparent);
 }
 
 /* Le rapport de CHAQUE page est posé en style inline : dans un même PDF, la
@@ -746,6 +746,6 @@
   padding: 0.16rem 0.38rem;
   border-radius: 999px;
   color: var(--accent-ink);
-  background: color-mix(in srgb, var(--orange) 22%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 22%, var(--surface));
   border: 1px solid color-mix(in srgb, var(--orange) 45%, transparent);
 }

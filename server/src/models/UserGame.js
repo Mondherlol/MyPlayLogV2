@@ -143,6 +143,11 @@ const userGameSchema = new mongoose.Schema(
     // proposer de retirer les jeux ajoutés lors d'une déliaison du compte Steam.
     steamAppId: { type: Number, default: null },
     steamImported: { type: Boolean, default: false },
+    // Origine « import Backloggd » : vrai UNIQUEMENT si l'entrée a été CRÉÉE par
+    // l'import (même logique que Steam). Sert au parcours d'accueil à dire
+    // « 123 jeux importés » sur la carte Backloggd, au lieu de proposer de
+    // refaire un import déjà fait.
+    backloggdImported: { type: Boolean, default: false },
     // Origine « import PSN » : npCommunicationId PSN rattaché, et vrai UNIQUEMENT
     // si l'entrée a été CRÉÉE par un import PSN (même logique que Steam). Sert à
     // proposer de retirer les jeux ajoutés lors d'une déliaison du compte PSN.

@@ -114,7 +114,7 @@ export default function FontPicker() {
           className="font-bar-reset clickable"
           onClick={() => commit({ ...DEFAULT_FONTS })}
           disabled={isDefault}
-          title="Inter pour le texte, Space Grotesk pour les titres"
+          title="Segoe UI (la police d'Xbox) pour tout le site"
         >
           <RotateCcw size={14} /> Polices d'origine
         </button>

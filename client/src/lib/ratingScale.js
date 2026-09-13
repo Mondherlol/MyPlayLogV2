@@ -23,13 +23,21 @@ const EVENT = "mpl:rating-scale";
 export const SCALE_100 = "100";
 export const SCALE_STARS = "stars";
 
-/** L'échelle choisie, « 100 » par défaut (celle de toujours). */
+/**
+ * L'échelle choisie — CINQ ÉTOILES PAR DÉFAUT.
+ *
+ * ⚠️ C'ÉTAIT « SUR 100 », ET ÇA A CHANGÉ. Les étoiles se lisent d'un coup d'œil
+ * et se posent d'un geste ; le pourcentage reste à un clic pour qui veut la
+ * précision (Paramètres, ou « ou plutôt en % ? » dans le parcours d'accueil).
+ * C'est aussi le défaut de l'application mobile : les deux disent la même chose
+ * à qui n'a rien réglé. Seul un « 100 » EXPLICITEMENT enregistré le garde.
+ */
 export function getRatingScale() {
   try {
-    return localStorage.getItem(KEY) === SCALE_STARS ? SCALE_STARS : SCALE_100;
+    return localStorage.getItem(KEY) === SCALE_100 ? SCALE_100 : SCALE_STARS;
   } catch {
-    // Navigation privée, stockage refusé : on note sur 100, comme avant.
-    return SCALE_100;
+    // Navigation privée, stockage refusé : les étoiles, comme tout le monde.
+    return SCALE_STARS;
   }
 }
 
@@ -74,6 +82,31 @@ export const fromStars = (s) => Math.round(Math.max(0, Math.min(5, s)) * 20);
  * La virgule ne s'affiche que si elle dit quelque chose — « 4 » plutôt que
  * « 4,0 ».
  */
+// ======================================================================
+//  Le mot qui va avec la note
+// ======================================================================
+// Les mêmes qu'en haut de l'app mobile : une étiquette par dizaine, celle
+// qu'on atteint. « 3,5 étoiles » ne dit rien à personne ; « Bien », si.
+const LABELS = [
+  [10, "Atroce"],
+  [20, "Nul"],
+  [30, "Mauvais"],
+  [40, "Bof"],
+  [50, "Passable"],
+  [60, "Sympa"],
+  [70, "Bien"],
+  [80, "Très bien"],
+  [90, "Excellent"],
+  [100, "Chef-d'œuvre"],
+];
+
+/** Le mot d'une note sur 100 (« Bien », « Chef-d'œuvre »…), ou `null`. */
+export function ratingLabel(n) {
+  if (n == null) return null;
+  const v = Math.max(1, Math.min(100, Math.round(n)));
+  return (LABELS.find(([max]) => v <= max) || LABELS[LABELS.length - 1])[1];
+}
+
 export function formatRating(n, scale) {
   if (n == null) return null;
   if (scale !== SCALE_STARS) return String(Math.round(n));

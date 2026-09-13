@@ -1163,6 +1163,7 @@ function ItemCard({
       style={style}
       title={compact ? item.name : undefined}
       className={`ic-card ${compact ? "compact" : ""} ${palette ? "palette" : ""} ${dragging ? "dragging" : ""} ${editable ? "grab" : ""} ${linkable ? "clickable" : ""}`}
+      data-game-id={linkable ? item.gameId : undefined}
       onClick={linkable ? () => navigate(`/game/${item.gameId}`) : undefined}
       {...dragProps}
     >

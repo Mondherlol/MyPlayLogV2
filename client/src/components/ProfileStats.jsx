@@ -11,7 +11,7 @@ import {
   Heart,
   Star,
   Layers,
-  Building2,
+  Code2,
   Crown,
   Joystick,
   Flame,
@@ -125,7 +125,11 @@ function Card({ Icon, title, sub, wide, actions, children }) {
 // valeur directe en bout — chaque valeur est lisible sans tooltip.
 // `logo` affiche une pastille logo (studios, consoles), `FallbackIcon` prend
 // le relais quand IGDB n'a pas de logo.
-function BarList({ items, onRowClick, FallbackIcon }) {
+// `games` : les rangées SONT des jeux (leur `key` est un gameId). C'est ce qui
+// leur donne le menu contextuel du clic droit, comme une jaquette ailleurs sur
+// le site (cf. components/GameContextMenu.jsx) — la même liste sert aussi aux
+// genres et aux consoles, qui n'ont pas de fiche.
+function BarList({ items, onRowClick, FallbackIcon, games = false }) {
   const max = Math.max(...items.map((i) => i.value), 1);
   return (
     <ul className="ps-barlist">
@@ -133,6 +137,7 @@ function BarList({ items, onRowClick, FallbackIcon }) {
         <li
           key={it.key}
           className={`ps-barrow ${onRowClick ? "clickable" : ""}`}
+          data-game-id={games ? it.key : undefined}
           style={{ "--d": `${idx * 55}ms` }}
           onClick={onRowClick ? () => onRowClick(it) : undefined}
           title={it.title || it.label}
@@ -661,6 +666,7 @@ export default function ProfileStats({ username, token }) {
             )}
             {stats.topByHours.length > 1 && (
               <BarList
+                games
                 onRowClick={goGame}
                 items={stats.topByHours.slice(1).map((g) => ({
                   key: g.gameId,
@@ -695,7 +701,7 @@ export default function ProfileStats({ username, token }) {
         {/* ---------- Studios / éditeurs (avec logos) ---------- */}
         {(stats.developers.length > 0 || (stats.publishers || []).length > 0) && (
           <Card
-            Icon={Building2}
+            Icon={Code2}
             title="Studios & éditeurs"
             actions={
               <span className="ps-seg">
@@ -716,7 +722,7 @@ export default function ProfileStats({ username, token }) {
           >
             {companies.length ? (
               <BarList
-                FallbackIcon={Building2}
+                FallbackIcon={Code2}
                 onRowClick={(it) =>
                   goCompany(it.key, companyTab === "developers" ? "dev" : "pub")
                 }

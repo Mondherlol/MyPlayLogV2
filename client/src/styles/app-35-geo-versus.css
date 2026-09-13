@@ -1610,7 +1610,7 @@
 }
 
 .gv-inv-row.on {
-  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
   border-color: var(--orange);
   color: var(--accent-ink);
 }
@@ -1703,12 +1703,12 @@
    et SANS couche de remplissage — le fond du site passe au travers. */
 .geo.gv:not(.in-game) .gv-lobby-bg {
   background:
-    radial-gradient(circle at 18% 0%, rgba(242, 183, 11, 0.14), transparent 55%),
-    radial-gradient(circle at 85% 100%, rgba(242, 183, 11, 0.08), transparent 50%);
+    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--tint) 14%, transparent), transparent 55%),
+    radial-gradient(circle at 85% 100%, color-mix(in srgb, var(--tint) 8%, transparent), transparent 50%);
 }
 
 .geo.gv:not(.in-game) .geo-done {
-  background: radial-gradient(110% 70% at 50% -10%, rgba(242, 183, 11, 0.12), transparent 60%);
+  background: radial-gradient(110% 70% at 50% -10%, color-mix(in srgb, var(--tint) 12%, transparent), transparent 60%);
 }
 
 /* Les commandes empruntées au cockpit (app-25-geo.css) portent des couleurs
@@ -1775,17 +1775,17 @@
 }
 
 .geo.gv:not(.in-game) .gv-lobby-kicker {
-  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
 }
 
 .geo.gv:not(.in-game) .gv-seat.empty:hover {
-  background: color-mix(in srgb, var(--orange) 8%, transparent);
+  background: color-mix(in srgb, var(--tint) 8%, transparent);
 }
 
 .geo.gv:not(.in-game) .gv-mode.on {
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--orange) 13%, transparent),
+    color-mix(in srgb, var(--tint) 13%, transparent),
     var(--surface)
   );
 }
@@ -1793,7 +1793,7 @@
 .geo.gv:not(.in-game) .gv-podium-row.r1 {
   background: linear-gradient(
     90deg,
-    color-mix(in srgb, var(--orange) 16%, transparent),
+    color-mix(in srgb, var(--tint) 16%, transparent),
     var(--surface)
   );
 }

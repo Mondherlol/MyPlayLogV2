@@ -71,7 +71,7 @@
 }
 
 .hf-sec-title svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .hf-sec-link {
@@ -338,7 +338,7 @@
   gap: 0.5rem;
   padding: 0.7rem 1rem;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--orange) 9%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 9%, var(--surface));
   border: 1px dashed color-mix(in srgb, var(--orange) 40%, var(--border));
   color: var(--accent-ink);
   font-size: 0.85rem;
@@ -462,7 +462,7 @@
 }
 
 .hf-status-badge.st-playing {
-  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  background: color-mix(in srgb, var(--tint) 16%, transparent);
   color: var(--accent-ink);
 }
 
@@ -717,7 +717,7 @@
 }
 
 .hf-list-body:hover {
-  background: color-mix(in srgb, var(--orange) 7%, var(--surface-2));
+  background: color-mix(in srgb, var(--tint) 7%, var(--surface-2));
 }
 
 .hf-list-mosaic {
@@ -803,7 +803,7 @@
   display: grid;
   place-items: center;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--orange) 15%, transparent);
+  background: color-mix(in srgb, var(--tint) 15%, transparent);
   color: var(--accent-ink);
 }
 
@@ -845,7 +845,7 @@
 }
 
 .hf-interaction.clickable:hover .hf-int-quote {
-  border-left-color: var(--accent-ink);
+  border-left-color: var(--accent-mark);
 }
 
 /* ---------- Commentaire sur un post du mur média (carte sobre) ---------- */
@@ -854,11 +854,11 @@
 }
 
 .hf-gmcom:hover .hf-int-quote {
-  border-left-color: var(--accent-ink);
+  border-left-color: var(--accent-mark);
 }
 
 .hf-int-badge.act-gamemedia_comment {
-  background: color-mix(in srgb, var(--orange) 15%, transparent);
+  background: color-mix(in srgb, var(--tint) 15%, transparent);
   color: var(--accent-ink);
 }
 
@@ -1169,7 +1169,7 @@
 }
 
 .hf-int-gamechip:hover {
-  background: color-mix(in srgb, var(--orange) 10%, var(--surface-2));
+  background: color-mix(in srgb, var(--tint) 10%, var(--surface-2));
 }
 
 .hf-int-gamechip svg:last-child {
@@ -1517,8 +1517,8 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--orange) 14%, transparent);
-  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
+  color: var(--accent-mark);
 }
 
 .hf-empty p {
@@ -1779,7 +1779,7 @@
 }
 
 .hf-w-title svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .hf-w-sub {
@@ -1881,7 +1881,7 @@
   flex-shrink: 0;
   padding: 0.24rem 0.55rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--orange) 13%, transparent);
+  background: color-mix(in srgb, var(--tint) 13%, transparent);
   color: var(--accent-ink);
   font-family: var(--font-display);
   font-size: 0.74rem;
@@ -2111,7 +2111,7 @@
 
 .spoiler-toggle.on {
   border-color: transparent;
-  background: color-mix(in srgb, var(--orange) 18%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 18%, var(--surface));
   color: var(--accent-ink);
 }
 
@@ -2433,12 +2433,12 @@
 }
 
 .doc-badge.reco {
-  background: color-mix(in srgb, var(--orange) 15%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 15%, var(--surface));
   color: var(--accent-ink);
 }
 
 .doc-modal .doc-badge.reco {
-  background: color-mix(in srgb, var(--orange) 28%, transparent);
+  background: color-mix(in srgb, var(--tint) 28%, transparent);
   color: #ffe08a;
 }
 
@@ -3311,8 +3311,8 @@
   border-radius: 50%;
   vertical-align: -6px;
   margin-right: 0.15rem;
-  color: var(--orange);
-  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  color: var(--accent-mark);
+  background: color-mix(in srgb, var(--tint) 16%, transparent);
 }
 
 .hf-vact-ic.k-like {
@@ -3556,7 +3556,7 @@
 }
 
 .hf-vcom-quote:hover .hf-int-quote {
-  border-left-color: var(--accent-ink);
+  border-left-color: var(--accent-mark);
 }
 
 .hf-vcom .hf-vmini-thumb {
@@ -3751,7 +3751,7 @@
 
 .act-spoiler-btn.on {
   border-color: transparent;
-  background: color-mix(in srgb, var(--orange) 16%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 16%, var(--surface));
   color: var(--accent-ink);
 }
 
@@ -3992,7 +3992,7 @@
 }
 
 .rv-reveal svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .rv-reveal small {
@@ -4188,7 +4188,7 @@
 }
 
 .cm-head-icon {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
   flex-shrink: 0;
 }
 
@@ -4619,7 +4619,7 @@
 /* Commentaire mis en avant dans le fil */
 .ld-comment.is-focused {
   border-radius: 12px;
-  background: color-mix(in srgb, var(--orange) 9%, transparent);
+  background: color-mix(in srgb, var(--tint) 9%, transparent);
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--orange) 40%, transparent);
   padding: 0.5rem;
   margin: -0.2rem 0;
@@ -4669,6 +4669,12 @@
 }
 
 /* --- Fond flouté --- */
+/* ⚠️ ELLE COMMENCE SOUS LA BARRE DU HAUT, PAS DERRIÈRE. La barre est
+   translucide : la photo remontée de 60 px transparaissait au travers, et on
+   lisait les icônes de la barre par-dessus une jaquette. `top: 0` cale le haut
+   de l'image sur le bord inférieur de la barre — .gamepage sort du padding de
+   .app-content par une marge négative, donc son bord haut EST déjà ce bord-là,
+   et il n'y a rien à compenser. */
 .gp-backdrop {
   position: absolute;
   top: 0;
@@ -4944,12 +4950,24 @@
   min-width: 0;
 }
 
+/* ⚠️ TOUT CE QUI SUIT LA JAQUETTE PASSE DEVANT SON OMBRE. La jaquette est
+   positionnée (donc peinte au-dessus de ses voisins non positionnés) : son
+   ombre portée, large de 46 px, tombait SUR les boutons d'action. On remet
+   l'ordre du balisage. */
+.gp-left > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* La jaquette n'est plus UN bouton : c'est un cadre qui en contient deux —
+   l'image (la regarder) et le bandeau du bas (la changer). Un bouton dans un
+   bouton n'existe pas en HTML, d'où le cadre neutre. */
 .gp-cover {
   position: relative;
+  z-index: 0;
   display: block;
   width: 100%;
   padding: 0;
-  cursor: var(--cursor-pointer), pointer;
   margin-top: -104px;
   /* remonte sur le backdrop */
   aspect-ratio: 3 / 4;
@@ -4960,9 +4978,25 @@
   box-shadow: 0 22px 46px rgba(10, 10, 20, 0.45);
 }
 
-/* Overlay « Modifier » au survol de la jaquette (ouvre le sélecteur) */
+/* L'image elle-même : le bouton « voir en grand », qui remplit tout le cadre. */
+.gp-cover-view {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: var(--cursor-pointer), pointer;
+}
+
+/* Bandeau « Modifier » au survol du bas de la jaquette (ouvre le sélecteur) */
 .gp-cover-edit {
   position: absolute;
+  z-index: 1;
+  border: none;
+  cursor: var(--cursor-pointer), pointer;
   left: 0;
   right: 0;
   bottom: 0;
@@ -5031,16 +5065,39 @@
 
 .gp-action:not(.disabled):hover {
   border-color: var(--orange);
-  color: var(--text);
-  background: color-mix(in srgb, var(--orange) 10%, var(--surface));
+  color: var(--accent-ink);
   transform: translateY(-2px);
 }
 
 .gp-action.active {
-  background: var(--accent-grad);
-  border-color: transparent;
+  background: var(--orange);
+  border-color: var(--orange);
   color: #1a1204;
-  box-shadow: 0 6px 16px rgba(242, 183, 11, 0.32);
+}
+
+/* ⚠️ UN BOUTON DÉJÀ ACTIF GARDE SON APLAT AU SURVOL. La règle de survol du
+   dessus lui repeignait un fond « 10 % de jaune dans du gris » par-dessus
+   son jaune plein : un marron sale, pile au moment où on le vise. */
+.gp-action.active:not(.disabled):hover {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: #1a1204;
+}
+
+/* Le coup de cœur est rouge-rose, pas doré. */
+.gp-action.like:not(.disabled):hover {
+  border-color: var(--like);
+  color: var(--like);
+}
+.gp-action.like.active {
+  background: var(--like);
+  border-color: var(--like);
+  color: #fff;
+}
+.gp-action.like.active:not(.disabled):hover {
+  background: #ff6d85;
+  border-color: #ff6d85;
+  color: #fff;
 }
 
 .gp-action.disabled {
@@ -5048,15 +5105,110 @@
   cursor: not-allowed;
 }
 
+/* ⚠️ UN RÉSUMÉ TROP LONG SE REPLIE. Six lignes, puis « Voir plus » : la fiche
+   garde sa forme quel que soit le bavardage d'IGDB. */
+.gp-about-body:not(.open) .gp-para {
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.gp-more {
+  margin-top: 0.1rem;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--font-display);
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+
+.gp-more:hover {
+  text-decoration: underline;
+}
+
+/* Le menu du clic droit sur la photo de couverture. */
+.gp-ctx-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+}
+
+.gp-ctx {
+  position: fixed;
+  z-index: 301;
+  min-width: 232px;
+  max-width: calc(100vw - 16px);
+  padding: 0.3rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  /* Posé au curseur : s'il est au bord droit, le menu rentre tout seul. */
+  max-height: 60vh;
+  animation: ddIn 0.12s ease;
+}
+
+.gp-ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.gp-ctx-item:hover {
+  background: var(--surface-2);
+  color: var(--accent-ink);
+}
+
+/* La bande-annonce pas encore chargée : sa vignette, à sa place exacte. */
+.gp-video-hold {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.gp-video-hold img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(0.85);
+}
+
 /* Compteur à rebours (jeu à venir) */
 .gp-countdown {
   border-radius: 16px;
   padding: 0.9rem 1rem;
-  background: linear-gradient(150deg,
-      color-mix(in srgb, var(--orange) 18%, var(--surface)),
-      var(--surface));
+  /* ⚠️ UN APLAT, PAS UN DÉGRADÉ (cf. index.css : « le doré est un aplat,
+     partout »). Un dégradé de teinte vers la surface, c'est joli quand la
+     teinte est dorée sur du noir ; en clair la teinte est grise, et le bloc
+     devenait un lavis gris sale posé sur du blanc. La carte redevient donc une
+     surface pleine, et c'est la BORDURE dorée qui dit que ce bloc compte. */
+  background: color-mix(in srgb, var(--tint) 14%, var(--surface));
   border: 1px solid color-mix(in srgb, var(--orange) 35%, transparent);
   box-shadow: var(--shadow-sm);
+}
+
+:root:not([data-theme="dark"]) .gp-countdown {
+  background: var(--surface);
+}
+
+/* La pendule est un signe : elle reste dorée quand le libellé passe à l'encre. */
+.gp-countdown-head svg {
+  color: var(--accent-mark);
 }
 
 .gp-countdown-head {
@@ -5129,8 +5281,8 @@
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  color: var(--accent-ink);
-  background: color-mix(in srgb, var(--orange) 15%, var(--surface));
+  color: var(--accent-mark);
+  background: color-mix(in srgb, var(--tint) 15%, var(--surface));
 }
 
 .gp-tbd-txt {
@@ -5360,6 +5512,22 @@
   flex-shrink: 0;
 }
 
+/* La jauge devient un bouton quand elle ouvre la liste des notes : mêmes
+   proportions, plus l'affordance. */
+.gp-gauge-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: var(--cursor-pointer), pointer;
+  border-radius: 12px;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.gp-gauge-btn:hover {
+  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
+}
+
 .gp-gauge {
   display: flex;
   flex-direction: column;
@@ -5463,13 +5631,21 @@
 .gp-tabs-arrow.left {
   left: 0;
   justify-content: flex-start;
-  background: linear-gradient(to right, var(--bg) 45%, transparent);
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--bg) 90%, transparent) 45%,
+    transparent
+  );
 }
 
 .gp-tabs-arrow.right {
   right: 0;
   justify-content: flex-end;
-  background: linear-gradient(to left, var(--bg) 45%, transparent);
+  background: linear-gradient(
+    to left,
+    color-mix(in srgb, var(--bg) 90%, transparent) 45%,
+    transparent
+  );
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -5519,7 +5695,18 @@
 
 .gp-tab.active {
   color: var(--accent-ink);
-  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
+}
+
+/* Cet endroit portait un contournement : en clair, l'onglet ouvert prenait le
+   bleu-nuit de la barre latérale, parce que du doré pâle sur un fond doré pâle
+   ne se voyait pas. C'était un pavé noir au milieu d'une page blanche. Le
+   problème n'existe plus — le fond de l'onglet ouvert est un gris neutre
+   (--tint) et son texte l'encre noire (--accent-ink) — donc le contournement
+   part, et l'onglet ouvert se reconnaît comme partout ailleurs sur le site :
+   au TRAIT DORÉ sous lui (::after) et à sa graisse, pas à un aplat. */
+:root:not([data-theme="dark"]) .gp-tab.active {
+  font-weight: 700;
 }
 
 .gp-tab.active::after {
@@ -5576,7 +5763,7 @@
 }
 
 .gpc-count svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .gpc-count-mine {
@@ -5622,7 +5809,7 @@
 .gpc-search-input:focus {
   outline: none;
   border-color: var(--orange);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--orange) 18%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tint) 18%, transparent);
 }
 
 .gpc-search-clear {
@@ -5654,7 +5841,7 @@
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 0.9rem;
-  box-shadow: 0 6px 16px rgba(242, 183, 11, 0.28);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--tint) 28%, transparent);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -5734,7 +5921,7 @@
 /* Favori : anneau doré + étoile */
 .gpc-card.is-fav .gpc-card-img {
   border-color: var(--orange);
-  box-shadow: 0 0 0 2px var(--orange), 0 10px 24px rgba(242, 183, 11, 0.3);
+  box-shadow: 0 0 0 2px var(--orange), 0 10px 24px color-mix(in srgb, var(--tint) 30%, transparent);
 }
 
 .gpc-fav-badge {
@@ -5801,7 +5988,7 @@
 
 .gpc-add-tile {
   border: 2px dashed var(--border-strong);
-  background: color-mix(in srgb, var(--orange) 5%, transparent);
+  background: color-mix(in srgb, var(--tint) 5%, transparent);
   color: var(--text-soft);
   box-shadow: none;
 }
@@ -5809,7 +5996,7 @@
 .gpc-add-card:hover .gpc-add-tile {
   border-color: var(--orange);
   color: var(--accent-ink);
-  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
 }
 
 /* Squelette de chargement */
@@ -5947,7 +6134,7 @@
 }
 
 .gp-patch-badge.fan {
-  background: var(--accent-soft, rgba(242, 183, 11, 0.14));
+  background: var(--accent-soft, color-mix(in srgb, var(--tint) 14%, transparent));
   border-color: rgba(242, 183, 11, 0.4);
   color: var(--accent-ink);
 }
@@ -6096,7 +6283,7 @@
 }
 
 .gp-hd-sortbtn.active {
-  background: var(--accent-soft, rgba(242, 183, 11, 0.14));
+  background: var(--accent-soft, color-mix(in srgb, var(--tint) 14%, transparent));
   border-color: rgba(242, 183, 11, 0.5);
   color: var(--accent-ink);
 }
@@ -6151,7 +6338,7 @@
 }
 
 .gp-hd-tab svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .gp-hd-tab.active svg {
@@ -6598,7 +6785,7 @@
 }
 
 .gp-troph-count svg {
-  color: var(--orange);
+  color: var(--accent-mark);
 }
 
 .gp-troph-legend {
@@ -6781,7 +6968,7 @@
 
 .psn-connect-head svg {
   flex-shrink: 0;
-  color: var(--orange);
+  color: var(--accent-mark);
   margin-top: 2px;
 }
 
@@ -6897,7 +7084,7 @@
 .psn-progress {
   font-family: var(--font-display);
   font-weight: 700;
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 
 .psn-count {
@@ -6959,7 +7146,7 @@
 }
 
 .gp-troph.psn.earned {
-  border-color: color-mix(in srgb, var(--orange) 30%, var(--border));
+  border-color: color-mix(in srgb, var(--tint) 30%, var(--border));
 }
 
 .psn-earned-check {
@@ -7000,7 +7187,7 @@
   height: 46px;
   border-radius: 13px;
   background: var(--surface-2);
-  color: var(--orange);
+  color: var(--accent-mark);
   flex-shrink: 0;
 }
 
@@ -7035,7 +7222,7 @@
   height: 38px;
   border-radius: 10px;
   background: var(--surface-2);
-  color: var(--orange);
+  color: var(--accent-mark);
   flex-shrink: 0;
 }
 
@@ -7152,6 +7339,11 @@
   --border: rgba(255, 255, 255, 0.09);
   --text: #f3f4f7;
   --text-soft: #a6acba;
+  /* Îlot sombre même en thème clair : le doré y reste bon, en encre comme en
+     lavis (cf. index.css, --accent-ink / --tint). */
+  --accent-ink: #ffd24a;
+  --accent-mark: #ffd24a;
+  --tint: #ffd24a;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -7183,7 +7375,7 @@
   color: var(--text);
 }
 .admin-tab.active {
-  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  background: color-mix(in srgb, var(--tint) 16%, transparent);
   color: #ffd24a;
 }
 .admin-tab.active::before {
@@ -7234,7 +7426,7 @@
   color: var(--text-soft);
 }
 .admin-denied svg {
-  color: var(--orange);
+  color: var(--accent-mark);
 }
 .admin-denied h1 {
   font-family: var(--font-display);
@@ -7303,7 +7495,7 @@
   transition: border-color 0.15s, color 0.15s;
 }
 .au-preset:hover {
-  border-color: var(--accent-ink);
+  border-color: var(--accent-mark);
   color: var(--text);
 }
 
@@ -7314,11 +7506,11 @@
 }
 .au-list .au-row:hover {
   border-color: color-mix(in srgb, var(--orange) 40%, var(--border));
-  background: color-mix(in srgb, var(--orange) 5%, var(--surface-2));
+  background: color-mix(in srgb, var(--tint) 5%, var(--surface-2));
 }
 .au-list .au-row.picked {
-  border-color: var(--accent-ink);
-  background: color-mix(in srgb, var(--orange) 10%, var(--surface-2));
+  border-color: var(--accent-mark);
+  background: color-mix(in srgb, var(--tint) 10%, var(--surface-2));
 }
 .au-row-main {
   flex: 1 1 auto;
@@ -7363,7 +7555,7 @@
   padding: 0.1rem 0.4rem;
   border-radius: 6px;
   border: 1px solid color-mix(in srgb, var(--orange) 45%, var(--border));
-  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
   color: var(--accent-ink);
   font-size: 0.68rem;
   font-weight: 700;
@@ -7393,8 +7585,8 @@
   transition: border-color 0.15s, background 0.15s;
 }
 .au-bulk.armed {
-  border-color: var(--accent-ink);
-  background: color-mix(in srgb, var(--orange) 7%, var(--surface-2));
+  border-color: var(--accent-mark);
+  background: color-mix(in srgb, var(--tint) 7%, var(--surface-2));
 }
 .au-bulk-all {
   display: inline-flex;
@@ -7537,7 +7729,7 @@
   margin-top: 0.3rem;
   font-size: 0.82rem;
   font-weight: 600;
-  color: var(--orange);
+  color: var(--accent-ink);
   text-decoration: none;
   width: fit-content;
 }
@@ -7708,17 +7900,17 @@
   padding: 0.55rem 0.9rem;
   border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--orange) 45%, transparent);
-  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
   color: color-mix(in srgb, var(--orange) 82%, var(--text));
   font-weight: 700;
   font-size: 0.88rem;
   width: fit-content;
 }
 .admin-transfer-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--orange) 20%, transparent);
+  background: color-mix(in srgb, var(--tint) 20%, transparent);
 }
 .admin-transfer-btn svg {
-  color: var(--orange);
+  color: var(--accent-mark);
 }
 
 /* Interrupteur admin */
@@ -7889,7 +8081,7 @@
   text-decoration: underline;
 }
 .admin-rel-admin {
-  color: var(--orange);
+  color: var(--accent-ink);
   flex-shrink: 0;
 }
 
@@ -8111,13 +8303,16 @@
   margin-bottom: 0.8rem;
 }
 
+/* ⚠️ PAS DE LARGEUR MAXIMALE. Les 72 caractères par ligne sont la bonne
+   mesure d'un texte posé sur une page blanche ; ici le bloc est déjà étroit
+   (une colonne à côté de la jaquette), et la limite ne faisait que renvoyer
+   des mots à la ligne alors qu'il restait de la place. */
 .gp-para {
   color: var(--text);
   line-height: 1.68;
   font-size: 0.98rem;
   margin: 0;
   white-space: pre-line;
-  max-width: 72ch;
 }
 
 .gp-story {
@@ -8176,8 +8371,8 @@
 }
 
 .gp-translate:hover:not(:disabled) {
-  background: var(--accent-soft, rgba(242, 183, 11, 0.14));
-  border-color: var(--accent-ink);
+  background: var(--accent-soft, color-mix(in srgb, var(--tint) 14%, transparent));
+  border-color: var(--accent-mark);
 }
 
 .gp-translate:disabled {
@@ -8281,8 +8476,18 @@
   color: #1a1204;
 }
 
+/* ⚠️ UNE RANGÉE QUI DÉFILE ROGNE AUSSI EN HAUT ET EN BAS. `overflow-x: auto`
+   n'existe pas : le navigateur lit `overflow: auto hidden`, donc la vignette
+   qui se soulève au survol voit son ombre portée COUPÉE NET au ras du cadre —
+   invisible sur fond sombre, franche et laide sur fond clair.
+   L'ombre fait 28 px de flou sur 12 px de décalage, plus 3 px de soulèvement :
+   on creuse donc la place qu'il lui faut en rembourrage, et on la reprend en
+   marge négative pour que la rangée occupe exactement la même hauteur qu'avant
+   dans la page. */
 .gp-media-row {
   gap: 0.7rem;
+  padding-block: 16px 36px;
+  margin-block: -16px -28px;
 }
 
 .gp-media {
@@ -8381,18 +8586,41 @@
   gap: 0.45rem;
 }
 
+/* « Voir 12 autres » : un chip de langue, mais qui se clique. */
+.gp-lang-more {
+  border: 1px dashed var(--border-strong);
+  background: none;
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
+.gp-lang-more:hover {
+  color: var(--text);
+  border-color: var(--orange);
+  border-style: solid;
+}
+
+/* ⚠️ DES CARRÉS, PAS DES ÉTIQUETTES. Un logo se reconnaît sans se lire : la
+   rangée de liens tient sur une ligne au lieu de trois, et le nom reste
+   accessible en infobulle (title) comme aux lecteurs d'écran (aria-label).
+   Carré parfait : c'est le seul format où dix logos de largeurs différentes
+   s'alignent vraiment. */
 .gp-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.42rem 0.8rem;
-  border-radius: 10px;
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 11px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   color: var(--text);
-  font-size: 0.84rem;
-  font-weight: 500;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition: border-color 0.15s ease, color 0.15s ease,
+    background 0.15s ease, transform 0.15s ease;
+}
+
+.gp-link:hover {
+  transform: translateY(-2px);
 }
 
 .gp-link:hover {
@@ -8606,7 +8834,7 @@
 
 .gp-video-thumb.active {
   border-color: var(--orange);
-  background: color-mix(in srgb, var(--orange) 10%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 10%, var(--surface));
 }
 
 .gp-video-thumb-img {
@@ -9151,9 +9379,9 @@
   gap: 0.45rem;
   padding: 0.62rem;
   border-radius: 13px;
-  border: 1.5px solid color-mix(in srgb, var(--orange) 45%, var(--border-strong));
-  background: color-mix(in srgb, var(--orange) 8%, var(--surface));
-  color: var(--accent-ink);
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 0.85rem;
@@ -9161,11 +9389,10 @@
 }
 
 .gp-recommend:hover {
-  background: var(--accent-grad);
-  border-color: transparent;
+  background: var(--orange);
+  border-color: var(--orange);
   color: #1a1204;
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(242, 183, 11, 0.3);
 }
 
 /* Amis ayant le jeu (en-tête page jeu) */
@@ -9287,7 +9514,7 @@
   overflow: hidden;
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, var(--orange) 14%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 14%, var(--surface));
   color: var(--accent-ink);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
@@ -9357,7 +9584,7 @@
 
 .grv-switch.on {
   border-color: transparent;
-  background: color-mix(in srgb, var(--orange) 18%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 18%, var(--surface));
   color: var(--accent-ink);
 }
 
@@ -9424,7 +9651,7 @@
   overflow: hidden;
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, var(--orange) 14%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 14%, var(--surface));
   color: var(--accent-ink);
   border: 1px solid var(--border);
 }
@@ -9654,7 +9881,7 @@
 .rvc.is-mine .rvc-bubble::before {
   border-color: color-mix(in srgb, var(--orange) 38%, var(--border));
   background: linear-gradient(120deg,
-      color-mix(in srgb, var(--orange) 8%, var(--surface)),
+      color-mix(in srgb, var(--tint) 8%, var(--surface)),
       var(--surface) 60%);
 }
 
@@ -9681,7 +9908,7 @@
 
 /* Ma review : le fond du header suit la teinte or de la bulle */
 .rvc.is-mine .rvc-top {
-  background: color-mix(in srgb, var(--orange) 8%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 8%, var(--surface));
 }
 
 .rvc-id {
@@ -9820,7 +10047,7 @@
 
 .rvc-reply-btn.on {
   border-color: transparent;
-  background: color-mix(in srgb, var(--orange) 16%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 16%, var(--surface));
   color: var(--accent-ink);
 }
 
@@ -9901,8 +10128,8 @@
   height: 42px;
   flex-shrink: 0;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--orange) 14%, var(--surface));
-  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--tint) 14%, var(--surface));
+  color: var(--accent-mark);
 }
 
 .grv-locked-txt {
@@ -9962,7 +10189,7 @@
 /* Réponse mise en avant à l'ouverture du fil depuis le feed d'accueil. */
 .rvcm-item.is-focused {
   border-radius: 12px;
-  background: color-mix(in srgb, var(--orange) 9%, transparent);
+  background: color-mix(in srgb, var(--tint) 9%, transparent);
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--orange) 40%, transparent);
   padding: 0.5rem;
   margin: -0.2rem 0;
@@ -10277,7 +10504,7 @@
   flex-shrink: 0;
   padding: 0.2rem 0.55rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--orange) 16%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 16%, var(--surface));
   color: var(--accent-ink);
   font-family: var(--font-display);
   font-weight: 700;
@@ -10604,7 +10831,7 @@
 
 .reco-plus.mine {
   cursor: var(--cursor-default), auto;
-  background: color-mix(in srgb, var(--orange) 14%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 14%, var(--surface));
   border-color: color-mix(in srgb, var(--orange) 40%, transparent);
   color: var(--accent-ink);
 }
@@ -10822,7 +11049,7 @@
 }
 
 .pfo-title svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .pfo-count {
@@ -10881,7 +11108,7 @@
 }
 
 .pfo-hint svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 /* --- Grille de cards « pochette + CD » --- */
@@ -10929,7 +11156,7 @@
 .pfo-card.playing {
   border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--orange) 45%, transparent),
-    0 16px 40px color-mix(in srgb, var(--orange) 20%, transparent);
+    0 16px 40px color-mix(in srgb, var(--tint) 20%, transparent);
 }
 
 .pfo-card.dragging {
@@ -11205,7 +11432,7 @@
 
 .pfo-game svg {
   flex-shrink: 0;
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .pfo-game:hover {
@@ -11262,7 +11489,7 @@
 }
 
 .pfo-empty svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
   opacity: 0.8;
 }
 
@@ -11456,7 +11683,7 @@
 
 .gp-feed-filter:hover {
   color: var(--text);
-  border-color: var(--accent-ink);
+  border-color: var(--accent-mark);
 }
 
 .gp-feed-filter.active {
@@ -12030,7 +12257,7 @@
 }
 
 .gp-feed-reddit.text {
-  border-left: 3px solid var(--accent-ink);
+  border-left: 3px solid var(--accent-mark);
 }
 
 .gp-feed-foot {
@@ -12080,7 +12307,7 @@
 }
 
 .gp-feed-empty svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .gp-feed-empty p {
@@ -12375,7 +12602,7 @@
 }
 
 .gp-rev-summary.mixed .gp-rev-score b {
-  color: #f2b70b;
+  color: var(--accent-ink);
 }
 
 .gp-rev-summary.bad .gp-rev-score b {
@@ -12570,7 +12797,7 @@
 
 .gp-rail-arrow:hover {
   color: var(--text);
-  border-color: var(--accent-ink);
+  border-color: var(--accent-mark);
   background: var(--surface-2);
 }
 
@@ -13300,7 +13527,7 @@
 }
 
 .pff-w-title svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .pff-w-sub {
@@ -13603,7 +13830,7 @@
 }
 
 .pff-action svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .pff-time {
@@ -13697,7 +13924,7 @@
 }
 
 .pff-game:hover {
-  border-color: var(--accent-ink);
+  border-color: var(--accent-mark);
   transform: translateY(-1px);
 }
 
@@ -13792,7 +14019,7 @@
   place-items: center;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .pff-sentinel {
@@ -13955,7 +14182,7 @@
 }
 
 .pff-act-comment:hover .pff-act-ic {
-  background: rgba(242, 183, 11, 0.14);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
 }
 
 /* Republier : poussé à droite, pastille dorée pleine quand c'est fait */
@@ -13970,7 +14197,7 @@
 }
 
 .pff-act-repost:hover .pff-act-ic {
-  background: rgba(242, 183, 11, 0.14);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
 }
 
 .pff-act-repost.on {
@@ -14098,7 +14325,7 @@
 }
 
 .rp-cmodal-name svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
   flex-shrink: 0;
 }
 
@@ -14257,9 +14484,9 @@
   border-radius: 11px;
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, var(--orange) 14%, var(--surface));
-  color: var(--accent-ink);
-  border: 1px solid color-mix(in srgb, var(--orange) 26%, transparent);
+  background: color-mix(in srgb, var(--tint) 14%, var(--surface));
+  color: var(--accent-mark);
+  border: 1px solid color-mix(in srgb, var(--tint) 26%, transparent);
 }
 
 .pn-item-body {
@@ -14655,9 +14882,9 @@
   width: 32px;
   height: 32px;
   border-radius: 9px;
-  background: color-mix(in srgb, var(--orange) 14%, var(--surface));
-  color: var(--accent-ink);
-  border: 1px solid color-mix(in srgb, var(--orange) 24%, transparent);
+  background: color-mix(in srgb, var(--tint) 14%, var(--surface));
+  color: var(--accent-mark);
+  border: 1px solid color-mix(in srgb, var(--tint) 24%, transparent);
 }
 
 .pn-icon-picker select {
@@ -15082,7 +15309,7 @@
 
 .dg-plat.on {
   border-color: transparent;
-  background: color-mix(in srgb, var(--orange) 18%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 18%, var(--surface));
   color: var(--accent-ink);
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--orange) 45%, transparent);
 }
@@ -15451,8 +15678,8 @@
   gap: 0.45rem;
   padding: 0.5rem 0.65rem;
   border-radius: 10px;
-  background: rgba(242, 183, 11, 0.09);
-  border: 1px solid rgba(242, 183, 11, 0.25);
+  background: color-mix(in srgb, var(--tint) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tint) 25%, transparent);
   font-size: 0.8rem;
   line-height: 1.45;
   font-style: italic;
@@ -15508,7 +15735,7 @@
 
 .dg-ost.playing {
   border-color: transparent;
-  background: color-mix(in srgb, var(--orange) 14%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 14%, var(--surface));
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--orange) 45%, transparent);
 }
 
@@ -15708,7 +15935,7 @@
 }
 
 .dg-deck-end svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .dg-deck-end h3 {
@@ -16105,7 +16332,7 @@
 
 .hf-gems-cta:hover {
   border-color: var(--orange);
-  background: color-mix(in srgb, var(--orange) 10%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 10%, var(--surface));
 }
 
 /* --- Modale « les pépites de X » (GemsFeedModal) --- */
@@ -16156,7 +16383,7 @@
 }
 
 .gfm-title svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .gfm-sub {
@@ -16311,7 +16538,7 @@
 }
 
 .gfm-owner.st-playing {
-  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  background: color-mix(in srgb, var(--tint) 16%, transparent);
   color: var(--accent-ink);
 }
 
@@ -16360,7 +16587,7 @@
 
 .gfm-wish.on {
   border-color: transparent;
-  background: color-mix(in srgb, var(--orange) 16%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 16%, var(--surface));
   color: var(--accent-ink);
 }
 
@@ -16442,7 +16669,7 @@
   padding: 0.35rem 0.75rem 0.35rem 0.4rem;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--orange) 35%, var(--border));
-  background: color-mix(in srgb, var(--orange) 9%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 9%, var(--surface));
   color: var(--text);
   font-size: 0.85rem;
   font-weight: 500;
@@ -16452,7 +16679,7 @@
 
 .gp-relation:not(:disabled):hover {
   border-color: var(--orange);
-  background: color-mix(in srgb, var(--orange) 16%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 16%, var(--surface));
   transform: translateY(-1px);
 }
 
@@ -16474,8 +16701,8 @@
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--orange) 18%, transparent);
-  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--tint) 18%, transparent);
+  color: var(--accent-mark);
 }
 
 .gp-relation-txt b {
@@ -16515,14 +16742,14 @@
 }
 
 .gpr-count svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .gpr-franchise-chip {
   padding: 0.25rem 0.7rem;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--orange) 40%, var(--border));
-  background: color-mix(in srgb, var(--orange) 10%, transparent);
+  background: color-mix(in srgb, var(--tint) 10%, transparent);
   color: var(--accent-ink);
   font-family: var(--font-display);
   font-weight: 600;
@@ -16538,7 +16765,7 @@
 }
 
 .gpr-h2 svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .gpr-h2-count {
@@ -16588,7 +16815,7 @@
   transform: translateY(-4px);
   border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
   box-shadow: 0 14px 30px rgba(10, 10, 20, 0.3),
-    0 0 0 3px color-mix(in srgb, var(--orange) 16%, transparent);
+    0 0 0 3px color-mix(in srgb, var(--tint) 16%, transparent);
 }
 
 .gpr-card:hover .gpr-cover img {
@@ -16641,7 +16868,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  background: color-mix(in srgb, var(--orange) 14%, var(--surface-2));
+  background: color-mix(in srgb, var(--tint) 14%, var(--surface-2));
   border: 1px solid color-mix(in srgb, var(--orange) 35%, var(--border));
   color: var(--accent-ink);
 }
@@ -16731,7 +16958,7 @@
   height: 13px;
   background: var(--accent-grad);
   border-color: transparent;
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--orange) 22%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--tint) 22%, transparent);
 }
 
 .gpr-tl-year {
@@ -16771,7 +16998,7 @@
 .gpr-tl-item.is-current .gpr-tl-card {
   cursor: var(--cursor-default), auto;
   border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
-  background: color-mix(in srgb, var(--orange) 7%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 7%, var(--surface));
 }
 
 .gpr-tl-cover {
@@ -16858,7 +17085,7 @@
 
 /* Pastilles des nouveaux types d'action */
 .hf-status-badge.st-review {
-  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  background: color-mix(in srgb, var(--tint) 16%, transparent);
   color: var(--accent-ink);
 }
 
@@ -16884,7 +17111,7 @@
 
 .hf-status-badge.st-listadd,
 .hf-status-badge.st-follow {
-  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
   color: var(--accent-ink);
 }
 
@@ -17649,7 +17876,7 @@ b.hf-dl-src {
 /* Chip « fraîchement modifié » (heures ajoutées, note posée…) */
 .hf-chip.new {
   border-color: color-mix(in srgb, var(--orange) 55%, transparent);
-  background: color-mix(in srgb, var(--orange) 9%, transparent);
+  background: color-mix(in srgb, var(--tint) 9%, transparent);
   color: var(--accent-ink);
 }
 
@@ -17670,13 +17897,13 @@ b.hf-dl-src {
 
 .hf-ost:hover {
   border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
-  background: color-mix(in srgb, var(--orange) 7%, var(--surface-2));
+  background: color-mix(in srgb, var(--tint) 7%, var(--surface-2));
   transform: translateY(-1px);
 }
 
 .hf-ost.playing {
   border-color: color-mix(in srgb, var(--orange) 65%, var(--border));
-  background: color-mix(in srgb, var(--orange) 10%, var(--surface-2));
+  background: color-mix(in srgb, var(--tint) 10%, var(--surface-2));
 }
 
 .hf-ost-art {
@@ -17764,7 +17991,7 @@ b.hf-dl-src {
 .hf-ost-eq i {
   width: 3px;
   border-radius: 2px;
-  background: var(--accent-ink);
+  background: var(--accent-mark);
   animation: hf-eq 0.9s ease-in-out infinite;
 }
 
@@ -17886,7 +18113,7 @@ b.hf-dl-src {
 .hf-reply-btn.on {
   color: var(--accent-ink);
   border-color: color-mix(in srgb, var(--orange) 55%, transparent);
-  background: color-mix(in srgb, var(--orange) 8%, transparent);
+  background: color-mix(in srgb, var(--tint) 8%, transparent);
 }
 
 /* Fil de réponses inline (réutilise les styles rvcm de l'onglet Reviews) */
@@ -18052,7 +18279,7 @@ b.hf-dl-src {
 
 .hf-rvprev:hover {
   border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
-  background: color-mix(in srgb, var(--orange) 6%, var(--surface-2));
+  background: color-mix(in srgb, var(--tint) 6%, var(--surface-2));
   transform: translateY(-1px);
 }
 
@@ -18343,7 +18570,7 @@ b.hf-dl-src {
 }
 
 .sys-stat-label svg {
-  color: var(--orange);
+  color: var(--accent-mark);
 }
 
 .sys-stat-value {
@@ -18428,7 +18655,7 @@ b.hf-dl-src {
 }
 
 .sys-folder-name svg {
-  color: var(--orange);
+  color: var(--accent-mark);
   flex-shrink: 0;
 }
 
@@ -18550,7 +18777,7 @@ b.hf-dl-src {
 }
 
 .sys-user-name:hover {
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 
 .sys-user-name.deleted {
@@ -19240,7 +19467,7 @@ b.hf-dl-src {
 
 .logdm-conv.on {
   border-color: color-mix(in srgb, var(--orange) 45%, transparent);
-  background: color-mix(in srgb, var(--orange) 10%, transparent);
+  background: color-mix(in srgb, var(--tint) 10%, transparent);
 }
 
 .logdm-faces {
@@ -19549,7 +19776,7 @@ b.hf-dl-src {
 
 .logdm-row.right .logdm-bubble {
   border-color: color-mix(in srgb, var(--orange) 35%, transparent);
-  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
 }
 
 .logdm-bubble p {
@@ -19662,7 +19889,7 @@ b.hf-dl-src {
   color: var(--text-soft);
 }
 .push-reach-stat svg {
-  color: var(--orange);
+  color: var(--accent-mark);
   flex: none;
 }
 .push-reach-stat strong {
@@ -19677,13 +19904,13 @@ b.hf-dl-src {
   margin-top: 0.9rem;
   border: 1px solid rgba(242, 183, 11, 0.35);
   border-radius: 10px;
-  background: rgba(242, 183, 11, 0.1);
+  background: color-mix(in srgb, var(--tint) 10%, transparent);
   padding: 0.6rem 0.75rem;
   font-size: 0.85rem;
   color: var(--text);
 }
 .push-warn svg {
-  color: var(--orange);
+  color: var(--accent-mark);
   flex: none;
 }
 
@@ -19735,7 +19962,7 @@ b.hf-dl-src {
   color: var(--text-soft);
 }
 .push-count.warn {
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 
 /* L'aperçu imite un bandeau de notification : c'est le seul moyen de juger une
@@ -19830,10 +20057,10 @@ b.hf-dl-src {
 }
 .push-mode.active {
   border-color: var(--orange);
-  background: rgba(242, 183, 11, 0.09);
+  background: color-mix(in srgb, var(--tint) 9%, transparent);
 }
 .push-mode.active svg {
-  color: var(--orange);
+  color: var(--accent-mark);
 }
 
 .push-picker {
@@ -19890,7 +20117,7 @@ b.hf-dl-src {
   background: var(--surface-2);
 }
 .push-user.on {
-  background: rgba(242, 183, 11, 0.11);
+  background: color-mix(in srgb, var(--tint) 11%, transparent);
 }
 .push-check {
   display: grid;
@@ -19940,7 +20167,7 @@ b.hf-dl-src {
   font-size: 0.66rem;
   font-weight: 700;
   text-transform: uppercase;
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 .push-user-meta {
   display: flex;
@@ -20015,10 +20242,10 @@ b.hf-dl-src {
 }
 .push-result.partial {
   border-color: rgba(242, 183, 11, 0.4);
-  background: rgba(242, 183, 11, 0.1);
+  background: color-mix(in srgb, var(--tint) 10%, transparent);
 }
 .push-result.partial > svg {
-  color: var(--orange);
+  color: var(--accent-mark);
 }
 
 /* --- Historique --- */

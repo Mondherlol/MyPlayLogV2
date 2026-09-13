@@ -28,7 +28,19 @@ export const FONT_GROUPS = [
 
 export const FONTS = [
   // --- Sobres & lisibles ----------------------------------------------
-  { id: "inter", family: "Inter", group: "neutral", note: "Texte actuel" },
+  // ⚠️ `local` : pas de Google Fonts pour elle. Segoe UI vient du système,
+  // Selawik (sa jumelle libre) est servie par le site (cf. index.css) — et
+  // `stack` donne la pile complète, qu'un simple nom de famille ne dit pas.
+  {
+    id: "segoe",
+    family: "Selawik",
+    group: "neutral",
+    label: "Segoe UI",
+    note: "Style Xbox · par défaut",
+    local: true,
+    stack: '"Segoe UI Variable Display", "Segoe UI", "Selawik", system-ui, sans-serif',
+  },
+  { id: "inter", family: "Inter", group: "neutral", note: "Ancien texte" },
   { id: "system", family: null, group: "neutral", label: "Police du système", note: "Aucun téléchargement" },
   { id: "geist", family: "Geist", group: "neutral" },
   { id: "onest", family: "Onest", group: "neutral" },
@@ -56,7 +68,7 @@ export const FONTS = [
   { id: "kumbh-sans", family: "Kumbh Sans", group: "geometric" },
 
   // --- Grotesques à caractère -----------------------------------------
-  { id: "space-grotesk", family: "Space Grotesk", group: "grotesk", note: "Titres actuels" },
+  { id: "space-grotesk", family: "Space Grotesk", group: "grotesk", note: "Anciens titres" },
   { id: "hanken-grotesk", family: "Hanken Grotesk", group: "grotesk" },
   { id: "schibsted-grotesk", family: "Schibsted Grotesk", group: "grotesk" },
   { id: "bricolage-grotesque", family: "Bricolage Grotesque", group: "grotesk" },
@@ -108,7 +120,10 @@ export const FONTS = [
 
 const BY_ID = new Map(FONTS.map((f) => [f.id, f]));
 
-export const DEFAULT_FONTS = { body: "inter", display: "space-grotesk" };
+// Segoe UI partout, comme sur une Xbox (cf. index.css). Quelqu'un qui avait
+// gardé les anciennes polices par défaut n'avait rien enregistré : il passe à
+// la nouvelle. Celui qui avait CHOISI Inter ou Space Grotesk les garde.
+export const DEFAULT_FONTS = { body: "segoe", display: "segoe" };
 
 /** Les polices proposées pour un rôle (« body » ou « display »). */
 export function fontsFor(role) {
@@ -127,6 +142,7 @@ const SYSTEM_STACK = 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, A
 
 /** La pile CSS d'une police, avec un repli du même genre qu'elle. */
 export function fontStack(font) {
+  if (font?.stack) return font.stack;
   if (!font?.family) return SYSTEM_STACK;
   const fallback =
     font.category === "serif"
@@ -142,7 +158,10 @@ function familyParam(font, weights) {
 }
 
 function cssUrl(fonts, weightsOf) {
-  const params = fonts.filter((f) => f.family).map((f) => familyParam(f, weightsOf(f)));
+  // Les polices `local` ne passent jamais par Google (cf. l'entrée Segoe UI).
+  const params = fonts
+    .filter((f) => f.family && !f.local)
+    .map((f) => familyParam(f, weightsOf(f)));
   return params.length ? `https://fonts.googleapis.com/css2?${params.join("&")}&display=swap` : null;
 }
 

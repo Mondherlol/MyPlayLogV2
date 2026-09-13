@@ -45,7 +45,7 @@
   color: #3b2a02;
   font-size: 0.86rem;
   font-weight: 700;
-  box-shadow: 0 6px 16px rgba(242, 183, 11, 0.28);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--tint) 28%, transparent);
   transition: transform 0.14s ease;
 }
 .dlp-nav-cta:hover {
@@ -188,7 +188,7 @@
   transition: color 0.15s ease, border-color 0.15s ease;
 }
 .dlp-copy:hover {
-  color: var(--orange);
+  color: var(--accent-ink);
   border-color: var(--orange);
 }
 
@@ -289,7 +289,7 @@
 .dlp-rel-dot.now {
   border-color: var(--orange);
   background: var(--orange);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--orange) 22%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--tint) 22%, transparent);
 }
 
 .dlp-rel-ver {
@@ -301,7 +301,7 @@
 .dlp-rel-now {
   padding: 0.08rem 0.45rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  background: color-mix(in srgb, var(--tint) 16%, transparent);
   color: var(--accent-ink);
   font-size: 0.62rem;
   font-weight: 800;
@@ -369,4 +369,18 @@
   .dlp-icon {
     animation: none;
   }
+}
+
+/* ---------- Dans la coquille de l'app (connecté) ---------- */
+/* ⚠️ `.lp` EST FAITE POUR OCCUPER L'ÉCRAN ENTIER : 100dvh, pas de défilement,
+   et son propre bandeau en haut. Posée telle quelle sous la barre du haut de
+   l'app, elle ajoutait une hauteur d'écran à celle de la barre — la page
+   défilait, et le bouton de téléchargement se retrouvait sous le pli. Ici elle
+   n'est plus qu'un bloc de contenu : elle prend la hauteur de ce qu'elle
+   contient, et le cadre autour est celui de l'app. */
+.lp.dlp.is-embedded {
+  min-height: auto;
+  padding: 0;
+  border-radius: var(--radius-lg);
+  overflow: clip;
 }

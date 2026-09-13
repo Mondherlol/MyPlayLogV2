@@ -13,7 +13,7 @@
 }
 
 .explorer-title svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .explorer-sub {
@@ -21,10 +21,34 @@
   margin: 0.4rem 0 0;
 }
 
+/* ⚠️ LA COLONNE MINIMALE DÉCIDE DE LA TAILLE, PAS DU NOMBRE. En `auto-fill`,
+   les cartes grandissent jusqu'à remplir la ligne : à 160 px de minimum, un
+   écran de 1920 px en faisait des affiches de 180 px — des jaquettes géantes
+   pour une page qu'on parcourt en diagonale. Plus bas, plus de colonnes, et
+   des cartes à la taille d'un catalogue. */
 .game-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 1.1rem;
+  grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+  gap: 1rem;
+}
+
+/* Barre latérale repliée : la place gagnée ajoute des COLONNES au lieu
+   d'agrandir encore les cartes. Réservé à l'ordinateur — sur téléphone la
+   barre est en bas, et la grille à deux colonnes plus bas doit gagner. */
+@media (min-width: 761px) {
+  .app-shell.is-collapsed .game-grid {
+    grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+    gap: 0.85rem;
+  }
+}
+
+/* Le « + » et son éventail suivent la carte : 42 px sur une jaquette de
+   120 px, c'était le tiers de l'affiche. */
+.game-grid .add-fan,
+.game-grid .game-add,
+.game-grid .fan-btn {
+  width: 36px;
+  height: 36px;
 }
 
 /* ---------- Vue liste ---------- */
@@ -224,8 +248,8 @@
 
 .game-card:hover .game-cover {
   transform: translateY(-6px);
-  box-shadow: 0 18px 40px rgba(20, 20, 40, 0.28);
-  border-color: color-mix(in srgb, var(--orange) 45%, transparent);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+  border-color: var(--orange);
 }
 
 .game-card:hover .game-cover img {
@@ -660,7 +684,7 @@
 }
 
 .explorer-error svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
   margin-bottom: 0.6rem;
 }
 
@@ -760,7 +784,7 @@
 }
 
 .filter-panel-title svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .filter-clear {
@@ -1563,6 +1587,30 @@
   background: var(--surface-2);
 }
 
+/* ⚠️ EN ÉTOILES, PLUS DE CADRE : le bloc vit déjà dans une carte, et un cadre
+   dans un cadre ne dit rien de plus. La jauge en %, elle, garde le sien — c'est
+   une jauge, elle a besoin de ses bords. */
+.rating-block.stars {
+  align-items: stretch;
+  gap: 0.35rem;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.star-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.star-head-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
 .rating-block-label {
   font-size: 0.78rem;
   font-weight: 700;
@@ -1767,20 +1815,20 @@
 .seg-opt:hover {
   border-color: var(--orange);
   color: var(--text);
-  background: color-mix(in srgb, var(--orange) 10%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 10%, var(--surface));
   transform: translateY(-1px);
 }
 
 .seg-opt:hover svg {
   opacity: 1;
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .seg-opt.active {
   background: var(--accent-grad);
   border-color: transparent;
   color: #1a1204;
-  box-shadow: 0 4px 12px rgba(242, 183, 11, 0.3);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--tint) 30%, transparent);
 }
 
 /* Statut spécial « Sans fin » (jeux multi/service) : pointillés + cyan actif
@@ -1857,7 +1905,7 @@
 .format-opt.active {
   background: var(--accent-grad);
   color: #1a1204;
-  box-shadow: 0 3px 10px rgba(242, 183, 11, 0.28);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--tint) 28%, transparent);
 }
 
 .format-opt.active svg {
@@ -1936,7 +1984,7 @@
 }
 
 .input-group .input-icon {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
   flex-shrink: 0;
 }
 
@@ -2008,7 +2056,7 @@
 }
 
 .ttb-label svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .ttb-chips {
@@ -2368,7 +2416,7 @@
 
 .review-btn.filled {
   border-color: transparent;
-  background: color-mix(in srgb, var(--orange) 16%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 16%, var(--surface));
   color: var(--accent-ink);
 }
 
@@ -2646,32 +2694,44 @@
 }
 
 /* Fondus sur les bords quand il reste des cards à révéler */
-.scroll-row-wrap::before,
-.scroll-row-wrap::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 8px;
-  width: 46px;
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s ease;
+/* ⚠️ UN MASQUE, PAS UN DÉGRADÉ DE COULEUR. Les deux voiles d'avant étaient
+   peints en `--surface` : dès que la rangée n'était pas posée sur cette
+   couleur-là (le plus souvent le fond de page), ils laissaient une bavure —
+   discrète en sombre, franche en clair. Un masque efface vraiment le bord,
+   quelle que soit la couleur dessous. */
+.scroll-row-wrap .pick-row {
+  --fade-l: 0px;
+  --fade-r: 0px;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 var(--fade-l),
+    #000 calc(100% - var(--fade-r)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 var(--fade-l),
+    #000 calc(100% - var(--fade-r)),
+    transparent 100%
+  );
+}
+.scroll-row-wrap.has-left .pick-row {
+  --fade-l: 46px;
+}
+.scroll-row-wrap.has-right .pick-row {
+  --fade-r: 46px;
 }
 
-.scroll-row-wrap::before {
-  left: 0;
-  background: linear-gradient(90deg, var(--surface), transparent);
+/* En clair, le fondu se réduit à un liseré : sur du blanc, une vignette
+   délavée sur 46 px se voit comme une tache (cf. app-47-home.css, même
+   correction pour les rangées de l'accueil). */
+:root:not([data-theme="dark"]) .scroll-row-wrap.has-left .pick-row {
+  --fade-l: 14px;
 }
-
-.scroll-row-wrap::after {
-  right: 0;
-  background: linear-gradient(270deg, var(--surface), transparent);
-}
-
-.scroll-row-wrap.has-left::before,
-.scroll-row-wrap.has-right::after {
-  opacity: 1;
+:root:not([data-theme="dark"]) .scroll-row-wrap.has-right .pick-row {
+  --fade-r: 14px;
 }
 
 .scroll-arrow {
@@ -3190,7 +3250,7 @@
 }
 
 .gp-ost-title svg {
-  color: var(--orange);
+  color: var(--accent-mark);
 }
 
 .gp-ost-count {
@@ -3271,9 +3331,9 @@
 }
 
 .gp-ost-trash-btn.active {
-  color: var(--orange);
+  color: var(--accent-ink);
   border-color: var(--orange);
-  background: rgba(242, 183, 11, 0.08);
+  background: color-mix(in srgb, var(--tint) 8%, transparent);
 }
 
 .gp-ost-trash-btn .gp-ost-count {
@@ -3321,7 +3381,7 @@
   gap: 0.35rem;
   border: none;
   background: none;
-  color: var(--orange);
+  color: var(--accent-ink);
   font-size: 0.82rem;
   font-weight: 600;
   padding: 0.2rem 0.3rem;
@@ -3406,7 +3466,7 @@
 }
 
 .gp-ost-trash-restore:hover {
-  color: var(--orange);
+  color: var(--accent-ink);
   border-color: var(--orange);
   transform: rotate(-30deg);
 }
@@ -3685,7 +3745,7 @@
   display: grid;
   place-items: center;
   background: var(--surface-2);
-  color: var(--orange);
+  color: var(--accent-mark);
   box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.55);
 }
 
@@ -3885,8 +3945,8 @@
   margin-top: 0.9rem;
   padding: 0.7rem 0.85rem;
   border-radius: 11px;
-  background: color-mix(in srgb, var(--orange) 12%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--orange) 25%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--tint) 25%, transparent);
   color: var(--accent-ink);
   font-size: 0.88rem;
   font-weight: 600;
@@ -4158,7 +4218,7 @@
 /* Survol : léger fond doré, remontée douce et petit rebond de l'icône. */
 .profile-tab:hover:not(.active):not(:disabled) {
   color: var(--accent-ink);
-  background: color-mix(in srgb, var(--orange) 9%, transparent);
+  background: color-mix(in srgb, var(--tint) 9%, transparent);
   border-bottom-color: color-mix(in srgb, var(--orange) 45%, transparent);
 }
 
@@ -4176,7 +4236,7 @@
 }
 
 .profile-tab:hover:not(:disabled) .tab-count {
-  background: color-mix(in srgb, var(--orange) 22%, transparent);
+  background: color-mix(in srgb, var(--tint) 22%, transparent);
   color: var(--accent-ink);
 }
 
@@ -4219,7 +4279,7 @@
 }
 
 .profile-section-title svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .section-count {
@@ -4542,6 +4602,17 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   gap: 0.7rem;
+}
+
+/* ⚠️ LA PHOTO DE COUVERTURE SE CHOISIT EN PAYSAGE. Elle remplit toute la
+   largeur du haut de la fiche : la proposer sous forme de jaquettes verticales
+   ne montrait pas ce qu'on allait obtenir (comme sur l'app mobile). */
+.picker-grid.wide {
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+}
+.picker-grid.wide .picker-item,
+.picker-grid.wide .picker-upload {
+  aspect-ratio: 16 / 9;
 }
 
 .picker-item,
@@ -4968,7 +5039,7 @@
 }
 .star-row {
   display: flex;
-  gap: 0.15rem;
+  gap: 0.04rem;
   padding: 0.25rem 0.1rem;
   border-radius: 10px;
   color: var(--border-strong);
@@ -4980,7 +5051,13 @@
   outline-offset: 3px;
 }
 .star-row.on {
-  color: #f2b70b;
+  color: var(--accent-ink);
+}
+/* ⚠️ LE SURVOL EST DÉJÀ DORÉ, ET DU MÊME DORÉ. Un aperçu gris disait
+   « désactivé » ; un doré assombri au mélange virait au terne. C'est la même
+   couleur que la note posée : ce qu'on voit est ce qu'on obtient. */
+.star-row.hovering {
+  color: var(--accent-ink);
 }
 .star-cell {
   position: relative;
@@ -5004,11 +5081,29 @@
   align-items: center;
   gap: 0.6rem;
 }
+.star-rating.with-head {
+  width: 100%;
+  align-items: stretch;
+}
+.star-rating.with-head .star-row {
+  justify-content: flex-start;
+  margin-left: -0.2rem;
+}
+.star-rating.with-head .star-foot {
+  justify-content: space-between;
+}
+/* Le mot de la note (« Bien », « Chef-d'œuvre »), celui de l'app mobile. */
+.star-mood {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
 .star-value {
   font-family: var(--font-display);
   font-weight: 800;
   font-size: 1.15rem;
-  color: #f2b70b;
+  color: var(--accent-ink);
 }
 .star-outof {
   margin-left: 0.1rem;

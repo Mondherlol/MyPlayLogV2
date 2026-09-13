@@ -215,7 +215,7 @@
   /* Sur le dock sombre : bouton doré bien visible (fond var(--text) exclu). */
   background: var(--accent-grad);
   color: #23180a;
-  box-shadow: 0 4px 14px rgba(242, 183, 11, 0.28);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--tint) 28%, transparent);
 }
 
 .ld-addbtn.small:hover {
@@ -628,7 +628,7 @@
   bottom: 0;
   z-index: 30;
   /* Aligné et centré sur la colonne de contenu (après la sidebar). */
-  left: calc(var(--app-sidebar-w, 208px) + var(--content-pad, 1.5rem));
+  left: calc(var(--app-sidebar-w, 192px) + var(--content-pad, 1.5rem));
   right: var(--content-pad, 1.5rem);
   transform: none;
   margin-top: 0;
@@ -678,7 +678,7 @@
 }
 
 .tier-pool.is-collapsed .tier-pool-head:hover {
-  background: color-mix(in srgb, var(--orange) 8%, transparent);
+  background: color-mix(in srgb, var(--tint) 8%, transparent);
 }
 
 .tier-pool-title {
@@ -708,14 +708,14 @@
 }
 
 .tier-pool-title svg {
-  color: var(--orange);
+  color: var(--accent-mark);
 }
 
 .tier-pool-count {
   min-width: 1.5rem;
   padding: 0.1rem 0.42rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  background: color-mix(in srgb, var(--tint) 16%, transparent);
   color: var(--accent-ink);
   text-align: center;
   font-size: 0.72rem;
@@ -839,7 +839,7 @@
   padding: 0.55rem 1.1rem;
   border-radius: 999px;
   border: 1.5px dashed color-mix(in srgb, var(--orange) 50%, var(--border));
-  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
   color: var(--accent-ink);
   font-family: var(--font-display);
   font-weight: 600;
@@ -848,7 +848,7 @@
 }
 
 .tier-pool-cta:hover {
-  background: color-mix(in srgb, var(--orange) 22%, transparent);
+  background: color-mix(in srgb, var(--tint) 22%, transparent);
   border-color: color-mix(in srgb, var(--orange) 70%, transparent);
 }
 
@@ -1436,11 +1436,11 @@
 }
 
 .lc-tool:hover {
-  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
 }
 
 .lc-tool.on {
-  background: color-mix(in srgb, var(--orange) 18%, transparent);
+  background: color-mix(in srgb, var(--tint) 18%, transparent);
 }
 
 .lc-tool:disabled {
@@ -1492,7 +1492,7 @@
 
 .lc-count-fg {
   fill: none;
-  stroke: var(--orange);
+  stroke: var(--accent-mark);
   stroke-width: 2.5;
   stroke-linecap: round;
   transition: stroke-dashoffset 0.15s ease, stroke 0.15s ease;
@@ -1887,7 +1887,7 @@
 
 .hist-item.current {
   border-color: color-mix(in srgb, var(--orange) 45%, var(--border));
-  background: color-mix(in srgb, var(--orange) 7%, var(--surface-2));
+  background: color-mix(in srgb, var(--tint) 7%, var(--surface-2));
 }
 
 .hist-item p {

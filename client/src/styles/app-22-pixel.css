@@ -58,7 +58,7 @@
   --bts-gold: #f2b70b;
   --bts-gold-2: #ffd24a;
   --bts-gold-ink: #96690a;
-  --bts-gold-soft: rgba(242, 183, 11, 0.16);
+  --bts-gold-soft: color-mix(in srgb, var(--tint) 16%, transparent);
   --bts-grad: linear-gradient(135deg, #ffd24a, #f2a50b);
   --bts-good: #1f9d55;
   --bts-bad: #d92d33;
@@ -107,7 +107,7 @@
   --bts-gold: #f2b70b;
   --bts-gold-2: #ffd24a;
   --bts-gold-ink: #ffd76b;
-  --bts-gold-soft: rgba(242, 183, 11, 0.14);
+  --bts-gold-soft: color-mix(in srgb, var(--tint) 14%, transparent);
   --bts-grad: linear-gradient(135deg, #ffd24a, #f2a50b);
   --bts-good: #3ddc84;
   --bts-bad: #ff5c62;
@@ -408,7 +408,7 @@
 .px-hero-face.front {
   transform: rotateY(180deg);
   background:
-    radial-gradient(closest-side, rgba(242, 183, 11, 0.18), transparent 76%),
+    radial-gradient(closest-side, color-mix(in srgb, var(--tint) 18%, transparent), transparent 76%),
     linear-gradient(160deg, var(--px-card-2), var(--px-card));
   border-color: rgba(255, 214, 130, 0.4);
 }
@@ -790,12 +790,12 @@
   background: linear-gradient(180deg, var(--px-card-2), var(--px-card));
 }
 .px-page .bt-hint.open {
-  border-color: rgba(242, 183, 11, 0.3);
+  border-color: color-mix(in srgb, var(--tint) 30%, transparent);
   border-top-color: var(--bts-gold);
   background: linear-gradient(
     180deg,
-    rgba(242, 183, 11, 0.18),
-    rgba(242, 183, 11, 0.05)
+    color-mix(in srgb, var(--tint) 18%, transparent),
+    color-mix(in srgb, var(--tint) 5%, transparent)
   );
   color: var(--bts-gold-ink);
 }

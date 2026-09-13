@@ -32,6 +32,7 @@ import {
   UserCheck,
   MessagesSquare,
   PenSquare,
+  Menu,
   Image as ImageIcon,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -122,6 +123,26 @@ export default function Topbar() {
   // « + Log un jeu » : la recherche plein écran qui mène droit à la modale de
   // notation (cf. components/LogGameOverlay.jsx).
   const [logOpen, setLogOpen] = useState(false);
+  // Sur téléphone, le bouton de la barre du haut disparaît : c'est le « + » du
+  // centre de la barre du bas qui ouvre la saisie. Il vit dans la barre
+  // latérale, qui n'a pas la main sur cette modale — il la demande ici.
+  useEffect(() => {
+    const open = () => setLogOpen(true);
+    window.addEventListener("mpl:log-game", open);
+    return () => window.removeEventListener("mpl:log-game", open);
+  }, []);
+
+  // ⚠️ LA BARRE EST TRANSPARENTE TANT QU'ON N'A PAS DÉFILÉ. En haut de page il
+  // n'y a rien dessous : un bandeau plein y coupait le décor de l'accueil (et
+  // les lueurs du fond) d'une bande opaque. Elle ne reprend son verre dépoli
+  // qu'au moment où du contenu passe réellement sous elle.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 6);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   useClickOutside(searchRef, () => closeSearch(), searchOpen);
   useClickOutside(notifRef, () => setMenu(null), menu === "notif");
@@ -337,8 +358,22 @@ export default function Topbar() {
   }
 
   return (
-    <header className="topbar">
+    <header className={`topbar ${scrolled ? "scrolled" : ""}`}>
       {logOpen && <LogGameOverlay onClose={() => setLogOpen(false)} />}
+
+      {/* Le burger, téléphone seulement (cf. `.topbar-burger`). Il ouvre le
+          tiroir des sections que la barre du bas ne peut pas porter — Sorties,
+          Listes, Collection, Arcade. La liste et les droits vivent dans la
+          barre latérale, qui écoute : ici, on se contente de crier. */}
+      <button
+        className="topbar-burger clickable"
+        onClick={() => window.dispatchEvent(new Event("mpl:menu"))}
+        aria-label="Ouvrir le menu"
+        title="Menu"
+      >
+        <Menu size={22} />
+      </button>
+
       <div className="topbar-actions">
         {/* Le geste le plus courant de l'app — enregistrer un jeu auquel on
             vient de jouer — demandait quatre écrans. Il tient ici en un

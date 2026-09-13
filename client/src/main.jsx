@@ -14,6 +14,7 @@ import { CosmeticsProvider } from "./context/CosmeticsContext.jsx";
 import { ChatProvider } from "./context/ChatContext.jsx";
 import { CallProvider } from "./context/CallContext.jsx";
 import { ListenPartyProvider } from "./context/ListenPartyContext.jsx";
+import { GameMenuProvider } from "./components/GameContextMenu.jsx";
 import { applyFonts, getFontPrefs } from "./lib/fonts.js";
 
 // Les polices choisies dans Paramètres → Apparence, AVANT le premier rendu :
@@ -55,7 +56,14 @@ createRoot(document.getElementById("root")).render(
                         lecteur qu'il pilote — une séance d'écoute n'est pas une
                         page, elle continue pendant qu'on navigue. */}
                     <ListenPartyProvider>
-                      <App />
+                      {/* Le clic droit (et l'appui long) sur n'importe quelle
+                          jaquette du site : un seul écouteur au-dessus des
+                          routes, plutôt qu'un branchement par vignette.
+                          Sous la bibliothèque, dont il lit et modifie le
+                          suivi. */}
+                      <GameMenuProvider>
+                        <App />
+                      </GameMenuProvider>
                     </ListenPartyProvider>
                   </PlayerProvider>
                 </LibraryProvider>

@@ -48,7 +48,7 @@
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: var(--accent-soft, rgba(242, 183, 11, 0.14));
+  background: var(--accent-soft, color-mix(in srgb, var(--tint) 14%, transparent));
   color: var(--accent);
   flex: none;
 }
@@ -155,8 +155,8 @@
   margin: 0.7rem 0 0;
   padding: 0.55rem 0.7rem;
   border-radius: var(--radius);
-  background: rgba(242, 183, 11, 0.1);
-  border: 1px solid rgba(242, 183, 11, 0.28);
+  background: color-mix(in srgb, var(--tint) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tint) 28%, transparent);
   font-size: 0.76rem;
   color: var(--text-soft);
 }
@@ -284,7 +284,7 @@
   opacity: 1;
   color: var(--accent);
   border-color: rgba(242, 183, 11, 0.4);
-  background: rgba(242, 183, 11, 0.08);
+  background: color-mix(in srgb, var(--tint) 8%, transparent);
 }
 
 .casestudio-row {

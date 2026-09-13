@@ -102,7 +102,7 @@
 }
 
 .gm-tool:hover:not(:disabled) {
-  background: rgba(242, 183, 11, 0.12);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
 }
 
 .gm-tool:active {
@@ -115,7 +115,7 @@
 }
 
 .gm-tool.on {
-  background: rgba(242, 183, 11, 0.16);
+  background: color-mix(in srgb, var(--tint) 16%, transparent);
 }
 
 .gm-tool-gif {
@@ -1389,6 +1389,11 @@
   color: var(--accent-ink);
 }
 
+/* Le « j'aime » se survole en rouge-rose, comme il s'allume. */
+.gm-act.like:hover {
+  color: var(--like);
+}
+
 .gm-act.liked {
   color: #ff5470;
 }
@@ -1702,7 +1707,7 @@
 
 .ve-q.active {
   border-color: var(--orange);
-  background: rgba(242, 183, 11, 0.1);
+  background: color-mix(in srgb, var(--tint) 10%, transparent);
 }
 
 .ve-q.active em {
@@ -1860,7 +1865,7 @@
   height: 12px;
   border-radius: 50%;
   background: #fff;
-  border: 2px solid var(--accent-ink);
+  border: 2px solid var(--accent-mark);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   pointer-events: none;
 }
@@ -1883,7 +1888,7 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 }
 .ve-clip-video {
-  background: rgba(242, 183, 11, 0.22);
+  background: color-mix(in srgb, var(--tint) 22%, transparent);
   border: 1px solid rgba(242, 183, 11, 0.55);
 }
 .ve-clip-audio {
@@ -2148,7 +2153,7 @@
     100deg,
     transparent 20%,
     rgba(255, 255, 255, 0.07) 45%,
-    rgba(242, 183, 11, 0.1) 50%,
+    color-mix(in srgb, var(--tint) 10%, transparent) 50%,
     rgba(255, 255, 255, 0.07) 55%,
     transparent 80%
   );
@@ -2467,7 +2472,7 @@
   background: transparent;
 }
 .gm-input-field .gm-composer-input::selection {
-  background: rgba(242, 183, 11, 0.3);
+  background: color-mix(in srgb, var(--tint) 30%, transparent);
 }
 
 /* ======================================================================

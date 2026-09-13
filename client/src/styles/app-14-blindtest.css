@@ -77,7 +77,7 @@
 }
 .hf-bt-row:hover { background: var(--surface-2); }
 .hf-bt-row.me {
-  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
 }
 
 .hf-bt-rank {
@@ -176,7 +176,7 @@
 .hf-bt-cta:hover {
   border-color: var(--orange);
   color: var(--accent-ink);
-  background: color-mix(in srgb, var(--orange) 8%, transparent);
+  background: color-mix(in srgb, var(--tint) 8%, transparent);
 }
 .hf-bt-cta svg {
   animation: bt-note-bob 1.8s ease-in-out infinite;
@@ -259,7 +259,7 @@
 .hf-bt-challenge-cta:hover {
   border-color: var(--orange);
   color: var(--accent-ink);
-  background: color-mix(in srgb, var(--orange) 8%, transparent);
+  background: color-mix(in srgb, var(--tint) 8%, transparent);
 }
 :root[data-theme="dark"] .hf-bt-versus.win { color: #3ddc84; }
 
@@ -295,8 +295,8 @@
   border: 1px solid transparent;
 }
 .hf-btg-row.best {
-  background: color-mix(in srgb, var(--orange) 10%, transparent);
-  border-color: color-mix(in srgb, var(--orange) 30%, transparent);
+  background: color-mix(in srgb, var(--tint) 10%, transparent);
+  border-color: color-mix(in srgb, var(--tint) 30%, transparent);
 }
 .hf-btg-pts {
   flex: 0 0 auto;
@@ -364,7 +364,7 @@
 .hf-btg-see:hover {
   border-color: var(--orange);
   color: var(--accent-ink);
-  background: color-mix(in srgb, var(--orange) 8%, transparent);
+  background: color-mix(in srgb, var(--tint) 8%, transparent);
 }
 .hf-btg-see svg { color: var(--accent-ink); }
 
@@ -706,7 +706,7 @@
   font-weight: 700;
   padding: 0.12rem 0.45rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
   color: var(--accent-ink);
   white-space: nowrap;
 }
@@ -816,7 +816,7 @@
   --bts-gold: #f2b70b;
   --bts-gold-2: #ffd24a;
   --bts-gold-ink: #96690a;
-  --bts-gold-soft: rgba(242, 183, 11, 0.14);
+  --bts-gold-soft: color-mix(in srgb, var(--tint) 14%, transparent);
   --bts-grad: linear-gradient(135deg, #ffd24a, #f2a50b);
   --bts-good: #1f9d55;
   --bts-bad: #d92d33;
@@ -848,7 +848,7 @@
 /* ---- Thème sombre ---- */
 :root[data-theme="dark"] .bt-page {
   --bts-bg-base: #0a0b12;
-  --bts-halo-1: rgba(242, 183, 11, 0.17);
+  --bts-halo-1: color-mix(in srgb, var(--tint) 17%, transparent);
   --bts-halo-2: rgba(126, 90, 255, 0.13);
   --bts-halo-3: rgba(24, 130, 240, 0.11);
   --bts-text: #f5f3ea;
@@ -868,7 +868,7 @@
   --bts-scan: rgba(255, 255, 255, 0.028);
   --bts-shadow: rgba(0, 0, 0, 0.85);
   --bts-title-grad: linear-gradient(160deg, #fff 20%, #ffd24a 55%, #f2b70b);
-  --bts-stage-glow: rgba(242, 183, 11, 0.2);
+  --bts-stage-glow: color-mix(in srgb, var(--tint) 20%, transparent);
   --bts-overlay: rgba(4, 5, 9, 0.68);
   --bts-btn-bg: rgba(255, 255, 255, 0.05);
   --bts-btn-bg-2: rgba(255, 255, 255, 0.1);
@@ -1098,7 +1098,7 @@
     radial-gradient(circle at center, #14151d 0 18%, transparent 19%),
     repeating-radial-gradient(circle at center, #16161c 0 2px, #26262e 2px 4px);
   box-shadow:
-    0 0 0 7px rgba(242, 183, 11, 0.18),
+    0 0 0 7px color-mix(in srgb, var(--tint) 18%, transparent),
     0 0 70px rgba(242, 183, 11, 0.32),
     0 24px 50px -18px var(--bts-shadow);
   animation: bt-spin 3.6s linear infinite;
@@ -1130,7 +1130,7 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 6px 26px rgba(242, 183, 11, 0.25));
+  filter: drop-shadow(0 6px 26px color-mix(in srgb, var(--tint) 25%, transparent));
 }
 .bt-sub {
   margin: 0;
@@ -1606,7 +1606,7 @@
 .bt-search:focus-within {
   border-color: var(--bts-gold);
   box-shadow:
-    0 0 0 4px rgba(242, 183, 11, 0.16),
+    0 0 0 4px color-mix(in srgb, var(--tint) 16%, transparent),
     0 14px 40px -18px var(--bts-shadow);
 }
 .bt-search-ic { color: var(--bts-soft); flex: 0 0 auto; }
@@ -2036,7 +2036,7 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 6px 26px rgba(242, 183, 11, 0.3));
+  filter: drop-shadow(0 6px 26px color-mix(in srgb, var(--tint) 30%, transparent));
 }
 .bt-done-score-label {
   text-transform: uppercase;

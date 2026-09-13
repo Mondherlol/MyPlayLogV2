@@ -1333,6 +1333,7 @@ function RecoPreview({ item, token }) {
   return (
     <div
       className="hf-reco clickable"
+      data-game-id={g.id}
       onClick={() => navigate(`/game/${g.id}`)}
       title={g.name}
     >

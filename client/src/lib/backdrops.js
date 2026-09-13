@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "./api";
+import { safeSetItem } from "./storage";
 
 // ======================================================================
 //  Les décors des jeux (une image large par jeu)
@@ -61,4 +62,31 @@ export function useGameBackdrops(ids, token) {
     if (url) out[id] = url;
   }
   return out;
+}
+
+// ======================================================================
+//  Le décor CHOISI pour un jeu, sur cet appareil
+// ======================================================================
+// La photo de couverture qu'on pose soi-même sur une fiche prime sur l'artwork
+// du catalogue. Elle reste LOCALE (comme sur l'app mobile) : c'est un goût, pas
+// une donnée du jeu, et rien ne justifie de l'imposer aux autres.
+//
+// La clé vit ici plutôt que dans la page : le menu contextuel d'une jaquette
+// permet d'en changer sans ouvrir la fiche (cf. components/GameContextMenu),
+// et deux définitions du même nom de clé, c'est un jour où l'une des deux
+// écrit à côté.
+export function backdropKey(id) {
+  return `mpl_bg_${id}`;
+}
+
+export function readBackdrop(id) {
+  try {
+    return localStorage.getItem(backdropKey(id)) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeBackdrop(id, url) {
+  safeSetItem(backdropKey(id), url);
 }

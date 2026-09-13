@@ -1,4 +1,6 @@
 import { platformLabel } from "../lib/platforms";
+import PlatformMark from "../components/PlatformMark";
+import GameSiteIcon from "../components/GameSiteIcon";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -17,9 +19,10 @@ import {
   Users,
   Flame,
   Calendar,
-  Building2,
+  Code2,
   Cpu,
   Layers,
+  Package,
   Clock,
   CalendarClock,
   Play,
@@ -28,7 +31,6 @@ import {
   Heart,
   Infinity as InfinityIcon,
   Plus,
-  Upload,
   ImagePlus,
   ImageOff,
   ExternalLink,
@@ -45,11 +47,15 @@ import {
   Wrench,
   Download,
 } from "lucide-react";
-import { apiFetch, apiUpload } from "../lib/api";
+import { apiFetch } from "../lib/api";
+// La clé du décor choisi vit avec les décors : le menu contextuel d'une
+// jaquette permet d'en changer sans passer par cette page.
+import { backdropKey as bgKey, writeBackdrop } from "../lib/backdrops";
+import { coverAtSize, coverKey, writeCover } from "../lib/gameCover";
 import { makeCache } from "../lib/cache";
 import { downloadImage } from "../lib/download";
-import { safeSetItem } from "../lib/storage";
 import { useAuth } from "../context/AuthContext";
+import { SCALE_STARS, useRatingScale } from "../lib/ratingScale";
 import { useLibrary } from "../context/LibraryContext";
 import ScrollRow from "../components/ScrollRow";
 // Jeu ajouté par lien Steam et pas encore référencé chez IGDB : sa fiche le dit.
@@ -57,6 +63,9 @@ import LocalGameBanner from "../components/LocalGameBanner";
 import RatingInput from "../components/RatingInput";
 import PlayedModal from "../components/PlayedModal";
 import AddToListModal from "../components/AddToListModal";
+import CoverPickerModal from "../components/GameCoverPicker";
+import GameCoverView from "../components/GameCoverView";
+import GameRatingsModal from "../components/GameRatingsModal";
 import GameReviews from "../components/GameReviews";
 import RecommendModal from "../components/RecommendModal";
 import GameCharacters from "../components/GameCharacters";
@@ -140,16 +149,6 @@ function gaugeColor(v) {
   return v < 40 ? "#e0483f" : v < 70 ? "#f2b70b" : "#22a35a";
 }
 
-function bgKey(id) {
-  return `mpl_bg_${id}`;
-}
-
-// Jaquette choisie pour ce jeu (persistée localement pour survivre au refresh
-// même si le jeu n'est pas dans la bibliothèque).
-function coverKey(id) {
-  return `mpl_cover_${id}`;
-}
-
 // Compteur à rebours jusqu'à la sortie (jours / heures / min / sec).
 function ReleaseCountdown({ ts, dateLabel }) {
   const [now, setNow] = useState(Date.now());
@@ -188,15 +187,69 @@ function ReleaseCountdown({ ts, dateLabel }) {
   );
 }
 
+// ======================================================================
+//  Les langues du jeu
+// ======================================================================
+// ⚠️ LES DEUX QUI COMPTENT D'ABORD, LE RESTE SUR DEMANDE. IGDB rend les
+// langues dans SON ordre (celui de ses identifiants), donc un jeu traduit en
+// trente langues montrait trente drapeaux, et le français — la seule réponse
+// qu'un visiteur d'ici vient chercher — se trouvait quelque part au milieu.
+// On remonte donc le français puis l'anglais en tête, on en montre une
+// poignée, et le reste tient derrière un bouton qui dit COMBIEN il en reste :
+// « voir 12 autres » se décide d'un coup d'œil, « voir plus » non.
+const LANGS_SHOWN = 6;
+const LANG_FIRST = [/fran|french/i, /anglais|english/i];
+
+function LanguageList({ languages }) {
+  const [all, setAll] = useState(false);
+  const rank = (l) => {
+    const i = LANG_FIRST.findIndex((re) => re.test(l.name || "") || re.test(l.cc || ""));
+    return i === -1 ? LANG_FIRST.length : i;
+  };
+  // `toSorted` n'existe pas partout : on copie avant de trier, plutôt que de
+  // réordonner le tableau que le parent nous prête.
+  const sorted = [...languages].sort((a, b) => rank(a) - rank(b));
+  const hidden = sorted.length - LANGS_SHOWN;
+  const shown = all || hidden <= 1 ? sorted : sorted.slice(0, LANGS_SHOWN);
+
+  return (
+    <section className="gp-block">
+      <h3 className="gp-h3">
+        <Languages size={14} /> Langues disponibles
+      </h3>
+      <div className="gp-chips">
+        {shown.map((l) => (
+          <span className="gp-chip gp-lang" key={l.name}>
+            {l.cc && /^[a-z]{2}$/.test(l.cc) && (
+              <img
+                className="gp-flag"
+                src={`https://flagcdn.com/20x15/${l.cc}.png`}
+                alt=""
+                loading="lazy"
+              />
+            )}
+            {l.name}
+          </span>
+        ))}
+        {hidden > 1 && (
+          <button className="gp-chip gp-lang-more clickable" onClick={() => setAll(!all)}>
+            {all ? "Voir moins" : `Voir ${hidden} autres`}
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // Jauge circulaire (note en %)
-function Gauge({ value, label, sub }) {
+function Gauge({ value, label, sub, onOpen }) {
   const R = 25;
   const C = 2 * Math.PI * R;
   const pct = Math.max(0, Math.min(100, value));
   const off = C * (1 - pct / 100);
   const color = gaugeColor(value);
-  return (
-    <div className="gp-gauge" title={label}>
+  const inner = (
+    <>
       <div className="gp-gauge-vis">
         <svg viewBox="0 0 60 60" className="gp-gauge-svg">
           <circle cx="30" cy="30" r={R} className="gp-gauge-track" />
@@ -216,7 +269,18 @@ function Gauge({ value, label, sub }) {
       </div>
       <span className="gp-gauge-label">{label}</span>
       {sub != null && <span className="gp-gauge-sub">{sub}</span>}
-    </div>
+    </>
+  );
+
+  // ⚠️ N'IMPORTE LAQUELLE OUVRE TOUT. Les deux jauges de l'en-tête ne sont que
+  // deux des six sources que le serveur connaît : cliquer l'une ou l'autre
+  // ouvre la même liste complète, parce que « je veux voir les notes » ne
+  // distingue pas la jauge sur laquelle on a cliqué.
+  if (!onOpen) return <div className="gp-gauge" title={label}>{inner}</div>;
+  return (
+    <button className="gp-gauge gp-gauge-btn clickable" onClick={onOpen} title="Voir toutes les notes">
+      {inner}
+    </button>
   );
 }
 
@@ -320,6 +384,13 @@ export default function GamePage({
   const [bgOverride, setBgOverride] = useState(null);
   const [coverOverride, setCoverOverride] = useState(null);
   const [showCover, setShowCover] = useState(false);
+  const [coverView, setCoverView] = useState(false);
+  const [ratingsOpen, setRatingsOpen] = useState(false);
+  // ⚠️ LE CLIC DROIT SUR LA PHOTO DE COUVERTURE OUVRE SON MENU, comme sur l'app
+  // Android : une seule entrée, celle qu'on vient chercher là. Le menu retient
+  // l'endroit du clic pour s'y poser.
+  const [bgMenu, setBgMenu] = useState(null);
+  const [showBg, setShowBg] = useState(false);
   const tabsTopRef = useRef(null);
   const tabsNavRef = useRef(null);
   // Drag-to-scroll (souris) + flèches (desktop) de la barre d'onglets, qui
@@ -613,14 +684,14 @@ export default function GamePage({
   // Mémorisée localement pour survivre au refresh, et persistée sur l'entrée de
   // bibliothèque si le jeu y est déjà (pour rester cohérent ailleurs).
   function pickCover(url) {
-    safeSetItem(coverKey(id), url);
+    writeCover(id, url);
     setCoverOverride(url);
     if (fav) patchEntry({ cover: url });
   }
 
   // Définit l'image affichée comme fond de la page (mémorisé localement)
   function setGameCover(url) {
-    safeSetItem(bgKey(id), url);
+    writeBackdrop(id, url);
     setBgOverride(url);
   }
 
@@ -693,9 +764,34 @@ export default function GamePage({
   return (
     <div className={`gamepage ${embedded ? "gp-embedded" : ""}`} {...swipe}>
       {/* Fond flouté */}
-      <div className="gp-backdrop">
+      <div
+        className="gp-backdrop"
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setBgMenu({ x: e.clientX, y: e.clientY });
+        }}
+      >
         {backdrop ? (
-          <img src={backdrop} alt="" draggable="false" />
+          <img
+            src={backdrop}
+            // ⚠️ DEUX TAILLES, ET C'EST LE NAVIGATEUR QUI TRANCHE. Le fond
+            // s'étale sur toute la largeur du contenu : sur un grand écran,
+            // les 1920 px de la version courante sont étirés d'un bon tiers et
+            // l'image bave. On propose donc aussi le fichier d'origine — mais
+            // seulement quand il est plus grand (cf. /games/:id/full), et sans
+            // l'imposer : un téléphone garde la petite.
+            //
+            // Pas de `srcSet` sur une image CHOISIE (menu contextuel, upload) :
+            // elle n'existe qu'en un exemplaire.
+            srcSet={
+              !bgOverride && game.backdropHd
+                ? `${backdrop} 1920w, ${game.backdropHd} ${game.backdropW}w`
+                : undefined
+            }
+            sizes="100vw"
+            alt=""
+            draggable="false"
+          />
         ) : (
           <div className="gp-backdrop-fallback" />
         )}
@@ -722,22 +818,39 @@ export default function GamePage({
         <div className="gp-grid">
           {/* ---------------- Colonne gauche (fixe) ---------------- */}
           <aside className="gp-left" ref={leftRef}>
-            <button
-              className="gp-cover clickable"
-              onClick={() => setShowCover(true)}
-              title="Changer la jaquette"
+            {/* ⚠️ DEUX GESTES, DEUX INTENTIONS. Le clic simple MONTRE la
+                jaquette en grand (c'est ce qu'on attend en cliquant une
+                image) ; la changer demande de le dire — par le bandeau
+                « Modifier » en bas, ou par un clic droit sur la jaquette.
+                Avant, le seul geste disponible remplaçait l'image. */}
+            <div
+              className="gp-cover"
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setShowCover(true);
+              }}
             >
-              {cover ? (
-                <img src={cover} alt={game.name} draggable="false" />
-              ) : (
-                <div className="gp-cover-empty">
-                  <ImageOff size={34} />
-                </div>
-              )}
-              <span className="gp-cover-edit">
+              <button
+                className="gp-cover-view clickable"
+                onClick={() => setCoverView(true)}
+                title="Voir la jaquette en grand"
+              >
+                {cover ? (
+                  <img src={coverAtSize(cover)} alt={game.name} draggable="false" />
+                ) : (
+                  <div className="gp-cover-empty">
+                    <ImageOff size={34} />
+                  </div>
+                )}
+              </button>
+              <button
+                className="gp-cover-edit clickable"
+                onClick={() => setShowCover(true)}
+                title="Changer la jaquette"
+              >
                 <ImagePlus size={15} /> Modifier
-              </span>
-            </button>
+              </button>
+            </div>
 
             {/* Compteur à rebours si le jeu n'est pas encore sorti */}
             {upcoming && <ReleaseCountdown ts={releaseTs} dateLabel={release} />}
@@ -777,7 +890,7 @@ export default function GamePage({
               {/* Jeu joué → « Coup de cœur » ; sinon → « Wishlist ». */}
               {isPlayed ? (
                 <button
-                  className={`gp-action ${fav?.favorite ? "active" : ""}`}
+                  className={`gp-action like ${fav?.favorite ? "active" : ""}`}
                   onClick={toggleFavorite}
                   title="Coup de cœur"
                 >
@@ -917,7 +1030,7 @@ export default function GamePage({
                   )}
                   {game.developers?.[0] && (
                     <span>
-                      <Building2 size={14} />{" "}
+                      <Code2 size={14} />{" "}
                       <CompanyLink
                         name={game.developers[0]}
                         role="dev"
@@ -964,6 +1077,7 @@ export default function GamePage({
                       value={game.playerRating}
                       label="Joueurs"
                       sub={game.playerRatingCount ? `${game.playerRatingCount} avis` : null}
+                      onOpen={() => setRatingsOpen(true)}
                     />
                   )}
                   {game.criticRating != null && (
@@ -971,6 +1085,7 @@ export default function GamePage({
                       value={game.criticRating}
                       label="Critiques"
                       sub={game.criticRatingCount ? `${game.criticRatingCount} tests` : null}
+                      onOpen={() => setRatingsOpen(true)}
                     />
                   )}
                 </div>
@@ -1137,6 +1252,27 @@ export default function GamePage({
         />
       )}
 
+      {ratingsOpen && (
+        <GameRatingsModal
+          gameId={id}
+          gameName={game.name}
+          token={token}
+          onClose={() => setRatingsOpen(false)}
+        />
+      )}
+
+      {coverView && (
+        <GameCoverView
+          cover={cover}
+          name={game.name}
+          onEdit={() => {
+            setCoverView(false);
+            setShowCover(true);
+          }}
+          onClose={() => setCoverView(false)}
+        />
+      )}
+
       {showCover && (
         <CoverPickerModal
           gameId={id}
@@ -1144,6 +1280,53 @@ export default function GamePage({
           currentCover={cover}
           onPick={pickCover}
           onClose={() => setShowCover(false)}
+        />
+      )}
+
+      {/* Le menu du clic droit sur la photo de couverture. Le voile attrape le
+          clic suivant — n'importe où, y compris un autre clic droit. */}
+      {!!bgMenu && (
+        <>
+          <div
+            className="gp-ctx-veil"
+            onMouseDown={() => setBgMenu(null)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setBgMenu(null);
+            }}
+          />
+          <div
+            className="gp-ctx"
+            style={{ top: bgMenu.y, left: bgMenu.x }}
+            role="menu"
+          >
+            <button
+              type="button"
+              role="menuitem"
+              className="gp-ctx-item clickable"
+              onClick={() => {
+                setBgMenu(null);
+                setShowBg(true);
+              }}
+            >
+              <ImagePlus size={15} /> Changer la photo de couverture
+            </button>
+          </div>
+        </>
+      )}
+
+      {showBg && (
+        <CoverPickerModal
+          gameId={id}
+          token={token}
+          title="Choisir une photo de couverture"
+          currentCover={backdrop}
+          onPick={setGameCover}
+          onClose={() => setShowBg(false)}
+          wide
+          extraImages={(game.media || [])
+            .filter((m) => m.type !== "video" && m.url)
+            .map((m) => m.url)}
         />
       )}
 
@@ -1460,6 +1643,11 @@ function FriendsPlayed({ friends }) {
 // « Ma note » de la colonne gauche : note éditable directement, persistée en
 // base sans ouvrir la modale (petit délai pour ne pas spammer l'API en tapant).
 function InlineRating({ value, onSave }) {
+  // En étoiles, le bloc n'a plus ni titre ni cadre à lui : le composant rend
+  // son propre en-tête (titre à gauche, note chiffrée à droite) et il vit déjà
+  // dans une carte — un cadre dans un cadre, c'était un de trop. La jauge en %
+  // garde les siens.
+  const stars = useRatingScale() === SCALE_STARS;
   const [hasRating, setHasRating] = useState(value != null);
   const [rating, setRating] = useState(value ?? 50);
   const timer = useRef(null);
@@ -1475,9 +1663,10 @@ function InlineRating({ value, onSave }) {
   }
 
   return (
-    <div className="rating-block">
-      <span className="rating-block-label">Ma note</span>
+    <div className={`rating-block ${stars ? "stars" : ""}`}>
+      {!stars && <span className="rating-block-label">Ma note</span>}
       <RatingInput
+        heading={stars ? "Ma note" : null}
         value={rating}
         active={hasRating}
         onEnable={() => {
@@ -1535,100 +1724,6 @@ function InlinePlaytime({ value, onSave }) {
   );
 }
 
-// Sélecteur de jaquette (ouvert en cliquant la cover sur la page) : mêmes
-// jaquettes que la modale (IGDB + covers custom) + upload d'une image perso.
-function CoverPickerModal({ gameId, token, currentCover, onPick, onClose }) {
-  const [covers, setCovers] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const fileRef = useRef(null);
-
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    const onKey = (e) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    let alive = true;
-    apiFetch(`/games/${gameId}/details`, { token })
-      .then((d) => alive && setCovers(d.covers || []))
-      .catch(() => alive && setCovers([]));
-    return () => {
-      alive = false;
-      document.body.style.overflow = "";
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [gameId, token, onClose]);
-
-  async function onUpload(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append("cover", file);
-      const data = await apiUpload(`/games/${gameId}/cover`, fd, token);
-      onPick(data.cover.url);
-      onClose();
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  return createPortal(
-    <div className="modal-overlay" onMouseDown={onClose} onClick={(e) => e.stopPropagation()}>
-      <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
-        <button className="modal-close clickable" onClick={onClose} aria-label="Fermer">
-          <X size={20} />
-        </button>
-        <div className="cover-picker">
-          <h3 className="picker-title">Choisir une jaquette</h3>
-          {covers === null ? (
-            <div style={{ display: "grid", placeItems: "center", padding: "2.5rem" }}>
-              <Loader2 size={24} className="spin" />
-            </div>
-          ) : (
-            <div className="picker-grid">
-              <button
-                className="picker-upload clickable"
-                onClick={() => fileRef.current?.click()}
-                disabled={uploading}
-              >
-                {uploading ? (
-                  <Loader2 size={22} className="spin" />
-                ) : (
-                  <>
-                    <Upload size={22} />
-                    <span>Uploader</span>
-                  </>
-                )}
-              </button>
-              {covers.map((c) => (
-                <button
-                  key={c.id}
-                  className={`picker-item clickable ${currentCover === c.url ? "active" : ""}`}
-                  onClick={() => {
-                    onPick(c.url);
-                    onClose();
-                  }}
-                >
-                  <img src={c.url} alt="" loading="lazy" />
-                  {c.custom && <span className="picker-badge">custom</span>}
-                  {currentCover === c.url && (
-                    <span className="picker-check">
-                      <Check size={16} />
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-          <input ref={fileRef} type="file" accept="image/*" hidden onChange={onUpload} />
-        </div>
-      </div>
-    </div>,
-    document.body
-  );
-}
 
 function FavCard({ Icon, title, children, onAdd, filled }) {
   return (
@@ -1654,6 +1749,9 @@ const isBundleGameDone = (b) => b.status === "finished" || b.done;
 
 function InfosTab({ game, entry, onOpenImage, navigate }) {
   const { token } = useAuth();
+  // Un résumé de vingt lignes repoussait tout le reste de la fiche sous la
+  // ligne de flottaison : on en montre le début, le reste à la demande.
+  const [aboutOpen, setAboutOpen] = useState(false);
   const media = game.media || [];
   const videos = media.filter((m) => m.type === "video");
   const images = media.filter((m) => m.type !== "video");
@@ -1703,13 +1801,13 @@ function InfosTab({ game, entry, onOpenImage, navigate }) {
 
   const facts = [
     game.developers?.length && {
-      Icon: Building2,
+      Icon: Code2,
       label: game.developers.length > 1 ? "Développeurs" : "Développeur",
       companies: game.developers,
       role: "dev",
     },
     game.publishers?.length && {
-      Icon: Building2,
+      Icon: Package,
       label: game.publishers.length > 1 ? "Éditeurs" : "Éditeur",
       companies: game.publishers,
       role: "pub",
@@ -1756,7 +1854,20 @@ function InfosTab({ game, entry, onOpenImage, navigate }) {
             )}
           </div>
           {transErr && <p className="gp-translate-err">{transErr}</p>}
-          {shownSummary && <p className="gp-para">{shownSummary}</p>}
+          {shownSummary && (
+            <div className={`gp-about-body ${aboutOpen ? "open" : ""}`}>
+              <p className="gp-para">{shownSummary.trim()}</p>
+              {shownSummary.length > 420 && (
+                <button
+                  type="button"
+                  className="gp-more clickable"
+                  onClick={() => setAboutOpen((v) => !v)}
+                >
+                  {aboutOpen ? "Voir moins" : "Voir plus"}
+                </button>
+              )}
+            </div>
+          )}
           {storyLong && (
             <details className="gp-story">
               <summary className="clickable">Scénario</summary>
@@ -1789,6 +1900,7 @@ function InfosTab({ game, entry, onOpenImage, navigate }) {
                 <button
                   key={s.id}
                   className="gp-similar clickable"
+                  data-game-id={s.id}
                   onClick={() => navigate(`/game/${s.id}`)}
                 >
                   <div className={`gp-similar-cover ${done ? "bundle-done" : ""}`}>
@@ -1922,6 +2034,7 @@ function InfosTab({ game, entry, onOpenImage, navigate }) {
                 onClick={() => navigate(`/platform/${p.id}`)}
                 title={`Voir la console ${platformLabel(p.name)}`}
               >
+                <PlatformMark name={p.name} abbr={p.abbreviation} size={14} />
                 {platformLabel(p.name)}
                 <ChevronRight size={13} />
               </button>
@@ -1931,26 +2044,7 @@ function InfosTab({ game, entry, onOpenImage, navigate }) {
       )}
 
       {game.languages?.length > 0 && (
-        <section className="gp-block">
-          <h3 className="gp-h3">
-            <Languages size={14} /> Langues disponibles
-          </h3>
-          <div className="gp-chips">
-            {game.languages.map((l) => (
-              <span className="gp-chip gp-lang" key={l.name}>
-                {l.cc && /^[a-z]{2}$/.test(l.cc) && (
-                  <img
-                    className="gp-flag"
-                    src={`https://flagcdn.com/20x15/${l.cc}.png`}
-                    alt=""
-                    loading="lazy"
-                  />
-                )}
-                {l.name}
-              </span>
-            ))}
-          </div>
-        </section>
+        <LanguageList languages={game.languages} />
       )}
 
       {game.websites?.length > 0 && (
@@ -1964,9 +2058,10 @@ function InfosTab({ game, entry, onOpenImage, navigate }) {
                 target="_blank"
                 rel="noreferrer"
                 className="gp-link clickable"
+                title={WEBSITE_LABELS[w.kind] || w.kind}
+                aria-label={WEBSITE_LABELS[w.kind] || w.kind}
               >
-                {WEBSITE_LABELS[w.kind] || w.kind}
-                <ExternalLink size={13} />
+                <GameSiteIcon kind={w.kind} />
               </a>
             ))}
           </div>
@@ -1981,6 +2076,7 @@ function InfosTab({ game, entry, onOpenImage, navigate }) {
               <button
                 key={s.id}
                 className="gp-similar clickable"
+                data-game-id={s.id}
                 onClick={() => navigate(`/game/${s.id}`)}
               >
                 <div className="gp-similar-cover">
@@ -2012,22 +2108,55 @@ function InfosTab({ game, entry, onOpenImage, navigate }) {
 // pouvoir lire quoi que ce soit — sans compter la data dépensée sans l'avoir
 // demandé. On attend donc un vrai geste. Choisir une autre bande-annonce EN EST
 // un : à partir de là, la lecture repart d'elle-même.
+// ⚠️ RIEN NE SE LANCE HORS DE L'ÉCRAN. Le lecteur est bas dans la fiche : le
+// charger au montage, c'est une bande-annonce qui tourne (et se télécharge)
+// pendant qu'on lit le résumé, tout en haut. Une fois vu, il reste monté — on
+// ne coupe pas une vidéo parce que son cadre est sorti de l'écran.
+function useInView(ref, threshold = 0.3) {
+  const [seen, setSeen] = useState(false);
+  useEffect(() => {
+    if (seen) return undefined;
+    const el = ref.current;
+    if (!el) return undefined;
+    if (typeof IntersectionObserver === "undefined") {
+      setSeen(true);
+      return undefined;
+    }
+    const io = new IntersectionObserver(
+      ([e]) => e.isIntersecting && setSeen(true),
+      { threshold }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref, seen, threshold]);
+  return seen;
+}
+
 function VideoGallery({ videos }) {
   const [active, setActive] = useState(videos[0].videoId);
   const [asked, setAsked] = useState(false);
   const compact = useMediaQuery("(max-width: 760px)");
   const solo = videos.length === 1;
+  const boxRef = useRef(null);
+  const seen = useInView(boxRef);
+  const poster = videos.find((v) => v.videoId === active)?.thumb || videos[0].thumb;
   return (
-    <div className={`gp-videos ${solo ? "solo" : ""}`}>
+    <div className={`gp-videos ${solo ? "solo" : ""}`} ref={boxRef}>
       <div className="gp-video-main">
         {/* Notre lecteur plutôt que l'iframe nue : volume, ±10 s aux flèches ou
             en double-tapant une moitié, et pas d'habillage YouTube. */}
-        <YouTubePlayer
-          key={active}
-          videoId={active}
-          autoPlay={!compact || asked}
-          title="Bande-annonce"
-        />
+        {seen ? (
+          <YouTubePlayer
+            key={active}
+            videoId={active}
+            autoPlay={!compact || asked}
+            title="Bande-annonce"
+          />
+        ) : (
+          <div className="gp-video-hold" aria-hidden="true">
+            {!!poster && <img src={poster} alt="" loading="lazy" draggable="false" />}
+          </div>
+        )}
       </div>
       {videos.length > 1 && (
         <div className="gp-video-list">

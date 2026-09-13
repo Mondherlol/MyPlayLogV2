@@ -63,6 +63,7 @@ function GameCard({ g }) {
   return (
     <div
       className={`relc clickable ${inWish ? "is-wish" : ""}`}
+      data-game-id={g.gameId}
       onClick={() => navigate(`/game/${g.gameId}`)}
       title={g.name}
     >
@@ -608,6 +609,8 @@ export default function PlatformPage() {
                   <li
                     key={g.gameId}
                     className={`pv-lead-row clickable ${i < 3 ? "top3" : ""}`}
+                    data-game-id={g.gameId}
+                    data-game-name={g.name}
                     onClick={() => navigate(`/game/${g.gameId}`)}
                   >
                     <span className="pv-lead-rank">{i + 1}</span>

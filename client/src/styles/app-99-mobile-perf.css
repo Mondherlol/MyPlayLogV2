@@ -21,8 +21,10 @@
   /* Les barres collées se servaient du flou pour rester lisibles par-dessus le
      contenu qui défile : sans lui, on les rend opaques pour éviter que le texte
      du dessous ne « bave » à travers. */
+  /* La topbar, seulement une fois qu'on a défilé : en haut de page rien ne
+     passe dessous, et elle laisse voir le décor de l'accueil. */
   .navbar,
-  .topbar {
+  .topbar.scrolled {
     background: var(--bg) !important;
   }
 }

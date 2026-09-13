@@ -23,7 +23,7 @@
   background: linear-gradient(180deg, #262a33 0%, #1e2129 100%);
   border: 1px solid rgba(255, 255, 255, 0.09);
   box-shadow:
-    0 -2px 0 rgba(242, 183, 11, 0.12) inset,
+    0 -2px 0 color-mix(in srgb, var(--tint) 12%, transparent) inset,
     0 18px 44px rgba(0, 0, 0, 0.5);
   color: #f3f4f7;
   backdrop-filter: saturate(140%) blur(10px);
@@ -289,7 +289,7 @@ button.mp-disc {
 
 /* Cœur « OST favorite » actif : doré, comme les autres accents. */
 .mp-like.on {
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 
 .mp-like.on:hover {
@@ -440,7 +440,7 @@ body.mpl-open .app-content {
   background: linear-gradient(180deg, #262a33 0%, #1e2129 100%);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow:
-    0 -2px 0 rgba(242, 183, 11, 0.14) inset,
+    0 -2px 0 color-mix(in srgb, var(--tint) 14%, transparent) inset,
     0 10px 30px rgba(0, 0, 0, 0.5);
   animation: mp-rise 0.28s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
@@ -539,7 +539,7 @@ body.mpl-open .app-content {
   border-radius: 13px;
   background: var(--accent-grad);
   color: #1a1204;
-  box-shadow: 0 6px 18px rgba(242, 183, 11, 0.3);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--tint) 30%, transparent);
 }
 
 .mpq-head-txt {
@@ -624,7 +624,7 @@ body.mpl-open .app-content {
 }
 
 .mpq-row.active {
-  background: color-mix(in srgb, var(--orange) 12%, var(--surface-2));
+  background: color-mix(in srgb, var(--tint) 12%, var(--surface-2));
 }
 
 .mpq-index {
@@ -700,7 +700,7 @@ body.mpl-open .app-content {
   width: 3px;
   height: 100%;
   border-radius: 2px;
-  background: var(--accent-ink);
+  background: var(--accent-mark);
   transform-origin: bottom;
   animation: mpq-eq 0.9s ease-in-out infinite;
 }
@@ -788,7 +788,7 @@ body.mpl-open .app-content {
 }
 
 .mp-confirm-modal .modal-title svg {
-  color: var(--orange);
+  color: var(--accent-mark);
 }
 
 .mp-confirm-text {

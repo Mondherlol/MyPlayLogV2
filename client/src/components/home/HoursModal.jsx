@@ -65,6 +65,12 @@ export default function HoursModal({ entry, onClose, onSave }) {
           </button>
           <div className="mh-hours-figure">
             <input
+              /* ⚠️ LE CHAMP SE MESURE À SON CONTENU, IL N'A PAS DE LARGEUR.
+                 Fixé à 100 px, il coupait tout ce qui dépassait quatre signes :
+                 « 451.2 » passait sous le « h ». En `ch` avec des chiffres
+                 tabulaires, une unité vaut exactement l'avance d'un chiffre,
+                 donc le compte est juste quelle que soit la police. */
+              style={{ width: `${Math.max(2, String(value).length)}ch` }}
               value={String(value)}
               onChange={(e) => setValue(e.target.value.replace(/[^0-9]/g, "").slice(0, 5))}
               inputMode="numeric"

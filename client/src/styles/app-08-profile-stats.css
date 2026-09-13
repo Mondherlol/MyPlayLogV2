@@ -20,7 +20,7 @@
   --ps-card-shadow: 0 1px 2px rgba(20, 20, 40, 0.04), 0 6px 24px rgba(20, 20, 40, 0.05);
   --ps-card-shadow-hover: 0 2px 4px rgba(20, 20, 40, 0.05), 0 14px 36px rgba(20, 20, 40, 0.09);
   --ps-hero-number: var(--brand-grad);
-  --ps-chip-bg: rgba(242, 183, 11, 0.13);
+  --ps-chip-bg: color-mix(in srgb, var(--tint) 13%, transparent);
 
   display: flex;
   flex-direction: column;
@@ -32,7 +32,7 @@
 
 :root[data-theme="dark"] .ps {
   --ps-bar: #f2b70b;
-  --ps-bar-track: rgba(242, 183, 11, 0.14);
+  --ps-bar-track: color-mix(in srgb, var(--tint) 14%, transparent);
   --ps-c-playing: #3987e5;
   --ps-c-endless: #2cb8c7;
   --ps-c-finished: #199e70;
@@ -96,8 +96,8 @@
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(460px 260px at 10% -10%, rgba(242, 183, 11, 0.16), transparent 68%),
-    radial-gradient(300px 200px at 100% 120%, rgba(242, 183, 11, 0.07), transparent 70%);
+    radial-gradient(460px 260px at 10% -10%, color-mix(in srgb, var(--tint) 16%, transparent), transparent 68%),
+    radial-gradient(300px 200px at 100% 120%, color-mix(in srgb, var(--tint) 7%, transparent), transparent 70%);
 }
 .ps-hero-main {
   position: relative;
@@ -168,7 +168,7 @@
   display: grid;
   place-items: center;
   background: var(--ps-chip-bg);
-  color: var(--accent-ink);
+  color: var(--accent-mark);
   margin-bottom: 0.3rem;
 }
 .ps-tile-value {
@@ -238,7 +238,7 @@
   display: grid;
   place-items: center;
   background: var(--ps-chip-bg);
-  color: var(--accent-ink);
+  color: var(--accent-mark);
   flex-shrink: 0;
 }
 .ps-card-sub {
@@ -584,7 +584,7 @@
   border-radius: var(--radius);
   background: linear-gradient(
     120deg,
-    rgba(242, 183, 11, 0.12),
+    color-mix(in srgb, var(--tint) 12%, transparent),
     rgba(255, 210, 74, 0.04)
   );
   border: 1px solid rgba(242, 183, 11, 0.35);
@@ -592,7 +592,7 @@
 }
 .ps-marathon-hero:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(242, 183, 11, 0.18);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--tint) 18%, transparent);
 }
 .ps-marathon-hero img {
   width: 46px;
@@ -920,7 +920,7 @@
   border-radius: var(--radius);
   background: linear-gradient(
     120deg,
-    rgba(242, 183, 11, 0.12),
+    color-mix(in srgb, var(--tint) 12%, transparent),
     rgba(255, 210, 74, 0.05)
   );
   border: 1px solid rgba(242, 183, 11, 0.35);
@@ -928,7 +928,7 @@
 }
 .ps-soulmate:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(242, 183, 11, 0.18);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--tint) 18%, transparent);
 }
 .ps-soulmate-avatar,
 .ps-soulmate-avatar img,
@@ -1037,7 +1037,7 @@
 .ps-common-all:hover {
   color: var(--accent-ink);
   border-color: var(--orange);
-  background: rgba(242, 183, 11, 0.07);
+  background: color-mix(in srgb, var(--tint) 7%, transparent);
 }
 .ps-runnerups {
   list-style: none;

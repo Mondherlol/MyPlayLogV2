@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Bell, BellRing, Radio } from "lucide-react";
 import PlatformMark from "../PlatformMark";
@@ -27,6 +28,10 @@ import {
 export default function EventCard({ event, now, onToggleInterest }) {
   const theme = brandTheme(event.brand);
   const { big, live, over } = countdown(event, now || Date.now());
+  // Une miniature qui ne charge pas (vidéo retirée, lien mort) retombe sur le
+  // logo de la marque : un cadre noir avec l'icône d'image cassée faisait
+  // croire que toute la rangée était en panne.
+  const [broken, setBroken] = useState(false);
 
   const time = localTime(event.startsAt, event.precision);
   const duration = durationLabel(event.durationMin);
@@ -49,8 +54,14 @@ export default function EventCard({ event, now, onToggleInterest }) {
         to={`/event/${event.id}`}
         title={event.name}
       >
-        {event.image ? (
-          <img src={event.image} alt="" loading="lazy" draggable="false" />
+        {event.image && !broken ? (
+          <img
+            src={event.image}
+            alt=""
+            loading="lazy"
+            draggable="false"
+            onError={() => setBroken(true)}
+          />
         ) : (
           // Le repli : le logo de la marque, entier et centré, sur son dégradé.
           // C'est le seul cas où l'on dessine soi-même le cadre, donc le seul

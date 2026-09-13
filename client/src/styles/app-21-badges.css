@@ -69,7 +69,7 @@
 }
 
 .pb-hero-ring-in svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .pb-hero-ring-in strong {
@@ -119,14 +119,14 @@
   padding: 0.35rem 0.75rem;
   border: 1px solid rgba(242, 183, 11, 0.42);
   border-radius: 999px;
-  background: rgba(242, 183, 11, 0.12);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
   font-weight: 700;
   font-size: 0.86rem;
   font-variant-numeric: tabular-nums;
 }
 
 .pb-hero-points svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 /* Rappel « tu as des récompenses qui t'attendent » : il pulse doucement. */
@@ -201,7 +201,7 @@
 .pb-badge.ready {
   border-color: color-mix(in srgb, var(--orange) 60%, transparent);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--orange) 35%, transparent),
-    0 10px 30px color-mix(in srgb, var(--orange) 18%, transparent);
+    0 10px 30px color-mix(in srgb, var(--tint) 18%, transparent);
 }
 
 .pb-badge.ready::before {
@@ -210,7 +210,7 @@
   inset: 0;
   background: linear-gradient(
     115deg,
-    color-mix(in srgb, var(--orange) 14%, transparent),
+    color-mix(in srgb, var(--tint) 14%, transparent),
     transparent 60%
   );
   pointer-events: none;
@@ -227,7 +227,7 @@
 
 @keyframes pb-burst {
   0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--orange) 60%, transparent); }
-  55% { box-shadow: 0 0 0 16px color-mix(in srgb, var(--orange) 0%, transparent); }
+  55% { box-shadow: 0 0 0 16px color-mix(in srgb, var(--tint) 0%, transparent); }
   100% { box-shadow: var(--shadow-sm); }
 }
 
@@ -516,7 +516,7 @@
   gap: 0.25rem;
   padding: 0.28rem 0.6rem;
   border-radius: 999px;
-  background: rgba(242, 183, 11, 0.14);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
   color: var(--accent-ink);
   font-family: var(--font-display);
   font-weight: 800;
@@ -681,7 +681,7 @@
   height: 32px;
   border-radius: 9px;
   background: var(--surface-2);
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .am-row-foot {

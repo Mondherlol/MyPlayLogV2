@@ -1,0 +1,111 @@
+/* ======================================================================
+   Le menu contextuel d'un jeu (clic droit, appui long)
+   cf. components/GameContextMenu.jsx
+   ====================================================================== */
+
+.gmenu {
+  position: fixed;
+  /* Au-dessus de tout ce qui n'est pas une modale : il s'ouvre aussi bien sur
+     une grille que par-dessus le lecteur ou la barre d'appel. */
+  z-index: 5200;
+  min-width: 244px;
+  max-width: min(300px, calc(100vw - 16px));
+  padding: 5px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
+  /* Un menu qui apparaît sous le curseur, pas qui glisse : la position EST
+     l'information, une animation qui la déplace la contredit. */
+  animation: gmenu-in 90ms ease-out;
+}
+@keyframes gmenu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+/* Le nom du jeu, en tête : le menu s'ouvre au milieu d'une grille de jaquettes
+   qui se ressemblent toutes, et se tromper de ligne veut dire retirer le
+   mauvais jeu de sa bibliothèque. */
+.gmenu-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 5px 8px 7px;
+  color: var(--text-soft);
+  font-size: 0.72rem;
+}
+.gmenu-head img {
+  width: 22px;
+  height: 29px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex: none;
+}
+.gmenu-head b {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gmenu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  border: 0;
+  background: var(--border);
+}
+
+.gmenu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.44rem 0.55rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  text-align: left;
+}
+.gmenu-item svg {
+  flex: none;
+}
+.gmenu-item:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.gmenu-item:disabled {
+  opacity: 0.5;
+}
+
+/* Déjà dans la wishlist : le marque-page est plein et doré, comme sur la
+   jaquette. On lit l'état sans lire le libellé.
+
+   ⚠️ LE DORÉ VA SUR L'ICÔNE, PAS SUR LE TEXTE — et c'est `--accent-mark`, pas
+   `--accent-ink`. En thème clair, l'encre du site est NOIRE (un jaune posé sur
+   du blanc ne se lit plus) : le marque-page « rangé » sortait donc noir, et
+   rien ne distinguait plus un jeu de la wishlist d'un autre. `--accent-mark`
+   est le doré des SIGNES, le même dans les deux thèmes. */
+.gmenu-item.on svg {
+  color: var(--accent-mark);
+}
+/* Et le coup de cœur reste rose — le doré dit « rangé », le rose dit
+   « aimé », et les confondre revient à n'avoir qu'un seul signe pour deux
+   choses différentes. */
+.gmenu-item.like {
+  color: var(--like);
+}
+.gmenu-item.danger {
+  color: #e05555;
+}
+.gmenu-item.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, #e05555 14%, transparent);
+}

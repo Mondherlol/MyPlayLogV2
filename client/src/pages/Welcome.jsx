@@ -5,7 +5,6 @@ import {
   ChevronRight,
   Clapperboard,
   Smartphone,
-  Compass,
   Joystick,
   Plus,
   Settings,
@@ -18,6 +17,9 @@ import { useLibrary } from "../context/LibraryContext";
 import { useClickOutside } from "../hooks/useClickOutside";
 import { apiFetch } from "../lib/api";
 import { apiCached, isFreshApi, peekApi, writeApi } from "../lib/query";
+// Le décor qu'on a choisi soi-même pour un jeu : la clé vit avec les décors,
+// pas dans chaque page qui l'affiche.
+import { readBackdrop as chosenBackdrop } from "../lib/backdrops";
 import DocumentaryModal from "../components/DocumentaryModal";
 import DiscoverGemsModal, { GEMS_RESUME_KEY } from "../components/DiscoverGemsModal";
 import Section, { Rail } from "../components/home/Rail";
@@ -42,13 +44,11 @@ import { useGameBackdrops } from "../lib/backdrops";
 import {
   dustyGames,
   favoriteGames,
-  greeting,
   lovedPoolSize,
   lovedSeed,
   nowPlaying,
   recentlyFinished,
   sinceLabel,
-  todayLabel,
   todayReleasesPath,
   tonightPick,
   wishlistGames,
@@ -63,8 +63,8 @@ import { countdown, needsTicker, shortDate, useSecondsTicker } from "../lib/home
 // l'accueil du téléphone :
 //
 //   • en haut, toute la largeur : ce qu'il joue en ce moment ;
-//   • à gauche : ce qui arrive (Directs, conférences), ses envies, les sorties
-//     du jour, les plus attendus, puis le monde extérieur (placard, gratuits,
+//   • à gauche : ses envies, les plus attendus, ce qui arrive (Directs,
+//     conférences), les sorties du jour, puis le monde extérieur (placard, gratuits,
 //     découverte, OST) et, tout en bas, ce qu'il a déjà fait (terminés, coups
 //     de cœur, « parce que tu as adoré … ») ;
 //   • à droite : que des ACTIONS (mot du jour, ce soir, documentaire, pépite,
@@ -91,6 +91,10 @@ function loadPrefs() {
   return DEFAULT_PREFS;
 }
 
+// ⚠️ LE DÉCOR D'UN JEU, C'EST CELUI QU'ON LUI A CHOISI. La fiche du jeu laisse
+// définir son image de fond (gardée sous `mpl_bg_<id>`, cf. GamePage) : les
+// cartes « en cours » la reprennent, et ne retombent sur l'artwork d'IGDB que
+// si personne n'a rien choisi.
 // L'accueil ne montre que ce qui SE REGARDE. Les salons (gamescom, TGS) sont
 // dans le calendrier complet : ils durent quatre jours et se visitent, ils n'ont
 // rien à faire dans un rail de comptes à rebours.
@@ -287,7 +291,49 @@ export default function Welcome() {
   const lovedCount = useMemo(() => lovedPoolSize(library), [library]);
   // Trois bandes de plus, tirées de la MÊME liste déjà chargée : elles
   // s'affichent avant même qu'IGDB ait répondu (cf. lib/home).
-  const wanted = useMemo(() => wishlistGames(library), [library]);
+  // ⚠️ « CE QUE TU POURRAIS COMMENCER » NE PROPOSE PAS CE QUI N'EST PAS SORTI.
+  // Une wishlist mélange les deux : ce qu'on peut lancer ce soir et ce qu'on
+  // attend pour l'an prochain. Le rayon répond à « je prends quoi maintenant »,
+  // et un jeu qui ne sort qu'en novembre n'est pas une réponse — il a déjà son
+  // rayon, « les plus attendus », juste en dessous.
+  //
+  // On en prend large (40) AVANT de filtrer : sinon une wishlist pleine de
+  // sorties à venir viderait un rayon qui avait de quoi se remplir.
+  const wishPool = useMemo(() => wishlistGames(library, 40), [library]);
+  // Les dates de sortie des souhaits : une entrée de bibliothèque n'en porte
+  // pas (elle ne retient que le nom et la jaquette), il faut les demander. Une
+  // seule requête pour tout le rayon, gardée une journée — une date de sortie
+  // ne bouge pas d'une visite à l'autre.
+  const [wishRelease, setWishRelease] = useState({});
+  const wishKey = wishPool.map((e) => e.gameId).join(",");
+  useEffect(() => {
+    if (!token || !wishKey) return undefined;
+    let alive = true;
+    apiCached(`/games/list-details?ids=${wishKey}`, {
+      token,
+      scope,
+      maxAge: MAX_AGE.similar,
+    })
+      .then((d) => {
+        if (!alive) return;
+        const by = {};
+        for (const g of d.games || []) by[g.id] = g.releaseDate ?? null;
+        setWishRelease(by);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [token, scope, wishKey]);
+
+  const wanted = useMemo(() => {
+    const now = Date.now() / 1000;
+    return wishPool
+      // Sans date connue, on garde : IGDB en oublie sur de vieux jeux, et les
+      // faire disparaître de SA PROPRE wishlist serait incompréhensible.
+      .filter((e) => !(wishRelease[e.gameId] > now))
+      .slice(0, 16);
+  }, [wishPool, wishRelease]);
   const finished = useMemo(() => recentlyFinished(library), [library]);
   const favorites = useMemo(() => favoriteGames(library), [library]);
   const owned = useMemo(() => new Set((library || []).map((e) => String(e.gameId))), [library]);
@@ -361,6 +407,7 @@ export default function Welcome() {
     ),
     token
   );
+  const gameArt = (e) => chosenBackdrop(e.gameId) || backdrops[String(e.gameId)] || null;
 
   // « Parce que tu as adoré … ». On passe par la fiche complète du jeu adoré :
   // c'est elle qui porte les jeux voisins selon IGDB.
@@ -545,7 +592,6 @@ export default function Welcome() {
       key: "hot",
       label: "Du moment",
       title: "Les jeux du moment",
-      hint: "Ce que tout le monde regarde en ce moment",
       more: "/explore",
       games: hot,
       sub: (g) => (g.rating ? `${g.rating} %` : null),
@@ -555,7 +601,6 @@ export default function Welcome() {
       key: "forYou",
       label: "Pour toi",
       title: "Ça devrait te plaire",
-      hint: "Selon les genres de ta bibliothèque",
       more: "/explore",
       games: forYou,
       sub: (g) => (g.year ? String(g.year) : null),
@@ -565,7 +610,6 @@ export default function Welcome() {
       key: "indies",
       label: "Indés",
       title: "Sorties indés",
-      hint: "Le meilleur de l'indé, juste sorti ou tout proche",
       more: "/explore?gen=32",
       games: indies,
       sub: () => null,
@@ -583,23 +627,11 @@ export default function Welcome() {
 
   return (
     <div className="mh">
-      {/* --- L'en-tête. Il ne dépend de rien : jamais de squelette ici. --- */}
-      <header className="mh-hero">
-        <div className="mh-hero-txt">
-          <h1 className="mh-hero-title">
-            {greeting()} <span className="grad-text">{user?.username}</span>
-          </h1>
-          <p className="mh-hero-sub">{todayLabel()}</p>
-        </div>
-        <div className="mh-hero-acts">
-          <Link to="/explore" className="mh-pill ghost clickable">
-            <Compass size={15} /> Explorer
-          </Link>
-          <Link to="/explore" className="mh-pill gold solid clickable">
-            <Plus size={15} /> Ajouter un jeu
-          </Link>
-        </div>
-      </header>
+      {/* ⚠️ PLUS DE SALUT NI DE DATE EN TÊTE. « Bonjour pseudo », le jour de la
+          semaine et deux boutons (Explorer, Ajouter) prenaient le haut de la
+          page pour ne rien dire qu'on ne sache déjà — les deux boutons sont
+          dans la barre du haut et la barre latérale. La page s'ouvre
+          directement sur le jeu en cours, en grand, comme une console. */}
 
       {/* ⚠️ DEUX COLONNES, MAIS UN SEUL ORDRE DE LECTURE. Au-dessus de 1360 px,
           `.mh-side` devient une colonne de droite ; en dessous, les deux
@@ -607,6 +639,7 @@ export default function Welcome() {
           remet chaque rayon à sa place dans le fil (cf. app-47-home.css). */}
       {/* --- Le bandeau du haut : ce qu'on joue, sur toute la largeur. --- */}
       <section className="mh-top">
+        {/* Des cartes, sur toutes les tailles d'écran. */}
         {library === null ? (
           // Le TITRE ne dépend de rien et s'affiche tel quel ; seules les cartes
           // attendent leur donnée.
@@ -614,27 +647,29 @@ export default function Welcome() {
             <SkelRepeat of={SkelNowPlaying} count={3} />
           </Section>
         ) : playing.length > 0 ? (
-          <Section
-            kicker="Tu joues à"
-            title={
-              playing.length > 1 ? `${playing.length} parties en cours` : "Ta partie en cours"
-            }
-            className="mh-sec-np"
-          >
-            {playing.map((e) => (
-              <NowPlayingCard
-                key={e.gameId}
-                entry={e}
-                backdrop={backdrops[String(e.gameId)]}
-                busy={busyId === e.gameId}
-                onHours={() => setHoursFor(e)}
-                onFinish={() => finish(e)}
-                onPause={() => patch(e, { status: "paused" })}
-                onDrop={() => patch(e, { status: "dropped" })}
-                onFavorite={(want) => patch(e, { favorite: want })}
-              />
-            ))}
-          </Section>
+          <>
+            <Section
+              kicker="Tu joues à"
+              title={
+                playing.length > 1 ? `${playing.length} parties en cours` : "Ta partie en cours"
+              }
+              className="mh-sec-np"
+            >
+              {playing.map((e) => (
+                <NowPlayingCard
+                  key={e.gameId}
+                  entry={e}
+                  backdrop={gameArt(e)}
+                  busy={busyId === e.gameId}
+                  onHours={() => setHoursFor(e)}
+                  onFinish={() => finish(e)}
+                  onPause={() => patch(e, { status: "paused" })}
+                  onDrop={() => patch(e, { status: "dropped" })}
+                  onFavorite={(want) => patch(e, { favorite: want })}
+                />
+              ))}
+            </Section>
+          </>
         ) : (
           <Link to="/explore" className="mh-empty clickable">
             <span className="mh-empty-ic">
@@ -649,14 +684,76 @@ export default function Welcome() {
       </section>
 
       <div className="mh-col">
-        {/* --- Directs et showcases, en tête de colonne ------------------
-            Un rendez-vous a une heure : c'est la deuxième chose qu'on vient
-            vérifier en ouvrant la page, juste après ce qu'on joue. */}
+        {/* --- Tes envies ------------------------------------------------
+            ⚠️ EN HAUT, ET PAS EN BAS AVEC LES RAYONS DE CATALOGUE. C'est une
+            liste qu'on a écrite soi-même : elle répond à « bon, je prends quoi
+            ensuite ? ». */}
+        {library === null ? (
+          <Section
+            kicker="Tes envies"
+            title="Ce que tu pourrais commencer"
+            moreTo="/profile?tab=allgames&st=wishlist"
+            moreLabel="Tout voir"
+            className="s-wish"
+            snap={false}
+          >
+            <SkelRepeat of={SkelTile} count={8} />
+          </Section>
+        ) : (
+          wanted.length > 0 && (
+            <Section
+              kicker="Tes envies"
+              title="Ce que tu pourrais commencer"
+              moreTo="/profile?tab=allgames&st=wishlist"
+              moreLabel="Tout voir"
+              className="s-wish"
+            >
+              {wanted.map((e) => (
+                <GameTile key={e.gameId} game={e} sub={sinceLabel(e.updatedAt)} bare />
+              ))}
+            </Section>
+          )
+        )}
+
+        {/* --- Les plus attendus ----------------------------------------- */}
+        {discover === null ? (
+          <Section
+            kicker="Compte à rebours"
+            title="Les plus attendus"
+            className="s-awaited"
+            snap={false}
+          >
+            <SkelRepeat of={SkelAnticipated} count={4} />
+          </Section>
+        ) : (
+          awaited.length > 0 && (
+            <Section
+              kicker="Compte à rebours"
+              title="Les plus attendus"
+              className="s-awaited"
+            >
+              {awaited.map((g) => (
+                <AnticipatedCard
+                  key={g.id}
+                  game={g}
+                  backdrop={backdrops[String(g.id)]}
+                  now={tick}
+                  wished={wishlist.has(String(g.id))}
+                  friends={awaitedFaces.get(String(g.id)) || []}
+                  onToggleWish={(want) => toggleWish(g, want)}
+                />
+              ))}
+            </Section>
+          )
+        )}
+
+        {/* --- Directs et showcases ----------------------------------------
+            Un rendez-vous a une heure : on vient le vérifier juste après ses
+            envies et les sorties qu'on attend. */}
         {events === null ? (
           <Section
             kicker="Ce qui arrive"
             title="Directs et showcases"
-            hint="Les rendez-vous à ne pas manquer"
             className="s-events"
             snap={false}
           >
@@ -667,7 +764,6 @@ export default function Welcome() {
             <Section
               kicker="Ce qui arrive"
               title="Directs et showcases"
-              hint="Les rendez-vous à ne pas manquer"
               className="s-events"
             >
               {sortedEvents.map((ev) => (
@@ -689,7 +785,6 @@ export default function Welcome() {
           <Section
             kicker="Ce qui a été annoncé"
             title="Les dernières conférences"
-            hint="Chaque Direct, chaque showcase, et tous les jeux qu'on y a vus"
             moreTo="/lists"
             moreLabel="Toutes les listes"
             className="s-elists"
@@ -702,45 +797,12 @@ export default function Welcome() {
             <Section
               kicker="Ce qui a été annoncé"
               title="Les dernières conférences"
-              hint="Chaque Direct, chaque showcase, et tous les jeux qu'on y a vus"
               moreTo="/lists"
               moreLabel="Toutes les listes"
               className="s-elists"
             >
               {eventLists.map((l) => (
                 <EventListCard key={l.id} list={l} />
-              ))}
-            </Section>
-          )
-        )}
-
-        {/* --- Tes envies ------------------------------------------------
-            ⚠️ EN HAUT, ET PAS EN BAS AVEC LES RAYONS DE CATALOGUE. C'est une
-            liste qu'on a écrite soi-même : elle répond à « bon, je prends quoi
-            ensuite ? ». */}
-        {library === null ? (
-          <Section
-            kicker="Tes envies"
-            title="Ce que tu veux jouer"
-            moreTo="/profile?tab=allgames&st=wishlist"
-            moreLabel="Tout voir"
-            className="s-wish"
-            snap={false}
-          >
-            <SkelRepeat of={SkelTile} count={8} />
-          </Section>
-        ) : (
-          wanted.length > 0 && (
-            <Section
-              kicker="Tes envies"
-              title="Ce que tu veux jouer"
-              hint={`${wanted.length} jeu${wanted.length > 1 ? "x" : ""} de côté`}
-              moreTo="/profile?tab=allgames&st=wishlist"
-              moreLabel="Tout voir"
-              className="s-wish"
-            >
-              {wanted.map((e) => (
-                <GameTile key={e.gameId} game={e} sub={sinceLabel(e.updatedAt)} />
               ))}
             </Section>
           )
@@ -754,7 +816,6 @@ export default function Welcome() {
           <Section
             kicker="Aujourd'hui"
             title="Ça sort maintenant"
-            hint="Les sorties du jour, du plus attendu au moins attendu"
             moreTo="/releases"
             moreLabel="Calendrier"
             className="s-today"
@@ -769,40 +830,6 @@ export default function Welcome() {
           </Section>
         )}
 
-        {/* --- Les plus attendus ----------------------------------------- */}
-        {discover === null ? (
-          <Section
-            kicker="Compte à rebours"
-            title="Les plus attendus"
-            hint="Mets-les de côté, tu seras prévenu"
-            className="s-awaited"
-            snap={false}
-          >
-            <SkelRepeat of={SkelAnticipated} count={4} />
-          </Section>
-        ) : (
-          awaited.length > 0 && (
-            <Section
-              kicker="Compte à rebours"
-              title="Les plus attendus"
-              hint="Mets-les de côté, tu seras prévenu"
-              className="s-awaited"
-            >
-              {awaited.map((g) => (
-                <AnticipatedCard
-                  key={g.id}
-                  game={g}
-                  backdrop={backdrops[String(g.id)]}
-                  now={tick}
-                  wished={wishlist.has(String(g.id))}
-                  friends={awaitedFaces.get(String(g.id)) || []}
-                  onToggleWish={(want) => toggleWish(g, want)}
-                />
-              ))}
-            </Section>
-          )
-        )}
-
         {/* ⚠️ À PARTIR D'ICI, PLUS DE SQUELETTES. Ces rayons sont sous la ligne
             de flottaison : personne ne les voit charger, et les annoncer par
             des rectangles gris ne ferait qu'allonger la page d'attente. Ils
@@ -813,11 +840,10 @@ export default function Welcome() {
           <Section
             kicker="Le placard"
             title="Tu les avais commencés"
-            hint="Plus touchés depuis un moment"
             className="s-dusty"
           >
             {dusty.map((e) => (
-              <GameTile key={e.gameId} game={e} sub={sinceLabel(e.updatedAt)} />
+              <GameTile key={e.gameId} game={e} sub={sinceLabel(e.updatedAt)} bare />
             ))}
           </Section>
         )}
@@ -827,7 +853,6 @@ export default function Welcome() {
           <Section
             kicker="À récupérer"
             title="Gratuit en ce moment"
-            hint={`${free.length} offre${free.length > 1 ? "s" : ""} · Epic · Steam · GOG · Prime…`}
             className="s-free"
           >
             {free.map((g) => (
@@ -846,7 +871,6 @@ export default function Welcome() {
                 <span className="mh-head-text">
                   <span className="mh-kicker">Découvrir</span>
                   <span className="mh-head-title">{current.title}</span>
-                  <span className="mh-head-hint">{current.hint}</span>
                 </span>
               </div>
 
@@ -891,13 +915,17 @@ export default function Welcome() {
           <Section
             kicker="Derrière toi"
             title="Tes derniers terminés"
-            hint="Ce que tu as fini, du plus récent au plus ancien"
             moreTo="/profile?tab=allgames&st=finished"
             moreLabel="Tout voir"
             className="s-done"
           >
             {finished.map((e) => (
-              <GameTile key={e.gameId} game={e} sub={sinceLabel(e.finishedAt || e.updatedAt)} />
+              <GameTile
+                key={e.gameId}
+                game={e}
+                sub={sinceLabel(e.finishedAt || e.updatedAt)}
+                bare
+              />
             ))}
           </Section>
         )}
@@ -907,7 +935,6 @@ export default function Welcome() {
           <Section
             kicker="Ton étagère"
             title="Tes coups de cœur"
-            hint="Les jeux que tu as aimés au point de les marquer"
             moreTo="/profile"
             moreLabel="Ton profil"
             className="s-fav"
@@ -918,6 +945,7 @@ export default function Welcome() {
                 game={e}
                 sub={e.rating ? `${e.rating} %` : null}
                 subGold={!!e.rating && e.rating >= 85}
+                bare
               />
             ))}
           </Section>
@@ -928,7 +956,6 @@ export default function Welcome() {
           <Section
             kicker="Parce que tu as adoré"
             title={loved.name}
-            hint="Des jeux de la même famille"
             cover={loved.cover}
             titleTo={`/game/${loved.gameId}`}
             onRefresh={lovedCount > 1 ? () => setLovedShift((n) => n + 1) : null}
@@ -965,7 +992,6 @@ export default function Welcome() {
                 <span className="mh-head-text">
                   <span className="mh-kicker">Ce soir</span>
                   <span className="mh-head-title">Tu joues à quoi ?</span>
-                  <span className="mh-head-hint">Une proposition, tirée de ce qui t'attend</span>
                 </span>
               </div>
             </div>
@@ -991,7 +1017,6 @@ export default function Welcome() {
               </span>
               <span className="mh-door-txt">
                 <b>Lancer un documentaire</b>
-                <i>Sur les jeux que tu as joués</i>
               </span>
             </button>
             <div className="mh-door-gear" ref={settingsRef}>
@@ -1056,7 +1081,6 @@ export default function Welcome() {
             </span>
             <span className="mh-door-txt">
               <b>Découvrir une pépite indé</b>
-              <i>3 jeux que tu aimes → des pépites sur mesure</i>
             </span>
           </button>
 
@@ -1066,7 +1090,6 @@ export default function Welcome() {
             </span>
             <span className="mh-door-txt">
               <b>Arcade</b>
-              <i>Mini-jeux, classements et curseurs</i>
             </span>
             <span className="mh-door-points">
               <Coins size={13} />
@@ -1083,7 +1106,6 @@ export default function Welcome() {
             </span>
             <span className="mh-door-txt">
               <b>App Android</b>
-              <i>Ta bibliothèque dans ta poche</i>
             </span>
           </Link>
         </section>

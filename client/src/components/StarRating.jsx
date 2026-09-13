@@ -13,15 +13,34 @@
 //   • à la SAISIE, on tombe sur les demi-étoiles. Personne ne vise 4,15 : les
 //     échelles en étoiles se pensent par crans d'une demie, et laisser glisser
 //     au centième donnerait une note impossible à reproduire.
+//
+// ⚠️ `moodTop` : le MOT de la note (« Chef-d'œuvre ») posé AU-DESSUS des
+// étoiles au lieu d'en dessous. C'est ce que fait la fiche d'un jeu, et c'est
+// l'ordre de lecture qui compte : on voit le verdict, puis les étoiles qui le
+// justifient. Il suit le survol, donc il change pendant qu'on règle — et sa
+// ligne est réservée, sinon le bloc entier sauterait au premier survol.
+//
+// ⚠️ `heading` : le titre du bloc (« Ma note ») rendu ICI plutôt qu'au-dessus,
+// pour que la note chiffrée se pose sur la même ligne, à droite — et qu'elle
+// suive l'aperçu pendant qu'on glisse. Sans lui, le composant s'affiche seul,
+// comme avant.
 
 import { useRef, useState } from "react";
 import { Star, X } from "lucide-react";
-import { fromStars } from "../lib/ratingScale";
+import { fromStars, ratingLabel } from "../lib/ratingScale";
 
 const STARS = 5;
 const STEP = 0.5;
 
-export default function StarRating({ value, active, onEnable, onChange, onClear }) {
+export default function StarRating({
+  value,
+  active,
+  onEnable,
+  onChange,
+  onClear,
+  heading,
+  moodTop = false,
+}) {
   const rowRef = useRef(null);
   const draggingRef = useRef(false);
   // Ce que l'on survole avant de lâcher : l'aperçu doit suivre le doigt sans
@@ -84,12 +103,31 @@ export default function StarRating({ value, active, onEnable, onChange, onClear 
   }
 
   const label = Number.isInteger(shown) ? String(shown) : shown.toLocaleString("fr-FR");
+  // Le mot de la note visée (celle qu'on survole, sinon la sienne).
+  const mood = active || hover != null ? ratingLabel(shown * 20) : null;
+  const value100 = (
+    <span className="star-value">
+      {label}
+      <span className="star-outof">/{STARS}</span>
+    </span>
+  );
 
   return (
-    <div className="star-rating">
+    <div className={`star-rating ${heading ? "with-head" : ""} ${moodTop ? "with-mood" : ""}`}>
+      {!!heading && (
+        <div className="star-head">
+          <span className="star-head-label">{heading}</span>
+          {(active || hover != null) && value100}
+        </div>
+      )}
+
+      {/* La ligne existe même vide : c'est elle qui empêche le bloc de grandir
+          dès qu'un mot y apparaît. */}
+      {moodTop && <div className="star-mood-top">{mood || " "}</div>}
+
       <div
         ref={rowRef}
-        className={`star-row ${active ? "on" : ""}`}
+        className={`star-row ${active ? "on" : ""} ${hover != null ? "hovering" : ""}`}
         role="slider"
         tabIndex={0}
         aria-valuemin={0.5}
@@ -121,18 +159,22 @@ export default function StarRating({ value, active, onEnable, onChange, onClear 
 
       {active ? (
         <div className="star-foot">
-          <span className="star-value">
-            {label}
-            <span className="star-outof">/{STARS}</span>
-          </span>
+          {/* Le mot remplace le chiffre quand celui-ci est déjà monté dans
+              l'en-tête : « 3,5 /5 » deux fois dans dix centimètres carrés. */}
+          {heading ? <span className="star-mood">{mood}</span> : value100}
           <button className="gauge-clear clickable" onClick={onClear}>
             <X size={12} /> retirer la note
           </button>
         </div>
       ) : (
-        <button className="gauge-noter clickable" onClick={onEnable}>
-          Noter
-        </button>
+        // ⚠️ PAS DE BOUTON « NOTER ». Les étoiles SONT le bouton : cliquer dessus
+        // pose la note, du premier coup et à la bonne valeur. Un bouton sous
+        // elles ne faisait que répéter ce qu'elles disent déjà.
+        // Reste le mot de la note survolée, avant même de cliquer.
+        // Le mot n'est pas répété : posé en haut, il n'a rien à faire ici.
+        <div className="star-foot">
+          {!moodTop && !!mood && <span className="star-mood">{mood}</span>}
+        </div>
       )}
     </div>
   );

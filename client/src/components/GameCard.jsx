@@ -20,6 +20,7 @@ import { useClickOutside } from "../hooks/useClickOutside";
 import { apiFetch } from "../lib/api";
 import PlayedModal from "./PlayedModal";
 import AddToListModal from "./AddToListModal";
+import { coverAtSize } from "../lib/gameCover";
 
 const PLAYED = ["playing", "finished", "paused", "dropped", "endless"];
 
@@ -86,11 +87,12 @@ export default function GameCard({ game, variant = "grid" }) {
       <>
       <article
         className="game-row clickable"
+        data-game-id={game.id}
         onClick={() => navigate(`/game/${game.id}`)}
       >
         <div className="game-row-cover">
           {game.cover ? (
-            <img src={game.cover} alt={game.name} loading="lazy" draggable="false" />
+            <img src={coverAtSize(game.cover)} alt={game.name} loading="lazy" draggable="false" />
           ) : (
             <div className="game-nocover">
               <Gamepad2 size={22} />
@@ -171,11 +173,12 @@ export default function GameCard({ game, variant = "grid" }) {
     <>
     <article
       className="game-card clickable"
+      data-game-id={game.id}
       onClick={() => navigate(`/game/${game.id}`)}
     >
       <div className={`game-cover ${fanOpen ? "fan-open" : ""}`}>
         {game.cover ? (
-          <img src={game.cover} alt={game.name} loading="lazy" draggable="false" />
+          <img src={coverAtSize(game.cover)} alt={game.name} loading="lazy" draggable="false" />
         ) : (
           <div className="game-nocover">
             <Gamepad2 size={30} />

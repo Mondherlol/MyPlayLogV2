@@ -152,6 +152,7 @@ router.post("/import", requireAuth, async (req, res) => {
           platform: it.platform || null,
           finishedAt,
           wasWishlisted: status === "wishlist",
+          backloggdImported: true,
         });
         added++;
         warmGameMeta(gameId);

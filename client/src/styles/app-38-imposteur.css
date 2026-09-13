@@ -47,7 +47,7 @@
   /* L'accent EN TEXTE : le doré vif est illisible sur blanc, --accent-ink est
      le jeton que le site tient précisément pour ce cas. */
   --imp-warm-ink: var(--accent-ink);
-  --imp-warm-soft: color-mix(in srgb, var(--orange) 14%, transparent);
+  --imp-warm-soft: color-mix(in srgb, var(--tint) 14%, transparent);
 }
 :root[data-theme="dark"] {
   --imp-mask: #b79bff;

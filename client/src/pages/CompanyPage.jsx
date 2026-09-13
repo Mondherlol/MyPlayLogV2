@@ -51,6 +51,7 @@ function CompanyGameCard({ g }) {
   return (
     <div
       className={`relc clickable ${inWish ? "is-wish" : ""}`}
+      data-game-id={g.gameId}
       onClick={() => navigate(`/game/${g.gameId}`)}
       title={g.name}
     >

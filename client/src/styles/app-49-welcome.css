@@ -186,7 +186,7 @@
   padding: 0.26rem 0.7rem;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--orange) 45%, transparent);
-  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
   color: var(--accent-ink);
   font-size: 0.68rem;
   font-weight: 800;
@@ -236,7 +236,7 @@
 .lp-btn.primary {
   background: var(--accent-grad);
   color: #3b2a02;
-  box-shadow: 0 10px 26px rgba(242, 183, 11, 0.3);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--tint) 30%, transparent);
 }
 .lp-btn.primary:hover {
   box-shadow: 0 14px 32px rgba(242, 183, 11, 0.42);
@@ -249,7 +249,7 @@
 }
 .lp-btn.ghost:hover {
   border-color: var(--orange);
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 
 /* Les chiffres. C'est la seule chose vérifiable de la page — d'où leur place
@@ -299,7 +299,7 @@
   transition: color 0.15s ease;
 }
 .lp-foot-link:hover {
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 .lp-foot-dot {
   opacity: 0.5;
@@ -372,7 +372,7 @@
   padding: 0.2rem 0.6rem;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--orange) 40%, transparent);
-  background: color-mix(in srgb, var(--orange) 10%, transparent);
+  background: color-mix(in srgb, var(--tint) 10%, transparent);
   color: var(--accent-ink);
   font-size: 0.68rem;
   font-weight: 700;
@@ -401,7 +401,7 @@
   transition: color 0.15s ease;
 }
 .mpl-auth-back:hover {
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 
 /* La carte n'a ni bord ni ombre : sur un panneau qui lui est déjà réservé, un
@@ -473,8 +473,8 @@
   width: 62px;
   height: 62px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--orange) 14%, transparent);
-  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
+  color: var(--accent-mark);
   margin-bottom: 0.4rem;
 }
 .mpl-auth-card .auth-hint {
@@ -493,7 +493,7 @@
 }
 .mpl-auth-card .auth-hint svg {
   flex-shrink: 0;
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 /* ⚠️ SUR TÉLÉPHONE, LE DÉCOR S'EFFACE. Il pousserait le formulaire sous la
@@ -560,7 +560,7 @@
 /* Le sombre est le thème par défaut : il a droit au même soin. */
 :root[data-theme="dark"] .lp {
   background:
-    radial-gradient(1100px 520px at 50% -12%, rgba(242, 183, 11, 0.12), transparent 62%),
+    radial-gradient(1100px 520px at 50% -12%, color-mix(in srgb, var(--tint) 12%, transparent), transparent 62%),
     linear-gradient(180deg, #101219 0%, #0b0c11 58%, #08090d 100%);
 }
 :root[data-theme="dark"] .lp::before {
@@ -585,7 +585,7 @@
    y ressortent enfin, ce qui était toute leur raison d'être. */
 .mpl-auth-side {
   background:
-    radial-gradient(620px 320px at 18% 0%, rgba(242, 183, 11, 0.18), transparent 66%),
+    radial-gradient(620px 320px at 18% 0%, color-mix(in srgb, var(--tint) 18%, transparent), transparent 66%),
     linear-gradient(160deg, #161922 0%, #0a0b0f 100%);
   border-right-color: rgba(255, 255, 255, 0.08);
 }
@@ -613,7 +613,7 @@
   color: #ffffff;
 }
 .mpl-auth-tag {
-  background: rgba(242, 183, 11, 0.16);
+  background: color-mix(in srgb, var(--tint) 16%, transparent);
   border-color: rgba(242, 183, 11, 0.45);
   color: #ffd24a;
 }

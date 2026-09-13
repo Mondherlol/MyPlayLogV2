@@ -15,14 +15,14 @@
   border-radius: var(--radius-lg);
   /* Fond dégradé du panneau : léger et lumineux en clair, profond en sombre. */
   background:
-    radial-gradient(120% 80% at 100% 0%, rgba(242, 183, 11, 0.08), transparent 55%),
+    radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--tint) 8%, transparent), transparent 55%),
     linear-gradient(180deg, #fbfaf7 0%, #eef0f5 100%);
   border: 1px solid var(--border);
 }
 
 :root[data-theme="dark"] .trk {
   background:
-    radial-gradient(120% 80% at 100% 0%, rgba(242, 183, 11, 0.12), transparent 55%),
+    radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--tint) 12%, transparent), transparent 55%),
     linear-gradient(180deg, #171a21 0%, #101319 100%);
   border-color: var(--border-strong);
 }
@@ -209,7 +209,7 @@
 }
 
 .trk-season-opt.on {
-  background: rgba(242, 183, 11, 0.14);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
   color: var(--accent-ink);
 }
 
@@ -217,8 +217,8 @@
 .trk-note {
   padding: 0.6rem 0.85rem;
   border-radius: 12px;
-  background: rgba(242, 183, 11, 0.1);
-  border: 1px solid rgba(242, 183, 11, 0.25);
+  background: color-mix(in srgb, var(--tint) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tint) 25%, transparent);
   color: var(--accent-ink);
   font-size: 0.85rem;
 }
@@ -255,7 +255,7 @@
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background:
-    radial-gradient(140% 120% at 0% 0%, rgba(242, 183, 11, 0.14), transparent 60%),
+    radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--tint) 14%, transparent), transparent 60%),
     var(--surface);
   box-shadow: var(--shadow-sm);
 }
@@ -312,7 +312,7 @@
 }
 
 .trk-rank-peak svg {
-  color: var(--orange);
+  color: var(--accent-mark);
 }
 
 .trk-rank-peak b {
@@ -429,7 +429,7 @@
   height: 28px;
   border-radius: 8px;
   background: var(--surface-2);
-  color: var(--accent-ink);
+  color: var(--accent-mark);
   flex: none;
 }
 
@@ -461,7 +461,7 @@
 }
 
 .trk-section-title svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .trk-heroes {
@@ -598,6 +598,11 @@
   color: #f4f5f9;
   --text: #f4f5f9;
   --text-soft: #c4c8d4;
+  /* Îlot sombre même en thème clair : le doré y reste bon, en encre comme en
+     lavis (cf. index.css, --accent-ink / --tint). */
+  --accent-ink: #ffd24a;
+  --accent-mark: #ffd24a;
+  --tint: #ffd24a;
   transition: filter 0.15s;
 }
 
@@ -889,7 +894,7 @@
 }
 
 .trk-match-queue.comp {
-  background: rgba(242, 183, 11, 0.18);
+  background: color-mix(in srgb, var(--tint) 18%, transparent);
   color: #ffcf3a;
 }
 
@@ -1003,7 +1008,7 @@
 }
 
 .sb-team-label svg {
-  color: var(--orange);
+  color: var(--accent-mark);
 }
 
 .sb-team.win .sb-team-head {
@@ -1063,7 +1068,7 @@
 }
 
 .sb-row.me {
-  background: rgba(242, 183, 11, 0.12);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
 }
 
 .sb-row.me .sb-name {
@@ -1232,7 +1237,7 @@
   height: 58px;
   border-radius: 50%;
   background: var(--surface-2);
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .trk-cta {
@@ -1338,7 +1343,7 @@
   letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--accent-ink);
-  background: color-mix(in srgb, var(--orange) 18%, transparent);
+  background: color-mix(in srgb, var(--tint) 18%, transparent);
 }
 
 .hf-trk-tag.ranked.sm {
@@ -1862,7 +1867,7 @@
   height: 52px;
   border-radius: 50%;
   background: var(--surface-2);
-  color: var(--accent-ink);
+  color: var(--accent-mark);
   margin-bottom: 0.2rem;
 }
 
@@ -2142,7 +2147,7 @@
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background:
-    radial-gradient(150% 120% at 0% 0%, rgba(242, 183, 11, 0.14), transparent 62%),
+    radial-gradient(150% 120% at 0% 0%, color-mix(in srgb, var(--tint) 14%, transparent), transparent 62%),
     var(--surface);
   box-shadow: var(--shadow-sm);
 }
@@ -2282,7 +2287,7 @@
 }
 
 .lol-rank-peak svg {
-  color: var(--orange);
+  color: var(--accent-mark);
   flex: none;
 }
 
@@ -2368,7 +2373,7 @@
   font-size: 0.62rem;
   font-weight: 800;
   color: var(--accent-ink);
-  background: color-mix(in srgb, var(--orange) 18%, transparent);
+  background: color-mix(in srgb, var(--tint) 18%, transparent);
 }
 
 /* ---------- Parties (cartes dépliables) ---------- */
@@ -2654,7 +2659,7 @@
 }
 
 .lol-sb-row.me {
-  background: rgba(242, 183, 11, 0.12);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
 }
 
 .lol-sb-row.me .lol-sb-name {
@@ -2954,8 +2959,8 @@
 }
 
 .trk-acc.on .trk-av {
-  border-color: var(--accent-ink);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--orange) 25%, transparent);
+  border-color: var(--accent-mark);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tint) 25%, transparent);
 }
 
 /* Mini pastille « S » sur la PP d'un smurf dans la rangée. */
@@ -2989,8 +2994,8 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--accent-ink);
-  background: color-mix(in srgb, var(--orange) 16%, transparent);
-  border: 1px solid color-mix(in srgb, var(--orange) 30%, transparent);
+  background: color-mix(in srgb, var(--tint) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tint) 30%, transparent);
   vertical-align: middle;
 }
 
@@ -3032,7 +3037,7 @@
 
 .trk-add-smurf:hover {
   color: var(--accent-ink);
-  border-color: var(--accent-ink);
+  border-color: var(--accent-mark);
 }
 
 .trk-add-form {
@@ -3081,7 +3086,7 @@
   letter-spacing: 0.01em;
   text-transform: none;
   color: var(--accent-ink);
-  background: color-mix(in srgb, var(--orange) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--orange) 28%, transparent);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tint) 28%, transparent);
   vertical-align: middle;
 }

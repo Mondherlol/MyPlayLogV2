@@ -109,6 +109,7 @@ function CoverTile({ entry, fav, fields, editing, releaseTs }) {
     <div className="cover-tile-wrap">
       <div
         className="cover-tile clickable"
+        data-game-id={entry.gameId}
         onClick={() => navigate(`/game/${entry.gameId}`)}
         title={entry.name}
       >

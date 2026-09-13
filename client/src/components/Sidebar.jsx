@@ -1,9 +1,9 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import {
   Gamepad2,
   Home,
-  Compass,
+  Search,
   CalendarDays,
   Activity,
   MessagesSquare,
@@ -22,12 +22,16 @@ import {
   Check,
   Sparkles,
   ChevronUp,
+  Plus,
+  X,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { useChat } from "../context/ChatContext";
 import { useCosmetics } from "../context/CosmeticsContext";
 import { useClickOutside } from "../hooks/useClickOutside";
+import { useBackClose } from "../hooks/useBackClose";
+import { useScrollLock } from "../hooks/useScrollLock";
 import { FlagEN, FlagFR } from "./Flags";
 
 // Version courante de l'app (affichée en bas de la sidebar).
@@ -36,12 +40,36 @@ const APP_VERSION = "1.1";
 const NAV = [
   { to: "/app", label: "Accueil", Icon: Home, end: true },
   { to: "/activity", label: "Activité", Icon: Sparkles },
-  { to: "/explore", label: "Explorer", Icon: Compass },
+  // Le « + » du centre de la barre du bas (téléphone seulement, cf. `.side-add`) :
+  // pas une page, il ouvre la saisie « Log un jeu » de la barre du haut.
+  { add: true },
+  // La loupe plutôt que la boussole : on vient y CHERCHER un jeu, et c'est le
+  // signe que tout le monde cherche des yeux pour ça.
+  { to: "/explore", label: "Explorer", Icon: Search },
   // `noMobile` : entrée gardée sur la sidebar desktop, retirée de la bottom bar.
-  { to: "/releases", label: "Sorties", Icon: CalendarDays, noMobile: true },
+  //
+  // ⚠️ `more` : ET REPRISE DANS LA FEUILLE « PLUS ». Retirer une section de la
+  // barre du bas ne doit pas la rendre INTROUVABLE : sur téléphone, ces
+  // entrées-là n'avaient plus aucun chemin. `hint` n'est lu que par la feuille,
+  // qui a la largeur d'en dire un mot.
+  {
+    to: "/releases",
+    label: "Sorties",
+    Icon: CalendarDays,
+    noMobile: true,
+    more: true,
+    hint: "Le calendrier des sorties",
+  },
   // `badge` : la pastille de non-lus vient du contexte de messagerie.
-  { to: "/messages", label: "Messages", Icon: MessagesSquare, badge: "chat" },
-  { to: "/lists", label: "Listes", Icon: List },
+  { to: "/messages", label: "Messages", Icon: MessagesSquare, badge: "chat", noMobile: true },
+  {
+    to: "/lists",
+    label: "Listes",
+    Icon: List,
+    noMobile: true,
+    more: true,
+    hint: "Tes listes de jeux",
+  },
   // `feature` : entrée soumise à un drapeau réglé dans le panneau d'admin.
   // Éteinte, elle n'apparaît que pour l'admin (qui prépare la page).
   // `right` : en plus du drapeau, un DROIT PERSONNEL — la Collection ne
@@ -53,12 +81,22 @@ const NAV = [
     Icon: Library,
     feature: "collection",
     right: "canCollection",
+    noMobile: true,
+    more: true,
+    hint: "Ton étagère et tes boîtiers",
   },
-  { to: "/arcade", label: "Arcade", Icon: Joystick },
+  {
+    to: "/arcade",
+    label: "Arcade",
+    Icon: Joystick,
+    noMobile: true,
+    more: true,
+    hint: "Mini-jeux, classements et curseurs",
+  },
   { to: "/profile", label: "Profil", Icon: User },
   // L'app Android n'est dans aucun magasin : cette entrée est le seul chemin
   // qu'un habitué du site ait pour découvrir qu'elle existe.
-  { to: "/download", label: "App mobile", Icon: Smartphone },
+  { to: "/download", label: "App mobile", Icon: Smartphone, noMobile: true },
   { to: "/admin", label: "Admin", Icon: Shield, adminOnly: true },
 ];
 
@@ -72,8 +110,31 @@ export default function Sidebar({ collapsed, onToggle }) {
   const langRef = useRef(null);
   useClickOutside(langRef, () => setLangOpen(false), langOpen);
 
+  // Le tiroir du téléphone : les sections qui ne tiennent pas dans la barre du
+  // bas, et qui, sans lui, n'auraient aucun chemin.
+  //
+  // ⚠️ IL S'OUVRE D'AILLEURS : le burger vit dans la barre du HAUT, qui ne
+  // connaît ni la liste des sections ni les droits. Elle se contente donc de
+  // crier — même passe-plat que le « + » de la barre du bas (`mpl:log-game`).
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => {
+    const open = () => setMenuOpen(true);
+    window.addEventListener("mpl:menu", open);
+    return () => window.removeEventListener("mpl:menu", open);
+  }, []);
+
+  // ⚠️ LES DROITS SE LISENT AU MÊME ENDROIT POUR LA BARRE ET POUR LE TIROIR.
+  // Une section éteinte (Collection sans le droit, Admin sans le rôle) ne doit
+  // pas pouvoir rentrer par la porte de derrière.
+  const allowed = (n) =>
+    (!n.adminOnly || user?.isAdmin) &&
+    (!n.feature || hasFeature(n.feature)) &&
+    (!n.right || !!user?.[n.right]);
+
+  const menuItems = NAV.filter((n) => n.more && allowed(n));
+
   return (
-    <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
+    <aside className={`sidebar ${collapsed ? "collapsed" : ""} ${menuOpen ? "menu-open" : ""}`}>
       {/* Flèche flottante qui dépasse du bord droit */}
       <button
         className="side-toggle clickable"
@@ -96,13 +157,24 @@ export default function Sidebar({ collapsed, onToggle }) {
       </div>
 
       <nav className="side-nav">
-        {NAV.filter(
-          (n) =>
-            (!n.adminOnly || user?.isAdmin) &&
-            (!n.feature || hasFeature(n.feature)) &&
-            (!n.right || !!user?.[n.right])
-        ).map(
-          ({ to, label, Icon, end, adminOnly, badge, noMobile }) => {
+        {NAV.filter(allowed).map(
+          (item) => {
+            if (item.add) {
+              return (
+                <button
+                  key="add"
+                  className="side-add clickable"
+                  onClick={() => window.dispatchEvent(new Event("mpl:log-game"))}
+                  title="Log un jeu"
+                  aria-label="Log un jeu"
+                >
+                  <span className="side-add-ic">
+                    <Plus size={25} strokeWidth={2.8} />
+                  </span>
+                </button>
+              );
+            }
+            const { to, label, Icon, end, adminOnly, badge, noMobile } = item;
             const count = badge === "chat" ? unread : 0;
             return (
               <NavLink
@@ -136,6 +208,10 @@ export default function Sidebar({ collapsed, onToggle }) {
           }
         )}
       </nav>
+
+      {menuOpen && menuItems.length > 0 && (
+        <MenuDrawer items={menuItems} onClose={() => setMenuOpen(false)} />
+      )}
 
       <div className="side-bottom">
         {/* Un thème de l'arcade impose son mode clair/sombre : on remplace alors
@@ -197,5 +273,70 @@ export default function Sidebar({ collapsed, onToggle }) {
         </div>
       </div>
     </aside>
+  );
+}
+
+/**
+ * Le tiroir du burger : les sections qui ne tiennent pas dans la barre du bas.
+ *
+ * ⚠️ IL ENTRE PAR LA GAUCHE, SOUS LE BOUTON QUI L'OUVRE. C'est la place qu'un
+ * menu de navigation occupe sur téléphone depuis toujours — et sur ordinateur,
+ * c'est exactement d'où vient la barre latérale : le tiroir en est la version
+ * repliée, pas un panneau de plus.
+ *
+ * Le « retour » du téléphone le referme au lieu de quitter la page
+ * (useBackClose) — sans quoi, ouvrir le menu puis faire retour sortirait de
+ * l'app.
+ */
+function MenuDrawer({ items, onClose }) {
+  useBackClose(onClose, "side-menu");
+  useScrollLock(true);
+
+  // Échap, pour un téléphone posé sur un clavier (et pour les tests).
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <>
+      <button className="side-drawer-veil" onClick={onClose} aria-label="Fermer le menu" />
+      <div className="side-drawer" role="dialog" aria-modal="true" aria-label="Menu">
+        <div className="side-drawer-head">
+          <span className="brand side-drawer-brand">
+            <span className="brand-logo">
+              <Gamepad2 size={18} strokeWidth={2.5} />
+            </span>
+            <span className="brand-name">
+              My<span className="grad-text">PlayLog</span>
+            </span>
+          </span>
+          <button className="side-drawer-x clickable" onClick={onClose} aria-label="Fermer">
+            <X size={18} />
+          </button>
+        </div>
+
+        <nav className="side-drawer-nav">
+          {items.map(({ to, label, Icon, hint }) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) => `side-drawer-row clickable ${isActive ? "active" : ""}`}
+              onClick={onClose}
+            >
+              <span className="side-drawer-ic">
+                <Icon size={20} />
+              </span>
+              <span className="side-drawer-txt">
+                <b>{label}</b>
+                {!!hint && <i>{hint}</i>}
+              </span>
+              <ChevronRight size={16} className="side-drawer-go" />
+            </NavLink>
+          ))}
+        </nav>
+      </div>
+    </>
   );
 }

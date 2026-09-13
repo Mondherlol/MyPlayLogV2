@@ -249,3 +249,319 @@
     transition: none;
   }
 }
+
+/* ======================================================================
+   La jaquette en grand (components/GameCoverView.jsx)
+   ====================================================================== */
+/* Pas la visionneuse plein écran (.mlb) : une jaquette n'est pas une galerie.
+   Elle se regarde posée, entière, au milieu d'un voile — comme le boîtier
+   qu'on sort de l'étagère — avec son titre et de quoi la changer dessous. */
+.gcv {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: grid;
+  place-items: center;
+  padding: clamp(1rem, 5vh, 3rem) 1rem;
+  background: rgba(6, 5, 10, 0.9);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: gcv-in 0.16s ease-out;
+}
+
+@keyframes gcv-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.gcv-stage {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  max-width: min(92vw, 540px);
+  min-width: 0;
+  animation: gcv-pop 0.18s ease-out;
+}
+
+@keyframes gcv-pop {
+  from {
+    transform: scale(0.97);
+  }
+}
+
+/* ⚠️ LA BORNE EST EN UNITÉS D'ÉCRAN, PAS EN POURCENTAGE. `max-height: 100%`
+   sur l'image ne bornait RIEN : un pourcentage de hauteur ne se résout que
+   contre un parent de hauteur définie, et le parent est en hauteur
+   automatique — la règle était donc purement ignorée et la jaquette
+   s'affichait à sa taille native, débordant de l'écran. `dvh` se résout
+   toujours, et suit la barre d'URL qui se rétracte sur mobile. */
+.gcv-stage img {
+  min-height: 0;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 74dvh;
+  object-fit: contain;
+  border-radius: 14px;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6);
+}
+
+.gcv-empty {
+  display: grid;
+  place-items: center;
+  gap: 0.5rem;
+  width: min(70vw, 300px);
+  aspect-ratio: 3 / 4;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.85rem;
+}
+
+.gcv-foot {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 100%;
+}
+
+.gcv-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  color: #fff;
+}
+
+.gcv-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  border: none;
+  background: var(--orange);
+  color: #1a1204;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.gcv-edit:hover {
+  background: var(--amber);
+}
+
+.gcv-x {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 0.8rem);
+  right: 0.9rem;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.gcv-x:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* ======================================================================
+   Toutes les notes d'un jeu (components/GameRatingsModal.jsx)
+   ====================================================================== */
+.grm-back {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(6, 5, 10, 0.72);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  animation: gcv-in 0.16s ease-out;
+}
+
+.grm {
+  width: min(100%, 520px);
+  max-height: 86dvh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.1rem;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  animation: gcv-pop 0.18s ease-out;
+}
+
+.grm-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+}
+
+.grm-head h3 {
+  font-size: 1.08rem;
+}
+
+.grm-kicker {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--accent-mark);
+  margin-bottom: 0.15rem;
+}
+
+.grm-x {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.grm-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+/* Une ligne = une source. La grille tient la colonne des notes alignée quelle
+   que soit la longueur des noms : c'est ce qui rend deux notes comparables
+   d'un coup d'œil, et c'est tout l'intérêt de les réunir ici. */
+.grm-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) minmax(40px, 90px) auto auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.grm-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.grm-id {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.grm-id b {
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grm-id small {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* La barre est la comparaison : elle se lit avant les chiffres. */
+.grm-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  overflow: hidden;
+}
+
+.grm-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+}
+
+.grm-score {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.grm-score small {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.grm-score em {
+  display: block;
+  font-style: normal;
+  font-size: 0.66rem;
+  font-weight: 500;
+  color: var(--text-soft);
+}
+
+.grm-go {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--text-soft);
+}
+
+.grm-go:hover {
+  color: var(--accent-mark);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
+}
+
+.grm-load,
+.grm-empty {
+  display: grid;
+  place-items: center;
+  padding: 2rem 0;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+}
+
+@media (max-width: 520px) {
+  /* La barre part la première : sur un écran étroit, le nom et le chiffre
+     valent mieux qu'une comparaison de 30 px de large. */
+  .grm-row {
+    grid-template-columns: 34px minmax(0, 1fr) auto auto;
+  }
+  .grm-bar {
+    display: none;
+  }
+}

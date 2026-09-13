@@ -92,7 +92,7 @@
   pointer-events: none;
   background: radial-gradient(
       460px 300px at 50% 20%,
-      rgba(242, 183, 11, 0.22),
+      color-mix(in srgb, var(--tint) 22%, transparent),
       transparent 70%
     ),
     radial-gradient(360px 260px at 78% 60%, rgba(255, 210, 74, 0.14), transparent 72%);
@@ -114,7 +114,7 @@
 }
 
 .hero-badge svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .hero-title {
@@ -188,7 +188,7 @@
 }
 
 .float-chip svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .float-chip.chip-1 {
@@ -306,7 +306,7 @@
   font-weight: 600;
   padding: 0.28rem 0.6rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  background: color-mix(in srgb, var(--tint) 16%, transparent);
   color: var(--accent-ink);
   white-space: nowrap;
 }
@@ -328,7 +328,7 @@
   overflow: hidden;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--orange) 6%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 6%, var(--surface));
   -webkit-mask-image: linear-gradient(
     90deg,
     transparent,
@@ -405,7 +405,7 @@
   font-size: 3.2rem;
   font-weight: 600;
   line-height: 1;
-  color: color-mix(in srgb, var(--orange) 16%, transparent);
+  color: color-mix(in srgb, var(--tint) 16%, transparent);
 }
 
 .step-icon {
@@ -495,9 +495,9 @@
   border-radius: 12px;
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, var(--orange) 12%, var(--surface));
-  color: var(--accent-ink);
-  border: 1px solid color-mix(in srgb, var(--orange) 22%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, var(--surface));
+  color: var(--accent-mark);
+  border: 1px solid color-mix(in srgb, var(--tint) 22%, transparent);
   margin-bottom: 1rem;
   transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
@@ -685,9 +685,9 @@
   border-radius: 18px;
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, var(--orange) 12%, var(--surface));
-  color: var(--accent-ink);
-  border: 1px solid color-mix(in srgb, var(--orange) 22%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, var(--surface));
+  color: var(--accent-mark);
+  border: 1px solid color-mix(in srgb, var(--tint) 22%, transparent);
   animation: pop 0.5s ease;
 }
 
@@ -719,8 +719,8 @@
   font-size: 0.88rem;
   line-height: 1.45;
   color: var(--accent-ink);
-  background: color-mix(in srgb, var(--orange) 12%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--orange) 26%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--tint) 26%, transparent);
 }
 
 .auth-hint svg {
@@ -769,9 +769,9 @@
   border-radius: 20px;
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, var(--orange) 12%, var(--surface));
-  color: var(--accent-ink);
-  border: 1px solid color-mix(in srgb, var(--orange) 22%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, var(--surface));
+  color: var(--accent-mark);
+  border: 1px solid color-mix(in srgb, var(--tint) 22%, transparent);
   animation: pop 0.5s ease;
 }
 
@@ -822,7 +822,7 @@
   min-height: 100vh;
   /* Largeur courante de la sidebar (héritée par les éléments fixed enfants,
      ex. le dock de la tier list qui doit se centrer sur le contenu). */
-  --app-sidebar-w: 208px;
+  --app-sidebar-w: 192px;
   /* Hauteur de la bottom bar mobile (0 sur desktop) — utilisée par les
      éléments flottants qui doivent se poser au-dessus (ex. FAB filtres). */
   --bottom-bar-h: 0px;
@@ -838,20 +838,28 @@
      l'arcade peut la recolorer : les couleurs viennent de variables --side-*
      dont le repli est justement ce look sombre d'origine. CosmeticsContext pose
      les --side-* du thème sur <html>, et ces règles les récupèrent. */
-  --surface: var(--side-surface, #23262e);
-  --surface-2: var(--side-surface-2, #2f333d);
+  --surface: var(--side-surface, #232326);
+  --surface-2: var(--side-surface-2, #2c2c30);
   /* Fond de la barre (distinct de --surface pour les thèmes qui veulent deux
-     tons) — par défaut identique à l'ancien look. */
-  --side-canvas: var(--side-bg, #23262e);
-  --border: var(--side-border, rgba(255, 255, 255, 0.09));
-  --border-strong: var(--side-border-strong, rgba(255, 255, 255, 0.16));
-  --text: var(--side-text, #f3f4f7);
-  --text-soft: var(--side-text-soft, #a6acba);
+     tons) : un gris plein, un cran sous celui de la page (cf. index.css,
+     `--side-solid`). Pas de verre ni de flou : la barre est un meuble, pas
+     un effet. */
+  --side-canvas: var(--side-bg, var(--side-fill, var(--side-solid)));
+  --border: var(--side-border, rgba(255, 255, 255, 0.07));
+  --border-strong: var(--side-border-strong, rgba(255, 255, 255, 0.14));
+  --text: var(--side-text, #eef2f8);
+  --text-soft: var(--side-text-soft, #a3a3aa);
   --shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
   --accent-ink: var(--side-accent, #ffd24a);
+  --tint: var(--side-accent, #ffd24a);
+  --accent-mark: var(--side-accent, #ffd24a);
   --brand-grad: var(--side-brand, linear-gradient(100deg, #f0b012 0%, #ffd23f 100%));
 
-  width: 208px;
+  /* ⚠️ CALÉE SUR SON CONTENU, PAS SUR UN CHIFFRE ROND. 208px laissaient une
+     trentaine de pixels de vide à droite du plus long libellé (« Thème
+     sombre ») : une colonne qui prend de la place sans rien y mettre, et
+     autant en moins pour les jaquettes. */
+  width: 192px;
   flex-shrink: 0;
   position: sticky;
   top: 0;
@@ -862,8 +870,14 @@
   padding: 0.9rem 0.7rem;
   background: var(--side-canvas);
   color: var(--text);
-  border-right: 1px solid rgba(0, 0, 0, 0.16);
-  transition: width 0.2s ease, background 0.3s ease;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  /* ⚠️ AUCUNE TRANSITION SUR LE FOND. Le fond de la barre est un DÉGRADÉ :
+     une image, que le navigateur ne sait pas interpoler. En changeant de
+     thème, il gardait l'ancienne image une demi-transition puis basculait,
+     pendant que la couleur de fond, elle, traversait le transparent — et le
+     motif du fond de page apparaissait à travers la barre. Le thème bascule
+     donc d'un coup ici. */
+  transition: width 0.2s ease;
 }
 
 .sidebar.collapsed {
@@ -879,9 +893,9 @@
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: #23262e;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #cfd3dc;
+  background: var(--side-solid);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #cfd6e2;
   display: grid;
   place-items: center;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
@@ -904,7 +918,6 @@
   gap: 0.5rem;
   padding: 0.3rem 0.4rem 0.9rem;
   margin-bottom: 0.4rem;
-  border-bottom: 1px solid var(--border);
 }
 
 .sidebar.collapsed .sidebar-head {
@@ -924,12 +937,13 @@
 }
 
 .side-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.75rem;
   padding: 0.62rem 0.7rem;
   border-radius: 11px;
-  color: var(--text);
+  color: color-mix(in srgb, var(--text) 86%, transparent);
   background: transparent;
   border: none;
   font-family: var(--font-body);
@@ -937,29 +951,47 @@
   font-weight: 600;
   width: 100%;
   text-align: left;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.18s ease, color 0.18s ease;
 }
 
 .side-row .side-icon {
   color: var(--text-soft);
+  transition: color 0.18s ease, transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .side-row:hover {
   background: color-mix(in srgb, var(--text) 7%, transparent);
+  color: var(--text);
 }
 
 .side-row:hover .side-icon {
   color: var(--text);
+  transform: scale(1.08);
 }
 
+/* ⚠️ L'ENTRÉE ACTIVE : UN FOND GRIS, LE DORÉ POUR L'ICÔNE, LE TEXTE ET UN TRAIT.
+   Un fond teinté de jaune sur du gris donnait un jaune boueux, qui n'était
+   plus le nôtre : le jaune reste pur, c'est le fond qui reste neutre. */
 .side-row.active {
-  background: color-mix(in srgb, var(--orange) 15%, transparent);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
   color: var(--accent-ink);
   font-weight: 700;
 }
 
+.side-row.active::before {
+  content: "";
+  position: absolute;
+  /* La marge intérieure de la barre : le trait se colle à SON bord. */
+  left: -0.7rem;
+  top: 24%;
+  bottom: 24%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--orange);
+}
+
 .side-row.active .side-icon {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .side-icon {
@@ -967,6 +999,19 @@
   place-items: center;
   width: 22px;
   flex-shrink: 0;
+}
+
+/* Un libellé plus long que la barre la coupe, il ne l'élargit pas : les noms
+   des thèmes gagnés à l'arcade sont libres, et l'un d'eux ne doit pas décider
+   de la largeur de la colonne. */
+.side-label {
+  /* `min-width: 0` est ce qui AUTORISE la coupe : sans lui, un enfant de flex
+     refuse de descendre sous la largeur de son texte, et les points de
+     suspension ne servent jamais. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar.collapsed .side-label {
@@ -1052,7 +1097,7 @@
 
 .lang-check {
   margin-left: auto;
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 
 .lang-item.disabled {
@@ -1106,10 +1151,12 @@
   align-items: center;
   justify-content: flex-end;
   padding: 0 clamp(1rem, 3vw, 1.6rem);
-  background: color-mix(in srgb, var(--bg) 82%, transparent);
-  backdrop-filter: saturate(140%) blur(12px);
-  -webkit-backdrop-filter: saturate(140%) blur(12px);
-  border-bottom: 1px solid var(--border);
+  /* ⚠️ TRANSLUCIDE EN PERMANENCE, ET SANS FLOU. Le flou faisait une barre de
+     verre qui bavait au défilement ; la variante « transparente tant qu'on n'a
+     pas défilé » faisait apparaître un fond en cours de route. Une seule
+     couche, toujours la même : on voit à travers, c'est tout. */
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 }
 
 .topbar-actions {
@@ -1226,9 +1273,9 @@
 }
 
 .search-tab.active {
-  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
   border-color: color-mix(in srgb, var(--orange) 40%, transparent);
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 
 .search-results {
@@ -1335,7 +1382,7 @@
 
 .search-more:hover {
   background: var(--surface-2);
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 
 /* --- Historique de recherche (panneau ouvert avant de taper) --- */
@@ -1583,11 +1630,11 @@
 }
 
 .notif-item.unread {
-  background: color-mix(in srgb, var(--orange) 9%, transparent);
+  background: color-mix(in srgb, var(--tint) 9%, transparent);
 }
 
 .notif-item.unread:hover {
-  background: color-mix(in srgb, var(--orange) 15%, transparent);
+  background: color-mix(in srgb, var(--tint) 15%, transparent);
 }
 
 .notif-avatar {
@@ -1692,9 +1739,9 @@
   padding: 0.3rem 0.55rem 0.3rem 0.3rem;
   border-radius: 999px;
   /* Toujours sombre pour le contraste (effet TV Time) */
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: #23262e;
-  color: #f3f4f7;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--side-solid);
+  color: #eef2f8;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -1704,7 +1751,7 @@
 }
 
 .profile-btn .profile-caret {
-  color: #a6acba;
+  color: #a3a3aa;
 }
 
 .avatar {
@@ -1814,7 +1861,7 @@
 
 .public-cta {
   border-top: 1px solid var(--border);
-  background: color-mix(in srgb, var(--orange) 7%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 7%, var(--surface));
   padding: clamp(1.2rem, 4vw, 2rem) var(--content-pad);
 }
 
@@ -1892,9 +1939,9 @@
   border-radius: 20px;
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, var(--orange) 12%, var(--surface));
-  color: var(--accent-ink);
-  border: 1px solid color-mix(in srgb, var(--orange) 22%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, var(--surface));
+  color: var(--accent-mark);
+  border: 1px solid color-mix(in srgb, var(--tint) 22%, transparent);
   margin-bottom: 0.9rem;
 }
 
@@ -1905,6 +1952,183 @@
 .placeholder-sub {
   color: var(--text-soft);
   font-size: 1.02rem;
+}
+
+/* Le « + » de la barre du bas : il n'existe que sur téléphone. */
+.side-add {
+  display: none;
+}
+
+/* ======================================================================
+   Le burger et son tiroir
+   ======================================================================
+   ⚠️ TÉLÉPHONE UNIQUEMENT. Sur ordinateur, la barre latérale affiche déjà
+   toutes les sections : un burger n'y cacherait que ce qui est sous les yeux.
+   En bottom bar, en revanche, les entrées `noMobile` (Sorties, Listes,
+   Collection, Arcade) n'avaient plus AUCUN chemin — c'est ce trou que le
+   tiroir bouche. */
+.topbar-burger {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  /* Le coin haut gauche, là où un menu se cherche. `margin-right: auto`
+     repousse les actions (recherche, messages, notifs, avatar) contre le bord
+     droit — la barre, elle, aligne tout à droite par défaut. */
+  .topbar-burger {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    margin-right: auto;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--text);
+  }
+  .topbar-burger:active {
+    background: var(--surface-2);
+  }
+
+  /* ⚠️ LE TIROIR VIT DANS LA BARRE DU BAS, DONC DANS SON PLAN (z-index 120) —
+     SOUS la barre du haut (140), qui passait par-dessus son en-tête et cachait
+     la croix. On ne le sort pas de la barre : il en hérite ses couleurs
+     sombres. C'est la barre entière qui passe devant, le temps qu'il est
+     ouvert. */
+  .sidebar.menu-open {
+    z-index: 150;
+  }
+
+  /* Le voile : il ferme au toucher, et assombrit la page pour dire que le
+     tiroir attend une réponse. */
+  .side-drawer-veil {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    border: none;
+    padding: 0;
+    background: rgba(6, 7, 10, 0.55);
+    animation: side-drawer-fade 0.18s ease;
+  }
+
+  /* ⚠️ IL COUVRE TOUTE LA HAUTEUR, BARRE DU BAS COMPRISE. Un menu de
+     navigation qui laisserait dépasser les onglets donnerait deux
+     navigations concurrentes à l'écran en même temps. */
+  .side-drawer {
+    position: fixed;
+    z-index: 2;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(86vw, 320px);
+    display: flex;
+    flex-direction: column;
+    padding: calc(env(safe-area-inset-top) + 0.7rem) 0.6rem
+      calc(env(safe-area-inset-bottom) + 0.9rem);
+    overflow-y: auto;
+    /* Les couleurs sombres de la barre, héritées : le tiroir EST la barre
+       latérale de l'ordinateur, sortie de son bord. */
+    background: var(--side-canvas, var(--surface));
+    border-right: 1px solid var(--border);
+    box-shadow: 20px 0 50px rgba(0, 0, 0, 0.45);
+    animation: side-drawer-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .side-drawer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.25rem 0.35rem 0.9rem;
+  }
+  .side-drawer-brand {
+    font-size: 1.05rem;
+  }
+  .side-drawer-x {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-soft);
+    flex-shrink: 0;
+  }
+
+  .side-drawer-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .side-drawer-row {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.7rem 0.65rem;
+    border-radius: 15px;
+    color: var(--text);
+    transition: background 0.15s ease;
+  }
+  .side-drawer-row:active {
+    background: var(--surface-2);
+  }
+
+  .side-drawer-ic {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 13px;
+    background: var(--surface-2);
+    color: var(--accent-ink);
+    flex-shrink: 0;
+  }
+  .side-drawer-row.active .side-drawer-ic {
+    background: color-mix(in srgb, var(--tint) 22%, transparent);
+  }
+
+  .side-drawer-txt {
+    display: grid;
+    gap: 0.1rem;
+    min-width: 0;
+  }
+  .side-drawer-txt b {
+    font-size: 0.92rem;
+    font-weight: 600;
+  }
+  .side-drawer-txt i {
+    font-style: normal;
+    font-size: 0.75rem;
+    color: var(--text-soft);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .side-drawer-go {
+    margin-left: auto;
+    color: var(--text-soft);
+    flex-shrink: 0;
+  }
+}
+
+@keyframes side-drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+@keyframes side-drawer-fade {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .side-drawer,
+  .side-drawer-veil {
+    animation: none;
+  }
 }
 
 /* ======================================================================
@@ -1929,10 +2153,13 @@
     flex-direction: row;
     padding: 0.35rem 0.4rem calc(0.35rem + env(safe-area-inset-bottom));
     border-right: none;
-    border-top: 1px solid rgba(0, 0, 0, 0.28);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
     box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.28);
     z-index: 120;
     transition: none;
+    /* Le flou est coupé sur mobile (app-99-mobile-perf) : du verre sans flou
+       laisserait le contenu baver à travers la barre. Elle redevient pleine. */
+    --side-canvas: var(--side-bg, var(--side-solid));
   }
 
   /* Éléments desktop inutiles en bottom bar */
@@ -1991,8 +2218,14 @@
     background: transparent;
   }
 
+  /* Le trait lumineux du bord gauche n'a pas de bord où se coller ici : c'est
+     la pilule derrière l'icône qui marque l'onglet. */
+  .sidebar .side-row.active::before {
+    display: none;
+  }
+
   .sidebar .side-row.active .side-icon {
-    background: color-mix(in srgb, var(--orange) 18%, transparent);
+    background: color-mix(in srgb, var(--tint) 18%, transparent);
   }
 
   /* Le contenu ne doit pas finir caché derrière la bottom bar */
@@ -2003,5 +2236,39 @@
   /* Le thème se règle depuis la topbar en mobile */
   .theme-btn-mobile {
     display: grid;
+  }
+
+  /* ⚠️ LA BARRE DU BAS EST CELLE DE L'APP : Accueil, Activité, « + », Explorer,
+     Profil. Le reste (messages, listes, arcade…) se trouve depuis la barre du
+     haut ou le profil. Le « + » n'est pas un onglet, c'est un geste : rond,
+     doré, il mord sur le bord de la barre, cerclé de sa couleur. */
+  .sidebar .side-add {
+    display: grid;
+    place-items: center;
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    background: none;
+  }
+  .side-add-ic {
+    display: grid;
+    place-items: center;
+    width: 50px;
+    height: 50px;
+    margin-top: -20px;
+    border-radius: 999px;
+    background: var(--orange);
+    color: #1a1204;
+    box-shadow: 0 0 0 5px var(--side-bg, var(--side-solid));
+    transition: transform 0.12s ease, background 0.15s ease;
+  }
+  .side-add:active .side-add-ic {
+    transform: scale(0.92);
+  }
+
+  /* « Log un jeu » quitte la barre du haut : le « + » le remplace. */
+  .topbar .log-game-btn {
+    display: none;
   }
 }

@@ -31,7 +31,7 @@ import {
   MessageSquareText,
   Star,
   ArrowRight,
-  Building2,
+  Code2,
   ScrollText,
   Gamepad2,
   Swords,
@@ -74,7 +74,7 @@ const WIDGET_META = {
   "tracking-rivals": { label: "Tracking · Rivals", Icon: Swords },
   console: { label: "Console favorite", Icon: Joystick },
   characters: { label: "Personnages favoris", Icon: Users },
-  studios: { label: "Studios favoris", Icon: Building2 },
+  studios: { label: "Studios favoris", Icon: Code2 },
   playlist: { label: "Playlist", Icon: ListMusic },
   ost: { label: "Dernière OST likée", Icon: Music },
   video: { label: "Dernière reco vidéo", Icon: Film },
@@ -716,13 +716,13 @@ export default function ProfileOverviewAside({
         if (!studiosShown.length) {
           if (!isMe) return null;
           return (
-            <AsideCard Icon={Building2} title="Studios favoris">
+            <AsideCard Icon={Code2} title="Studios favoris">
               <p className="pfa-card-empty">Aucun studio épinglé pour l'instant.</p>
             </AsideCard>
           );
         }
         return (
-          <AsideCard Icon={Building2} title="Studios favoris">
+          <AsideCard Icon={Code2} title="Studios favoris">
             <div className="pfa-studios">
               {studiosShown.slice(0, 6).map((c) => (
                 <Link
@@ -732,7 +732,7 @@ export default function ProfileOverviewAside({
                   title={c.name}
                 >
                   <span className="pfa-studio-logo">
-                    {c.logo ? <img src={c.logo} alt="" loading="lazy" /> : <Building2 size={16} />}
+                    {c.logo ? <img src={c.logo} alt="" loading="lazy" /> : <Code2 size={16} />}
                   </span>
                   <span className="pfa-studio-body">
                     <span className="pfa-studio-name">{c.name}</span>

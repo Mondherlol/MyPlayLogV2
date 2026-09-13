@@ -47,7 +47,7 @@
   display: flex;
   align-items: center;
   background:
-    radial-gradient(120% 90% at 20% 0%, rgba(242, 183, 11, 0.10), transparent 60%),
+    radial-gradient(120% 90% at 20% 0%, color-mix(in srgb, var(--tint) 10%, transparent), transparent 60%),
     var(--surface-2);
 }
 
@@ -351,7 +351,7 @@
 .cvr-ed-chip.on {
   color: var(--accent-ink);
   border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
-  background: color-mix(in srgb, var(--orange) 12%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 12%, var(--surface));
 }
 
 .cvr-ed-icon {
@@ -451,7 +451,7 @@
   padding: 0.6rem 0.7rem;
   border-radius: 12px;
   border: 1px solid color-mix(in srgb, var(--orange) 40%, var(--border));
-  background: color-mix(in srgb, var(--orange) 6%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 6%, var(--surface));
 }
 
 .cvr-ed-foot {
@@ -827,7 +827,7 @@
   place-items: center;
   color: var(--text-soft);
   background:
-    radial-gradient(circle at 50% 50%, rgba(242, 183, 11, 0.16), transparent 65%),
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--tint) 16%, transparent), transparent 65%),
     var(--surface-2);
 }
 
@@ -926,7 +926,7 @@
   padding: 0.4rem 0.85rem;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--orange) 45%, var(--border));
-  background: color-mix(in srgb, var(--orange) 10%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 10%, var(--surface));
   color: var(--accent-ink);
   font-size: 0.82rem;
   font-weight: 600;
@@ -1099,10 +1099,10 @@
 /* Piste en cours : ressort vers la droite, cerclée d'or. */
 .pld-row.current {
   border-color: var(--orange);
-  background: color-mix(in srgb, var(--orange) 9%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 9%, var(--surface));
   box-shadow:
     0 0 0 1px var(--orange),
-    0 10px 28px rgba(242, 183, 11, 0.28);
+    0 10px 28px color-mix(in srgb, var(--tint) 28%, transparent);
 }
 
 .pld-row-num {
@@ -1322,7 +1322,7 @@ body.mpl-open .pld-done {
 .aost-tool.active {
   color: var(--accent-ink);
   border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
-  background: color-mix(in srgb, var(--orange) 10%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 10%, var(--surface));
 }
 
 .aost-tool.danger:hover {
@@ -1384,7 +1384,7 @@ body.mpl-open .pld-done {
 
 .aost-track.added {
   border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
-  background: color-mix(in srgb, var(--orange) 8%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 8%, var(--surface));
 }
 
 /* Piste en cours de pré-écoute : bien identifiable */
@@ -1974,7 +1974,7 @@ body.mpl-open .pld-done {
 .pfo-view.active {
   color: var(--accent-ink);
   border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
-  background: color-mix(in srgb, var(--orange) 10%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 10%, var(--surface));
 }
 
 /* ---------- Responsive ---------- */
@@ -2024,7 +2024,7 @@ body.mpl-open .pld-done {
   border-radius: 12px;
   border: 1px solid var(--border);
   border-left: 3px solid var(--orange);
-  background: rgba(242, 183, 11, 0.07);
+  background: color-mix(in srgb, var(--tint) 7%, transparent);
   color: inherit;
   transition: border-color 0.15s ease, transform 0.12s ease;
 }

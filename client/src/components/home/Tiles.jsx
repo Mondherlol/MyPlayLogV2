@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Clock, ExternalLink, Gamepad2, Gift, Heart, Play, Tv } from "lucide-react";
 import { STORE_COLORS, freeEndsLabel } from "../FreeGameBanner";
+import GameAddFan from "../GameAddFan";
 
 // ======================================================================
 //  Les petites briques des rails
@@ -14,12 +15,24 @@ import { STORE_COLORS, freeEndsLabel } from "../FreeGameBanner";
  * La LÉGENDE est le sujet : le titre, et une ligne d'appoint qui dit pourquoi
  * ce jeu est là (« il y a 4 mois », « 92 % », « PS5 »). Sans elle, un rail de
  * jaquettes n'est qu'un mur d'images — joli, muet.
+ *
+ * ⚠️ SAUF DANS SES PROPRES RAYONS (`bare`). « Tu les avais commencés », « tes
+ * derniers terminés », « tes coups de cœur », « tes envies » : ce sont SES jeux,
+ * qu'il a joués et rangés lui-même. Leur écrire le nom sous la jaquette, c'est
+ * légender sa propre étagère — la ligne d'appoint reste, elle, parce qu'elle
+ * dit ce que la jaquette ne dit pas (depuis quand il dort, la note qu'il a
+ * mise). Les rayons de catalogue gardent leur titre : là, on découvre.
+ *
+ * ⚠️ ET LE « + » N'EST PAS DANS LE LIEN. Un bouton dans une ancre, c'est du
+ * HTML invalide et un clic qui navigue au lieu d'ouvrir l'éventail : la
+ * vignette est donc une boîte, avec le lien d'un côté et GameAddFan de l'autre
+ * — le même composant que les Sorties, le Studio et la Plateforme.
  */
-export function GameTile({ game, sub, subGold = false, badge = null }) {
+export function GameTile({ game, sub, subGold = false, badge = null, bare = false }) {
   const id = game.gameId ?? game.id;
   return (
-    <Link to={`/game/${id}`} className="mh-tile clickable" title={game.name}>
-      <span className="mh-tile-art">
+    <div className="mh-tile" title={game.name}>
+      <Link to={`/game/${id}`} className="mh-tile-art clickable">
         {game.cover ? (
           <img src={game.cover} alt="" loading="lazy" draggable="false" />
         ) : (
@@ -33,10 +46,19 @@ export function GameTile({ game, sub, subGold = false, badge = null }) {
             <Heart size={12} fill="currentColor" strokeWidth={0} />
           </span>
         )}
-      </span>
-      <span className="mh-tile-name">{game.name}</span>
+      </Link>
+      {!bare && (
+        <Link to={`/game/${id}`} className="mh-tile-name clickable">
+          {game.name}
+        </Link>
+      )}
       {!!sub && <span className={`mh-tile-sub ${subGold ? "gold" : ""}`}>{sub}</span>}
-    </Link>
+
+      <GameAddFan
+        game={{ id, name: game.name, cover: game.cover }}
+        hoverOnly
+      />
+    </div>
   );
 }
 

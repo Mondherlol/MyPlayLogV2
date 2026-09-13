@@ -31,7 +31,7 @@
   transition: color 0.15s ease;
 }
 .ep-back:hover {
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 
 .ep-missing {
@@ -101,7 +101,7 @@
   gap: 0.3rem;
   padding: 0.2rem 0.6rem;
   border-radius: 999px;
-  background: rgba(242, 183, 11, 0.16);
+  background: color-mix(in srgb, var(--tint) 16%, transparent);
   color: var(--accent-ink);
   font-size: 0.82rem;
   font-weight: 800;
@@ -153,7 +153,7 @@
 }
 .mh-pill.ghost.on {
   border-color: var(--orange);
-  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
   color: var(--accent-ink);
 }
 .mh-pill.ghost.danger:hover {
@@ -249,7 +249,7 @@
   text-underline-offset: 3px;
 }
 .ep-source:hover {
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 
 @media (max-width: 900px) {
@@ -858,7 +858,7 @@ button.bg-cell:hover {
 .bgc-howto svg {
   flex-shrink: 0;
   margin-top: 0.1rem;
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 /* L'en-tête d'une case : précédente, « case 3 sur 9 », suivante, OK. */
@@ -883,7 +883,7 @@ button.bg-cell:hover {
   margin-left: 0.35rem;
   padding: 0.05rem 0.4rem;
   border-radius: 999px;
-  background: rgba(242, 183, 11, 0.16);
+  background: color-mix(in srgb, var(--tint) 16%, transparent);
   color: var(--accent-ink);
   font-style: normal;
   font-size: 0.64rem;
@@ -1060,7 +1060,7 @@ button.bg-cell:hover {
   border-color: var(--orange);
 }
 .bgc-imgbtn svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 .bgc-imgbtn:disabled {
   opacity: 0.6;
@@ -1118,7 +1118,7 @@ button.bg-cell:hover {
   white-space: nowrap;
 }
 .bgs-back:hover {
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 .bgs-state {
   display: grid;
@@ -1269,7 +1269,7 @@ button.bg-cell:hover {
   border: none;
   background: var(--accent-grad);
   color: #3b2a02;
-  box-shadow: 0 6px 16px rgba(242, 183, 11, 0.3);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--tint) 30%, transparent);
 }
 .bgc-btn.gold:hover {
   filter: brightness(1.05);

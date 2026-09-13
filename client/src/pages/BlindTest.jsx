@@ -27,7 +27,7 @@ import {
   SkipForward,
   Lock,
   Calendar,
-  Building2,
+  Code2,
   Tag,
   Timer,
   Home,
@@ -948,7 +948,7 @@ export default function BlindTest() {
         label: "Plateformes",
         text: h.platforms.slice(0, 3).join(" · "),
       });
-    if (h.studio) pool.push({ key: "studio", Icon: Building2, label: "Studio", text: h.studio });
+    if (h.studio) pool.push({ key: "studio", Icon: Code2, label: "Studio", text: h.studio });
     else if (h.genre) pool.push({ key: "genre", Icon: Tag, label: "Genre", text: h.genre });
     const durMs = round.durationSec * 1000;
     return pool.slice(0, 3).map((p, i) => ({ ...p, atMs: HINT_FRACS[i] * durMs }));

@@ -386,7 +386,7 @@
 }
 .pt-cc-tab.on {
   color: #7a5600;
-  background: color-mix(in srgb, var(--orange) 18%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 18%, var(--surface));
   border-color: color-mix(in srgb, var(--orange) 50%, var(--border));
 }
 .pt-cc-options {
@@ -432,7 +432,7 @@
 }
 .pt-cc-opt.on {
   color: #7a5600;
-  background: color-mix(in srgb, var(--orange) 20%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 20%, var(--surface));
   border-color: color-mix(in srgb, var(--orange) 55%, var(--border));
 }
 

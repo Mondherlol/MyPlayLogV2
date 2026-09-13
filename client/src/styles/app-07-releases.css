@@ -272,7 +272,7 @@
   font-size: 0.82rem;
 }
 .rel-dd-clear:hover {
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 
 /* Bouton case à cocher « Exclure le contenu IA » */
@@ -386,7 +386,7 @@
   height: 10px;
   border-radius: 50%;
   background: var(--orange);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--orange) 25%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--tint) 25%, transparent);
 }
 
 .rel-now-label {
@@ -497,7 +497,7 @@
 /* Journée du jour : accent doré */
 .rel-day-badge.today {
   border-color: transparent;
-  background: linear-gradient(160deg, rgba(242, 183, 11, 0.16), rgba(242, 183, 11, 0.05));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--tint) 16%, transparent), color-mix(in srgb, var(--tint) 5%, transparent));
   box-shadow: 0 0 0 1.5px var(--orange) inset;
 }
 .rel-day-badge.today .rel-daynum {
@@ -627,7 +627,7 @@
 /* Jeu de la wishlist : liseré doré + marque-page */
 .relc.is-wish .relc-cover {
   border-color: var(--orange);
-  box-shadow: 0 0 14px rgba(242, 183, 11, 0.25);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--tint) 25%, transparent);
 }
 .relc-wishtag {
   position: absolute;
@@ -693,7 +693,7 @@
   font-size: 1.2rem;
 }
 .rel-state svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 .rel-empty p {
   margin: 0;
@@ -731,7 +731,7 @@
 }
 .relm-hero.plain {
   min-height: 0;
-  background: linear-gradient(160deg, rgba(242, 183, 11, 0.14), transparent 65%);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--tint) 14%, transparent), transparent 65%);
 }
 .relm-backdrop {
   position: absolute;
@@ -885,7 +885,7 @@
   border-radius: 999px;
   font-size: 0.76rem;
   font-weight: 700;
-  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
   color: var(--accent-ink);
 }
 .relm-chip.soft {
@@ -997,7 +997,7 @@
   color: var(--text-soft);
 }
 .relm-langs-label svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 .relm-lang {
   display: inline-flex;
@@ -1065,7 +1065,7 @@
   transition: background 0.15s ease;
 }
 .relm-go:hover {
-  background: color-mix(in srgb, var(--orange) 10%, transparent);
+  background: color-mix(in srgb, var(--tint) 10%, transparent);
 }
 
 /* ======================================================================

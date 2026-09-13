@@ -122,19 +122,19 @@ export default function BackloggdImportModal({ onClose, onDone }) {
           </div>
         </div>
 
-        {/* --- 1. L'adresse du profil --- */}
+        {/* --- 1. L'adresse du profil ---
+            ⚠️ UNE LIGNE, PAS UN PARAGRAPHE. Tout ce qu'il y a à savoir tient
+            dans le champ : ce qu'on y met, et qu'on ne touche à rien là-bas
+            se voit à l'écran suivant, où l'on valide avant que rien ne parte. */}
         {phase === "ask" && (
           <form className="bl-body" onSubmit={scan}>
-            <p className="bl-intro">
-              Colle l'adresse de ta page Backloggd. On lit tes jeux, tes notes, ton
-              avancement et tes avis — sans toucher à ton compte là-bas.
-            </p>
+            <p className="bl-intro">Ton pseudo ou l'adresse de ton profil.</p>
             <div className="bl-field">
               <Search size={18} />
               <input
                 type="text"
                 inputMode="url"
-                placeholder="https://backloggd.com/u/TonPseudo/games/"
+                placeholder="backloggd.com/u/TonPseudo"
                 value={url}
                 onChange={(e) => {
                   setUrl(e.target.value);
@@ -147,10 +147,7 @@ export default function BackloggdImportModal({ onClose, onDone }) {
             <button className="btn-steam-primary clickable" disabled={!url.trim()}>
               Lire mon profil
             </button>
-            <p className="bl-hint">
-              Ta bibliothèque doit être publique. La lecture prend quelques secondes :
-              on parcourt tes pages une par une, sans brusquer leur serveur.
-            </p>
+            <p className="bl-hint">Profil public requis.</p>
           </form>
         )}
 
@@ -159,7 +156,6 @@ export default function BackloggdImportModal({ onClose, onDone }) {
           <div className="steam-center">
             <Loader2 size={44} className="spin" />
             <h3>Lecture de ton profil…</h3>
-            <p>On parcourt ta bibliothèque, tes rayons et tes avis.</p>
           </div>
         )}
 
@@ -302,7 +298,6 @@ export default function BackloggdImportModal({ onClose, onDone }) {
           <div className="steam-center">
             <Loader2 size={44} className="spin" />
             <h3>Import en cours…</h3>
-            <p>On range tes jeux dans ta bibliothèque.</p>
           </div>
         )}
 

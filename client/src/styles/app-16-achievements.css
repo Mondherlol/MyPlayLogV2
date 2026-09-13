@@ -33,7 +33,7 @@
   border-radius: var(--radius-lg);
   background: radial-gradient(
       120% 140% at 0% 0%,
-      color-mix(in srgb, var(--orange) 12%, transparent),
+      color-mix(in srgb, var(--tint) 12%, transparent),
       transparent 55%
     ),
     var(--surface);
@@ -91,7 +91,7 @@
   margin-bottom: 0.9rem;
 }
 .ach-hero-head svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
   transform: translateY(2px);
 }
 .ach-hero-head em {
@@ -121,11 +121,11 @@
   margin-bottom: 0.15rem;
 }
 .ach-stat-tile.accent {
-  background: linear-gradient(150deg, color-mix(in srgb, var(--orange) 20%, var(--surface)), var(--surface));
+  background: linear-gradient(150deg, color-mix(in srgb, var(--tint) 20%, var(--surface)), var(--surface));
   border-color: color-mix(in srgb, var(--orange) 34%, var(--border));
 }
 .ach-stat-tile.accent svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 .ach-stat-tile strong {
   font-family: var(--font-display);
@@ -153,7 +153,7 @@
   margin: 0 0 0.7rem;
 }
 .ach-rail-title svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 .ach-rail-wrap {
   position: relative;
@@ -375,7 +375,7 @@
 }
 .ach-chip.on {
   border-color: color-mix(in srgb, var(--orange) 50%, var(--border));
-  background: color-mix(in srgb, var(--orange) 14%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 14%, var(--surface));
   color: var(--accent-ink);
 }
 
@@ -431,7 +431,7 @@
   font-weight: 700;
 }
 .ach-sort-item.on svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .ach-noresult {
@@ -787,7 +787,7 @@
 }
 .ach-modal-tab.on {
   color: var(--accent-ink);
-  background: color-mix(in srgb, var(--orange) 14%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 14%, var(--surface));
   border-color: color-mix(in srgb, var(--orange) 40%, var(--border));
 }
 .ach-modal-list {
@@ -992,7 +992,7 @@
 }
 .ach-single-game:hover {
   border-color: var(--border-strong);
-  background: color-mix(in srgb, var(--orange) 8%, var(--surface-2));
+  background: color-mix(in srgb, var(--tint) 8%, var(--surface-2));
 }
 .ach-single-game img {
   width: 40px;

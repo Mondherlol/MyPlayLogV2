@@ -262,7 +262,7 @@
   border: 1.5px solid var(--orange);
   border-radius: 14px;
   background:
-    radial-gradient(140% 120% at 0% 0%, rgba(242, 183, 11, 0.12), transparent 60%),
+    radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--tint) 12%, transparent), transparent 60%),
     var(--surface);
   box-shadow: var(--shadow-sm);
   animation: trk-preview-in 0.18s ease;
@@ -1034,7 +1034,7 @@
   width: fit-content;
 }
 .steam-tag.pink { color: #e0679b; background: rgba(224, 103, 155, 0.14); }
-.steam-tag.gold { color: var(--accent-ink); background: rgba(242, 183, 11, 0.14); }
+.steam-tag.gold { color: var(--accent-ink); background: color-mix(in srgb, var(--tint) 14%, transparent); }
 
 /* Badge de progression des trophées (modale PSN). */
 .psn-trophy-tag {
@@ -1620,7 +1620,7 @@
   display: grid;
   place-items: center;
   color: #eaa908;
-  background: radial-gradient(circle, rgba(242, 183, 11, 0.22), transparent 70%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--tint) 22%, transparent), transparent 70%);
   animation: steam-burst 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.4);
 }
 @keyframes steam-burst {
@@ -1676,8 +1676,8 @@
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--accent-ink);
-  background: color-mix(in srgb, var(--orange) 12%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--orange) 30%, var(--border));
+  background: color-mix(in srgb, var(--tint) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--tint) 30%, var(--border));
 }
 .psn-request-banner.ok {
   color: #1f8f4e;
@@ -1746,7 +1746,7 @@
 .psn-req-badge.pending {
   color: var(--accent-ink);
   border-color: color-mix(in srgb, var(--orange) 40%, var(--border));
-  background: color-mix(in srgb, var(--orange) 12%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 12%, var(--surface));
 }
 .psn-req-badge.processing {
   color: #2f8fd0;
@@ -1851,9 +1851,9 @@
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 .pv-row.on:not(.off) .pv-row-icon {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
   border-color: color-mix(in srgb, var(--orange) 40%, var(--border));
-  background: color-mix(in srgb, var(--orange) 12%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 12%, var(--surface));
 }
 .pv-row-txt {
   display: flex;
@@ -2117,7 +2117,7 @@
 }
 .fg-open:hover .pv-row-icon {
   border-color: var(--accent);
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 .fg .pv-row-txt strong {
   font-size: 0.98rem;
@@ -2216,21 +2216,6 @@
   cursor: var(--cursor-default), auto;
 }
 
-/* Un lien deguise en bouton : sans ca, l'ancre d'ajout du bot ne s'aligne pas
-   avec les vrais boutons de la meme rangee. */
-a.btn-discord-primary {
-  text-decoration: none;
-}
-a.btn-discord-primary.disabled {
-  opacity: 0.55;
-  pointer-events: none;
-}
-.import-card-desc.bot-guilds {
-  margin-top: 0.35rem;
-  font-size: 0.78rem;
-  color: var(--text-soft);
-}
-
 /* ======================================================================
    Apparence — l'échelle de notation
    ====================================================================== */
@@ -2306,7 +2291,7 @@ a.btn-discord-primary.disabled {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  color: #f2b70b;
+  color: var(--accent-ink);
   font-family: var(--font-display);
   font-weight: 800;
 }
@@ -2625,4 +2610,634 @@ a.btn-discord-primary.disabled {
 .import-card-desc svg {
   vertical-align: -2px;
   margin-right: 0.25rem;
+}
+
+/* ======================================================================
+   Paramètres — la version compacte
+   ======================================================================
+   Une plateforme = une ligne : logo, nom, une ligne d'état, l'action à
+   droite. Ce qui se déplie (saisie, confirmation, erreur) passe dessous,
+   sur toute la largeur. Plat, sans halo ni dégradé, dans les deux thèmes.
+
+   ⚠️ TOUT EST RANGÉ SOUS .settings-page. Les classes import-*, pv-* et
+   btn-* servent aussi aux modales d'import et à l'onglet Tracking des
+   profils, qui gardent leur habillage — c'est aussi pour ça que les
+   modales ouvertes d'ici partent dans <body>. */
+
+.settings-page {
+  max-width: 940px;
+  padding: 1.25rem 1rem 4rem;
+}
+.settings-page .settings-head h1 {
+  margin: 0 0 1.25rem;
+  font-size: 1.55rem;
+  letter-spacing: -0.01em;
+}
+.settings-page .settings-layout {
+  grid-template-columns: 196px minmax(0, 1fr);
+  gap: 2rem;
+}
+
+/* --- Navigation --- */
+.settings-page .settings-nav {
+  gap: 2px;
+}
+.settings-page .settings-tab {
+  gap: 0.6rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.87rem;
+  font-weight: 500;
+}
+.settings-page .settings-tab svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.settings-page .settings-tab.active {
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border);
+  font-weight: 600;
+}
+.settings-page .settings-tab.active::before {
+  display: none;
+}
+.settings-page .settings-tab.active svg {
+  color: var(--accent-mark);
+}
+.settings-page .settings-tab-badge {
+  background: #f2b70b;
+  color: #161618;
+}
+
+/* --- Titres --- */
+.settings-page .settings-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.settings-page .settings-section-title {
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+}
+.settings-page .settings-section-head .settings-section-title {
+  margin: 0;
+}
+.settings-page .settings-section-title svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text-soft);
+}
+.settings-page .settings-sub-title {
+  margin: 1.6rem 0 0.6rem;
+  color: var(--text-soft);
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.settings-page .settings-section-title + .settings-sub-title {
+  margin-top: 0;
+}
+
+/* --- La ligne : [logo · nom · état] [actions] puis le reste dessous --- */
+.settings-page .import-cards,
+.settings-page .trk-cards {
+  gap: 0.5rem;
+}
+.settings-page .import-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 1rem;
+  align-items: center;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: none;
+}
+.settings-page .import-card > * {
+  grid-column: 1 / -1;
+}
+.settings-page .import-card > .import-card-main {
+  grid-column: 1;
+  grid-row: 1;
+}
+.settings-page .import-card > .import-actions {
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0;
+  gap: 0.4rem;
+  flex-wrap: nowrap;
+}
+.settings-page
+  .import-card
+  > :not(:first-child):not(.import-card-main):not(.import-actions) {
+  margin-top: 0.65rem;
+}
+.settings-page .import-card.connected,
+.settings-page .import-card.psn.connected,
+.settings-page .import-card.discord.connected,
+.settings-page .import-card.bot.connected,
+.settings-page .import-card.google.connected {
+  border-color: var(--border);
+}
+.settings-page .import-card-glow {
+  display: none;
+}
+.settings-page .import-card.trk-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: none;
+  transform: none;
+}
+.settings-page .import-card.trk-card:hover .import-logo-cover {
+  transform: none;
+}
+.settings-page .import-card.is-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 58px;
+  color: var(--text-soft);
+}
+
+.settings-page .import-card-main {
+  gap: 0.75rem;
+}
+.settings-page .import-logo {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+/* Les marques, en aplat. */
+.settings-page .steam-logo {
+  background: #1b2838;
+  color: #fff;
+}
+.settings-page .psn-logo {
+  background: #0070d1;
+  color: #fff;
+}
+.settings-page .discord-logo {
+  background: #5865f2;
+  color: #fff;
+}
+.settings-page .bot-logo {
+  background: #2a2a31;
+  color: #fff;
+}
+.settings-page .bl-logo {
+  background: #f13278;
+  color: #1b1c1f;
+}
+.settings-page .google-logo {
+  background: #fff;
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.settings-page .import-card-title {
+  gap: 0.45rem;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.settings-page .import-card-desc {
+  margin: 0.1rem 0 0;
+  overflow: hidden;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings-page .import-badge {
+  gap: 3px;
+  padding: 1px 7px 1px 5px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: #15803d;
+  background: color-mix(in srgb, #22c55e 14%, transparent);
+}
+:root[data-theme="dark"] .settings-page .import-badge {
+  color: #4ade80;
+}
+
+/* Le compte relié, sur la ligne d'état : mini-avatar + pseudo. */
+.settings-page .import-steam-user {
+  gap: 0.35rem;
+  min-width: 0;
+  margin-top: 0.1rem;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+}
+.settings-page .import-steam-user img {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: 50%;
+}
+.settings-page .import-steam-user strong {
+  display: inline;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings-page .import-steam-user span {
+  flex: none;
+  font-size: 0.78rem;
+}
+
+/* --- Boutons --- */
+.settings-page .btn-set-primary,
+.settings-page .btn-steam-primary,
+.settings-page .btn-ghost,
+.settings-page .btn-ghost-danger,
+.settings-page .btn-ghost-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 32px;
+  padding: 0 0.8rem;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: none;
+  transform: none;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, filter 0.15s;
+}
+.settings-page .btn-set-primary,
+.settings-page .btn-steam-primary {
+  border: 0;
+  background: #f2b70b;
+  color: #161618;
+}
+.settings-page .btn-set-primary:hover:not(:disabled),
+.settings-page .btn-steam-primary:hover:not(:disabled) {
+  filter: brightness(0.95);
+  transform: none;
+}
+.settings-page .btn-ghost,
+.settings-page .btn-ghost-danger {
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text);
+}
+.settings-page .btn-ghost:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+.settings-page .btn-ghost-danger {
+  color: var(--text-soft);
+}
+.settings-page .btn-ghost-danger:hover:not(:disabled),
+.settings-page .import-unlink .btn-ghost-danger {
+  border-color: color-mix(in srgb, #e5484d 45%, var(--border));
+  background: color-mix(in srgb, #e5484d 8%, transparent);
+  color: #e5484d;
+}
+.settings-page .btn-ghost-link {
+  padding: 0 0.55rem;
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  font-weight: 500;
+}
+.settings-page .btn-ghost-link:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.settings-page .set-icon {
+  width: 32px;
+  padding: 0;
+}
+.settings-page :is(.btn-set-primary, .btn-steam-primary, .btn-ghost, .btn-ghost-danger):disabled {
+  opacity: 0.5;
+  cursor: var(--cursor-default), auto;
+}
+
+/* --- Ce qui se déplie sous la ligne --- */
+.settings-page .import-manual {
+  gap: 0.4rem;
+  margin-top: 0;
+}
+.settings-page .import-manual input,
+.settings-page .lol-region {
+  height: 32px;
+  padding: 0 0.7rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.84rem;
+}
+.settings-page .lol-region {
+  padding: 0 0.45rem;
+}
+.settings-page .import-manual input:focus,
+.settings-page .lol-region:focus {
+  outline: none;
+  border-color: #f2b70b;
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.settings-page .psn-connect {
+  padding: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  animation: none;
+}
+.settings-page .psn-connect .import-manual input {
+  background: var(--surface);
+}
+.settings-page .psn-note {
+  margin: 0.45rem 0 0;
+  font-size: 0.74rem;
+}
+
+.settings-page .import-unlink {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 0.5rem 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.settings-page .import-unlink > p {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+.settings-page .import-check {
+  align-items: center;
+  font-size: 0.8rem;
+}
+.settings-page .import-check input {
+  margin: 0;
+  accent-color: #f2b70b;
+}
+.settings-page .import-unlink-actions {
+  gap: 0.4rem;
+  margin: 0 0 0 auto;
+}
+
+.settings-page .import-error,
+.settings-page .import-ok,
+.settings-page .import-hint,
+.settings-page .psn-request-banner {
+  margin: 0;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+.settings-page .settings-section > .import-ok,
+.settings-page .settings-section > .import-error {
+  margin-bottom: 0.6rem;
+}
+
+.settings-page .import-soon-row {
+  margin-top: 0.6rem;
+}
+.settings-page .import-soon-chip {
+  padding: 0.2rem 0.6rem;
+  font-size: 0.7rem;
+}
+
+/* --- Tracking : les comptes liés, en sous-lignes --- */
+.settings-page .import-card-head {
+  gap: 0.75rem;
+}
+.settings-page .trk-acc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.settings-page .trk-acc-row {
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0.35rem 0.35rem 0.35rem 0.5rem;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.settings-page .trk-connected-txt strong {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+.settings-page .trk-connected-rank {
+  font-size: 0.74rem;
+}
+.settings-page .trk-unlink {
+  margin-left: auto;
+}
+.settings-page .trk-form {
+  margin-top: 0;
+}
+
+/* --- Interrupteurs (Confidentialité, Fil d'accueil) --- */
+.settings-page .pv-block {
+  margin-bottom: 0.6rem;
+  padding: 0 0.8rem;
+  border-radius: 12px;
+  box-shadow: none;
+}
+.settings-page .pv-row {
+  gap: 0.7rem;
+  padding: 0.55rem 0;
+}
+.settings-page .pv-row-icon {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.settings-page .pv-row.on:not(.off) .pv-row-icon {
+  border: 0;
+  background: color-mix(in srgb, #f2b70b 16%, transparent);
+}
+.settings-page .pv-row-txt {
+  gap: 0.05rem;
+}
+.settings-page .pv-row-txt strong {
+  font-size: 0.87rem;
+  font-weight: 600;
+}
+.settings-page .pv-row-txt span {
+  font-size: 0.76rem;
+}
+.settings-page .pv-sub-head {
+  padding: 0.65rem 0 0.45rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.07em;
+}
+.settings-page .pv-switch-track {
+  width: 36px;
+  height: 20px;
+}
+.settings-page .pv-switch-track::after {
+  width: 14px;
+  height: 14px;
+}
+.settings-page .pv-switch input:checked + .pv-switch-track::after {
+  transform: translateX(16px);
+}
+.settings-page .pv-switch input:indeterminate + .pv-switch-track::after {
+  transform: translateX(8px);
+}
+.settings-page .pv-empty {
+  flex-direction: row;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.9rem 0;
+}
+.settings-page .pv-empty p {
+  font-size: 0.8rem;
+}
+.settings-page .pv-req {
+  gap: 0.65rem;
+  padding: 0.55rem 0;
+}
+.settings-page .pv-req-avatar {
+  width: 32px;
+  height: 32px;
+}
+.settings-page .pv-req-ok,
+.settings-page .pv-req-no {
+  height: 30px;
+  padding: 0 0.6rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+}
+
+.settings-page .fp-reset {
+  height: 28px;
+  padding: 0 0.65rem;
+  font-size: 0.76rem;
+}
+.settings-page .fp-warn {
+  margin-bottom: 0.6rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+}
+.settings-page .fg {
+  margin-bottom: 0.5rem;
+  border-radius: 12px;
+  box-shadow: none;
+}
+.settings-page .fg-head {
+  padding-right: 0.8rem;
+}
+.settings-page .fg-open {
+  gap: 0.7rem;
+  padding: 0.55rem 0.5rem 0.55rem 0.8rem;
+}
+.settings-page .fg .pv-row-txt strong {
+  font-size: 0.87rem;
+}
+.settings-page .fg-count {
+  flex: none;
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+.settings-page .fg-chev {
+  margin-left: auto;
+}
+.settings-page .fg-count + .fg-chev {
+  margin-left: 0.35rem;
+}
+.settings-page .fg-kids {
+  padding: 0 0.8rem 0 3.05rem;
+}
+.settings-page .fg-kids .pv-row-txt strong {
+  font-size: 0.83rem;
+  font-weight: 500;
+}
+
+/* --- Apparence --- */
+.settings-page .scale-picker {
+  gap: 0.5rem;
+}
+.settings-page .scale-opt {
+  gap: 0.5rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.settings-page .scale-opt:hover {
+  border-color: var(--border-strong);
+}
+.settings-page .scale-opt.active {
+  border-color: #f2b70b;
+  background: color-mix(in srgb, #f2b70b 8%, var(--surface));
+}
+.settings-page .scale-opt-title {
+  font-family: var(--font-body);
+  font-size: 0.87rem;
+  font-weight: 600;
+}
+.settings-page .scale-opt-demo {
+  margin-top: 0;
+}
+.settings-page .font-preview {
+  border-radius: 12px;
+  box-shadow: none;
+}
+.settings-page .font-role-opt,
+.settings-page .font-tile {
+  border-width: 1px;
+  border-radius: 10px;
+}
+.settings-page .font-bar {
+  border-radius: 10px;
+}
+
+@media (max-width: 720px) {
+  .settings-page .settings-layout {
+    gap: 1rem;
+  }
+  .settings-page .settings-nav {
+    gap: 4px;
+    scrollbar-width: none;
+  }
+  .settings-page .settings-tab {
+    flex: none;
+    white-space: nowrap;
+  }
+}
+@media (max-width: 520px) {
+  .settings-page .import-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settings-page .import-card > .import-actions {
+    grid-column: 1;
+    grid-row: auto;
+    flex-wrap: wrap;
+    margin-top: 0.6rem;
+  }
 }

@@ -119,7 +119,7 @@ body.mpl-open .chat-page {
 }
 
 .chat-aside-head h1 svg {
-  color: var(--orange);
+  color: var(--accent-mark);
 }
 
 .chat-new {
@@ -217,7 +217,7 @@ body.mpl-open .chat-page {
 }
 
 .chat-item.active {
-  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
   border-color: color-mix(in srgb, var(--orange) 34%, transparent);
 }
 
@@ -533,7 +533,7 @@ body.mpl-open .chat-page {
      gêner la lecture. */
   background: radial-gradient(
     620px 220px at 50% -10%,
-    color-mix(in srgb, var(--orange) 7%, transparent),
+    color-mix(in srgb, var(--tint) 7%, transparent),
     transparent 70%
   );
 }
@@ -875,7 +875,7 @@ body.mpl-open .chat-page {
 }
 
 .chat-quote:hover {
-  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
 }
 
 .chat-row.mine .chat-quote {
@@ -1186,7 +1186,7 @@ a.chat-card:hover {
 
 .chat-react.mine {
   border-color: var(--orange);
-  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  background: color-mix(in srgb, var(--tint) 16%, transparent);
 }
 
 .chat-react.mine b {
@@ -1636,7 +1636,7 @@ a.chat-card:hover {
 .chat-tool:hover:not(:disabled),
 .chat-tool.on {
   color: var(--accent-ink);
-  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
 }
 
 .chat-tool:disabled {
@@ -1695,7 +1695,7 @@ a.chat-card:hover {
 .chat-emoji-in:hover,
 .chat-emoji-in.on {
   color: var(--accent-ink);
-  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  background: color-mix(in srgb, var(--tint) 16%, transparent);
 }
 
 /* Métriques STRICTEMENT identiques entre le textarea et son calque, sinon le
@@ -2075,7 +2075,7 @@ a.chat-card:hover {
 }
 
 .chat-contact.on {
-  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
   border-color: color-mix(in srgb, var(--orange) 32%, transparent);
 }
 
@@ -2123,7 +2123,7 @@ a.chat-card:hover {
 }
 
 .chat-new-modal .modal-title svg {
-  color: var(--orange);
+  color: var(--accent-mark);
   flex: 0 0 auto;
 }
 
@@ -2207,13 +2207,13 @@ a.chat-card:hover {
   padding: 0.7rem 0.8rem;
   border: 1px solid color-mix(in srgb, var(--orange) 45%, transparent);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--orange) 10%, transparent);
+  background: color-mix(in srgb, var(--tint) 10%, transparent);
 }
 
 .chat-dup-warn > svg {
   flex: 0 0 auto;
   margin-top: 2px;
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .chat-dup-body {
@@ -2397,7 +2397,7 @@ a.chat-card:hover {
 }
 
 .chat-member-crown {
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 
 .chat-member-kick {
@@ -3715,7 +3715,7 @@ body.mpl-open .chat-dock {
 
 .chat-fx-card.on {
   border-color: var(--orange);
-  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
 }
 
 .chat-fx-ico {
@@ -3726,7 +3726,7 @@ body.mpl-open .chat-dock {
   place-items: center;
   border-radius: 9px;
   background: var(--surface);
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .chat-fx-card.on .chat-fx-ico {
@@ -4707,8 +4707,8 @@ body.mpl-open .chat-dock {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--orange) 14%, transparent);
-  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
+  color: var(--accent-mark);
 }
 .call-gate.bad .call-gate-ico {
   background: color-mix(in srgb, #dc2626 13%, transparent);
@@ -4848,7 +4848,7 @@ body.mpl-open .chat-dock {
 }
 .rt-row.picked {
   border-color: var(--orange);
-  background: color-mix(in srgb, var(--orange) 7%, transparent);
+  background: color-mix(in srgb, var(--tint) 7%, transparent);
 }
 /* Une sonnerie retirée de la banque reste lisible : elle sonne encore chez
    ceux qui l'avaient prise, la griser complètement laisserait croire l'inverse. */
@@ -4955,7 +4955,7 @@ body.mpl-open .chat-dock {
 .rt-upload-btn:hover:not(:disabled) {
   border-color: var(--orange);
   color: var(--accent-ink);
-  background: color-mix(in srgb, var(--orange) 8%, transparent);
+  background: color-mix(in srgb, var(--tint) 8%, transparent);
 }
 .rt-upload-btn:disabled { opacity: 0.6; }
 .rt-upload-hint {
@@ -5030,8 +5030,8 @@ body.mpl-open .chat-dock {
 .rt-star:hover:not(:disabled) { opacity: 1; color: var(--accent-ink); }
 .rt-star.on {
   opacity: 1;
-  color: var(--orange);
-  fill: var(--orange);
+  color: var(--accent-ink);
+  fill: var(--accent-mark);
 }
 .rt-star.on svg { fill: currentColor; }
 

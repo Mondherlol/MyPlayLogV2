@@ -160,6 +160,7 @@ export default function GameRelated({ gameId, token, game }) {
                 <span className="gpr-tl-year">{it.year ?? "TBA"}</span>
                 <button
                   className="gpr-tl-card clickable"
+                  data-game-id={it.current ? undefined : it.id}
                   onClick={() => !it.current && navigate(`/game/${it.id}`)}
                   disabled={it.current}
                 >
@@ -192,7 +193,12 @@ export default function GameRelated({ gameId, token, game }) {
 // Card jaquette d'un contenu lié : année, note et badge de type au survol.
 function RelCard({ item, onOpen }) {
   return (
-    <button className="gpr-card clickable" onClick={onOpen} title={item.name}>
+    <button
+      className="gpr-card clickable"
+      data-game-id={item.id}
+      onClick={onOpen}
+      title={item.name}
+    >
       <div className="gpr-cover">
         {item.cover ? (
           <img src={item.cover} alt={item.name} loading="lazy" draggable="false" />

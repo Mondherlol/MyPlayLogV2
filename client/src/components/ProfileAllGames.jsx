@@ -25,6 +25,7 @@ import { loadFilters } from "../lib/filters";
 import { useAuth } from "../context/AuthContext";
 import FilterSection from "./FilterSection";
 import GameAddFan from "./GameAddFan";
+import { coverAtSize } from "../lib/gameCover";
 
 const STATUSES = [
   { key: "playing", label: "En cours" },
@@ -104,12 +105,13 @@ function GameTile({ entry, fields }) {
   return (
     <div
       className="pg-tile clickable"
+      data-game-id={entry.gameId}
       onClick={() => navigate(`/game/${entry.gameId}`)}
       title={entry.name}
     >
       <div className="pg-tile-cover">
         {entry.cover ? (
-          <img src={entry.cover} alt={entry.name} loading="lazy" />
+          <img src={coverAtSize(entry.cover)} alt={entry.name} loading="lazy" />
         ) : (
           <div className="pg-tile-ph">
             <Gamepad2 size={26} />

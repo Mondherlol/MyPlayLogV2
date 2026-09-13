@@ -2850,7 +2850,7 @@
   padding: 11px 16px;
   border-radius: 12px;
   border: 1px solid color-mix(in srgb, var(--orange) 35%, transparent);
-  background: color-mix(in srgb, var(--orange) 9%, transparent);
+  background: color-mix(in srgb, var(--tint) 9%, transparent);
   color: var(--accent-ink);
   font-size: 0.88rem;
   font-weight: 600;
@@ -2859,7 +2859,7 @@
 }
 .hf-qz-cta:hover {
   transform: translateY(-1px);
-  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  background: color-mix(in srgb, var(--tint) 16%, transparent);
   border-color: var(--orange);
 }
 .hf-qz-cta em {
@@ -2889,7 +2889,7 @@
   font-size: 0.8rem;
 }
 .hf-qz-run.best {
-  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
 }
 .hf-qz-run-pts b { font-size: 0.94rem; }
 .hf-qz-run-stat { color: var(--text-soft, #6b6c76); }

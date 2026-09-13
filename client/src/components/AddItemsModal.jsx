@@ -25,6 +25,12 @@ export default function AddItemsModal({
   existing, // Set de refId déjà dans la liste
   onToggle, // (item) => void  (ajoute si absent, retire si présent)
   onClose,
+  // ⚠️ MODE « UN SEUL », pour les endroits qui CHOISISSENT au lieu de REMPLIR :
+  // « si j'étais un personnage » ne garnit pas une liste, il désigne quelqu'un.
+  // Le compteur du bas et le bouton « Terminé » n'ont alors aucun sens — on
+  // repart dès le clic, et c'est l'appelant qui referme.
+  single = false,
+  title = null,
 }) {
   const { token } = useAuth();
   const isChar = kind === "character";
@@ -44,7 +50,7 @@ export default function AddItemsModal({
 
         <h2 className="modal-title">
           {isChar ? <User size={20} /> : <Gamepad2 size={20} />}
-          {isChar ? "Ajouter des personnages" : "Ajouter des jeux"}
+          {title || (isChar ? "Ajouter des personnages" : "Ajouter des jeux")}
         </h2>
 
         {isChar ? (
@@ -53,14 +59,16 @@ export default function AddItemsModal({
           <GameSearch token={token} existing={existing} onToggle={onToggle} />
         )}
 
-        <div className="additems-foot">
-          <span className="additems-count">
-            {existing.size} élément{existing.size > 1 ? "s" : ""} dans la liste
-          </span>
-          <button className="btn btn-primary" onClick={onClose}>
-            <Check size={18} /> Terminé
-          </button>
-        </div>
+        {!single && (
+          <div className="additems-foot">
+            <span className="additems-count">
+              {existing.size} élément{existing.size > 1 ? "s" : ""} dans la liste
+            </span>
+            <button className="btn btn-primary" onClick={onClose}>
+              <Check size={18} /> Terminé
+            </button>
+          </div>
+        )}
       </div>
     </div>,
     document.body

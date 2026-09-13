@@ -16,7 +16,7 @@ import {
   Play,
   Pause,
   Search,
-  Building2,
+  Code2,
   Loader2,
 } from "lucide-react";
 import { usePlayer } from "../context/PlayerContext";
@@ -70,7 +70,7 @@ const SPEC = {
     select: "multi4",
   },
   studios: {
-    Icon: Building2,
+    Icon: Code2,
     title: "Studios favoris",
     auto: "Tes studios favoris",
     pin: "Choisir jusqu'à 3 studios",
@@ -351,7 +351,7 @@ export default function ProfileAsideCardModal({ widget, config, data, token, onS
                     title="Retirer"
                   >
                     <span className="pac-studio-chip-logo">
-                      {s.logo ? <img src={s.logo} alt="" /> : <Building2 size={12} />}
+                      {s.logo ? <img src={s.logo} alt="" /> : <Code2 size={12} />}
                     </span>
                     {s.name}
                     <X size={12} />
@@ -406,7 +406,7 @@ export default function ProfileAsideCardModal({ widget, config, data, token, onS
                       }}
                     >
                       <span className="pac-opt-thumb contain">
-                        {o.logo ? <img src={o.logo} alt="" loading="lazy" /> : <Building2 size={18} />}
+                        {o.logo ? <img src={o.logo} alt="" loading="lazy" /> : <Code2 size={18} />}
                       </span>
                       <span className="pac-opt-body">
                         <span className="pac-opt-title">{o.name}</span>

@@ -2013,7 +2013,7 @@
 
 .adm-rom-read li svg {
   flex: none;
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 .adm-rom-read p {

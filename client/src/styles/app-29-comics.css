@@ -737,7 +737,7 @@
   background: color-mix(in srgb, var(--surface) 90%, transparent);
   backdrop-filter: blur(10px);
   box-shadow: 0 16px 40px rgba(10, 10, 20, 0.2),
-    0 0 0 5px color-mix(in srgb, var(--orange) 9%, transparent);
+    0 0 0 5px color-mix(in srgb, var(--tint) 9%, transparent);
   pointer-events: none;
   animation: b3d-tuto-in 0.5s cubic-bezier(0.2, 0.9, 0.25, 1) both;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -748,7 +748,7 @@
 .b3d-tuto.hit {
   border-color: var(--orange);
   box-shadow: 0 16px 40px rgba(10, 10, 20, 0.2),
-    0 0 0 5px color-mix(in srgb, var(--orange) 22%, transparent);
+    0 0 0 5px color-mix(in srgb, var(--tint) 22%, transparent);
 }
 
 @keyframes b3d-tuto-in {
@@ -817,7 +817,7 @@
   border-radius: 9px;
   border: 1px solid color-mix(in srgb, var(--orange) 50%, transparent);
   border-bottom-width: 3px;
-  background: color-mix(in srgb, var(--orange) 15%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 15%, var(--surface));
   color: var(--accent-ink);
   font-family: var(--font-body);
   font-size: 0.82rem;
@@ -1220,6 +1220,8 @@
   --text: #f2f3f6;
   --text-soft: #9a9dab;
   --accent-ink: #ffd24a;
+  --tint: #ffd24a;
+  --accent-mark: #ffd24a;
 }
 
 @media (max-width: 720px) {

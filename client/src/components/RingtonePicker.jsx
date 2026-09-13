@@ -216,15 +216,9 @@ export default function RingtonePicker() {
           {mine.file ? "Remplacer ma sonnerie" : "Envoyer ma sonnerie"}
         </button>
         <span className="rt-upload-hint">
-          mp3, m4a, ogg ou wav · {maxSeconds} s et 3 Mo maximum · elle tourne en
-          boucle tant que ça sonne
+          mp3, m4a, ogg, wav · {maxSeconds} s · 3 Mo max
         </span>
       </div>
-
-      <p className="rt-note">
-        C'est ce que <b>tu</b> entends quand on t'appelle. Personne d'autre ne
-        l'entend, et personne ne peut t'imposer la sienne.
-      </p>
     </div>
   );
 }

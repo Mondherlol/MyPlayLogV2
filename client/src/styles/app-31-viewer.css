@@ -418,7 +418,7 @@
 
 .vw-pill.on {
   border-color: color-mix(in srgb, var(--orange) 60%, transparent);
-  background: color-mix(in srgb, var(--orange) 18%, transparent);
+  background: color-mix(in srgb, var(--tint) 18%, transparent);
   color: #fff;
 }
 
@@ -494,7 +494,7 @@
 }
 
 .vw-src-star {
-  color: var(--orange);
+  color: var(--accent-mark);
 }
 
 .vw-src-menu {
@@ -541,7 +541,7 @@
 }
 
 .vw-src-row.current {
-  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
 }
 
 .vw-src-pick {
@@ -582,8 +582,8 @@
 }
 
 .vw-src-row.current .vw-src-lang {
-  background: color-mix(in srgb, var(--orange) 22%, transparent);
-  color: var(--orange);
+  background: color-mix(in srgb, var(--tint) 22%, transparent);
+  color: var(--accent-ink);
 }
 
 /* La pastille dit lequel joue, sans avoir à lire. */
@@ -597,7 +597,7 @@
 
 .vw-src-row.current .vw-src-dot {
   background: var(--orange);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--orange) 22%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tint) 22%, transparent);
 }
 
 .vw-src-act {
@@ -619,7 +619,7 @@
 }
 
 .vw-src-act.on {
-  color: var(--orange);
+  color: var(--accent-ink);
 }
 
 .vw-src-act.danger:hover:not(:disabled) {
@@ -644,7 +644,7 @@
 .vw-src-foot svg {
   flex: 0 0 auto;
   margin-top: 0.15rem;
-  color: var(--orange);
+  color: var(--accent-mark);
 }
 
 /* ---------------- le tiroir d'épisodes ----------------
@@ -734,7 +734,7 @@
 }
 
 .vw-list li button.current {
-  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  background: color-mix(in srgb, var(--tint) 16%, transparent);
   color: #fff;
 }
 
@@ -743,7 +743,7 @@
   font-family: var(--font-display);
   font-size: 0.76rem;
   font-weight: 700;
-  color: var(--orange);
+  color: var(--accent-ink);
   font-variant-numeric: tabular-nums;
 }
 

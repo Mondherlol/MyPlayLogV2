@@ -56,4 +56,6 @@
 @import "./styles/app-51-legal.css";
 /* Le parcours d'accueil des nouveaux inscrits (pages/Onboarding.jsx). */
 @import "./styles/app-52-onboarding.css";
+/* Le menu contextuel d'un jeu : clic droit à la souris, appui long au doigt. */
+@import "./styles/app-53-game-menu.css";
 @import "./styles/app-99-mobile-perf.css";

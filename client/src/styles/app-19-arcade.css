@@ -51,7 +51,7 @@
   margin: 0;
 }
 .arc-h2 svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 /* ======================================================================
@@ -64,7 +64,7 @@
   padding: 1.6rem 1.7rem;
   color: #f5f3ea;
   background:
-    radial-gradient(680px 320px at 88% -30%, rgba(242, 183, 11, 0.28), transparent 60%),
+    radial-gradient(680px 320px at 88% -30%, color-mix(in srgb, var(--tint) 28%, transparent), transparent 60%),
     radial-gradient(520px 300px at 0% 130%, rgba(126, 96, 255, 0.24), transparent 62%),
     linear-gradient(150deg, #191a24 0%, #101119 60%, #0b0c12 100%);
   box-shadow:
@@ -664,7 +664,7 @@
   width: 220px;
   height: 220px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(242, 183, 11, 0.18), transparent 68%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--tint) 18%, transparent), transparent 68%);
   pointer-events: none;
 }
 .arc-crate-art {
@@ -791,7 +791,7 @@
   margin: 0.2rem 0 -0.1rem;
 }
 .arc-rail-title svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 
 /* ---- Porte d'entrée de la collection de curseurs (en tête du rail) ---- */
@@ -861,7 +861,7 @@
   color: var(--text-soft);
 }
 .arc-rail-cursors.friends:hover .arc-rail-cursors-ic {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
   border-color: color-mix(in srgb, var(--orange) 45%, var(--border));
 }
 
@@ -1045,7 +1045,7 @@
 }
 .afc-person.on {
   border-color: color-mix(in srgb, var(--orange) 45%, var(--border));
-  background: color-mix(in srgb, var(--orange) 9%, var(--surface));
+  background: color-mix(in srgb, var(--tint) 9%, var(--surface));
 }
 .afc-person-av {
   flex: 0 0 auto;
@@ -1893,8 +1893,8 @@
   box-shadow: 0 0 0 1px var(--arc-rarity), var(--shadow-sm);
 }
 .arc-theme.previewing {
-  border-color: var(--accent-ink);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-ink) 60%, transparent);
+  border-color: var(--accent-mark);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-mark) 60%, transparent);
 }
 
 /* L'aperçu (le mini-écran) */
@@ -2037,7 +2037,7 @@
 }
 .arc-theme-btn.ghost:hover,
 .arc-theme-btn.ghost.on {
-  border-color: var(--accent-ink);
+  border-color: var(--accent-mark);
   color: var(--accent-ink);
 }
 .arc-theme-btn:disabled {
@@ -2898,8 +2898,8 @@
 }
 /* Essai admin : ni gain ni perte, on le dit clairement en doré neutre. */
 .co-try-note {
-  background: color-mix(in srgb, var(--accent-ink) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent-ink) 34%, transparent);
+  background: color-mix(in srgb, var(--accent-mark) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-mark) 34%, transparent);
   color: var(--accent-ink);
 }
 .co-new {
@@ -2936,7 +2936,7 @@
   font-variant-numeric: tabular-nums;
 }
 .co-balance svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 .co-again {
   display: inline-flex;
@@ -3078,7 +3078,7 @@
   color: var(--text-soft);
 }
 .arw-transfer-opt input {
-  accent-color: var(--accent-ink);
+  accent-color: var(--accent-mark);
 }
 
 /* ⚠ PROVISOIRE (démo vidéo) : bloc « Tirage truqué ». Supprimable d'un bloc. */
@@ -3093,8 +3093,8 @@
 }
 /* Truquage actif : la carte se signale, on ne l'oublie pas en la quittant. */
 .arw-rig.on {
-  border-color: var(--accent-ink);
-  box-shadow: inset 3px 0 0 var(--accent-ink);
+  border-color: var(--accent-mark);
+  box-shadow: inset 3px 0 0 var(--accent-mark);
 }
 .arw-rig-on {
   color: var(--accent-ink);
@@ -3136,8 +3136,8 @@
 }
 /* Ligne touchée mais pas encore enregistrée : liseré doré. */
 .arw-list-row.dirty {
-  border-color: var(--accent-ink);
-  background: color-mix(in srgb, var(--accent-ink) 7%, var(--surface));
+  border-color: var(--accent-mark);
+  background: color-mix(in srgb, var(--accent-mark) 7%, var(--surface));
 }
 .arw-list-art {
   display: grid;
@@ -3163,7 +3163,7 @@
 .arw-list-row input:focus,
 .arw-list-row select:focus {
   outline: none;
-  border-color: var(--accent-ink);
+  border-color: var(--accent-mark);
   background: var(--surface);
 }
 .arw-list-name {
@@ -3192,9 +3192,9 @@
   gap: 0.6rem;
   margin: 0.7rem -1.3rem -1.3rem;
   padding: 0.7rem 1.3rem;
-  border-top: 1px solid var(--accent-ink);
+  border-top: 1px solid var(--accent-mark);
   border-radius: 0 0 16px 16px;
-  background: color-mix(in srgb, var(--accent-ink) 8%, var(--surface));
+  background: color-mix(in srgb, var(--accent-mark) 8%, var(--surface));
 }
 .arw-save-bar > span {
   flex: 1;
@@ -3238,7 +3238,7 @@
   flex-direction: column;
   gap: 0.4rem;
   padding: 0.8rem;
-  border: 1px solid color-mix(in srgb, var(--accent-ink) 42%, var(--border));
+  border: 1px solid color-mix(in srgb, var(--accent-mark) 42%, var(--border));
   border-radius: var(--radius);
   background: var(--surface);
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28);
@@ -3249,7 +3249,7 @@
   gap: 0.4rem;
 }
 .ctest-head > svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
   flex: 0 0 auto;
 }
 .ctest-title {
@@ -3335,7 +3335,7 @@
   margin-right: auto;
 }
 .pn-foot-left.on {
-  border-color: var(--accent-ink);
+  border-color: var(--accent-mark);
   color: var(--accent-ink);
 }
 
@@ -3766,7 +3766,7 @@
   background: var(--surface-2);
 }
 .cur-url > svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
   flex: 0 0 auto;
 }
 .cur-url input {
@@ -3811,9 +3811,9 @@
   transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 .cur-drop:hover:not(:disabled) {
-  border-color: var(--accent-ink);
+  border-color: var(--accent-mark);
   color: var(--text);
-  background: color-mix(in srgb, var(--accent-ink) 7%, var(--surface-2));
+  background: color-mix(in srgb, var(--accent-mark) 7%, var(--surface-2));
 }
 .cur-drop-main {
   font-weight: 700;
@@ -3840,12 +3840,12 @@
   background: var(--surface);
 }
 .cur-slot.filled {
-  border-color: color-mix(in srgb, var(--accent-ink) 38%, var(--border));
+  border-color: color-mix(in srgb, var(--accent-mark) 38%, var(--border));
 }
 /* Le slot dont le menu contextuel est ouvert reste visuellement désigné. */
 .cur-slot.menued {
-  border-color: var(--accent-ink);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-ink) 22%, transparent);
+  border-color: var(--accent-mark);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-mark) 22%, transparent);
 }
 
 /* Menu contextuel d'un rôle (clic droit). */
@@ -3912,7 +3912,7 @@
   font-size: 0.82rem;
 }
 .cur-slot-head svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
   flex: 0 0 auto;
 }
 .cur-slot-req {
@@ -3922,7 +3922,7 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--accent-ink);
-  background: color-mix(in srgb, var(--accent-ink) 15%, transparent);
+  background: color-mix(in srgb, var(--accent-mark) 15%, transparent);
   padding: 0.06rem 0.32rem;
   border-radius: 999px;
 }
@@ -3959,7 +3959,7 @@
 }
 .cur-slot-add:hover:not(:disabled) {
   color: var(--text);
-  border-color: var(--accent-ink);
+  border-color: var(--accent-mark);
 }
 .cur-hotspot {
   display: flex;
@@ -4010,7 +4010,7 @@
 }
 .cur-size-chip:hover:not(:disabled):not(.on) {
   color: var(--text);
-  border-color: var(--accent-ink);
+  border-color: var(--accent-mark);
 }
 .cur-size-chip.on {
   color: #3a2600;
@@ -4036,7 +4036,7 @@
   color: var(--text);
 }
 .cur-lib-head svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 .cur-lib-sub {
   margin-left: auto;
@@ -4092,7 +4092,7 @@
 .cur-review {
   margin-top: 0.5rem;
   padding: 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--accent-ink) 30%, var(--border));
+  border: 1px solid color-mix(in srgb, var(--accent-mark) 30%, var(--border));
   border-radius: var(--radius);
   background: var(--surface);
 }
@@ -4174,17 +4174,17 @@
   padding: 0.5rem 1rem;
   border: 1px solid rgba(242, 183, 11, 0.42);
   border-radius: 999px;
-  background: rgba(242, 183, 11, 0.12);
+  background: color-mix(in srgb, var(--tint) 12%, transparent);
   color: var(--text);
   font-size: 0.87rem;
   transition: background 0.18s ease, transform 0.12s ease;
 }
 .bt-earned:hover {
-  background: rgba(242, 183, 11, 0.2);
+  background: color-mix(in srgb, var(--tint) 20%, transparent);
   transform: translateY(-1px);
 }
 .bt-earned svg {
-  color: var(--accent-ink);
+  color: var(--accent-mark);
 }
 .bt-earned b {
   font-family: var(--font-display);

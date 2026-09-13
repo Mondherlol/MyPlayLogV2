@@ -2180,11 +2180,20 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
 
     // Fond de page : l'artwork le PLUS haute résolution (déjà trié), sinon la
     // meilleure capture. Jamais la jaquette portrait (affreuse étirée en fond).
-    const backdrop = artworks[0]
-      ? imgFull(artworks[0].image_id)
-      : screenshots[0]
-      ? imgFull(screenshots[0].image_id)
-      : null;
+    const bg = artworks[0] || screenshots[0] || null;
+    const backdrop = bg ? imgFull(bg.image_id) : null;
+    // ⚠️ ET LA MÊME EN TAILLE D'ORIGINE, QUAND ELLE EST PLUS GRANDE QUE 1080p.
+    // Le fond d'une fiche s'étale sur toute la largeur du contenu : sur un
+    // écran large, les 1920 px de `t_1080p` sont étirés à 2300 ou 3000, et ça
+    // se voit — l'image bave. `t_original` est le fichier tel qu'il a été
+    // déposé sur IGDB (souvent 3840 px).
+    //
+    // Elle part en PLUS, jamais à la place : c'est le navigateur qui choisit
+    // (cf. le `srcSet` de la fiche), donc un téléphone continue de télécharger
+    // la version 1080p. Envoyer d'office l'image d'origine à tout le monde,
+    // ce serait payer trois mégaoctets pour une bande de 200 px de haut.
+    const backdropHd = bg && (bg.width || 0) > 1920 ? igdbImg("t_original", bg.image_id) : null;
+    const backdropW = backdropHd ? bg.width : null;
 
     const companies = g.involved_companies || [];
     const developers = [
@@ -2301,6 +2310,8 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
       storylineFr: translation.storylineFr,
       cover: g.cover?.image_id ? igdbImg("t_cover_big", g.cover.image_id) : null,
       backdrop,
+      backdropHd,
+      backdropW,
       media,
       // { id, name } : l'id IGDB permet de rendre les puces cliquables côté
       // client (→ Explorer filtré). Le name est traduit pour l'affichage.

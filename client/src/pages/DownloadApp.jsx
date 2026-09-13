@@ -70,7 +70,11 @@ function noteLines(notes) {
     .filter(Boolean);
 }
 
-export default function DownloadApp() {
+// `embedded` : la page est rendue dans la coquille de l'app (cf. App.jsx).
+// C'est le cas dès qu'on est connecté — on garde alors sa barre latérale et sa
+// barre du haut, au lieu de se retrouver sur une page nue qui a l'air d'être
+// sortie du site.
+export default function DownloadApp({ embedded = false }) {
   // La page est publique : on y arrive connecté (depuis l'accueil, la barre
   // latérale) comme sans compte (un lien partagé). Le haut à droite s'adapte.
   const { user, loading: authLoading } = useAuth();
@@ -127,58 +131,64 @@ export default function DownloadApp() {
   const total = release?.downloadsTotal ?? release?.downloads ?? 0;
 
   return (
-    <div className="lp dlp">
+    <div className={`lp dlp ${embedded ? "is-embedded" : ""}`}>
       <CoverDrift />
 
-      <header className="lp-top">
-        <Link to={user ? "/app" : "/"} className="brand clickable">
-          <span className="brand-logo">
-            <Gamepad2 size={20} strokeWidth={2.5} />
-          </span>
-          <span className="brand-name">
-            My<span className="grad-text">PlayLog</span>
-          </span>
-        </Link>
-
-        <nav className="dlp-nav">
-          {/* ⚠️ UN VRAI LIEN « ACCUEIL », PAS SEULEMENT LE LOGO. Le logo mène
-              bien à l'accueil, mais personne ne le devine sur une page où il
-              n'y a rien d'autre à cliquer : on restait coincé sur le bouton de
-              téléchargement. Connecté, l'accueil c'est l'app. */}
-          <Link to={user ? "/app" : "/"} className="dlp-nav-link clickable">
-            <ArrowLeft size={15} /> Accueil
+      {/* ⚠️ PAS DEUX BARRES DU HAUT. Connecté, la page vit DANS l'app : la
+          barre latérale et la barre du haut portent déjà le logo, le retour
+          à l'accueil et l'avatar. Ce bandeau-ci ne sert qu'au visiteur qui
+          arrive par un lien partagé, sans rien autour. */}
+      {!embedded && (
+        <header className="lp-top">
+          <Link to={user ? "/app" : "/"} className="brand clickable">
+            <span className="brand-logo">
+              <Gamepad2 size={20} strokeWidth={2.5} />
+            </span>
+            <span className="brand-name">
+              My<span className="grad-text">PlayLog</span>
+            </span>
           </Link>
 
-          {/* Tant qu'on ne sait pas qui est là, on ne montre rien : des boutons
-              « Se connecter » qui clignotent une demi-seconde avant l'avatar,
-              ça se voit. */}
-          {!authLoading &&
-            (user ? (
-              <Link
-                to="/profile"
-                className="dlp-me clickable"
-                title={`Connecté en tant que ${user.username}`}
-              >
-                {user.avatar ? (
-                  <img src={user.avatar} alt="" />
-                ) : (
-                  (user.username || "?").charAt(0).toUpperCase()
-                )}
-              </Link>
-            ) : (
-              <>
-                <Link to="/login" className="dlp-nav-link clickable">
-                  Se connecter
-                </Link>
-                <Link to="/register" className="dlp-nav-cta clickable">
-                  S'inscrire
-                </Link>
-              </>
-            ))}
+          <nav className="dlp-nav">
+            {/* ⚠️ UN VRAI LIEN « ACCUEIL », PAS SEULEMENT LE LOGO. Le logo mène
+                bien à l'accueil, mais personne ne le devine sur une page où il
+                n'y a rien d'autre à cliquer : on restait coincé sur le bouton de
+                téléchargement. Connecté, l'accueil c'est l'app. */}
+            <Link to={user ? "/app" : "/"} className="dlp-nav-link clickable">
+              <ArrowLeft size={15} /> Accueil
+            </Link>
 
-          <ThemeToggle />
-        </nav>
-      </header>
+            {/* Tant qu'on ne sait pas qui est là, on ne montre rien : des boutons
+                « Se connecter » qui clignotent une demi-seconde avant l'avatar,
+                ça se voit. */}
+            {!authLoading &&
+              (user ? (
+                <Link
+                  to="/profile"
+                  className="dlp-me clickable"
+                  title={`Connecté en tant que ${user.username}`}
+                >
+                  {user.avatar ? (
+                    <img src={user.avatar} alt="" />
+                  ) : (
+                    (user.username || "?").charAt(0).toUpperCase()
+                  )}
+                </Link>
+              ) : (
+                <>
+                  <Link to="/login" className="dlp-nav-link clickable">
+                    Se connecter
+                  </Link>
+                  <Link to="/register" className="dlp-nav-cta clickable">
+                    S'inscrire
+                  </Link>
+                </>
+              ))}
+
+            <ThemeToggle />
+          </nav>
+        </header>
+      )}
 
       <main className="dlp-main">
         {/* L'icône de l'app : c'est elle qu'on retrouvera sur son téléphone,
