@@ -1,0 +1,1007 @@
+/* ======================================================================
+   Le parcours d'accueil (pages/Onboarding.jsx)
+   ======================================================================
+
+   ⚠️ CET ÉCRAN EST SOMBRE DANS LES DEUX THÈMES, et ce n'est pas un oubli.
+   C'est le même parti pris que la barre latérale et que les écrans d'auth : le
+   parcours est une PARENTHÈSE, pas une page de l'app. Un fond noir profond
+   derrière des jaquettes, c'est une salle de cinéma — et c'est la seule scène
+   où les couvertures de jeux sont le sujet plutôt que le décor.
+
+   Il ne dépend donc d'aucune variable de thème : ses couleurs sont ici, en
+   dur, et il a la même tête pour tout le monde.
+   ====================================================================== */
+
+.onb {
+  --onb-bg: #0a0b0f;
+  --onb-surface: rgba(255, 255, 255, 0.045);
+  --onb-surface-hi: rgba(255, 255, 255, 0.085);
+  --onb-line: rgba(255, 255, 255, 0.1);
+  --onb-line-hi: rgba(255, 255, 255, 0.2);
+  --onb-text: #f4f5f8;
+  --onb-soft: #9598a6;
+  --onb-gold: #f2b70b;
+  --onb-amber: #ffd24a;
+
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  background: var(--onb-bg);
+  color: var(--onb-text);
+  overflow: hidden;
+}
+
+/* Le halo. Deux taches dorées très diluées qui respirent lentement : de quoi
+   éviter le fond plat sans jamais attirer l'œil. */
+.onb-aurora {
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+  background:
+    radial-gradient(46% 38% at 18% 8%, rgba(242, 183, 11, 0.16), transparent 70%),
+    radial-gradient(40% 42% at 88% 78%, rgba(120, 90, 255, 0.12), transparent 72%);
+  animation: onb-breathe 16s ease-in-out infinite alternate;
+}
+@keyframes onb-breathe {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.85;
+  }
+  to {
+    transform: translate3d(-2%, 2%, 0) scale(1.08);
+    opacity: 1;
+  }
+}
+
+/* ---------- L'en-tête : marque, avancement, sortie ---------- */
+.onb-head {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.1rem clamp(1rem, 4vw, 2.4rem);
+}
+.onb-brand {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.02rem;
+  letter-spacing: -0.03em;
+}
+.onb-brand-gold {
+  color: var(--onb-amber);
+}
+
+.onb-progress {
+  display: flex;
+  gap: 6px;
+  justify-self: center;
+}
+.onb-pip {
+  width: 26px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  transition: background 0.35s ease, width 0.35s ease;
+}
+.onb-pip.done {
+  background: rgba(242, 183, 11, 0.55);
+}
+.onb-pip.now {
+  width: 46px;
+  background: linear-gradient(90deg, #eaa908, #ffcf3a);
+  box-shadow: 0 0 14px rgba(242, 183, 11, 0.5);
+}
+
+.onb-skip,
+.onb-skip-ghost {
+  justify-self: end;
+}
+.onb-skip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--onb-soft);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.onb-skip:hover:not(:disabled) {
+  color: var(--onb-text);
+  border-color: var(--onb-line);
+  background: var(--onb-surface);
+}
+
+/* ---------- La scène ---------- */
+.onb-stage {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 clamp(1rem, 4vw, 2.4rem) 1.5rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+.onb-slide {
+  animation: onb-in 0.42s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+}
+@keyframes onb-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.onb-step {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: clamp(1rem, 3vh, 2.4rem) 0;
+}
+.onb-step-wide {
+  max-width: 940px;
+}
+.onb-hero {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: left;
+}
+
+.onb-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  align-self: flex-start;
+  padding: 0.32rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(242, 183, 11, 0.35);
+  background: rgba(242, 183, 11, 0.08);
+  color: var(--onb-amber);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.onb-title {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5.2vw, 3.1rem);
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  margin: 1rem 0 0;
+}
+.onb-gold {
+  color: var(--onb-amber);
+}
+.onb-lede {
+  max-width: 46ch;
+  margin: 1rem 0 0;
+  font-size: 1.02rem;
+  line-height: 1.62;
+  color: var(--onb-soft);
+}
+.onb-note {
+  margin: 1.2rem 0 0;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--onb-soft);
+}
+.onb-error {
+  margin: 0.9rem 0 0;
+  padding: 0.6rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid rgba(230, 80, 80, 0.35);
+  background: rgba(230, 60, 60, 0.12);
+  color: #ff9d95;
+  font-size: 0.86rem;
+}
+
+/* Le sommaire du premier écran : ce qui va être demandé, en trois lignes. */
+.onb-agenda {
+  list-style: none;
+  margin: 2rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+.onb-agenda-item {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.85rem 1rem;
+  border-radius: 16px;
+  border: 1px solid var(--onb-line);
+  background: var(--onb-surface);
+  animation: onb-in 0.5s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+.onb-agenda-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  background: rgba(242, 183, 11, 0.12);
+  color: var(--onb-amber);
+}
+.onb-agenda-item strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.98rem;
+}
+.onb-agenda-item em {
+  display: block;
+  margin-top: 1px;
+  font-style: normal;
+  font-size: 0.83rem;
+  color: var(--onb-soft);
+}
+
+/* ---------- Le titre d'une étape ---------- */
+.onb-step-head {
+  margin-bottom: 1.6rem;
+}
+.onb-step-n {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  background: rgba(242, 183, 11, 0.14);
+  color: var(--onb-amber);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.onb-step-head h2 {
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 3.4vw, 2.05rem);
+  letter-spacing: -0.03em;
+  margin: 0.6rem 0 0;
+}
+.onb-step-head p {
+  max-width: 56ch;
+  margin: 0.55rem 0 0;
+  font-size: 0.94rem;
+  line-height: 1.55;
+  color: var(--onb-soft);
+}
+
+/* ======================================================================
+   Étape « photo de profil »
+   ====================================================================== */
+.onb-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: clamp(1rem, 4vw, 2rem);
+  flex-wrap: wrap;
+}
+.onb-avatar-big {
+  position: relative;
+  flex: none;
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(140deg, #2a2d38, #16181f);
+  border: 2px solid rgba(242, 183, 11, 0.4);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55), 0 0 0 6px rgba(242, 183, 11, 0.07);
+}
+.onb-avatar-big img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.onb-avatar-big > span:not(.onb-avatar-busy) {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  color: var(--onb-amber);
+}
+.onb-avatar-busy {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 11, 15, 0.6);
+  color: var(--onb-amber);
+}
+
+.onb-avatar-choices {
+  flex: 1 1 320px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 0.7rem;
+}
+.onb-av {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.7rem 0.4rem 0.6rem;
+  border-radius: 16px;
+  border: 1px solid var(--onb-line);
+  background: var(--onb-surface);
+  color: var(--onb-text);
+  transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
+}
+.onb-av:hover:not(:disabled) {
+  border-color: var(--onb-line-hi);
+  background: var(--onb-surface-hi);
+  transform: translateY(-2px);
+}
+.onb-av.active {
+  border-color: var(--onb-gold);
+  background: rgba(242, 183, 11, 0.1);
+}
+.onb-av img {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.onb-av-badge {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #14161c;
+  border: 1px solid var(--onb-line);
+  color: var(--onb-soft);
+}
+.onb-av-check {
+  position: absolute;
+  top: 0.6rem;
+  left: 0.6rem;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--onb-gold);
+  color: #1a1204;
+}
+.onb-av-label {
+  font-size: 0.72rem;
+  line-height: 1.3;
+  text-align: center;
+  color: var(--onb-soft);
+}
+.onb-av-plus {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1.5px dashed var(--onb-line-hi);
+  color: var(--onb-soft);
+}
+.onb-av-upload:hover .onb-av-plus {
+  border-color: var(--onb-gold);
+  color: var(--onb-amber);
+}
+
+/* ======================================================================
+   Étape « à quoi tu joues »
+   ====================================================================== */
+.onb-modes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 1.1rem;
+}
+.onb-mode {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 0.95rem;
+  border-radius: 14px;
+  border: 1px solid var(--onb-line);
+  background: var(--onb-surface);
+  color: var(--onb-soft);
+  text-align: left;
+  transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
+}
+.onb-mode:hover {
+  border-color: var(--onb-line-hi);
+}
+.onb-mode.active {
+  border-color: var(--onb-gold);
+  background: rgba(242, 183, 11, 0.11);
+  color: var(--onb-amber);
+}
+.onb-mode strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+}
+.onb-mode em {
+  display: block;
+  font-style: normal;
+  font-size: 0.78rem;
+  color: var(--onb-soft);
+}
+
+/* La rangée des sagas : elle défile horizontalement, et ne prend jamais deux
+   lignes — c'est un rayon, pas une grille. */
+.onb-sagas {
+  display: flex;
+  gap: 0.55rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.9rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+.onb-saga {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.32rem 0.8rem 0.32rem 0.32rem;
+  border-radius: 999px;
+  border: 1px solid var(--onb-line);
+  background: var(--onb-surface);
+  color: var(--onb-text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: border-color 0.16s ease, background 0.16s ease;
+}
+.onb-saga img {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.onb-saga:hover {
+  border-color: var(--onb-line-hi);
+  background: var(--onb-surface-hi);
+}
+.onb-saga.active {
+  border-color: var(--onb-gold);
+  background: rgba(242, 183, 11, 0.13);
+  color: var(--onb-amber);
+}
+
+.onb-searchbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0 0.85rem;
+  height: 44px;
+  border-radius: 13px;
+  border: 1px solid var(--onb-line);
+  background: var(--onb-surface);
+  color: var(--onb-soft);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.onb-searchbar:focus-within {
+  border-color: var(--onb-gold);
+  box-shadow: 0 0 0 4px rgba(242, 183, 11, 0.14);
+}
+.onb-searchbar input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  color: var(--onb-text);
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+}
+.onb-searchbar input::placeholder {
+  color: var(--onb-soft);
+  opacity: 0.75;
+}
+.onb-search-clear {
+  border: none;
+  background: none;
+  color: var(--onb-soft);
+  display: grid;
+  place-items: center;
+}
+.onb-search-clear:hover {
+  color: var(--onb-text);
+}
+
+.onb-scope {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 0.9rem;
+  font-size: 0.85rem;
+  color: var(--onb-soft);
+}
+.onb-scope-back {
+  border: none;
+  background: none;
+  color: var(--onb-amber);
+  font-weight: 600;
+  font-size: 0.83rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* La grille de jaquettes. Le ratio 3/4 est celui d'IGDB : le poser en dur
+   évite que la grille saute pendant le chargement des images. */
+.onb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+.onb-tile {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: 13px;
+  overflow: hidden;
+  padding: 0;
+  border: 1.5px solid transparent;
+  background: #191b22;
+  transition: transform 0.18s cubic-bezier(0.2, 0.9, 0.25, 1), border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+.onb-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.35s ease, filter 0.2s ease;
+}
+.onb-tile:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5);
+}
+.onb-tile:hover img {
+  transform: scale(1.05);
+}
+.onb-tile-skel {
+  background: linear-gradient(100deg, #16181f 30%, #1f222b 50%, #16181f 70%);
+  background-size: 300% 100%;
+  animation: onb-shimmer 1.4s linear infinite;
+}
+@keyframes onb-shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -150% 0;
+  }
+}
+.onb-tile-noart {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 0.6rem;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: var(--onb-soft);
+  text-align: center;
+}
+
+/* Le voile : il ne se pose QUE sur les cases cochées, pour que la couleur du
+   statut se lise sans repeindre la jaquette. */
+.onb-tile-veil {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.onb-tile.picked .onb-tile-veil {
+  opacity: 1;
+}
+.onb-tile.picked.finished {
+  border-color: var(--onb-gold);
+}
+.onb-tile.picked.finished .onb-tile-veil {
+  background: linear-gradient(180deg, rgba(242, 183, 11, 0.1), rgba(242, 183, 11, 0.32));
+}
+.onb-tile.picked.wishlist {
+  border-color: #e0679b;
+}
+.onb-tile.picked.wishlist .onb-tile-veil {
+  background: linear-gradient(180deg, rgba(224, 103, 155, 0.1), rgba(224, 103, 155, 0.34));
+}
+
+.onb-tile-mark {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: rgba(10, 11, 15, 0.66);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 0.16s ease, transform 0.16s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+.onb-tile:hover .onb-tile-mark,
+.onb-tile.picked .onb-tile-mark {
+  opacity: 1;
+  transform: none;
+}
+.onb-tile.picked.finished .onb-tile-mark {
+  background: var(--onb-gold);
+  color: #1a1204;
+}
+.onb-tile.picked.wishlist .onb-tile-mark {
+  background: #e0679b;
+  color: #26060f;
+}
+
+/* Le titre n'apparaît qu'au survol : une grille de jaquettes se lit à l'image,
+   et vingt légendes en permanence la transforment en tableau. */
+.onb-tile-name {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 1.6rem 0.5rem 0.45rem;
+  background: linear-gradient(transparent, rgba(6, 7, 10, 0.92));
+  font-size: 0.72rem;
+  line-height: 1.25;
+  font-weight: 600;
+  text-align: left;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.onb-tile:hover .onb-tile-name {
+  opacity: 1;
+}
+
+.onb-tally {
+  position: sticky;
+  bottom: 0;
+  /* `inline-flex` + `margin: auto` ne centre rien : une boîte en ligne n'a pas
+     de largeur à répartir. `width: fit-content` lui en donne une, et les marges
+     automatiques peuvent enfin faire leur travail. */
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 1rem auto 0;
+  padding: 0.5rem 0.95rem;
+  border-radius: 999px;
+  border: 1px solid rgba(242, 183, 11, 0.4);
+  background: rgba(28, 22, 6, 0.92);
+  backdrop-filter: blur(8px);
+  color: var(--onb-amber);
+  font-size: 0.84rem;
+  font-weight: 600;
+  animation: onb-in 0.3s ease both;
+}
+
+/* ======================================================================
+   Étape « import »
+   ====================================================================== */
+.onb-imports {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.9rem;
+}
+.onb-import {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 1.2rem;
+  border-radius: 18px;
+  border: 1px solid var(--onb-line);
+  background: var(--onb-surface);
+  overflow: hidden;
+}
+.onb-import.linked {
+  border-color: rgba(242, 183, 11, 0.42);
+  background: rgba(242, 183, 11, 0.06);
+}
+.onb-import-logo {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--onb-text);
+}
+.onb-import-logo.steam {
+  background: rgba(102, 192, 244, 0.14);
+  color: #66c0f4;
+}
+.onb-import-logo.backloggd {
+  background: rgba(224, 103, 155, 0.15);
+  color: #e0679b;
+}
+.onb-import h3 {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  margin: 0.2rem 0 0;
+}
+.onb-import p {
+  flex: 1;
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--onb-soft);
+}
+.onb-import-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.5rem;
+  padding: 0.6rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--onb-line-hi);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--onb-text);
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition: background 0.16s ease, border-color 0.16s ease, filter 0.16s ease;
+}
+.onb-import-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.32);
+}
+.onb-import-btn.primary {
+  border-color: transparent;
+  background: linear-gradient(100deg, #eaa908, #ffcf3a);
+  color: #1a1204;
+  box-shadow: 0 8px 22px rgba(242, 183, 11, 0.3);
+}
+.onb-import-btn.primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+.onb-import-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.onb-soon {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin-top: 1.1rem;
+}
+.onb-soon-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--onb-soft);
+}
+.onb-soon-chip {
+  padding: 0.32rem 0.7rem;
+  border-radius: 999px;
+  border: 1px dashed var(--onb-line);
+  color: rgba(255, 255, 255, 0.32);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* ======================================================================
+   Étape « les gestes »
+   ====================================================================== */
+.onb-tips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.7rem;
+}
+.onb-tip {
+  display: flex;
+  gap: 0.9rem;
+  padding: 1rem 1.1rem;
+  border-radius: 16px;
+  border: 1px solid var(--onb-line);
+  background: var(--onb-surface);
+  animation: onb-in 0.5s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+.onb-tip-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: rgba(242, 183, 11, 0.12);
+  color: var(--onb-amber);
+}
+.onb-tip strong {
+  font-family: var(--font-display);
+  font-size: 1rem;
+}
+.onb-tip p {
+  margin: 0.25rem 0 0;
+  font-size: 0.87rem;
+  line-height: 1.55;
+  color: var(--onb-soft);
+}
+
+/* ======================================================================
+   Étape finale
+   ====================================================================== */
+.onb-done {
+  align-items: flex-start;
+}
+.onb-burst {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 24px;
+  background: linear-gradient(140deg, rgba(242, 183, 11, 0.22), rgba(242, 183, 11, 0.06));
+  border: 1px solid rgba(242, 183, 11, 0.4);
+  color: var(--onb-amber);
+  margin-bottom: 1.2rem;
+  animation: onb-pop 0.7s cubic-bezier(0.2, 1.6, 0.35, 1) both;
+}
+@keyframes onb-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.5) rotate(-14deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.onb-replay-note {
+  margin: 1.4rem 0 0;
+  font-size: 0.83rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* ======================================================================
+   Le pied de page : retour, repère, suite
+   ====================================================================== */
+.onb-foot {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem clamp(1rem, 4vw, 2.4rem);
+  padding-bottom: max(0.9rem, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--onb-line);
+  background: rgba(10, 11, 15, 0.75);
+  backdrop-filter: blur(14px);
+}
+.onb-back {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--onb-soft);
+  font-family: var(--font-body);
+  font-size: 0.86rem;
+  font-weight: 600;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.onb-back:hover:not(:disabled) {
+  color: var(--onb-text);
+  border-color: var(--onb-line);
+}
+.onb-back:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+.onb-foot-note {
+  justify-self: center;
+  margin: 0;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.38);
+  text-align: center;
+}
+.onb-next {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.78rem 1.35rem;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(100deg, #eaa908, #ffcf3a);
+  color: #1a1204;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  box-shadow: 0 8px 24px rgba(242, 183, 11, 0.32);
+  transition: filter 0.16s ease, box-shadow 0.2s ease, transform 0.12s ease;
+}
+.onb-next:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow: 0 10px 30px rgba(242, 183, 11, 0.45);
+}
+.onb-next:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.onb-next:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ---------- Étroit : le repère du pied de page saute, pas les boutons ---------- */
+@media (max-width: 720px) {
+  .onb-head {
+    grid-template-columns: auto 1fr auto;
+  }
+  .onb-brand {
+    font-size: 0.92rem;
+  }
+  .onb-skip span {
+    display: none;
+  }
+  .onb-foot {
+    grid-template-columns: auto 1fr;
+  }
+  .onb-foot-note {
+    display: none;
+  }
+  .onb-next {
+    grid-column: 2;
+    justify-self: end;
+  }
+  .onb-avatar-big {
+    width: 96px;
+    height: 96px;
+  }
+  .onb-grid {
+    grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  }
+  /* Sur un écran tactile il n'y a pas de survol : le titre et la pastille
+     doivent être là d'emblée, sinon la grille est muette. */
+  .onb-tile-name {
+    opacity: 1;
+  }
+  .onb-tile-mark {
+    opacity: 1;
+    transform: none;
+  }
+}

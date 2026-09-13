@@ -54,4 +54,6 @@
 @import "./styles/app-49-welcome.css";
 /* Les pages légales : confidentialité et conditions d'utilisation. */
 @import "./styles/app-51-legal.css";
+/* Le parcours d'accueil des nouveaux inscrits (pages/Onboarding.jsx). */
+@import "./styles/app-52-onboarding.css";
 @import "./styles/app-99-mobile-perf.css";

@@ -45,6 +45,7 @@ import Messages from "./pages/Messages";
 import ListDetail from "./pages/ListDetail";
 import Admin from "./pages/Admin";
 import Settings from "./pages/Settings";
+import Onboarding from "./pages/Onboarding";
 import Placeholder from "./pages/Placeholder";
 import AppLayout from "./components/AppLayout";
 import PublicShell from "./components/PublicShell";
@@ -52,6 +53,26 @@ import InstallPrompt from "./components/InstallPrompt";
 import ScrollManager from "./components/ScrollManager";
 
 function ProtectedRoute({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="center-screen">Chargement…</div>;
+  if (!user) return <Navigate to="/login" replace />;
+  // ⚠️ LE TOUR DU PROPRIÉTAIRE PASSE AVANT L'APP, ET UNE SEULE FOIS.
+  // `user.onboarded` est une DATE côté serveur (cf. models/User.js) : tant
+  // qu'elle est vide, on n'entre pas dans l'app connectée — on fait le tour.
+  // Passer le tour REMPLIT cette date, donc personne ne le revoit sans le
+  // demander (Paramètres → Compte → « Revoir l'intro »).
+  //
+  // Le garde ne couvre QUE l'espace connecté : les pages partageables
+  // (/u/pseudo, /game/:id) passent par `PublicOrApp`, et détourner quelqu'un
+  // qui vient d'ouvrir un lien partagé serait le meilleur moyen de lui faire
+  // fermer l'onglet.
+  if (!user.onboarded) return <Navigate to="/onboarding" replace />;
+  return children;
+}
+
+// La même porte, sans le renvoi vers le parcours — sinon la page du parcours
+// se redirigerait vers elle-même, indéfiniment.
+function OnboardingRoute({ children }) {
   const { user, loading } = useAuth();
   if (loading) return <div className="center-screen">Chargement…</div>;
   if (!user) return <Navigate to="/login" replace />;
@@ -213,6 +234,19 @@ export default function App() {
           <PublicOrApp>
             <ListenInvite />
           </PublicOrApp>
+        }
+      />
+
+      {/* Le tour du propriétaire, juste après l'inscription — et rejouable
+          depuis les paramètres. HORS de la coquille connectée : il prend tout
+          l'écran, sans barre latérale ni barre du haut, parce qu'il n'y a
+          rien d'autre à faire pendant qu'on le fait. */}
+      <Route
+        path="/onboarding"
+        element={
+          <OnboardingRoute>
+            <Onboarding />
+          </OnboardingRoute>
         }
       />
 

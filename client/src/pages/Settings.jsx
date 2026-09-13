@@ -2194,6 +2194,53 @@ function ConnectionsPanel() {
           );
         })}
       </div>
+
+      <ReplayIntroCard />
+    </div>
+  );
+}
+
+// ======================================================================
+//  « Revoir l'intro »
+// ======================================================================
+// Le tour du propriétaire que l'on voit à l'inscription (cf. pages/Onboarding).
+// Il vit ICI, dans « Compte », et pas dans « Apparence » : ce n'est pas un
+// réglage d'affichage, c'est un état du compte — la date à laquelle il a fait
+// le tour. La remettre à zéro suffit à le relancer.
+//
+// ⚠️ ON N'EFFACE RIEN POUR LE REJOUER, ON Y VA. Vider la date remettrait le
+// compte dans l'état « n'a jamais fait le tour » : fermer l'onglet au milieu
+// suffirait alors à s'y retrouver renvoyé à la visite suivante, sans l'avoir
+// demandé. La page du parcours s'ouvre très bien sur un compte qui l'a déjà
+// fait — elle repose simplement la date en sortant.
+function ReplayIntroCard() {
+  const navigate = useNavigate();
+
+  return (
+    <div className="import-card">
+      <div className="import-card-glow" />
+      <div className="import-card-main">
+        <div className="import-logo">
+          <Sparkles size={28} />
+        </div>
+        <div className="import-card-info">
+          <h3>Revoir l'intro</h3>
+          <p className="import-card-desc">
+            Le petit tour du propriétaire de l'inscription : la photo de profil,
+            les jeux à cocher, les imports et les trois gestes à connaître. Rien
+            n'est effacé au passage.
+          </p>
+        </div>
+      </div>
+      <div className="import-actions">
+        <button
+          className="btn-ghost clickable"
+          onClick={() => navigate("/onboarding?replay=1")}
+        >
+          <Sparkles size={16} />
+          Refaire le tour
+        </button>
+      </div>
     </div>
   );
 }

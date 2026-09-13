@@ -733,6 +733,32 @@ router.post("/:id/follow", requireAuth, async (req, res) => {
   }
 });
 
+// --- Le parcours d'accueil est fait ---
+// ======================================================================
+// Appelée à la dernière étape ET par « Passer » : PASSER, C'EST FINIR. Sans
+// ça, on remontrerait le parcours à la prochaine ouverture — précisément ce
+// que le geste demande d'éviter.
+//
+// ⚠️ IL N'Y A PAS DE ROUTE POUR « REMETTRE À ZÉRO », ET C'EST VOULU. « Revoir
+// l'intro » (dans les réglages des deux clients) ouvre simplement l'écran du
+// parcours : il n'y a rien à défaire pour le rejouer, et vider la date
+// exposerait à s'y retrouver enfermé en fermant l'app au milieu.
+//
+// ⚠️ ÉCRITURE ATOMIQUE. Le parcours se termine souvent pendant qu'un import
+// Steam se range dans la bibliothèque : un load-modify-save sur le document
+// entier écraserait ce que l'import vient d'y poser.
+router.post("/me/onboarding", requireAuth, async (req, res) => {
+  try {
+    await User.updateOne({ _id: req.userId }, { $set: { onboardedAt: new Date() } });
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
+    res.json({ user: user.toPublic() });
+  } catch (err) {
+    console.error("onboarding flag error:", err.message);
+    res.status(500).json({ error: "Erreur lors de l'enregistrement." });
+  }
+});
+
 // --- Confidentialité : compte privé + sous-options ---
 // Repasser en public accepte automatiquement toutes les demandes en attente
 // (elles n'auraient plus aucun sens : le profil devient visible de tous).

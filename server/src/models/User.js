@@ -411,6 +411,18 @@ const userSchema = new mongoose.Schema(
     // d'office chez tout le monde.
     feedHidden: { type: [String], default: [] },
 
+    // --- Le parcours d'accueil (le « tour du propriétaire ») ---
+    // ⚠️ UNE DATE, PAS UN BOOLÉEN, ET C'EST CE QUI PERMET DE LE REJOUER. Un
+    // drapeau ne dit que « vu » ; une date dit AUSSI quand, donc on peut
+    // remontrer le parcours à ceux qui l'ont vu il y a un an sans obliger
+    // personne à le revoir chaque semaine. La remettre à `null` (le bouton
+    // « Revoir l'intro » des réglages) suffit à le relancer.
+    //
+    // `null` = jamais terminé. Les comptes créés AVANT cette fonctionnalité
+    // valent donc `null` eux aussi : ils verront le parcours une fois, ce qui
+    // est exactement ce qu'on veut d'une nouveauté qui présente l'app.
+    onboardedAt: { type: Date, default: null },
+
     // Demandes d'abonnement REÇUES et encore en attente (comptes privés).
     // Acceptée → le demandeur passe dans SON `following` ; refusée → oubliée.
     followRequests: {
@@ -604,6 +616,10 @@ userSchema.methods.toPublic = function () {
     // Pastille « demandes d'abonnement en attente » (compte privé).
     followRequestCount: (this.followRequests || []).length,
     feedHidden: this.feedHidden || [],
+    // Le client s'en sert comme d'un aiguillage au démarrage : tant que c'est
+    // faux, il envoie sur le parcours d'accueil au lieu de la page d'accueil.
+    onboarded: !!this.onboardedAt,
+    onboardedAt: this.onboardedAt || null,
     createdAt: this.createdAt,
   };
 };
