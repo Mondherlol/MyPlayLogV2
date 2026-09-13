@@ -4,16 +4,14 @@ import {
   ArrowLeft,
   ArrowRight,
   Bookmark,
-  Camera,
   Check,
-  Compass,
+  ChevronLeft,
+  ChevronRight,
   Gamepad2,
-  Heart,
   Loader2,
   MousePointerClick,
-  PartyPopper,
-  Plus,
   Search,
+  Shuffle,
   Sparkles,
   Trophy,
   Upload,
@@ -25,7 +23,6 @@ import { useAuth } from "../context/AuthContext";
 import { useLibrary } from "../context/LibraryContext";
 import { API_BASE, apiFetch, apiUpload } from "../lib/api";
 import BackloggdImportModal from "../components/BackloggdImportModal";
-import CoverDrift from "../components/CoverDrift";
 import DiscordIcon from "../components/DiscordIcon";
 import GoogleIcon from "../components/GoogleIcon";
 import SteamIcon from "../components/SteamIcon";
@@ -36,46 +33,53 @@ import SteamImportModal from "../components/SteamImportModal";
 // ======================================================================
 //
 // Cinq écrans, une minute, et on peut partir à n'importe lequel. Ce n'est pas
-// un formulaire d'inscription bis : le compte existe déjà quand on arrive ici.
-// C'est le moment où l'app cesse d'être vide — une photo, quelques jaquettes,
-// une bibliothèque importée — parce qu'une app de bibliothèque OUVERTE SUR DU
-// VIDE ne se comprend pas, et ne se garde pas.
+// un formulaire d'inscription bis — le compte existe déjà quand on arrive ici.
+// C'est le moment où l'app cesse d'être vide, parce qu'une app de bibliothèque
+// OUVERTE SUR DU VIDE ne se comprend pas, et ne se garde pas.
 //
-// ⚠️ CHAQUE ÉTAPE DOIT POUVOIR ÊTRE SAUTÉE, ET LE BOUTON DOIT SE VOIR. Un
-// parcours qu'on subit est pire que pas de parcours : on le traverse en
-// cliquant n'importe où pour en sortir, et ce qu'il a récolté ne veut rien
-// dire. Ici tout est optionnel, « Passer » est visible en permanence en haut à
-// droite, et « Passer, c'est terminer » — sinon on le remontrerait à la
-// prochaine ouverture, ce qui est exactement ce que le geste demande d'éviter.
+// ⚠️ PAS UN SEUL ÉCRAN QUI NE SE FAIT QUE LIRE. Il y a eu un « Bienvenue » et
+// un « C'est prêt » : deux pages de prose où l'on ne pouvait rien faire que
+// cliquer sur Suivant. Une intro se TRAVERSE en faisant des choses ; chaque
+// écran demande donc un geste, et le seul qui n'en demande pas (les trois
+// astuces) est aussi le dernier, celui qu'on lit en partant.
+//
+// ⚠️ DEUX QUESTIONS, DEUX ÉCRANS. « Coche ce que tu as joué OU ce que tu veux
+// jouer » sur le même écran, avec un interrupteur entre les deux, obligeait à
+// tenir deux intentions à la fois — et personne ne vérifiait dans quel mode il
+// cochait. On demande donc l'envie d'abord, le passé ensuite, et chaque écran
+// ne sait faire qu'une chose.
 //
 // ⚠️ ET IL NE S'ÉCRIT QU'À LA FIN DE CHAQUE ÉTAPE, jamais à chaque clic. On
-// coche huit jaquettes en trois secondes : envoyer huit requêtes pendant qu'on
-// hésite, c'est huit occasions de désynchroniser l'écran et la base, pour un
-// résultat que l'utilisateur va de toute façon modifier avant de valider.
+// attrape huit jaquettes en trois secondes : envoyer huit requêtes pendant
+// qu'on hésite, c'est huit occasions de désynchroniser l'écran et la base pour
+// un choix pas encore arrêté.
 
-const STEPS = ["welcome", "avatar", "taste", "import", "tips", "done"];
+const STEPS = ["avatar", "wishlist", "played", "import", "tips"];
 
-// Les deux façons de ranger un jeu pendant l'étape des goûts. Volontairement
-// DEUX, et pas les six statuts de la bibliothèque : on répond ici à « tu l'as
-// fait ou tu veux le faire ? », le reste se règle plus tard sur la fiche.
-const MODES = {
-  played: {
-    key: "played",
-    status: "finished",
-    label: "Déjà joué",
-    hint: "Faits",
-    Icon: Trophy,
-  },
+// Les deux écrans de choix. `need` est le minimum pour passer — et il se
+// compte SUR LA BIBLIOTHÈQUE, pas seulement sur ce qu'on vient d'attraper
+// (voir `have` plus bas) : quelqu'un qui arrive avec trente jeux n'a rien à
+// prouver.
+const PICKS = {
   wishlist: {
-    key: "wishlist",
     status: "wishlist",
-    label: "À jouer",
-    hint: "En attente",
+    need: 3,
     Icon: Bookmark,
+    n: "2",
+    title: "Qu'est-ce qui te tente ?",
+    sub: "Choisis au moins trois jeux que tu as envie de faire.",
+  },
+  played: {
+    status: "finished",
+    need: 1,
+    Icon: Trophy,
+    n: "3",
+    title: "Et un jeu que tu as déjà fait ?",
+    sub: "Un seul suffit pour lancer ta bibliothèque.",
   },
 };
 
-// Combien d'écritures en parallèle au moment de valider les jaquettes cochées.
+// Combien d'écritures en parallèle au moment de valider ce qui a été attrapé.
 // Trois : assez pour que trente jeux partent en une seconde, assez peu pour ne
 // pas ouvrir trente connexions d'un coup depuis un onglet.
 const FLUSH_PARALLEL = 3;
@@ -96,7 +100,8 @@ async function pool(items, size, worker) {
 }
 
 export default function Onboarding() {
-  const { user, token, updateUser } = useAuth();
+  const { token, updateUser } = useAuth();
+  const { map: library } = useLibrary();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const replay = params.get("replay") === "1";
@@ -105,23 +110,38 @@ export default function Onboarding() {
   const [leaving, setLeaving] = useState(false);
   const step = STEPS[index];
 
-  // Ce que l'étape des goûts a coché, et qui n'est écrit qu'à sa sortie.
+  // Ce que les écrans de choix ont attrapé, écrit à leur sortie.
   // gameId -> { status, name, cover }
   const [picked, setPicked] = useState({});
   // ⚠️ CE QUI EST DÉJÀ PARTI NE REPART PAS. Revenir en arrière puis repartir
   // est un geste ordinaire ; sans cette mémoire, il réécrirait trente entrées
-  // identiques à chaque aller-retour. Les cases, elles, restent cochées — les
-  // décocher après enregistrement ferait croire que rien n'a été gardé.
+  // identiques à chaque aller-retour. Les cartes, elles, restent choisies —
+  // les décocher après enregistrement ferait croire que rien n'a été gardé.
   const flushed = useRef(new Set());
   const pending = useCallback(
     () => Object.entries(picked).filter(([id]) => !flushed.current.has(id)),
     [picked]
   );
 
-  // ⚠️ ON PRÉCHARGE LE CATALOGUE DÈS LE PREMIER ÉCRAN. La liste des jaquettes
-  // vient d'IGDB : demandée à l'ouverture de l'étape, elle arriverait pendant
-  // qu'on la regarde, et la grille se remplirait sous les yeux. Demandée
-  // pendant qu'on lit « Bienvenue », elle est déjà là quand on arrive.
+  // ⚠️ CE QU'IL A DÉJÀ COMPTE AUTANT QUE CE QU'IL ATTRAPE. Quelqu'un qui vient
+  // d'importer Steam, ou qui rejoue l'intro depuis les réglages, a déjà tout ce
+  // qu'on lui demande : lui redemander trois envies, ce serait lui faire
+  // remplir un formulaire dont on connaît la réponse.
+  const have = useMemo(() => {
+    let wishlist = 0;
+    let played = 0;
+    for (const e of Object.values(library || {})) {
+      if (!e?.status) continue;
+      if (e.status === "wishlist") wishlist += 1;
+      else played += 1;
+    }
+    return { wishlist, played };
+  }, [library]);
+
+  // ⚠️ ON PRÉCHARGE LE CATALOGUE DÈS LE PREMIER ÉCRAN. Les jaquettes viennent
+  // d'IGDB : demandées à l'ouverture de l'étape, elles arriveraient pendant
+  // qu'on la regarde, et le tapis se remplirait sous les yeux. Demandées
+  // pendant qu'on choisit sa photo, elles sont déjà là.
   const [picks, setPicks] = useState(null);
   useEffect(() => {
     if (!token) return;
@@ -132,13 +152,12 @@ export default function Onboarding() {
 
   const go = useCallback((delta) => {
     setIndex((i) => Math.min(STEPS.length - 1, Math.max(0, i + delta)));
-    // La fenêtre du parcours défile toute seule d'une étape à l'autre : on
-    // remonte, sinon l'étape suivante s'ouvrirait à mi-hauteur.
     window.scrollTo({ top: 0, behavior: "instant" });
   }, []);
 
-  // Sortir : on marque le parcours fait (« passer, c'est terminer »), on
-  // envoie ce qui reste à écrire, puis on entre dans l'app.
+  // Sortir : « passer, c'est terminer » — sinon on remontrerait le parcours à
+  // la prochaine ouverture, ce qui est exactement ce que le geste demande
+  // d'éviter. Ce qui restait attrapé part quand même : c'est un choix fait.
   const finish = useCallback(
     async (rest = null) => {
       setLeaving(true);
@@ -161,15 +180,24 @@ export default function Onboarding() {
     [navigate, token, updateUser]
   );
 
+  const conf = PICKS[step] || null;
+  const chosen = conf
+    ? Object.values(picked).filter((p) => p.status === conf.status).length
+    : 0;
+  const total = conf ? chosen + have[step] : 0;
+  const blocked = conf ? total < conf.need : false;
+
   return (
     <div className="onb">
-      {/* ⚠️ LE DÉCOR EST UN PLAN, PAS UNE LUEUR. Une aurore dorée en fond
-          donnait un écran de bienvenue de banque en ligne ; ici on veut la
-          table de travail — un quadrillage technique gris, et derrière lui les
-          jaquettes du site qui glissent, à peine lisibles. Le doré ne sert
-          plus qu'aux choses qui se touchent. */}
+      {/* ⚠️ LE DÉCOR NE DOIT RIEN DISPUTER AUX CARTES. Il y a eu une aurore
+          dorée, puis des jaquettes qui défilaient derrière tout : deux fois
+          trop. Sur cet écran, les jaquettes SONT le contenu — un fond qui en
+          montre d'autres, même à 9 %, met du bruit exactement là où l'œil
+          cherche à reconnaître un jeu, et les titres passent par-dessus.
+          Il ne reste donc qu'un plan technique, immobile, ET ÉTEINT AU CENTRE
+          (cf. le masque en feuille de style) : la trame tient les bords, le
+          milieu où tout se passe reste un fond propre. */}
       <div className="onb-bg" aria-hidden="true">
-        <CoverDrift />
         <span className="onb-blueprint" />
         <span className="onb-vignette" />
       </div>
@@ -179,7 +207,13 @@ export default function Onboarding() {
           MyPlay<span className="onb-brand-gold">Log</span>
         </span>
 
-        <div className="onb-progress" role="progressbar" aria-valuenow={index + 1} aria-valuemin={1} aria-valuemax={STEPS.length}>
+        <div
+          className="onb-progress"
+          role="progressbar"
+          aria-valuenow={index + 1}
+          aria-valuemin={1}
+          aria-valuemax={STEPS.length}
+        >
           {STEPS.map((s, i) => (
             <span
               key={s}
@@ -188,27 +222,38 @@ export default function Onboarding() {
           ))}
         </div>
 
-        {step === "done" ? (
-          <span className="onb-skip-ghost" />
-        ) : (
-          <button className="onb-skip clickable" onClick={() => finish(pending())} disabled={leaving}>
-            Passer <X size={15} />
-          </button>
-        )}
+        {/* ⚠️ « PASSER » RESTE OUVERT MÊME QUAND « CONTINUER » EST FERMÉ. Le
+            minimum de trois jeux est une INVITATION, pas un péage : quelqu'un
+            qui ne veut rien donner doit pouvoir entrer quand même, sinon on
+            l'a juste bloqué à la porte de son propre compte. */}
+        <button
+          className="onb-skip clickable"
+          onClick={() => finish(pending())}
+          disabled={leaving}
+        >
+          Passer <X size={15} />
+        </button>
       </header>
 
       <main className="onb-stage">
         {/* La clé force le remontage : c'est elle qui rejoue l'animation
             d'entrée à chaque étape, sans un seul état d'animation à tenir. */}
         <div className="onb-slide" key={step}>
-          {step === "welcome" && <StepWelcome user={user} replay={replay} />}
-          {step === "avatar" && <StepAvatar />}
-          {step === "taste" && (
-            <StepTaste picks={picks} picked={picked} onPicked={setPicked} token={token} />
+          {step === "avatar" && <StepAvatar replay={replay} />}
+          {conf && (
+            <StepPick
+              conf={conf}
+              stepKey={step}
+              picks={picks}
+              picked={picked}
+              onPicked={setPicked}
+              library={library}
+              have={have[step]}
+              token={token}
+            />
           )}
           {step === "import" && <StepImport />}
           {step === "tips" && <StepTips />}
-          {step === "done" && <StepDone user={user} picked={picked} />}
         </div>
       </main>
 
@@ -221,20 +266,32 @@ export default function Onboarding() {
           <ArrowLeft size={16} /> Retour
         </button>
 
-        {step === "done" ? (
+        {conf ? (
+          <p className="onb-quota" data-ok={!blocked}>
+            {blocked ? (
+              `${total} / ${conf.need}`
+            ) : (
+              <>
+                <Check size={14} strokeWidth={3} /> {total}
+              </>
+            )}
+          </p>
+        ) : (
+          <span />
+        )}
+
+        {step === "tips" ? (
           <button className="onb-next clickable" onClick={() => finish()} disabled={leaving}>
             {leaving ? <Loader2 className="spin" size={17} /> : <Sparkles size={17} />}
             Entrer
           </button>
         ) : (
           <NextButton
-            step={step}
-            picked={picked}
             pending={pending}
             flushed={flushed}
             token={token}
             onDone={() => go(1)}
-            disabled={leaving}
+            disabled={leaving || blocked}
           />
         )}
       </footer>
@@ -242,17 +299,15 @@ export default function Onboarding() {
   );
 }
 
-// Le bouton « Suivant ». Sur l'étape des goûts il ÉCRIT avant d'avancer : c'est
-// le seul endroit du parcours qui a des choses en attente, et les laisser filer
-// vers l'écran suivant sans repère (« est-ce que c'est enregistré ? ») serait la
-// seule vraie source d'inquiétude du parcours.
-function NextButton({ step, picked, pending, flushed, token, onDone, disabled }) {
+// Le bouton « Continuer ». Il ÉCRIT avant d'avancer quand l'écran qu'on quitte
+// a laissé des choix en attente — le seul moment du parcours où quelque chose
+// pourrait se perdre, et donc le seul qui a le droit de faire patienter.
+function NextButton({ pending, flushed, token, onDone, disabled }) {
   const { upsertLocal } = useLibrary();
   const [busy, setBusy] = useState(false);
-  const entries = Object.entries(picked);
 
   async function next() {
-    const rest = step === "taste" ? pending() : [];
+    const rest = pending();
     if (!rest.length) return onDone();
     setBusy(true);
     await flushPicks(rest, token, upsertLocal);
@@ -261,25 +316,15 @@ function NextButton({ step, picked, pending, flushed, token, onDone, disabled })
     onDone();
   }
 
-  const label =
-    step === "taste" && entries.length
-      ? `Ajouter ${entries.length} jeu${entries.length > 1 ? "x" : ""}`
-      : step === "welcome"
-        ? "C'est parti"
-        : "Continuer";
-
   return (
     <button className="onb-next clickable" onClick={next} disabled={busy || disabled}>
       {busy ? <Loader2 className="spin" size={17} /> : null}
-      {label}
+      Continuer
       {!busy && <ArrowRight size={17} />}
     </button>
   );
 }
 
-// Écrit les jaquettes cochées dans la bibliothèque. `upsertLocal` est facultatif
-// (absent quand on sort du parcours en catastrophe) : la bibliothèque se
-// rechargera d'elle-même à la première page qui la lit.
 async function flushPicks(entries, token, upsertLocal) {
   await pool(entries, FLUSH_PARALLEL, async ([gameId, pick]) => {
     const { entry } = await apiFetch(`/library/${gameId}`, {
@@ -292,60 +337,21 @@ async function flushPicks(entries, token, upsertLocal) {
 }
 
 // ======================================================================
-//  1 — Bienvenue
-// ======================================================================
-function StepWelcome({ user, replay }) {
-  const name = user?.username || "toi";
-  return (
-    <section className="onb-step onb-hero">
-      <span className="onb-kicker">
-        <Sparkles size={13} /> {replay ? "Le tour, à nouveau" : "Bienvenue"}
-      </span>
-      <h1 className="onb-title">
-        Salut <span className="onb-gold">{name}</span>,<br />
-        on range tes jeux ?
-      </h1>
-      <p className="onb-lede">Trois questions, une minute. Tout est facultatif.</p>
-
-      <ul className="onb-agenda">
-        {[
-          { Icon: Camera, t: "Ta photo", s: "Discord, Google, ou la tienne" },
-          { Icon: Gamepad2, t: "Tes jeux", s: "Coche des jaquettes" },
-          { Icon: Compass, t: "Ta bibliothèque", s: "Steam, Backloggd" },
-        ].map(({ Icon, t, s }, i) => (
-          <li key={t} className="onb-agenda-item" style={{ "--d": `${i * 90}ms` }}>
-            <span className="onb-agenda-icon">
-              <Icon size={19} />
-            </span>
-            <span>
-              <strong>{t}</strong>
-              <em>{s}</em>
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-// ======================================================================
-//  2 — La photo de profil
+//  1 — La photo de profil
 // ======================================================================
 // ⚠️ LA PREMIÈRE PROPOSITION EST CELLE QU'ON A DÉJÀ. Quelqu'un qui vient
 // d'ouvrir son compte avec Discord ou Google a une photo chez eux, et la
 // meilleure façon de lui demander la sienne est de la lui MONTRER : un clic,
 // c'est fini. Lui présenter un champ « choisir un fichier » alors qu'on a son
 // portrait sous la main, c'est lui faire chercher ce qu'on tient déjà.
-function StepAvatar() {
+function StepAvatar({ replay }) {
   const { user, token, updateUser } = useAuth();
-  const [busy, setBusy] = useState(null); // la source en cours d'envoi
+  const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
   const fileRef = useRef(null);
 
   const current = user?.avatar || null;
 
-  // Les portraits déjà disponibles, dédoublonnés : lier Google puis Discord
-  // avec la même photo ne doit pas donner deux fois la même case.
   const sources = useMemo(() => {
     const out = [];
     const seen = new Set();
@@ -395,20 +401,25 @@ function StepAvatar() {
     }
   }
 
-  const initial = (user?.username || "?")[0].toUpperCase();
+  const name = user?.username || "";
+  const initial = (name || "?")[0].toUpperCase();
 
   return (
     <section className="onb-step">
       <StepHead
         n="1"
-        title="Une photo ?"
-        sub="Ce que les autres verront à côté de tes avis."
+        title={replay ? `Rebonjour, ${name}` : `Salut ${name}`}
+        sub="Une photo pour commencer. Elle ira à côté de tes avis."
       />
 
       <div className="onb-avatar-row">
         <div className="onb-avatar-big">
           {current ? <img src={current} alt="" /> : <span>{initial}</span>}
-          {busy && <span className="onb-avatar-busy"><Loader2 className="spin" size={22} /></span>}
+          {busy && (
+            <span className="onb-avatar-busy">
+              <Loader2 className="spin" size={22} />
+            </span>
+          )}
         </div>
 
         <div className="onb-avatar-choices">
@@ -465,28 +476,27 @@ function StepAvatar() {
 }
 
 // ======================================================================
-//  3 — Les jeux
+//  2 et 3 — Les jeux, en cartes jetées sur la table
 // ======================================================================
-// L'étape qui décide si le compte servira à quelque chose. Elle tient en un
-// geste : un interrupteur en haut (« j'y ai joué » / « je veux y jouer »), et
-// une grille de jaquettes qu'on coche.
+// Le même écran sert deux fois : une fois pour l'envie, une fois pour le
+// passé. Seuls le titre, le statut écrit et le minimum changent.
 //
-// ⚠️ LA RANGÉE DE SAGAS N'EST PAS UNE DÉCORATION, C'EST LE MOTEUR DE LA GRILLE.
-// Une grille de « jeux populaires » est la même pour tout le monde et ne
-// ressemble à personne : au bout de vingt cases, celui qui ne joue qu'à Zelda
-// et Pokémon n'a rien trouvé. Ouvrir une saga REMPLACE la grille par ses jeux à
-// elle — deux clics pour cocher dix Final Fantasy, ce qu'aucun champ de
-// recherche ne permet.
-function StepTaste({ picks, picked, onPicked, token }) {
-  const [mode, setMode] = useState("played");
-  const [saga, setSaga] = useState(null); // { kind, id, name } — la saga ouverte
+// ⚠️ LA RANGÉE DE SAGAS N'EST PAS UNE DÉCORATION, C'EST CE QUI CHANGE LA
+// DONNE. Un tapis de « jeux populaires » est le même pour tout le monde et ne
+// ressemble à personne : au bout de vingt cartes, celui qui ne joue qu'à Zelda
+// et Pokémon n'a rien trouvé. Ouvrir une saga REMPLACE le paquet par ses jeux
+// à elle — deux clics pour attraper trois Final Fantasy.
+//
+// ⚠️ ET ON RETIRE CE QU'IL A DÉJÀ. Poser sur la table un jeu qui est déjà dans
+// sa bibliothèque, c'est lui demander de refaire un choix qu'il a déjà fait —
+// il n'y a rien à répondre à une carte cochée d'avance.
+function StepPick({ conf, stepKey, picks, picked, onPicked, library, have, token }) {
+  const [saga, setSaga] = useState(null);
   const [sagaGames, setSagaGames] = useState(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Recherche libre : le filet pour tout ce que ni la grille ni les sagas
-  // n'ont proposé. Temporisée, sinon chaque lettre part chez IGDB.
   useEffect(() => {
     const q = query.trim();
     if (q.length < 2) {
@@ -495,7 +505,7 @@ function StepTaste({ picks, picked, onPicked, token }) {
     }
     const timer = setTimeout(() => {
       setLoading(true);
-      apiFetch(`/games?search=${encodeURIComponent(q)}&limit=24`, { token })
+      apiFetch(`/games?search=${encodeURIComponent(q)}&limit=36`, { token })
         .then((d) => setResults(d.games || []))
         .catch(() => setResults([]))
         .finally(() => setLoading(false));
@@ -514,10 +524,7 @@ function StepTaste({ picks, picked, onPicked, token }) {
     setLoading(true);
     try {
       const d = await apiFetch(`/games/franchises/${s.kind}/${s.id}`, { token });
-      // Les jeux d'une saga arrivent du plus récent au plus ancien et
-      // contiennent tout — y compris des sorties confidentielles. On garde
-      // celles qui ont une jaquette, dans la limite d'un écran.
-      setSagaGames((d.games || []).filter((g) => g.cover).slice(0, 30));
+      setSagaGames((d.games || []).filter((g) => g.cover).slice(0, 40));
     } catch {
       setSagaGames([]);
     } finally {
@@ -529,59 +536,49 @@ function StepTaste({ picks, picked, onPicked, token }) {
     const id = String(game.id);
     onPicked((prev) => {
       const next = { ...prev };
-      const cur = next[id];
-      // Un clic pose le jeu dans le mode courant ; un clic sur un jeu DÉJÀ posé
-      // dans ce mode-là le retire. Recliquer dans l'autre mode le déplace,
-      // sans qu'on ait à le décocher d'abord.
-      if (cur && cur.status === MODES[mode].status) delete next[id];
-      else next[id] = { status: MODES[mode].status, name: game.name, cover: game.cover || null };
+      if (next[id]) delete next[id];
+      else next[id] = { status: conf.status, name: game.name, cover: game.cover || null };
       return next;
     });
   }
 
-  const grid = results ?? sagaGames ?? picks?.games ?? null;
-  const count = Object.keys(picked).length;
+  const deck = useMemo(() => {
+    const source = results ?? sagaGames ?? picks?.games ?? null;
+    if (!source) return null;
+    return source.filter((g) => g.cover && !library?.[g.id]);
+  }, [results, sagaGames, picks, library]);
 
   return (
     <section className="onb-step onb-step-wide">
-      <StepHead
-        n="2"
-        title="À quoi tu joues ?"
-        sub="Coche ce que tu reconnais. Corrigeable après."
-      />
+      <StepHead n={conf.n} title={conf.title} sub={conf.sub} />
 
-      <div className="onb-modes">
-        {Object.values(MODES).map((m) => (
-          <button
-            key={m.key}
-            className={`onb-mode clickable ${mode === m.key ? "active" : ""}`}
-            onClick={() => setMode(m.key)}
-          >
-            <m.Icon size={16} />
-            <span>
-              <strong>{m.label}</strong>
-              <em>{m.hint}</em>
-            </span>
-          </button>
-        ))}
-      </div>
+      {have > 0 && (
+        <p className="onb-have">
+          <Check size={13} strokeWidth={3} />
+          {stepKey === "wishlist"
+            ? `${have} déjà dans tes envies. Tu peux passer directement.`
+            : `${have} déjà dans ta bibliothèque. Tu peux passer directement.`}
+        </p>
+      )}
 
-      {/* Les sagas : la rangée qui remplace la grille. */}
       {picks?.franchises?.length > 0 && (
         <div className="onb-sagas" role="tablist">
-          {picks.franchises.map((s) => (
-            <button
-              key={`${s.kind}:${s.id}`}
-              role="tab"
-              aria-selected={saga?.id === s.id && saga?.kind === s.kind}
-              className={`onb-saga clickable ${saga?.id === s.id && saga?.kind === s.kind ? "active" : ""}`}
-              onClick={() => openSaga(s)}
-              title={s.name}
-            >
-              <img src={s.cover} alt="" loading="lazy" />
-              <span>{s.name}</span>
-            </button>
-          ))}
+          {picks.franchises.map((s) => {
+            const on = saga?.id === s.id && saga?.kind === s.kind;
+            return (
+              <button
+                key={`${s.kind}:${s.id}`}
+                role="tab"
+                aria-selected={on}
+                className={`onb-saga clickable ${on ? "active" : ""}`}
+                onClick={() => openSaga(s)}
+                title={s.name}
+              >
+                <img src={s.cover} alt="" loading="lazy" />
+                <span>{s.name}</span>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -594,7 +591,11 @@ function StepTaste({ picks, picked, onPicked, token }) {
           placeholder="Ou cherche un jeu précis…"
         />
         {query && (
-          <button className="onb-search-clear clickable" onClick={() => setQuery("")} aria-label="Effacer">
+          <button
+            className="onb-search-clear clickable"
+            onClick={() => setQuery("")}
+            aria-label="Effacer"
+          >
             <X size={15} />
           </button>
         )}
@@ -602,11 +603,7 @@ function StepTaste({ picks, picked, onPicked, token }) {
 
       {(saga || results) && (
         <div className="onb-scope">
-          <span>
-            {results
-              ? `Résultats pour « ${query.trim()} »`
-              : `Saga ${saga.name}`}
-          </span>
+          <span>{results ? `« ${query.trim()} »` : `Saga ${saga.name}`}</span>
           <button
             className="onb-scope-back clickable"
             onClick={() => {
@@ -621,60 +618,201 @@ function StepTaste({ picks, picked, onPicked, token }) {
         </div>
       )}
 
-      {grid === null ? (
-        <div className="onb-grid">
-          {Array.from({ length: 18 }).map((_, i) => (
-            <span key={i} className="onb-tile onb-tile-skel" />
-          ))}
-        </div>
-      ) : grid.length === 0 ? (
-        <p className="onb-note">
-          {loading ? "Recherche…" : "Rien trouvé. Essaie un autre titre."}
-        </p>
-      ) : (
-        <div className="onb-grid">
-          {grid.map((g) => {
-            const pick = picked[String(g.id)];
+      <ScatterDeck
+        games={deck}
+        picked={picked}
+        onToggle={toggle}
+        accent={conf.status === "wishlist" ? "wishlist" : "played"}
+        loading={loading}
+      />
+    </section>
+  );
+}
+
+// ======================================================================
+//  Le tapis de cartes
+// ======================================================================
+// Des jaquettes jetées à plat, penchées, qui se chevauchent — un paquet qu'on
+// vient de faire tomber par terre, pas une grille de produits. C'est tout le
+// propos : dans une grille on LIT une liste, sur un tapis on ATTRAPE ce qu'on
+// reconnaît.
+//
+// ⚠️ LES INCLINAISONS NE SONT PAS TIRÉES AU HASARD À CHAQUE RENDU, elles sont
+// CALCULÉES À PARTIR DE L'IDENTIFIANT DU JEU. Un `Math.random()` ici, et tout
+// le tapis se redistribue au moindre clic : on attraperait une carte et les
+// onze autres sauteraient. Le même jeu doit retomber au même endroit, toujours.
+//
+// ⚠️ ET LE GESTE PRINCIPAL EST LE GLISSÉ : on tire le tapis sur le côté, les
+// cartes pivotent et retombent avec une autre main. Les deux flèches sont là
+// pour la souris et le clavier — un geste qui n'existe qu'au doigt n'existe pas
+// sur un ordinateur.
+
+const HAND = 12; // combien de cartes sur la table à la fois
+const SWIPE_MIN = 55; // au-delà de quoi un glissé change de main
+
+// Les emplacements, en pourcentage du tapis. Volontairement IRRÉGULIERS et
+// débordant les uns sur les autres : une grille déguisée se voit tout de
+// suite, et c'est le chevauchement qui fait « posé là » plutôt que « rangé ».
+const SLOTS = [
+  { x: 9, y: 20 },
+  { x: 27, y: 11 },
+  { x: 45, y: 23 },
+  { x: 63, y: 10 },
+  { x: 81, y: 20 },
+  { x: 92, y: 46 },
+  { x: 17, y: 52 },
+  { x: 35, y: 61 },
+  { x: 54, y: 54 },
+  { x: 72, y: 62 },
+  { x: 88, y: 78 },
+  { x: 25, y: 86 },
+];
+
+// Un bruit STABLE : le même identifiant donne toujours la même valeur.
+function jitter(id, salt) {
+  const n = Math.abs(Math.sin((Number(id) || 1) * (salt + 1) * 12.9898) * 43758.5453);
+  return n - Math.floor(n); // 0 → 1
+}
+
+function ScatterDeck({ games, picked, onToggle, accent, loading }) {
+  const [page, setPage] = useState(0);
+  const [dir, setDir] = useState(1);
+  const drag = useRef(null);
+
+  // Un nouveau paquet (saga ouverte, recherche) repart de sa première main :
+  // rester à la page 4 d'un paquet qui n'en a que deux montrerait du vide.
+  useEffect(() => {
+    setPage(0);
+  }, [games]);
+
+  const pages = games ? Math.max(1, Math.ceil(games.length / HAND)) : 1;
+  const safePage = Math.min(page, pages - 1);
+  const hand = games ? games.slice(safePage * HAND, safePage * HAND + HAND) : null;
+
+  const turn = useCallback(
+    (delta) => {
+      if (pages < 2) return;
+      setDir(delta);
+      setPage((p) => (p + delta + pages) % pages);
+    },
+    [pages]
+  );
+
+  // Le glissé, à la souris comme au doigt : les Pointer Events couvrent les
+  // deux, et `setPointerCapture` garde le geste même si le curseur sort du
+  // tapis en cours de route.
+  function onDown(e) {
+    if (e.button > 0) return;
+    drag.current = { x: e.clientX, moved: false };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  }
+  function onMove(e) {
+    if (!drag.current) return;
+    if (Math.abs(e.clientX - drag.current.x) > 8) drag.current.moved = true;
+  }
+  function onUp(e) {
+    const d = drag.current;
+    if (!d) return;
+    const dx = e.clientX - d.x;
+    // ⚠️ ON RELÂCHE APRÈS LE CLIC, PAS AVANT. Le `click` d'une carte part une
+    // fraction de seconde après ce `pointerup` : effacer `drag` tout de suite
+    // ferait passer la fin d'un glissé pour un clic, et on cocherait un jeu à
+    // chaque fois qu'on tire le tapis.
+    setTimeout(() => {
+      drag.current = null;
+    }, 0);
+    if (Math.abs(dx) >= SWIPE_MIN) turn(dx < 0 ? 1 : -1);
+  }
+
+  if (!hand) {
+    return (
+      <div className="onb-scatter is-loading">
+        {SLOTS.slice(0, 8).map((s, i) => (
+          <span
+            key={i}
+            className="onb-card onb-card-skel"
+            style={{ left: `${s.x}%`, top: `${s.y}%`, "--rot": `${(i % 5) - 2}deg` }}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (!hand.length) {
+    return (
+      <p className="onb-note">
+        {loading ? "Recherche…" : "Rien à proposer ici. Cherche un titre, ou passe."}
+      </p>
+    );
+  }
+
+  return (
+    <>
+      <div
+        className="onb-scatter"
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={() => {
+          drag.current = null;
+        }}
+      >
+        {/* La clé porte la page : les cartes se remontent, donc l'animation de
+            chute se rejoue, et chacune tombe avec son propre retard. */}
+        <div className={`onb-hand ${dir > 0 ? "from-right" : "from-left"}`} key={safePage}>
+          {hand.map((g, i) => {
+            const slot = SLOTS[i % SLOTS.length];
+            const on = !!picked[String(g.id)];
             return (
               <button
                 key={g.id}
-                className={`onb-tile clickable ${pick ? `picked ${pick.status}` : ""}`}
-                onClick={() => toggle(g)}
+                className={`onb-card clickable ${on ? `picked ${accent}` : ""}`}
+                onClick={() => {
+                  if (drag.current?.moved) return;
+                  onToggle(g);
+                }}
                 title={g.name}
+                style={{
+                  left: `${slot.x}%`,
+                  top: `${slot.y}%`,
+                  "--rot": `${(jitter(g.id, 1) - 0.5) * 26}deg`,
+                  "--z": Math.round(jitter(g.id, 2) * 10),
+                  "--d": `${i * 32}ms`,
+                }}
               >
-                {g.cover ? (
-                  <img src={g.cover} alt="" loading="lazy" />
-                ) : (
-                  <span className="onb-tile-noart">{g.name}</span>
-                )}
-                <span className="onb-tile-veil" />
-                <span className="onb-tile-mark">
-                  {pick ? (
-                    pick.status === "wishlist" ? (
-                      <Bookmark size={17} fill="currentColor" />
-                    ) : (
-                      <Check size={18} strokeWidth={3} />
-                    )
-                  ) : (
-                    <Plus size={17} strokeWidth={2.6} />
-                  )}
+                <img src={g.cover} alt="" loading="lazy" draggable="false" />
+                <span className="onb-card-mark">
+                  {on ? <Check size={15} strokeWidth={3.2} /> : <span className="onb-card-dot" />}
                 </span>
-                <span className="onb-tile-name">{g.name}</span>
+                <span className="onb-card-name">{g.name}</span>
               </button>
             );
           })}
         </div>
-      )}
+      </div>
 
-      {/* Le compteur suit le bas de l'écran : c'est la seule récompense de
-          l'étape, elle doit rester sous les yeux pendant qu'on coche. */}
-      {count > 0 && (
-        <div className="onb-tally">
-          <Heart size={14} fill="currentColor" />
-          {count} jeu{count > 1 ? "x" : ""} sélectionné{count > 1 ? "s" : ""}
+      {pages > 1 && (
+        <div className="onb-deal">
+          <button
+            className="onb-deal-btn clickable"
+            onClick={() => turn(-1)}
+            aria-label="Main précédente"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <span className="onb-deal-hint">
+            <Shuffle size={13} /> Glisse pour d'autres jeux
+          </span>
+          <button
+            className="onb-deal-btn clickable"
+            onClick={() => turn(1)}
+            aria-label="Main suivante"
+          >
+            <ChevronRight size={18} />
+          </button>
         </div>
       )}
-    </section>
+    </>
   );
 }
 
@@ -684,18 +822,12 @@ function StepTaste({ picks, picked, onPicked, token }) {
 // Les modales d'import existent déjà et sont bien meilleures que tout ce qu'on
 // referait ici en petit : on les OUVRE, on ne les réécrit pas. Cette étape
 // n'est qu'une vitrine — quelles portes existent, lesquelles sont ouvertes.
-const SOON = [
-  { key: "psn", label: "PlayStation" },
-  { key: "xbox", label: "Xbox" },
-  { key: "switch", label: "Nintendo" },
-  { key: "epic", label: "Epic Games" },
-  { key: "gog", label: "GOG" },
-];
+const SOON = ["PlayStation", "Xbox", "Nintendo", "Epic Games", "GOG"];
 
 function StepImport() {
   const { user, token, updateUser } = useAuth();
   const { refresh } = useLibrary();
-  const [status, setStatus] = useState(null); // /steam/status
+  const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [steamOpen, setSteamOpen] = useState(false);
@@ -758,8 +890,8 @@ function StepImport() {
   return (
     <section className="onb-step onb-step-wide">
       <StepHead
-        n="3"
-        title="Une bibliothèque ailleurs ?"
+        n="4"
+        title={"Une bibliothèque ailleurs ?"}
         sub="Tu valides jeu par jeu avant que rien ne bouge."
       />
 
@@ -807,23 +939,17 @@ function StepImport() {
       <div className="onb-soon">
         <span className="onb-soon-label">Bientôt</span>
         {SOON.map((s) => (
-          <span key={s.key} className="onb-soon-chip">
-            {s.label}
+          <span key={s} className="onb-soon-chip">
+            {s}
           </span>
         ))}
       </div>
 
       {steamOpen && (
-        <SteamImportModal
-          onClose={() => setSteamOpen(false)}
-          onDone={() => refresh?.()}
-        />
+        <SteamImportModal onClose={() => setSteamOpen(false)} onDone={() => refresh?.()} />
       )}
       {backloggdOpen && (
-        <BackloggdImportModal
-          onClose={() => setBackloggdOpen(false)}
-          onDone={() => refresh?.()}
-        />
+        <BackloggdImportModal onClose={() => setBackloggdOpen(false)} onDone={() => refresh?.()} />
       )}
     </section>
   );
@@ -832,9 +958,10 @@ function StepImport() {
 // ======================================================================
 //  5 — Les gestes
 // ======================================================================
-// ⚠️ TROIS, ET SEULEMENT DES GESTES QUI EXISTENT VRAIMENT. Une page d'astuces
-// se lit une fois : au-delà de trois, on la saute — et une astuce fausse est
-// pire qu'aucune astuce, parce qu'on la cherche ensuite pendant dix minutes.
+// ⚠️ TROIS, ET SEULEMENT DES GESTES QUI EXISTENT VRAIMENT. Une astuce fausse
+// est pire qu'aucune astuce : on la cherche ensuite pendant dix minutes. C'est
+// aussi le SEUL écran du parcours qu'on ne fait que lire — d'où sa place, tout
+// à la fin, quand il ne reste plus qu'à entrer.
 const TIPS = [
   {
     Icon: MousePointerClick,
@@ -856,11 +983,7 @@ const TIPS = [
 function StepTips() {
   return (
     <section className="onb-step">
-      <StepHead
-        n="4"
-        title="Trois gestes"
-        sub="Le reste s'apprend tout seul."
-      />
+      <StepHead n="5" title="Trois gestes" sub="Le reste s'apprend tout seul." />
       <ul className="onb-tips">
         {TIPS.map(({ Icon, title, body }, i) => (
           <li key={title} className="onb-tip" style={{ "--d": `${i * 110}ms` }}>
@@ -874,28 +997,6 @@ function StepTips() {
           </li>
         ))}
       </ul>
-    </section>
-  );
-}
-
-// ======================================================================
-//  6 — Fini
-// ======================================================================
-function StepDone({ user, picked }) {
-  const count = Object.keys(picked).length;
-  return (
-    <section className="onb-step onb-hero onb-done">
-      <span className="onb-burst" aria-hidden="true">
-        <PartyPopper size={34} />
-      </span>
-      <h1 className="onb-title">
-        C'est prêt, <span className="onb-gold">{user?.username}</span>.
-      </h1>
-      <p className="onb-lede">
-        {count > 0
-          ? `${count} jeu${count > 1 ? "x" : ""} dans ta bibliothèque. À toi de jouer.`
-          : "Ta bibliothèque t'attend. À toi de jouer."}
-      </p>
       <p className="onb-replay-note">Rejouable dans Paramètres → Compte.</p>
     </section>
   );

@@ -24,8 +24,8 @@
   --onb-amber: #ffd24a;
   /* Le bleu-gris du papier calque : c'est LUI la couleur du fond, le doré ne
      touche plus que ce qui se clique. */
-  --onb-ink: rgba(150, 172, 205, 0.09);
-  --onb-ink-strong: rgba(150, 172, 205, 0.17);
+  --onb-ink: rgba(150, 172, 205, 0.055);
+  --onb-ink-strong: rgba(150, 172, 205, 0.11);
 
   position: fixed;
   inset: 0;
@@ -40,17 +40,17 @@
 /* ======================================================================
    Le décor
    ======================================================================
-   Trois couches, et aucune n'est dorée :
+   ⚠️ IL NE DOIT RIEN DISPUTER AUX CARTES, ET C'EST TOUTE LA CONTRAINTE.
+   Il y a eu une aurore dorée, puis les jaquettes du site défilant derrière
+   tout l'écran : deux fois trop. Sur ce parcours, les jaquettes SONT le
+   contenu — un fond qui en montre d'autres, même très effacées, met du bruit
+   exactement là où l'œil cherche à reconnaître un jeu, et les titres blancs
+   passent par-dessus sans se lire.
 
-     1. les jaquettes du site qui glissent (le même CoverDrift que l'accueil
-        visiteur), poussées très loin en arrière — désaturées, à 9 % ;
-     2. le QUADRILLAGE TECHNIQUE par-dessus, deux pas : une trame fine, et un
-        trait plus marqué toutes les cinq cases, comme un papier millimétré ;
-     3. une vignette qui éteint les bords et creuse le centre.
-
-   ⚠️ L'ORDRE COMPTE. La grille passe PAR-DESSUS les jaquettes, pas dessous :
-   c'est ce qui donne l'impression que les jeux sont sous la table de travail
-   plutôt que collés dessus. */
+   Il ne reste donc qu'un plan technique. Immobile (rien ne bouge derrière ce
+   qu'on est en train de lire), très peu contrasté, ET ÉTEINT AU CENTRE : le
+   masque creuse un grand trou au milieu, là où vivent le texte et les cartes.
+   La trame tient les bords, le milieu reste un fond propre. */
 .onb-bg {
   position: absolute;
   inset: 0;
@@ -64,37 +64,25 @@
   display: block;
 }
 
-/* Les jaquettes : le composant apporte son inclinaison, son défilement et son
-   fondu ; on ne fait ici que les enfoncer dans le fond. */
-.onb .drift {
-  opacity: 0.09;
-  filter: grayscale(1) contrast(0.85) brightness(1.15);
-}
-
 .onb-blueprint {
   background-image:
-    /* le trait fort, toutes les cinq cases */
+    /* le trait fort, toutes les quatre cases */
     linear-gradient(var(--onb-ink-strong) 1px, transparent 1px),
     linear-gradient(90deg, var(--onb-ink-strong) 1px, transparent 1px),
     /* la trame fine */
     linear-gradient(var(--onb-ink) 1px, transparent 1px),
     linear-gradient(90deg, var(--onb-ink) 1px, transparent 1px);
-  background-size: 160px 160px, 160px 160px, 32px 32px, 32px 32px;
-  /* La trame dérive très lentement en diagonale : assez pour que l'écran soit
-     vivant, trop peu pour qu'on puisse dire ce qui bouge. */
-  animation: onb-drift-grid 90s linear infinite;
-}
-@keyframes onb-drift-grid {
-  to {
-    background-position: 160px 160px, 160px 160px, 160px 160px, 160px 160px;
-  }
+  background-size: 128px 128px, 128px 128px, 32px 32px, 32px 32px;
+  /* Le trou au milieu : opaque sur les bords, transparent au centre. C'est ce
+     masque, et lui seul, qui rend le fond compatible avec du texte. */
+  -webkit-mask-image: radial-gradient(78% 66% at 50% 48%, transparent 30%, #000 100%);
+  mask-image: radial-gradient(78% 66% at 50% 48%, transparent 30%, #000 100%);
 }
 
+/* Un simple assombrissement des bords, pour que le quadrillage ne s'arrête pas
+   net sur les côtés de la fenêtre. */
 .onb-vignette {
-  background:
-    radial-gradient(120% 90% at 50% 0%, rgba(150, 172, 205, 0.07), transparent 60%),
-    radial-gradient(100% 80% at 50% 55%, transparent 30%, rgba(6, 7, 10, 0.72) 100%),
-    linear-gradient(180deg, rgba(11, 12, 17, 0.35), rgba(11, 12, 17, 0.8));
+  background: radial-gradient(115% 85% at 50% 42%, transparent 45%, rgba(4, 5, 8, 0.6) 100%);
 }
 
 /* ---------- L'en-tête : marque, avancement, sortie ---------- */
@@ -197,46 +185,6 @@
 .onb-step-wide {
   max-width: 940px;
 }
-.onb-hero {
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  text-align: left;
-}
-
-.onb-kicker {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  align-self: flex-start;
-  padding: 0.32rem 0.7rem;
-  border-radius: 999px;
-  border: 1px solid rgba(242, 183, 11, 0.35);
-  background: rgba(242, 183, 11, 0.08);
-  color: var(--onb-amber);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-.onb-title {
-  font-family: var(--font-display);
-  font-size: clamp(2rem, 5.2vw, 3.1rem);
-  line-height: 1.04;
-  letter-spacing: -0.035em;
-  margin: 1rem 0 0;
-}
-.onb-gold {
-  color: var(--onb-amber);
-}
-.onb-lede {
-  max-width: 46ch;
-  margin: 1rem 0 0;
-  font-size: 1.02rem;
-  line-height: 1.62;
-  color: var(--onb-soft);
-}
 .onb-note {
   margin: 1.2rem 0 0;
   font-size: 0.86rem;
@@ -251,48 +199,6 @@
   background: rgba(230, 60, 60, 0.12);
   color: #ff9d95;
   font-size: 0.86rem;
-}
-
-/* Le sommaire du premier écran : ce qui va être demandé, en trois lignes. */
-.onb-agenda {
-  list-style: none;
-  margin: 2rem 0 0;
-  padding: 0;
-  display: grid;
-  gap: 0.6rem;
-}
-.onb-agenda-item {
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  padding: 0.85rem 1rem;
-  border-radius: 16px;
-  border: 1px solid var(--onb-line);
-  background: var(--onb-surface);
-  animation: onb-in 0.5s cubic-bezier(0.2, 0.9, 0.25, 1) both;
-  animation-delay: var(--d, 0ms);
-}
-.onb-agenda-icon {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 13px;
-  background: rgba(242, 183, 11, 0.12);
-  color: var(--onb-amber);
-}
-.onb-agenda-item strong {
-  display: block;
-  font-family: var(--font-display);
-  font-size: 0.98rem;
-}
-.onb-agenda-item em {
-  display: block;
-  margin-top: 1px;
-  font-style: normal;
-  font-size: 0.83rem;
-  color: var(--onb-soft);
 }
 
 /* ---------- Le titre d'une étape ---------- */
@@ -445,46 +351,6 @@
   color: var(--onb-amber);
 }
 
-/* ======================================================================
-   Étape « à quoi tu joues »
-   ====================================================================== */
-.onb-modes {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 0.6rem;
-  margin-bottom: 1.1rem;
-}
-.onb-mode {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.7rem 0.95rem;
-  border-radius: 14px;
-  border: 1px solid var(--onb-line);
-  background: var(--onb-surface);
-  color: var(--onb-soft);
-  text-align: left;
-  transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
-}
-.onb-mode:hover {
-  border-color: var(--onb-line-hi);
-}
-.onb-mode.active {
-  border-color: var(--onb-gold);
-  background: rgba(242, 183, 11, 0.11);
-  color: var(--onb-amber);
-}
-.onb-mode strong {
-  display: block;
-  font-family: var(--font-display);
-  font-size: 0.95rem;
-}
-.onb-mode em {
-  display: block;
-  font-style: normal;
-  font-size: 0.78rem;
-  color: var(--onb-soft);
-}
 
 /* La rangée des sagas : elle défile horizontalement, et ne prend jamais deux
    lignes — c'est un rayon, pas une grille. */
@@ -591,43 +457,167 @@
   text-underline-offset: 3px;
 }
 
-/* La grille de jaquettes. Le ratio 3/4 est celui d'IGDB : le poser en dur
-   évite que la grille saute pendant le chargement des images. */
-.onb-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-  gap: 0.65rem;
-  margin-top: 1rem;
-}
-.onb-tile {
+/* ======================================================================
+   Le tapis de cartes
+   ======================================================================
+   Des jaquettes jetées à plat, penchées, qui se chevauchent. Chaque carte est
+   posée en absolu à son emplacement, tournée de son propre angle, et remontée
+   d'un cran quand on l'attrape.
+
+   ⚠️ LA HAUTEUR DU TAPIS EST FIXE (en `vh` borné). Elle ne peut pas dépendre
+   des cartes : elles sont toutes en position absolue, donc le conteneur
+   n'aurait aucune hauteur du tout et l'écran s'effondrerait. */
+.onb-scatter {
   position: relative;
-  aspect-ratio: 3 / 4;
-  border-radius: 13px;
-  overflow: hidden;
-  padding: 0;
-  border: 1.5px solid transparent;
-  background: #191b22;
-  transition: transform 0.18s cubic-bezier(0.2, 0.9, 0.25, 1), border-color 0.18s ease,
-    box-shadow 0.18s ease;
+  height: clamp(300px, 46vh, 460px);
+  margin-top: 1.1rem;
+  touch-action: pan-y;
+  cursor: grab;
+  user-select: none;
 }
-.onb-tile img {
+.onb-scatter:active {
+  cursor: grabbing;
+}
+.onb-hand {
+  position: absolute;
+  inset: 0;
+}
+
+.onb-card {
+  position: absolute;
+  width: clamp(72px, 9.5vw, 112px);
+  aspect-ratio: 3 / 4;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #191b22;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.55);
+  z-index: var(--z, 1);
+  /* Le point d'ancrage est le CENTRE de la carte : sans ça, `left/top` collent
+     son coin haut-gauche à l'emplacement et la rotation la fait fuir. */
+  transform: translate(-50%, -50%) rotate(var(--rot, 0deg));
+  transition:
+    transform 0.18s cubic-bezier(0.2, 1.4, 0.4, 1),
+    border-color 0.16s ease,
+    box-shadow 0.2s ease;
+  /* Chaque carte tombe avec son propre retard : c'est ce décalage qui fait
+     « on vient de les lâcher » plutôt que « elles étaient déjà là ». */
+  animation: onb-drop 0.44s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+.onb-card img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
-  transition: transform 0.35s ease, filter 0.2s ease;
+  pointer-events: none;
 }
-.onb-tile:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5);
+
+/* Une carte survolée se REDRESSE et remonte : le geste est « je la sors du
+   tas », et il faut le sentir avant même d'avoir cliqué. */
+.onb-card:hover {
+  transform: translate(-50%, -50%) rotate(calc(var(--rot, 0deg) * 0.35)) translateY(-10px)
+    scale(1.06);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 22px 40px rgba(0, 0, 0, 0.65);
+  z-index: 40;
 }
-.onb-tile:hover img {
-  transform: scale(1.05);
+.onb-card.picked {
+  transform: translate(-50%, -50%) rotate(0deg) translateY(-12px) scale(1.07);
+  z-index: 30;
 }
-.onb-tile-skel {
+.onb-card.picked.wishlist {
+  border-color: #e0679b;
+  box-shadow: 0 18px 36px rgba(224, 103, 155, 0.34);
+}
+.onb-card.picked.played {
+  border-color: var(--onb-gold);
+  box-shadow: 0 18px 36px rgba(242, 183, 11, 0.32);
+}
+
+@keyframes onb-drop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(calc(var(--rot, 0deg) * 2.6)) translateY(-46px)
+      scale(1.14);
+  }
+}
+/* Le sens du glissé décide du côté d'où les cartes retombent. */
+.onb-hand.from-left .onb-card {
+  animation-name: onb-drop-left;
+}
+@keyframes onb-drop-left {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(calc(var(--rot, 0deg) * 2.6)) translateX(-60px)
+      scale(1.1);
+  }
+}
+
+.onb-card-mark {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(8, 9, 13, 0.68);
+  backdrop-filter: blur(6px);
+  color: #fff;
+}
+.onb-card-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+}
+.onb-card.picked.wishlist .onb-card-mark {
+  background: #e0679b;
+  color: #26060f;
+}
+.onb-card.picked.played .onb-card-mark {
+  background: var(--onb-gold);
+  color: #1a1204;
+}
+
+/* Le titre ne sort qu'au survol : douze légendes en permanence, et le tapis
+   redevient une liste. */
+.onb-card-name {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 1.6rem 0.45rem 0.45rem;
+  /* Un dégradé qui va jusqu'à l'opaque : le titre se pose sur du noir, pas sur
+     la jaquette. Sur une pochette claire (une jaquette Nintendo, un fond de
+     neige), un simple voile à 60 % laissait du blanc sur blanc. */
+  background: linear-gradient(transparent, rgba(6, 7, 10, 0.72) 45%, rgba(6, 7, 10, 0.97));
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  font-size: 0.69rem;
+  line-height: 1.2;
+  font-weight: 600;
+  text-align: left;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.16s ease;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.onb-card:hover .onb-card-name,
+.onb-card.picked .onb-card-name {
+  opacity: 1;
+}
+
+.onb-card-skel {
   background: linear-gradient(100deg, #16181f 30%, #1f222b 50%, #16181f 70%);
   background-size: 300% 100%;
   animation: onb-shimmer 1.4s linear infinite;
+  border-color: transparent;
+  box-shadow: none;
 }
 @keyframes onb-shimmer {
   from {
@@ -637,117 +627,52 @@
     background-position: -150% 0;
   }
 }
-.onb-tile-noart {
-  display: grid;
-  place-items: center;
-  height: 100%;
-  padding: 0.6rem;
-  font-size: 0.75rem;
-  line-height: 1.3;
-  color: var(--onb-soft);
-  text-align: center;
-}
 
-/* Le voile : il ne se pose QUE sur les cases cochées, pour que la couleur du
-   statut se lise sans repeindre la jaquette. */
-.onb-tile-veil {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-.onb-tile.picked .onb-tile-veil {
-  opacity: 1;
-}
-.onb-tile.picked.finished {
-  border-color: var(--onb-gold);
-}
-.onb-tile.picked.finished .onb-tile-veil {
-  background: linear-gradient(180deg, rgba(242, 183, 11, 0.1), rgba(242, 183, 11, 0.32));
-}
-.onb-tile.picked.wishlist {
-  border-color: #e0679b;
-}
-.onb-tile.picked.wishlist .onb-tile-veil {
-  background: linear-gradient(180deg, rgba(224, 103, 155, 0.1), rgba(224, 103, 155, 0.34));
-}
-
-.onb-tile-mark {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  display: grid;
-  place-items: center;
-  width: 27px;
-  height: 27px;
-  border-radius: 50%;
-  background: rgba(10, 11, 15, 0.66);
-  backdrop-filter: blur(6px);
-  color: #fff;
-  opacity: 0;
-  transform: scale(0.7);
-  transition: opacity 0.16s ease, transform 0.16s cubic-bezier(0.2, 1.5, 0.4, 1);
-}
-.onb-tile:hover .onb-tile-mark,
-.onb-tile.picked .onb-tile-mark {
-  opacity: 1;
-  transform: none;
-}
-.onb-tile.picked.finished .onb-tile-mark {
-  background: var(--onb-gold);
-  color: #1a1204;
-}
-.onb-tile.picked.wishlist .onb-tile-mark {
-  background: #e0679b;
-  color: #26060f;
-}
-
-/* Le titre n'apparaît qu'au survol : une grille de jaquettes se lit à l'image,
-   et vingt légendes en permanence la transforment en tableau. */
-.onb-tile-name {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 1.6rem 0.5rem 0.45rem;
-  background: linear-gradient(transparent, rgba(6, 7, 10, 0.92));
-  font-size: 0.72rem;
-  line-height: 1.25;
-  font-weight: 600;
-  text-align: left;
-  color: #fff;
-  opacity: 0;
-  transition: opacity 0.18s ease;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.onb-tile:hover .onb-tile-name {
-  opacity: 1;
-}
-
-.onb-tally {
-  position: sticky;
-  bottom: 0;
-  /* `inline-flex` + `margin: auto` ne centre rien : une boîte en ligne n'a pas
-     de largeur à répartir. `width: fit-content` lui en donne une, et les marges
-     automatiques peuvent enfin faire leur travail. */
+/* Les deux flèches et le rappel du geste. */
+.onb-deal {
   display: flex;
-  width: fit-content;
   align-items: center;
-  gap: 0.45rem;
-  margin: 1rem auto 0;
-  padding: 0.5rem 0.95rem;
+  justify-content: center;
+  gap: 0.9rem;
+  margin-top: 0.6rem;
+}
+.onb-deal-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--onb-line);
+  background: var(--onb-surface);
+  color: var(--onb-soft);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.onb-deal-btn:hover {
+  border-color: var(--onb-line-hi);
+  color: var(--onb-text);
+  background: var(--onb-surface-hi);
+}
+.onb-deal-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.76rem;
+  color: rgba(255, 255, 255, 0.34);
+}
+
+/* « Tu en as déjà assez, tu peux passer. » */
+.onb-have {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.9rem;
+  padding: 0.35rem 0.75rem;
   border-radius: 999px;
-  border: 1px solid rgba(242, 183, 11, 0.4);
-  background: rgba(28, 22, 6, 0.92);
-  backdrop-filter: blur(8px);
-  color: var(--onb-amber);
-  font-size: 0.84rem;
+  border: 1px solid rgba(127, 227, 160, 0.3);
+  background: rgba(127, 227, 160, 0.08);
+  color: #a9efc2;
+  font-size: 0.79rem;
   font-weight: 600;
-  animation: onb-in 0.3s ease both;
 }
 
 /* ======================================================================
@@ -900,34 +825,7 @@
   color: var(--onb-soft);
 }
 
-/* ======================================================================
-   Étape finale
-   ====================================================================== */
-.onb-done {
-  align-items: flex-start;
-}
-.onb-burst {
-  display: grid;
-  place-items: center;
-  width: 76px;
-  height: 76px;
-  border-radius: 24px;
-  background: linear-gradient(140deg, rgba(242, 183, 11, 0.22), rgba(242, 183, 11, 0.06));
-  border: 1px solid rgba(242, 183, 11, 0.4);
-  color: var(--onb-amber);
-  margin-bottom: 1.2rem;
-  animation: onb-pop 0.7s cubic-bezier(0.2, 1.6, 0.35, 1) both;
-}
-@keyframes onb-pop {
-  from {
-    opacity: 0;
-    transform: scale(0.5) rotate(-14deg);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
+/* Le renvoi vers les réglages, en bas du dernier écran. */
 .onb-replay-note {
   margin: 1.4rem 0 0;
   font-size: 0.83rem;
@@ -974,12 +872,28 @@
   opacity: 0;
   pointer-events: none;
 }
-.onb-foot-note {
+/* Le compteur du minimum : « 1 / 3 » tant qu'il en manque, une coche quand
+   c'est bon. C'est LUI qui explique pourquoi « Continuer » est éteint — sans
+   quoi le bouton grisé passerait pour une panne. */
+.onb-quota {
   justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   margin: 0;
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.38);
-  text-align: center;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--onb-line);
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--onb-soft);
+}
+.onb-quota[data-ok="true"] {
+  border-color: rgba(127, 227, 160, 0.32);
+  background: rgba(127, 227, 160, 0.09);
+  color: #a9efc2;
 }
 .onb-next {
   justify-self: end;
@@ -1023,7 +937,7 @@
   .onb-foot {
     grid-template-columns: auto 1fr;
   }
-  .onb-foot-note {
+  .onb-quota {
     display: none;
   }
   .onb-next {
@@ -1034,16 +948,12 @@
     width: 96px;
     height: 96px;
   }
-  .onb-grid {
-    grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
-  }
-  /* Sur un écran tactile il n'y a pas de survol : le titre et la pastille
-     doivent être là d'emblée, sinon la grille est muette. */
-  .onb-tile-name {
+  /* Sur un écran tactile il n'y a pas de survol : le titre doit être là
+     d'emblée, sinon les cartes sont muettes. */
+  .onb-card-name {
     opacity: 1;
   }
-  .onb-tile-mark {
-    opacity: 1;
-    transform: none;
+  .onb-scatter {
+    height: clamp(320px, 52vh, 420px);
   }
 }
