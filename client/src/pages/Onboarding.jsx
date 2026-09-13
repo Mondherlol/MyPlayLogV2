@@ -25,6 +25,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLibrary } from "../context/LibraryContext";
 import { API_BASE, apiFetch, apiUpload } from "../lib/api";
 import BackloggdImportModal from "../components/BackloggdImportModal";
+import CoverDrift from "../components/CoverDrift";
 import DiscordIcon from "../components/DiscordIcon";
 import GoogleIcon from "../components/GoogleIcon";
 import SteamIcon from "../components/SteamIcon";
@@ -62,14 +63,14 @@ const MODES = {
     key: "played",
     status: "finished",
     label: "Déjà joué",
-    hint: "Ceux que tu as faits",
+    hint: "Faits",
     Icon: Trophy,
   },
   wishlist: {
     key: "wishlist",
     status: "wishlist",
     label: "À jouer",
-    hint: "Ceux qui t'attendent",
+    hint: "En attente",
     Icon: Bookmark,
   },
 };
@@ -162,7 +163,16 @@ export default function Onboarding() {
 
   return (
     <div className="onb">
-      <div className="onb-aurora" aria-hidden="true" />
+      {/* ⚠️ LE DÉCOR EST UN PLAN, PAS UNE LUEUR. Une aurore dorée en fond
+          donnait un écran de bienvenue de banque en ligne ; ici on veut la
+          table de travail — un quadrillage technique gris, et derrière lui les
+          jaquettes du site qui glissent, à peine lisibles. Le doré ne sert
+          plus qu'aux choses qui se touchent. */}
+      <div className="onb-bg" aria-hidden="true">
+        <CoverDrift />
+        <span className="onb-blueprint" />
+        <span className="onb-vignette" />
+      </div>
 
       <header className="onb-head">
         <span className="onb-brand">
@@ -182,7 +192,7 @@ export default function Onboarding() {
           <span className="onb-skip-ghost" />
         ) : (
           <button className="onb-skip clickable" onClick={() => finish(pending())} disabled={leaving}>
-            Passer l'intro <X size={15} />
+            Passer <X size={15} />
           </button>
         )}
       </header>
@@ -211,12 +221,10 @@ export default function Onboarding() {
           <ArrowLeft size={16} /> Retour
         </button>
 
-        <p className="onb-foot-note">{FOOT_NOTE[step]}</p>
-
         {step === "done" ? (
           <button className="onb-next clickable" onClick={() => finish()} disabled={leaving}>
             {leaving ? <Loader2 className="spin" size={17} /> : <Sparkles size={17} />}
-            Entrer dans MyPlayLog
+            Entrer
           </button>
         ) : (
           <NextButton
@@ -233,17 +241,6 @@ export default function Onboarding() {
     </div>
   );
 }
-
-// La ligne de bas de page : ce que l'étape attend, en une phrase. Elle tient
-// lieu de sous-titre permanent — le titre de l'étape, lui, peut défiler.
-const FOOT_NOTE = {
-  welcome: "Une minute, pas plus. Tout est facultatif.",
-  avatar: "Tu pourras la changer quand tu veux dans ton profil.",
-  taste: "Coche ce que tu reconnais — ça remplit ta bibliothèque.",
-  import: "Rien n'est ajouté sans que tu l'aies validé.",
-  tips: "Trois gestes, et tu connais l'app.",
-  done: "",
-};
 
 // Le bouton « Suivant ». Sur l'étape des goûts il ÉCRIT avant d'avancer : c'est
 // le seul endroit du parcours qui a des choses en attente, et les laisser filer
@@ -308,17 +305,13 @@ function StepWelcome({ user, replay }) {
         Salut <span className="onb-gold">{name}</span>,<br />
         on range tes jeux ?
       </h1>
-      <p className="onb-lede">
-        MyPlayLog garde ce que tu as joué, ce que tu veux jouer, et ce que tu en
-        as pensé. Trois questions pour que ton compte ne s'ouvre pas sur du
-        vide — et tu peux t'arrêter quand tu veux.
-      </p>
+      <p className="onb-lede">Trois questions, une minute. Tout est facultatif.</p>
 
       <ul className="onb-agenda">
         {[
-          { Icon: Camera, t: "Ta photo", s: "Celle de Discord ou de Google fait très bien l'affaire." },
-          { Icon: Gamepad2, t: "Tes jeux", s: "Coche des jaquettes, elles atterrissent dans ta bibliothèque." },
-          { Icon: Compass, t: "Ta bibliothèque", s: "Steam et Backloggd peuvent la remplir d'un coup." },
+          { Icon: Camera, t: "Ta photo", s: "Discord, Google, ou la tienne" },
+          { Icon: Gamepad2, t: "Tes jeux", s: "Coche des jaquettes" },
+          { Icon: Compass, t: "Ta bibliothèque", s: "Steam, Backloggd" },
         ].map(({ Icon, t, s }, i) => (
           <li key={t} className="onb-agenda-item" style={{ "--d": `${i * 90}ms` }}>
             <span className="onb-agenda-icon">
@@ -361,10 +354,10 @@ function StepAvatar() {
       seen.add(url);
       out.push({ key, url, label, Badge });
     };
-    add("current", current, "Ta photo actuelle", UserRound);
-    add("discord", user?.discord?.avatar, "Celle de Discord", DiscordIcon);
-    add("google", user?.google?.avatar, "Celle de Google", GoogleIcon);
-    add("steam", user?.steam?.avatar, "Celle de Steam", SteamIcon);
+    add("current", current, "Actuelle", UserRound);
+    add("discord", user?.discord?.avatar, "Discord", DiscordIcon);
+    add("google", user?.google?.avatar, "Google", GoogleIcon);
+    add("steam", user?.steam?.avatar, "Steam", SteamIcon);
     return out;
   }, [current, user]);
 
@@ -408,8 +401,8 @@ function StepAvatar() {
     <section className="onb-step">
       <StepHead
         n="1"
-        title="Mets un visage sur ton pseudo"
-        sub="C'est ce que les autres verront à côté de tes avis. Facultatif, comme le reste."
+        title="Une photo ?"
+        sub="Ce que les autres verront à côté de tes avis."
       />
 
       <div className="onb-avatar-row">
@@ -448,7 +441,7 @@ function StepAvatar() {
             <span className="onb-av-plus">
               <Upload size={20} />
             </span>
-            <span className="onb-av-label">Envoyer une image</span>
+            <span className="onb-av-label">Envoyer</span>
           </button>
           <input
             ref={fileRef}
@@ -464,10 +457,7 @@ function StepAvatar() {
       </div>
 
       {!sources.length && (
-        <p className="onb-note">
-          Aucune photo à récupérer : lie Discord ou Google plus tard dans les
-          paramètres, et la leur deviendra disponible ici.
-        </p>
+        <p className="onb-note">Rien à récupérer : envoie une image, ou passe.</p>
       )}
       {error && <p className="onb-error">{error}</p>}
     </section>
@@ -557,7 +547,7 @@ function StepTaste({ picks, picked, onPicked, token }) {
       <StepHead
         n="2"
         title="À quoi tu joues ?"
-        sub="Coche ce que tu reconnais. Chaque case atterrit dans ta bibliothèque — et tu pourras tout corriger après."
+        sub="Coche ce que tu reconnais. Corrigeable après."
       />
 
       <div className="onb-modes">
@@ -626,7 +616,7 @@ function StepTaste({ picks, picked, onPicked, token }) {
               setSagaGames(null);
             }}
           >
-            Revenir aux incontournables
+            Les incontournables
           </button>
         </div>
       )}
@@ -681,7 +671,7 @@ function StepTaste({ picks, picked, onPicked, token }) {
       {count > 0 && (
         <div className="onb-tally">
           <Heart size={14} fill="currentColor" />
-          {count} jeu{count > 1 ? "x" : ""} prêt{count > 1 ? "s" : ""} à rejoindre ta bibliothèque
+          {count} jeu{count > 1 ? "x" : ""} sélectionné{count > 1 ? "s" : ""}
         </div>
       )}
     </section>
@@ -769,8 +759,8 @@ function StepImport() {
     <section className="onb-step onb-step-wide">
       <StepHead
         n="3"
-        title="Tu as déjà une bibliothèque quelque part ?"
-        sub="On peut la récupérer. Tu verras chaque jeu et son statut avant que quoi que ce soit soit ajouté."
+        title="Une bibliothèque ailleurs ?"
+        sub="Tu valides jeu par jeu avant que rien ne bouge."
       />
 
       {error && <p className="onb-error">{error}</p>}
@@ -783,12 +773,12 @@ function StepImport() {
           <h3>Steam</h3>
           <p>
             {steamLinked
-              ? `Compte lié${status?.steam?.personaName ? ` : ${status.steam.personaName}` : ""}. Tes heures de jeu et tes succès viennent avec.`
-              : "Ta bibliothèque, tes heures de jeu et tes succès, en une liaison."}
+              ? `Lié${status?.steam?.personaName ? ` : ${status.steam.personaName}` : ""}. Heures et succès compris.`
+              : "Jeux, heures de jeu et succès."}
           </p>
           {steamLinked ? (
             <button className="onb-import-btn primary clickable" onClick={() => setSteamOpen(true)}>
-              <Sparkles size={16} /> Importer mes jeux
+              <Sparkles size={16} /> Importer
             </button>
           ) : (
             <button
@@ -797,7 +787,7 @@ function StepImport() {
               disabled={busy || status?.configured === false}
             >
               {busy ? <Loader2 className="spin" size={16} /> : <SteamIcon size={16} />}
-              Lier mon compte Steam
+              Lier Steam
             </button>
           )}
         </article>
@@ -807,12 +797,9 @@ function StepImport() {
             <Gamepad2 size={26} />
           </span>
           <h3>Backloggd</h3>
-          <p>
-            Ton pseudo suffit : on lit ton profil public, avec tes notes et tes
-            avis.
-          </p>
+          <p>Ton pseudo suffit. Notes et avis compris.</p>
           <button className="onb-import-btn clickable" onClick={() => setBackloggdOpen(true)}>
-            <ArrowRight size={16} /> Importer depuis Backloggd
+            <ArrowRight size={16} /> Importer
           </button>
         </article>
       </div>
@@ -825,11 +812,6 @@ function StepImport() {
           </span>
         ))}
       </div>
-
-      <p className="onb-note">
-        Rien à importer ? Passe à la suite : la recherche en haut de l'app
-        ajoute un jeu en deux clics.
-      </p>
 
       {steamOpen && (
         <SteamImportModal
@@ -857,17 +839,17 @@ const TIPS = [
   {
     Icon: MousePointerClick,
     title: "Survole une jaquette",
-    body: "Un « + » apparaît sur chaque jeu, partout dans l'app. Il déplie de quoi le ranger — joué, en cours, wishlist — sans quitter la page.",
+    body: "Le « + » déplie de quoi la ranger, sans quitter la page.",
   },
   {
     Icon: Search,
     title: "La recherche, en haut",
-    body: "Elle cherche les jeux ET les joueurs : le petit bouton à sa gauche bascule de l'un à l'autre.",
+    body: "Jeux ou joueurs : le bouton à sa gauche bascule.",
   },
   {
     Icon: UserRound,
     title: "Ton profil est ta vitrine",
-    body: "Les sections de l'aperçu se réorganisent à la souris, et la bannière accepte jusqu'à six images.",
+    body: "Sections déplaçables à la souris, bannière à six images.",
   },
 ];
 
@@ -876,7 +858,7 @@ function StepTips() {
     <section className="onb-step">
       <StepHead
         n="4"
-        title="Trois gestes et tu es chez toi"
+        title="Trois gestes"
         sub="Le reste s'apprend tout seul."
       />
       <ul className="onb-tips">
@@ -911,13 +893,10 @@ function StepDone({ user, picked }) {
       </h1>
       <p className="onb-lede">
         {count > 0
-          ? `${count} jeu${count > 1 ? "x" : ""} t'attende${count > 1 ? "nt" : ""} déjà dans ta bibliothèque. À partir d'ici, chaque jeu terminé, chaque note et chaque avis s'ajoutent à ton profil.`
-          : "Ta bibliothèque est vide, et c'est très bien : elle se remplit un jeu à la fois. Cherche ton dernier jeu terminé en haut de l'app, et c'est parti."}
+          ? `${count} jeu${count > 1 ? "x" : ""} dans ta bibliothèque. À toi de jouer.`
+          : "Ta bibliothèque t'attend. À toi de jouer."}
       </p>
-      <p className="onb-replay-note">
-        Tu peux refaire ce tour quand tu veux : Paramètres → Compte →
-        « Revoir l'intro ».
-      </p>
+      <p className="onb-replay-note">Rejouable dans Paramètres → Compte.</p>
     </section>
   );
 }

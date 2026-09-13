@@ -412,15 +412,9 @@ const userSchema = new mongoose.Schema(
     feedHidden: { type: [String], default: [] },
 
     // --- Le parcours d'accueil (le « tour du propriétaire ») ---
-    // ⚠️ UNE DATE, PAS UN BOOLÉEN, ET C'EST CE QUI PERMET DE LE REJOUER. Un
-    // drapeau ne dit que « vu » ; une date dit AUSSI quand, donc on peut
-    // remontrer le parcours à ceux qui l'ont vu il y a un an sans obliger
-    // personne à le revoir chaque semaine. La remettre à `null` (le bouton
-    // « Revoir l'intro » des réglages) suffit à le relancer.
-    //
-    // `null` = jamais terminé. Les comptes créés AVANT cette fonctionnalité
-    // valent donc `null` eux aussi : ils verront le parcours une fois, ce qui
-    // est exactement ce qu'on veut d'une nouveauté qui présente l'app.
+    // ⚠️ UNE DATE, PAS UN BOOLÉEN. Un drapeau ne dit que « vu » ; une date dit
+    // AUSSI quand, donc on saura un jour à qui remontrer une version mise à
+    // jour du parcours sans l'imposer à ceux qui viennent de le faire.
     onboardedAt: { type: Date, default: null },
 
     // Demandes d'abonnement REÇUES et encore en attente (comptes privés).
@@ -501,6 +495,27 @@ export function publicPick(doc) {
     if (doc[k] != null) out[k] = doc[k];
   }
   return out;
+}
+
+// ======================================================================
+//  QUI VOIT LE PARCOURS D'ACCUEIL
+// ======================================================================
+// ⚠️ LE PARCOURS EST POUR LES NOUVEAUX VENUS, PAS POUR LES ABONNÉS. Il se
+// déclenche sur `onboardedAt` vide — ce que valent tous les comptes ouverts
+// AVANT qu'il existe, puisque personne ne pouvait le faire. Sans cette
+// borne, sa mise en ligne aurait collé une visite guidée à la figure de
+// chaque habitué à sa prochaine connexion.
+//
+// D'où la date de mise en service : un compte plus ancien qu'elle n'a rien à
+// visiter, et il n'y a AUCUNE MIGRATION à lancer pour ça — la base n'a pas à
+// être réécrite pour répondre à une question qu'un `if` tranche.
+//
+// (Ceux-là gardent bien sûr « Revoir l'intro » dans leurs réglages.)
+const ONBOARDING_SINCE = new Date("2026-09-13T00:00:00Z");
+
+function hasOnboarded(user) {
+  if (user.onboardedAt) return true;
+  return !!user.createdAt && user.createdAt < ONBOARDING_SINCE;
 }
 
 userSchema.methods.toPublic = function () {
@@ -618,7 +633,7 @@ userSchema.methods.toPublic = function () {
     feedHidden: this.feedHidden || [],
     // Le client s'en sert comme d'un aiguillage au démarrage : tant que c'est
     // faux, il envoie sur le parcours d'accueil au lieu de la page d'accueil.
-    onboarded: !!this.onboardedAt,
+    onboarded: hasOnboarded(this),
     onboardedAt: this.onboardedAt || null,
     createdAt: this.createdAt,
   };

@@ -13,7 +13,7 @@
    ====================================================================== */
 
 .onb {
-  --onb-bg: #0a0b0f;
+  --onb-bg: #0b0c11;
   --onb-surface: rgba(255, 255, 255, 0.045);
   --onb-surface-hi: rgba(255, 255, 255, 0.085);
   --onb-line: rgba(255, 255, 255, 0.1);
@@ -22,6 +22,10 @@
   --onb-soft: #9598a6;
   --onb-gold: #f2b70b;
   --onb-amber: #ffd24a;
+  /* Le bleu-gris du papier calque : c'est LUI la couleur du fond, le doré ne
+     touche plus que ce qui se clique. */
+  --onb-ink: rgba(150, 172, 205, 0.09);
+  --onb-ink-strong: rgba(150, 172, 205, 0.17);
 
   position: fixed;
   inset: 0;
@@ -33,26 +37,64 @@
   overflow: hidden;
 }
 
-/* Le halo. Deux taches dorées très diluées qui respirent lentement : de quoi
-   éviter le fond plat sans jamais attirer l'œil. */
-.onb-aurora {
+/* ======================================================================
+   Le décor
+   ======================================================================
+   Trois couches, et aucune n'est dorée :
+
+     1. les jaquettes du site qui glissent (le même CoverDrift que l'accueil
+        visiteur), poussées très loin en arrière — désaturées, à 9 % ;
+     2. le QUADRILLAGE TECHNIQUE par-dessus, deux pas : une trame fine, et un
+        trait plus marqué toutes les cinq cases, comme un papier millimétré ;
+     3. une vignette qui éteint les bords et creuse le centre.
+
+   ⚠️ L'ORDRE COMPTE. La grille passe PAR-DESSUS les jaquettes, pas dessous :
+   c'est ce qui donne l'impression que les jeux sont sous la table de travail
+   plutôt que collés dessus. */
+.onb-bg {
   position: absolute;
-  inset: -20%;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
   pointer-events: none;
-  background:
-    radial-gradient(46% 38% at 18% 8%, rgba(242, 183, 11, 0.16), transparent 70%),
-    radial-gradient(40% 42% at 88% 78%, rgba(120, 90, 255, 0.12), transparent 72%);
-  animation: onb-breathe 16s ease-in-out infinite alternate;
 }
-@keyframes onb-breathe {
-  from {
-    transform: translate3d(0, 0, 0) scale(1);
-    opacity: 0.85;
-  }
+.onb-bg > span {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+/* Les jaquettes : le composant apporte son inclinaison, son défilement et son
+   fondu ; on ne fait ici que les enfoncer dans le fond. */
+.onb .drift {
+  opacity: 0.09;
+  filter: grayscale(1) contrast(0.85) brightness(1.15);
+}
+
+.onb-blueprint {
+  background-image:
+    /* le trait fort, toutes les cinq cases */
+    linear-gradient(var(--onb-ink-strong) 1px, transparent 1px),
+    linear-gradient(90deg, var(--onb-ink-strong) 1px, transparent 1px),
+    /* la trame fine */
+    linear-gradient(var(--onb-ink) 1px, transparent 1px),
+    linear-gradient(90deg, var(--onb-ink) 1px, transparent 1px);
+  background-size: 160px 160px, 160px 160px, 32px 32px, 32px 32px;
+  /* La trame dérive très lentement en diagonale : assez pour que l'écran soit
+     vivant, trop peu pour qu'on puisse dire ce qui bouge. */
+  animation: onb-drift-grid 90s linear infinite;
+}
+@keyframes onb-drift-grid {
   to {
-    transform: translate3d(-2%, 2%, 0) scale(1.08);
-    opacity: 1;
+    background-position: 160px 160px, 160px 160px, 160px 160px, 160px 160px;
   }
+}
+
+.onb-vignette {
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(150, 172, 205, 0.07), transparent 60%),
+    radial-gradient(100% 80% at 50% 55%, transparent 30%, rgba(6, 7, 10, 0.72) 100%),
+    linear-gradient(180deg, rgba(11, 12, 17, 0.35), rgba(11, 12, 17, 0.8));
 }
 
 /* ---------- L'en-tête : marque, avancement, sortie ---------- */
