@@ -578,18 +578,27 @@ function PickStage({ conf, picks, picked, onPicked, flushed, library, token, onR
     return source.filter((g) => g.cover && !library?.[g.id]).slice(0, 40);
   }, [results, picks, conf.source, library]);
 
+  const { removeLocal } = useLibrary();
+
+  // ⚠️ UN JEU CHOISI SE RETIRE D'UN CLIC, MÊME APRÈS UN RETOUR EN ARRIÈRE. Les
+  // choix d'une étape s'écrivent en la quittant ; revenir dessus montrait donc
+  // des jaquettes déjà enregistrées, et le clic ne faisait plus rien. Or la roue
+  // ne propose QUE des jeux absents de la bibliothèque : ce qu'on retire ici,
+  // c'est ce que ce parcours a ajouté — on peut donc l'effacer pour de bon.
   const remove = useCallback(
     (id) => {
-      // Ce qui est déjà enregistré ne se retire pas d'ici : il est dans la
-      // bibliothèque, et c'est sur la fiche du jeu qu'on le défait.
-      if (flushed.current.has(id)) return;
       onPicked((prev) => {
+        if (!prev[id]) return prev;
         const next = { ...prev };
         delete next[id];
         return next;
       });
+      if (!flushed.current.has(id)) return;
+      flushed.current.delete(id);
+      removeLocal?.(Number(id));
+      apiFetch(`/library/${id}`, { method: "DELETE", token }).catch(() => {});
     },
-    [flushed, onPicked]
+    [flushed, onPicked, removeLocal, token]
   );
 
   const toggle = useCallback(
@@ -613,25 +622,21 @@ function PickStage({ conf, picks, picked, onPicked, flushed, library, token, onR
       {tray.length > 0 && (
         <div className="onb-tray">
           {tray.map(([id, pick]) => {
-            const locked = flushed.current.has(id);
             return (
               <button
                 key={id}
                 className="onb-tray-item clickable"
                 onClick={() => remove(id)}
-                disabled={locked}
                 title={pick.name}
-                aria-label={locked ? pick.name : `Retirer ${pick.name}`}
+                aria-label={`Retirer ${pick.name}`}
               >
                 {pick.cover && <img src={pick.cover} alt="" />}
                 {pick.rating != null && (
                   <span className="onb-tray-rate">{formatRating(pick.rating, scale)}</span>
                 )}
-                {!locked && (
-                  <span className="onb-tray-x">
-                    <X size={14} strokeWidth={3} />
-                  </span>
-                )}
+                <span className="onb-tray-x">
+                  <X size={14} strokeWidth={3} />
+                </span>
               </button>
             );
           })}
