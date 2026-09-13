@@ -1196,9 +1196,15 @@
   gap: clamp(20px, 4vh, 36px);
 }
 .onb-avatar-ring {
+  /* ⚠️ UN CARRÉ EN DUR, PAS UN `aspect-ratio`. Le ratio n'est qu'une taille
+     PRÉFÉRÉE : une photo plus haute que large imposait sa hauteur au cercle,
+     qui s'étirait en ovale. Largeur et hauteur tirées de la même variable, le
+     cercle reste un cercle quelle que soit l'image. */
+  --av: clamp(140px, 24vh, 190px);
   position: relative;
-  width: clamp(140px, 24vh, 190px);
-  aspect-ratio: 1;
+  flex: none;
+  width: var(--av);
+  height: var(--av);
   padding: 4px;
   border-radius: 50%;
   background: conic-gradient(from 0deg, #eaa908, #ffe28a, #eaa908, #7a5a08, #eaa908);
@@ -1210,6 +1216,7 @@
   opacity: 0.6;
 }
 .onb-avatar-img {
+  position: relative;
   width: 100%;
   height: 100%;
   border-radius: 50%;
@@ -1219,7 +1226,11 @@
   border: 4px solid var(--onb-bg);
   background: var(--onb-bg);
 }
+/* L'image est POSÉE dans le cercle, pas rangée dedans : en élément de grille,
+   sa hauteur naturelle agrandissait la rangée — et le cercle avec. */
 .onb-avatar-img img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -2088,9 +2099,14 @@ html[data-theme="dark"] .taste-modal[data-kind="studio"] .taste-visual {
 @media (max-width: 700px) {
   /* La roue est descendue vers le pouce : le HAUT est libre, le plateau des
      jeux choisis y monte. */
+  /* ⚠️ ET IL S'ÉLOIGNE DU TITRE. Collé à 4 px sous « Choisis 3 jeux », le
+     plateau se lisait comme la fin de la phrase — alors que la roue, calée en
+     bas vers le pouce, laisse tout le haut libre. L'écart suit la hauteur de
+     l'écran : aéré sur un grand téléphone, encore raisonnable sur un petit. */
   .onb-tray {
     order: 0;
-    padding-top: 4px;
+    padding-top: clamp(18px, 5vh, 44px);
+    padding-bottom: clamp(6px, 1.5vh, 14px);
   }
   /* Et le rappel du geste passe au-dessus de la roue. */
   .onb-wheel-hint {

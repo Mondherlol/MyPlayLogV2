@@ -1073,6 +1073,23 @@ function VolumeBar({ volume, muted, onChange, onMute }) {
   );
 }
 
+// ⚠️ UNE PISTE SE RECONNAÎT À SON ADRESSE, PAS À SON NOM. Une bande originale
+// aligne volontiers trois « Main Theme » (version jeu, orchestrale, remix) :
+// comparées par le nom, en cocher une les cochait toutes. L'adresse de la
+// vidéo est unique ; le nom ne sert plus que de repli pour une piste sans lien.
+function sameTrack(a, b) {
+  if (!a || !b) return false;
+  if (a.url && b.url) return a.url === b.url;
+  return a.name === b.name;
+}
+
+// Même piège pour les personnages (deux « Link » d'époques différentes) : le
+// portrait les distingue quand le nom ne suffit pas.
+function sameChar(a, b) {
+  if (!a || !b) return false;
+  return a.name === b.name && (a.image || null) === (b.image || null);
+}
+
 function RatePanel({ game, pick, onSave, onClose }) {
   const { token } = useAuth();
   const scale = useRatingScale();
@@ -1172,7 +1189,7 @@ function RatePanel({ game, pick, onSave, onClose }) {
 
   const pickTrack = (tr) =>
     setOst((cur) =>
-      cur?.name === tr.name
+      sameTrack(cur, tr)
         ? null
         : {
             name: tr.name,
@@ -1184,7 +1201,7 @@ function RatePanel({ game, pick, onSave, onClose }) {
     );
 
   const pickChar = (c) =>
-    setCharacter((cur) => (cur?.name === c.name ? null : { name: c.name, image: c.image || null }));
+    setCharacter((cur) => (sameChar(cur, c) ? null : { name: c.name, image: c.image || null }));
 
   const HEAD = {
     rate: ["Tu lui mets", "combien", "?"],
@@ -1246,7 +1263,7 @@ function RatePanel({ game, pick, onSave, onClose }) {
           {step === "ost" && (
             <div className="onb-tlist">
               {tracks.map((tr, i) => {
-                const on = ost?.name === tr.name;
+                const on = sameTrack(ost, tr);
                 const views = formatViews(tr.views);
                 const sounding = isPlaying(tr);
                 // ⚠️ UNE PISTE YOUTUBE MET UNE À DEUX SECONDES À PARTIR. Sans
@@ -1299,7 +1316,7 @@ function RatePanel({ game, pick, onSave, onClose }) {
           {step === "char" && (
             <div className="onb-faces">
               {chars.map((c) => {
-                const on = character?.name === c.name;
+                const on = sameChar(character, c);
                 return (
                   <button
                     key={c.id}
