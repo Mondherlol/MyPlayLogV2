@@ -63,6 +63,8 @@ import LocalGameBanner from "../components/LocalGameBanner";
 import RatingInput from "../components/RatingInput";
 import PlayedModal from "../components/PlayedModal";
 import AddToListModal from "../components/AddToListModal";
+import GameAddFan from "../components/GameAddFan";
+import { SITE_COLORS } from "../lib/siteIcons";
 import CoverPickerModal from "../components/GameCoverPicker";
 import GameCoverView from "../components/GameCoverView";
 import GameRatingsModal from "../components/GameRatingsModal";
@@ -2058,6 +2060,11 @@ function InfosTab({ game, entry, onOpenImage, navigate }) {
                 target="_blank"
                 rel="noreferrer"
                 className="gp-link clickable"
+                style={
+                  SITE_COLORS[w.kind]
+                    ? { "--brand": SITE_COLORS[w.kind].c, "--brand-on": SITE_COLORS[w.kind].on }
+                    : undefined
+                }
                 title={WEBSITE_LABELS[w.kind] || w.kind}
                 aria-label={WEBSITE_LABELS[w.kind] || w.kind}
               >
@@ -2072,12 +2079,28 @@ function InfosTab({ game, entry, onOpenImage, navigate }) {
         <section className="gp-block">
           <h2 className="gp-h2">Jeux similaires</h2>
           <ScrollRow className="gp-similar-row">
+            {/* ⚠️ UNE DIV, PAS UN BOUTON : la vignette porte maintenant le
+                « + » d'ajout rapide, et un bouton ne peut pas en contenir
+                d'autres. Et on ne navigue que sur un clic VRAIMENT dans la
+                vignette : les modales du « + » sont des portails, dont les
+                clics remontent l'arbre React jusqu'ici. */}
             {game.similar.map((s) => (
-              <button
+              <div
                 key={s.id}
+                role="button"
+                tabIndex={0}
                 className="gp-similar clickable"
                 data-game-id={s.id}
-                onClick={() => navigate(`/game/${s.id}`)}
+                onClick={(e) => {
+                  if (e.currentTarget.contains(e.target)) navigate(`/game/${s.id}`);
+                }}
+                onKeyDown={(e) => {
+                  if (e.target !== e.currentTarget) return;
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    navigate(`/game/${s.id}`);
+                  }
+                }}
               >
                 <div className="gp-similar-cover">
                   <img src={s.cover} alt={s.name} loading="lazy" draggable="false" />
@@ -2087,9 +2110,10 @@ function InfosTab({ game, entry, onOpenImage, navigate }) {
                       {Math.round(s.rating / 10)}
                     </span>
                   )}
+                  <GameAddFan game={{ id: s.id, name: s.name, cover: s.cover }} hoverOnly />
                 </div>
                 <span className="gp-similar-name">{s.name}</span>
-              </button>
+              </div>
             ))}
           </ScrollRow>
         </section>

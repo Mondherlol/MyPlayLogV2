@@ -35,7 +35,7 @@ export default function Navbar() {
                 className="btn btn-ghost"
                 onClick={() => {
                   logout();
-                  navigate("/");
+                  navigate("/login", { replace: true });
                 }}
               >
                 <LogOut size={16} /> Déconnexion

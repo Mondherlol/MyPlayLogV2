@@ -27,8 +27,10 @@ import {
   Gamepad2,
   CalendarDays,
   CalendarCheck,
-  Medal,
+  MonitorPlay,
 } from "lucide-react";
+import PlatformMark from "./PlatformMark";
+import Burst from "./Burst";
 import { apiFetch, apiUpload } from "../lib/api";
 import { startShortcuts, endShortcuts, dateLabel } from "../lib/dateQuick";
 import { STORES, storesFor } from "../lib/storeIcons";
@@ -45,17 +47,41 @@ import OstPicker from "./OstPicker";
 import RatingInput from "./RatingInput";
 import { Composer } from "./ListComments";
 
+// Chaque état garde SA couleur, la même que sur l'app (myplaylog-mobile,
+// lib/status.js) : c'est elle qu'on lit en premier dans « Tous mes jeux ».
 const STATUSES = [
-  { value: "playing", label: "En cours", Icon: Play },
-  { value: "finished", label: "Terminé", Icon: Trophy },
-  { value: "paused", label: "En pause", Icon: Pause },
-  { value: "dropped", label: "Abandonné", Icon: X },
+  { value: "playing", label: "En cours", Icon: Play, color: "#4aa8ff" },
+  { value: "finished", label: "Terminé", Icon: Trophy, color: "#3dd68c" },
+  { value: "paused", label: "En pause", Icon: Pause, color: "#ffb648" },
+  { value: "dropped", label: "Abandonné", Icon: X, color: "#e0574d" },
 ];
 
 // Statut spécial des jeux sans fin (multi/service : Rocket League, Overwatch…).
 // Proposé automatiquement quand IGDB signale du multi/MMO/battle royale, et
 // activable à la main sur n'importe quel jeu via le lien sous les statuts.
-const ENDLESS = { value: "endless", label: "Sans fin", Icon: InfinityIcon };
+const ENDLESS = { value: "endless", label: "Sans fin", Icon: InfinityIcon, color: "#c46bff" };
+
+// Même plafond que la feuille mobile (QuickAddSheet) : quatre chiffres, déjà
+// plus d'un an de jeu non-stop sur un seul titre.
+const MAX_HOURS = 9999;
+
+// Le clin d'œil des grosses heures — pas un avertissement : beaucoup jouer
+// n'est pas une erreur. Du plus grand au plus petit, on rend le premier qui
+// s'applique (mêmes paliers et mêmes phrases que sur mobile).
+const HOUR_QUIPS = [
+  { at: MAX_HOURS, text: "C'est le maximum. On te croit sur parole." },
+  { at: 6000, text: "Presque deux ans de journées de travail. Tu dors parfois ?" },
+  { at: 3000, text: "Ouhla. Quatre mois non-stop, manette en main." },
+  { at: 1500, text: "Deux mois pleins. Respect, ou faute de frappe ?" },
+  { at: 700, text: "Un mois entier. T'es sûr ?" },
+];
+
+function hourQuip(value) {
+  if (value === "" || value == null) return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return HOUR_QUIPS.find((q) => n >= q.at) || null;
+}
 
 const LETSPLAY = "Vu en let's play";
 const PLAYED = ["playing", "finished", "paused", "dropped", "endless"];
@@ -218,6 +244,10 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   // dropped) ou absent. Permet de finir un jeu du bundle sans finir les autres ;
   // chaque statut se reporte sur la fiche du jeu inclus à l'enregistrement.
   const [bundleStatus, setBundleStatus] = useState({});
+  // Compteurs des gerbes d'éclats : chaque incrément remonte la gerbe (key),
+  // donc la rejoue. Zéro = rien à l'ouverture, seulement sur un vrai clic.
+  const [bursts, setBursts] = useState({ finished: 0, hundred: 0, fav: 0 });
+  const fire = (k) => setBursts((b) => ({ ...b, [k]: b[k] + 1 }));
 
   useEffect(() => {
     let alive = true;
@@ -379,6 +409,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   // Choix du statut GLOBAL. Marquer un bundle « Terminé » passe évidemment
   // tous ses jeux inclus en terminé.
   function pickStatus(v) {
+    if (v === "finished" && status !== "finished") fire("finished");
     setStatus(v);
     if (v === "finished" && details.bundleGames?.length) {
       const next = { ...bundleStatus };
@@ -553,6 +584,8 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   // (ni PC/mobile/cloud, ni let's play).
   const showFormat =
     !!platform && platform !== LETSPLAY && !DIGITAL_ONLY.test(platform);
+  const showStores = !showFormat && storeOptions.length > 0;
+  const quip = hourQuip(playtime);
   const hasReview = review.trim() || reviewMedia.length || pros.length || cons.length;
   // « Sans fin » visible si le jeu est multi/service (IGDB), déjà dans ce
   // statut, ou activé à la main via le lien sous les statuts.
@@ -669,45 +702,22 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                     </span>
                   </button>
 
-                  {/* ⚠️ DEUX MARQUES SUR UNE LIGNE, ET LE 100 % N'EST QU'UNE
-                      ICÔNE. Ce sont des questions qui se répondent d'un clic :
-                      leur donner chacune un bouton pleine largeur les faisait
-                      peser autant que la note ou la review, qui, elles,
-                      demandent de réfléchir. Le coup de cœur garde son
-                      libellé — il s'adresse à tout le monde ; la complétion se
-                      réduit à sa médaille, que seuls cherchent ceux qui la
-                      visent.
-
-                      Elle ne se propose qu'à un jeu MENÉ AU BOUT : demander
-                      « l'as-tu complété ? » d'un jeu en cours n'a pas de sens.
-                      Un jeu sans fin, si — c'est même là que la complétion
-                      demande le plus de travail. */}
+                  {/* Le 100 % a quitté cette ligne : il vit à côté des dates,
+                      dans « Parcours », avec le reste de ce qu'on a fait du jeu. */}
                   <div className="marks-row">
                     <button
                       className={`fav-btn clickable ${favorite ? "active" : ""}`}
-                      onClick={() => setFavorite((v) => !v)}
+                      onClick={() => {
+                        if (!favorite) fire("fav");
+                        setFavorite((v) => !v);
+                      }}
                     >
                       <Heart size={18} fill={favorite ? "currentColor" : "none"} />
                       Coup de cœur
+                      {favorite && bursts.fav > 0 && (
+                        <Burst key={bursts.fav} colors={["#ff5470", "#ff9db0", "#ffffff"]} count={12} spread={60} />
+                      )}
                     </button>
-
-                    {canComplete && (
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={platinum}
-                        aria-label="Terminé à 100 %"
-                        className={`hundred-btn clickable ${platinum ? "active" : ""}`}
-                        onClick={() => setPlatinum((v) => !v)}
-                        title={
-                          platinum
-                            ? "Terminé à 100 % — clique pour retirer"
-                            : "Terminé à 100 % : succès, collectibles, fins"
-                        }
-                      >
-                        <Medal size={19} />
-                      </button>
-                    )}
                   </div>
 
                   <div className="rating-block">
@@ -757,13 +767,18 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                     {statusOptions.map((s) => (
                       <button
                         key={s.value}
+                        type="button"
                         className={`seg-opt ${s.value === "endless" ? "endless" : ""} ${
                           status === s.value ? "active" : ""
                         }`}
+                        style={{ "--st": s.color }}
                         onClick={() => pickStatus(s.value)}
                       >
-                        <s.Icon size={16} />
+                        <s.Icon size={15} />
                         {s.label}
+                        {s.value === "finished" && status === "finished" && bursts.finished > 0 && (
+                          <Burst key={bursts.finished} colors={["#3dd68c", "#f2b70b", "#ffffff"]} count={14} />
+                        )}
                       </button>
                     ))}
                   </div>
@@ -823,6 +838,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                                     className={`bundle-st clickable st-${s.value} ${
                                       cur === s.value ? "active" : ""
                                     }`}
+                                    style={{ "--st": s.color }}
                                     onClick={() =>
                                       setChildStatus(
                                         b.id,
@@ -919,103 +935,120 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                     </div>
                   )}
 
+                  {/* --- Plateforme, puis où je l'ai eu ------------------
+                      ⚠️ UN SEUL CHAMP EN DEUX PARTIES. La boutique et le
+                      format ne sont pas des questions à part : ce sont la
+                      suite de la plateforme, qui n'existent qu'une fois elle
+                      cochée. Posés en rangées séparées avec leurs propres
+                      titres, ils creusaient un trou au milieu de la feuille ;
+                      rangés sous la plateforme, dans le même cadre, ils se
+                      lisent comme la fin de la même phrase.
+
+                      ⚠️ SUR PC, « PHYSIQUE OU DÉMAT » NE VEUT RIEN DIRE : tout
+                      y est démat. La question qu'on se pose vraiment, c'est
+                      OÙ. Les deux sous-rangées sont donc exclusives :
+                      « Format » sur une console physique-capable, « Boutique »
+                      partout ailleurs. Game Pass et « hors boutique » sont
+                      proposés sans passer par le catalogue (cf.
+                      lib/storeIcons.js). */}
                   <label className="field-label">Plateforme</label>
                   {detailsLoading ? (
                     <span className="mf-sk-row" />
                   ) : (
-                    <ScrollRow>
-                      {platformOptions.map((p) => {
-                        const active = platform === p;
-                        return (
-                          <button
-                            key={p}
-                            className={`plat-card clickable ${active ? "active" : ""}`}
-                            onClick={() => setPlatform(active ? "" : p)}
-                          >
-                            {active && (
-                              <span className="pick-check">
-                                <Check size={13} strokeWidth={3} />
-                              </span>
-                            )}
-                            {platformLabel(p)}
-                          </button>
-                        );
-                      })}
-                    </ScrollRow>
-                  )}
-
-                  {/* --- Où je l'ai eu ----------------------------------
-                      ⚠️ SUR PC, « PHYSIQUE OU DÉMAT » NE VEUT RIEN DIRE : tout
-                      y est démat. La question qu'on se pose vraiment, c'est
-                      OÙ — et c'est celle-là qu'on remplace. Les deux rangées
-                      sont donc exclusives : « Format » sur une console
-                      physique-capable, « Boutique » partout ailleurs.
-
-                      Game Pass et « hors boutique » sont proposés sans passer
-                      par le catalogue : par définition, IGDB ne les connaît
-                      pas (cf. lib/storeIcons.js). */}
-                  {!showFormat && storeOptions.length > 0 && (
-                    <div className="store-row">
-                      <label className="field-label">
-                        {/let.s play/i.test(platform) ? "Vu sur" : "Boutique"}
-                      </label>
-                      <div className="store-chips">
-                        {storeOptions.map((k) => {
-                          const on = store === k;
+                    <div className={`plat-group ${showStores || showFormat ? "split" : ""}`}>
+                      <ScrollRow>
+                        {platformOptions.map((p) => {
+                          const active = platform === p;
+                          const meta = details.platforms.find((x) => x.name === p);
                           return (
                             <button
-                              key={k}
+                              key={p}
                               type="button"
-                              className={`store-chip clickable ${on ? "active" : ""} ${k}`}
-                              onClick={() => setStore(on ? null : k)}
-                              title={STORES[k].label}
+                              className={`plat-card clickable ${active ? "active" : ""}`}
+                              onClick={() => setPlatform(active ? "" : p)}
                             >
-                              <StoreIcon store={k} size={14} />
-                              <span>{STORES[k].label}</span>
+                              {p === LETSPLAY ? (
+                                <MonitorPlay size={15} />
+                              ) : (
+                                <PlatformMark name={p} abbr={meta?.abbreviation} size={14} />
+                              )}
+                              {platformLabel(p)}
                             </button>
                           );
                         })}
-                      </div>
-                    </div>
-                  )}
+                      </ScrollRow>
 
-                  {/* Format d'achat (console uniquement) : démat ou boîte */}
-                  {showFormat && (
-                    <div className="format-row">
-                      <label className="field-label">Format</label>
-                      <div className="format-seg">
-                        <button
-                          type="button"
-                          className={`format-opt clickable ${format === "digital" ? "active" : ""}`}
-                          onClick={() => setFormat("digital")}
-                        >
-                          <Cloud size={16} />
-                          <span>Digital</span>
-                        </button>
-                        <button
-                          type="button"
-                          className={`format-opt clickable ${format === "physical" ? "active" : ""}`}
-                          onClick={() => setFormat("physical")}
-                        >
-                          <Disc size={16} />
-                          <span>Physique</span>
-                        </button>
-                      </div>
+                      {showStores && (
+                        <div className="plat-sub">
+                          <span className="plat-sub-label">
+                            {/let.s play/i.test(platform) ? "Vu sur" : "Boutique"}
+                          </span>
+                          <div className="store-chips">
+                            {storeOptions.map((k) => {
+                              const on = store === k;
+                              return (
+                                <button
+                                  key={k}
+                                  type="button"
+                                  className={`store-chip clickable ${on ? "active" : ""} ${k}`}
+                                  onClick={() => setStore(on ? null : k)}
+                                  title={STORES[k].label}
+                                >
+                                  <StoreIcon store={k} size={14} />
+                                  <span>{STORES[k].label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {showFormat && (
+                        <div className="plat-sub">
+                          <span className="plat-sub-label">Format</span>
+                          <div className="format-seg">
+                            <button
+                              type="button"
+                              className={`format-opt clickable ${format === "digital" ? "active" : ""}`}
+                              onClick={() => setFormat("digital")}
+                            >
+                              <Cloud size={15} />
+                              <span>Digital</span>
+                            </button>
+                            <button
+                              type="button"
+                              className={`format-opt clickable ${format === "physical" ? "active" : ""}`}
+                              onClick={() => setFormat("physical")}
+                            >
+                              <Disc size={15} />
+                              <span>Physique</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
                   <div className="time-ttb-row">
                     <div className="time-col">
                       <label className="field-label">Temps de jeu</label>
-                      <div className="input-group">
+                      <div className={`input-group ${Number(playtime) >= MAX_HOURS ? "maxed" : ""}`}>
                         <Clock size={17} className="input-icon" />
+                        {/* On BORNE au lieu de refuser la frappe (comme sur
+                            mobile) : un champ qui ignore une touche a l'air
+                            cassé ; ici le nombre se pose sur le plafond, et la
+                            phrase dessous dit pourquoi. */}
                         <input
                           className="modal-input"
-                          type="number"
-                          min="0"
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={5}
                           placeholder="0"
                           value={playtime}
-                          onChange={(e) => setPlaytime(e.target.value)}
+                          onChange={(e) => {
+                            const digits = e.target.value.replace(/\D/g, "").slice(0, 5);
+                            setPlaytime(digits ? String(Math.min(Number(digits), MAX_HOURS)) : "");
+                          }}
                         />
                         <span className="input-suffix">h</span>
                       </div>
@@ -1040,7 +1073,13 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                     </div>
                   </div>
 
-                  {/* --- Quand ------------------------------------------
+                  {quip && (
+                    <p key={quip.at} className="hour-quip">
+                      {quip.text}
+                    </p>
+                  )}
+
+                  {/* --- Parcours ---------------------------------------
                       ⚠️ DEUX BOUTONS, PAS DEUX CHAMPS. Les dates étaient
                       posées à plat au milieu du formulaire, chacune avec sa
                       rangée de raccourcis : à elles deux, elles occupaient plus
@@ -1052,8 +1091,16 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
 
                       Le serveur ne devine pas ces dates, et il ne faut pas
                       qu'il essaie : un jeu ajouté aujourd'hui a très bien pu
-                      être terminé il y a dix ans. */}
-                  <label className="field-label">Quand</label>
+                      être terminé il y a dix ans.
+
+                      ⚠️ « TERMINÉ LE » RESTE À SA PLACE, GRISÉ. Il n'apparaissait
+                      qu'au statut « Terminé » : la rangée changeait de forme
+                      sous la souris à chaque statut cliqué. Il est toujours là,
+                      simplement inactif tant que le jeu n'est pas fini.
+
+                      Le 100 % s'y range aussi — c'est la suite de « terminé » :
+                      une coupe et un mot, actif sur un jeu fini ou sans fin. */}
+                  <label className="field-label">Parcours</label>
                   <div className="when-btns">
                     <button
                       type="button"
@@ -1069,23 +1116,51 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                       </span>
                     </button>
 
-                    {/* La date de fin ne se demande QU'À UN JEU TERMINÉ :
-                        partout ailleurs, c'est une question sans réponse. */}
-                    {status === "finished" && (
-                      <button
-                        type="button"
-                        className={`when-btn clickable ${finishedAt ? "set" : ""}`}
-                        onClick={() => setDateSheet("end")}
-                      >
-                        <CalendarCheck size={16} />
-                        <span className="when-btn-txt">
-                          <span className="when-btn-label">Terminé le</span>
-                          <span className="when-btn-value">
-                            {finishedAt ? dateLabel(new Date(`${finishedAt}T12:00:00`)) : "—"}
-                          </span>
+                    <button
+                      type="button"
+                      className={`when-btn clickable ${finishedAt ? "set" : ""}`}
+                      onClick={() => setDateSheet("end")}
+                      disabled={status !== "finished"}
+                      title={status !== "finished" ? "Passe le jeu en « Terminé » pour dater la fin" : undefined}
+                    >
+                      <CalendarCheck size={16} />
+                      <span className="when-btn-txt">
+                        <span className="when-btn-label">Terminé le</span>
+                        <span className="when-btn-value">
+                          {finishedAt ? dateLabel(new Date(`${finishedAt}T12:00:00`)) : "—"}
                         </span>
-                      </button>
-                    )}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={platinum && canComplete}
+                      className={`hundred-btn clickable ${platinum && canComplete ? "active" : ""}`}
+                      disabled={!canComplete}
+                      onClick={() => {
+                        if (!platinum) fire("hundred");
+                        setPlatinum((v) => !v);
+                      }}
+                      title={
+                        !canComplete
+                          ? "Termine le jeu pour le marquer à 100 %"
+                          : platinum
+                            ? "Terminé à 100 % — clique pour retirer"
+                            : "Terminé à 100 % : succès, collectibles, fins"
+                      }
+                    >
+                      <Trophy size={16} />
+                      <span>100 %</span>
+                      {platinum && canComplete && bursts.hundred > 0 && (
+                        <Burst
+                          key={bursts.hundred}
+                          colors={["#f2b70b", "#ffe08a", "#ffffff", "#3dd68c"]}
+                          count={22}
+                          spread={70}
+                        />
+                      )}
+                    </button>
                   </div>
 
                   <CharacterPicker

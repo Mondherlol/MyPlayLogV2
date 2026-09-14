@@ -15,12 +15,15 @@ import {
   MoveHorizontal,
   Music,
   Pause,
+  Pencil,
   Play,
+  Plus,
   Volume1,
   Volume2,
   VolumeX,
   Search,
   Sparkles,
+  Star,
   Trophy,
   Upload,
   X,
@@ -159,6 +162,9 @@ export default function Onboarding() {
 
   // Le jeu qu'on est en train de noter (étape « déjà fini »).
   const [rateFor, setRateFor] = useState(null);
+  // L'échelle se demande UNE fois, avant la première note : les jeux suivants
+  // s'ouvrent directement sur l'échelle choisie.
+  const [scaleChosen, setScaleChosen] = useState(false);
 
   // ⚠️ ON PRÉCHARGE LA ROUE DÈS LA PHOTO. Demandées à l'ouverture de l'étape,
   // les jaquettes arriveraient pendant qu'on la regarde tourner.
@@ -336,6 +342,8 @@ export default function Onboarding() {
         <RatePanel
           game={rateFor}
           pick={picked[String(rateFor.id)] || null}
+          askScale={!scaleChosen}
+          onScaleChosen={() => setScaleChosen(true)}
           onSave={(patch) => setExtras(String(rateFor.id), patch)}
           onClose={() => setRateFor(null)}
         />
@@ -741,17 +749,33 @@ function GameWheel({ games, picked, onToggle, rose }) {
   // haut de sa zone ; sur un téléphone, c'était le haut de l'écran — hors de
   // portée du pouce. Là, la carte du sommet se cale en bas de la zone, et elle
   // y reste quand le plateau apparaît au-dessus (la zone rétrécit par le haut).
+  //
+  // ⚠️ SUR ORDINATEUR, LE BOUTON EST SOUS LA JAQUETTE DU MILIEU. Posé en bas de
+  // la zone, on ne comprenait pas qu'il visait CE jeu : la carte est bornée pour
+  // lui laisser, avec le nom, sa place en dessous.
+  //
+  // ⚠️ ET SUR UN TRÈS LARGE ÉCRAN, LA ROUE S'EFFACE AVANT D'ÊTRE COUPÉE. En
+  // descendant le long de la jante, les cartes des côtés passaient sous le bas
+  // de la zone et s'y faisaient trancher net. `reach` est la demi-largeur où une
+  // carte touche encore le bas : le fondu des bords se cale dessus.
   const geo = useMemo(() => {
     if (!size || !n) return null;
-    const cw = Math.round(Math.min(150, Math.max(92, size.w * 0.12), size.h * 0.34));
+    const narrow = size.w < 700;
+    const cw = Math.round(
+      Math.min(150, Math.max(92, size.w * 0.12), size.h * 0.34, narrow ? Infinity : size.h * 0.64 - 70)
+    );
     const ch = Math.round((cw * 4) / 3);
     const rad = (step * Math.PI) / 180;
     const R = Math.max((cw * 1.18) / rad, size.w * 0.6);
-    const narrow = size.w < 700;
     const top = narrow
       ? Math.max(ch / 2 + 12, size.h - ch * 0.62 - 44)
       : ch / 2 + Math.max(14, size.h * 0.08);
-    return { cw, ch, R, cx: size.w / 2, cy: top + R, top };
+    let reach = null;
+    if (!narrow) {
+      const room = size.h - top - ch * 0.62;
+      if (room > 0 && room < R) reach = Math.sqrt(R * R - (R - room) ** 2);
+    }
+    return { cw, ch, R, cx: size.w / 2, cy: top + R, top, reach };
   }, [size, n, step]);
 
   // Des pixels de glissé aux degrés de roue : la carte sous le doigt suit le
@@ -900,10 +924,16 @@ function GameWheel({ games, picked, onToggle, rose }) {
   const focused = slots[focus];
   const pickedFocus = focused && !focused.skel && !!picked[String(focused.id)];
 
+  const fade =
+    geo?.reach && geo.reach < geo.cx
+      ? `linear-gradient(90deg, transparent ${geo.cx - geo.reach}px, #000 ${geo.cx - geo.reach * 0.6}px, #000 ${geo.cx + geo.reach * 0.6}px, transparent ${geo.cx + geo.reach}px)`
+      : null;
+
   return (
     <div
       className="onb-wheel"
       ref={boxRef}
+      style={fade ? { WebkitMaskImage: fade, maskImage: fade } : undefined}
       tabIndex={0}
       aria-label="Roue de jeux"
       onPointerDown={onPointerDown}
@@ -959,42 +989,34 @@ function GameWheel({ games, picked, onToggle, rose }) {
           Le glissé reste là pour qui veut jouer avec, mais deux flèches et un
           bouton disent la même chose en un geste — et c'est ce qu'on attend
           d'un ordinateur. Sur écran tactile ils disparaissent (feuille de
-          style) : le doigt fait mieux, et il cacherait la roue. */}
+          style) : le doigt fait mieux, et il cacherait la roue.
+          Le nom puis le bouton, collés sous la jaquette qu'ils désignent. */}
       {geo && focused && !focused.skel && (
-        <div className="onb-nav">
-          <button
-            className="onb-nav-arrow clickable"
-            onClick={() => turn(1)}
-            aria-label="Jeu précédent"
-          >
-            <ChevronLeft size={20} />
-          </button>
-          <button
-            className={`onb-nav-pick clickable ${pickedFocus ? "is-on" : ""}`}
-            onClick={() => onToggle(focused)}
-          >
-            {pickedFocus ? (
-              <>
-                {rose ? "Plus envie" : "Finalement non"}
-              </>
-            ) : (
-              "Celui-là"
-            )}
-          </button>
-          <button
-            className="onb-nav-arrow clickable"
-            onClick={() => turn(-1)}
-            aria-label="Jeu suivant"
-          >
-            <ChevronRight size={20} />
-          </button>
+        <div className="onb-focus" style={{ top: geo.top + geo.ch * 0.57 + 14 }}>
+          <p className="onb-wheel-name">{focused.name}</p>
+          <div className="onb-nav">
+            <button
+              className="onb-nav-arrow clickable"
+              onClick={() => turn(1)}
+              aria-label="Jeu précédent"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <button
+              className={`onb-nav-pick clickable ${pickedFocus ? "is-on" : ""}`}
+              onClick={() => onToggle(focused)}
+            >
+              {pickedFocus ? (rose ? "Plus envie" : "Finalement non") : "Choisir"}
+            </button>
+            <button
+              className="onb-nav-arrow clickable"
+              onClick={() => turn(-1)}
+              aria-label="Jeu suivant"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
         </div>
-      )}
-
-      {geo && focused && !focused.skel && (
-        <p className="onb-wheel-name" style={{ top: geo.top + geo.ch * 0.57 + 16 }}>
-          {focused.name}
-        </p>
       )}
 
       {geo && !touched && games?.length > 0 && (
@@ -1095,7 +1117,7 @@ function sameChar(a, b) {
   return a.name === b.name && (a.image || null) === (b.image || null);
 }
 
-function RatePanel({ game, pick, onSave, onClose }) {
+function RatePanel({ game, pick, askScale, onScaleChosen, onSave, onClose }) {
   const { token } = useAuth();
   const scale = useRatingScale();
   const {
@@ -1134,6 +1156,15 @@ function RatePanel({ game, pick, onSave, onClose }) {
   const [ost, setOst] = useState(pick?.favoriteOst || null);
   const [character, setCharacter] = useState(pick?.favoriteCharacter || null);
   const Input = stars ? StarRating : RatingGauge;
+
+  // ⚠️ AVANT LA PREMIÈRE NOTE, ON DEMANDE L'ÉCHELLE. Le lien « ou plutôt en % ? »
+  // passait inaperçu : on notait en étoiles sans savoir qu'on avait le choix.
+  const [choosing, setChoosing] = useState(!!askScale);
+  const chooseScale = (next) => {
+    setRatingScale(next);
+    onScaleChosen?.();
+    setChoosing(false);
+  };
 
   const [tracks, setTracks] = useState(null);
   const [chars, setChars] = useState(null);
@@ -1208,11 +1239,13 @@ function RatePanel({ game, pick, onSave, onClose }) {
   const pickChar = (c) =>
     setCharacter((cur) => (sameChar(cur, c) ? null : { name: c.name, image: c.image || null }));
 
+  const phase = step === "rate" && choosing ? "scale" : step;
   const HEAD = {
+    scale: ["Comment tu préfères", "noter", "?"],
     rate: ["Tu lui mets", "combien", "?"],
     ost: ["Ta piste", "préférée", "?"],
     char: ["Ton perso", "préféré", "?"],
-  }[step];
+  }[phase];
 
   return (
     <div
@@ -1243,17 +1276,47 @@ function RatePanel({ game, pick, onSave, onClose }) {
 
         {/* La clé relance l'entrée à chaque temps : un seul geste, et tout le
             contenu glisse. */}
-        <div className="onb-rate-step" key={step}>
-          {step === "rate" && (
+        <div className="onb-rate-step" key={phase}>
+          {phase === "scale" && (
+            <div className="onb-rate-body">
+              <div className="onb-scale">
+                <button className="onb-scale-opt clickable" onClick={() => chooseScale(SCALE_STARS)}>
+                  <span className="onb-scale-demo is-stars" aria-hidden="true">
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <Star
+                        key={i}
+                        size={24}
+                        fill="currentColor"
+                        strokeWidth={0}
+                        className={i === 4 ? "is-empty" : undefined}
+                      />
+                    ))}
+                  </span>
+                  <span className="onb-scale-name">En étoiles</span>
+                </button>
+                <button className="onb-scale-opt clickable" onClick={() => chooseScale(SCALE_100)}>
+                  <span className="onb-scale-demo is-pct" aria-hidden="true">
+                    87<small>%</small>
+                  </span>
+                  <span className="onb-scale-name">En pourcentage</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {phase === "rate" && (
             <div className="onb-rate-body">
               <div className="onb-rate-input">
                 <Input
                   value={draft ?? 0}
                   active={draft != null}
-                  onEnable={() => {}}
+                  // La jauge a un bouton « Noter » : il ouvre la note au milieu.
+                  onEnable={() => setDraft((d) => d ?? 50)}
                   onChange={setDraft}
                   onClear={() => setDraft(null)}
                   moodTop
+                  unit="%"
+                  mood
                 />
               </div>
               <button
@@ -1358,13 +1421,15 @@ function RatePanel({ game, pick, onSave, onClose }) {
           <button className="onb-rate-skip clickable" onClick={last ? onClose : go}>
             {last ? "Plus tard" : "Passer"}
           </button>
-          <button
-            className="onb-rate-save clickable"
-            disabled={step === "rate" && draft == null && steps.length === 1}
-            onClick={go}
-          >
-            {last ? "Terminer" : "Suivant"}
-          </button>
+          {phase !== "scale" && (
+            <button
+              className="onb-rate-save clickable"
+              disabled={step === "rate" && draft == null && steps.length === 1}
+              onClick={go}
+            >
+              {last ? "Terminer" : "Suivant"}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -1881,8 +1946,11 @@ function StepProfile({ user, picked, have }) {
               }}
               onClick={info.open}
             >
+              {/* ⚠️ UN « + » TANT QUE C'EST À FAIRE, UN CRAYON UNE FOIS FAIT.
+                  L'icône du sujet (cœur, manette…) faisait de la pastille une
+                  étiquette : on ne devinait pas qu'elle se cliquait. */}
               <span className="onb-act-icon">
-                <a.Icon size={18} />
+                {info.done ? <Pencil size={15} strokeWidth={2.4} /> : <Plus size={20} strokeWidth={2.6} />}
               </span>
               <span className="onb-act-text">
                 {info.label}

@@ -25,6 +25,7 @@ import {
   PenLine,
   Gamepad2,
   SlidersHorizontal,
+  ChevronDown,
   MessageCircle,
   ExternalLink,
 } from "lucide-react";
@@ -53,7 +54,7 @@ const SORTS = [
 ];
 
 const SENTIMENTS = [
-  { key: "all", label: "Toutes", Icon: Gamepad2 },
+  { key: "all", label: "Toutes", Icon: null },
   { key: "positive", label: "Positives", Icon: ThumbsUp },
   { key: "negative", label: "Négatives", Icon: ThumbsDown },
 ];
@@ -831,7 +832,7 @@ export default function GameReviews({ game, viewerStatus, upcoming, onWantPlay }
       <div className="grv-others">
         <div className="grv-others-head">
           <h3 className="grv-section-title">
-            <Gamepad2 size={16} /> Reviews des joueurs
+            Reviews des joueurs
             <span className="section-count">{others.length}</span>
           </h3>
         </div>
@@ -845,7 +846,7 @@ export default function GameReviews({ game, viewerStatus, upcoming, onWantPlay }
                   className={`grv-seg-opt clickable ${sentiment === s.key ? "active" : ""}`}
                   onClick={() => setSentiment(s.key)}
                 >
-                  <s.Icon size={14} /> {s.label}
+                  {s.Icon && <s.Icon size={14} />} {s.label}
                 </button>
               ))}
             </div>
@@ -861,6 +862,7 @@ export default function GameReviews({ game, viewerStatus, upcoming, onWantPlay }
                       </option>
                     ))}
                   </select>
+                  <ChevronDown size={14} className="grv-select-chev" />
                 </label>
               )}
               <label className="grv-select">
@@ -872,6 +874,7 @@ export default function GameReviews({ game, viewerStatus, upcoming, onWantPlay }
                     </option>
                   ))}
                 </select>
+                <ChevronDown size={14} className="grv-select-chev" />
               </label>
             </div>
           </div>

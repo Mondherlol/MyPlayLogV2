@@ -476,13 +476,25 @@
   }
 }
 
-.onb-wheel-name {
+/* Le nom puis le bouton, en colonne juste sous la jaquette du milieu (le `top`
+   est calculé dans GameWheel). */
+.onb-focus {
   position: absolute;
-  left: 50%;
-  z-index: 2;
-  margin: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: fit-content;
   max-width: 70%;
-  transform: translateX(-50%);
+  margin: 0 auto;
+  pointer-events: none;
+}
+.onb-wheel-name {
+  margin: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -500,14 +512,10 @@
    exactement la même chose en un clic — et c'est ce qu'on attend d'un
    ordinateur. Sur écran tactile, ils disparaissent : le doigt fait mieux. */
 .onb-nav {
-  position: absolute;
-  left: 50%;
-  bottom: 6%;
-  z-index: 3;
   display: flex;
   align-items: center;
   gap: 10px;
-  transform: translateX(-50%);
+  pointer-events: auto;
 }
 .onb-nav-arrow {
   display: grid;
@@ -526,6 +534,7 @@
   background: rgba(26, 29, 37, 0.92);
 }
 .onb-nav-pick {
+  min-width: 136px;
   height: 44px;
   padding: 0 20px;
   border-radius: 999px;
@@ -548,6 +557,12 @@
 .onb-nav-pick.is-on {
   background: var(--acc);
   color: var(--acc-ink);
+}
+/* ⚠️ LE SURVOL D'UN BOUTON PLEIN L'ÉCLAIRCIT, IL NE LE VIDE PAS. La règle
+   commune remettait un fond translucide sous un texte resté foncé : « Plus
+   envie » devenait noir sur noir. */
+.onb-nav-pick.is-on:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--acc) 82%, #fff);
 }
 
 .onb-wheel-hint {
@@ -759,6 +774,12 @@
 .onb-rate-input .gauge-vis {
   max-width: 250px;
 }
+.onb-rate-input .gauge-read {
+  font-size: 2.4rem;
+}
+.onb-rate-input .gauge-mood {
+  font-size: 1.05rem;
+}
 .onb-rate-switch {
   padding: 7px 16px;
   border-radius: 999px;
@@ -772,6 +793,69 @@
 }
 .onb-rate-switch:hover {
   background: rgba(255, 92, 141, 0.16);
+}
+
+/* Le choix de l'échelle, avant la première note : deux blocs côte à côte, qui
+   MONTRENT chacun à quoi ressemble une note plutôt que de l'expliquer. */
+.onb-scale {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+  padding: 6px 0 2px;
+}
+.onb-scale-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 156px;
+  padding: 20px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #1c1f27;
+  color: var(--onb-text);
+  font-family: var(--font-display);
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+.onb-scale-opt:hover {
+  border-color: #f2b70b;
+  background: #21242d;
+  transform: translateY(-2px);
+}
+.onb-scale-opt:focus-visible {
+  outline: 2px solid #f2b70b;
+  outline-offset: 2px;
+}
+.onb-scale-demo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  color: #f2b70b;
+}
+.onb-scale-demo.is-stars {
+  gap: 3px;
+}
+.onb-scale-demo .is-empty {
+  color: rgba(255, 255, 255, 0.16);
+}
+.onb-scale-demo.is-pct {
+  align-items: baseline;
+  font-size: 2.6rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 48px;
+}
+.onb-scale-demo.is-pct small {
+  margin-left: 2px;
+  font-size: 0.5em;
+  letter-spacing: 0;
+}
+.onb-scale-name {
+  font-size: 1rem;
+  font-weight: 700;
 }
 /* ======================================================================
    Les trois temps : la note, la piste, le personnage
@@ -1748,6 +1832,12 @@
   border-radius: 12px;
   background: color-mix(in srgb, var(--tone) 18%, transparent);
   color: var(--tone);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+/* Au survol, la case du « + » se remplit : c'est elle qui dit « bouton ». */
+.onb-act:hover .onb-act-icon {
+  background: var(--tone);
+  color: #0d0e12;
 }
 .onb-act-text {
   min-width: 0;

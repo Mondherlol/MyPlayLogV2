@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
+import { ratingLabel } from "../lib/ratingScale";
 
 // Jauge de note semi-circulaire, PARTAGÉE (PlayedModal, GamePage, GameReviews).
 // On attrape l'arc et on glisse le long du demi-cercle pour régler la note, ou
@@ -9,7 +10,9 @@ import { X } from "lucide-react";
 // .gauge-*).
 const GAUGE = { R: 56, CX: 70, CY: 66, SW: 12 };
 
-export default function RatingGauge({ value, active, onEnable, onChange, onClear }) {
+// `unit` (« % ») se colle au chiffre et `mood` pose le mot de la note dessous
+// (« Très bien ») : deux options, éteintes par défaut.
+export default function RatingGauge({ value, active, onEnable, onChange, onClear, unit = null, mood = false }) {
   const { R, CX, CY, SW } = GAUGE;
   const L = Math.PI * R;
   const arc = `M ${CX - R} ${CY} A ${R} ${R} 0 0 1 ${CX + R} ${CY}`;
@@ -104,24 +107,35 @@ export default function RatingGauge({ value, active, onEnable, onChange, onClear
             </>
           )}
         </svg>
-        <div className="gauge-center">
+        <div className={`gauge-center ${mood ? "with-mood" : ""}`}>
           {active ? (
-            <input
-              type="text"
-              inputMode="numeric"
-              maxLength={3}
-              value={txt}
-              onChange={onInput}
-              onFocus={(e) => e.target.select()}
-              onBlur={() => txt === "" && setTxt(String(value))}
-              className="gauge-input"
-              style={{ color }}
-              aria-label="Note sur 100"
-            />
+            <span className={unit ? "gauge-read" : undefined} style={unit ? { color } : undefined}>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={3}
+                value={txt}
+                onChange={onInput}
+                onFocus={(e) => e.target.select()}
+                onBlur={() => txt === "" && setTxt(String(value))}
+                className="gauge-input"
+                // Avec une unité, le champ prend la largeur de ses chiffres :
+                // sinon le « % » flotterait loin d'un « 7 ».
+                style={unit ? { color, width: `${Math.max(1, txt.length) + 0.2}ch` } : { color }}
+                aria-label="Note sur 100"
+              />
+              {unit && <span className="gauge-unit">{unit}</span>}
+            </span>
           ) : (
             <button className="gauge-noter clickable" onClick={onEnable}>
               Noter
             </button>
+          )}
+          {/* La ligne existe même vide : rien ne saute quand le mot arrive. */}
+          {mood && (
+            <span className="gauge-mood" style={active ? { color } : undefined}>
+              {active ? ratingLabel(value) : " "}
+            </span>
           )}
         </div>
       </div>

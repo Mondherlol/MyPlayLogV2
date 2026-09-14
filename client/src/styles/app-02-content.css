@@ -1499,6 +1499,7 @@
 }
 
 .fav-btn {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1515,16 +1516,17 @@
 }
 
 .fav-btn:hover {
-  border-color: #ff5a7a;
-  color: #ff5a7a;
+  border-color: #ff5470;
+  color: #ff5470;
   transform: translateY(-1px);
 }
 
+/* Un aplat, le rose des likes : pas de dégradé. */
 .fav-btn.active {
-  background: linear-gradient(100deg, #ff3d6e 0%, #ff7a5a 100%);
-  border-color: transparent;
+  background: #ff5470;
+  border-color: #ff5470;
   color: #fff;
-  box-shadow: 0 8px 22px rgba(255, 61, 110, 0.4);
+  box-shadow: 0 6px 18px rgba(255, 84, 112, 0.32);
 }
 
 .fav-btn.active svg {
@@ -1668,6 +1670,34 @@
   outline: none;
 }
 
+/* Les options `unit` et `mood` : le « % » collé au chiffre, le mot dessous. */
+.gauge-center.with-mood {
+  top: 40%;
+  flex-direction: column;
+  align-items: center;
+}
+.gauge-read {
+  display: inline-flex;
+  align-items: baseline;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 26px;
+}
+.gauge-read .gauge-input {
+  font-size: inherit;
+}
+.gauge-unit {
+  margin-left: 1px;
+  font-size: 0.6em;
+}
+.gauge-mood {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
 /* input texte (inputMode numérique) : aucune flèche parasite, réglage au slider */
 .gauge-input::-webkit-inner-spin-button,
 .gauge-input::-webkit-outer-spin-button {
@@ -1786,72 +1816,74 @@
   color: var(--text-soft);
 }
 
+/* ⚠️ CHAQUE ÉTAT A SA COULEUR, ET ELLE NE SE PERD JAMAIS. `--st` est posée
+   par le bouton (PlayedModal : bleu en cours, vert terminé, orange pause,
+   rouge abandon, violet sans fin — les teintes de l'app). Au repos, seule
+   l'icône la porte ; au survol, le cadre la prend ; cochée, elle devient le
+   fond, avec texte et icône en blanc. Avant, tout virait au jaune au survol,
+   et l'icône jaune disparaissait sur le fond jaune du bouton coché. */
 .seg-opt {
+  --st: var(--text-soft);
+  position: relative;
   flex: 1;
   min-width: 78px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  padding: 0.62rem 0.5rem;
+  padding: 0.52rem 0.5rem;
   border-radius: 11px;
   border: 1.5px solid var(--border-strong);
   background: var(--surface);
   color: var(--text-soft);
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 0.85rem;
-  transition: all 0.15s ease;
+  font-size: 0.84rem;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease,
+    transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .seg-opt svg {
-  opacity: 0.7;
-}
-
-.seg-opt.active svg {
-  opacity: 1;
+  flex: 0 0 auto;
+  color: var(--st);
 }
 
 .seg-opt:hover {
-  border-color: var(--orange);
+  border-color: var(--st);
   color: var(--text);
-  background: color-mix(in srgb, var(--tint) 10%, var(--surface));
+  background: color-mix(in srgb, var(--st) 9%, var(--surface));
   transform: translateY(-1px);
 }
 
-.seg-opt:hover svg {
-  opacity: 1;
-  color: var(--accent-mark);
+.seg-opt.active,
+.seg-opt.active:hover {
+  background: var(--st);
+  border-color: var(--st);
+  color: #fff;
+  transform: none;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--st) 32%, transparent);
 }
 
-.seg-opt.active {
-  background: var(--accent-grad);
-  border-color: transparent;
-  color: #1a1204;
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--tint) 30%, transparent);
+.seg-opt.active svg {
+  color: #fff;
+  animation: segPop 0.32s ease;
 }
 
-/* Statut spécial « Sans fin » (jeux multi/service) : pointillés + cyan actif
-   pour le distinguer des statuts d'avancement classiques. */
+@keyframes segPop {
+  40% {
+    transform: scale(1.28);
+  }
+}
+
+/* Statut spécial « Sans fin » (jeux multi/service) : pointillés au repos pour
+   le distinguer des statuts d'avancement classiques. */
 .seg-opt.endless {
   border-style: dashed;
 }
 
-.seg-opt.endless:hover {
-  border-color: #17b3c4;
-  background: color-mix(in srgb, #17b3c4 10%, var(--surface));
-}
-
-.seg-opt.endless:hover svg {
-  color: #0e8a99;
-}
-
 .seg-opt.endless.active {
-  background: linear-gradient(135deg, #2cc5d6, #0e8a99);
-  border-color: transparent;
   border-style: solid;
-  color: #03262b;
-  box-shadow: 0 4px 12px rgba(23, 179, 196, 0.3);
 }
 
 /* Format d'achat (digital / physique) — apparaît quand une console est cochée */
@@ -1927,7 +1959,7 @@
 }
 
 .endless-link:hover {
-  color: #0e8a99;
+  color: #c46bff;
   text-decoration: underline;
 }
 
@@ -2798,19 +2830,30 @@
   place-items: center;
 }
 
+/* Une console = son logo + son nom (PlatformMark, le même que sur la fiche). */
 .plat-card {
   position: relative;
   flex: 0 0 auto;
-  padding: 0.62rem 0.95rem;
-  border-radius: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: 10px;
   border: 1.5px solid var(--border-strong);
   background: var(--surface);
   color: var(--text);
   font-family: var(--font-body);
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   font-weight: 600;
   white-space: nowrap;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.plat-card svg {
+  flex: 0 0 auto;
+  color: var(--text-soft);
+  transition: color 0.15s ease;
 }
 
 .plat-card:hover {
@@ -2818,11 +2861,70 @@
   transform: translateY(-2px);
 }
 
+.plat-card:hover svg {
+  color: var(--text);
+}
+
 .plat-card.active {
-  background: var(--accent-grad);
-  border-color: transparent;
+  background: var(--orange);
+  border-color: var(--orange);
   color: #1a1204;
-  padding-left: 1.75rem;
+}
+
+.plat-card.active svg {
+  color: #1a1204;
+}
+
+/* Plateforme + boutique/format : UN champ en deux parties (cf. PlayedModal). */
+.plat-group {
+  padding: 0 0.45rem;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+
+.plat-group .pick-row {
+  padding: 7px 2px 7px;
+}
+
+.plat-sub {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.5rem 0.1rem;
+  border-top: 1px solid var(--border);
+  animation: formatIn 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.plat-sub-label {
+  flex: 0 0 auto;
+  min-width: 58px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.plat-sub .store-chips {
+  flex: 1;
+  min-width: 0;
+  gap: 0.35rem;
+}
+
+.plat-sub .format-seg {
+  padding: 0.2rem;
+  background: var(--surface);
+}
+
+.plat-sub .format-opt {
+  padding: 0.38rem 0.8rem;
+}
+
+@media (max-width: 520px) {
+  .plat-sub {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
 }
 
 /* --- Bundle : cases « terminé » par jeu inclus (modale joué) --- */
@@ -2944,27 +3046,18 @@
   transform: translateY(-1px);
 }
 
-.bundle-st.active.st-playing {
-  background: var(--accent-grad);
-  border-color: transparent;
-  color: #1a1204;
+/* Même code couleur que les grands boutons d'avancement (`--st`). */
+.bundle-st svg {
+  color: var(--st, currentColor);
 }
 
-.bundle-st.active.st-finished {
-  background: #26a96a;
+.bundle-st.active {
+  background: var(--st);
   border-color: transparent;
   color: #fff;
 }
 
-.bundle-st.active.st-paused {
-  background: #cf8a13;
-  border-color: transparent;
-  color: #fff;
-}
-
-.bundle-st.active.st-dropped {
-  background: #d65454;
-  border-color: transparent;
+.bundle-st.active svg {
   color: #fff;
 }
 
@@ -2974,45 +3067,50 @@
   color: var(--text-soft);
 }
 
+/* ⚠️ DES PORTRAITS EN HAUTEUR, PAS DES PASTILLES RONDES. Les images de
+   personnages sont souvent des cartes verticales en pied : rognées en rond au
+   centre, on gardait le ventre. Cadre 3:4 calé sur le HAUT de l'image, pour
+   garder la tête et le buste. */
 .char-card {
   position: relative;
   flex: 0 0 auto;
-  width: 84px;
+  width: 74px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.55rem 0.3rem 0.5rem;
-  border-radius: 12px;
-  border: 2px solid var(--border);
-  background: var(--surface-2);
-  transition: all 0.15s ease;
+  gap: 0.3rem;
+  padding: 0;
+  border: none;
+  background: none;
+  transition: transform 0.15s ease;
 }
 
 .char-card:hover {
-  border-color: var(--orange);
   transform: translateY(-3px);
 }
 
-.char-card.active {
-  border-color: var(--amber);
-}
-
 .char-card-img {
-  width: 54px;
-  height: 54px;
-  border-radius: 50%;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 10px;
   overflow: hidden;
   display: grid;
   place-items: center;
-  background: var(--surface);
+  border: 2px solid var(--border);
+  background: var(--surface-2);
   color: var(--text-soft);
+  transition: border-color 0.15s ease;
+}
+
+.char-card:hover .char-card-img,
+.char-card.active .char-card-img {
+  border-color: var(--orange);
 }
 
 .char-card-img img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center top;
 }
 
 .char-card-name {
@@ -4871,29 +4969,163 @@
   white-space: nowrap;
 }
 
-.hundred-btn {
-  display: grid;
-  place-items: center;
+.when-btn svg {
   flex: 0 0 auto;
-  width: 46px;
+  color: var(--orange);
+}
+/* Pas encore terminé : le bouton reste en place, simplement éteint. */
+.when-btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+.when-btn:disabled:hover {
+  border-color: var(--border-strong);
+}
+
+/* --- Terminé à 100 % : une coupe et un mot, dans la rangée « Parcours » --- */
+.hundred-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  padding: 0.5rem 0.95rem;
   border-radius: 13px;
   border: 1.5px solid var(--border-strong);
-  background: var(--surface);
+  background: var(--surface-2);
   color: var(--text-soft);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.86rem;
+  white-space: nowrap;
   cursor: var(--cursor-pointer), pointer;
-  transition: all 0.18s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease,
+    transform 0.15s ease;
 }
-.hundred-btn:hover {
-  border-color: #9fb2c8;
-  color: #b9c9dc;
+.hundred-btn svg {
+  color: var(--orange);
+}
+.hundred-btn:hover:not(:disabled) {
+  border-color: var(--orange);
+  color: var(--text);
   transform: translateY(-1px);
 }
-/* Actif : le gris-bleu du platine, le même repère que sur mobile. */
-.hundred-btn.active {
-  background: linear-gradient(120deg, #1d2431 0%, #2b3647 100%);
-  border-color: #9fb2c8;
-  color: #e6eef7;
-  box-shadow: 0 8px 22px rgba(60, 80, 110, 0.35);
+.hundred-btn.active,
+.hundred-btn.active:hover {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #1a1204;
+  transform: none;
+}
+.hundred-btn.active svg {
+  color: #1a1204;
+  animation: trophyPop 0.5s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.hundred-btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+@keyframes trophyPop {
+  0% {
+    transform: scale(0.6) rotate(-14deg);
+  }
+  60% {
+    transform: scale(1.3) rotate(8deg);
+  }
+}
+
+/* --- Gerbe d'éclats (components/Burst.jsx) ---------------------------------
+   Chaque éclat part du centre du bouton dans sa direction (`--a`), file sur
+   `--d` px et s'éteint. Un sur trois est une étoile à quatre branches. */
+.burst {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.burst i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--s);
+  height: var(--s);
+  margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2);
+  border-radius: 50%;
+  background: var(--c);
+  animation: burstFly 0.75s cubic-bezier(0.15, 0.75, 0.3, 1) both;
+}
+.burst i.star {
+  width: calc(var(--s) * 2.4);
+  height: calc(var(--s) * 2.4);
+  margin: calc(var(--s) * -1.2) 0 0 calc(var(--s) * -1.2);
+  border-radius: 0;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+}
+@keyframes burstFly {
+  0% {
+    opacity: 1;
+    transform: rotate(var(--a)) translateX(0) scale(0.3);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--a)) translateX(var(--d)) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .burst {
+    display: none;
+  }
+}
+
+/* --- Temps de jeu : le clin d'œil des grosses heures ---------------------- */
+.hour-quip {
+  margin: 0.45rem 0 0;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--text-soft);
+  transform-origin: left center;
+  animation: quipPop 0.38s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+@keyframes quipPop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.92);
+  }
+}
+/* Posé sur le plafond : le champ tressaille une fois. */
+.input-group.maxed {
+  border-color: var(--orange);
+  animation: hourWiggle 0.4s ease;
+}
+@keyframes hourWiggle {
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(1px); }
+}
+
+/* --- Modale plus compacte ------------------------------------------------- */
+.played-modal .modal-title {
+  margin-bottom: 0.75rem;
+}
+.played-modal .field-label {
+  margin: 0.75rem 0 0.35rem;
+}
+.played-modal .ttb-chip {
+  padding: 0.45rem 0.6rem;
+}
+.played-modal .time-col .modal-input {
+  padding: 0.68rem 0;
+}
+.played-modal .when-btn {
+  padding: 0.48rem 0.75rem;
 }
 
 /* ======================================================================

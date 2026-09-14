@@ -4932,6 +4932,36 @@
   pointer-events: none;
 }
 
+/* ⚠️ SUR UN GRAND ÉCRAN, LE DÉCOR DESCEND PRESQUE JUSQU'EN BAS. Coupé à
+   520 px, il laissait sur un 1440p une bande d'image en haut puis deux grands
+   pans vides de chaque côté de la feuille (qui plafonne à 1240 px). Il occupe
+   désormais quasi toute la hauteur de la fenêtre et ne se fond dans le fond
+   qu'au bas de l'écran ; la feuille, elle, remonte plus haut pour que la
+   jaquette et le titre soient visibles sans défiler. */
+@media (min-width: 1100px) and (min-height: 700px) {
+  .gp-backdrop {
+    height: min(96vh, 1200px);
+  }
+
+  .gp-backdrop img {
+    object-position: center 22%;
+  }
+
+  .gp-backdrop-veil {
+    background: linear-gradient(to bottom,
+        rgba(6, 6, 12, 0.34) 0%,
+        rgba(6, 6, 12, 0.05) 12%,
+        transparent 26%,
+        color-mix(in srgb, var(--bg) 18%, transparent) 50%,
+        color-mix(in srgb, var(--bg) 60%, transparent) 76%,
+        var(--bg) 100%);
+  }
+
+  .gp-sheet {
+    margin-top: clamp(160px, 20vh, 240px);
+  }
+}
+
 /* --- Grille : gauche fixe + droite --- */
 .gp-grid {
   display: grid;
@@ -8605,27 +8635,34 @@
    accessible en infobulle (title) comme aux lecteurs d'écran (aria-label).
    Carré parfait : c'est le seul format où dix logos de largeurs différentes
    s'alignent vraiment. */
+/* Chaque logo porte la couleur de sa marque (`--brand`, cf. SITE_COLORS dans
+   GameSiteIcon) ; au survol, elle devient le fond. `--brand-on` : l'encre
+   posée sur ce fond (blanc par défaut, sombre pour les marques claires). */
 .gp-link {
+  --brand: var(--text-soft);
   display: inline-grid;
   place-items: center;
   width: 40px;
   height: 40px;
   padding: 0;
   border-radius: 11px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  color: var(--text);
+  background: color-mix(in srgb, var(--brand) 11%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--brand) 26%, var(--border));
+  color: var(--brand);
   transition: border-color 0.15s ease, color 0.15s ease,
     background 0.15s ease, transform 0.15s ease;
 }
 
-.gp-link:hover {
-  transform: translateY(-2px);
+.gp-link svg {
+  display: block;
+  flex: 0 0 auto;
 }
 
 .gp-link:hover {
-  border-color: var(--orange);
-  color: var(--accent-ink);
+  transform: translateY(-2px);
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--brand-on, #fff);
 }
 
 /* Similaires */
@@ -8662,6 +8699,33 @@
 .gp-similar:hover .gp-similar-cover {
   transform: translateY(-4px);
   box-shadow: 0 14px 30px rgba(10, 10, 20, 0.3);
+}
+
+/* Le « + » d'ajout rapide (GameAddFan), comme sur l'Explorer : au survol, et
+   seulement à la souris (sur tactile il resterait affiché sur chaque jaquette). */
+@media (hover: hover) {
+  .gp-similar:hover .add-fan.hover-only,
+  .gp-similar .add-fan.hover-only:focus-within {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* Une vignette de 122 px : le bouton des grandes grilles y serait trop gros. */
+.gp-similar .add-fan,
+.gp-similar .game-add,
+.gp-similar .fan-btn {
+  width: 34px;
+  height: 34px;
+}
+
+.gp-similar .add-fan {
+  top: 6px;
+  right: 6px;
+}
+
+.gp-similar .game-add {
+  border-radius: 10px;
 }
 
 .gp-similar-rating {
@@ -9756,6 +9820,7 @@
 }
 
 .grv-select {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -9768,23 +9833,44 @@
   transition: border-color 0.15s ease;
 }
 
-.grv-select:hover {
+.grv-select:hover,
+.grv-select:focus-within {
   border-color: var(--orange);
 }
 
+/* ⚠️ LE NAVIGATEUR DESSINE SON PROPRE CADRE AUTOUR D'UN SELECT. Sans
+   `appearance: none`, un rectangle carré à bord noir s'incrustait dans la
+   pilule arrondie. On efface tout le rendu natif et on redessine la flèche
+   (.grv-select-chev) — la liste déroulante, elle, reste celle du système. */
 .grv-select select {
-  border: none;
-  background: none;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+  background: transparent;
   color: var(--text);
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 0.84rem;
-  padding-right: 0.2rem;
+  height: 100%;
+  padding: 0 1.2rem 0 0;
   cursor: var(--cursor-pointer), pointer;
 }
 
-.grv-select select:focus {
+.grv-select select:focus,
+.grv-select select:focus-visible {
   outline: none;
+}
+
+.grv-select-chev {
+  position: absolute;
+  right: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-soft);
 }
 
 /* --- Carte de review : avatar EN DEHORS + bulle --- */

@@ -843,7 +843,7 @@ export default function Topbar() {
                 onClick={() => {
                   setMenu(null);
                   logout();
-                  navigate("/");
+                  navigate("/login", { replace: true });
                 }}
               >
                 <LogOut size={17} /> Déconnexion

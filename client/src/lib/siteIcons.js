@@ -13,6 +13,31 @@
 //
 // Même forme que lib/storeIcons.js (`viewBox` + `d`, monochrome, teinté par
 // `currentColor`) pour que components/GameSiteIcon les dessine pareil.
+// La couleur de chaque marque sur la rangée de liens de la fiche. `c` teinte
+// le logo (et devient le fond au survol) ; `on` est l'encre posée sur ce fond.
+// ⚠️ LES MARQUES NOIR/BLANC SUIVENT LE THÈME. Le logo d'Epic, de X ou de
+// Wikipédia est noir sur blanc ou blanc sur noir : une couleur fixe aurait
+// disparu dans l'un des deux thèmes. On prend donc l'encre du texte.
+// Steam et GOG sont éclaircis : leurs teintes officielles (#1b2838, #86328a)
+// se perdent sur un fond sombre.
+export const SITE_COLORS = {
+  official: { c: "#f2b70b", on: "#161618" },
+  steam: { c: "#1a9fff" },
+  epic: { c: "var(--text)", on: "var(--bg)" },
+  gog: { c: "#a54fd8" },
+  itch: { c: "#fa5c5c" },
+  youtube: { c: "#ff0033" },
+  twitch: { c: "#9146ff" },
+  kick: { c: "#53fc18", on: "#0b1a02" },
+  twitter: { c: "var(--text)", on: "var(--bg)" },
+  reddit: { c: "#ff4500" },
+  discord: { c: "#5865f2" },
+  wikipedia: { c: "var(--text)", on: "var(--bg)" },
+  googleplay: { c: "#01875f" },
+  appstore: { c: "#0d84ff" },
+  gamepass: { c: "#1fa81f" },
+};
+
 export const SITE_BRANDS = {
   twitter: {
     label: "X / Twitter",
