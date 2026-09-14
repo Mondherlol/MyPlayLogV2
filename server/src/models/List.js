@@ -104,6 +104,33 @@ const listEventSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// Liste officielle éditée par le site (hors événements synchronisés) : un TOP
+// de synthèse ou le palmarès d'une cérémonie. Publiée par lib/officialLists
+// depuis le panel admin ; `key` est la clé d'idempotence de la publication.
+const listOfficialSchema = new mongoose.Schema(
+  {
+    key: { type: String, required: true },
+    kind: { type: String, enum: ["top", "awards"], required: true },
+    // Rayon de l'onglet « Tops » : console, genre ou saga (awards pour les cérémonies).
+    group: { type: String, default: null },
+    order: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
+// Une catégorie du palmarès d'une cérémonie. `winner` et `nominees` sont des
+// refId d'items de la liste : l'affichage reprend nom et jaquette de là.
+const listAwardSchema = new mongoose.Schema(
+  {
+    category: { type: String, required: true },
+    main: { type: Boolean, default: false }, // le Jeu de l'année
+    winner: { type: String, default: null },
+    person: { type: String, default: null }, // prix d'interprétation
+    nominees: { type: [String], default: [] },
+  },
+  { _id: false }
+);
+
 // Mention @user résolue à la création (pour la coloration et, plus tard, les notifs).
 const commentMentionSchema = new mongoose.Schema(
   {
@@ -186,6 +213,11 @@ const listSchema = new mongoose.Schema(
     tiers: { type: [tierSchema], default: [] },
     // Liste officielle adossée à un événement (null = liste de joueur).
     event: { type: listEventSchema, default: null },
+    // Mots-clés libres (« Switch », « JRPG »…) : filtres de l'onglet Tops et
+    // de la recherche. Bornés côté route (8 tags, 24 caractères).
+    tags: { type: [String], default: [] },
+    official: { type: listOfficialSchema, default: null },
+    awards: { type: [listAwardSchema], default: [] },
     likes: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
       default: [],
@@ -204,5 +236,9 @@ listSchema.index({ user: 1, updatedAt: -1 });
 // (toutes les listes d'événement, de la plus récente à la plus ancienne).
 listSchema.index({ "event.igdbId": 1 });
 listSchema.index({ "event.startTime": -1 });
+// Publication des listes officielles + onglet « Tops » (rangé par `order`).
+listSchema.index({ "official.key": 1 });
+listSchema.index({ "official.kind": 1, "official.order": 1 });
+listSchema.index({ tags: 1 });
 
 export default mongoose.model("List", listSchema);

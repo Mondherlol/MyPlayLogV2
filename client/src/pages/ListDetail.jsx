@@ -26,6 +26,7 @@ import {
   LayoutGrid,
   Rows3,
 } from "lucide-react";
+import AwardsBoard from "../components/AwardsBoard";
 import {
   DndContext,
   DragOverlay,
@@ -138,6 +139,53 @@ function EventReplay({ event }) {
   );
 }
 
+// Tags de la liste en mode édition : Entrée (ou virgule) ajoute, Retour
+// arrière sur un champ vide retire le dernier. 8 au plus, comme le serveur.
+function TagEditor({ tags, onChange }) {
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    const t = draft.replace(/,/g, " ").replace(/\s+/g, " ").trim().slice(0, 24);
+    setDraft("");
+    if (!t || tags.length >= 8 || tags.some((x) => x.toLowerCase() === t.toLowerCase())) return;
+    onChange([...tags, t]);
+  };
+  return (
+    <div className="ld-tags editing">
+      {tags.map((t) => (
+        <span key={t} className="ld-tag">
+          {t}
+          <button
+            type="button"
+            className="ld-tag-x clickable"
+            onClick={() => onChange(tags.filter((x) => x !== t))}
+            aria-label={`Retirer le tag ${t}`}
+          >
+            <X size={12} />
+          </button>
+        </span>
+      ))}
+      {tags.length < 8 && (
+        <input
+          className="ld-tag-input"
+          value={draft}
+          maxLength={24}
+          placeholder={tags.length ? "Ajouter un tag" : "Ajouter des tags"}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={add}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === ",") {
+              e.preventDefault();
+              add();
+            } else if (e.key === "Backspace" && !draft && tags.length) {
+              onChange(tags.slice(0, -1));
+            }
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 // Conteneur virtuel pour les éléments non classés (tier list) / la liste simple.
 const POOL = "__pool__";
 const tierOf = (containerId) => (containerId === POOL ? null : containerId);
@@ -217,6 +265,7 @@ export default function ListDetail() {
               title: l.title,
               description: l.description,
               visibility: l.visibility,
+              tags: l.tags || [],
               tiers: trs,
               type: l.type,
               items: its.map((i) => ({
@@ -599,6 +648,27 @@ export default function ListDetail() {
             list.description && <p className="ld-desc">{list.description}</p>
           )}
 
+          {editable ? (
+            <TagEditor tags={list.tags || []} onChange={(tags) => patchList({ tags })} />
+          ) : (
+            list.tags?.length > 0 && (
+              <div className="ld-tags">
+                {list.tags.map((t) => (
+                  <Link
+                    key={t}
+                    className="ld-tag clickable"
+                    to={`/lists?${new URLSearchParams({
+                      ...(list.official?.kind === "top" ? { sc: "tops" } : {}),
+                      tag: t,
+                    })}`}
+                  >
+                    {t}
+                  </Link>
+                ))}
+              </div>
+            )
+          )}
+
           <div className="ld-meta">
             <span className="ld-author">
               par{" "}
@@ -708,6 +778,15 @@ export default function ListDetail() {
       {/* Liste officielle d'une conférence : la rediff se regarde ici, sans
           quitter la liste des jeux annoncés. */}
       {list.event && <EventReplay event={list.event} />}
+
+      {/* Cérémonie : le palmarès d'abord, puis tous les jeux (lauréats en
+          tête, suivis des jeux montrés pendant le show). */}
+      {list.awards?.length > 0 && !editable && (
+        <>
+          <AwardsBoard awards={list.awards} items={items} />
+          <h2 className="ld-section-title">Tous les jeux de la cérémonie</h2>
+        </>
+      )}
 
       {/* --- Corps --- */}
       <DndContext

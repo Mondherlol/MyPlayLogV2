@@ -1,0 +1,401 @@
+/* ======================================================================
+   Tops officiels, tags et palmarès des cérémonies
+   ======================================================================
+   Onglet « Tops » de la page Listes (rayons + pastilles de tags), tags sur
+   les cartes et la page d'une liste, et bloc Palmarès des Game Awards. */
+
+/* ---------- Onglet Tops : sélecteur de rayon ---------- */
+.lists-seg {
+  display: inline-flex;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.lists-seg-opt {
+  border: none;
+  background: none;
+  padding: 0.42rem 0.8rem;
+  border-radius: 9px;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.lists-seg-opt:hover {
+  color: var(--text);
+}
+
+.lists-seg-opt.active {
+  background: var(--surface-2);
+  color: var(--accent-ink);
+}
+
+/* ---------- Pastilles de tags (filtre) ---------- */
+.lists-tagbar {
+  display: flex;
+  gap: 0.4rem;
+  margin: -0.6rem 0 1.3rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.lists-tagbar::-webkit-scrollbar {
+  display: none;
+}
+
+.lists-tagchip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.32rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.lists-tagchip:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.lists-tagchip.active {
+  border-color: #f2b70b;
+  color: var(--text);
+  background: color-mix(in srgb, #f2b70b 12%, var(--surface));
+}
+
+.lists-tagchip-n {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  opacity: 0.8;
+}
+
+/* ---------- Tags sur une carte de liste ---------- */
+.list-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.list-tag-chip {
+  padding: 0.1rem 0.45rem;
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+/* ---------- Tags sur la page d'une liste ---------- */
+.ld-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.2rem 0 0.5rem;
+}
+
+.ld-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+a.ld-tag:hover {
+  color: var(--text);
+  border-color: #f2b70b;
+}
+
+.ld-tag-x {
+  display: inline-flex;
+  border: none;
+  background: none;
+  padding: 0;
+  color: inherit;
+  opacity: 0.7;
+}
+
+.ld-tag-x:hover {
+  opacity: 1;
+  color: #ff5470;
+}
+
+.ld-tag-input {
+  flex: 1 1 140px;
+  min-width: 120px;
+  padding: 0.25rem 0.4rem;
+  border: none;
+  border-bottom: 1px dashed var(--border-strong);
+  background: none;
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+.ld-tag-input:focus {
+  outline: none;
+  border-bottom-color: #f2b70b;
+}
+
+/* ---------- Palmarès ---------- */
+.ld-section-title {
+  margin: 0 0 0.9rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.aw-board {
+  margin: 0 0 1.6rem;
+  padding: 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.aw-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.9rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.aw-head svg {
+  color: #f2b70b;
+}
+
+.aw-count {
+  margin-left: auto;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+/* Jeu de l'année : jaquette du lauréat + rangée des nommés. */
+.aw-goty {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.1rem;
+  padding: 0.9rem;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border-left: 3px solid #f2b70b;
+}
+
+.aw-goty-link {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex: 1 1 260px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.aw-goty-cover {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 96px;
+  aspect-ratio: 3 / 4;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--text-soft);
+}
+
+.aw-goty-cover img,
+.aw-nominee-cover img,
+.aw-cell-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.aw-goty-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.aw-kicker {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #f2b70b;
+}
+
+.aw-goty-title {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.aw-goty-link:hover .aw-goty-title {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.aw-nominees {
+  flex: 2 1 320px;
+  min-width: 0;
+}
+
+.aw-nominees-label {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.aw-nominees-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 0.6rem;
+}
+
+.aw-nominee {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+  color: var(--text-soft);
+  text-decoration: none;
+}
+
+.aw-nominee-cover {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 3 / 4;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+  transition: transform 0.15s ease;
+}
+
+.aw-nominee:hover .aw-nominee-cover {
+  transform: translateY(-2px);
+}
+
+.aw-nominee-name {
+  font-size: 0.72rem;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Les autres catégories : une case par prix. */
+.aw-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 0.55rem;
+  margin-top: 0.9rem;
+}
+
+.aw-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.aw-cell:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+
+.aw-cell-cover {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  aspect-ratio: 3 / 4;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.aw-cell-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.aw-cat {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.aw-cell-title {
+  font-size: 0.9rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.aw-person {
+  font-size: 0.74rem;
+  color: #ff5470;
+  font-weight: 600;
+}
+
+@media (max-width: 520px) {
+  .aw-board {
+    padding: 0.8rem;
+  }
+  .aw-goty-cover {
+    width: 76px;
+  }
+  .aw-goty-title {
+    font-size: 1.15rem;
+  }
+  .aw-grid {
+    grid-template-columns: 1fr;
+  }
+}

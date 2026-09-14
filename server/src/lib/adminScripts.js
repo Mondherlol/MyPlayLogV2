@@ -1,6 +1,7 @@
 import GameTrivia from "../models/GameTrivia.js";
 import UserGame from "../models/UserGame.js";
 import { runSteamIgdbSync } from "./steamIgdbSync.js";
+import { publishGameAwards, publishOfficialTops } from "./officialLists.js";
 
 // ======================================================================
 //  Scripts de maintenance — onglet « Scripts » du panel admin
@@ -131,7 +132,42 @@ async function purgeLegacyTrivia({ dryRun }) {
   };
 }
 
+// Phrase de bilan commune aux deux publications de listes officielles.
+function publishSummary(s, noun, dryRun) {
+  return (
+    `${s.created} ${noun} créé(s), ${s.updated} mis à jour, ${s.skipped} inchangé(s) — ` +
+    `${s.games} jeux au total` +
+    (dryRun ? " (simulation : rien n'a été écrit)." : ".")
+  );
+}
+
 export const SCRIPTS = [
+  {
+    key: "officialTops",
+    label: "Publier les Tops officiels",
+    description:
+      "Crée ou met à jour les listes classées du compte MyPlayLog (Top 100 Switch, " +
+      "meilleurs JRPG, tous les Zelda classés…) à partir de server/src/data/officialLists. " +
+      "Les likes et commentaires sont conservés ; une liste inchangée n'est pas touchée.",
+    run: async ({ dryRun }) => {
+      const log = [];
+      const s = await publishOfficialTops({ dryRun, log: (l) => log.push(l) });
+      return { summary: publishSummary(s, "top(s)", dryRun), log };
+    },
+  },
+  {
+    key: "gameAwards",
+    label: "Publier les listes des Game Awards",
+    description:
+      "Une liste par cérémonie (The Game Awards 2014 → 2025, Spike VGA 2004 → 2012) avec " +
+      "son palmarès complet, la rediffusion et les jeux montrés pendant le show. Complète " +
+      "les listes d'événements déjà synchronisées au lieu d'en créer des doublons.",
+    run: async ({ dryRun, baseUrl }) => {
+      const log = [];
+      const s = await publishGameAwards({ dryRun, baseUrl, log: (l) => log.push(l) });
+      return { summary: publishSummary(s, "cérémonie(s)", dryRun), log };
+    },
+  },
   {
     key: "purgeLegacyTrivia",
     label: "Réécrire les anecdotes Trivia de la première génération",

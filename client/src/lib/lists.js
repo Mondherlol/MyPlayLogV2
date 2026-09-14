@@ -46,6 +46,14 @@ export const LIST_SORTS = [
   { value: "likes", label: "Popularité" },
 ];
 
+// Rayons de l'onglet « Tops » (valeur = param `group` du backend).
+export const TOP_GROUPS = [
+  { value: "", label: "Tous" },
+  { value: "platform", label: "Consoles" },
+  { value: "genre", label: "Genres" },
+  { value: "series", label: "Sagas" },
+];
+
 // Options de filtre par type (null = tous).
 export const LIST_TYPE_FILTERS = [
   { value: "", label: "Tous les types" },

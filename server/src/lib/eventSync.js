@@ -66,6 +66,21 @@ function isUnchanged(list, { title, items, event, cover }) {
   );
 }
 
+// Une liste de cérémonie (Game Awards) porte aussi son palmarès, publié par
+// lib/officialLists : ses jeux restent en tête, la synchro ne remplace que
+// ceux montrés pendant le show, derrière.
+function withAwardItems(list, items) {
+  if (!list.awards?.length) return items;
+  const refs = new Set(
+    list.awards.flatMap((a) => [a.winner, ...(a.nominees || [])]).filter(Boolean).map(String)
+  );
+  const head = (list.items || [])
+    .filter((i) => refs.has(String(i.refId)))
+    .map((i) => (i.toObject ? i.toObject() : i));
+  const taken = new Set(head.map((i) => String(i.refId)));
+  return [...head, ...items.filter((i) => !taken.has(String(i.refId)))];
+}
+
 // Le 1er janvier de l'année en cours, borne par défaut.
 export const defaultSince = () =>
   Math.floor(new Date(new Date().getFullYear(), 0, 1).getTime() / 1000);
@@ -107,7 +122,8 @@ export async function syncEventLists({
 
     const existing = await List.findOne({ "event.igdbId": ev.id });
     if (existing) {
-      if (isUnchanged(existing, { title, items, event, cover })) {
+      const merged = withAwardItems(existing, items);
+      if (isUnchanged(existing, { title, items: merged, event, cover })) {
         summary.skipped += 1;
         continue;
       }
@@ -115,7 +131,7 @@ export async function syncEventLists({
         existing.title = title;
         existing.description = eventDescription();
         existing.cover = cover;
-        existing.items = items;
+        existing.items = merged;
         existing.event = event;
         await existing.save();
       }

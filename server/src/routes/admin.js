@@ -1772,7 +1772,10 @@ router.post("/scripts/:key/run", async (req, res) => {
   const dryRun = req.body?.dryRun !== false;
   const startedAt = Date.now();
   try {
-    const out = (await script.run({ dryRun })) || {};
+    // `baseUrl` : le domaine qui sert /uploads, pour les scripts qui génèrent
+    // des images (couvertures de cérémonies).
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const out = (await script.run({ dryRun, baseUrl })) || {};
     const ms = Date.now() - startedAt;
 
     if (!dryRun) {

@@ -105,6 +105,23 @@ function sanitizeItem(raw) {
   };
 }
 
+// Tags d'une liste : 8 au plus, 24 caractères chacun, sans doublon (casse
+// ignorée). La première écriture d'un tag fait foi pour son affichage.
+export function sanitizeTags(raw) {
+  if (!Array.isArray(raw)) return undefined;
+  const seen = new Set();
+  const out = [];
+  for (const t of raw) {
+    const tag = String(t ?? "").replace(/\s+/g, " ").trim().slice(0, 24);
+    const k = tag.toLowerCase();
+    if (!tag || seen.has(k)) continue;
+    seen.add(k);
+    out.push(tag);
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+
 function sanitizeTiers(raw) {
   if (!Array.isArray(raw)) return undefined;
   return raw
@@ -166,6 +183,12 @@ async function eventOfList(list) {
     .lean();
 }
 
+// Marqueur d'une liste officielle (top ou cérémonie), null sinon.
+function toOfficial(l) {
+  if (!l.official?.key) return null;
+  return { kind: l.official.kind, group: l.official.group || null };
+}
+
 // Auteur d'une liste. `isSystem` distingue le compte officiel du site pour lui
 // coller sa pastille de compte vérifié.
 function toAuthor(u) {
@@ -183,6 +206,8 @@ function toCard(l, userId) {
   const items = l.items || [];
   return {
     event: toEvent(l),
+    official: toOfficial(l),
+    tags: l.tags || [],
     ...(l.type === "playlist" ? playlistDuration(items) : {}),
     id: l._id,
     title: l.title,
@@ -259,6 +284,15 @@ function toFull(l, userId) {
     visibility: l.visibility,
     author: toAuthor(l.user),
     event: toEvent(l),
+    official: toOfficial(l),
+    tags: l.tags || [],
+    awards: (l.awards || []).map((a) => ({
+      category: a.category,
+      main: !!a.main,
+      winner: a.winner,
+      person: a.person || null,
+      nominees: a.nominees || [],
+    })),
     mine: userId ? String(l.user?._id || l.user) === String(userId) : false,
     items: (l.items || []).map((i) => ({
       _id: i._id,
@@ -313,15 +347,25 @@ router.get("/", optionalAuth, async (req, res) => {
           ? // Listes officielles adossées à un événement (Nintendo Direct,
             // Summer Game Fest…), publiées par le compte du site.
             { visibility: "public", "event.igdbId": { $exists: true } }
-          : { $or: [{ visibility: "public" }, { user: req.userId }] };
-    // Filtres optionnels : type, itemKind (jeu/perso), recherche plein-texte.
+          : scope === "tops"
+            ? // Classements officiels (Top 100 Switch, meilleurs JRPG…).
+              { visibility: "public", "official.kind": "top" }
+            : { $or: [{ visibility: "public" }, { user: req.userId }] };
+    // Filtres optionnels : type, itemKind (jeu/perso), rayon, tag, recherche.
     if (TYPES.includes(req.query.type)) filter.type = req.query.type;
     if (ITEM_KINDS.includes(req.query.itemKind))
       filter.itemKind = req.query.itemKind;
+    if (scope === "tops" && req.query.group) filter["official.group"] = String(req.query.group);
+    const tag = String(req.query.tag || "").trim();
+    if (tag) filter.tags = new RegExp(`^${escapeRx(tag)}$`, "i");
     const search = String(req.query.q || "").trim();
+    // Les tops officiels ont leur onglet : dans le fil « Découvrir », leurs
+    // dizaines de listes publiées d'un coup noieraient celles des joueurs. Ils
+    // y reviennent dès qu'on cherche quelque chose ou qu'on filtre par tag.
+    if (!scope && !author && !search && !tag) filter["official.kind"] = { $ne: "top" };
     if (search) {
-      const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-      filter.$and = [{ $or: [{ title: rx }, { description: rx }] }];
+      const rx = new RegExp(escapeRx(search), "i");
+      filter.$and = [{ $or: [{ title: rx }, { description: rx }, { tags: rx }] }];
     }
     // ⚠️ UN PLAFOND DEMANDABLE. L'accueil n'affiche qu'une rangée des
     // dernières conférences : lui renvoyer deux cents listes peuplées pour en
@@ -333,7 +377,14 @@ router.get("/", optionalAuth, async (req, res) => {
       .populate("user", "username avatar isSystem")
       // Les événements se rangent par date de diffusion (la dernière
       // conférence en tête), pas par date de mise à jour de la liste.
-      .sort(scope === "events" ? { "event.startTime": -1 } : { updatedAt: -1 })
+      .sort(
+        scope === "events"
+          ? { "event.startTime": -1 }
+          : scope === "tops"
+            ? // L'ordre éditorial : consoles, puis genres, puis sagas.
+              { "official.order": 1 }
+            : { updatedAt: -1 }
+      )
       .limit(limit)
       .lean();
     let cards = lists.map((l) => toCard(l, req.userId));
@@ -360,6 +411,29 @@ router.get("/", optionalAuth, async (req, res) => {
   } catch (err) {
     console.error("lists feed error:", err.message);
     res.status(500).json({ error: "Erreur lors du chargement des listes." });
+  }
+});
+
+const escapeRx = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// GET /api/lists/tags?scope=tops&group= — les tags en usage, du plus fréquent
+// au plus rare. Sert les pastilles de filtre de l'onglet Tops. Déclaré AVANT /:id.
+router.get("/tags", async (req, res) => {
+  try {
+    const match = { visibility: "public" };
+    if (req.query.scope === "tops") match["official.kind"] = "top";
+    if (req.query.scope === "tops" && req.query.group) match["official.group"] = String(req.query.group);
+    const rows = await List.aggregate([
+      { $match: match },
+      { $unwind: "$tags" },
+      { $group: { _id: { $toLower: "$tags" }, tag: { $first: "$tags" }, count: { $sum: 1 } } },
+      { $sort: { count: -1, tag: 1 } },
+      { $limit: 80 },
+    ]);
+    res.json({ tags: rows.map((r) => ({ tag: r.tag, count: r.count })) });
+  } catch (err) {
+    console.error("list tags error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement des tags." });
   }
 });
 
@@ -608,6 +682,7 @@ router.post("/", requireAuth, async (req, res) => {
       visibility,
       items,
       tiers,
+      tags: sanitizeTags(b.tags) || [],
     });
     // Fil : « X a créé une liste » (les listes privées n'y apparaissent pas —
     // le feed refiltre de toute façon sur la visibilité actuelle).
@@ -654,6 +729,10 @@ router.put("/:id", requireAuth, async (req, res) => {
     }
     if (b.visibility !== undefined && VISIBILITIES.includes(b.visibility))
       list.visibility = b.visibility;
+    if (b.tags !== undefined) {
+      const tags = sanitizeTags(b.tags);
+      if (tags) list.tags = tags;
+    }
     // Changement de type : on garde les items (itemKind figé). En quittant
     // "tier" on déclasse tout ; en y entrant on pose des paliers par défaut.
     // Une playlist ne change pas de type (et rien ne devient playlist) : le
