@@ -2,7 +2,8 @@
    La feuille de dates
    ======================================================================
    Les raccourcis d'abord, le calendrier ensuite : une date de jeu se dit
-   presque toujours par rapport à quelque chose. Cf. DatePickerModal.jsx.
+   presque toujours par rapport à quelque chose. On choisit sur un brouillon,
+   et seul « Valider » l'écrit. Cf. DatePickerModal.jsx.
    ====================================================================== */
 .dp-overlay {
   display: grid;
@@ -10,12 +11,16 @@
   padding: 1rem;
 }
 .dp-card {
-  width: min(440px, 100%);
-  max-height: 88vh;
+  width: min(400px, 100%);
+  max-height: 92vh;
   overflow-y: auto;
-  padding: 1.1rem 1.2rem 0.9rem;
-  border: 1px solid var(--border-strong);
-  border-radius: 20px;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 18px;
   background: var(--surface);
   box-shadow: var(--shadow);
   animation: steam-pop 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.3);
@@ -23,26 +28,14 @@
 
 .dp-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.8rem;
-  margin-bottom: 0.9rem;
-}
-.dp-titles {
-  flex: 1;
-  min-width: 0;
 }
 .dp-head h3 {
+  flex: 1;
   margin: 0;
   font-family: var(--font-display);
   font-size: 1.05rem;
-}
-.dp-head p {
-  margin: 0.15rem 0 0;
-  color: var(--text-soft);
-  font-size: 0.8rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .dp-x {
   flex: 0 0 auto;
@@ -51,7 +44,7 @@
   display: grid;
   place-items: center;
   border: none;
-  border-radius: 50%;
+  border-radius: 9px;
   background: var(--surface-2);
   color: var(--text-soft);
   cursor: var(--cursor-pointer), pointer;
@@ -60,18 +53,56 @@
   color: var(--text);
 }
 
-/* --- Les raccourcis, une rangée par origine --- */
-.dp-row {
-  margin-bottom: 0.8rem;
+/* --- La date retenue --- */
+.dp-display {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.8rem;
+  border: 1.5px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface-2);
 }
+.dp-display svg {
+  flex: 0 0 auto;
+  color: var(--orange);
+}
+.dp-display-val {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.dp-display.empty .dp-display-val {
+  color: var(--text-soft);
+  font-weight: 600;
+}
+.dp-display-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: var(--cursor-pointer), pointer;
+}
+.dp-display-clear:hover {
+  color: #e0574d;
+}
+
+/* --- Les raccourcis, une rangée par origine --- */
 .dp-row-label {
   display: block;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.4rem;
   color: var(--text-soft);
-  font-size: 0.69rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: 0.74rem;
+  font-weight: 600;
 }
 .dp-chips {
   display: flex;
@@ -79,28 +110,27 @@
   gap: 0.35rem;
 }
 .dp-chip {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.05rem;
-  padding: 0.32rem 0.65rem;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.36rem 0.72rem;
   border: 1.5px solid var(--border);
-  border-radius: 11px;
-  background: var(--surface-2);
+  border-radius: 999px;
+  background: var(--surface);
   color: var(--text);
   font: inherit;
   font-size: 0.78rem;
   line-height: 1.25;
-  text-align: left;
   cursor: var(--cursor-pointer), pointer;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 .dp-chip:hover {
-  border-color: var(--accent);
+  border-color: var(--orange);
 }
 .dp-chip.active {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #1a1204;
 }
 .dp-chip-label {
   font-weight: 600;
@@ -108,41 +138,75 @@
 /* « Un mois après », d'accord — mais quel jour ? */
 .dp-chip-hint {
   color: var(--text-soft);
-  font-size: 0.67rem;
+  font-size: 0.7rem;
+}
+.dp-chip.active .dp-chip-hint {
+  color: rgba(26, 18, 4, 0.7);
 }
 
 /* --- Le calendrier --- */
 .dp-cal {
-  margin-top: 0.4rem;
-  padding-top: 0.8rem;
-  border-top: 1px solid var(--border);
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
 }
 .dp-cal-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 0.4rem;
   margin-bottom: 0.5rem;
 }
-.dp-month {
+.dp-cal-selects {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  gap: 0.2rem;
+}
+.dp-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.dp-select select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  outline: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
   font-family: var(--font-display);
   font-size: 0.92rem;
   font-weight: 700;
   text-transform: capitalize;
+  padding: 0.28rem 1.3rem 0.28rem 0.5rem;
+  cursor: var(--cursor-pointer), pointer;
+}
+.dp-select select:hover,
+.dp-select select:focus-visible {
+  background: var(--surface);
+}
+.dp-select svg {
+  position: absolute;
+  right: 0.35rem;
+  pointer-events: none;
+  color: var(--text-soft);
 }
 .dp-nav {
-  width: 28px;
-  height: 28px;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
-  border: 1.5px solid var(--border);
+  border: none;
   border-radius: 9px;
-  background: var(--surface-2);
+  background: var(--surface);
   color: var(--text-soft);
   cursor: var(--cursor-pointer), pointer;
 }
 .dp-nav:hover:not(:disabled) {
   color: var(--text);
-  border-color: var(--border-strong);
 }
 .dp-nav:disabled {
   opacity: 0.35;
@@ -152,7 +216,7 @@
 .dp-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
+  gap: 3px;
 }
 .dp-dow {
   display: grid;
@@ -163,22 +227,25 @@
   font-weight: 700;
 }
 .dp-blank {
-  height: 34px;
+  height: 36px;
 }
 .dp-day {
-  height: 34px;
+  height: 36px;
   display: grid;
   place-items: center;
   border: none;
-  border-radius: 9px;
+  border-radius: 10px;
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
+  font-weight: 600;
   cursor: var(--cursor-pointer), pointer;
+  transition: background 0.12s ease, box-shadow 0.12s ease;
 }
 .dp-day:hover:not(:disabled) {
-  background: var(--surface-2);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1.5px var(--orange);
 }
 /* Un jour hors de l'intervalle possible reste VISIBLE mais éteint : le trou
    dans la grille serait plus déroutant que la case grisée. */
@@ -189,42 +256,16 @@
 .dp-day.today {
   box-shadow: inset 0 0 0 1.5px var(--border-strong);
 }
-.dp-day.on {
-  background: var(--accent-grad);
+.dp-day.on,
+.dp-day.on:hover {
+  background: var(--orange);
+  box-shadow: none;
   color: #1a1204;
   font-weight: 800;
 }
 
 .dp-foot {
   display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  margin-top: 0.8rem;
-  padding-top: 0.7rem;
-  border-top: 1px solid var(--border);
-}
-.dp-clear {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.3rem 0.6rem;
-  border: 1.5px solid var(--border);
-  border-radius: 999px;
-  background: none;
-  color: var(--text-soft);
-  font: inherit;
-  font-size: 0.78rem;
-  cursor: var(--cursor-pointer), pointer;
-}
-.dp-clear:hover {
-  border-color: #c0554d;
-  color: #c0554d;
-}
-.dp-current {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  margin-left: auto;
-  color: var(--text-soft);
-  font-size: 0.8rem;
+  justify-content: flex-end;
+  gap: 0.5rem;
 }

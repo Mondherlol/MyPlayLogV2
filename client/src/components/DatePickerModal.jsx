@@ -11,10 +11,14 @@
 // même raison qu'elle existe là-bas : dans la modale de suivi, deux champs date
 // nus au milieu du formulaire noyaient tout le reste. Ici ils se replient
 // derrière un bouton, et tout ce qui les entoure redevient lisible.
+//
+// ⚠️ CHOISIR N'EST PAS VALIDER. La feuille se refermait au premier clic : un
+// raccourci effleuré ou un jour mal visé, et il fallait tout rouvrir. On
+// travaille maintenant sur un BROUILLON, et seul « Valider » l'écrit.
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, ChevronLeft, ChevronRight, Check, Trash2 } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, ChevronDown, Check, CalendarDays } from "lucide-react";
 import { day, dateLabel, toInputValue } from "../lib/dateQuick";
 
 const JOURS = ["L", "M", "M", "J", "V", "S", "D"];
@@ -37,9 +41,10 @@ function gridOf(month) {
 const sameDay = (a, b) =>
   !!a && !!b && new Date(a).toDateString() === new Date(b).toDateString();
 
+const firstOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1, 12);
+
 export default function DatePickerModal({
   title,
-  subtitle = null,
   // "AAAA-MM-JJ" ou "" — la valeur du champ qu'on modifie.
   value,
   rows = [],
@@ -53,16 +58,9 @@ export default function DatePickerModal({
   onClear,
   onClose,
 }) {
-  const selected = value ? new Date(`${value}T12:00:00`) : null;
-  const [month, setMonth] = useState(() =>
-    day(selected || anchor || new Date())
-  );
-
-  useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  const [draft, setDraft] = useState(value || "");
+  const selected = draft ? new Date(`${draft}T12:00:00`) : null;
+  const [month, setMonth] = useState(() => firstOfMonth(day(selected || anchor || new Date())));
 
   const cells = useMemo(() => gridOf(month), [month]);
   const today = day(new Date());
@@ -73,10 +71,38 @@ export default function DatePickerModal({
   const disabled = (d) =>
     !d || d > today || (minD && d < minD) || (maxD && d > maxD);
 
+  // Les années du menu : de la borne basse (la sortie du jeu) à aujourd'hui.
+  const years = useMemo(() => {
+    const from = minD ? minD.getFullYear() : today.getFullYear() - 50;
+    const out = [];
+    for (let y = today.getFullYear(); y >= from; y--) out.push(y);
+    return out;
+  }, [minD?.getTime(), today.getFullYear()]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function choose(d) {
-    onPick(toInputValue(d));
+    setDraft(toInputValue(d));
+    setMonth(firstOfMonth(d));
+  }
+
+  function confirm() {
+    if (draft) onPick(draft);
+    else onClear();
     onClose();
   }
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "Enter") confirm();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }); // relit le brouillon courant à chaque rendu
+
+  const atCurrentMonth =
+    month.getFullYear() === today.getFullYear() && month.getMonth() === today.getMonth();
+  const atMinMonth =
+    !!minD && month.getFullYear() === minD.getFullYear() && month.getMonth() === minD.getMonth();
 
   return createPortal(
     <div
@@ -85,13 +111,21 @@ export default function DatePickerModal({
     >
       <div className="dp-card" onMouseDown={(e) => e.stopPropagation()}>
         <div className="dp-head">
-          <div className="dp-titles">
-            <h3>{title}</h3>
-            {subtitle && <p>{subtitle}</p>}
-          </div>
+          <h3>{title}</h3>
           <button className="dp-x clickable" onClick={onClose} aria-label="Fermer">
             <X size={17} />
           </button>
+        </div>
+
+        {/* La date retenue, en clair — c'est elle que « Valider » écrira. */}
+        <div className={`dp-display ${selected ? "" : "empty"}`}>
+          <CalendarDays size={18} />
+          <span className="dp-display-val">{selected ? dateLabel(selected) : "Aucune date"}</span>
+          {selected && (
+            <button type="button" className="dp-display-clear clickable" onClick={() => setDraft("")}>
+              <X size={13} /> Effacer
+            </button>
+          )}
         </div>
 
         {/* --- Les raccourcis, une rangée par origine --- */}
@@ -103,9 +137,7 @@ export default function DatePickerModal({
                 <button
                   key={it.key}
                   type="button"
-                  className={`dp-chip clickable ${
-                    sameDay(it.date, selected) ? "active" : ""
-                  }`}
+                  className={`dp-chip clickable ${sameDay(it.date, selected) ? "active" : ""}`}
                   onClick={() => choose(it.date)}
                 >
                   <span className="dp-chip-label">{it.label}</span>
@@ -124,21 +156,50 @@ export default function DatePickerModal({
               className="dp-nav clickable"
               onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1, 12))}
               aria-label="Mois précédent"
+              disabled={atMinMonth}
             >
               <ChevronLeft size={16} />
             </button>
-            <span className="dp-month">
-              {MOIS[month.getMonth()]} {month.getFullYear()}
-            </span>
+
+            {/* Mois et année en menus : remonter à 2011 se fait en un choix,
+                pas en cent-soixante clics sur la flèche. */}
+            <div className="dp-cal-selects">
+              <label className="dp-select">
+                <select
+                  value={month.getMonth()}
+                  onChange={(e) => setMonth(new Date(month.getFullYear(), Number(e.target.value), 1, 12))}
+                  aria-label="Mois"
+                >
+                  {MOIS.map((m, i) => (
+                    <option key={m} value={i}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={13} />
+              </label>
+              <label className="dp-select">
+                <select
+                  value={month.getFullYear()}
+                  onChange={(e) => setMonth(new Date(Number(e.target.value), month.getMonth(), 1, 12))}
+                  aria-label="Année"
+                >
+                  {years.map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={13} />
+              </label>
+            </div>
+
             <button
               type="button"
               className="dp-nav clickable"
               onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1, 12))}
               aria-label="Mois suivant"
-              disabled={
-                month.getFullYear() === today.getFullYear() &&
-                month.getMonth() === today.getMonth()
-              }
+              disabled={atCurrentMonth}
             >
               <ChevronRight size={16} />
             </button>
@@ -171,27 +232,17 @@ export default function DatePickerModal({
         </div>
 
         <div className="dp-foot">
-          {value && (
-            <button
-              type="button"
-              className="dp-clear clickable"
-              onClick={() => {
-                onClear();
-                onClose();
-              }}
-            >
-              <Trash2 size={14} /> Effacer
-            </button>
-          )}
-          <span className="dp-current">
-            {selected ? (
-              <>
-                <Check size={14} /> {dateLabel(selected)}
-              </>
-            ) : (
-              "Aucune date"
-            )}
-          </span>
+          <button type="button" className="btn btn-ghost" onClick={onClose}>
+            Annuler
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={confirm}
+            disabled={(draft || "") === (value || "")}
+          >
+            <Check size={16} /> Valider
+          </button>
         </div>
       </div>
     </div>,

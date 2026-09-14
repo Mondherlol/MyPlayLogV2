@@ -5111,6 +5111,92 @@
   80% { transform: translateX(1px); }
 }
 
+/* ⚠️ PAS DE DÉFILEMENT HORIZONTAL. Les éclats du 100 % partent au-delà du
+   bord droit de la modale : sans ce verrou, ils y ouvraient une barre de
+   défilement le temps de leur vol. */
+.modal.played-modal,
+.modal.played-modal > .modal-body {
+  overflow-x: hidden;
+}
+
+/* Un bouton ne s'étire pas tout seul dans un bloc : sans flex, le coup de
+   cœur restait à la largeur de son texte, plus étroit que « Ma note ». */
+.marks-row {
+  display: flex;
+  gap: 0.5rem;
+}
+.marks-row .fav-btn {
+  flex: 1;
+}
+
+/* Note en étoiles dans la modale : le bloc s'aligne à gauche, titre et
+   chiffre sur la même ligne (cf. StarRating `heading`). */
+.rating-block.star-mode {
+  align-items: stretch;
+  padding: 0.6rem 0.75rem 0.45rem;
+}
+
+/* --- Temps de jeu : − / + dans le champ, pas rapides dessous --- */
+.played-modal .time-col {
+  flex-basis: 210px;
+}
+.played-modal .time-col .hours-group {
+  gap: 0.35rem;
+  padding: 0 0.3rem;
+}
+.hours-group .modal-input {
+  min-width: 0;
+  text-align: center;
+}
+.hour-step {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 9px;
+  background: var(--surface-2);
+  color: var(--text);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.hour-step:hover:not(:disabled) {
+  background: var(--orange);
+  color: #1a1204;
+}
+.hour-step:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.hour-steps {
+  display: flex;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+}
+.hour-chip {
+  flex: 1;
+  padding: 0.28rem 0;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  font-weight: 700;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.hour-chip:hover:not(:disabled) {
+  border-color: var(--orange);
+  color: var(--text);
+}
+.hour-chip:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.hour-chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* --- Modale plus compacte ------------------------------------------------- */
 .played-modal .modal-title {
   margin-bottom: 0.75rem;
@@ -5282,14 +5368,17 @@
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
+/* ⚠️ LE VRAI JAUNE, PAS `--accent-ink`. Cette encre vaut #161618 en thème
+   clair : les étoiles posées sortaient NOIRES. Une étoile est une icône, et les
+   icônes gardent le #f2b70b dans les deux thèmes. */
 .star-row.on {
-  color: var(--accent-ink);
+  color: var(--orange);
 }
 /* ⚠️ LE SURVOL EST DÉJÀ DORÉ, ET DU MÊME DORÉ. Un aperçu gris disait
    « désactivé » ; un doré assombri au mélange virait au terne. C'est la même
    couleur que la note posée : ce qu'on voit est ce qu'on obtient. */
 .star-row.hovering {
-  color: var(--accent-ink);
+  color: var(--orange);
 }
 .star-cell {
   position: relative;
@@ -5297,7 +5386,7 @@
   line-height: 0;
 }
 .star-bg {
-  color: var(--border-strong);
+  color: var(--border);
 }
 /* La moitié pleine, découpée à la largeur voulue : c'est ce qui permet les
    demi-étoiles ET le remplissage continu d'une note posée sur 100. */
@@ -5308,10 +5397,18 @@
   line-height: 0;
   color: inherit;
 }
+/* ⚠️ LES LIGNES SONT RÉSERVÉES. Le mot de la note (« J'adore ») et le chiffre
+   n'apparaissent qu'au survol ou une fois noté : sans hauteur fixe, leur
+   arrivée poussait tout ce qui suit (« Écrire une review »…) d'une ligne. */
 .star-foot {
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  min-height: 22px;
+}
+.star-head {
+  min-height: 26px;
+  align-items: center;
 }
 .star-rating.with-head {
   width: 100%;

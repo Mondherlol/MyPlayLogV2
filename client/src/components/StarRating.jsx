@@ -147,10 +147,13 @@ export default function StarRating({
           // les demies — et les 4,15 étoiles d'une note posée sur 100.
           const fill = Math.max(0, Math.min(1, shown - i));
           return (
+            // ⚠️ PLEINES ET ARRONDIES. Un contour fin se lisait « désactivé »,
+            // et un remplissage sans trait gardait des pointes coupantes : le
+            // trait de la même couleur, aux jointures rondes, adoucit les coins.
             <span key={i} className="star-cell">
-              <Star size={26} className="star-bg" />
+              <Star size={26} className="star-bg" fill="currentColor" strokeWidth={2.2} strokeLinejoin="round" />
               <span className="star-fg" style={{ width: `${fill * 100}%` }}>
-                <Star size={26} fill="currentColor" strokeWidth={0} />
+                <Star size={26} fill="currentColor" strokeWidth={2.2} strokeLinejoin="round" />
               </span>
             </span>
           );

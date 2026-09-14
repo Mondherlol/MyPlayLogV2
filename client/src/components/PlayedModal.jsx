@@ -6,6 +6,7 @@ import {
   Check,
   Heart,
   Plus,
+  Minus,
   Trash2,
   Upload,
   ArrowLeft,
@@ -45,6 +46,7 @@ import StoreIcon from "./StoreIcon";
 import CharacterPicker from "./CharacterPicker";
 import OstPicker from "./OstPicker";
 import RatingInput from "./RatingInput";
+import { useRatingScale, SCALE_STARS } from "../lib/ratingScale";
 import { Composer } from "./ListComments";
 
 // Chaque état garde SA couleur, la même que sur l'app (myplaylog-mobile,
@@ -76,6 +78,9 @@ const HOUR_QUIPS = [
   { at: 700, text: "Un mois entier. T'es sûr ?" },
 ];
 
+// Les pas rapides, ceux de la feuille mobile « J'ai joué combien ? ».
+const HOUR_STEPS = [1, 2, 5, 10];
+
 function hourQuip(value) {
   if (value === "" || value == null) return null;
   const n = Number(value);
@@ -93,7 +98,8 @@ const DIGITAL_ONLY = /windows|\bpc\b|android|ios|linux|\bmac\b|browser|stadia|lu
 // Infos statiques du jeu (plateformes, jaquettes, persos, temps de jeu) : elles
 // ne changent pas d'une ouverture à l'autre → cache mémoire + localStorage 24h,
 // pour afficher la modale instantanément la 2e fois. (v3 : + bundleGames)
-const detailsCache = makeCache("mpl_gamedetails3_", 24 * 60 * 60 * 1000);
+// (v4 : le Game Pass vient maintenant du catalogue → on relit les boutiques)
+const detailsCache = makeCache("mpl_gamedetails4_", 24 * 60 * 60 * 1000);
 
 const EMPTY_DETAILS = {
   platforms: [],
@@ -248,6 +254,14 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   // donc la rejoue. Zéro = rien à l'ouverture, seulement sur un vrai clic.
   const [bursts, setBursts] = useState({ finished: 0, hundred: 0, fav: 0 });
   const fire = (k) => setBursts((b) => ({ ...b, [k]: b[k] + 1 }));
+
+  // ± n heures, borné entre 0 et le plafond. Revenir à zéro vide le champ :
+  // « 0 h » se lirait comme une durée saisie, pas comme une absence.
+  const bumpPlaytime = (n) =>
+    setPlaytime((p) => {
+      const next = Math.max(0, Math.min(MAX_HOURS, (Number(p) || 0) + n));
+      return next ? String(next) : "";
+    });
 
   useEffect(() => {
     let alive = true;
@@ -579,7 +593,15 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
   // Les boutiques possibles pour la plateforme cochée, parmi celles où le jeu
   // est réellement sorti (le serveur les tire des liens externes d'IGDB) —
   // plus le Game Pass et « hors boutique », qu'aucun catalogue ne connaît.
-  const storeOptions = storesFor(platform, details.stores || []);
+  // Une boutique déjà enregistrée reste proposée même si le catalogue ne la
+  // cite plus (un Game Pass saisi avant le filtrage) : sinon elle disparaîtrait
+  // de l'écran tout en restant en base.
+  const baseStores = storesFor(platform, details.stores || []);
+  const storeOptions =
+    baseStores.length && store && STORES[store] && !baseStores.includes(store)
+      ? [...baseStores, store]
+      : baseStores;
+  const scale = useRatingScale();
   // Choix digital/physique : uniquement pour une console « physique-capable »
   // (ni PC/mobile/cloud, ni let's play).
   const showFormat =
@@ -720,9 +742,12 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                     </button>
                   </div>
 
-                  <div className="rating-block">
-                    <span className="rating-block-label">Ma note</span>
+                  {/* En étoiles, « Ma note » est rendu PAR le composant, pour que
+                      la note chiffrée se pose sur la même ligne, à droite. */}
+                  <div className={`rating-block ${scale === SCALE_STARS ? "star-mode" : ""}`}>
+                    {scale !== SCALE_STARS && <span className="rating-block-label">Ma note</span>}
                     <RatingInput
+                      heading={scale === SCALE_STARS ? "Ma note" : undefined}
                       value={rating}
                       active={hasRating}
                       onEnable={() => {
@@ -1032,8 +1057,17 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                   <div className="time-ttb-row">
                     <div className="time-col">
                       <label className="field-label">Temps de jeu</label>
-                      <div className={`input-group ${Number(playtime) >= MAX_HOURS ? "maxed" : ""}`}>
-                        <Clock size={17} className="input-icon" />
+                      <div className={`input-group hours-group ${Number(playtime) >= MAX_HOURS ? "maxed" : ""}`}>
+                        <button
+                          type="button"
+                          className="hour-step clickable"
+                          onClick={() => bumpPlaytime(-1)}
+                          disabled={!Number(playtime)}
+                          aria-label="Retirer une heure"
+                        >
+                          <Minus size={15} />
+                        </button>
+                        <Clock size={16} className="input-icon" />
                         {/* On BORNE au lieu de refuser la frappe (comme sur
                             mobile) : un champ qui ignore une touche a l'air
                             cassé ; ici le nombre se pose sur le plafond, et la
@@ -1051,6 +1085,30 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
                           }}
                         />
                         <span className="input-suffix">h</span>
+                        <button
+                          type="button"
+                          className="hour-step clickable"
+                          onClick={() => bumpPlaytime(1)}
+                          disabled={Number(playtime) >= MAX_HOURS}
+                          aria-label="Ajouter une heure"
+                        >
+                          <Plus size={15} />
+                        </button>
+                      </div>
+                      {/* Les pas de la feuille mobile (HoursSheet) : on compte
+                          en heures pleines, en deux clics, sans clavier. */}
+                      <div className="hour-steps">
+                        {HOUR_STEPS.map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            className="hour-chip clickable"
+                            onClick={() => bumpPlaytime(n)}
+                            disabled={Number(playtime) >= MAX_HOURS}
+                          >
+                            +{n} h
+                          </button>
+                        ))}
                       </div>
                     </div>
                     <div className="ttb-col">
@@ -1332,7 +1390,6 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
       {dateSheet === "start" && (
         <DatePickerModal
           title="Commencé le"
-          subtitle={game.name}
           value={startedAt}
           rows={startRows}
           anchor={release}
@@ -1346,11 +1403,6 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
       {dateSheet === "end" && (
         <DatePickerModal
           title="Terminé le"
-          subtitle={
-            startedAt
-              ? `Commencé le ${dateLabel(new Date(`${startedAt}T12:00:00`))}`
-              : game.name
-          }
           value={finishedAt}
           rows={endRows}
           anchor={startedAt ? new Date(`${startedAt}T12:00:00`) : release}

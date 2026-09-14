@@ -89,10 +89,15 @@ export const STREAMS = ["youtube", "twitch", "kick"];
 
 // Toujours proposés sur une plateforme dématérialisée, quel que soit ce
 // qu'IGDB connaît du jeu : ils ne viennent pas du catalogue (voir plus haut).
-const ALWAYS = ["gamepass", "unofficial"];
+//
+// ⚠️ LE GAME PASS N'EN FAIT PLUS PARTIE. Proposé partout, il s'affichait sous
+// Clannad, qui n'y a jamais été. Il passe désormais par le filtre comme les
+// boutiques : le serveur le signale quand IGDB lie le jeu au Game Pass
+// (source 54, cf. STORE_SOURCES dans routes/games.js).
+const ALWAYS = ["unofficial"];
 
 const BY_PLATFORM = [
-  [/windows|pc|linux|mac/i, ["steam", "gog", "epic", "itch"]],
+  [/windows|pc|linux|mac/i, ["steam", "gog", "epic", "itch", "gamepass"]],
   [/android/i, ["googleplay"]],
   [/ios|iphone|ipad/i, ["appstore"]],
 ];

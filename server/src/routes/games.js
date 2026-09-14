@@ -32,6 +32,7 @@ import OstRename from "../models/OstRename.js";
 import VnCache from "../models/VnCache.js";
 import SwitchPatchCache from "../models/SwitchPatchCache.js";
 import GameEvent from "../models/GameEvent.js";
+import GameHype from "../models/GameHype.js";
 import List from "../models/List.js";
 import { fetchHltbTimes } from "../lib/hltb.js";
 import { buildGameFeed, fetchSteamReviews } from "../lib/feed.js";
@@ -701,18 +702,20 @@ const windowCache = createTtlCache({
 //   « Q4 2026 »      → trimestre    « 2026 »     → année seulement
 // Sans ligne correspondante (IGDB ne renvoie pas toujours le détail), on reste
 // prudent : « day », le comportement d'avant.
+function humanPrecision(human) {
+  if (!human) return "day";
+  if (/^\d{4}$/.test(human)) return "year";
+  if (/^Q[1-4]\s+\d{4}$/i.test(human)) return "quarter";
+  if (/^[A-Za-z]{3,}\s+\d{4}$/.test(human)) return "month";
+  return "day";
+}
+
 function precisionOf(g) {
   const ts = g.first_release_date || null;
   if (!ts) return { precision: null, releaseHuman: null };
   const row = (g.release_dates || []).find((r) => r?.date === ts);
   const human = row?.human || null;
-  let precision = "day";
-  if (human) {
-    if (/^\d{4}$/.test(human)) precision = "year";
-    else if (/^Q[1-4]\s+\d{4}$/i.test(human)) precision = "quarter";
-    else if (/^[A-Za-z]{3,}\s+\d{4}$/.test(human)) precision = "month";
-  }
-  return { precision, releaseHuman: human };
+  return { precision: humanPrecision(human), releaseHuman: human };
 }
 
 router.get("/releases", optionalAuth, async (req, res) => {
@@ -736,10 +739,17 @@ router.get("/releases", optionalAuth, async (req, res) => {
       if (hit !== undefined) return res.json({ games: hit });
     }
 
+    // `undated=1` (liste d'ids seulement) : les jeux SANS date reviennent aussi.
+    // Un jeu annoncé sans fenêtre de sortie n'est pas sorti pour autant — et
+    // c'est précisément ce que l'accueil doit savoir pour ne pas proposer d'y
+    // jouer ce soir.
+    const withUndated = ids.length > 0 && req.query.undated === "1";
     const where = [
       "cover != null",
       "version_parent = null",
-      `first_release_date >= ${from}`,
+      withUndated
+        ? `(first_release_date >= ${from} | first_release_date = null)`
+        : `first_release_date >= ${from}`,
     ];
 
     if (ids.length) {
@@ -1685,6 +1695,9 @@ const STORE_SOURCES = {
   26: "epic",
   30: "itch",
   36: "playstation",
+  // « Xbox Game Pass Ultimate Cloud » chez IGDB : la seule trace fiable qu'un
+  // jeu est au catalogue du Game Pass. Sans elle, on ne le propose plus.
+  54: "gamepass",
 };
 
 const STORE_URLS = [
@@ -2325,6 +2338,11 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
         abbr: p.abbreviation || p.name,
       })),
       releaseDate: g.first_release_date || null,
+      // ⚠️ « 31 DÉCEMBRE 2028 » VEUT SOUVENT DIRE « 2028 ». La fiche affichait
+      // la date d'IGDB au jour près alors que les jeux attendus du profil,
+      // eux, savaient qu'elle n'était qu'une année (cf. precisionOf) : deux
+      // écrans, deux réponses. La précision voyage désormais avec la fiche.
+      releasePrecision: precisionOf(g).precision,
       year: g.first_release_date
         ? new Date(g.first_release_date * 1000).getFullYear()
         : null,
@@ -3224,6 +3242,86 @@ async function announcementOf(gameId, releaseDate) {
   };
 }
 
+// --- La hype -----------------------------------------------------------------
+// Sur un jeu pas encore sorti, chacun dit de 0 à 100 à quel point il l'attend,
+// et voit à quel point les autres l'attendent. À côté de notre moyenne, le
+// nombre de joueurs qui suivent le jeu sur IGDB (`hypes`) : la seule mesure de
+// l'attente à l'échelle du monde, là où la nôtre est celle de la communauté.
+//
+// ⚠️ `hypes` N'EST PAS DANS `CORE_FIELDS`, et c'est voulu : l'y ajouter
+// obligerait à bumper `VERSIONS.core`, c'est-à-dire à reposer toutes les fiches
+// en cache à IGDB. Une requête d'un champ, gardée six heures, fait l'affaire.
+const igdbHypesCache = createTtlCache({
+  name: "games:igdb-hypes",
+  max: 2000,
+  ttl: 6 * 60 * 60 * 1000,
+});
+
+async function igdbHypesOf(gameId) {
+  if (isLocalId(gameId)) return 0;
+  const hit = igdbHypesCache.get(gameId);
+  if (hit !== undefined) return hit;
+  const rows = await igdbQuery("games", `fields hypes; where id = ${gameId};`).catch(() => null);
+  if (!rows) return 0; // IGDB en panne : on ne garde pas le zéro en cache
+  const n = rows[0]?.hypes || 0;
+  igdbHypesCache.set(gameId, n);
+  return n;
+}
+
+async function hypePayload(gameId, userId) {
+  const [agg, mine, followers] = await Promise.all([
+    GameHype.aggregate([
+      { $match: { gameId } },
+      { $group: { _id: null, avg: { $avg: "$level" }, count: { $sum: 1 } } },
+    ]),
+    userId ? GameHype.findOne({ user: userId, gameId }).select("level").lean() : null,
+    igdbHypesOf(gameId),
+  ]);
+  return {
+    mine: mine ? mine.level : null,
+    average: agg[0] ? Math.round(agg[0].avg) : null,
+    count: agg[0]?.count || 0,
+    followers,
+  };
+}
+
+router.get("/:id/hype", optionalAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+    res.json(await hypePayload(id, req.userId || null));
+  } catch (err) {
+    console.error("game hype error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement de la hype." });
+  }
+});
+
+// PUT { level: 0..100 } pose ma hype ; { level: null } la retire.
+router.put("/:id/hype", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+    const raw = req.body?.level;
+    if (raw === null) {
+      await GameHype.deleteOne({ user: req.userId, gameId: id });
+    } else {
+      const level = Math.round(Number(raw));
+      if (!Number.isFinite(level) || level < 0 || level > 100) {
+        return res.status(400).json({ error: "Niveau de hype invalide." });
+      }
+      await GameHype.updateOne(
+        { user: req.userId, gameId: id },
+        { $set: { level } },
+        { upsert: true }
+      );
+    }
+    res.json(await hypePayload(id, req.userId));
+  } catch (err) {
+    console.error("game hype save error:", err.message);
+    res.status(500).json({ error: "Erreur lors de l'enregistrement de la hype." });
+  }
+});
+
 router.get("/:id/releases", optionalAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -3250,6 +3348,7 @@ router.get("/:id/releases", optionalAuth, async (req, res) => {
           abbr: platformName.get(r.platform)?.abbr || null,
           date: r.date,
           human: r.human || null,
+          precision: humanPrecision(r.human),
           region: REGIONS_FR[r.region] || null,
           status: RELEASE_STATUS_FR[r.status] || null,
         });
@@ -3305,6 +3404,7 @@ router.get("/:id/releases", optionalAuth, async (req, res) => {
     res.json({
       name: g.name,
       releaseDate: g.first_release_date || null,
+      precision: precisionOf(g).precision,
       type: GAME_TYPES_FR[g.game_type]?.label || null,
       announced,
       platforms,
