@@ -48,7 +48,8 @@ COPY . .
 # Le dossier des uploads est monté en volume (voir docker-compose.yml).
 # On le crée quand même pour que multer ait sa cible au 1er démarrage.
 # Idem pour le cache audio des OST (routes/audio.js).
-RUN mkdir -p uploads/covers uploads/avatars uploads/comments uploads/reposts cache/audio
+# Et les logos rognés (lib/gameLogo.js).
+RUN mkdir -p uploads/covers uploads/avatars uploads/comments uploads/reposts cache/audio cache/logos
 
 ENV NODE_ENV=production
 EXPOSE 4000

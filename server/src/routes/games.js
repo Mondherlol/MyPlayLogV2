@@ -57,6 +57,7 @@ import {
   hasUnknownWords,
   suggestTitles,
 } from "../lib/gameSpell.js";
+import { logoPath, trimmedLogo } from "../lib/gameLogo.js";
 import {
   gameBundleContents,
   gameCharacters,
@@ -1157,6 +1158,20 @@ const isScenery = (a) =>
 // n'en ont pas : un fond de fiche barré du titre fait doublon avec le titre.
 const withLogoLast = (a, b) => (a.artwork_type === 3 ? 1 : 0) - (b.artwork_type === 3 ? 1 : 0);
 
+// GET /api/games/logo/:appid — le logo Steam du jeu, ROGNÉ au plus près du
+// dessin (cf. lib/gameLogo). Public : c'est une image, que l'app charge sans
+// jeton. Gardé longtemps par le client : un logo ne change pas.
+router.get("/logo/:appid", async (req, res) => {
+  try {
+    const png = await trimmedLogo(req.params.appid);
+    if (!png) return res.status(404).end();
+    res.set("Cache-Control", "public, max-age=2592000, immutable");
+    res.type("png").send(png);
+  } catch {
+    res.status(404).end();
+  }
+});
+
 router.get("/backdrops", optionalAuth, async (req, res) => {
   try {
     const ids = [...new Set(parseIds(req.query.ids))].slice(0, MAX_BACKDROPS);
@@ -1193,9 +1208,9 @@ router.get("/backdrops", optionalAuth, async (req, res) => {
       const appid = (g.external_games || []).find(
         (x) => x.external_game_source === 1 && /^\d+$/.test(String(x.uid || ""))
       )?.uid;
-      logos[g.id] = appid
-        ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/logo.png`
-        : null;
+      // Le chemin du logo ROGNÉ, relatif à l'API : le client le complète avec
+      // l'adresse du serveur qu'il connaît (cf. lib/gameBackdrops côté app).
+      logos[g.id] = appid ? logoPath(appid) : null;
     }
     // Les jeux sans image répondent `null` : le client saura qu'il a demandé
     // et n'y reviendra pas à chaque affichage.
