@@ -1168,7 +1168,8 @@ router.get("/backdrops", optionalAuth, async (req, res) => {
         ? await igdbQuery(
             "games",
             `fields artworks.image_id,artworks.width,artworks.height,artworks.artwork_type,` +
-              `artworks.alpha_channel,screenshots.image_id,screenshots.width,screenshots.height; ` +
+              `artworks.alpha_channel,screenshots.image_id,screenshots.width,screenshots.height,` +
+              `external_games.external_game_source,external_games.uid; ` +
               `where id = (${remote.join(",")}); limit ${remote.length};`
           )
         : []),
@@ -1177,6 +1178,10 @@ router.get("/backdrops", optionalAuth, async (req, res) => {
 
     const byArea = (a, b) => (b.width || 0) * (b.height || 0) - (a.width || 0) * (a.height || 0);
     const backdrops = {};
+    // Le logo détouré du jeu, quand il est sur Steam : la même adresse que la
+    // fiche (déduite de l'appid). Les grandes cartes de l'accueil l'écrivent à
+    // la place du titre. Pas d'appid, pas de logo : le client écrit le nom.
+    const logos = {};
     for (const g of rows) {
       const best =
         [...(g.artworks || [])]
@@ -1185,12 +1190,21 @@ router.get("/backdrops", optionalAuth, async (req, res) => {
         [...(g.screenshots || [])].filter((s) => s.image_id).sort(byArea)[0];
       // `t_720p` : ces images habillent une vignette, jamais un plein écran.
       backdrops[g.id] = best ? igdbImg("t_720p", best.image_id) : null;
+      const appid = (g.external_games || []).find(
+        (x) => x.external_game_source === 1 && /^\d+$/.test(String(x.uid || ""))
+      )?.uid;
+      logos[g.id] = appid
+        ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/logo.png`
+        : null;
     }
     // Les jeux sans image répondent `null` : le client saura qu'il a demandé
     // et n'y reviendra pas à chaque affichage.
-    for (const id of ids) if (backdrops[id] === undefined) backdrops[id] = null;
+    for (const id of ids) {
+      if (backdrops[id] === undefined) backdrops[id] = null;
+      if (logos[id] === undefined) logos[id] = null;
+    }
 
-    res.json({ backdrops });
+    res.json({ backdrops, logos });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   }
