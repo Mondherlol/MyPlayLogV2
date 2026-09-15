@@ -16,6 +16,7 @@ import GameTracker from "../models/GameTracker.js";
 import Notification from "../models/Notification.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { ensureGameMeta } from "../lib/gameMeta.js";
+import { isLocalId } from "../lib/localGame.js";
 import { ensureEntityLogos } from "../lib/entityLogos.js";
 import { ensurePlatformImages } from "../lib/platformImages.js";
 import { setServiceNpsso, getServiceStatus, clearServiceTokens } from "../lib/psn.js";
@@ -110,6 +111,74 @@ const ASIDE_WIDGETS = new Set([
   "review",
   "wanted",
 ]);
+
+// ======================================================================
+//  Les métadonnées IGDB d'une bibliothèque, gardées en mémoire
+// ======================================================================
+// ⚠️ LE PROFIL INTERROGEAIT IGDB À CHAQUE OUVERTURE. Genres, plateformes, modes,
+// thèmes et date de sortie de toute la bibliothèque, demandés en direct derrière
+// la file d'attente d'IGDB (cf. lib/igdb) : une bonne part du temps de réponse
+// d'un profil, pour des données qui ne bougent presque jamais. On les garde ici
+// par jeu pendant douze heures, et on ne demande que ceux qu'on n'a pas.
+const PROFILE_META_TTL = 12 * 3600 * 1000;
+const PROFILE_META_MAX = 50000;
+const PROFILE_META_CHUNK = 500;
+// gameId -> { at, genres, platforms, game_modes, themes, first_release_date }
+const profileMeta = new Map();
+
+async function libraryIgdbMeta(ids) {
+  const now = Date.now();
+  const out = new Map();
+  const missing = [];
+  for (const id of ids) {
+    const hit = profileMeta.get(id);
+    if (hit && now - hit.at < PROFILE_META_TTL) out.set(id, hit);
+    else missing.push(id);
+  }
+
+  for (let i = 0; i < missing.length; i += PROFILE_META_CHUNK) {
+    const chunk = missing.slice(i, i + PROFILE_META_CHUNK);
+    let raw;
+    try {
+      raw = await igdbQuery(
+        "games",
+        `fields genres,platforms,game_modes,themes,first_release_date; where id = (${chunk.join(",")}); limit ${chunk.length};`
+      );
+    } catch (err) {
+      // IGDB en panne : ce qu'on avait en mémoire sert quand même, le reste
+      // repartira à la prochaine visite.
+      console.error("profile igdb enrich error:", err.message);
+      continue;
+    }
+    const found = new Set();
+    for (const g of raw || []) {
+      const meta = {
+        at: now,
+        genres: g.genres || [],
+        platforms: g.platforms || [],
+        game_modes: g.game_modes || [],
+        themes: g.themes || [],
+        first_release_date: g.first_release_date || null,
+      };
+      profileMeta.delete(g.id);
+      profileMeta.set(g.id, meta);
+      out.set(g.id, meta);
+      found.add(g.id);
+    }
+    // Un jeu qu'IGDB ne rend pas est retenu vide : sans ça, il repartirait
+    // chez IGDB à chaque visite du profil.
+    for (const id of chunk) {
+      if (!found.has(id)) profileMeta.set(id, { at: now });
+    }
+  }
+
+  // Les plus anciennes entrées sortent quand le dépôt déborde.
+  for (const key of profileMeta.keys()) {
+    if (profileMeta.size <= PROFILE_META_MAX) break;
+    profileMeta.delete(key);
+  }
+  return out;
+}
 
 function entryCard(e) {
   return {
@@ -2319,7 +2388,9 @@ router.get("/:username", optionalAuth, async (req, res) => {
 
     const [entries, followers, listQuery, recoCount, videoCount, achievementsCount, trackerDocs, badgeCount] =
       await Promise.all([
-        UserGame.find({ user: user._id }).sort({ updatedAt: -1 }),
+        // `lean` : des objets simples plutôt que des documents Mongoose. Le
+        // profil ne fait que les lire, et hydrater des centaines d'entrées coûtait.
+        UserGame.find({ user: user._id }).sort({ updatedAt: -1 }).lean(),
         User.countDocuments({ following: user._id }),
         List.find(
           isMe
@@ -2378,12 +2449,11 @@ router.get("/:username", optionalAuth, async (req, res) => {
     // indisponible, on renvoie simplement des tableaux vides.
     if (library.length) {
       try {
-        const ids = [...new Set(library.map((e) => e.gameId))].slice(0, 500);
-        const raw = await igdbQuery(
-          "games",
-          `fields genres,platforms,game_modes,themes,first_release_date; where id = (${ids.join(",")}); limit 500;`
-        );
-        const meta = new Map(raw.map((g) => [g.id, g]));
+        // Les fiches locales (ajoutées par lien Steam) n'existent pas chez IGDB,
+        // et un seul identifiant négatif fait échouer la requête entière (cf.
+        // lib/gameMeta) : toute la bibliothèque perdait alors ses filtres.
+        const ids = [...new Set(library.map((e) => e.gameId))].filter((id) => !isLocalId(id));
+        const meta = await libraryIgdbMeta(ids);
         for (const e of library) {
           const g = meta.get(e.gameId) || {};
           e.genres = g.genres || [];
