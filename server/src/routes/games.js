@@ -1093,6 +1093,30 @@ router.get("/yt-durations", optionalAuth, async (req, res) => {
 // image derrière un titre.
 const MAX_BACKDROPS = 40;
 
+// ⚠️ UN « ARTWORK » IGDB N'EST PAS FORCÉMENT UNE ILLUSTRATION. Le même tableau
+// range les logos du jeu (blanc, noir, couleur — souvent sur fond transparent),
+// ses icônes, des infographies et d'autres jaquettes. Trié par taille, un logo
+// de 5 000 px passait devant tout le reste : il ouvrait le rail « Images » et
+// finissait même en fond de fiche. `artwork_type` les nomme (cf. l'endpoint
+// `artwork_types`) ; `alpha_channel` rattrape les logos mal classés.
+const NOT_SCENERY = new Set([
+  5, // logo blanc
+  6, // logo noir
+  7, // logo couleur
+  8, // infographie
+  9, // jaquette alternative
+  10, // jaquette historique
+  11, // jaquette carrée
+  12, // icône
+  13, // logo historique
+  14, // icône historique
+]);
+const isScenery = (a) =>
+  !!a?.image_id && !NOT_SCENERY.has(a.artwork_type) && a.alpha_channel !== true;
+// Le key art AVEC logo reste une illustration, mais passe après celles qui
+// n'en ont pas : un fond de fiche barré du titre fait doublon avec le titre.
+const withLogoLast = (a, b) => (a.artwork_type === 3 ? 1 : 0) - (b.artwork_type === 3 ? 1 : 0);
+
 router.get("/backdrops", optionalAuth, async (req, res) => {
   try {
     const ids = [...new Set(parseIds(req.query.ids))].slice(0, MAX_BACKDROPS);
@@ -1103,8 +1127,9 @@ router.get("/backdrops", optionalAuth, async (req, res) => {
       ...(remote.length
         ? await igdbQuery(
             "games",
-            `fields artworks.image_id,artworks.width,artworks.height,screenshots.image_id,` +
-              `screenshots.width,screenshots.height; where id = (${remote.join(",")}); limit ${remote.length};`
+            `fields artworks.image_id,artworks.width,artworks.height,artworks.artwork_type,` +
+              `artworks.alpha_channel,screenshots.image_id,screenshots.width,screenshots.height; ` +
+              `where id = (${remote.join(",")}); limit ${remote.length};`
           )
         : []),
       ...(await localRows(ids)),
@@ -1114,7 +1139,9 @@ router.get("/backdrops", optionalAuth, async (req, res) => {
     const backdrops = {};
     for (const g of rows) {
       const best =
-        [...(g.artworks || [])].filter((a) => a.image_id).sort(byArea)[0] ||
+        [...(g.artworks || [])]
+          .filter(isScenery)
+          .sort((a, b) => withLogoLast(a, b) || byArea(a, b))[0] ||
         [...(g.screenshots || [])].filter((s) => s.image_id).sort(byArea)[0];
       // `t_720p` : ces images habillent une vignette, jamais un plein écran.
       backdrops[g.id] = best ? igdbImg("t_720p", best.image_id) : null;
@@ -2166,7 +2193,11 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
     const imgFull = (imgId) => igdbImg("t_1080p", imgId);
     const imgThumb = (imgId) => igdbImg("t_screenshot_med", imgId);
     const byArea = (a, b) => (b.width || 0) * (b.height || 0) - (a.width || 0) * (a.height || 0);
-    const artworks = (g.artworks || []).filter((a) => a.image_id).sort(byArea);
+    // Sans les logos ni les icônes (cf. `isScenery`) : ni dans les images, ni
+    // en fond de page.
+    const artworks = (g.artworks || [])
+      .filter(isScenery)
+      .sort((a, b) => withLogoLast(a, b) || byArea(a, b));
     const screenshots = (g.screenshots || []).filter((s) => s.image_id).sort(byArea);
 
     const toMedia = (type) => (a) => ({

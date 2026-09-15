@@ -169,6 +169,11 @@ export const CORE_FIELDS = [
   "artworks.image_id",
   "artworks.width",
   "artworks.height",
+  // La nature de l'artwork (logo, icône, illustration…) et sa transparence :
+  // c'est ce qui permet d'écarter les logos des images et du fond de la fiche
+  // (cf. `isScenery` dans routes/games.js).
+  "artworks.artwork_type",
+  "artworks.alpha_channel",
   "screenshots.image_id",
   "screenshots.width",
   "screenshots.height",
@@ -242,7 +247,7 @@ export const REL_SUBFIELDS = [
 
 // Bumper une de ces versions invalide le morceau correspondant, partout.
 const VERSIONS = {
-  core: 3, // v3 : websites.category renommé en websites.type
+  core: 4, // v4 : artworks.artwork_type + alpha_channel (écarter les logos)
   chars: 3, // v3 : `akas` demandés, pour fusionner les doublons de langue
   ttb: 1,
   bundle: 1,
