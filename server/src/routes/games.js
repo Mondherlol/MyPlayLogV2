@@ -51,7 +51,12 @@ import { ensureGameScores } from "../lib/gameScores.js";
 import { createTtlCache } from "../lib/ttlCache.js";
 // « Vouliez-vous dire… » : IGDB ne tolère aucune faute de frappe, c'est donc
 // nous qui rattrapons (cf. lib/gameSpell.js).
-import { suggestTitles } from "../lib/gameSpell.js";
+import {
+  accentVariants,
+  correctQuery,
+  hasUnknownWords,
+  suggestTitles,
+} from "../lib/gameSpell.js";
 import {
   gameBundleContents,
   gameCharacters,
@@ -533,8 +538,18 @@ function buildQuery(opts) {
         // restreindre (on a déjà désigné un seul jeu au quatrième mot).
         .slice(0, 8)
     : [];
-  for (const w of words)
-    where.push(`(name ~ *"${w}"* | alternative_names.name ~ *"${w}"*)`);
+  // ⚠️ LES ACCENTS, DANS LES DEUX SENS. IGDB compare les lettres telles
+  // quelles (vérifié) : « détective conan » ne trouvait pas « Detective
+  // Conan », et « okami » ne trouve pas « Ōkami ». Chaque mot part donc sous
+  // trois formes au plus : tel quel, sans ses accents, et avec ceux que les
+  // titres du lexique lui donnent (cf. `accentVariants`).
+  for (const w of words) {
+    const bare = w.normalize("NFD").replace(/[̀-ͯ]/g, "");
+    const forms = [...new Set([w, bare, ...accentVariants(bare)])].slice(0, 5);
+    where.push(
+      `(${forms.map((f) => `name ~ *"${f}"* | alternative_names.name ~ *"${f}"*`).join(" | ")})`
+    );
+  }
 
   for (const f of filters) {
     const c = clause(f.field, f.ids, f.mode);
@@ -635,17 +650,35 @@ router.get("/", requireAuth, async (req, res) => {
     // On CLÉ SUR LES PARAMÈTRES, pas sur la requête Apicalypse : celle-ci
     // contient l'instant présent (pour « déjà sorti »), donc elle change à
     // chaque seconde et ne collerait jamais deux fois.
-    const key = JSON.stringify([search, sort, dir, limit, offset, typeIds, filters, release]);
     // Une frappe de recherche vieillit vite (un jeu vient d'être ajouté chez
     // IGDB), une page de catalogue beaucoup moins.
-    const games = await searchCache.remember(
-      key,
-      async () => {
-        const query = buildQuery({ search, sort, dir, limit, offset, filters, typeIds, release });
-        return (await igdbQuery("games", query)).map(mapGame);
-      },
-      search ? SEARCH_TTL : BROWSE_TTL
-    );
+    const fetchGames = (s) =>
+      searchCache.remember(
+        JSON.stringify([s, sort, dir, limit, offset, typeIds, filters, release]),
+        async () => {
+          const query = buildQuery({ search: s, sort, dir, limit, offset, filters, typeIds, release });
+          return (await igdbQuery("games", query)).map(mapGame);
+        },
+        s ? SEARCH_TTL : BROWSE_TTL
+      );
+    let games = await fetchGames(search);
+
+    // ZÉRO RÉSULTAT ET UN MOT MAL ÉCRIT : on cherche la version corrigée TOUT
+    // DE SUITE, au lieu de rendre une page vide avec une proposition. Comme
+    // un moteur de recherche : « higurshi » montre Higurashi, et l'app dit
+    // qu'elle a corrigé (`corrected`). Seulement en page 1 — les pages
+    // suivantes, l'app les demande directement avec le terme corrigé.
+    let corrected = null;
+    if (search && !games.length && page === 1) {
+      const fix = correctQuery(search);
+      if (fix) {
+        const again = await fetchGames(fix);
+        if (again.length) {
+          games = again;
+          corrected = fix;
+        }
+      }
+    }
 
     // ⚠️ LES FICHES STEAM LOCALES NE SONT PAS DANS LA RECHERCHE, ET C'EST VOULU.
     // Elles l'ont été, et c'était pénible : un jeu ajouté par lien remontait en
@@ -657,8 +690,14 @@ router.get("/", requireAuth, async (req, res) => {
     // IGDB cherche au caractère près et n'a rien à proposer, alors on cherche
     // le titre le plus proche dans notre lexique. On ne remplace RIEN — on
     // joint la proposition à une réponse vide, et l'app en fait ce qu'elle veut.
+    //
+    // ⚠️ SEULEMENT SI UN MOT EST INCONNU. « mario » filtré sur une console sans
+    // Mario rend zéro jeu, et on proposait « Mari0 » : le mot était bon, c'est
+    // le filtre qui vidait la liste. Là, il n'y a rien à corriger.
     const suggestions =
-      search && !games.length && page === 1 ? suggestTitles(search, 3) : [];
+      search && !games.length && page === 1 && hasUnknownWords(search)
+        ? suggestTitles(search, 3)
+        : [];
 
     res.json({
       page,
@@ -666,6 +705,7 @@ router.get("/", requireAuth, async (req, res) => {
       count: games.length,
       hasMore: games.length === limit,
       games,
+      corrected,
       suggestion: suggestions[0] || null,
       suggestions,
     });

@@ -91,7 +91,45 @@ function load() {
     names.forEach(([name], i) => add(name, i, true));
     for (const [alt, i] of raw.alts || []) add(alt, i, false);
 
-    lexicon = { names, entries, exact };
+    // Le VOCABULAIRE : chaque mot des titres et de leurs variantes, avec la
+    // popularité du jeu le plus connu qui le porte. C'est lui qui corrige mot
+    // par mot (cf. `correctQuery`) — et qui sait dire qu'un mot tapé EXISTE.
+    const words = new Map();
+    const addWords = (text, nameIndex) => {
+      const pop = names[nameIndex]?.[1] || 0;
+      for (const w of normalizeTitle(text).split(" ")) {
+        if (w && (words.get(w) ?? -1) < pop) words.set(w, pop);
+      }
+    };
+    names.forEach(([name], i) => addWords(name, i));
+    for (const [alt, i] of raw.alts || []) addWords(alt, i);
+    // Rangés par longueur : une faute ne déplace la longueur que de une ou deux
+    // lettres, inutile de comparer le reste du vocabulaire.
+    const wordsByLen = new Map();
+    for (const [w, pop] of words) {
+      if (!wordsByLen.has(w.length)) wordsByLen.set(w.length, []);
+      wordsByLen.get(w.length).push([w, pop]);
+    }
+
+    // Les ACCENTS des titres, retrouvés depuis le mot écrit à plat : « okami »
+    // → « ōkami », « pokemon » → « pokémon ». IGDB compare les lettres telles
+    // quelles (vérifié : `name ~ *"okami"*` ne trouve pas « Ōkami ») — il faut
+    // donc lui envoyer le mot avec les accents que les titres lui donnent.
+    const accents = new Map();
+    const addAccents = (text) => {
+      for (const piece of String(text || "").toLowerCase().split(/[^\p{L}\p{N}]+/u)) {
+        if (!piece) continue;
+        const flat = normalizeTitle(piece);
+        if (!flat || flat === piece || flat.includes(" ")) continue;
+        if (!accents.has(flat)) accents.set(flat, new Set());
+        const forms = accents.get(flat);
+        if (forms.size < 3) forms.add(piece);
+      }
+    };
+    names.forEach(([name]) => addAccents(name));
+    for (const [alt] of raw.alts || []) addAccents(alt);
+
+    lexicon = { names, entries, exact, words, wordsByLen, accents };
     console.log(
       `[gameSpell] lexique chargé : ${names.length} titres, ${entries.length} écritures (${raw.builtAt || "?"})`
     );
@@ -230,7 +268,87 @@ export function suggestTitles(query, count = 1) {
   return top.slice(0, count);
 }
 
+/** Les écritures accentuées qu'ont les titres pour ce mot (« okami » → ["ōkami"]). */
+export function accentVariants(word) {
+  const lex = load();
+  if (!lex) return [];
+  return [...(lex.accents.get(normalizeTitle(word)) || [])];
+}
+
 /** Le meilleur candidat, ou null. */
 export function suggestTitle(query) {
   return suggestTitles(query, 1)[0] || null;
+}
+
+// ======================================================================
+//  La correction MOT PAR MOT
+// ======================================================================
+//
+// ⚠️ `suggestTitles` COMPARE À DES TITRES ENTIERS, ET ÇA NE SUFFIT PAS. Il
+// rattrape « mincrft » parce que « Minecraft » est un titre à lui seul. Mais
+// « higurshi » ne ressemble à AUCUN titre : ils s'appellent tous « Higurashi
+// When They Cry… », à quinze lettres de là. Personne ne tape un titre entier —
+// on tape un mot, et c'est ce mot qu'il faut corriger.
+//
+// On corrige donc chaque mot inconnu vers le mot le plus proche du vocabulaire
+// des titres (à distance égale, celui du jeu le plus connu). Les mots CONNUS
+// ne sont jamais touchés : « mario » reste « mario », même si la recherche ne
+// rend rien — c'est alors un filtre qui vide la liste, pas une faute.
+
+const WORD_MIN = 4;
+const wordTolerance = (len) => (len < 7 ? 1 : 2);
+const isNumber = (w) => /^\d+$/.test(w);
+const wordCache = createTtlCache({ name: "games:spell-words", max: 2000, ttl: 60 * 60 * 1000 });
+
+function closestWord(lex, w) {
+  const hit = wordCache.get(w);
+  if (hit !== undefined) return hit;
+  const max = wordTolerance(w.length);
+  let best = null;
+  for (let len = w.length - max; len <= w.length + max; len++) {
+    for (const [cand, pop] of lex.wordsByLen.get(len) || []) {
+      const d = distance(w, cand, max);
+      if (d > max) continue;
+      if (!best || d < best.d || (d === best.d && pop > best.pop)) best = { w: cand, d, pop };
+    }
+  }
+  const out = best?.w || "";
+  wordCache.set(w, out);
+  return out;
+}
+
+/**
+ * La recherche tapée, corrigée mot par mot — ou null si rien n'a changé.
+ * « higurshi » → « higurashi », « zeldda breth » → « zelda breath ».
+ */
+export function correctQuery(query) {
+  const lex = load();
+  if (!lex) return null;
+  let changed = false;
+  const out = normalizeTitle(query)
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => {
+      if (w.length < WORD_MIN || isNumber(w) || lex.words.has(w)) return w;
+      const fix = closestWord(lex, w);
+      if (!fix) return w;
+      changed = true;
+      return fix;
+    });
+  return changed ? out.join(" ") : null;
+}
+
+/**
+ * Un des mots tapés est-il inconnu de tous les titres ?
+ *
+ * C'est la condition pour proposer quoi que ce soit. « mario » sur une console
+ * où Mario n'a jamais mis les pieds rend zéro jeu — et proposait « Mari0 »,
+ * alors que le mot était juste : c'était le filtre, pas la frappe.
+ */
+export function hasUnknownWords(query) {
+  const lex = load();
+  if (!lex) return false;
+  return normalizeTitle(query)
+    .split(" ")
+    .some((w) => w.length >= WORD_MIN && !isNumber(w) && !lex.words.has(w));
 }
