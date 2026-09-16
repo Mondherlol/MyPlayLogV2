@@ -186,6 +186,10 @@ function mapGame(g) {
     year: g.first_release_date
       ? new Date(g.first_release_date * 1000).getFullYear()
       : null,
+    // La date complète, pour la vue liste de l'Explorateur. SEULEMENT si elle
+    // existe : côté mobile, `releaseDate: null` veut dire « annoncé sans date »
+    // (cf. lib/release), et tous les vieux jeux non datés passeraient à venir.
+    ...(g.first_release_date ? { releaseDate: g.first_release_date } : {}),
     genres: (g.genres || []).map((x) => x.name),
     platforms: (g.platforms || [])
       .map((p) => p.abbreviation || p.name)
