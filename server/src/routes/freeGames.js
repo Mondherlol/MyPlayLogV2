@@ -1,5 +1,5 @@
 import express from "express";
-import { getFreeGames, getFreeGameForIgdbId } from "../lib/freeGames.js";
+import { getLiveFreeGames, getFreeGameForIgdbId } from "../lib/freeGames.js";
 
 // Jeux gratuits à récupérer cette semaine (Epic / Steam / GOG / Prime…),
 // agrégés depuis GamerPower et mis en cache (voir lib/freeGames.js).
@@ -8,7 +8,7 @@ const router = express.Router();
 // GET /api/free-games — liste des giveaways de jeux en cours.
 router.get("/", async (_req, res) => {
   try {
-    const games = await getFreeGames();
+    const games = await getLiveFreeGames();
     res.json({ games });
   } catch (err) {
     console.error("free-games error:", err.message);

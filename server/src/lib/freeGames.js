@@ -69,6 +69,20 @@ function parseEnd(endDate) {
   return Number.isNaN(t) ? null : new Date(t).toISOString();
 }
 
+// ⚠️ SEULEMENT LES VRAIES BOUTIQUES. GamerPower liste aussi Stove, IndieGala et
+// d'autres portails obscurs (« Primal Slideee Deluxe » sur Stove), souvent
+// sans date de fin et laissés « Active » des semaines après la fin réelle.
+const MAJOR = new Set(["epic", "steam", "gog", "ubisoft", "ea", "battlenet", "prime", "itchio"]);
+// Une offre sans échéance publiée il y a plus longtemps que ça est morte en
+// pratique (clés épuisées), même si GamerPower ne l'a pas fermée.
+const NO_END_MAX_AGE = 21 * 24 * 60 * 60 * 1000;
+
+function isLive(g, now = Date.now()) {
+  if (!MAJOR.has(g.store.slug)) return false;
+  if (g.endsAt) return Date.parse(g.endsAt) > now;
+  return !!g.publishedAt && now - g.publishedAt < NO_END_MAX_AGE;
+}
+
 function normalize(g) {
   const store = pickStore(g.platforms);
   return {
@@ -80,6 +94,7 @@ function normalize(g) {
     url: g.open_giveaway_url || g.gamerpower_url || null,
     endsAt: parseEnd(g.end_date),
     users: g.users || 0,
+    publishedAt: Date.parse(String(g.published_date || "").replace(" ", "T") + "Z") || 0,
     // Renseignés par attachIgdb() (null si le titre n'a pas été reconnu).
     gameId: null,
     cover: null,
@@ -122,6 +137,7 @@ export async function getFreeGames() {
   const games = (Array.isArray(raw) ? raw : [])
     .filter((g) => g && g.status === "Active" && (g.open_giveaway_url || g.gamerpower_url))
     .map(normalize)
+    .filter((g) => isLive(g))
     .sort((a, b) => {
       // Les offres qui expirent bientôt d'abord (l'esprit « de la semaine »),
       // puis les offres sans échéance triées par popularité.
@@ -130,12 +146,20 @@ export async function getFreeGames() {
       if (b.endsAt) return 1;
       return b.users - a.users;
     })
-    .slice(0, 12);
+    .slice(0, 16);
 
   await attachIgdb(games);
 
-  cache = { at: Date.now(), games };
-  return games;
+  // Une carte doit ouvrir la fiche du jeu : sans fiche IGDB, pas de carte.
+  const matched = games.filter((g) => g.gameId).slice(0, 12);
+
+  cache = { at: Date.now(), games: matched };
+  return matched;
+}
+
+// Le cache vit une heure : une offre peut expirer entre-temps.
+export async function getLiveFreeGames() {
+  return (await getFreeGames()).filter((g) => isLive(g));
 }
 
 // Le giveaway en cours pour un jeu IGDB donné (null si ce jeu n'est pas
