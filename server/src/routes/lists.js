@@ -7,6 +7,7 @@ import multer from "multer";
 import List from "../models/List.js";
 import Activity from "../models/Activity.js";
 import User from "../models/User.js";
+import UserGame from "../models/UserGame.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { notify } from "../lib/notify.js";
 import {
@@ -329,7 +330,28 @@ function toFull(l, userId) {
 // ?author=<userId> pour les listes d'UN joueur (publiques sauf si c'est moi).
 router.get("/", optionalAuth, async (req, res) => {
   try {
-    const scope = req.query.scope;
+    let scope = req.query.scope;
+    // « De tes abonnements » et « Pour toi » (sections de découverte de l'app) :
+    // tous deux demandent un compte. Sans lui — ou sans abonnement, sans
+    // bibliothèque — ils retombent sur le fil habituel plutôt que sur du vide.
+    let followingIds = null;
+    let forYouIds = null;
+    if (scope === "following" && req.userId) {
+      const me = await User.findById(req.userId).select("following").lean();
+      followingIds = me?.following || [];
+    }
+    if (scope === "foryou" && req.userId) {
+      const games = await UserGame.find({ user: req.userId })
+        .sort({ rating: -1, updatedAt: -1 })
+        .limit(300)
+        .select("gameId")
+        .lean();
+      forYouIds = games.map((g) => String(g.gameId));
+      if (!forYouIds.length) forYouIds = null;
+    }
+    if ((scope === "following" && !followingIds) || (scope === "foryou" && !forYouIds)) {
+      scope = scope === "foryou" ? "" : "none";
+    }
     const author =
       req.query.author && mongoose.isValidObjectId(req.query.author)
         ? req.query.author
@@ -341,6 +363,21 @@ router.get("/", optionalAuth, async (req, res) => {
             ? {}
             : { visibility: "public" }),
         }
+      : scope === "none"
+        ? { _id: null }
+      : followingIds
+        ? { visibility: "public", user: { $in: followingIds } }
+      : forYouIds
+        ? // Des listes de joueurs qui partagent des jeux avec ma bibliothèque :
+          // ni les miennes, ni les listes éditées par le site.
+          {
+            visibility: "public",
+            user: { $ne: req.userId },
+            itemKind: "game",
+            official: null,
+            event: null,
+            "items.refId": { $in: forYouIds },
+          }
       : scope === "mine"
         ? { user: req.userId }
         : scope === "events"
@@ -362,7 +399,8 @@ router.get("/", optionalAuth, async (req, res) => {
     // Les tops officiels ont leur onglet : dans le fil « Découvrir », leurs
     // dizaines de listes publiées d'un coup noieraient celles des joueurs. Ils
     // y reviennent dès qu'on cherche quelque chose ou qu'on filtre par tag.
-    if (!scope && !author && !search && !tag) filter["official.kind"] = { $ne: "top" };
+    if (!scope && !author && !search && !tag && !req.query.group)
+      filter["official.kind"] = { $ne: "top" };
     if (search) {
       const rx = new RegExp(escapeRx(search), "i");
       filter.$and = [{ $or: [{ title: rx }, { description: rx }, { tags: rx }] }];
@@ -373,6 +411,11 @@ router.get("/", optionalAuth, async (req, res) => {
     // centaines de Ko à chaque ouverture du site. Sans `limit`, rien ne change
     // pour la page Listes.
     const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 200));
+    // ⚠️ UN TRI QUI SE FAIT APRÈS COUP DOIT VOIR TOUT LE MONDE. Les « j'aime »
+    // et le recoupement « pour toi » se comptent en mémoire : plafonner la
+    // requête d'abord, c'était ranger les douze plus récentes, pas trouver
+    // les douze plus aimées.
+    const late = req.query.sort === "likes" || !!forYouIds;
     const lists = await List.find(filter)
       .populate("user", "username avatar isSystem")
       // Les événements se rangent par date de diffusion (la dernière
@@ -385,9 +428,22 @@ router.get("/", optionalAuth, async (req, res) => {
               { "official.order": 1 }
             : { updatedAt: -1 }
       )
-      .limit(limit)
+      .limit(late ? 200 : limit)
       .lean();
     let cards = lists.map((l) => toCard(l, req.userId));
+    if (forYouIds) {
+      const owned = new Set(forYouIds);
+      const overlap = new Map(
+        lists.map((l) => [
+          String(l._id),
+          (l.items || []).filter((i) => owned.has(String(i.refId))).length,
+        ])
+      );
+      cards = cards
+        .map((c) => ({ c, n: overlap.get(String(c.id)) || 0 }))
+        .sort((a, b) => b.n - a.n || b.c.likeCount - a.c.likeCount)
+        .map((x) => x.c);
+    }
 
     // Les listes d'UN auteur suivent le rangement de sa vitrine (User.listOrder,
     // réglé depuis son profil). Celles qu'il n'a pas rangées — les dernières
@@ -407,7 +463,7 @@ router.get("/", optionalAuth, async (req, res) => {
     if (req.query.sort === "likes") {
       cards = cards.sort((a, b) => b.likeCount - a.likeCount);
     }
-    res.json({ lists: cards });
+    res.json({ lists: late ? cards.slice(0, limit) : cards });
   } catch (err) {
     console.error("lists feed error:", err.message);
     res.status(500).json({ error: "Erreur lors du chargement des listes." });
