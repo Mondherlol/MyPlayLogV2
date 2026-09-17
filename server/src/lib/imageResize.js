@@ -10,8 +10,8 @@ import ffmpegStatic from "ffmpeg-static";
 // bannière d'un profil mettait plusieurs secondes à apparaître — pour être
 // affichée sur 400 px de large.
 //
-// On passe par FFMPEG plutôt que par `sharp` : il est DÉJÀ là (lib/audio.js et
-// lib/videoEdit.js s'en servent), il tourne aussi bien en Docker alpine qu'en
+// On passe par FFMPEG plutôt que par `sharp` : il est DÉJÀ là (lib/audioConvert.js
+// et lib/videoEdit.js s'en servent), il tourne aussi bien en Docker alpine qu'en
 // local, et ajouter une dépendance native au build pour redimensionner trois
 // images serait disproportionné.
 //

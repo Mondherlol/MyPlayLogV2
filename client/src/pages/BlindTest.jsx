@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { usePlayer } from "../context/PlayerContext";
-import { apiFetch, API_BASE } from "../lib/api";
+import { apiFetch } from "../lib/api";
 import { useLiveStatus } from "../lib/presence";
 import { loadYT } from "../lib/youtube";
 // Règles communes aux mini-jeux « devine le jeu » (partagées avec Pixel Rush) :
@@ -65,38 +65,13 @@ const AUTO_NEXT_MS = 5000;
 const GRACE_MS = 10000;
 
 // ============================================================
-//  D'OÙ SORT LE SON — et pourquoi il ne sort plus de l'iframe
+//  D'OÙ SORT LE SON
 // ============================================================
-// L'extrait passait par une iframe YouTube cachée. Sur téléphone, il ne
-// démarrait pas : il fallait appuyer sur Pause puis Play pour l'entendre.
-//
-// La cause : une iframe d'un AUTRE domaine n'a pas le droit de lancer du son
-// toute seule. Elle ne peut le faire que dans la foulée d'un geste de
-// l'utilisateur, et cette autorisation ne dure que quelques secondes. Or entre
-// le clic sur « Lancer la partie » et le vrai `playVideo()`, il se passe le
-// temps de créer la partie côté serveur PUIS celui de charger la vidéo : bien
-// plus que le délai accordé. L'autorisation avait expiré. Appuyer sur Pause /
-// Play remarchait pour cette exacte raison — le `playVideo()` tombait alors
-// juste après un clic.
-//
-// On lit donc l'extrait avec une balise <audio> de NOTRE page, sur le flux m4a
-// que le serveur extrait déjà (/api/audio/:videoId, celui du mini-lecteur et de
-// l'appli mobile). Une balise de la page, elle, garde l'autorisation acquise au
-// premier clic. Bonus : le placement au climax est à la milliseconde (plus de
-// sondage de `getDuration()`), et l'extrait suivant est préchargé pendant que
-// le précédent joue.
-//
-// L'IFRAME RESTE, EN SECOURS. L'extraction dépend de yt-dlp, que YouTube casse
-// régulièrement (cf. l'en-tête de server/src/routes/audio.js) : si le flux ne
-// vient pas, on rebascule sur l'ancien chemin plutôt que de jouer une manche
-// muette. Sur PC il n'a de toute façon jamais posé de problème.
-const CLIP_FALLBACK_MS = 7000;
-
-// Joué en muet dans le geste de lancement : sur iOS, une balise <audio> qui a
-// joué une fois pendant un clic accepte ensuite les lectures programmées.
-// (Même technique que context/PlayerContext.jsx.)
-const SILENT_WAV =
-  "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+// D'une iframe YouTube cachée, propre à la page. Une iframe d'un AUTRE domaine
+// n'a pas le droit de lancer du son toute seule : elle ne peut le faire que
+// dans la foulée d'un geste de l'utilisateur. Elle peut en revanche toujours
+// jouer MUETTE — on charge donc la vidéo en sourdine, on se cale au climax dès
+// que la durée est connue, puis on démasque le son.
 
 // Où poser l'aiguille dans le morceau pour cet extrait.
 function clipStartFor(round, duration) {
@@ -179,13 +154,6 @@ export default function BlindTest() {
   const loadingRef = useRef(false); // miroir de clipLoading pour le timer de manche
   const graceRef = useRef(false); // l'extrait est fini, on est dans le temps bonus
 
-  // --- Les deux moteurs de son (cf. l'en-tête « D'OÙ SORT LE SON ») ---
-  const audioRef = useRef(null); // <audio> sur le flux extrait : le principal
-  const engineRef = useRef("audio"); // "audio" | "yt"
-  const pendingRef = useRef(null); // manche dont on attend les métadonnées
-  const fallbackRef = useRef(null); // minuteur de bascule vers l'iframe
-  const unlockedRef = useRef(false); // déverrouillage iOS déjà fait
-
   // --- Player YouTube caché, propre à la page (indépendant du mini-lecteur) ---
   const ytHostRef = useRef(null);
   const ytRef = useRef(null);
@@ -221,7 +189,6 @@ export default function BlindTest() {
     return () => {
       destroyed = true;
       if (pollRef.current) clearInterval(pollRef.current);
-      clearTimeout(fallbackRef.current);
       clearTimeout(replayStopRef.current);
       try {
         ytRef.current?.destroy();
@@ -235,16 +202,9 @@ export default function BlindTest() {
   }, []);
 
   const stopClip = useCallback(() => {
-    pendingRef.current = null;
-    clearTimeout(fallbackRef.current);
     if (pollRef.current) {
       clearInterval(pollRef.current);
       pollRef.current = null;
-    }
-    try {
-      audioRef.current?.pause();
-    } catch {
-      /* ignore */
     }
     try {
       ytRef.current?.pauseVideo?.();
@@ -256,19 +216,19 @@ export default function BlindTest() {
   // Le son tourne pour de bon : c'est LÀ que la manche commence (le chrono est
   // gelé pendant le chargement, sinon il descendrait sur du silence).
   const clipRolling = useCallback(() => {
-    clearTimeout(fallbackRef.current);
     if (!lockedRef.current && !pausedRef.current) roundStartRef.current = Date.now();
     loadingRef.current = false;
     setClipLoading(false);
   }, []);
 
-  // --- Moteur de secours : l'iframe YouTube (voir l'en-tête) ---------------
   // Démarre muet, sonde la durée, se cale au climax puis démasque le son.
-  const playClipYT = useCallback(
+  const playClip = useCallback(
     (round) => {
+      loadingRef.current = true;
+      setClipLoading(true);
+      clipLenRef.current = round.durationSec || 15;
       const p = ytRef.current;
-      if (!p) return clipRolling(); // rien à jouer : la manche continue en silence
-      engineRef.current = "yt";
+      if (!p || !round.videoId) return clipRolling(); // rien à jouer : la manche continue en silence
       seekDoneRef.current = false;
       try {
         p.loadVideoById(round.videoId);
@@ -314,80 +274,10 @@ export default function BlindTest() {
     [clipRolling]
   );
 
-  // --- Moteur principal : le flux extrait, dans une balise de la page ------
-  const playClip = useCallback(
-    (round) => {
-      loadingRef.current = true;
-      setClipLoading(true);
-      clipLenRef.current = round.durationSec || 15;
-      clearTimeout(fallbackRef.current);
-      const a = audioRef.current;
-      if (!a || !round.videoId) return playClipYT(round);
-
-      engineRef.current = "audio";
-      pendingRef.current = round;
-      try {
-        ytRef.current?.pauseVideo?.();
-      } catch {
-        /* ignore */
-      }
-      a.src = `${API_BASE}/audio/${round.videoId}`;
-      a.load();
-      // Le serveur doit peut-être extraire la piste (quelques secondes). Passé
-      // ce délai, on n'attend plus : l'iframe prend le relais.
-      fallbackRef.current = setTimeout(() => {
-        if (pendingRef.current !== round) return;
-        pendingRef.current = null;
-        playClipYT(round);
-      }, CLIP_FALLBACK_MS);
-    },
-    [playClipYT]
-  );
-
-  // Départ du son dès que la durée du morceau est connue : on pose l'aiguille
-  // au climax et on lance. Un refus de lecture ou un flux introuvable renvoie
-  // sur l'iframe — jamais de manche muette sans avoir tout essayé.
-  useEffect(() => {
-    const a = audioRef.current;
-    if (!a) return undefined;
-
-    const onMeta = () => {
-      const round = pendingRef.current;
-      if (!round || engineRef.current !== "audio") return;
-      const dur = a.duration;
-      if (!isFinite(dur) || dur <= 0) return;
-      pendingRef.current = null;
-      clipStartRef.current = clipStartFor(round, dur);
-      try {
-        a.currentTime = clipStartRef.current;
-      } catch {
-        /* ignore */
-      }
-      a.muted = mutedRef.current;
-      a.volume = volumeRef.current / 100;
-      if (pausedRef.current) return clipRolling();
-      a.play().then(clipRolling, () => playClipYT(round));
-    };
-    const onErr = () => {
-      const round = pendingRef.current;
-      if (!round) return;
-      pendingRef.current = null;
-      playClipYT(round);
-    };
-
-    a.addEventListener("loadedmetadata", onMeta);
-    a.addEventListener("error", onErr);
-    return () => {
-      a.removeEventListener("loadedmetadata", onMeta);
-      a.removeEventListener("error", onErr);
-    };
-  }, [clipRolling, playClipYT]);
-
-  // Applique le mute aux deux moteurs + aux bruitages.
+  // Applique le mute au lecteur + aux bruitages.
   useEffect(() => {
     mutedRef.current = muted;
     sfx.setMuted(muted);
-    if (audioRef.current) audioRef.current.muted = muted;
     try {
       if (muted) ytRef.current?.mute?.();
       else if (readyRef.current) {
@@ -399,13 +289,12 @@ export default function BlindTest() {
     }
   }, [muted, sfx]);
 
-  // Applique le volume aux deux moteurs + aux bruitages, et le retient pour la
+  // Applique le volume au lecteur + aux bruitages, et le retient pour la
   // prochaine session.
   useEffect(() => {
     volumeRef.current = volume;
     localStorage.setItem("bt_volume", String(volume));
     sfx.setLevel(volume / 100);
-    if (audioRef.current) audioRef.current.volume = volume / 100;
     try {
       ytRef.current?.setVolume?.(volume);
     } catch {
@@ -445,7 +334,6 @@ export default function BlindTest() {
     if (next) {
       pauseStartRef.current = Date.now();
       try {
-        audioRef.current?.pause();
         ytRef.current?.pauseVideo?.();
       } catch {
         /* ignore */
@@ -455,8 +343,7 @@ export default function BlindTest() {
       // Pas de reprise du son si l'extrait était déjà terminé (temps bonus).
       if (!graceRef.current) {
         try {
-          if (engineRef.current === "audio") audioRef.current?.play()?.catch(() => {});
-          else ytRef.current?.playVideo?.();
+          ytRef.current?.playVideo?.();
         } catch {
           /* ignore */
         }
@@ -471,11 +358,9 @@ export default function BlindTest() {
     replayRef.current = next;
     setReplayOn(next);
     clearTimeout(replayStopRef.current);
-    const a = audioRef.current;
     const p = ytRef.current;
     try {
       if (!next) {
-        a?.pause();
         p?.pauseVideo?.();
         return;
       }
@@ -485,19 +370,11 @@ export default function BlindTest() {
         replayRef.current = false;
         setReplayOn(false);
         try {
-          a?.pause();
           p?.pauseVideo?.();
         } catch {
           /* ignore */
         }
       }, clipLenRef.current * 1000);
-      if (engineRef.current === "audio" && a) {
-        a.currentTime = clipStartRef.current || 0;
-        a.muted = mutedRef.current;
-        a.volume = volumeRef.current / 100;
-        a.play().catch(() => {});
-        return;
-      }
       p?.seekTo?.(clipStartRef.current || 0, true);
       if (!mutedRef.current) {
         p?.unMute?.();
@@ -567,30 +444,9 @@ export default function BlindTest() {
     }
   }
 
-  // À appeler DANS un geste utilisateur : sur iOS, une balise <audio> qui a
-  // joué une fois pendant un clic accepte ensuite les lectures programmées.
-  const unlockAudio = useCallback(() => {
-    const a = audioRef.current;
-    if (!a || unlockedRef.current) return;
-    unlockedRef.current = true;
-    a.muted = true;
-    a.src = SILENT_WAV;
-    a.play()
-      .catch(() => {})
-      .finally(() => {
-        try {
-          a.pause();
-          a.muted = mutedRef.current;
-        } catch {
-          /* ignore */
-        }
-      });
-  }, []);
-
   // --- Démarrage d'une partie ---
   async function startGame() {
     sfx.resume(); // crée/réveille l'AudioContext dans le geste utilisateur
-    unlockAudio(); // …et déverrouille la balise <audio> dans le même geste
     player?.pause?.(); // coupe le mini-lecteur global (ex. OST des résultats)
     setError("");
     setPhase("loading");
@@ -672,12 +528,6 @@ export default function BlindTest() {
     setTimeLeftMs(total);
     playClip(round);
     sfx.play("start");
-    // Pendant qu'on cherche, le serveur prépare déjà la piste suivante : elle
-    // partira sans temps de chargement (l'extraction est le seul moment lent).
-    const nextRound = rounds[idx + 1];
-    if (nextRound?.videoId) {
-      fetch(`${API_BASE}/audio/${nextRound.videoId}/prefetch`).catch(() => {});
-    }
     // Focus le champ de recherche pour taper tout de suite.
     setTimeout(() => inputRef.current?.focus(), 60);
 
@@ -970,9 +820,7 @@ export default function BlindTest() {
   // ============================================================
   return (
     <div className="bt-page">
-      {/* Le moteur principal : une balise de NOTRE page (cf. « D'OÙ SORT LE
-          SON »). `playsInline` pour qu'iOS ne réquisitionne pas l'écran. */}
-      <audio ref={audioRef} preload="auto" playsInline style={{ display: "none" }} />
+      {/* Hôte de l'iframe YouTube cachée (cf. « D'OÙ SORT LE SON »). */}
       <div ref={ytHostRef} style={{ position: "fixed", left: -9999, top: -9999 }} />
 
       <header className="bt-topbar">

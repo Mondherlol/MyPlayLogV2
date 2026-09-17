@@ -6,7 +6,7 @@ import UserGame from "../models/UserGame.js";
 import User from "../models/User.js";
 import CustomOst from "../models/CustomOst.js";
 import { ensureScraped } from "../lib/ostScrape.js";
-import { climaxFor, warmClimax } from "../lib/ostClimax.js";
+import { climaxFor } from "../lib/ostClimax.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { requireAuth } from "../middleware/auth.js";
 import { recordActivity } from "../lib/activity.js";
@@ -420,13 +420,8 @@ async function buildRounds(userId, count) {
 
   // --- Recaler chaque extrait sur le climax du morceau ---
   // Une seule requête, une fois les manches arrêtées : on ne connaît les
-  // videoId qu'ici. Ce qui n'a pas encore été analysé garde l'estimation posée
-  // par mkRound (35–55 %) et part en analyse EN TÂCHE DE FOND — la partie en
-  // cours n'en profite pas, les suivantes oui.
-  //
-  // Le rattrapage converge vite parce que le tirage est borné au top 3 des
-  // morceaux les plus écoutés de chaque jeu : l'ensemble des pistes atteignables
-  // est petit et stable, contrairement aux 200 pistes d'une playlist complète.
+  // videoId qu'ici. Ce qui n'a jamais été analysé garde l'estimation posée par
+  // mkRound (35–55 %).
   try {
     const ids = rounds.map((r) => r.videoId).filter(Boolean);
     const climax = await climaxFor(ids);
@@ -437,7 +432,6 @@ async function buildRounds(userId, count) {
         r.climaxed = true;
       }
     }
-    warmClimax(ids, CLIP_SEC);
   } catch (err) {
     // Le climax est un confort : une partie se joue très bien sans.
     console.error("blindtest climax error:", err.message);
@@ -482,9 +476,6 @@ async function buildRounds(userId, count) {
 // Pas de pondération par le temps de jeu, en revanche : elle n'aurait de sens
 // que rapportée à un joueur.
 const VERSUS_FOREIGN_SHARE = 0.25;
-// Doit rester en phase avec CLIP_SEC de routes/blindtestVersus.js : c'est la
-// fenêtre sur laquelle on cherche le climax des pistes du versus.
-const VERSUS_CLIP_SEC = 35;
 // Part des manches « bibliothèque » réservée aux jeux que TOUT LE MONDE a
 // joués, quand la table en a en réserve. Le reste part au tirage à plat.
 const VERSUS_EVERYONE_SHARE = 0.3;
@@ -603,9 +594,6 @@ export async function buildVersusRounds(userIds, count) {
         r.climaxed = true;
       }
     }
-    // La fenêtre du versus est plus longue que celle du solo (voir CLIP_SEC
-    // dans routes/blindtestVersus.js) : le climax se cherche sur la bonne.
-    warmClimax(out.map((r) => r.videoId).filter(Boolean), VERSUS_CLIP_SEC);
   } catch {
     /* le climax est un confort */
   }

@@ -14,20 +14,6 @@ services:
     networks:
       - myplaylog
 
-  # Générateur de « preuve d'origine » (PO token) pour yt-dlp. Depuis l'IP d'un
-  # datacenter, YouTube répond « Sign in to confirm you're not a bot » à une
-  # requête sur deux — c'est ce qui cassait la lecture des OST. Ce service
-  # fabrique le jeton qu'un vrai navigateur produirait, sans compte Google ni
-  # cookie à entretenir. Il ne parle qu'au serveur, sur le réseau interne.
-  potoken:
-    image: brainicism/bgutil-ytdlp-pot-provider
-    restart: unless-stopped
-    # Le conteneur lance un runtime JS : sans init, ses processus fils zombies
-    # s'accumulent (c'est la recommandation de l'image elle-même).
-    init: true
-    networks:
-      - myplaylog
-
   server:
     build:
       context: ./server
@@ -39,14 +25,12 @@ services:
       MONGODB_URI: mongodb://mongo:27017/myplaylog
       CLIENT_ORIGIN: https://myplaylog.cc
       PORT: 4000
-      # Adresse du générateur de PO token (cf. le service `potoken` ci-dessus).
-      # 4416 est le port par défaut de l'image.
-      POT_PROVIDER_URL: http://potoken:4416
     volumes:
       # Les images uploadées (covers, avatars, reposts…) persistent hors conteneur.
       - uploads_data:/app/uploads
-      # Cache des flux audio extraits (OST) : survit aux redéploiements pour ne
-      # pas re-télécharger les pistes déjà écoutées.
+      # Caches régénérables (logos rognés, lib/gameLogo.js) : survivent aux
+      # redéploiements. Le volume garde son ancien nom (il servait au cache audio
+      # des OST) pour ne pas repartir d'un cache vide.
       - audio_cache:/app/cache
       # Le .env de l'hôte est monté dans le conteneur → l'onglet Secrets du panel
       # Admin peut le LIRE et l'ÉCRIRE (les modifs persistent sur l'hôte).
@@ -55,7 +39,6 @@ services:
       - ./server/.env:/app/.env
     depends_on:
       - mongo
-      - potoken
     networks:
       - myplaylog
 

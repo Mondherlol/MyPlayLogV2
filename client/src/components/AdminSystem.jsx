@@ -11,7 +11,6 @@ import {
   Image as ImageIcon,
   Loader2,
   MemoryStick,
-  Music2,
   RefreshCw,
   Users,
 } from "lucide-react";
@@ -129,7 +128,7 @@ export default function SystemPanel({ token }) {
     );
   }
 
-  const { disk, memory, cpu, host, process: proc, db, uploads, audioCache, users } = data;
+  const { disk, memory, cpu, host, process: proc, db, uploads, users } = data;
 
   const diskPct = disk ? (disk.used / disk.total) * 100 : null;
   const memPct = memory ? (memory.used / memory.total) * 100 : null;
@@ -225,12 +224,11 @@ export default function SystemPanel({ token }) {
           <div className="admin-card-titles">
             <h2>Fichiers de l'app</h2>
             <p>
-              Tout ce que les utilisateurs ont uploadé (dossier <code>uploads/</code>) et le
-              cache audio des OST.
+              Tout ce que les utilisateurs ont uploadé (dossier <code>uploads/</code>).
             </p>
           </div>
           <span className="psn-status on">
-            {fmtBytes((uploads?.bytes || 0) + (audioCache?.bytes || 0))}
+            {fmtBytes(uploads?.bytes || 0)}
           </span>
         </div>
 
@@ -254,22 +252,6 @@ export default function SystemPanel({ token }) {
               <strong className="sys-folder-size">{fmtBytes(f.bytes)}</strong>
             </div>
           ))}
-
-          {audioCache && (
-            <div className="sys-folder-row cache">
-              <span className="sys-folder-name">
-                <Music2 size={13} /> Cache audio OST
-              </span>
-              <div className="sys-folder-bar">
-                <Gauge pct={(audioCache.bytes / audioCache.maxBytes) * 100} />
-                <span className="sys-folder-detail">
-                  {audioCache.files} morceau{audioCache.files > 1 ? "x" : ""} · quota{" "}
-                  {fmtBytes(audioCache.maxBytes)} (purge auto au-delà)
-                </span>
-              </div>
-              <strong className="sys-folder-size">{fmtBytes(audioCache.bytes)}</strong>
-            </div>
-          )}
         </div>
       </section>
 

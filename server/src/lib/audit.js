@@ -32,7 +32,6 @@ const SKIP = [
   /^\/api\/missions\/event$/,
   /^\/api\/presence$/,
   /^\/api\/client-errors/,
-  /^\/api\/audio\//,
   // La connexion est journalisée à la main dans routes/auth.js : elle seule
   // sait QUI a tenté d'entrer quand ça échoue (le middleware, lui, ne verrait
   // qu'un 401 anonyme).

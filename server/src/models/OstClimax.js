@@ -20,10 +20,9 @@ import mongoose from "mongoose";
 // c'est le passage le plus plein — orchestration complète, percussions, thème
 // principal — et sur une bande-son de jeu les deux coïncident presque toujours.
 //
-// L'analyse coûte un téléchargement + un décodage complet : elle ne peut donc
-// PAS se faire pendant qu'un joueur attend. Elle tourne en tâche de fond
-// (lib/ostClimax.js) et ce document est son cache — permanent, car le contenu
-// d'un videoId ne change jamais.
+// L'analyse téléchargeait l'audio avec yt-dlp, retiré depuis : plus aucune
+// analyse n'est lancée. Les résultats déjà en base restent lus par le blind
+// test (lib/ostClimax.js) — le contenu d'un videoId ne change jamais.
 const ostClimaxSchema = new mongoose.Schema(
   {
     videoId: { type: String, required: true, unique: true, index: true },

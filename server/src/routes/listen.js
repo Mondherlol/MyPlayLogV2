@@ -29,7 +29,7 @@ import {
 //
 // ------------------------------------------------- ce que le serveur transporte
 // PAS UN OCTET D'AUDIO. Chaque auditeur lit la piste de son côté (c'est la
-// même vidéo YouTube, ou le même flux extrait par /api/audio) ; le serveur ne
+// même vidéo YouTube) ; le serveur ne
 // fait circuler qu'un repère : « piste X, position Y, ça joue ». C'est ce qui
 // rend la chose gratuite à l'échelle — contrairement à la diffusion GBA, où
 // l'hôte paie un flux vidéo par spectateur.

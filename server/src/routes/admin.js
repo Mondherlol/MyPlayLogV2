@@ -612,7 +612,6 @@ router.post("/users/:id/remove-follower", async (req, res) => {
 // ======================================================================
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOADS_DIR = path.join(__dirname, "../../uploads");
-const AUDIO_CACHE_DIR = path.join(__dirname, "../../cache/audio");
 
 const VIDEO_EXT = new Set([".mp4", ".mov", ".webm", ".mkv", ".avi", ".m4v"]);
 
@@ -713,30 +712,6 @@ async function scanUploads() {
   return { folders, perUser };
 }
 
-// Cache audio des OST (m4a extraits par yt-dlp) + son quota.
-async function scanAudioCache() {
-  const out = {
-    files: 0,
-    bytes: 0,
-    maxBytes: Number(process.env.AUDIO_CACHE_MAX_MB || 500) * 1024 * 1024,
-  };
-  try {
-    for (const name of await fsp.readdir(AUDIO_CACHE_DIR)) {
-      try {
-        const st = await fsp.stat(path.join(AUDIO_CACHE_DIR, name));
-        if (!st.isFile()) continue;
-        out.files += 1;
-        out.bytes += st.size;
-      } catch {
-        continue;
-      }
-    }
-  } catch {
-    /* dossier absent */
-  }
-  return out;
-}
-
 // Stats MongoDB : totaux + les collections les plus lourdes.
 async function readDbStats() {
   const db = mongoose.connection.db;
@@ -782,10 +757,9 @@ async function readDbStats() {
 
 router.get("/system", async (req, res) => {
   try {
-    const [disk, uploads, audioCache, db] = await Promise.all([
+    const [disk, uploads, db] = await Promise.all([
       readDisk(),
       scanUploads(),
-      scanAudioCache(),
       readDbStats().catch(() => null),
     ]);
 
@@ -835,7 +809,6 @@ router.get("/system", async (req, res) => {
         bytes: uploads.folders.reduce((n, f) => n + f.bytes, 0),
         folders: uploads.folders,
       },
-      audioCache,
       users,
     });
   } catch (err) {

@@ -28,7 +28,7 @@ import mongoose from "mongoose";
 // nulle part avant la révélation.
 //
 // Ce chemin repose sur yt-dlp, et depuis l'IP d'un datacenter YouTube le bloque
-// en permanence (cf. l'en-tête de routes/audio.js). En prod, toute piste absente
+// en permanence (route retirée depuis, avec yt-dlp). En prod, toute piste absente
 // du cache disque renvoyait 502 et la manche partait MUETTE — pendant que le
 // solo, sur la même piste, retombait sur l'iframe et jouait très bien. Un mode
 // inviolable et silencieux ne vaut pas un mode jouable : le `videoId` part
