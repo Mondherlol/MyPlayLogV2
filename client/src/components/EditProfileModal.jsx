@@ -9,6 +9,22 @@ import EmojiPanel from "./EmojiPanel";
 
 const BIO_MAX = 50;
 
+// Les trois pronoms proposés. Pas de quatrième puce « ne pas dire » : c'est
+// l'état de départ, et on y revient en recliquant celle qu'on avait prise. Une
+// case à cocher pour dire qu'on ne répond pas transforme le silence en
+// déclaration.
+const PRONOUNS = [
+  { value: "il", label: "Il" },
+  { value: "elle", label: "Elle" },
+  { value: "iel", label: "Iel" },
+];
+
+// La phrase d'exemple, accordée comme le fera l'app (cf. server/lib/notify.js
+// et client/components/Topbar). On montre CELLE qu'on est en train de régler
+// plutôt que de l'expliquer.
+const sample = (pronoun) =>
+  `s'est abonné${pronoun === "il" ? "" : pronoun === "elle" ? "e" : "·e"} à toi`;
+
 // Modal d'édition des infos de profil : identifiant (verrouillé), bio (émojis,
 // 50 car.), et alter ego = un personnage de jeu vidéo existant (recherche).
 export default function EditProfileModal({ profile, onSaved, onClose }) {
@@ -16,6 +32,9 @@ export default function EditProfileModal({ profile, onSaved, onClose }) {
   const [bio, setBio] = useState(profile.bio || "");
   const [tagline, setTagline] = useState(profile.tagline || "");
   const [taglineImg, setTaglineImg] = useState(profile.taglineImage || null);
+  // "il" | "elle" | "iel" | null — null étant « je ne le dis pas », qui est le
+  // cas par défaut et une réponse parfaitement valable.
+  const [pronoun, setPronoun] = useState(profile.pronoun || null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -67,7 +86,7 @@ export default function EditProfileModal({ profile, onSaved, onClose }) {
       const { user } = await apiFetch("/users/me", {
         method: "PUT",
         token,
-        body: { bio, tagline, taglineImage: taglineImg },
+        body: { bio, tagline, taglineImage: taglineImg, pronoun },
       });
       updateUser(user);
       onSaved(user);
@@ -128,6 +147,41 @@ export default function EditProfileModal({ profile, onSaved, onClose }) {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* --- Le pronom ---
+              ⚠️ IL NE S'AFFICHE NULLE PART SUR LE PROFIL, et ce n'est pas un
+              oubli. Ce réglage ne sert pas à se présenter, il sert à ce que
+              l'application PARLE JUSTE : « Mael s'est abonnée à toi » plutôt
+              que « s'est abonné ». C'est de la grammaire, pas une étiquette de
+              plus sur une fiche.
+
+              Ne rien choisir est la valeur par défaut et une réponse valable :
+              l'app écrit alors en inclusif, qui n'affirme rien de personne. */}
+          <div className="field">
+            <label>Pronom</label>
+            <div className="ep-pronouns">
+              {PRONOUNS.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  className={`ep-pronoun clickable ${pronoun === p.value ? "on" : ""}`}
+                  aria-pressed={pronoun === p.value}
+                  // Recliquer celui qui est pris le retire : c'est le seul
+                  // geste qui ramène à « je ne le dis pas ».
+                  onClick={() => setPronoun((v) => (v === p.value ? null : p.value))}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <span className="ep-sample">
+              {profile.username} {sample(pronoun)}
+            </span>
+            <span className="ep-help">
+              Sert uniquement à accorder les phrases qui parlent de toi. Sans choix,
+              l'app écrit en inclusif.
+            </span>
           </div>
 
           <div className="field">

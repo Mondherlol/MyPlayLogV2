@@ -111,10 +111,11 @@ export function mainFranchise(g) {
 //     pour TOUT LE LOT d'un coup, et les licences les plus etroites servent en
 //     premier : Wolverine a dix jeux ou puiser, Marvel en a mille -- c'est
 //     Wolverine qui doit choisir d'abord, sinon Marvel lui prend le sien.
-//  3. UNE IMAGE DE COUVERTURE, PAS UNE JAQUETTE. La carte est un PAYSAGE :
-//     une jaquette portrait y etait recadree dans sa largeur, donc reduite a
-//     une bande du milieu. On prend l'artwork du jeu, sa capture a defaut, et
-//     la jaquette seulement s'il n'a rien d'autre.
+// ⚠️ ET C'EST SA JAQUETTE QU'ON REND, PAS SON ARTWORK. On a essaye l'artwork —
+// un paysage pour une carte paysage — et une rangee de decors sans titre ne se
+// reconnait pas d'un coup d'oeil, la ou une jaquette porte le nom et l'identite
+// du jeu. La requete qui allait chercher artworks et captures a donc ete
+// retiree : la jaquette, elle, arrive deja avec les candidats.
 //
 // ATTENTION, LE CACHE PORTE LES CANDIDATS, PAS LE CHOIX. Le choix depend des
 // AUTRES licences presentes sur la fiche (regle 2) : le garder tel quel ferait
@@ -123,7 +124,6 @@ export function mainFranchise(g) {
 // (24 h) et les images d'un jeu (24 h).
 
 const reps = createTtlCache({ name: "igdb:franchise-reps", max: 800, ttl: 24 * 60 * 60 * 1000 });
-const gameArt = createTtlCache({ name: "igdb:game-art", max: 1500, ttl: 24 * 60 * 60 * 1000 });
 
 const REP_FIELDS =
   "fields name,cover.image_id,game_type,total_rating,total_rating_count,franchises,collections";
@@ -224,43 +224,6 @@ function bestFor(f, taken, exclude) {
 }
 
 /**
- * Les images d'un lot de jeux : artwork, capture, jaquette.
- *
- * Une seule requete pour tout le lot, et le resultat se garde par jeu -- deux
- * fiches voisines demandent souvent les memes.
- */
-async function loadArt(ids) {
-  const todo = ids.filter((id) => gameArt.get(`game:${id}`) === undefined);
-  if (!todo.length) return;
-  let rows = [];
-  try {
-    rows =
-      (await igdbQuery(
-        "games",
-        `fields artworks.image_id,screenshots.image_id,cover.image_id;` +
-          ` where id = (${todo.join(",")}); limit ${todo.length};`
-      )) || [];
-  } catch {
-    rows = [];
-  }
-  const found = new Set();
-  for (const row of rows) {
-    found.add(row.id);
-    // L'artwork d'abord : c'est une image DESSINEE pour etre un fond. La
-    // capture ensuite. La jaquette en dernier -- sur une carte paysage, elle
-    // n'est qu'une bande recadree au milieu d'une affiche.
-    const wide = row.artworks?.[0]?.image_id || row.screenshots?.[0]?.image_id || null;
-    gameArt.set(`game:${row.id}`, {
-      art: wide ? `${IMG_BASE}/t_720p/${wide}.jpg` : null,
-      cover: row.cover?.image_id ? `${IMG_BASE}/t_cover_big/${row.cover.image_id}.jpg` : null,
-    });
-  }
-  // Un jeu qui n'a rien rendu ne doit pas etre redemande a chaque ouverture de
-  // la fiche : on retient l'absence aussi.
-  for (const id of todo) if (!found.has(id)) gameArt.set(`game:${id}`, { art: null, cover: null });
-}
-
-/**
  * Pour chaque licence : son image, et combien de jeux elle contient.
  *
  * `list` : ce que rend `franchisesOf`. `exclude` : le jeu d'ou l'on vient -- sa
@@ -287,25 +250,16 @@ export async function decorateFranchises(list, { exclude = null } = {}) {
     }
   }
 
-  await loadArt([...new Set([...picked.values()].map((g) => g.id))]);
-
   // On rend dans l'ordre recu : c'est celui de la pertinence pour CE jeu-la
   // (cf. `franchisesOf`), et l'attribution ci-dessus n'avait rien a y changer.
   return list.map((f) => {
     const slot = reps.get(repKey(f)) || { count: 0 };
     const game = picked.get(repKey(f));
-    const art = game ? gameArt.get(`game:${game.id}`) : null;
     return {
       id: f.id,
       kind: f.kind,
       name: f.name,
-      // ATTENTION, DEUX IMAGES, ET ELLES NE SE REMPLACENT PAS. `art` est le
-      // paysage de la carte ; `cover` reste la jaquette portrait, parce que la
-      // page d'une licence en fait le premier carreau de son mur de jaquettes
-      // -- un paysage y serait le seul cadre de travers.
-      art: art?.art || null,
-      cover:
-        art?.cover || (game?.cover ? `${IMG_BASE}/t_cover_big/${game.cover}.jpg` : null),
+      cover: game?.cover ? `${IMG_BASE}/t_cover_big/${game.cover}.jpg` : null,
       count: slot.count || 0,
     };
   });

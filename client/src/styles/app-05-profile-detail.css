@@ -609,6 +609,54 @@ button.pf-stat:hover {
   color: var(--text-soft);
 }
 
+/* ----------------------------------------------------------------------
+   Le pronom (cf. EditProfileModal)
+   ----------------------------------------------------------------------
+   Trois puces, et aucune de prise au départ. Celle qui est choisie prend
+   l'accent doré, comme partout ailleurs dans l'app : c'est la même
+   grammaire visuelle qu'un filtre actif. */
+.ep-pronouns {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ep-pronoun {
+  flex: 1;
+  padding: 0.5rem 0.7rem;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.ep-pronoun:hover {
+  border-color: var(--border-strong);
+  background: var(--surface);
+}
+
+/* ⚠️ `--accent-mark`, PAS `--accent` : cette dernière n'est définie nulle part
+   dans le thème (elle traîne ailleurs dans la feuille de style, où elle ne
+   peint rien non plus). Une puce choisie qui garde le fond des autres est une
+   puce qu'on croit n'avoir pas cliquée. */
+.ep-pronoun.on {
+  background: var(--accent-mark);
+  border-color: var(--accent-mark);
+  color: #3b2a02;
+}
+
+/* La phrase d'exemple : elle change sous le doigt à chaque choix, ce qui dit
+   mieux que n'importe quelle note ce que ce réglage change. */
+.ep-sample {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.82rem;
+  font-style: italic;
+  color: var(--text-soft);
+}
+
 /* Compteur de caractères de la bio */
 .ep-counter {
   float: right;

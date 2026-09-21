@@ -2494,6 +2494,10 @@ router.get("/:username", optionalAuth, async (req, res) => {
         coverPos: user.coverPos,
         covers: user.effectiveCovers(),
         bio: user.bio,
+        // Il ne s'affiche pas sur le profil : il sert à accorder les phrases
+        // qui parlent de cette personne, et à remplir son propre sélecteur
+        // (cf. EditProfileModal).
+        pronoun: user.pronoun || null,
         tagline: user.tagline,
         taglineImage: user.taglineImage,
         favoriteConsole: publicPick(user.favoriteConsole),
