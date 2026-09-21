@@ -38,6 +38,7 @@ const notificationSchema = new mongoose.Schema(
         "recommendation_boost", // on a fait +1 sur une reco que tu as faite
         "recommendation_comment", // on a commenté une reco (reçue/faite)
         "download_react", // on s'est moqué de ton délit de téléchargement
+        "follow", // quelqu'un s'est abonné à toi
         "follow_request", // (compte privé) quelqu'un demande à s'abonner à toi
         "follow_accepted", // ta demande d'abonnement a été acceptée
         "import_pending", // (système) de nouveaux jeux à valider après une synchro

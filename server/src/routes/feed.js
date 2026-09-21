@@ -42,7 +42,16 @@ import VideoSocial from "../models/VideoSocial.js";
 const router = express.Router();
 
 const person = (u) =>
-  u ? { id: String(u._id), username: u.username, avatar: u.avatar || null } : null;
+  u
+    ? {
+        id: String(u._id),
+        username: u.username,
+        avatar: u.avatar || null,
+        // Le pronom voyage avec la personne : c'est lui qui accorde « s'est
+        // abonne·e » dans la carte du fil (cf. mobile, i18n).
+        pronoun: u.pronoun || null,
+      }
+    : null;
 
 // Un visuel déposé chez nous est stocké en chemin relatif ; ce qui vient
 // d'ailleurs est déjà une URL complète. Même règle que `abs` dans

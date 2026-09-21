@@ -9,7 +9,15 @@ function serialize(n) {
     id: n._id,
     type: n.type,
     actor: n.actor
-      ? { id: n.actor._id, username: n.actor.username, avatar: n.actor.avatar || null }
+      ? {
+          id: n.actor._id,
+          username: n.actor.username,
+          avatar: n.actor.avatar || null,
+          // ATTENTION, IL FAUT AUSSI LE DEMANDER AU `populate` PLUS BAS.
+          // Sans ca le champ est absent de l'objet peuple, et toutes les
+          // phrases retombent silencieusement sur l'inclusif.
+          pronoun: n.actor.pronoun || null,
+        }
       : null,
     listId: n.list?._id || n.list || null,
     listTitle: n.list?.title || null,
@@ -41,7 +49,7 @@ router.get("/", requireAuth, async (req, res) => {
       Notification.find({ user: req.userId })
         .sort({ createdAt: -1 })
         .limit(30)
-        .populate("actor", "username avatar")
+        .populate("actor", "username avatar pronoun")
         .populate("list", "title type")
         .populate("ostOwner", "username")
         .populate("repostOwner", "username")

@@ -33,9 +33,35 @@ const VERBS = {
   recommendation_boost: "a fait +1 sur ta reco de",
   recommendation_comment: "a commenté la reco de",
   download_react: "se moque de ton téléchargement de",
+  follow: "s'est abonné[e] à toi",
   follow_request: "demande à s'abonner à toi",
   follow_accepted: "a accepté ta demande d'abonnement",
 };
+
+// ======================================================================
+//  L'ACCORD EN GENRE
+// ======================================================================
+// Les verbes ci-dessus sont presque tous au passé composé avec « avoir », qui
+// ne s'accorde pas : « a aimé ton commentaire » se dit pareil pour tout le
+// monde, et c'est pour ça que la question ne s'était jamais posée. Mais un
+// verbe pronominal, lui, s'accorde : « s'est abonné », « s'est abonnée ».
+//
+// La convention est la même que dans l'app (cf. mobile, src/i18n) : on écrit
+// la forme masculine suivie du complément féminin entre crochets, et c'est le
+// pronom choisi par la personne qui décide de ce qu'on en fait.
+//
+//   « s'est abonné[e] à toi »  →  il   : s'est abonné à toi
+//                                 elle : s'est abonnée à toi
+//                                 iel  : s'est abonné·e à toi
+//                                 rien : s'est abonné·e à toi
+//
+// ⚠️ SANS PRONOM CHOISI, C'EST L'INCLUSIF — PAS LE MASCULIN. Personne n'a à se
+// déclarer pour se servir de l'application, et un défaut masculin ferait de la
+// non-réponse une réponse.
+function agree(text, pronoun) {
+  const join = pronoun === "il" ? "" : pronoun === "elle" ? "$1" : "·$1";
+  return String(text || "").replace(/\[([^\]]+)\]/g, join);
+}
 
 // Envoi push d'une notification fraîchement créée. Best-effort et sans await
 // chez l'appelant : une notification push lente ne doit jamais retarder
@@ -45,8 +71,9 @@ async function pushNotification({ user, type, actor, gameName, snippet }) {
     const verb = VERBS[type];
     if (!verb) return; // type système : pas d'acteur, pas de phrase à composer
 
-    const who = await User.findById(actor).select("username").lean();
+    const who = await User.findById(actor).select("username pronoun").lean();
     const name = who?.username || "Quelqu'un";
+    const said = agree(verb, who?.pronoun);
 
     // `gameName` porte selon les cas le nom du jeu, de la liste ou du badge :
     // il complète le verbe quand celui-ci attend un complément.
@@ -55,7 +82,7 @@ async function pushNotification({ user, type, actor, gameName, snippet }) {
 
     await pushToUsers([user], {
       title: "MyPlayLog",
-      body: body ? `${name} ${verb}${tail} — ${body}` : `${name} ${verb}${tail}`,
+      body: body ? `${name} ${said}${tail} — ${body}` : `${name} ${said}${tail}`,
       data: { type: "notification" },
     });
   } catch (err) {

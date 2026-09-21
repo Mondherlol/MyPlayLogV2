@@ -90,6 +90,14 @@ const userSchema = new mongoose.Schema(
       default: [],
     },
     bio: { type: String, default: "", maxlength: 300 },
+    // Comment l'app parle de cette personne a la troisieme personne : « il
+    // s'est abonne », « elle s'est abonnee », « iel s'est abonne·e ».
+    //
+    // ATTENTION, `null` EST LA VALEUR PAR DEFAUT, ET CE N'EST PAS UN OUBLI.
+    // Personne n'a a declarer quoi que ce soit pour utiliser l'application :
+    // sans choix, on ecrit en inclusif (« abonne·e »), qui n'affirme rien. Un
+    // defaut masculin aurait fait de la non-reponse une reponse.
+    pronoun: { type: String, enum: ["il", "elle", "iel", null], default: null },
     // "Si j'étais un perso de jeu vidéo, je serais…" : nom d'un personnage
     // existant + son image (pour l'afficher dans le profil).
     tagline: { type: String, default: "", maxlength: 120 },
@@ -528,6 +536,7 @@ userSchema.methods.toPublic = function () {
     coverPos: this.coverPos,
     covers: this.effectiveCovers(),
     bio: this.bio,
+    pronoun: this.pronoun || null,
     tagline: this.tagline,
     taglineImage: this.taglineImage,
     favoriteConsole: publicPick(this.favoriteConsole),
@@ -646,6 +655,9 @@ userSchema.methods.toCard = function () {
     username: this.username,
     avatar: this.avatar,
     bio: this.bio,
+    // Il voyage avec la carte : partout ou une phrase parle de quelqu'un a la
+    // troisieme personne, c'est lui qui decide de l'accord.
+    pronoun: this.pronoun || null,
   };
 };
 

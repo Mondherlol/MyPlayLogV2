@@ -1061,7 +1061,9 @@ function FollowEvent({ item }) {
           </span>
         }
       >
-        s'est abonné à{" "}
+        {/* L'accord suit le pronom choisi par la personne, et vaut l'inclusif
+            quand elle n'en a pas choisi (cf. server/models/User, `pronoun`). */}
+        s'est abonné{item.user?.pronoun === "il" ? "" : item.user?.pronoun === "elle" ? "e" : "·e"} à{" "}
         <Link to={`/u/${t.username}`} className="hf-game-link clickable">
           {t.username}
         </Link>

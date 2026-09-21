@@ -84,29 +84,68 @@ export function mainFranchise(g) {
 }
 
 // ======================================================================
-//  Les jaquettes des licences
+//  L'image d'une licence : QUEL JEU la represente
 // ======================================================================
-// Une licence IGDB n'a PAS d'image à elle : c'est une étiquette, un nom et un
-// identifiant. Pour en faire une carte qu'on a envie de toucher, on lui
-// emprunte la jaquette de son jeu le mieux noté — celui auquel on pense quand
-// on entend le nom de la série.
+// Une licence IGDB n'a PAS d'image a elle : c'est une etiquette, un nom et un
+// identifiant. Pour en faire une carte qu'on a envie de toucher, elle emprunte
+// l'image d'un de ses jeux. Reste a savoir LEQUEL -- et la reponse evidente,
+// « le mieux note », donne un resultat absurde.
 //
-// Une licence ne change pas d'un jour à l'autre : 24 h de cache, et une seule
-// requête IGDB pour toutes les licences d'un même tiroir.
+// ATTENTION, LE BUG QUE CE BLOC REGLE, VU SUR MARVEL'S WOLVERINE. La fiche
+// affiche quatre licences : Marvel, Wolverine, X-Men, Marvel's Spider-Man. On
+// prenait pour chacune la jaquette de son jeu le mieux note -- mais un meme jeu
+// appartient a plusieurs de ces licences a la fois : Marvel's Spider-Man est le
+// mieux note de « Marvel » ET de « Marvel's Spider-Man », LEGO Marvel Super
+// Heroes celui de « X-Men » ET de « Wolverine ». On obtenait donc quatre cartes
+// pour deux images, dont aucune ne parlait de sa licence : la carte Wolverine
+// montrait du LEGO.
+//
+// Trois regles, dans cet ordre :
+//
+//  1. LE NOM DU JEU DOIT PARLER DE LA LICENCE. C'est le meme bareme que celui
+//     qui choisit la licence a ecrire sous un titre (`franchiseScore`) :
+//     « X-Men Origins: Wolverine » represente Wolverine, « LEGO Marvel Super
+//     Heroes » ne represente ni Wolverine ni X-Men, quoi qu'en dise le
+//     rangement d'IGDB.
+//  2. DEUX CARTES NE PARTAGENT JAMAIS UNE IMAGE. L'attribution est donc faite
+//     pour TOUT LE LOT d'un coup, et les licences les plus etroites servent en
+//     premier : Wolverine a dix jeux ou puiser, Marvel en a mille -- c'est
+//     Wolverine qui doit choisir d'abord, sinon Marvel lui prend le sien.
+//  3. UNE IMAGE DE COUVERTURE, PAS UNE JAQUETTE. La carte est un PAYSAGE :
+//     une jaquette portrait y etait recadree dans sa largeur, donc reduite a
+//     une bande du milieu. On prend l'artwork du jeu, sa capture a defaut, et
+//     la jaquette seulement s'il n'a rien d'autre.
+//
+// ATTENTION, LE CACHE PORTE LES CANDIDATS, PAS LE CHOIX. Le choix depend des
+// AUTRES licences presentes sur la fiche (regle 2) : le garder tel quel ferait
+// ressortir, sur un autre jeu, l'image attribuee ailleurs -- et les doublons
+// avec elle. Ce qui se garde, c'est ce qui coute cher : les listes de candidats
+// (24 h) et les images d'un jeu (24 h).
 
-const covers = createTtlCache({ name: "igdb:franchise-covers", max: 800, ttl: 24 * 60 * 60 * 1000 });
+const reps = createTtlCache({ name: "igdb:franchise-reps", max: 800, ttl: 24 * 60 * 60 * 1000 });
+const gameArt = createTtlCache({ name: "igdb:game-art", max: 1500, ttl: 24 * 60 * 60 * 1000 });
 
-const REP_FIELDS = "fields name,cover.image_id,total_rating,total_rating_count,franchises,collections";
+const REP_FIELDS =
+  "fields name,cover.image_id,game_type,total_rating,total_rating_count,franchises,collections";
+
+// Au-dela, on ne pioche plus : les candidats arrivent tries par notoriete, et
+// le vingt-cinquieme jeu d'une licence n'a aucune chance d'etre choisi.
+const MAX_CANDIDATES = 24;
+
+// A partir de combien de licences un jeu est un crossover -- le meme repere que
+// pour les visuels de saga, plus bas.
+const CROSSOVER = 5;
+
+const repKey = (f) => `${f.kind}:${f.id}`;
 
 /**
- * Pour chaque licence : sa jaquette de tête et combien de jeux elle contient.
+ * Les candidats de chaque licence : ses jeux, du plus connu au moins connu.
  *
- * `list` : ce que rend `franchisesOf`. On regroupe par tiroir pour ne poser
- * que deux questions à IGDB — une pour les franchises, une pour les séries —
- * quel que soit le nombre de licences.
+ * Une seule question a IGDB par tiroir, quel que soit le nombre de licences.
  */
-export async function decorateFranchises(list) {
-  const todo = list.filter((f) => covers.get(`${f.kind}:${f.id}`) === undefined);
+async function loadCandidates(list) {
+  const todo = list.filter((f) => reps.get(repKey(f)) === undefined);
+  if (!todo.length) return;
 
   for (const kind of ["franchise", "collection"]) {
     const ids = todo.filter((f) => f.kind === kind).map((f) => f.id);
@@ -123,27 +162,152 @@ export async function decorateFranchises(list) {
     } catch {
       rows = [];
     }
-    // Un jeu peut appartenir à plusieurs des licences demandées : il compte
-    // pour chacune. La première ligne rencontrée est la mieux notée (le tri
-    // vient d'IGDB), donc la première jaquette est la bonne.
-    const bucket = new Map(ids.map((id) => [id, { cover: null, count: 0 }]));
+
+    const bucket = new Map(ids.map((id) => [id, { count: 0, games: [] }]));
     for (const row of rows) {
       for (const f of row[field] || []) {
         const id = typeof f === "number" ? f : f?.id;
         const slot = bucket.get(id);
         if (!slot) continue;
+        // Le compte, lui, voit TOUS les jeux : c'est le « 42 jeux » de la carte.
         slot.count += 1;
-        if (!slot.cover && row.cover?.image_id) {
-          slot.cover = `${IMG_BASE}/t_cover_big/${row.cover.image_id}.jpg`;
-        }
+        if (slot.games.length >= MAX_CANDIDATES) continue;
+        slot.games.push({
+          id: row.id,
+          name: row.name || "",
+          cover: row.cover?.image_id || null,
+          // Combien d'univers ce jeu porte : c'est ce qui distingue un jeu
+          // Wolverine d'un crossover ou Wolverine passe faire coucou.
+          spread: (row.franchises || []).length + (row.collections || []).length,
+          // Un jeu principal, pas un DLC ni une compilation : on prefere
+          // « Marvel's Spider-Man » a « Marvel's Spider-Man: Turf Wars ».
+          main: row.game_type === 0,
+        });
       }
     }
-    for (const [id, slot] of bucket) covers.set(`${kind}:${id}`, slot);
+    for (const [id, slot] of bucket) reps.set(`${kind}:${id}`, slot);
+  }
+}
+
+/**
+ * Le jeu qui represente le mieux cette licence, parmi ceux qu'on n'a pas deja
+ * donnes a une autre.
+ */
+function bestFor(f, taken, exclude) {
+  const slot = reps.get(repKey(f)) || { count: 0, games: [] };
+  const ranked = slot.games
+    .map((g, i) => ({ g, i, title: franchiseScore(f.name, g.name) }))
+    .sort((a, b) => {
+      // 1. Le titre parle-t-il de la licence ?
+      if (a.title !== b.title) return b.title - a.title;
+      // 2. Un vrai jeu avant un DLC ou une compilation.
+      if (a.g.main !== b.g.main) return a.g.main ? -1 : 1;
+      // 3. Un jeu centre sur son univers avant un crossover : c'est la
+      //    difference entre « un jeu Wolverine » et « un jeu ou il y a
+      //    Wolverine ».
+      const ca = a.g.spread >= CROSSOVER;
+      const cb = b.g.spread >= CROSSOVER;
+      if (ca !== cb) return ca ? 1 : -1;
+      // 4. A egalite, le plus connu (l'ordre d'IGDB).
+      return a.i - b.i;
+    });
+
+  // ATTENTION, TROIS PASSES, DE LA PLUS EXIGEANTE A LA PLUS RESIGNEE. Une
+  // licence qui n'a qu'un seul jeu ne doit pas se retrouver SANS image parce
+  // que sa voisine le lui a pris : mieux vaut un doublon qu'une carte grise.
+  return (
+    ranked.find((c) => !taken.has(c.g.id) && c.g.id !== exclude)?.g ||
+    ranked.find((c) => !taken.has(c.g.id))?.g ||
+    ranked[0]?.g ||
+    null
+  );
+}
+
+/**
+ * Les images d'un lot de jeux : artwork, capture, jaquette.
+ *
+ * Une seule requete pour tout le lot, et le resultat se garde par jeu -- deux
+ * fiches voisines demandent souvent les memes.
+ */
+async function loadArt(ids) {
+  const todo = ids.filter((id) => gameArt.get(`game:${id}`) === undefined);
+  if (!todo.length) return;
+  let rows = [];
+  try {
+    rows =
+      (await igdbQuery(
+        "games",
+        `fields artworks.image_id,screenshots.image_id,cover.image_id;` +
+          ` where id = (${todo.join(",")}); limit ${todo.length};`
+      )) || [];
+  } catch {
+    rows = [];
+  }
+  const found = new Set();
+  for (const row of rows) {
+    found.add(row.id);
+    // L'artwork d'abord : c'est une image DESSINEE pour etre un fond. La
+    // capture ensuite. La jaquette en dernier -- sur une carte paysage, elle
+    // n'est qu'une bande recadree au milieu d'une affiche.
+    const wide = row.artworks?.[0]?.image_id || row.screenshots?.[0]?.image_id || null;
+    gameArt.set(`game:${row.id}`, {
+      art: wide ? `${IMG_BASE}/t_720p/${wide}.jpg` : null,
+      cover: row.cover?.image_id ? `${IMG_BASE}/t_cover_big/${row.cover.image_id}.jpg` : null,
+    });
+  }
+  // Un jeu qui n'a rien rendu ne doit pas etre redemande a chaque ouverture de
+  // la fiche : on retient l'absence aussi.
+  for (const id of todo) if (!found.has(id)) gameArt.set(`game:${id}`, { art: null, cover: null });
+}
+
+/**
+ * Pour chaque licence : son image, et combien de jeux elle contient.
+ *
+ * `list` : ce que rend `franchisesOf`. `exclude` : le jeu d'ou l'on vient -- sa
+ * propre fiche affiche deja son decor en grand, le revoir en vignette juste en
+ * dessous n'apprend rien. Il reste utilisable en dernier recours.
+ */
+export async function decorateFranchises(list, { exclude = null } = {}) {
+  await loadCandidates(list);
+
+  // ATTENTION, LES LICENCES ETROITES CHOISISSENT EN PREMIER. Sans cet ordre,
+  // « Marvel » -- mille jeux, donc mille choix possibles -- raflait le seul jeu
+  // que « Wolverine » pouvait montrer.
+  const order = [...list].sort(
+    (a, b) => (reps.get(repKey(a))?.count || 0) - (reps.get(repKey(b))?.count || 0)
+  );
+
+  const taken = new Set();
+  const picked = new Map();
+  for (const f of order) {
+    const game = bestFor(f, taken, exclude);
+    if (game) {
+      taken.add(game.id);
+      picked.set(repKey(f), game);
+    }
   }
 
+  await loadArt([...new Set([...picked.values()].map((g) => g.id))]);
+
+  // On rend dans l'ordre recu : c'est celui de la pertinence pour CE jeu-la
+  // (cf. `franchisesOf`), et l'attribution ci-dessus n'avait rien a y changer.
   return list.map((f) => {
-    const slot = covers.get(`${f.kind}:${f.id}`) || { cover: null, count: 0 };
-    return { id: f.id, kind: f.kind, name: f.name, cover: slot.cover, count: slot.count };
+    const slot = reps.get(repKey(f)) || { count: 0 };
+    const game = picked.get(repKey(f));
+    const art = game ? gameArt.get(`game:${game.id}`) : null;
+    return {
+      id: f.id,
+      kind: f.kind,
+      name: f.name,
+      // ATTENTION, DEUX IMAGES, ET ELLES NE SE REMPLACENT PAS. `art` est le
+      // paysage de la carte ; `cover` reste la jaquette portrait, parce que la
+      // page d'une licence en fait le premier carreau de son mur de jaquettes
+      // -- un paysage y serait le seul cadre de travers.
+      art: art?.art || null,
+      cover:
+        art?.cover || (game?.cover ? `${IMG_BASE}/t_cover_big/${game.cover}.jpg` : null),
+      count: slot.count || 0,
+    };
   });
 }
 

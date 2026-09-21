@@ -69,6 +69,11 @@ const NOTIF_META = {
   recommendation_boost: { Icon: Plus, verb: "a fait +1 sur ta reco de" },
   recommendation_comment: { Icon: MessageSquare, verb: "a commenté la reco de" },
   download_react: { Icon: Megaphone, verb: "se moque de ton téléchargement de" },
+  // ⚠️ LES CROCHETS SONT UNE MARQUE D'ACCORD, pas une coquille : « s'est
+  // abonné » au masculin, « s'est abonnée » au féminin, « s'est abonné·e »
+  // quand la personne n'a pas choisi de pronom (cf. `agree`, plus bas, et
+  // server/lib/notify.js qui applique la même règle au push).
+  follow: { Icon: UserPlus, verb: "s'est abonné[e] à toi" },
   follow_request: { Icon: UserPlus, verb: "demande à s'abonner à toi" },
   follow_accepted: { Icon: UserCheck, verb: "a accepté ta demande d'abonnement" },
   // Notif système (pas d'acteur) : le titre vient de `title`, le détail du snippet.
@@ -78,6 +83,17 @@ const NOTIF_META = {
   // Badge de mission débloqué : le nom du badge est dans `gameName`.
   mission_unlocked: { Icon: Award, verb: "", system: true, badge: true, title: "Badge débloqué" },
 };
+
+// L'accord en genre d'une phrase qui parle de quelqu'un.
+//
+// Le pronom est choisi par la personne dans ses paramètres, et il est absent
+// par défaut : on écrit alors en inclusif, qui n'affirme rien. Les phrases sans
+// crochets — l'immense majorité, parce qu'un passé composé avec « avoir » ne
+// s'accorde pas — traversent la fonction sans changer.
+function agree(text, pronoun) {
+  if (!text || !text.includes("[")) return text;
+  return text.replace(/\[([^\]]+)\]/g, pronoun === "il" ? "" : pronoun === "elle" ? "$1" : "·$1");
+}
 
 // Historique local des derniers jeux ouverts depuis la recherche : affiché
 // dès l'ouverture de la barre, avant de taper quoi que ce soit.
@@ -723,6 +739,7 @@ export default function Topbar() {
                     // « … sur « Jeu » » : sans nom de jeu (vieux posts), on
                     // laisse tomber la préposition orpheline.
                     if (!n.gameName && verb.endsWith(" sur")) verb = verb.slice(0, -4);
+                    verb = agree(verb, n.actor?.pronoun);
                     return (
                       <button
                         key={n.id}

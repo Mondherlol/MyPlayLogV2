@@ -294,6 +294,12 @@ router.put("/me", requireAuth, async (req, res) => {
       }
     }
     if (b.bio !== undefined) user.bio = String(b.bio).slice(0, 300);
+    // Le pronom. Une valeur inconnue vaut « pas de choix » plutot qu'une
+    // erreur : ce reglage ne doit jamais empecher d'enregistrer le reste du
+    // profil.
+    if (b.pronoun !== undefined) {
+      user.pronoun = ["il", "elle", "iel"].includes(b.pronoun) ? b.pronoun : null;
+    }
     if (b.tagline !== undefined) user.tagline = String(b.tagline).slice(0, 120);
     if (b.taglineImage !== undefined)
       user.taglineImage = b.taglineImage ? String(b.taglineImage) : null;
@@ -790,6 +796,12 @@ router.post("/:id/follow", requireAuth, async (req, res) => {
     if (has) removeActivity({ actor: req.userId, type: "follow", target: target._id });
     else {
       recordActivity({ actor: req.userId, type: "follow", target: target._id });
+      // ⚠️ ET ON LE DIT À LA PERSONNE. Un compte privé était prévenu qu'on
+      // DEMANDAIT à le suivre (`follow_request`), mais un compte public
+      // n'apprenait jamais qu'il avait un nouvel abonné : l'information
+      // n'existait que dans le fil, noyée entre deux parties. C'est pourtant
+      // la notification la plus attendue d'une app sociale.
+      notify({ user: target._id, type: "follow", actor: me._id });
       // Missions « Premier contact » / « Papillon social ».
       triggerMissionCheck(req.userId);
     }

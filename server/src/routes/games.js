@@ -2807,7 +2807,10 @@ router.get("/:id/franchises", optionalAuth, async (req, res) => {
 
     const list = franchisesOf(g);
     if (!list.length) return res.json({ franchises: [] });
-    res.json({ franchises: await decorateFranchises(list) });
+    // On lui passe le jeu d'ou l'on vient : sa fiche affiche deja son decor en
+    // grand, et une carte de licence qui le reprend en vignette juste en
+    // dessous n'apprend rien (cf. lib/franchises).
+    res.json({ franchises: await decorateFranchises(list, { exclude: g.id ?? id }) });
   } catch (err) {
     console.error("game franchises error:", err.message);
     res.status(err.status || 500).json({ error: err.message || "Erreur." });
