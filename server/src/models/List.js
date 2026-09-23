@@ -204,6 +204,11 @@ const listSchema = new mongoose.Schema(
       enum: ["game", "character", "ost"],
       default: "game",
     },
+    // « Le principe des 9 » : une liste de NEUF jeux sur un thème proposé
+    // (« Ces 9 jeux de mon enfance »…). La valeur est la clé du thème, côté
+    // client (lib/nines), ou « custom » pour un thème inventé. null = liste
+    // ordinaire. Une liste des 9 ne dépasse jamais neuf jeux (cf. routes).
+    nine: { type: String, default: null },
     visibility: {
       type: String,
       enum: ["public", "private"],
@@ -240,5 +245,7 @@ listSchema.index({ "event.startTime": -1 });
 listSchema.index({ "official.key": 1 });
 listSchema.index({ "official.kind": 1, "official.order": 1 });
 listSchema.index({ tags: 1 });
+// Les listes des 9 : combien l'ont faite, par thème, et la mienne.
+listSchema.index({ nine: 1, visibility: 1 });
 
 export default mongoose.model("List", listSchema);

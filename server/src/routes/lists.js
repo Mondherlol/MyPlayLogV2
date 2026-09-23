@@ -24,6 +24,16 @@ import { triggerMissionCheck } from "../lib/missions.js";
 const router = express.Router();
 
 const TYPES = ["classic", "ranked", "tier", "playlist"];
+
+// « Le principe des 9 » (cf. models/List, champ `nine`). Neuf jeux, pas un de
+// plus : c'est la règle du jeu, et la grille 3 × 3 qui l'affiche n'a pas de
+// dixième case.
+const NINE_MAX = 9;
+const nineKey = (raw) => {
+  const k = String(raw || "").trim().toLowerCase();
+  return /^[a-z0-9-]{2,32}$/.test(k) ? k : null;
+};
+const TOO_MANY_NINE = "Une liste des 9 contient neuf jeux, pas un de plus.";
 const VISIBILITIES = ["public", "private"];
 const ITEM_KINDS = ["game", "character", "ost"];
 
@@ -217,15 +227,17 @@ function toCard(l, userId) {
     coverDesign: l.coverDesign || null,
     type: l.type,
     itemKind: l.itemKind || "game",
+    nine: l.nine || null,
     visibility: l.visibility,
     author: toAuthor(l.user),
     mine: userId ? String(l.user?._id || l.user) === String(userId) : false,
     itemCount: items.length,
     // Aperçu : les premières images pour un montage visuel (jusqu'à 8 pour
-    // laisser respirer l'éventail des listes classées).
+    // laisser respirer l'éventail des listes classées — 9 pour une liste des
+    // 9, dont la carte montre la grille entière).
     preview: items
       .filter((i) => i.image)
-      .slice(0, 8)
+      .slice(0, l.nine ? NINE_MAX : 8)
       .map((i) => i.image),
     // Les entrées de l'aperçu au complet (identifiant, nom, image), dans
     // l'ordre de la liste. L'app en fait une SECTION de profil — un rayon de
@@ -282,6 +294,7 @@ function toFull(l, userId) {
     coverDesign: l.coverDesign || null,
     type: l.type,
     itemKind: l.itemKind || "game",
+    nine: l.nine || null,
     visibility: l.visibility,
     author: toAuthor(l.user),
     event: toEvent(l),
@@ -498,6 +511,66 @@ router.get("/tags", async (req, res) => {
   } catch (err) {
     console.error("list tags error:", err.message);
     res.status(500).json({ error: "Erreur lors du chargement des tags." });
+  }
+});
+
+// GET /api/lists/nines — « le principe des 9 », thème par thème.
+// Déclaré AVANT /:id. Pour chaque thème : combien de joueurs l'ont fait (listes
+// publiques), les visages de ceux que je suis qui l'ont fait, et MA liste si
+// je l'ai déjà faite — la carte dit alors « voir la mienne » au lieu de
+// « à toi », et montre mes neuf jaquettes.
+router.get("/nines", optionalAuth, async (req, res) => {
+  try {
+    const me = req.userId
+      ? await User.findById(req.userId).select("following").lean()
+      : null;
+    const following = (me?.following || []).slice(0, 300);
+
+    const [counts, mine, friends] = await Promise.all([
+      List.aggregate([
+        { $match: { nine: { $ne: null }, visibility: "public" } },
+        { $group: { _id: "$nine", n: { $sum: 1 } } },
+      ]),
+      req.userId
+        ? List.find({ user: req.userId, nine: { $ne: null } })
+            .sort({ updatedAt: -1 })
+            .select("nine title items.image")
+            .lean()
+        : [],
+      following.length
+        ? List.find({ user: { $in: following }, nine: { $ne: null }, visibility: "public" })
+            .sort({ updatedAt: -1 })
+            .limit(400)
+            .select("nine user")
+            .populate("user", "username avatar")
+            .lean()
+        : [],
+    ]);
+
+    const themes = {};
+    const at = (k) => (themes[k] ||= { count: 0, faces: [], mine: null });
+    for (const c of counts) at(c._id).count = c.n;
+    for (const l of friends) {
+      const th = at(l.nine);
+      if (l.user && th.faces.length < 3 && !th.faces.some((f) => f.username === l.user.username)) {
+        th.faces.push({ username: l.user.username, avatar: l.user.avatar || null });
+      }
+    }
+    // Les thèmes inventés (« custom ») ne se regroupent pas : chacun est à
+    // part, la carte « Invente le tien » ne montre donc pas « la mienne ».
+    for (const l of mine) {
+      if (l.nine === "custom") continue;
+      const th = at(l.nine);
+      if (th.mine) continue;
+      th.mine = {
+        id: String(l._id),
+        preview: (l.items || []).map((i) => i.image).filter(Boolean).slice(0, NINE_MAX),
+      };
+    }
+    res.json({ themes });
+  } catch (err) {
+    console.error("lists nines error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement des thèmes." });
   }
 });
 
@@ -731,8 +804,12 @@ router.post("/", requireAuth, async (req, res) => {
     const items = Array.isArray(b.items)
       ? b.items.map(sanitizeItem).filter(Boolean)
       : [];
+    // Une liste des 9 est une liste simple de jeux : ni classement, ni
+    // paliers, ni personnages — la grille EST sa forme.
+    const nine = nineKey(b.nine);
+    if (nine && items.length > NINE_MAX) return res.status(400).json({ error: TOO_MANY_NINE });
     const tiers =
-      type === "tier"
+      type === "tier" && !nine
         ? sanitizeTiers(b.tiers) || DEFAULT_TIERS
         : [];
 
@@ -741,10 +818,11 @@ router.post("/", requireAuth, async (req, res) => {
       title,
       description: String(b.description || "").slice(0, 2000),
       cover: b.cover ? String(b.cover) : null,
-      type,
-      itemKind,
+      type: nine ? "classic" : type,
+      itemKind: nine ? "game" : itemKind,
+      nine,
       visibility,
-      items,
+      items: nine ? items.filter((i) => i.kind === "game") : items,
       tiers,
       tags: sanitizeTags(b.tags) || [],
     });
@@ -806,7 +884,8 @@ router.put("/:id", requireAuth, async (req, res) => {
       TYPES.includes(b.type) &&
       b.type !== list.type &&
       b.type !== "playlist" &&
-      list.type !== "playlist"
+      list.type !== "playlist" &&
+      !list.nine
     ) {
       const wasTier = list.type === "tier";
       list.type = b.type;
@@ -818,8 +897,11 @@ router.put("/:id", requireAuth, async (req, res) => {
     let addedCount = 0;
     let addedRefIds = [];
     if (b.items !== undefined && Array.isArray(b.items)) {
+      const next = b.items.map(sanitizeItem).filter(Boolean);
+      if (list.nine && next.length > NINE_MAX)
+        return res.status(400).json({ error: TOO_MANY_NINE });
       const before = new Set(list.items.map((i) => String(i.refId)));
-      list.items = b.items.map(sanitizeItem).filter(Boolean);
+      list.items = next;
       const fresh = list.items.filter((i) => !before.has(String(i.refId)));
       addedCount = fresh.length;
       addedRefIds = fresh.map((i) => String(i.refId));
@@ -944,6 +1026,8 @@ router.post("/:id/items", requireAuth, async (req, res) => {
         .status(400)
         .json({ error: "Cette liste n'accepte pas ce type d'élément." });
     const exists = list.items.some((i) => String(i.refId) === item.refId);
+    if (!exists && list.nine && list.items.length >= NINE_MAX)
+      return res.status(400).json({ error: TOO_MANY_NINE, full: true });
     if (!exists) {
       item.tier = null;
       list.items.push(item);

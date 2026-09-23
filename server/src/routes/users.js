@@ -234,12 +234,13 @@ function listCard(l, viewerId) {
     coverDesign: l.coverDesign || null,
     type: l.type,
     itemKind: l.itemKind || "game",
+    nine: l.nine || null,
     visibility: l.visibility,
     author: l.user
       ? { id: l.user._id || l.user, username: l.user.username, avatar: l.user.avatar || null }
       : null,
     itemCount: items.length,
-    preview: items.filter((i) => i.image).slice(0, 8).map((i) => i.image),
+    preview: items.filter((i) => i.image).slice(0, l.nine ? 9 : 8).map((i) => i.image),
     // Aperçu de tier list : images regroupées par palier (ordre des paliers).
     ...(l.type === "tier"
       ? {
