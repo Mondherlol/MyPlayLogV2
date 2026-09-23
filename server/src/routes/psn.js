@@ -1480,6 +1480,8 @@ router.post("/mobile/sync", requireAuth, async (req, res) => {
         name: u.psnName || u.name,
         icon: u.icon,
         playtimeMinutes: u.playMinutes || 0,
+        npCommunicationId: u.npCommunicationId || null,
+        npServiceName: u.npServiceName || null,
       })),
       counts,
     });
@@ -1617,7 +1619,8 @@ router.post("/mobile/sync/apply", requireAuth, async (req, res) => {
         if (it.updateHours && it.hours != null && it.hours !== before) hoursUpdated++;
       }
 
-      const trophies = it.importAchievements ? trophyMap.get(String(it.key)) : null;
+      // Même règle que côté Steam : les trophées suivent le jeu coché.
+      const trophies = it.canImportAchievements ? trophyMap.get(String(it.key)) : null;
       if (trophies) {
         await GameAchievements.updateOne(
           { user: req.userId, gameId: Number(it.gameId), platform: "psn" },
@@ -1703,7 +1706,14 @@ router.post("/mobile/ignored/:key", requireAuth, async (req, res) => {
     );
 
     if (sync) {
-      sync.items = sync.items.filter((it) => it.key !== key);
+      // On marque le jeu au lieu de le retirer : écarter doit rester réversible
+      // sans relancer toute une synchro (même règle que côté Steam).
+      const hit = sync.items.find((it) => it.key === key);
+      if (hit) {
+        hit.ignored = true;
+        hit.include = false;
+        sync.markModified("items");
+      }
       sync.unmatched = sync.unmatched.filter((u) => u.key !== key);
       sync.counts.ignored = (sync.counts.ignored || 0) + 1;
       await sync.save();
@@ -1744,14 +1754,88 @@ router.get("/mobile/ignored", requireAuth, async (req, res) => {
 
 router.delete("/mobile/ignored/:key", requireAuth, async (req, res) => {
   try {
-    await PendingImport.deleteOne({
-      user: req.userId,
-      platform: "psn",
-      titleKey: psnKey(req.params.key),
-    });
+    const key = psnKey(req.params.key);
+    await PendingImport.deleteOne({ user: req.userId, platform: "psn", titleKey: key });
+    // Le récap en cours, s'il portait ce jeu, le remet dans la liste.
+    const sync = await pendingPsnSync(req.userId);
+    const hit = sync?.items.find((it) => it.key === key);
+    if (hit) {
+      hit.ignored = false;
+      hit.include = true;
+      sync.markModified("items");
+      sync.counts.ignored = Math.max(0, (sync.counts.ignored || 0) - 1);
+      await sync.save();
+    }
     res.json({ ok: true });
   } catch (err) {
     console.error("psn unignore error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// --- Relier à la main un titre non reconnu. ---
+//
+// Le rapprochement PlayStation se fait par NOM : une édition régionale, un
+// sous-titre en trop, et le jeu tombe dans les « non reconnus ». L'utilisateur,
+// lui, sait de quel jeu il s'agit — il le désigne, on le range (et on garde
+// l'identifiant de trophées, pour qu'il n'entre pas les mains vides).
+router.post("/mobile/sync/match", requireAuth, async (req, res) => {
+  try {
+    const sync = await pendingPsnSync(req.userId);
+    if (!sync) return res.status(404).json({ error: "Aucune synchro en attente." });
+
+    const key = psnKey(req.body?.key);
+    const gameId = Number(req.body?.gameId);
+    const name = String(req.body?.name || "").trim();
+    if (!key || !gameId || !name)
+      return res.status(400).json({ error: "Jeu à relier incomplet." });
+
+    const idx = sync.unmatched.findIndex((u) => u.key === key);
+    if (idx === -1) return res.status(404).json({ error: "Titre introuvable." });
+    const [u] = sync.unmatched.splice(idx, 1);
+
+    const existing = await UserGame.findOne({ user: req.userId, gameId }).select(
+      "status playtimeHours"
+    );
+    const hours = Math.round(((u.playtimeMinutes || 0) / 60) * 10) / 10;
+    const category = existing ? "update" : "played";
+    const suggestedStatus = existing
+      ? existing.status
+      : hours >= FINISHED_HOURS
+      ? "finished"
+      : "paused";
+
+    sync.items.push({
+      key,
+      sourceName: u.name,
+      icon: u.icon,
+      playtimeMinutes: u.playtimeMinutes || 0,
+      playtimeHours: hours,
+      gameId,
+      name,
+      cover: req.body?.cover || null,
+      inLibrary: !!existing,
+      currentStatus: existing?.status || null,
+      currentHours: existing?.playtimeHours ?? null,
+      category,
+      suggestedStatus,
+      canImportAchievements: !!u.npCommunicationId,
+      npCommunicationId: u.npCommunicationId || null,
+      npServiceName: u.npServiceName || null,
+      include: true,
+      status: suggestedStatus,
+      hours,
+      updateHours: category === "update",
+      importAchievements: !!u.npCommunicationId,
+    });
+    sync.counts[category] = (sync.counts[category] || 0) + 1;
+    sync.counts.unmatched = Math.max(0, (sync.counts.unmatched || 0) - 1);
+    sync.markModified("items");
+    await sync.save();
+
+    res.json({ sync: mapPsnSync(sync, { full: true }) });
+  } catch (err) {
+    console.error("psn match error:", err.message);
     res.status(500).json({ error: "Erreur." });
   }
 });

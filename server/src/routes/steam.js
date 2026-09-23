@@ -705,7 +705,9 @@ router.post("/sync/apply", requireAuth, async (req, res) => {
       // Le statut choisi s'applique aussi à un jeu déjà présent (le joueur a pu
       // le passer de « en pause » à « terminé » depuis le récap).
       setStatus: it.category === "update" && it.status !== it.currentStatus,
-      importAchievements: !!it.importAchievements && it.canImportAchievements,
+      // ⚠️ LES SUCCÈS SUIVENT LE JEU, SANS CASE À PART : qui importe un jeu
+      // veut ses succès. On ne regarde plus que ce qui est POSSIBLE.
+      importAchievements: !!it.canImportAchievements,
     }));
 
     const result = await applyItems(req.userId, steamId, payload);
@@ -776,7 +778,15 @@ router.post("/ignored/:appid", requireAuth, async (req, res) => {
     );
 
     if (sync) {
-      sync.items = sync.items.filter((it) => Number(it.appid) !== appid);
+      // ⚠️ ON MARQUE, ON NE RETIRE PAS. Retirer le jeu du récap rendait le
+      // geste irréversible : plus moyen de revenir dessus sans relancer toute
+      // une synchro. Marqué, il sort de la liste mais reste retrouvable.
+      const hit = sync.items.find((it) => Number(it.appid) === appid);
+      if (hit) {
+        hit.ignored = true;
+        hit.include = false;
+        sync.markModified("items");
+      }
       sync.unmatched = sync.unmatched.filter((u) => Number(u.key) !== appid);
       sync.counts.ignored = (sync.counts.ignored || 0) + 1;
       await sync.save();
@@ -821,14 +831,94 @@ router.get("/ignored", requireAuth, async (req, res) => {
 // Repêcher un jeu écarté : il repassera à la prochaine synchro.
 router.delete("/ignored/:appid", requireAuth, async (req, res) => {
   try {
+    const appid = Number(req.params.appid);
     await PendingImport.deleteOne({
       user: req.userId,
       platform: "steam",
-      titleKey: keyOf(req.params.appid),
+      titleKey: keyOf(appid),
     });
+    // Le récap en cours, s'il portait ce jeu, le remet dans la liste.
+    const sync = await pendingSyncOf(req.userId);
+    const hit = sync?.items.find((it) => Number(it.appid) === appid);
+    if (hit) {
+      hit.ignored = false;
+      hit.include = true;
+      sync.markModified("items");
+      sync.counts.ignored = Math.max(0, (sync.counts.ignored || 0) - 1);
+      await sync.save();
+    }
     res.json({ ok: true });
   } catch (err) {
     console.error("steam unignore error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// --- Relier à la main un titre non reconnu. ---
+//
+// ⚠️ LE CATALOGUE N'EST PAS LA RÉALITÉ. Un nom régional, une édition, un jeu
+// trop récent : le rapprochement automatique échoue régulièrement, et sans
+// ceci le jeu était perdu pour l'import — alors que l'utilisateur, lui, sait
+// parfaitement de quel jeu il s'agit. Il le désigne, on le range.
+router.post("/sync/match", requireAuth, async (req, res) => {
+  try {
+    const sync = await pendingSyncOf(req.userId);
+    if (!sync) return res.status(404).json({ error: "Aucune synchro en attente." });
+
+    const key = String(req.body?.key || "");
+    const gameId = Number(req.body?.gameId);
+    const name = String(req.body?.name || "").trim();
+    if (!key || !gameId || !name)
+      return res.status(400).json({ error: "Jeu à relier incomplet." });
+
+    const idx = sync.unmatched.findIndex((u) => String(u.key) === key);
+    if (idx === -1) return res.status(404).json({ error: "Titre introuvable." });
+    const [u] = sync.unmatched.splice(idx, 1);
+
+    const existing = await UserGame.findOne({ user: req.userId, gameId }).select(
+      "status playtimeHours"
+    );
+    const hours = hoursOf(u.playtimeMinutes || 0);
+    const played = (u.playtimeMinutes || 0) > 0;
+    const category = existing ? "update" : played ? "played" : "wishlist";
+    const suggestedStatus = existing
+      ? existing.status
+      : !played
+      ? "wishlist"
+      : hours >= FINISHED_HOURS
+      ? "finished"
+      : "paused";
+
+    sync.items.push({
+      key,
+      appid: Number(key) || null,
+      sourceName: u.name,
+      icon: u.icon,
+      playtimeMinutes: u.playtimeMinutes || 0,
+      playtimeHours: hours,
+      gameId,
+      name,
+      cover: req.body?.cover || null,
+      inLibrary: !!existing,
+      currentStatus: existing?.status || null,
+      currentHours: existing?.playtimeHours ?? null,
+      category,
+      suggestedStatus,
+      canImportAchievements: played,
+      include: true,
+      status: suggestedStatus,
+      hours,
+      updateHours: category === "update",
+      importAchievements: played,
+    });
+    sync.counts[category] = (sync.counts[category] || 0) + 1;
+    sync.counts.unmatched = Math.max(0, (sync.counts.unmatched || 0) - 1);
+    sync.markModified("items");
+    await sync.save();
+
+    res.json({ sync: mapSync(sync, { full: true }) });
+  } catch (err) {
+    console.error("steam match error:", err.message);
     res.status(500).json({ error: "Erreur." });
   }
 });

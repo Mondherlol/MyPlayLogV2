@@ -71,6 +71,10 @@ const itemSchema = new mongoose.Schema(
 
     // --- Les choix de l'utilisateur, modifiables jusqu'à la validation ---
     include: { type: Boolean, default: true },
+    // ⚠️ ÉCARTÉ N'EST PAS SUPPRIMÉ. Un jeu qu'on ne veut plus voir proposer
+    // reste dans le récap, marqué : c'est ce qui permet de le retrouver et de
+    // revenir sur un geste définitif sans relancer toute une synchro.
+    ignored: { type: Boolean, default: false },
     status: { type: String, default: "wishlist" },
     console: { type: String, default: null }, // console retenue (PlayStation)
     hours: { type: Number, default: null },
@@ -88,6 +92,10 @@ const unmatchedSchema = new mongoose.Schema(
     name: { type: String, default: null },
     icon: { type: String, default: null },
     playtimeMinutes: { type: Number, default: 0 },
+    // Gardés pour PlayStation : un titre relié à la main garde ainsi accès à
+    // ses trophées, au lieu d'entrer en bibliothèque les mains vides.
+    npCommunicationId: { type: String, default: null },
+    npServiceName: { type: String, default: null },
   },
   { _id: false }
 );

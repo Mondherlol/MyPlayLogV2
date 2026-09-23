@@ -368,7 +368,14 @@ function cleanKeys(arr, allowed) {
 // ne connaît pas : une section ajoutée dans l'app et oubliée ici serait
 // silencieusement effacée de la mise en page au premier enregistrement, et le
 // joueur la verrait retomber à sa place par défaut sans comprendre pourquoi.
-const EXTRA_SECTIONS = new Set(["lists", "reviews", "stats", "ost", "badges"]);
+const EXTRA_SECTIONS = new Set([
+  "lists",
+  "reviews",
+  "stats",
+  "ost",
+  "badges",
+  "achievements",
+]);
 const LIST_SECTION = /^list:[0-9a-fA-F]{24}$/;
 
 function cleanLayout(value) {
