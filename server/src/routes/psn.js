@@ -10,6 +10,7 @@ import PlatformSync from "../models/PlatformSync.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { warmGameMeta } from "../lib/gameMeta.js";
 import { triggerMissionCheck } from "../lib/missions.js";
+import { open as openSecret, seal } from "../lib/secretBox.js";
 import {
   isConfigured,
   getServiceAccessToken,
@@ -230,6 +231,11 @@ router.get("/status", requireAuth, async (req, res) => {
             scannedAt: scan.scannedAt,
           }
         : null,
+      // Relié À SON COMPTE (le joueur s'est connecté) ou simple lecture d'un
+      // profil public par le compte de service : ce n'est pas la même chose,
+      // et l'interface doit pouvoir le dire (le temps de jeu, par exemple, ne
+      // se lit que sur son propre compte).
+      self: !!psn?.npsso,
       psn: linked
         ? {
             onlineId: psn.onlineId || null,
@@ -349,7 +355,15 @@ router.delete("/", requireAuth, async (req, res) => {
       PlatformSync.deleteMany({ user: req.userId, platform: "psn" }),
     ]);
 
-    user.psn = { accountId: null, onlineId: null, avatar: null, connectedAt: null };
+    // Délier, c'est aussi rendre son secret : on n'en garde rien.
+    user.psn = {
+      accountId: null,
+      onlineId: null,
+      avatar: null,
+      connectedAt: null,
+      lastSyncAt: null,
+      npsso: null,
+    };
     await user.save();
     res.json({ connected: false, removedGames: removed });
   } catch (err) {
@@ -1067,6 +1081,65 @@ router.post("/request", requireAuth, async (req, res) => {
   }
 });
 
+// ======================================================================
+//  SE CONNECTER AVEC SON COMPTE PLAYSTATION (site)
+// ======================================================================
+//
+// ⚠️ POURQUOI UN NPSSO COLLÉ, ET PAS UN BOUTON « Se connecter ». Dans un
+// navigateur, rien d'autre n'est possible : Sony ne redirige qu'AU SCHÉMA de
+// son application mobile (illisible depuis une page web, origine différente),
+// et son API n'autorise aucun appel navigateur (pas d'en-tête CORS). Le seul
+// pont praticable est celui que Sony affiche lui-même, sur son propre domaine,
+// à un joueur DÉJÀ connecté : `/api/v1/ssocookie`. On ne voit donc jamais son
+// mot de passe — il s'authentifie chez eux, et nous confie la clé qui en sort.
+//
+// ⚠️ ET LE SERVEUR NE S'EN SERT PAS LUI-MÊME. Son IP est bloquée par Sony : il
+// scelle ce secret (cf. lib/secretBox) et le transmet au worker maison, seul à
+// pouvoir parler à PlayStation. C'est aussi ce qui rend le compte de service —
+// et donc l'admin dans la boucle — inutile pour ce joueur-là.
+router.post("/session", requireAuth, async (req, res) => {
+  try {
+    // On accepte ce que le joueur a sous la main : la valeur nue, ou le JSON
+    // entier affiché par Sony ({"npsso":"…"}), qu'on ne va pas lui faire
+    // découper à la main.
+    const raw = String(req.body?.npsso || "").trim();
+    const found = raw.match(/[A-Za-z0-9_-]{40,128}/);
+    const npsso = found ? found[0] : null;
+    if (!npsso)
+      return res.status(400).json({
+        error: "Ce n'est pas un jeton NPSSO. Copie la valeur affichée par Sony.",
+      });
+
+    const user = await User.findById(req.userId).select("psn username");
+    user.psn = { ...(user.psn?.toObject?.() || user.psn || {}), npsso: seal(npsso) };
+    await user.save();
+
+    // Une seule demande active à la fois : recoller un jeton ne fait pas la
+    // queue, ça remet la demande en attente avec le nouveau secret.
+    let reqDoc = await PsnSyncRequest.findOne({
+      user: req.userId,
+      status: { $in: ["pending", "processing"] },
+    });
+    if (reqDoc) {
+      reqDoc.mode = "self";
+      reqDoc.status = "pending";
+      reqDoc.error = null;
+      await reqDoc.save();
+    } else {
+      reqDoc = await PsnSyncRequest.create({ user: req.userId, mode: "self" });
+    }
+    notifyAdmin(
+      "psn_request",
+      `${user.username} s'est connecté à PlayStation (synchro à traiter)`
+    ).catch(() => {});
+
+    res.json({ ok: true, status: reqDoc.status });
+  } catch (err) {
+    console.error("psn session error:", err.message);
+    res.status(500).json({ error: "Erreur lors de la connexion PlayStation." });
+  }
+});
+
 // --- Admin : liste des demandes de synchro (panel Admin). ---
 router.get("/requests", requireAuth, requireAdmin, async (req, res) => {
   try {
@@ -1125,9 +1198,14 @@ router.get("/worker/jobs", requireWorker, async (req, res) => {
     res.json({
       job: {
         id: String(job._id),
+        mode: job.mode || "service",
         psnId: job.psnId || null,
         accountId: user?.psn?.accountId || null,
         username: user?.username || null,
+        // Le secret du joueur ne sort d'ici que pour le worker, sur un canal
+        // déjà protégé par le secret partagé — et seulement s'il s'est
+        // connecté lui-même.
+        npsso: job.mode === "self" ? openSecret(user?.psn?.npsso) : null,
       },
     });
   } catch (err) {
@@ -1152,10 +1230,14 @@ router.post("/worker/jobs/:id/result", requireWorker, async (req, res) => {
     const body = req.body || {};
     // Liaison du compte (première demande) : le worker a résolu le PSN ID.
     if (body.account?.accountId) {
+      // ⚠️ ON COMPLÈTE, ON NE REMPLACE PAS. Réécrire le sous-document entier
+      // effaçait le secret du joueur et la date de dernière synchro — donc la
+      // connexion qu'il venait d'établir.
       user.psn = {
+        ...(user.psn?.toObject?.() || user.psn || {}),
         accountId: body.account.accountId,
         onlineId: body.account.onlineId || job.psnId || user.psn?.onlineId || null,
-        avatar: body.account.avatar || null,
+        avatar: body.account.avatar || user.psn?.avatar || null,
         connectedAt: user.psn?.connectedAt || new Date(),
       };
     }

@@ -45,6 +45,7 @@ import {
   Video,
   Sparkles,
   Send,
+  ExternalLink,
   ChevronDown,
   ChevronRight,
   PhoneCall,
@@ -1247,7 +1248,7 @@ function SteamCard() {
             Steam
             {connected && (
               <span className="import-badge">
-                <CheckCircle2 size={12} /> Lié
+                <CheckCircle2 size={12} /> {status.self ? "Connecté" : "Lié"}
               </span>
             )}
           </div>
@@ -1378,7 +1379,8 @@ function PsnCard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [connectOpen, setConnectOpen] = useState(false);
-  const [psnId, setPsnId] = useState("");
+  // Le jeton que Sony affiche au joueur connecté (cf. le parcours ci-dessous).
+  const [npsso, setNpsso] = useState("");
   const [unlinkOpen, setUnlinkOpen] = useState(false);
   const [removeGames, setRemoveGames] = useState(false);
   const [sent, setSent] = useState(false);
@@ -1399,19 +1401,13 @@ function PsnCard() {
   }, []);
 
   // Demande de synchro PSN, traitée par le worker maison (l'IP du serveur étant
-  // bloquée par Sony). withId=true → 1re liaison (le PSN ID est fourni) ;
-  // false → simple re-synchro d'un compte déjà lié.
-  async function requestSync(withId) {
-    if (withId && !psnId.trim()) return;
+  // bloquée par Sony). Une RE-synchro : le compte est déjà lié, le worker sait
+  // avec quel jeton le lire (celui du joueur s'il s'est connecté).
+  async function requestSync() {
     setBusy(true);
     setError(null);
     try {
-      await apiFetch("/psn/request", {
-        method: "POST",
-        token,
-        body: withId ? { psnId: psnId.trim() } : {},
-      });
-      setPsnId("");
+      await apiFetch("/psn/request", { method: "POST", token, body: {} });
       setConnectOpen(false);
       setSent(true);
       await load();
@@ -1445,6 +1441,26 @@ function PsnCard() {
   if (!status) return <CardLoading />;
 
   const connected = status.connected;
+  // ⚠️ SE CONNECTER, PAS SE DÉCLARER. Entrer un pseudo ne donnait accès qu'au
+  // profil PUBLIC d'un joueur, lu par le compte de service : pas de temps de
+  // jeu, et un profil fermé restait invisible. En se connectant, le joueur
+  // ouvre SON compte — c'est son jeton, scellé chez nous, qui fait le travail.
+  async function connectSelf() {
+    const value = npsso.trim();
+    if (!value || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await apiFetch("/psn/session", { method: "POST", token, body: { npsso: value } });
+      setNpsso("");
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const psn = status.psn;
   const req = status.request; // { status } en cours, ou null
   const scan = status.scan; // { games, unmatched, total } prêt à importer, ou null
@@ -1498,7 +1514,7 @@ function PsnCard() {
             {!req && (
               <button
                 className="btn-ghost set-icon clickable"
-                onClick={() => requestSync(false)}
+                onClick={() => requestSync()}
                 disabled={busy}
                 title="Relancer une synchro"
                 aria-label="Relancer une synchro PlayStation"
@@ -1566,27 +1582,61 @@ function PsnCard() {
           document.body
         )}
 
-      {/* Première liaison : on enregistre une DEMANDE (traitée par le worker). */}
+      {/* PREMIÈRE LIAISON : le joueur se connecte À SON COMPTE.
+          Sony ne propose aucun « Se connecter avec PlayStation » exploitable
+          depuis un navigateur : pas de redirection lisible, pas d'appel
+          possible à son API. Le seul pont est celui qu'il affiche lui-même à
+          un joueur déjà identifié — d'où ces trois pas, et un seul
+          copier-coller. On ne voit jamais son mot de passe. */}
       {connectOpen && !connected && !req && (
         <div className="psn-connect">
+          {/* Le même vocabulaire que le rappel NPSSO du panel admin : une
+              liste numérotée et deux liens. Pas la peine d'inventer une autre
+              mise en page pour le même geste. */}
+          <ol className="psn-steps">
+            <li>
+              Connecte-toi sur{" "}
+              <a href="https://my.playstation.com" target="_blank" rel="noreferrer">
+                playstation.com <ExternalLink size={12} />
+              </a>
+            </li>
+            <li>
+              Dans le même navigateur, ouvre{" "}
+              <a
+                href="https://ca.account.sony.com/api/v1/ssocookie"
+                target="_blank"
+                rel="noreferrer"
+              >
+                le lien ssocookie <ExternalLink size={12} />
+              </a>{" "}
+              et copie ce qu'il affiche (<code>{'{"npsso":"…"}'}</code>)
+            </li>
+            <li>Colle-le ci-dessous : on s'occupe du reste.</li>
+          </ol>
+
           <div className="import-manual">
             <input
               type="text"
-              placeholder="PSN ID"
-              value={psnId}
-              onChange={(e) => setPsnId(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && requestSync(true)}
+              placeholder={'{"npsso":"…"}'}
+              value={npsso}
+              onChange={(e) => setNpsso(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && connectSelf()}
             />
             <button
               className="btn-set-primary clickable"
-              onClick={() => requestSync(true)}
-              disabled={busy || !psnId.trim()}
+              onClick={connectSelf}
+              disabled={busy || !npsso.trim()}
             >
-              {busy ? <Loader2 className="spin" size={15} /> : <Send size={15} />}
-              Envoyer
+              {busy ? <Loader2 className="spin" size={15} /> : <Link2 size={15} />}
+              Se connecter
             </button>
           </div>
-          <p className="psn-note">Profil et trophées publics requis.</p>
+
+          <p className="psn-note">
+            Ton compte, tes données : le temps de jeu et les trophées d'un profil
+            privé deviennent lisibles, ce qu'un simple pseudo ne permettait pas.
+            Le jeton est chiffré chez nous et s'efface si tu délies ton compte.
+          </p>
         </div>
       )}
 

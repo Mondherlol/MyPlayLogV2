@@ -33,11 +33,25 @@ function fail(msg) {
 }
 if (!BASE) fail("PSN_WORKER_URL manquant dans server/.env (ex: https://myplaylog.cc)");
 if (!SECRET) fail("PSN_WORKER_SECRET manquant dans server/.env (même valeur que sur le VPS)");
-if (!NPSSO) fail("PSN_NPSSO manquant dans server/.env (ton token NPSSO)");
+// ⚠️ PLUS OBLIGATOIRE. Une demande où le JOUEUR s'est connecté apporte SON
+// propre jeton : le compte de service ne sert alors à rien. Il reste nécessaire
+// pour l'ancienne voie (synchro par pseudo, profil public), d'où l'avertissement
+// plutôt que l'arrêt.
+if (!NPSSO)
+  console.warn(
+    "⚠️  PSN_NPSSO absent : seules les demandes où le joueur s'est connecté seront traitées."
+  );
 
 // Import APRÈS le chargement du .env (psn.js lit l'env au fil de l'eau).
-const { getServiceAccessToken, resolveOnlineId, checkTrophiesPublic, buildPsnImportData } =
-  await import("../src/lib/psn.js");
+const {
+  getServiceAccessToken,
+  resolveOnlineId,
+  checkTrophiesPublic,
+  buildPsnImportData,
+  tokensFromNpsso,
+  identityFromToken,
+  fetchOwnProfile,
+} = await import("../src/lib/psn.js");
 
 async function api(method, url, body) {
   const res = await fetch(BASE + url, {
@@ -61,19 +75,39 @@ async function api(method, url, body) {
 
 async function processJob(job) {
   console.log(`\n▶️  ${job.username || "?"}${job.psnId ? ` (${job.psnId})` : " (re-synchro)"}`);
-  const accessToken = await getServiceAccessToken();
 
+  let accessToken;
   let account = null;
   let accountId = job.accountId;
-  if (!accountId) {
-    // Première liaison : on résout le PSN ID → accountId.
-    const resolved = await resolveOnlineId(accessToken, job.psnId);
-    if (!resolved) throw new Error(`Profil PSN introuvable : ${job.psnId}`);
-    const isPublic = await checkTrophiesPublic(accessToken, resolved.accountId);
-    if (!isPublic) throw new Error(`Trophées non publics pour ${job.psnId}`);
-    account = resolved;
-    accountId = resolved.accountId;
-    console.log(`   compte résolu : ${resolved.onlineId}`);
+
+  if (job.mode === "self" && job.npsso) {
+    // ---- LE JOUEUR S'EST CONNECTÉ : on lit SON compte, avec SON jeton. ----
+    // Aucun profil public requis, et le temps de jeu — que seul le compte
+    // lui-même peut lire — devient enfin accessible.
+    const auth = await tokensFromNpsso(job.npsso);
+    accessToken = auth.accessToken;
+    const id = identityFromToken(accessToken);
+    accountId = id.accountId || accountId;
+    if (!accountId) throw new Error("Compte PlayStation illisible dans le jeton.");
+    account =
+      (await fetchOwnProfile(accessToken, accountId).catch(() => null)) || {
+        accountId,
+        onlineId: id.onlineId || null,
+        avatar: null,
+      };
+    console.log(`   connecté : ${account.onlineId || accountId}`);
+  } else {
+    // ---- Ancienne voie : profil PUBLIC lu par le compte de service. ----
+    accessToken = await getServiceAccessToken();
+    if (!accountId) {
+      const resolved = await resolveOnlineId(accessToken, job.psnId);
+      if (!resolved) throw new Error(`Profil PSN introuvable : ${job.psnId}`);
+      const isPublic = await checkTrophiesPublic(accessToken, resolved.accountId);
+      if (!isPublic) throw new Error(`Trophées non publics pour ${job.psnId}`);
+      account = resolved;
+      accountId = resolved.accountId;
+      console.log(`   compte résolu : ${resolved.onlineId}`);
+    }
   }
 
   const data = await buildPsnImportData(accessToken, accountId, (done, total) => {

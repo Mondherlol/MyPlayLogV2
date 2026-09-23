@@ -137,6 +137,71 @@ let refreshing = null;
 // Renvoie un access token de service valide (rafraîchi / réobtenu si besoin).
 // Lève une erreur 503 si le compte de service n'est pas configuré (ni NPSSO
 // d'environnement, ni connexion runtime valide).
+// ----------------------------------------------------------------------
+//  Le compte D'UN JOUEUR (site : « se connecter avec PlayStation »)
+// ----------------------------------------------------------------------
+
+/**
+ * Échange le NPSSO d'un joueur contre ses jetons.
+ *
+ * ⚠️ À APPELER DEPUIS UNE IP RÉSIDENTIELLE. Comme le reste de PSN, ces adresses
+ * sont fermées au VPS : c'est le worker maison qui s'en charge (cf.
+ * tools/psn-worker.mjs), le serveur ne fait que transporter le secret.
+ */
+export async function tokensFromNpsso(npsso) {
+  const code = await exchangeNpssoForAccessCode(String(npsso || "").trim());
+  return exchangeAccessCodeForAuthTokens(code);
+}
+
+/**
+ * Ce que le jeton dit du compte : `{ accountId, onlineId }`.
+ *
+ * ⚠️ « me » NE SUFFIT PAS À SONY : l'API de profil répond « Bad Request: path
+ * account id ». L'identifiant, lui, voyage DANS le jeton d'accès (un JWT, donc
+ * lisible sans rien demander à personne). On ne vérifie pas la signature : ce
+ * n'est pas notre rôle, et elle ne nous apprendrait rien de plus.
+ */
+export function identityFromToken(jwt) {
+  try {
+    const payload = Buffer.from(String(jwt || "").split(".")[1] || "", "base64url").toString(
+      "utf8"
+    );
+    const data = JSON.parse(payload);
+    const pick = (...keys) => {
+      for (const k of keys) {
+        const v = data?.[k];
+        if (v != null && String(v).trim()) return String(v).trim();
+      }
+      return null;
+    };
+    let accountId = pick("account_id", "accountId");
+    if (!accountId && /^\d{8,25}$/.test(String(data?.sub || ""))) accountId = String(data.sub);
+    return { accountId, onlineId: pick("online_id", "onlineId") };
+  } catch {
+    return { accountId: null, onlineId: null };
+  }
+}
+
+/** Le profil (pseudo, avatar) d'un compte, lu avec le jeton de ce compte. */
+export async function fetchOwnProfile(accessToken, accountId) {
+  const res = await fetch(
+    `https://m.np.playstation.com/api/userProfile/v1/internal/users/${accountId}/profiles`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!res.ok) return null;
+  const me = await res.json().catch(() => null);
+  const avatars = Array.isArray(me?.avatars) ? me.avatars : [];
+  return {
+    accountId,
+    onlineId: me?.onlineId || null,
+    avatar:
+      avatars.find((a) => a.size === "xl")?.url ||
+      avatars.find((a) => a.size === "l")?.url ||
+      avatars[0]?.url ||
+      null,
+  };
+}
+
 export async function getServiceAccessToken() {
   if (!isConfigured()) {
     const err = new Error(

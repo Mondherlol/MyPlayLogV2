@@ -227,6 +227,11 @@ const userSchema = new mongoose.Schema(
     //     l'identité du joueur, aucun secret). ---
     psn: {
       accountId: { type: String, default: null }, // id numérique interne PSN
+      // ⚠️ LE SECRET DU JOUEUR, JAMAIS EN CLAIR (cf. lib/secretBox). Présent
+      // seulement quand il s'est connecté À SON COMPTE depuis le site : c'est
+      // ce qui permet de lire SA bibliothèque (temps de jeu compris) au lieu
+      // d'un profil public vu par un compte de service.
+      npsso: { type: String, default: null },
       onlineId: { type: String, default: null }, // PSN ID (pseudo public)
       avatar: { type: String, default: null },
       connectedAt: { type: Date, default: null },

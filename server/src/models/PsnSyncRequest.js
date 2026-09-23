@@ -10,6 +10,10 @@ const psnSyncRequestSchema = new mongoose.Schema(
     // PSN ID saisi (première liaison) ; null pour une simple re-synchro d'un
     // compte déjà lié (le worker utilise alors l'accountId déjà connu).
     psnId: { type: String, default: null },
+    // « service » : lecture d'un profil public avec le compte de l'admin (la
+    // vieille voie, par pseudo). « self » : le joueur s'est connecté, et le
+    // worker lit SON compte avec SON jeton.
+    mode: { type: String, enum: ["service", "self"], default: "service" },
     status: {
       type: String,
       enum: ["pending", "processing", "done", "error"],
