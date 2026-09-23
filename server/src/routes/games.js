@@ -23,6 +23,7 @@ import { ensureEntityLogos } from "../lib/entityLogos.js";
 import { reviewVisibility, privacyOf, isFollower } from "../lib/privacy.js";
 import User from "../models/User.js";
 import UserGame from "../models/UserGame.js";
+import GameAchievements from "../models/GameAchievements.js";
 import CustomCover from "../models/CustomCover.js";
 import CustomCharacter from "../models/CustomCharacter.js";
 import CustomOst from "../models/CustomOst.js";
@@ -3375,20 +3376,47 @@ async function igdbHypesOf(gameId) {
   return n;
 }
 
+// Au-delà, les visages s'empilent sous la barre sans plus rien dire.
+const FRIENDS_HYPE_CAP = 40;
+
+// La hype de ceux que je suis, pour les poser sous ma barre à leur niveau.
+// Suivre un compte privé suppose qu'il a accepté : même règle que /:id/friends.
+async function friendsHypeOf(gameId, userId) {
+  const me = await User.findById(userId).select("following").lean();
+  const following = (me?.following || []).slice(0, FOLLOW_CAP);
+  if (!following.length) return [];
+  const rows = await GameHype.find({ gameId, user: { $in: following } })
+    .sort({ level: -1, updatedAt: -1 })
+    .limit(FRIENDS_HYPE_CAP)
+    .select("user level")
+    .populate("user", "username avatar")
+    .lean();
+  return rows
+    .filter((r) => r.user)
+    .map((r) => ({
+      id: String(r.user._id),
+      username: r.user.username,
+      avatar: r.user.avatar || null,
+      level: r.level,
+    }));
+}
+
 async function hypePayload(gameId, userId) {
-  const [agg, mine, followers] = await Promise.all([
+  const [agg, mine, followers, friends] = await Promise.all([
     GameHype.aggregate([
       { $match: { gameId } },
       { $group: { _id: null, avg: { $avg: "$level" }, count: { $sum: 1 } } },
     ]),
     userId ? GameHype.findOne({ user: userId, gameId }).select("level").lean() : null,
     igdbHypesOf(gameId),
+    userId ? friendsHypeOf(gameId, userId) : [],
   ]);
   return {
     mine: mine ? mine.level : null,
     average: agg[0] ? Math.round(agg[0].avg) : null,
     count: agg[0]?.count || 0,
     followers,
+    friends,
   };
 }
 
@@ -4340,8 +4368,37 @@ router.get("/:id/friends", optionalAuth, async (req, res) => {
     if (!following.length) return res.json({ friends: [] });
 
     const entries = await UserGame.find({ user: { $in: following }, gameId: id })
+      .select(
+        "user status rating platform format platinum playtimeHours startedAt finishedAt favorite review reviewedAt createdAt"
+      )
       .populate("user", "username avatar")
       .lean();
+
+    // Leurs succès sur CE jeu, pour la petite fiche qu'ouvre leur visage. Un
+    // jeu qu'ils ont masqué ou retiré de leur profil ne se montre pas ici non
+    // plus (cf. `visibility` dans models/GameAchievements). Sans les listes :
+    // des totaux suffisent.
+    const achDocs = await GameAchievements.find({
+      user: { $in: entries.map((e) => e.user?._id).filter(Boolean) },
+      gameId: id,
+      visibility: { $nin: ["private", "removed"] },
+    })
+      .select("user platform total unlocked achievements.tier achievements.unlocked")
+      .lean();
+    const achOf = new Map();
+    for (const d of achDocs) {
+      const k = String(d.user);
+      const cur = achOf.get(k);
+      // Deux plateformes pour un même jeu : on garde la plus avancée.
+      if (cur && cur.unlocked >= d.unlocked) continue;
+      achOf.set(k, {
+        platform: d.platform,
+        unlocked: d.unlocked,
+        total: d.total,
+        percent: d.total ? Math.round((d.unlocked / d.total) * 100) : 0,
+        platinum: (d.achievements || []).some((a) => a.tier === "platinum" && a.unlocked),
+      });
+    }
 
     const friends = entries
       .filter((e) => e.user)
@@ -4349,6 +4406,16 @@ router.get("/:id/friends", optionalAuth, async (req, res) => {
         user: { id: e.user._id, username: e.user.username, avatar: e.user.avatar || null },
         status: e.status,
         rating: e.rating ?? null,
+        platform: e.platform || null,
+        format: e.format || null,
+        platinum: !!e.platinum,
+        playtime: e.playtimeHours ?? null,
+        startedAt: e.startedAt || null,
+        finishedAt: e.finishedAt || null,
+        addedAt: e.createdAt || null,
+        favorite: !!e.favorite,
+        reviewed: !!String(e.review || "").trim(),
+        achievements: achOf.get(String(e.user._id)) || null,
       }));
     res.json({ friends });
   } catch (err) {

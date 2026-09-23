@@ -19,6 +19,7 @@ import {
   checkTrophiesPublic,
   fetchPlayedGames,
   fetchUserTitles,
+  cleanPsnAvatar,
   fetchTitleTrophies,
   matchNamesToIgdb,
   simplifyName,
@@ -240,7 +241,7 @@ router.get("/status", requireAuth, async (req, res) => {
       psn: linked
         ? {
             onlineId: psn.onlineId || null,
-            avatar: psn.avatar || null,
+            avatar: cleanPsnAvatar(psn.avatar),
             connectedAt: psn.connectedAt || null,
             lastSyncAt: psn.lastSyncAt || null,
           }
@@ -302,7 +303,7 @@ router.post("/connect", requireAuth, async (req, res) => {
     user.psn = {
       accountId: resolved.accountId,
       onlineId: resolved.onlineId,
-      avatar: resolved.avatar,
+      avatar: cleanPsnAvatar(resolved.avatar),
       connectedAt: new Date(),
     };
     await user.save();
@@ -312,7 +313,7 @@ router.post("/connect", requireAuth, async (req, res) => {
       connected: true,
       psn: {
         onlineId: resolved.onlineId,
-        avatar: resolved.avatar,
+        avatar: user.psn.avatar,
         connectedAt: user.psn.connectedAt,
       },
     });
@@ -1250,7 +1251,7 @@ router.post("/worker/jobs/:id/result", requireWorker, async (req, res) => {
         ...(user.psn?.toObject?.() || user.psn || {}),
         accountId: body.account.accountId,
         onlineId: body.account.onlineId || job.psnId || user.psn?.onlineId || null,
-        avatar: body.account.avatar || user.psn?.avatar || null,
+        avatar: cleanPsnAvatar(body.account.avatar) || cleanPsnAvatar(user.psn?.avatar),
         connectedAt: user.psn?.connectedAt || new Date(),
       };
     }
@@ -1404,11 +1405,12 @@ router.get("/mobile/status", requireAuth, async (req, res) => {
       connected: true,
       psn: {
         onlineId: psn.onlineId || null,
-        avatar: psn.avatar || null,
+        avatar: cleanPsnAvatar(psn.avatar),
         connectedAt: psn.connectedAt || null,
         lastSyncAt: psn.lastSyncAt || null,
       },
-      avatarDiffers: !!psn.avatar && user.avatar !== psn.avatar,
+      // Une photo par défaut (ou illisible) ne se propose pas (cf. cleanPsnAvatar).
+      avatarDiffers: !!cleanPsnAvatar(psn.avatar) && user.avatar !== cleanPsnAvatar(psn.avatar),
       // Une synchro sans rien de neuf n'attend rien de personne (cf. isQuiet).
       pendingSync: pending && !isQuiet(pending) ? mapPsnSync(pending) : null,
       syncCount: applied,
@@ -1445,7 +1447,7 @@ router.post("/mobile/link", requireAuth, async (req, res) => {
       ...(user.psn?.toObject?.() || user.psn || {}),
       accountId,
       onlineId,
-      avatar: req.body?.avatar ? String(req.body.avatar) : null,
+      avatar: cleanPsnAvatar(req.body?.avatar),
       connectedAt: new Date(),
     };
     await user.save();
@@ -2004,7 +2006,7 @@ router.get("/mobile/history", requireAuth, async (req, res) => {
 router.post("/mobile/avatar", requireAuth, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
-    const avatar = user?.psn?.avatar;
+    const avatar = cleanPsnAvatar(user?.psn?.avatar);
     if (!avatar) return res.status(400).json({ error: "Aucune photo PlayStation." });
     user.avatar = avatar;
     await user.save();

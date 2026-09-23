@@ -26,6 +26,22 @@ const CACHE_FILE = path.join(__dirname, "../../.psn-token.json");
 
 const auth = (accessToken) => ({ accessToken });
 
+/**
+ * La photo PlayStation d'un joueur, telle qu'on peut la montrer — ou `null`.
+ *
+ * ⚠️ UN COMPTE SANS PHOTO A QUAND MÊME UNE ADRESSE DE PHOTO. Sony renvoie alors
+ * son image PAR DÉFAUT, et souvent en `http://` : Android refuse de charger du
+ * http, l'aperçu restait vide, et l'app proposait tout de même de « remplacer
+ * sa photo » par ce vide. Une image par défaut n'est pas une photo : on n'en
+ * garde rien. Les autres passent en https, que les serveurs de Sony servent.
+ */
+export function cleanPsnAvatar(url) {
+  const u = typeof url === "string" ? url.trim() : "";
+  if (!/^https?:\/\//i.test(u)) return null;
+  if (/\/default\/|defaultavatar/i.test(u)) return null;
+  return u.replace(/^http:\/\//i, "https://");
+}
+
 const IMG_BASE = "https://images.igdb.com/igdb/image/upload";
 // Modes de jeu IGDB considérés « sans fin » (multi/MMO/battle royale) : mêmes
 // ids que la modale d'ajout / l'import Steam → statut « Sans fin » suggéré.
