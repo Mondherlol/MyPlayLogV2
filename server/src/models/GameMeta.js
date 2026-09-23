@@ -12,6 +12,11 @@ const gameMetaSchema = new mongoose.Schema(
     developers: { type: [String], default: [] },
     publishers: { type: [String], default: [] },
     franchise: { type: String, default: null },
+    // La saga ci-dessus, identifiée (cf. lib/gameMeta franchiseRefs). SANS
+    // valeur par défaut, exprès : « absent » veut dire « pas encore cherché »,
+    // `null` veut dire « cherché, aucune saga ».
+    franchiseId: { type: Number },
+    franchiseKind: { type: String },
     year: { type: Number, default: null }, // année de première sortie
     rating: { type: Number, default: null }, // total_rating IGDB arrondi
   },

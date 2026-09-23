@@ -943,15 +943,19 @@ export async function evaluateMissions(targetUserId, { award = false } = {}) {
   };
 }
 
-// Combien de badges ce joueur a-t-il RÉELLEMENT gagnés (récompense récupérée) —
-// c'est ce compteur qui s'affiche sur l'onglet du profil.
+// Combien de badges ce joueur a-t-il décrochés — c'est ce compteur qui
+// s'affiche sur le profil.
+//
+// ⚠️ DÉBLOQUÉ SUFFIT, RÉCUPÉRÉ OU NON. On ne comptait que les récompenses
+// réclamées : quelqu'un qui n'était jamais allé cliquer « Récupérer » affichait
+// « 0 badge » sur son profil, alors que le rail juste en dessous montrait ses
+// badges. Récupérer crédite des points ; le badge, lui, est gagné dès « ready ».
 export function countBadges(userId) {
   // Restreint au catalogue COURANT : des missions retirées (l'arcade, les OST)
   // ont laissé des récompenses en base, et les compter gonflerait un total
   // que la page des badges ne peut plus justifier.
   return MissionAward.countDocuments({
     user: userId,
-    status: "claimed",
     missionKey: { $in: MISSIONS.map((m) => m.key) },
   });
 }

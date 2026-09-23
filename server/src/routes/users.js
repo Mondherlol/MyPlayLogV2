@@ -14,8 +14,10 @@ import Documentary from "../models/Documentary.js";
 import GameAchievements from "../models/GameAchievements.js";
 import GameTracker from "../models/GameTracker.js";
 import Notification from "../models/Notification.js";
+import Activity from "../models/Activity.js";
 import { igdbQuery } from "../lib/igdb.js";
-import { ensureGameMeta } from "../lib/gameMeta.js";
+import { ensureGameMeta, franchiseRefs } from "../lib/gameMeta.js";
+import { createTtlCache } from "../lib/ttlCache.js";
 import { isLocalId } from "../lib/localGame.js";
 import { ensureEntityLogos } from "../lib/entityLogos.js";
 import { ensurePlatformImages } from "../lib/platformImages.js";
@@ -1627,6 +1629,103 @@ router.get("/:username/missions", optionalAuth, async (req, res) => {
 // --- Statistiques du profil (onglet Stats) ---
 // Tout est calculé à la volée depuis Mongo. IGDB n'est sollicité que pour les
 // jeux absents du cache GameMeta (1 requête batchée max, puis plus jamais).
+//
+// Le résultat est gardé une minute par profil : c'est la page la plus chère
+// du serveur (bibliothèque entière, activité, croisement avec les
+// abonnements), et on y revient souvent en un aller-retour. Il ne dépend pas
+// du lecteur — la confidentialité est vérifiée AVANT la lecture du cache.
+// `?fresh=1` (tirer pour rafraîchir) passe outre.
+const statsCache = createTtlCache({ name: "users:stats", max: 300, ttl: 60 * 1000 });
+
+// Le fil de l'activité remonte jusque-là pour le graphique « mois par mois ».
+const STATS_MONTHS = 36;
+// Ce qui dit « j'y ai joué ce mois-là » dans une carte d'activité.
+const PLAY_CHANGES = new Set(["status", "time", "added", "bundle"]);
+// Là où l'on regarde quelqu'un jouer (cf. STREAMS côté client).
+const WATCH_CHANNELS = ["youtube", "twitch", "kick"];
+const MONTH_GAMES_CAP = 40;
+
+const monthKey = (d) =>
+  `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+
+/**
+ * Les jeux joués, mois par mois, sur les `STATS_MONTHS` derniers mois.
+ *
+ * Un jeu compte dans un mois s'il y a une trace de partie ce mois-là : une
+ * date de début ou de fin posée à la main, ou une carte d'activité qui dit
+ * qu'on y jouait (statut changé, temps de jeu mis à jour, ajout « en cours »).
+ *
+ * ⚠️ UN AJOUT « TERMINÉ » N'EST PAS UNE PARTIE DU MOIS. C'est quelqu'un qui
+ * range ses vieux jeux : les compter ferait du jour de l'import le mois le
+ * plus chargé de sa vie. Seul un PASSAGE à « terminé » compte comme une fin —
+ * et la date de fin posée à la main, quand elle existe, l'emporte toujours.
+ */
+async function monthlyPlay(userId, entries) {
+  const now = new Date();
+  const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (STATS_MONTHS - 1), 1));
+  const acts = await Activity.find({
+    actor: userId,
+    type: "game_update",
+    createdAt: { $gte: since },
+  })
+    .select("game gameName gameCover meta.changes createdAt")
+    .lean();
+
+  const byId = new Map(entries.map((e) => [e.gameId, e]));
+  const infoOf = (gameId, a) => {
+    const e = byId.get(gameId);
+    return e
+      ? { gameId, name: e.name, cover: e.cover }
+      : { gameId, name: a?.gameName || "", cover: a?.gameCover || null };
+  };
+
+  const months = new Map(); // "2026-09" → Map(gameId → { info, finished })
+  const mark = (date, gameId, info, finished) => {
+    if (!date || !gameId) return;
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime()) || d < since || d > now) return;
+    const k = monthKey(d);
+    if (!months.has(k)) months.set(k, new Map());
+    const m = months.get(k);
+    const cur = m.get(gameId);
+    if (cur) cur.finished = cur.finished || finished;
+    else m.set(gameId, { info, finished });
+  };
+
+  for (const e of entries) {
+    if (e.status === "wishlist") continue;
+    if (e.startedAt) mark(e.startedAt, e.gameId, infoOf(e.gameId), false);
+    if (e.finishedAt) mark(e.finishedAt, e.gameId, infoOf(e.gameId), true);
+  }
+
+  for (const a of acts) {
+    const e = byId.get(a.game);
+    if (e?.status === "wishlist") continue;
+    let played = false;
+    let finished = false;
+    for (const c of a.meta?.changes || []) {
+      if (!PLAY_CHANGES.has(c.kind)) continue;
+      if (c.kind === "added" && c.status !== "playing") continue;
+      if (c.kind === "status" && (!c.to || c.to === "wishlist")) continue;
+      played = true;
+      if (c.kind === "status" && c.to === "finished" && !e?.finishedAt) finished = true;
+    }
+    if (played) mark(a.createdAt, a.game, infoOf(a.game, a), finished);
+  }
+
+  return [...months.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([key, m]) => {
+      const list = [...m.values()].sort((a, b) => Number(b.finished) - Number(a.finished));
+      return {
+        key,
+        played: list.length,
+        finished: list.filter((x) => x.finished).length,
+        games: list.slice(0, MONTH_GAMES_CAP).map((x) => ({ ...x.info, finished: x.finished })),
+      };
+    });
+}
+
 router.get("/:username/stats", optionalAuth, async (req, res) => {
   try {
     const user = await User.findOne({ username: req.params.username }).select(
@@ -1635,8 +1734,18 @@ router.get("/:username/stats", optionalAuth, async (req, res) => {
     if (!user) return res.status(404).json({ error: "Profil introuvable." });
     if (await blockIfPrivate(res, user, req.userId)) return;
 
+    const cacheKey = String(user._id);
+    if (!req.query.fresh) {
+      // Une COPIE à chaque fois : le filtre des photos masquées (middleware
+      // avatarPrivacy) réécrit la réponse en place, selon le lecteur.
+      const hit = statsCache.get(cacheKey);
+      if (hit) return res.json(JSON.parse(hit));
+    }
+
     const entries = await UserGame.find({ user: user._id })
-      .select("gameId name cover status platform format playtimeHours favorite rating review")
+      .select(
+        "gameId name cover status platform format store playtimeHours favorite rating review startedAt finishedAt"
+      )
       .lean();
 
     const meta = await ensureGameMeta(entries.map((e) => e.gameId));
@@ -1694,29 +1803,33 @@ router.get("/:username/stats", optionalAuth, async (req, res) => {
       })
     );
 
+    // Regarder quelqu'un y jouer n'est pas y avoir joué : ces jeux-là ont leur
+    // propre bloc (« Regardés »), et sortent des consoles et des boutiques.
+    const LETSPLAY_PLATFORM = "Vu en let's play";
+
     // -- Consoles (plateforme déclarée sur l'entrée) --
     const platMap = new Map();
     for (const e of played) {
-      if (!e.platform) continue;
+      if (!e.platform || e.platform === LETSPLAY_PLATFORM) continue;
       const p = platMap.get(e.platform) || { name: e.platform, count: 0, hours: 0 };
       p.count += 1;
       p.hours += e.playtimeHours || 0;
       platMap.set(e.platform, p);
     }
     const platGames = groupGames(played, (e) => (e.platform ? [e.platform] : []));
+    const consoleBase = played.filter((e) => e.platform !== LETSPLAY_PLATFORM).length || 1;
     const platforms = [...platMap.values()]
       .sort((a, b) => b.count - a.count)
       .slice(0, 8)
       .map((p) => ({
         ...p,
-        pct: Math.round((p.count / played.length) * 100),
+        pct: Math.round((p.count / consoleBase) * 100),
         games: platGames.get(p.name) || [],
       }));
 
     // -- Démat vs physique vs let's play (jeux joués ; défaut : digital) --
     // Les jeux « vus en let's play » n'ont pas de format d'achat : on les sort
     // du décompte démat/physique pour en faire une catégorie à part.
-    const LETSPLAY_PLATFORM = "Vu en let's play";
     const letsplayEntries = played.filter((e) => e.platform === LETSPLAY_PLATFORM);
     const ownedEntries = played.filter((e) => e.platform !== LETSPLAY_PLATFORM);
     const physicalEntries = ownedEntries.filter((e) => e.format === "physical");
@@ -1728,6 +1841,36 @@ router.get("/:username/stats", optionalAuth, async (req, res) => {
       digitalGames: digitalEntries.slice(0, FACET_CAP).map(slim),
       physicalGames: physicalEntries.slice(0, FACET_CAP).map(slim),
       letsplayGames: letsplayEntries.slice(0, FACET_CAP).map(slim),
+    };
+
+    // -- Boutiques : OÙ l'on a joué sur PC, mobile ou cloud (Steam, Epic…) --
+    // Clés du client (lib/storeIcons) : le libellé et le logo vivent là-bas.
+    const storeEntries = ownedEntries.filter((e) => e.store);
+    const storeGames = groupGames(storeEntries, (e) => [e.store]);
+    const storeHours = new Map();
+    for (const e of storeEntries)
+      storeHours.set(e.store, (storeHours.get(e.store) || 0) + (e.playtimeHours || 0));
+    const stores = tally(storeEntries.map((e) => e.store))
+      .slice(0, 10)
+      .map(([key, count]) => ({
+        key,
+        count,
+        pct: Math.round((count / storeEntries.length) * 100),
+        hours: Math.round(storeHours.get(key) || 0),
+        games: storeGames.get(key) || [],
+      }));
+
+    // -- Regardés : les let's play, et chez qui on les a vus --
+    const channelOf = (e) => (WATCH_CHANNELS.includes(e.store) ? e.store : "other");
+    const watchGames = groupGames(letsplayEntries, (e) => [channelOf(e)]);
+    const watched = {
+      count: letsplayEntries.length,
+      channels: tally(letsplayEntries.map(channelOf)).map(([key, count]) => ({
+        key,
+        count,
+        games: watchGames.get(key) || [],
+      })),
+      games: letsplayEntries.slice(0, FACET_CAP).map(slim),
     };
 
     // -- Marathon : jeux avec le plus d'heures --
@@ -1765,42 +1908,83 @@ router.get("/:username/stats", optionalAuth, async (req, res) => {
     const franchiseGames = groupGames(base, (e) =>
       metaOf(e).franchise ? [metaOf(e).franchise] : []
     );
-    const franchises = tally(base.map((e) => metaOf(e).franchise))
+    const franchiseRows = tally(base.map((e) => metaOf(e).franchise))
       .filter(([, count]) => count >= 2)
-      .slice(0, 6)
-      .map(([name, count]) => ({
+      .slice(0, 6);
+    // Un jeu de chaque saga, pour la retrouver chez IGDB : la page d'une saga
+    // (la même que depuis la fiche d'un jeu) s'ouvre sur son identifiant.
+    const franchiseSeed = new Map(
+      franchiseRows.map(([name]) => [name, base.find((e) => metaOf(e).franchise === name)?.gameId])
+    );
+    const refs = await franchiseRefs([...franchiseSeed.values()]);
+    const franchises = franchiseRows.map(([name, count]) => {
+      const seed = franchiseSeed.get(name) || null;
+      const ref = seed ? refs.get(seed) : null;
+      return {
         name,
         count,
+        seed,
+        fid: ref?.id || null,
+        kind: ref?.kind || null,
         covers: base
           .filter((e) => metaOf(e).franchise === name && e.cover)
           .slice(0, 3)
           .map((e) => e.cover),
         games: franchiseGames.get(name) || [],
-      }));
+      };
+    });
 
     // -- Machine à remonter le temps : décennies de sortie --
-    const decadeGames = groupGames(base, (e) => {
+    const decadeOf = (e) => {
       const y = metaOf(e).year;
-      return y ? [Math.floor(y / 10) * 10] : [];
+      return y ? Math.floor(y / 10) * 10 : null;
+    };
+    const decadeGames = groupGames(base, (e) => {
+      const d = decadeOf(e);
+      return d != null ? [d] : [];
     });
-    const decades = tally(
-      base.map((e) => {
-        const y = metaOf(e).year;
-        return y ? Math.floor(y / 10) * 10 : null;
-      })
-    )
+    // Le visage de chaque décennie : le jeu qu'on y a le plus aimé.
+    const weight = (e) =>
+      (e.favorite ? 1000 : 0) + (e.rating ?? 0) * 2 + Math.min(e.playtimeHours || 0, 200) / 10;
+    const decadeTop = new Map();
+    for (const e of base) {
+      const d = decadeOf(e);
+      if (d == null || !e.cover) continue;
+      const cur = decadeTop.get(d);
+      if (!cur || weight(e) > weight(cur)) decadeTop.set(d, e);
+    }
+    const decades = tally(base.map(decadeOf))
       .map(([decade, count]) => ({
         decade,
         count,
+        top: decadeTop.has(decade) ? slim(decadeTop.get(decade)) : null,
         games: decadeGames.get(decade) || [],
       }))
       .sort((a, b) => a.decade - b.decade);
+    const oldestEntry = base
+      .filter((e) => metaOf(e).year)
+      .reduce((best, e) => (!best || metaOf(e).year < metaOf(best).year ? e : best), null);
+    const oldest = oldestEntry ? { ...slim(oldestEntry), year: metaOf(oldestEntry).year } : null;
 
     // -- Notes : distribution (10 paliers) + podium --
     const dist = Array.from({ length: 10 }, () => 0);
     for (const e of rated) dist[Math.min(9, Math.floor(e.rating / 10))] += 1;
     const ratingGames = groupGames(rated, (e) => [Math.min(9, Math.floor(e.rating / 10))]);
     const distGames = Array.from({ length: 10 }, (_, i) => ratingGames.get(i) || []);
+    // La même chose en demi-étoiles, comme l'app les pose : ½ ★ … 5 ★ (le cran
+    // le plus proche, cf. fromPctHalf côté mobile). Index 0 = ½ étoile.
+    const halfOf = (r) => Math.min(9, Math.max(0, Math.round(r / 10) - 1));
+    const starDist = Array.from({ length: 10 }, () => 0);
+    for (const e of rated) starDist[halfOf(e.rating)] += 1;
+    const starGroups = groupGames(rated, (e) => [halfOf(e.rating)]);
+    const starGames = Array.from({ length: 10 }, (_, i) => starGroups.get(i) || []);
+
+    // -- Mois par mois : les jeux joués, et ceux terminés --
+    // Deux sources, parce qu'aucune ne suffit : les dates posées à la main
+    // (début, fin) disent la vérité mais sont rares ; l'activité (chaque
+    // changement de statut, de temps de jeu…) est datée d'office. Un jeu
+    // compte UNE fois par mois, terminé ou non.
+    const monthly = await monthlyPlay(user._id, entries);
     const topRated = rated
       .slice()
       .sort((a, b) => b.rating - a.rating || (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0))
@@ -1832,9 +2016,21 @@ router.get("/:username/stats", optionalAuth, async (req, res) => {
     const mine = new Map(entries.map((e) => [e.gameId, e]));
     let soulmates = [];
     if (following.length && entries.length) {
-      const friendGames = await UserGame.find({ user: { $in: following } })
-        .select("user gameId rating favorite")
-        .lean();
+      // ⚠️ SEULS LES JEUX EN COMMUN font le voyage. On ramenait ici la
+      // bibliothèque ENTIÈRE de chaque abonnement (des dizaines de milliers
+      // de lignes pour un compte qui suit du monde) pour n'en garder que
+      // l'intersection. La taille de chaque bibliothèque, seule utile en plus,
+      // se compte à part sur l'index.
+      const [friendGames, sizes] = await Promise.all([
+        UserGame.find({ user: { $in: following }, gameId: { $in: [...mine.keys()] } })
+          .select("user gameId rating favorite")
+          .lean(),
+        UserGame.aggregate([
+          { $match: { user: { $in: following } } },
+          { $group: { _id: "$user", n: { $sum: 1 } } },
+        ]),
+      ]);
+      const sizeOf = new Map(sizes.map((s) => [String(s._id), s.n]));
       const byFriend = new Map();
       for (const g of friendGames) {
         const k = String(g.user);
@@ -1842,10 +2038,10 @@ router.get("/:username/stats", optionalAuth, async (req, res) => {
         byFriend.get(k).push(g);
       }
       const scored = [];
-      for (const [fid, list] of byFriend) {
-        const common = list.filter((g) => mine.has(g.gameId));
+      for (const [fid, common] of byFriend) {
         if (common.length < 3) continue;
-        const overlap = common.length / Math.min(entries.length, list.length);
+        const overlap =
+          common.length / Math.min(entries.length, sizeOf.get(fid) || common.length);
         const ratedPairs = common
           .map((g) => [g.rating, mine.get(g.gameId).rating])
           .filter(([a, b]) => a != null && b != null);
@@ -1908,7 +2104,7 @@ router.get("/:username/stats", optionalAuth, async (req, res) => {
       }
     }
 
-    res.json({
+    const payload = {
       totals: {
         games: entries.length,
         played: played.length,
@@ -1926,13 +2122,25 @@ router.get("/:username/stats", optionalAuth, async (req, res) => {
       statuses,
       platforms,
       formats,
+      stores,
+      watched,
       topByHours,
       genres,
       developers,
       publishers,
       franchises,
       decades,
-      ratings: { avg: avgRating, dist, distGames, top: topRated, flop: flopRated },
+      oldest,
+      monthly,
+      ratings: {
+        avg: avgRating,
+        dist,
+        distGames,
+        starDist,
+        starGames,
+        top: topRated,
+        flop: flopRated,
+      },
       soulmates,
       // Part des jeux dont on a les métadonnées (honnêteté des % affichés)
       metaCoverage: entries.length
@@ -1940,7 +2148,9 @@ router.get("/:username/stats", optionalAuth, async (req, res) => {
             (entries.filter((e) => meta.has(e.gameId)).length / entries.length) * 100
           )
         : 0,
-    });
+    };
+    statsCache.set(cacheKey, JSON.stringify(payload));
+    res.json(payload);
   } catch (err) {
     console.error("profile stats error:", err.message);
     res.status(500).json({ error: "Erreur lors du calcul des statistiques." });
@@ -1954,7 +2164,8 @@ router.get("/:username/stats", optionalAuth, async (req, res) => {
 // page, et les mêmes chiffres se relisent par console.
 //
 // Le tri N'EST PAS FAIT ICI : la réponse porte toutes les mesures (heures,
-// jeux, terminés, platines) pour chacun, globales et par console. Changer de
+// jeux, terminés, platines, succès et trophées) pour chacun, globales et par
+// console. Changer de
 // classement côté client est alors instantané, sans un aller-retour réseau à
 // chaque appui sur une pastille.
 const LEADERBOARD_CAP = 150; // abonnements pris en compte (les plus anciens)
@@ -2005,7 +2216,85 @@ router.get("/:username/leaderboard", optionalAuth, async (req, res) => {
       platinum: { $sum: { $cond: [{ $eq: ["$platinum", true] }, 1, 0] } },
     };
 
-    const [totals, byPlatform, byTop] = await Promise.all([
+    // Succès et trophées : combien chacun en a débloqué, ses grades PlayStation,
+    // et les dix jeux où il en a le plus. Mêmes règles que l'onglet Succès — un
+    // jeu masqué ou retiré ne compte pas, sauf pour son propriétaire.
+    const countTier = (tier) => ({
+      $size: { $filter: { input: "$tiers", as: "t", cond: { $eq: ["$$t", tier] } } },
+    });
+    const achievementsAgg = GameAchievements.aggregate([
+      { $match: { user: { $in: ids }, ...visibleMatch(req.userId) } },
+      {
+        $project: {
+          user: 1,
+          gameId: 1,
+          gameName: 1,
+          gameCover: 1,
+          platform: 1,
+          unlocked: 1,
+          total: 1,
+          tiers: {
+            $map: {
+              input: {
+                $filter: {
+                  input: { $ifNull: ["$achievements", []] },
+                  as: "a",
+                  cond: { $and: [{ $eq: ["$$a.unlocked", true] }, { $ne: ["$$a.tier", null] }] },
+                },
+              },
+              as: "a",
+              in: "$$a.tier",
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          user: 1,
+          gameId: 1,
+          gameName: 1,
+          gameCover: 1,
+          platform: 1,
+          unlocked: 1,
+          total: 1,
+          platinum: countTier("platinum"),
+          gold: countTier("gold"),
+          silver: countTier("silver"),
+          bronze: countTier("bronze"),
+        },
+      },
+      { $sort: { unlocked: -1 } },
+      {
+        $group: {
+          _id: "$user",
+          unlocked: { $sum: "$unlocked" },
+          total: { $sum: "$total" },
+          perfect: {
+            $sum: {
+              $cond: [{ $and: [{ $gt: ["$total", 0] }, { $eq: ["$unlocked", "$total"] }] }, 1, 0],
+            },
+          },
+          platinum: { $sum: "$platinum" },
+          gold: { $sum: "$gold" },
+          silver: { $sum: "$silver" },
+          bronze: { $sum: "$bronze" },
+          top: {
+            $push: {
+              gameId: "$gameId",
+              name: "$gameName",
+              cover: "$gameCover",
+              platform: "$platform",
+              unlocked: "$unlocked",
+              total: "$total",
+              platinum: { $gt: ["$platinum", 0] },
+            },
+          },
+        },
+      },
+      { $project: { unlocked: 1, total: 1, perfect: 1, platinum: 1, gold: 1, silver: 1, bronze: 1, top: { $slice: ["$top", LEADERBOARD_TOP] } } },
+    ]);
+
+    const [totals, byPlatform, byTop, byAch] = await Promise.all([
       UserGame.aggregate([{ $match: played }, { $group: { _id: "$user", ...measures } }]),
       UserGame.aggregate([
         { $match: { ...played, platform: { $nin: [null, ""] } } },
@@ -2040,8 +2329,10 @@ router.get("/:username/leaderboard", optionalAuth, async (req, res) => {
         },
         { $project: { games: { $slice: ["$games", LEADERBOARD_TOP] } } },
       ]),
+      achievementsAgg,
     ]);
 
+    const achOf = new Map(byAch.map((a) => [String(a._id), a]));
     const totalOf = new Map(totals.map((t) => [String(t._id), t]));
     const topOf = new Map(byTop.map((t) => [String(t._id), t.games || []]));
     const platsOf = new Map();
@@ -2078,6 +2369,7 @@ router.get("/:username/leaderboard", optionalAuth, async (req, res) => {
     const users = pool.map((p) => {
       const key = String(p._id);
       const t = totalOf.get(key) || {};
+      const a = achOf.get(key) || {};
       return {
         id: key,
         username: p.username,
@@ -2090,6 +2382,17 @@ router.get("/:username/leaderboard", optionalAuth, async (req, res) => {
         platinum: t.platinum || 0,
         topGames: topOf.get(key) || [],
         platforms: platsOf.get(key) || [],
+        // Succès (Steam) et trophées (PSN) débloqués, tous confondus.
+        achievements: a.unlocked || 0,
+        achievementsTotal: a.total || 0,
+        perfect: a.perfect || 0,
+        trophies: {
+          platinum: a.platinum || 0,
+          gold: a.gold || 0,
+          silver: a.silver || 0,
+          bronze: a.bronze || 0,
+        },
+        topAchievements: (a.top || []).filter((g) => g.unlocked > 0),
       };
     });
 

@@ -22,11 +22,65 @@ function toDoc(g) {
       ...new Set(companies.filter((c) => c.publisher).map((c) => c.company?.name).filter(Boolean)),
     ],
     franchise: g.franchises?.[0]?.name || g.collections?.[0]?.name || null,
+    ...franchiseRefOf(g),
     year: g.first_release_date
       ? new Date(g.first_release_date * 1000).getFullYear()
       : null,
     rating: g.total_rating ? Math.round(g.total_rating) : null,
   };
+}
+
+// L'identifiant IGDB de la saga retenue dans `franchise`, et sa nature : c'est
+// ce qu'attend la page d'une saga côté client (/games/franchises/:kind/:id).
+// IGDB renvoie l'id de tout objet déplié, `franchises.name` suffit donc.
+function franchiseRefOf(g) {
+  const f = g.franchises?.[0];
+  const c = g.collections?.[0];
+  if (f?.id) return { franchiseId: f.id, franchiseKind: "franchise" };
+  if (c?.id) return { franchiseId: c.id, franchiseKind: "collection" };
+  return { franchiseId: null, franchiseKind: null };
+}
+
+/**
+ * La saga (id + nature) de quelques jeux, pour ouvrir sa page.
+ *
+ * Les fiches mises en cache avant l'ajout de `franchiseId` ne l'ont pas : on
+ * ne les redemande à IGDB que pour les jeux passés ici — une poignée, ceux
+ * qui représentent les sagas affichées — et on range la réponse pour la fois
+ * suivante. Rend une Map gameId → { id, kind } (sans les jeux sans saga).
+ */
+export async function franchiseRefs(gameIds) {
+  const ids = [...new Set(gameIds)].filter((id) => id && !isLocalId(id));
+  const out = new Map();
+  if (!ids.length) return out;
+  const docs = await GameMeta.find({ gameId: { $in: ids } })
+    .select("gameId franchiseId franchiseKind")
+    .lean();
+  const known = new Set();
+  for (const d of docs) {
+    // `undefined` : jamais cherché ; `null` : cherché, pas de saga.
+    if (d.franchiseId === undefined) continue;
+    known.add(d.gameId);
+    if (d.franchiseId) out.set(d.gameId, { id: d.franchiseId, kind: d.franchiseKind });
+  }
+  const todo = ids.filter((id) => !known.has(id));
+  if (!todo.length) return out;
+  try {
+    const raw = await igdbQuery(
+      "games",
+      `fields franchises.name,collections.name; where id = (${todo.join(",")}); limit ${todo.length};`
+    );
+    const ops = [];
+    for (const g of raw) {
+      const ref = franchiseRefOf(g);
+      if (ref.franchiseId) out.set(g.id, { id: ref.franchiseId, kind: ref.franchiseKind });
+      ops.push({ updateOne: { filter: { gameId: g.id }, update: { $set: ref } } });
+    }
+    if (ops.length) await GameMeta.bulkWrite(ops, { ordered: false });
+  } catch (err) {
+    console.error("franchise refs error:", err.message);
+  }
+  return out;
 }
 
 // Garantit la présence en cache des métadonnées des jeux demandés et renvoie
