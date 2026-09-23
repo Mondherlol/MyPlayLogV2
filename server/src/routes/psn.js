@@ -10,6 +10,7 @@ import PlatformSync from "../models/PlatformSync.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { warmGameMeta } from "../lib/gameMeta.js";
 import { triggerMissionCheck } from "../lib/missions.js";
+import { hasChanged, lastSnapshot, needsLook } from "../lib/syncDiff.js";
 import { open as openSecret, seal } from "../lib/secretBox.js";
 import {
   isConfigured,
@@ -541,12 +542,22 @@ async function buildScan(userId, played, titles) {
     const existing = libMap.get(m.gameId);
     const inLibrary = !!existing;
     const progress = g.trophyProgress ?? 0;
+    // ⚠️ JAMAIS LANCÉ = ni une minute de jeu, ni un seul trophée. Ces jeux-là
+    // (achetés, offerts par le PS Plus, téléchargés puis oubliés) partaient en
+    // « En pause », alors que le récap les affichait « jamais lancé ». Même
+    // règle que Steam : ils vont dans « À jouer ». Les deux signaux comptent,
+    // parce que la PS3 et la Vita ne remontent aucun temps de jeu : un jeu PS3
+    // à 40 % de trophées a bien été joué, même à zéro minute.
+    const launched = g.playMinutes > 0 || progress > 0;
 
     let category;
     let suggestedStatus;
     if (inLibrary) {
       category = "update";
       suggestedStatus = existing.status;
+    } else if (!launched) {
+      category = "wishlist";
+      suggestedStatus = "wishlist";
     } else {
       category = "played";
       suggestedStatus = m.endless
@@ -573,7 +584,9 @@ async function buildScan(userId, played, titles) {
       trophyProgress: g.trophyProgress,
       definedTrophies: g.definedTrophies,
       hasPlatinum: g.hasPlatinum,
-      canImportTrophies: !!g.npCommunicationId && g.definedTrophies > 0,
+      // Une liste à 0 % d'un jeu jamais lancé n'apprend rien : comme Steam, on
+      // ne propose les trophées que d'un jeu auquel on a joué.
+      canImportTrophies: !!g.npCommunicationId && g.definedTrophies > 0 && launched,
       inLibrary,
       currentStatus: existing?.status || null,
       currentHours: existing?.playtimeHours ?? null,
@@ -1361,7 +1374,9 @@ function mapPsnSync(sync, { full = false } = {}) {
     kind: sync.kind,
     counts: sync.counts,
     result: sync.result,
-    total: items.length,
+    // Ce qui demande un regard ; les mises à jour inchangées se comptent à part.
+    total: items.filter(needsLook).length,
+    upToDate: items.length - items.filter(needsLook).length,
     selected: items.filter((i) => i.include).length,
     createdAt: sync.createdAt,
     appliedAt: sync.appliedAt,
@@ -1504,8 +1519,17 @@ router.post("/mobile/sync", requireAuth, async (req, res) => {
     const keptUnmatched = unmatched.filter((g) => !skip.has(g.titleKey));
     const ignored = games.length + unmatched.length - kept.length - keptUnmatched.length;
 
+    // Ce que PlayStation disait à la dernière synchro validée (cf. lib/syncDiff).
+    const snapshot = await lastSnapshot(req.userId, "psn");
+
     const items = kept.map((g) => {
       const better = g.playtimeHours > (g.currentHours || 0);
+      const changed =
+        g.category !== "update" ||
+        hasChanged(snapshot, g.titleKey, {
+          playtimeMinutes: g.playMinutes,
+          trophyProgress: g.trophyProgress,
+        });
       return {
         key: g.titleKey,
         sourceName: g.psnName,
@@ -1530,7 +1554,11 @@ router.post("/mobile/sync", requireAuth, async (req, res) => {
         hasPlatinum: g.hasPlatinum,
         consoles: g.consoles,
         suggestedConsole: g.suggestedConsole,
-        include: g.category === "update" ? better || g.canImportTrophies : true,
+        changed,
+        // Déjà en bibliothèque : coché seulement s'il a bougé depuis la
+        // dernière synchro — sinon le téléphone irait rechercher les trophées
+        // de toute la bibliothèque pour rien.
+        include: g.category === "update" ? changed && (better || g.canImportTrophies) : true,
         status: g.suggestedStatus,
         console: g.suggestedConsole,
         hours: g.playtimeHours,
@@ -1568,13 +1596,15 @@ router.post("/mobile/sync", requireAuth, async (req, res) => {
       counts,
     });
 
-    if (items.length) {
+    // Rien de neuf, rien à annoncer : les jeux inchangés ne valent pas un ping.
+    const fresh = items.filter(needsLook).length;
+    if (fresh) {
       await Notification.deleteMany({ user: req.userId, type: "import_pending", read: false });
       await Notification.create({
         user: req.userId,
         type: "import_pending",
         actor: null,
-        snippet: `${items.length} jeu${items.length > 1 ? "x" : ""} PlayStation à valider`,
+        snippet: `${fresh} jeu${fresh > 1 ? "x" : ""} PlayStation à valider`,
       }).catch(() => {});
     }
 

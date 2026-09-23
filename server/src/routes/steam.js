@@ -9,6 +9,7 @@ import Notification from "../models/Notification.js";
 import { requireAuth } from "../middleware/auth.js";
 import { warmGameMeta } from "../lib/gameMeta.js";
 import { triggerMissionCheck } from "../lib/missions.js";
+import { hasChanged, lastSnapshot, needsLook } from "../lib/syncDiff.js";
 import {
   isConfigured,
   buildLoginUrl,
@@ -523,7 +524,9 @@ function mapSync(sync, { full = false } = {}) {
     kind: sync.kind,
     counts: sync.counts,
     result: sync.result,
-    total: items.length,
+    // Ce qui demande un regard ; les mises à jour inchangées se comptent à part.
+    total: items.filter(needsLook).length,
+    upToDate: items.length - items.filter(needsLook).length,
     selected: items.filter((i) => i.include).length,
     createdAt: sync.createdAt,
     appliedAt: sync.appliedAt,
@@ -554,6 +557,8 @@ router.post("/sync", requireAuth, async (req, res) => {
     const { games, unmatched, counts, ignored } = await scanLibrary(req.userId, steamId, {
       skip: await ignoredAppIds(req.userId),
     });
+    // Ce que Steam disait à la dernière synchro validée (cf. lib/syncDiff).
+    const snapshot = await lastSnapshot(req.userId, "steam");
 
     // Les jeux « synced » (présents des deux côtés, jamais lancés) n'ont rien à
     // dire : on les compte, on ne les fait pas défiler.
@@ -564,6 +569,9 @@ router.post("/sync", requireAuth, async (req, res) => {
       .filter((g) => g.category !== "synced")
       .map((g) => {
         const better = g.playtimeHours > (g.currentHours || 0);
+        const changed =
+          g.category !== "update" ||
+          hasChanged(snapshot, g.appid, { playtimeMinutes: g.playtimeMinutes });
         return {
           key: String(g.appid),
           appid: g.appid,
@@ -581,9 +589,12 @@ router.post("/sync", requireAuth, async (req, res) => {
           category: g.category,
           suggestedStatus: g.suggestedStatus,
           canImportAchievements: g.canImportAchievements,
-          // Un jeu déjà présent n'est coché que s'il y a QUELQUE CHOSE à en
-          // faire : des heures en plus, ou des succès à récupérer.
-          include: g.category === "update" ? better || g.canImportAchievements : true,
+          changed,
+          // Un jeu déjà présent n'est coché que s'il a BOUGÉ depuis la
+          // dernière synchro, et qu'il y a quelque chose à en faire : des
+          // heures en plus, ou des succès à récupérer.
+          include:
+            g.category === "update" ? changed && (better || g.canImportAchievements) : true,
           status: g.suggestedStatus,
           hours: g.playtimeHours,
           updateHours: g.category === "update" ? better : true,
@@ -617,13 +628,15 @@ router.post("/sync", requireAuth, async (req, res) => {
     });
 
     // Une seule notification non lue à la fois : on remplace la précédente.
-    if (items.length) {
+    // Rien de neuf, rien à annoncer : les jeux inchangés ne valent pas un ping.
+    const fresh = items.filter(needsLook).length;
+    if (fresh) {
       await Notification.deleteMany({ user: req.userId, type: "import_pending", read: false });
       await Notification.create({
         user: req.userId,
         type: "import_pending",
         actor: null,
-        snippet: `${items.length} jeu${items.length > 1 ? "x" : ""} Steam à valider`,
+        snippet: `${fresh} jeu${fresh > 1 ? "x" : ""} Steam à valider`,
       }).catch(() => {});
     }
 

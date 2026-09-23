@@ -52,6 +52,10 @@ const itemSchema = new mongoose.Schema(
 
     // wishlist (jamais lancé) | played (joué, absent) | update (déjà là)
     category: { type: String, default: "played" },
+    // Mise à jour seulement : le jeu a-t-il bougé depuis la dernière synchro
+    // validée ? Faux, il sort de l'étape et attend dans « déjà à jour »
+    // (cf. lib/syncDiff).
+    changed: { type: Boolean, default: true },
     suggestedStatus: { type: String, default: "paused" },
     canImportAchievements: { type: Boolean, default: false },
 

@@ -186,7 +186,7 @@ export default function ProfileAchievements({ username, token, isMe }) {
             {data.rarest.slice(0, 12).map((a, i) => (
               <div
                 key={i}
-                className={`ach-rare-card clickable ${rarityClass(a.rarity)}`}
+                className={`ach-rare-card clickable ${rarityClass(a.rarityAdj ?? a.rarity)}`}
                 role="button"
                 tabIndex={0}
                 onClick={() => setOpenAch(a)}
@@ -320,7 +320,7 @@ export default function ProfileAchievements({ username, token, isMe }) {
                     <div className="ach-progress-fill" style={{ width: `${g.percent}%` }} />
                   </div>
                   {g.rarest && (
-                    <div className={`ach-game-rarest ${rarityClass(g.rarest.rarity)}`}>
+                    <div className={`ach-game-rarest ${rarityClass(g.rarest.rarityAdj ?? g.rarest.rarity)}`}>
                       <Gem size={11} />
                       <span>{g.rarest.name}</span>
                       <em>{g.rarest.rarity}%</em>
@@ -558,8 +558,8 @@ function SortMenu({ sort, setSort, dir, setDir }) {
 
 // Modale de détail d'UN succès (ouverte depuis les rails rares / récents).
 function AchievementModal({ ach, onClose }) {
-  const cls = rarityClass(ach.rarity);
-  const label = rarityLabel(ach.rarity);
+  const cls = rarityClass(ach.rarityAdj ?? ach.rarity);
+  const label = rarityLabel(ach.rarityAdj ?? ach.rarity);
   return (
     <div className="ach-modal-overlay" onClick={onClose}>
       <div className={`ach-single ${cls}`} onClick={(e) => e.stopPropagation()}>
@@ -689,7 +689,7 @@ function GameAchievementsModal({ username, token, game, onClose }) {
             shown.map((a) => (
               <div
                 key={a.apiName}
-                className={`ach-row ${a.unlocked ? "unlocked" : "locked"} ${rarityClass(a.rarity)}`}
+                className={`ach-row ${a.unlocked ? "unlocked" : "locked"} ${rarityClass(a.rarityAdj ?? a.rarity)}`}
               >
                 <div className="ach-row-icon">
                   {a.icon ? <img src={a.icon} alt="" /> : <Trophy size={20} />}

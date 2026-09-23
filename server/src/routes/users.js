@@ -2174,6 +2174,29 @@ const emptyTiers = () =>
 const rarityKey = (pct) =>
   pct < 5 ? "legendary" : pct < 15 ? "epic" : pct < 40 ? "rare" : "common";
 
+// ⚠️ LA RARETÉ BRUTE MENT SUR LES JEUX PEU JOUÉS. Steam compte parmi TOUS les
+// possesseurs — jeux de bundle, week-ends gratuits, achats jamais lancés — :
+// sur un jeu que presque personne n'a ouvert, même le succès du tutoriel
+// plafonne à 8 %, et toute la liste passait « légendaire ». On mesure donc
+// la rareté PARMI CEUX QUI ONT JOUÉ : le succès le plus obtenu du jeu sert
+// d'étalon (≈ la part des possesseurs qui l'a vraiment lancé), et chaque
+// pourcentage est ramené à lui. Le pourcentage affiché reste le vrai ; seuls
+// le PALIER (légendaire, épique…) et les classements suivent la valeur
+// ajustée. Sous cinq succès notés, l'étalon ne vaut rien : on garde le brut.
+const RARITY_MIN_SAMPLE = 5;
+function rarityBase(list) {
+  let max = 0;
+  let n = 0;
+  for (const a of list || []) {
+    if (a.rarity == null) continue;
+    n++;
+    if (a.rarity > max) max = a.rarity;
+  }
+  return n >= RARITY_MIN_SAMPLE && max > 0 ? max : null;
+}
+const adjustRarity = (pct, base) =>
+  pct == null ? null : base ? Math.min(100, Math.round((pct / base) * 1000) / 10) : pct;
+
 // --- Onglet « Succès » du profil : synthèse des succès (Steam pour l'instant,
 //     PSN prévu) agrégés par jeu + statistiques globales. ---
 router.get("/:username/achievements", optionalAuth, async (req, res) => {
@@ -2190,18 +2213,22 @@ router.get("/:username/achievements", optionalAuth, async (req, res) => {
     // Temps de jeu / note depuis la bibliothèque (jointure par gameId) pour
     // permettre les tris « temps de jeu » et « note » côté client.
     const ugs = await UserGame.find({ user: user._id })
-      .select("gameId playtimeHours rating")
+      .select("gameId playtimeHours rating platform")
       .lean();
     const ugMap = new Map(ugs.map((u) => [u.gameId, u]));
+
+    // L'étalon de rareté de chaque jeu (cf. rarityBase), calculé une fois.
+    const bases = new Map(docs.map((d) => [String(d._id), rarityBase(d.achievements)]));
+    const adj = (d, a) => adjustRarity(a.rarity, bases.get(String(d._id)));
 
     const games = docs
       .map((d) => {
         const percent = d.total ? Math.round((d.unlocked / d.total) * 100) : 0;
         const list = d.achievements || [];
-        // Succès débloqué le plus rare de ce jeu (rareté = % de joueurs).
+        // Succès débloqué le plus rare de ce jeu, rareté ajustée.
         const rarest = list
           .filter((a) => a.unlocked && a.rarity != null)
-          .sort((a, b) => a.rarity - b.rarity)[0];
+          .sort((a, b) => adj(d, a) - adj(d, b))[0];
         // Date du dernier succès débloqué (pour le tri « activité récente »).
         let lastUnlock = null;
         for (const a of list) {
@@ -2218,7 +2245,7 @@ router.get("/:username/achievements", optionalAuth, async (req, res) => {
         const rarity = { legendary: 0, epic: 0, rare: 0, common: 0 };
         const tiers = d.platform === "psn" ? emptyTiers() : null;
         for (const a of list) {
-          if (a.unlocked && a.rarity != null) rarity[rarityKey(a.rarity)]++;
+          if (a.unlocked && a.rarity != null) rarity[rarityKey(adj(d, a))]++;
           if (tiers && TIER_KEYS.includes(a.tier)) {
             tiers[a.tier].total++;
             if (a.unlocked) tiers[a.tier].earned++;
@@ -2235,6 +2262,7 @@ router.get("/:username/achievements", optionalAuth, async (req, res) => {
           perfect: d.total > 0 && d.unlocked === d.total,
           playtime: ug?.playtimeHours ?? null,
           rating: ug?.rating ?? null,
+          console: ug?.platform || null,
           lastUnlock: lastUnlock ? new Date(lastUnlock) : null,
           createdAt: d.createdAt,
           updatedAt: d.updatedAt,
@@ -2242,6 +2270,7 @@ router.get("/:username/achievements", optionalAuth, async (req, res) => {
             ? {
                 name: rarest.name,
                 rarity: rarest.rarity,
+                rarityAdj: adj(d, rarest),
                 icon: rarest.icon,
                 tier: rarest.tier || null,
               }
@@ -2263,6 +2292,7 @@ router.get("/:username/achievements", optionalAuth, async (req, res) => {
           description: a.description,
           icon: a.icon,
           rarity: a.rarity,
+          rarityAdj: adj(d, a),
           tier: a.tier || null,
           unlockedAt: a.unlockedAt,
           gameId: d.gameId,
@@ -2285,7 +2315,9 @@ router.get("/:username/achievements", optionalAuth, async (req, res) => {
         .sort((a, b) => new Date(b.unlockedAt) - new Date(a.unlockedAt))
     );
     const rarest = perPlatform(
-      flat.filter((a) => a.rarity != null).sort((a, b) => a.rarity - b.rarity)
+      flat
+        .filter((a) => a.rarity != null)
+        .sort((a, b) => a.rarityAdj - b.rarityAdj || a.rarity - b.rarity)
     );
 
     const withAch = games.filter((g) => g.total > 0);
@@ -2296,7 +2328,7 @@ router.get("/:username/achievements", optionalAuth, async (req, res) => {
       : 0;
     // Succès « légendaires » débloqués : rareté mondiale < 5 %.
     const legendaryUnlocked = flat.filter(
-      (a) => a.rarity != null && a.rarity < 5
+      (a) => a.rarityAdj != null && a.rarityAdj < 5
     ).length;
     // Répartition des jeux suivis par plateforme (pour les filtres client).
     const byPlatform = games.reduce((acc, g) => {
@@ -2339,6 +2371,176 @@ router.get("/:username/achievements", optionalAuth, async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+//  Se comparer : les succès des gens qu'on suit
+// ---------------------------------------------------------------------------
+// « Les gens » = ceux que le LECTEUR suit, plus le lecteur lui-même, plus le
+// propriétaire de la page. Ceux qu'on suit sont lisibles même en privé (un
+// abonnement à un compte privé n'existe qu'une fois accepté) : aucun contrôle
+// de confidentialité de plus à faire sur eux.
+async function comparePeople(ownerId, viewerId) {
+  const me = viewerId ? await User.findById(viewerId).select("following").lean() : null;
+  const ids = new Set((me?.following || []).map(String));
+  if (viewerId) ids.add(String(viewerId));
+  ids.add(String(ownerId));
+  return [...ids].map((id) => new mongoose.Types.ObjectId(id));
+}
+
+async function peopleCards(ids) {
+  const users = await User.find({ _id: { $in: ids } })
+    .select("_id username avatar")
+    .lean();
+  return new Map(users.map((u) => [String(u._id), u]));
+}
+
+// Le classement entre abonnés, par plateforme (le client additionne pour
+// « Tout »). Une agrégation, pas des documents entiers : on ne ramène pas les
+// milliers de succès de chacun pour n'en garder que des totaux.
+router.get("/:username/achievements/friends", optionalAuth, async (req, res) => {
+  try {
+    const owner = await User.findOne({ username: req.params.username }).select("_id privacy");
+    if (!owner) return res.status(404).json({ error: "Profil introuvable." });
+    if (await blockIfPrivate(res, owner, req.userId)) return;
+    if (!req.userId) return res.json({ people: [] });
+
+    const ids = await comparePeople(owner._id, req.userId);
+    const rows = await GameAchievements.aggregate([
+      { $match: { user: { $in: ids } } },
+      {
+        $project: {
+          user: 1,
+          platform: 1,
+          unlocked: 1,
+          total: 1,
+          perfect: {
+            $cond: [
+              { $and: [{ $gt: ["$total", 0] }, { $eq: ["$unlocked", "$total"] }] },
+              1,
+              0,
+            ],
+          },
+          platinum: {
+            $size: {
+              $filter: {
+                input: { $ifNull: ["$achievements", []] },
+                as: "a",
+                cond: {
+                  $and: [{ $eq: ["$$a.unlocked", true] }, { $eq: ["$$a.tier", "platinum"] }],
+                },
+              },
+            },
+          },
+        },
+      },
+      {
+        $group: {
+          _id: { user: "$user", platform: "$platform" },
+          games: { $sum: 1 },
+          unlocked: { $sum: "$unlocked" },
+          total: { $sum: "$total" },
+          perfect: { $sum: "$perfect" },
+          platinum: { $sum: "$platinum" },
+        },
+      },
+    ]);
+
+    const cards = await peopleCards(ids);
+    const byUser = new Map();
+    for (const r of rows) {
+      const id = String(r._id.user);
+      const u = cards.get(id);
+      if (!u) continue;
+      if (!byUser.has(id)) {
+        byUser.set(id, {
+          id,
+          username: u.username,
+          avatar: u.avatar || null,
+          isMe: id === String(req.userId),
+          isOwner: id === String(owner._id),
+          byPlatform: {},
+        });
+      }
+      byUser.get(id).byPlatform[r._id.platform] = {
+        games: r.games,
+        unlocked: r.unlocked,
+        total: r.total,
+        perfect: r.perfect,
+        platinum: r.platinum,
+      };
+    }
+    res.json({ people: [...byUser.values()] });
+  } catch (err) {
+    console.error("achievements friends error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement des amis." });
+  }
+});
+
+// Qui, parmi les gens qu'on suit, a ce jeu — et lesquels de ses succès.
+// `got` : apiName → date d'obtention (ou true sans date), débloqués seulement.
+router.get("/:username/achievements/:gameId/friends", optionalAuth, async (req, res) => {
+  try {
+    const owner = await User.findOne({ username: req.params.username }).select(
+      "_id username avatar privacy"
+    );
+    if (!owner) return res.status(404).json({ error: "Profil introuvable." });
+    if (await blockIfPrivate(res, owner, req.userId)) return;
+    if (!req.userId) return res.json({ people: [] });
+
+    const gameId = Number(req.params.gameId);
+    if (!Number.isFinite(gameId)) return res.json({ people: [] });
+    const platform = ["steam", "psn"].includes(req.query.platform) ? req.query.platform : null;
+    const ids = (await comparePeople(owner._id, req.userId)).filter(
+      (id) => String(id) !== String(owner._id)
+    );
+    if (!ids.length) return res.json({ people: [] });
+
+    const docs = await GameAchievements.find({
+      user: { $in: ids },
+      gameId,
+      ...(platform ? { platform } : {}),
+    })
+      .select("user total unlocked achievements.apiName achievements.unlocked achievements.unlockedAt")
+      .lean();
+
+    const cards = await peopleCards(docs.map((d) => d.user));
+    const people = [];
+    for (const d of docs) {
+      const u = cards.get(String(d.user));
+      if (!u) continue;
+      const got = {};
+      for (const a of d.achievements || []) {
+        if (a.unlocked) got[a.apiName] = a.unlockedAt || true;
+      }
+      people.push({
+        id: String(u._id),
+        username: u.username,
+        avatar: u.avatar || null,
+        isMe: String(u._id) === String(req.userId),
+        total: d.total,
+        unlocked: d.unlocked,
+        percent: d.total ? Math.round((d.unlocked / d.total) * 100) : 0,
+        got,
+      });
+    }
+    // Le lecteur d'abord, puis les plus avancés.
+    people.sort((a, b) => (b.isMe ? 1 : 0) - (a.isMe ? 1 : 0) || b.percent - a.percent);
+    // Le propriétaire de la page, pour le face-à-face : ses succès, le client
+    // les a déjà ; il lui manque son visage.
+    res.json({
+      owner: {
+        id: String(owner._id),
+        username: owner.username,
+        avatar: owner.avatar || null,
+        isMe: String(owner._id) === String(req.userId),
+      },
+      people,
+    });
+  } catch (err) {
+    console.error("achievements game friends error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
 // --- Liste complète des succès d'UN jeu (chargée à l'ouverture d'une carte). ---
 router.get("/:username/achievements/:gameId", optionalAuth, async (req, res) => {
   try {
@@ -2356,8 +2558,13 @@ router.get("/:username/achievements/:gameId", optionalAuth, async (req, res) => 
       ...(platform ? { platform } : {}),
     }).lean();
     if (!doc) return res.json({ achievements: [] });
+    const base = rarityBase(doc.achievements);
     // Débloqués d'abord (par date récente), puis verrouillés (par rareté).
-    const achievements = (doc.achievements || []).slice().sort((a, b) => {
+    const achievements = (doc.achievements || []).map((a) => ({
+      ...a,
+      rarityAdj: adjustRarity(a.rarity, base),
+    }));
+    achievements.sort((a, b) => {
       if (a.unlocked !== b.unlocked) return a.unlocked ? -1 : 1;
       if (a.unlocked) return new Date(b.unlockedAt || 0) - new Date(a.unlockedAt || 0);
       return (b.rarity ?? -1) - (a.rarity ?? -1);
@@ -2384,6 +2591,11 @@ router.get("/:username/achievements/:gameId", optionalAuth, async (req, res) => 
       /* pas de backdrop → repli jaquette côté client */
     }
 
+    // Ce que la bibliothèque sait du jeu : les heures, la console, le statut.
+    const ug = await UserGame.findOne({ user: user._id, gameId: doc.gameId })
+      .select("playtimeHours platform status")
+      .lean();
+
     res.json({
       gameId: doc.gameId,
       name: doc.gameName,
@@ -2392,6 +2604,9 @@ router.get("/:username/achievements/:gameId", optionalAuth, async (req, res) => 
       platform: doc.platform,
       total: doc.total,
       unlocked: doc.unlocked,
+      playtime: ug?.playtimeHours ?? null,
+      console: ug?.platform || null,
+      status: ug?.status || null,
       achievements,
     });
   } catch (err) {
