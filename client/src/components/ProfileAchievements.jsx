@@ -183,7 +183,7 @@ export default function ProfileAchievements({ username, token, isMe }) {
             <Gem size={16} /> Tes succès les plus rares
           </h3>
           <Rail>
-            {data.rarest.map((a, i) => (
+            {data.rarest.slice(0, 12).map((a, i) => (
               <div
                 key={i}
                 className={`ach-rare-card clickable ${rarityClass(a.rarity)}`}
@@ -212,7 +212,7 @@ export default function ProfileAchievements({ username, token, isMe }) {
             <Sparkles size={16} /> Débloqués récemment
           </h3>
           <Rail>
-            {data.recent.map((a, i) => (
+            {data.recent.slice(0, 12).map((a, i) => (
               <div
                 key={i}
                 className="ach-recent-card clickable"
@@ -603,7 +603,7 @@ function GameAchievementsModal({ username, token, game, onClose }) {
 
   useEffect(() => {
     let alive = true;
-    apiFetch(`/users/${username}/achievements/${game.gameId}`, { token })
+    apiFetch(`/users/${username}/achievements/${game.gameId}?platform=${game.platform}`, { token })
       .then((d) => alive && setData(d))
       .catch(() => alive && setData({ achievements: [] }))
       .finally(() => alive && setLoading(false));

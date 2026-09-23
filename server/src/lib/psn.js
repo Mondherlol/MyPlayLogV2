@@ -360,11 +360,20 @@ export async function fetchPlayedGames(accessToken, accountId) {
   }));
 }
 
+// Sony rend les noms et descriptions de trophées dans la langue de
+// `Accept-Language`, et en anglais sans lui. Même langue que l'import Steam
+// (`l=french`, cf. lib/steam.js) : un profil ne doit pas mélanger les deux. Un
+// jeu sans traduction française revient simplement dans sa langue par défaut.
+const TROPHY_LANG = { "Accept-Language": "fr-FR" };
+
 // Trophées d'un titre (définitions + statut gagné/pas gagné fusionnés).
 export async function fetchTitleTrophies(accessToken, npCommunicationId, npServiceName, accountId) {
   const opts = npServiceName ? { npServiceName } : {};
   const [defs, earned] = await Promise.all([
-    getTitleTrophies(auth(accessToken), npCommunicationId, "all", opts),
+    getTitleTrophies(auth(accessToken), npCommunicationId, "all", {
+      ...opts,
+      headerOverrides: TROPHY_LANG,
+    }),
     getUserTrophiesEarnedForTitle(
       auth(accessToken),
       accountId,

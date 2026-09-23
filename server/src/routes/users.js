@@ -2166,6 +2166,14 @@ router.get("/:username/common/:other", optionalAuth, async (req, res) => {
   }
 });
 
+// Grades de trophées PlayStation, du plus prestigieux au plus courant.
+const TIER_KEYS = ["platinum", "gold", "silver", "bronze"];
+const emptyTiers = () =>
+  Object.fromEntries(TIER_KEYS.map((k) => [k, { earned: 0, total: 0 }]));
+// Paliers de rareté (% de joueurs) : mêmes seuils que les deux clients.
+const rarityKey = (pct) =>
+  pct < 5 ? "legendary" : pct < 15 ? "epic" : pct < 40 ? "rare" : "common";
+
 // --- Onglet « Succès » du profil : synthèse des succès (Steam pour l'instant,
 //     PSN prévu) agrégés par jeu + statistiques globales. ---
 router.get("/:username/achievements", optionalAuth, async (req, res) => {
@@ -2203,6 +2211,19 @@ router.get("/:username/achievements", optionalAuth, async (req, res) => {
           }
         }
         const ug = ugMap.get(d.gameId);
+        // Débloqués par palier de rareté (mêmes seuils que les clients : 5 /
+        // 15 / 40 %), et, pour PlayStation, par grade de trophée — obtenus et
+        // au total. De quoi recalculer côté client les chiffres d'un filtre
+        // (Steam seul, PSN seul) sans redemander la liste complète.
+        const rarity = { legendary: 0, epic: 0, rare: 0, common: 0 };
+        const tiers = d.platform === "psn" ? emptyTiers() : null;
+        for (const a of list) {
+          if (a.unlocked && a.rarity != null) rarity[rarityKey(a.rarity)]++;
+          if (tiers && TIER_KEYS.includes(a.tier)) {
+            tiers[a.tier].total++;
+            if (a.unlocked) tiers[a.tier].earned++;
+          }
+        }
         return {
           gameId: d.gameId,
           name: d.gameName,
@@ -2218,8 +2239,15 @@ router.get("/:username/achievements", optionalAuth, async (req, res) => {
           createdAt: d.createdAt,
           updatedAt: d.updatedAt,
           rarest: rarest
-            ? { name: rarest.name, rarity: rarest.rarity, icon: rarest.icon }
+            ? {
+                name: rarest.name,
+                rarity: rarest.rarity,
+                icon: rarest.icon,
+                tier: rarest.tier || null,
+              }
             : null,
+          rarity,
+          tiers,
         };
       })
       .sort((a, b) => b.unlocked - a.unlocked || b.percent - a.percent);
@@ -2230,10 +2258,12 @@ router.get("/:username/achievements", optionalAuth, async (req, res) => {
       for (const a of d.achievements || []) {
         if (!a.unlocked) continue;
         flat.push({
+          apiName: a.apiName,
           name: a.name,
           description: a.description,
           icon: a.icon,
           rarity: a.rarity,
+          tier: a.tier || null,
           unlockedAt: a.unlockedAt,
           gameId: d.gameId,
           gameName: d.gameName,
@@ -2242,14 +2272,21 @@ router.get("/:username/achievements", optionalAuth, async (req, res) => {
         });
       }
     }
-    const recent = flat
-      .filter((a) => a.unlockedAt)
-      .sort((a, b) => new Date(b.unlockedAt) - new Date(a.unlockedAt))
-      .slice(0, 12);
-    const rarest = flat
-      .filter((a) => a.rarity != null)
-      .sort((a, b) => a.rarity - b.rarity)
-      .slice(0, 12);
+    // Vingt par plateforme et non vingt en tout : le client filtre Steam /
+    // PlayStation, et un joueur surtout Steam n'aurait sinon aucun trophée à
+    // montrer une fois PlayStation choisi.
+    const perPlatform = (list) => {
+      const seen = {};
+      return list.filter((a) => (seen[a.platform] = (seen[a.platform] || 0) + 1) <= 20);
+    };
+    const recent = perPlatform(
+      flat
+        .filter((a) => a.unlockedAt)
+        .sort((a, b) => new Date(b.unlockedAt) - new Date(a.unlockedAt))
+    );
+    const rarest = perPlatform(
+      flat.filter((a) => a.rarity != null).sort((a, b) => a.rarity - b.rarity)
+    );
 
     const withAch = games.filter((g) => g.total > 0);
     const totalUnlocked = games.reduce((s, g) => s + g.unlocked, 0);
@@ -2266,6 +2303,15 @@ router.get("/:username/achievements", optionalAuth, async (req, res) => {
       acc[g.platform] = (acc[g.platform] || 0) + 1;
       return acc;
     }, {});
+    // Les trophées PlayStation par grade, tous jeux confondus.
+    const trophies = emptyTiers();
+    for (const g of games) {
+      if (!g.tiers) continue;
+      for (const k of TIER_KEYS) {
+        trophies[k].earned += g.tiers[k].earned;
+        trophies[k].total += g.tiers[k].total;
+      }
+    }
 
     res.json({
       isMe,
@@ -2281,6 +2327,7 @@ router.get("/:username/achievements", optionalAuth, async (req, res) => {
         perfectGames: games.filter((g) => g.perfect).length,
         legendaryUnlocked,
         byPlatform,
+        trophies: byPlatform.psn ? trophies : null,
       },
       games,
       recent,
@@ -2298,9 +2345,15 @@ router.get("/:username/achievements/:gameId", optionalAuth, async (req, res) => 
     const user = await User.findOne({ username: req.params.username }).select("_id privacy");
     if (!user) return res.status(404).json({ error: "Profil introuvable." });
     if (await blockIfPrivate(res, user, req.userId)) return;
+    // Un même jeu peut avoir ses succès Steam ET ses trophées PlayStation :
+    // sans plateforme, on ne savait pas lequel des deux on renvoyait.
+    const platform = ["steam", "psn"].includes(req.query.platform)
+      ? req.query.platform
+      : null;
     const doc = await GameAchievements.findOne({
       user: user._id,
       gameId: Number(req.params.gameId),
+      ...(platform ? { platform } : {}),
     }).lean();
     if (!doc) return res.json({ achievements: [] });
     // Débloqués d'abord (par date récente), puis verrouillés (par rareté).
