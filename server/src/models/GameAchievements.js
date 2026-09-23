@@ -25,7 +25,10 @@ const gameAchievementsSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     gameId: { type: Number, required: true }, // id IGDB (rattachement à la fiche)
-    platform: { type: String, enum: ["steam", "psn"], default: "steam" },
+    // `local` : remontés par le compagnon PC depuis les fichiers d'un
+    // émulateur de succès (jeux hors boutique). Déclaratifs, donc tenus à
+    // l'écart des classements (cf. routes users, leaderboard).
+    platform: { type: String, enum: ["steam", "psn", "local"], default: "steam" },
     // Référence propre à la plateforme (appid Steam / npCommunicationId PSN).
     platformAppId: { type: String, default: null },
     gameName: { type: String, default: "" },

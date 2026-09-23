@@ -204,6 +204,8 @@ app.use("/api/gba-stream", gbaStreamRoutes);
 app.use("/api/listen", listenRoutes);
 app.use("/api/arcade", arcadeRoutes);
 app.use("/api/steam", steamRoutes);
+// Le compagnon PC : succès et temps de jeu des jeux hors boutique.
+app.use("/api/companion", companionRoutes);
 // Import d'une bibliothèque Backloggd (lecture des pages publiques du profil).
 app.use("/api/backloggd", backloggdRoutes);
 // Le parcours d'accueil des nouveaux inscrits : les jeux et les sagas qu'il

@@ -203,6 +203,63 @@ export async function getGameAchievements(steamId, appid, lang = "french") {
   };
 }
 
+// Les succès d'un jeu SANS la progression d'un joueur : le schéma (noms,
+// descriptions, icônes) et la rareté mondiale. Sert au compagnon PC, qui
+// connaît ce que le joueur a débloqué (fichiers de l'émulateur) mais pas le
+// reste. `unlocked` : Map apiName → Date|null des succès débloqués.
+// Renvoie null si le jeu n'a pas de succès connus de Steam.
+// Le schéma et la rareté bougent peu : douze heures de cache, le compagnon
+// renvoyant le même jeu à chaque succès débloqué.
+const schemaCache = new Map(); // `${appid}|${lang}` → { at, schemaJ, globalJ }
+const SCHEMA_TTL = 12 * 60 * 60 * 1000;
+
+export async function getAchievementSchema(appid, unlocked = new Map(), lang = "french") {
+  const ck = `${appid}|${lang}`;
+  let hit = schemaCache.get(ck);
+  if (!hit || Date.now() - hit.at > SCHEMA_TTL) {
+    const [schemaJ, globalJ] = await Promise.all([
+      getJson(`${API}/ISteamUserStats/GetSchemaForGame/v2/?key=${key()}&appid=${appid}&l=${lang}`),
+      getJson(
+        `${API}/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/?gameid=${appid}`
+      ),
+    ]);
+    // Une réponse vide (Steam en panne) ne s'installe pas pour douze heures.
+    if (schemaJ) {
+      if (schemaCache.size > 1000) schemaCache.delete(schemaCache.keys().next().value);
+      hit = { at: Date.now(), schemaJ, globalJ };
+      schemaCache.set(ck, hit);
+    } else {
+      hit = { schemaJ, globalJ };
+    }
+  }
+  const { schemaJ, globalJ } = hit;
+  const schemaList = schemaJ?.game?.availableGameStats?.achievements || [];
+  if (!schemaList.length) return null;
+  const globalMap = new Map(
+    (globalJ?.achievementpercentages?.achievements || []).map((a) => [a.name, a.percent])
+  );
+  const achievements = schemaList.map((s) => {
+    const got = unlocked.has(s.name);
+    const pct = globalMap.get(s.name);
+    return {
+      apiName: s.name,
+      name: s.displayName || s.name,
+      description: s.description || "",
+      icon: (got ? s.icon : s.icongray) || s.icon || null,
+      hidden: s.hidden === 1,
+      unlocked: got,
+      unlockedAt: got ? unlocked.get(s.name) || null : null,
+      rarity: pct != null ? Math.round(Number(pct) * 10) / 10 : null,
+    };
+  });
+  return {
+    gameName: schemaJ?.game?.gameName || "",
+    total: achievements.length,
+    unlocked: achievements.filter((a) => a.unlocked).length,
+    achievements,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Matching Steam appid -> jeu IGDB
 // ---------------------------------------------------------------------------
