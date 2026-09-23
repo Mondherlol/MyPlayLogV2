@@ -58,6 +58,7 @@ import downloadRoutes from "./routes/downloads.js";
 import appReleaseRoutes from "./routes/appRelease.js";
 import trackerRoutes, { startTrackerAutoSync } from "./routes/trackers.js";
 import { startSteamIgdbSync } from "./lib/steamIgdbSync.js";
+import { startCatalogSync } from "./lib/catalogs.js";
 import {
   startEventCalendarSync,
   startEventReminders,
@@ -340,6 +341,10 @@ async function start() {
     // on redemande régulièrement, et le jour où IGDB les ajoute on recolle les
     // bibliothèques sur la vraie fiche (cf. lib/steamIgdbSync.js).
     startSteamIgdbSync();
+    // Les catalogues Game Pass et GeForce NOW, relevés deux fois par jour :
+    // les rails de l'accueil, et la place d'un jeu dans chacun sur sa fiche
+    // (cf. lib/catalogs.js).
+    startCatalogSync();
     // Le calendrier des rendez-vous à venir (Directs, showcases) : deux
     // passages par jour, Wikipédia + IGDB. Cf. lib/eventCalendar.
     startEventCalendarSync();

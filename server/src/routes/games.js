@@ -36,6 +36,18 @@ import GameEvent from "../models/GameEvent.js";
 import GameHype from "../models/GameHype.js";
 import List from "../models/List.js";
 import { fetchHltbTimes } from "../lib/hltb.js";
+import { availabilityOf, catalogHome } from "../lib/catalogs.js";
+import {
+  itadEnabled,
+  itadHistory,
+  itadIdOf,
+  itadPrices,
+  steamDeals,
+  steamOffer,
+  steamPlayers,
+  steamReviews,
+} from "../lib/prices.js";
+import { getFreeGameForIgdbId } from "../lib/freeGames.js";
 import { buildGameFeed, fetchSteamReviews } from "../lib/feed.js";
 import { findVnId, fetchVnCharacters, fetchVnFrPatches } from "../lib/vndb.js";
 import { GENRES_FR, MODES_FR, THEMES_FR, LANGUAGES_FR, frName } from "../lib/translations.js";
@@ -938,6 +950,30 @@ router.get("/releases/awaited", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("awaited releases error:", err.message);
     res.status(500).json({ error: "Erreur lors de la récupération des attentes." });
+  }
+});
+
+// GET /api/games/catalogs/home
+// Les rails de l'accueil qui regardent AU-DEHORS de la bibliothèque : le Game
+// Pass (populaires, nouveautés, départs, arrivées), GeForce NOW (nouveaux,
+// populaires) et les promos Steam du moment. Chaque source peut manquer sans
+// emporter les autres : son rail disparaît, c'est tout.
+router.get("/catalogs/home", optionalAuth, async (req, res) => {
+  try {
+    const [catalogs, deals] = await Promise.all([
+      catalogHome().catch((err) => {
+        console.error("catalog home error:", err.message);
+        return null;
+      }),
+      steamDeals().catch((err) => {
+        console.error("steam deals error:", err.message);
+        return [];
+      }),
+    ]);
+    res.json({ ...(catalogs || {}), deals });
+  } catch (err) {
+    console.error("catalogs home error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement des catalogues." });
   }
 });
 
@@ -3419,6 +3455,93 @@ async function hypePayload(gameId, userId) {
     friends,
   };
 }
+
+// --- Où l'acheter ----------------------------------------------------------
+// Tout ce qui répond à « je le prends où, et à combien ? » : le prix Steam et
+// ses joueurs du moment, le prix chez chaque boutique et le plus bas jamais vu
+// (IsThereAnyDeal, si une clé est configurée), la courbe des prix, et la place
+// du jeu dans le Game Pass et GeForce NOW. Chaque source est facultative.
+const offersCache = createTtlCache({
+  name: "games:offers",
+  max: 500,
+  ttl: 30 * 60 * 1000,
+});
+
+// Les boutiques d'un jeu AVEC leur lien (storesFrom ne garde que les clés).
+function storeLinks(externalGames) {
+  const out = new Map();
+  for (const r of externalGames || []) {
+    const url = String(r.url || "");
+    const key =
+      STORE_SOURCES[r.external_game_source] ||
+      STORE_URLS.find(([re]) => re.test(url))?.[1];
+    if (!key || key === "gamepass" || out.has(key) || !/^https?:\/\//.test(url)) continue;
+    out.set(key, url);
+  }
+  return [...out].map(([key, url]) => ({ key, url }));
+}
+
+// PC Windows, Mac, Linux : là où IsThereAnyDeal a quelque chose à dire.
+const PC_PLATFORMS = new Set([6, 14, 3]);
+
+router.get("/:id/offers", optionalAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+    const hit = offersCache.get(id);
+    if (hit) return res.json(hit);
+
+    const core = await gameCore(id).catch(() => null);
+    const name = core?.name || "";
+    const appid = isLocalId(id) ? appIdOf(id) : await resolveSteamAppId(id);
+    const onPc = (core?.platforms || []).some((p) => PC_PLATFORMS.has(p?.id ?? p));
+    const safe = (p) => Promise.resolve(p).catch(() => null);
+
+    const [steam, players, reviews, itadId, availability, free] = await Promise.all([
+      appid ? safe(steamOffer(appid)) : null,
+      appid ? safe(steamPlayers(appid)) : null,
+      appid ? safe(steamReviews(appid)) : null,
+      appid || onPc ? safe(itadIdOf({ appid, title: name })) : null,
+      availabilityOf(id, name).catch(() => ({ gamepass: null, geforcenow: null })),
+      safe(getFreeGameForIgdbId(id)),
+    ]);
+    // La courbe suit Steam : c'est le prix de référence, et une courbe par
+    // boutique ferait un plat de spaghettis sur un écran de téléphone.
+    const [prices, history] = itadId
+      ? await Promise.all([
+          safe(itadPrices(itadId)),
+          appid ? safe(itadHistory(itadId)) : null,
+        ])
+      : [null, null];
+
+    const shops = prices?.shops || [];
+    const steamBest =
+      steam && steam.price != null && !steam.free
+        ? { shop: "Steam", price: steam.price, regular: steam.regular, cut: steam.cut, url: steam.url }
+        : null;
+
+    const payload = {
+      currency: "EUR",
+      itad: itadEnabled(),
+      steam: steam || players != null || reviews ? { ...(steam || {}), appid, players, reviews } : null,
+      best: shops[0] || steamBest,
+      shops: shops.slice(0, 8),
+      lows: prices?.lows || null,
+      history: history?.length ? history : null,
+      stores: storeLinks(core?.external_games),
+      gamepass: availability.gamepass,
+      geforcenow: availability.geforcenow,
+      free: free
+        ? { store: free.store?.label || null, url: free.url, endsAt: free.endsAt || null }
+        : null,
+    };
+    offersCache.set(id, payload);
+    res.json(payload);
+  } catch (err) {
+    console.error("game offers error:", err.message);
+    res.status(500).json({ error: "Erreur lors du chargement des prix." });
+  }
+});
 
 router.get("/:id/hype", optionalAuth, async (req, res) => {
   try {
