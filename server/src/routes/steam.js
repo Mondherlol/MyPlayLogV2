@@ -677,6 +677,12 @@ router.patch("/sync", requireAuth, async (req, res) => {
       if (c.updateHours !== undefined) it.updateHours = !!c.updateHours;
       if (c.importAchievements !== undefined)
         it.importAchievements = !!c.importAchievements && it.canImportAchievements;
+      // Une autre jaquette, choisie depuis le récap : c'est elle que prendra
+      // le jeu en entrant en bibliothèque. Une adresse web, rien d'autre.
+      if (c.cover !== undefined) {
+        const url = typeof c.cover === "string" ? c.cover.trim() : "";
+        if (/^https?:\/\//i.test(url) && url.length < 2048) it.cover = url;
+      }
       if (c.hours !== undefined) {
         const h = Number(c.hours);
         it.hours = c.hours === null || !Number.isFinite(h) || h < 0 ? null : h;
@@ -890,9 +896,21 @@ router.post("/sync/match", requireAuth, async (req, res) => {
     if (!key || !gameId || !name)
       return res.status(400).json({ error: "Jeu à relier incomplet." });
 
-    const idx = sync.unmatched.findIndex((u) => String(u.key) === key);
-    if (idx === -1) return res.status(404).json({ error: "Titre introuvable." });
-    const [u] = sync.unmatched.splice(idx, 1);
+    // ⚠️ RELIER, OU CORRIGER. Un titre non reconnu se relie ; un titre MAL
+    // reconnu (le catalogue a pris le mauvais jeu) se corrige de la même
+    // façon : on le reprend tel que Steam le décrit, et on le range à nouveau.
+    let u;
+    const idx = sync.unmatched.findIndex((x) => String(x.key) === key);
+    if (idx !== -1) {
+      [u] = sync.unmatched.splice(idx, 1);
+      sync.counts.unmatched = Math.max(0, (sync.counts.unmatched || 0) - 1);
+    } else {
+      const at = sync.items.findIndex((x) => String(x.key) === key);
+      if (at === -1) return res.status(404).json({ error: "Titre introuvable." });
+      const [old] = sync.items.splice(at, 1);
+      sync.counts[old.category] = Math.max(0, (sync.counts[old.category] || 0) - 1);
+      u = { key, name: old.sourceName, icon: old.icon, playtimeMinutes: old.playtimeMinutes };
+    }
 
     const existing = await UserGame.findOne({ user: req.userId, gameId }).select(
       "status playtimeHours"
@@ -931,7 +949,6 @@ router.post("/sync/match", requireAuth, async (req, res) => {
       importAchievements: played,
     });
     sync.counts[category] = (sync.counts[category] || 0) + 1;
-    sync.counts.unmatched = Math.max(0, (sync.counts.unmatched || 0) - 1);
     sync.markModified("items");
     await sync.save();
 
