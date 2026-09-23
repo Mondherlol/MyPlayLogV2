@@ -2166,6 +2166,21 @@ router.get("/:username/common/:other", optionalAuth, async (req, res) => {
   }
 });
 
+// Un jeu à succès se montre-t-il à ce lecteur ? Retiré : à personne.
+// Masqué : à son propriétaire seulement.
+const shownTo = (doc, isOwner) =>
+  doc.visibility !== "removed" && (isOwner || doc.visibility !== "private");
+
+// Le même filtre, pour une requête qui mélange plusieurs joueurs : le lecteur
+// voit ses propres jeux masqués, pas ceux des autres.
+const visibleMatch = (viewerId) => ({
+  visibility: { $ne: "removed" },
+  $or: [
+    { visibility: { $ne: "private" } },
+    ...(viewerId ? [{ user: new mongoose.Types.ObjectId(String(viewerId)) }] : []),
+  ],
+});
+
 // Grades de trophées PlayStation, du plus prestigieux au plus courant.
 const TIER_KEYS = ["platinum", "gold", "silver", "bronze"];
 const emptyTiers = () =>
@@ -2197,18 +2212,58 @@ function rarityBase(list) {
 const adjustRarity = (pct, base) =>
   pct == null ? null : base ? Math.min(100, Math.round((pct / base) * 1000) / 10) : pct;
 
+// --- Qui voit un de MES jeux à succès : tout le monde, moi seul, personne. ---
+// Le document n'est jamais supprimé (cf. `visibility` dans le modèle) : un jeu
+// « retiré » se remet d'un geste, et la prochaine synchro ne le fait pas
+// revenir dans le dos de son propriétaire.
+router.patch("/me/achievements/:gameId", requireAuth, async (req, res) => {
+  try {
+    const gameId = Number(req.params.gameId);
+    const platform = String(req.body?.platform || "");
+    const visibility = String(req.body?.visibility || "");
+    if (!Number.isFinite(gameId) || !["steam", "psn"].includes(platform))
+      return res.status(400).json({ error: "Jeu inconnu." });
+    if (!["public", "private", "removed"].includes(visibility))
+      return res.status(400).json({ error: "Visibilité inconnue." });
+    const r = await GameAchievements.updateOne(
+      { user: req.userId, gameId, platform },
+      { $set: { visibility } }
+    );
+    if (!r.matchedCount) return res.status(404).json({ error: "Jeu introuvable." });
+    res.json({ ok: true, visibility });
+  } catch (err) {
+    console.error("achievements visibility error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
 // --- Onglet « Succès » du profil : synthèse des succès (Steam pour l'instant,
 //     PSN prévu) agrégés par jeu + statistiques globales. ---
 router.get("/:username/achievements", optionalAuth, async (req, res) => {
   try {
     const user = await User.findOne({ username: req.params.username }).select(
-      "_id steam psn privacy"
+      "_id username avatar steam psn privacy"
     );
     if (!user) return res.status(404).json({ error: "Profil introuvable." });
     if (await blockIfPrivate(res, user, req.userId)) return;
     const isMe = String(user._id) === String(req.userId);
 
-    const docs = await GameAchievements.find({ user: user._id }).lean();
+    const all = await GameAchievements.find({ user: user._id }).lean();
+    // Les jeux retirés ne se montrent à personne ; les jeux masqués, qu'à
+    // leur propriétaire (cf. `visibility` dans models/GameAchievements).
+    const docs = all.filter((d) => shownTo(d, isMe));
+    const removed = isMe
+      ? all
+          .filter((d) => d.visibility === "removed")
+          .map((d) => ({
+            gameId: d.gameId,
+            platform: d.platform,
+            name: d.gameName,
+            cover: d.gameCover,
+            total: d.total,
+            unlocked: d.unlocked,
+          }))
+      : [];
 
     // Temps de jeu / note depuis la bibliothèque (jointure par gameId) pour
     // permettre les tris « temps de jeu » et « note » côté client.
@@ -2263,6 +2318,7 @@ router.get("/:username/achievements", optionalAuth, async (req, res) => {
           playtime: ug?.playtimeHours ?? null,
           rating: ug?.rating ?? null,
           console: ug?.platform || null,
+          private: d.visibility === "private",
           lastUnlock: lastUnlock ? new Date(lastUnlock) : null,
           createdAt: d.createdAt,
           updatedAt: d.updatedAt,
@@ -2347,6 +2403,10 @@ router.get("/:username/achievements", optionalAuth, async (req, res) => {
 
     res.json({
       isMe,
+      // Le visage de la page : quand ce sont les succès de quelqu'un d'autre,
+      // l'écran le montre en tête.
+      owner: { username: user.username, avatar: user.avatar || null },
+      removed,
       connected: !!user.steam?.steamId || !!user.psn?.accountId,
       stats: {
         games: games.length,
@@ -2405,7 +2465,7 @@ router.get("/:username/achievements/friends", optionalAuth, async (req, res) => 
 
     const ids = await comparePeople(owner._id, req.userId);
     const rows = await GameAchievements.aggregate([
-      { $match: { user: { $in: ids } } },
+      { $match: { user: { $in: ids }, ...visibleMatch(req.userId) } },
       {
         $project: {
           user: 1,
@@ -2498,6 +2558,7 @@ router.get("/:username/achievements/:gameId/friends", optionalAuth, async (req, 
       user: { $in: ids },
       gameId,
       ...(platform ? { platform } : {}),
+      ...visibleMatch(req.userId),
     })
       .select("user total unlocked achievements.apiName achievements.unlocked achievements.unlockedAt")
       .lean();
@@ -2557,7 +2618,8 @@ router.get("/:username/achievements/:gameId", optionalAuth, async (req, res) => 
       gameId: Number(req.params.gameId),
       ...(platform ? { platform } : {}),
     }).lean();
-    if (!doc) return res.json({ achievements: [] });
+    if (!doc || !shownTo(doc, String(user._id) === String(req.userId)))
+      return res.json({ achievements: [] });
     const base = rarityBase(doc.achievements);
     // Débloqués d'abord (par date récente), puis verrouillés (par rareté).
     const achievements = (doc.achievements || []).map((a) => ({
@@ -2607,6 +2669,7 @@ router.get("/:username/achievements/:gameId", optionalAuth, async (req, res) => 
       playtime: ug?.playtimeHours ?? null,
       console: ug?.platform || null,
       status: ug?.status || null,
+      visibility: doc.visibility || "public",
       achievements,
     });
   } catch (err) {
@@ -2690,7 +2753,10 @@ router.get("/:username", optionalAuth, async (req, res) => {
           .lean(),
         Recommendation.countDocuments({ to: user._id }),
         Documentary.countDocuments({ user: user._id, recommended: true }),
-        GameAchievements.countDocuments({ user: user._id }),
+        GameAchievements.countDocuments({
+          user: user._id,
+          visibility: { $nin: isMe ? ["removed"] : ["removed", "private"] },
+        }),
         GameTracker.find({ user: user._id }).lean(),
         countBadges(user._id),
       ]);

@@ -10,7 +10,7 @@ import PlatformSync from "../models/PlatformSync.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { warmGameMeta } from "../lib/gameMeta.js";
 import { triggerMissionCheck } from "../lib/missions.js";
-import { hasChanged, lastSnapshot, needsLook } from "../lib/syncDiff.js";
+import { hasChanged, isQuiet, lastSnapshot, needsLook } from "../lib/syncDiff.js";
 import { open as openSecret, seal } from "../lib/secretBox.js";
 import {
   isConfigured,
@@ -1376,7 +1376,7 @@ function mapPsnSync(sync, { full = false } = {}) {
     result: sync.result,
     // Ce qui demande un regard ; les mises à jour inchangées se comptent à part.
     total: items.filter(needsLook).length,
-    upToDate: items.length - items.filter(needsLook).length,
+    upToDate: items.filter((i) => !i.ignored && !needsLook(i)).length,
     selected: items.filter((i) => i.include).length,
     createdAt: sync.createdAt,
     appliedAt: sync.appliedAt,
@@ -1409,7 +1409,8 @@ router.get("/mobile/status", requireAuth, async (req, res) => {
         lastSyncAt: psn.lastSyncAt || null,
       },
       avatarDiffers: !!psn.avatar && user.avatar !== psn.avatar,
-      pendingSync: pending ? mapPsnSync(pending) : null,
+      // Une synchro sans rien de neuf n'attend rien de personne (cf. isQuiet).
+      pendingSync: pending && !isQuiet(pending) ? mapPsnSync(pending) : null,
       syncCount: applied,
       ignoredCount,
     });
@@ -1775,6 +1776,11 @@ router.delete("/mobile/sync", requireAuth, async (req, res) => {
   try {
     const sync = await pendingPsnSync(req.userId);
     if (!sync) return res.json({ ok: true });
+    // Rien de neuf : on la referme sans trace (cf. isQuiet).
+    if (isQuiet(sync)) {
+      await sync.deleteOne();
+      return res.json({ ok: true, closed: true });
+    }
     sync.state = "cancelled";
     sync.items = [];
     sync.unmatched = [];

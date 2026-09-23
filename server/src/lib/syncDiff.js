@@ -43,4 +43,19 @@ export function hasChanged(snapshot, key, { playtimeMinutes = 0, trophyProgress 
 }
 
 /** Un jeu qui demande qu'on le regarde : tout sauf une mise à jour inchangée. */
-export const needsLook = (it) => it.category !== "update" || it.changed !== false;
+export const needsLook = (it) =>
+  !it.ignored && (it.category !== "update" || it.changed !== false);
+
+/**
+ * Une synchro « calme » : rien de neuf, rien de coché, rien à reconnaître.
+ *
+ * ⚠️ CE N'EST PAS UNE SYNCHRO EN ATTENTE. Les réglages l'annonçaient pourtant
+ * comme telle (« synchro en attente »), et le récap s'ouvrait sur « tout est à
+ * jour » sans rien à valider. On ne l'annonce donc plus, et la refermer la
+ * supprime au lieu de l'inscrire « annulée » dans l'historique : il ne s'est
+ * rien passé. Elle existe seulement pour qu'on puisse, depuis le récap,
+ * remettre à jour un jeu inchangé.
+ */
+export const isQuiet = (sync) =>
+  !(sync?.unmatched || []).length &&
+  !(sync?.items || []).some((it) => !it.ignored && (it.include || needsLook(it)));

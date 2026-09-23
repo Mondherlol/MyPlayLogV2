@@ -33,6 +33,19 @@ const gameAchievementsSchema = new mongoose.Schema(
     total: { type: Number, default: 0 },
     unlocked: { type: Number, default: 0 },
     achievements: { type: [achievementSchema], default: [] },
+    // Qui voit ce jeu dans l'onglet Succès :
+    //   public   tout le monde (défaut) ;
+    //   private  son propriétaire seulement — les autres ne le voient ni dans
+    //            la liste, ni dans les totaux, ni dans les comparaisons ;
+    //   removed  personne : « retiré de mon profil ». Le document reste (sans
+    //            lui, la prochaine synchro réimporterait le jeu), les imports
+    //            continuent de le tenir à jour sans jamais le remontrer.
+    // ⚠️ Les imports font des `$set` ciblés : ils ne touchent pas ce champ.
+    visibility: {
+      type: String,
+      enum: ["public", "private", "removed"],
+      default: "public",
+    },
   },
   { timestamps: true }
 );

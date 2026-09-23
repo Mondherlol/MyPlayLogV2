@@ -9,7 +9,7 @@ import Notification from "../models/Notification.js";
 import { requireAuth } from "../middleware/auth.js";
 import { warmGameMeta } from "../lib/gameMeta.js";
 import { triggerMissionCheck } from "../lib/missions.js";
-import { hasChanged, lastSnapshot, needsLook } from "../lib/syncDiff.js";
+import { hasChanged, isQuiet, lastSnapshot, needsLook } from "../lib/syncDiff.js";
 import {
   isConfigured,
   buildLoginUrl,
@@ -99,7 +99,8 @@ router.get("/status", requireAuth, async (req, res) => {
       // La photo Steam vaut-elle d'être proposée ? Inutile de le demander si
       // c'est déjà celle du compte.
       avatarDiffers: !!s.avatar && user.avatar !== s.avatar,
-      pendingSync: pending ? mapSync(pending) : null,
+      // Une synchro sans rien de neuf n'attend rien de personne (cf. isQuiet).
+      pendingSync: pending && !isQuiet(pending) ? mapSync(pending) : null,
       syncCount: applied,
       ignoredCount,
     });
@@ -526,7 +527,7 @@ function mapSync(sync, { full = false } = {}) {
     result: sync.result,
     // Ce qui demande un regard ; les mises à jour inchangées se comptent à part.
     total: items.filter(needsLook).length,
-    upToDate: items.length - items.filter(needsLook).length,
+    upToDate: items.filter((i) => !i.ignored && !needsLook(i)).length,
     selected: items.filter((i) => i.include).length,
     createdAt: sync.createdAt,
     appliedAt: sync.appliedAt,
@@ -748,6 +749,11 @@ router.delete("/sync", requireAuth, async (req, res) => {
   try {
     const sync = await pendingSyncOf(req.userId);
     if (!sync) return res.json({ ok: true });
+    // Rien de neuf : on la referme sans trace (cf. isQuiet).
+    if (isQuiet(sync)) {
+      await sync.deleteOne();
+      return res.json({ ok: true, closed: true });
+    }
     sync.state = "cancelled";
     // Une synchro annulée n'a rien à dire de ses jeux : on rend la place.
     sync.items = [];
