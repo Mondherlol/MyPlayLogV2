@@ -2224,7 +2224,9 @@ router.get("/:username/leaderboard", optionalAuth, async (req, res) => {
       $size: { $filter: { input: "$tiers", as: "t", cond: { $eq: ["$$t", tier] } } },
     });
     const achievementsAgg = GameAchievements.aggregate([
-      { $match: { user: { $in: ids }, ...visibleMatch(req.userId) } },
+      // Les succès « hors boutique » (compagnon PC) sont déclaratifs : ils
+      // s'affichent sur le profil, pas dans les classements.
+      { $match: { user: { $in: ids }, platform: { $ne: "local" }, ...visibleMatch(req.userId) } },
       {
         $project: {
           user: 1,
@@ -2769,7 +2771,9 @@ router.get("/:username/achievements/friends", optionalAuth, async (req, res) => 
 
     const ids = await comparePeople(owner._id, req.userId);
     const rows = await GameAchievements.aggregate([
-      { $match: { user: { $in: ids }, ...visibleMatch(req.userId) } },
+      // Les succès « hors boutique » (compagnon PC) sont déclaratifs : ils
+      // s'affichent sur le profil, pas dans les classements.
+      { $match: { user: { $in: ids }, platform: { $ne: "local" }, ...visibleMatch(req.userId) } },
       {
         $project: {
           user: 1,

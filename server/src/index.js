@@ -43,6 +43,7 @@ import gbaStreamRoutes from "./routes/gbaStream.js";
 import listenRoutes from "./routes/listen.js";
 import arcadeRoutes from "./routes/arcade.js";
 import steamRoutes from "./routes/steam.js";
+import companionRoutes from "./routes/companion.js";
 import backloggdRoutes from "./routes/backloggd.js";
 import onboardingRoutes from "./routes/onboarding.js";
 import steamGameRoutes from "./routes/steamGames.js";
