@@ -3,6 +3,9 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import UserGame from "../models/UserGame.js";
 import GameAchievements from "../models/GameAchievements.js";
+import PendingImport from "../models/PendingImport.js";
+import SteamSync from "../models/SteamSync.js";
+import Notification from "../models/Notification.js";
 import { requireAuth } from "../middleware/auth.js";
 import { warmGameMeta } from "../lib/gameMeta.js";
 import { triggerMissionCheck } from "../lib/missions.js";
@@ -16,6 +19,7 @@ import {
   getGameAchievements,
   matchAppsToIgdb,
 } from "../lib/steam.js";
+import { fetchUserReviews } from "../lib/steamReviews.js";
 
 const router = express.Router();
 
@@ -56,22 +60,47 @@ background:${ok ? "#1b9d55" : "#c0392b"};display:flex;align-items:center;justify
 setTimeout(function(){window.close();},${ok ? 800 : 2500});</script></body></html>`;
 }
 
+// Le rappel demandé par l'application mobile. Un schéma d'URL n'est réservé à
+// personne : on n'accepte QUE le nôtre, jamais une adresse web — sans quoi
+// cette route servirait de tremplin pour renvoyer un visiteur n'importe où.
+function safeRedirect(value) {
+  const rd = String(value || "").trim();
+  return /^myplaylog:\/\/[a-z0-9\-\/]*$/i.test(rd) ? rd : null;
+}
+
 // --- Statut de la connexion Steam ---
 router.get("/status", requireAuth, async (req, res) => {
   try {
-    const user = await User.findById(req.userId).select("steam");
+    const user = await User.findById(req.userId).select("steam avatar");
     const s = user?.steam;
+    if (!s?.steamId) {
+      return res.json({ configured: isConfigured(), connected: false, steam: null });
+    }
+
+    // Le récap en attente et le compte des synchros passées : l'écran des
+    // réglages en a besoin en même temps que le reste.
+    const [pending, applied, ignoredCount] = await Promise.all([
+      SteamSync.findOne({ user: req.userId, state: "pending" }),
+      SteamSync.countDocuments({ user: req.userId, state: "applied" }),
+      PendingImport.countDocuments({ user: req.userId, platform: "steam", state: "ignored" }),
+    ]);
+
     res.json({
       configured: isConfigured(),
-      connected: !!s?.steamId,
-      steam: s?.steamId
-        ? {
-            personaName: s.personaName || null,
-            avatar: s.avatar || null,
-            profileUrl: s.profileUrl || null,
-            connectedAt: s.connectedAt || null,
-          }
-        : null,
+      connected: true,
+      steam: {
+        personaName: s.personaName || null,
+        avatar: s.avatar || null,
+        profileUrl: s.profileUrl || null,
+        connectedAt: s.connectedAt || null,
+        lastSyncAt: s.lastSyncAt || null,
+      },
+      // La photo Steam vaut-elle d'être proposée ? Inutile de le demander si
+      // c'est déjà celle du compte.
+      avatarDiffers: !!s.avatar && user.avatar !== s.avatar,
+      pendingSync: pending ? mapSync(pending) : null,
+      syncCount: applied,
+      ignoredCount,
     });
   } catch (err) {
     console.error("steam status error:", err.message);
@@ -93,7 +122,13 @@ router.get("/login", (req, res) => {
       return res.status(401).send(closerPage(false, "Session invalide."));
     }
     const base = `${req.protocol}://${req.get("host")}`;
-    const returnTo = `${base}/api/steam/return?token=${encodeURIComponent(token)}`;
+    // L'application mobile n'a pas de fenêtre à refermer : elle ouvre un onglet
+    // de navigateur et attend qu'on la rappelle sur son propre schéma d'URL.
+    // On transporte donc ce rappel jusqu'au retour OpenID (cf. /return).
+    const rd = safeRedirect(req.query.redirect);
+    const returnTo =
+      `${base}/api/steam/return?token=${encodeURIComponent(token)}` +
+      (rd ? `&rd=${encodeURIComponent(rd)}` : "");
     res.redirect(buildLoginUrl(returnTo, base));
   } catch (err) {
     console.error("steam login error:", err.message);
@@ -104,19 +139,29 @@ router.get("/login", (req, res) => {
 // --- Retour OpenID : on vérifie la réponse Steam, on rattache le SteamID64 au
 //     compte identifié par le token, et on stocke un instantané du profil. ---
 router.get("/return", async (req, res) => {
+  // Mobile : au lieu de la page qui se referme, on renvoie l'onglet vers
+  // l'application, qui saura si la liaison a pris.
+  const rd = safeRedirect(req.query.rd);
+  const finish = (ok, error) => {
+    if (rd) {
+      const q = ok ? "ok=1" : `error=${encodeURIComponent(error || "failed")}`;
+      return res.redirect(`${rd}?${q}`);
+    }
+    return res.send(closerPage(ok, error));
+  };
   try {
     let userId = null;
     try {
       userId = jwt.verify(String(req.query.token || ""), process.env.JWT_SECRET).sub;
     } catch {
-      return res.status(401).send(closerPage(false, "Session invalide."));
+      return finish(false, "Session invalide.");
     }
 
     const steamId = await verifyOpenId(req.query);
-    if (!steamId) return res.status(400).send(closerPage(false, "Vérification Steam échouée."));
+    if (!steamId) return finish(false, "Vérification Steam échouée.");
 
     const user = await User.findById(userId);
-    if (!user) return res.status(404).send(closerPage(false, "Utilisateur introuvable."));
+    if (!user) return finish(false, "Utilisateur introuvable.");
 
     // Empêche de lier un compte Steam déjà rattaché à un autre utilisateur.
     const clash = await User.findOne({
@@ -124,7 +169,7 @@ router.get("/return", async (req, res) => {
       _id: { $ne: user._id },
     }).select("_id");
     if (clash)
-      return res.status(409).send(closerPage(false, "Ce compte Steam est déjà lié ailleurs."));
+      return finish(false, "Ce compte Steam est déjà lié ailleurs.");
 
     const summary = await getPlayerSummary(steamId).catch(() => null);
     user.steam = {
@@ -136,10 +181,10 @@ router.get("/return", async (req, res) => {
     };
     await user.save();
     triggerMissionCheck(user._id); // mission « Tout est relié »
-    res.send(closerPage(true));
+    finish(true);
   } catch (err) {
     console.error("steam return error:", err.message);
-    res.status(500).send(closerPage(false, "Erreur serveur."));
+    finish(false, "Erreur serveur.");
   }
 });
 
@@ -196,12 +241,20 @@ router.delete("/", requireAuth, async (req, res) => {
     // Les succès Steam n'ont plus de source : on les retire toujours.
     await GameAchievements.deleteMany({ user: req.userId, platform: "steam" });
 
+    // Délier, c'est tout oublier : le récap en attente, l'historique des
+    // synchros et la liste des jeux écartés partent avec le compte. Les
+    // garder ferait resurgir des choix d'un compte qu'on ne relie plus.
+    await SteamSync.deleteMany({ user: req.userId });
+    await PendingImport.deleteMany({ user: req.userId, platform: "steam" });
+    await Notification.deleteMany({ user: req.userId, type: "import_pending", read: false });
+
     user.steam = {
       steamId: null,
       personaName: null,
       avatar: null,
       profileUrl: null,
       connectedAt: null,
+      lastSyncAt: null,
     };
     await user.save();
     res.json({ connected: false, removedGames: removed });
@@ -211,86 +264,107 @@ router.delete("/", requireAuth, async (req, res) => {
   }
 });
 
-// --- Aperçu de l'import : bibliothèque Steam matchée sur IGDB, catégorisée. ---
+// ----------------------------------------------------------------------
+//  LE SCAN : la bibliothèque Steam, rapprochée du catalogue et rangée
+// ----------------------------------------------------------------------
+// Partagé par l'aperçu du site (POST /preview) et par la synchro de
+// l'application (POST /sync) : une seule lecture de Steam, une seule façon de
+// deviner les statuts. `skip` = les appid que l'utilisateur a écartés pour de
+// bon (cf. la liste des ignorés).
+async function scanLibrary(userId, steamId, { skip } = {}) {
+  const owned = await getOwnedGames(steamId);
+  if (owned === null) {
+    const err = new Error(
+      "Impossible de lire ta bibliothèque Steam. Passe ton profil (et les détails des jeux) en public, puis réessaie."
+    );
+    err.status = 422;
+    throw err;
+  }
+  if (!owned.length) return { games: [], unmatched: [], counts: emptyCounts(), ignored: 0 };
+
+  // Les jeux écartés pour de bon ne repassent jamais par le scan : ils ne sont
+  // pas « décochés », ils n'existent plus pour la synchro.
+  const skipSet = skip instanceof Set ? skip : new Set(skip || []);
+  const kept = owned.filter((g) => !skipSet.has(Number(g.appid)));
+  const ignored = owned.length - kept.length;
+
+  const matchMap = await matchAppsToIgdb(kept.map((g) => g.appid));
+
+  // État actuel de la bibliothèque MyPlayLog (statut + heures) par gameId.
+  const libRows = await UserGame.find({ user: userId }).select(
+    "gameId status playtimeHours"
+  );
+  const libMap = new Map(libRows.map((e) => [e.gameId, e]));
+
+  const games = [];
+  const unmatched = [];
+  for (const g of kept) {
+    const m = matchMap.get(g.appid);
+    if (!m) {
+      unmatched.push({
+        appid: g.appid,
+        name: g.name,
+        playtimeMinutes: g.playtimeMinutes,
+        icon: g.icon,
+      });
+      continue;
+    }
+    const played = g.playtimeMinutes > 0;
+    const hours = hoursOf(g.playtimeMinutes);
+    const existing = libMap.get(m.gameId);
+    const inLibrary = !!existing;
+
+    let category;
+    let suggestedStatus;
+    if (!played) {
+      category = inLibrary ? "synced" : "wishlist";
+      suggestedStatus = "wishlist";
+    } else if (!inLibrary) {
+      category = "played";
+      suggestedStatus = m.endless
+        ? "endless"
+        : hours >= FINISHED_HOURS
+        ? "finished"
+        : "paused";
+    } else {
+      // Déjà en librairie ET joué : étape « update » (on y importe les succès
+      // et on propose la maj d'heures quand Steam en sait plus).
+      category = "update";
+      suggestedStatus = existing.status;
+    }
+
+    games.push({
+      appid: g.appid,
+      steamName: g.name,
+      steamIcon: g.icon,
+      playtimeMinutes: g.playtimeMinutes,
+      playtimeHours: hours,
+      gameId: m.gameId,
+      name: m.name,
+      cover: m.cover,
+      endless: m.endless,
+      inLibrary,
+      currentStatus: existing?.status || null,
+      currentHours: existing?.playtimeHours ?? null,
+      category,
+      suggestedStatus,
+      canImportAchievements: played,
+    });
+  }
+
+  return { games, unmatched, counts: countBy(games, unmatched), ignored };
+}
+
+// --- Aperçu de l'import (site) : ne touche à rien, montre ce qu'on a trouvé. ---
 router.post("/preview", requireAuth, async (req, res) => {
   try {
     const user = await User.findById(req.userId).select("steam");
     const steamId = user?.steam?.steamId;
     if (!steamId) return res.status(400).json({ error: "Aucun compte Steam lié." });
-
-    const owned = await getOwnedGames(steamId);
-    if (owned === null)
-      return res.status(422).json({
-        error:
-          "Impossible de lire ta bibliothèque Steam. Passe ton profil (et les détails des jeux) en public, puis réessaie.",
-      });
-    if (!owned.length) return res.json({ games: [], unmatched: [], counts: emptyCounts() });
-
-    const matchMap = await matchAppsToIgdb(owned.map((g) => g.appid));
-
-    // État actuel de la bibliothèque MyPlayLog (statut + heures) par gameId.
-    const libRows = await UserGame.find({ user: req.userId }).select(
-      "gameId status playtimeHours"
-    );
-    const libMap = new Map(libRows.map((e) => [e.gameId, e]));
-
-    const games = [];
-    const unmatched = [];
-    for (const g of owned) {
-      const m = matchMap.get(g.appid);
-      if (!m) {
-        unmatched.push({
-          appid: g.appid,
-          name: g.name,
-          playtimeMinutes: g.playtimeMinutes,
-          icon: g.icon,
-        });
-        continue;
-      }
-      const played = g.playtimeMinutes > 0;
-      const hours = hoursOf(g.playtimeMinutes);
-      const existing = libMap.get(m.gameId);
-      const inLibrary = !!existing;
-
-      let category;
-      let suggestedStatus;
-      if (!played) {
-        category = inLibrary ? "synced" : "wishlist";
-        suggestedStatus = "wishlist";
-      } else if (!inLibrary) {
-        category = "played";
-        suggestedStatus = m.endless
-          ? "endless"
-          : hours >= FINISHED_HOURS
-          ? "finished"
-          : "paused";
-      } else {
-        // Déjà en librairie ET joué : étape « update » (on y importe les succès
-        // et on propose la maj d'heures quand Steam en sait plus).
-        category = "update";
-        suggestedStatus = existing.status;
-      }
-
-      games.push({
-        appid: g.appid,
-        steamName: g.name,
-        steamIcon: g.icon,
-        playtimeMinutes: g.playtimeMinutes,
-        playtimeHours: hours,
-        gameId: m.gameId,
-        name: m.name,
-        cover: m.cover,
-        endless: m.endless,
-        inLibrary,
-        currentStatus: existing?.status || null,
-        currentHours: existing?.playtimeHours ?? null,
-        category,
-        suggestedStatus,
-        canImportAchievements: played,
-      });
-    }
-
-    res.json({ games, unmatched, counts: countBy(games, unmatched) });
+    const { games, unmatched, counts } = await scanLibrary(req.userId, steamId, {
+      skip: await ignoredAppIds(req.userId),
+    });
+    res.json({ games, unmatched, counts });
   } catch (err) {
     console.error("steam preview error:", err.message);
     res.status(err.status || 500).json({ error: err.message || "Erreur lors de l'aperçu." });
@@ -307,7 +381,92 @@ function countBy(games, unmatched) {
   return c;
 }
 
-// --- Import effectif : applique les sélections validées par l'utilisateur. ---
+// ----------------------------------------------------------------------
+//  L'ÉCRITURE : appliquer des choix déjà validés
+// ----------------------------------------------------------------------
+// La SEULE fonction de ce fichier qui touche à la bibliothèque. Elle ne décide
+// de rien — elle exécute une liste que l'utilisateur a validée, qu'elle vienne
+// de la modale du site (POST /import) ou du récap de l'application
+// (POST /sync/apply).
+const STATUSES = ["wishlist", "playing", "finished", "paused", "dropped", "endless"];
+
+async function applyItems(userId, steamId, items) {
+  let added = 0;
+  let updated = 0;
+  let hoursUpdated = 0;
+
+  for (const it of items) {
+    const gameId = Number(it.gameId);
+    if (!gameId || !it.name) continue;
+    const status = STATUSES.includes(it.status) ? it.status : "wishlist";
+    const hours =
+      it.playtimeHours != null && Number.isFinite(Number(it.playtimeHours))
+        ? Number(it.playtimeHours)
+        : null;
+
+    const existing = await UserGame.findOne({ user: userId, gameId });
+    if (!existing) {
+      await UserGame.create({
+        user: userId,
+        gameId,
+        name: it.name,
+        cover: it.cover || null,
+        status,
+        playtimeHours: status === "wishlist" ? null : hours,
+        steamAppId: Number(it.appid) || null,
+        steamImported: true,
+      });
+      added++;
+      warmGameMeta(gameId); // pré-chauffe les métadonnées (stats), non bloquant
+    } else {
+      const set = { steamAppId: Number(it.appid) || existing.steamAppId || null };
+      // Maj des heures si demandé : on honore la valeur validée par
+      // l'utilisateur (éventuellement éditée à la main), y compris à la baisse.
+      if (it.updateHours && hours != null && hours >= 0) {
+        set.playtimeHours = hours;
+        if (hours !== existing.playtimeHours) hoursUpdated++;
+      }
+      // Un statut explicitement choisi dans le récap s'applique aussi aux jeux
+      // déjà présents : c'est tout l'intérêt de pouvoir le changer là.
+      if (it.setStatus && STATUSES.includes(it.status)) set.status = it.status;
+      await UserGame.updateOne({ _id: existing._id }, { $set: set });
+      updated++;
+    }
+  }
+
+  // Succès : uniquement les jeux cochés « importer les succès » (jeux lancés).
+  const achItems = items.filter(
+    (it) => it.importAchievements && it.appid && Number(it.gameId)
+  );
+  let achievements = 0;
+  await pool(achItems, 3, async (it) => {
+    try {
+      const data = await getGameAchievements(steamId, it.appid);
+      if (!data) return;
+      await GameAchievements.updateOne(
+        { user: userId, gameId: Number(it.gameId), platform: "steam" },
+        {
+          $set: {
+            platformAppId: String(it.appid),
+            gameName: it.name,
+            gameCover: it.cover || null,
+            total: data.total,
+            unlocked: data.unlocked,
+            achievements: data.achievements,
+          },
+        },
+        { upsert: true }
+      );
+      achievements++;
+    } catch (e) {
+      /* best-effort : un jeu qui échoue ne bloque pas l'import */
+    }
+  });
+
+  return { added, updated, hoursUpdated, achievements };
+}
+
+// --- Import effectif (site) : applique les sélections validées par l'utilisateur. ---
 router.post("/import", requireAuth, async (req, res) => {
   try {
     const user = await User.findById(req.userId).select("steam");
@@ -317,78 +476,475 @@ router.post("/import", requireAuth, async (req, res) => {
     const items = Array.isArray(req.body?.items) ? req.body.items : [];
     if (!items.length) return res.json({ added: 0, updated: 0, achievements: 0 });
 
-    const STATUSES = ["wishlist", "playing", "finished", "paused", "dropped", "endless"];
-    let added = 0;
-    let updated = 0;
-
-    for (const it of items) {
-      const gameId = Number(it.gameId);
-      if (!gameId || !it.name) continue;
-      const status = STATUSES.includes(it.status) ? it.status : "wishlist";
-      const hours =
-        it.playtimeHours != null && Number.isFinite(Number(it.playtimeHours))
-          ? Number(it.playtimeHours)
-          : null;
-
-      const existing = await UserGame.findOne({ user: req.userId, gameId });
-      if (!existing) {
-        await UserGame.create({
-          user: req.userId,
-          gameId,
-          name: it.name,
-          cover: it.cover || null,
-          status,
-          playtimeHours: status === "wishlist" ? null : hours,
-          steamAppId: Number(it.appid) || null,
-          steamImported: true,
-        });
-        added++;
-        warmGameMeta(gameId); // pré-chauffe les métadonnées (stats), non bloquant
-      } else {
-        const set = { steamAppId: Number(it.appid) || existing.steamAppId || null };
-        // Maj des heures si demandé : on honore la valeur validée par
-        // l'utilisateur (éventuellement éditée à la main), y compris à la baisse.
-        if (it.updateHours && hours != null && hours >= 0) {
-          set.playtimeHours = hours;
-        }
-        await UserGame.updateOne({ _id: existing._id }, { $set: set });
-        updated++;
-      }
-    }
-
-    // Succès : uniquement les jeux cochés « importer les succès » (jeux lancés).
-    const achItems = items.filter(
-      (it) => it.importAchievements && it.appid && Number(it.gameId)
-    );
-    let achievements = 0;
-    await pool(achItems, 3, async (it) => {
-      try {
-        const data = await getGameAchievements(steamId, it.appid);
-        if (!data) return;
-        await GameAchievements.updateOne(
-          { user: req.userId, gameId: Number(it.gameId), platform: "steam" },
-          {
-            $set: {
-              platformAppId: String(it.appid),
-              gameName: it.name,
-              gameCover: it.cover || null,
-              total: data.total,
-              unlocked: data.unlocked,
-              achievements: data.achievements,
-            },
-          },
-          { upsert: true }
-        );
-        achievements++;
-      } catch (e) {
-        /* best-effort : un jeu qui échoue ne bloque pas l'import */
-      }
-    });
-
+    const { added, updated, achievements } = await applyItems(req.userId, steamId, items);
+    user.steam.lastSyncAt = new Date();
+    await user.save();
     res.json({ added, updated, achievements });
   } catch (err) {
     console.error("steam import error:", err.message);
     res.status(500).json({ error: "Erreur lors de l'import." });
+  }
+});
+
+// ======================================================================
+//  LA SYNCHRO EN ATTENTE — on scanne, l'utilisateur valide, puis on écrit
+// ======================================================================
+//
+// ⚠️ UNE SYNCHRO NE TOUCHE À RIEN AVANT D'ÊTRE VALIDÉE. Le scan dépose un
+// RÉCAP (SteamSync à l'état « pending ») qui attend dans les réglages, aussi
+// longtemps qu'il le faut : on peut le rouvrir, changer un statut, décocher
+// un jeu, fermer l'app, revenir le lendemain. Rien n'entre dans la
+// bibliothèque tant que /sync/apply n'a pas été appelé.
+//
+// Un jeu ÉCARTÉ (croix) n'est pas un jeu décoché : il va dans la liste des
+// ignorés (PendingImport, platform « steam ») et ne sera plus jamais proposé,
+// jusqu'à ce que l'utilisateur le repêche.
+
+// La clé d'un titre Steam dans la liste des ignorés.
+const keyOf = (appid) => `app:${Number(appid)}`;
+const appIdOf = (titleKey) => Number(String(titleKey || "").replace(/^app:/, "")) || null;
+
+async function ignoredAppIds(userId) {
+  const rows = await PendingImport.find({
+    user: userId,
+    platform: "steam",
+    state: "ignored",
+  }).select("titleKey");
+  return new Set(rows.map((r) => appIdOf(r.titleKey)).filter(Boolean));
+}
+
+// Ce que l'application reçoit d'une synchro. `full` ajoute les jeux — c'est
+// plusieurs centaines de lignes, on ne les envoie que pour le récap ouvert.
+function mapSync(sync, { full = false } = {}) {
+  const items = sync.items || [];
+  const base = {
+    id: String(sync._id),
+    state: sync.state,
+    kind: sync.kind,
+    counts: sync.counts,
+    result: sync.result,
+    total: items.length,
+    selected: items.filter((i) => i.include).length,
+    createdAt: sync.createdAt,
+    appliedAt: sync.appliedAt,
+  };
+  return full ? { ...base, items, unmatched: sync.unmatched || [] } : base;
+}
+
+// Le récap en attente, s'il y en a un.
+const pendingSyncOf = (userId) => SteamSync.findOne({ user: userId, state: "pending" });
+
+async function steamIdOf(userId) {
+  const user = await User.findById(userId).select("steam");
+  const steamId = user?.steam?.steamId;
+  if (!steamId) {
+    const err = new Error("Aucun compte Steam lié.");
+    err.status = 400;
+    throw err;
+  }
+  return { user, steamId };
+}
+
+// --- Lancer un scan : produit (ou remplace) le récap en attente. ---
+router.post("/sync", requireAuth, async (req, res) => {
+  try {
+    const { steamId } = await steamIdOf(req.userId);
+
+    const { games, unmatched, counts, ignored } = await scanLibrary(req.userId, steamId, {
+      skip: await ignoredAppIds(req.userId),
+    });
+
+    // Les jeux « synced » (présents des deux côtés, jamais lancés) n'ont rien à
+    // dire : on les compte, on ne les fait pas défiler.
+    const items = games
+      .filter((g) => g.category !== "synced")
+      .map((g) => {
+        const better = g.playtimeHours > (g.currentHours || 0);
+        return {
+          ...g,
+          // Un jeu déjà présent n'est coché que s'il y a QUELQUE CHOSE à en
+          // faire : des heures en plus, ou des succès à récupérer.
+          include: g.category === "update" ? better || g.canImportAchievements : true,
+          status: g.suggestedStatus,
+          hours: g.playtimeHours,
+          updateHours: g.category === "update" ? better : true,
+          importAchievements: g.canImportAchievements,
+        };
+      });
+
+    const appliedBefore = await SteamSync.countDocuments({
+      user: req.userId,
+      state: "applied",
+    });
+
+    // Un seul récap à la fois : relancer un scan remplace le brouillon
+    // précédent (rien ne s'était produit) sans toucher à l'historique.
+    await SteamSync.deleteMany({ user: req.userId, state: "pending" });
+
+    const sync = await SteamSync.create({
+      user: req.userId,
+      state: "pending",
+      kind: appliedBefore ? "refresh" : "first",
+      items,
+      unmatched,
+      counts: { ...counts, ignored },
+    });
+
+    // Une seule notification non lue à la fois : on remplace la précédente.
+    if (items.length) {
+      await Notification.deleteMany({ user: req.userId, type: "import_pending", read: false });
+      await Notification.create({
+        user: req.userId,
+        type: "import_pending",
+        actor: null,
+        snippet: `${items.length} jeu${items.length > 1 ? "x" : ""} Steam à valider`,
+      }).catch(() => {});
+    }
+
+    res.json({ sync: mapSync(sync, { full: true }) });
+  } catch (err) {
+    console.error("steam sync error:", err.message);
+    res.status(err.status || 500).json({ error: err.message || "Erreur lors de la synchro." });
+  }
+});
+
+// --- Le récap en attente (rouvert depuis les réglages). ---
+router.get("/sync", requireAuth, async (req, res) => {
+  try {
+    const sync = await pendingSyncOf(req.userId);
+    res.json({ sync: sync ? mapSync(sync, { full: true }) : null });
+  } catch (err) {
+    console.error("steam sync get error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// --- Modifier le récap : cocher, changer un statut, corriger des heures. ---
+router.patch("/sync", requireAuth, async (req, res) => {
+  try {
+    const sync = await pendingSyncOf(req.userId);
+    if (!sync) return res.status(404).json({ error: "Aucune synchro en attente." });
+
+    const changes = Array.isArray(req.body?.changes) ? req.body.changes : [];
+    const byApp = new Map(sync.items.map((it, i) => [Number(it.appid), i]));
+
+    for (const c of changes) {
+      const idx = byApp.get(Number(c.appid));
+      if (idx == null) continue;
+      const it = sync.items[idx];
+      if (c.include !== undefined) it.include = !!c.include;
+      if (c.status !== undefined && STATUSES.includes(c.status)) it.status = c.status;
+      if (c.updateHours !== undefined) it.updateHours = !!c.updateHours;
+      if (c.importAchievements !== undefined)
+        it.importAchievements = !!c.importAchievements && it.canImportAchievements;
+      if (c.hours !== undefined) {
+        const h = Number(c.hours);
+        it.hours = c.hours === null || !Number.isFinite(h) || h < 0 ? null : h;
+      }
+    }
+
+    // Tout cocher / tout décocher d'une catégorie, en un seul aller-retour.
+    const bulk = req.body?.bulk;
+    if (bulk && typeof bulk.include === "boolean") {
+      for (const it of sync.items) {
+        if (!bulk.category || it.category === bulk.category) it.include = bulk.include;
+      }
+    }
+
+    sync.markModified("items");
+    await sync.save();
+    res.json({ sync: mapSync(sync, { full: true }) });
+  } catch (err) {
+    console.error("steam sync patch error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// --- Valider : c'est ICI, et nulle part ailleurs, que la bibliothèque bouge. ---
+router.post("/sync/apply", requireAuth, async (req, res) => {
+  try {
+    const { user, steamId } = await steamIdOf(req.userId);
+    const sync = await pendingSyncOf(req.userId);
+    if (!sync) return res.status(404).json({ error: "Aucune synchro en attente." });
+
+    const chosen = sync.items.filter((it) => it.include);
+    const payload = chosen.map((it) => ({
+      appid: it.appid,
+      gameId: it.gameId,
+      name: it.name,
+      cover: it.cover,
+      status: it.category === "wishlist" ? "wishlist" : it.status,
+      playtimeHours: it.hours != null ? it.hours : it.playtimeHours,
+      updateHours: !!it.updateHours,
+      // Le statut choisi s'applique aussi à un jeu déjà présent (le joueur a pu
+      // le passer de « en pause » à « terminé » depuis le récap).
+      setStatus: it.category === "update" && it.status !== it.currentStatus,
+      importAchievements: !!it.importAchievements && it.canImportAchievements,
+    }));
+
+    const result = await applyItems(req.userId, steamId, payload);
+
+    sync.state = "applied";
+    sync.appliedAt = new Date();
+    sync.result = { ...result, skipped: sync.items.length - chosen.length };
+    await sync.save();
+
+    user.steam.lastSyncAt = sync.appliedAt;
+    await user.save();
+
+    await Notification.deleteMany({ user: req.userId, type: "import_pending", read: false });
+    triggerMissionCheck(req.userId);
+
+    res.json({ sync: mapSync(sync), result: sync.result });
+  } catch (err) {
+    console.error("steam sync apply error:", err.message);
+    res.status(err.status || 500).json({ error: err.message || "Erreur lors de la validation." });
+  }
+});
+
+// --- Annuler le récap : il part à l'historique, marqué « annulée ». ---
+router.delete("/sync", requireAuth, async (req, res) => {
+  try {
+    const sync = await pendingSyncOf(req.userId);
+    if (!sync) return res.json({ ok: true });
+    sync.state = "cancelled";
+    // Une synchro annulée n'a rien à dire de ses jeux : on rend la place.
+    sync.items = [];
+    sync.unmatched = [];
+    await sync.save();
+    await Notification.deleteMany({ user: req.userId, type: "import_pending", read: false });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("steam sync cancel error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// --- Écarter un jeu pour de bon (et le retirer du récap en cours). ---
+router.post("/ignored/:appid", requireAuth, async (req, res) => {
+  try {
+    const appid = Number(req.params.appid);
+    if (!appid) return res.status(400).json({ error: "Jeu inconnu." });
+
+    const sync = await pendingSyncOf(req.userId);
+    const item = sync?.items.find((it) => Number(it.appid) === appid);
+    const fromUnmatched = sync?.unmatched.find((u) => Number(u.appid) === appid);
+
+    await PendingImport.updateOne(
+      { user: req.userId, platform: "steam", titleKey: keyOf(appid) },
+      {
+        $set: {
+          state: "ignored",
+          // `psnName` porte ici le nom Steam : le modèle est partagé avec
+          // l'import PlayStation, et un champ de plus par plateforme ne
+          // vaudrait pas la duplication.
+          psnName: item?.steamName || fromUnmatched?.name || null,
+          icon: item?.steamIcon || fromUnmatched?.icon || null,
+          gameId: item?.gameId ?? null,
+          name: item?.name ?? null,
+          cover: item?.cover ?? null,
+          playtimeHours: item?.playtimeHours ?? null,
+        },
+      },
+      { upsert: true }
+    );
+
+    if (sync) {
+      sync.items = sync.items.filter((it) => Number(it.appid) !== appid);
+      sync.unmatched = sync.unmatched.filter((u) => Number(u.appid) !== appid);
+      sync.counts.ignored = (sync.counts.ignored || 0) + 1;
+      await sync.save();
+    }
+
+    res.json({ ok: true, sync: sync ? mapSync(sync, { full: true }) : null });
+  } catch (err) {
+    console.error("steam ignore error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// --- La liste des écartés, et le droit de changer d'avis. ---
+router.get("/ignored", requireAuth, async (req, res) => {
+  try {
+    const rows = await PendingImport.find({
+      user: req.userId,
+      platform: "steam",
+      state: "ignored",
+    }).sort({ updatedAt: -1 });
+    res.json({
+      ignored: rows.map((r) => ({
+        id: String(r._id),
+        appid: appIdOf(r.titleKey),
+        steamName: r.psnName || null,
+        icon: r.icon || null,
+        gameId: r.gameId || null,
+        name: r.name || r.psnName || null,
+        cover: r.cover || null,
+        playtimeHours: r.playtimeHours ?? null,
+      })),
+    });
+  } catch (err) {
+    console.error("steam ignored error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// Repêcher un jeu écarté : il repassera à la prochaine synchro.
+router.delete("/ignored/:appid", requireAuth, async (req, res) => {
+  try {
+    await PendingImport.deleteOne({
+      user: req.userId,
+      platform: "steam",
+      titleKey: keyOf(req.params.appid),
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("steam unignore error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// --- L'historique des synchros. ---
+router.get("/history", requireAuth, async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 20, 50);
+    const rows = await SteamSync.find({
+      user: req.userId,
+      state: { $in: ["applied", "cancelled"] },
+    })
+      .sort({ createdAt: -1 })
+      .limit(limit);
+    res.json({ history: rows.map((r) => mapSync(r)) });
+  } catch (err) {
+    console.error("steam history error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// --- Adopter la photo de profil Steam (garder la sienne = ne rien appeler). ---
+router.post("/avatar", requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    const avatar = user?.steam?.avatar;
+    if (!avatar) return res.status(400).json({ error: "Aucune photo Steam." });
+    user.avatar = avatar;
+    await user.save();
+    res.json({ user: user.toPublic() });
+  } catch (err) {
+    console.error("steam avatar error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// ======================================================================
+//  LES AVIS STEAM — proposés, jamais publiés d'office
+// ======================================================================
+// Lus sur le profil public (cf. lib/steamReviews.js). On les montre tels
+// quels : l'utilisateur choisit lesquels deviennent des avis MyPlayLog.
+
+router.get("/reviews", requireAuth, async (req, res) => {
+  try {
+    const { steamId } = await steamIdOf(req.userId);
+    const raw = await fetchUserReviews(steamId);
+    if (!raw.length) return res.json({ reviews: [] });
+
+    const matchMap = await matchAppsToIgdb(raw.map((r) => r.appid));
+    const gameIds = raw.map((r) => matchMap.get(r.appid)?.gameId).filter(Boolean);
+    const rows = await UserGame.find({ user: req.userId, gameId: { $in: gameIds } }).select(
+      "gameId review rating status"
+    );
+    const libMap = new Map(rows.map((r) => [r.gameId, r]));
+
+    const reviews = [];
+    for (const r of raw) {
+      const m = matchMap.get(r.appid);
+      if (!m) continue; // un avis sans fiche chez nous n'irait nulle part
+      const existing = libMap.get(m.gameId);
+      reviews.push({
+        appid: r.appid,
+        gameId: m.gameId,
+        name: m.name,
+        cover: m.cover,
+        steamName: r.gameName,
+        recommended: r.recommended,
+        hours: r.hours,
+        text: r.text,
+        postedAt: r.postedAt,
+        inLibrary: !!existing,
+        currentStatus: existing?.status || null,
+        // Un avis déjà écrit ici ne se remplace pas sans le dire.
+        hasReview: !!(existing?.review || "").trim(),
+        currentRating: existing?.rating ?? null,
+      });
+    }
+    res.json({ reviews });
+  } catch (err) {
+    console.error("steam reviews error:", err.message);
+    res
+      .status(err.status || 500)
+      .json({ error: err.message || "Erreur lors de la lecture des avis." });
+  }
+});
+
+// Reprendre les avis cochés. Un jeu absent de la bibliothèque y entre au
+// passage : on ne peut pas avoir un avis sur un jeu qu'on n'a pas.
+router.post("/reviews/import", requireAuth, async (req, res) => {
+  try {
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    if (!items.length) return res.json({ imported: 0, skipped: 0 });
+
+    let imported = 0;
+    let skipped = 0;
+
+    for (const it of items) {
+      const gameId = Number(it.gameId);
+      const text = String(it.text || "").trim();
+      if (!gameId || !text) {
+        skipped++;
+        continue;
+      }
+      const rating =
+        it.rating != null && Number.isFinite(Number(it.rating))
+          ? Math.max(0, Math.min(100, Number(it.rating)))
+          : null;
+      const when = it.postedAt ? new Date(it.postedAt) : new Date();
+      const reviewedAt = Number.isNaN(when.getTime()) ? new Date() : when;
+
+      const existing = await UserGame.findOne({ user: req.userId, gameId });
+      if (existing) {
+        // On n'écrase un avis existant que si l'utilisateur l'a demandé.
+        if ((existing.review || "").trim() && !it.overwrite) {
+          skipped++;
+          continue;
+        }
+        const set = { review: text, reviewedAt };
+        if (rating != null) set.rating = rating;
+        await UserGame.updateOne({ _id: existing._id }, { $set: set });
+      } else {
+        const hours = Number(it.hours);
+        await UserGame.create({
+          user: req.userId,
+          gameId,
+          name: it.name || "Jeu",
+          cover: it.cover || null,
+          // Même règle que l'import : beaucoup d'heures → terminé, sinon en pause.
+          status: Number.isFinite(hours) && hours >= FINISHED_HOURS ? "finished" : "paused",
+          playtimeHours: Number.isFinite(hours) ? hours : null,
+          steamAppId: Number(it.appid) || null,
+          steamImported: true,
+          review: text,
+          reviewedAt,
+          ...(rating != null ? { rating } : {}),
+        });
+        warmGameMeta(gameId);
+      }
+      imported++;
+    }
+
+    res.json({ imported, skipped });
+  } catch (err) {
+    console.error("steam reviews import error:", err.message);
+    res.status(500).json({ error: "Erreur lors de l'import des avis." });
   }
 });
 

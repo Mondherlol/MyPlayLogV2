@@ -387,6 +387,14 @@ router.get("/", optionalAuth, async (req, res) => {
           : scope === "tops"
             ? // Classements officiels (Top 100 Switch, meilleurs JRPG…).
               { visibility: "public", "official.kind": "top" }
+          : scope === "awards"
+            ? // Les palmarès de cérémonies (The Game Awards, Spike VGA…).
+              // ⚠️ ILS N'AVAIENT AUCUNE PORTE. `official.kind` vaut "top" ou
+              // "awards" ; seuls les tops avaient leur portée, et les palmarès
+              // se noyaient dans le fil général au milieu des listes de
+              // joueurs. Or ce sont exactement les listes qu'on vient chercher
+              // de tête, une fois par an et pendant des années.
+              { visibility: "public", "official.kind": "awards" }
             : { $or: [{ visibility: "public" }, { user: req.userId }] };
     // Filtres optionnels : type, itemKind (jeu/perso), rayon, tag, recherche.
     if (TYPES.includes(req.query.type)) filter.type = req.query.type;

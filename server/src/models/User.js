@@ -216,6 +216,10 @@ const userSchema = new mongoose.Schema(
       avatar: { type: String, default: null },
       profileUrl: { type: String, default: null },
       connectedAt: { type: Date, default: null },
+      // Dernière synchro VALIDÉE (pas le dernier scan) : c'est la date que
+      // l'application affiche sous « Steam », et celle qui dit au joueur si
+      // ses heures sont à jour.
+      lastSyncAt: { type: Date, default: null },
     },
 
     // --- Connexion PSN (modèle « compte de service » : le serveur lit les
@@ -570,6 +574,7 @@ userSchema.methods.toPublic = function () {
           avatar: this.steam.avatar || null,
           profileUrl: this.steam.profileUrl || null,
           connectedAt: this.steam.connectedAt || null,
+          lastSyncAt: this.steam.lastSyncAt || null,
         }
       : null,
     discordConnected: !!(this.discord && this.discord.discordId),
