@@ -800,8 +800,11 @@ router.get("/ignored", requireAuth, async (req, res) => {
     res.json({
       ignored: rows.map((r) => ({
         id: String(r._id),
+        // `key` est le mot commun aux deux plateformes (l'écran est partagé) ;
+        // `appid` reste pour ce qui, côté Steam, en a vraiment besoin.
+        key: String(appIdOf(r.titleKey) || ""),
         appid: appIdOf(r.titleKey),
-        steamName: r.psnName || null,
+        sourceName: r.psnName || null,
         icon: r.icon || null,
         gameId: r.gameId || null,
         name: r.name || r.psnName || null,

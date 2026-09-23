@@ -6,6 +6,7 @@ import PendingImport from "../models/PendingImport.js";
 import Notification from "../models/Notification.js";
 import PsnSyncRequest from "../models/PsnSyncRequest.js";
 import PsnScan from "../models/PsnScan.js";
+import PlatformSync from "../models/PlatformSync.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { warmGameMeta } from "../lib/gameMeta.js";
 import { triggerMissionCheck } from "../lib/missions.js";
@@ -78,6 +79,11 @@ async function upsertUserGame(userId, it) {
   const set = {
     psnCommunicationId: it.npCommunicationId || existing.psnCommunicationId || null,
   };
+  // Statut explicitement retouché dans le récap (le joueur a fait passer un
+  // jeu d'« en pause » à « terminé ») : il s'applique aussi aux jeux déjà là.
+  // Sans `setStatus`, on n'y touche pas — les autres chemins d'import n'ont
+  // jamais eu à le faire.
+  if (it.setStatus && STATUSES.includes(it.status)) set.status = it.status;
   // Console : on la renseigne si le jeu n'en avait pas encore (sans écraser
   // un choix existant de l'utilisateur).
   if (platform && !existing.platform) set.platform = platform;
@@ -338,6 +344,9 @@ router.delete("/", requireAuth, async (req, res) => {
         status: { $in: ["pending", "processing"] },
       }),
       Notification.deleteMany({ user: req.userId, type: "psn_ready" }),
+      // Récap en attente et historique des synchros du téléphone : ils
+      // parlaient d'un compte qu'on ne relie plus.
+      PlatformSync.deleteMany({ user: req.userId, platform: "psn" }),
     ]);
 
     user.psn = { accountId: null, onlineId: null, avatar: null, connectedAt: null };
@@ -368,7 +377,19 @@ async function scanPsn(userId, accountId, accessToken) {
       return [];
     }),
   ]);
+  return buildScan(userId, played, titles);
+}
 
+/**
+ * Le scan proprement dit — et il NE PARLE À PERSONNE.
+ *
+ * Il reçoit l'historique joué et la liste de trophées, d'où qu'ils viennent :
+ * du compte de service (ci-dessus), du worker maison, ou du TÉLÉPHONE du joueur
+ * quand c'est lui qui s'est connecté chez Sony. Une seule fusion, un seul
+ * rapprochement IGDB, une seule façon de deviner statut et console — sinon les
+ * trois chemins finiraient par proposer trois choses différentes.
+ */
+async function buildScan(userId, played, titles) {
   // Diagnostic : répartition par plateforme (voir si Sony renvoie bien les PS4/PS3
   // et pas seulement les PS5) et volumes des deux sources.
   const platBreakdown = {};
@@ -1204,6 +1225,566 @@ router.post("/worker/jobs/:id/error", requireWorker, async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error("psn worker error report:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// ======================================================================
+//  PLAYSTATION DEPUIS LE TÉLÉPHONE — le compte du joueur, pas le nôtre
+// ======================================================================
+//
+// ⚠️ LE MODÈLE CHANGE ICI, ET C'EST TOUT L'INTÉRÊT. Le reste de ce fichier
+// lit les profils PUBLICS avec le compte de service de l'admin, depuis une IP
+// résidentielle empruntée à un worker maison — parce que Sony bloque le VPS et
+// parce qu'un compte de service ne voit que ce qui est public. Deux contraintes
+// dont personne ne veut : il faut un admin dans la boucle, et un profil ouvert.
+//
+// Le téléphone, lui, n'a aucun de ces problèmes. Le joueur se connecte À SON
+// compte PlayStation dans une vraie page Sony, l'app en ressort un jeton qui
+// est LE SIEN, et c'est le téléphone — IP résidentielle, comme l'app officielle
+// — qui lit sa bibliothèque. Le serveur ne parle jamais à Sony sur ce chemin :
+// il reçoit une moisson déjà faite, la rapproche du catalogue, et la range dans
+// un récap à valider. Aucun admin, aucun profil public exigé, aucun jeton à
+// recopier à la main.
+//
+// COROLLAIRE DE SÉCURITÉ : ce qui arrive ici vient du client, donc de
+// n'importe qui. On ne lui fait confiance sur rien — les volumes sont plafonnés,
+// les champs recopiés un par un — et de toute façon un joueur ne peut abîmer
+// que sa propre bibliothèque.
+
+const MAX_TITLES = 1200; // au-delà, ce n'est plus une bibliothèque
+const MAX_TROPHIES_PER_GAME = 600;
+
+// La clé d'un titre PlayStation dans la liste des ignorés : son nom simplifié,
+// le même que celui qui sert à fusionner les versions PS4/PS5 d'un jeu.
+const psnKey = (name) => simplifyName(name);
+
+async function psnIgnoredKeys(userId) {
+  const rows = await PendingImport.find({
+    user: userId,
+    platform: "psn",
+    state: "ignored",
+  }).select("titleKey");
+  return new Set(rows.map((r) => r.titleKey).filter(Boolean));
+}
+
+// Ce que l'application reçoit d'une synchro (même forme que côté Steam : c'est
+// ce qui permet à l'app de n'avoir qu'un seul écran de récap).
+function mapPsnSync(sync, { full = false } = {}) {
+  const items = sync.items || [];
+  const base = {
+    id: String(sync._id),
+    platform: sync.platform,
+    state: sync.state,
+    kind: sync.kind,
+    counts: sync.counts,
+    result: sync.result,
+    total: items.length,
+    selected: items.filter((i) => i.include).length,
+    createdAt: sync.createdAt,
+    appliedAt: sync.appliedAt,
+  };
+  return full ? { ...base, items, unmatched: sync.unmatched || [] } : base;
+}
+
+const pendingPsnSync = (userId) =>
+  PlatformSync.findOne({ user: userId, platform: "psn", state: "pending" });
+
+// --- L'état de la liaison, tel que l'écran des réglages le lit d'un coup. ---
+router.get("/mobile/status", requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select("psn avatar");
+    const psn = user?.psn;
+    if (!psn?.accountId) return res.json({ connected: false, psn: null });
+
+    const [pending, applied, ignoredCount] = await Promise.all([
+      pendingPsnSync(req.userId),
+      PlatformSync.countDocuments({ user: req.userId, platform: "psn", state: "applied" }),
+      PendingImport.countDocuments({ user: req.userId, platform: "psn", state: "ignored" }),
+    ]);
+
+    res.json({
+      connected: true,
+      psn: {
+        onlineId: psn.onlineId || null,
+        avatar: psn.avatar || null,
+        connectedAt: psn.connectedAt || null,
+        lastSyncAt: psn.lastSyncAt || null,
+      },
+      avatarDiffers: !!psn.avatar && user.avatar !== psn.avatar,
+      pendingSync: pending ? mapPsnSync(pending) : null,
+      syncCount: applied,
+      ignoredCount,
+    });
+  } catch (err) {
+    console.error("psn mobile status error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// --- Liaison : le téléphone s'est connecté chez Sony et nous dit QUI il est. ---
+//
+// Le serveur ne peut pas vérifier ce profil (il ne parle pas à Sony sur ce
+// chemin), et il n'en a pas besoin : le jeton qui a servi à le lire ne quitte
+// jamais le téléphone, et se tromper de compte ne pénalise que soi-même. On
+// vérifie en revanche qu'un autre membre ne l'a pas déjà rattaché.
+router.post("/mobile/link", requireAuth, async (req, res) => {
+  try {
+    const accountId = String(req.body?.accountId || "").trim();
+    const onlineId = String(req.body?.onlineId || "").trim();
+    if (!accountId || !onlineId)
+      return res.status(400).json({ error: "Profil PlayStation incomplet." });
+
+    const clash = await User.findOne({
+      "psn.accountId": accountId,
+      _id: { $ne: req.userId },
+    }).select("_id");
+    if (clash)
+      return res.status(409).json({ error: "Ce compte PlayStation est déjà lié à un autre profil." });
+
+    const user = await User.findById(req.userId);
+    user.psn = {
+      ...(user.psn?.toObject?.() || user.psn || {}),
+      accountId,
+      onlineId,
+      avatar: req.body?.avatar ? String(req.body.avatar) : null,
+      connectedAt: new Date(),
+    };
+    await user.save();
+    triggerMissionCheck(req.userId); // mission « Tout est relié »
+
+    res.json({
+      connected: true,
+      psn: {
+        onlineId: user.psn.onlineId,
+        avatar: user.psn.avatar,
+        connectedAt: user.psn.connectedAt,
+        lastSyncAt: user.psn.lastSyncAt || null,
+      },
+    });
+  } catch (err) {
+    console.error("psn mobile link error:", err.message);
+    res.status(500).json({ error: "Erreur lors de la liaison." });
+  }
+});
+
+// --- La moisson du téléphone entre ici et ressort en récap à valider. ---
+router.post("/mobile/sync", requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select("psn");
+    if (!user?.psn?.accountId)
+      return res.status(400).json({ error: "Aucun compte PlayStation lié." });
+
+    // Recopie champ par champ : rien de ce qui arrive du client n'est utilisé
+    // tel quel, et les volumes sont plafonnés.
+    const played = (Array.isArray(req.body?.played) ? req.body.played : [])
+      .slice(0, MAX_TITLES)
+      .map((p) => ({
+        name: String(p?.name || ""),
+        icon: p?.icon ? String(p.icon) : null,
+        category: p?.category ? String(p.category) : null,
+        playMinutes: Math.max(0, Math.round(Number(p?.playMinutes) || 0)),
+        lastPlayed: p?.lastPlayed || null,
+      }))
+      .filter((p) => p.name);
+
+    const titles = (Array.isArray(req.body?.titles) ? req.body.titles : [])
+      .slice(0, MAX_TITLES)
+      .map((t) => ({
+        npCommunicationId: t?.npCommunicationId ? String(t.npCommunicationId) : null,
+        npServiceName: t?.npServiceName ? String(t.npServiceName) : null,
+        trophyTitleName: String(t?.trophyTitleName || ""),
+        trophyTitleIconUrl: t?.trophyTitleIconUrl ? String(t.trophyTitleIconUrl) : null,
+        trophyTitlePlatform: t?.trophyTitlePlatform ? String(t.trophyTitlePlatform) : null,
+        definedTrophies: {
+          bronze: Number(t?.definedTrophies?.bronze) || 0,
+          silver: Number(t?.definedTrophies?.silver) || 0,
+          gold: Number(t?.definedTrophies?.gold) || 0,
+          platinum: Number(t?.definedTrophies?.platinum) || 0,
+        },
+        progress: t?.progress == null ? null : Number(t.progress),
+        lastUpdatedDateTime: t?.lastUpdatedDateTime || null,
+      }))
+      .filter((t) => t.trophyTitleName);
+
+    if (!played.length && !titles.length)
+      return res.status(422).json({
+        error:
+          "Ta bibliothèque PlayStation est revenue vide. Reconnecte ton compte, puis réessaie.",
+      });
+
+    const { games, unmatched } = await buildScan(req.userId, played, titles);
+
+    // Les jeux écartés pour de bon ne repassent pas : ils ne sont pas
+    // « décochés », ils n'existent plus pour la synchro.
+    const skip = await psnIgnoredKeys(req.userId);
+    const kept = games.filter((g) => !skip.has(g.titleKey));
+    const keptUnmatched = unmatched.filter((g) => !skip.has(g.titleKey));
+    const ignored = games.length + unmatched.length - kept.length - keptUnmatched.length;
+
+    const items = kept.map((g) => {
+      const better = g.playtimeHours > (g.currentHours || 0);
+      return {
+        key: g.titleKey,
+        sourceName: g.psnName,
+        icon: g.icon,
+        playtimeMinutes: g.playMinutes,
+        playtimeHours: g.playtimeHours,
+        lastPlayed: g.lastPlayed,
+        gameId: g.gameId,
+        name: g.name,
+        cover: g.cover,
+        endless: g.endless,
+        inLibrary: g.inLibrary,
+        currentStatus: g.currentStatus,
+        currentHours: g.currentHours,
+        category: g.category,
+        suggestedStatus: g.suggestedStatus,
+        canImportAchievements: g.canImportTrophies,
+        npCommunicationId: g.npCommunicationId,
+        npServiceName: g.npServiceName,
+        trophyProgress: g.trophyProgress,
+        definedTrophies: g.definedTrophies,
+        hasPlatinum: g.hasPlatinum,
+        consoles: g.consoles,
+        suggestedConsole: g.suggestedConsole,
+        include: g.category === "update" ? better || g.canImportTrophies : true,
+        status: g.suggestedStatus,
+        console: g.suggestedConsole,
+        hours: g.playtimeHours,
+        updateHours: g.category === "update" ? better : true,
+        importAchievements: g.canImportTrophies,
+      };
+    });
+
+    const counts = { wishlist: 0, played: 0, update: 0, synced: 0, unmatched: keptUnmatched.length, ignored };
+    for (const it of items) counts[it.category] = (counts[it.category] || 0) + 1;
+
+    const appliedBefore = await PlatformSync.countDocuments({
+      user: req.userId,
+      platform: "psn",
+      state: "applied",
+    });
+    // Un seul récap à la fois : relancer un scan remplace le brouillon
+    // précédent (rien ne s'était produit) sans toucher à l'historique.
+    await PlatformSync.deleteMany({ user: req.userId, platform: "psn", state: "pending" });
+
+    const sync = await PlatformSync.create({
+      user: req.userId,
+      platform: "psn",
+      state: "pending",
+      kind: appliedBefore ? "refresh" : "first",
+      items,
+      unmatched: keptUnmatched.map((u) => ({
+        key: u.titleKey,
+        name: u.psnName || u.name,
+        icon: u.icon,
+        playtimeMinutes: u.playMinutes || 0,
+      })),
+      counts,
+    });
+
+    if (items.length) {
+      await Notification.deleteMany({ user: req.userId, type: "import_pending", read: false });
+      await Notification.create({
+        user: req.userId,
+        type: "import_pending",
+        actor: null,
+        snippet: `${items.length} jeu${items.length > 1 ? "x" : ""} PlayStation à valider`,
+      }).catch(() => {});
+    }
+
+    res.json({ sync: mapPsnSync(sync, { full: true }) });
+  } catch (err) {
+    console.error("psn mobile sync error:", err.message);
+    res.status(err.status || 500).json({ error: err.message || "Erreur lors de la synchro." });
+  }
+});
+
+// --- Le récap en attente (rouvert depuis les réglages). ---
+router.get("/mobile/sync", requireAuth, async (req, res) => {
+  try {
+    const sync = await pendingPsnSync(req.userId);
+    res.json({ sync: sync ? mapPsnSync(sync, { full: true }) : null });
+  } catch (err) {
+    console.error("psn sync get error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// --- Modifier le récap : cocher, statut, console, heures. ---
+router.patch("/mobile/sync", requireAuth, async (req, res) => {
+  try {
+    const sync = await pendingPsnSync(req.userId);
+    if (!sync) return res.status(404).json({ error: "Aucune synchro en attente." });
+
+    const changes = Array.isArray(req.body?.changes) ? req.body.changes : [];
+    const byKey = new Map(sync.items.map((it, i) => [String(it.key), i]));
+
+    for (const c of changes) {
+      const idx = byKey.get(String(c.key));
+      if (idx == null) continue;
+      const it = sync.items[idx];
+      if (c.include !== undefined) it.include = !!c.include;
+      if (c.status !== undefined && STATUSES.includes(c.status)) it.status = c.status;
+      if (c.updateHours !== undefined) it.updateHours = !!c.updateHours;
+      if (c.importAchievements !== undefined)
+        it.importAchievements = !!c.importAchievements && it.canImportAchievements;
+      // La console doit rester une de celles où le jeu est SORTI : on ne range
+      // pas un jeu PS3 sur une PS5 parce qu'un client l'a demandé.
+      if (c.console !== undefined && (it.consoles || []).some((x) => x.name === c.console))
+        it.console = c.console;
+      if (c.hours !== undefined) {
+        const h = Number(c.hours);
+        it.hours = c.hours === null || !Number.isFinite(h) || h < 0 ? null : h;
+      }
+    }
+
+    const bulk = req.body?.bulk;
+    if (bulk && typeof bulk.include === "boolean") {
+      for (const it of sync.items) {
+        if (!bulk.category || it.category === bulk.category) it.include = bulk.include;
+      }
+    }
+
+    sync.markModified("items");
+    await sync.save();
+    res.json({ sync: mapPsnSync(sync, { full: true }) });
+  } catch (err) {
+    console.error("psn sync patch error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// --- Valider : c'est ICI, et nulle part ailleurs, que la bibliothèque bouge. ---
+//
+// Les trophées arrivent AVEC la validation, récupérés par le téléphone pour les
+// seuls jeux cochés : le serveur ne peut pas les chercher lui-même, et les
+// prendre tous d'avance coûterait des centaines d'appels pour rien.
+router.post("/mobile/sync/apply", requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select("psn");
+    if (!user?.psn?.accountId)
+      return res.status(400).json({ error: "Aucun compte PlayStation lié." });
+
+    const sync = await pendingPsnSync(req.userId);
+    if (!sync) return res.status(404).json({ error: "Aucune synchro en attente." });
+
+    // Trophées envoyés par le téléphone, rangés par clé de jeu.
+    const trophyMap = new Map();
+    for (const t of Array.isArray(req.body?.trophies) ? req.body.trophies : []) {
+      const list = (Array.isArray(t?.list) ? t.list : []).slice(0, MAX_TROPHIES_PER_GAME);
+      if (!t?.key || !list.length) continue;
+      trophyMap.set(String(t.key), {
+        total: Number(t.total) || list.length,
+        unlocked: Number(t.unlocked) || list.filter((x) => x?.unlocked).length,
+        list: list.map((x) => ({
+          apiName: String(x?.apiName || ""),
+          name: String(x?.name || ""),
+          description: x?.description ? String(x.description) : "",
+          icon: x?.icon ? String(x.icon) : null,
+          hidden: !!x?.hidden,
+          unlocked: !!x?.unlocked,
+          unlockedAt: x?.unlockedAt ? new Date(x.unlockedAt) : null,
+          rarity: x?.rarity == null ? null : Number(x.rarity),
+          tier: x?.tier ? String(x.tier) : null,
+        })),
+      });
+    }
+
+    const chosen = sync.items.filter((it) => it.include);
+    let added = 0;
+    let updated = 0;
+    let hoursUpdated = 0;
+    let achievements = 0;
+
+    for (const it of chosen) {
+      const before = it.currentHours;
+      const result = await upsertUserGame(req.userId, {
+        gameId: it.gameId,
+        name: it.name,
+        cover: it.cover,
+        platform: it.console || it.suggestedConsole,
+        status: it.status,
+        playtimeHours: it.hours != null ? it.hours : it.playtimeHours,
+        updateHours: it.category === "update" ? !!it.updateHours : true,
+        setStatus: it.category === "update" && it.status !== it.currentStatus,
+        npCommunicationId: it.npCommunicationId,
+      });
+      if (result === "added") added++;
+      else {
+        updated++;
+        if (it.updateHours && it.hours != null && it.hours !== before) hoursUpdated++;
+      }
+
+      const trophies = it.importAchievements ? trophyMap.get(String(it.key)) : null;
+      if (trophies) {
+        await GameAchievements.updateOne(
+          { user: req.userId, gameId: Number(it.gameId), platform: "psn" },
+          {
+            $set: {
+              platformAppId: String(it.npCommunicationId || ""),
+              gameName: it.name,
+              gameCover: it.cover || null,
+              total: trophies.total,
+              unlocked: trophies.unlocked,
+              achievements: trophies.list,
+            },
+          },
+          { upsert: true }
+        );
+        achievements++;
+      }
+    }
+
+    sync.state = "applied";
+    sync.appliedAt = new Date();
+    sync.result = { added, updated, hoursUpdated, achievements, skipped: sync.items.length - chosen.length };
+    await sync.save();
+
+    user.psn.lastSyncAt = sync.appliedAt;
+    await user.save();
+
+    await Notification.deleteMany({ user: req.userId, type: "import_pending", read: false });
+    triggerMissionCheck(req.userId);
+
+    res.json({ sync: mapPsnSync(sync), result: sync.result });
+  } catch (err) {
+    console.error("psn sync apply error:", err.message);
+    res.status(err.status || 500).json({ error: err.message || "Erreur lors de la validation." });
+  }
+});
+
+// --- Annuler le récap : il part à l'historique, marqué « annulée ». ---
+router.delete("/mobile/sync", requireAuth, async (req, res) => {
+  try {
+    const sync = await pendingPsnSync(req.userId);
+    if (!sync) return res.json({ ok: true });
+    sync.state = "cancelled";
+    sync.items = [];
+    sync.unmatched = [];
+    await sync.save();
+    await Notification.deleteMany({ user: req.userId, type: "import_pending", read: false });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("psn sync cancel error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// --- Écarter un jeu pour de bon (et le retirer du récap en cours). ---
+//
+// La clé est un nom simplifié (lettres et chiffres uniquement, cf.
+// simplifyName) : elle passe sans risque dans une adresse.
+router.post("/mobile/ignored/:key", requireAuth, async (req, res) => {
+  try {
+    const key = psnKey(req.params.key);
+    if (!key) return res.status(400).json({ error: "Jeu inconnu." });
+
+    const sync = await pendingPsnSync(req.userId);
+    const item = sync?.items.find((it) => it.key === key);
+    const fromUnmatched = sync?.unmatched.find((u) => u.key === key);
+
+    await PendingImport.updateOne(
+      { user: req.userId, platform: "psn", titleKey: key },
+      {
+        $set: {
+          state: "ignored",
+          psnName: item?.sourceName || fromUnmatched?.name || null,
+          icon: item?.icon || fromUnmatched?.icon || null,
+          gameId: item?.gameId ?? null,
+          name: item?.name ?? null,
+          cover: item?.cover ?? null,
+          playtimeHours: item?.playtimeHours ?? null,
+          npCommunicationId: item?.npCommunicationId ?? null,
+        },
+      },
+      { upsert: true }
+    );
+
+    if (sync) {
+      sync.items = sync.items.filter((it) => it.key !== key);
+      sync.unmatched = sync.unmatched.filter((u) => u.key !== key);
+      sync.counts.ignored = (sync.counts.ignored || 0) + 1;
+      await sync.save();
+    }
+
+    res.json({ ok: true, sync: sync ? mapPsnSync(sync, { full: true }) : null });
+  } catch (err) {
+    console.error("psn ignore error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// --- La liste des écartés, et le droit de changer d'avis. ---
+router.get("/mobile/ignored", requireAuth, async (req, res) => {
+  try {
+    const rows = await PendingImport.find({
+      user: req.userId,
+      platform: "psn",
+      state: "ignored",
+    }).sort({ updatedAt: -1 });
+    res.json({
+      ignored: rows.map((r) => ({
+        id: String(r._id),
+        key: r.titleKey,
+        sourceName: r.psnName || null,
+        icon: r.icon || null,
+        gameId: r.gameId || null,
+        name: r.name || r.psnName || null,
+        cover: r.cover || null,
+        playtimeHours: r.playtimeHours ?? null,
+      })),
+    });
+  } catch (err) {
+    console.error("psn ignored error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+router.delete("/mobile/ignored/:key", requireAuth, async (req, res) => {
+  try {
+    await PendingImport.deleteOne({
+      user: req.userId,
+      platform: "psn",
+      titleKey: psnKey(req.params.key),
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("psn unignore error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// --- L'historique des synchros. ---
+router.get("/mobile/history", requireAuth, async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 20, 50);
+    const rows = await PlatformSync.find({
+      user: req.userId,
+      platform: "psn",
+      state: { $in: ["applied", "cancelled"] },
+    })
+      .sort({ createdAt: -1 })
+      .limit(limit);
+    res.json({ history: rows.map((r) => mapPsnSync(r)) });
+  } catch (err) {
+    console.error("psn history error:", err.message);
+    res.status(500).json({ error: "Erreur." });
+  }
+});
+
+// --- Adopter l'avatar PlayStation (garder le sien = ne rien appeler). ---
+router.post("/mobile/avatar", requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    const avatar = user?.psn?.avatar;
+    if (!avatar) return res.status(400).json({ error: "Aucune photo PlayStation." });
+    user.avatar = avatar;
+    await user.save();
+    res.json({ user: user.toPublic() });
+  } catch (err) {
+    console.error("psn avatar error:", err.message);
     res.status(500).json({ error: "Erreur." });
   }
 });
