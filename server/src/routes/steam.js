@@ -4,7 +4,7 @@ import User from "../models/User.js";
 import UserGame from "../models/UserGame.js";
 import GameAchievements from "../models/GameAchievements.js";
 import PendingImport from "../models/PendingImport.js";
-import SteamSync from "../models/SteamSync.js";
+import PlatformSync from "../models/PlatformSync.js";
 import Notification from "../models/Notification.js";
 import { requireAuth } from "../middleware/auth.js";
 import { warmGameMeta } from "../lib/gameMeta.js";
@@ -80,8 +80,8 @@ router.get("/status", requireAuth, async (req, res) => {
     // Le récap en attente et le compte des synchros passées : l'écran des
     // réglages en a besoin en même temps que le reste.
     const [pending, applied, ignoredCount] = await Promise.all([
-      SteamSync.findOne({ user: req.userId, state: "pending" }),
-      SteamSync.countDocuments({ user: req.userId, state: "applied" }),
+      PlatformSync.findOne({ user: req.userId, platform: "steam", state: "pending" }),
+      PlatformSync.countDocuments({ user: req.userId, platform: "steam", state: "applied" }),
       PendingImport.countDocuments({ user: req.userId, platform: "steam", state: "ignored" }),
     ]);
 
@@ -244,7 +244,7 @@ router.delete("/", requireAuth, async (req, res) => {
     // Délier, c'est tout oublier : le récap en attente, l'historique des
     // synchros et la liste des jeux écartés partent avec le compte. Les
     // garder ferait resurgir des choix d'un compte qu'on ne relie plus.
-    await SteamSync.deleteMany({ user: req.userId });
+    await PlatformSync.deleteMany({ user: req.userId, platform: "steam" });
     await PendingImport.deleteMany({ user: req.userId, platform: "steam" });
     await Notification.deleteMany({ user: req.userId, type: "import_pending", read: false });
 
@@ -491,7 +491,7 @@ router.post("/import", requireAuth, async (req, res) => {
 // ======================================================================
 //
 // ⚠️ UNE SYNCHRO NE TOUCHE À RIEN AVANT D'ÊTRE VALIDÉE. Le scan dépose un
-// RÉCAP (SteamSync à l'état « pending ») qui attend dans les réglages, aussi
+// RÉCAP (PlatformSync à l'état « pending ») qui attend dans les réglages, aussi
 // longtemps qu'il le faut : on peut le rouvrir, changer un statut, décocher
 // un jeu, fermer l'app, revenir le lendemain. Rien n'entre dans la
 // bibliothèque tant que /sync/apply n'a pas été appelé.
@@ -532,7 +532,8 @@ function mapSync(sync, { full = false } = {}) {
 }
 
 // Le récap en attente, s'il y en a un.
-const pendingSyncOf = (userId) => SteamSync.findOne({ user: userId, state: "pending" });
+const pendingSyncOf = (userId) =>
+  PlatformSync.findOne({ user: userId, platform: "steam", state: "pending" });
 
 async function steamIdOf(userId) {
   const user = await User.findById(userId).select("steam");
@@ -556,12 +557,30 @@ router.post("/sync", requireAuth, async (req, res) => {
 
     // Les jeux « synced » (présents des deux côtés, jamais lancés) n'ont rien à
     // dire : on les compte, on ne les fait pas défiler.
+    // ⚠️ LA FORME EST CELLE DU RÉCAP, PAS CELLE DE STEAM. Le scan parle
+    // « steamName / steamIcon » parce que la modale du site le lit ainsi ; le
+    // récap, lui, est commun à PlayStation et à Steam, d'où la traduction ici.
     const items = games
       .filter((g) => g.category !== "synced")
       .map((g) => {
         const better = g.playtimeHours > (g.currentHours || 0);
         return {
-          ...g,
+          key: String(g.appid),
+          appid: g.appid,
+          sourceName: g.steamName,
+          icon: g.steamIcon,
+          playtimeMinutes: g.playtimeMinutes,
+          playtimeHours: g.playtimeHours,
+          gameId: g.gameId,
+          name: g.name,
+          cover: g.cover,
+          endless: g.endless,
+          inLibrary: g.inLibrary,
+          currentStatus: g.currentStatus,
+          currentHours: g.currentHours,
+          category: g.category,
+          suggestedStatus: g.suggestedStatus,
+          canImportAchievements: g.canImportAchievements,
           // Un jeu déjà présent n'est coché que s'il y a QUELQUE CHOSE à en
           // faire : des heures en plus, ou des succès à récupérer.
           include: g.category === "update" ? better || g.canImportAchievements : true,
@@ -572,21 +591,28 @@ router.post("/sync", requireAuth, async (req, res) => {
         };
       });
 
-    const appliedBefore = await SteamSync.countDocuments({
+    const appliedBefore = await PlatformSync.countDocuments({
       user: req.userId,
+      platform: "steam",
       state: "applied",
     });
 
     // Un seul récap à la fois : relancer un scan remplace le brouillon
     // précédent (rien ne s'était produit) sans toucher à l'historique.
-    await SteamSync.deleteMany({ user: req.userId, state: "pending" });
+    await PlatformSync.deleteMany({ user: req.userId, platform: "steam", state: "pending" });
 
-    const sync = await SteamSync.create({
+    const sync = await PlatformSync.create({
       user: req.userId,
       state: "pending",
+      platform: "steam",
       kind: appliedBefore ? "refresh" : "first",
       items,
-      unmatched,
+      unmatched: unmatched.map((u) => ({
+        key: String(u.appid),
+        name: u.name,
+        icon: u.icon,
+        playtimeMinutes: u.playtimeMinutes,
+      })),
       counts: { ...counts, ignored },
     });
 
@@ -626,10 +652,10 @@ router.patch("/sync", requireAuth, async (req, res) => {
     if (!sync) return res.status(404).json({ error: "Aucune synchro en attente." });
 
     const changes = Array.isArray(req.body?.changes) ? req.body.changes : [];
-    const byApp = new Map(sync.items.map((it, i) => [Number(it.appid), i]));
+    const byKey = new Map(sync.items.map((it, i) => [String(it.key), i]));
 
     for (const c of changes) {
-      const idx = byApp.get(Number(c.appid));
+      const idx = byKey.get(String(c.key));
       if (idx == null) continue;
       const it = sync.items[idx];
       if (c.include !== undefined) it.include = !!c.include;
@@ -728,7 +754,7 @@ router.post("/ignored/:appid", requireAuth, async (req, res) => {
 
     const sync = await pendingSyncOf(req.userId);
     const item = sync?.items.find((it) => Number(it.appid) === appid);
-    const fromUnmatched = sync?.unmatched.find((u) => Number(u.appid) === appid);
+    const fromUnmatched = sync?.unmatched.find((u) => Number(u.key) === appid);
 
     await PendingImport.updateOne(
       { user: req.userId, platform: "steam", titleKey: keyOf(appid) },
@@ -738,8 +764,8 @@ router.post("/ignored/:appid", requireAuth, async (req, res) => {
           // `psnName` porte ici le nom Steam : le modèle est partagé avec
           // l'import PlayStation, et un champ de plus par plateforme ne
           // vaudrait pas la duplication.
-          psnName: item?.steamName || fromUnmatched?.name || null,
-          icon: item?.steamIcon || fromUnmatched?.icon || null,
+          psnName: item?.sourceName || fromUnmatched?.name || null,
+          icon: item?.icon || fromUnmatched?.icon || null,
           gameId: item?.gameId ?? null,
           name: item?.name ?? null,
           cover: item?.cover ?? null,
@@ -751,7 +777,7 @@ router.post("/ignored/:appid", requireAuth, async (req, res) => {
 
     if (sync) {
       sync.items = sync.items.filter((it) => Number(it.appid) !== appid);
-      sync.unmatched = sync.unmatched.filter((u) => Number(u.appid) !== appid);
+      sync.unmatched = sync.unmatched.filter((u) => Number(u.key) !== appid);
       sync.counts.ignored = (sync.counts.ignored || 0) + 1;
       await sync.save();
     }
@@ -808,8 +834,9 @@ router.delete("/ignored/:appid", requireAuth, async (req, res) => {
 router.get("/history", requireAuth, async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 20, 50);
-    const rows = await SteamSync.find({
+    const rows = await PlatformSync.find({
       user: req.userId,
+      platform: "steam",
       state: { $in: ["applied", "cancelled"] },
     })
       .sort({ createdAt: -1 })

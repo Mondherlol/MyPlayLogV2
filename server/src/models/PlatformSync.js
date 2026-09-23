@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 // ======================================================================
-//  UNE SYNCHRO STEAM — le brouillon, puis la trace
+//  UNE SYNCHRO DE PLATEFORME — le brouillon, puis la trace
 // ======================================================================
 //
 // ⚠️ UNE SYNCHRO N'ÉCRIT RIEN TOUTE SEULE. Elle se dépose ici à l'état
@@ -12,17 +12,31 @@ import mongoose from "mongoose";
 //
 // Une fois validée (ou annulée), le même document devient la ligne
 // d'historique : ce qu'on a trouvé, ce qu'on a appliqué, et quand.
+//
+// ⚠️ UN SEUL MODÈLE POUR STEAM ET PLAYSTATION, et c'est ce qui permet à
+// l'application de n'avoir QU'UN écran de récap. Les deux plateformes posent
+// la même question (« ces jeux, on en fait quoi ? ») ; ce qui change tient en
+// quelques champs — un appid d'un côté, un identifiant de trophées et une
+// console de l'autre — et un champ vide ne coûte rien.
 
-// Un jeu de la bibliothèque Steam, tel qu'il a été trouvé au moment du scan —
-// et ce que l'utilisateur a décidé d'en faire.
+const consoleSchema = new mongoose.Schema(
+  { label: String, name: String },
+  { _id: false }
+);
+
 const itemSchema = new mongoose.Schema(
   {
-    // --- Ce que Steam en dit ---
-    appid: { type: Number, required: true },
-    steamName: { type: String, default: null },
-    steamIcon: { type: String, default: null },
+    // L'identité du jeu CHEZ LA PLATEFORME, et la clé de tout le reste : c'est
+    // elle que l'app renvoie pour cocher, changer un statut ou écarter.
+    // Steam : l'appid en toutes lettres. PlayStation : le titre simplifié.
+    key: { type: String, required: true },
+
+    // --- Ce que la plateforme en dit ---
+    sourceName: { type: String, default: null }, // le nom tel qu'affiché là-bas
+    icon: { type: String, default: null },
     playtimeMinutes: { type: Number, default: 0 },
     playtimeHours: { type: Number, default: 0 },
+    lastPlayed: { type: Date, default: null },
 
     // --- Le jeu IGDB derrière (toujours présent : les non reconnus vivent
     //     dans `unmatched`, pas ici) ---
@@ -36,14 +50,29 @@ const itemSchema = new mongoose.Schema(
     currentStatus: { type: String, default: null },
     currentHours: { type: Number, default: null },
 
-    // wishlist (jamais lancé) | played (joué, absent) | update (déjà là) | synced (rien à faire)
-    category: { type: String, default: "wishlist" },
-    suggestedStatus: { type: String, default: "wishlist" },
+    // wishlist (jamais lancé) | played (joué, absent) | update (déjà là)
+    category: { type: String, default: "played" },
+    suggestedStatus: { type: String, default: "paused" },
     canImportAchievements: { type: Boolean, default: false },
+
+    // --- Propre à Steam ---
+    appid: { type: Number, default: null },
+
+    // --- Propre à PlayStation ---
+    npCommunicationId: { type: String, default: null },
+    npServiceName: { type: String, default: null },
+    trophyProgress: { type: Number, default: null },
+    definedTrophies: { type: Number, default: 0 },
+    hasPlatinum: { type: Boolean, default: false },
+    // Les consoles PS où le jeu est sorti, et celle qu'on propose : un jeu
+    // PlayStation entre en bibliothèque AVEC sa console, sinon la fiche ment.
+    consoles: { type: [consoleSchema], default: [] },
+    suggestedConsole: { type: String, default: null },
 
     // --- Les choix de l'utilisateur, modifiables jusqu'à la validation ---
     include: { type: Boolean, default: true },
     status: { type: String, default: "wishlist" },
+    console: { type: String, default: null }, // console retenue (PlayStation)
     hours: { type: Number, default: null },
     updateHours: { type: Boolean, default: false },
     importAchievements: { type: Boolean, default: true },
@@ -51,11 +80,11 @@ const itemSchema = new mongoose.Schema(
   { _id: false }
 );
 
-// Un titre que Steam connaît mais qu'on n'a pas su relier au catalogue : on le
-// montre pour l'honnêteté du récap, on n'en fait rien.
+// Un titre que la plateforme connaît mais qu'on n'a pas su relier au
+// catalogue : on le montre pour l'honnêteté du récap, on n'en fait rien.
 const unmatchedSchema = new mongoose.Schema(
   {
-    appid: { type: Number, required: true },
+    key: { type: String, required: true },
     name: { type: String, default: null },
     icon: { type: String, default: null },
     playtimeMinutes: { type: Number, default: 0 },
@@ -63,9 +92,10 @@ const unmatchedSchema = new mongoose.Schema(
   { _id: false }
 );
 
-const steamSyncSchema = new mongoose.Schema(
+const platformSyncSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    platform: { type: String, enum: ["steam", "psn"], required: true },
     // pending : le récap attend la validation — applied / cancelled : historique.
     state: {
       type: String,
@@ -102,7 +132,7 @@ const steamSyncSchema = new mongoose.Schema(
 );
 
 // Le récap en cours se cherche à chaque ouverture des réglages.
-steamSyncSchema.index({ user: 1, state: 1 });
-steamSyncSchema.index({ user: 1, createdAt: -1 });
+platformSyncSchema.index({ user: 1, platform: 1, state: 1 });
+platformSyncSchema.index({ user: 1, platform: 1, createdAt: -1 });
 
-export default mongoose.model("SteamSync", steamSyncSchema);
+export default mongoose.model("PlatformSync", platformSyncSchema);
