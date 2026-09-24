@@ -30,11 +30,17 @@ namespace MyPlayLog.Companion
 
         public event Action<PlayChunk> Chunk;
         public event Action<string> Started;
+        public event Action Stopped;
+
+        // Les jeux écartés sur le site (« pas un jeu ») : on ne les compte plus.
+        public Func<string, bool> Skip;
 
         readonly Timer timer;
         readonly object gate = new object();
         // appid → dernier envoi (ou début de session)
         readonly Dictionary<string, DateTime> running = new Dictionary<string, DateTime>();
+        // appid → début de la session (le chrono de la fenêtre)
+        readonly Dictionary<string, DateTime> since = new Dictionary<string, DateTime>();
         // dossier d'un exécutable → appid ("" = aucun)
         readonly Dictionary<string, string> dirCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -46,6 +52,12 @@ namespace MyPlayLog.Companion
         public string[] Running
         {
             get { lock (gate) return running.Keys.ToArray(); }
+        }
+
+        /// <summary>Les jeux en cours et l'heure (UTC) où chacun a été lancé.</summary>
+        public KeyValuePair<string, DateTime>[] Sessions
+        {
+            get { lock (gate) return since.OrderBy(kv => kv.Value).ToArray(); }
         }
 
         int busy;
@@ -64,8 +76,8 @@ namespace MyPlayLog.Companion
                         if (p.Id <= 4) continue;
                         var path = ImagePath(p.Id);
                         if (path == null) continue;
-                        var appId = AppIdOf(path);
-                        if (appId != null) seen.Add(appId);
+                        var key = KeyOf(path);
+                        if (key != null && (Skip == null || !Skip(key))) seen.Add(key);
                     }
                     finally
                     {
@@ -76,6 +88,7 @@ namespace MyPlayLog.Companion
                 var now = DateTime.UtcNow;
                 var started = new List<string>();
                 var chunks = new List<PlayChunk>();
+                int stopped = 0;
                 lock (gate)
                 {
                     foreach (var appId in seen)
@@ -83,6 +96,7 @@ namespace MyPlayLog.Companion
                         if (!running.ContainsKey(appId))
                         {
                             running[appId] = now;
+                            since[appId] = now;
                             started.Add(appId);
                         }
                         else if (now - running[appId] >= FlushEvery)
@@ -95,9 +109,12 @@ namespace MyPlayLog.Companion
                     {
                         chunks.Add(Make(appId, now - running[appId]));
                         running.Remove(appId);
+                        since.Remove(appId);
+                        stopped++;
                     }
                 }
                 foreach (var a in started) if (Started != null) Started(a);
+                if (stopped > 0 && Stopped != null) Stopped();
                 foreach (var c in chunks) if (c.Seconds >= 30 && Chunk != null) Chunk(c);
             }
             catch
@@ -110,12 +127,18 @@ namespace MyPlayLog.Companion
             }
         }
 
-        static PlayChunk Make(string appId, TimeSpan span)
+        static PlayChunk Make(string key, TimeSpan span)
         {
+            long appId;
+            long.TryParse(key, out appId);
+            var g = Library.ByKey(key);
             return new PlayChunk
             {
                 Id = Guid.NewGuid().ToString("N"),
-                AppId = long.Parse(appId),
+                Key = key,
+                AppId = appId,
+                Name = g != null ? g.Name : null,
+                Folder = g != null ? g.Folder : null,
                 Seconds = (int)Math.Min(span.TotalSeconds, 12 * 3600),
             };
         }
@@ -145,6 +168,21 @@ namespace MyPlayLog.Companion
         };
         static readonly Regex IniAppId = new Regex(@"(?im)^\s*(?:RealAppId|AppId|app_id)\s*=\s*(\d{2,10})\s*$");
         static readonly Regex BareId = new Regex(@"^\s*(\d{2,10})\s*$");
+
+        /// <summary>
+        /// La clé du jeu d'un exécutable : son appid (fichiers de l'émulateur à
+        /// côté), sinon le dossier de jeu qui le contient (D:\Games\…) — ce qui
+        /// couvre les jeux sans appid Steam (émulateur Ubisoft, sans DRM…).
+        /// </summary>
+        string KeyOf(string exePath)
+        {
+            var appId = AppIdOf(exePath);
+            if (appId != null) return appId;
+            if (exePath.StartsWith(WinDir, StringComparison.OrdinalIgnoreCase)) return null;
+            if (exePath.IndexOf(@"\steamapps\", StringComparison.OrdinalIgnoreCase) >= 0) return null;
+            var g = Library.GameAt(exePath);
+            return g != null ? g.Key : null;
+        }
 
         string AppIdOf(string exePath)
         {
@@ -180,7 +218,7 @@ namespace MyPlayLog.Companion
             return found;
         }
 
-        static string ReadAppId(string file)
+        public static string ReadAppId(string file)
         {
             try
             {

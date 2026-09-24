@@ -45,6 +45,7 @@ import Messages from "./pages/Messages";
 import ListDetail from "./pages/ListDetail";
 import Admin from "./pages/Admin";
 import Settings from "./pages/Settings";
+import Companion from "./pages/Companion";
 import Onboarding from "./pages/Onboarding";
 import Placeholder from "./pages/Placeholder";
 import AppLayout from "./components/AppLayout";
@@ -352,6 +353,7 @@ export default function App() {
         <Route path="/profile" element={<MyProfileRedirect />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/companion" element={<Companion />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -134,14 +134,20 @@ export default function Settings() {
   const tab = TAB_KEYS.includes(urlTab) ? urlTab : "imports";
   const setTab = (key) => setParams({ tab: key }, { replace: true });
 
-  // Badge « à valider » sur l'onglet Imports (jeux détectés par une synchro PSN).
-  const [pendingCount, setPendingCount] = useState(0);
+  // Badge « à valider » sur l'onglet Imports : jeux détectés par une synchro
+  // PSN, et ce que le compagnon PC a envoyé.
+  const [psnPending, setPsnPending] = useState(0);
+  const [companionPending, setCompanionPending] = useState(0);
+  const pendingCount = psnPending + companionPending;
   // Badge « demandes d'abonnement » sur l'onglet Confidentialité (compte privé).
   const [requestCount, setRequestCount] = useState(0);
   useEffect(() => {
     if (!token) return;
     apiFetch("/psn/status", { token })
-      .then((s) => setPendingCount(s?.pending || 0))
+      .then((s) => setPsnPending(s?.pending || 0))
+      .catch(() => {});
+    apiFetch("/companion/devices", { token })
+      .then((d) => setCompanionPending(d?.pending || 0))
       .catch(() => {});
     apiFetch("/users/me/follow-requests", { token })
       .then((d) => setRequestCount(d?.count || 0))
@@ -275,7 +281,9 @@ function seenAgo(date) {
 
 function CompanionCard() {
   const { token } = useAuth();
+  const navigate = useNavigate();
   const [devices, setDevices] = useState(null);
+  const [pending, setPending] = useState(0);
   const [code, setCode] = useState(null); // { code, exp }
   const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState(false);
@@ -290,6 +298,7 @@ function CompanionCard() {
       if (known.current && list.some((x) => !known.current.has(x.id))) setCode(null);
       known.current = new Set(list.map((x) => x.id));
       setDevices(list);
+      setPending(d.pending || 0);
     } catch {
       setDevices((prev) => prev || []);
     }
@@ -358,10 +367,20 @@ function CompanionCard() {
         <a className="btn-ghost-link clickable" href={COMPANION_EXE} download>
           <Download size={15} /> Télécharger
         </a>
-        <button className="btn-set-primary clickable" onClick={newCode} disabled={busy}>
+        <button
+          className={`${linked ? "btn-ghost" : "btn-set-primary"} clickable`}
+          onClick={newCode}
+          disabled={busy}
+        >
           {busy ? <Loader2 className="spin" size={15} /> : <Link2 size={15} />}
           {linked ? "Relier un autre PC" : "Relier un PC"}
         </button>
+        {linked && (
+          <button className="btn-set-primary clickable" onClick={() => navigate("/companion")}>
+            <Inbox size={15} />
+            {pending > 0 ? `${pending} à valider` : "Envois et historique"}
+          </button>
+        )}
       </div>
 
       {code && !expired && (
@@ -409,9 +428,9 @@ function CompanionCard() {
       )}
 
       <p className="companion-note">
-        Télécharge-le sur ton PC Windows, lance-le, puis relie-le ici.{" "}
-        Les succès qu'il envoie s'affichent « PC · hors boutique » et ne comptent pas
-        dans les classements.
+        Télécharge-le sur ton PC Windows, lance-le, puis relie-le ici. Ce qu'il
+        trouve attend ta validation avant d'arriver sur ton profil. Ses succès
+        s'affichent « PC · hors boutique » et ne comptent pas dans les classements.
       </p>
     </div>
   );

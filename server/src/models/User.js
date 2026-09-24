@@ -238,6 +238,13 @@ const userSchema = new mongoose.Schema(
       lastSyncAt: { type: Date, default: null }, // dernière synchro (bouton)
     },
 
+    // --- Compagnon PC : ce qu'il envoie s'applique-t-il tout seul ? ---
+    // false (défaut) : chaque envoi attend d'être validé sur le site.
+    // true : les jeux déjà validés reçoivent leurs succès et leurs heures
+    // directement (toujours annulables dans l'historique). Un jeu jamais vu
+    // attend sa validation dans les deux cas. Cf. routes/companion.js.
+    companionAuto: { type: Boolean, default: false },
+
     // --- Connexion Discord (OAuth2 « identify ») ---
     // On ne garde que l'identité publique : l'id Discord (immuable, c'est LUI
     // la clé — un pseudo Discord se change), le pseudo affiché et l'avatar.

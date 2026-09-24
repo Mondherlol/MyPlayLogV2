@@ -37,7 +37,7 @@ namespace MyPlayLog.Companion
         {
             var http = new HttpClient();
             http.Timeout = TimeSpan.FromSeconds(25);
-            http.DefaultRequestHeaders.UserAgent.ParseAdd("MyPlayLogCompagnon/1.0");
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("MyPlayLogCompagnon/" + Program.Version);
             return http;
         }
 

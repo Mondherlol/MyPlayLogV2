@@ -1,4 +1,4 @@
-# Fabrique assets\icon.ico à partir de assets\icon.png (l'icône du site,
+﻿# Fabrique assets\icon.ico à partir de assets\icon.png (l'icône du site,
 # client/public/pwa-icon.svg rendue en 512 px).
 #
 # Plusieurs tailles dans un seul .ico : 16 px pour la barre des tâches, 32/48
