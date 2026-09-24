@@ -33,7 +33,7 @@ namespace MyPlayLog.Companion
             MaximizeBox = false;
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(380, 300);
+            ClientSize = new Size(380, 318);
             BackColor = Bg;
             ForeColor = Color.White;
             Font = new Font("Segoe UI", 10f);
@@ -48,12 +48,15 @@ namespace MyPlayLog.Companion
                 AutoSize = true,
                 Location = new Point(24, 22),
             };
+            // Largeur bornée, hauteur libre : le texte passe à la ligne et la
+            // case grandit avec lui, au lieu de sortir de la fenêtre.
             var hint = new Label
             {
-                Text = "Dans l'app MyPlayLog : Réglages › Compagnon PC ›\nRelier un PC, puis tape le code affiché.",
+                Text = "Dans l'app MyPlayLog : Réglages › Compagnon PC › Relier un PC, puis tape le code affiché.",
                 ForeColor = Soft,
                 AutoSize = true,
-                Location = new Point(26, 64),
+                MaximumSize = new Size(330, 0),
+                Location = new Point(26, 60),
             };
             code = new TextBox
             {
@@ -63,7 +66,7 @@ namespace MyPlayLog.Companion
                 BackColor = Surface,
                 ForeColor = Gold,
                 BorderStyle = BorderStyle.FixedSingle,
-                Location = new Point(26, 118),
+                Location = new Point(26, 134),
                 Width = 328,
             };
             code.KeyPress += (s, e) =>
@@ -83,21 +86,32 @@ namespace MyPlayLog.Companion
                 BackColor = Gold,
                 ForeColor = Ink,
                 Font = new Font("Segoe UI Semibold", 11f),
-                Location = new Point(26, 196),
+                Location = new Point(26, 212),
                 Size = new Size(328, 44),
                 Cursor = Cursors.Hand,
             };
             go.FlatAppearance.BorderSize = 0;
+            // Désactivé, il passe au gris : un bouton doré promet un clic.
+            go.EnabledChanged += (s, e) => PaintButton();
+            PaintButton();
             go.Click += async (s, e) => await Submit();
             status = new Label
             {
                 ForeColor = Color.FromArgb(0xe0, 0x57, 0x4d),
                 AutoSize = false,
-                Location = new Point(26, 250),
+                Location = new Point(26, 266),
                 Size = new Size(328, 36),
             };
             AcceptButton = go;
+            // Le curseur dans le champ dès l'ouverture : on tape le code, c'est tout.
+            Shown += (s, e) => code.Focus();
             Controls.AddRange(new Control[] { title, hint, code, go, status });
+        }
+
+        void PaintButton()
+        {
+            go.BackColor = go.Enabled ? Gold : Surface;
+            go.ForeColor = go.Enabled ? Ink : Soft;
         }
 
         string Digits

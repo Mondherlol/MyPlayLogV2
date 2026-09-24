@@ -107,11 +107,13 @@ namespace MyPlayLog.Companion
         {
             string text = ReadShared(file);
             if (string.IsNullOrWhiteSpace(text)) return new List<Unlock>();
+            // ⚠️ PAR L'EXTENSION, PAS PAR LE PREMIER CARACTÈRE : un INI commence
+            // lui aussi par « [ » (sa première section), et se faisait lire
+            // comme du JSON — qui échouait, donc « aucun succès ».
+            bool json = file.EndsWith(".json", StringComparison.OrdinalIgnoreCase);
             try
             {
-                return text.TrimStart().StartsWith("{") || text.TrimStart().StartsWith("[")
-                    ? ParseJson(text)
-                    : ParseIni(text);
+                return json ? ParseJson(text) : ParseIni(text);
             }
             catch
             {
@@ -192,8 +194,10 @@ namespace MyPlayLog.Companion
                 return result;
             }
 
-            var arr = root as ArrayList;
-            if (arr != null)
+            // Un tableau arrive en object[] au premier niveau, en ArrayList
+            // plus bas : on prend n'importe quelle liste.
+            var arr = root as IEnumerable;
+            if (arr != null && !(root is string))
             {
                 foreach (var item in arr)
                 {

@@ -2527,7 +2527,7 @@ router.patch("/me/achievements/:gameId", requireAuth, async (req, res) => {
     const gameId = Number(req.params.gameId);
     const platform = String(req.body?.platform || "");
     const visibility = String(req.body?.visibility || "");
-    if (!Number.isFinite(gameId) || !["steam", "psn"].includes(platform))
+    if (!Number.isFinite(gameId) || !["steam", "psn", "local"].includes(platform))
       return res.status(400).json({ error: "Jeu inconnu." });
     if (!["public", "private", "removed"].includes(visibility))
       return res.status(400).json({ error: "Visibilité inconnue." });
@@ -2856,7 +2856,7 @@ router.get("/:username/achievements/:gameId/friends", optionalAuth, async (req, 
 
     const gameId = Number(req.params.gameId);
     if (!Number.isFinite(gameId)) return res.json({ people: [] });
-    const platform = ["steam", "psn"].includes(req.query.platform) ? req.query.platform : null;
+    const platform = ["steam", "psn", "local"].includes(req.query.platform) ? req.query.platform : null;
     const ids = (await comparePeople(owner._id, req.userId)).filter(
       (id) => String(id) !== String(owner._id)
     );
@@ -2918,7 +2918,7 @@ router.get("/:username/achievements/:gameId", optionalAuth, async (req, res) => 
     if (await blockIfPrivate(res, user, req.userId)) return;
     // Un même jeu peut avoir ses succès Steam ET ses trophées PlayStation :
     // sans plateforme, on ne savait pas lequel des deux on renvoyait.
-    const platform = ["steam", "psn"].includes(req.query.platform)
+    const platform = ["steam", "psn", "local"].includes(req.query.platform)
       ? req.query.platform
       : null;
     const doc = await GameAchievements.findOne({

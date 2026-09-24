@@ -48,8 +48,12 @@ namespace MyPlayLog.Companion
             get { lock (gate) return running.Keys.ToArray(); }
         }
 
+        int busy;
+
         void Tick()
         {
+            // Une passe lente (disque endormi) ne doit pas se chevaucher avec la suivante.
+            if (Interlocked.Exchange(ref busy, 1) == 1) return;
             try
             {
                 var seen = new HashSet<string>();
@@ -99,6 +103,10 @@ namespace MyPlayLog.Companion
             catch
             {
                 // Une passe ratée n'arrête pas le suivi.
+            }
+            finally
+            {
+                Interlocked.Exchange(ref busy, 0);
             }
         }
 

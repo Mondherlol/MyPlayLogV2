@@ -169,6 +169,12 @@ async function ensureEntry(userId, g, appid) {
   });
 }
 
+// POST /api/companion/unlink — le compagnon se délie lui-même.
+router.post("/unlink", companionAuth, async (req, res) => {
+  await CompanionDevice.deleteOne({ _id: req.device._id }).catch(() => null);
+  res.json({ ok: true });
+});
+
 // GET /api/companion/me — à qui ce PC est relié.
 router.get("/me", companionAuth, async (req, res) => {
   const user = await User.findById(req.userId).select("username avatar").lean();

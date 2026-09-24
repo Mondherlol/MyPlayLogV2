@@ -105,8 +105,9 @@ namespace MyPlayLog.Companion
         {
             object v;
             if (d == null || !d.TryGetValue(key, out v)) yield break;
-            var arr = v as System.Collections.ArrayList;
-            if (arr == null) yield break;
+            // ArrayList ou object[] selon la profondeur : n'importe quelle liste.
+            var arr = v as System.Collections.IEnumerable;
+            if (arr == null || v is string) yield break;
             foreach (var item in arr)
             {
                 var obj = item as Dictionary<string, object>;
