@@ -25,3 +25,12 @@ if ($LASTEXITCODE -ne 0) { throw "La compilation a échoué." }
 
 $size = [Math]::Round((Get-Item $out).Length / 1KB)
 Write-Host "OK : $out ($size Ko)"
+
+# ⚠️ C'EST LE SITE QUI LE DISTRIBUE, PAS L'API. Le conteneur du serveur est
+# construit à partir de ./server seul (docker-compose) : il ne voit jamais ce
+# dossier. Le site, lui, sert tout client/public tel quel (Caddy) — l'exe y est
+# donc copié, et se télécharge sur https://myplaylog.cc/downloads/MyPlayLogCompagnon.exe
+$pub = Join-Path $here "..\client\public\downloads"
+New-Item -ItemType Directory -Force $pub | Out-Null
+Copy-Item $out (Join-Path $pub "MyPlayLogCompagnon.exe") -Force
+Write-Host "Copie pour le site : client\public\downloads\MyPlayLogCompagnon.exe"

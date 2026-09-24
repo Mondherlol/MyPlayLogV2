@@ -19,9 +19,6 @@
 
 import express from "express";
 import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import rateLimit from "express-rate-limit";
 
 import CompanionDevice from "../models/CompanionDevice.js";
@@ -33,8 +30,6 @@ import { getAchievementSchema, matchAppsToIgdb } from "../lib/steam.js";
 import { createTtlCache } from "../lib/ttlCache.js";
 
 const router = express.Router();
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const EXE = path.resolve(__dirname, "../../../companion/dist/MyPlayLogCompagnon.exe");
 
 const sha = (s) => crypto.createHash("sha256").update(s).digest("hex");
 
@@ -105,7 +100,6 @@ router.get("/devices", requireAuth, async (req, res) => {
       lastSeenAt: d.lastSeenAt,
       createdAt: d.createdAt,
     })),
-    download: fs.existsSync(EXE),
   });
 });
 
@@ -115,11 +109,9 @@ router.delete("/devices/:id", requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-// GET /api/companion/download — le compagnon lui-même.
-router.get("/download", (req, res) => {
-  if (!fs.existsSync(EXE)) return res.status(404).json({ error: "Compagnon indisponible." });
-  res.download(EXE, "MyPlayLogCompagnon.exe");
-});
+// Le compagnon lui-même se télécharge sur le SITE
+// (https://myplaylog.cc/downloads/MyPlayLogCompagnon.exe) : le conteneur de
+// l'API est construit à partir de ./server seul et ne voit pas companion/.
 
 // ----------------------------------------------------------------------
 //  Les routes du compagnon

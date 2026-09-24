@@ -15,8 +15,11 @@ fichiers que tiennent les émulateurs de succès.
 powershell -ExecutionPolicy Bypass -File build.ps1
 ```
 
-Produit `dist\MyPlayLogCompagnon.exe`, que le serveur distribue sur
-`GET /api/companion/download` s'il est présent (bouton « Télécharger » de l'app).
+Produit `dist\MyPlayLogCompagnon.exe` et en copie un exemplaire dans
+`client\public\downloads\`. C'est **le site** qui le distribue, sur
+`https://myplaylog.cc/downloads/MyPlayLogCompagnon.exe` (boutons
+« Télécharger » du site et de l'app) : le conteneur de l'API est construit à
+partir de `./server` seul et ne voit pas ce dossier.
 `make-icon.ps1` régénère `assets\icon.ico` depuis `assets\icon.png`
 (l'icône du site, `client/public/pwa-icon.svg` rendue en 512 px).
 

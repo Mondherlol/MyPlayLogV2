@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   Loader2,
   Trophy,
+  Monitor,
   Star,
   Gem,
   Award,
@@ -27,6 +28,8 @@ import PsnIcon from "./PsnIcon";
 function PlatformIcon({ platform, size = 13 }) {
   if (platform === "psn") return <PsnIcon size={size} />;
   if (platform === "steam") return <SteamIcon size={size} />;
+  // Le compagnon PC (jeux hors boutique, fichiers d'émulateurs).
+  if (platform === "local") return <Monitor size={size} />;
   return <Trophy size={size} />;
 }
 
@@ -639,7 +642,13 @@ function GameAchievementsModal({ username, token, game, onClose }) {
             <div className="ach-modal-badges">
               <span className="ach-mb">
                 <PlatformIcon platform={game.platform} size={13} />
-                {game.platform === "psn" ? "PlayStation" : game.platform === "steam" ? "Steam" : "Succès"}
+                {game.platform === "psn"
+                  ? "PlayStation"
+                  : game.platform === "steam"
+                    ? "Steam"
+                    : game.platform === "local"
+                      ? "PC · hors boutique"
+                      : "Succès"}
               </span>
               <span className="ach-mb">
                 <Trophy size={13} /> {game.unlocked}/{game.total}

@@ -2796,6 +2796,78 @@
   background: #f13278;
   color: #1b1c1f;
 }
+/* Le compagnon PC : un écran doré sur l'aplat sombre de l'icône du site. */
+.settings-page .companion-logo {
+  background: #14161c;
+  color: #f2b70b;
+}
+
+/* --- Compagnon PC : le code à taper, et les PC reliés --- */
+.companion-code {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #f2b70b;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.companion-code-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+.companion-code-digits {
+  font-size: 2.2rem;
+  letter-spacing: 0.3rem;
+  font-variant-numeric: tabular-nums;
+  color: #f2b70b;
+  line-height: 1.1;
+}
+.companion-code-wait {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+.companion-devices {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.companion-devices li {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.85rem;
+}
+.companion-device-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--text);
+}
+.companion-device-seen {
+  font-size: 0.78rem;
+}
+.companion-note {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-soft);
+}
 .settings-page .google-logo {
   background: #fff;
   border: 1px solid var(--border);

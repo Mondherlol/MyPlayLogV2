@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   DownloadCloud,
+  Download,
+  Monitor,
   UserCog,
   Palette,
   Star,
@@ -199,6 +201,7 @@ function ImportsPanel() {
         <SteamCard />
         <PsnCard />
         <BackloggdCard />
+        <CompanionCard />
       </div>
       <div className="import-soon-row">
         <span className="import-soon-chip">Xbox · bientôt</span>
@@ -248,6 +251,169 @@ function BackloggdCard() {
           document.body
         )}
     </>
+  );
+}
+
+// --- Compagnon PC : les jeux hors boutique -------------------------------
+// Une petite application Windows (companion/ dans le dépôt) qui lit les
+// fichiers des émulateurs de succès et compte le temps passé dans les jeux
+// lancés hors de Steam. On la relie avec un code à 6 chiffres, valable dix
+// minutes : le PC reçoit SON jeton, limité à ses envois et révocable ici.
+// Pendant qu'un code est affiché, on regarde toutes les 4 s si un PC est
+// arrivé — la liaison se voit ici sans recharger.
+//
+// Le fichier est servi par le SITE (client/public/downloads, copié par
+// companion/build.ps1) : le conteneur de l'API ne voit pas le dossier companion/.
+const COMPANION_EXE = "/downloads/MyPlayLogCompagnon.exe";
+const relTime = new Intl.RelativeTimeFormat("fr", { numeric: "auto" });
+function seenAgo(date) {
+  const min = Math.round((Date.now() - new Date(date).getTime()) / 60000);
+  if (min < 60) return relTime.format(-Math.max(min, 0), "minute");
+  if (min < 48 * 60) return relTime.format(-Math.round(min / 60), "hour");
+  return relTime.format(-Math.round(min / 1440), "day");
+}
+
+function CompanionCard() {
+  const { token } = useAuth();
+  const [devices, setDevices] = useState(null);
+  const [code, setCode] = useState(null); // { code, exp }
+  const [now, setNow] = useState(Date.now());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const known = useRef(null);
+
+  async function load() {
+    try {
+      const d = await apiFetch("/companion/devices", { token });
+      const list = d.devices || [];
+      // Un PC de plus alors qu'un code attendait : c'est lui, le code a servi.
+      if (known.current && list.some((x) => !known.current.has(x.id))) setCode(null);
+      known.current = new Set(list.map((x) => x.id));
+      setDevices(list);
+    } catch {
+      setDevices((prev) => prev || []);
+    }
+  }
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!code) return undefined;
+    const poll = setInterval(load, 4000);
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => {
+      clearInterval(poll);
+      clearInterval(tick);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code]);
+
+  async function newCode() {
+    setBusy(true);
+    setError(null);
+    try {
+      const d = await apiFetch("/companion/code", { method: "POST", token });
+      setCode({ code: d.code, exp: new Date(d.expiresAt).getTime() });
+      setNow(Date.now());
+    } catch (e) {
+      setError(e.message);
+    }
+    setBusy(false);
+  }
+
+  async function unlink(d) {
+    if (!window.confirm(`Délier ${d.name} ? Les succès déjà envoyés restent sur ton profil.`)) return;
+    await apiFetch(`/companion/devices/${d.id}`, { method: "DELETE", token }).catch(() => {});
+    load();
+  }
+
+  if (!devices) return <CardLoading />;
+
+  const left = code ? Math.max(0, code.exp - now) : 0;
+  const expired = !!code && left === 0;
+  const mmss = `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, "0")}`;
+  const linked = devices.length > 0;
+
+  return (
+    <div className={`import-card companion ${linked ? "connected" : ""}`}>
+      <div className="import-card-main">
+        <div className="import-logo companion-logo">
+          <Monitor size={20} />
+        </div>
+        <div className="import-card-info">
+          <div className="import-card-title">
+            Compagnon PC
+            {linked && (
+              <span className="import-badge">
+                <CheckCircle2 size={12} /> {devices.length} PC relié{devices.length > 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+          <p className="import-card-desc">Succès et heures des jeux hors boutique · Windows</p>
+        </div>
+      </div>
+
+      <div className="import-actions">
+        <a className="btn-ghost-link clickable" href={COMPANION_EXE} download>
+          <Download size={15} /> Télécharger
+        </a>
+        <button className="btn-set-primary clickable" onClick={newCode} disabled={busy}>
+          {busy ? <Loader2 className="spin" size={15} /> : <Link2 size={15} />}
+          {linked ? "Relier un autre PC" : "Relier un PC"}
+        </button>
+      </div>
+
+      {code && !expired && (
+        <div className="companion-code">
+          <span className="companion-code-label">Tape ce code dans le compagnon</span>
+          <strong className="companion-code-digits">
+            {code.code.slice(0, 3)} {code.code.slice(3)}
+          </strong>
+          <span className="companion-code-wait">
+            <Loader2 className="spin" size={13} /> En attente du PC · expire dans {mmss}
+          </span>
+        </div>
+      )}
+      {expired && (
+        <div className="import-error">
+          <AlertTriangle size={14} /> Code expiré : génère-en un autre.
+        </div>
+      )}
+      {error && (
+        <div className="import-error">
+          <AlertTriangle size={14} /> {error}
+        </div>
+      )}
+
+      {linked && (
+        <ul className="companion-devices">
+          {devices.map((d) => (
+            <li key={d.id}>
+              <Monitor size={14} />
+              <span className="companion-device-name">{d.name}</span>
+              <span className="companion-device-seen">
+                {d.lastSeenAt ? `vu ${seenAgo(d.lastSeenAt)}` : "jamais vu"}
+              </span>
+              <button
+                className="btn-ghost-danger set-icon clickable"
+                onClick={() => unlink(d)}
+                title="Délier"
+                aria-label={`Délier ${d.name}`}
+              >
+                <Link2Off size={14} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="companion-note">
+        Télécharge-le sur ton PC Windows, lance-le, puis relie-le ici.{" "}
+        Les succès qu'il envoie s'affichent « PC · hors boutique » et ne comptent pas
+        dans les classements.
+      </p>
+    </div>
   );
 }
 
