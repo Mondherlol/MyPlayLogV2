@@ -636,9 +636,13 @@ function GameAchievementsModal({ username, token, game, onClose }) {
           className="ach-modal-head"
           style={backdrop ? { "--ach-modal-bg": `url(${backdrop})` } : undefined}
         >
-          {game.cover && <img src={game.cover} alt="" className="ach-modal-cover" />}
+          {game.cover && <a href={game.url} target="_blank" rel="noopener noreferrer">
+            <img src={game.cover} alt="" className="ach-modal-cover" />
+          </a>}
           <div className="ach-modal-head-info">
+          <a href={game.url} target="_blank" rel="noopener noreferrer">
             <h3>{game.name}</h3>
+          </a>
             <div className="ach-modal-badges">
               <span className="ach-mb">
                 <PlatformIcon platform={game.platform} size={13} />
