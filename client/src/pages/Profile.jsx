@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Heart,
   Trophy,
@@ -266,6 +266,7 @@ export default function Profile() {
   const { openWith } = useChat();
   const { map } = useLibrary();
   const targetUsername = routeUsername || user?.username;
+  const navigate = useNavigate();
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1302,6 +1303,11 @@ export default function Profile() {
               profileCache.set(targetUsername, next);
               return next;
             });
+            // Nouveau pseudo : l'adresse du profil change avec lui.
+            if (routeUsername && u.username !== routeUsername) {
+              profileCache.remove(targetUsername);
+              navigate(`/u/${encodeURIComponent(u.username)}`, { replace: true });
+            }
           }}
         />
       )}

@@ -609,6 +609,19 @@ button.pf-stat:hover {
   color: var(--text-soft);
 }
 
+/* Le pseudo vérifié pendant la saisie. */
+.ep-input-icon.invalid,
+.ep-input-icon.invalid:focus-within {
+  border-color: #e0574d;
+}
+.ep-help.is-error,
+.ep-name-bad {
+  color: #e0574d;
+}
+.ep-name-ok {
+  color: #f2b70b;
+}
+
 /* ----------------------------------------------------------------------
    Le pronom (cf. EditProfileModal)
    ----------------------------------------------------------------------

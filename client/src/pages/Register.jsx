@@ -59,8 +59,9 @@ export default function Register() {
               type="text"
               autoComplete="username"
               placeholder="ton_pseudo"
+              maxLength={20}
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))}
               required
             />
           </div>

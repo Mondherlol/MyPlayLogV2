@@ -25,6 +25,7 @@ import { setServiceNpsso, getServiceStatus, clearServiceTokens } from "../lib/ps
 import { isUserAdmin, isUserStaff } from "../lib/admin.js";
 import { isExpoPushToken } from "../lib/push.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
+import { applyUsername, usernameProblem } from "../lib/username.js";
 import { summarizeReactions, reviewComment } from "../lib/reviewSerialize.js";
 import { recordActivity, removeActivity } from "../lib/activity.js";
 import { FEED_KEYS } from "../lib/feedCategories.js";
@@ -280,21 +281,34 @@ function pickEntity(value, extras = [], { platformId = false } = {}) {
   return out;
 }
 
+// --- Ce pseudo est-il possible pour moi ? (vérification pendant la saisie) ---
+router.get("/me/username-check", requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select("username usernameChangedAt");
+    if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
+    const problem = await usernameProblem(req.query.name, user);
+    res.json({ ok: !problem, error: problem?.error || null });
+  } catch (err) {
+    console.error("username check error:", err.message);
+    res.status(500).json({ error: "Vérification impossible." });
+  }
+});
+
 router.put("/me", requireAuth, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ error: "Utilisateur introuvable." });
     const b = req.body || {};
 
+    // Le pseudo : format, délai entre deux changements, place libre (cf.
+    // lib/username.js). Renvoyer son pseudo actuel ne coûte rien.
     if (b.username !== undefined) {
-      const username = String(b.username).trim();
-      if (username.length < 2)
-        return res.status(400).json({ error: "Identifiant trop court." });
-      if (username !== user.username) {
-        const taken = await User.findOne({ username });
-        if (taken) return res.status(409).json({ error: "Cet identifiant est déjà pris." });
-        user.username = username;
-      }
+      const problem = await usernameProblem(b.username, user);
+      if (problem)
+        return res
+          .status(problem.status)
+          .json({ error: problem.error, nextChangeAt: problem.nextChangeAt || null });
+      applyUsername(user, b.username);
     }
     if (b.bio !== undefined) user.bio = String(b.bio).slice(0, 300);
     // Le pronom. Une valeur inconnue vaut « pas de choix » plutot qu'une

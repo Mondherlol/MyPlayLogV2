@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Check, Loader2, AtSign, Sparkles, Smile, User } from "lucide-react";
+import { X, Check, Loader2, AtSign, Sparkles, Smile, User, CircleAlert } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useClickOutside } from "../hooks/useClickOutside";
@@ -8,6 +8,13 @@ import AddItemsModal from "./AddItemsModal";
 import EmojiPanel from "./EmojiPanel";
 
 const BIO_MAX = 50;
+// Les bornes du pseudo : les mêmes que le serveur (server/lib/username.js), qui
+// reste seul juge — on les reprend ici pour bloquer la saisie au bon endroit.
+const USERNAME_MAX = 20;
+const USERNAME_COOLDOWN_DAYS = 30;
+
+const fmtDate = (d) =>
+  new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 
 // Les trois pronoms proposés. Pas de quatrième puce « ne pas dire » : c'est
 // l'état de départ, et on y revient en recliquant celle qu'on avait prise. Une
@@ -25,10 +32,21 @@ const PRONOUNS = [
 const sample = (pronoun) =>
   `s'est abonné${pronoun === "il" ? "" : pronoun === "elle" ? "e" : "·e"} à toi`;
 
-// Modal d'édition des infos de profil : identifiant (verrouillé), bio (émojis,
-// 50 car.), et alter ego = un personnage de jeu vidéo existant (recherche).
+// Modal d'édition des infos de profil : pseudo (un changement tous les 30
+// jours), bio (émojis, 50 car.), et alter ego = un personnage de jeu vidéo
+// existant (recherche).
 export default function EditProfileModal({ profile, onSaved, onClose }) {
-  const { token, updateUser } = useAuth();
+  const { token, user: me, updateUser } = useAuth();
+  const [username, setUsername] = useState(profile.username || "");
+  // Le serveur dit jusqu'à quand le pseudo est figé (null : libre).
+  const lockedUntil =
+    me?.usernameNextChangeAt && new Date(me.usernameNextChangeAt) > new Date()
+      ? me.usernameNextChangeAt
+      : null;
+  const nameChanged =
+    username.trim().toLowerCase() !== String(profile.username || "").toLowerCase();
+  // "idle" | "checking" | "ok" | message d'erreur
+  const [nameState, setNameState] = useState("idle");
   const [bio, setBio] = useState(profile.bio || "");
   const [tagline, setTagline] = useState(profile.tagline || "");
   const [taglineImg, setTaglineImg] = useState(profile.taglineImage || null);
@@ -50,6 +68,36 @@ export default function EditProfileModal({ profile, onSaved, onClose }) {
   // les portraits et la recherche par jeu (c'est celle de l'appli mobile), et
   // son mode « un seul » se referme au premier clic.
   const [picking, setPicking] = useState(false);
+
+  // Vérifie le pseudo pendant la saisie, une fois la frappe posée : le format,
+  // le délai, et si la place est libre — le serveur répond pour les trois.
+  useEffect(() => {
+    const name = username.trim();
+    if (!nameChanged) {
+      setNameState("idle");
+      return undefined;
+    }
+    setNameState("checking");
+    let alive = true;
+    const timer = setTimeout(async () => {
+      try {
+        const d = await apiFetch(`/users/me/username-check?name=${encodeURIComponent(name)}`, {
+          token,
+        });
+        if (alive) setNameState(d.ok ? "ok" : d.error || "Pseudo indisponible.");
+      } catch {
+        // Vérification impossible (réseau) : on laisse le serveur trancher à
+        // l'enregistrement plutôt que de bloquer le bouton.
+        if (alive) setNameState("idle");
+      }
+    }, 350);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [username, nameChanged, token]);
+
+  const nameError = nameState !== "idle" && nameState !== "checking" && nameState !== "ok";
 
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && onClose();
@@ -79,14 +127,20 @@ export default function EditProfileModal({ profile, onSaved, onClose }) {
 
   async function submit(e) {
     e.preventDefault();
-    if (busy) return;
+    if (busy || nameError || nameState === "checking") return;
     setBusy(true);
     setError(null);
     try {
       const { user } = await apiFetch("/users/me", {
         method: "PUT",
         token,
-        body: { bio, tagline, taglineImage: taglineImg, pronoun },
+        body: {
+          bio,
+          tagline,
+          taglineImage: taglineImg,
+          pronoun,
+          ...(username.trim() !== profile.username ? { username: username.trim() } : {}),
+        },
       });
       updateUser(user);
       onSaved(user);
@@ -107,12 +161,32 @@ export default function EditProfileModal({ profile, onSaved, onClose }) {
           {error && <div className="alert alert-error">{error}</div>}
 
           <div className="field">
-            <label htmlFor="ep-username">Identifiant</label>
-            <div className="ep-input-icon disabled">
+            <label htmlFor="ep-username">Pseudo</label>
+            <div className={`ep-input-icon ${lockedUntil ? "disabled" : ""} ${nameError ? "invalid" : ""}`}>
               <AtSign size={16} />
-              <input id="ep-username" value={profile.username || ""} disabled readOnly />
+              <input
+                id="ep-username"
+                value={username}
+                maxLength={USERNAME_MAX}
+                autoComplete="off"
+                spellCheck={false}
+                disabled={!!lockedUntil}
+                readOnly={!!lockedUntil}
+                onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))}
+              />
+              {nameState === "checking" && <Loader2 size={15} className="spin" />}
+              {nameState === "ok" && <Check size={15} className="ep-name-ok" />}
+              {nameError && <CircleAlert size={15} className="ep-name-bad" />}
             </div>
-            <span className="ep-help">L'identifiant ne peut pas être modifié.</span>
+            <span className={`ep-help ${nameError ? "is-error" : ""}`}>
+              {lockedUntil
+                ? `Prochain changement possible le ${fmtDate(lockedUntil)}.`
+                : nameError
+                  ? nameState
+                  : nameChanged
+                    ? `Après ça, plus de changement pendant ${USERNAME_COOLDOWN_DAYS} jours. L'ancien lien de ton profil ne marchera plus.`
+                    : `Un changement tous les ${USERNAME_COOLDOWN_DAYS} jours. Lettres, chiffres, _ . -`}
+            </span>
           </div>
 
           <div className="field">
@@ -225,7 +299,11 @@ export default function EditProfileModal({ profile, onSaved, onClose }) {
             <button type="button" className="btn btn-ghost" onClick={onClose}>
               Annuler
             </button>
-            <button type="submit" className="btn btn-primary" disabled={busy}>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={busy || nameError || nameState === "checking"}
+            >
               {busy ? <Loader2 size={18} className="spin" /> : <Check size={18} />} Enregistrer
             </button>
           </div>

@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
+import { usernameProblem } from "../lib/username.js";
 import { sendMail } from "../lib/mailer.js";
 import { readFeatures } from "../lib/features.js";
 import { logEvent, ipOf } from "../lib/audit.js";
@@ -58,11 +59,13 @@ router.post("/register", async (req, res) => {
         .json({ error: "Le mot de passe doit faire au moins 3 caractères." });
     }
 
-    const exists = await User.findOne({ $or: [{ email }, { username }] });
-    if (exists) {
-      const field = exists.email === email ? "email" : "identifiant";
-      return res.status(409).json({ error: `Cet ${field} est déjà utilisé.` });
+    if (await User.findOne({ email }).select("_id")) {
+      return res.status(409).json({ error: "Cet email est déjà utilisé." });
     }
+    // Les mêmes règles qu'un changement de pseudo : format, place libre sans
+    // tenir compte de la casse, noms quittés récemment (cf. lib/username.js).
+    const problem = await usernameProblem(username);
+    if (problem) return res.status(problem.status).json({ error: problem.error });
 
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await User.create({ email, username, passwordHash });

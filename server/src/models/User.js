@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { nextUsernameChangeAt } from "../lib/username.js";
 
 const userSchema = new mongoose.Schema(
   {
@@ -14,6 +15,13 @@ const userSchema = new mongoose.Schema(
       required: true,
       unique: true,
       trim: true,
+    },
+    // Le dernier changement de pseudo (délai entre deux, cf. lib/username.js)
+    // et les noms quittés, réservés un temps à leur ancien propriétaire.
+    usernameChangedAt: { type: Date, default: null },
+    previousUsernames: {
+      type: [{ _id: false, name: String, changedAt: Date }],
+      default: [],
     },
     // ⚠️ PAS OBLIGATOIRE, ET C'EST VOULU. Un compte ouvert avec Google ou
     // Discord n'a jamais eu de mot de passe : l'exiger obligerait à en inventer
@@ -547,6 +555,8 @@ userSchema.methods.toPublic = function () {
     id: this._id,
     email: this.email,
     username: this.username,
+    // Quand le pseudo pourra de nouveau changer (null : tout de suite).
+    usernameNextChangeAt: nextUsernameChangeAt(this),
     avatar: this.avatar,
     cover: this.cover,
     coverPos: this.coverPos,
