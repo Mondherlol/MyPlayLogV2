@@ -3,6 +3,7 @@ import { optionalAuth, requireAdmin, requireAuth } from "../middleware/auth.js";
 import { recommendForUser, similarGames } from "../lib/recoEngine.js";
 import { getRecoCatalogState, runRecoCatalogSync } from "../lib/recoCatalog.js";
 import { getCoPlayState } from "../lib/recoCoPlay.js";
+import GemSkip from "../models/GemSkip.js";
 
 // ======================================================================
 //  /api/reco — les recommandations calculées (lib/recoEngine.js)
@@ -42,6 +43,29 @@ router.get("/similar/:id", optionalAuth, async (req, res) => {
     console.error("reco similar:", err);
     res.status(500).json({ error: "Impossible de trouver des jeux similaires." });
   }
+});
+
+// POST /api/reco/dismiss/:id — « pas intéressé ». Même liste que le swipe gauche
+// de la découverte de pépites (GemSkip) : un jeu écarté ici ne revient ni dans
+// les recommandations, ni dans les pépites. Le moteur le voit tout de suite —
+// son cache se périme dès que la liste change.
+router.post("/dismiss/:id", requireAuth, async (req, res) => {
+  const gameId = Number(req.params.id);
+  if (!Number.isInteger(gameId) || gameId <= 0) return res.status(400).json({ error: "Jeu invalide." });
+  await GemSkip.updateOne(
+    { user: req.userId, gameId },
+    { $setOnInsert: { user: req.userId, gameId } },
+    { upsert: true }
+  );
+  res.json({ ok: true });
+});
+
+// DELETE /api/reco/dismiss/:id — annuler un « pas intéressé ».
+router.delete("/dismiss/:id", requireAuth, async (req, res) => {
+  const gameId = Number(req.params.id);
+  if (!Number.isInteger(gameId)) return res.status(400).json({ error: "Jeu invalide." });
+  await GemSkip.deleteOne({ user: req.userId, gameId });
+  res.json({ ok: true });
 });
 
 // GET /api/reco/status — l'état du catalogue et du co-jeu (admin).

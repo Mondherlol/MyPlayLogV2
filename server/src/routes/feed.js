@@ -2007,16 +2007,14 @@ const DISCOVER_FIELDS =
 // « Jeux du moment » et « sorties marquantes » : identiques pour tout le
 // monde, mis en cache mémoire par jour (comme /games/releases).
 const sharedCache = { day: 0, hot: null, upcoming: null, undated: null, indies: null };
-// Suggestions personnalisées : cache par utilisateur (20 min), plafonné à 5 000
-// personnes — au-delà, la moins récemment vue repart (elle recalculera).
-// Sans plafond, c'était une entrée par compte ayant ouvert l'onglet depuis le
-// démarrage, gardée pour toujours. 20 min et non plus 6 h : le moteur de
-// recommandations tient déjà son propre cache, qui se périme dès que la
-// bibliothèque change — garder 6 h ici masquerait une nouvelle note.
+// L'ancien « pour toi » (par genres, deux appels IGDB) : cache par utilisateur
+// (6 h), plafonné à 5 000 personnes — au-delà, la moins récemment vue repart.
+// Il ne sert plus que de repli, tant que le moteur de recommandations n'est pas
+// prêt (cf. fetchPersonal) ; le moteur, lui, tient son propre cache.
 const forYouCache = createTtlCache({
   name: "feed:for-you",
   max: 5000,
-  ttl: 20 * 60 * 1000,
+  ttl: 6 * 60 * 60 * 1000,
 });
 
 async function fetchHot(now) {
@@ -2105,10 +2103,23 @@ async function fetchIndies(now) {
 
 // Suggestions « pour toi » : le moteur de recommandations (lib/recoEngine.js)
 // dès que son catalogue est prêt ; sinon l'ancien repli ci-dessous.
-async function fetchForYou(userId) {
+//
+// ⚠️ PAS DE CACHE ICI QUAND LE MOTEUR RÉPOND : il tient le sien, qui se périme
+// dès que la bibliothèque (ou un « pas intéressé ») change. En remettre un
+// par-dessus ferait survivre 20 minutes un jeu qu'on vient d'écarter.
+// Rend { forYou, because } : `because`, ce sont les rangées « Parce que tu as
+// adoré X » de l'accueil (trois au plus).
+async function fetchPersonal(userId) {
   const reco = await recommendForUser(userId).catch(() => null);
-  if (reco?.forYou?.length) return reco.forYou.slice(0, 12);
-  return fetchForYouByGenres(userId);
+  if (reco?.forYou?.length)
+    return {
+      forYou: reco.forYou.slice(0, 12),
+      because: (reco.because || []).slice(0, 3).map((r) => ({ seed: r.seed, games: r.games.slice(0, 12) })),
+    };
+  const forYou = await forYouCache.remember(String(userId), () =>
+    fetchForYouByGenres(userId).catch(() => [])
+  );
+  return { forYou, because: [] };
 }
 
 // L'ancien « pour toi » : jeux bien notés dans les 3 genres les plus présents
@@ -2170,9 +2181,7 @@ router.get("/discover", requireAuth, async (req, res) => {
       }
     }
 
-    const forYou = await forYouCache.remember(String(req.userId), () =>
-      fetchForYou(req.userId).catch(() => [])
-    );
+    const { forYou, because } = await fetchPersonal(req.userId);
 
     res.json({
       hot: sharedCache.hot || [],
@@ -2184,6 +2193,7 @@ router.get("/discover", requireAuth, async (req, res) => {
       upcomingUndated: sharedCache.undated || [],
       indies: sharedCache.indies || [],
       forYou,
+      because,
     });
   } catch (err) {
     console.error("discover error:", err.message);

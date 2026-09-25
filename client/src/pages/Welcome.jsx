@@ -289,6 +289,13 @@ export default function Welcome() {
   const dusty = useMemo(() => dustyGames(library), [library]);
   const pick = useMemo(() => tonightPick(library, reroll), [library, reroll]);
   const loved = useMemo(() => lovedSeed(library, Date.now(), lovedShift), [library, lovedShift]);
+  // Les rangées « Parce que tu as adoré X » du moteur de recommandations (cf.
+  // server/src/lib/recoEngine.js), livrées avec /feed/discover : le moteur
+  // choisit des jeux de départ qui ne se ressemblent pas entre eux, et « un
+  // autre » passe à la rangée suivante. Tant qu'il n'en a pas (catalogue pas
+  // encore prêt), l'ancien rayon ci-dessous prend le relais.
+  const recoRails = discover?.because || [];
+  const recoRail = recoRails.length ? recoRails[lovedShift % recoRails.length] : null;
   const lovedCount = useMemo(() => lovedPoolSize(library), [library]);
   // Trois bandes de plus, tirées de la MÊME liste déjà chargée : elles
   // s'affichent avant même qu'IGDB ait répondu (cf. lib/home).
@@ -418,7 +425,11 @@ export default function Welcome() {
   // n'a que quelques mégaoctets pour tout le site : on en garde la seule partie
   // que ce rayon affiche, sous une adresse à elle.
   const lovedId = loved?.gameId;
+  const hasRecoRails = recoRails.length > 0;
   useEffect(() => {
+    // Le moteur a répondu : l'ancien rayon ne s'affiche pas, inutile de
+    // demander la fiche complète du jeu adoré.
+    if (hasRecoRails) return undefined;
     if (!lovedId) {
       setSimilar([]);
       return undefined;
@@ -450,7 +461,29 @@ export default function Welcome() {
     // dans la bibliothèque, et relancer la requête pour retirer une jaquette du
     // rayon coûterait plus que de la laisser jusqu'au prochain passage.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lovedId, token, scope]);
+  }, [lovedId, token, scope, hasRecoRails]);
+
+  // « Pas intéressé » (menu clic droit d'une recommandation, cf.
+  // components/GameContextMenu) : le jeu quitte tout de suite les rayons de la
+  // page, sans attendre le prochain chargement.
+  useEffect(() => {
+    const onDismiss = (e) => {
+      const id = e.detail;
+      const drop = (list) => (list || []).filter((g) => g.id !== id);
+      setDiscover((d) =>
+        d
+          ? {
+              ...d,
+              forYou: drop(d.forYou),
+              because: (d.because || []).map((r) => ({ ...r, games: drop(r.games) })),
+            }
+          : d
+      );
+      setSimilar(drop);
+    };
+    window.addEventListener("mpl:reco-dismiss", onDismiss);
+    return () => window.removeEventListener("mpl:reco-dismiss", onDismiss);
+  }, []);
 
   // ------------------------------------------------------------------
   //  Écrire dans la bibliothèque, depuis l'accueil
@@ -866,7 +899,7 @@ export default function Welcome() {
             ⚠️ TROIS RÉPONSES À LA MÊME QUESTION (« je joue à quoi d'autre ? »),
             donc un seul rayon, et on choisit d'où vient la réponse. */}
         {discoverTabs.length > 0 && (
-          <section className="mh-sec s-discover">
+          <section className={`mh-sec s-discover ${current.key === "forYou" ? "reco-rail" : ""}`}>
             <div className="mh-head">
               <div className="mh-head-main">
                 <span className="mh-head-text">
@@ -956,7 +989,28 @@ export default function Welcome() {
         )}
 
         {/* --- Parce que tu as adoré … (le fond du rayon) ---------------- */}
-        {similar.length > 0 && !!loved && (
+        {recoRail ? (
+          <Section
+            kicker="Parce que tu as adoré"
+            title={recoRail.seed.name}
+            cover={recoRail.seed.cover}
+            titleTo={`/game/${recoRail.seed.id}`}
+            onRefresh={recoRails.length > 1 ? () => setLovedShift((n) => n + 1) : null}
+            refreshLabel="Un autre de mes coups de cœur"
+            className="s-similar reco-rail"
+          >
+            {recoRail.games
+              .filter((g) => !owned.has(String(g.id)))
+              .map((g) => (
+                <GameTile
+                  key={g.id}
+                  game={g}
+                  sub={g.rating ? `${g.rating} %` : null}
+                  subGold={!!g.rating && g.rating >= 85}
+                />
+              ))}
+          </Section>
+        ) : similar.length > 0 && !!loved && (
           <Section
             kicker="Parce que tu as adoré"
             title={loved.name}

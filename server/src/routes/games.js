@@ -82,6 +82,7 @@ import {
 // Les jeux ajoutés par lien Steam qu'IGDB ne connaît pas encore : identifiant
 // négatif, fiche tirée de leur page boutique (cf. lib/localGame.js).
 import { isLocalId, appIdOf, coreFromSteam } from "../lib/localGame.js";
+import { similarGames } from "../lib/recoEngine.js";
 import SteamGame from "../models/SteamGame.js";
 import {
   decorateFranchises,
@@ -2372,18 +2373,37 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
       .map((w) => ({ url: w.url, kind: WEBSITE_KINDS[w.type] }))
       .filter((w) => w.kind);
 
-    const similar = (g.similar_games || [])
-      .filter((s) => s.cover?.image_id)
-      .map((s) => ({
-        id: s.id,
-        name: s.name,
-        cover: igdbImg("t_cover_big", s.cover.image_id),
-        rating: s.total_rating ? Math.round(s.total_rating) : null,
-        year: s.first_release_date
-          ? new Date(s.first_release_date * 1000).getFullYear()
-          : null,
-      }))
-      .slice(0, 12);
+    // Les jeux similaires : ceux du moteur de recommandations (contenu + co-jeu,
+    // cf. lib/recoEngine.js) dès qu'il est prêt, en écartant ta bibliothèque ;
+    // les `similar_games` d'IGDB — souvent « même genre, populaire » — ne
+    // servent plus que de repli (moteur pas prêt, fiche locale, jeu inconnu).
+    const recoSimilar =
+      id > 0
+        ? await similarGames(id, { userId: req.userId || null, limit: 12 }).catch(() => null)
+        : null;
+    const similar =
+      recoSimilar?.length >= 4
+        ? recoSimilar.map((c) => ({
+            id: c.id,
+            name: c.name,
+            cover: c.cover,
+            rating: c.rating,
+            year: c.year,
+            // Pourquoi il ressort : « Adoré par les fans de X », un thème, un studio.
+            traits: c.traits,
+          }))
+        : (g.similar_games || [])
+            .filter((s) => s.cover?.image_id)
+            .map((s) => ({
+              id: s.id,
+              name: s.name,
+              cover: igdbImg("t_cover_big", s.cover.image_id),
+              rating: s.total_rating ? Math.round(s.total_rating) : null,
+              year: s.first_release_date
+                ? new Date(s.first_release_date * 1000).getFullYear()
+                : null,
+            }))
+            .slice(0, 12);
 
     // Langues (dédupliquées) + code pays du drapeau, déduit de la locale IGDB
     // (ex: "fr-FR" -> "fr", "pt-BR" -> "br").

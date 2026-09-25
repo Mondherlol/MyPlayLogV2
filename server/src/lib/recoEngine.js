@@ -923,7 +923,11 @@ function compute(idx, { pos, neg, known, taste }) {
     if (picked.length < 6) continue;
     railSeeds.push(s);
     because.push({
-      seed: { id: idx.docs[s.i].id, name: idx.docs[s.i].fr || idx.docs[s.i].name },
+      seed: {
+        id: idx.docs[s.i].id,
+        name: nameOf(idx, s.i),
+        cover: idx.docs[s.i].cover ? `${IMG}/t_cover_big/${idx.docs[s.i].cover}.jpg` : null,
+      },
       games: picked.map((c) =>
         card(idx, c.i, {
           score: Math.round(c.score * 1000) / 1000,

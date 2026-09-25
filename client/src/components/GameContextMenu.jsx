@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Bookmark,
   Check,
+  EyeOff,
   Gamepad,
   Heart,
   Image as ImageIcon,
@@ -134,7 +135,9 @@ export function GameMenuProvider({ children }) {
       const hit = gameFromNode(e.target);
       if (!hit) return;
       e.preventDefault();
-      openAt(e, metaFromNode(hit.el, hit.id));
+      // Une vignette dans un rayon de recommandations (`.reco-rail`) : le menu
+      // y ajoute « Pas intéressé ».
+      openAt(e, { ...metaFromNode(hit.el, hit.id), reco: !!hit.el.closest(".reco-rail") });
     }
     document.addEventListener("contextmenu", onContextMenu);
     return () => document.removeEventListener("contextmenu", onContextMenu);
@@ -164,7 +167,10 @@ export function GameMenuProvider({ children }) {
           full: true,
         };
         META.set(pendingId, meta);
-        if (alive) setMenu((m) => (m && m.game.id === pendingId ? { ...m, game: meta } : m));
+        if (alive)
+          setMenu((m) =>
+            m && m.game.id === pendingId ? { ...m, game: { ...meta, reco: m.game.reco } } : m
+          );
       })
       .catch(() => {});
     return () => {
@@ -367,6 +373,22 @@ function Menu({ menu, onClose, onSheet }) {
     }
   }
 
+  // « Pas intéressé » : le moteur ne le proposera plus (même liste que le swipe
+  // gauche des pépites), et les rayons de la page le retirent tout de suite.
+  async function dismiss() {
+    if (busy || !requireLogin()) return;
+    setBusy(true);
+    try {
+      await apiFetch(`/reco/dismiss/${game.id}`, { method: "POST", token });
+      window.dispatchEvent(new CustomEvent("mpl:reco-dismiss", { detail: game.id }));
+      onClose();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function toggleWish() {
     // Retirer de la wishlist, c'est retirer l'entrée : elle ne porte rien
     // d'autre qu'une intention, il n'y a pas de note à protéger d'où la
@@ -433,6 +455,16 @@ function Menu({ menu, onClose, onSheet }) {
       label: "Changer la jaquette",
       onClick: () => onSheet("cover", game),
     },
+    // Sur une recommandation seulement : ailleurs, « pas intéressé » ne
+    // voudrait rien dire (le jeu n'a été proposé par personne).
+    game.reco && !entry && { sep: true, key: "s-reco" },
+    game.reco &&
+      !entry && {
+        key: "dismiss",
+        Icon: EyeOff,
+        label: "Pas intéressé",
+        onClick: dismiss,
+      },
     !!entry && { sep: true, key: "s3" },
     !!entry && {
       key: "remove",
