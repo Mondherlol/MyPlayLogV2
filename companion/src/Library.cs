@@ -99,7 +99,9 @@ namespace MyPlayLog.Companion
             // jeux garde ce dossier (et son nom).
             foreach (var source in Emulators.Sources())
             {
-                if (!source.Exists) continue;
+                // Ubisoft : des identifiants de produit, pas des appid Steam ; le
+                // jeu est déjà là par son dossier (cf. UbisoftGame).
+                if (!source.Exists || source.Ubisoft) continue;
                 string[] dirs;
                 try
                 {
@@ -136,6 +138,54 @@ namespace MyPlayLog.Companion
                 foreach (var g in games)
                     if (g.Folder != null && exePath.StartsWith(g.Folder + "\\", StringComparison.OrdinalIgnoreCase))
                         return g;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Le jeu d'un dossier de sauvegarde Ubisoft (…\Goldberg UplayEmu Saves\66088) :
+        /// ses sauvegardes portent le nom de l'exécutable (ACBlackFlag[AutoSave01].save
+        /// ↔ ACBlackFlag.exe), ce qui le relie au bon dossier de jeu. Rend aussi
+        /// ce préfixe, qui sert de nom à défaut de mieux.
+        /// </summary>
+        public static LocalGame UbisoftGame(string saveDir, out string prefix)
+        {
+            prefix = null;
+            try
+            {
+                foreach (var f in Directory.GetFiles(saveDir, "*.save"))
+                {
+                    var n = Path.GetFileNameWithoutExtension(f);
+                    int cut = n.IndexOf('[');
+                    prefix = (cut > 0 ? n.Substring(0, cut) : n).Trim();
+                    if (prefix.Length > 0) break;
+                }
+            }
+            catch
+            {
+            }
+            if (string.IsNullOrEmpty(prefix)) return null;
+            LocalGame[] snapshot;
+            lock (gate) snapshot = games.Where(g => g.Folder != null).ToArray();
+            var exe = prefix + ".exe";
+            // D'abord à la racine des jeux (le cas courant), puis deux niveaux
+            // plus bas (Binaries\Win64\…) — jamais tout le dossier d'un jeu.
+            foreach (var g in snapshot)
+                if (File.Exists(Path.Combine(g.Folder, exe))) return g;
+            foreach (var g in snapshot)
+            {
+                try
+                {
+                    foreach (var sub in Directory.GetDirectories(g.Folder))
+                    {
+                        if (File.Exists(Path.Combine(sub, exe))) return g;
+                        foreach (var sub2 in Directory.GetDirectories(sub))
+                            if (File.Exists(Path.Combine(sub2, exe))) return g;
+                    }
+                }
+                catch
+                {
+                }
             }
             return null;
         }

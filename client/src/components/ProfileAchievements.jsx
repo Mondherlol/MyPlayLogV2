@@ -311,7 +311,7 @@ export default function ProfileAchievements({ username, token, isMe }) {
                   <div className="ach-game-meta">
                     <span className={`ach-game-pct ${g.perfect ? "done" : ""}`}>{g.percent}%</span>
                     <span className="ach-game-count">
-                      {g.unlocked}/{g.total}
+                      {g.total ? `${g.unlocked}/${g.total}` : g.unlocked}
                     </span>
                     {g.playtime != null && g.playtime > 0 && (
                       <span className="ach-game-time">
@@ -651,7 +651,7 @@ function GameAchievementsModal({ username, token, game, onClose }) {
                       : "Succès"}
               </span>
               <span className="ach-mb">
-                <Trophy size={13} /> {game.unlocked}/{game.total}
+                <Trophy size={13} /> {game.total ? `${game.unlocked}/${game.total}` : game.unlocked}
               </span>
               {game.playtime != null && game.playtime > 0 && (
                 <span className="ach-mb">

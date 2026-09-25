@@ -457,11 +457,17 @@ function DoneScreen({ result, onClose }) {
           <span>mis à jour</span>
         </div>
         <div className="steam-done-stat">
-          <strong>{result?.achievements || 0}</strong>
+          {/* Les succès arrivent après la réponse (cf. server routes/steam.js) :
+              on compte les jeux en cours, pas un 0 trompeur. */}
+          <strong>{result?.achievements || result?.achievementsPending || 0}</strong>
           <span>jeux à succès</span>
         </div>
       </div>
-      <p>Retrouve tes succès dans l'onglet « Succès » de ton profil.</p>
+      <p>
+        {result?.achievementsPending
+          ? "Tes succès arrivent dans l'onglet « Succès » de ton profil d'ici une minute."
+          : "Retrouve tes succès dans l'onglet « Succès » de ton profil."}
+      </p>
       <button className="btn-steam-primary clickable" onClick={onClose}>
         Génial <Check size={16} />
       </button>

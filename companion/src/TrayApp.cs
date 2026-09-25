@@ -464,8 +464,10 @@ namespace MyPlayLog.Companion
         void OnFileEvent(Source source, string path)
         {
             if (!Emulators.IsAchievementFile(source, path)) return;
-            var appId = Emulators.AppIdFromPath(source.Root, path);
-            if (appId == null) return;
+            var id = Emulators.AppIdFromPath(source.Root, path);
+            if (id == null) return;
+            // Un produit Ubisoft n'est pas un appid Steam : clé à part.
+            var appId = source.Ubisoft ? "ubi:" + id : id;
             // Un jeu réécrit son fichier plusieurs fois d'affilée : on attend
             // qu'il ait fini (1,5 s de calme) avant de le lire.
             lock (debounce)
@@ -502,7 +504,7 @@ namespace MyPlayLog.Companion
             int fresh = 0;
             foreach (var hit in Emulators.Scan(source).ToList())
             {
-                var n = await SyncFile(hit.Key, hit.Value, quiet);
+                var n = await SyncFile(source.Ubisoft ? "ubi:" + hit.Key : hit.Key, hit.Value, quiet);
                 if (n >= 0)
                 {
                     games++;
@@ -536,15 +538,33 @@ namespace MyPlayLog.Companion
 
                 var body = new Dictionary<string, object>
                 {
-                    { "appid", long.Parse(appId) },
                     {
                         "unlocked",
-                        unlocks.Select(u => new Dictionary<string, object> { { "name", u.Name }, { "at", u.At } }).ToList()
+                        unlocks.Select(u =>
+                        {
+                            var d = new Dictionary<string, object> { { "name", u.Name }, { "at", u.At } };
+                            if (!string.IsNullOrEmpty(u.Title)) d["title"] = u.Title;
+                            return d;
+                        }).ToList()
                     },
                 };
                 // Le dossier du jeu, s'il est dans un dossier de jeux : il aide
-                // le site à le montrer (et à le reconnaître).
-                var local = Library.ByKey(appId);
+                // le site à le montrer (et à le reconnaître). Un jeu Ubisoft n'a
+                // pas d'appid : c'est ce dossier (ou à défaut le nom de ses
+                // sauvegardes) qui le fait reconnaître.
+                LocalGame local;
+                if (appId.StartsWith("ubi:"))
+                {
+                    string prefix;
+                    local = Library.UbisoftGame(Path.GetDirectoryName(file), out prefix);
+                    body["emulator"] = "Ubisoft";
+                    if (local == null) body["name"] = prefix ?? appId;
+                }
+                else
+                {
+                    body["appid"] = long.Parse(appId);
+                    local = Library.ByKey(appId);
+                }
                 if (local != null && local.Name != null) body["name"] = local.Name;
                 if (local != null && local.Folder != null) body["folder"] = local.Folder;
                 var res = await api.Post("/companion/achievements", body);

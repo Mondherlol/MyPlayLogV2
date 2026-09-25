@@ -143,19 +143,52 @@ export async function getOwnedGames(steamId) {
     appid: g.appid,
     name: g.name || "",
     playtimeMinutes: g.playtime_forever || 0,
+    // Le jeu a-t-il des succès ? Steam le dit dès la bibliothèque : inutile
+    // de lui poser trois questions de plus pour un jeu qui n'en a aucun.
+    hasStats: !!g.has_community_visible_stats,
     icon: g.img_icon_url
       ? `https://media.steampowered.com/steamcommunity/public/images/apps/${g.appid}/${g.img_icon_url}.jpg`
       : null,
   }));
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// La progression d'un joueur sur un jeu (`playerstats`), en séparant ce que
+// Steam RÉPOND de ce qu'il n'a pas pu répondre.
+//
+// ⚠️ « PAS DE SUCCÈS » N'EST PAS UNE PANNE. Steam refuse en 400 (« Requested
+// app has no stats ») ou en 403 (jeu marqué privé dans la bibliothèque) : ce
+// sont des réponses, qu'on renvoie telles quelles (`success: false`). Lues
+// comme des pannes, elles étaient indiscernables d'un vrai échec — et on ne
+// savait plus s'il fallait réessayer. Une vraie panne (réseau, 429 qui dure,
+// 5xx, réponse illisible) lève une erreur.
+async function readPlayerStats(url) {
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url);
+    if (res.status === 429 && attempt < 2) {
+      await sleep(1500 * (attempt + 1));
+      continue;
+    }
+    let body = null;
+    try {
+      body = await res.json();
+    } catch {
+      /* illisible : traité comme une panne ci-dessous */
+    }
+    if (body?.playerstats) return body.playerstats;
+    throw new Error(`Steam n'a pas répondu (${res.status}).`);
+  }
+}
+
 // Succès d'un joueur pour un jeu : on fusionne le schéma (définitions : nom
 // lisible, description, icônes) avec la progression du joueur (débloqué + date)
-// et la rareté mondiale (% de joueurs l'ayant obtenu). Renvoie null si le jeu
-// n'a pas de succès ou si la progression est illisible (profil privé).
+// et la rareté mondiale (% de joueurs l'ayant obtenu). Renvoie null si Steam
+// dit que le jeu n'a pas de succès lisibles (aucun, ou jeu privé) ; LÈVE une
+// erreur s'il n'a pas répondu — à retenter plus tard (cf. readPlayerStats).
 export async function getGameAchievements(steamId, appid, lang = "french") {
-  const [playerJ, schemaJ, globalJ] = await Promise.all([
-    getJson(
+  const [player, schemaJ, globalJ] = await Promise.all([
+    readPlayerStats(
       `${API}/ISteamUserStats/GetPlayerAchievements/v1/?key=${key()}&steamid=${steamId}&appid=${appid}&l=${lang}`
     ),
     getJson(
@@ -166,10 +199,12 @@ export async function getGameAchievements(steamId, appid, lang = "french") {
     ),
   ]);
 
-  const player = playerJ?.playerstats;
-  if (!player || player.success === false) return null;
+  if (player.success === false) return null;
   const playerList = player.achievements || [];
   if (!playerList.length) return null; // jeu sans succès
+  // Sans le schéma, on n'aurait que des identifiants techniques, sans nom ni
+  // icône : mieux vaut réessayer à la prochaine synchro que ranger ça.
+  if (!schemaJ) throw new Error("Schéma des succès Steam illisible.");
 
   const schemaList =
     schemaJ?.game?.availableGameStats?.achievements || [];

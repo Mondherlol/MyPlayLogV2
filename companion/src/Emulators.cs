@@ -13,6 +13,7 @@ namespace MyPlayLog.Companion
     {
         public string Name;
         public long At; // horodatage Unix, 0 si l'émulateur ne le note pas
+        public string Title; // nom lisible, quand l'émulateur le connaît (Ubisoft)
     }
 
     /// <summary>Un dossier où un émulateur range ses succès, un sous-dossier par appid.</summary>
@@ -21,6 +22,9 @@ namespace MyPlayLog.Companion
         public string Label;
         public string Root;
         public string[] Files;
+        // Émulateur Ubisoft : le dossier porte l'identifiant de PRODUIT Ubisoft
+        // (66088), pas un appid Steam — on ne doit jamais les confondre.
+        public bool Ubisoft;
 
         public bool Exists { get { return Directory.Exists(Root); } }
     }
@@ -56,6 +60,9 @@ namespace MyPlayLog.Companion
                 new Source { Label = "RUNE", Root = Path.Combine(docs, @"Steam\RUNE"), Files = ini },
                 new Source { Label = "OnlineFix", Root = Path.Combine(docs, "OnlineFix"), Files = ini },
                 new Source { Label = "SKIDROW", Root = Path.Combine(local, "SKIDROW"), Files = new[] { "achiev.ini" } },
+                // upc_r2 (Goldberg UplayEmu) : même format que Goldberg, rangé par
+                // produit Ubisoft ; il n'écrit que si Achievements = 1 dans upc_r2.ini.
+                new Source { Label = "Ubisoft", Root = Path.Combine(appData, "Goldberg UplayEmu Saves"), Files = json, Ubisoft = true },
             };
         }
 
@@ -189,7 +196,16 @@ namespace MyPlayLog.Companion
                         continue;
                     }
                     if (Truthy(Pick(entry, DoneKeys)))
-                        result.Add(new Unlock { Name = kv.Key, At = ToUnix(Pick(entry, TimeKeys)) });
+                    {
+                        object title;
+                        entry.TryGetValue("displayName", out title);
+                        result.Add(new Unlock
+                        {
+                            Name = kv.Key,
+                            At = ToUnix(Pick(entry, TimeKeys)),
+                            Title = title as string,
+                        });
+                    }
                 }
                 return result;
             }

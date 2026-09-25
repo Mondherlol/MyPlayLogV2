@@ -61,6 +61,12 @@ const itemSchema = new mongoose.Schema(
 
     // --- Propre à Steam ---
     appid: { type: Number, default: null },
+    // Steam a-t-il déjà répondu pour les succès de ce jeu (trouvés, ou « il
+    // n'en a pas ») ? Rempli après la validation, reporté de synchro en
+    // synchro : un jeu joué dont on n'a JAMAIS eu les succès repasse dans la
+    // mise à jour, mais un jeu qui n'en a pas ne revient pas en boucle
+    // (cf. routes/steam.js, POST /sync).
+    achievementsChecked: { type: Boolean, default: false },
 
     // --- Propre à PlayStation ---
     npCommunicationId: { type: String, default: null },
@@ -135,7 +141,12 @@ const platformSyncSchema = new mongoose.Schema(
       updated: { type: Number, default: 0 },
       hoursUpdated: { type: Number, default: 0 },
       achievements: { type: Number, default: 0 },
+      // Steam : les succès se récupèrent APRÈS la réponse (cf. routes/steam.js).
+      // Le nombre de jeux dont on va les chercher ; revient à 0 une fois fait.
+      achievementsPending: { type: Number, default: 0 },
       skipped: { type: Number, default: 0 }, // décochés au moment de valider
+      // Jeux nouveaux laissés décochés, rangés dans les masqués (cf. lib/syncDiff).
+      ignored: { type: Number, default: 0 },
     },
 
     appliedAt: { type: Date, default: null },

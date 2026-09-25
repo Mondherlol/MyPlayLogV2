@@ -64,7 +64,7 @@ router.get("/users", async (req, res) => {
     // lastSeenAt) retombent en fin de liste, départagés par date d'inscription.
     const users = await User.find(filter)
       .select(
-        "username email avatar createdAt lastSeenAt following isAdmin isSuperAdmin isStaff points canDownload botAccess discord"
+        "username email avatar createdAt lastSeenAt following isAdmin isSuperAdmin isStaff points canDownload canCollection botAccess discord"
       )
       .sort({ lastSeenAt: -1, createdAt: -1 })
       .limit(500)
@@ -195,7 +195,21 @@ router.delete("/users/:id", async (req, res) => {
 // l'accès au téléchargement, supprimer). Chaque compte est traité
 // indépendamment : un refus (super-admin, soi-même) n'annule pas le reste, il
 // est simplement remonté dans `skipped` pour que l'admin sache ce qui a résisté.
-const BULK_ACTIONS = ["grant-download", "revoke-download", "delete"];
+const BULK_ACTIONS = [
+  "grant-download",
+  "revoke-download",
+  "grant-collection",
+  "revoke-collection",
+  "delete",
+];
+
+// Le drapeau que touche chaque geste d'accès, et la valeur qu'il y pose.
+const BULK_FLAGS = {
+  "grant-download": ["canDownload", true],
+  "revoke-download": ["canDownload", false],
+  "grant-collection": ["canCollection", true],
+  "revoke-collection": ["canCollection", false],
+};
 
 router.post("/users/bulk", async (req, res) => {
   try {
@@ -222,10 +236,10 @@ router.post("/users/bulk", async (req, res) => {
       return res.json({ done, skipped });
     }
 
-    const value = action === "grant-download";
+    const [field, value] = BULK_FLAGS[action];
     const r = await User.updateMany(
       { _id: { $in: ids } },
-      { $set: { canDownload: value } },
+      { $set: { [field]: value } },
       { timestamps: false }
     );
     res.json({ done: r.modifiedCount ?? 0, matched: r.matchedCount ?? 0, skipped: [] });
@@ -364,7 +378,7 @@ router.get("/users/:id", async (req, res) => {
 
     const user = await User.findById(id)
       .select(
-        "username email avatar bio createdAt lastSeenAt following isAdmin isSuperAdmin isStaff canDownload botAccess discord points equipped inventory"
+        "username email avatar bio createdAt lastSeenAt following isAdmin isSuperAdmin isStaff canDownload canCollection botAccess discord points equipped inventory"
       )
       .populate("following", "username avatar isAdmin isSuperAdmin")
       .lean();

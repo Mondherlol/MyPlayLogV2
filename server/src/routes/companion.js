@@ -540,18 +540,22 @@ router.get("/recent", companionAuth, async (req, res) => {
   }
 });
 
-// POST /api/companion/achievements — { appid, unlocked: [{ name, at }], name?, folder?, emulator? }
-// `name` (dans unlocked) est l'apiName Steam, `at` un horodatage Unix (ou rien).
+// POST /api/companion/achievements — { appid?, unlocked: [{ name, at, title? }], name?, folder?, emulator? }
+// `name` (dans unlocked) est l'identifiant du succès (apiName Steam, ou numéro
+// Ubisoft), `at` un horodatage Unix (ou rien), `title` son nom lisible quand
+// l'émulateur le connaît. Un jeu sans appid (émulateur Ubisoft) vient avec le
+// nom de son dossier.
 router.post("/achievements", companionAuth, async (req, res) => {
   try {
-    const appid = Number(req.body?.appid);
-    if (!appid) return res.status(400).json({ error: "appid manquant." });
+    const appid = Number(req.body?.appid) || null;
+    if (!appid && !req.body?.name) return res.status(400).json({ error: "Jeu manquant." });
     const game = await upsertGame(req.userId, req.device._id, {
       appid,
       name: req.body?.name,
       folder: req.body?.folder,
       emulator: req.body?.emulator,
     });
+    if (!game) return res.status(400).json({ error: "Jeu manquant." });
     const auto = await autoOf(req.userId);
     const list = (Array.isArray(req.body?.unlocked) ? req.body.unlocked : []).slice(0, 3000);
     const { event, fresh } = await recordAchievements(req.userId, game, list, auto);

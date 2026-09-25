@@ -164,7 +164,8 @@ export async function recordAchievements(userId, game, unlocks, auto) {
     if (!name || seen.has(name)) continue;
     seen.add(name);
     const at = Number(u?.at);
-    fresh.push({ apiName: name, at: at > 946684800 ? new Date(at * 1000) : new Date() });
+    const title = String(u?.title || "").trim().slice(0, 200) || null;
+    fresh.push({ apiName: name, title, at: at > 946684800 ? new Date(at * 1000) : new Date() });
   }
   if (!fresh.length) return { event: null, fresh: [] };
 
@@ -175,7 +176,7 @@ export async function recordAchievements(userId, game, unlocks, auto) {
   const byName = new Map((schema?.achievements || []).map((a) => [a.apiName, a]));
   const details = fresh.map((f) => ({
     apiName: f.apiName,
-    name: byName.get(f.apiName)?.name || f.apiName,
+    name: byName.get(f.apiName)?.name || f.title || f.apiName,
     icon: byName.get(f.apiName)?.icon || null,
     at: f.at,
   }));
@@ -269,16 +270,30 @@ export async function ensureEntry(userId, game, gameId, status = "playing", logI
 }
 
 // Réécrit les succès `local` d'un jeu à partir de l'ensemble débloqué.
-async function writeLocal(userId, game, gameId, got) {
+// Sans schéma Steam (jeu Ubisoft…), les noms viennent des envois (`extra`) ou
+// de ce qu'on avait déjà.
+async function writeLocal(userId, game, gameId, got, extra = []) {
   const filter = { user: userId, gameId, platform: "local" };
   if (!got.size) {
     await GameAchievements.deleteOne(filter);
     return;
   }
   const schema = game.appid ? await getAchievementSchema(game.appid, got).catch(() => null) : null;
-  const achievements = schema
-    ? schema.achievements
-    : [...got].map(([apiName, unlockedAt]) => ({ apiName, name: apiName, unlocked: true, unlockedAt }));
+  let achievements;
+  if (schema) {
+    achievements = schema.achievements;
+  } else {
+    const prev = await GameAchievements.findOne(filter).select("achievements.apiName achievements.name achievements.icon").lean();
+    const known = new Map((prev?.achievements || []).map((a) => [a.apiName, a]));
+    for (const a of extra) known.set(a.apiName, a);
+    achievements = [...got].map(([apiName, unlockedAt]) => ({
+      apiName,
+      name: known.get(apiName)?.name || apiName,
+      icon: known.get(apiName)?.icon || null,
+      unlocked: true,
+      unlockedAt,
+    }));
+  }
   await GameAchievements.updateOne(
     filter,
     {
@@ -286,7 +301,9 @@ async function writeLocal(userId, game, gameId, got) {
         platformAppId: game.appid ? String(game.appid) : null,
         gameName: game.name || game.rawName || "",
         gameCover: game.cover || null,
-        total: achievements.length,
+        // Sans liste officielle (jeu Ubisoft…), le total est inconnu : 0, pour
+        // ne pas afficher « 2/2 » comme un jeu fini à 100 %.
+        total: schema ? achievements.length : 0,
         unlocked: achievements.filter((a) => a.unlocked).length,
         achievements,
       },
@@ -307,7 +324,7 @@ async function unlockedMap(userId, gameId) {
 async function applyAchievements(userId, game, gameId, list) {
   const got = await unlockedMap(userId, gameId);
   for (const a of list) if (!got.has(a.apiName)) got.set(a.apiName, a.at || new Date());
-  await writeLocal(userId, game, gameId, got);
+  await writeLocal(userId, game, gameId, got, list);
   await ensureEntry(userId, game, gameId);
 }
 

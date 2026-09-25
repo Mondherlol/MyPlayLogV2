@@ -10,7 +10,13 @@ import PlatformSync from "../models/PlatformSync.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { warmGameMeta } from "../lib/gameMeta.js";
 import { triggerMissionCheck } from "../lib/missions.js";
-import { hasChanged, isQuiet, lastSnapshot, needsLook } from "../lib/syncDiff.js";
+import {
+  hasChanged,
+  ignoreUnchecked,
+  isQuiet,
+  lastSnapshot,
+  needsLook,
+} from "../lib/syncDiff.js";
 import { open as openSecret, seal } from "../lib/secretBox.js";
 import {
   isConfigured,
@@ -1761,9 +1767,19 @@ router.post("/mobile/sync/apply", requireAuth, async (req, res) => {
       }
     }
 
+    // Les jeux nouveaux laissés décochés ne reviendront plus (cf. lib/syncDiff).
+    const ignored = await ignoreUnchecked(req.userId, "psn", sync);
+
     sync.state = "applied";
     sync.appliedAt = new Date();
-    sync.result = { added, updated, hoursUpdated, achievements, skipped: sync.items.length - chosen.length };
+    sync.result = {
+      added,
+      updated,
+      hoursUpdated,
+      achievements,
+      ignored,
+      skipped: sync.items.length - chosen.length,
+    };
     await sync.save();
 
     user.psn.lastSyncAt = sync.appliedAt;

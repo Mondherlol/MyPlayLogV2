@@ -7,9 +7,15 @@ import PendingImport from "../models/PendingImport.js";
 import PlatformSync from "../models/PlatformSync.js";
 import Notification from "../models/Notification.js";
 import { requireAuth } from "../middleware/auth.js";
-import { warmGameMeta } from "../lib/gameMeta.js";
+import { ensureGameMeta, warmGameMeta } from "../lib/gameMeta.js";
 import { triggerMissionCheck } from "../lib/missions.js";
-import { hasChanged, isQuiet, lastSnapshot, needsLook } from "../lib/syncDiff.js";
+import {
+  hasChanged,
+  ignoreUnchecked,
+  isQuiet,
+  lastSnapshot,
+  needsLook,
+} from "../lib/syncDiff.js";
 import {
   isConfigured,
   buildLoginUrl,
@@ -292,11 +298,14 @@ async function scanLibrary(userId, steamId, { skip } = {}) {
 
   const matchMap = await matchAppsToIgdb(kept.map((g) => g.appid));
 
-  // État actuel de la bibliothèque MyPlayLog (statut + heures) par gameId.
-  const libRows = await UserGame.find({ user: userId }).select(
-    "gameId status playtimeHours"
-  );
+  // État actuel de la bibliothèque MyPlayLog (statut + heures) par gameId,
+  // et les jeux dont on a déjà les succès Steam.
+  const [libRows, achIds] = await Promise.all([
+    UserGame.find({ user: userId }).select("gameId status playtimeHours"),
+    GameAchievements.distinct("gameId", { user: userId, platform: "steam" }),
+  ]);
   const libMap = new Map(libRows.map((e) => [e.gameId, e]));
+  const withAch = new Set(achIds);
 
   const games = [];
   const unmatched = [];
@@ -350,7 +359,10 @@ async function scanLibrary(userId, steamId, { skip } = {}) {
       currentHours: existing?.playtimeHours ?? null,
       category,
       suggestedStatus,
-      canImportAchievements: played,
+      // Un jeu lancé ET qui a des succès : les autres coûtaient trois appels
+      // Steam chacun pour rien.
+      canImportAchievements: played && g.hasStats,
+      hasAchievements: withAch.has(m.gameId),
     });
   }
 
@@ -386,16 +398,31 @@ function countBy(games, unmatched) {
 // ----------------------------------------------------------------------
 //  L'ÉCRITURE : appliquer des choix déjà validés
 // ----------------------------------------------------------------------
-// La SEULE fonction de ce fichier qui touche à la bibliothèque. Elle ne décide
-// de rien — elle exécute une liste que l'utilisateur a validée, qu'elle vienne
-// de la modale du site (POST /import) ou du récap de l'application
-// (POST /sync/apply).
+// Les SEULES fonctions de ce fichier qui touchent à la bibliothèque. Elles ne
+// décident de rien — elles exécutent une liste que l'utilisateur a validée,
+// qu'elle vienne de la modale du site (POST /import) ou du récap de
+// l'application (POST /sync/apply).
+//
+// ⚠️ LES SUCCÈS NE TIENNENT PAS DANS UNE RÉPONSE. Trois appels Steam par jeu
+// lancé : une bibliothèque de deux cents jeux joués, c'est plus d'une minute.
+// L'application, elle, abandonne au bout de vingt secondes — elle affichait
+// une erreur alors que le serveur continuait, on revalidait par-dessus, et on
+// repartait sans ses succès. On écrit donc la bibliothèque (rapide), on
+// répond, et les succès suivent en arrière-plan (cf. importAchievementsLater).
 const STATUSES = ["wishlist", "playing", "finished", "paused", "dropped", "endless"];
 
-async function applyItems(userId, steamId, items) {
+async function applyLibrary(userId, items) {
   let added = 0;
   let updated = 0;
   let hoursUpdated = 0;
+  const fresh = [];
+
+  // Une seule lecture pour toute la liste, au lieu d'une par jeu.
+  const ids = items.map((it) => Number(it.gameId)).filter(Boolean);
+  const rows = await UserGame.find({ user: userId, gameId: { $in: ids } }).select(
+    "_id gameId playtimeHours steamAppId"
+  );
+  const byGame = new Map(rows.map((r) => [r.gameId, r]));
 
   for (const it of items) {
     const gameId = Number(it.gameId);
@@ -406,20 +433,29 @@ async function applyItems(userId, steamId, items) {
         ? Number(it.playtimeHours)
         : null;
 
-    const existing = await UserGame.findOne({ user: userId, gameId });
+    const existing = byGame.get(gameId);
     if (!existing) {
-      await UserGame.create({
-        user: userId,
-        gameId,
-        name: it.name,
-        cover: it.cover || null,
-        status,
-        playtimeHours: status === "wishlist" ? null : hours,
-        steamAppId: Number(it.appid) || null,
-        steamImported: true,
-      });
-      added++;
-      warmGameMeta(gameId); // pré-chauffe les métadonnées (stats), non bloquant
+      try {
+        const doc = await UserGame.create({
+          user: userId,
+          gameId,
+          name: it.name,
+          cover: it.cover || null,
+          status,
+          playtimeHours: status === "wishlist" ? null : hours,
+          steamAppId: Number(it.appid) || null,
+          steamImported: true,
+        });
+        // Deux appid peuvent mener à la même fiche (édition, démo) : le
+        // second trouvera le premier et le mettra à jour.
+        byGame.set(gameId, doc);
+        added++;
+        fresh.push(gameId);
+      } catch (err) {
+        // Déjà créé entre-temps (une autre validation) : ce jeu est là, la
+        // validation continue au lieu de tomber avec lui.
+        if (err?.code !== 11000) throw err;
+      }
     } else {
       const set = { steamAppId: Number(it.appid) || existing.steamAppId || null };
       // Maj des heures si demandé : on honore la valeur validée par
@@ -436,40 +472,90 @@ async function applyItems(userId, steamId, items) {
     }
   }
 
-  // Succès : uniquement les jeux cochés « importer les succès » (jeux lancés).
-  const achItems = items.filter(
-    (it) => it.importAchievements && it.appid && Number(it.gameId)
-  );
+  // Les métadonnées (onglet Stats) des jeux ajoutés, par paquets et sans
+  // bloquer. ⚠️ PAS UN APPEL PAR JEU : trois cents jeux d'un coup, c'était
+  // trois cents requêtes IGDB en file — la file saturait, et tout le site
+  // attendait derrière.
+  if (fresh.length) ensureGameMeta(fresh).catch(() => {});
+
+  return { added, updated, hoursUpdated };
+}
+
+// Les jeux dont on va chercher les succès : cochés « importer les succès »
+// (jeux lancés qui en ont).
+const achievementItems = (items) =>
+  items.filter((it) => it.importAchievements && it.appid && Number(it.gameId));
+
+// Renvoie le nombre de jeux dont les succès ont été écrits, et les appid pour
+// lesquels Steam a RÉPONDU (succès trouvés, ou « ce jeu n'en a pas »). Une
+// panne n'y figure pas : le jeu sera retenté à la prochaine synchro.
+async function importAchievements(userId, steamId, items) {
   let achievements = 0;
-  await pool(achItems, 3, async (it) => {
+  const checked = new Set();
+  await pool(achievementItems(items), 4, async (it) => {
     try {
       const data = await getGameAchievements(steamId, it.appid);
-      if (!data) return;
-      await GameAchievements.updateOne(
-        { user: userId, gameId: Number(it.gameId), platform: "steam" },
-        {
-          $set: {
-            platformAppId: String(it.appid),
-            gameName: it.name,
-            gameCover: it.cover || null,
-            total: data.total,
-            unlocked: data.unlocked,
-            achievements: data.achievements,
+      if (data) {
+        await GameAchievements.updateOne(
+          { user: userId, gameId: Number(it.gameId), platform: "steam" },
+          {
+            $set: {
+              platformAppId: String(it.appid),
+              gameName: it.name,
+              gameCover: it.cover || null,
+              total: data.total,
+              unlocked: data.unlocked,
+              achievements: data.achievements,
+            },
           },
-        },
-        { upsert: true }
-      );
-      achievements++;
-    } catch (e) {
-      /* best-effort : un jeu qui échoue ne bloque pas l'import */
+          { upsert: true }
+        );
+        achievements++;
+      }
+      checked.add(Number(it.appid));
+    } catch {
+      /* best-effort : un jeu qui échoue ne bloque pas les autres */
     }
   });
+  return { achievements, checked };
+}
 
-  return { added, updated, hoursUpdated, achievements };
+// Les succès, APRÈS la réponse. Une fois fini, la synchro validée (s'il y en
+// a une) apprend combien on en a écrit et quels jeux sont réglés.
+function importAchievementsLater(userId, steamId, items, syncId = null) {
+  if (!achievementItems(items).length) return;
+  importAchievements(userId, steamId, items)
+    .then(async ({ achievements, checked }) => {
+      triggerMissionCheck(userId); // missions liées aux succès
+      if (!syncId) return;
+      const sync = await PlatformSync.findById(syncId);
+      if (!sync) return;
+      for (const it of sync.items) {
+        if (checked.has(Number(it.appid))) it.achievementsChecked = true;
+      }
+      sync.markModified("items");
+      sync.result.achievements = achievements;
+      sync.result.achievementsPending = 0;
+      await sync.save();
+    })
+    .catch((err) => console.error("steam achievements error:", err.message));
+}
+
+// Une validation à la fois par joueur : une deuxième lancée pendant que la
+// première écrit encore referait tout en double.
+const applying = new Set();
+
+function lockApply(userId) {
+  const key = String(userId);
+  if (applying.has(key)) return null;
+  applying.add(key);
+  return () => applying.delete(key);
 }
 
 // --- Import effectif (site) : applique les sélections validées par l'utilisateur. ---
 router.post("/import", requireAuth, async (req, res) => {
+  const unlock = lockApply(req.userId);
+  if (!unlock) return res.status(409).json({ error: "Import déjà en cours, patiente un instant." });
   try {
     const user = await User.findById(req.userId).select("steam");
     const steamId = user?.steam?.steamId;
@@ -478,13 +564,21 @@ router.post("/import", requireAuth, async (req, res) => {
     const items = Array.isArray(req.body?.items) ? req.body.items : [];
     if (!items.length) return res.json({ added: 0, updated: 0, achievements: 0 });
 
-    const { added, updated, achievements } = await applyItems(req.userId, steamId, items);
+    const { added, updated } = await applyLibrary(req.userId, items);
     user.steam.lastSyncAt = new Date();
     await user.save();
-    res.json({ added, updated, achievements });
+    importAchievementsLater(req.userId, steamId, items);
+    res.json({
+      added,
+      updated,
+      achievements: 0,
+      achievementsPending: achievementItems(items).length,
+    });
   } catch (err) {
     console.error("steam import error:", err.message);
     res.status(500).json({ error: "Erreur lors de l'import." });
+  } finally {
+    unlock();
   }
 });
 
@@ -570,8 +664,18 @@ router.post("/sync", requireAuth, async (req, res) => {
       .filter((g) => g.category !== "synced")
       .map((g) => {
         const better = g.playtimeHours > (g.currentHours || 0);
+        const prev = snapshot?.get(String(g.appid));
+        // ⚠️ UN JEU DONT ON N'A JAMAIS EU LES SUCCÈS N'EST PAS « À JOUR ». Un
+        // import coupé en route (Steam en panne, ancienne validation qui
+        // dépassait le temps de l'app) les laissait de côté, et le jeu, lui,
+        // n'ayant pas bougé, ne repassait plus jamais : ses succès étaient
+        // perdus. Il revient donc tant que Steam n'a pas répondu pour lui —
+        // et une seule fois s'il n'en a pas (cf. `achievementsChecked`).
+        const missingAchievements =
+          g.canImportAchievements && !g.hasAchievements && !prev?.achievementsChecked;
         const changed =
           g.category !== "update" ||
+          missingAchievements ||
           hasChanged(snapshot, g.appid, { playtimeMinutes: g.playtimeMinutes });
         return {
           key: String(g.appid),
@@ -600,6 +704,8 @@ router.post("/sync", requireAuth, async (req, res) => {
           hours: g.playtimeHours,
           updateHours: g.category === "update" ? better : true,
           importAchievements: g.canImportAchievements,
+          // Reporté de la synchro d'avant : ce que Steam a déjà répondu reste su.
+          achievementsChecked: !!prev?.achievementsChecked,
         };
       });
 
@@ -708,6 +814,8 @@ router.patch("/sync", requireAuth, async (req, res) => {
 
 // --- Valider : c'est ICI, et nulle part ailleurs, que la bibliothèque bouge. ---
 router.post("/sync/apply", requireAuth, async (req, res) => {
+  const unlock = lockApply(req.userId);
+  if (!unlock) return res.status(409).json({ error: "Validation déjà en cours, patiente un instant." });
   try {
     const { user, steamId } = await steamIdOf(req.userId);
     const sync = await pendingSyncOf(req.userId);
@@ -730,11 +838,19 @@ router.post("/sync/apply", requireAuth, async (req, res) => {
       importAchievements: !!it.canImportAchievements,
     }));
 
-    const result = await applyItems(req.userId, steamId, payload);
+    const result = await applyLibrary(req.userId, payload);
+    // Les jeux nouveaux laissés décochés ne reviendront plus (cf. lib/syncDiff).
+    const ignored = await ignoreUnchecked(req.userId, "steam", sync, keyOf);
 
     sync.state = "applied";
     sync.appliedAt = new Date();
-    sync.result = { ...result, skipped: sync.items.length - chosen.length };
+    sync.result = {
+      ...result,
+      achievements: 0,
+      achievementsPending: achievementItems(payload).length,
+      ignored,
+      skipped: sync.items.length - chosen.length,
+    };
     await sync.save();
 
     user.steam.lastSyncAt = sync.appliedAt;
@@ -743,10 +859,16 @@ router.post("/sync/apply", requireAuth, async (req, res) => {
     await Notification.deleteMany({ user: req.userId, type: "import_pending", read: false });
     triggerMissionCheck(req.userId);
 
+    // La synchro est validée : une relance tombe sur « aucune synchro en
+    // attente » au lieu de tout refaire. Les succès partent maintenant.
+    importAchievementsLater(req.userId, steamId, payload, sync._id);
+
     res.json({ sync: mapSync(sync), result: sync.result });
   } catch (err) {
     console.error("steam sync apply error:", err.message);
     res.status(err.status || 500).json({ error: err.message || "Erreur lors de la validation." });
+  } finally {
+    unlock();
   }
 });
 

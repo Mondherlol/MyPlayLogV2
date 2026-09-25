@@ -251,6 +251,18 @@ const BULK_ACTIONS = [
     verb: (n) => `Révoquer l'accès au téléchargement de ${n} compte${n > 1 ? "s" : ""} ?`,
   },
   {
+    key: "grant-collection",
+    label: "Donner l'accès à la Collection",
+    Icon: Library,
+    verb: (n) => `Donner l'accès à la Collection à ${n} compte${n > 1 ? "s" : ""} ?`,
+  },
+  {
+    key: "revoke-collection",
+    label: "Révoquer l'accès à la Collection",
+    Icon: Library,
+    verb: (n) => `Révoquer l'accès à la Collection de ${n} compte${n > 1 ? "s" : ""} ?`,
+  },
+  {
     key: "delete",
     label: "Supprimer les comptes",
     Icon: Trash2,
