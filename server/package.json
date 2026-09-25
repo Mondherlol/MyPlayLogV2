@@ -33,7 +33,8 @@
     "backfill:clip-posters": "node src/scripts/backfillClipPosters.js",
     "backfill:ost-stats": "node src/scripts/backfillOstStats.js",
     "reset:mission-claims": "node src/scripts/resetMissionClaims.js",
-    "purge:ds": "node src/scripts/purgeDsGames.js"
+    "purge:ds": "node src/scripts/purgeDsGames.js",
+    "build:coplay": "node --max-old-space-size=6144 src/scripts/buildCoPlay.js"
   },
   "dependencies": {
     "adm-zip": "^0.6.0",

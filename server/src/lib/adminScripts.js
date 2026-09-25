@@ -1,6 +1,8 @@
 import GameTrivia from "../models/GameTrivia.js";
 import UserGame from "../models/UserGame.js";
 import { runSteamIgdbSync } from "./steamIgdbSync.js";
+import { getRecoCatalogState, runRecoCatalogSync } from "./recoCatalog.js";
+import { getCoPlayState, refreshCoPlay } from "./recoCoPlay.js";
 import { publishGameAwards, publishOfficialTops } from "./officialLists.js";
 
 // ======================================================================
@@ -197,6 +199,55 @@ export const SCRIPTS = [
       "bibliothèques, avis, listes et succès suivent. La tâche tourne déjà " +
       "toute seule toutes les six heures ; ce bouton force un passage.",
     run: ({ dryRun }) => runSteamIgdbSync({ dryRun, limit: 100 }),
+  },
+  {
+    key: "recoCatalog",
+    label: "Resynchroniser le catalogue de recommandations",
+    description:
+      "Recopie depuis IGDB les traits (genres, thèmes, mots-clés, studios, notes…) des " +
+      "~45 000 jeux recommandables, puis ceux des jeux présents dans les bibliothèques. " +
+      "Deux minutes environ, une requête IGDB à la fois. La tâche tourne déjà seule " +
+      "une fois par jour ; ce bouton force un passage.",
+    run: async ({ dryRun }) => {
+      if (dryRun) {
+        const s = await getRecoCatalogState();
+        const when = s.lastOk ? new Date(s.lastOk).toLocaleString("fr-FR") : "jamais";
+        return {
+          summary: `${s.pool} jeux recommandables, ${s.total} fiches en tout — dernier passage réussi : ${when} (simulation : rien n'a été lancé).`,
+        };
+      }
+      const r = await runRecoCatalogSync();
+      return {
+        summary: r.ok
+          ? `${r.pool} jeux recommandables, passage en ${Math.round(r.durationMs / 1000)} s.`
+          : `Échec : ${r.error}`,
+        log: r.log,
+      };
+    },
+  },
+  {
+    key: "recoCoPlay",
+    label: "Recalculer le co-jeu des recommandations",
+    description:
+      "« Ceux qui ont aimé X ont aussi aimé Y » : réimporte le fichier des avis publics " +
+      "livré avec le serveur (data/coplay.json.gz, Amazon + Steam) et recalcule les liens " +
+      "entre joueurs de MyPlayLog. Tourne déjà seul au démarrage et chaque nuit.",
+    run: async ({ dryRun }) => {
+      if (dryRun) {
+        const s = await getCoPlayState();
+        return {
+          summary:
+            `Avis publics : ${s.extGames ?? 0} jeux (version ${s.extVersion || "aucune"}) — ` +
+            `MyPlayLog : ${s.localGames ?? 0} jeux, ${s.localUsers ?? 0} joueurs (simulation : rien n'a été lancé).`,
+        };
+      }
+      const r = await refreshCoPlay({ forceImport: true });
+      return {
+        summary:
+          `Avis publics : ${r.import.games ?? 0} jeux importés — ` +
+          `MyPlayLog : ${r.local.localGames} jeux, ${r.local.localUsers} joueurs.`,
+      };
+    },
   },
 ];
 

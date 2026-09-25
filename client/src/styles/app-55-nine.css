@@ -1,0 +1,585 @@
+/* ======================================================================
+   LE PRINCIPE DES 9 — le rail de l'accueil et la fenêtre de sélection
+   ======================================================================
+   `--nc` : la couleur du thème (cf. lib/nines.js), posée en style sur la carte
+   et sur la fenêtre. Tout ce qui est teinté en dérive — jamais de dégradé ni de
+   halo : des aplats, et l'or de la maison à sa valeur exacte. */
+
+/* ---------- La carte d'un thème ---------- */
+.nine-card {
+  --nc: #f2b70b;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 178px;
+  height: 226px;
+  padding: 0.85rem;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  overflow: hidden;
+  isolation: isolate;
+  transition:
+    transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1),
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+.nine-card:hover {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--nc) 60%, var(--border));
+  background: color-mix(in srgb, var(--nc) 5%, var(--surface));
+}
+.nine-card:active {
+  transform: translateY(-1px) scale(0.98);
+}
+.nine-card:focus-visible {
+  outline: 2px solid var(--nc);
+  outline-offset: 2px;
+}
+.nine-card.is-custom {
+  border-style: dashed;
+  border-color: var(--border-strong);
+}
+.nine-card.is-mine {
+  border-color: #f2b70b;
+}
+
+/* Le filigrane : l'icône du thème, immense, coupée par le coin. Elle se
+   redresse et prend un peu de couleur au survol. */
+.nine-card-wm {
+  position: absolute;
+  right: -34px;
+  bottom: -30px;
+  z-index: -1;
+  color: var(--nc);
+  opacity: 0.08;
+  transform: rotate(-12deg);
+  transition:
+    transform 0.45s cubic-bezier(0.2, 0.8, 0.3, 1),
+    opacity 0.3s ease;
+}
+.nine-card:hover .nine-card-wm {
+  opacity: 0.16;
+  transform: rotate(-3deg) scale(1.08);
+}
+
+.nine-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.nine-card-badge {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  color: var(--nc);
+  background: color-mix(in srgb, var(--nc) 15%, transparent);
+  transition: transform 0.3s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.nine-card:hover .nine-card-badge {
+  transform: rotate(-8deg) scale(1.08);
+}
+
+/* Le « 9 » penché, discret, dans le coin : la signature du format. */
+.nine-card-nine {
+  margin: -0.35rem -0.1rem 0 0;
+  font-family: "Space Grotesk", var(--font-display);
+  font-weight: 700;
+  font-size: 2.3rem;
+  line-height: 1;
+  color: #f2b70b;
+  opacity: 0.22;
+  transform: rotate(-10deg) skewX(-6deg);
+  transition: opacity 0.2s ease;
+}
+.nine-card:hover .nine-card-nine {
+  opacity: 0.9;
+}
+
+/* Sa liste déjà faite : ses neuf jaquettes en miniature. */
+.nine-card-mini {
+  display: grid;
+  grid-template-columns: repeat(3, 14px);
+  gap: 2px;
+}
+.nine-card-mini > * {
+  width: 14px;
+  height: 19px;
+  border-radius: 3px;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+
+.nine-card-text {
+  margin-top: auto;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.02rem;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.nine-card-text b {
+  font-family: "Space Grotesk", var(--font-display);
+  font-weight: 700;
+  font-size: 1.3rem;
+  color: #f2b70b;
+}
+
+.nine-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 22px;
+  margin-top: 0.6rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+.nine-card-count {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nine-card-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 1;
+  color: #f2b70b;
+}
+.nine-card.is-custom .nine-card-foot > span:first-child {
+  flex: 1;
+}
+
+/* La flèche qui glisse au survol : « ça s'ouvre ». */
+.nine-card-go {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  border-radius: 999px;
+  color: #2a1c00;
+  background: #f2b70b;
+  opacity: 0;
+  transform: translateX(-6px);
+  transition:
+    opacity 0.2s ease,
+    transform 0.25s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.nine-card:hover .nine-card-go {
+  opacity: 1;
+  transform: none;
+}
+
+.nine-faces {
+  display: inline-flex;
+}
+.nine-faces > * {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 2px solid var(--surface);
+  object-fit: cover;
+  background: var(--surface-2);
+}
+.nine-faces > * + * {
+  margin-left: -7px;
+}
+.nine-face-letter {
+  display: grid;
+  place-items: center;
+  font-size: 0.55rem;
+  font-weight: 800;
+  color: #2a1c00;
+  background: #f2b70b !important;
+}
+
+/* ======================================================================
+   La fenêtre : choisir ses 9
+   ====================================================================== */
+.modal.nine-modal {
+  --nc: #f2b70b;
+  display: grid;
+  grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+  gap: 1.6rem;
+  max-width: 1000px;
+  height: min(720px, 94vh);
+  padding: 1.6rem;
+  overflow: hidden;
+}
+
+.nine-m-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.nine-m-hero {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-height: 84px;
+}
+.nine-m-mark {
+  position: relative;
+  flex: 0 0 auto;
+  font-family: "Space Grotesk", var(--font-display);
+  font-weight: 700;
+  font-size: 4.6rem;
+  line-height: 1;
+  color: #f2b70b;
+  transform: rotate(-10deg) skewX(-6deg);
+  text-shadow: 3px 4px 0 rgba(0, 0, 0, 0.35);
+  animation: nineDrop 0.5s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+.nine-m-badge {
+  position: absolute;
+  right: -10px;
+  bottom: 2px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 3px solid var(--surface);
+  color: var(--nc);
+  background: color-mix(in srgb, var(--nc) 20%, var(--surface));
+  transform: rotate(10deg) skewX(6deg);
+  text-shadow: none;
+}
+@keyframes nineDrop {
+  from {
+    opacity: 0;
+    transform: translateY(-14px) rotate(-24deg) skewX(-6deg) scale(0.7);
+  }
+}
+
+.nine-m-title {
+  margin: 0;
+  padding-right: 2rem;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  line-height: 1.22;
+  letter-spacing: -0.02em;
+}
+.nine-m-custom {
+  flex: 1;
+  display: grid;
+  gap: 0.2rem;
+  padding-right: 2rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+.nine-m-custom input {
+  width: 100%;
+  padding: 0.3rem 0;
+  border: none;
+  border-bottom: 1.5px solid var(--border-strong);
+  border-radius: 0;
+  background: none;
+  outline: none;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.nine-m-custom input:focus {
+  border-bottom-color: #f2b70b;
+  box-shadow: none;
+}
+
+/* Les neuf cases. */
+.nine-m-slots {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  padding: 9px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.nine-m-slots.shake {
+  animation: nineShake 0.32s ease;
+}
+@keyframes nineShake {
+  20% { transform: translateX(-9px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-5px); }
+  80% { transform: translateX(3px); }
+}
+.nine-m-slot {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: 9px;
+  overflow: hidden;
+  padding: 0;
+  border: none;
+  background: none;
+}
+.nine-m-slot.empty {
+  display: grid;
+  place-items: center;
+  border: 1.5px dashed var(--border-strong);
+  font-family: "Space Grotesk", var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  opacity: 0.55;
+  transition: border-color 0.2s ease, opacity 0.2s ease;
+}
+.nine-m-slot.empty.next {
+  border-color: #f2b70b;
+  color: #f2b70b;
+  opacity: 1;
+}
+.nine-m-slot.filled {
+  animation: ninePop 0.34s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+@keyframes ninePop {
+  from { transform: scale(0.45); opacity: 0; }
+}
+.nine-m-slot.filled img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.nine-m-slot-x {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(10, 10, 14, 0.6);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.nine-m-slot.filled:hover .nine-m-slot-x {
+  opacity: 1;
+}
+.nine-m-noart {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0.3rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text);
+  background: var(--border);
+}
+
+.nine-m-hint {
+  margin: -0.2rem 0 0;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+.nine-m-hint.warn {
+  color: #ff5470;
+  font-weight: 700;
+}
+
+.nine-m-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: auto;
+}
+.nine-m-vis {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.95rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.nine-m-vis svg {
+  color: #f2b70b;
+}
+.nine-m-vis.is-private svg {
+  color: #e0574d;
+}
+.nine-m-publish {
+  flex: 1;
+  justify-content: center;
+  min-height: 46px;
+}
+
+/* À droite : la bibliothèque. */
+.nine-m-right {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+}
+.nine-m-search {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-right: 2.6rem;
+  padding: 0 0.9rem;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+.nine-m-search:focus-within {
+  border-color: #f2b70b;
+}
+.nine-m-search input,
+.nine-m-search input:focus {
+  flex: 1;
+  min-width: 0;
+  padding: 0.7rem 0;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  background: none;
+  font: inherit;
+  color: var(--text);
+}
+.nine-m-search button {
+  display: grid;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+}
+
+.nine-m-shelves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.nine-m-shelf {
+  padding: 0.38rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.nine-m-shelf:hover {
+  color: var(--text);
+}
+.nine-m-shelf.on {
+  border-color: #f2b70b;
+  background: #f2b70b;
+  color: #2a1c00;
+}
+
+.nine-m-grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  align-content: start;
+  gap: 10px;
+  padding: 4px 4px 4px 2px;
+  scrollbar-width: thin;
+}
+.nine-m-game {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  padding: 0;
+  border-radius: 10px;
+  border: none;
+  overflow: hidden;
+  background: var(--surface-2);
+  transition: transform 0.16s ease;
+}
+.nine-m-game img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: opacity 0.16s ease;
+}
+.nine-m-game:hover {
+  transform: translateY(-2px);
+}
+.nine-m-game.on {
+  outline: 3px solid #f2b70b;
+  outline-offset: -3px;
+}
+.nine-m-game.on img {
+  opacity: 0.55;
+}
+.nine-m-pos {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  font-family: "Space Grotesk", var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #2a1c00;
+  background: #f2b70b;
+  animation: ninePop 0.28s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.nine-m-empty {
+  grid-column: 1 / -1;
+  margin: 2rem 0;
+  text-align: center;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+}
+
+/* Sur un écran étroit, tout passe en une colonne qui défile. */
+@media (max-width: 760px) {
+  .modal.nine-modal {
+    grid-template-columns: 1fr;
+    height: auto;
+    max-height: 100vh;
+    overflow-y: auto;
+    padding: 1.2rem;
+  }
+  .nine-m-left {
+    overflow: visible;
+  }
+  .nine-m-grid {
+    overflow: visible;
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nine-card,
+  .nine-card-wm,
+  .nine-card-badge,
+  .nine-m-mark,
+  .nine-m-slot.filled,
+  .nine-m-pos {
+    animation: none !important;
+    transition: none !important;
+  }
+}

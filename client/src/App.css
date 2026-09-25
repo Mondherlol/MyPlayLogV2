@@ -61,4 +61,5 @@
 /* Le menu contextuel d'un jeu : clic droit à la souris, appui long au doigt. */
 @import "./styles/app-53-game-menu.css";
 @import "./styles/app-54-companion.css";
+@import "./styles/app-55-nine.css";
 @import "./styles/app-99-mobile-perf.css";

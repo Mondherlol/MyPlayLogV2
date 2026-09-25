@@ -24,6 +24,7 @@ import GemSkip from "../models/GemSkip.js";
 import Recommendation from "../models/Recommendation.js";
 import { ensureGameMeta } from "../lib/gameMeta.js";
 import { igdbQuery } from "../lib/igdb.js";
+import { recommendForUser } from "../lib/recoEngine.js";
 import { geminiJson, isGeminiConfigured } from "../lib/gemini.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { feedFilters } from "../lib/feedCategories.js";
@@ -2006,14 +2007,16 @@ const DISCOVER_FIELDS =
 // « Jeux du moment » et « sorties marquantes » : identiques pour tout le
 // monde, mis en cache mémoire par jour (comme /games/releases).
 const sharedCache = { day: 0, hot: null, upcoming: null, undated: null, indies: null };
-// Suggestions personnalisées : cache par utilisateur (6 h), plafonné à 5 000
+// Suggestions personnalisées : cache par utilisateur (20 min), plafonné à 5 000
 // personnes — au-delà, la moins récemment vue repart (elle recalculera).
 // Sans plafond, c'était une entrée par compte ayant ouvert l'onglet depuis le
-// démarrage, gardée pour toujours.
+// démarrage, gardée pour toujours. 20 min et non plus 6 h : le moteur de
+// recommandations tient déjà son propre cache, qui se périme dès que la
+// bibliothèque change — garder 6 h ici masquerait une nouvelle note.
 const forYouCache = createTtlCache({
   name: "feed:for-you",
   max: 5000,
-  ttl: 6 * 60 * 60 * 1000,
+  ttl: 20 * 60 * 1000,
 });
 
 async function fetchHot(now) {
@@ -2100,9 +2103,18 @@ async function fetchIndies(now) {
   );
 }
 
-// Suggestions « pour toi » : jeux bien notés dans les genres favoris de la
-// bibliothèque, en excluant les jeux déjà possédés. Best-effort (2 appels IGDB).
+// Suggestions « pour toi » : le moteur de recommandations (lib/recoEngine.js)
+// dès que son catalogue est prêt ; sinon l'ancien repli ci-dessous.
 async function fetchForYou(userId) {
+  const reco = await recommendForUser(userId).catch(() => null);
+  if (reco?.forYou?.length) return reco.forYou.slice(0, 12);
+  return fetchForYouByGenres(userId);
+}
+
+// L'ancien « pour toi » : jeux bien notés dans les 3 genres les plus présents
+// de la bibliothèque. Best-effort (2 appels IGDB). Ne sert plus que tant que le
+// catalogue de recommandations n'est pas synchronisé.
+async function fetchForYouByGenres(userId) {
   const owned = await UserGame.find({ user: userId }).select("gameId").lean();
   const ownedIds = owned.map((e) => e.gameId);
   if (!ownedIds.length) return [];

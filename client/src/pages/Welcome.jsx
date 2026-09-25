@@ -28,6 +28,7 @@ import AnticipatedCard from "../components/home/AnticipatedCard";
 import EventCard from "../components/home/EventCard";
 import HoursModal from "../components/home/HoursModal";
 import OstRail from "../components/home/OstRail";
+import NineRail from "../components/home/NineRail";
 import { MotStrip, TonightCard } from "../components/home/Strips";
 import { EventListCard, FreeCard, GameTile } from "../components/home/Tiles";
 import {
@@ -906,6 +907,9 @@ export default function Welcome() {
             </Rail>
           </section>
         )}
+
+        {/* --- Le principe des 9 : une idée de liste à faire en un clic -- */}
+        <NineRail token={token} library={library} />
 
         <OstRail token={token} limit={OST_LIMIT} />
 

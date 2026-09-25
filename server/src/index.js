@@ -14,6 +14,7 @@ import listRoutes from "./routes/lists.js";
 import userRoutes from "./routes/users.js";
 import notificationRoutes from "./routes/notifications.js";
 import recommendationRoutes from "./routes/recommendations.js";
+import recoRoutes from "./routes/reco.js";
 import ostRoutes from "./routes/ost.js";
 import repostRoutes from "./routes/reposts.js";
 import videoRoutes from "./routes/videos.js";
@@ -60,6 +61,9 @@ import appReleaseRoutes from "./routes/appRelease.js";
 import trackerRoutes, { startTrackerAutoSync } from "./routes/trackers.js";
 import { startSteamIgdbSync } from "./lib/steamIgdbSync.js";
 import { startCatalogSync } from "./lib/catalogs.js";
+import { startRecoCatalogSync } from "./lib/recoCatalog.js";
+import { getRecoIndex } from "./lib/recoEngine.js";
+import { startRecoCoPlay } from "./lib/recoCoPlay.js";
 import {
   startEventCalendarSync,
   startEventReminders,
@@ -160,6 +164,8 @@ app.use("/api/lists", listRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/recommendations", recommendationRoutes);
+// Les recommandations CALCULÉES (lib/recoEngine.js) — celles des amis sont au-dessus.
+app.use("/api/reco", recoRoutes);
 app.use("/api/ost", ostRoutes);
 app.use("/api/reposts", repostRoutes);
 app.use("/api/videos", videoRoutes);
@@ -348,6 +354,17 @@ async function start() {
     // les rails de l'accueil, et la place d'un jeu dans chacun sur sa fiche
     // (cf. lib/catalogs.js).
     startCatalogSync();
+    // Le catalogue local des recommandations (~45 000 jeux) : un passage
+    // complet par jour, deux minutes, une requête IGDB à la fois (cf.
+    // lib/recoCatalog.js).
+    startRecoCatalogSync();
+    // Et l'index du moteur, construit à l'avance (~2 s) plutôt qu'au premier
+    // visiteur qui ouvre ses recommandations. Sans catalogue, ne fait rien.
+    setTimeout(() => getRecoIndex().catch(() => {}), 30_000);
+    // Le co-jeu (« ceux qui ont aimé X ont aimé Y ») : le fichier livré avec
+    // le serveur est importé s'il est nouveau, celui des joueurs de MyPlayLog
+    // recalculé chaque nuit (cf. lib/recoCoPlay.js).
+    startRecoCoPlay();
     // Le calendrier des rendez-vous à venir (Directs, showcases) : deux
     // passages par jour, Wikipédia + IGDB. Cf. lib/eventCalendar.
     startEventCalendarSync();

@@ -26,6 +26,7 @@ import {
   Hourglass,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useClickOutside } from "../hooks/useClickOutside";
 import { useChat } from "../context/ChatContext";
 import { apiFetch } from "../lib/api";
 import { useLiveStatus } from "../lib/presence";
@@ -1680,18 +1681,7 @@ function BoardRow({ entry, rank }) {
           <span className="mdj-board-who">{entry.user.username}</span>
         </Link>
       ) : (
-        <span className="mdj-board-user team">
-          <span className="mdj-sess-faces">
-            {team.slice(0, 4).map((u) => (
-              <Face key={u.id} user={u} size={25} />
-            ))}
-          </span>
-          <span className="mdj-board-who">
-            {team.length > 2
-              ? `${team[0].username} +${team.length - 1}`
-              : team.map((u) => u.username).join(" & ")}
-          </span>
-        </span>
+        <TeamFaces team={team} size={25} max={4} className="mdj-board-user team" whoClass="mdj-board-who" />
       )}
       <span
         className="mdj-board-tries"
@@ -1702,6 +1692,61 @@ function BoardRow({ entry, rank }) {
         {entry.tries}
       </span>
     </li>
+  );
+}
+
+// ---------- Une équipe, dans le classement ou la course ----------
+// Chaque tête mène au profil de son joueur. Les noms (« motaru +3 ») ouvrent
+// la liste COMPLÈTE de l'équipe : au-delà de quatre têtes on ne voit plus qui
+// en est, et c'est pourtant la question qu'on se pose en lisant la ligne.
+function TeamFaces({ team, size, max, className, whoClass = "" }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const close = useCallback(() => setOpen(false), []);
+  useClickOutside(ref, close, open);
+
+  return (
+    <span ref={ref} className={`${className} mdj-team-wrap`}>
+      <span className="mdj-sess-faces">
+        {team.slice(0, max).map((u) => (
+          <Link key={u.id} to={`/u/${u.username}`} className="mdj-team-face clickable" title={u.username}>
+            <Face user={u} size={size} />
+          </Link>
+        ))}
+      </span>
+      <button
+        type="button"
+        className={`mdj-team-names clickable ${whoClass}`}
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        title="Voir toute l'équipe"
+      >
+        {team.length > 2
+          ? `${team[0].username} +${team.length - 1}`
+          : team.map((u) => u.username).join(" & ")}
+      </button>
+
+      {open && (
+        <span className="mdj-team-pop" role="menu">
+          <span className="mdj-team-pop-head">
+            <Users size={12} /> {team.length} joueurs
+          </span>
+          {team.map((u) => (
+            <Link
+              key={u.id}
+              to={`/u/${u.username}`}
+              className="mdj-team-pop-row clickable"
+              role="menuitem"
+              onClick={close}
+            >
+              <Face user={u} size={26} />
+              <span>{u.username}</span>
+              <ArrowRight size={13} />
+            </Link>
+          ))}
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -1731,18 +1776,7 @@ function Searching({ rows }) {
                   <span>{r.user.username}</span>
                 </Link>
               ) : (
-                <span className="mdj-live-who team">
-                  <span className="mdj-sess-faces">
-                    {r.team.slice(0, 3).map((u) => (
-                      <Face key={u.id} user={u} size={22} />
-                    ))}
-                  </span>
-                  <span>
-                    {r.team.length > 2
-                      ? `${r.team[0].username} +${r.team.length - 1}`
-                      : r.team.map((u) => u.username).join(" & ")}
-                  </span>
-                </span>
+                <TeamFaces team={r.team} size={22} max={3} className="mdj-live-who team" />
               )}
               <span className="mdj-live-tries">
                 {r.gaveUp ? "abandon" : `${r.tries} essai${r.tries > 1 ? "s" : ""}`}
