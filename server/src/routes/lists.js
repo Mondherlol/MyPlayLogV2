@@ -414,6 +414,10 @@ router.get("/", optionalAuth, async (req, res) => {
     if (ITEM_KINDS.includes(req.query.itemKind))
       filter.itemKind = req.query.itemKind;
     if (scope === "tops" && req.query.group) filter["official.group"] = String(req.query.group);
+    // ?nine=<thème> : les listes des 9 d'un thème (page d'une liste des 9,
+    // « les autres ») ; ?nine=any : toutes les listes des 9.
+    if (req.query.nine === "any") filter.nine = { $ne: null };
+    else if (nineKey(req.query.nine)) filter.nine = nineKey(req.query.nine);
     const tag = String(req.query.tag || "").trim();
     if (tag) filter.tags = new RegExp(`^${escapeRx(tag)}$`, "i");
     const search = String(req.query.q || "").trim();

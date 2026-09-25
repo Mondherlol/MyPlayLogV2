@@ -1,22 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, Globe, Loader2, Lock, Search, X } from "lucide-react";
+import { Check, Globe, Loader2, Lock, Plus, Search, X } from "lucide-react";
 
+import NinePhrase, { useNineFonts } from "./NinePhrase";
 import { apiFetch } from "../lib/api";
+import { apiCached } from "../lib/query";
 import { useAuth } from "../context/AuthContext";
-import { NINE_CUSTOM, NINE_MAX, NINE_PREFIX, nineTheme, nineTitle } from "../lib/nines";
+import { NINE_CUSTOM, NINE_MAX, NINE_PREFIX, nineEnding, nineTheme, nineTitle } from "../lib/nines";
 
 // ======================================================================
 //  Choisir SES neuf jeux sur un thème
 // ======================================================================
 // Le pendant de l'écran du téléphone (myplaylog-mobile/src/app/nine.jsx).
 // Tout tient dans une fenêtre : à gauche le thème et les neuf cases, qui se
-// remplissent au fil des choix ; à droite sa bibliothèque, rangée par coups de
-// cœur, notes, heures, et la recherche pour le reste. Neuf, pas un de plus —
-// le dixième fait trembler la grille.
+// remplissent au fil des choix ; à droite sa bibliothèque en cartes (jaquette
+// + nom), rangée par coups de cœur, notes, heures, et la recherche pour le
+// reste. Neuf, pas un de plus — le dixième fait trembler la grille.
+//
+// `list` : une liste des 9 déjà publiée, qu'on retouche (ses jeux, sa
+// visibilité, la fin de phrase d'un thème inventé).
 
-// Les rangements de sa bibliothèque, pour trouver ses neuf jeux sans rien
-// taper : on pioche d'abord dans ce qu'on a aimé.
 const SHELVES = [
   {
     key: "favorites",
@@ -40,19 +43,24 @@ const SHELVES = [
 ];
 
 const asGame = (e) => ({
-  id: Number(e.gameId ?? e.id),
+  id: Number(e.gameId ?? e.refId ?? e.id),
   name: e.name,
   cover: e.cover || e.image || null,
+  year: e.year || (e.releaseDate ? new Date(e.releaseDate).getFullYear() : null),
 });
 
-export default function NineModal({ themeKey, library, onClose, onPublished }) {
+export default function NineModal({ themeKey, library: given, list = null, onClose, onPublished }) {
   const { token } = useAuth();
   const custom = themeKey === NINE_CUSTOM;
-  const { Icon, color } = nineTheme(themeKey);
+  const { color } = nineTheme(themeKey);
+  const fontsReady = useNineFonts();
 
-  const [ending, setEnding] = useState("");
-  const [picked, setPicked] = useState([]);
-  const [priv, setPriv] = useState(false);
+  const [ending, setEnding] = useState(() => (list && custom ? nineEnding(list.title) : ""));
+  const [picked, setPicked] = useState(() =>
+    (list?.items || []).slice(0, NINE_MAX).map(asGame).filter((g) => g.id)
+  );
+  const [priv, setPriv] = useState(list?.visibility === "private");
+  const [library, setLibrary] = useState(given || null);
   const [shelfKey, setShelfKey] = useState(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState(null);
@@ -70,6 +78,19 @@ export default function NineModal({ themeKey, library, onClose, onPublished }) {
       document.body.style.overflow = "";
     };
   }, [onClose]);
+
+  // Ouverte hors de l'accueil (page d'une liste), la fenêtre n'a pas reçu la
+  // bibliothèque : elle la charge elle-même.
+  useEffect(() => {
+    if (given) return undefined;
+    let alive = true;
+    apiCached("/library", { token, maxAge: 60000 })
+      .then((d) => alive && setLibrary(d?.entries || []))
+      .catch(() => alive && setLibrary([]));
+    return () => {
+      alive = false;
+    };
+  }, [given, token]);
 
   // --- La recherche : au silence, deux lettres au moins -------------------
   useEffect(() => {
@@ -133,25 +154,32 @@ export default function NineModal({ themeKey, library, onClose, onPublished }) {
     if (!ready || saving) return;
     setSaving(true);
     setError(null);
+    const items = picked.map((g) => ({
+      kind: "game",
+      refId: String(g.id),
+      gameId: g.id,
+      name: g.name,
+      image: g.cover || null,
+    }));
     try {
-      const res = await apiFetch("/lists", {
-        method: "POST",
-        token,
-        body: {
-          title,
-          nine: themeKey,
-          type: "classic",
-          itemKind: "game",
-          visibility: priv ? "private" : "public",
-          items: picked.map((g) => ({
-            kind: "game",
-            refId: String(g.id),
-            gameId: g.id,
-            name: g.name,
-            image: g.cover || null,
-          })),
-        },
-      });
+      const res = list
+        ? await apiFetch(`/lists/${list.id}`, {
+            method: "PUT",
+            token,
+            body: { items, visibility: priv ? "private" : "public", ...(custom ? { title } : {}) },
+          })
+        : await apiFetch("/lists", {
+            method: "POST",
+            token,
+            body: {
+              title,
+              nine: themeKey,
+              type: "classic",
+              itemKind: "game",
+              visibility: priv ? "private" : "public",
+              items,
+            },
+          });
       onPublished(res.list);
     } catch (e) {
       setError(e.message || "Impossible d'enregistrer la liste.");
@@ -169,17 +197,13 @@ export default function NineModal({ themeKey, library, onClose, onPublished }) {
         {/* --- À gauche : le thème, les neuf cases, publier -------------- */}
         <div className="nine-m-left">
           <div className="nine-m-hero">
-            <span className="nine-m-mark" aria-hidden="true">
-              9
-              <span className="nine-m-badge">
-                <Icon size={16} strokeWidth={2.4} />
-              </span>
-            </span>
             {custom ? (
               <div className="nine-m-custom">
-                <span>{NINE_PREFIX}</span>
+                <span className="nine-phrase-lead">
+                  Ces <b className="nine-phrase-9">9</b> jeux
+                </span>
                 <input
-                  autoFocus
+                  autoFocus={!list}
                   value={ending}
                   maxLength={90}
                   placeholder="qui m'ont appris l'anglais"
@@ -187,7 +211,7 @@ export default function NineModal({ themeKey, library, onClose, onPublished }) {
                 />
               </div>
             ) : (
-              <h2 className="nine-m-title">{title}</h2>
+              <NinePhrase themeKey={themeKey} inner={300} scale={1.25} ready={fontsReady} />
             )}
           </div>
 
@@ -210,8 +234,9 @@ export default function NineModal({ themeKey, library, onClose, onPublished }) {
                   title={`Retirer ${g.name}`}
                 >
                   {g.cover ? <img src={g.cover} alt={g.name} /> : <span className="nine-m-noart">{g.name}</span>}
+                  <span className="nine-m-slot-num">{i + 1}</span>
                   <span className="nine-m-slot-x">
-                    <X size={14} strokeWidth={3} />
+                    <X size={16} strokeWidth={3} />
                   </span>
                 </button>
               );
@@ -252,7 +277,7 @@ export default function NineModal({ themeKey, library, onClose, onPublished }) {
                 "Termine la phrase"
               ) : (
                 <>
-                  <Check size={17} /> Publier mes 9
+                  <Check size={17} /> {list ? "Enregistrer" : "Publier mes 9"}
                 </>
               )}
             </button>
@@ -287,28 +312,45 @@ export default function NineModal({ themeKey, library, onClose, onPublished }) {
                   onClick={() => setShelfKey(s.key)}
                 >
                   {s.label}
+                  <span>{s.games.length}</span>
                 </button>
               ))}
             </div>
           )}
 
           <div className="nine-m-grid">
-            {grid.map((g) => {
-              const at = picked.findIndex((x) => x.id === g.id);
-              return (
-                <button
-                  key={g.id}
-                  type="button"
-                  className={`nine-m-game clickable ${at >= 0 ? "on" : ""}`}
-                  onClick={() => toggle(g)}
-                  title={g.name}
-                >
-                  {g.cover ? <img src={g.cover} alt="" loading="lazy" /> : <span className="nine-m-noart">{g.name}</span>}
-                  {at >= 0 && <span className="nine-m-pos">{at + 1}</span>}
-                </button>
-              );
-            })}
-            {!grid.length && (
+            {library === null && !results ? (
+              <div className="nine-m-empty">
+                <Loader2 size={18} className="spin" />
+              </div>
+            ) : (
+              grid.map((g) => {
+                const at = picked.findIndex((x) => x.id === g.id);
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    className={`nine-m-game clickable ${at >= 0 ? "on" : ""}`}
+                    onClick={() => toggle(g)}
+                    title={g.name}
+                  >
+                    <span className="nine-m-game-art">
+                      {g.cover ? (
+                        <img src={g.cover} alt="" loading="lazy" />
+                      ) : (
+                        <span className="nine-m-noart">{g.name}</span>
+                      )}
+                      <span className="nine-m-game-mark">
+                        {at >= 0 ? at + 1 : <Plus size={15} strokeWidth={3} />}
+                      </span>
+                    </span>
+                    <span className="nine-m-game-name">{g.name}</span>
+                    {!!g.year && <span className="nine-m-game-year">{g.year}</span>}
+                  </button>
+                );
+              })
+            )}
+            {library !== null && !grid.length && (
               <p className="nine-m-empty">
                 {results ? "Aucun jeu trouvé." : "Cherche tes jeux juste au-dessus."}
               </p>

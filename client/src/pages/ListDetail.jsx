@@ -50,6 +50,7 @@ import { apiFetch, apiUpload } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { typeMeta, timeAgo, DEFAULT_TIERS, localId, GAME_LIST_TYPES } from "../lib/lists";
 import PlaylistDetail from "./PlaylistDetail";
+import NineDetail from "./NineDetail";
 import AddItemsModal from "../components/AddItemsModal";
 import ItemEditModal from "../components/ItemEditModal";
 import ListComments from "../components/ListComments";
@@ -517,6 +518,23 @@ export default function ListDetail() {
   // même route /lists/:id : la donnée chargée décide du rendu.
   if (list.type === "playlist")
     return <PlaylistDetail key={list.id} id={id} initial={list} />;
+
+  // Les listes des 9 ont leur page à elles : une affiche, une grille 3 × 3.
+  if (list.nine)
+    return (
+      <NineDetail
+        key={list.id}
+        list={list}
+        items={items}
+        token={token}
+        onLike={toggleLike}
+        onDelete={deleteList}
+        onChanged={(l) => {
+          setList((prev) => ({ ...prev, ...l }));
+          setItems((l.items || []).map((it) => ({ ...it, key: it._id || localId("it") })));
+        }}
+      />
+    );
 
   const meta = typeMeta(list.type);
   const ranked = list.type === "ranked";

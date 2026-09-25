@@ -48,22 +48,22 @@ const ROSE = "#ff5470";
 // écrit en énorme, dans la police du thème (`font`), penché de `rotate` degrés.
 // `size` est sa taille maximale en pixels (cf. nineKeySize).
 export const NINE_THEMES = [
-  { key: "personality", short: "qui ont forgé ma personnalité", card: "jeux qui ont forgé ma *personnalité*", Icon: FingerprintPattern, color: GOLD, font: "'Playfair Display', serif", italic: true, size: 56, rotate: -4 },
-  { key: "childhood", short: "de mon enfance", card: "jeux de mon *enfance*", Icon: ToyBrick, color: ORANGE, font: "'Press Start 2P', monospace", size: 30, rotate: -3 },
-  { key: "cried", short: "qui m'ont fait pleurer", card: "jeux qui m'ont fait *pleurer*", Icon: Droplet, color: BLUE, font: "'Caveat', cursive", size: 84, rotate: -6 },
-  { key: "island", short: "que j'emporterais sur une île déserte", card: "jeux pour une *île déserte*", Icon: TreePalm, color: GREEN, font: "'Pacifico', cursive", size: 50, rotate: -5 },
-  { key: "mustplay", short: "que tout le monde devrait faire", card: "jeux que *tout le monde* devrait faire", Icon: Award, color: GOLD, font: "'Anton', sans-serif", upper: true, size: 64, rotate: -2 },
-  { key: "comfort", short: "que je relance sans jamais me lasser", card: "jeux que je relance *sans me lasser*", Icon: Sofa, color: VIOLET, font: "'Fredoka', sans-serif", size: 52, rotate: 3 },
-  { key: "underrated", short: "sous-cotés que personne ne connaît", card: "jeux *sous-cotés* que personne ne connaît", Icon: Gem, color: TEAL, font: "'Permanent Marker', cursive", size: 40, rotate: -4 },
-  { key: "soundtrack", short: "aux bandes-son inoubliables", card: "jeux aux *bandes-son* inoubliables", Icon: Music, color: VIOLET, font: "'Playfair Display', serif", italic: true, size: 46, rotate: -3 },
-  { key: "firsttime", short: "que j'aimerais oublier pour les redécouvrir", card: "jeux à *oublier* pour les redécouvrir", Icon: Sparkles, color: BLUE, font: "'Caveat', cursive", size: 84, rotate: 4 },
-  { key: "scared", short: "qui m'ont fait peur", card: "jeux qui m'ont fait *peur*", Icon: Ghost, color: VIOLET, font: "'Creepster', cursive", size: 84, rotate: -3 },
-  { key: "worlds", short: "aux univers où j'aimerais vivre", card: "jeux aux *univers* où j'aimerais vivre", Icon: Castle, color: GREEN, font: "'Cinzel', serif", upper: true, size: 44, rotate: -2 },
-  { key: "villains", short: "aux méchants inoubliables", card: "jeux aux *méchants* inoubliables", Icon: Skull, color: ROSE, font: "'Bangers', cursive", size: 72, rotate: -5 },
-  { key: "coop", short: "à faire entre potes", card: "jeux à faire *entre potes*", Icon: Users, color: ORANGE, font: "'Fredoka', sans-serif", size: 56, rotate: -3 },
-  { key: "rage", short: "qui m'ont fait rager", card: "jeux qui m'ont fait *rager*", Icon: Angry, color: ROSE, font: "'Anton', sans-serif", upper: true, size: 90, rotate: -7 },
-  { key: "hours", short: "où j'ai englouti le plus d'heures", card: "jeux où j'ai englouti des *heures*", Icon: Hourglass, color: GOLD, font: "'Bungee', sans-serif", size: 50, rotate: -3 },
-  { key: "disappointed", short: "qui n'ont pas tenu leurs promesses", card: "jeux qui n'ont pas tenu leurs *promesses*", Icon: HeartCrack, color: ROSE, font: "'Playfair Display', serif", italic: true, strike: true, size: 50, rotate: -2 },
+  { key: "personality", short: "qui ont forgé ma personnalité", card: "jeux qui ont forgé ma *personnalité*", Icon: FingerprintPattern, color: GOLD, font: "'Playfair Display', serif", italic: true, size: 40, rotate: -4 },
+  { key: "childhood", short: "de mon enfance", card: "jeux de mon *enfance*", Icon: ToyBrick, color: ORANGE, font: "'Press Start 2P', monospace", size: 22, rotate: -3 },
+  { key: "cried", short: "qui m'ont fait pleurer", card: "jeux qui m'ont fait *pleurer*", Icon: Droplet, color: BLUE, font: "'Caveat', cursive", size: 54, rotate: -6 },
+  { key: "island", short: "que j'emporterais sur une île déserte", card: "jeux pour une *île déserte*", Icon: TreePalm, color: GREEN, font: "'Pacifico', cursive", size: 38, rotate: -5 },
+  { key: "mustplay", short: "que tout le monde devrait faire", card: "jeux que *tout le monde* devrait faire", Icon: Award, color: GOLD, font: "'Anton', sans-serif", upper: true, size: 40, rotate: -2 },
+  { key: "comfort", short: "que je relance sans jamais me lasser", card: "jeux que je relance *sans me lasser*", Icon: Sofa, color: VIOLET, font: "'Fredoka', sans-serif", size: 34, rotate: 3 },
+  { key: "underrated", short: "sous-cotés que personne ne connaît", card: "jeux *sous-cotés* que personne ne connaît", Icon: Gem, color: TEAL, font: "'Permanent Marker', cursive", size: 34, rotate: -4 },
+  { key: "soundtrack", short: "aux bandes-son inoubliables", card: "jeux aux *bandes-son* inoubliables", Icon: Music, color: VIOLET, font: "'Playfair Display', serif", italic: true, size: 38, rotate: -3 },
+  { key: "firsttime", short: "que j'aimerais oublier pour les redécouvrir", card: "jeux à *oublier* pour les redécouvrir", Icon: Sparkles, color: BLUE, font: "'Caveat', cursive", size: 54, rotate: 4 },
+  { key: "scared", short: "qui m'ont fait peur", card: "jeux qui m'ont fait *peur*", Icon: Ghost, color: VIOLET, font: "'Creepster', cursive", size: 54, rotate: -3 },
+  { key: "worlds", short: "aux univers où j'aimerais vivre", card: "jeux aux *univers* où j'aimerais vivre", Icon: Castle, color: GREEN, font: "'Cinzel', serif", upper: true, size: 30, rotate: -2 },
+  { key: "villains", short: "aux méchants inoubliables", card: "jeux aux *méchants* inoubliables", Icon: Skull, color: ROSE, font: "'Bangers', cursive", size: 46, rotate: -5 },
+  { key: "coop", short: "à faire entre potes", card: "jeux à faire *entre potes*", Icon: Users, color: ORANGE, font: "'Fredoka', sans-serif", size: 38, rotate: -3 },
+  { key: "rage", short: "qui m'ont fait rager", card: "jeux qui m'ont fait *rager*", Icon: Angry, color: ROSE, font: "'Anton', sans-serif", upper: true, size: 58, rotate: -7 },
+  { key: "hours", short: "où j'ai englouti le plus d'heures", card: "jeux où j'ai englouti des *heures*", Icon: Hourglass, color: GOLD, font: "'Bungee', sans-serif", size: 34, rotate: -3 },
+  { key: "disappointed", short: "qui n'ont pas tenu leurs promesses", card: "jeux qui n'ont pas tenu leurs *promesses*", Icon: HeartCrack, color: ROSE, font: "'Playfair Display', serif", italic: true, strike: true, size: 36, rotate: -2 },
 ];
 
 const CUSTOM_META = {
@@ -73,7 +73,7 @@ const CUSTOM_META = {
   Icon: PenLine,
   color: GOLD,
   font: "'Caveat', cursive",
-  size: 90,
+  size: 54,
   rotate: -5,
 };
 
@@ -124,7 +124,7 @@ export function splitWord(word) {
  * en taille. La taille est plafonnée à `meta.size`, pour qu'un mot court
  * (« ton », « peur ») ne mange pas la carte. Rend `{ size, lines }`.
  */
-export function nineKeyLayout(meta, text, inner) {
+export function nineKeyLayout(meta, text, inner, cap = meta.size) {
   const words = text.split(/\s+/);
   const widthOf = (lines) => Math.max(...lines.map((l) => textWidth(meta, l, 100)));
   let lines = [text];
@@ -146,8 +146,12 @@ export function nineKeyLayout(meta, text, inner) {
     }
   }
   // 0.94 : la place de l'inclinaison et du surlignage qui déborde.
-  return { size: Math.floor(Math.min(meta.size, (inner * 0.94 * 100) / widest)), lines };
+  return { size: Math.floor(Math.min(cap, (inner * 0.94 * 100) / widest)), lines };
 }
+
+/** La fin de phrase d'une liste au thème inventé (« qui m'ont appris l'anglais »). */
+export const nineEnding = (title) =>
+  String(title || "").replace(/^\s*Ces\s+9\s+jeux\s*/i, "").trim();
 
 export const nineTheme = (key) => NINE_THEMES.find((t) => t.key === key) || CUSTOM_META;
 
