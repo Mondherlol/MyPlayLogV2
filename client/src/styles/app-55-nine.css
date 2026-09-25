@@ -5,32 +5,33 @@
    et sur la fenêtre. Tout ce qui est teinté en dérive — jamais de dégradé ni de
    halo : des aplats, et l'or de la maison à sa valeur exacte. */
 
-/* ---------- La carte d'un thème ---------- */
+/* ---------- La carte d'un thème ----------
+   Une affiche typographique : le texte occupe toute la carte, le fond prend
+   une teinte de la couleur du thème. */
 .nine-card {
   --nc: #f2b70b;
   position: relative;
   display: flex;
   flex-direction: column;
-  width: 178px;
-  height: 226px;
-  padding: 0.85rem;
+  width: 196px;
+  height: 256px;
+  padding: 16px;
   border-radius: 18px;
-  border: 1px solid var(--border);
-  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--nc) 32%, var(--border));
+  background: color-mix(in srgb, var(--nc) 9%, var(--surface));
   color: var(--text);
   text-align: left;
   font: inherit;
   overflow: hidden;
-  isolation: isolate;
   transition:
-    transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1),
+    transform 0.25s cubic-bezier(0.2, 0.8, 0.3, 1),
     border-color 0.2s ease,
     background-color 0.2s ease;
 }
 .nine-card:hover {
-  transform: translateY(-4px);
-  border-color: color-mix(in srgb, var(--nc) 60%, var(--border));
-  background: color-mix(in srgb, var(--nc) 5%, var(--surface));
+  transform: translateY(-5px) rotate(-1deg);
+  border-color: color-mix(in srgb, var(--nc) 70%, var(--border));
+  background: color-mix(in srgb, var(--nc) 14%, var(--surface));
 }
 .nine-card:active {
   transform: translateY(-1px) scale(0.98);
@@ -41,97 +42,79 @@
 }
 .nine-card.is-custom {
   border-style: dashed;
-  border-color: var(--border-strong);
 }
 .nine-card.is-mine {
   border-color: #f2b70b;
 }
 
-/* Le filigrane : l'icône du thème, immense, coupée par le coin. Elle se
-   redresse et prend un peu de couleur au survol. */
-.nine-card-wm {
-  position: absolute;
-  right: -34px;
-  bottom: -30px;
-  z-index: -1;
-  color: var(--nc);
-  opacity: 0.08;
-  transform: rotate(-12deg);
-  transition:
-    transform 0.45s cubic-bezier(0.2, 0.8, 0.3, 1),
-    opacity 0.3s ease;
-}
-.nine-card:hover .nine-card-wm {
-  opacity: 0.16;
-  transform: rotate(-3deg) scale(1.08);
-}
-
-.nine-card-top {
+/* La phrase, en escalier, qui remplit la carte. */
+/* `space-between` : le premier morceau en haut, le dernier en bas — la phrase
+   s'étire sur toute la hauteur au lieu de laisser un trou sous elle. */
+.nine-card-phrase {
+  flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: flex-start;
   justify-content: space-between;
+  gap: 6px;
+  min-height: 0;
 }
-.nine-card-badge {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 13px;
-  color: var(--nc);
-  background: color-mix(in srgb, var(--nc) 15%, transparent);
-  transition: transform 0.3s cubic-bezier(0.3, 1.6, 0.5, 1);
-}
-.nine-card:hover .nine-card-badge {
-  transform: rotate(-8deg) scale(1.08);
-}
-
-/* Le « 9 » penché, discret, dans le coin : la signature du format. */
-.nine-card-nine {
-  margin: -0.35rem -0.1rem 0 0;
-  font-family: "Space Grotesk", var(--font-display);
-  font-weight: 700;
-  font-size: 2.3rem;
-  line-height: 1;
-  color: #f2b70b;
-  opacity: 0.22;
-  transform: rotate(-10deg) skewX(-6deg);
-  transition: opacity 0.2s ease;
-}
-.nine-card:hover .nine-card-nine {
-  opacity: 0.9;
-}
-
-/* Sa liste déjà faite : ses neuf jaquettes en miniature. */
-.nine-card-mini {
-  display: grid;
-  grid-template-columns: repeat(3, 14px);
-  gap: 2px;
-}
-.nine-card-mini > * {
-  width: 14px;
-  height: 19px;
-  border-radius: 3px;
-  object-fit: cover;
-  background: var(--surface-2);
-}
-
-.nine-card-text {
-  margin-top: auto;
+/* Ni la phrase ni le mot-clé ne se laissent écraser : tassés par la
+   colonne, ils se faisaient rogner (le « j » de « jeux », la dernière ligne). */
+.nine-card-small {
+  flex-shrink: 0;
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 1.02rem;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
+  font-weight: 700;
+  font-size: 1.36rem;
+  line-height: 1.16;
+  letter-spacing: -0.02em;
   display: -webkit-box;
-  -webkit-line-clamp: 4;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.nine-card-text b {
+.nine-card-nine {
+  display: inline-block;
   font-family: "Space Grotesk", var(--font-display);
   font-weight: 700;
-  font-size: 1.3rem;
+  font-size: 2.6rem;
+  line-height: 0.9;
   color: #f2b70b;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.3);
+  transform: rotate(-8deg);
+  transition: transform 0.3s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.nine-card:hover .nine-card-nine {
+  transform: rotate(-16deg) scale(1.12);
+}
+
+/* Le mot qui compte : énorme, penché, surligné au marqueur. */
+.nine-card-key {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 100%;
+  font-weight: 700;
+  line-height: 1.02;
+  color: var(--nc);
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.28);
+  transform: rotate(var(--rot, -4deg));
+  transform-origin: left center;
+  white-space: nowrap;
+  transition: transform 0.35s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.nine-card-key > span {
+  padding: 0 3px;
+  background: linear-gradient(
+    transparent 55%,
+    color-mix(in srgb, var(--nc) 28%, transparent) 55%,
+    color-mix(in srgb, var(--nc) 28%, transparent) 90%,
+    transparent 90%
+  );
+}
+.nine-card:hover .nine-card-key {
+  transform: rotate(calc(var(--rot, -4deg) * 1.8)) scale(1.05);
 }
 
 .nine-card-foot {
@@ -156,19 +139,40 @@
   align-items: center;
   gap: 0.3rem;
   flex: 1;
+  min-width: 0;
+  white-space: nowrap;
   color: #f2b70b;
 }
-.nine-card.is-custom .nine-card-foot > span:first-child {
-  flex: 1;
+.nine-card-mini {
+  display: grid;
+  grid-template-columns: repeat(3, 9px);
+  gap: 1px;
+}
+.nine-card-mini > * {
+  width: 9px;
+  height: 12px;
+  border-radius: 2px;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+.nine-card-ic {
+  display: grid;
+  color: var(--nc);
+  transition: opacity 0.15s ease;
+}
+.nine-card:hover .nine-card-ic {
+  opacity: 0;
 }
 
-/* La flèche qui glisse au survol : « ça s'ouvre ». */
+/* La flèche prend la place de l'icône au survol : « ça s'ouvre ». */
 .nine-card-go {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
-  margin-left: auto;
+  width: 26px;
+  height: 26px;
   border-radius: 999px;
   color: #2a1c00;
   background: #f2b70b;
@@ -574,8 +578,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .nine-card,
-  .nine-card-wm,
-  .nine-card-badge,
+  .nine-card-nine,
+  .nine-card-key,
   .nine-m-mark,
   .nine-m-slot.filled,
   .nine-m-pos {
