@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Check, Globe, Heart, ImageDown, Loader2, Lock, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Eraser, Globe, Heart, ImageDown, Loader2, Lock, Sparkles } from "lucide-react";
 
 import PlayerCard from "../components/board/PlayerCard";
 import BoardPicker from "../components/board/BoardPicker";
@@ -23,7 +23,7 @@ import { boardOf, itemsBySlot, openMyBoard } from "../lib/boards";
 // enchaîne donc chaque envoi sur le précédent, et c'est toujours l'état le
 // plus récent qui part.
 
-export default function BoardDetail({ list, items: initialItems, token, onLike, onDelete, onChanged }) {
+export default function BoardDetail({ list, items: initialItems, token, onLike, onChanged }) {
   const navigate = useNavigate();
   const board = boardOf(list.board);
   const [items, setItems] = useState(initialItems);
@@ -89,6 +89,13 @@ export default function BoardDetail({ list, items: initialItems, token, onLike, 
     setPicking(null);
   };
 
+  // Vider la carte : on garde la carte (son lien, ses « j'aime », ses
+  // commentaires), on retire seulement ses jeux.
+  const clearAll = () => {
+    if (!confirm("Vider ta carte ? Tous les jeux choisis seront retirés.")) return;
+    persist([]);
+  };
+
   const toggleVisibility = () =>
     persist(items, { visibility: list.visibility === "private" ? "public" : "private" });
 
@@ -147,8 +154,13 @@ export default function BoardDetail({ list, items: initialItems, token, onLike, 
               >
                 {list.visibility === "private" ? <Lock size={17} /> : <Globe size={17} />}
               </button>
-              <button className="bd-rail-btn danger clickable" onClick={onDelete} title="Supprimer ma carte">
-                <Trash2 size={17} />
+              <button
+                className="bd-rail-btn danger clickable"
+                onClick={clearAll}
+                disabled={!filled}
+                title="Vider ma carte"
+              >
+                <Eraser size={17} />
               </button>
             </>
           ) : (

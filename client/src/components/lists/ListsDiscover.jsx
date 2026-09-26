@@ -4,6 +4,8 @@ import { Heart } from "lucide-react";
 
 import Section from "../home/Rail";
 import NineRail from "../home/NineRail";
+import TierIdea from "./TierIdea";
+import { apiFetch } from "../../lib/api";
 import { apiCached, peekApi } from "../../lib/query";
 import { DEFAULT_BOARD, boardOf } from "../../lib/boards";
 
@@ -85,6 +87,43 @@ function ListRail({ path, token, title, moreTo, render, lead = null, skipId = nu
   );
 }
 
+/**
+ * Le rayon des tier lists. Vide — ou tant que le joueur n'en a fait aucune —,
+ * il propose d'en faire à partir de ses sagas : « Tier list des jeux Zelda ».
+ */
+function TierRail({ token, render }) {
+  const path = "/lists?type=tier&sort=likes&limit=14";
+  const lists = useRail(path, token) || [];
+  const [ideas, setIdeas] = useState(null);
+  useEffect(() => {
+    if (!token) return undefined;
+    let alive = true;
+    apiFetch("/lists/suggest/tiers", { token })
+      .then((d) => alive && setIdeas(d))
+      .catch(() => alive && setIdeas(null));
+    return () => {
+      alive = false;
+    };
+  }, [token]);
+
+  const shown = ideas && (!lists.length || !ideas.hasOwnTier) ? ideas.suggestions : [];
+  if (!lists.length && !shown.length) return null;
+  return (
+    <Section title="Tier lists" moreTo={lists.length ? "/lists?type=tier&sort=likes" : null} className="lx-sec">
+      {lists.map((l) => (
+        <div key={l.id} className="lx-rail-item">
+          {render(l)}
+        </div>
+      ))}
+      {shown.map((idea) => (
+        <div key={idea.saga} className="lx-rail-item">
+          <TierIdea idea={idea} token={token} />
+        </div>
+      ))}
+    </Section>
+  );
+}
+
 export default function ListsDiscover({ token, renderCard }) {
   const board = boardOf(DEFAULT_BOARD);
   const [mine, setMine] = useState(undefined); // ma carte : undefined = en cours
@@ -116,13 +155,7 @@ export default function ListsDiscover({ token, renderCard }) {
         moreTo="/lists?sc=tops"
         render={renderCard}
       />
-      <ListRail
-        path="/lists?type=tier&sort=likes&limit=14"
-        token={token}
-        title="Tier lists"
-        moreTo="/lists?type=tier&sort=likes"
-        render={renderCard}
-      />
+      <TierRail token={token} render={renderCard} />
       <ListRail
         path={`/lists?board=${board.key}&sort=likes&limit=16`}
         token={token}

@@ -10,9 +10,10 @@ import { boardOf, itemsBySlot } from "../../lib/boards";
 // quatre rangées, sans en-tête au-dessus (les outils vivent dans une colonne
 // à côté, cf. pages/BoardDetail).
 //
-// Une case vide dit ce qu'elle attend EN SON CENTRE — son icône et son
-// libellé. Remplie, la jaquette est entière et le libellé passe DESSOUS : posé
-// dessus, il mangeait le bas de l'image, souvent le titre du jeu.
+// Le libellé de la case est TOUJOURS dessous, remplie ou non : posé dessus,
+// il mangeait le bas de la jaquette, et au centre d'une case vide il faisait
+// formulaire. Une case vide n'affiche qu'un « + » (chez son propriétaire) ou
+// l'icône de la case (chez les autres).
 //
 // Les cases à personnage (protagoniste, antagoniste) gardent la jaquette du
 // jeu en grand ; le personnage choisi s'y pose en petite carte, à droite.
@@ -46,12 +47,10 @@ export default function PlayerCard({ list, items, compact = false, onCell, onRem
           </>
         ) : (
           <span className="pc-empty">
-            <s.Icon size={compact ? 15 : 22} strokeWidth={1.8} />
-            {!compact && <span className="pc-empty-label">{s.label}</span>}
-            {!compact && onCell && (
-              <span className="pc-empty-add">
-                <Plus size={13} strokeWidth={2.6} /> Choisir
-              </span>
+            {onCell ? (
+              <Plus size={compact ? 16 : 26} strokeWidth={2} />
+            ) : (
+              <s.Icon size={compact ? 15 : 22} strokeWidth={1.8} />
             )}
           </span>
         );
@@ -83,7 +82,7 @@ export default function PlayerCard({ list, items, compact = false, onCell, onRem
               </button>
             )}
             {!compact && (
-              <span className="pc-label">{it ? s.label : ""}</span>
+              <span className="pc-label">{s.label}</span>
             )}
           </li>
         );

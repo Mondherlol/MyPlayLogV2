@@ -133,12 +133,13 @@ export function renderBoard(canvas, { list, items, opts, imageMap }) {
     ctx.fillStyle = theme.tile;
     ctx.fillRect(x, y, cellW, cellH);
     if (cover) drawCover(ctx, cover, x, y, cellW, cellH);
-    else {
-      // Case vide, ou jeu sans image : son libellé (ou son nom) au centre.
+    else if (it) {
+      // Jeu sans image : son nom au centre. (Une case vide reste vide : son
+      // libellé est dessous, comme partout.)
       ctx.fillStyle = theme.soft;
       ctx.font = font(700, 21);
       ctx.textAlign = "center";
-      const text = it ? it.name : labelOf(s);
+      const text = it.name;
       const words = text.split(" ");
       const lines = [];
       let line = "";
@@ -175,10 +176,9 @@ export function renderBoard(canvas, { list, items, opts, imageMap }) {
       ctx.restore();
     }
 
-    // Le libellé, sous la case remplie, sur deux lignes au plus (une case
-    // vide l'affiche déjà en son centre).
-    if (it) {
-      ctx.fillStyle = theme.text;
+    // Le libellé, sous la case, sur deux lignes au plus — grisé si vide.
+    {
+      ctx.fillStyle = it ? theme.text : theme.soft;
       ctx.font = font(700, 19);
       const words = labelOf(s).toUpperCase().split(" ");
       let first = "";

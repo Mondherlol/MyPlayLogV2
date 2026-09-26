@@ -532,7 +532,6 @@ export default function ListDetail() {
         items={items}
         token={token}
         onLike={toggleLike}
-        onDelete={deleteList}
         onChanged={(l) => {
           setList((prev) => ({ ...prev, ...l }));
           setItems((l.items || []).map((it) => ({ ...it, key: it._id || localId("it") })));

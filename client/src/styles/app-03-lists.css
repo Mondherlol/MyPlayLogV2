@@ -3148,3 +3148,31 @@
 .lt-likes.on {
   color: #ff5470;
 }
+
+/* Une tier list à faire (components/lists/TierIdea) : la carte d'une liste,
+   marquée d'un « + » jaune et d'un léger voile tant qu'on ne la survole pas. */
+.lt-idea {
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
+}
+.lt-idea .lt-mosaic img {
+  filter: saturate(0.55) brightness(0.8);
+  transition:
+    transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1),
+    filter 0.2s ease;
+}
+.lt-idea:hover .lt-mosaic img {
+  filter: none;
+}
+.lt-type.lt-idea-plus {
+  background: #f2b70b;
+  color: #161618;
+}
+.lt-idea .lt-meta {
+  color: #f2b70b;
+  font-weight: 600;
+}

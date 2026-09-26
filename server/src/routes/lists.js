@@ -22,6 +22,7 @@ import { gridsForEvent } from "../lib/eventGrids.js";
 import { triggerMissionCheck } from "../lib/missions.js";
 import { nineSuggestions } from "../lib/nineSuggest.js";
 import { boardKey, boardSlot, cleanBoardItems } from "../lib/boards.js";
+import { ensureGameMeta } from "../lib/gameMeta.js";
 
 const router = express.Router();
 
@@ -768,6 +769,62 @@ router.get("/mine/for-item", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("lists for-item error:", err.message);
     res.status(500).json({ error: "Erreur lors du chargement des listes." });
+  }
+});
+
+// GET /api/lists/suggest/tiers — des tier lists à faire, tirées des sagas que
+// le joueur a jouées (« Tier list des jeux Pokémon »). La page Listes les
+// propose quand le rayon des tier lists est vide, ou tant que le joueur n'en a
+// fait aucune. Chaque suggestion porte ses jeux : un clic crée la tier list
+// déjà remplie, il ne reste qu'à ranger.
+// Déclarée AVANT /:id pour ne pas être capturée par la route paramétrée.
+const TIER_SUGGEST_MAX = 8;
+router.get("/suggest/tiers", requireAuth, async (req, res) => {
+  try {
+    const [entries, mine] = await Promise.all([
+      UserGame.find({ user: req.userId, status: { $ne: "wishlist" } })
+        .select("gameId name cover")
+        .lean(),
+      List.find({ user: req.userId, type: "tier" }).select("title").lean(),
+    ]);
+    const meta = await ensureGameMeta(entries.map((e) => e.gameId));
+
+    const bySaga = new Map();
+    for (const e of entries) {
+      const saga = meta.get(e.gameId)?.franchise;
+      if (!saga) continue;
+      if (!bySaga.has(saga)) bySaga.set(saga, []);
+      bySaga.get(saga).push(e);
+    }
+    // Une saga déjà classée par le joueur ne se repropose pas.
+    const done = mine.map((l) => l.title.toLowerCase());
+    const fresh = [...bySaga].filter(
+      ([saga]) => !done.some((t) => t.includes(saga.toLowerCase()))
+    );
+    // Trois jeux au moins font une tier list qui vaut d'être rangée ; à défaut,
+    // on se contente de deux plutôt que de ne rien proposer.
+    const min = fresh.some(([, games]) => games.length >= 3) ? 3 : 2;
+
+    const suggestions = fresh
+      .filter(([, games]) => games.length >= min)
+      .sort((a, b) => b[1].length - a[1].length)
+      .slice(0, TIER_SUGGEST_MAX)
+      .map(([saga, games]) => ({
+        saga,
+        title: `Tier list des jeux ${saga}`,
+        count: games.length,
+        covers: games.filter((g) => g.cover).slice(0, 3).map((g) => g.cover),
+        games: games.slice(0, 60).map((g) => ({
+          gameId: g.gameId,
+          name: g.name,
+          cover: g.cover || null,
+        })),
+      }));
+
+    res.json({ hasOwnTier: mine.length > 0, suggestions });
+  } catch (err) {
+    console.error("tier suggest error:", err.message);
+    res.status(500).json({ error: "Suggestions indisponibles." });
   }
 });
 

@@ -59,6 +59,10 @@
   color: var(--text);
   border-color: var(--border-strong);
 }
+.bd-rail-btn:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
 .bd-rail-btn.danger:hover {
   color: #e0574d;
   border-color: #e0574d;
@@ -170,7 +174,7 @@
   font-weight: 700;
   text-align: center;
 }
-/* Remplie : le libellé SOUS la jaquette, sur deux lignes au plus. */
+/* Le libellé SOUS la case, remplie ou non, sur deux lignes au plus. */
 .pc-label {
   flex: none;
   height: 30px;
@@ -185,7 +189,7 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.pc-slot.is-filled:hover .pc-label {
+.pc-slot:hover .pc-label {
   color: var(--text);
 }
 /* Case à personnage : la jaquette en grand, le personnage en petite carte
@@ -229,7 +233,7 @@
 .pc-x:hover {
   background: #e0574d;
 }
-/* Vide : l'icône et le libellé AU CENTRE de la case. */
+/* Vide : un « + » (ou l'icône de la case) au centre, rien d'autre. */
 .pc-empty {
   position: absolute;
   inset: 0;
@@ -242,33 +246,13 @@
   text-align: center;
   color: var(--text-soft);
 }
-.pc-empty-label {
-  font-size: 0.86rem;
-  font-weight: 700;
-  line-height: 1.25;
-  color: var(--text);
-}
-.pc-empty-add {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  margin-top: 2px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--text-soft);
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
 button.pc-cell.empty:hover {
   border-color: #f2b70b;
 }
 button.pc-cell.empty:hover .pc-empty {
   color: #f2b70b;
 }
-button.pc-cell.empty:hover .pc-empty-add {
-  opacity: 1;
-  color: #f2b70b;
-}
+
 
 /* ---------- La version du profil : 10 × 2, jaquettes en 3/4 ---------- */
 .pc-grid.is-compact {
