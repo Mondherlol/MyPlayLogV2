@@ -39,6 +39,7 @@ import { apiFetch } from "../lib/api";
 import useFollowingRail from "../hooks/useFollowingRail";
 import GameAddFan from "./GameAddFan";
 import ProfileOverviewAside from "./ProfileOverviewAside";
+import ProfileBoard from "./ProfileBoard";
 
 // Les « sections » de l'aperçu (favoris + statuts) que l'utilisateur peut
 // réordonner par glisser-déposer. L'ordre par défaut place les favoris et les
@@ -570,6 +571,9 @@ export default function ProfileOverview({
             </div>
           </div>
         )}
+
+        {/* La carte de joueur (un jeu par case) ouvre le profil. */}
+        {!editing && <ProfileBoard lists={lists} isMe={isMe} username={username} />}
 
         {editing ? (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>

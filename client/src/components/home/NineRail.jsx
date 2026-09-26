@@ -39,8 +39,8 @@ function Faces({ faces }) {
 }
 
 /**
- * Un thème, en carte : l'icône, puis la phrase, calées en haut ; le pied en
- * bas. Quand ta liste est faite, ses neuf jaquettes tapissent le fond, en
+ * Un thème, en carte, façon affiche : la phrase calée en haut, un grand 9 en
+ * filigrane dans le coin, l'icône et le compteur en pied. Quand ta liste est faite, ses neuf jaquettes tapissent le fond, en
  * mosaïque assombrie — la carte devient TA liste, sans qu'on ait à lire le
  * pied pour le savoir.
  */
@@ -72,13 +72,19 @@ function NineCard({ themeKey, stats, onOpen, fontsReady }) {
         </span>
       )}
 
-      <span className="nine-card-ic" aria-hidden="true">
-        <Icon size={17} strokeWidth={2.3} />
-      </span>
+      {/* Le 9 en filigrane, coupé par le coin : la signature du principe. */}
+      {!mosaic.length && (
+        <span className="nine-card-mark" aria-hidden="true">
+          9
+        </span>
+      )}
 
       <NinePhrase themeKey={themeKey} inner={CARD_INNER} ready={fontsReady} prompt={custom} />
 
       <span className="nine-card-foot">
+        <span className="nine-card-ic" aria-hidden="true">
+          <Icon size={14} strokeWidth={2.4} />
+        </span>
         {mine ? (
           <span className="nine-card-done">
             <Check size={13} strokeWidth={3} /> Ta liste est faite

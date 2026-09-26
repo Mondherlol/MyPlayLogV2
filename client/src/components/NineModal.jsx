@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Globe, Loader2, Lock, Plus, Search, X } from "lucide-react";
 
@@ -68,6 +68,19 @@ export default function NineModal({ themeKey, library: given, list = null, onClo
   const [full, setFull] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  // La largeur RÉELLE de l'en-tête : le mot-clé se compose pour elle (une
+  // largeur fixe laissait « tout le monde » revenir à la ligne sans raison).
+  const heroRef = useRef(null);
+  const [heroW, setHeroW] = useState(300);
+  useLayoutEffect(() => {
+    const el = heroRef.current;
+    if (!el) return undefined;
+    const measure = () => setHeroW(Math.max(200, Math.floor(el.clientWidth)));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && onClose();
@@ -91,6 +104,21 @@ export default function NineModal({ themeKey, library: given, list = null, onClo
       alive = false;
     };
   }, [given, token]);
+
+  // Le rayon du thème : « Tes plus longues parties » pour les heures, « Sortis
+  // il y a plus de 12 ans » pour l'enfance… (cf. server lib/nineSuggest). Il
+  // passe devant les rayons de toujours, et c'est lui qui s'ouvre.
+  const [themeShelf, setThemeShelf] = useState(null);
+  useEffect(() => {
+    if (custom || !token) return undefined;
+    let alive = true;
+    apiCached(`/lists/nines/suggest/${themeKey}`, { token, maxAge: 5 * 60000 })
+      .then((d) => alive && d?.shelf?.games?.length && setThemeShelf(d.shelf))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [custom, themeKey, token]);
 
   // --- La recherche : au silence, deux lettres au moins -------------------
   useEffect(() => {
@@ -116,11 +144,14 @@ export default function NineModal({ themeKey, library: given, list = null, onClo
 
   const shelves = useMemo(() => {
     const owned = (library || []).filter((e) => e.status !== "wishlist");
-    return SHELVES.map((s) => ({
+    const base = SHELVES.map((s) => ({
       ...s,
       games: owned.filter(s.pick).sort(s.sort).slice(0, 90).map(asGame),
     })).filter((s) => s.games.length);
-  }, [library]);
+    return themeShelf
+      ? [{ key: "theme", label: themeShelf.label, games: themeShelf.games, theme: true }, ...base]
+      : base;
+  }, [library, themeShelf]);
   const shelf = shelves.find((s) => s.key === shelfKey) || shelves[0];
   const grid = results ?? shelf?.games ?? [];
 
@@ -196,7 +227,7 @@ export default function NineModal({ themeKey, library: given, list = null, onClo
 
         {/* --- À gauche : le thème, les neuf cases, publier -------------- */}
         <div className="nine-m-left">
-          <div className="nine-m-hero">
+          <div className="nine-m-hero" ref={heroRef}>
             {custom ? (
               <div className="nine-m-custom">
                 <span className="nine-phrase-lead">
@@ -211,7 +242,7 @@ export default function NineModal({ themeKey, library: given, list = null, onClo
                 />
               </div>
             ) : (
-              <NinePhrase themeKey={themeKey} inner={300} scale={1.25} ready={fontsReady} />
+              <NinePhrase themeKey={themeKey} inner={heroW} scale={1.25} ready={fontsReady} />
             )}
           </div>
 
@@ -308,7 +339,7 @@ export default function NineModal({ themeKey, library: given, list = null, onClo
                   key={s.key}
                   role="tab"
                   aria-selected={s.key === shelf?.key}
-                  className={`nine-m-shelf clickable ${s.key === shelf?.key ? "on" : ""}`}
+                  className={`nine-m-shelf clickable ${s.key === shelf?.key ? "on" : ""} ${s.theme ? "is-theme" : ""}`}
                   onClick={() => setShelfKey(s.key)}
                 >
                   {s.label}

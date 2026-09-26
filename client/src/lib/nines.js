@@ -129,6 +129,10 @@ export function nineKeyLayout(meta, text, inner, cap = meta.size) {
   const widthOf = (lines) => Math.max(...lines.map((l) => textWidth(meta, l, 100)));
   let lines = [text];
   let widest = widthOf(lines);
+  // ⚠️ SUR UNE LIGNE DÈS QUE ÇA TIENT À TAILLE PLEINE. Couper ne sert qu'à
+  // grossir un mot trop large ; quand la taille est de toute façon plafonnée,
+  // « TOUT LE / MONDE » revenait à la ligne avec toute la place à côté.
+  if ((widest * cap) / 100 <= inner * 0.94) return { size: Math.floor(cap), lines };
   for (let i = 1; i < words.length; i++) {
     const cand = [words.slice(0, i).join(" "), words.slice(i).join(" ")];
     const w = widthOf(cand);

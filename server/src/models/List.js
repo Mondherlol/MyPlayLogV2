@@ -30,6 +30,11 @@ const listItemSchema = new mongoose.Schema(
     artist: { type: String, default: null }, // compositeur / artiste
     releaseYear: { type: Number, default: null },
     durationSec: { type: Number, default: null }, // durée (iTunes, best-effort)
+    // Grille « un jeu par case » (cf. lib/boards) : la case de l'élément, et
+    // pour le protagoniste / l'antagoniste, le personnage choisi dans le jeu.
+    slot: { type: String, default: null },
+    charName: { type: String, default: null },
+    charImage: { type: String, default: null },
     note: { type: String, default: "" }, // commentaire de l'auteur (texte)
     // Médias joints à l'annotation (GIF / images), comme les commentaires.
     media: { type: [commentMediaSchema], default: [] },
@@ -209,6 +214,10 @@ const listSchema = new mongoose.Schema(
     // client (lib/nines), ou « custom » pour un thème inventé. null = liste
     // ordinaire. Une liste des 9 ne dépasse jamais neuf jeux (cf. routes).
     nine: { type: String, default: null },
+    // Grille « un jeu par case » (« Ma carte de joueur », cf. lib/boards) :
+    // la clé du modèle de grille, null pour une liste ordinaire. Une seule
+    // grille de chaque modèle par joueur (cf. routes).
+    board: { type: String, default: null },
     visibility: {
       type: String,
       enum: ["public", "private"],
@@ -247,5 +256,6 @@ listSchema.index({ "official.kind": 1, "official.order": 1 });
 listSchema.index({ tags: 1 });
 // Les listes des 9 : combien l'ont faite, par thème, et la mienne.
 listSchema.index({ nine: 1, visibility: 1 });
+listSchema.index({ user: 1, board: 1 });
 
 export default mongoose.model("List", listSchema);

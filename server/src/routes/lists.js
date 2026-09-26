@@ -20,6 +20,8 @@ import EventBingo from "../models/EventBingo.js";
 import GameEvent from "../models/GameEvent.js";
 import { gridsForEvent } from "../lib/eventGrids.js";
 import { triggerMissionCheck } from "../lib/missions.js";
+import { nineSuggestions } from "../lib/nineSuggest.js";
+import { boardKey, boardSlot, cleanBoardItems } from "../lib/boards.js";
 
 const router = express.Router();
 
@@ -113,6 +115,9 @@ function sanitizeItem(raw) {
     media: sanitizeMediaList(raw.media),
     rating,
     tier: raw.tier ? String(raw.tier) : null,
+    slot: raw.slot ? String(raw.slot).slice(0, 32) : null,
+    charName: raw.charName ? String(raw.charName).slice(0, 120) : null,
+    charImage: raw.charImage ? String(raw.charImage).slice(0, 600) : null,
   };
 }
 
@@ -228,6 +233,21 @@ function toCard(l, userId) {
     type: l.type,
     itemKind: l.itemKind || "game",
     nine: l.nine || null,
+    board: l.board || null,
+    // Une grille se montre entière sur sa carte (profil, page Listes) : ses
+    // cases, dans l'ordre, avec le perso des cases qui en ont un.
+    ...(l.board
+      ? {
+          boardItems: items.map((i) => ({
+            slot: i.slot,
+            refId: i.refId,
+            name: i.name,
+            image: i.image,
+            charName: i.charName || null,
+            charImage: i.charImage || null,
+          })),
+        }
+      : {}),
     visibility: l.visibility,
     author: toAuthor(l.user),
     mine: userId ? String(l.user?._id || l.user) === String(userId) : false,
@@ -295,6 +315,7 @@ function toFull(l, userId) {
     type: l.type,
     itemKind: l.itemKind || "game",
     nine: l.nine || null,
+    board: l.board || null,
     visibility: l.visibility,
     author: toAuthor(l.user),
     event: toEvent(l),
@@ -325,6 +346,9 @@ function toFull(l, userId) {
       media: i.media || [],
       rating: i.rating,
       tier: i.tier,
+      slot: i.slot || null,
+      charName: i.charName || null,
+      charImage: i.charImage || null,
     })),
     tiers: l.tiers || [],
     likeCount: (l.likes || []).length,
@@ -418,6 +442,9 @@ router.get("/", optionalAuth, async (req, res) => {
     // « les autres ») ; ?nine=any : toutes les listes des 9.
     if (req.query.nine === "any") filter.nine = { $ne: null };
     else if (nineKey(req.query.nine)) filter.nine = nineKey(req.query.nine);
+    // ?board=<modèle> | any : les grilles « un jeu par case » (profil).
+    if (req.query.board === "any") filter.board = { $ne: null };
+    else if (boardKey(req.query.board)) filter.board = boardKey(req.query.board);
     const tag = String(req.query.tag || "").trim();
     if (tag) filter.tags = new RegExp(`^${escapeRx(tag)}$`, "i");
     const search = String(req.query.q || "").trim();
@@ -575,6 +602,34 @@ router.get("/nines", optionalAuth, async (req, res) => {
   } catch (err) {
     console.error("lists nines error:", err.message);
     res.status(500).json({ error: "Erreur lors du chargement des thèmes." });
+  }
+});
+
+// GET /api/lists/boards/:board/suggest/:slot — le rayon d'une case de grille :
+// « Mon jeu préféré » ouvre sur les coups de cœur, « Meilleur jeu rétro » sur
+// les jeux de plus de vingt ans (cf. lib/boards `suggest`, lib/nineSuggest).
+router.get("/boards/:board/suggest/:slot", requireAuth, async (req, res) => {
+  try {
+    const slot = boardSlot(boardKey(req.params.board), String(req.params.slot || ""));
+    const shelf = slot ? await nineSuggestions(req.userId, slot.suggest) : null;
+    res.json({ shelf });
+  } catch (err) {
+    console.error("lists board suggest error:", err.message);
+    res.json({ shelf: null });
+  }
+});
+
+// GET /api/lists/nines/suggest/:theme — le rayon propre à un thème des 9 :
+// « où j'ai englouti des heures » ouvre sur les plus longues parties, « de mon
+// enfance » sur les jeux sortis il y a plus de douze ans (cf. lib/nineSuggest).
+// `{ shelf: null }` quand le thème n'a pas de règle ou que rien ne colle.
+router.get("/nines/suggest/:theme", requireAuth, async (req, res) => {
+  try {
+    const shelf = await nineSuggestions(req.userId, String(req.params.theme || ""));
+    res.json({ shelf });
+  } catch (err) {
+    console.error("lists nines suggest error:", err.message);
+    res.json({ shelf: null });
   }
 });
 
@@ -812,8 +867,16 @@ router.post("/", requireAuth, async (req, res) => {
     // paliers, ni personnages — la grille EST sa forme.
     const nine = nineKey(b.nine);
     if (nine && items.length > NINE_MAX) return res.status(400).json({ error: TOO_MANY_NINE });
+    // Une grille « un jeu par case » : une seule par modèle et par joueur —
+    // c'est SA carte. La seconde création renvoie vers la première.
+    const board = nine ? null : boardKey(b.board);
+    if (board) {
+      const existing = await List.findOne({ user: req.userId, board }).select("_id").lean();
+      if (existing)
+        return res.status(409).json({ error: "Tu as déjà ta carte : modifie-la.", id: existing._id });
+    }
     const tiers =
-      type === "tier" && !nine
+      type === "tier" && !nine && !board
         ? sanitizeTiers(b.tiers) || DEFAULT_TIERS
         : [];
 
@@ -822,11 +885,16 @@ router.post("/", requireAuth, async (req, res) => {
       title,
       description: String(b.description || "").slice(0, 2000),
       cover: b.cover ? String(b.cover) : null,
-      type: nine ? "classic" : type,
-      itemKind: nine ? "game" : itemKind,
+      type: nine || board ? "classic" : type,
+      itemKind: nine || board ? "game" : itemKind,
       nine,
+      board,
       visibility,
-      items: nine ? items.filter((i) => i.kind === "game") : items,
+      items: board
+        ? cleanBoardItems(board, items)
+        : nine
+          ? items.filter((i) => i.kind === "game")
+          : items,
       tiers,
       tags: sanitizeTags(b.tags) || [],
     });
@@ -889,7 +957,8 @@ router.put("/:id", requireAuth, async (req, res) => {
       b.type !== list.type &&
       b.type !== "playlist" &&
       list.type !== "playlist" &&
-      !list.nine
+      !list.nine &&
+      !list.board
     ) {
       const wasTier = list.type === "tier";
       list.type = b.type;
@@ -905,7 +974,7 @@ router.put("/:id", requireAuth, async (req, res) => {
       if (list.nine && next.length > NINE_MAX)
         return res.status(400).json({ error: TOO_MANY_NINE });
       const before = new Set(list.items.map((i) => String(i.refId)));
-      list.items = next;
+      list.items = list.board ? cleanBoardItems(list.board, next) : next;
       const fresh = list.items.filter((i) => !before.has(String(i.refId)));
       addedCount = fresh.length;
       addedRefIds = fresh.map((i) => String(i.refId));

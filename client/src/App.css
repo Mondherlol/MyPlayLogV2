@@ -62,4 +62,6 @@
 @import "./styles/app-53-game-menu.css";
 @import "./styles/app-54-companion.css";
 @import "./styles/app-55-nine.css";
+/* Ma carte de joueur : un jeu par case. */
+@import "./styles/app-56-board.css";
 @import "./styles/app-99-mobile-perf.css";

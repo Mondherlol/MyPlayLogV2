@@ -54,7 +54,9 @@
   );
 }
 
-/* ---------- La carte d'un thème ---------- */
+/* ---------- La carte d'un thème ----------
+   Une affiche plate : un aplat de la couleur du thème, la phrase en haut, un
+   grand 9 en filigrane coupé par le coin, le pied sans filet. */
 .nine-card {
   --nc: #f2b70b;
   position: relative;
@@ -62,10 +64,10 @@
   flex-direction: column;
   width: 200px;
   height: 262px;
-  padding: 16px 18px 14px;
-  border-radius: 20px;
-  border: 1px solid var(--border);
-  background: var(--surface);
+  padding: 18px 18px 14px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--nc) 22%, var(--border));
+  background: color-mix(in srgb, var(--nc) 9%, var(--surface));
   color: var(--text);
   text-align: left;
   font: inherit;
@@ -73,21 +75,29 @@
   transition:
     transform 0.25s cubic-bezier(0.2, 0.8, 0.3, 1),
     border-color 0.2s ease,
-    box-shadow 0.25s ease;
+    background-color 0.2s ease;
 }
-/* Un liseré de la couleur du thème en haut : la seule touche de couleur au
-   repos, avec le mot-clé. */
-.nine-card::before {
-  content: "";
+.nine-card-mark {
   position: absolute;
-  inset: 0 0 auto;
-  height: 4px;
-  background: var(--nc);
+  right: -18px;
+  bottom: -58px;
+  font-family: "Space Grotesk", var(--font-display);
+  font-size: 210px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--nc);
+  opacity: 0.14;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.35s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 .nine-card:hover {
   transform: translateY(-4px);
-  border-color: color-mix(in srgb, var(--nc) 55%, var(--border));
-  box-shadow: 0 14px 30px -18px color-mix(in srgb, var(--nc) 70%, transparent);
+  border-color: color-mix(in srgb, var(--nc) 60%, var(--border));
+  background: color-mix(in srgb, var(--nc) 13%, var(--surface));
+}
+.nine-card:hover .nine-card-mark {
+  opacity: 0.24;
+  transform: translate(-4px, -6px) rotate(-4deg);
 }
 .nine-card:active {
   transform: translateY(-1px) scale(0.985);
@@ -99,9 +109,7 @@
 .nine-card.is-custom {
   border-style: dashed;
   border-color: var(--border-strong);
-}
-.nine-card.is-custom::before {
-  display: none;
+  background: var(--surface);
 }
 .nine-card.is-mine {
   border-color: #f2b70b;
@@ -137,30 +145,24 @@
 .nine-card.has-mosaic .nine-phrase {
   color: #fff;
 }
-.nine-card.has-mosaic .nine-card-foot {
-  border-top-color: rgba(255, 255, 255, 0.16);
-}
 .nine-card.has-mosaic .nine-card-ic {
   background: rgba(10, 10, 12, 0.55);
-}
-.nine-card.has-mosaic::before {
-  z-index: 1;
 }
 
 .nine-card-ic {
   position: relative;
+  flex: none;
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
   color: var(--nc);
   background: color-mix(in srgb, var(--nc) 14%, transparent);
 }
 
 .nine-card .nine-phrase {
   position: relative;
-  margin-top: 12px;
 }
 
 .nine-card-foot {
@@ -170,8 +172,6 @@
   gap: 0.4rem;
   min-height: 22px;
   margin-top: auto;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
   font-size: 0.74rem;
   font-weight: 600;
   color: var(--text-soft);
@@ -494,6 +494,12 @@
   border-color: #f2b70b;
   background: #f2b70b;
   color: #2a1c00;
+}
+/* Le rayon du thème : liseré de la couleur du thème au repos, pour qu'on voie
+   qu'il n'est pas un rayon comme les autres. */
+.nine-m-shelf.is-theme:not(.on) {
+  border-color: color-mix(in srgb, var(--nc) 60%, var(--border));
+  color: var(--text);
 }
 
 .nine-m-grid {

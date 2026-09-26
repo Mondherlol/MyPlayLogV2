@@ -29,6 +29,7 @@ import {
 import CreateListModal from "../components/CreateListModal";
 import PlaylistCard from "../components/PlaylistCard";
 import { Preview, Author } from "../components/ListPreview";
+import ListsDiscover from "../components/lists/ListsDiscover";
 
 const SCOPES = [
   { value: "feed", label: "Découvrir" },
@@ -133,6 +134,8 @@ export default function Lists() {
   const [lists, setLists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // `false` fermé ; sinon le type imposé à la création (tuiles « Créer » de
+  // la vitrine), ou `true` pour laisser choisir.
   const [creating, setCreating] = useState(false);
 
   // Filtres / tri / recherche persistés dans l'URL : on retrouve son écran
@@ -287,6 +290,25 @@ export default function Lists() {
           </button>
         ))}
       </div>
+
+      {/* La vitrine : seulement sur « Découvrir », tant qu'on ne cherche ni ne
+          filtre rien — une recherche veut des résultats, pas des rayons. */}
+      {scope === "feed" && !query && !tag && !typeFilter && !kindFilter && (
+        <>
+          <ListsDiscover
+            token={token}
+            onCreate={(t) => setCreating(t)}
+            renderCard={(l) =>
+              l.type === "playlist" ? (
+                <PlaylistCard list={l} onDelete={handleDelete} />
+              ) : (
+                <ListCard list={l} onDelete={handleDelete} />
+              )
+            }
+          />
+          <h2 className="lists-all-title">Toutes les listes</h2>
+        </>
+      )}
 
       <div className="lists-toolbar">
         <div className="lists-search">
@@ -467,6 +489,7 @@ export default function Lists() {
 
       {creating && (
         <CreateListModal
+          fixedType={typeof creating === "string" ? creating : null}
           onClose={() => setCreating(false)}
           onCreated={(list) => {
             setCreating(false);
