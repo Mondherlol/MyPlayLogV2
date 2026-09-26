@@ -13,9 +13,6 @@ import { typeMeta } from "../../lib/lists";
 // Les images du montage. Une liste classée garde son podium secret (même
 // principe que l'éventail de ListPreview) : on montre la suite du classement.
 function mosaicOf(list) {
-  if (list.type === "tier" && list.tierPreview?.length) {
-    return list.tierPreview.flatMap((t) => t.images).slice(0, 3);
-  }
   const imgs = list.preview || [];
   if (list.type === "ranked" && imgs.length > 3) return imgs.slice(3, 6);
   return imgs.slice(0, 3);
@@ -23,13 +20,33 @@ function mosaicOf(list) {
 
 export default function ListTile({ list, onDelete }) {
   const meta = typeMeta(list.type);
-  const imgs = list.cover ? [] : mosaicOf(list);
+  // Une tier list se reconnaît à ses paliers : on montre les premiers, avec
+  // leurs jaquettes, plutôt qu'un montage qui la confondrait avec une liste.
+  const tiers = !list.cover && list.type === "tier" ? (list.tierPreview || []).slice(0, 4) : [];
+  const imgs = list.cover || tiers.length ? [] : mosaicOf(list);
   const author = list.author;
 
   return (
     <Link to={`/lists/${list.id}`} className="lt clickable">
-      <span className="lt-media">
-        {list.cover ? (
+      <span className={`lt-media ${tiers.length ? "is-tier" : ""}`}>
+        {tiers.length ? (
+          <span className="lt-tiers">
+            {tiers.map((t, r) => (
+              <span className="ltp-row" key={r}>
+                <span className="ltp-label" style={{ "--tier": t.color }}>
+                  {t.label}
+                </span>
+                <span className="ltp-cells">
+                  {t.images.slice(0, 6).map((src, i) => (
+                    <span className="ltp-cell" key={i}>
+                      <img src={src} alt="" loading="lazy" draggable="false" />
+                    </span>
+                  ))}
+                </span>
+              </span>
+            ))}
+          </span>
+        ) : list.cover ? (
           <img className="lt-cover" src={list.cover} alt="" loading="lazy" draggable="false" />
         ) : imgs.length ? (
           <span className="lt-mosaic" style={{ "--n": imgs.length }}>
@@ -43,7 +60,7 @@ export default function ListTile({ list, onDelete }) {
           </span>
         )}
 
-        {list.type !== "classic" && (
+        {list.type !== "classic" && !tiers.length && (
           <span className="lt-type" title={meta.long}>
             <meta.Icon size={13} />
           </span>

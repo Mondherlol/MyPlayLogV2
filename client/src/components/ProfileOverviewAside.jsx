@@ -876,8 +876,8 @@ export default function ProfileOverviewAside({
       }
 
       // -------- La carte de joueur (un jeu par case) --------
-      // Quelques cases, AVEC leur intitulé — « Jeu préféré », « Protagoniste »…
-      // — pour que les jeux aient un sens ; la carte entière est à un clic.
+      // Un aperçu de la grille (les vingt jaquettes en miniature) ; la carte
+      // entière, avec ses intitulés, est à un clic.
       case "board": {
         const bl = (lists || []).find((l) => l.board === DEFAULT_BOARD);
         const bItems = bl?.boardItems || [];
@@ -896,11 +896,6 @@ export default function ProfileOverviewAside({
         }
         const board = boardOf(DEFAULT_BOARD);
         const by = itemsBySlot(bItems);
-        const FEATURED = ["favorite", "protagonist", "antagonist", "story", "everyone", "nostalgia"];
-        const shown = [
-          ...FEATURED.filter((k) => by[k]),
-          ...board.slots.map((sl) => sl.key).filter((k) => by[k] && !FEATURED.includes(k)),
-        ].slice(0, 4);
         return (
           <AsideCard
             Icon={IdCard}
@@ -911,26 +906,15 @@ export default function ProfileOverviewAside({
               </Link>
             }
           >
-            <Link to={`/lists/${bl.id}`} className="pfa-board clickable">
-              {shown.map((k) => {
-                const it = by[k];
-                const slot = board.slots.find((sl) => sl.key === k);
-                return (
-                  <span key={k} className="pfa-board-row">
-                    <span className="pfa-board-thumb">
-                      {it.image ? <img src={it.image} alt="" loading="lazy" /> : <slot.Icon size={14} />}
-                      {it.charImage && <img className="pfa-board-char" src={it.charImage} alt="" loading="lazy" />}
-                    </span>
-                    <span className="pfa-board-body">
-                      <span className="pfa-board-slot">{slot.label}</span>
-                      <span className="pfa-board-name">{it.charName ? `${it.charName} · ${it.name}` : it.name}</span>
-                    </span>
-                  </span>
+            <Link to={`/lists/${bl.id}`} className="pfa-board clickable" title="Voir la carte de joueur">
+              {board.slots.map((sl) => {
+                const it = by[sl.key];
+                return it?.image ? (
+                  <img key={sl.key} src={it.image} alt="" loading="lazy" />
+                ) : (
+                  <span key={sl.key} />
                 );
               })}
-              <span className="pfa-board-foot">
-                {bItems.length}/{board.slots.length} cases · voir toute la carte <ArrowRight size={12} />
-              </span>
             </Link>
           </AsideCard>
         );

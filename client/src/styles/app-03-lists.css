@@ -228,8 +228,6 @@
   color: #fff;
   background: color-mix(in srgb, var(--tc) 26%, rgba(14, 15, 20, 0.7));
   border: 1px solid color-mix(in srgb, var(--tc) 45%, rgba(255, 255, 255, 0.16));
-  backdrop-filter: blur(8px) saturate(130%);
-  -webkit-backdrop-filter: blur(8px) saturate(130%);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.32);
 }
 
@@ -249,8 +247,6 @@
   border-radius: 999px;
   color: #fff;
   background: rgba(14, 15, 20, 0.7);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.32);
 }
@@ -431,8 +427,6 @@
   font-weight: 800;
   font-size: 0.74rem;
   line-height: 1;
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.32);
 }
 
@@ -475,8 +469,6 @@
   font-weight: 700;
   font-size: 0.72rem;
   line-height: 1;
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
 }
 
 /* ---------- Aperçu « tier list » : mini-grille de paliers ---------- */
@@ -1746,8 +1738,6 @@
   border-radius: 9px;
   background: rgba(15, 15, 20, 0.6);
   color: #fff;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
   opacity: 0;
   transform: translateY(-4px);
   transition: opacity 0.16s ease, transform 0.16s ease, background 0.16s ease;
@@ -3033,6 +3023,40 @@
   opacity: 0.6;
 }
 
+/* Tier list : ses paliers en haut, le bandeau du titre en dessous (et non
+   par-dessus, il cacherait les derniers). */
+.lt-media.is-tier {
+  display: flex;
+  flex-direction: column;
+}
+.lt-media.is-tier .lt-caption {
+  position: static;
+}
+.lt-tiers {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px;
+}
+/* Les pastilles descendent dans le bandeau : en haut, elles cacheraient les
+   jaquettes du premier palier. */
+.lt-media.is-tier .lt-badges {
+  top: auto;
+  bottom: 12px;
+}
+.lt-media.is-tier .lt-caption {
+  padding-right: 3.2rem;
+}
+.lt-tiers .ltp-label {
+  width: 24px;
+  font-size: 0.78rem;
+}
+.lt:hover .ltp-cell {
+  transform: translateY(-2px);
+}
+
 /* Les pastilles posées sur l'image : sombres, petites, sans texte superflu. */
 .lt-type,
 .lt-pill {
@@ -3045,11 +3069,10 @@
   padding: 0 0.4rem;
   border: none;
   border-radius: 6px;
-  background: rgba(10, 10, 12, 0.72);
+  background: rgba(10, 10, 12, 0.85);
   color: #fff;
   font-size: 0.72rem;
   font-weight: 700;
-  backdrop-filter: blur(6px);
 }
 .lt-type {
   position: absolute;
@@ -3085,8 +3108,7 @@
   flex-direction: column;
   gap: 0.3rem;
   padding: 0.6rem 0.75rem 0.65rem;
-  background: rgba(14, 14, 16, 0.78);
-  backdrop-filter: blur(10px);
+  background: rgba(14, 14, 16, 0.95);
 }
 .lt-title {
   font-family: var(--font-display);
@@ -3149,30 +3171,110 @@
   color: #ff5470;
 }
 
-/* Une tier list à faire (components/lists/TierIdea) : la carte d'une liste,
-   marquée d'un « + » jaune et d'un léger voile tant qu'on ne la survole pas. */
-.lt-idea {
+/* Une tier list à faire (components/lists/TierIdea) : une proposition, pas une
+   liste — contour pointillé, paliers vides, jaquettes à ranger, bouton Créer. */
+.ti {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
   width: 100%;
-  padding: 0;
-  border: none;
-  background: none;
+  aspect-ratio: 4 / 3;
+  padding: 0.7rem;
+  border-radius: 12px;
+  border: 1.5px dashed var(--border-strong, var(--border));
+  background: transparent;
+  color: var(--text);
   font: inherit;
   text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
-.lt-idea .lt-mosaic img {
-  filter: saturate(0.55) brightness(0.8);
-  transition:
-    transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1),
-    filter 0.2s ease;
+.ti:hover {
+  border-color: #f2b70b;
+  background: color-mix(in srgb, #f2b70b 5%, transparent);
 }
-.lt-idea:hover .lt-mosaic img {
-  filter: none;
+.ti-tiers {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
-.lt-type.lt-idea-plus {
+.ti-row {
+  flex: 1;
+  display: flex;
+  gap: 3px;
+}
+.ti-label {
+  flex: none;
+  width: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--tier) 30%, transparent);
+  color: var(--tier);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.72rem;
+}
+.ti-slot {
+  flex: 1;
+  border-radius: 5px;
+  border: 1px dashed var(--border);
+}
+.ti-pool {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 44px;
+}
+.ti-pool img {
+  height: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 4px;
+  object-fit: cover;
+  transition: transform 0.2s ease;
+}
+.ti:hover .ti-pool img {
+  transform: translateY(-3px);
+}
+.ti-more {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  padding-left: 2px;
+}
+.ti-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.ti-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ti-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.92rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ti-sub {
+  font-size: 0.74rem;
+  color: var(--text-soft);
+}
+.ti-cta {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
   background: #f2b70b;
   color: #161618;
-}
-.lt-idea .lt-meta {
-  color: #f2b70b;
-  font-weight: 600;
+  font-size: 0.8rem;
+  font-weight: 700;
 }
