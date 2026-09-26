@@ -208,6 +208,25 @@ export default function ListExportModal({ list, items, tiers, token, onClose }) 
               </button>
             </div>
 
+            {/* La langue des textes de l'image — pour les affiches qui en
+                écrivent (carte de joueur, liste des 9). */}
+            {(list.board || list.nine) && (
+              <div className="le-theme" role="group" aria-label="Langue">
+                {[
+                  ["fr", "Français"],
+                  ["en", "English"],
+                ].map(([code, label]) => (
+                  <button
+                    key={code}
+                    className={`le-theme-opt clickable ${(opts.lang || "fr") === code ? "active" : ""}`}
+                    onClick={() => setOpts((o) => ({ ...o, lang: code }))}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {groups.map((g) => (
               <div className="le-group" key={g.title}>
                 <span className="le-group-title">{g.title}</span>

@@ -3,7 +3,8 @@
 // ======================================================================
 // Même esprit que sa page (cf. components/board/PlayerCard) : cinq colonnes,
 // quatre rangées, le libellé SOUS chaque jaquette, et pour le protagoniste /
-// l'antagoniste le portrait du personnage avec la jaquette en vignette. En
+// l'antagoniste le personnage en petite carte sur la jaquette. En français ou
+// en anglais (`opts.lang`). En
 // tête, l'identité du joueur ; en pied, la marque. Fond plat.
 //
 // Les images passent par le même chargement que les autres exports (proxy →
@@ -15,7 +16,7 @@ const PAD = 64;
 const GAP = 18;
 const COLS = 5;
 const SCALE = 2;
-const LABEL_H = 56;
+const LABEL_H = 64;
 
 const THEMES = {
   dark: { bg: "#121316", text: "#f4f4f6", soft: "#9a9dab", tile: "#1c1e24", line: "#2a2c33", gold: "#f2b70b" },
@@ -69,14 +70,17 @@ export function renderBoard(canvas, { list, items, opts, imageMap }) {
   const board = boardOf(list.board);
   const by = itemsBySlot(items);
   const filled = board.slots.filter((s) => by[s.key]).length;
+  // La langue de l'image (FR / EN) : le titre et les libellés des cases.
+  const en = opts.lang === "en";
+  const labelOf = (s) => (en ? s.en || s.label : s.label);
 
   const cellW = Math.floor((W - PAD * 2 - GAP * (COLS - 1)) / COLS);
   const cellH = Math.round(cellW * (4 / 3));
   const rows = Math.ceil(board.slots.length / COLS);
-  const headH = 96;
+  const headH = 108;
   const gridTop = PAD + headH + 28;
   const gridH = rows * (cellH + LABEL_H) + (rows - 1) * GAP;
-  const footH = opts.showWatermark ? 64 : 0;
+  const footH = opts.showWatermark ? 72 : 0;
   const H = gridTop + gridH + footH + PAD * 0.8;
 
   canvas.width = W * SCALE;
@@ -90,26 +94,24 @@ export function renderBoard(canvas, { list, items, opts, imageMap }) {
 
   // --- L'identité ------------------------------------------------------
   ctx.fillStyle = theme.gold;
-  ctx.font = font(800, 18);
+  ctx.font = font(800, 22);
   ctx.letterSpacing = "4px";
-  ctx.fillText("CARTE DE JOUEUR", PAD, PAD + 22);
+  ctx.fillText(en ? "PLAYER CARD" : "CARTE DE JOUEUR", PAD, PAD + 24);
   ctx.letterSpacing = "0px";
   if (opts.showAuthor !== false) {
     ctx.fillStyle = theme.text;
-    ctx.font = font(700, 56, "Space Grotesk");
-    ctx.fillText(ellipsize(ctx, list.author?.username || "", W - PAD * 2 - 200), PAD, PAD + 84);
+    ctx.font = font(700, 66, "Space Grotesk");
+    ctx.fillText(ellipsize(ctx, list.author?.username || "", W - PAD * 2 - 220), PAD, PAD + 94);
   }
   ctx.textAlign = "right";
-  ctx.fillStyle = theme.text;
-  ctx.font = font(700, 48, "Space Grotesk");
   const tot = `/${board.slots.length}`;
-  ctx.font = font(700, 26, "Space Grotesk");
+  ctx.font = font(700, 30, "Space Grotesk");
   const totW = ctx.measureText(tot).width;
   ctx.fillStyle = theme.soft;
-  ctx.fillText(tot, W - PAD, PAD + 84);
+  ctx.fillText(tot, W - PAD, PAD + 94);
   ctx.fillStyle = theme.gold;
-  ctx.font = font(700, 48, "Space Grotesk");
-  ctx.fillText(String(filled), W - PAD - totW - 4, PAD + 84);
+  ctx.font = font(700, 58, "Space Grotesk");
+  ctx.fillText(String(filled), W - PAD - totW - 4, PAD + 94);
   ctx.textAlign = "left";
 
   ctx.fillStyle = theme.line;
@@ -130,14 +132,13 @@ export function renderBoard(canvas, { list, items, opts, imageMap }) {
     ctx.clip();
     ctx.fillStyle = theme.tile;
     ctx.fillRect(x, y, cellW, cellH);
-    if (char) drawCover(ctx, char, x, y, cellW, cellH, true);
-    else if (cover) drawCover(ctx, cover, x, y, cellW, cellH);
+    if (cover) drawCover(ctx, cover, x, y, cellW, cellH);
     else {
       // Case vide, ou jeu sans image : son libellé (ou son nom) au centre.
       ctx.fillStyle = theme.soft;
-      ctx.font = font(700, 17);
+      ctx.font = font(700, 21);
       ctx.textAlign = "center";
-      const text = it ? it.name : s.label;
+      const text = it ? it.name : labelOf(s);
       const words = text.split(" ");
       const lines = [];
       let line = "";
@@ -150,25 +151,27 @@ export function renderBoard(canvas, { list, items, opts, imageMap }) {
       }
       if (line) lines.push(line);
       lines.slice(0, 4).forEach((l, li) =>
-        ctx.fillText(l, x + cellW / 2, y + cellH / 2 - ((lines.length - 1) * 22) / 2 + li * 22 + 6)
+        ctx.fillText(l, x + cellW / 2, y + cellH / 2 - ((lines.length - 1) * 26) / 2 + li * 26 + 7)
       );
       ctx.textAlign = "left";
     }
     ctx.restore();
 
-    // La jaquette en vignette sur le portrait.
-    if (char && cover) {
-      const iw = Math.round(cellW * 0.32);
+    // Le personnage (protagoniste, antagoniste), en petite carte à droite.
+    if (char) {
+      const iw = Math.round(cellW * 0.38);
       const ih = Math.round(iw * (4 / 3));
       const ix = x + cellW - iw - 8;
       const iy = y + cellH - ih - 8;
       ctx.save();
-      roundRect(ctx, ix - 3, iy - 3, iw + 6, ih + 6, 7);
-      ctx.fillStyle = theme.bg;
+      roundRect(ctx, ix - 3, iy - 3, iw + 6, ih + 6, 8);
+      ctx.fillStyle = theme.gold;
       ctx.fill();
-      roundRect(ctx, ix, iy, iw, ih, 5);
+      roundRect(ctx, ix, iy, iw, ih, 6);
       ctx.clip();
-      drawCover(ctx, cover, ix, iy, iw, ih);
+      ctx.fillStyle = theme.tile;
+      ctx.fillRect(ix, iy, iw, ih);
+      drawCover(ctx, char, ix, iy, iw, ih, true);
       ctx.restore();
     }
 
@@ -176,8 +179,8 @@ export function renderBoard(canvas, { list, items, opts, imageMap }) {
     // vide l'affiche déjà en son centre).
     if (it) {
       ctx.fillStyle = theme.text;
-      ctx.font = font(700, 15);
-      const words = s.label.toUpperCase().split(" ");
+      ctx.font = font(700, 19);
+      const words = labelOf(s).toUpperCase().split(" ");
       let first = "";
       let i2 = 0;
       for (; i2 < words.length; i2++) {
@@ -185,23 +188,23 @@ export function renderBoard(canvas, { list, items, opts, imageMap }) {
         if (first && ctx.measureText(next).width > cellW) break;
         first = next;
       }
-      ctx.fillText(first, x, y + cellH + 24);
+      ctx.fillText(first, x, y + cellH + 28);
       const rest = words.slice(i2).join(" ");
-      if (rest) ctx.fillText(ellipsize(ctx, rest, cellW), x, y + cellH + 44);
+      if (rest) ctx.fillText(ellipsize(ctx, rest, cellW), x, y + cellH + 52);
     }
   });
 
   // --- La marque -------------------------------------------------------
   if (footH) {
-    const fy = gridTop + gridH + 50;
+    const fy = gridTop + gridH + 56;
     ctx.textAlign = "right";
     ctx.fillStyle = theme.soft;
-    ctx.font = font(500, 20);
+    ctx.font = font(500, 24);
     const dom = "  ·  myplaylog.cc";
     ctx.fillText(dom, W - PAD, fy);
     const dw = ctx.measureText(dom).width;
     ctx.fillStyle = theme.gold;
-    ctx.font = font(700, 26, "Space Grotesk");
+    ctx.font = font(700, 32, "Space Grotesk");
     ctx.fillText("MyPlayLog", W - PAD - dw, fy);
     ctx.textAlign = "left";
   }

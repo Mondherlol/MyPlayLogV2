@@ -236,6 +236,23 @@ function listCard(l, viewerId) {
     type: l.type,
     itemKind: l.itemKind || "game",
     nine: l.nine || null,
+    // La carte de joueur (un jeu par case) : le profil l'affiche en tête, il
+    // lui faut ses cases — sans elles, il croyait qu'elle n'existait pas et
+    // proposait « La remplir » à qui l'avait pourtant complétée.
+    board: l.board || null,
+    ...(l.board
+      ? {
+          boardItems: items.map((i) => ({
+            slot: i.slot,
+            refId: i.refId,
+            gameId: i.gameId,
+            name: i.name,
+            image: i.image,
+            charName: i.charName || null,
+            charImage: i.charImage || null,
+          })),
+        }
+      : {}),
     visibility: l.visibility,
     author: l.user
       ? { id: l.user._id || l.user, username: l.user.username, avatar: l.user.avatar || null }

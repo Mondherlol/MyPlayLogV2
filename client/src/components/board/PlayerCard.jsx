@@ -14,9 +14,8 @@ import { boardOf, itemsBySlot } from "../../lib/boards";
 // libellé. Remplie, la jaquette est entière et le libellé passe DESSOUS : posé
 // dessus, il mangeait le bas de l'image, souvent le titre du jeu.
 //
-// ⚠️ LES CASES À PERSONNAGE MONTRENT LE PERSONNAGE. « Protagoniste préféré »,
-// c'est Geralt, pas la jaquette du Sorceleur : son portrait remplit la case,
-// et le jeu d'où il vient n'est plus qu'une vignette dans le coin.
+// Les cases à personnage (protagoniste, antagoniste) gardent la jaquette du
+// jeu en grand ; le personnage choisi s'y pose en petite carte, à droite.
 //
 // `onCell(slot)` : la grille est éditable (chez son propriétaire), chaque case
 // s'ouvre au clic, et `onRemove(slot)` ajoute la croix de retrait au survol.
@@ -38,16 +37,12 @@ export default function PlayerCard({ list, items, compact = false, onCell, onRem
 
         const inner = it ? (
           <>
-            {withChar ? (
-              <>
-                <img className="pc-cover is-char" src={it.charImage} alt="" loading="lazy" />
-                {it.image && <img className="pc-inset" src={it.image} alt="" loading="lazy" />}
-              </>
-            ) : it.image ? (
+            {it.image ? (
               <img className="pc-cover" src={it.image} alt="" loading="lazy" />
             ) : (
               <span className="pc-noart">{it.name}</span>
             )}
+            {withChar && <img className="pc-inset" src={it.charImage} alt={it.charName || ""} loading="lazy" />}
           </>
         ) : (
           <span className="pc-empty">
