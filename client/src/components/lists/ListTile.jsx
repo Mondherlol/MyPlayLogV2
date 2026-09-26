@@ -1,66 +1,201 @@
 import { Link } from "react-router-dom";
-import { BadgeCheck, Heart, Lock, Play, Trash2 } from "lucide-react";
+import { BadgeCheck, Heart, IdCard, Lock, Play, Trash2 } from "lucide-react";
 import { typeMeta } from "../../lib/lists";
+import { boardOf } from "../../lib/boards";
+import { NINE_CUSTOM } from "../../lib/nines";
+import NinePhrase, { useNineFonts } from "../NinePhrase";
 
 // ======================================================================
 //  La carte de liste de la page Listes : l'image d'abord
 // ======================================================================
-// L'ancienne carte empilait date, titre, tags, auteur, nombre d'éléments,
-// visibilité, « 0 ♥ 0 💬 » et « màj il y a… » sous un petit montage : on
-// lisait avant de voir. Ici l'image porte la carte, et dessous il ne reste que
-// le titre et qui l'a faite, posés sur l'image elle-même.
+// L'image porte la carte ; le titre et l'auteur sont posés dessus. Chaque
+// sorte de liste a son visuel, pour qu'on la reconnaisse avant de lire :
+//
+//   · liste simple ou classée → les jaquettes coupées en biais, séparées d'un
+//     filet doré (la carte « étagère » de l'app, components/ListShelfCard) ;
+//   · tier list → ses premiers paliers ;
+//   · liste des 9 → l'affiche du thème : « Ces 9 jeux… » dans sa police ;
+//   · carte de joueur → une carte d'identité : l'auteur, et sa grille 5 × 4.
 
-// Les images du montage. Une liste classée garde son podium secret (même
-// principe que l'éventail de ListPreview) : on montre la suite du classement.
-function mosaicOf(list) {
-  const imgs = list.preview || [];
-  if (list.type === "ranked" && imgs.length > 3) return imgs.slice(3, 6);
-  return imgs.slice(0, 3);
+// Le cadre des tranches, en unités SVG : le rapport 4:3 de .lt-media.
+const W = 400;
+const H = 300;
+// De combien la coupe se décale entre le haut et le bas (fraction de H), et
+// l'épaisseur du filet doré — les valeurs de l'app.
+const LEAN = 0.32;
+const GAP = 6;
+
+/** Les images coupées en oblique ; le fond doré fait le filet. */
+function Slices({ id, images }) {
+  const n = images.length;
+  if (n === 1) return <img className="lt-cover" src={images[0]} alt="" loading="lazy" draggable="false" />;
+
+  const slice = W / n;
+  const lean = H * LEAN;
+  const shape = (i) => {
+    const l = i * slice + GAP / 2;
+    const r = (i + 1) * slice - GAP / 2;
+    const left = i === 0 ? [-lean, -lean] : [l + lean / 2, l - lean / 2];
+    const right = i === n - 1 ? [W + lean, W + lean] : [r + lean / 2, r - lean / 2];
+    return `${left[0]},0 ${right[0]},0 ${right[1]},${H} ${left[1]},${H}`;
+  };
+  // Chaque image couvre exactement sa tranche, pas plus : plus large, elle
+  // serait agrandie, donc rognée en haut et en bas.
+  const box = (i) => {
+    const x0 = i === 0 ? 0 : i * slice + GAP / 2 - lean / 2;
+    const x1 = i === n - 1 ? W : (i + 1) * slice - GAP / 2 + lean / 2;
+    return { x: x0, w: x1 - x0 };
+  };
+
+  return (
+    <svg className="lt-slices" viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
+      <rect width={W} height={H} fill="#f2b70b" />
+      <defs>
+        {images.map((_, i) => (
+          <clipPath key={i} id={`lt-${id}-${i}`}>
+            <polygon points={shape(i)} />
+          </clipPath>
+        ))}
+      </defs>
+      {images.map((src, i) => (
+        <image
+          key={i}
+          href={src}
+          x={box(i).x}
+          y={0}
+          width={box(i).w}
+          height={H}
+          preserveAspectRatio="xMidYMid slice"
+          clipPath={`url(#lt-${id}-${i})`}
+        />
+      ))}
+    </svg>
+  );
+}
+
+/** Les premiers paliers d'une tier list. */
+function Tiers({ tiers }) {
+  return (
+    <span className="lt-tiers">
+      {tiers.map((t, r) => (
+        <span className="ltp-row" key={r}>
+          <span className="ltp-label" style={{ "--tier": t.color }}>
+            {t.label}
+          </span>
+          <span className="ltp-cells">
+            {t.images.slice(0, 6).map((src, i) => (
+              <span className="ltp-cell" key={i}>
+                <img src={src} alt="" loading="lazy" draggable="false" />
+              </span>
+            ))}
+          </span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** L'affiche d'une liste des 9 : ses jaquettes en fond, la phrase du thème. */
+function NinePoster({ list }) {
+  const ready = useNineFonts();
+  const imgs = (list.preview || []).filter(Boolean);
+  return (
+    <span className="lt-nine">
+      {imgs.length > 0 && (
+        <span className="lt-nine-mosaic" aria-hidden="true">
+          {Array.from({ length: 9 }, (_, i) => (
+            <img key={i} src={imgs[i % imgs.length]} alt="" loading="lazy" draggable="false" />
+          ))}
+        </span>
+      )}
+      <span className="lt-nine-mark" aria-hidden="true">
+        9
+      </span>
+      <NinePhrase
+        themeKey={list.nine}
+        title={list.nine === NINE_CUSTOM ? list.title : undefined}
+        inner={200}
+        scale={0.9}
+        ready={ready}
+      />
+    </span>
+  );
+}
+
+/** Une carte de joueur : l'auteur à gauche, sa grille à droite. */
+function BoardId({ list }) {
+  const board = boardOf(list.board);
+  const by = Object.fromEntries((list.boardItems || []).map((it) => [it.slot, it]));
+  const a = list.author;
+  return (
+    <span className="lt-board">
+      <span className="lt-board-who">
+        <IdCard size={16} className="lt-board-ic" />
+        <span className="lt-board-pp">
+          {a?.avatar ? (
+            <img src={a.avatar} alt="" loading="lazy" draggable="false" />
+          ) : (
+            a?.username?.[0]?.toUpperCase() || "?"
+          )}
+        </span>
+        <span className="lt-board-name">{a?.username || "—"}</span>
+        {list.likeCount > 0 && (
+          <span className={`lt-likes ${list.liked ? "on" : ""}`}>
+            <Heart size={12} fill={list.liked ? "currentColor" : "none"} /> {list.likeCount}
+          </span>
+        )}
+      </span>
+      <span className="lt-board-grid" aria-hidden="true">
+        {board.slots.map((s) =>
+          by[s.key]?.image ? (
+            <img key={s.key} src={by[s.key].image} alt="" loading="lazy" draggable="false" />
+          ) : (
+            <span key={s.key} />
+          )
+        )}
+      </span>
+    </span>
+  );
 }
 
 export default function ListTile({ list, onDelete }) {
   const meta = typeMeta(list.type);
-  // Une tier list se reconnaît à ses paliers : on montre les premiers, avec
-  // leurs jaquettes, plutôt qu'un montage qui la confondrait avec une liste.
-  const tiers = !list.cover && list.type === "tier" ? (list.tierPreview || []).slice(0, 4) : [];
-  const imgs = list.cover || tiers.length ? [] : mosaicOf(list);
   const author = list.author;
 
+  const kind = list.board
+    ? "board"
+    : list.nine
+      ? "nine"
+      : !list.cover && list.type === "tier" && list.tierPreview?.length
+        ? "tier"
+        : "slices";
+  // Une liste officielle (conférence, palmarès) garde son affiche entière ;
+  // les autres mettent la couverture de l'auteur en tête des tranches.
+  const images =
+    kind !== "slices"
+      ? []
+      : list.cover && (list.event || list.official)
+        ? [list.cover]
+        : [...(list.cover ? [list.cover] : []), ...(list.preview || [])].slice(0, 3);
+
   return (
-    <Link to={`/lists/${list.id}`} className="lt clickable">
-      <span className={`lt-media ${tiers.length ? "is-tier" : ""}`}>
-        {tiers.length ? (
-          <span className="lt-tiers">
-            {tiers.map((t, r) => (
-              <span className="ltp-row" key={r}>
-                <span className="ltp-label" style={{ "--tier": t.color }}>
-                  {t.label}
-                </span>
-                <span className="ltp-cells">
-                  {t.images.slice(0, 6).map((src, i) => (
-                    <span className="ltp-cell" key={i}>
-                      <img src={src} alt="" loading="lazy" draggable="false" />
-                    </span>
-                  ))}
-                </span>
-              </span>
-            ))}
-          </span>
-        ) : list.cover ? (
-          <img className="lt-cover" src={list.cover} alt="" loading="lazy" draggable="false" />
-        ) : imgs.length ? (
-          <span className="lt-mosaic" style={{ "--n": imgs.length }}>
-            {imgs.map((src, i) => (
-              <img key={i} src={src} alt="" loading="lazy" draggable="false" />
-            ))}
-          </span>
+    <Link to={`/lists/${list.id}`} className={`lt is-${kind} clickable`}>
+      <span className="lt-media">
+        {kind === "board" ? (
+          <BoardId list={list} />
+        ) : kind === "nine" ? (
+          <NinePoster list={list} />
+        ) : kind === "tier" ? (
+          <Tiers tiers={list.tierPreview.slice(0, 4)} />
+        ) : images.length ? (
+          <Slices id={list.id} images={images} />
         ) : (
           <span className="lt-empty">
             <meta.Icon size={28} />
           </span>
         )}
 
-        {list.type !== "classic" && !tiers.length && (
+        {kind === "slices" && list.type === "ranked" && (
           <span className="lt-type" title={meta.long}>
             <meta.Icon size={13} />
           </span>
@@ -90,29 +225,35 @@ export default function ListTile({ list, onDelete }) {
               <Lock size={11} />
             </span>
           )}
-          <span className="lt-pill">{list.itemCount}</span>
+          {kind !== "board" && kind !== "nine" && <span className="lt-pill">{list.itemCount}</span>}
         </span>
 
-        {/* Le nom de la liste, posé sur l'image. */}
-        <span className="lt-caption">
-          <span className="lt-title">{list.title}</span>
-          <span className="lt-meta">
-            <span className="lt-pp" aria-hidden="true">
-              {author?.avatar ? (
-                <img src={author.avatar} alt="" loading="lazy" draggable="false" />
-              ) : (
-                author?.username?.[0]?.toUpperCase() || "?"
+        {/* Le nom de la liste, posé sur l'image. La carte de joueur n'en a pas
+            besoin (c'est l'auteur qui la nomme), ni l'affiche des 9 (la phrase
+            du thème EST son titre). */}
+        {kind !== "board" && (
+          <span className="lt-caption">
+            {kind !== "nine" && <span className="lt-title">{list.title}</span>}
+            <span className="lt-meta">
+              <span className="lt-pp" aria-hidden="true">
+                {author?.avatar ? (
+                  <img src={author.avatar} alt="" loading="lazy" draggable="false" />
+                ) : (
+                  author?.username?.[0]?.toUpperCase() || "?"
+                )}
+              </span>
+              <span className="lt-author">{author?.username || "—"}</span>
+              {author?.isSystem && (
+                <BadgeCheck size={12} className="lt-check" aria-label="Compte officiel" />
+              )}
+              {list.likeCount > 0 && (
+                <span className={`lt-likes ${list.liked ? "on" : ""}`}>
+                  <Heart size={12} fill={list.liked ? "currentColor" : "none"} /> {list.likeCount}
+                </span>
               )}
             </span>
-            <span className="lt-author">{author?.username || "—"}</span>
-            {author?.isSystem && <BadgeCheck size={12} className="lt-check" aria-label="Compte officiel" />}
-            {list.likeCount > 0 && (
-              <span className={`lt-likes ${list.liked ? "on" : ""}`}>
-                <Heart size={12} fill={list.liked ? "currentColor" : "none"} /> {list.likeCount}
-              </span>
-            )}
           </span>
-        </span>
+        )}
       </span>
     </Link>
   );

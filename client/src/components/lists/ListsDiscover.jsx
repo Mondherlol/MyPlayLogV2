@@ -1,6 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { Heart } from "lucide-react";
 
 import Section from "../home/Rail";
 import NineRail from "../home/NineRail";
@@ -18,34 +16,6 @@ import { DEFAULT_BOARD, boardOf } from "../../lib/boards";
 //
 // La grille complète, avec sa recherche et ses filtres, suit en dessous (cf.
 // pages/Lists).
-
-/** Une carte de joueur en miniature : sa grille 5 × 4 et son auteur. */
-function BoardCard({ l, mine }) {
-  const board = boardOf(l.board);
-  const by = Object.fromEntries((l.boardItems || []).map((it) => [it.slot, it]));
-  return (
-    <Link to={`/lists/${l.id}`} className={`lx-board clickable ${mine ? "is-mine" : ""}`}>
-      <span className="lx-board-grid">
-        {board.slots.map((s) =>
-          by[s.key]?.image ? <img key={s.key} src={by[s.key].image} alt="" loading="lazy" /> : <span key={s.key} />
-        )}
-      </span>
-      <span className="lx-board-by">
-        {l.author?.avatar ? (
-          <img src={l.author.avatar} alt="" />
-        ) : (
-          <span className="lx-board-letter">{(l.author?.username || "?")[0].toUpperCase()}</span>
-        )}
-        <span className="lx-board-name">{mine ? "Ma carte" : l.author?.username}</span>
-        {l.likeCount > 0 && (
-          <span className="lx-board-likes">
-            <Heart size={11} /> {l.likeCount}
-          </span>
-        )}
-      </span>
-    </Link>
-  );
-}
 
 // Une carte de joueur sans une seule image n'a rien à montrer dans un rayon.
 const hasImages = (l) => (l.boardItems || []).some((it) => it.image);
@@ -77,9 +47,9 @@ function ListRail({ path, token, title, moreTo, render, lead = null, skipId = nu
   if (!lead && !lists.length) return null;
   return (
     <Section title={title} moreTo={moreTo} className="lx-sec">
-      {lead && <div className="lx-rail-item is-board">{lead}</div>}
+      {lead && <div className="lx-rail-item">{lead}</div>}
       {lists.map((l) => (
-        <div key={l.id} className={`lx-rail-item ${l.board ? "is-board" : ""}`}>
+        <div key={l.id} className="lx-rail-item">
           {render(l)}
         </div>
       ))}
@@ -144,7 +114,7 @@ export default function ListsDiscover({ token, renderCard }) {
 
   // Ma carte ouvre le rayon des cartes de joueur — seulement si elle montre
   // déjà quelque chose : les cartes vides n'y ont pas leur place.
-  const lead = mine && hasImages(mine) ? <BoardCard l={mine} mine /> : null;
+  const lead = mine && hasImages(mine) ? renderCard(mine) : null;
 
   return (
     <div className="lx">
@@ -163,7 +133,7 @@ export default function ListsDiscover({ token, renderCard }) {
         lead={lead}
         skipId={mine?.id}
         keep={hasImages}
-        render={(l) => <BoardCard l={l} />}
+        render={renderCard}
       />
       <ListRail
         path="/lists?scope=events&limit=14"

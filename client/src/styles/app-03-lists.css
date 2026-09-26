@@ -2872,99 +2872,8 @@
   flex: none;
   width: 260px;
 }
-.lx-rail-item.is-board {
-  width: 170px;
-}
 .lx-rail-item .list-card {
   height: 100%;
-}
-
-/* Une carte de joueur d'un autre, en miniature. */
-.lx-board {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-  width: 100%;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-}
-.lx-board-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 3px;
-  padding: 6px;
-  border-radius: 12px;
-  background: var(--surface-2);
-  transition: transform 0.2s ease;
-}
-.lx-board:hover .lx-board-grid {
-  transform: translateY(-3px);
-}
-.lx-board.is-mine .lx-board-grid {
-  box-shadow: inset 0 0 0 2px #f2b70b;
-}
-.lx-board-grid > * {
-  width: 100%;
-  aspect-ratio: 3 / 4;
-  border-radius: 3px;
-  object-fit: cover;
-  background: color-mix(in srgb, var(--text) 6%, transparent);
-}
-.lx-board-new .lx-board-grid > span {
-  background: none;
-  border: 1px dashed var(--border-strong, var(--border));
-}
-.lx-board-new:hover .lx-board-name {
-  color: var(--accent-ink);
-}
-.lx-board-plus {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #f2b70b;
-  color: #161618;
-}
-.lx-board-by {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-}
-.lx-board-by > img,
-.lx-board-letter {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-.lx-board-letter {
-  display: grid;
-  place-items: center;
-  font-size: 0.65rem;
-  font-weight: 800;
-  color: #2a1c00;
-  background: #f2b70b;
-}
-.lx-board-name {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.lx-board-likes {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2rem;
-  font-size: 0.74rem;
-  color: var(--text-soft);
 }
 
 .lists-all-title {
@@ -2996,22 +2905,14 @@
   overflow: hidden;
   background: var(--surface-2);
 }
-.lt-cover,
-.lt-mosaic img {
+.lt-cover {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
   transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
-.lt-mosaic {
-  display: grid;
-  grid-template-columns: repeat(var(--n), minmax(0, 1fr));
-  gap: 2px;
-  height: 100%;
-}
-.lt:hover .lt-cover,
-.lt:hover .lt-mosaic img {
+.lt:hover .lt-cover {
   transform: scale(1.04);
 }
 .lt-empty {
@@ -3025,11 +2926,11 @@
 
 /* Tier list : ses paliers en haut, le bandeau du titre en dessous (et non
    par-dessus, il cacherait les derniers). */
-.lt-media.is-tier {
+.lt.is-tier .lt-media {
   display: flex;
   flex-direction: column;
 }
-.lt-media.is-tier .lt-caption {
+.lt.is-tier .lt-caption {
   position: static;
 }
 .lt-tiers {
@@ -3040,15 +2941,6 @@
   gap: 3px;
   padding: 6px;
 }
-/* Les pastilles descendent dans le bandeau : en haut, elles cacheraient les
-   jaquettes du premier palier. */
-.lt-media.is-tier .lt-badges {
-  top: auto;
-  bottom: 12px;
-}
-.lt-media.is-tier .lt-caption {
-  padding-right: 3.2rem;
-}
 .lt-tiers .ltp-label {
   width: 24px;
   font-size: 0.78rem;
@@ -3057,6 +2949,124 @@
   transform: translateY(-2px);
 }
 
+/* Liste simple ou classée : les tranches en biais (cf. Slices). */
+.lt-slices {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Liste des 9 : l'affiche du thème, comme les cartes du rail des thèmes. */
+.lt-nine {
+  position: absolute;
+  inset: 0;
+  display: block;
+  padding: 14px 16px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.lt-nine-mosaic {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+}
+.lt-nine-mosaic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: grayscale(0.4) brightness(0.24);
+}
+.lt-nine-mark {
+  position: absolute;
+  right: -10px;
+  bottom: -52px;
+  font-family: "Space Grotesk", var(--font-display);
+  font-size: 190px;
+  font-weight: 700;
+  line-height: 1;
+  color: #f2b70b;
+  opacity: 0.22;
+  pointer-events: none;
+}
+.lt-nine .nine-phrase {
+  position: relative;
+}
+.lt-nine ~ .lt-caption {
+  background: none;
+}
+
+/* Carte de joueur : une carte d'identité, l'auteur à gauche, la grille à
+   droite sur toute la hauteur. */
+.lt-board {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  background: var(--surface-2);
+}
+.lt-board-who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  color: var(--text);
+}
+.lt-board-ic {
+  margin-bottom: auto;
+  color: #f2b70b;
+}
+.lt-board-pp {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #f2b70b;
+  color: #161618;
+  font-weight: 800;
+}
+.lt-board-pp img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.lt-board-name {
+  max-width: 100%;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lt-board .lt-likes {
+  margin-left: 0;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+.lt-board-grid {
+  flex: none;
+  height: 100%;
+  aspect-ratio: 15 / 16;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  gap: 2px;
+}
+.lt-board-grid > * {
+  width: 100%;
+  height: 100%;
+  border-radius: 3px;
+  object-fit: cover;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
 /* Les pastilles posées sur l'image : sombres, petites, sans texte superflu. */
 .lt-type,
 .lt-pill {

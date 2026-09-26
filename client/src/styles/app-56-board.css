@@ -531,24 +531,66 @@ button.pc-cell.empty:hover .pc-empty {
 
 /* ---------- Le widget du profil (colonne latérale) ---------- */
 .pfa-board {
+  position: relative;
+  display: block;
+  color: inherit;
+}
+/* Trois rangées, qui s'effacent en fondu à partir du milieu. */
+.pfa-board-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 4px;
-  border-radius: 10px;
-  transition: opacity 0.15s ease;
+  -webkit-mask-image: linear-gradient(to bottom, #000 38%, transparent 96%);
+  mask-image: linear-gradient(to bottom, #000 38%, transparent 96%);
 }
-.pfa-board > * {
+.pfa-board-grid > * {
   width: 100%;
   aspect-ratio: 3 / 4;
   border-radius: 4px;
   object-fit: cover;
+  transition: opacity 0.15s ease;
 }
-.pfa-board > span {
+.pfa-board-grid > span {
   border: 1px dashed var(--border-strong);
-  opacity: 0.6;
 }
-.pfa-board:hover {
-  opacity: 0.85;
+.pfa-board-grid:hover > * {
+  opacity: 0.55;
+}
+.pfa-board-grid > *:hover {
+  opacity: 1;
+}
+/* Ce que dit la jaquette survolée, posé dans le fondu. */
+.pfa-board-cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  pointer-events: none;
+}
+.pfa-board-cap b {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #f2b70b;
+}
+.pfa-board-cap span {
+  max-width: 100%;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pfa-board-hint {
+  color: var(--text-soft);
+}
+.pfa-board:hover .pfa-board-hint {
+  color: var(--text);
 }
 .pfa-board-cta {
   display: inline-flex;

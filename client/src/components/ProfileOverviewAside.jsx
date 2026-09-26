@@ -122,6 +122,40 @@ function resolveHidden(saved, configured) {
   return configured ? [] : DEFAULT_HIDDEN.slice();
 }
 
+// L'aperçu de la carte de joueur : les trois premières rangées de jaquettes,
+// qui s'effacent en fondu vers le bas — de quoi reconnaître la carte, pas la
+// lire. Au survol d'une jaquette, la case à laquelle elle correspond s'écrit
+// dans le fondu (« Mon jeu préféré — Elden Ring »).
+function BoardPreview({ to, board, by }) {
+  const [hover, setHover] = useState(null);
+  const slots = board.slots.slice(0, 15);
+  const it = hover ? by[hover.key] : null;
+  return (
+    <Link to={to} className="pfa-board clickable" onMouseLeave={() => setHover(null)}>
+      <span className="pfa-board-grid">
+        {slots.map((sl) => {
+          const x = by[sl.key];
+          return x?.image ? (
+            <img key={sl.key} src={x.image} alt="" loading="lazy" onMouseEnter={() => setHover(sl)} />
+          ) : (
+            <span key={sl.key} onMouseEnter={() => setHover(sl)} />
+          );
+        })}
+      </span>
+      <span className="pfa-board-cap">
+        {hover ? (
+          <>
+            <b>{hover.label}</b>
+            {it && <span>{it.charName ? `${it.charName} · ${it.name}` : it.name}</span>}
+          </>
+        ) : (
+          <span className="pfa-board-hint">Voir la carte</span>
+        )}
+      </span>
+    </Link>
+  );
+}
+
 // Petite carte titrée réutilisée par tous les blocs de l'aside.
 function AsideCard({ Icon, title, more, className = "", children }) {
   return (
@@ -906,16 +940,7 @@ export default function ProfileOverviewAside({
               </Link>
             }
           >
-            <Link to={`/lists/${bl.id}`} className="pfa-board clickable" title="Voir la carte de joueur">
-              {board.slots.map((sl) => {
-                const it = by[sl.key];
-                return it?.image ? (
-                  <img key={sl.key} src={it.image} alt="" loading="lazy" />
-                ) : (
-                  <span key={sl.key} />
-                );
-              })}
-            </Link>
+            <BoardPreview to={`/lists/${bl.id}`} board={board} by={by} />
           </AsideCard>
         );
       }
