@@ -1,6 +1,12 @@
 // Tops officiels — THÈMES (ni une console, ni un genre, ni une saga : ce qu'on
 // ressent ou ce qu'on cherche — rire, pleurer, enquêter, jouer à deux…).
 // Format : cf. nintendo.js. Rayon « Thèmes » de l'onglet Tops.
+//
+// ⚠️ CLASSÉS SELON LE THÈME, PAS SELON LA NOTE. Portal 2 est mieux noté que
+// Monkey Island 2, mais « les jeux les plus drôles » se classe au rire : un
+// chef-d'œuvre sérieux qui fait sourire deux fois passe derrière une comédie.
+// Même règle partout — la peur pour « flippants », la difficulté pour
+// « difficiles », la place de l'enquête dans le jeu pour « enquête ».
 
 export default [
   {
@@ -11,57 +17,57 @@ export default [
     tags: ["Enquête", "Mystère", "Thème"],
     games: `
 Return of the Obra Dinn
-Disco Elysium
 The Case of the Golden Idol
 Her Story
+The Rise of the Golden Idol
+Shadows of Doubt
+Disco Elysium
 Phoenix Wright: Ace Attorney - Trials and Tribulations
-Outer Wilds
 L.A. Noire
 Paradise Killer
-Danganronpa 2: Goodbye Despair
-Pentiment
 Ghost Trick: Phantom Detective
-The Rise of the Golden Idol
-AI: The Somnium Files
-Shadows of Doubt
 The Great Ace Attorney: Adventures
-Heavy Rain
-Immortality
-Hotel Dusk: Room 215
-Famicom Detective Club: The Missing Heir
-Famicom Detective Club: The Girl Who Stands Behind
-Master Detective Archives: Rain Code
-Nine Hours, Nine Persons, Nine Doors
-Zero Escape: Virtue's Last Reward
-The Wolf Among Us
-Alan Wake II
+Danganronpa 2: Goodbye Despair
+AI: The Somnium Files
 Phoenix Wright: Ace Attorney
-Professor Layton and the Curious Village
 Sherlock Holmes Chapter One
 Sherlock Holmes: Crimes & Punishments
-Lorelei and the Laser Eyes
-Duck Detective: The Secret Salami
-Tangle Tower
-Chinatown Detective Agency
-Telling Lies
+Famicom Detective Club: The Missing Heir
+Famicom Detective Club: The Girl Who Stands Behind
+Hotel Dusk: Room 215
 Last Window: The Secret of Cape West
+Master Detective Archives: Rain Code
+Duck Detective: The Secret Salami
+Telling Lies
+Immortality
+Lorelei and the Laser Eyes
 Gabriel Knight: Sins of the Fathers
 Blade Runner @1997
+Tangle Tower
+Chinatown Detective Agency
+The Wolf Among Us
+Heavy Rain
+Unheard
 Deadly Premonition
+Pentiment
+Nine Hours, Nine Persons, Nine Doors
+Zero Escape: Virtue's Last Reward
 The Sinking City
 Murdered: Soul Suspect
-Condemned: Criminal Origins
+Contradiction: Spot the Liar!
 Strange Horticulture
 Overboard!
-Unheard
 Killer Frequency
-Contradiction: Spot the Liar!
-Gone Home
 Tex Murphy: Under a Killing Moon
 AI: The Somnium Files - nirvanA Initiative
 Detective Pikachu
+Condemned: Criminal Origins
+Alan Wake II
+Outer Wilds
 Twin Mirror
 The Painscreek Killings
+Professor Layton and the Curious Village
+Gone Home
 `,
   },
   {
@@ -71,52 +77,52 @@ The Painscreek Killings
     size: 50,
     tags: ["Humour", "Thème"],
     games: `
-Portal 2
 Monkey Island 2: LeChuck's Revenge
-The Stanley Parable: Ultra Deluxe
-Untitled Goose Game
 The Secret of Monkey Island
 Day of the Tentacle
-Grim Fandango
-Psychonauts 2
+The Stanley Parable: Ultra Deluxe
 Conker's Bad Fur Day
+Portal 2
+Grim Fandango
+Untitled Goose Game
+South Park: The Stick of Truth
+Sam & Max Hit the Road
+Psychonauts 2
+Yakuza 0
 Undertale
 EarthBound
-Yakuza 0
-South Park: The Stick of Truth
-Borderlands 2
 Mario & Luigi: Superstar Saga
-Paper Mario: The Thousand-Year Door @2004
 Tales from the Borderlands
-Katamari Damacy
-WarioWare: Touched!
-Rhythm Heaven Fever
-Psychonauts
-Sam & Max Hit the Road
-Disco Elysium
-Hi-Fi Rush
-Pizza Tower
-Thank Goodness You're Here!
 Octodad: Dadliest Catch
+WarioWare: Touched!
 Goat Simulator
-Saints Row IV
-South Park: The Fractured But Whole
-Like a Dragon: Infinite Wealth
-Overcooked! 2
-Human: Fall Flat
-Gang Beasts
-Ratchet & Clank: Up Your Arsenal
-Earthworm Jim
-Space Quest IV: Roger Wilco and the Time Rippers
+Katamari Damacy
 Discworld @1995
+Space Quest IV: Roger Wilco and the Time Rippers
+Psychonauts
+Paper Mario: The Thousand-Year Door @2004
+South Park: The Fractured But Whole
+Thank Goodness You're Here!
+Return to Monkey Island
+Frog Fractions
+Borderlands 2
+Saints Row IV
+Rhythm Heaven Fever
+Earthworm Jim
+Like a Dragon: Infinite Wealth
+The Haunted Island, a Frog Detective Game
+Pizza Tower
+Hi-Fi Rush
 We Love Katamari
 WarioWare: Smooth Moves
-Bugsnax
+Disco Elysium
 High on Life
-Frog Fractions
-The Haunted Island, a Frog Detective Game
 Surgeon Simulator
-Return to Monkey Island
+Human: Fall Flat
+Gang Beasts
+Bugsnax
+Ratchet & Clank: Up Your Arsenal
+Overcooked! 2
 `,
   },
   {
@@ -126,48 +132,48 @@ Return to Monkey Island
     size: 50,
     tags: ["Émotion", "Thème"],
     games: `
-The Last of Us
 To the Moon
-Red Dead Redemption 2
+The Last of Us
 What Remains of Edith Finch
+Red Dead Redemption 2
 Spiritfarer
 Brothers: A Tale of Two Sons
-NieR: Automata
-The Last of Us Part II
-Final Fantasy X
-Life is Strange
-Journey
-Ori and the Blind Forest
+That Dragon, Cancer
 The Walking Dead
+Final Fantasy X
+NieR: Automata
+Life is Strange
 Clannad
 Valiant Hearts: The Great War
-Undertale
-Gris
+The Last of Us Part II
+Before Your Eyes
 Mother 3
 Metal Gear Solid 3: Snake Eater
 Final Fantasy VII
-Night in the Woods
-Before Your Eyes
-Florence
-Unpacking
-That Dragon, Cancer
 Omori
-Firewatch
-Shadow of the Colossus @2005
+Journey
+Gris
+Florence
+Ori and the Blind Forest
+Unpacking
+Finding Paradise
+Night in the Woods
+Undertale
 Final Fantasy IX
 Lost Odyssey
-Hellblade: Senua's Sacrifice
-God of War @2018
+Firewatch
+Shadow of the Colossus @2005
 Kentucky Route Zero
 Steins;Gate
+God of War @2018
+Hellblade: Senua's Sacrifice
 Detroit: Become Human
 Xenoblade Chronicles 3
-Outer Wilds
-Celeste
-Ori and the Will of the Wisps
-Finding Paradise
 Spec Ops: The Line
 Mass Effect 3
+Outer Wilds
+Ori and the Will of the Wisps
+Celeste
 The Legend of Zelda: Majora's Mask
 Children of Morta
 Life is Strange: Before the Storm
@@ -245,43 +251,43 @@ Cyberpunk 2077
     size: 40,
     tags: ["Peur", "Horreur", "Thème"],
     games: `
-Silent Hill 2 @2001
-Amnesia: The Dark Descent
 P.T.
-Alien: Isolation
-Resident Evil 7: Biohazard
+Amnesia: The Dark Descent
 Outlast
+Alien: Isolation
+Silent Hill 2 @2001
+Resident Evil 7: Biohazard
 Fatal Frame II: Crimson Butterfly
 SOMA
-Dead Space @2008
-Resident Evil @2002
-Silent Hill @1999
 Siren
-Until Dawn @2015
-Resident Evil 2 @2019
-Signalis
-Darkwood
-Mouthwashing
-Iron Lung
-Condemned: Criminal Origins
-F.E.A.R.
-Five Nights at Freddy's
-Phasmophobia
-Lethal Company
+Dead Space @2008
+Silent Hill @1999
 Visage
-Layers of Fear @2016
-The Evil Within
-Dead Space 2
+Iron Lung
+Darkwood
+Phasmophobia
+Five Nights at Freddy's
+Mouthwashing
+Signalis
 Haunting Ground
 Clock Tower
-Little Nightmares
-Observer
-Silent Hill 2 @2024
-Resident Evil Village
+Condemned: Criminal Origins
+F.E.A.R.
 The Mortuary Assistant
-Amnesia: The Bunker
-Doki Doki Literature Club!
 Slender: The Eight Pages
+Resident Evil @2002
+Resident Evil 2 @2019
+Layers of Fear @2016
+Until Dawn @2015
+Silent Hill 2 @2024
+Amnesia: The Bunker
+Lethal Company
+Observer
+The Evil Within
+Dead Space 2
+Little Nightmares
+Resident Evil Village
+Doki Doki Literature Club!
 Alan Wake II
 `,
   },
@@ -293,48 +299,48 @@ Alan Wake II
     tags: ["Coop", "Multijoueur local", "Thème"],
     games: `
 It Takes Two
-Split Fiction
 Overcooked! 2
 Mario Kart 8 Deluxe
+Split Fiction
 Super Smash Bros. Ultimate
+Keep Talking and Nobody Explodes
+Castle Crashers
 Cuphead
 Super Mario 3D World + Bowser's Fury
+Lovers in a Dangerous Spacetime
+Moving Out
+Towerfall Ascension
 Rayman Legends
 Portal 2
 A Way Out
-Castle Crashers
-Keep Talking and Nobody Explodes
-Lovers in a Dangerous Spacetime
-Moving Out
+Gang Beasts
+Mario Party Superstars
+Nidhogg
 Streets of Rage 4
 Teenage Mutant Ninja Turtles: Shredder's Revenge
-Towerfall Ascension
-Nidhogg
-Unravel Two
-Stardew Valley
-Don't Starve Together
-Minecraft
-Luigi's Mansion 3
-Donkey Kong Country: Tropical Freeze
-New Super Mario Bros. U Deluxe
-Kirby's Return to Dream Land Deluxe
-Sackboy: A Big Adventure
-LittleBigPlanet 2
-Lego Star Wars: The Skywalker Saga
-Mario Party Superstars
-Super Mario Party Jamboree
 Wii Sports
 Rocket League
 Heave Ho
-Gang Beasts
+Human: Fall Flat
+Unravel Two
+Super Mario Party Jamboree
+New Super Mario Bros. U Deluxe
+Luigi's Mansion 3
+Kirby's Return to Dream Land Deluxe
+Donkey Kong Country: Tropical Freeze
+Sackboy: A Big Adventure
+LittleBigPlanet 2
+Lego Star Wars: The Skywalker Saga
+PlateUp!
+Unrailed!
+Super Bomberman R
+Stardew Valley
+Don't Starve Together
+Minecraft
 Borderlands 2
 Diablo III
 Halo: The Master Chief Collection
 Trine 2
-PlateUp!
-Unrailed!
-Super Bomberman R
-Human: Fall Flat
 Spiritfarer
 Death Squared
 `,
@@ -393,42 +399,42 @@ Solar Ash
     size: 40,
     tags: ["Difficile", "Défi", "Thème"],
     games: `
-Sekiro: Shadows Die Twice
-Cuphead
-Dark Souls
-Celeste
-Super Meat Boy
-Ninja Gaiden Black
-Hollow Knight
 Getting Over It with Bennett Foddy
-Ghosts 'n Goblins
-Battletoads @1991
-Bloodborne
-Elden Ring
-Demon's Souls @2009
-Nioh 2
-Ninja Gaiden @1988
-Contra
-Super Mario Bros.: The Lost Levels
 I Wanna Be the Guy
+Battletoads @1991
+Ghosts 'n Goblins
+Ninja Gaiden @1988
+Super Mario Bros.: The Lost Levels
+Silver Surfer
+Cuphead
+Sekiro: Shadows Die Twice
+Ninja Gaiden Black
+Super Meat Boy
+Jump King
+Contra
+Ikaruga
+Demon's Souls @2009
+Celeste
+Dark Souls
 Furi
-Hotline Miami
+Hollow Knight
+Bloodborne
+Nioh 2
 Spelunky 2
 Returnal
 Lies of P
-Jump King
-Ikaruga
 Devil May Cry 3: Dante's Awakening
-Enter the Gungeon
-The Binding of Isaac: Rebirth
-Crypt of the NecroDancer
-Sifu
-Blasphemous
-Katana Zero
+Elden Ring
 Dark Souls II
 Pathologic 2
+Katana Zero
+Hotline Miami
+Blasphemous
+Sifu
 Mega Man 9
-Silver Surfer
+Crypt of the NecroDancer
+The Binding of Isaac: Rebirth
+Enter the Gungeon
 `,
   },
   {

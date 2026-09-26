@@ -175,6 +175,8 @@ export function splitTopTitle(title, fallbackN = null) {
     t.match(/^les\s+(\d+)\s+meilleur(?:e?s)\s+(.+)$/i) ||
     t.match(/^top\s+(\d+)\s+des\s+(.+)$/i);
   const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-  if (m) return { n: Number(m[1]), subject: cap(m[2]) };
+  // La parenthèse du titre complet (« RPG Mario (Paper Mario, Mario &
+  // Luigi…) ») précise la liste, pas l'affiche : elle y serait coupée.
+  if (m) return { n: Number(m[1]), subject: cap(m[2].replace(/\s*\([^)]*\)\s*$/, "")) };
   return { n: fallbackN, subject: t };
 }

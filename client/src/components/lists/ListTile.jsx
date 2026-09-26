@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { BadgeCheck, Heart, IdCard, Lock, Play, Trash2 } from "lucide-react";
 import { typeMeta } from "../../lib/lists";
@@ -136,6 +137,58 @@ function NinePoster({ list }) {
 }
 
 /**
+ * Où poser le visuel d'un top, d'après ses proportions (largeur / hauteur).
+ *
+ * ⚠️ À SURFACE ÉGALE, PAS À LARGEUR ÉGALE. Calée en bas à droite avec une
+ * largeur maximale, une console tout en longueur (Super Nintendo, 2:1)
+ * finissait minuscule dans le coin pendant qu'un héros debout prenait toute
+ * la hauteur. On vise la même surface pour tous, dans la limite de la carte,
+ * et on CENTRE sur la moitié droite : verticalement pour tous, les consoles un
+ * peu plus bas pour laisser le titre respirer.
+ *
+ * Rend la boîte en % de la carte (4:3), prête pour `style`.
+ */
+function artBox(ratio, icon) {
+  const H = 0.75; // hauteur de la carte, en largeurs
+  const area = icon ? 0.13 : 0.3;
+  let h = Math.sqrt(area / ratio);
+  let w = ratio * h;
+  const k = Math.min(1, (icon ? 0.42 : 0.7) / w, (0.9 * H) / h);
+  w *= k;
+  h *= k;
+  // Le centre : les trois quarts de la largeur, sans déborder de plus de 5 %
+  // à droite ; à mi-hauteur (un peu plus bas pour ce qui est tout en largeur).
+  const cx = Math.min(0.73, 1.05 - w / 2);
+  const cy = (ratio > 1.3 ? 0.6 : 0.53) * H;
+  return {
+    width: `${w * 100}%`,
+    height: `${(h / H) * 100}%`,
+    left: `${(cx - w / 2) * 100}%`,
+    top: `${((cy - h / 2) / H) * 100}%`,
+  };
+}
+
+/** Le visuel d'un top : mesuré au chargement, puis placé par `artBox`. */
+function TopArt({ src, icon }) {
+  // Une icône de thème est carrée : inutile d'attendre de la mesurer.
+  const [ratio, setRatio] = useState(icon ? 1 : null);
+  return (
+    <img
+      className={`lt-top-art ${icon ? "is-icon" : ""}`}
+      src={src}
+      alt=""
+      loading="lazy"
+      draggable="false"
+      style={ratio ? artBox(ratio, icon) : { opacity: 0 }}
+      onLoad={(e) => {
+        const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+        if (!icon && w && h) setRatio(w / h);
+      }}
+    />
+  );
+}
+
+/**
  * L'affiche d'un top officiel.
  *
  * ⚠️ PAS DE BANDEAU NOIR. Les listes de joueurs posent leur titre sur un aplat
@@ -171,13 +224,7 @@ function TopPoster({ list }) {
       )}
       <span className="lt-top-dots" aria-hidden="true" />
       {art ? (
-        <img
-          className={`lt-top-art ${icon ? "is-icon" : ""}`}
-          src={art}
-          alt=""
-          loading="lazy"
-          draggable="false"
-        />
+        <TopArt src={art} icon={icon} />
       ) : (
         fan.length > 0 && (
           <span className="lt-top-fan" aria-hidden="true">
@@ -193,7 +240,7 @@ function TopPoster({ list }) {
             Top <b>{n}</b>
           </span>
         )}
-        <span className="lt-top-subject">{subject}</span>
+        <span className={`lt-top-subject ${subject.length > 22 ? "is-long" : ""}`}>{subject}</span>
         <span className="lt-top-by">
           MyPlayLog <BadgeCheck size={12} aria-label="Compte officiel" />
           {list.likeCount > 0 && (
