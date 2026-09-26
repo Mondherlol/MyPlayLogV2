@@ -443,10 +443,22 @@
   "year": 2013,
   "exact": true
  },
+ "Another Code: Recollection": {
+  "id": 266679,
+  "name": "Another Code: Recollection",
+  "year": 2024,
+  "exact": true
+ },
  "Another Crab's Treasure": {
   "id": 200903,
   "name": "Another Crab's Treasure",
   "year": 2024,
+  "exact": true
+ },
+ "Another Eden: The Cat Beyond Time and Space": {
+  "id": 27055,
+  "name": "Another Eden",
+  "year": 2017,
   "exact": true
  },
  "Another World #29": {
@@ -513,6 +525,18 @@
   "id": 255,
   "name": "Arcanum: of Steamworks and Magick Obscura",
   "year": 2001,
+  "exact": true
+ },
+ "Arknights": {
+  "id": 123395,
+  "name": "Arknights",
+  "year": 2019,
+  "exact": true
+ },
+ "Armello": {
+  "id": 11260,
+  "name": "Armello",
+  "year": 2015,
   "exact": true
  },
  "Armored Core VI: Fires of Rubicon": {
@@ -867,6 +891,12 @@
   "id": 8652,
   "name": "Axiom Verge",
   "year": 2015,
+  "exact": true
+ },
+ "Azur Lane": {
+  "id": 70708,
+  "name": "Azur Lane",
+  "year": 2017,
   "exact": true
  },
  "Azure Dreams": {
@@ -1361,6 +1391,12 @@
   "year": 2006,
   "exact": true
  },
+ "Black Mesa": {
+  "id": 6739,
+  "name": "Black Mesa",
+  "year": 2020,
+  "exact": true
+ },
  "Black Myth: Wukong": {
   "id": 136879,
   "name": "Black Myth: Wukong",
@@ -1451,6 +1487,12 @@
   "year": 2002,
   "exact": true
  },
+ "Blood Bowl 2": {
+  "id": 6059,
+  "name": "Blood Bowl 2",
+  "year": 2015,
+  "exact": true
+ },
  "Bloodborne": {
   "id": 7334,
   "name": "Bloodborne",
@@ -1497,6 +1539,12 @@
   "id": 27994,
   "name": "Blossom Tales: The Sleeping King",
   "year": 2017,
+  "exact": true
+ },
+ "Blue Archive": {
+  "id": 139391,
+  "name": "Blue Archive",
+  "year": 2021,
   "exact": true
  },
  "Blue Dragon": {
@@ -1629,6 +1677,18 @@
   "id": 11256,
   "name": "Bravely Second: End Layer",
   "year": 2015,
+  "exact": true
+ },
+ "Brawl Stars": {
+  "id": 55945,
+  "name": "Brawl Stars",
+  "year": 2018,
+  "exact": true
+ },
+ "Brawlhalla": {
+  "id": 10233,
+  "name": "Brawlhalla",
+  "year": 2017,
   "exact": true
  },
  "Breath of Fire #19": {
@@ -1859,6 +1919,12 @@
   "year": 2009,
   "exact": true
  },
+ "Call of Duty: Warzone": {
+  "id": 131800,
+  "name": "Call of Duty: Warzone",
+  "year": 2020,
+  "exact": true
+ },
  "Callisto Protocol": {
   "id": 141538,
   "name": "The Callisto Protocol",
@@ -1929,6 +1995,12 @@
   "id": 6344,
   "name": "Car Battler Joe",
   "year": 2001,
+  "exact": true
+ },
+ "Carcassonne": {
+  "id": 75582,
+  "name": "Carcassonne",
+  "year": 2017,
   "exact": true
  },
  "Cardinal Cross": {
@@ -2201,6 +2273,12 @@
   "year": 2007,
   "exact": true
  },
+ "Catan Universe": {
+  "id": 28278,
+  "name": "Catan Universe",
+  "year": 2017,
+  "exact": true
+ },
  "Catherine #9": {
   "id": 2151,
   "name": "Catherine",
@@ -2439,6 +2517,12 @@
   "id": 19717,
   "name": "Clockwork Knight 2",
   "year": 1995,
+  "exact": true
+ },
+ "Clubhouse Games: 51 Worldwide Classics": {
+  "id": 131961,
+  "name": "Clubhouse Games: 51 Worldwide Classics",
+  "year": 2020,
   "exact": true
  },
  "Clubhouse Games: 51 Worldwide Classics #130": {
@@ -2747,6 +2831,12 @@
   "year": 2020,
   "exact": true
  },
+ "Crash Bandicoot N. Sane Trilogy": {
+  "id": 26196,
+  "name": "Crash Bandicoot N. Sane Trilogy",
+  "year": 2017,
+  "exact": true
+ },
  "Crash Bandicoot: The Wrath of Cortex": {
   "id": 1188,
   "name": "Crash Bandicoot: The Wrath of Cortex",
@@ -2907,6 +2997,18 @@
   "id": 3121,
   "name": "Crystalis",
   "year": 1990,
+  "exact": true
+ },
+ "Cube Escape: Paradox": {
+  "id": 100667,
+  "name": "Cube Escape: Paradox",
+  "year": 2018,
+  "exact": true
+ },
+ "Culdcept Saga": {
+  "id": 6949,
+  "name": "Culdcept Saga",
+  "year": 2006,
   "exact": true
  },
  "Cult of the Lamb": {
@@ -3419,6 +3521,12 @@
   "year": 2018,
   "exact": true
  },
+ "Destroy All Humans! @2020": {
+  "id": 119257,
+  "name": "Destroy All Humans!",
+  "year": 2020,
+  "exact": true
+ },
  "Destroy All Humans! #8": {
   "id": 2651,
   "name": "Destroy All Humans!",
@@ -3839,6 +3947,12 @@
   "year": 2002,
   "exact": true
  },
+ "Dokapon Kingdom": {
+  "id": 4816,
+  "name": "Dokapon Kingdom",
+  "year": 2007,
+  "exact": true
+ },
  "Doki Doki Literature Club!": {
   "id": 55935,
   "name": "Doki Doki Literature Club!",
@@ -4091,6 +4205,12 @@
   "year": 2002,
   "exact": true
  },
+ "Doors: Paradox": {
+  "id": 174803,
+  "name": "Doors: Paradox",
+  "year": 2021,
+  "exact": true
+ },
  "Doraemon Story of Seasons": {
   "id": 115286,
   "name": "Doraemon Story of Seasons",
@@ -4101,6 +4221,12 @@
   "id": 132188,
   "name": "Dordogne",
   "year": 2023,
+  "exact": true
+ },
+ "Dota 2": {
+  "id": 2963,
+  "name": "Dota 2",
+  "year": 2013,
   "exact": true
  },
  "Dota 2 #6": {
@@ -4167,6 +4293,12 @@
   "id": 4499,
   "name": "Dr. Robotnik's Mean Bean Machine",
   "year": 1993,
+  "exact": true
+ },
+ "Dragalia Lost": {
+  "id": 99118,
+  "name": "Dragalia Lost",
+  "year": 2018,
   "exact": true
  },
  "Dragon Age: Inquisition": {
@@ -4269,6 +4401,12 @@
   "id": 19835,
   "name": "Dragon Ball Z: Buu's Fury",
   "year": 2004,
+  "exact": true
+ },
+ "Dragon Ball Z: Dokkan Battle": {
+  "id": 88818,
+  "name": "Dragon Ball Z: Dokkan Battle",
+  "year": 2015,
   "exact": true
  },
  "Dragon Ball Z: Hyper Dimension #19": {
@@ -4943,6 +5081,24 @@
   "year": 2010,
   "exact": true
  },
+ "Epic Seven": {
+  "id": 112191,
+  "name": "Epic Seven",
+  "year": 2018,
+  "exact": true
+ },
+ "Escape Academy": {
+  "id": 194464,
+  "name": "Escape Academy",
+  "year": 2022,
+  "exact": true
+ },
+ "Escape Simulator": {
+  "id": 145439,
+  "name": "Escape Simulator",
+  "year": 2021,
+  "exact": true
+ },
  "Espgaluda II": {
   "id": 6989,
   "name": "Espgaluda II",
@@ -5009,6 +5165,12 @@
   "year": 2013,
   "exact": true
  },
+ "Eve Online": {
+  "id": 2584,
+  "name": "Eve Online",
+  "year": 2003,
+  "exact": true
+ },
  "EVE Online": {
   "id": 2584,
   "name": "Eve Online",
@@ -5025,6 +5187,12 @@
   "id": 18037,
   "name": "Ever17: The Out of Infinity",
   "year": 2002,
+  "exact": true
+ },
+ "Everdell": {
+  "id": 210527,
+  "name": "Everdell",
+  "year": 2022,
   "exact": true
  },
  "Everspace 2": {
@@ -5333,6 +5501,12 @@
   "year": 2025,
   "exact": true
  },
+ "Fate/Grand Order": {
+  "id": 24493,
+  "name": "Fate/Grand Order",
+  "year": 2015,
+  "exact": true
+ },
  "Fate/stay night": {
   "id": 12328,
   "name": "Fate/Stay Night",
@@ -5415,6 +5589,12 @@
   "id": 423,
   "name": "Final Fantasy Anthology",
   "year": 1999,
+  "exact": true
+ },
+ "Final Fantasy Brave Exvius": {
+  "id": 19334,
+  "name": "Final Fantasy: Brave Exvius",
+  "year": 2015,
   "exact": true
  },
  "Final Fantasy Fables: Chocobo's Dungeon": {
@@ -5843,6 +6023,12 @@
   "year": 2015,
   "exact": true
  },
+ "Fire Emblem Heroes": {
+  "id": 26841,
+  "name": "Fire Emblem Heroes",
+  "year": 2017,
+  "exact": true
+ },
  "Fire Emblem Warriors: Three Hopes #130": {
   "id": 191396,
   "name": "Fire Emblem Warriors: Three Hopes",
@@ -5985,6 +6171,12 @@
   "id": 1905,
   "name": "Fortnite",
   "year": 2020,
+  "exact": true
+ },
+ "Fortune Street": {
+  "id": 19930,
+  "name": "Fortune Street",
+  "year": 2011,
   "exact": true
  },
  "Forza Horizon #12": {
@@ -6341,10 +6533,22 @@
   "year": 1992,
   "exact": true
  },
+ "Girls' Frontline": {
+  "id": 58075,
+  "name": "Girls' Frontline",
+  "year": 2016,
+  "exact": true
+ },
  "Gitaroo Man": {
   "id": 11338,
   "name": "Gitaroo Man",
   "year": 2001,
+  "exact": true
+ },
+ "Gloomhaven": {
+  "id": 106803,
+  "name": "Gloomhaven",
+  "year": 2019,
   "exact": true
  },
  "Gloomwood": {
@@ -6465,6 +6669,12 @@
   "id": 550,
   "name": "God of War: Ghost of Sparta",
   "year": 2010,
+  "exact": true
+ },
+ "Goddess of Victory: Nikke": {
+  "id": 117199,
+  "name": "Goddess of Victory: Nikke",
+  "year": 2022,
   "exact": true
  },
  "Goemon's Great Adventure #4": {
@@ -6651,6 +6861,12 @@
   "id": 14363,
   "name": "Gran Turismo Sport",
   "year": 2017,
+  "exact": true
+ },
+ "Granblue Fantasy": {
+  "id": 13623,
+  "name": "Granblue Fantasy",
+  "year": 2014,
   "exact": true
  },
  "Granblue Fantasy Versus: Rising": {
@@ -6911,6 +7127,12 @@
   "year": 1996,
   "exact": true
  },
+ "Guild Wars 2": {
+  "id": 1183,
+  "name": "Guild Wars 2",
+  "year": 2012,
+  "exact": true
+ },
  "Guild Wars 2 #6": {
   "id": 1183,
   "name": "Guild Wars 2",
@@ -7005,6 +7227,12 @@
   "id": 6422,
   "name": "Gunstar Super Heroes",
   "year": 2005,
+  "exact": true
+ },
+ "Gwent: The Witcher Card Game": {
+  "id": 19474,
+  "name": "Gwent: The Witcher Card Game",
+  "year": 2018,
   "exact": true
  },
  "Hades": {
@@ -7349,6 +7577,12 @@
   "year": 1999,
   "exact": true
  },
+ "Heroes of the Storm": {
+  "id": 7313,
+  "name": "Heroes of the Storm",
+  "year": 2015,
+  "exact": true
+ },
  "Hey! Pikmin #37": {
   "id": 28124,
   "name": "Hey! Pikmin",
@@ -7491,6 +7725,12 @@
   "id": 749,
   "name": "Homeworld",
   "year": 1999,
+  "exact": true
+ },
+ "Honkai Impact 3rd": {
+  "id": 96032,
+  "name": "Honkai Impact 3rd",
+  "year": 2016,
   "exact": true
  },
  "Honkai: Star Rail": {
@@ -8669,6 +8909,12 @@
   "year": 2017,
   "exact": true
  },
+ "League of Legends": {
+  "id": 115,
+  "name": "League of Legends",
+  "year": 2009,
+  "exact": true
+ },
  "League of Legends #6": {
   "id": 115,
   "name": "League of Legends",
@@ -8721,6 +8967,12 @@
   "id": 20516,
   "name": "Legend of the River King 2",
   "year": 1999,
+  "exact": true
+ },
+ "Legends of Runeterra": {
+  "id": 124701,
+  "name": "Legends of Runeterra",
+  "year": 2020,
   "exact": true
  },
  "Lego Star Wars: The Complete Saga": {
@@ -8915,6 +9167,12 @@
   "year": 2022,
   "exact": true
  },
+ "Live A Live @2022": {
+  "id": 191407,
+  "name": "Live A Live",
+  "year": 2022,
+  "exact": true
+ },
  "Live A Live #19": {
   "id": 191407,
   "name": "Live A Live",
@@ -8969,10 +9227,22 @@
   "year": 2023,
   "exact": true
  },
+ "Lords of Waterdeep": {
+  "id": 68484,
+  "name": "D&D Lords of Waterdeep",
+  "year": 2013,
+  "exact": false
+ },
  "Lorelei and the Laser Eyes": {
   "id": 206806,
   "name": "Lorelei and the Laser Eyes",
   "year": 2024,
+  "exact": true
+ },
+ "Lost Ark": {
+  "id": 26128,
+  "name": "Lost Ark",
+  "year": 2019,
   "exact": true
  },
  "Lost Judgment": {
@@ -9131,10 +9401,22 @@
   "year": 2010,
   "exact": true
  },
+ "Mafia: Definitive Edition": {
+  "id": 134070,
+  "name": "Mafia: Definitive Edition",
+  "year": 2020,
+  "exact": true
+ },
  "Magic Knight Rayearth #32": {
   "id": 105043,
   "name": "Magic Knight Rayearth",
   "year": 1995,
+  "exact": true
+ },
+ "Magic: The Gathering Arena": {
+  "id": 54538,
+  "name": "Magic: The Gathering Arena",
+  "year": 2019,
   "exact": true
  },
  "Magical Tetris Challenge #33,22": {
@@ -9359,6 +9641,12 @@
   "year": 1992,
   "exact": true
  },
+ "Mario Party 2": {
+  "id": 2328,
+  "name": "Mario Party 2",
+  "year": 1999,
+  "exact": true
+ },
  "Mario Party 2 #4": {
   "id": 2328,
   "name": "Mario Party 2",
@@ -9447,6 +9735,12 @@
   "id": 4356,
   "name": "Mars Matrix",
   "year": 2000,
+  "exact": true
+ },
+ "Marvel Rivals": {
+  "id": 294041,
+  "name": "Marvel Rivals",
+  "year": 2024,
   "exact": true
  },
  "Marvel Snap": {
@@ -9609,6 +9903,12 @@
   "id": 5910,
   "name": "MechAssault",
   "year": 2002,
+  "exact": true
+ },
+ "MediEvil @2019": {
+  "id": 76960,
+  "name": "MediEvil",
+  "year": 2019,
   "exact": true
  },
  "Medievil #7": {
@@ -10485,6 +10785,12 @@
   "id": 61,
   "name": "Monkey Island 2: LeChuck's Revenge",
   "year": 1991,
+  "exact": true
+ },
+ "Monopoly Plus": {
+  "id": 20313,
+  "name": "Monopoly Plus",
+  "year": 2014,
   "exact": true
  },
  "Monster Boy and the Cursed Kingdom": {
@@ -11537,6 +11843,12 @@
   "year": 2023,
   "exact": true
  },
+ "Octopath Traveler: Champions of the Continent": {
+  "id": 115861,
+  "name": "Octopath Traveler: Champions of the Continent",
+  "year": 2020,
+  "exact": true
+ },
  "Oddworld: Abe's Oddysee #7": {
   "id": 999,
   "name": "Oddworld: Abe's Oddysee",
@@ -11547,6 +11859,12 @@
   "id": 1001,
   "name": "Oddworld: Munch's Oddysee",
   "year": 2001,
+  "exact": true
+ },
+ "Oddworld: New 'n' Tasty!": {
+  "id": 5552,
+  "name": "Oddworld: New 'n' Tasty",
+  "year": 2014,
   "exact": true
  },
  "Oddworld: Stranger's Wrath #11": {
@@ -11673,6 +11991,12 @@
   "id": 11522,
   "name": "Operation C",
   "year": 1991,
+  "exact": true
+ },
+ "Operation: Tango": {
+  "id": 134822,
+  "name": "Operation: Tango",
+  "year": 2021,
   "exact": true
  },
  "Opoona #5": {
@@ -11825,6 +12149,12 @@
   "year": 2010,
   "exact": true
  },
+ "Paladins": {
+  "id": 11544,
+  "name": "Paladins",
+  "year": 2017,
+  "exact": true
+ },
  "Palworld": {
   "id": 151665,
   "name": "Palworld",
@@ -11913,6 +12243,12 @@
   "id": 3349,
   "name": "Paper Mario: The Thousand-Year Door",
   "year": 2004,
+  "exact": true
+ },
+ "Paper Mario: The Thousand-Year Door @2024": {
+  "id": 266690,
+  "name": "Paper Mario: The Thousand-Year Door",
+  "year": 2024,
   "exact": true
  },
  "Paper Mario: The Thousand-Year Door @2024 #130": {
@@ -12647,6 +12983,12 @@
   "year": 2025,
   "exact": true
  },
+ "Pokémon Masters EX": {
+  "id": 144248,
+  "name": "Pokémon Masters EX",
+  "year": 2019,
+  "exact": true
+ },
  "Pokémon Mystery Dungeon: Explorers of Sky": {
   "id": 2323,
   "name": "Pokémon Mystery Dungeon: Explorers of Sky",
@@ -12813,6 +13155,12 @@
   "id": 36792,
   "name": "Pokémon Ultra Sun",
   "year": 2017,
+  "exact": true
+ },
+ "Pokémon Unite": {
+  "id": 135381,
+  "name": "Pokémon Unite",
+  "year": 2021,
   "exact": true
  },
  "Pokémon X": {
@@ -13157,6 +13505,12 @@
   "year": 2009,
   "exact": true
  },
+ "Punishing: Gray Raven": {
+  "id": 132185,
+  "name": "Punishing: Gray Raven",
+  "year": 2019,
+  "exact": true
+ },
  "Puppeteer": {
   "id": 7391,
   "name": "Puppeteer",
@@ -13191,6 +13545,12 @@
   "id": 6866,
   "name": "Puyo Puyo Tetris",
   "year": 2014,
+  "exact": true
+ },
+ "Puzzle & Dragons": {
+  "id": 8590,
+  "name": "Puzzle & Dragons",
+  "year": 2012,
   "exact": true
  },
  "Puzzle Quest: Challenge of the Warlords": {
@@ -13955,6 +14315,12 @@
   "year": 1996,
   "exact": true
  },
+ "Reverse: 1999": {
+  "id": 188383,
+  "name": "Reverse: 1999",
+  "year": 2023,
+  "exact": true
+ },
  "Rez": {
   "id": 11244,
   "name": "Rez",
@@ -14303,6 +14669,18 @@
   "year": 2002,
   "exact": true
  },
+ "Romancing SaGa 2: Revenge of the Seven": {
+  "id": 306154,
+  "name": "Romancing SaGa 2: Revenge of the Seven",
+  "year": 2024,
+  "exact": true
+ },
+ "Root": {
+  "id": 139145,
+  "name": "Root",
+  "year": 2020,
+  "exact": true
+ },
  "Rule of Rose": {
   "id": 7415,
   "name": "Rule of Rose",
@@ -14343,6 +14721,18 @@
   "id": 250922,
   "name": "Rune Factory: Guardians of Azuma",
   "year": 2025,
+  "exact": true
+ },
+ "Rusty Lake Hotel": {
+  "id": 18011,
+  "name": "Rusty Lake Hotel",
+  "year": 2015,
+  "exact": true
+ },
+ "Rusty Lake: Roots": {
+  "id": 25222,
+  "name": "Rusty Lake: Roots",
+  "year": 2016,
   "exact": true
  },
  "S.T.A.L.K.E.R. 2: Heart of Chornobyl": {
@@ -14489,6 +14879,12 @@
   "year": 2010,
   "exact": true
  },
+ "Scythe: Digital Edition": {
+  "id": 81124,
+  "name": "Scythe: Digital Edition",
+  "year": 2018,
+  "exact": true
+ },
  "SD Gundam G Generation Cross Rays": {
   "id": 114152,
   "name": "SD Gundam G Generation Cross Rays",
@@ -14625,6 +15021,12 @@
   "id": 2207,
   "name": "Shadow of the Colossus",
   "year": 2005,
+  "exact": true
+ },
+ "Shadow of the Colossus @2018": {
+  "id": 37094,
+  "name": "Shadow of the Colossus",
+  "year": 2018,
   "exact": true
  },
  "Shadow of the Colossus #8": {
@@ -15287,6 +15689,18 @@
   "year": 2013,
   "exact": true
  },
+ "Small World 2": {
+  "id": 342926,
+  "name": "Small World 2",
+  "year": 2013,
+  "exact": true
+ },
+ "Smite": {
+  "id": 5607,
+  "name": "Smite",
+  "year": 2014,
+  "exact": true
+ },
  "Snake Rattle 'n' Roll #18,99": {
   "id": 4479,
   "name": "Snake Rattle 'n' Roll",
@@ -15803,6 +16217,12 @@
   "year": 2022,
   "exact": true
  },
+ "Splendor": {
+  "id": 35058,
+  "name": "Splendor",
+  "year": 2015,
+  "exact": true
+ },
  "Split Fiction": {
   "id": 325594,
   "name": "Split Fiction",
@@ -15821,10 +16241,22 @@
   "year": 2010,
   "exact": true
  },
+ "Splitgate": {
+  "id": 114684,
+  "name": "Splitgate",
+  "year": 2019,
+  "exact": true
+ },
  "Spyro 2: Ripto's Rage! #7": {
   "id": 1577,
   "name": "Spyro 2: Ripto's Rage!",
   "year": 1999,
+  "exact": true
+ },
+ "Spyro Reignited Trilogy": {
+  "id": 87683,
+  "name": "Spyro Reignited Trilogy",
+  "year": 2018,
   "exact": true
  },
  "Spyro the Dragon": {
@@ -15939,6 +16371,12 @@
   "id": 11210,
   "name": "Star Ocean: The Second Story",
   "year": 1998,
+  "exact": true
+ },
+ "Star Ocean: The Second Story R": {
+  "id": 254337,
+  "name": "Star Ocean: The Second Story R",
+  "year": 2023,
   "exact": true
  },
  "Star Ocean: Till the End of Time": {
@@ -16577,6 +17015,12 @@
   "year": 2003,
   "exact": true
  },
+ "Summoners War": {
+  "id": 23622,
+  "name": "Summoners War: Sky Arena",
+  "year": 2014,
+  "exact": false
+ },
  "Sun Haven": {
   "id": 144098,
   "name": "Sun Haven",
@@ -16899,6 +17343,12 @@
   "id": 306148,
   "name": "Super Mario Party Jamboree",
   "year": 2024,
+  "exact": true
+ },
+ "Super Mario RPG @2023": {
+  "id": 254327,
+  "name": "Super Mario RPG",
+  "year": 2023,
   "exact": true
  },
  "Super Mario RPG @2023 #130": {
@@ -17231,6 +17681,12 @@
   "year": 1999,
   "exact": true
  },
+ "Tabletop Simulator": {
+  "id": 8351,
+  "name": "Tabletop Simulator",
+  "year": 2015,
+  "exact": true
+ },
  "Tacoma": {
   "id": 8259,
   "name": "Tacoma",
@@ -17433,6 +17889,12 @@
   "id": 6452,
   "name": "Tales of Zestiria",
   "year": 2015,
+  "exact": true
+ },
+ "Talisman: Digital Edition": {
+  "id": 10952,
+  "name": "Talisman: Digital Edition",
+  "year": 2014,
   "exact": true
  },
  "Tangle Tower": {
@@ -17673,6 +18135,12 @@
   "id": 122611,
   "name": "Terminator: Resistance",
   "year": 2019,
+  "exact": true
+ },
+ "Terraforming Mars": {
+  "id": 86558,
+  "name": "Terraforming Mars",
+  "year": 2018,
   "exact": true
  },
  "Terranigma": {
@@ -17945,6 +18413,12 @@
   "year": 1989,
   "exact": true
  },
+ "The Finals": {
+  "id": 214417,
+  "name": "The Finals",
+  "year": 2023,
+  "exact": true
+ },
  "The Great Ace Attorney 2: Resolve": {
   "id": 146081,
   "name": "The Great Ace Attorney 2: Resolve",
@@ -17973,6 +18447,18 @@
   "id": 36278,
   "name": "The House in Fata Morgana",
   "year": 2012,
+  "exact": true
+ },
+ "The House of Da Vinci": {
+  "id": 39749,
+  "name": "The House of Da Vinci",
+  "year": 2017,
+  "exact": true
+ },
+ "The House of Da Vinci 2": {
+  "id": 132542,
+  "name": "The House of Da Vinci 2",
+  "year": 2019,
   "exact": true
  },
  "The House of the Dead #32": {
@@ -18015,6 +18501,12 @@
   "id": 1009,
   "name": "The Last of Us",
   "year": 2013,
+  "exact": true
+ },
+ "The Last of Us Part I": {
+  "id": 204350,
+  "name": "The Last of Us Part I",
+  "year": 2022,
   "exact": true
  },
  "The Last of Us Part II": {
@@ -18243,6 +18735,12 @@
   "id": 1028,
   "name": "The Legend of Zelda: Link's Awakening",
   "year": 1993,
+  "exact": true
+ },
+ "The Legend of Zelda: Link's Awakening @2019": {
+  "id": 115284,
+  "name": "The Legend of Zelda: Link's Awakening",
+  "year": 2019,
   "exact": true
  },
  "The Legend of Zelda: Link's Awakening @2019 #130": {
@@ -18485,6 +18983,12 @@
   "year": 2017,
   "exact": true
  },
+ "The Past Within": {
+  "id": 147340,
+  "name": "The Past Within",
+  "year": 2022,
+  "exact": true
+ },
  "The Revenge of Shinobi #29": {
   "id": 3327,
   "name": "The Revenge of Shinobi",
@@ -18502,6 +19006,30 @@
   "name": "The Room",
   "year": 2012,
   "exact": true
+ },
+ "The Room Three": {
+  "id": 18222,
+  "name": "The Room Three",
+  "year": 2015,
+  "exact": true
+ },
+ "The Room Two": {
+  "id": 11276,
+  "name": "The Room Two",
+  "year": 2013,
+  "exact": true
+ },
+ "The Room VR: A Dark Matter": {
+  "id": 123991,
+  "name": "The Room VR: A Dark Matter",
+  "year": 2020,
+  "exact": true
+ },
+ "The Room: Old Sins": {
+  "id": 27725,
+  "name": "The Room 4: Old Sins",
+  "year": 2018,
+  "exact": false
  },
  "The Secret of Monkey Island": {
   "id": 60,
@@ -18755,6 +19283,12 @@
   "year": 1999,
   "exact": true
  },
+ "Through the Ages": {
+  "id": 87726,
+  "name": "Through the Ages",
+  "year": 2017,
+  "exact": true
+ },
  "Thumper": {
   "id": 10960,
   "name": "Thumper",
@@ -18783,6 +19317,12 @@
   "id": 145028,
   "name": "Thymesia",
   "year": 2022,
+  "exact": true
+ },
+ "Ticket to Ride": {
+  "id": 267278,
+  "name": "Ticket to Ride",
+  "year": 2023,
   "exact": true
  },
  "Timespinner": {
@@ -18819,6 +19359,12 @@
   "id": 215217,
   "name": "Tiny Rogues",
   "year": 2022,
+  "exact": true
+ },
+ "Tiny Room Stories: Town Mystery": {
+  "id": 122907,
+  "name": "Tiny Room Stories: Town Mystery",
+  "year": 2019,
   "exact": true
  },
  "Titan Quest": {
@@ -19379,6 +19925,12 @@
   "year": 1997,
   "exact": true
  },
+ "Twilight Struggle": {
+  "id": 34351,
+  "name": "Twilight Struggle",
+  "year": 2016,
+  "exact": true
+ },
  "Twin Mirror": {
   "id": 103266,
   "name": "Twin Mirror",
@@ -19461,6 +20013,12 @@
   "id": 27867,
   "name": "Unavowed",
   "year": 2018,
+  "exact": true
+ },
+ "Unboxing the Cryptic Killer": {
+  "id": 247757,
+  "name": "Unboxing the Cryptic Killer",
+  "year": 2023,
   "exact": true
  },
  "Uncharted 2: Among Thieves": {
@@ -19883,6 +20441,12 @@
   "year": 2002,
   "exact": true
  },
+ "Warframe": {
+  "id": 2903,
+  "name": "Warframe",
+  "year": 2013,
+  "exact": true
+ },
  "Wargroove": {
   "id": 27441,
   "name": "Wargroove",
@@ -20033,6 +20597,30 @@
   "year": 2005,
   "exact": true
  },
+ "We Were Here": {
+  "id": 27310,
+  "name": "We Were Here",
+  "year": 2017,
+  "exact": true
+ },
+ "We Were Here Forever": {
+  "id": 144455,
+  "name": "We Were Here Forever",
+  "year": 2022,
+  "exact": true
+ },
+ "We Were Here Together": {
+  "id": 109535,
+  "name": "We Were Here Together",
+  "year": 2019,
+  "exact": true
+ },
+ "We Were Here Too": {
+  "id": 54486,
+  "name": "We Were Here Too",
+  "year": 2018,
+  "exact": true
+ },
  "Weird West": {
   "id": 127350,
   "name": "Weird West",
@@ -20109,6 +20697,12 @@
   "id": 279617,
   "name": "Windblown",
   "year": 2024,
+  "exact": true
+ },
+ "Wingspan": {
+  "id": 121586,
+  "name": "Wingspan",
+  "year": 2020,
   "exact": true
  },
  "Wipeout 2048 #46": {
@@ -20189,6 +20783,12 @@
   "year": 2014,
   "exact": true
  },
+ "Wonder Boy: The Dragon's Trap": {
+  "id": 19452,
+  "name": "Wonder Boy: The Dragon's Trap",
+  "year": 2017,
+  "exact": true
+ },
  "World of Goo": {
   "id": 942,
   "name": "World of Goo",
@@ -20223,6 +20823,12 @@
   "id": 171225,
   "name": "Wuchang: Fallen Feathers",
   "year": 2025,
+  "exact": true
+ },
+ "Wuthering Waves": {
+  "id": 202956,
+  "name": "Wuthering Waves",
+  "year": 2024,
   "exact": true
  },
  "Wylde Flowers": {
@@ -20661,6 +21267,12 @@
   "id": 1025,
   "name": "Zelda II: The Adventure of Link",
   "year": 1987,
+  "exact": true
+ },
+ "Zenless Zone Zero": {
+  "id": 200551,
+  "name": "Zenless Zone Zero",
+  "year": 2024,
   "exact": true
  },
  "Zero Escape: Virtue's Last Reward": {

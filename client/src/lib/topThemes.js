@@ -42,7 +42,7 @@ const ART = new Set([
 const ICONS = new Set([
   "top-detective", "top-funny", "top-emotional", "top-narrative", "top-scary",
   "top-couch-coop", "top-short", "top-hard", "top-art", "top-soundtrack", "top-space",
-  "top-postapo",
+  "top-postapo", "top-remakes", "top-escape", "top-board", "top-free-to-play", "top-gacha",
 ]);
 
 // Un aplat par top : la couleur de la console ou celle qu'on associe à la
@@ -136,6 +136,11 @@ const COLORS = {
   "top-soundtrack": "#7048e8",
   "top-space": "#1b2a5e",
   "top-postapo": "#6b7d1f",
+  "top-remakes": "#0b7285",
+  "top-escape": "#5f3dc4",
+  "top-board": "#2b8a3e",
+  "top-free-to-play": "#1971c2",
+  "top-gacha": "#c2255c",
 };
 
 // Les tops sans couleur attitrée (les genres, surtout) : une teinte de cette

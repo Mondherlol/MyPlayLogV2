@@ -635,4 +635,198 @@ Borderlands 2
 Terminator: Resistance
 `,
   },
+  {
+    key: "top-remakes",
+    group: "theme",
+    title: "Top {n} des meilleurs remakes",
+    size: 40,
+    tags: ["Remake", "Thème"],
+    games: `
+Resident Evil 4 @2023
+Resident Evil 2 @2019
+Resident Evil @2002
+Final Fantasy VII Rebirth
+Final Fantasy VII Remake
+Demon's Souls @2020
+Shadow of the Colossus @2018
+Silent Hill 2 @2024
+Dead Space @2023
+The Legend of Zelda: Link's Awakening @2019
+Metroid: Zero Mission
+Metal Gear Solid Delta: Snake Eater
+Persona 3 Reload
+Black Mesa
+Crash Bandicoot N. Sane Trilogy
+Paper Mario: The Thousand-Year Door @2024
+Tony Hawk's Pro Skater 1 + 2
+Pokémon HeartGold Version
+Dragon Quest III HD-2D Remake
+Live A Live @2022
+Ys: The Oath in Felghana
+Spyro Reignited Trilogy
+The Last of Us Part I
+System Shock @2023
+Super Mario RPG @2023
+Romancing SaGa 2: Revenge of the Seven
+Metroid: Samus Returns
+Tomb Raider: Anniversary
+Trials of Mana @2020
+Star Ocean: The Second Story R
+Mafia: Definitive Edition
+Wonder Boy: The Dragon's Trap
+Oddworld: New 'n' Tasty!
+Pokémon Omega Ruby
+Resident Evil 3 @2020
+MediEvil @2019
+Destroy All Humans! @2020
+Ratchet & Clank @2016
+Another Code: Recollection
+Mario vs. Donkey Kong @2024
+`,
+  },
+  {
+    key: "top-escape",
+    group: "theme",
+    title: "Top {n} des meilleurs escape games",
+    size: 25,
+    tags: ["Escape game", "Énigmes", "Thème"],
+    games: `
+The Room Three
+The Room Two
+The Room
+The Room: Old Sins
+Escape Simulator
+Escape Academy
+The Room VR: A Dark Matter
+We Were Here Forever
+We Were Here Together
+Rusty Lake Hotel
+Rusty Lake: Roots
+The House of Da Vinci
+The Past Within
+We Were Here Too
+Unboxing the Cryptic Killer
+Operation: Tango
+The House of Da Vinci 2
+Cube Escape: Paradox
+We Were Here
+Doors: Paradox
+Tiny Room Stories: Town Mystery
+`,
+  },
+  {
+    key: "top-board",
+    group: "theme",
+    title: "Top {n} des meilleurs jeux de plateau",
+    size: 30,
+    tags: ["Jeu de plateau", "Thème"],
+    games: `
+Wingspan
+Root
+Gloomhaven
+Terraforming Mars
+Through the Ages
+Twilight Struggle
+Scythe: Digital Edition
+Ticket to Ride
+Carcassonne
+Catan Universe
+Armello
+Mario Party Superstars
+Tabletop Simulator
+Splendor
+Everdell
+Lords of Waterdeep
+Small World 2
+Talisman: Digital Edition
+Blood Bowl 2
+Clubhouse Games: 51 Worldwide Classics
+Super Mario Party Jamboree
+Mario Party 2
+Fortune Street
+Dokapon Kingdom
+Culdcept Saga
+Monopoly Plus
+`,
+  },
+  {
+    key: "top-free-to-play",
+    group: "theme",
+    title: "Top {n} des meilleurs free-to-play",
+    size: 40,
+    tags: ["Free-to-play", "Thème"],
+    games: `
+Dota 2
+League of Legends
+Counter-Strike 2
+Fortnite
+Team Fortress 2
+Path of Exile
+Warframe
+Valorant
+Apex Legends
+Genshin Impact
+Rocket League
+Hearthstone
+Marvel Rivals
+Destiny 2
+Honkai: Star Rail
+Guild Wars 2
+Legends of Runeterra
+Magic: The Gathering Arena
+Marvel Snap
+Brawlhalla
+Lost Ark
+Tetris 99
+Zenless Zone Zero
+The Finals
+Pokémon Unite
+Heroes of the Storm
+Call of Duty: Warzone
+Fall Guys
+Gwent: The Witcher Card Game
+Eve Online
+Wuthering Waves
+Smite
+Paladins
+Brawl Stars
+Clash Royale
+Splitgate
+Doki Doki Literature Club!
+`,
+  },
+  {
+    key: "top-gacha",
+    group: "theme",
+    title: "Top {n} des meilleurs gacha",
+    size: 25,
+    tags: ["Gacha", "Free-to-play", "Thème"],
+    games: `
+Genshin Impact
+Honkai: Star Rail
+Fate/Grand Order
+Arknights
+Zenless Zone Zero
+Wuthering Waves
+Blue Archive
+Umamusume: Pretty Derby
+Granblue Fantasy
+Fire Emblem Heroes
+Azur Lane
+Punishing: Gray Raven
+Reverse: 1999
+Dragalia Lost
+Goddess of Victory: Nikke
+Honkai Impact 3rd
+Epic Seven
+Another Eden: The Cat Beyond Time and Space
+Dragon Ball Z: Dokkan Battle
+Pokémon Masters EX
+Octopath Traveler: Champions of the Continent
+Final Fantasy Brave Exvius
+Girls' Frontline
+Puzzle & Dragons
+Summoners War
+`,
+  },
 ];
