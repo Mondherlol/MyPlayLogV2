@@ -36,17 +36,18 @@ import genresA from "../data/officialLists/genres-a.js";
 import genresB from "../data/officialLists/genres-b.js";
 import series from "../data/officialLists/series.js";
 import seriesB from "../data/officialLists/series-b.js";
+import themes from "../data/officialLists/themes.js";
 import gameAwards from "../data/officialLists/gameAwards.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const IMG_BASE = "https://images.igdb.com/igdb/image/upload";
 
 export const RESOLVED_FILE = path.join(__dirname, "../data/officialLists/resolved.json");
-export const TOP_DEFINITIONS = [...nintendo, ...sony, ...segaXboxPc, ...genresA, ...genresB, ...series, ...seriesB];
+export const TOP_DEFINITIONS = [...nintendo, ...sony, ...segaXboxPc, ...genresA, ...genresB, ...series, ...seriesB, ...themes];
 export const AWARD_DEFINITIONS = gameAwards;
 
-// Les trois rayons de l'onglet « Tops ».
-export const TOP_GROUPS = ["platform", "genre", "series"];
+// Les rayons de l'onglet « Tops ».
+export const TOP_GROUPS = ["platform", "genre", "series", "theme"];
 
 const GROUP_DESCRIPTIONS = {
   platform:
@@ -55,6 +56,8 @@ const GROUP_DESCRIPTIONS = {
     "Classement de synthèse des références du genre, établi d'après les notes de la presse et des joueurs et les classements des sites spécialisés.",
   series:
     "Les épisodes de la saga classés du meilleur au moins bon, d'après les notes de la presse et des joueurs.",
+  theme:
+    "Classement de synthèse des jeux qui incarnent le mieux ce thème, établi d'après les notes de la presse et des joueurs et les classements des sites spécialisés.",
 };
 
 // ----------------------------------------------------------------------

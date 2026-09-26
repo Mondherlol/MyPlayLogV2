@@ -52,6 +52,7 @@ export const TOP_GROUPS = [
   { value: "platform", label: "Consoles" },
   { value: "genre", label: "Genres" },
   { value: "series", label: "Sagas" },
+  { value: "theme", label: "Thèmes" },
 ];
 
 // Options de filtre par type (null = tous).

@@ -153,6 +153,7 @@ function TopPoster({ list }) {
   const theme = topTheme(list.official?.key);
   const color = theme.color;
   const art = list.cover || theme.art;
+  const icon = !list.cover && theme.icon;
   const { n, subject } = splitTopTitle(list.title, list.itemCount);
   const imgs = (list.preview || []).filter(Boolean);
   // Sans visuel, les trois premières jaquettes font l'éventail à droite.
@@ -170,7 +171,13 @@ function TopPoster({ list }) {
       )}
       <span className="lt-top-dots" aria-hidden="true" />
       {art ? (
-        <img className="lt-top-art" src={art} alt="" loading="lazy" draggable="false" />
+        <img
+          className={`lt-top-art ${icon ? "is-icon" : ""}`}
+          src={art}
+          alt=""
+          loading="lazy"
+          draggable="false"
+        />
       ) : (
         fan.length > 0 && (
           <span className="lt-top-fan" aria-hidden="true">

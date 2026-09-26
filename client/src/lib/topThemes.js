@@ -8,7 +8,14 @@
 // `art` : un PNG détouré dans /public/tops/<clé>.webp (consoles : photos
 // Evan-Amos du domaine public ; héros : rendus officiels repris de Wikipédia).
 // Sans `art`, la carte montre ses trois premières jaquettes en éventail — c'est
-// voulu pour Pokémon et pour les genres, où aucune image seule ne résume tout.
+// voulu pour les genres, où aucune image seule ne résume tout.
+//
+// Les tops THÈMES (enquête, jeux drôles…) ont une icône à la place : un
+// emoji Twemoji en SVG (/public/tops/<clé>.svg, CC-BY 4.0), une loupe pour
+// l'enquête, une fusée pour l'espace — `icon: true`, posé un peu plus petit.
+//
+// ⚠️ LES IMAGES SONT RECADRÉES AU PIXEL PRÈS (plus aucune marge vide autour du
+// sujet) : c'est ce qui les aligne toutes sur le même coin de la carte.
 //
 // ⚠️ LA CLÉ EST CELLE DU SERVEUR (server/src/data/officialLists/*.js,
 // `official.key`). Un top ajouté là-bas sans entrée ici prend une couleur de
@@ -27,7 +34,15 @@ const ART = new Set([
   "top-danganronpa", "top-donkey-kong", "top-god-of-war", "top-uncharted", "top-halo",
   "top-crash", "top-ratchet", "top-devil-may-cry", "top-tomb-raider", "top-assassins-creed",
   "top-professor-layton", "top-tekken", "top-mortal-kombat", "top-fallout", "top-ys",
-  "top-monster-hunter",
+  "top-monster-hunter", "top-touhou", "top-pokemon", "top-suikoden", "top-dragon-ball",
+  "top-star-wars", "top-atelier",
+]);
+
+// Les tops thèmes : une icône (SVG) plutôt qu'un personnage.
+const ICONS = new Set([
+  "top-detective", "top-funny", "top-emotional", "top-narrative", "top-scary",
+  "top-couch-coop", "top-short", "top-hard", "top-art", "top-soundtrack", "top-space",
+  "top-postapo",
 ]);
 
 // Un aplat par top : la couleur de la console ou celle qu'on associe à la
@@ -108,6 +123,19 @@ const COLORS = {
   "top-dragon-ball": "#f07316",
   "top-star-wars": "#27272f",
   "top-metal-slug": "#5f8f10",
+
+  "top-detective": "#2c5f8a",
+  "top-funny": "#f08c00",
+  "top-emotional": "#3d7fd6",
+  "top-narrative": "#8a4b2e",
+  "top-scary": "#4c2a7a",
+  "top-couch-coop": "#e0561b",
+  "top-short": "#0e9384",
+  "top-hard": "#8e1b1b",
+  "top-art": "#d6336c",
+  "top-soundtrack": "#7048e8",
+  "top-space": "#1b2a5e",
+  "top-postapo": "#6b7d1f",
 };
 
 // Les tops sans couleur attitrée (les genres, surtout) : une teinte de cette
@@ -120,12 +148,17 @@ function hash(s) {
   return Math.abs(h);
 }
 
-/** `{ color, art }` d'un top officiel — `art` null : l'éventail de jaquettes. */
+/**
+ * `{ color, art, icon }` d'un top officiel — `art` null : l'éventail de
+ * jaquettes ; `icon` : l'image est une icône de thème, pas un personnage.
+ */
 export function topTheme(key) {
   const k = String(key || "");
+  const icon = ICONS.has(k);
   return {
     color: COLORS[k] || FALLBACK[hash(k) % FALLBACK.length],
-    art: ART.has(k) ? `/tops/${k}.webp` : null,
+    art: icon ? `/tops/${k}.svg` : ART.has(k) ? `/tops/${k}.webp` : null,
+    icon,
   };
 }
 
@@ -136,7 +169,11 @@ export function topTheme(key) {
  */
 export function splitTopTitle(title, fallbackN = null) {
   const t = String(title || "").trim();
-  const m = t.match(/^top\s+(\d+)\s+des\s+meilleur(?:e?s)\s+(.+)$/i) || t.match(/^les\s+(\d+)\s+meilleur(?:e?s)\s+(.+)$/i);
+  // « Top 50 des jeux les plus drôles » → « Jeux les plus drôles ».
+  const m =
+    t.match(/^top\s+(\d+)\s+des\s+meilleur(?:e?s)\s+(.+)$/i) ||
+    t.match(/^les\s+(\d+)\s+meilleur(?:e?s)\s+(.+)$/i) ||
+    t.match(/^top\s+(\d+)\s+des\s+(.+)$/i);
   const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
   if (m) return { n: Number(m[1]), subject: cap(m[2]) };
   return { n: fallbackN, subject: t };

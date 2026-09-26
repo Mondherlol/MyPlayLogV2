@@ -3372,6 +3372,19 @@
 .lt:hover .lt-top-art {
   transform: translateY(-5px) scale(1.07) rotate(-2deg);
 }
+/* Une icône de thème (loupe, fusée…) : plus petite, penchée, au milieu du
+   côté droit plutôt que posée en bas comme un personnage. */
+.lt-top-art.is-icon {
+  right: 7%;
+  bottom: 50%;
+  width: 38%;
+  max-height: none;
+  transform: translateY(50%) rotate(-10deg);
+  transform-origin: 50% 50%;
+}
+.lt:hover .lt-top-art.is-icon {
+  transform: translateY(50%) rotate(-2deg) scale(1.1);
+}
 
 /* Sans visuel : trois jaquettes en éventail, qui s'ouvrent au survol. */
 .lt-top-fan {
