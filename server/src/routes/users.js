@@ -101,6 +101,7 @@ const OVERVIEW_CARD_FIELDS = new Set(["rating", "hours", "platform", "title"]);
 // (ProfileOverviewAside). Toute clé inconnue est ignorée à l'enregistrement.
 const ASIDE_WIDGETS = new Set([
   "stats",
+  "board", // la carte de joueur (un jeu par case)
   "playtime",
   "tracking-lol",
   "tracking-rivals",

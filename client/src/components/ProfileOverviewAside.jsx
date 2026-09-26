@@ -1,6 +1,6 @@
 import { platformLabel } from "../lib/platforms";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   DndContext,
   DragOverlay,
@@ -45,9 +45,11 @@ import {
   Settings,
   Crown,
   BarChart3,
+  IdCard,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { typeMeta, timeAgo } from "../lib/lists";
+import { DEFAULT_BOARD, boardOf, itemsBySlot, openMyBoard } from "../lib/boards";
 import { extractVideoId } from "../lib/youtube";
 import { usePlayer } from "../context/PlayerContext";
 import { WantedPosterCard, WantedModal } from "./WantedPoster";
@@ -69,6 +71,7 @@ function fmtHours(h) {
 //     part. ---
 const WIDGET_META = {
   stats: { label: "Statistiques", Icon: BarChart3 },
+  board: { label: "Carte de joueur", Icon: IdCard },
   playtime: { label: "Temps de jeu", Icon: Hourglass },
   "tracking-lol": { label: "Tracking · LoL", Icon: Swords },
   "tracking-rivals": { label: "Tracking · Rivals", Icon: Swords },
@@ -84,6 +87,7 @@ const WIDGET_META = {
 };
 const DEFAULT_ORDER = [
   "stats",
+  "board",
   "playtime",
   "tracking-lol",
   "tracking-rivals",
@@ -107,6 +111,9 @@ const DEFAULT_HIDDEN = ["console", "characters", "playlist"];
 // pour qu'un nouveau widget apparaisse toujours, même sur un ordre ancien.
 function resolveOrder(saved) {
   const base = (saved?.length ? saved : DEFAULT_ORDER).filter((k) => WIDGET_META[k]);
+  // La carte de joueur est arrivée après coup : sur un ordre déjà enregistré,
+  // elle se glisse juste sous les statistiques plutôt qu'en toute fin.
+  if (!base.includes("board")) base.splice(Math.min(1, base.length), 0, "board");
   for (const k of DEFAULT_ORDER) if (!base.includes(k)) base.push(k);
   return base;
 }
@@ -260,6 +267,7 @@ export default function ProfileOverviewAside({
   onOpenTab,
   railRef,
 }) {
+  const navigate = useNavigate();
   const favoriteCompanies = profile?.favoriteCompanies || [];
   const counts = profile?.counts || {};
   const trackers = profile?.trackers || [];
@@ -863,6 +871,67 @@ export default function ProfileOverviewAside({
                 {video.author && <span className="pfa-video-chan">{video.author}</span>}
               </span>
             </a>
+          </AsideCard>
+        );
+      }
+
+      // -------- La carte de joueur (un jeu par case) --------
+      // Quelques cases, AVEC leur intitulé — « Jeu préféré », « Protagoniste »…
+      // — pour que les jeux aient un sens ; la carte entière est à un clic.
+      case "board": {
+        const bl = (lists || []).find((l) => l.board === DEFAULT_BOARD);
+        const bItems = bl?.boardItems || [];
+        if (!bItems.length) {
+          if (!isMe) return null;
+          return (
+            <AsideCard Icon={IdCard} title="Carte de joueur">
+              <button
+                className="pfa-board-cta clickable"
+                onClick={() => openMyBoard({ token, navigate, apiFetch })}
+              >
+                <Plus size={15} /> Remplir ma carte
+              </button>
+            </AsideCard>
+          );
+        }
+        const board = boardOf(DEFAULT_BOARD);
+        const by = itemsBySlot(bItems);
+        const FEATURED = ["favorite", "protagonist", "antagonist", "story", "everyone", "nostalgia"];
+        const shown = [
+          ...FEATURED.filter((k) => by[k]),
+          ...board.slots.map((sl) => sl.key).filter((k) => by[k] && !FEATURED.includes(k)),
+        ].slice(0, 4);
+        return (
+          <AsideCard
+            Icon={IdCard}
+            title="Carte de joueur"
+            more={
+              <Link to={`/lists/${bl.id}`} className="pf-aside-more clickable">
+                Voir <ArrowRight size={12} />
+              </Link>
+            }
+          >
+            <Link to={`/lists/${bl.id}`} className="pfa-board clickable">
+              {shown.map((k) => {
+                const it = by[k];
+                const slot = board.slots.find((sl) => sl.key === k);
+                return (
+                  <span key={k} className="pfa-board-row">
+                    <span className="pfa-board-thumb">
+                      {it.image ? <img src={it.image} alt="" loading="lazy" /> : <slot.Icon size={14} />}
+                      {it.charImage && <img className="pfa-board-char" src={it.charImage} alt="" loading="lazy" />}
+                    </span>
+                    <span className="pfa-board-body">
+                      <span className="pfa-board-slot">{slot.label}</span>
+                      <span className="pfa-board-name">{it.charName ? `${it.charName} · ${it.name}` : it.name}</span>
+                    </span>
+                  </span>
+                );
+              })}
+              <span className="pfa-board-foot">
+                {bItems.length}/{board.slots.length} cases · voir toute la carte <ArrowRight size={12} />
+              </span>
+            </Link>
           </AsideCard>
         );
       }
