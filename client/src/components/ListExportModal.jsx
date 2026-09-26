@@ -10,6 +10,7 @@ import {
   GRID_MIN_COLS,
   GRID_MAX_COLS,
 } from "../lib/listExport";
+import { ensureNineFonts, renderNine } from "../lib/nineExport";
 
 const slugify = (s) =>
   String(s || "liste")
@@ -22,6 +23,19 @@ const slugify = (s) =>
 
 // Cases à cocher proposées selon le type de liste.
 function optionGroups(list) {
+  // Une liste des 9 a sa propre affiche (cf. lib/nineExport) : la phrase et la
+  // grille 3 × 3 sont fixes, il ne reste à choisir que ce qui l'accompagne.
+  if (list.nine)
+    return [
+      {
+        title: "Afficher",
+        opts: [
+          { key: "showNames", label: "Noms des jeux" },
+          { key: "showAuthor", label: "Auteur" },
+          { key: "showWatermark", label: "Filigrane MyPlayLog" },
+        ],
+      },
+    ];
   const common = [
     { key: "showTitle", label: "Titre" },
     { key: "showDescription", label: "Description", disabled: !list.description },
@@ -72,6 +86,7 @@ export default function ListExportModal({ list, items, tiers, token, onClose }) 
     let alive = true;
     (async () => {
       await ensureFonts();
+      if (list.nine) await ensureNineFonts(list.nine);
       const map = await loadImages(collectImageUrls(list, items), token);
       if (!alive) return;
       setImageMap(map);
@@ -98,7 +113,8 @@ export default function ListExportModal({ list, items, tiers, token, onClose }) 
   // un blob PNG frais (pour ouvrir/télécharger sans re-générer au clic).
   useEffect(() => {
     if (!imageMap || !canvasRef.current) return;
-    renderList(canvasRef.current, { list: exportList, items, tiers, opts, imageMap });
+    if (list.nine) renderNine(canvasRef.current, { list: exportList, items, opts, imageMap });
+    else renderList(canvasRef.current, { list: exportList, items, tiers, opts, imageMap });
     canvasRef.current.toBlob((blob) => {
       if (!blob) return;
       const u = URL.createObjectURL(blob);

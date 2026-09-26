@@ -702,6 +702,45 @@ router.get("/", requireAuth, async (req, res) => {
       }
     }
 
+    // TOUJOURS RIEN : UN MOT DE TROP. La recherche exige CHAQUE mot tapé
+    // (cf. buildQuery) — c'est ce qui la garde serrée, mais un seul mot de
+    // travers suffit à tout vider. « birth be sleep » ne trouvait pas
+    // « Kingdom Hearts Birth by Sleep » : « be » n'est nulle part dans le titre.
+    // On relâche donc, du plus sûr au plus large :
+    //   1. sans les mots de deux lettres ou moins (« be », « of », « la ») ;
+    //   2. le titre le plus proche du lexique — c'est lui qui retrouve
+    //      « bith be sleep », que la correction mot à mot envoie sur « with » ;
+    //   3. un mot en moins, en commençant par ceux qu'aucun titre ne contient.
+    // La première qui trouve gagne, et l'app dit ce qu'on a cherché à la place
+    // (`corrected`). Seulement en page 1, comme la correction.
+    if (search && !games.length && page === 1) {
+      const split = (q) => String(q || "").split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+      const long = (ws) => ws.filter((w) => w.length >= 3);
+      const orig = split(search);
+      const fixed = split(corrected || correctQuery(search));
+      const tries = [];
+      if (long(orig).length && long(orig).length < orig.length) tries.push(long(orig).join(" "));
+      if (long(fixed).length && long(fixed).length < fixed.length) tries.push(long(fixed).join(" "));
+      const title = suggestTitles(search, 1)[0];
+      if (title) tries.push(title);
+      const kept = long(orig);
+      if (kept.length >= 2) {
+        const unknownFirst = [...kept].sort(
+          (x, y) => Number(hasUnknownWords(y)) - Number(hasUnknownWords(x))
+        );
+        for (const drop of unknownFirst.slice(0, 3)) tries.push(kept.filter((w) => w !== drop).join(" "));
+      }
+      for (const q of [...new Set(tries)]) {
+        if (!q || q === search) continue;
+        const again = await fetchGames(q);
+        if (again.length) {
+          games = again;
+          corrected = q;
+          break;
+        }
+      }
+    }
+
     // ⚠️ LES FICHES STEAM LOCALES NE SONT PAS DANS LA RECHERCHE, ET C'EST VOULU.
     // Elles l'ont été, et c'était pénible : un jeu ajouté par lien remontait en
     // tête à chaque frappe qui l'approchait, devant le catalogue entier, alors
@@ -1739,7 +1778,9 @@ async function fetchBundleGames(bundleId, releaseDate = null) {
         : null,
       releaseDate: g.first_release_date || null,
     }))
-    .sort((a, b) => (a.releaseDate || Infinity) - (b.releaseDate || Infinity));
+    // À date égale (une compilation HD ressort les trois épisodes le même jour),
+    // l'id IGDB départage : les épisodes y sont saisis dans l'ordre de la série.
+    .sort((a, b) => (a.releaseDate || Infinity) - (b.releaseDate || Infinity) || a.id - b.id);
 }
 
 // ======================================================================

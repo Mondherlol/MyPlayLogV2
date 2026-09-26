@@ -224,21 +224,87 @@ export default function BoardPicker({ boardKey, slotKey, current, token, onPick,
 }
 
 // Les personnages d'un jeu, pour le médaillon du protagoniste / antagoniste.
+//
+// ⚠️ UN BUNDLE N'A PAS DE PERSONNAGES, SES JEUX EN ONT. « Ace Attorney
+// Trilogy » chez IGDB, c'est trois jeux ; chercher les personnages du bundle
+// lui-même ne donne rien (ou un bric-à-brac). On montre donc ceux de chaque jeu
+// inclus, regroupés par jeu, dans l'ordre de sortie — le 1, puis le 2, puis le
+// 3 —, chaque groupe arrivant dès qu'il est chargé.
+const SKELETONS = 12;
+
+function CharSkeleton() {
+  return (
+    <div className="bd-char-grid-in">
+      {Array.from({ length: SKELETONS }, (_, i) => (
+        <span key={i} className="bd-char-skel">
+          <span className="bd-char-skel-face" style={{ animationDelay: `${i * 60}ms` }} />
+          <span className="bd-char-skel-line" />
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function CharPicker({ game, prompt, token, onBack, onPick }) {
-  const [chars, setChars] = useState(null);
+  // [{ game, chars }] — `chars` à null tant que le groupe charge. `null` tant
+  // qu'on ne sait pas encore si le jeu est un bundle.
+  const [groups, setGroups] = useState(null);
   const [q, setQ] = useState("");
 
   useEffect(() => {
     let alive = true;
+    setGroups(null);
+    const clean = (d) => (d?.characters || []).filter((c) => c.name);
     apiFetch(`/games/${game.id}/details`, { token })
-      .then((d) => alive && setChars((d.characters || []).filter((c) => c.name)))
-      .catch(() => alive && setChars([]));
+      .then((d) => {
+        if (!alive) return;
+        const inside = d.bundleGames || [];
+        if (!inside.length) {
+          setGroups([{ game, chars: clean(d) }]);
+          return;
+        }
+        setGroups(inside.map((g) => ({ game: g, chars: null })));
+        inside.forEach((g, i) =>
+          apiFetch(`/games/${g.id}/details`, { token })
+            .then(clean)
+            .catch(() => [])
+            .then((chars) => {
+              if (!alive) return;
+              setGroups((prev) => prev && prev.map((x, j) => (j === i ? { ...x, chars } : x)));
+            })
+        );
+      })
+      .catch(() => alive && setGroups([{ game, chars: [] }]));
     return () => {
       alive = false;
     };
-  }, [game.id, token]);
+  }, [game, token]);
 
-  const shown = q ? (chars || []).filter((c) => c.name.toLowerCase().includes(q.toLowerCase())) : chars || [];
+  const bundle = (groups?.length || 0) > 1;
+  const match = (c) => !q || c.name.toLowerCase().includes(q.toLowerCase());
+  const total = (groups || []).reduce((n, g) => n + (g.chars?.length || 0), 0);
+
+  const renderChars = (chars) =>
+    chars === null ? (
+      <CharSkeleton />
+    ) : (
+      <div className="bd-char-grid-in">
+        {chars.filter(match).map((c) => (
+          <button
+            key={c.id || c.name}
+            type="button"
+            className="bd-char-opt clickable"
+            onClick={() => onPick({ name: c.name, image: c.image || null })}
+            title={c.name}
+          >
+            <span className="bd-char-face">
+              {c.image ? <img src={c.image} alt="" loading="lazy" /> : <b>{c.name.charAt(0)}</b>}
+            </span>
+            <span className="bd-char-name">{c.name}</span>
+          </button>
+        ))}
+      </div>
+    );
 
   return (
     <>
@@ -256,35 +322,35 @@ function CharPicker({ game, prompt, token, onBack, onPick }) {
         </button>
       </div>
 
-      {chars && chars.length > 8 && (
+      {total > 8 && (
         <div className="nine-m-search">
           <Search size={16} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher un personnage" />
         </div>
       )}
 
-      <div className="nine-m-grid bd-char-grid">
-        {chars === null ? (
-          <div className="nine-m-empty">
-            <Loader2 size={18} className="spin" />
-          </div>
-        ) : !shown.length ? (
-          <p className="nine-m-empty">Aucun personnage connu pour ce jeu.</p>
+      <div className="bd-char-scroll">
+        {groups === null ? (
+          <CharSkeleton />
+        ) : !bundle ? (
+          groups[0].chars?.length ? (
+            renderChars(groups[0].chars)
+          ) : (
+            <p className="nine-m-empty">Aucun personnage connu pour ce jeu.</p>
+          )
         ) : (
-          shown.map((c) => (
-            <button
-              key={c.id || c.name}
-              type="button"
-              className="bd-char-opt clickable"
-              onClick={() => onPick({ name: c.name, image: c.image || null })}
-              title={c.name}
-            >
-              <span className="bd-char-face">
-                {c.image ? <img src={c.image} alt="" loading="lazy" /> : <b>{c.name.charAt(0)}</b>}
-              </span>
-              <span className="bd-char-name">{c.name}</span>
-            </button>
-          ))
+          groups.map((g) =>
+            g.chars && !g.chars.filter(match).length ? null : (
+              <section key={g.game.id} className="bd-char-group">
+                <h4>
+                  {g.game.cover && <img src={g.game.cover} alt="" />}
+                  {g.game.name}
+                  {g.game.year && <span>{g.game.year}</span>}
+                </h4>
+                {renderChars(g.chars)}
+              </section>
+            )
+          )
         )}
       </div>
     </>
