@@ -140,8 +140,11 @@ function NinePoster({ list }) {
  *
  * ⚠️ PAS DE BANDEAU NOIR. Les listes de joueurs posent leur titre sur un aplat
  * sombre ; un top officiel est une vitrine de la maison, il a sa couleur et son
- * visuel, et c'est ce qui le fait repérer dans un rail de listes. On entrevoit
- * quelques-uns de ses jeux en petite pile, qui s'étale au survol.
+ * visuel, et c'est ce qui le fait repérer dans un rail de listes.
+ *
+ * Le fond garde sa couleur unique, mais il n'est plus nu : un semis de points
+ * blancs, et les jaquettes du top en mosaïque penchée, fondues dans la couleur
+ * — on devine les jeux sans qu'ils mangent l'aplat.
  */
 function TopPoster({ list }) {
   const ready = useNineFonts();
@@ -152,12 +155,20 @@ function TopPoster({ list }) {
   const art = list.cover || theme.art;
   const { n, subject } = splitTopTitle(list.title, list.itemCount);
   const imgs = (list.preview || []).filter(Boolean);
-  // Sans visuel, les trois premières jaquettes font l'éventail à droite ; les
-  // suivantes font la petite pile sous le titre.
+  // Sans visuel, les trois premières jaquettes font l'éventail à droite.
   const fan = art ? [] : imgs.slice(0, 3);
-  const peek = (art ? imgs : imgs.slice(3)).slice(0, 4);
+  // La mosaïque du fond : 18 cases, on reboucle sur ce qu'on a.
+  const mosaic = imgs.length ? Array.from({ length: 18 }, (_, i) => imgs[i % imgs.length]) : [];
   return (
     <span className={`lt-top ${ready ? "fonts-ready" : ""}`} style={{ "--tc": color }}>
+      {mosaic.length > 0 && (
+        <span className="lt-top-mosaic" aria-hidden="true">
+          {mosaic.map((src, i) => (
+            <img key={i} src={src} alt="" loading="lazy" draggable="false" />
+          ))}
+        </span>
+      )}
+      <span className="lt-top-dots" aria-hidden="true" />
       {art ? (
         <img className="lt-top-art" src={art} alt="" loading="lazy" draggable="false" />
       ) : (
@@ -176,13 +187,6 @@ function TopPoster({ list }) {
           </span>
         )}
         <span className="lt-top-subject">{subject}</span>
-        {peek.length > 0 && (
-          <span className="lt-top-peek" aria-hidden="true">
-            {peek.map((src, i) => (
-              <img key={i} src={src} alt="" loading="lazy" draggable="false" style={{ "--i": i }} />
-            ))}
-          </span>
-        )}
         <span className="lt-top-by">
           MyPlayLog <BadgeCheck size={12} aria-label="Compte officiel" />
           {list.likeCount > 0 && (
@@ -275,7 +279,11 @@ export default function ListTile({ list, onDelete }) {
         : [...(list.cover ? [list.cover] : []), ...(list.preview || [])].slice(0, 3);
 
   return (
-    <Link to={`/lists/${list.id}`} className={`lt is-${kind} clickable`}>
+    <Link
+      to={`/lists/${list.id}`}
+      className={`lt is-${kind} clickable`}
+      style={kind === "top" ? { "--tc": topTheme(list.official?.key).color } : undefined}
+    >
       <span className="lt-media">
         {kind === "board" ? (
           <BoardId list={list} />

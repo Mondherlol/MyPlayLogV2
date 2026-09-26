@@ -2904,6 +2904,25 @@
   border-radius: 12px;
   overflow: hidden;
   background: var(--surface-2);
+  /* Un contour et une ombre portée : sur le fond clair, les cartes se
+     détachaient à peine de la page. */
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 6px 18px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.25s ease, transform 0.25s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.lt:hover .lt-media {
+  transform: translateY(-3px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08), 0 14px 30px rgba(0, 0, 0, 0.16);
+}
+:root[data-theme="dark"] .lt-media {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+:root[data-theme="dark"] .lt:hover .lt-media {
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5);
+}
+/* Sur un top, le contour prend la couleur du top, un cran plus sombre. */
+.lt.is-top .lt-media {
+  border-color: color-mix(in srgb, var(--tc, #3aa7ee) 70%, #000);
 }
 .lt-cover {
   width: 100%;
@@ -3236,12 +3255,52 @@
   background: var(--tc);
   color: #fff;
 }
+/* Le fond : les jaquettes du top en mosaïque penchée, désaturées et fondues
+   dans la couleur (on les devine), puis un semis de points blancs par-dessus. */
+.lt-top-mosaic {
+  position: absolute;
+  z-index: 0;
+  top: -30%;
+  left: -20%;
+  width: 150%;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  transform: rotate(-12deg);
+  opacity: 0.2;
+  mix-blend-mode: luminosity;
+  pointer-events: none;
+  transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.3, 1), opacity 0.3s ease;
+}
+.lt-top-mosaic img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 5px;
+  filter: grayscale(1) contrast(1.1);
+}
+.lt:hover .lt-top-mosaic {
+  opacity: 0.28;
+  transform: rotate(-12deg) translate(-3%, -2%);
+}
+.lt-top-dots {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.28) 1.4px, transparent 1.6px);
+  background-size: 14px 14px;
+  /* Les points s'effacent vers le bas à droite, là où vit le visuel. */
+  -webkit-mask-image: linear-gradient(115deg, #000 20%, transparent 75%);
+  mask-image: linear-gradient(115deg, #000 20%, transparent 75%);
+  pointer-events: none;
+}
+
 .lt-top-text {
   position: absolute;
   z-index: 3;
   top: 14px;
   left: 16px;
-  width: 52%;
+  width: 54%;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -3250,7 +3309,7 @@
 }
 .lt-top-num {
   font-family: "Anton", "Space Grotesk", var(--font-display);
-  font-size: 1.95rem;
+  font-size: 2.1rem;
   line-height: 1;
   letter-spacing: 0.01em;
   text-transform: uppercase;
@@ -3267,12 +3326,12 @@
 .lt-top-subject {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 1.02rem;
-  line-height: 1.15;
-  letter-spacing: -0.01em;
+  font-size: 1.42rem;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
   color: #fff;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
@@ -3344,37 +3403,10 @@
     translateY(-4px);
 }
 
-/* Quelques jeux du top, en petite pile sous le titre : on les entrevoit, ils
-   s'étalent au survol. */
-.lt-top-peek {
-  display: flex;
-  margin-top: 0.45rem;
-  padding-left: 2px;
-}
-.lt-top-peek img {
-  width: 30px;
-  aspect-ratio: 3 / 4;
-  object-fit: cover;
-  border-radius: 4px;
-  border: 1.5px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
-  transform: rotate(calc((var(--i) - 1.5) * 6deg));
-  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.3, 1), margin 0.35s cubic-bezier(0.2, 0.8, 0.3, 1);
-}
-.lt-top-peek img + img {
-  margin-left: -12px;
-}
-.lt:hover .lt-top-peek img {
-  transform: rotate(calc((var(--i) - 1.5) * 3deg)) translateY(-2px);
-}
-.lt:hover .lt-top-peek img + img {
-  margin-left: 3px;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .lt-top-art,
   .lt-top-fan img,
-  .lt-top-peek img {
+  .lt-top-mosaic {
     transition: none;
   }
 }
