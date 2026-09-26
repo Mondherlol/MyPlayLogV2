@@ -1,7 +1,7 @@
 import { platformLabel } from "../lib/platforms";
 import PlatformMark from "../components/PlatformMark";
 import GameSiteIcon from "../components/GameSiteIcon";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
@@ -22,7 +22,6 @@ import {
   Code2,
   Cpu,
   Layers,
-  Package,
   Clock,
   CalendarClock,
   Play,
@@ -332,17 +331,30 @@ function GameTags({ tags }) {
   );
 }
 
-// Liste de studios/éditeurs cliquables séparés par des virgules.
-function CompanyList({ names, role, navigate }) {
+// Un studio de la fiche : son logo (ou son initiale), son nom, ce qu'il a fait
+// sur ce jeu. Mène à sa page /company, sur l'onglet de son premier rôle.
+const ROLE_LABEL = { dev: "Développeur", pub: "Éditeur" };
+function StudioCard({ studio, navigate }) {
+  const [broken, setBroken] = useState(false);
+  const { name, logo, roles } = studio;
   return (
-    <>
-      {names.map((n, i) => (
-        <Fragment key={n}>
-          {i > 0 && ", "}
-          <CompanyLink name={n} role={role} navigate={navigate} />
-        </Fragment>
-      ))}
-    </>
+    <button
+      className="gp-studio clickable"
+      onClick={() => navigate(`/company/${encodeURIComponent(name)}?role=${roles[0]}`)}
+      title={`Voir ${name}`}
+    >
+      <span className="gp-studio-logo">
+        {logo && !broken ? (
+          <img src={logo} alt="" loading="lazy" onError={() => setBroken(true)} />
+        ) : (
+          <b>{name.charAt(0).toUpperCase()}</b>
+        )}
+      </span>
+      <span className="gp-studio-text">
+        <span className="gp-studio-name">{name}</span>
+        <span className="gp-studio-role">{roles.map((r) => ROLE_LABEL[r]).join(" · ")}</span>
+      </span>
+    </button>
   );
 }
 
@@ -1900,19 +1912,22 @@ function InfosTab({ game, entry, onOpenImage, navigate }) {
     { label: "Modes de jeu", items: game.gameModes, param: "mod" },
   ].filter((g) => g.items?.length);
 
+  // Studios : développeurs et éditeurs fondus en une seule rangée de cartes,
+  // chacune avec son logo. Un studio qui a fait les deux (Nihon Falcom qui
+  // s'auto-édite) n'apparaît qu'une fois, avec ses deux rôles.
+  const studios = [];
+  for (const [names, role] of [
+    [game.developers || [], "dev"],
+    [game.publishers || [], "pub"],
+  ]) {
+    for (const name of names) {
+      const known = studios.find((st) => st.name === name);
+      if (known) known.roles.push(role);
+      else studios.push({ name, logo: game.companyLogos?.[name] || null, roles: [role] });
+    }
+  }
+
   const facts = [
-    game.developers?.length && {
-      Icon: Code2,
-      label: game.developers.length > 1 ? "Développeurs" : "Développeur",
-      companies: game.developers,
-      role: "dev",
-    },
-    game.publishers?.length && {
-      Icon: Package,
-      label: game.publishers.length > 1 ? "Éditeurs" : "Éditeur",
-      companies: game.publishers,
-      role: "pub",
-    },
     game.engines?.length && { Icon: Cpu, label: "Moteur", value: game.engines.join(", ") },
     game.perspectives?.length && {
       Icon: Layers,
@@ -2076,6 +2091,17 @@ function InfosTab({ game, entry, onOpenImage, navigate }) {
         </section>
       )}
 
+      {studios.length > 0 && (
+        <section className="gp-block">
+          <h3 className="gp-h3">Studios</h3>
+          <div className="gp-studios">
+            {studios.map((st) => (
+              <StudioCard key={st.name} studio={st} navigate={navigate} />
+            ))}
+          </div>
+        </section>
+      )}
+
       {facts.length > 0 && (
         <section className="gp-block">
           <div className="gp-factgrid">
@@ -2084,13 +2110,7 @@ function InfosTab({ game, entry, onOpenImage, navigate }) {
                 <span className="gp-fact-label">
                   <f.Icon size={13} /> {f.label}
                 </span>
-                <span className="gp-fact-value">
-                  {f.companies ? (
-                    <CompanyList names={f.companies} role={f.role} navigate={navigate} />
-                  ) : (
-                    f.value
-                  )}
-                </span>
+                <span className="gp-fact-value">{f.value}</span>
               </div>
             ))}
           </div>

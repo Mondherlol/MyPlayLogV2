@@ -8446,6 +8446,74 @@
   color: var(--text);
 }
 
+/* Studios : une carte par studio, logo + nom + rôle. Les logos IGDB sont
+   dessinés pour fond clair (souvent noirs, sans fond) : ils posent donc sur une
+   pastille blanche, sinon la moitié disparaît dans le thème sombre. */
+.gp-studios {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.5rem;
+}
+.gp-studio {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+  padding: 0.5rem 0.7rem 0.5rem 0.5rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: var(--cursor-pointer), pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.gp-studio:hover {
+  border-color: var(--border-strong);
+}
+.gp-studio-logo {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 5px;
+  border-radius: 9px;
+  background: #fff;
+  overflow: hidden;
+}
+.gp-studio-logo img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.gp-studio-logo b {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #1a1a1d;
+}
+.gp-studio-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.gp-studio-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gp-studio:hover .gp-studio-name {
+  color: var(--accent-ink);
+}
+.gp-studio-role {
+  font-size: 0.74rem;
+  color: var(--text-soft);
+}
+
 /* Nom de studio / éditeur cliquable (hero + facts) → page /company */
 .gp-company-link {
   border: 0;

@@ -107,31 +107,48 @@
   border-color: #f2b70b;
 }
 
-.nine-card-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: auto;
-}
-/* Les neuf cases : la forme même du principe. Au survol elles se remplissent
-   de la couleur du thème, l'une après l'autre. */
-.nine-card-slots {
+/* Ta liste faite : ses neuf jaquettes en fond, grisées et assombries, sous un
+   voile qui garde la phrase lisible en haut et le pied en bas. */
+.nine-card-mosaic {
+  position: absolute;
+  inset: 0;
   display: grid;
-  grid-template-columns: repeat(3, 10px);
-  gap: 3px;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
 }
-.nine-card-slots > * {
-  width: 10px;
-  height: 13px;
-  border-radius: 3px;
-  background: color-mix(in srgb, var(--nc) 18%, var(--surface-2));
+.nine-card-mosaic img {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  transition: background-color 0.18s ease;
+  filter: grayscale(0.5) blur(1.5px) brightness(0.62);
+  transform: scale(1.04);
+  transition: filter 0.3s ease;
 }
-.nine-card:hover .nine-card-slots > span {
-  background: var(--nc);
+.nine-card-mosaic::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(10, 10, 12, 0.62), rgba(10, 10, 12, 0.2) 55%, rgba(10, 10, 12, 0.72));
 }
+.nine-card.has-mosaic:hover .nine-card-mosaic img {
+  filter: grayscale(0.2) blur(0.5px) brightness(0.6);
+}
+.nine-card.has-mosaic,
+.nine-card.has-mosaic .nine-phrase {
+  color: #fff;
+}
+.nine-card.has-mosaic .nine-card-foot {
+  border-top-color: rgba(255, 255, 255, 0.16);
+}
+.nine-card.has-mosaic .nine-card-ic {
+  background: rgba(10, 10, 12, 0.55);
+}
+.nine-card.has-mosaic::before {
+  z-index: 1;
+}
+
 .nine-card-ic {
+  position: relative;
   display: grid;
   place-items: center;
   width: 32px;
@@ -142,15 +159,17 @@
 }
 
 .nine-card .nine-phrase {
-  margin-top: 10px;
+  position: relative;
+  margin-top: 12px;
 }
 
 .nine-card-foot {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.4rem;
   min-height: 22px;
-  margin-top: 12px;
+  margin-top: auto;
   padding-top: 10px;
   border-top: 1px solid var(--border);
   font-size: 0.74rem;
@@ -785,14 +804,21 @@
   border-color: color-mix(in srgb, #ff5470 45%, var(--border));
 }
 
-/* La grille : trois par ligne, neuf cases. */
+/* La grille : trois par ligne, neuf cases — et LES NEUF D'UN COUP D'ŒIL.
+   Étalée sur toute la colonne, chaque jaquette montait à 300 px de haut et la
+   troisième rangée passait sous la ligne de flottaison : il fallait défiler
+   pour voir sa propre liste. La largeur est donc déduite de la hauteur de
+   l'écran : ~300 px de chrome (barre du haut, retour, noms sous les
+   jaquettes, écarts), le reste en trois rangées de jaquettes 3/4. */
 .nd-grid {
   list-style: none;
-  margin: 0;
+  margin: 0 auto;
   padding: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 22px 18px;
+  gap: 14px 14px;
+  width: 100%;
+  max-width: max(360px, calc((100vh - 300px) * 0.75 + 28px));
 }
 .nd-cell {
   min-width: 0;
@@ -807,7 +833,7 @@
 .nd-cell-link {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   color: var(--text);
   text-decoration: none;
 }
@@ -835,12 +861,12 @@
 }
 .nd-cell-num {
   position: absolute;
-  left: 9px;
-  top: 9px;
+  left: 7px;
+  top: 7px;
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   border-radius: 999px;
   font-family: "Space Grotesk", var(--font-display);
   font-size: 0.95rem;
@@ -850,11 +876,11 @@
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
 }
 .nd-cell-name {
-  font-size: 0.92rem;
+  font-size: 0.84rem;
   font-weight: 700;
   line-height: 1.25;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -978,7 +1004,7 @@
     top: 0;
   }
   .nd-grid {
-    gap: 14px 10px;
+    gap: 12px 10px;
   }
 }
 

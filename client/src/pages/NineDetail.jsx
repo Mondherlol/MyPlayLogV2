@@ -209,7 +209,7 @@ export default function NineDetail({ list, items, token, onLike, onDelete, onCha
                   {it.image ? <img src={it.image} alt="" loading="lazy" /> : <span className="nd-cell-noart">{it.name}</span>}
                   <span className="nd-cell-num">{i + 1}</span>
                 </span>
-                <span className="nd-cell-name">{it.name}</span>
+                <span className="nd-cell-name" title={it.name}>{it.name}</span>
               </>
             );
             return (

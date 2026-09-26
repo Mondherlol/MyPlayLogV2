@@ -39,9 +39,10 @@ function Faces({ faces }) {
 }
 
 /**
- * Un thème, en carte. En haut, les neuf cases à remplir — la forme même du
- * principe, qui se remplit de la couleur du thème au survol, case après case
- * (ou tes neuf jaquettes si la liste est faite) ; en bas, la phrase.
+ * Un thème, en carte : l'icône, puis la phrase, calées en haut ; le pied en
+ * bas. Quand ta liste est faite, ses neuf jaquettes tapissent le fond, en
+ * mosaïque assombrie — la carte devient TA liste, sans qu'on ait à lire le
+ * pied pour le savoir.
  */
 function NineCard({ themeKey, stats, onOpen, fontsReady }) {
   const custom = themeKey === NINE_CUSTOM;
@@ -49,28 +50,30 @@ function NineCard({ themeKey, stats, onOpen, fontsReady }) {
   const mine = !custom && stats?.mine;
   const count = stats?.count || 0;
   const faces = stats?.faces || [];
+  const mosaic = (mine?.preview || []).filter(Boolean).slice(0, 9);
 
   return (
     <button
       type="button"
-      className={`nine-card clickable ${custom ? "is-custom" : ""} ${mine ? "is-mine" : ""}`}
+      className={`nine-card clickable ${custom ? "is-custom" : ""} ${mine ? "is-mine" : ""} ${
+        mosaic.length ? "has-mosaic" : ""
+      }`}
       style={{ "--nc": color }}
       onClick={onOpen}
       title={custom ? "Invente ton propre thème" : `Ces 9 jeux ${short}`}
     >
-      <span className="nine-card-top">
-        <span className={`nine-card-slots ${mine ? "filled" : ""}`} aria-hidden="true">
-          {Array.from({ length: 9 }, (_, i) =>
-            mine?.preview?.[i] ? (
-              <img key={i} src={mine.preview[i]} alt="" loading="lazy" />
-            ) : (
-              <span key={i} style={{ transitionDelay: `${i * 35}ms` }} />
-            )
-          )}
+      {mosaic.length > 0 && (
+        <span className="nine-card-mosaic" aria-hidden="true">
+          {Array.from({ length: 9 }, (_, i) => {
+            // Moins de neuf aperçus : on reboucle plutôt que de laisser des trous.
+            const src = mosaic[i % mosaic.length];
+            return <img key={i} src={src} alt="" loading="lazy" />;
+          })}
         </span>
-        <span className="nine-card-ic" aria-hidden="true">
-          <Icon size={17} strokeWidth={2.3} />
-        </span>
+      )}
+
+      <span className="nine-card-ic" aria-hidden="true">
+        <Icon size={17} strokeWidth={2.3} />
       </span>
 
       <NinePhrase themeKey={themeKey} inner={CARD_INNER} ready={fontsReady} prompt={custom} />
