@@ -2148,7 +2148,7 @@ function InfosTab({ game, entry, onOpenImage, navigate }) {
         </section>
       ))}
 
-      <GameTags key={id} tags={game.tags} />
+      <GameTags key={game.id} tags={game.tags} />
 
       {game.platforms?.length > 0 && (
         <section className="gp-block">
