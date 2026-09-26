@@ -573,7 +573,7 @@ export default function ProfileOverview({
         )}
 
         {/* La carte de joueur (un jeu par case) ouvre le profil. */}
-        {!editing && <ProfileBoard lists={lists} isMe={isMe} username={username} />}
+        {!editing && <ProfileBoard lists={lists} isMe={isMe} token={token} />}
 
         {editing ? (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>

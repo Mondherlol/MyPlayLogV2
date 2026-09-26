@@ -465,12 +465,22 @@
   color: inherit;
 }
 
+/* Les rayons tiennent sur UNE ligne : s'ils débordent, la ligne défile
+   plutôt que de passer à la ligne et de pousser la grille vers le bas. */
 .nine-m-shelves {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.4rem;
+  flex: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.nine-m-shelves::-webkit-scrollbar {
+  display: none;
 }
 .nine-m-shelf {
+  flex: none;
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;

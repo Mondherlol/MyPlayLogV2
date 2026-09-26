@@ -1,30 +1,37 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Globe, Heart, IdCard, Lock, PenLine, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Globe, Heart, Loader2, Lock, Sparkles, Trash2 } from "lucide-react";
 
-import BoardGrid from "../components/BoardGrid";
-import BoardModal from "../components/BoardModal";
+import PlayerCard from "../components/board/PlayerCard";
+import BoardPicker from "../components/board/BoardPicker";
 import ListComments from "../components/ListComments";
 import { apiFetch } from "../lib/api";
-import { boardOf } from "../lib/boards";
+import { boardOf, itemsBySlot, openMyBoard } from "../lib/boards";
 
 // ======================================================================
-//  La page d'une carte de joueur
+//  La page d'une carte de joueur — et son éditeur
 // ======================================================================
-// Comme la page d'une liste des 9 : une affiche, pas une liste. Le titre et
-// son auteur, la grille entière — qui tient dans l'écran, sans défiler —, et
-// « Fais la tienne » pour qui passe par là.
+// La carte se remplit ICI, directement : un clic sur une case ouvre le choix
+// de son jeu (components/board/BoardPicker), et le choix est enregistré dans
+// la foulée. Rien n'attend un bouton « Publier » : fermer une fenêtre par
+// mégarde ne fait rien perdre.
+//
+// ⚠️ LES ENREGISTREMENTS PARTENT À LA FILE. Deux cases remplies coup sur coup
+// envoient deux PUT de la liste entière ; s'ils se croisaient, le second
+// arrivé écraserait le premier avec un état qui ne le contient pas. On
+// enchaîne donc chaque envoi sur le précédent, et c'est toujours l'état le
+// plus récent qui part.
 
-const fmtDate = (d) =>
-  d ? new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "";
-
-export default function BoardDetail({ list, items, token, onLike, onDelete, onChanged }) {
+export default function BoardDetail({ list, items: initialItems, token, onLike, onDelete, onChanged }) {
   const navigate = useNavigate();
   const board = boardOf(list.board);
-  const [editing, setEditing] = useState(false);
-  const [editSlot, setEditSlot] = useState(null);
-  const [making, setMaking] = useState(false);
-  const [mine, setMine] = useState(null); // ma propre carte, si j'en ai une
+  const [items, setItems] = useState(initialItems);
+  const [picking, setPicking] = useState(null); // clé de la case en cours de choix
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [mine, setMine] = useState(null); // ma propre carte, sur celle d'un autre
+  const queue = useRef(Promise.resolve());
+  const latest = useRef(initialItems);
 
   useEffect(() => {
     if (!token || list.mine) return undefined;
@@ -37,7 +44,60 @@ export default function BoardDetail({ list, items, token, onLike, onDelete, onCh
     };
   }, [token, list.mine, board.key]);
 
-  const filled = items.filter((i) => i.slot).length;
+  const persist = (next, extra = {}) => {
+    latest.current = next;
+    setItems(next);
+    setSaving(true);
+    setSaved(false);
+    queue.current = queue.current
+      .catch(() => {})
+      .then(() =>
+        apiFetch(`/lists/${list.id}`, {
+          method: "PUT",
+          token,
+          body: { items: latest.current, ...extra },
+        })
+      )
+      .then((res) => {
+        if (res?.list) onChanged?.(res.list);
+        setSaved(true);
+      })
+      .catch((e) => alert(e.message || "Impossible d'enregistrer la case."))
+      .finally(() => setSaving(false));
+  };
+
+  const setCell = (slot, game, char) => {
+    const rest = items.filter((i) => i.slot !== slot);
+    const next = game
+      ? [
+          ...rest,
+          {
+            kind: "game",
+            refId: String(game.id),
+            gameId: game.id,
+            name: game.name,
+            image: game.cover || null,
+            slot,
+            charName: char?.name || null,
+            charImage: char?.image || null,
+          },
+        ]
+      : rest;
+    persist(next);
+    setPicking(null);
+  };
+
+  const toggleVisibility = () =>
+    persist(items, { visibility: list.visibility === "private" ? "public" : "private" });
+
+  // Le petit « Enregistré » s'efface tout seul.
+  useEffect(() => {
+    if (!saved) return undefined;
+    const t = setTimeout(() => setSaved(false), 1600);
+    return () => clearTimeout(t);
+  }, [saved]);
+
+  const by = itemsBySlot(items);
 
   return (
     <div className="bd-page">
@@ -45,112 +105,78 @@ export default function BoardDetail({ list, items, token, onLike, onDelete, onCh
         <button className="nd-back clickable" onClick={() => navigate(-1)}>
           <ArrowLeft size={17} /> Retour
         </button>
-        {list.mine && (
-          <div className="nd-tools">
-            <span className="nd-vis" title={list.visibility === "private" ? "Privée" : "Publique"}>
-              {list.visibility === "private" ? <Lock size={14} /> : <Globe size={14} />}
+        <div className="nd-tools">
+          {list.mine && (
+            <span className={`bd-save ${saving || saved ? "on" : ""}`}>
+              {saving ? <Loader2 size={14} className="spin" /> : <Check size={14} />}
+              {saving ? "Enregistrement…" : "Enregistré"}
             </span>
-            <button className="nd-tool danger clickable" onClick={onDelete} title="Supprimer">
-              <Trash2 size={16} />
-            </button>
-          </div>
-        )}
+          )}
+          {list.mine ? (
+            <>
+              <button
+                className="nd-tool clickable"
+                onClick={toggleVisibility}
+                title={list.visibility === "private" ? "Privée — la rendre publique" : "Publique — la rendre privée"}
+              >
+                {list.visibility === "private" ? <Lock size={15} /> : <Globe size={15} />}
+              </button>
+              <button className="nd-tool danger clickable" onClick={onDelete} title="Supprimer">
+                <Trash2 size={16} />
+              </button>
+            </>
+          ) : (
+            <>
+              {token && (
+                <button
+                  className={`nd-like clickable ${list.liked ? "on" : ""}`}
+                  onClick={onLike}
+                  aria-pressed={!!list.liked}
+                  title={list.liked ? "Je n'aime plus" : "J'aime"}
+                >
+                  <Heart size={16} fill={list.liked ? "currentColor" : "none"} />
+                  {list.likeCount > 0 && <span>{list.likeCount}</span>}
+                </button>
+              )}
+              {mine ? (
+                <Link to={`/lists/${mine.id}`} className="btn btn-primary bd-cta clickable">
+                  Ma carte <ArrowRight size={16} />
+                </Link>
+              ) : (
+                token && (
+                  <button
+                    className="btn btn-primary bd-cta clickable"
+                    onClick={() => openMyBoard({ token, navigate, apiFetch, boardKey: board.key })}
+                  >
+                    <Sparkles size={16} /> Fais la tienne
+                  </button>
+                )
+              )}
+            </>
+          )}
+        </div>
       </div>
 
-      <header className="bd-hero">
-        <div className="bd-hero-main">
-          <span className="bd-hero-ic" aria-hidden="true">
-            <IdCard size={20} />
-          </span>
-          <div>
-            <h1 className="bd-title">
-              {list.mine ? board.title : `La carte de joueur de ${list.author?.username || "?"}`}
-            </h1>
-            <div className="nd-by">
-              <Link to={`/u/${list.author?.username}`} className="nd-author clickable">
-                {list.author?.avatar ? (
-                  <img src={list.author.avatar} alt="" />
-                ) : (
-                  <span className="nd-author-letter">{(list.author?.username || "?")[0].toUpperCase()}</span>
-                )}
-                <span>{list.author?.username}</span>
-              </Link>
-              <span className="nd-date">
-                {filled}/{board.slots.length} cases · {fmtDate(list.updatedAt || list.createdAt)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="nd-actions">
-          {list.mine ? (
-            <button className="btn btn-primary nd-cta clickable" onClick={() => setEditing(true)}>
-              <PenLine size={17} /> Modifier ma carte
-            </button>
-          ) : mine ? (
-            <Link to={`/lists/${mine.id}`} className="btn btn-primary nd-cta clickable">
-              Voir la mienne <ArrowRight size={17} />
-            </Link>
-          ) : (
-            token && (
-              <button className="btn btn-primary nd-cta clickable" onClick={() => setMaking(true)}>
-                <Sparkles size={17} /> Fais la tienne
-              </button>
-            )
-          )}
-          {token && (
-            <button
-              className={`nd-like clickable ${list.liked ? "on" : ""}`}
-              onClick={onLike}
-              aria-pressed={!!list.liked}
-              title={list.liked ? "Je n'aime plus" : "J'aime"}
-            >
-              <Heart size={17} fill={list.liked ? "currentColor" : "none"} />
-              {list.likeCount > 0 && <span>{list.likeCount}</span>}
-            </button>
-          )}
-        </div>
-      </header>
-
-      <BoardGrid
-        board={board.key}
+      <PlayerCard
+        list={list}
         items={items}
-        onFill={
-          list.mine
-            ? (slot) => {
-                setEditSlot(slot);
-                setEditing(true);
-              }
-            : undefined
-        }
+        author={list.author}
+        onCell={list.mine ? (slot) => setPicking(slot) : undefined}
       />
 
-      <ListComments listId={list.id} list={list} token={token} />
+      <div className="bd-comments">
+        <ListComments listId={list.id} list={list} token={token} />
+      </div>
 
-      {editing && (
-        <BoardModal
+      {picking && (
+        <BoardPicker
           boardKey={board.key}
-          list={{ ...list, items }}
-          startSlot={editSlot}
-          onClose={() => {
-            setEditing(false);
-            setEditSlot(null);
-          }}
-          onPublished={(updated) => {
-            setEditing(false);
-            setEditSlot(null);
-            if (updated) onChanged(updated);
-          }}
-        />
-      )}
-      {making && (
-        <BoardModal
-          boardKey={board.key}
-          onClose={() => setMaking(false)}
-          onPublished={(created) => {
-            setMaking(false);
-            navigate(`/lists/${created.id}`);
-          }}
+          slotKey={picking}
+          current={by[picking] || null}
+          token={token}
+          onPick={(g, c) => setCell(picking, g, c)}
+          onClear={() => setCell(picking, null)}
+          onClose={() => setPicking(null)}
         />
       )}
     </div>

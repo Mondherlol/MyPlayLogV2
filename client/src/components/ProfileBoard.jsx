@@ -1,10 +1,9 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { ChevronRight, IdCard, Sparkles } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { IdCard, Sparkles } from "lucide-react";
 
-import BoardGrid from "./BoardGrid";
-import BoardModal from "./BoardModal";
-import { DEFAULT_BOARD, boardOf } from "../lib/boards";
+import PlayerCard from "./board/PlayerCard";
+import { apiFetch } from "../lib/api";
+import { DEFAULT_BOARD, openMyBoard } from "../lib/boards";
 
 // ======================================================================
 //  La carte de joueur, en tête du profil
@@ -12,15 +11,15 @@ import { DEFAULT_BOARD, boardOf } from "../lib/boards";
 // Un jeu par case — préféré, meilleure histoire, pas mon style mais… — c'est
 // le portrait le plus rapide d'un joueur : elle ouvre donc son profil, en
 // compact (deux rangées de dix). Sur SON profil, sans carte, une invitation à
-// la faire à la place ; sur celui d'un autre, rien.
+// la faire à la place ; sur celui d'un autre, rien — pas plus qu'une carte
+// encore vide.
 
-export default function ProfileBoard({ lists, isMe, username }) {
+export default function ProfileBoard({ lists, isMe, token }) {
   const navigate = useNavigate();
-  const [making, setMaking] = useState(false);
   const list = (lists || []).find((l) => l.board === DEFAULT_BOARD);
-  const board = boardOf(DEFAULT_BOARD);
+  const items = list?.boardItems || [];
 
-  if (!list) {
+  if (!list || (!items.length && !isMe)) {
     if (!isMe) return null;
     return (
       <section className="profile-section pf-block pf-board-cta">
@@ -29,36 +28,20 @@ export default function ProfileBoard({ lists, isMe, username }) {
         </span>
         <div>
           <b>Ta carte de joueur</b>
-          <span>Un jeu par case : ton préféré, la meilleure histoire, pas ton style mais…</span>
         </div>
-        <button className="btn btn-primary clickable" onClick={() => setMaking(true)}>
+        <button
+          className="btn btn-primary clickable"
+          onClick={() => openMyBoard({ token, navigate, apiFetch })}
+        >
           <Sparkles size={16} /> La remplir
         </button>
-        {making && (
-          <BoardModal
-            boardKey={board.key}
-            onClose={() => setMaking(false)}
-            onPublished={(created) => {
-              setMaking(false);
-              navigate(`/lists/${created.id}`);
-            }}
-          />
-        )}
       </section>
     );
   }
 
   return (
     <section className="profile-section pf-block pf-board">
-      <div className="pf-board-head">
-        <h3>
-          <IdCard size={16} /> {isMe ? board.title : `La carte de joueur de ${username}`}
-        </h3>
-        <Link to={`/lists/${list.id}`} className="pf-board-more clickable">
-          Voir en grand <ChevronRight size={15} />
-        </Link>
-      </div>
-      <BoardGrid board={board.key} items={list.boardItems || []} compact />
+      <PlayerCard list={list} items={items} author={list.author} compact link={`/lists/${list.id}`} />
     </section>
   );
 }

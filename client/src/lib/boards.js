@@ -73,3 +73,29 @@ export function itemsBySlot(items) {
   for (const it of items || []) if (it.slot) out[it.slot] = it;
   return out;
 }
+
+/**
+ * Ouvre SA carte : la retrouve, ou la crée vide puis l'ouvre.
+ *
+ * ⚠️ PAS DE FENÊTRE DE CRÉATION. La carte se remplit directement sur sa page,
+ * case par case, et chaque choix est enregistré aussitôt : fermer une fenêtre
+ * par mégarde ne fait plus rien perdre. La créer vide d'entrée, c'est ce qui
+ * rend ça possible — il faut un id pour enregistrer la première case.
+ */
+export async function openMyBoard({ token, navigate, apiFetch, boardKey = DEFAULT_BOARD }) {
+  const board = boardOf(boardKey);
+  try {
+    const d = await apiFetch(`/lists?scope=mine&board=${board.key}&limit=1`, { token });
+    if (d.lists?.[0]) return navigate(`/lists/${d.lists[0].id}`);
+    const res = await apiFetch("/lists", {
+      method: "POST",
+      token,
+      body: { title: board.title, board: board.key, type: "classic", itemKind: "game", items: [] },
+    });
+    navigate(`/lists/${res.list.id}`);
+  } catch (err) {
+    // Créée entre-temps (autre onglet) : le serveur donne son id.
+    if (err.status === 409 && err.data?.id) navigate(`/lists/${err.data.id}`);
+    else alert(err.message || "Impossible d'ouvrir ta carte.");
+  }
+}

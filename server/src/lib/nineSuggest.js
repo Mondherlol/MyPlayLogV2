@@ -6,6 +6,9 @@
 // sur un rayon propre au thème, tiré de TA bibliothèque, avant les rayons
 // de toujours (coups de cœur, mieux notés…).
 //
+// Le libellé est COURT : il tient dans une pastille, sur la même ligne que
+// les rayons de toujours.
+//
 // Chaque thème est une règle : un filtre (facultatif) et un score. Les deux
 // lisent l'entrée de bibliothèque (note, heures, coup de cœur, statut) et la
 // fiche du jeu (date, note du public, popularité, thèmes, genres, modes,
@@ -64,30 +67,30 @@ const ageOf = (f) => (f?.date ? (Date.now() / 1000 - f.date) / YEAR_S : null);
 
 export const NINE_SUGGEST = {
   personality: {
-    label: "Tes coups de cœur de longue date",
+    label: "De longue date",
     score: (e, f) => userScore(e) + (e.favorite ? 40 : 0) + Math.min(20, (ageOf(f) || 0) * 1.5),
   },
   childhood: {
-    label: "Sortis il y a plus de 12 ans",
+    label: "12 ans et plus",
     filter: (e, f) => (ageOf(f) || 0) >= 12,
     score: (e, f) => userScore(e) + (e.favorite ? 30 : 0) + Math.min(25, (ageOf(f) || 0) - 12),
   },
   cried: {
-    label: "Des histoires qui touchent",
+    label: "Émouvants",
     filter: (e, f) => has(f?.themes, [TH.drama, TH.romance]) || has(f?.keywords, KW.emotional),
     score: (e) => userScore(e) + (e.favorite ? 25 : 0),
   },
   island: {
-    label: "Ceux que tu garderais toujours",
+    label: "Indispensables",
     score: (e) => userScore(e) + (e.favorite ? 30 : 0) + Math.log2(1 + hoursOf(e)) * 2,
   },
   mustplay: {
-    label: "Adorés par toi et par le public",
+    label: "Adorés de tous",
     filter: (e) => userScore(e) >= 75 || e.favorite,
     score: (e, f) => userScore(e) * 0.6 + (f?.rating ?? 70) * 0.4 + (e.status === "finished" ? 8 : 0),
   },
   comfort: {
-    label: "Ceux où tu reviens toujours",
+    label: "Tes refuges",
     score: (e, f) =>
       Math.log2(1 + hoursOf(e)) * 12 +
       (e.status === "endless" ? 30 : e.status === "playing" ? 10 : 0) +
@@ -95,7 +98,7 @@ export const NINE_SUGGEST = {
       userScore(e) * 0.3,
   },
   underrated: {
-    label: "Aimés par toi, boudés par le public",
+    label: "Sous-estimés",
     filter: (e, f) => (userScore(e) >= 70 || e.favorite) && f != null,
     score: (e, f) =>
       userScore(e) -
@@ -104,7 +107,7 @@ export const NINE_SUGGEST = {
       (e.favorite ? 10 : 0),
   },
   soundtrack: {
-    label: "Tes OST favorites d'abord",
+    label: "Tes OST",
     score: (e, f) =>
       (e.favoriteOst?.name ? 60 : 0) +
       (has(f?.genres, [GENRE.music]) ? 30 : 0) +
@@ -112,58 +115,58 @@ export const NINE_SUGGEST = {
       userScore(e) * 0.5,
   },
   firsttime: {
-    label: "Terminés et adorés",
+    label: "Finis et adorés",
     filter: (e) => e.status === "finished" || e.favorite,
     score: (e) => userScore(e) + (e.favorite ? 20 : 0),
   },
   scared: {
-    label: "Horreur et frissons",
+    label: "Horreur",
     filter: (e, f) => has(f?.themes, [TH.horror, TH.thriller, TH.survival]),
     score: (e, f) => userScore(e) + (has(f?.themes, [TH.horror]) ? 15 : 0),
   },
   worlds: {
-    label: "Des univers à part",
+    label: "Univers",
     filter: (e, f) =>
       has(f?.themes, [TH.fantasy, TH.scifi, TH.openWorld]) || has(f?.keywords, KW.world),
     score: (e) => userScore(e) + (e.favorite ? 20 : 0) + Math.log2(1 + hoursOf(e)) * 3,
   },
   villains: {
-    label: "Des histoires et leurs méchants",
+    label: "Grands méchants",
     filter: (e, f) =>
       has(f?.keywords, KW.villain) || has(f?.themes, [TH.drama, TH.fantasy, TH.scifi, TH.thriller]),
     score: (e, f) => userScore(e) + (has(f?.keywords, KW.villain) ? 25 : 0) + (e.favoriteCharacter?.name ? 10 : 0),
   },
   coop: {
-    label: "Jouables à plusieurs",
+    label: "À plusieurs",
     filter: (e, f) => has(f?.modes, MODES_GROUP),
     score: (e, f) => userScore(e) + (has(f?.modes, [3, 4]) ? 15 : 0) + Math.log2(1 + hoursOf(e)) * 4,
   },
   rage: {
-    label: "Les plus exigeants",
+    label: "Exigeants",
     filter: (e, f) => has(f?.keywords, KW.hard) || has(f?.genres, [GENRE.fighting]),
     score: (e) => userScore(e) + Math.log2(1 + hoursOf(e)) * 4,
   },
   hours: {
-    label: "Tes plus longues parties",
+    label: "Records d'heures",
     filter: (e) => hoursOf(e) > 0,
     score: (e) => hoursOf(e),
   },
   // --- Les cases de « Ma carte de joueur » (cf. lib/boards) ------------
   favorites: {
-    label: "Tes coups de cœur",
+    label: "Tes préférés",
     score: (e) => userScore(e) + (e.favorite ? 50 : 0) + Math.log2(1 + hoursOf(e)),
   },
   story: {
-    label: "Des jeux à histoire",
+    label: "À histoire",
     filter: (e, f) => isStory(f),
     score: (e, f) => userScore(e) + (e.favorite ? 20 : 0) + (has(f?.keywords, KW.emotional) ? 15 : 0),
   },
   art: {
-    label: "Tes mieux notés",
+    label: "Tes pépites",
     score: (e, f) => userScore(e) + (e.favorite ? 20 : 0) + (f?.rating ?? 70) * 0.2,
   },
   combat: {
-    label: "Ça se bat",
+    label: "Combat",
     filter: (e, f) =>
       has(f?.genres, [GENRE.fighting, GENRE.hackSlash, GENRE.shooter]) ||
       (has(f?.themes, [TH_ACTION]) && has(f?.keywords, KW.hard)),
@@ -171,29 +174,29 @@ export const NINE_SUGGEST = {
   },
   // Populaire, mal-aimé du public, et toi tu l'aimes : l'injustice qu'on défend.
   overhated: {
-    label: "Aimés par toi, détestés par beaucoup",
+    label: "Mal-aimés",
     filter: (e, f) => (userScore(e) >= 70 || e.favorite) && f?.rating != null && f.ratingCount >= 100,
     score: (e, f) => userScore(e) - f.rating + Math.min(20, Math.log2(f.ratingCount) * 2),
   },
   // Adoré du public, et toi pas tant que ça.
   overrated: {
-    label: "Encensés par le public, pas par toi",
+    label: "Surcotés",
     filter: (e, f) => e.rating != null && f?.rating != null && f.rating - e.rating >= 10,
     score: (e, f) => f.rating - e.rating + Math.min(15, Math.log2(1 + f.ratingCount)),
   },
   remake: {
-    label: "Des classiques qui ont vieilli",
+    label: "Classiques",
     filter: (e, f) => (ageOf(f) || 0) >= 15,
     score: (e, f) => userScore(e) + (e.favorite ? 20 : 0) + Math.min(20, (ageOf(f) || 0) - 15),
   },
   overlooked: {
-    label: "Aimés par toi, connus de peu",
+    label: "Méconnus",
     filter: (e, f) => (userScore(e) >= 70 || e.favorite) && (f == null || f.ratingCount < 80),
     score: (e, f) => userScore(e) + (f ? 40 - Math.min(40, f.ratingCount / 2) : 30),
   },
   // « Pas mon style, mais… » : un jeu aimé dans un genre rare de ta bibliothèque.
   notmything: {
-    label: "Hors de tes genres habituels",
+    label: "Hors genre",
     filter: (e) => userScore(e) >= 65 || e.favorite,
     score: (e, f, ctx) => {
       const g = f?.genres || [];
@@ -203,7 +206,7 @@ export const NINE_SUGGEST = {
     },
   },
   brainoff: {
-    label: "Pour débrancher le cerveau",
+    label: "Détente",
     filter: (e, f) =>
       has(f?.genres, [GENRE.arcade, GENRE.racing, GENRE.platform, GENRE.sport, GENRE.hackSlash]) ||
       has(f?.themes, [TH_PARTY]) ||
@@ -211,18 +214,18 @@ export const NINE_SUGGEST = {
     score: (e) => userScore(e) + Math.log2(1 + hoursOf(e)) * 4,
   },
   multiplayer: {
-    label: "Du multi, surtout en ligne",
+    label: "Multi",
     filter: (e, f) => has(f?.modes, [2, 5, 6]),
     score: (e, f) =>
       userScore(e) + (has(f?.modes, [5, 6]) ? 20 : 0) + Math.log2(1 + hoursOf(e)) * 6 - (has(f?.modes, [1]) ? 10 : 0),
   },
   retro: {
-    label: "Sortis il y a plus de 20 ans",
+    label: "Rétro",
     filter: (e, f) => (ageOf(f) || 0) >= 20,
     score: (e) => userScore(e) + (e.favorite ? 25 : 0),
   },
   disappointed: {
-    label: "Ceux qui t'ont déçu",
+    label: "Déceptions",
     filter: (e) => (e.rating != null && e.rating <= 65) || e.status === "dropped",
     score: (e, f) =>
       100 - (e.rating ?? 50) + (e.status === "dropped" ? 15 : 0) + ((f?.rating ?? 0) >= 80 ? 20 : 0) + Math.min(20, (f?.hypes || 0) / 10),

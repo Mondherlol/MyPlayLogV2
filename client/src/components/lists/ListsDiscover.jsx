@@ -4,10 +4,10 @@ import { ArrowRight, Heart, IdCard, Sparkles } from "lucide-react";
 
 import Section from "../home/Rail";
 import NineRail from "../home/NineRail";
-import BoardModal from "../BoardModal";
+import { apiFetch } from "../../lib/api";
 import { apiCached } from "../../lib/query";
 import { LIST_TYPES } from "../../lib/lists";
-import { DEFAULT_BOARD, boardOf } from "../../lib/boards";
+import { DEFAULT_BOARD, boardOf, openMyBoard } from "../../lib/boards";
 
 // ======================================================================
 //  La page Listes, onglet « Découvrir » : une vitrine, pas un tas
@@ -83,7 +83,6 @@ export default function ListsDiscover({ token, onCreate, renderCard }) {
   const navigate = useNavigate();
   const board = boardOf(DEFAULT_BOARD);
   const [mine, setMine] = useState(undefined); // ma carte : undefined = en cours
-  const [making, setMaking] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -122,7 +121,10 @@ export default function ListsDiscover({ token, onCreate, renderCard }) {
             ) : (
               token &&
               mine === null && (
-                <button className="btn btn-primary clickable" onClick={() => setMaking(true)}>
+                <button
+                  className="btn btn-primary clickable"
+                  onClick={() => openMyBoard({ token, navigate, apiFetch, boardKey: board.key })}
+                >
                   <Sparkles size={16} /> Remplir ma carte
                 </button>
               )
@@ -203,16 +205,6 @@ export default function ListsDiscover({ token, onCreate, renderCard }) {
         render={renderCard}
       />
 
-      {making && (
-        <BoardModal
-          boardKey={board.key}
-          onClose={() => setMaking(false)}
-          onPublished={(created) => {
-            setMaking(false);
-            navigate(`/lists/${created.id}`);
-          }}
-        />
-      )}
     </div>
   );
 }
