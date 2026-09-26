@@ -54,22 +54,26 @@
 /* L'ordre de lecture du fil, celui du telephone. Il ne sert que tant qu'il n'y
    a qu'une colonne — au-dela, la grille reprend la main et ces valeurs
    n'ont plus aucun effet. */
+/* ⚠️ LES DIRECTS ET LES CONFÉRENCES FERMENT LA MARCHE. Ils ouvraient la page
+   juste sous les envies ; ce sont des rendez-vous qu'on vient consulter, pas
+   ce qu'on regarde en arrivant — ils ont leur page (/events, /lists). */
 .mh-top { order: 1; }
 .s-wish { order: 2; }
 .s-awaited { order: 3; }
-.s-events { order: 4; }
-.s-elists { order: 5; }
-.s-today { order: 6; }
-.mh-mot { order: 7; }
-.s-tonight { order: 8; }
-.s-dusty { order: 9; }
-.s-free { order: 10; }
-.s-discover { order: 11; }
-.s-ost { order: 12; }
-.s-done { order: 13; }
-.s-fav { order: 14; }
-.s-similar { order: 15; }
-.mh-doors { order: 16; }
+.mh-board-ask { order: 4; }
+.s-today { order: 5; }
+.mh-mot { order: 6; }
+.s-tonight { order: 7; }
+.s-dusty { order: 8; }
+.s-free { order: 9; }
+.s-discover { order: 10; }
+.s-nine { order: 11; }
+.s-done { order: 12; }
+.s-fav { order: 13; }
+.s-similar { order: 14; }
+.s-events { order: 15; }
+.s-elists { order: 16; }
+.mh-doors { order: 17; }
 
 /* ======================================================================
    L'ECRAN LARGE : une colonne de plus
@@ -159,18 +163,18 @@
 
 /* ---------- Le rayon : en-tête ---------- */
 .mh-sec {
-  margin-bottom: 2.1rem;
+  margin-bottom: 2.5rem;
   min-width: 0;
 }
 
 .mh-head {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   /* Un en-tete peut porter un titre, des onglets ET un lien : sur une colonne
      etroite, ils passent a la ligne plutot que de se comprimer. */
   flex-wrap: wrap;
   gap: 0.5rem 0.8rem;
-  margin-bottom: 0.7rem;
+  margin-bottom: 0.85rem;
 }
 .mh-tabs {
   flex-shrink: 0;
@@ -208,6 +212,16 @@ a.mh-head-main:hover .mh-head-title {
 /* L'étiquette dorée. C'est ce petit décrochage qui donne le rythme de
    magazine : un seul niveau de titre, répété douze fois, donne une liste de
    dossiers. */
+/* ⚠️ PLUS D'ÉTIQUETTE AU-DESSUS DES TITRES. Répétée douze fois, elle faisait
+   de chaque rayon un encart de magazine et doublait le nombre de mots à lire.
+   Le titre suffit — sauf quand il est le NOM D'UN JEU (« Parce que tu as
+   adoré … » + la jaquette) : là, l'étiquette dit pourquoi ce jeu est là. */
+.mh .mh-head .mh-kicker {
+  display: none;
+}
+.mh .mh-head-main:has(.mh-head-cover) .mh-kicker {
+  display: inline-flex;
+}
 .mh-kicker {
   display: inline-flex;
   align-items: center;
@@ -223,9 +237,9 @@ a.mh-head-main:hover .mh-head-title {
 
 .mh-head-title {
   font-family: var(--font-display);
-  font-size: clamp(1rem, 1.5vw, 1.16rem);
-  font-weight: 700;
-  letter-spacing: -0.025em;
+  font-size: clamp(1.1rem, 1.7vw, 1.32rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
   line-height: 1.15;
   color: var(--text);
   transition: color 0.15s ease;
@@ -246,27 +260,30 @@ a.mh-head-main:hover .mh-head-title {
 /* Le filet qui prolonge le titre jusqu'au bord. Un titre seul au-dessus d'une
    rangée flotte ; le trait le pose, et c'est ce qui donne à la page son air de
    magazine plutôt que de liste de dossiers. */
+/* Plus de filet : le titre, plus gros, se tient tout seul, et le lien
+   « Tout voir » passe en pastille au bout de la ligne. */
 .mh-head-main::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  min-width: 1.2rem;
-  background: var(--border);
+  content: none;
 }
 
 .mh-head-more {
   display: inline-flex;
   align-items: center;
   gap: 0.1rem;
+  height: 28px;
+  padding: 0 0.55rem 0 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--text-soft);
   white-space: nowrap;
-  padding-bottom: 0.15rem;
-  transition: color 0.15s ease;
+  transition: color 0.15s ease, border-color 0.15s ease;
 }
 .mh-head-more:hover {
-  color: var(--accent-ink);
+  color: var(--text);
+  border-color: #f2b70b;
 }
 
 .mh-head-refresh {
@@ -1650,32 +1667,102 @@ a.mh-head-main:hover .mh-head-title {
 }
 
 /* ======================================================================
-   13. Les OST, en rail
-   ====================================================================== */
-/* La card OST du profil, telle quelle, mais posée dans un rail : il lui faut
-   une largeur (elle la tenait de la grille) et un peu d'air à droite, parce que
-   son CD sort du cadre au survol. */
-.pfo-card.mh-ost {
-  width: 178px;
-  margin-right: 0.5rem;
+   13. Ta carte de joueur, à remplir (home/BoardAsk)
+   ======================================================================
+   Une porte de plus, un peu plus haute : dix cases vides et leurs icônes, le
+   titre dessous. La croix dans le coin, discrète, la retire pour de bon. */
+.mh-board-ask {
+  position: relative;
+  margin-bottom: 1.1rem;
 }
-.mh-ost-by {
+.mh-board-ask-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.9rem 1rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.mh-board-ask-main:hover {
+  transform: translateY(-2px);
+  border-color: #f2b70b;
+}
+.mh-board-ask-main:disabled {
+  opacity: 0.7;
+}
+.mh-board-ask-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  width: calc(100% - 26px);
+}
+.mh-board-ask-grid > span {
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: var(--surface-2);
-  font-size: 0.65rem;
-  font-weight: 700;
-  margin-left: auto;
-  flex-shrink: 0;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  border: 1px dashed var(--border-strong);
+  color: var(--text-soft);
+  transition: border-color 0.2s ease, color 0.2s ease, transform 0.25s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
-.mh-ost-by img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.mh-board-ask-grid > span.on {
+  border-style: solid;
+  border-color: #f2b70b;
+  color: #f2b70b;
+}
+.mh-board-ask-main:hover .mh-board-ask-grid > span {
+  color: #f2b70b;
+  border-color: color-mix(in srgb, #f2b70b 55%, var(--border));
+}
+.mh-board-ask-txt {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.mh-board-ask-txt b {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 0.94rem;
+  font-weight: 700;
+}
+.mh-board-ask-ic {
+  flex: none;
+  color: #f2b70b;
+}
+.mh-board-ask-go {
+  flex: none;
+  color: var(--text-soft);
+  transition: color 0.15s ease, transform 0.2s ease;
+}
+.mh-board-ask-main:hover .mh-board-ask-go {
+  color: #f2b70b;
+  transform: translateX(3px);
+}
+.mh-board-ask-x {
+  position: absolute;
+  z-index: 1;
+  top: 0.55rem;
+  right: 0.55rem;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: none;
+  background: none;
+  color: var(--text-soft);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.mh-board-ask-x:hover {
+  color: var(--text);
+  background: var(--surface-2);
 }
 
 /* ======================================================================
@@ -1979,10 +2066,10 @@ a.mh-head-main:hover .mh-head-title {
     font-size: 0.66rem;
   }
   .mh-head-title {
-    font-size: 1.32rem;
+    font-size: 1.42rem;
   }
   .mh-sec {
-    margin-bottom: 2.7rem;
+    margin-bottom: 2.9rem;
   }
 }
 

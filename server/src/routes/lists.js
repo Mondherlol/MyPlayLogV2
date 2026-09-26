@@ -9,6 +9,7 @@ import Activity from "../models/Activity.js";
 import User from "../models/User.js";
 import UserGame from "../models/UserGame.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
+import { isUserAdmin } from "../lib/admin.js";
 import { notify } from "../lib/notify.js";
 import {
   recordActivity,
@@ -200,10 +201,23 @@ async function eventOfList(list) {
     .lean();
 }
 
+// Une liste publiée par le site : top, palmarès ou conférence.
+const isOfficialList = (l) => !!(l.official?.key || l.event?.igdbId);
+
+// Un admin peut changer l'image d'une liste officielle — et de rien d'autre :
+// les listes des joueurs restent à leurs auteurs.
+async function adminOnOfficial(req, list) {
+  if (!isOfficialList(list)) return false;
+  const me = await User.findById(req.userId).select("isAdmin isSuperAdmin").lean();
+  return isUserAdmin(me);
+}
+
 // Marqueur d'une liste officielle (top ou cérémonie), null sinon.
 function toOfficial(l) {
   if (!l.official?.key) return null;
-  return { kind: l.official.kind, group: l.official.group || null };
+  // `key` : les cartes des tops s'habillent d'après lui (couleur, console ou
+  // héros de la saga, cf. client lib/topThemes).
+  return { kind: l.official.kind, group: l.official.group || null, key: l.official.key };
 }
 
 // Auteur d'une liste. `isSystem` distingue le compte officiel du site pour lui
@@ -479,7 +493,10 @@ router.get("/", optionalAuth, async (req, res) => {
           : scope === "tops"
             ? // L'ordre éditorial : consoles, puis genres, puis sagas.
               { "official.order": 1 }
-            : { updatedAt: -1 }
+            : scope === "awards"
+              ? // La dernière cérémonie en tête (`official.order` = l'année).
+                { "official.order": -1 }
+              : { updatedAt: -1 }
       )
       .limit(late ? 200 : limit)
       .lean();
@@ -573,19 +590,30 @@ router.get("/nines", optionalAuth, async (req, res) => {
         ? List.find({ user: { $in: following }, nine: { $ne: null }, visibility: "public" })
             .sort({ updatedAt: -1 })
             .limit(400)
-            .select("nine user")
+            .select("nine user items.image")
             .populate("user", "username avatar")
             .lean()
         : [],
     ]);
 
     const themes = {};
-    const at = (k) => (themes[k] ||= { count: 0, faces: [], mine: null });
+    const at = (k) => (themes[k] ||= { count: 0, faces: [], friends: [], mine: null });
     for (const c of counts) at(c._id).count = c.n;
+    // ⚠️ LES VISAGES MÈNENT À LEURS LISTES. On voyait qui avait fait le thème
+    // sans pouvoir aller voir SES neuf jeux : `friends` porte chaque liste
+    // (une par ami, la plus récente), avec de quoi la prévisualiser.
     for (const l of friends) {
+      if (!l.user || l.nine === "custom") continue;
       const th = at(l.nine);
-      if (l.user && th.faces.length < 3 && !th.faces.some((f) => f.username === l.user.username)) {
-        th.faces.push({ username: l.user.username, avatar: l.user.avatar || null });
+      if (th.friends.some((f) => f.username === l.user.username)) continue;
+      const who = { username: l.user.username, avatar: l.user.avatar || null };
+      if (th.faces.length < 3) th.faces.push(who);
+      if (th.friends.length < 30) {
+        th.friends.push({
+          ...who,
+          id: String(l._id),
+          preview: (l.items || []).map((i) => i.image).filter(Boolean).slice(0, NINE_MAX),
+        });
       }
     }
     // Les thèmes inventés (« custom ») ne se regroupent pas : chacun est à
@@ -1129,10 +1157,12 @@ router.post(
       if (!req.file) return res.status(400).json({ error: "Aucun fichier." });
       const list = await List.findById(req.params.id);
       if (!list) return res.status(404).json({ error: "Liste introuvable." });
-      if (String(list.user) !== String(req.userId))
+      const owner = String(list.user) === String(req.userId);
+      if (!owner && !(await adminOnOfficial(req, list)))
         return res.status(403).json({ error: "Action non autorisée." });
       const url = `${req.protocol}://${req.get("host")}/uploads/lists/${req.file.filename}`;
       list.cover = url;
+      if (isOfficialList(list)) list.coverLocked = true;
       await list.save({ validateModifiedOnly: true });
       res.status(201).json({ cover: url });
     } catch (err) {
@@ -1141,6 +1171,26 @@ router.post(
     }
   }
 );
+
+// DELETE /api/lists/:id/cover — un admin retire la couverture d'une liste
+// officielle : le verrou saute, la synchro remettra l'image d'IGDB (et un top
+// retrouve son visuel par défaut, cf. client lib/topThemes).
+router.delete("/:id/cover", requireAuth, async (req, res) => {
+  try {
+    const list = await List.findById(req.params.id);
+    if (!list) return res.status(404).json({ error: "Liste introuvable." });
+    const owner = String(list.user) === String(req.userId);
+    if (!owner && !(await adminOnOfficial(req, list)))
+      return res.status(403).json({ error: "Action non autorisée." });
+    list.cover = null;
+    list.coverLocked = false;
+    await list.save({ validateModifiedOnly: true });
+    res.json({ cover: null });
+  } catch (err) {
+    console.error("list cover delete error:", err.message);
+    res.status(500).json({ error: "Erreur lors de la suppression." });
+  }
+});
 
 // POST /api/lists/:id/items — ajouter un élément (quick-add). Dédup sur refId.
 router.post("/:id/items", requireAuth, async (req, res) => {

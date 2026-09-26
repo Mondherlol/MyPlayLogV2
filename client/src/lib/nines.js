@@ -48,27 +48,29 @@ const ROSE = "#ff5470";
 // écrit en énorme, dans la police du thème (`font`), penché de `rotate` degrés.
 // `size` est sa taille maximale en pixels (cf. nineKeySize).
 // `cardEn` : la même phrase en anglais, pour l'export en image (cf. lib/nineExport).
+// `emoji` : ce qui flotte en pied de la carte du thème (rendu en twemoji).
 export const NINE_THEMES = [
-  { key: "personality", short: "qui ont forgé ma personnalité", card: "jeux qui ont forgé ma *personnalité*", cardEn: "games that *shaped* who I am", Icon: FingerprintPattern, color: GOLD, font: "'Playfair Display', serif", italic: true, size: 40, rotate: -4 },
-  { key: "childhood", short: "de mon enfance", card: "jeux de mon *enfance*", cardEn: "games from my *childhood*", Icon: ToyBrick, color: ORANGE, font: "'Press Start 2P', monospace", size: 22, rotate: -3 },
-  { key: "cried", short: "qui m'ont fait pleurer", card: "jeux qui m'ont fait *pleurer*", cardEn: "games that made me *cry*", Icon: Droplet, color: BLUE, font: "'Caveat', cursive", size: 54, rotate: -6 },
-  { key: "island", short: "que j'emporterais sur une île déserte", card: "jeux pour une *île déserte*", cardEn: "games for a *desert island*", Icon: TreePalm, color: GREEN, font: "'Pacifico', cursive", size: 38, rotate: -5 },
-  { key: "mustplay", short: "que tout le monde devrait faire", card: "jeux que *tout le monde* devrait faire", cardEn: "games *everyone* should play", Icon: Award, color: GOLD, font: "'Anton', sans-serif", upper: true, size: 40, rotate: -2 },
-  { key: "comfort", short: "que je relance sans jamais me lasser", card: "jeux que je relance *sans me lasser*", cardEn: "games I replay *forever*", Icon: Sofa, color: VIOLET, font: "'Fredoka', sans-serif", size: 34, rotate: 3 },
-  { key: "underrated", short: "sous-cotés que personne ne connaît", card: "jeux *sous-cotés* que personne ne connaît", cardEn: "*underrated* games nobody knows", Icon: Gem, color: TEAL, font: "'Permanent Marker', cursive", size: 34, rotate: -4 },
-  { key: "soundtrack", short: "aux bandes-son inoubliables", card: "jeux aux *bandes-son* inoubliables", cardEn: "games with unforgettable *soundtracks*", Icon: Music, color: VIOLET, font: "'Playfair Display', serif", italic: true, size: 38, rotate: -3 },
-  { key: "firsttime", short: "que j'aimerais oublier pour les redécouvrir", card: "jeux à *oublier* pour les redécouvrir", cardEn: "games I'd *forget* to play again", Icon: Sparkles, color: BLUE, font: "'Caveat', cursive", size: 54, rotate: 4 },
-  { key: "scared", short: "qui m'ont fait peur", card: "jeux qui m'ont fait *peur*", cardEn: "games that *scared* me", Icon: Ghost, color: VIOLET, font: "'Creepster', cursive", size: 54, rotate: -3 },
-  { key: "worlds", short: "aux univers où j'aimerais vivre", card: "jeux aux *univers* où j'aimerais vivre", cardEn: "games with *worlds* I'd live in", Icon: Castle, color: GREEN, font: "'Cinzel', serif", upper: true, size: 30, rotate: -2 },
-  { key: "villains", short: "aux méchants inoubliables", card: "jeux aux *méchants* inoubliables", cardEn: "games with unforgettable *villains*", Icon: Skull, color: ROSE, font: "'Bangers', cursive", size: 46, rotate: -5 },
-  { key: "coop", short: "à faire entre potes", card: "jeux à faire *entre potes*", cardEn: "games to play *with friends*", Icon: Users, color: ORANGE, font: "'Fredoka', sans-serif", size: 38, rotate: -3 },
-  { key: "rage", short: "qui m'ont fait rager", card: "jeux qui m'ont fait *rager*", cardEn: "games that made me *rage*", Icon: Angry, color: ROSE, font: "'Anton', sans-serif", upper: true, size: 58, rotate: -7 },
-  { key: "hours", short: "où j'ai englouti le plus d'heures", card: "jeux où j'ai englouti des *heures*", cardEn: "games I sank *hours* into", Icon: Hourglass, color: GOLD, font: "'Bungee', sans-serif", size: 34, rotate: -3 },
-  { key: "disappointed", short: "qui n'ont pas tenu leurs promesses", card: "jeux qui n'ont pas tenu leurs *promesses*", cardEn: "games that broke their *promises*", Icon: HeartCrack, color: ROSE, font: "'Playfair Display', serif", italic: true, strike: true, size: 36, rotate: -2 },
+  { key: "personality", emoji: "🧬", short: "qui ont forgé ma personnalité", card: "jeux qui ont forgé ma *personnalité*", cardEn: "games that *shaped* who I am", Icon: FingerprintPattern, color: GOLD, font: "'Playfair Display', serif", italic: true, size: 40, rotate: -4 },
+  { key: "childhood", emoji: "🧸", short: "de mon enfance", card: "jeux de mon *enfance*", cardEn: "games from my *childhood*", Icon: ToyBrick, color: ORANGE, font: "'Press Start 2P', monospace", size: 22, rotate: -3 },
+  { key: "cried", emoji: "😢", short: "qui m'ont fait pleurer", card: "jeux qui m'ont fait *pleurer*", cardEn: "games that made me *cry*", Icon: Droplet, color: BLUE, font: "'Caveat', cursive", size: 54, rotate: -6 },
+  { key: "island", emoji: "🏝️", short: "que j'emporterais sur une île déserte", card: "jeux pour une *île déserte*", cardEn: "games for a *desert island*", Icon: TreePalm, color: GREEN, font: "'Pacifico', cursive", size: 38, rotate: -5 },
+  { key: "mustplay", emoji: "🏆", short: "que tout le monde devrait faire", card: "jeux que *tout le monde* devrait faire", cardEn: "games *everyone* should play", Icon: Award, color: GOLD, font: "'Anton', sans-serif", upper: true, size: 40, rotate: -2 },
+  { key: "comfort", emoji: "🛋️", short: "que je relance sans jamais me lasser", card: "jeux que je relance *sans me lasser*", cardEn: "games I replay *forever*", Icon: Sofa, color: VIOLET, font: "'Fredoka', sans-serif", size: 34, rotate: 3 },
+  { key: "underrated", emoji: "💎", short: "sous-cotés que personne ne connaît", card: "jeux *sous-cotés* que personne ne connaît", cardEn: "*underrated* games nobody knows", Icon: Gem, color: TEAL, font: "'Permanent Marker', cursive", size: 34, rotate: -4 },
+  { key: "soundtrack", emoji: "🎧", short: "aux bandes-son inoubliables", card: "jeux aux *bandes-son* inoubliables", cardEn: "games with unforgettable *soundtracks*", Icon: Music, color: VIOLET, font: "'Playfair Display', serif", italic: true, size: 38, rotate: -3 },
+  { key: "firsttime", emoji: "✨", short: "que j'aimerais oublier pour les redécouvrir", card: "jeux à *oublier* pour les redécouvrir", cardEn: "games I'd *forget* to play again", Icon: Sparkles, color: BLUE, font: "'Caveat', cursive", size: 54, rotate: 4 },
+  { key: "scared", emoji: "👻", short: "qui m'ont fait peur", card: "jeux qui m'ont fait *peur*", cardEn: "games that *scared* me", Icon: Ghost, color: VIOLET, font: "'Creepster', cursive", size: 54, rotate: -3 },
+  { key: "worlds", emoji: "🏰", short: "aux univers où j'aimerais vivre", card: "jeux aux *univers* où j'aimerais vivre", cardEn: "games with *worlds* I'd live in", Icon: Castle, color: GREEN, font: "'Cinzel', serif", upper: true, size: 30, rotate: -2 },
+  { key: "villains", emoji: "😈", short: "aux méchants inoubliables", card: "jeux aux *méchants* inoubliables", cardEn: "games with unforgettable *villains*", Icon: Skull, color: ROSE, font: "'Bangers', cursive", size: 46, rotate: -5 },
+  { key: "coop", emoji: "🤝", short: "à faire entre potes", card: "jeux à faire *entre potes*", cardEn: "games to play *with friends*", Icon: Users, color: ORANGE, font: "'Fredoka', sans-serif", size: 38, rotate: -3 },
+  { key: "rage", emoji: "😡", short: "qui m'ont fait rager", card: "jeux qui m'ont fait *rager*", cardEn: "games that made me *rage*", Icon: Angry, color: ROSE, font: "'Anton', sans-serif", upper: true, size: 58, rotate: -7 },
+  { key: "hours", emoji: "⏳", short: "où j'ai englouti le plus d'heures", card: "jeux où j'ai englouti des *heures*", cardEn: "games I sank *hours* into", Icon: Hourglass, color: GOLD, font: "'Bungee', sans-serif", size: 34, rotate: -3 },
+  { key: "disappointed", emoji: "💔", short: "qui n'ont pas tenu leurs promesses", card: "jeux qui n'ont pas tenu leurs *promesses*", cardEn: "games that broke their *promises*", Icon: HeartCrack, color: ROSE, font: "'Playfair Display', serif", italic: true, strike: true, size: 36, rotate: -2 },
 ];
 
 const CUSTOM_META = {
   key: NINE_CUSTOM,
+  emoji: "✏️",
   short: "",
   card: "Invente *ton* thème",
   Icon: PenLine,

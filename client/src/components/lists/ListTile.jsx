@@ -3,6 +3,7 @@ import { BadgeCheck, Heart, IdCard, Lock, Play, Trash2 } from "lucide-react";
 import { typeMeta } from "../../lib/lists";
 import { boardOf } from "../../lib/boards";
 import { NINE_CUSTOM } from "../../lib/nines";
+import { splitTopTitle, topTheme } from "../../lib/topThemes";
 import NinePhrase, { useNineFonts } from "../NinePhrase";
 
 // ======================================================================
@@ -15,11 +16,18 @@ import NinePhrase, { useNineFonts } from "../NinePhrase";
 //     filet doré (la carte « étagère » de l'app, components/ListShelfCard) ;
 //   · tier list → ses premiers paliers ;
 //   · liste des 9 → l'affiche du thème : « Ces 9 jeux… » dans sa police ;
-//   · carte de joueur → une carte d'identité : l'auteur, et sa grille 5 × 4.
+//   · carte de joueur → une carte d'identité : l'auteur, et sa grille 5 × 4 ;
+//   · top officiel → une affiche : un aplat de couleur, « TOP 100 » en grand,
+//     la console ou le héros de la saga détouré à droite (cf. lib/topThemes) ;
+//   · conférence ou palmarès → son affiche entière, le titre SOUS l'image.
 
-// Le cadre des tranches, en unités SVG : le rapport 4:3 de .lt-media.
+// Le cadre des tranches, en unités SVG. ⚠️ PLUS LE 4:3 DE .lt-media : les
+// tranches s'arrêtent maintenant au ras du bandeau du titre au lieu de passer
+// dessous (les jaquettes y perdaient leur bas, logos compris). La zone qui
+// reste est à peu près deux fois plus large que haute ; le SVG la remplit
+// (`slice`) quelle que soit la hauteur du titre, sur une ou deux lignes.
 const W = 400;
-const H = 300;
+const H = 200;
 // De combien la coupe se décale entre le haut et le bas (fraction de H), et
 // l'épaisseur du filet doré — les valeurs de l'app.
 const LEAN = 0.32;
@@ -48,7 +56,12 @@ function Slices({ id, images }) {
   };
 
   return (
-    <svg className="lt-slices" viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
+    <svg
+      className="lt-slices"
+      viewBox={`0 0 ${W} ${H}`}
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+    >
       <rect width={W} height={H} fill="#f2b70b" />
       <defs>
         {images.map((_, i) => (
@@ -122,6 +135,67 @@ function NinePoster({ list }) {
   );
 }
 
+/**
+ * L'affiche d'un top officiel.
+ *
+ * ⚠️ PAS DE BANDEAU NOIR. Les listes de joueurs posent leur titre sur un aplat
+ * sombre ; un top officiel est une vitrine de la maison, il a sa couleur et son
+ * visuel, et c'est ce qui le fait repérer dans un rail de listes. On entrevoit
+ * quelques-uns de ses jeux en petite pile, qui s'étale au survol.
+ */
+function TopPoster({ list }) {
+  const ready = useNineFonts();
+  // Une image choisie par un admin (page de la liste) passe devant le visuel
+  // par défaut : c'est elle qu'on voulait voir.
+  const theme = topTheme(list.official?.key);
+  const color = theme.color;
+  const art = list.cover || theme.art;
+  const { n, subject } = splitTopTitle(list.title, list.itemCount);
+  const imgs = (list.preview || []).filter(Boolean);
+  // Sans visuel, les trois premières jaquettes font l'éventail à droite ; les
+  // suivantes font la petite pile sous le titre.
+  const fan = art ? [] : imgs.slice(0, 3);
+  const peek = (art ? imgs : imgs.slice(3)).slice(0, 4);
+  return (
+    <span className={`lt-top ${ready ? "fonts-ready" : ""}`} style={{ "--tc": color }}>
+      {art ? (
+        <img className="lt-top-art" src={art} alt="" loading="lazy" draggable="false" />
+      ) : (
+        fan.length > 0 && (
+          <span className="lt-top-fan" aria-hidden="true">
+            {fan.map((src, i) => (
+              <img key={i} src={src} alt="" loading="lazy" draggable="false" style={{ "--i": i }} />
+            ))}
+          </span>
+        )
+      )}
+      <span className="lt-top-text">
+        {n != null && (
+          <span className="lt-top-num">
+            Top <b>{n}</b>
+          </span>
+        )}
+        <span className="lt-top-subject">{subject}</span>
+        {peek.length > 0 && (
+          <span className="lt-top-peek" aria-hidden="true">
+            {peek.map((src, i) => (
+              <img key={i} src={src} alt="" loading="lazy" draggable="false" style={{ "--i": i }} />
+            ))}
+          </span>
+        )}
+        <span className="lt-top-by">
+          MyPlayLog <BadgeCheck size={12} aria-label="Compte officiel" />
+          {list.likeCount > 0 && (
+            <span className={`lt-likes ${list.liked ? "on" : ""}`}>
+              <Heart size={12} fill={list.liked ? "currentColor" : "none"} /> {list.likeCount}
+            </span>
+          )}
+        </span>
+      </span>
+    </span>
+  );
+}
+
 /** Une carte de joueur : l'auteur à gauche, sa grille à droite. */
 function BoardId({ list }) {
   const board = boardOf(list.board);
@@ -161,20 +235,42 @@ function BoardId({ list }) {
 export default function ListTile({ list, onDelete }) {
   const meta = typeMeta(list.type);
   const author = list.author;
+  const byline = (
+    <span className="lt-meta">
+      <span className="lt-pp" aria-hidden="true">
+        {author?.avatar ? (
+          <img src={author.avatar} alt="" loading="lazy" draggable="false" />
+        ) : (
+          author?.username?.[0]?.toUpperCase() || "?"
+        )}
+      </span>
+      <span className="lt-author">{author?.username || "—"}</span>
+      {author?.isSystem && <BadgeCheck size={12} className="lt-check" aria-label="Compte officiel" />}
+      {list.likeCount > 0 && (
+        <span className={`lt-likes ${list.liked ? "on" : ""}`}>
+          <Heart size={12} fill={list.liked ? "currentColor" : "none"} /> {list.likeCount}
+        </span>
+      )}
+    </span>
+  );
 
   const kind = list.board
     ? "board"
-    : list.nine
+    : list.official?.kind === "top"
+      ? "top"
+      : list.event && list.cover
+        ? "event"
+      : list.nine
       ? "nine"
       : !list.cover && list.type === "tier" && list.tierPreview?.length
         ? "tier"
         : "slices";
-  // Une liste officielle (conférence, palmarès) garde son affiche entière ;
-  // les autres mettent la couverture de l'auteur en tête des tranches.
+  // Une liste officielle garde son affiche entière ; les autres mettent la
+  // couverture de l'auteur en tête des tranches.
   const images =
     kind !== "slices"
       ? []
-      : list.cover && (list.event || list.official)
+      : list.cover && list.official
         ? [list.cover]
         : [...(list.cover ? [list.cover] : []), ...(list.preview || [])].slice(0, 3);
 
@@ -183,6 +279,10 @@ export default function ListTile({ list, onDelete }) {
       <span className="lt-media">
         {kind === "board" ? (
           <BoardId list={list} />
+        ) : kind === "top" ? (
+          <TopPoster list={list} />
+        ) : kind === "event" ? (
+          <img className="lt-cover" src={list.cover} alt="" loading="lazy" draggable="false" />
         ) : kind === "nine" ? (
           <NinePoster list={list} />
         ) : kind === "tier" ? (
@@ -225,36 +325,30 @@ export default function ListTile({ list, onDelete }) {
               <Lock size={11} />
             </span>
           )}
-          {kind !== "board" && kind !== "nine" && <span className="lt-pill">{list.itemCount}</span>}
+          {kind !== "board" && kind !== "nine" && kind !== "top" && (
+            <span className="lt-pill">{list.itemCount}</span>
+          )}
         </span>
 
-        {/* Le nom de la liste, posé sur l'image. La carte de joueur n'en a pas
+        {/* Le nom de la liste, sous l'image. La carte de joueur n'en a pas
             besoin (c'est l'auteur qui la nomme), ni l'affiche des 9 (la phrase
-            du thème EST son titre). */}
-        {kind !== "board" && (
+            du thème EST son titre), ni un top officiel (son affiche le dit). */}
+        {kind !== "board" && kind !== "top" && kind !== "event" && (
           <span className="lt-caption">
             {kind !== "nine" && <span className="lt-title">{list.title}</span>}
-            <span className="lt-meta">
-              <span className="lt-pp" aria-hidden="true">
-                {author?.avatar ? (
-                  <img src={author.avatar} alt="" loading="lazy" draggable="false" />
-                ) : (
-                  author?.username?.[0]?.toUpperCase() || "?"
-                )}
-              </span>
-              <span className="lt-author">{author?.username || "—"}</span>
-              {author?.isSystem && (
-                <BadgeCheck size={12} className="lt-check" aria-label="Compte officiel" />
-              )}
-              {list.likeCount > 0 && (
-                <span className={`lt-likes ${list.liked ? "on" : ""}`}>
-                  <Heart size={12} fill={list.liked ? "currentColor" : "none"} /> {list.likeCount}
-                </span>
-              )}
-            </span>
+            {byline}
           </span>
         )}
       </span>
+
+      {/* Conférence ou palmarès : l'affiche a déjà son logo et ses titres,
+          on n'écrit rien PAR-DESSUS — le nom de la liste passe dessous. */}
+      {kind === "event" && (
+        <span className="lt-under">
+          <span className="lt-title">{list.title}</span>
+          {byline}
+        </span>
+      )}
     </Link>
   );
 }

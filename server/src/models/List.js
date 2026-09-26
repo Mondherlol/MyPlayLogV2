@@ -192,6 +192,9 @@ const listSchema = new mongoose.Schema(
     description: { type: String, default: "", maxlength: 2000 },
     // Image de couverture (URL servie par le serveur), optionnelle.
     cover: { type: String, default: null },
+    // Couverture choisie par un admin sur une liste officielle (conférence,
+    // palmarès, top) : les synchros ne la remplacent plus par l'image IGDB.
+    coverLocked: { type: Boolean, default: false },
     // Pochette générée & personnalisée (playlists), utilisée quand `cover` est
     // vide. null = pochette générée par défaut (dérivée du titre).
     coverDesign: { type: coverDesignSchema, default: null },

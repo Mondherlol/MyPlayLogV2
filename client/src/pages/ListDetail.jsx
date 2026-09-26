@@ -195,7 +195,7 @@ const containerOfItem = (it) => it.tier ?? POOL;
 
 export default function ListDetail() {
   const { id } = useParams();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -225,6 +225,11 @@ export default function ListDetail() {
 
   const isOwner = list?.mine;
   const editable = isOwner && editing; // droits d'écriture ET mode édition actif
+  // Un admin peut changer l'image d'une liste publiée par le site (top,
+  // conférence, palmarès) sans en être l'auteur — et rien d'autre. Le serveur
+  // vérifie de son côté (cf. routes/lists `adminOnOfficial`).
+  const adminCover =
+    !isOwner && !!(user?.isAdmin || user?.isSuperAdmin) && !!(list?.official || list?.event);
 
   // --- Chargement ---
   useEffect(() => {
@@ -450,8 +455,17 @@ export default function ListDetail() {
       setCoverBusy(false);
     }
   }
-  function removeCover() {
-    patchList({ cover: null });
+  async function removeCover() {
+    if (!adminCover) return patchList({ cover: null });
+    setCoverBusy(true);
+    try {
+      await apiFetch(`/lists/${id}/cover`, { method: "DELETE", token });
+      setList((prev) => ({ ...prev, cover: null }));
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setCoverBusy(false);
+    }
   }
 
   // --- Tiers ---
@@ -602,7 +616,7 @@ export default function ListDetail() {
         {list.cover && (
           <div className="ld-cover">
             <img src={list.cover} alt="" draggable="false" />
-            {editable && (
+            {(editable || adminCover) && (
               <div className="ld-cover-actions">
                 <button
                   type="button"
@@ -746,6 +760,17 @@ export default function ListDetail() {
               title="Exporter en image"
             >
               <ImageDown size={16} /> Exporter
+            </button>
+          )}
+          {adminCover && !list.cover && (
+            <button
+              className="ld-vis clickable"
+              onClick={() => coverInputRef.current?.click()}
+              disabled={coverBusy}
+              title="Choisir l'image de cette liste officielle (admin)"
+            >
+              {coverBusy ? <Loader2 size={16} className="spin" /> : <ImagePlus size={16} />}
+              Image
             </button>
           )}
           {isOwner && !editing && (

@@ -118,9 +118,11 @@ export async function syncEventLists({
       continue;
     }
     const event = toListEvent(ev);
-    const cover = await resolveEventCover(ev, baseUrl);
-
     const existing = await List.findOne({ "event.igdbId": ev.id });
+    // ⚠️ UNE COUVERTURE CHOISIE PAR UN ADMIN RESTE. Sans ce verrou, la synchro
+    // suivante remettait l'image d'IGDB par-dessus.
+    const cover = existing?.coverLocked ? existing.cover : await resolveEventCover(ev, baseUrl);
+
     if (existing) {
       const merged = withAwardItems(existing, items);
       if (isUnchanged(existing, { title, items: merged, event, cover })) {

@@ -27,8 +27,8 @@ import NowPlayingCard from "../components/home/NowPlayingCard";
 import AnticipatedCard from "../components/home/AnticipatedCard";
 import EventCard from "../components/home/EventCard";
 import HoursModal from "../components/home/HoursModal";
-import OstRail from "../components/home/OstRail";
 import NineRail from "../components/home/NineRail";
+import BoardAsk from "../components/home/BoardAsk";
 import { MotStrip, TonightCard } from "../components/home/Strips";
 import { EventListCard, FreeCard, GameTile } from "../components/home/Tiles";
 import {
@@ -64,12 +64,12 @@ import { countdown, needsTicker, shortDate, useSecondsTicker } from "../lib/home
 // l'accueil du téléphone :
 //
 //   • en haut, toute la largeur : ce qu'il joue en ce moment ;
-//   • à gauche : ses envies, les plus attendus, ce qui arrive (Directs,
-//     conférences), les sorties du jour, puis le monde extérieur (placard, gratuits,
-//     découverte, OST) et, tout en bas, ce qu'il a déjà fait (terminés, coups
-//     de cœur, « parce que tu as adoré … ») ;
-//   • à droite : que des ACTIONS (mot du jour, ce soir, documentaire, pépite,
-//     arcade, app Android).
+//   • à gauche : ses envies, les plus attendus, les sorties du jour, puis le
+//     monde extérieur (placard, gratuits, découverte, principe des 9), ce
+//     qu'il a déjà fait (terminés, coups de cœur, « parce que tu as adoré … »)
+//     et, tout en bas, les rendez-vous (Directs, dernières conférences) ;
+//   • à droite : que des ACTIONS (carte de joueur à remplir, mot du jour, ce
+//     soir, documentaire, pépite, arcade, app Android).
 //
 // Chaque rayon disparaît quand il n'a rien à dire.
 //
@@ -104,7 +104,6 @@ function loadPrefs() {
 // contient des dizaines d'autres, qui ont leur page (/events).
 const EVENTS_PATH = "/events/upcoming?featured=1&limit=8";
 const LISTS_PATH = "/lists?scope=events&limit=12";
-const OST_LIMIT = 8;
 
 // ⚠️ UNE DURÉE DE FRAÎCHEUR PAR SOURCE, CALÉE SUR LE RYTHME OÙ ELLE CHANGE — les
 // mêmes valeurs que le téléphone. La bibliothèque bouge quand on y touche ; les
@@ -784,69 +783,6 @@ export default function Welcome() {
           )
         )}
 
-        {/* --- Directs et showcases ----------------------------------------
-            Un rendez-vous a une heure : on vient le vérifier juste après ses
-            envies et les sorties qu'on attend. */}
-        {events === null ? (
-          <Section
-            kicker="Ce qui arrive"
-            title="Directs et showcases"
-            className="s-events"
-            snap={false}
-          >
-            <SkelRepeat of={SkelEvent} count={4} />
-          </Section>
-        ) : (
-          sortedEvents.length > 0 && (
-            <Section
-              kicker="Ce qui arrive"
-              title="Directs et showcases"
-              moreTo="/events"
-              moreLabel="Tout l'agenda"
-              className="s-events"
-            >
-              {sortedEvents.map((ev) => (
-                <EventCard
-                  key={ev.id}
-                  event={ev}
-                  now={tick}
-                  onToggleInterest={(want) => toggleInterest(ev, want)}
-                />
-              ))}
-            </Section>
-          )
-        )}
-
-        {/* --- Les dernières conférences ----------------------------------
-            ⚠️ JUSTE SOUS LES RENDEZ-VOUS, PARCE QUE C'EST LEUR SUITE. Le rail
-            du dessus dit ce qui arrive ; celui-ci dit ce qui est arrivé. */}
-        {eventLists === null ? (
-          <Section
-            kicker="Ce qui a été annoncé"
-            title="Les dernières conférences"
-            moreTo="/lists"
-            moreLabel="Toutes les listes"
-            className="s-elists"
-            snap={false}
-          >
-            <SkelRepeat of={SkelEventList} count={5} />
-          </Section>
-        ) : (
-          eventLists.length > 0 && (
-            <Section
-              kicker="Ce qui a été annoncé"
-              title="Les dernières conférences"
-              moreTo="/lists"
-              moreLabel="Toutes les listes"
-              className="s-elists"
-            >
-              {eventLists.map((l) => (
-                <EventListCard key={l.id} list={l} />
-              ))}
-            </Section>
-          )
-        )}
-
         {/* --- Sorties du jour -------------------------------------------
             Pas de squelette : le rayon est souvent vide (peu de jeux datés au
             jour près), et un titre qui apparaît puis disparaît fait sauter la
@@ -947,9 +883,7 @@ export default function Welcome() {
         )}
 
         {/* --- Le principe des 9 : une idée de liste à faire en un clic -- */}
-        <NineRail token={token} library={library} />
-
-        <OstRail token={token} limit={OST_LIMIT} />
+        <NineRail token={token} library={library} kicker={null} title="Le principe des 9" />
 
         {/* --- Tes derniers terminés -------------------------------------
             ⚠️ LE BAS DE PAGE EST FAIT POUR REGARDER EN ARRIÈRE. */}
@@ -1035,15 +969,85 @@ export default function Welcome() {
             ))}
           </Section>
         )}
+
+        {/* --- Directs et showcases ----------------------------------------
+            ⚠️ EN BAS DE PAGE. Ils ouvraient la colonne juste sous les envies :
+            un rendez-vous se consulte, on ne vient pas sur l'accueil pour lui.
+            Tout l'agenda reste à un clic (/events). */}
+        {events === null ? (
+          <Section
+            kicker="Ce qui arrive"
+            title="Directs et showcases"
+            className="s-events"
+            snap={false}
+          >
+            <SkelRepeat of={SkelEvent} count={4} />
+          </Section>
+        ) : (
+          sortedEvents.length > 0 && (
+            <Section
+              kicker="Ce qui arrive"
+              title="Directs et showcases"
+              moreTo="/events"
+              moreLabel="Tout l'agenda"
+              className="s-events"
+            >
+              {sortedEvents.map((ev) => (
+                <EventCard
+                  key={ev.id}
+                  event={ev}
+                  now={tick}
+                  onToggleInterest={(want) => toggleInterest(ev, want)}
+                />
+              ))}
+            </Section>
+          )
+        )}
+
+        {/* --- Les dernières conférences ----------------------------------
+            Juste sous les rendez-vous, parce que c'est leur suite : le rail du
+            dessus dit ce qui arrive, celui-ci ce qui est arrivé. */}
+        {eventLists === null ? (
+          <Section
+            kicker="Ce qui a été annoncé"
+            title="Les dernières conférences"
+            moreTo="/lists"
+            moreLabel="Toutes les listes"
+            className="s-elists"
+            snap={false}
+          >
+            <SkelRepeat of={SkelEventList} count={5} />
+          </Section>
+        ) : (
+          eventLists.length > 0 && (
+            <Section
+              kicker="Ce qui a été annoncé"
+              title="Les dernières conférences"
+              moreTo="/lists"
+              moreLabel="Toutes les listes"
+              className="s-elists"
+            >
+              {eventLists.map((l) => (
+                <EventListCard key={l.id} list={l} />
+              ))}
+            </Section>
+          )
+        )}
       </div>
 
       {/* ==================================================================
           La colonne de droite : que des ACTIONS
           ==================================================================
-          Mot du jour, proposition du soir, documentaire, pépite, arcade, app.
+          Carte de joueur à remplir, mot du jour, proposition du soir,
+          documentaire, pépite, arcade, app.
           Les quatre raccourcis du bas ne dépendent de rien : ils s'affichent
           tout de suite, sans squelette. */}
       <aside className="mh-side">
+        {/* --- Ta carte de joueur, pas encore remplie -------------------
+            Une proposition, pas une obligation : elle se ferme d'un clic et
+            ne revient plus (cf. home/BoardAsk). */}
+        <BoardAsk token={token} scope={scope} />
+
         {/* --- Le rendez-vous du jour ----------------------------------- */}
         {mot === undefined ? <SkelMot /> : mot ? <MotStrip mot={mot} /> : null}
 

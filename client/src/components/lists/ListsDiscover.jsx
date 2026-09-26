@@ -40,10 +40,11 @@ function useRail(path, token) {
 }
 
 /** Un rayon de listes ; rien à l'écran s'il est vide. */
-function ListRail({ path, token, title, moreTo, render, lead = null, skipId = null, keep = null }) {
+function ListRail({ path, token, title, moreTo, render, lead = null, skipId = null, keep = null, order = null }) {
   const lists = (useRail(path, token) || []).filter(
     (l) => l.id !== skipId && (!keep || keep(l))
   );
+  if (order) lists.sort(order);
   if (!lead && !lists.length) return null;
   return (
     <Section title={title} moreTo={moreTo} className="lx-sec">
@@ -146,6 +147,8 @@ export default function ListsDiscover({ token, renderCard }) {
         path="/lists?scope=awards&limit=14"
         token={token}
         title="Palmarès"
+        // La dernière cérémonie en tête (le serveur les rend déjà ainsi).
+        order={(a, b) => (b.event?.startTime || 0) - (a.event?.startTime || 0)}
         render={renderCard}
       />
       {token && <NineRail token={token} kicker="" title="Neuf jeux, un thème" />}

@@ -62,10 +62,12 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  width: 200px;
-  height: 262px;
-  padding: 18px 18px 14px;
-  border-radius: 18px;
+  /* Resserrée : on en voit une de plus dans le rail, et la phrase y tient
+     toujours (cf. CARD_INNER dans home/NineRail). */
+  width: 172px;
+  height: 228px;
+  padding: 15px 15px 12px;
+  border-radius: 16px;
   border: 1px solid color-mix(in srgb, var(--nc) 22%, var(--border));
   background: color-mix(in srgb, var(--nc) 9%, var(--surface));
   color: var(--text);
@@ -79,10 +81,10 @@
 }
 .nine-card-mark {
   position: absolute;
-  right: -18px;
-  bottom: -58px;
+  right: -16px;
+  bottom: -52px;
   font-family: "Space Grotesk", var(--font-display);
-  font-size: 210px;
+  font-size: 180px;
   font-weight: 700;
   line-height: 1;
   color: var(--nc);
@@ -212,8 +214,57 @@
   transform: none;
 }
 
+/* L'emoji du thème, qui flotte au centre du pied de la carte. */
+.nine-card-emoji {
+  position: relative;
+  align-self: center;
+  margin: auto 0 6px;
+  width: 38px;
+  height: 38px;
+  animation: nine-float 3.2s ease-in-out infinite;
+  filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.22));
+  pointer-events: none;
+}
+.nine-card-emoji img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.nine-card:hover .nine-card-emoji {
+  animation-duration: 1.6s;
+}
+@keyframes nine-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-4deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(4deg);
+  }
+}
+/* L'emoji prend la place libre : le pied se colle dessous. */
+.nine-card .nine-card-emoji + .nine-card-foot {
+  margin-top: 0;
+}
+
 .nine-faces {
   display: inline-flex;
+  flex: none;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+}
+button.nine-faces {
+  border-radius: 999px;
+  outline-offset: 2px;
+  transition: transform 0.15s ease;
+}
+button.nine-faces:hover {
+  transform: scale(1.12);
+}
+button.nine-faces:hover > * {
+  border-color: #f2b70b;
 }
 .nine-faces > * {
   width: 20px;
@@ -233,6 +284,87 @@
   font-weight: 800;
   color: #2a1c00;
   background: #f2b70b !important;
+}
+
+/* ---------- Les listes des amis pour un thème ---------- */
+.modal.nine-friends-modal {
+  width: min(560px, 94vw);
+}
+.nine-friends {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.8rem;
+  max-height: min(70vh, 620px);
+  overflow-y: auto;
+  padding: 2px;
+}
+.nine-friend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.55rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  transition: border-color 0.15s ease, transform 0.2s ease;
+}
+.nine-friend:hover {
+  border-color: #f2b70b;
+  transform: translateY(-2px);
+}
+.nine-friend-who {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+.nine-friend-pp {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  overflow: hidden;
+  display: grid;
+}
+.nine-friend-pp > * {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  font-size: 0.7rem;
+}
+.nine-friend-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  font-size: 0.86rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nine-friend-go {
+  flex: none;
+  color: var(--text-soft);
+  transition: color 0.15s ease, transform 0.2s ease;
+}
+.nine-friend:hover .nine-friend-go {
+  color: #f2b70b;
+  transform: translateX(2px);
+}
+.nine-friend-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.nine-friend-grid > * {
+  aspect-ratio: 3 / 4;
+  width: 100%;
+  object-fit: cover;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
 }
 
 /* ======================================================================
@@ -1025,6 +1157,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .nine-card-emoji,
   .nine-card,
   .nine-m-slot.filled,
   .nine-phrase-9,

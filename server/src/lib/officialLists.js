@@ -35,13 +35,14 @@ import segaXboxPc from "../data/officialLists/sega-xbox-pc.js";
 import genresA from "../data/officialLists/genres-a.js";
 import genresB from "../data/officialLists/genres-b.js";
 import series from "../data/officialLists/series.js";
+import seriesB from "../data/officialLists/series-b.js";
 import gameAwards from "../data/officialLists/gameAwards.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const IMG_BASE = "https://images.igdb.com/igdb/image/upload";
 
 export const RESOLVED_FILE = path.join(__dirname, "../data/officialLists/resolved.json");
-export const TOP_DEFINITIONS = [...nintendo, ...sony, ...segaXboxPc, ...genresA, ...genresB, ...series];
+export const TOP_DEFINITIONS = [...nintendo, ...sony, ...segaXboxPc, ...genresA, ...genresB, ...series, ...seriesB];
 export const AWARD_DEFINITIONS = gameAwards;
 
 // Les trois rayons de l'onglet « Tops ».
