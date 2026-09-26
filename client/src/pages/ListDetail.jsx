@@ -267,6 +267,9 @@ export default function ListDetail() {
               title: l.title,
               description: l.description,
               visibility: l.visibility,
+              // Sans elle, « Retirer l'image » ne quittait jamais l'écran :
+              // le serveur gardait l'ancienne couverture.
+              cover: l.cover || null,
               tags: l.tags || [],
               tiers: trs,
               type: l.type,

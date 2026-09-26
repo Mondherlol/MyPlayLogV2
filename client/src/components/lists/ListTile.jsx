@@ -8,7 +8,7 @@ import { typeMeta } from "../../lib/lists";
 // L'ancienne carte empilait date, titre, tags, auteur, nombre d'éléments,
 // visibilité, « 0 ♥ 0 💬 » et « màj il y a… » sous un petit montage : on
 // lisait avant de voir. Ici l'image porte la carte, et dessous il ne reste que
-// le titre et qui l'a faite.
+// le titre et qui l'a faite, posés sur l'image elle-même.
 
 // Les images du montage. Une liste classée garde son podium secret (même
 // principe que l'éventail de ListPreview) : on montre la suite du classement.
@@ -49,6 +49,20 @@ export default function ListTile({ list, onDelete }) {
           </span>
         )}
         <span className="lt-badges">
+          {list.mine && onDelete && (
+            <button
+              type="button"
+              className="lt-pill lt-del clickable"
+              title="Supprimer la liste"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onDelete(list);
+              }}
+            >
+              <Trash2 size={12} />
+            </button>
+          )}
           {list.event?.videoId && (
             <span className="lt-pill" title="Rediffusion disponible">
               <Play size={11} fill="currentColor" strokeWidth={0} />
@@ -62,38 +76,26 @@ export default function ListTile({ list, onDelete }) {
           <span className="lt-pill">{list.itemCount}</span>
         </span>
 
-        {list.mine && onDelete && (
-          <button
-            type="button"
-            className="lt-del clickable"
-            title="Supprimer la liste"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onDelete(list);
-            }}
-          >
-            <Trash2 size={14} />
-          </button>
-        )}
-      </span>
-
-      <span className="lt-title">{list.title}</span>
-      <span className="lt-meta">
-        <span className="lt-pp" aria-hidden="true">
-          {author?.avatar ? (
-            <img src={author.avatar} alt="" loading="lazy" draggable="false" />
-          ) : (
-            author?.username?.[0]?.toUpperCase() || "?"
-          )}
-        </span>
-        <span className="lt-author">{author?.username || "—"}</span>
-        {author?.isSystem && <BadgeCheck size={13} className="lt-check" aria-label="Compte officiel" />}
-        {list.likeCount > 0 && (
-          <span className={`lt-likes ${list.liked ? "on" : ""}`}>
-            <Heart size={12} fill={list.liked ? "currentColor" : "none"} /> {list.likeCount}
+        {/* Le nom de la liste, posé sur l'image. */}
+        <span className="lt-caption">
+          <span className="lt-title">{list.title}</span>
+          <span className="lt-meta">
+            <span className="lt-pp" aria-hidden="true">
+              {author?.avatar ? (
+                <img src={author.avatar} alt="" loading="lazy" draggable="false" />
+              ) : (
+                author?.username?.[0]?.toUpperCase() || "?"
+              )}
+            </span>
+            <span className="lt-author">{author?.username || "—"}</span>
+            {author?.isSystem && <BadgeCheck size={12} className="lt-check" aria-label="Compte officiel" />}
+            {list.likeCount > 0 && (
+              <span className={`lt-likes ${list.liked ? "on" : ""}`}>
+                <Heart size={12} fill={list.liked ? "currentColor" : "none"} /> {list.likeCount}
+              </span>
+            )}
           </span>
-        )}
+        </span>
       </span>
     </Link>
   );

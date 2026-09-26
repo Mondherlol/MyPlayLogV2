@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Heart, Plus } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Heart } from "lucide-react";
 
 import Section from "../home/Rail";
 import NineRail from "../home/NineRail";
-import { apiFetch } from "../../lib/api";
-import { apiCached } from "../../lib/query";
-import { DEFAULT_BOARD, boardOf, openMyBoard } from "../../lib/boards";
+import { apiCached, peekApi } from "../../lib/query";
+import { DEFAULT_BOARD, boardOf } from "../../lib/boards";
 
 // ======================================================================
 //  La page Listes, onglet « Découvrir » : des rayons d'images
@@ -46,31 +45,19 @@ function BoardCard({ l, mine }) {
   );
 }
 
-/** Le premier emplacement du rayon quand on n'a pas encore sa carte. */
-function FillMyBoard({ board, onFill }) {
-  return (
-    <button type="button" className="lx-board lx-board-new clickable" onClick={onFill}>
-      <span className="lx-board-grid">
-        {board.slots.map((s) => (
-          <span key={s.key} />
-        ))}
-      </span>
-      <span className="lx-board-by">
-        <span className="lx-board-plus">
-          <Plus size={13} />
-        </span>
-        <span className="lx-board-name">Remplir ma carte</span>
-      </span>
-    </button>
-  );
-}
+// Une carte de joueur sans une seule image n'a rien à montrer dans un rayon.
+const hasImages = (l) => (l.boardItems || []).some((it) => it.image);
 
-/** Charge un rayon de listes ; `null` tant que ça charge. */
+/**
+ * Charge un rayon de listes ; `null` tant que ça charge. Le cache s'affiche
+ * tout de suite, mais on redemande toujours : une liste modifiée (image
+ * retirée, titre changé) ne doit pas revenir dans son ancien état.
+ */
 function useRail(path, token) {
-  const [lists, setLists] = useState(null);
+  const [lists, setLists] = useState(() => peekApi(path)?.lists ?? null);
   useEffect(() => {
     let alive = true;
-    apiCached(path, { token, maxAge: 5 * 60000 })
+    apiCached(path, { token, force: true })
       .then((d) => alive && setLists(d?.lists || []))
       .catch(() => alive && setLists([]));
     return () => {
@@ -81,8 +68,10 @@ function useRail(path, token) {
 }
 
 /** Un rayon de listes ; rien à l'écran s'il est vide. */
-function ListRail({ path, token, title, moreTo, render, lead = null, skipId = null }) {
-  const lists = (useRail(path, token) || []).filter((l) => l.id !== skipId);
+function ListRail({ path, token, title, moreTo, render, lead = null, skipId = null, keep = null }) {
+  const lists = (useRail(path, token) || []).filter(
+    (l) => l.id !== skipId && (!keep || keep(l))
+  );
   if (!lead && !lists.length) return null;
   return (
     <Section title={title} moreTo={moreTo} className="lx-sec">
@@ -97,7 +86,6 @@ function ListRail({ path, token, title, moreTo, render, lead = null, skipId = nu
 }
 
 export default function ListsDiscover({ token, renderCard }) {
-  const navigate = useNavigate();
   const board = boardOf(DEFAULT_BOARD);
   const [mine, setMine] = useState(undefined); // ma carte : undefined = en cours
 
@@ -115,30 +103,18 @@ export default function ListsDiscover({ token, renderCard }) {
     };
   }, [token, board.key]);
 
-  // Ma carte ouvre le rayon des cartes de joueur : remplie, elle s'y montre
-  // comme les autres ; vide, c'est l'emplacement pour la commencer.
-  const lead = !token || mine === undefined ? null : mine ? (
-    <BoardCard l={mine} mine />
-  ) : (
-    <FillMyBoard board={board} onFill={() => openMyBoard({ token, navigate, apiFetch, boardKey: board.key })} />
-  );
+  // Ma carte ouvre le rayon des cartes de joueur — seulement si elle montre
+  // déjà quelque chose : les cartes vides n'y ont pas leur place.
+  const lead = mine && hasImages(mine) ? <BoardCard l={mine} mine /> : null;
 
   return (
     <div className="lx">
       <ListRail
-        path="/lists?scope=events&limit=14"
+        path="/lists?scope=tops&limit=14"
         token={token}
-        title="Conférences"
-        moreTo="/lists?sc=events"
+        title="Tops"
+        moreTo="/lists?sc=tops"
         render={renderCard}
-      />
-      <ListRail
-        path={`/lists?board=${board.key}&sort=likes&limit=16`}
-        token={token}
-        title="Cartes de joueur"
-        lead={lead}
-        skipId={mine?.id}
-        render={(l) => <BoardCard l={l} />}
       />
       <ListRail
         path="/lists?type=tier&sort=likes&limit=14"
@@ -148,10 +124,19 @@ export default function ListsDiscover({ token, renderCard }) {
         render={renderCard}
       />
       <ListRail
-        path="/lists?scope=tops&limit=14"
+        path={`/lists?board=${board.key}&sort=likes&limit=16`}
         token={token}
-        title="Tops"
-        moreTo="/lists?sc=tops"
+        title="Cartes de joueur"
+        lead={lead}
+        skipId={mine?.id}
+        keep={hasImages}
+        render={(l) => <BoardCard l={l} />}
+      />
+      <ListRail
+        path="/lists?scope=events&limit=14"
+        token={token}
+        title="Conférences"
+        moreTo="/lists?sc=events"
         render={renderCard}
       />
       <ListRail
