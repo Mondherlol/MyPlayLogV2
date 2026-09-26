@@ -1,38 +1,29 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, Heart, IdCard, Sparkles } from "lucide-react";
+import { Heart, Plus } from "lucide-react";
 
 import Section from "../home/Rail";
 import NineRail from "../home/NineRail";
 import { apiFetch } from "../../lib/api";
 import { apiCached } from "../../lib/query";
-import { LIST_TYPES } from "../../lib/lists";
 import { DEFAULT_BOARD, boardOf, openMyBoard } from "../../lib/boards";
 
 // ======================================================================
-//  La page Listes, onglet « Découvrir » : une vitrine, pas un tas
+//  La page Listes, onglet « Découvrir » : des rayons d'images
 // ======================================================================
-// La page n'était qu'une grille de cartes toutes pareilles, le Top 100 Switch
-// entre deux listes de trois jeux. Elle s'ouvre maintenant comme l'accueil,
-// en rayons, du plus personnel au plus général :
-//
-//   1. TA carte de joueur (ou l'invitation à la faire) et les types de listes
-//      à créer, en tuiles ;
-//   2. le principe des 9, ses thèmes ;
-//   3. les cartes de joueur des autres, les tier lists qui plaisent ;
-//   4. ce que le site publie : palmarès, conférences, tops.
+// Pas d'étiquettes au-dessus des titres, pas de paragraphe d'explication, pas
+// de tuiles « Créer » (le bouton de l'en-tête ouvre déjà le choix du type) :
+// que des rangées de cartes, de la plus visuelle à la plus textuelle.
 //
 // La grille complète, avec sa recherche et ses filtres, suit en dessous (cf.
-// pages/Lists) : on ne perd rien, on commence juste par le meilleur.
+// pages/Lists).
 
-const CREATE_TYPES = ["ranked", "tier", "classic", "playlist"];
-
-/** Une carte de joueur d'un autre, en miniature : sa grille 5 × 4 et son auteur. */
-function BoardCard({ l }) {
+/** Une carte de joueur en miniature : sa grille 5 × 4 et son auteur. */
+function BoardCard({ l, mine }) {
   const board = boardOf(l.board);
   const by = Object.fromEntries((l.boardItems || []).map((it) => [it.slot, it]));
   return (
-    <Link to={`/lists/${l.id}`} className="lx-board clickable">
+    <Link to={`/lists/${l.id}`} className={`lx-board clickable ${mine ? "is-mine" : ""}`}>
       <span className="lx-board-grid">
         {board.slots.map((s) =>
           by[s.key]?.image ? <img key={s.key} src={by[s.key].image} alt="" loading="lazy" /> : <span key={s.key} />
@@ -44,7 +35,7 @@ function BoardCard({ l }) {
         ) : (
           <span className="lx-board-letter">{(l.author?.username || "?")[0].toUpperCase()}</span>
         )}
-        <span className="lx-board-name">{l.author?.username}</span>
+        <span className="lx-board-name">{mine ? "Ma carte" : l.author?.username}</span>
         {l.likeCount > 0 && (
           <span className="lx-board-likes">
             <Heart size={11} /> {l.likeCount}
@@ -55,8 +46,27 @@ function BoardCard({ l }) {
   );
 }
 
-/** Un rayon de listes chargé à la demande ; rien à l'écran s'il est vide. */
-function ListRail({ path, token, kicker, title, moreTo, moreLabel, render }) {
+/** Le premier emplacement du rayon quand on n'a pas encore sa carte. */
+function FillMyBoard({ board, onFill }) {
+  return (
+    <button type="button" className="lx-board lx-board-new clickable" onClick={onFill}>
+      <span className="lx-board-grid">
+        {board.slots.map((s) => (
+          <span key={s.key} />
+        ))}
+      </span>
+      <span className="lx-board-by">
+        <span className="lx-board-plus">
+          <Plus size={13} />
+        </span>
+        <span className="lx-board-name">Remplir ma carte</span>
+      </span>
+    </button>
+  );
+}
+
+/** Charge un rayon de listes ; `null` tant que ça charge. */
+function useRail(path, token) {
   const [lists, setLists] = useState(null);
   useEffect(() => {
     let alive = true;
@@ -67,11 +77,18 @@ function ListRail({ path, token, kicker, title, moreTo, moreLabel, render }) {
       alive = false;
     };
   }, [path, token]);
-  if (!lists?.length) return null;
+  return lists;
+}
+
+/** Un rayon de listes ; rien à l'écran s'il est vide. */
+function ListRail({ path, token, title, moreTo, render, lead = null, skipId = null }) {
+  const lists = (useRail(path, token) || []).filter((l) => l.id !== skipId);
+  if (!lead && !lists.length) return null;
   return (
-    <Section kicker={kicker} title={title} moreTo={moreTo} moreLabel={moreLabel} className="lx-sec">
+    <Section title={title} moreTo={moreTo} className="lx-sec">
+      {lead && <div className="lx-rail-item is-board">{lead}</div>}
       {lists.map((l) => (
-        <div key={l.id} className="lx-rail-item">
+        <div key={l.id} className={`lx-rail-item ${l.board ? "is-board" : ""}`}>
           {render(l)}
         </div>
       ))}
@@ -79,7 +96,7 @@ function ListRail({ path, token, kicker, title, moreTo, moreLabel, render }) {
   );
 }
 
-export default function ListsDiscover({ token, onCreate, renderCard }) {
+export default function ListsDiscover({ token, renderCard }) {
   const navigate = useNavigate();
   const board = boardOf(DEFAULT_BOARD);
   const [mine, setMine] = useState(undefined); // ma carte : undefined = en cours
@@ -98,113 +115,52 @@ export default function ListsDiscover({ token, onCreate, renderCard }) {
     };
   }, [token, board.key]);
 
-  const by = Object.fromEntries((mine?.boardItems || []).map((it) => [it.slot, it]));
+  // Ma carte ouvre le rayon des cartes de joueur : remplie, elle s'y montre
+  // comme les autres ; vide, c'est l'emplacement pour la commencer.
+  const lead = !token || mine === undefined ? null : mine ? (
+    <BoardCard l={mine} mine />
+  ) : (
+    <FillMyBoard board={board} onFill={() => openMyBoard({ token, navigate, apiFetch, boardKey: board.key })} />
+  );
 
   return (
     <div className="lx">
-      {/* --- 1. Ta carte, et de quoi créer ------------------------------ */}
-      <div className="lx-top">
-        <div className="lx-mycard">
-          <div className="lx-mycard-text">
-            <span className="mh-kicker">Ta liste spéciale</span>
-            <h2>
-              <IdCard size={22} /> {board.title}
-            </h2>
-            <p>
-              Un jeu par case : ton préféré, la meilleure histoire, celui qui mérite un remake, ton
-              méchant favori… Elle s'affiche en tête de ton profil.
-            </p>
-            {mine ? (
-              <Link to={`/lists/${mine.id}`} className="btn btn-primary clickable">
-                Voir ma carte <ArrowRight size={16} />
-              </Link>
-            ) : (
-              token &&
-              mine === null && (
-                <button
-                  className="btn btn-primary clickable"
-                  onClick={() => openMyBoard({ token, navigate, apiFetch, boardKey: board.key })}
-                >
-                  <Sparkles size={16} /> Remplir ma carte
-                </button>
-              )
-            )}
-          </div>
-          <span className={`lx-mycard-grid ${mine ? "" : "is-empty"}`} aria-hidden="true">
-            {board.slots.map((s) =>
-              by[s.key]?.image ? (
-                <img key={s.key} src={by[s.key].image} alt="" loading="lazy" />
-              ) : (
-                <span key={s.key}>
-                  <s.Icon size={14} />
-                </span>
-              )
-            )}
-          </span>
-        </div>
-
-        <div className="lx-create">
-          <span className="mh-kicker">Créer</span>
-          <div className="lx-create-grid">
-            {CREATE_TYPES.map((t) => {
-              const meta = LIST_TYPES[t];
-              return (
-                <button key={t} type="button" className="lx-type clickable" onClick={() => onCreate(t)}>
-                  <meta.Icon size={20} />
-                  <b>{meta.long}</b>
-                  <span>{meta.desc}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* --- 2. Le principe des 9 --------------------------------------- */}
-      {token && <NineRail token={token} kicker="Le principe des 9" title="Neuf jeux, un thème" />}
-
-      {/* --- 3. Ce que font les autres ---------------------------------- */}
+      <ListRail
+        path="/lists?scope=events&limit=14"
+        token={token}
+        title="Conférences"
+        moreTo="/lists?sc=events"
+        render={renderCard}
+      />
       <ListRail
         path={`/lists?board=${board.key}&sort=likes&limit=16`}
         token={token}
-        kicker="Leurs cartes"
-        title="Les cartes de joueur"
+        title="Cartes de joueur"
+        lead={lead}
+        skipId={mine?.id}
         render={(l) => <BoardCard l={l} />}
       />
       <ListRail
         path="/lists?type=tier&sort=likes&limit=14"
         token={token}
-        kicker="Ça classe"
-        title="Les tier lists du moment"
+        title="Tier lists"
         moreTo="/lists?type=tier&sort=likes"
-        render={renderCard}
-      />
-
-      {/* --- 4. Ce que publie le site ----------------------------------- */}
-      <ListRail
-        path="/lists?scope=awards&limit=14"
-        token={token}
-        kicker="Les palmarès"
-        title="The Game Awards et les autres"
-        render={renderCard}
-      />
-      <ListRail
-        path="/lists?scope=events&limit=14"
-        token={token}
-        kicker="Ce qui a été annoncé"
-        title="Les dernières conférences"
-        moreTo="/lists?sc=events"
         render={renderCard}
       />
       <ListRail
         path="/lists?scope=tops&limit=14"
         token={token}
-        kicker="Classements officiels"
-        title="Les tops"
+        title="Tops"
         moreTo="/lists?sc=tops"
         render={renderCard}
       />
-
+      <ListRail
+        path="/lists?scope=awards&limit=14"
+        token={token}
+        title="Palmarès"
+        render={renderCard}
+      />
+      {token && <NineRail token={token} kicker="" title="Neuf jeux, un thème" />}
     </div>
   );
 }

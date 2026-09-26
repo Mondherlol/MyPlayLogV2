@@ -1,26 +1,19 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Plus,
-  Heart,
-  MessageCircle,
-  Lock,
-  Globe,
   Loader2,
   Layers,
   Search,
   X,
-  Trash2,
   Disc3,
   CalendarDays,
-  PlayCircle,
   ListOrdered,
   Tag,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import {
-  timeAgo,
   LIST_SORTS,
   LIST_TYPE_FILTERS,
   LIST_KIND_FILTERS,
@@ -28,7 +21,7 @@ import {
 } from "../lib/lists";
 import CreateListModal from "../components/CreateListModal";
 import PlaylistCard from "../components/PlaylistCard";
-import { Preview, Author } from "../components/ListPreview";
+import ListTile from "../components/lists/ListTile";
 import ListsDiscover from "../components/lists/ListsDiscover";
 
 const SCOPES = [
@@ -44,89 +37,6 @@ const SCOPES = [
 // que les listes officielles de conférences, « Tops » que les classements
 // officiels (filtrés, eux, par rayon et par tag).
 const FIXED_SCOPES = ["playlists", "events", "tops"];
-
-const fmtEventDate = new Intl.DateTimeFormat("fr-FR", {
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-});
-
-function ListCard({ list, onDelete }) {
-  return (
-    <Link to={`/lists/${list.id}`} className="list-card clickable">
-      {list.mine && (
-        <button
-          className="list-card-del clickable"
-          title="Supprimer la liste"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onDelete(list);
-          }}
-        >
-          <Trash2 size={15} />
-        </button>
-      )}
-      <Preview list={list} />
-      <div className="list-card-body">
-        {/* Liste officielle d'un événement : sa date passe avant le titre, et
-            on annonce la rediff quand elle existe. */}
-        {list.event && (
-          <div className="list-card-event">
-            <CalendarDays size={12} />
-            {list.event.startTime
-              ? fmtEventDate.format(new Date(list.event.startTime))
-              : "Événement"}
-            {list.event.videoId && (
-              <span className="list-card-replay" title="Rediffusion disponible">
-                <PlayCircle size={12} /> Rediff
-              </span>
-            )}
-          </div>
-        )}
-        <h3 className="list-card-title">{list.title}</h3>
-        {/* Les tops officiels ont tous la même phrase de méthode : sur la
-            carte, les tags disent mieux ce qui les distingue. */}
-        {list.description && !list.official && (
-          <p className="list-card-desc">{list.description}</p>
-        )}
-        {list.tags?.length > 0 && (
-          <div className="list-card-tags">
-            {list.tags.slice(0, 3).map((t) => (
-              <span key={t} className="list-tag-chip">
-                {t}
-              </span>
-            ))}
-          </div>
-        )}
-        <div className="list-card-meta">
-          <Author author={list.author} />
-          <span className="dot">·</span>
-          <span>{list.itemCount} élément{list.itemCount > 1 ? "s" : ""}</span>
-          {list.mine && (
-            <span className={`list-vis-badge ${list.visibility}`}>
-              {list.visibility === "private" ? (
-                <><Lock size={11} /> Privée</>
-              ) : (
-                <><Globe size={11} /> Publique</>
-              )}
-            </span>
-          )}
-        </div>
-        <div className="list-card-foot">
-          <span className={`list-stat ${list.liked ? "liked" : ""}`}>
-            <Heart size={14} fill={list.liked ? "currentColor" : "none"} />
-            {list.likeCount}
-          </span>
-          <span className="list-stat">
-            <MessageCircle size={14} /> {list.commentCount}
-          </span>
-          <span className="list-stat time">màj {timeAgo(list.updatedAt)}</span>
-        </div>
-      </div>
-    </Link>
-  );
-}
 
 export default function Lists() {
   const { token } = useAuth();
@@ -262,20 +172,11 @@ export default function Lists() {
 
   return (
     <div className="lists-page">
+      {/* Un titre, les onglets, un bouton : le reste se voit dans les cartes. */}
       <header className="lists-header">
-        <div className="lists-header-text">
-          <h1 className="lists-title">
-            <span className="lists-title-icon">
-              <Layers size={26} />
-            </span>
-            Listes
-          </h1>
-          <p className="lists-sub font-fun">
-            Crée tes tops, tier lists et playlists d'OST — et découvre celles des autres.
-          </p>
-        </div>
+        <h1 className="lists-title">Listes</h1>
         <button className="btn btn-primary" onClick={() => setCreating(true)}>
-          <Plus size={18} /> Créer une liste
+          <Plus size={18} /> Créer
         </button>
       </header>
 
@@ -297,12 +198,11 @@ export default function Lists() {
         <>
           <ListsDiscover
             token={token}
-            onCreate={(t) => setCreating(t)}
             renderCard={(l) =>
               l.type === "playlist" ? (
                 <PlaylistCard list={l} onDelete={handleDelete} />
               ) : (
-                <ListCard list={l} onDelete={handleDelete} />
+                <ListTile list={l} onDelete={handleDelete} />
               )
             }
           />
@@ -460,15 +360,6 @@ export default function Lists() {
                     ? "Aucun top ne correspond"
                     : "Rien par ici pour l'instant"}
           </h3>
-          <p className="font-fun">
-            {scope === "playlists"
-              ? "Crée la première playlist d'OST !"
-              : scope === "events"
-                ? "Les listes des Directs et showcases arrivent après chaque conférence."
-                : scope === "tops"
-                  ? "Essaie un autre rayon ou un autre tag."
-                  : "Lance-toi et crée ta première liste !"}
-          </p>
           {!["events", "tops"].includes(scope) && (
             <button className="btn btn-primary" onClick={() => setCreating(true)}>
               <Plus size={18} /> Créer une liste
@@ -481,7 +372,7 @@ export default function Lists() {
             l.type === "playlist" ? (
               <PlaylistCard key={l.id} list={l} onDelete={handleDelete} />
             ) : (
-              <ListCard key={l.id} list={l} onDelete={handleDelete} />
+              <ListTile key={l.id} list={l} onDelete={handleDelete} />
             )
           )}
         </div>
