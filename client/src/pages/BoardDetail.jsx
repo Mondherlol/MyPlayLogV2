@@ -99,70 +99,78 @@ export default function BoardDetail({ list, items: initialItems, token, onLike, 
 
   const by = itemsBySlot(items);
 
+  const filled = board.slots.filter((sl) => by[sl.key]).length;
+  const author = list.author || {};
+
   return (
     <div className="bd-page">
-      <div className="nd-top">
-        <button className="nd-back clickable" onClick={() => navigate(-1)}>
-          <ArrowLeft size={17} /> Retour
-        </button>
-        <div className="nd-tools">
-          {list.mine && (
-            <span className={`bd-save ${saving || saved ? "on" : ""}`}>
-              {saving ? <Loader2 size={14} className="spin" /> : <Check size={14} />}
-              {saving ? "Enregistrement…" : "Enregistré"}
-            </span>
-          )}
+      <div className="bd-stage">
+        <PlayerCard list={list} items={items} onCell={list.mine ? (slot) => setPicking(slot) : undefined} />
+
+        {/* Les outils, en colonne à côté de la grille : rien au-dessus d'elle,
+            rien par-dessus une case. */}
+        <aside className="bd-rail">
+          <button className="bd-rail-btn clickable" onClick={() => navigate(-1)} title="Retour">
+            <ArrowLeft size={18} />
+          </button>
+          <Link to={`/u/${author.username}`} className="bd-rail-me clickable" title={author.username}>
+            {author.avatar ? <img src={author.avatar} alt="" /> : <b>{(author.username || "?")[0].toUpperCase()}</b>}
+          </Link>
+          <span className="bd-rail-count" title={`${filled} cases remplies sur ${board.slots.length}`}>
+            {filled}
+            <small>/{board.slots.length}</small>
+          </span>
+
           {list.mine ? (
             <>
+              <span
+                className={`bd-rail-save ${saving || saved ? "on" : ""}`}
+                title={saving ? "Enregistrement…" : "Enregistré"}
+              >
+                {saving ? <Loader2 size={16} className="spin" /> : <Check size={16} />}
+              </span>
               <button
-                className="nd-tool clickable"
+                className="bd-rail-btn clickable"
                 onClick={toggleVisibility}
                 title={list.visibility === "private" ? "Privée — la rendre publique" : "Publique — la rendre privée"}
               >
-                {list.visibility === "private" ? <Lock size={15} /> : <Globe size={15} />}
+                {list.visibility === "private" ? <Lock size={17} /> : <Globe size={17} />}
               </button>
-              <button className="nd-tool danger clickable" onClick={onDelete} title="Supprimer">
-                <Trash2 size={16} />
+              <button className="bd-rail-btn danger clickable" onClick={onDelete} title="Supprimer ma carte">
+                <Trash2 size={17} />
               </button>
             </>
           ) : (
             <>
               {token && (
                 <button
-                  className={`nd-like clickable ${list.liked ? "on" : ""}`}
+                  className={`bd-rail-btn clickable ${list.liked ? "liked" : ""}`}
                   onClick={onLike}
                   aria-pressed={!!list.liked}
                   title={list.liked ? "Je n'aime plus" : "J'aime"}
                 >
-                  <Heart size={16} fill={list.liked ? "currentColor" : "none"} />
-                  {list.likeCount > 0 && <span>{list.likeCount}</span>}
+                  <Heart size={17} fill={list.liked ? "currentColor" : "none"} />
                 </button>
               )}
               {mine ? (
-                <Link to={`/lists/${mine.id}`} className="btn btn-primary bd-cta clickable">
-                  Ma carte <ArrowRight size={16} />
+                <Link to={`/lists/${mine.id}`} className="bd-rail-btn gold clickable" title="Ma carte">
+                  <ArrowRight size={17} />
                 </Link>
               ) : (
                 token && (
                   <button
-                    className="btn btn-primary bd-cta clickable"
+                    className="bd-rail-btn gold clickable"
                     onClick={() => openMyBoard({ token, navigate, apiFetch, boardKey: board.key })}
+                    title="Fais la tienne"
                   >
-                    <Sparkles size={16} /> Fais la tienne
+                    <Sparkles size={17} />
                   </button>
                 )
               )}
             </>
           )}
-        </div>
+        </aside>
       </div>
-
-      <PlayerCard
-        list={list}
-        items={items}
-        author={list.author}
-        onCell={list.mine ? (slot) => setPicking(slot) : undefined}
-      />
 
       <div className="bd-comments">
         <ListComments listId={list.id} list={list} token={token} />

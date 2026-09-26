@@ -1,5 +1,5 @@
-import { useNavigate } from "react-router-dom";
-import { IdCard, Sparkles } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { ChevronRight, IdCard, Sparkles } from "lucide-react";
 
 import PlayerCard from "./board/PlayerCard";
 import { apiFetch } from "../lib/api";
@@ -41,7 +41,15 @@ export default function ProfileBoard({ lists, isMe, token }) {
 
   return (
     <section className="profile-section pf-block pf-board">
-      <PlayerCard list={list} items={items} author={list.author} compact link={`/lists/${list.id}`} />
+      <div className="pf-board-head">
+        <h3>
+          <IdCard size={16} /> Carte de joueur
+        </h3>
+        <Link to={`/lists/${list.id}`} className="pf-board-more clickable">
+          {isMe ? "La remplir" : "Voir"} <ChevronRight size={15} />
+        </Link>
+      </div>
+      <PlayerCard list={list} items={items} compact />
     </section>
   );
 }
