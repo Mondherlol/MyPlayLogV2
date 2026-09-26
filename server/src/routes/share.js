@@ -7,6 +7,7 @@ import GameMedia from "../models/GameMedia.js";
 import MotSession from "../models/MotSession.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { gameDay } from "../lib/mots.js";
+import { gameIdFromSlug, gameSlug } from "../lib/gameIgdb.js";
 // Les séances d'écoute vivent en mémoire dans CE processus : l'aperçu se lit
 // donc directement dans le magasin, sans passer par l'API (voir listenRooms).
 import { get as listenRoom } from "../lib/listenRooms.js";
@@ -464,12 +465,18 @@ router.get("/mot", async (req, res) => {
 //  Jeux  — GET /game/:id  (id IGDB numérique)
 // ============================================================
 router.get("/game/:id", async (req, res) => {
-  const url = `${SITE_URL}/game/${encodeURIComponent(req.params.id)}`;
+  let url = `${SITE_URL}/game/${encodeURIComponent(req.params.id)}`;
   res.set("Cache-Control", "public, max-age=600");
   try {
-    const id = Number(req.params.id);
+    // /game/abzu (l'adresse partagée d'aujourd'hui) ou /game/19141 (les liens
+    // d'avant) : les deux mènent au même aperçu, et l'URL canonique annoncée
+    // est toujours celle au slug.
+    const raw = String(req.params.id);
+    const id = /^\d+$/.test(raw) ? Number(raw) : await gameIdFromSlug(raw).catch(() => null);
     if (!Number.isInteger(id) || id <= 0)
       return sendHtml(res, genericPage(url));
+    const slug = await gameSlug(id);
+    if (slug) url = `${SITE_URL}/game/${slug}`;
 
     const rows = await igdbQuery(
       "games",

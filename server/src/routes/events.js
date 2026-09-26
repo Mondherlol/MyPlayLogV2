@@ -5,7 +5,7 @@ import List from "../models/List.js";
 import UserGame from "../models/UserGame.js";
 import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
-import { upcomingFilter } from "../lib/eventCalendar.js";
+import { isFeaturedEvent, upcomingFilter } from "../lib/eventCalendar.js";
 import { eventFamily } from "../lib/gameEvents.js";
 
 const router = express.Router();
@@ -50,6 +50,9 @@ function serialize(ev, userId) {
     liveCheckedAt: ev.liveCheckedAt || null,
     interested: mine,
     interestedCount: (ev.interested || []).length,
+    // Les grands rendez-vous (cf. lib/eventCalendar `isFeaturedEvent`) : ce
+    // que l'accueil montre, et ce que l'agenda complet peut faire ressortir.
+    featured: isFeaturedEvent(ev),
   };
 }
 
@@ -67,8 +70,13 @@ router.get("/upcoming", requireAuth, async (req, res) => {
     // `kind=showcase` pour l'accueil (ce qui se regarde), rien du tout pour
     // l'agenda complet (qui montre aussi les salons).
     const kind = ["showcase", "conference"].includes(req.query.kind) ? req.query.kind : null;
+    // `featured=1` : l'accueil. Les grands rendez-vous seulement, showcases ET
+    // grandes soirées confondus (The Game Awards est un « salon » pour
+    // l'agenda). Le tri se fait en mémoire : la règle mêle nom, marque et
+    // source, et il n'y a jamais que quelques dizaines d'entrées à venir.
+    const featured = req.query.featured === "1";
 
-    const events = await GameEvent.find({
+    const found = await GameEvent.find({
       hidden: { $ne: true },
       // ⚠️ JAMAIS LES SAISONS ICI, MÊME SANS FILTRE. « Rien du tout » veut dire
       // « tout l'agenda », et une saison n'est pas dans l'agenda de tout le
@@ -78,8 +86,9 @@ router.get("/upcoming", requireAuth, async (req, res) => {
       ...upcomingFilter(),
     })
       .sort({ startsAt: 1 })
-      .limit(limit)
+      .limit(featured ? 300 : limit)
       .lean();
+    const events = featured ? found.filter(isFeaturedEvent).slice(0, limit) : found;
 
     res.json({ events: events.map((e) => serialize(e, req.userId)) });
   } catch (err) {

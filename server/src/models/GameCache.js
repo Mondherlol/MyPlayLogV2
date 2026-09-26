@@ -26,5 +26,10 @@ const gameCacheSchema = new mongoose.Schema(
 );
 
 gameCacheSchema.index({ gameId: 1, kind: 1 }, { unique: true });
+// /game/abzu → l'id : le chemin inverse du morceau « slug » (lib/gameIgdb.js).
+gameCacheSchema.index(
+  { "payload.slug": 1 },
+  { partialFilterExpression: { kind: "slug" } }
+);
 
 export default mongoose.model("GameCache", gameCacheSchema);

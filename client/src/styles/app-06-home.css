@@ -8580,6 +8580,74 @@
   font-weight: 500;
 }
 
+/* Tags (mots-clés IGDB) : plus petits et plus discrets que les genres —
+   ils précisent, ils ne classent pas. */
+.gp-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.gp-tag {
+  padding: 0.18rem 0.55rem;
+  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-soft, var(--text));
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.gp-tag-more {
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* PEGI : pastille d'âge + pictos de contenu, une rangée de cases carrées. */
+.pegi-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.pegi-tile {
+  width: 42px;
+  height: 42px;
+  border-radius: 4px;
+  flex: none;
+}
+.pegi-age {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  line-height: 1;
+}
+.pegi-age b {
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+.pegi-age small {
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-top: 2px;
+}
+.pegi-desc {
+  display: inline-block;
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 4px;
+  box-sizing: border-box;
+}
+.pegi-desc svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 /* Chips cliquables → page console (plateforme) / Explorer filtré (facettes) */
 .gp-chip-plat,
 .gp-chip-facet {

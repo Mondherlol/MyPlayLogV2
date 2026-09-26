@@ -76,6 +76,7 @@ import GameFeed from "../components/GameFeed";
 import GameRelated from "../components/GameRelated";
 import GameDownloads from "../components/GameDownloads";
 import FreeGameBanner from "../components/FreeGameBanner";
+import GamePegi from "../components/GamePegi";
 import YouTubePlayer from "../components/YouTubePlayer";
 import { useTabSwipe } from "../hooks/useTabSwipe";
 import useFollowingRail from "../hooks/useFollowingRail";
@@ -303,6 +304,34 @@ function CompanyLink({ name, role, navigate }) {
   );
 }
 
+// Les tags du jeu (mots-clés IGDB) : une poignée d'emblée, le reste sur
+// demande — certains jeux en ont soixante, et ils ne doivent pas repousser la
+// suite de la fiche.
+const TAGS_SHOWN = 12;
+function GameTags({ tags }) {
+  const [all, setAll] = useState(false);
+  if (!tags?.length) return null;
+  const shown = all ? tags : tags.slice(0, TAGS_SHOWN);
+  const rest = tags.length - shown.length;
+  return (
+    <section className="gp-block">
+      <h3 className="gp-h3">Tags</h3>
+      <div className="gp-tags">
+        {shown.map((t) => (
+          <span className="gp-tag" key={t}>
+            {t}
+          </span>
+        ))}
+        {rest > 0 && (
+          <button className="gp-tag gp-tag-more clickable" onClick={() => setAll(true)}>
+            +{rest}
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // Liste de studios/éditeurs cliquables séparés par des virgules.
 function CompanyList({ names, role, navigate }) {
   return (
@@ -337,7 +366,63 @@ function CompanyList({ names, role, navigate }) {
 // page passent par cette variable locale, y compris CompanyLink. Les <Link>,
 // eux, sont neutralisés par la surcouche elle-même (components/
 // GameSheetOverlay.jsx), qui intercepte le clic avant le routeur.
-export default function GamePage({
+// ⚠️ L'ADRESSE D'UNE FICHE EST SON SLUG : /game/abzu, pas /game/19141.
+// C'est ce qu'on lit dans la barre d'adresse et ce qu'on partage. Tout le reste
+// de l'app (bibliothèque, listes, API) parle en id IGDB, donc la page traduit
+// le slug en id AVANT de monter la fiche — et ne touche à rien d'autre.
+//
+// Les liens internes, eux, continuent de pointer vers /game/<id> (il y en a
+// des centaines, et l'id est ce qu'ils ont sous la main) : la fiche, une fois
+// chargée, remplace l'adresse par celle au slug, sans entrée d'historique.
+// Le cache ci-dessous garde la correspondance dans les deux sens, pour que ce
+// remplacement ne relance ni résolution ni chargement.
+const slugToId = new Map();
+const isNumericId = (s) => /^-?\d+$/.test(s);
+
+export function rememberGameSlug(id, slug) {
+  if (id && slug) slugToId.set(String(slug), String(id));
+}
+
+export default function GamePage(props) {
+  const params = useParams();
+  const raw = String(props.gameId || params.id || "");
+  const known = isNumericId(raw) ? raw : slugToId.get(raw) || null;
+  const [resolved, setResolved] = useState({ raw: null, id: null, error: null });
+
+  useEffect(() => {
+    if (known) return undefined;
+    let alive = true;
+    apiFetch(`/games/slug/${encodeURIComponent(raw)}`)
+      .then((d) => {
+        if (!alive) return;
+        rememberGameSlug(d.id, raw);
+        setResolved({ raw, id: String(d.id), error: null });
+      })
+      .catch((err) => alive && setResolved({ raw, id: null, error: err.message }));
+    return () => {
+      alive = false;
+    };
+  }, [raw, known]);
+
+  const id = known || (resolved.raw === raw ? resolved.id : null);
+  if (id) return <GameSheet {...props} gameId={id} />;
+  if (resolved.raw === raw && resolved.error) {
+    return (
+      <div className="gp-state">
+        <AlertTriangle size={30} />
+        <h3>Impossible de charger ce jeu</h3>
+        <p>{resolved.error}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="gp-state">
+      <Loader2 size={26} className="spin" />
+    </div>
+  );
+}
+
+function GameSheet({
   gameId = null,
   embedded = false,
   onClose = null,
@@ -592,6 +677,7 @@ export default function GamePage({
     ])
       .then(([d, e]) => {
         if (!alive) return;
+        rememberGameSlug(id, d.slug);
         setGame(d);
         gameCache.set(String(id), d);
         setFav(e.entry || null);
@@ -603,6 +689,19 @@ export default function GamePage({
       alive = false;
     };
   }, [id, token]);
+
+  // Arrivé par /game/19141 : l'adresse devient /game/abzu dès que la fiche
+  // connaît son slug (onglet et ancre conservés). En surcouche, l'URL
+  // appartient à la page du dessous : on n'y touche pas.
+  const slug = game?.slug;
+  useEffect(() => {
+    if (embedded || !slug || params.id === slug || String(game?.id) !== id) return;
+    rememberGameSlug(id, slug);
+    routerNavigate(
+      { pathname: `/game/${slug}`, search: window.location.search, hash: window.location.hash },
+      { replace: true, state: window.history.state?.usr }
+    );
+  }, [embedded, slug, params.id, id, game?.id, routerNavigate]);
 
   async function toggleWishlist() {
     if (!requireLogin()) return;
@@ -1998,6 +2097,12 @@ function InfosTab({ game, entry, onOpenImage, navigate }) {
         </section>
       )}
 
+      {game.pegi && (
+        <section className="gp-block">
+          <GamePegi pegi={game.pegi} />
+        </section>
+      )}
+
       {chipGroups.map((grp) => (
         <section className="gp-block" key={grp.label}>
           <h3 className="gp-h3">{grp.label}</h3>
@@ -2022,6 +2127,8 @@ function InfosTab({ game, entry, onOpenImage, navigate }) {
           </div>
         </section>
       ))}
+
+      <GameTags key={id} tags={game.tags} />
 
       {game.platforms?.length > 0 && (
         <section className="gp-block">

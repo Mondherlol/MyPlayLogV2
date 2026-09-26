@@ -76,7 +76,10 @@ import {
   gameCharacters,
   gameCore,
   gameCreatedAt,
+  gameExtras,
+  gameIdFromSlug,
   gameRelatives,
+  gameSlug,
   gameTimeToBeat,
 } from "../lib/gameIgdb.js";
 // Les jeux ajoutés par lien Steam qu'IGDB ne connaît pas encore : identifiant
@@ -776,6 +779,21 @@ function precisionOf(g) {
   const human = row?.human || null;
   return { precision: humanPrecision(human), releaseHuman: human };
 }
+
+// /game/abzu : la fiche s'ouvre par le slug IGDB, et c'est lui qu'on partage.
+// Le client le traduit ici en id avant de charger la fiche (toutes les autres
+// routes restent indexées par id).
+router.get("/slug/:slug", async (req, res) => {
+  try {
+    const id = await gameIdFromSlug(req.params.slug);
+    if (!id) return res.status(404).json({ error: "Jeu introuvable." });
+    res.set("Cache-Control", "public, max-age=86400");
+    res.json({ id, slug: String(req.params.slug).toLowerCase() });
+  } catch (err) {
+    console.error("game slug error:", err.message);
+    res.status(502).json({ error: "Recherche du jeu impossible." });
+  }
+});
 
 router.get("/releases", optionalAuth, async (req, res) => {
   try {
@@ -2287,6 +2305,56 @@ const GAME_TYPES_FR = {
 // (l'ancienne liste FULL_FIELDS est devenue CORE_FIELDS dans lib/gameIgdb.js,
 // partagée avec /details, /ratings, /related, /howlong… — une seule requête.)
 
+// ======================================================================
+//  PEGI et tags de la fiche
+// ======================================================================
+// Le PEGI seul — c'est la classification qu'on lit en France. Les pictos de
+// contenu sont renvoyés en CLÉS stables (le client dessine lui-même les
+// icônes) et dans l'ordre où PEGI les imprime au dos des boîtes.
+const PEGI_ORG = 2;
+const PEGI_DESCRIPTORS = [
+  ["violence", /violence/i],
+  ["language", /language/i],
+  ["fear", /fear/i],
+  ["gambling", /gambling/i],
+  ["sex", /^sex/i],
+  ["drugs", /drug/i],
+  ["discrimination", /discrimination/i],
+  ["purchases", /purchase/i],
+  ["online", /online/i],
+];
+
+function pegiOf(extras) {
+  const r = (extras?.ageRatings || []).find((a) => a.org === PEGI_ORG);
+  const age = Number(r?.rating);
+  if (![3, 7, 12, 16, 18].includes(age)) return null;
+  const descriptors = PEGI_DESCRIPTORS.filter(([, re]) =>
+    r.descriptors.some((d) => re.test(d))
+  ).map(([key]) => key);
+  return { age, descriptors };
+}
+
+// Les mots-clés IGDB : parfois plus de cent, en vrac, avec des doublons de
+// casse et des phrases entières. On garde les courts, sans doublon, avec une
+// majuscule — le client n'en montre qu'une poignée d'emblée.
+// Ce qui parle de la distribution, des salons ou des touches, pas du jeu.
+const TAG_NOISE =
+  /\d|bundle|store|steam|digital distribution|distribution|pax |gamescom|expo|wasd|controller|keyboard|mouse|achievement|trophies|trophy|soundtrack|dlc|patch|release|kickstarter|crowdfund|remaster|ps4 pro|xbox one x|game pass|playstation plus|games with gold|been here before|steam cloud|cloud save|save point/i;
+
+function tagsOf(extras) {
+  const seen = new Set();
+  const out = [];
+  for (const raw of extras?.keywords || []) {
+    const t = String(raw).trim().replace(/\s+/g, " ");
+    const key = t.toLowerCase();
+    if (!t || t.length > 28 || TAG_NOISE.test(t) || seen.has(key)) continue;
+    seen.add(key);
+    out.push(t.charAt(0).toUpperCase() + t.slice(1));
+    if (out.length >= 60) break;
+  }
+  return out;
+}
+
 router.get("/:id/full", optionalAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -2461,7 +2529,7 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
 
     // Traduction FR du résumé/scénario si elle a déjà été demandée une fois
     // (best-effort, lecture Mongo seule — jamais d'appel Gemini ici).
-    const [companyLogos, timeToBeat, translation, bundleGames] = await Promise.all([
+    const [companyLogos, timeToBeat, translation, bundleGames, slug, extras] = await Promise.all([
       logosPromise,
       beatPromise,
       getCachedTranslation(id, g.summary || null, g.storyline || null).catch(() => ({
@@ -2472,10 +2540,17 @@ router.get("/:id/full", optionalAuth, async (req, res) => {
       g.game_type === 3
         ? fetchBundleGames(id, g.first_release_date ?? null)
         : Promise.resolve([]),
+      // L'adresse de la fiche : /game/<slug> (null pour une fiche locale).
+      gameSlug(id),
+      // PEGI + tags (mots-clés IGDB).
+      gameExtras(id, g.first_release_date ?? null),
     ]);
 
     res.json({
       id: g.id,
+      slug,
+      pegi: pegiOf(extras),
+      tags: tagsOf(extras),
       name: fr?.name || g.name,
       originalName: g.name,
       summary: g.summary || null,

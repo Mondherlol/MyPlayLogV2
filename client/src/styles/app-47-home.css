@@ -2045,3 +2045,73 @@ a.mh-head-main:hover .mh-head-title {
   }
 }
 
+
+/* ======================================================================
+   L'agenda complet (/events) — tout ce qui arrive, rangé par mois
+   ====================================================================== */
+.agenda {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 3rem;
+}
+.agenda-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.agenda-head h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+.agenda-back {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.agenda-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 1rem 0 0.5rem;
+}
+.agenda-filter {
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.agenda-filter.active {
+  background: var(--accent-mark);
+  border-color: var(--accent-mark);
+  color: #111;
+}
+.agenda-month h2 {
+  margin: 1.6rem 0 0.7rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+.agenda-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  gap: 0.9rem;
+}
+.agenda-grid .mh-ev {
+  width: auto;
+}
+.agenda-empty {
+  display: grid;
+  place-items: center;
+  min-height: 30vh;
+  color: var(--text-soft);
+}

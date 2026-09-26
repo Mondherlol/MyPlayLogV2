@@ -253,6 +253,8 @@ const VERSIONS = {
   bundle: 1,
   relatives: 1,
   announce: 1,
+  slug: 1,
+  extras: 1,
 };
 
 const one = (arr) => (Array.isArray(arr) && arr.length ? arr[0] : null);
@@ -315,6 +317,125 @@ export function gameCreatedAt(gameId, releaseDate) {
       return { createdAt: g?.created_at ?? null };
     },
   }).then((d) => d?.createdAt ?? null);
+}
+
+// ======================================================================
+//  Le slug d'un jeu : /game/abzu plutôt que /game/19141
+// ======================================================================
+// C'est le slug d'IGDB, pas un slug fabriqué ici à partir du nom : il est
+// UNIQUE (IGDB suffixe les homonymes, « prey--1 »), il ne bouge pas quand on
+// traduit le titre, et IGDB sait retrouver le jeu à partir de lui. Un slug
+// maison « the-last-of-us » aurait désigné trois jeux à la fois.
+//
+// ⚠️ UN MORCEAU À PART, PAS UN CHAMP DE PLUS DANS `CORE_FIELDS` — même raison
+// que `gameCreatedAt` : bumper `VERSIONS.core` referait tout le catalogue en
+// cache pour une ligne de texte.
+//
+// Les fiches locales (id négatif, jeux Steam hors IGDB) n'ont pas de slug :
+// elles gardent leur id dans l'adresse.
+
+const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,199}$/;
+export const isGameSlug = (s) => SLUG_RE.test(String(s || "")) && !/^\d+$/.test(s);
+
+/** Le slug IGDB d'un jeu, ou `null` (fiche locale, jeu inconnu). */
+export function gameSlug(gameId) {
+  const id = Number(gameId);
+  if (!Number.isInteger(id) || id <= 0) return Promise.resolve(null);
+  return remember({
+    kind: "slug",
+    gameId: id,
+    ver: VERSIONS.slug,
+    dateFrom: (p) => p?.releaseDate ?? null,
+    load: async () => {
+      const g = one(
+        await igdbQuery("games", `fields slug,first_release_date; where id = ${id};`)
+      );
+      return g?.slug ? { slug: g.slug, releaseDate: g.first_release_date ?? null } : null;
+    },
+  })
+    .then((d) => d?.slug || null)
+    .catch(() => null);
+}
+
+// Le chemin inverse, gardé en mémoire : un slug ne change pour ainsi dire
+// jamais, et c'est la seule requête qu'une adresse partagée coûte en plus.
+const idBySlug = new Map();
+
+/** L'id IGDB derrière un slug, ou `null`. */
+export async function gameIdFromSlug(slug) {
+  const s = String(slug || "").toLowerCase();
+  if (!isGameSlug(s)) return null;
+  if (idBySlug.has(s)) return idBySlug.get(s);
+  // Déjà vu passer : le morceau « slug » d'une fiche ouverte par son id.
+  let id = null;
+  try {
+    const doc = await GameCache.findOne({ kind: "slug", "payload.slug": s }, { gameId: 1 }).lean();
+    id = doc?.gameId ?? null;
+  } catch {
+    /* base indisponible : on demande à IGDB */
+  }
+  if (!id) {
+    const g = one(
+      await igdbQuery("games", `fields id,first_release_date; where slug = "${s}";`)
+    );
+    if (!g?.id) return null;
+    id = g.id;
+    GameCache.updateOne(
+      { gameId: id, kind: "slug" },
+      {
+        $set: {
+          ver: VERSIONS.slug,
+          releaseDate: g.first_release_date ?? null,
+          payload: { slug: s, releaseDate: g.first_release_date ?? null },
+        },
+      },
+      { upsert: true }
+    ).catch(() => {});
+  }
+  if (idBySlug.size > 5000) idBySlug.clear();
+  idBySlug.set(s, id);
+  return id;
+}
+
+// ======================================================================
+//  PEGI et tags : ce que la fiche affiche sous les genres
+// ======================================================================
+// Un morceau à part, lui aussi, pour ne pas bumper `VERSIONS.core` (cf. plus
+// haut). Il est brut : c'est routes/games.js qui le met en forme.
+//
+// ⚠️ LE SCHÉMA « v2 » DES CLASSIFICATIONS. IGDB a remplacé `category` /
+// `rating` (des numéros) par `organization` + `rating_category.rating` (un
+// libellé : "3", "7", "12", "16", "18") et `rating_content_descriptions`.
+// L'ancien schéma ne renvoie plus d'erreur, il renvoie du vide.
+export function gameExtras(gameId, releaseDate) {
+  const id = Number(gameId);
+  if (!Number.isInteger(id) || id <= 0) return Promise.resolve(null);
+  return remember({
+    kind: "extras",
+    gameId: id,
+    ver: VERSIONS.extras,
+    releaseDate,
+    load: async () => {
+      const g = one(
+        await igdbQuery(
+          "games",
+          "fields keywords.name,age_ratings.organization,age_ratings.rating_category.rating," +
+            `age_ratings.rating_content_descriptions.description; where id = ${id};`
+        )
+      );
+      // Un objet même vide : `remember` ne met jamais « rien » en cache.
+      return {
+        keywords: (g?.keywords || []).map((k) => k.name).filter(Boolean),
+        ageRatings: (g?.age_ratings || []).map((a) => ({
+          org: a.organization ?? null,
+          rating: a.rating_category?.rating ?? null,
+          descriptors: (a.rating_content_descriptions || [])
+            .map((d) => d.description)
+            .filter(Boolean),
+        })),
+      };
+    },
+  }).catch(() => null);
 }
 
 /** La date de sortie du jeu (secondes IGDB), pour dater les autres morceaux. */

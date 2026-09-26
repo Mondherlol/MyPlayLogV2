@@ -12,6 +12,7 @@ import OAuthCallback from "./pages/OAuthCallback";
 import Welcome from "./pages/Welcome";
 import Activity from "./pages/Activity";
 import EventPage from "./pages/EventPage";
+import EventsAgenda from "./pages/EventsAgenda";
 import BingoPage from "./pages/BingoPage";
 import GbaWatch from "./pages/GbaWatch";
 import BlindTest from "./pages/BlindTest";
@@ -285,6 +286,9 @@ export default function App() {
         {/* La fiche d'un rendez-vous (Direct, showcase) : ses infos, son bingo,
             ce qui y a été annoncé, et les éditions précédentes. */}
         <Route path="/event/:id" element={<EventPage />} />
+        {/* L'agenda complet : TOUT ce qui arrive, petits showcases compris —
+            l'accueil n'en montre que les grands rendez-vous. */}
+        <Route path="/events" element={<EventsAgenda />} />
         {/* Une grille de bingo, en grand : la sienne qu'on coche, ou celle de
             quelqu'un d'autre qu'on regarde. */}
         <Route path="/bingo/:id" element={<BingoPage />} />

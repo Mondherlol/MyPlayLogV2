@@ -266,6 +266,37 @@ function isMajorConference(name) {
   return MAJOR_CONFERENCES.test(name) && !PRO_SUFFIX.test(name);
 }
 
+// ======================================================================
+//  Les rendez-vous qui MÉRITENT l'accueil
+// ======================================================================
+// ⚠️ L'AGENDA DES SHOWCASES NE TRIE RIEN. Il fait entrer, au même rang qu'un
+// Nintendo Direct, chaque micro-showcase d'éditeur ou de collectif indé dont
+// personne n'a entendu parler. Montrés tels quels sur l'accueil, ils
+// noyaient les deux ou trois rendez-vous qu'on vient y chercher.
+//
+// Est « à la une » :
+//   • ce qu'on a posé à la main depuis l'admin (c'était un choix) ;
+//   • une série connue — les mêmes motifs que les listes d'événements
+//     (Nintendo Direct, State of Play, Triple-i, Capcom Showcase…,
+//     cf. lib/gameEvents `EVENT_PATTERNS`) ;
+//   • un showcase d'un constructeur, même sans nom connu : le Direct des
+//     40 ans de Zelda n'accroche aucun motif, et c'est pourtant LE rendez-vous
+//     du mois ;
+//   • les très grandes soirées classées « salon » par l'agenda, qui se
+//     regardent autant qu'elles se visitent (The Game Awards, gamescom…).
+// Tout le reste reste visible dans l'agenda complet.
+const FEATURED_BRANDS = new Set(["nintendo", "playstation", "xbox"]);
+const FEATURED_CONFERENCES =
+  /\b(the game awards|gamescom|tokyo game show|summer game fest|blizzcon)\b/i;
+
+export function isFeaturedEvent(ev) {
+  if (!ev || ev.kind === "season") return false;
+  if (ev.source === "manual") return true;
+  if (isTrackedEvent(ev.name)) return true;
+  if (ev.kind === "showcase" && FEATURED_BRANDS.has(ev.brand)) return true;
+  return FEATURED_CONFERENCES.test(ev.name || "") && !PRO_SUFFIX.test(ev.name || "");
+}
+
 // Les descriptions de l'agenda sont du HTML avec des étiquettes régulières :
 //
 //   Watch The Legend of Zelda 40th Anniversary Direct…

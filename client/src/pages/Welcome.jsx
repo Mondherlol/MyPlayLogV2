@@ -99,7 +99,10 @@ function loadPrefs() {
 // L'accueil ne montre que ce qui SE REGARDE. Les salons (gamescom, TGS) sont
 // dans le calendrier complet : ils durent quatre jours et se visitent, ils n'ont
 // rien à faire dans un rail de comptes à rebours.
-const EVENTS_PATH = "/events/upcoming?kind=showcase&limit=8";
+// Les GRANDS rendez-vous seulement (Nintendo Direct, State of Play, The Game
+// Awards…, cf. server lib/eventCalendar `isFeaturedEvent`) : l'agenda en
+// contient des dizaines d'autres, qui ont leur page (/events).
+const EVENTS_PATH = "/events/upcoming?featured=1&limit=8";
 const LISTS_PATH = "/lists?scope=events&limit=12";
 const OST_LIMIT = 8;
 
@@ -798,6 +801,8 @@ export default function Welcome() {
             <Section
               kicker="Ce qui arrive"
               title="Directs et showcases"
+              moreTo="/events"
+              moreLabel="Tout l'agenda"
               className="s-events"
             >
               {sortedEvents.map((ev) => (
