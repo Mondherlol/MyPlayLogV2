@@ -175,6 +175,7 @@ function ReviewEditor({ game, token, initial, isNew, onSaved }) {
       const { entry } = await apiFetch(`/library/${game.id}`, {
         method: "PUT",
         token,
+        undoable: "Review enregistrée",
         body: {
           name: game.name,
           cover: game.cover,
@@ -721,6 +722,16 @@ export default function GameReviews({ game, viewerStatus, upcoming, onWantPlay }
     }
   }
 
+  // « Annuler » depuis un toast : la review remise en place doit réapparaître.
+  useEffect(() => {
+    function onRestored(e) {
+      if (String(e.detail.gameId) === String(game.id)) load();
+    }
+    window.addEventListener("mpl:library-restored", onRestored);
+    return () => window.removeEventListener("mpl:library-restored", onRestored);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.id]);
+
   // Supprime le contenu de ma review (sans retirer le jeu de la bibliothèque).
   async function deleteReview() {
     if (!confirm("Supprimer définitivement ta review pour ce jeu ?")) return;
@@ -728,6 +739,7 @@ export default function GameReviews({ game, viewerStatus, upcoming, onWantPlay }
       await apiFetch(`/library/${game.id}`, {
         method: "PUT",
         token,
+        undoable: "Review supprimée",
         body: {
           name: game.name,
           cover: game.cover,

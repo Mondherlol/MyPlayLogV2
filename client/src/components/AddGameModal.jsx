@@ -58,10 +58,10 @@ export default function AddGameModal({ mode = "status", status, title, onClose }
           body.cover = g.cover;
           body.status = "wishlist";
         }
-        await apiFetch(`/library/${g.id}`, { method: "PUT", token, body });
+        await apiFetch(`/library/${g.id}`, { method: "PUT", token, body, undoable: true });
       } else if (entry?.status === status) {
         // déjà dans ce statut → on le retire de la bibliothèque
-        await apiFetch(`/library/${g.id}`, { method: "DELETE", token });
+        await apiFetch(`/library/${g.id}`, { method: "DELETE", token, undoable: true });
         removeLocal(g.id);
       } else {
         upsertLocal(g.id, { status });
@@ -70,7 +70,7 @@ export default function AddGameModal({ mode = "status", status, title, onClose }
           body.name = g.name;
           body.cover = g.cover;
         }
-        await apiFetch(`/library/${g.id}`, { method: "PUT", token, body });
+        await apiFetch(`/library/${g.id}`, { method: "PUT", token, body, undoable: true });
       }
     } catch (err) {
       alert(err.message);

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, Check, Loader2, Plus, Search, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, Loader2, Plus, Search, Trash2, UserRound, X } from "lucide-react";
 
 import { apiFetch } from "../../lib/api";
 import { apiCached } from "../../lib/query";
@@ -125,15 +125,39 @@ export default function BoardPicker({ boardKey, slotKey, current, token, onPick,
             <slot.Icon size={20} />
           </span>
           <h2>{slot.label}</h2>
-          {current && onClear && (
-            <button type="button" className="bp-clear clickable" onClick={onClear} title="Vider la case">
-              <Trash2 size={15} />
-            </button>
-          )}
           <button type="button" className="bp-close clickable" onClick={onClose} aria-label="Fermer">
             <X size={18} />
           </button>
         </header>
+
+        {/* Ce qui est dans la case, pour s'en souvenir — et le changer ou le
+            retirer sans chercher. */}
+        {current && (
+          <div className="bp-current">
+            {current.image && <img className="bp-current-cover" src={current.image} alt="" />}
+            {current.charImage && <img className="bp-current-char" src={current.charImage} alt="" />}
+            <div className="bp-current-text">
+              <span>Actuellement</span>
+              <b>{current.charName ? `${current.charName} · ${current.name}` : current.name}</b>
+            </div>
+            {slot.char && !charFor && (
+              <button
+                type="button"
+                className="btn btn-ghost bp-current-btn clickable"
+                onClick={() =>
+                  setCharFor({ id: Number(current.gameId ?? current.refId), name: current.name, cover: current.image })
+                }
+              >
+                <UserRound size={15} /> Changer le perso
+              </button>
+            )}
+            {onClear && (
+              <button type="button" className="btn btn-ghost bp-current-btn danger clickable" onClick={onClear}>
+                <Trash2 size={15} /> Retirer
+              </button>
+            )}
+          </div>
+        )}
 
         {charFor ? (
           <CharPicker

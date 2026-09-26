@@ -376,6 +376,15 @@ function RelGameModal({ game, token, onClose }) {
     };
   }, [game.id, token]);
 
+  // « Annuler » depuis un toast : la modale reprend l'état remis en place.
+  useEffect(() => {
+    function onRestored(e) {
+      if (String(e.detail.gameId) === String(game.id)) setEntry(e.detail.entry);
+    }
+    window.addEventListener("mpl:library-restored", onRestored);
+    return () => window.removeEventListener("mpl:library-restored", onRestored);
+  }, [game.id]);
+
   // Verrou de défilement partagé : la visionneuse plein écran pose le sien
   // par-dessus, et se fermer en même temps qu'elle laissait la page bloquée.
   useScrollLock();
@@ -407,13 +416,14 @@ function RelGameModal({ game, token, onClose }) {
     setBusy(true);
     try {
       if (inWish) {
-        await apiFetch(`/library/${game.id}`, { method: "DELETE", token });
+        await apiFetch(`/library/${game.id}`, { method: "DELETE", token, undoable: true });
         setEntry(null);
         removeLocal(game.id);
       } else if (!entry) {
         const d = await apiFetch(`/library/${game.id}`, {
           method: "PUT",
           token,
+          undoable: true,
           body: { name: game.name, cover: game.cover, status: "wishlist" },
         });
         setEntry(d.entry);

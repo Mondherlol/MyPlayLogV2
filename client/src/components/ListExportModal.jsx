@@ -11,6 +11,7 @@ import {
   GRID_MAX_COLS,
 } from "../lib/listExport";
 import { ensureNineFonts, renderNine } from "../lib/nineExport";
+import { boardImageUrls, renderBoard } from "../lib/boardExport";
 
 const slugify = (s) =>
   String(s || "liste")
@@ -23,6 +24,17 @@ const slugify = (s) =>
 
 // Cases à cocher proposées selon le type de liste.
 function optionGroups(list) {
+  // La carte de joueur aussi (cf. lib/boardExport).
+  if (list.board)
+    return [
+      {
+        title: "Afficher",
+        opts: [
+          { key: "showAuthor", label: "Pseudo" },
+          { key: "showWatermark", label: "Filigrane MyPlayLog" },
+        ],
+      },
+    ];
   // Une liste des 9 a sa propre affiche (cf. lib/nineExport) : la phrase et la
   // grille 3 × 3 sont fixes, il ne reste à choisir que ce qui l'accompagne.
   if (list.nine)
@@ -87,7 +99,10 @@ export default function ListExportModal({ list, items, tiers, token, onClose }) 
     (async () => {
       await ensureFonts();
       if (list.nine) await ensureNineFonts(list.nine);
-      const map = await loadImages(collectImageUrls(list, items), token);
+      const map = await loadImages(
+        list.board ? boardImageUrls(items) : collectImageUrls(list, items),
+        token
+      );
       if (!alive) return;
       setImageMap(map);
       setLoading(false);
@@ -113,7 +128,8 @@ export default function ListExportModal({ list, items, tiers, token, onClose }) 
   // un blob PNG frais (pour ouvrir/télécharger sans re-générer au clic).
   useEffect(() => {
     if (!imageMap || !canvasRef.current) return;
-    if (list.nine) renderNine(canvasRef.current, { list: exportList, items, opts, imageMap });
+    if (list.board) renderBoard(canvasRef.current, { list: exportList, items, opts, imageMap });
+    else if (list.nine) renderNine(canvasRef.current, { list: exportList, items, opts, imageMap });
     else renderList(canvasRef.current, { list: exportList, items, tiers, opts, imageMap });
     canvasRef.current.toBlob((blob) => {
       if (!blob) return;

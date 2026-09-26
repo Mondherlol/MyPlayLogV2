@@ -64,4 +64,6 @@
 @import "./styles/app-55-nine.css";
 /* Ma carte de joueur : un jeu par case. */
 @import "./styles/app-56-board.css";
+/* Toasts de confirmation avec « Annuler ». */
+@import "./styles/app-57-toast.css";
 @import "./styles/app-99-mobile-perf.css";

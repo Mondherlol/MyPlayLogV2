@@ -341,6 +341,7 @@ function Menu({ menu, onClose, onSheet }) {
       await apiFetch(`/library/${game.id}`, {
         method: "PUT",
         token,
+        undoable: true,
         body: { ...patch, name: game.name, cover: game.cover || undefined },
       });
       upsertLocal(game.id, mapPatch || patch);
@@ -363,7 +364,7 @@ function Menu({ menu, onClose, onSheet }) {
       return;
     setBusy(true);
     try {
-      await apiFetch(`/library/${game.id}`, { method: "DELETE", token });
+      await apiFetch(`/library/${game.id}`, { method: "DELETE", token, undoable: true });
       removeLocal(game.id);
       onClose();
     } catch (err) {

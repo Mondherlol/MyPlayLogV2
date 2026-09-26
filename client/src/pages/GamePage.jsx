@@ -715,19 +715,30 @@ function GameSheet({
     );
   }, [embedded, slug, params.id, id, game?.id, routerNavigate]);
 
+  // « Annuler » depuis un toast (cf. LibraryContext) : on reprend l'entrée
+  // remise en place, sinon la fiche garderait l'état annulé.
+  useEffect(() => {
+    function onRestored(e) {
+      if (String(e.detail.gameId) === String(id)) setFav(e.detail.entry);
+    }
+    window.addEventListener("mpl:library-restored", onRestored);
+    return () => window.removeEventListener("mpl:library-restored", onRestored);
+  }, [id]);
+
   async function toggleWishlist() {
     if (!requireLogin()) return;
     if (wishBusy || !game) return;
     setWishBusy(true);
     try {
       if (isWishlist) {
-        await apiFetch(`/library/${id}`, { method: "DELETE", token });
+        await apiFetch(`/library/${id}`, { method: "DELETE", token, undoable: true });
         removeLocal(id);
         setFav(null);
       } else {
         await apiFetch(`/library/${id}`, {
           method: "PUT",
           token,
+          undoable: true,
           body: { status: "wishlist", name: game.name, cover: game.cover },
         });
         upsertLocal(id, { status: "wishlist" });
@@ -750,6 +761,8 @@ function GameSheet({
         method: "PUT",
         token,
         body: { ...patch, name: game.name, cover: game.cover },
+        // Changer de jaquette n'a pas besoin d'un toast : ça se voit.
+        undoable: patch.cover === undefined,
       });
       setFav(data.entry);
       if (mapPatch) upsertLocal(id, mapPatch);

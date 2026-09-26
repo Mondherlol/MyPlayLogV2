@@ -27,6 +27,7 @@ export default function FavoritePicker({ entries, onClose }) {
       await apiFetch(`/library/${e.gameId}`, {
         method: "PUT",
         token,
+        undoable: true,
         body: { favorite: next, name: e.name, cover: e.cover },
       });
     } catch (err) {

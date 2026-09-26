@@ -578,6 +578,7 @@ function GemCard({ game, full, friends, ost, token, onAdvance, onOpen, onPlayed 
     apiFetch(`/library/${game.id}`, {
       method: "PUT",
       token,
+      undoable: true,
       body: { status: "wishlist", name: game.name, cover: game.cover },
     })
       .then(() => upsertLocal(game.id, { status: "wishlist" }))

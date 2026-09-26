@@ -5,9 +5,13 @@ const BASE = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
 // disparaître (navigation, fermeture d'onglet). Indispensable pour les envois
 // d'adieu — typiquement « je ne joue plus » de lib/presence.js, qui part depuis
 // le nettoyage d'un effet et serait sinon annulé avec la page.
+//
+// `undoable` : l'appel modifie la bibliothèque et mérite un toast avec
+// « Annuler » (cf. LibraryContext). `true` pour un message déduit de la
+// requête, ou une chaîne pour le choisir soi-même.
 export async function apiFetch(
   path,
-  { method = "GET", body, token, keepalive = false } = {}
+  { method = "GET", body, token, keepalive = false, undoable = false } = {}
 ) {
   const headers = { "Content-Type": "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -33,6 +37,13 @@ export async function apiFetch(
     err.status = res.status;
     err.data = data;
     throw err;
+  }
+  if (undoable) {
+    window.dispatchEvent(
+      new CustomEvent("mpl:library-write", {
+        detail: { path, method, body, data, label: undoable },
+      })
+    );
   }
   return data;
 }

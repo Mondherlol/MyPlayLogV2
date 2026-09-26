@@ -78,12 +78,13 @@ export default function GemsFeedModal({ item, onClose }) {
     setBusyId(g.id);
     try {
       if (entry?.status === "wishlist") {
-        await apiFetch(`/library/${g.id}`, { method: "DELETE", token });
+        await apiFetch(`/library/${g.id}`, { method: "DELETE", token, undoable: true });
         removeLocal(g.id);
       } else {
         await apiFetch(`/library/${g.id}`, {
           method: "PUT",
           token,
+          undoable: true,
           body: { status: "wishlist", name: g.name, cover: g.cover },
         });
         upsertLocal(g.id, { status: "wishlist" });

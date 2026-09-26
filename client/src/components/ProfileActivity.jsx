@@ -594,6 +594,12 @@ export default function ProfileActivity({ username, token, isMe, libraryMap, onO
   const [editReview, setEditReview] = useState(null); // review en cours d'édition (modal)
   const [tick, setTick] = useState(0); // force le rechargement de l'activité
   const reload = () => setTick((t) => t + 1);
+  // « Annuler » depuis un toast (review supprimée par erreur…) : on recharge.
+  useEffect(() => {
+    const onRestored = () => setTick((t) => t + 1);
+    window.addEventListener("mpl:library-restored", onRestored);
+    return () => window.removeEventListener("mpl:library-restored", onRestored);
+  }, []);
 
   // Sous-onglet, tri et affichage des spoilers persistés dans l'URL (survivent
   // au refresh). On fusionne avec les params existants (ex : `tab` du profil).
@@ -680,6 +686,7 @@ export default function ProfileActivity({ username, token, isMe, libraryMap, onO
       await apiFetch(`/library/${r.gameId}`, {
         method: "PUT",
         token,
+        undoable: "Review supprimée",
         body: {
           name: r.name,
           cover: r.cover,

@@ -146,6 +146,7 @@ export default function LogGameOverlay({ onClose }) {
       await apiFetch(`/library/${g.id}`, {
         method: "PUT",
         token,
+        undoable: true,
         body: { status: "wishlist", name: g.name, cover: g.cover },
       });
       upsertLocal(g.id, { status: "wishlist" });

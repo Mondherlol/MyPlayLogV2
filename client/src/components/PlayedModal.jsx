@@ -514,7 +514,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
           status: bundleStatus[b.id] || null,
         }));
       }
-      const data = await apiFetch(`/library/${game.id}`, { method: "PUT", token, body });
+      const data = await apiFetch(`/library/${game.id}`, { method: "PUT", token, body, undoable: true });
       upsertLocal(game.id, { status: data.entry.status, favorite: data.entry.favorite });
       // Les jeux du bundle ont maintenant leur propre entrée côté serveur :
       // reflet immédiat dans la carte locale, puis resynchro complète (elle
@@ -538,7 +538,7 @@ export default function PlayedModal({ game, onClose, onSaved, openReview = false
     if (!confirm("Retirer complètement ce jeu de ton profil ?")) return;
     setSaving(true);
     try {
-      await apiFetch(`/library/${game.id}`, { method: "DELETE", token });
+      await apiFetch(`/library/${game.id}`, { method: "DELETE", token, undoable: true });
       removeLocal(game.id);
       // Bundle : le serveur retire aussi les entrées héritées restées vierges.
       if (details.bundleGames?.length) refresh?.();

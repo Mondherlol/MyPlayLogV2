@@ -68,12 +68,13 @@ export default function GameAddFan({
     setBusy(true);
     try {
       if (isWishlist) {
-        await apiFetch(`/library/${game.id}`, { method: "DELETE", token });
+        await apiFetch(`/library/${game.id}`, { method: "DELETE", token, undoable: true });
         removeLocal(game.id);
       } else {
         await apiFetch(`/library/${game.id}`, {
           method: "PUT",
           token,
+          undoable: true,
           body: { status: "wishlist", name: game.name, cover: game.cover },
         });
         upsertLocal(game.id, { status: "wishlist" });

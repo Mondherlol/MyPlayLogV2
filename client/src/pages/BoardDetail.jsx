@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Check, Globe, Heart, Loader2, Lock, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Globe, Heart, ImageDown, Loader2, Lock, Sparkles, Trash2 } from "lucide-react";
 
 import PlayerCard from "../components/board/PlayerCard";
 import BoardPicker from "../components/board/BoardPicker";
 import ListComments from "../components/ListComments";
+import ListExportModal from "../components/ListExportModal";
 import { apiFetch } from "../lib/api";
 import { boardOf, itemsBySlot, openMyBoard } from "../lib/boards";
 
@@ -27,6 +28,7 @@ export default function BoardDetail({ list, items: initialItems, token, onLike, 
   const board = boardOf(list.board);
   const [items, setItems] = useState(initialItems);
   const [picking, setPicking] = useState(null); // clé de la case en cours de choix
+  const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [mine, setMine] = useState(null); // ma propre carte, sur celle d'un autre
@@ -105,7 +107,12 @@ export default function BoardDetail({ list, items: initialItems, token, onLike, 
   return (
     <div className="bd-page">
       <div className="bd-stage">
-        <PlayerCard list={list} items={items} onCell={list.mine ? (slot) => setPicking(slot) : undefined} />
+        <PlayerCard
+          list={list}
+          items={items}
+          onCell={list.mine ? (slot) => setPicking(slot) : undefined}
+          onRemove={list.mine ? (slot) => setCell(slot, null) : undefined}
+        />
 
         {/* Les outils, en colonne à côté de la grille : rien au-dessus d'elle,
             rien par-dessus une case. */}
@@ -120,6 +127,10 @@ export default function BoardDetail({ list, items: initialItems, token, onLike, 
             {filled}
             <small>/{board.slots.length}</small>
           </span>
+
+          <button className="bd-rail-btn clickable" onClick={() => setExporting(true)} title="Exporter en image">
+            <ImageDown size={17} />
+          </button>
 
           {list.mine ? (
             <>
@@ -175,6 +186,10 @@ export default function BoardDetail({ list, items: initialItems, token, onLike, 
       <div className="bd-comments">
         <ListComments listId={list.id} list={list} token={token} />
       </div>
+
+      {exporting && (
+        <ListExportModal list={list} items={items} tiers={[]} token={token} onClose={() => setExporting(false)} />
+      )}
 
       {picking && (
         <BoardPicker

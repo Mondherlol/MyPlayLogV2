@@ -379,6 +379,14 @@ router.put("/:gameId", requireAuth, async (req, res) => {
     if (reviewBodyChanged(prev, b)) {
       update.reviewedAt = new Date();
     }
+    // « Annuler » côté client (toast) : on remet l'entrée telle qu'elle était,
+    // date de review d'origine comprise — sans quoi annuler un retrait ferait
+    // passer une vieille review pour une review du jour.
+    const restoring = b.restore === true;
+    if (restoring && b.reviewedAt) {
+      const d = new Date(b.reviewedAt);
+      if (!Number.isNaN(d.getTime())) update.reviewedAt = d;
+    }
 
     // Passage par la wishlist, retenu une bonne fois (le statut, lui, sera
     // écrasé le jour où le joueur s'y met) : c'est ce qui permet aux missions
@@ -407,16 +415,20 @@ router.put("/:gameId", requireAuth, async (req, res) => {
     // Stats, sans bloquer la réponse.
     warmGameMeta(gameId);
     // Journal du fil (best-effort, ne bloque pas la réponse).
-    recordGameActivity({
-      actor: req.userId,
-      gameId,
-      gameName: entry.name,
-      gameCover: entry.cover || null,
-      changes: diffChanges(prev, entry, b),
-    });
+    // Une annulation n'est pas une nouvelle activité : rien à publier.
+    if (!restoring) {
+      recordGameActivity({
+        actor: req.userId,
+        gameId,
+        gameName: entry.name,
+        gameCover: entry.cover || null,
+        changes: diffChanges(prev, entry, b),
+      });
+    }
     // Missions « Générique de fin », « À mon humble avis », « Collectionneur ».
     triggerMissionCheck(req.userId);
-    res.json({ entry: toPublic(entry) });
+    // `prev` : l'état d'avant, pour que le client puisse proposer « Annuler ».
+    res.json({ entry: toPublic(entry), prev: prev ? toPublic(prev) : null });
   } catch (err) {
     console.error("library put error:", err.message);
     res.status(500).json({ error: "Erreur lors de l'enregistrement." });
@@ -426,7 +438,8 @@ router.put("/:gameId", requireAuth, async (req, res) => {
 // Tout retirer pour ce jeu
 router.delete("/:gameId", requireAuth, async (req, res) => {
   const gameId = Number(req.params.gameId);
-  await UserGame.deleteOne({ user: req.userId, gameId });
+  // Renvoyée au client : c'est de quoi la remettre si on clique « Annuler ».
+  const prev = await UserGame.findOneAndDelete({ user: req.userId, gameId }).lean();
   // Si c'était un bundle : retire aussi les entrées héritées restées vierges
   // (les enfants enrichis à la main — note, avis… — sont conservés).
   await UserGame.deleteMany({
@@ -439,7 +452,7 @@ router.delete("/:gameId", requireAuth, async (req, res) => {
   });
   // Le jeu n'est plus dans la bibliothèque : ses cartes du fil n'ont plus de sens.
   removeActivity({ actor: req.userId, type: "game_update", game: gameId });
-  res.json({ ok: true });
+  res.json({ ok: true, prev: prev ? toPublic(prev) : null });
 });
 
 export default router;

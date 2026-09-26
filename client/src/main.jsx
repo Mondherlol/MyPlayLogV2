@@ -9,6 +9,7 @@ import { installGlobalErrorReporting, reportEnvPing } from "./lib/reportError.js
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { LibraryProvider } from "./context/LibraryContext.jsx";
+import { ToastProvider } from "./context/ToastContext.jsx";
 import { PlayerProvider } from "./context/PlayerContext.jsx";
 import { CosmeticsProvider } from "./context/CosmeticsContext.jsx";
 import { ChatProvider } from "./context/ChatContext.jsx";
@@ -47,6 +48,9 @@ createRoot(document.getElementById("root")).render(
               {/* Curseur & cosmétiques gagnés à l'arcade : au-dessus des routes,
                   l'apparence équipée vaut pour toute l'app. */}
               <CosmeticsProvider>
+                {/* Toasts de confirmation (avec « Annuler ») : au-dessus de la
+                    bibliothèque, qui en déclenche à chaque modification. */}
+                <ToastProvider>
                 <LibraryProvider>
                   {/* Lecteur audio global : monté une seule fois au-dessus des
                       routes pour survivre à TOUTE navigation (y compris /game/:id
@@ -67,6 +71,7 @@ createRoot(document.getElementById("root")).render(
                     </ListenPartyProvider>
                   </PlayerProvider>
                 </LibraryProvider>
+                </ToastProvider>
               </CosmeticsProvider>
               </CallProvider>
             </ChatProvider>
