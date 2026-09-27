@@ -43,6 +43,7 @@ import presenceRoutes from "./routes/presence.js";
 import gbaStreamRoutes from "./routes/gbaStream.js";
 import listenRoutes from "./routes/listen.js";
 import arcadeRoutes from "./routes/arcade.js";
+import cardRoutes from "./routes/cards.js";
 import steamRoutes from "./routes/steam.js";
 import companionRoutes from "./routes/companion.js";
 import backloggdRoutes from "./routes/backloggd.js";
@@ -210,6 +211,7 @@ app.use("/api/gba-stream", gbaStreamRoutes);
 // drapeau de section — c'est le mini-lecteur, qui existe partout.
 app.use("/api/listen", listenRoutes);
 app.use("/api/arcade", arcadeRoutes);
+app.use("/api/cards", cardRoutes);
 app.use("/api/steam", steamRoutes);
 // Le compagnon PC : succès et temps de jeu des jeux hors boutique.
 app.use("/api/companion", companionRoutes);

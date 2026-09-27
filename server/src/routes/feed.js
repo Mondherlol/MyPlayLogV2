@@ -19,6 +19,9 @@ import Reward from "../models/Reward.js";
 // Ordonné du plus commun au plus rare : sert à désigner la plus belle prise
 // d'une fournée de caisses.
 import { RARITY_KEYS } from "../lib/rarity.js";
+import { getCatalog, RARITY_ORDER as CARD_RARITIES } from "../lib/cards.js";
+import { isEnabled } from "../lib/features.js";
+import { isUserAdmin } from "../lib/admin.js";
 import GemDiscovery from "../models/GemDiscovery.js";
 import GemSkip from "../models/GemSkip.js";
 import Recommendation from "../models/Recommendation.js";
@@ -472,6 +475,7 @@ async function buildTimeline(
   const quizzes = []; // idem pour le Grand Quiz
   const perroquets = []; // idem pour Le Perroquet
   const caseopens = []; // idem : ouvrir plusieurs caisses d'affilée est la norme
+  const cardpacks = []; // boosters de cartes (idem, en rafale)
   const drops = []; // boîtiers sortis de la machine à capsules (idem, en rafale)
   // Victoires collectives au Mot du jour déjà sorties : chaque membre de
   // l'équipe a SA ligne d'activité (c'est son résultat, il a ses points), mais
@@ -931,6 +935,19 @@ async function buildTimeline(
         day: a.meta.date || "",
         // Équipe d'une victoire à plusieurs (vide en solo).
         team: Array.isArray(a.meta.team) ? a.meta.team : [],
+      });
+      continue;
+    }
+
+    if (a.type === "card_pack") {
+      if (!Array.isArray(a.meta?.cards) || !a.meta.cards.length) continue;
+      cardpacks.push({
+        id: `a-${a._id}`,
+        date: a.createdAt,
+        user: person(a.actor),
+        cards: a.meta.cards,
+        news: a.meta.news || [],
+        golden: !!a.meta.golden,
       });
       continue;
     }
@@ -1414,6 +1431,58 @@ async function buildTimeline(
     bestClip: m.bestClip,
     bestUrl: m.bestUrl,
   }));
+
+  // --- Boosters de cartes : même logique que les caisses — les ouvertures
+  //     rapprochées d'un même joueur font UNE carte, qui montre ses plus
+  //     belles prises. Tant que la section « Cartes » est éteinte, seuls les
+  //     admins (qui la préparent) les voient passer. ---
+  if (cardpacks.length) {
+    let visible = await isEnabled("cards");
+    if (!visible && req.userId) {
+      visible = isUserAdmin(await User.findById(req.userId).select("isAdmin isSuperAdmin").lean());
+    }
+    const cat = visible ? await getCatalog().catch(() => null) : null;
+    if (cat) {
+      cardpacks.sort((a, b) => new Date(b.date) - new Date(a.date));
+      const clusters = [];
+      for (const p of cardpacks) {
+        const last = clusters[clusters.length - 1];
+        if (last && last.user.id === p.user.id && new Date(last.lastDate) - new Date(p.date) <= GROUP_GAP) {
+          last.members.push(p);
+          last.lastDate = p.date;
+        } else {
+          clusters.push({ user: p.user, date: p.date, lastDate: p.date, members: [p] });
+        }
+      }
+      const rank = (c) => CARD_RARITIES.indexOf(c.rarity) * 1e6 - c.no;
+      for (const c of clusters) {
+        const news = new Set(c.members.flatMap((m) => m.news));
+        const seen = new Set();
+        const cards = [];
+        for (const m of c.members)
+          for (const id of m.cards) {
+            const card = cat.byId.get(id);
+            if (!card || seen.has(id)) continue;
+            seen.add(id);
+            cards.push({ ...card, isNew: news.has(id) });
+          }
+        if (!cards.length) continue;
+        cards.sort((a, b) => rank(b) - rank(a));
+        events.push({
+          type: "cardpack",
+          id: `cp-${c.members[0].id}`,
+          date: c.date,
+          user: c.user,
+          packs: c.members.length,
+          golden: c.members.some((m) => m.golden),
+          newCount: news.size,
+          total: cards.length,
+          // Les cinq plus belles : c'est ce que la carte du fil montre.
+          cards: cards.slice(0, 5),
+        });
+      }
+    }
+  }
 
   // --- Caisses ouvertes : on en ouvre rarement une seule, donc les ouvertures
   //     rapprochées d'un même joueur donnent UNE carte « a ouvert N caisses ».

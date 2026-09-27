@@ -261,6 +261,23 @@ const SECTIONS = [
     ),
   },
   {
+    id: "credits",
+    title: "Crédits",
+    body: (
+      <p>
+        Certaines icônes des cartes à collectionner viennent de{" "}
+        <a href="https://game-icons.net" target="_blank" rel="noreferrer">
+          game-icons.net
+        </a>{" "}
+        (Lorc, Delapouite, Skoll et leurs contributeurs), sous licence{" "}
+        <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noreferrer">
+          CC BY 3.0
+        </a>
+        . Les autres, de Phosphor Icons et Lucide (licence MIT).
+      </p>
+    ),
+  },
+  {
     id: "droit",
     title: "Droit applicable",
     body: (

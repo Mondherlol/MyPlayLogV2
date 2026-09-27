@@ -10,6 +10,7 @@ import {
   List,
   Library,
   Joystick,
+  GalleryVerticalEnd,
   User,
   Palmtree,
   Shield,
@@ -92,6 +93,15 @@ const NAV = [
     noMobile: true,
     more: true,
     hint: "Mini-jeux, classements et curseurs",
+  },
+  {
+    to: "/cartes",
+    label: "Cartes",
+    Icon: GalleryVerticalEnd,
+    feature: "cards",
+    noMobile: true,
+    more: true,
+    hint: "Boosters et classeur de cartes",
   },
   { to: "/profile", label: "Profil", Icon: User },
   // L'app Android n'est dans aucun magasin : cette entrée est le seul chemin

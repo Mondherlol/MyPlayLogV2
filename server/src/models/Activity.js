@@ -77,6 +77,9 @@ const activitySchema = new mongoose.Schema(
         // mot lui-même : la carte ne doit rien divulguer aux amis qui n'ont pas
         // encore joué)
         "case_open", // a ouvert une caisse de l'arcade (meta = lot obtenu)
+        "card_pack", // a ouvert un booster de cartes (meta = { cards: [ids des
+        // 5 cartes], news: [ids nouvelles], golden } — le fil relit les cartes
+        // dans le catalogue, qui fait foi pour le nom et la rareté)
         "collection_drop", // a sorti un boîtier de la machine à capsules
         // (meta = { slug, title } — le titre n'est là que comme repli si le
         // boîtier quitte le catalogue ; le fil relit la fiche par son slug)

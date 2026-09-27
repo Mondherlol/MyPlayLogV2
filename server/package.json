@@ -52,7 +52,8 @@
     "node-unrar-js": "^2.0.2",
     "nodemailer": "^9.0.3",
     "psn-api": "^2.18.0",
-    "sharp": "^0.35.4"
+    "sharp": "^0.35.4",
+    "smartcrop": "^2.0.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"

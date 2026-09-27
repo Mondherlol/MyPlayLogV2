@@ -43,6 +43,7 @@ import {
   SpellCheck,
   PackageOpen,
   Boxes,
+  GalleryVerticalEnd,
   Library,
   Video,
   Sparkles,
@@ -617,6 +618,12 @@ const FEED_GROUPS = [
         Icon: PackageOpen,
         title: "Caisses ouvertes",
         desc: "Les lots décrochés en dépensant ses points.",
+      },
+      {
+        key: "cardpacks",
+        Icon: GalleryVerticalEnd,
+        title: "Boosters de cartes",
+        desc: "Les cartes tirées par les autres.",
       },
       {
         key: "drops",

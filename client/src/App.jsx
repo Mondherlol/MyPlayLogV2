@@ -40,6 +40,8 @@ const Imposteur = lazyPage(() => import("./pages/Imposteur"));
 const ImposteurRoom = lazyPage(() => import("./pages/ImposteurRoom"));
 const MotDuJour = lazyPage(() => import("./pages/MotDuJour"));
 const Arcade = lazyPage(() => import("./pages/Arcade"));
+const Cards = lazyPage(() => import("./pages/Cards"));
+const CardsUser = lazyPage(() => import("./pages/CardsUser"));
 const Playtopia = lazyPage(() => import("./pages/Playtopia"));
 const Explorer = lazyPage(() => import("./pages/Explorer"));
 const Releases = lazyPage(() => import("./pages/Releases"));
@@ -309,6 +311,10 @@ export default function App() {
           element={<FeatureRoute name="collection" right="canCollection" element={<GbaWatch />} />}
         />
         <Route path="/arcade" element={<Arcade />} />
+        {/* Les cartes à collectionner : boosters payés en points d'arcade. */}
+        <Route path="/cartes" element={<FeatureRoute name="cards" element={<Cards />} />} />
+        {/* Le classeur d'un autre joueur, en lecture seule. */}
+        <Route path="/cartes/u/:username" element={<FeatureRoute name="cards" element={<CardsUser />} />} />
         <Route path="/blindtest" element={<BlindTest />} />
         {/* Salon de versus musical : adresse des liens d'invitation. */}
         <Route path="/blindtest/versus/:code" element={<BlindTestVersus />} />

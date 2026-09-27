@@ -23,6 +23,7 @@ export const POINT_SOURCES = {
   discordmot: "Lettres mêlées — Discord",
   case: "Ouverture de caisse",
   gacha: "Machine à capsules",
+  cards: "Booster de cartes",
   duplicate: "Doublon reconverti",
   admin: "Ajustement admin",
   // Rattrapage des parties jouées AVANT l'arcade (scripts/backfillArcadePoints.js).

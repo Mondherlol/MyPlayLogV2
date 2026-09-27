@@ -10,7 +10,7 @@
 /* Space Grotesk et Inter restent chargées : elles se choisissent encore dans
    Paramètres → Apparence, et quelques rendus canvas (exports, jaquettes) les
    dessinent. Une police déclarée mais pas utilisée ne se télécharge pas. */
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Fredoka:wght@500;600&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Fredoka:wght@500;600&family=Lilita+One&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap");
 
 /* ⚠️ LA POLICE D'XBOX, C'EST SEGOE UI — ET ELLE N'EST PAS LIBRE. On la demande
    d'abord au système (tout Windows l'a, Windows 11 dans sa version « Variable »,

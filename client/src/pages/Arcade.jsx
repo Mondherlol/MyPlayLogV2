@@ -34,6 +34,7 @@ import {
   Thermometer,
   Library,
   Lock,
+  Layers,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCosmetics } from "../context/CosmeticsContext";
@@ -47,6 +48,8 @@ import CaseOpeningModal from "../components/CaseOpeningModal";
 import FriendsCollectionModal from "../components/FriendsCollectionModal";
 import GachaModal from "../components/GachaModal";
 import PixelCanvas from "../components/PixelCanvas";
+import BoosterPack from "../components/cards/BoosterPack";
+import { CARD_RARITIES } from "../lib/cards";
 
 // ======================================================================
 //  Arcade — la salle de jeux : mini-jeux, classements, cagnotte, curseurs
@@ -150,6 +153,7 @@ const SOURCE_LABELS = {
   perroquet: "Le Perroquet",
   imposteur: "L'Imposteur",
   case: "Ouverture de caisse",
+  cards: "Booster de cartes",
   duplicate: "Doublon reconverti",
   admin: "Ajustement admin",
   backfill: "Parties d'avant l'arcade",
@@ -501,10 +505,11 @@ export default function Arcade() {
           />
         )}
 
-        {/* ---------- Les caisses ---------- */}
-        {data?.cases?.length > 0 && (
+        {/* ---------- Les caisses (et la porte des cartes) ---------- */}
+        {(data?.cases?.length > 0 || hasFeature("cards")) && (
           <div className="arc-crates">
-            {data.cases.map((c) => (
+            {hasFeature("cards") && <CardsDoor points={points} />}
+            {(data?.cases || []).map((c) => (
               <Crate
                 key={c.id}
                 crate={c}
@@ -1335,6 +1340,49 @@ function Crate({ crate, points, onOpen }) {
         {!afford && (
           <span className="arc-crate-need">− {fmt(missing)} points</span>
         )}
+      </div>
+    </article>
+  );
+}
+
+// ---------- La porte des cartes à collectionner ----------
+// Même gabarit qu'une caisse, mais le bouton mène à la page des cartes : c'est
+// là que se trouvent les boosters et le classeur.
+const PACK_PRICE = 500;
+function CardsDoor({ points }) {
+  const afford = points >= PACK_PRICE;
+  return (
+    <article className={`arc-crate arc-cards-door ${afford ? "" : "poor"}`}>
+      <span className="arc-crate-glow" aria-hidden="true" />
+      <div className="arc-crate-art">
+        <span className="arc-cards-pack">
+          <BoosterPack />
+        </span>
+      </div>
+      <div className="arc-crate-body">
+        <span className="arc-crate-kicker">
+          <Layers size={12} /> Boosters
+        </span>
+        <h3 className="arc-crate-name">Cartes</h3>
+        <div className="arc-crate-teaser">
+          {["mythic", "legendary", "epic"].map((r) => (
+            <span
+              key={r}
+              className="arc-crate-pip"
+              style={{ "--arc-rarity": CARD_RARITIES[r].color }}
+              title={CARD_RARITIES[r].label}
+            />
+          ))}
+          <span className="arc-crate-count">5 cartes par booster</span>
+        </div>
+      </div>
+      <div className="arc-crate-action">
+        <Link to="/cartes" className="arc-crate-btn clickable">
+          <Sparkles size={15} /> Ouvrir
+          <span className="arc-crate-price">
+            <Coins size={12} /> {fmt(PACK_PRICE)}
+          </span>
+        </Link>
       </div>
     </article>
   );

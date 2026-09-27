@@ -118,6 +118,12 @@ export const FEED_CATEGORIES = [
     activity: ["case_open"],
     cards: ["caseopen", "caseopengroup"],
   },
+  // Les boosters de cartes : ce que les amis ont tiré (cf. routes/cards.js).
+  {
+    key: "cardpacks",
+    activity: ["card_pack"],
+    cards: ["cardpack"],
+  },
   // La machine à capsules est à l'arcade, même si le boîtier gagné atterrit
   // dans la collection : la carte raconte le TIRAGE, elle est rangée avec le
   // reste de l'arcade.

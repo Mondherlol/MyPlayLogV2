@@ -23,6 +23,12 @@ export const FEATURES = {
     // Cachée par défaut : le rayon se garnit avant de s'ouvrir.
     default: false,
   },
+  cards: {
+    label: "Cartes",
+    hint: "Les boosters de cartes à collectionner, payés en points d'arcade.",
+    // Éteinte par défaut : l'admin la teste avant de l'ouvrir à tous.
+    default: false,
+  },
 };
 
 const TTL = 10_000;

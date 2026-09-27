@@ -30,8 +30,17 @@ export function useBackClose(onClose, key = "modal") {
     // ouverte. Différer l'empilement fait que ce cycle s'annule proprement :
     // le minuteur est annulé avant d'avoir rien empilé, donc rien à dépiler.
     let pushed = false;
+    // ⚠️ L'ENTRÉE PORTE AUSSI LES CLÉS DES MODALES D'EN DESSOUS. Avec la seule
+    // sienne, trois fenêtres empilées (une carte, son panneau, une bande-annonce)
+    // se fermaient toutes d'un coup : en dépilant la bande-annonce, on retombait
+    // sur l'entrée du panneau, où la carte ne trouvait pas SA clé — elle se
+    // croyait fermée par « retour », et entraînait le reste. On ne recopie que
+    // nos marqueurs (`true`), jamais l'état du routeur (usr, key, idx).
     const timer = setTimeout(() => {
-      window.history.pushState({ [key]: true }, "");
+      const below = Object.fromEntries(
+        Object.entries(window.history.state || {}).filter(([, v]) => v === true)
+      );
+      window.history.pushState({ ...below, [key]: true }, "");
       pushed = true;
     }, 0);
 

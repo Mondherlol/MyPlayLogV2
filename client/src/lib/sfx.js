@@ -821,3 +821,128 @@ export function playMicToggleSound(on) {
     /* idem */
   }
 }
+
+// ======================================================================
+//  Les cartes à collectionner : sachet, déchirure, cartes qui claquent
+// ======================================================================
+// Du papier et de l'alu, donc surtout du BRUIT filtré ; des notes seulement
+// pour la révélation, et de plus en plus de notes à mesure que la carte est
+// rare — l'oreille sait avant l'œil.
+
+function play(fn) {
+  if (isSfxMuted()) return;
+  try {
+    const ac = audio();
+    if (ac) fn(ac, ac.currentTime + 0.01);
+  } catch {
+    /* le son est un bonus : jamais bloquant */
+  }
+}
+
+// Le sachet qu'on attrape : un froissement d'alu bref.
+export function playPackGrab() {
+  play((ac, t) => {
+    noise(ac, { start: t, dur: 0.09, gain: 0.08, freq: 5200, q: 0.8 });
+    noise(ac, { start: t + 0.06, dur: 0.12, gain: 0.06, freq: 3800, q: 0.9 });
+  });
+}
+
+// Pendant qu'on déchire : un petit grain par cran.
+export function playTearTick(p = 0) {
+  play((ac, t) => {
+    noise(ac, { start: t, dur: 0.035, gain: 0.05 + p * 0.04, freq: 2600 + p * 2200, q: 2.2 });
+  });
+}
+
+// La déchirure : un « scrrrtch » qui descend, puis le rabat qui s'envole.
+export function playPackTear() {
+  play((ac, t) => {
+    noise(ac, { start: t, dur: 0.28, gain: 0.2, freq: 4200, q: 0.9, sweep: 1200 });
+    noise(ac, { start: t + 0.05, dur: 0.18, gain: 0.12, freq: 7000, q: 1.4, sweep: 2500 });
+    noise(ac, { start: t + 0.22, dur: 0.35, gain: 0.06, freq: 900, q: 0.7, type: "lowpass", sweep: 300 });
+  });
+}
+
+// Les cartes qui sortent du sachet et se posent.
+export function playCardDeal(i = 0) {
+  play((ac, t) => {
+    noise(ac, { start: t, dur: 0.07, gain: 0.07, freq: 3000 + i * 250, q: 1.2, sweep: 1400 });
+    note(ac, { freq: 140 - i * 6, start: t + 0.04, dur: 0.07, gain: 0.05, type: "sine" });
+  });
+}
+
+// La carte qui se retourne : un souffle d'air.
+export function playCardFlip() {
+  play((ac, t) => {
+    noise(ac, { start: t, dur: 0.16, gain: 0.1, freq: 1400, q: 0.8, sweep: 4200 });
+  });
+}
+
+// La charge avant une grosse carte : ça monte et ça tremble.
+export function playCardCharge(dur = 0.8) {
+  play((ac, t) => {
+    const osc = ac.createOscillator();
+    const env = ac.createGain();
+    const lfo = ac.createOscillator();
+    const lfoGain = ac.createGain();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(120, t);
+    osc.frequency.exponentialRampToValueAtTime(760, t + dur);
+    lfo.frequency.setValueAtTime(9, t);
+    lfo.frequency.linearRampToValueAtTime(26, t + dur);
+    lfoGain.gain.value = 0.025;
+    const filter = ac.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 1600;
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(0.05, t + dur * 0.8);
+    env.gain.linearRampToValueAtTime(0.0001, t + dur + 0.05);
+    lfo.connect(lfoGain).connect(env.gain);
+    osc.connect(filter).connect(env).connect(ac.destination);
+    osc.start(t);
+    lfo.start(t);
+    osc.stop(t + dur + 0.1);
+    lfo.stop(t + dur + 0.1);
+    noise(ac, { start: t, dur, gain: 0.03, freq: 800, q: 0.6, sweep: 6000 });
+  });
+}
+
+// La révélation, par rareté. Commune : un « tic » ; mythique : la fanfare.
+const REVEAL = {
+  common: [[523.25, 0]],
+  uncommon: [[523.25, 0], [659.25, 0.06]],
+  rare: [[523.25, 0], [659.25, 0.06], [783.99, 0.12]],
+  epic: [[523.25, 0], [659.25, 0.06], [783.99, 0.12], [1046.5, 0.18]],
+  legendary: [[392, 0], [523.25, 0.07], [659.25, 0.14], [783.99, 0.21], [1046.5, 0.28], [1318.51, 0.36]],
+  mythic: [[392, 0], [493.88, 0.07], [587.33, 0.14], [783.99, 0.21], [987.77, 0.28], [1174.66, 0.36], [1567.98, 0.46]],
+};
+export function playCardReveal(rarity = "common") {
+  play((ac, t) => {
+    const seq = REVEAL[rarity] || REVEAL.common;
+    const big = rarity === "legendary" || rarity === "mythic";
+    for (const [f, d] of seq)
+      note(ac, { freq: f, start: t + d, dur: big ? 0.5 : 0.22, gain: big ? 0.11 : 0.09 });
+    const end = seq[seq.length - 1][1];
+    if (seq.length >= 3) {
+      // Une pointe de brillance, une octave au-dessus de la dernière note.
+      note(ac, { freq: seq[seq.length - 1][0] * 2, start: t + end, dur: 0.6, gain: 0.03, type: "sine" });
+    }
+    if (big) {
+      // L'accord tenu, et le « boum » qui pose la carte.
+      for (const f of [seq[seq.length - 1][0], seq[seq.length - 1][0] * 1.25, seq[seq.length - 1][0] * 1.5])
+        note(ac, { freq: f, start: t + end + 0.05, dur: 1.4, gain: 0.05, type: "sine" });
+      note(ac, { freq: 70, start: t, dur: 0.5, gain: 0.18, type: "sine" });
+      noise(ac, { start: t + end, dur: 1.2, gain: 0.04, freq: 9000, q: 0.5, type: "highpass" });
+    }
+  });
+}
+
+// Le booster doré se révèle : un scintillement qui monte.
+export function playGoldenPack() {
+  play((ac, t) => {
+    [1046.5, 1318.51, 1567.98, 2093, 2637.02, 3135.96].forEach((f, i) =>
+      note(ac, { freq: f, start: t + i * 0.05, dur: 0.5, gain: 0.05, type: "sine" })
+    );
+    noise(ac, { start: t, dur: 0.8, gain: 0.04, freq: 8000, q: 0.5, type: "highpass" });
+  });
+}

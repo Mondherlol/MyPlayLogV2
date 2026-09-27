@@ -1,6 +1,10 @@
 import { platformLabel } from "../lib/platforms";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import TcgCard from "./cards/TcgCard";
+import { CARD_RARITIES, raritySymbol } from "../lib/cards";
+// La carte en grand (et son panneau du jeu) ne se charge qu'au premier clic.
+const CardInspector = lazy(() => import("./cards/CardInspector"));
 import { Link, useNavigate } from "react-router-dom";
 import {
   Repeat2,
@@ -60,6 +64,7 @@ import {
 } from "lucide-react";
 import {
   PackageOpen,
+  GalleryVerticalEnd,
   Sparkles as SparklesIc,
   Copy as CopyIc,
   Library,
@@ -196,6 +201,7 @@ export function FeedCard(props) {
   if (item.type === "perroquet" || item.type === "perroquetgroup")
     return <PerroquetEvent {...props} />;
   if (item.type === "mot") return <MotEvent {...props} />;
+  if (item.type === "cardpack") return <CardPackEvent {...props} />;
   if (item.type === "caseopen") return <CaseOpenEvent {...props} />;
   if (item.type === "caseopengroup") return <CaseOpenGroupEvent {...props} />;
   if (item.type === "collectiondrop") return <CollectionDropEvent {...props} />;
@@ -2267,6 +2273,76 @@ function BlindTestEvent({ item, onOpenBlindTest }) {
       >
         <Disc3 size={15} /> Voir les résultats
       </button>
+    </article>
+  );
+}
+
+// ============================================================
+//  Booster de cartes — les plus belles prises, en petites cartes
+// ============================================================
+// La plus rare en tête, sa couleur teinte la carte du fil. Un clic sur une
+// carte l'ouvre en grand (avec la fiche du jeu à tirer) : c'est aussi comme ça
+// qu'on découvre des jeux, par ce que les amis ont tiré.
+function CardPackEvent({ item }) {
+  const [inspect, setInspect] = useState(null);
+  const best = item.cards[0];
+  const meta = CARD_RARITIES[best.rarity] || CARD_RARITIES.common;
+  const stop = (e) => e.stopPropagation();
+  return (
+    <article className="hf-card hf-cardpack" style={{ "--drop-rarity": meta.color }}>
+      <EventHead
+        user={item.user}
+        date={item.date}
+        badge={item.golden ? <span className="hf-cp-gold">Doré</span> : null}
+      >
+        <GalleryVerticalEnd size={13} className="hf-inline-ic" /> a ouvert{" "}
+        {item.packs > 1 ? `${item.packs} boosters` : "un booster"}
+      </EventHead>
+
+      <div className="hf-cp-cards">
+        {item.cards.map((c, i) => (
+          <button
+            key={c.id}
+            type="button"
+            className="hf-cp-card clickable"
+            onClick={(e) => {
+              stop(e);
+              setInspect(i);
+            }}
+            title={c.name}
+          >
+            <TcgCard card={c} tilt={false} />
+            {c.isNew && <span className="hf-cp-new">NEW</span>}
+          </button>
+        ))}
+      </div>
+
+      <div className="hf-cp-foot">
+        <span className="hf-cp-best">
+          <span style={{ color: meta.color }}>{raritySymbol(best.rarity)}</span> {best.name}
+        </span>
+        {item.newCount > 0 && (
+          <span className="hf-cp-news">
+            <SparklesIc size={11} /> {item.newCount} nouvelle{item.newCount > 1 ? "s" : ""}
+          </span>
+        )}
+        <Link to={`/cartes/u/${item.user.username}`} className="hf-cp-link clickable" onClick={stop}>
+          Classeur
+        </Link>
+      </div>
+
+      {inspect != null && (
+        <div onClick={stop} onTouchStart={stop} onTouchEnd={stop}>
+          <Suspense fallback={null}>
+            <CardInspector
+              list={item.cards}
+              index={inspect}
+              onIndex={setInspect}
+              onClose={() => setInspect(null)}
+            />
+          </Suspense>
+        </div>
+      )}
     </article>
   );
 }
