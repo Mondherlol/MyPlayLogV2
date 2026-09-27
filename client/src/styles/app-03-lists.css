@@ -4384,3 +4384,30 @@
     min-height: 68px;
   }
 }
+
+/* ======================================================================
+   Glisser-déposer au doigt (listes en édition)
+   ======================================================================
+   ⚠️ `touch-action: none` SUR LES CARTES INTERDISAIT TOUT DÉFILEMENT AU
+   DOIGT. Le vivier en est rempli d'un bord à l'autre : impossible de le faire
+   glisser pour voir la suite. Le capteur tactile attend un appui tenu (cf.
+   TouchSensor dans ListDetail) : un glissé rapide reste donc un défilement —
+   horizontal dans le vivier, vertical dans les paliers et la grille — et un
+   appui tenu saisit la carte.
+   ⚠️ ET L'APPUI LONG NE DOIT RIEN FAIRE D'AUTRE. Sur une image, Android et iOS
+   ouvrent leur menu (« enregistrer l'image ») ou sélectionnent : le geste
+   partait là au lieu de saisir la carte. */
+.ic-card {
+  touch-action: pan-y;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.tier-pool-items .ic-card {
+  touch-action: pan-x;
+}
+.ic-card img {
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}

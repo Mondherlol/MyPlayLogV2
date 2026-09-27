@@ -899,7 +899,9 @@ router.get("/tops/for-me", requireAuth, async (req, res) => {
 // personnages de son roster) : un clic ouvre la tier list en brouillon, déjà
 // remplie — elle n'est créée qu'au premier élément classé.
 // Déclarée AVANT /:id pour ne pas être capturée par la route paramétrée.
-const TIER_SUGGEST_MAX = 8;
+// Le rayon défile : de quoi le remplir, pas seulement le début d'une ligne.
+const TIER_SUGGEST_MAX = 24;
+const ROSTER_SUGGEST_MAX = 6;
 const TIER_POOL_MAX = 60;
 const IGDB_COVER = "https://images.igdb.com/igdb/image/upload/t_cover_big";
 
@@ -981,12 +983,11 @@ router.get("/suggest/tiers", requireAuth, async (req, res) => {
     const fresh = [...bySaga].filter(
       ([saga]) => !done.some((t) => t.includes(saga.toLowerCase()))
     );
-    // Trois jeux au moins font une tier list qui vaut d'être rangée ; à défaut,
-    // on se contente de deux plutôt que de ne rien proposer.
-    const min = fresh.some(([, games]) => games.length >= 3) ? 3 : 2;
-
+    // Les sagas les plus jouées d'abord. Une saga dont on n'a joué qu'UN
+    // épisode reste une bonne idée — son bac est rempli avec toute la saga
+    // (cf. sagaPool) — mais elle passe après les autres, et seulement si ce
+    // bac a de quoi classer (filtre plus bas).
     const picked = fresh
-      .filter(([, games]) => games.length >= min)
       .sort((a, b) => b[1].length - a[1].length)
       .slice(0, TIER_SUGGEST_MAX);
     // Les bacs complets, en parallèle (un top officiel ou une requête IGDB
@@ -1031,7 +1032,7 @@ router.get("/suggest/tiers", requireAuth, async (req, res) => {
     const rosterPicked = [...rosterBySlug.values()]
       .filter(({ p }) => !done.some((t) => t.includes(p.title.toLowerCase())))
       .sort((a, b) => b.hours - a.hours || (b.e.favorite ? 1 : 0) - (a.e.favorite ? 1 : 0))
-      .slice(0, 4);
+      .slice(0, ROSTER_SUGGEST_MAX);
     const rosters = await Promise.all(
       rosterPicked.map(({ p, e }) =>
         p.source === "official" ? officialCharacters(e.name) : wikiCharacters(e.gameId, e.name, [])
@@ -1061,7 +1062,63 @@ router.get("/suggest/tiers", requireAuth, async (req, res) => {
       })
       .filter((sg) => sg.count >= 4);
 
-    res.json({ hasOwnTier: mine.length > 0, suggestions: [...rosterSuggestions, ...suggestions] });
+    // --- De quoi continuer : les sagas des tops officiels -----------------
+    // Une bibliothèque ne couvre souvent qu'une dizaine de sagas : le rayon
+    // s'arrêtait là. On le complète avec les sagas des tops officiels (Zelda,
+    // Pokémon, Final Fantasy…) qu'il n'a pas encore — après les siennes, et
+    // leur bac est le top lui-même, déjà trié et illustré.
+    // Un bac de moins de quatre jeux ne vaut pas une tier list.
+    const sagas = suggestions.filter((sg) => sg.count >= 4);
+    if (sagas.length < TIER_SUGGEST_MAX) {
+      const plainName = (x) =>
+        String(x || "")
+          .normalize("NFD")
+          .replace(/[̀-ͯ]/g, "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, " ")
+          .trim();
+      const have = sagas.map((sg) => plainName(sg.saga));
+      const tops = await List.find({ "official.kind": "top", "official.group": "series" })
+        .select("title official.order items.gameId items.name items.image")
+        .sort({ "official.order": 1, _id: 1 })
+        .lean();
+      for (const top of tops) {
+        if (sagas.length >= TIER_SUGGEST_MAX) break;
+        const saga = String(top.title || "")
+          .replace(/^les\s+\d+\s+meilleurs\s+(jeux\s+)?/i, "")
+          .trim();
+        const key = plainName(saga);
+        if (!key || (top.items || []).length < 5) continue;
+        if (have.some((h) => h.includes(key) || key.includes(h))) continue;
+        if (done.some((t) => plainName(t).includes(key))) continue;
+        have.push(key);
+        const games = top.items
+          .filter((i) => i.gameId)
+          .slice(0, TIER_POOL_MAX)
+          .map((i) => ({ gameId: i.gameId, name: i.name, cover: i.image || null }));
+        sagas.push({
+          saga,
+          title: `Tier list des jeux ${saga}`,
+          count: games.length,
+          played: 0,
+          covers: games.filter((g) => g.cover).slice(0, 3).map((g) => g.cover),
+          games,
+        });
+      }
+    }
+
+    // ⚠️ MÉLANGÉS, PAS EN BLOC. Les rosters en tête donnaient un rayon qui ne
+    // proposait QUE des personnages avant le premier jeu. Un roster, deux
+    // sagas, un roster, deux sagas… : le plus joué de chaque sorte en premier.
+    const mixed = [];
+    let r = 0;
+    let g = 0;
+    while (r < rosterSuggestions.length || g < sagas.length) {
+      if (r < rosterSuggestions.length) mixed.push(rosterSuggestions[r++]);
+      for (let k = 0; k < 2 && g < sagas.length; k += 1) mixed.push(sagas[g++]);
+    }
+
+    res.json({ hasOwnTier: mine.length > 0, suggestions: mixed });
   } catch (err) {
     console.error("tier suggest error:", err.message);
     res.status(500).json({ error: "Suggestions indisponibles." });
