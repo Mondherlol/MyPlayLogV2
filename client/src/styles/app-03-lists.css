@@ -3248,6 +3248,42 @@
   height: 1px;
 }
 
+/* L'année d'un palmarès : une banderole dorée en travers du coin haut gauche
+   (les pastilles vivent dans le coin opposé). */
+.lt-ribbon {
+  position: absolute;
+  z-index: 2;
+  top: 18px;
+  left: -38px;
+  width: 150px;
+  padding: 0.28rem 0;
+  transform: rotate(-38deg);
+  background: #f2b70b;
+  color: #1a1204;
+  font-family: "Anton", "Space Grotesk", var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-align: center;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.lt-ribbon::before,
+.lt-ribbon::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(26, 18, 4, 0.25);
+}
+.lt-ribbon::before {
+  top: 3px;
+}
+.lt-ribbon::after {
+  bottom: 3px;
+}
+
 /* La carte en attente (ListTileSkeleton). */
 .lt-skel {
   pointer-events: none;

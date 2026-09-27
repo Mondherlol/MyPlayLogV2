@@ -75,8 +75,8 @@ function ListRail({ path, token, title, moreTo, render, lead = null, skipId = nu
 }
 
 /**
- * Le rayon des tier lists. Vide — ou tant que le joueur n'en a fait aucune —,
- * il propose d'en faire à partir de ses sagas : « Tier list des jeux Zelda ».
+ * Le rayon des tier lists. Il s'ouvre sur celles à faire, tirées des sagas du
+ * joueur (« Tier list des jeux Zelda »), puis les plus aimées des autres.
  */
 function TierRail({ token, render }) {
   const path = "/lists?type=tier&sort=likes&limit=14";
@@ -93,18 +93,21 @@ function TierRail({ token, render }) {
     };
   }, [token]);
 
-  const shown = ideas && (!lists.length || !ideas.hasOwnTier) ? ideas.suggestions : [];
+  // ⚠️ TOUJOURS, ET EN TÊTE. Les idées disparaissaient dès qu'on avait fait
+  // UNE tier list, et passaient sinon derrière quatorze listes, hors de vue.
+  // Le serveur ne repropose déjà pas une saga qu'on a classée.
+  const shown = ideas?.suggestions || [];
   if (!lists.length && !shown.length) return null;
   return (
     <Section title="Tier lists" moreTo={lists.length ? "/lists?type=tier&sort=likes" : null} className="lx-sec">
-      {lists.map((l) => (
-        <div key={l.id} className="lx-rail-item">
-          {render(l)}
-        </div>
-      ))}
       {shown.map((idea) => (
         <div key={idea.saga} className="lx-rail-item">
           <TierIdea idea={idea} token={token} />
+        </div>
+      ))}
+      {lists.map((l) => (
+        <div key={l.id} className="lx-rail-item">
+          {render(l)}
         </div>
       ))}
     </Section>

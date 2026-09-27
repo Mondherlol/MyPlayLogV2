@@ -29,6 +29,7 @@ import EventCard from "../components/home/EventCard";
 import HoursModal from "../components/home/HoursModal";
 import NineRail from "../components/home/NineRail";
 import BoardAsk from "../components/home/BoardAsk";
+import TopsForYou from "../components/home/TopsForYou";
 import { MotStrip, TonightCard } from "../components/home/Strips";
 import { EventListCard, FreeCard, GameTile } from "../components/home/Tiles";
 import {
@@ -750,6 +751,11 @@ export default function Welcome() {
             </Section>
           )
         )}
+
+        {/* --- Des tops pour toi -----------------------------------------
+            Les tops officiels taillés pour ce compte : ceux dont il a joué une
+            bonne part sans les avoir finis (cf. home/TopsForYou). */}
+        <TopsForYou token={token} scope={scope} />
 
         {/* --- Les plus attendus ----------------------------------------- */}
         {discover === null ? (

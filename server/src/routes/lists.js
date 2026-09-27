@@ -24,6 +24,7 @@ import { triggerMissionCheck } from "../lib/missions.js";
 import { nineSuggestions } from "../lib/nineSuggest.js";
 import { boardKey, boardSlot, cleanBoardItems } from "../lib/boards.js";
 import { ensureGameMeta } from "../lib/gameMeta.js";
+import { igdbQuery } from "../lib/igdb.js";
 
 const router = express.Router();
 
@@ -809,6 +810,64 @@ router.get("/mine/for-item", requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/lists/tops/for-me — les tops officiels faits pour le joueur (rayon
+// « Tops pour toi » de l'accueil). Déclarée AVANT /:id.
+//
+// ⚠️ CE QUI INTÉRESSE, C'EST L'ÉCART. Un top dont on a joué la moitié dit
+// « tu aimes ça, et il t'en reste » ; un top dont on a tout fait n'a plus rien
+// à apprendre, et un top dont on ne connaît aucun jeu ne dit rien de nous. Le
+// score monte avec le nombre de jeux déjà joués (ramené à la taille du top,
+// sinon les Top 100 écraseraient tout) et retombe quand il ne reste rien à
+// découvrir.
+const TOPS_FOR_ME_MAX = 12;
+router.get("/tops/for-me", requireAuth, async (req, res) => {
+  try {
+    const [entries, tops] = await Promise.all([
+      UserGame.find({ user: req.userId }).select("gameId status").lean(),
+      List.find({ "official.kind": "top", visibility: "public" }).select("items.gameId").lean(),
+    ]);
+    // Une envie compte à moitié : on la veut, on ne l'a pas encore jouée.
+    const weight = new Map();
+    for (const e of entries) {
+      if (e.gameId == null) continue;
+      weight.set(String(e.gameId), e.status === "wishlist" ? 0.5 : 1);
+    }
+    const scored = [];
+    for (const t of tops) {
+      const ids = (t.items || []).map((i) => String(i.gameId));
+      if (!ids.length) continue;
+      let owned = 0;
+      let played = 0;
+      for (const id of ids) {
+        const w = weight.get(id);
+        if (!w) continue;
+        owned += w;
+        if (w === 1) played += 1;
+      }
+      if (played < 2) continue;
+      const left = ids.length - played;
+      const score = (owned / Math.sqrt(ids.length)) * (left > 0 ? 1 : 0.25);
+      scored.push({ id: t._id, score, played, total: ids.length });
+    }
+    scored.sort((a, b) => b.score - a.score);
+    const best = scored.slice(0, TOPS_FOR_ME_MAX);
+    const docs = await List.find({ _id: { $in: best.map((b) => b.id) } })
+      .populate("user", "username avatar isSystem")
+      .lean();
+    const byId = new Map(docs.map((d) => [String(d._id), d]));
+    const lists = best
+      .map((b) => {
+        const d = byId.get(String(b.id));
+        return d ? { ...toCard(d, req.userId), played: b.played } : null;
+      })
+      .filter(Boolean);
+    res.json({ lists });
+  } catch (err) {
+    console.error("tops for me error:", err.message);
+    res.json({ lists: [] });
+  }
+});
+
 // GET /api/lists/suggest/tiers — des tier lists à faire, tirées des sagas que
 // le joueur a jouées (« Tier list des jeux Pokémon »). La page Listes les
 // propose quand le rayon des tier lists est vide, ou tant que le joueur n'en a
@@ -816,6 +875,60 @@ router.get("/mine/for-item", requireAuth, async (req, res) => {
 // déjà remplie, il ne reste qu'à ranger.
 // Déclarée AVANT /:id pour ne pas être capturée par la route paramétrée.
 const TIER_SUGGEST_MAX = 8;
+const TIER_POOL_MAX = 60;
+const IGDB_COVER = "https://images.igdb.com/igdb/image/upload/t_cover_big";
+
+// Les jeux d'une saga, pour remplir le bac d'une tier list suggérée.
+// ⚠️ PAS SEULEMENT CEUX QU'ON A JOUÉS. « Tier list des jeux Pokémon » ne
+// proposait que les six Pokémon de la bibliothèque : on ne classe pas une
+// saga avec six jeux. On part du top officiel de la saga s'il existe (déjà
+// trié, jaquettes comprises, sans appel IGDB) ; sinon des épisodes de la
+// franchise sur IGDB — jeux principaux, remakes, remasters — gardés un jour.
+const sagaPoolCache = new Map(); // "franchise:12" -> { at, games }
+const SAGA_POOL_TTL = 24 * 3600 * 1000;
+
+async function sagaPool(saga, ref) {
+  const top = await List.findOne({
+    "official.kind": "top",
+    "official.group": "series",
+    title: new RegExp(`meilleurs\\s+(?:jeux\\s+)?${escapeRx(saga)}\\s*$`, "i"),
+  })
+    .select("items.gameId items.name items.image")
+    .lean();
+  if (top?.items?.length) {
+    return top.items.map((i) => ({ gameId: i.gameId, name: i.name, cover: i.image || null }));
+  }
+  if (!ref?.franchiseId) return [];
+  const key = `${ref.franchiseKind}:${ref.franchiseId}`;
+  const hit = sagaPoolCache.get(key);
+  if (hit && Date.now() - hit.at < SAGA_POOL_TTL) return hit.games;
+  const field = ref.franchiseKind === "collection" ? "collections" : "franchises";
+  let games = [];
+  try {
+    const rows = await igdbQuery(
+      "games",
+      `fields name, cover.image_id; where ${field} = (${Number(ref.franchiseId)}) & game_type = (0,8,9) & cover != null & version_parent = null; sort total_rating_count desc; limit ${TIER_POOL_MAX};`
+    );
+    // ⚠️ LES FRANCHISES IGDB COMPTENT LES CROSSOVERS : Smash Bros. et Mario
+    // Kart sortaient dans « Zelda ». On garde les jeux qui portent le nom de la
+    // saga, sauf s'il en reste trop peu (saga au nom différent de ses jeux).
+    const plain = (s) =>
+      String(s || "")
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .toLowerCase();
+    const named = rows.filter((g) => plain(g.name).includes(plain(saga)));
+    games = (named.length >= 5 ? named : rows).map((g) => ({
+      gameId: g.id,
+      name: g.name,
+      cover: `${IGDB_COVER}/${g.cover.image_id}.jpg`,
+    }));
+  } catch {
+    games = [];
+  }
+  sagaPoolCache.set(key, { at: Date.now(), games });
+  return games;
+}
 router.get("/suggest/tiers", requireAuth, async (req, res) => {
   try {
     const [entries, mine] = await Promise.all([
@@ -827,11 +940,16 @@ router.get("/suggest/tiers", requireAuth, async (req, res) => {
     const meta = await ensureGameMeta(entries.map((e) => e.gameId));
 
     const bySaga = new Map();
+    const refOf = new Map(); // saga -> { franchiseId, franchiseKind }
     for (const e of entries) {
-      const saga = meta.get(e.gameId)?.franchise;
+      const m = meta.get(e.gameId);
+      const saga = m?.franchise;
       if (!saga) continue;
       if (!bySaga.has(saga)) bySaga.set(saga, []);
       bySaga.get(saga).push(e);
+      if (m.franchiseId && !refOf.has(saga)) {
+        refOf.set(saga, { franchiseId: m.franchiseId, franchiseKind: m.franchiseKind });
+      }
     }
     // Une saga déjà classée par le joueur ne se repropose pas.
     const done = mine.map((l) => l.title.toLowerCase());
@@ -842,21 +960,30 @@ router.get("/suggest/tiers", requireAuth, async (req, res) => {
     // on se contente de deux plutôt que de ne rien proposer.
     const min = fresh.some(([, games]) => games.length >= 3) ? 3 : 2;
 
-    const suggestions = fresh
+    const picked = fresh
       .filter(([, games]) => games.length >= min)
       .sort((a, b) => b[1].length - a[1].length)
-      .slice(0, TIER_SUGGEST_MAX)
-      .map(([saga, games]) => ({
+      .slice(0, TIER_SUGGEST_MAX);
+    // Les bacs complets, en parallèle (un top officiel ou une requête IGDB
+    // par saga, cette dernière gardée un jour).
+    const pools = await Promise.all(picked.map(([saga]) => sagaPool(saga, refOf.get(saga))));
+    const suggestions = picked.map(([saga, played], i) => {
+      // Ses jeux d'abord (ce sont ceux qu'il a en tête), puis le reste de la
+      // saga, sans doublon.
+      const seen = new Set(played.map((g) => String(g.gameId)));
+      const games = [
+        ...played,
+        ...pools[i].filter((g) => g.gameId && !seen.has(String(g.gameId)) && seen.add(String(g.gameId))),
+      ].slice(0, TIER_POOL_MAX);
+      return {
         saga,
         title: `Tier list des jeux ${saga}`,
         count: games.length,
-        covers: games.filter((g) => g.cover).slice(0, 3).map((g) => g.cover),
-        games: games.slice(0, 60).map((g) => ({
-          gameId: g.gameId,
-          name: g.name,
-          cover: g.cover || null,
-        })),
-      }));
+        played: played.length,
+        covers: played.filter((g) => g.cover).slice(0, 3).map((g) => g.cover),
+        games: games.map((g) => ({ gameId: g.gameId, name: g.name, cover: g.cover || null })),
+      };
+    });
 
     res.json({ hasOwnTier: mine.length > 0, suggestions });
   } catch (err) {

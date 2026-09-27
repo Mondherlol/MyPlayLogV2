@@ -59,21 +59,22 @@
    ce qu'on regarde en arrivant — ils ont leur page (/events, /lists). */
 .mh-top { order: 1; }
 .s-wish { order: 2; }
-.s-awaited { order: 3; }
-.mh-board-ask { order: 4; }
-.s-today { order: 5; }
-.mh-mot { order: 6; }
-.s-tonight { order: 7; }
-.s-dusty { order: 8; }
-.s-free { order: 9; }
-.s-discover { order: 10; }
-.s-nine { order: 11; }
-.s-done { order: 12; }
-.s-fav { order: 13; }
-.s-similar { order: 14; }
-.s-events { order: 15; }
-.s-elists { order: 16; }
-.mh-doors { order: 17; }
+.s-tops { order: 3; }
+.s-awaited { order: 4; }
+.mh-board-ask { order: 5; }
+.s-today { order: 6; }
+.mh-mot { order: 7; }
+.s-tonight { order: 8; }
+.s-dusty { order: 9; }
+.s-free { order: 10; }
+.s-discover { order: 11; }
+.s-nine { order: 12; }
+.s-done { order: 13; }
+.s-fav { order: 14; }
+.s-similar { order: 15; }
+.s-events { order: 16; }
+.s-elists { order: 17; }
+.mh-doors { order: 18; }
 
 /* ======================================================================
    L'ECRAN LARGE : une colonne de plus
@@ -1664,6 +1665,30 @@ a.mh-head-main:hover .mh-head-title {
   justify-content: center;
   gap: 0.45rem;
   flex-wrap: wrap;
+}
+
+/* ======================================================================
+   12 bis. Des tops pour toi (home/TopsForYou)
+   ====================================================================== */
+.mh-topcard {
+  flex: none;
+  width: 260px;
+  display: grid;
+  gap: 0.4rem;
+}
+.mh-topcard-played {
+  padding-left: 0.15rem;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+.mh-topcard-played b {
+  color: var(--text);
+  font-weight: 700;
+}
+@media (max-width: 720px) {
+  .mh-topcard {
+    width: 220px;
+  }
 }
 
 /* ======================================================================

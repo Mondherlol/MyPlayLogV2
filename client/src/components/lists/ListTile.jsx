@@ -316,6 +316,14 @@ export function ListTileSkeleton() {
 export default function ListTile({ list, onDelete }) {
   const meta = typeMeta(list.type);
   const author = list.author;
+  // L'année d'une cérémonie (The Game Awards, Spike VGA) : sa date, sinon
+  // l'année écrite dans son titre.
+  const awardsYear =
+    list.official?.kind === "awards"
+      ? (list.event?.startTime && new Date(list.event.startTime).getFullYear()) ||
+        Number(String(list.title).match(/(19|20)\d{2}/)?.[0]) ||
+        null
+      : null;
   const byline = (
     <span className="lt-meta">
       <span className="lt-pp" aria-hidden="true">
@@ -367,7 +375,12 @@ export default function ListTile({ list, onDelete }) {
         ) : kind === "top" ? (
           <TopPoster list={list} />
         ) : kind === "event" ? (
-          <img className="lt-cover" src={list.cover} alt="" loading="lazy" draggable="false" />
+          <>
+            <img className="lt-cover" src={list.cover} alt="" loading="lazy" draggable="false" />
+            {/* Un palmarès se reconnaît à son année : elle est SUR l'affiche,
+                en banderole, et rien n'est écrit dessous. */}
+            {awardsYear && <span className="lt-ribbon">{awardsYear}</span>}
+          </>
         ) : kind === "nine" ? (
           <NinePoster list={list} />
         ) : kind === "tier" ? (
@@ -428,7 +441,7 @@ export default function ListTile({ list, onDelete }) {
 
       {/* Conférence ou palmarès : l'affiche a déjà son logo et ses titres,
           on n'écrit rien PAR-DESSUS — le nom de la liste passe dessous. */}
-      {kind === "event" && (
+      {kind === "event" && !awardsYear && (
         <span className="lt-under">
           <span className="lt-title">{list.title}</span>
           {byline}
