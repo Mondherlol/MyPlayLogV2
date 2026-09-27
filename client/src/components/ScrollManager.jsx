@@ -60,16 +60,41 @@ export default function ScrollManager() {
     }
     // REPLACE : on ne bouge pas (onglets / filtres vivent dans l'URL).
 
-    // Mémorise en continu la position de défilement de l'entrée courante,
-    // pour pouvoir la restaurer si on y revient plus tard (POP).
-    const onScroll = () => {
+    // Mémorise la position de défilement de l'entrée courante, pour pouvoir
+    // la restaurer si on y revient plus tard (POP).
+    //
+    // ⚠️ ON NE LIT PAS `scrollY` À CHAQUE ÉVÈNEMENT. La lecture force un
+    // recalcul complet des styles et de la mise en page, en plein défilement,
+    // à chaque frame — c'était la fonction la plus chère au scroll de tout le
+    // site. On lit une fois que ça s'arrête, et tout de suite si l'on clique
+    // ou revient en arrière pendant le mouvement (avant que la page change).
+    let settle = null;
+    const save = () => {
+      settle = null;
       if (!restoring) positions.current.set(key, window.scrollY);
     };
+    const onScroll = () => {
+      clearTimeout(settle);
+      settle = setTimeout(save, 120);
+    };
+    const flush = () => {
+      if (settle) {
+        clearTimeout(settle);
+        save();
+      }
+    };
     window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("pointerdown", flush, true);
+    window.addEventListener("keydown", flush, true);
+    window.addEventListener("popstate", flush, true);
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      clearTimeout(settle);
       window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("pointerdown", flush, true);
+      window.removeEventListener("keydown", flush, true);
+      window.removeEventListener("popstate", flush, true);
       window.removeEventListener("wheel", stopRestore);
       window.removeEventListener("touchstart", stopRestore);
     };

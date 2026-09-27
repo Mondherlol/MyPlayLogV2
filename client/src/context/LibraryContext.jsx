@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "./AuthContext";
 import { useToast } from "./ToastContext";
@@ -49,12 +49,12 @@ export function LibraryProvider({ children }) {
   // Recharge la carte complète depuis le serveur (après un import Steam massif,
   // par ex.) : la nouvelle référence de `map` déclenche le rafraîchissement des
   // écrans qui en dépendent (profil…).
-  function refresh() {
+  const refresh = useCallback(() => {
     if (!token) return Promise.resolve();
     return apiFetch("/library/map", { token })
       .then((d) => setMap(d.map || {}))
       .catch(() => {});
-  }
+  }, [token]);
 
   useEffect(() => {
     if (!token) {
@@ -115,14 +115,26 @@ export function LibraryProvider({ children }) {
   }
   function removeLocal(gameId) {
     setMap((m) => {
+      if (!(gameId in m)) return m;
       const next = { ...m };
       delete next[gameId];
       return next;
     });
   }
 
+  // ⚠️ UNE VALEUR STABLE. Toutes les jaquettes du site lisent ce contexte :
+  // un nouvel objet à chaque rendu du fournisseur (un toast qui passe, l'auth
+  // qui se rafraîchit…) les faisait TOUTES se redessiner pour rien. Elle ne
+  // change plus que quand la bibliothèque change vraiment.
+  const value = useMemo(
+    () => ({ map, upsertLocal, removeLocal, refresh }),
+    // upsertLocal / removeLocal ne passent que par setMap : stables de fait.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [map, refresh]
+  );
+
   return (
-    <LibraryContext.Provider value={{ map, upsertLocal, removeLocal, refresh }}>
+    <LibraryContext.Provider value={value}>
       {children}
     </LibraryContext.Provider>
   );

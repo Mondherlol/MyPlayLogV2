@@ -79,6 +79,7 @@ import ReviewThreadModal from "./ReviewThreadModal";
 import { CommentThreadModal } from "./ListComments";
 import { MediaGrid, PostText, PostEmbed, extractEmbeds, SharePostButton } from "./GameMediaWall";
 import { WantedModal } from "./WantedPoster";
+import { frDate } from "../lib/dateFormat";
 
 // Cards du fil social — partagées entre le fil d'accueil (HomeFeed) et
 // l'onglet Feed du profil (ProfileFeed). Chaque évènement reflète une VRAIE
@@ -231,7 +232,7 @@ export function EventHead({ user, date, children, badge }) {
           </Link>{" "}
           <span className="hf-action">{children}</span>
         </span>
-        <span className="hf-time" title={new Date(date).toLocaleString()}>
+        <span className="hf-time" title={frDate(date, { dateStyle: "short", timeStyle: "short" })}>
           {timeAgo(date)}
         </span>
       </div>

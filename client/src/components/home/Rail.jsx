@@ -113,23 +113,38 @@ export function Rail({ children, className = "", snap = true }) {
   const [dragging, setDragging] = useState(false);
   const [edges, setEdges] = useState({ left: false, right: false });
 
+  // ⚠️ LIRE `scrollWidth` FORCE LA MISE EN PAGE. Chaque rangée le faisait
+  // à chaque rendu de l'accueil (ses `children` changent d'identité à chaque
+  // fois) et à chaque pixel de défilement : une dizaine de rangées, autant de
+  // mises en page forcées en plein chargement. On regroupe la lecture dans la
+  // frame suivante, et l'état ne change que si les flèches changent.
+  const frame = useRef(0);
   const update = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    setEdges({
-      left: el.scrollLeft > 6,
-      right: el.scrollLeft < el.scrollWidth - el.clientWidth - 6,
+    if (frame.current) return;
+    frame.current = requestAnimationFrame(() => {
+      frame.current = 0;
+      const el = ref.current;
+      if (!el) return;
+      const left = el.scrollLeft > 6;
+      const right = el.scrollLeft < el.scrollWidth - el.clientWidth - 6;
+      setEdges((e) => (e.left === left && e.right === right ? e : { left, right }));
     });
   }, []);
 
   useEffect(() => {
-    update();
     const el = ref.current;
     if (!el) return undefined;
     const ro = new ResizeObserver(update);
     ro.observe(el);
-    return () => ro.disconnect();
-  }, [children, update]);
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(frame.current);
+      frame.current = 0;
+    };
+  }, [update]);
+
+  // Le contenu a pu changer de largeur sans que la rangée change de taille.
+  useEffect(update, [children, update]);
 
   // Les flèches calent sur une carte ; le glissé, lui, reste libre
   // (cf. lib/railScroll).

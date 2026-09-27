@@ -96,11 +96,34 @@ export function nineSegments(phrase) {
 // Le mot-clé se mesure pour de vrai, dans sa police, sur un canvas : une
 // estimation « par caractère » laissait « personnalité » deux fois trop petit
 // et faisait déborder « promesses ».
+//
+// ⚠️ MÉMORISÉ. Chaque carte des 9 mesure son mot-clé et chacune de ses coupes
+// possibles, deux fois : c'était le premier poste de calcul à l'ouverture de
+// l'accueil. Une mesure ne change pas… sauf quand une police finit d'arriver :
+// on repart alors de zéro.
 let ctx = null;
+let ctxFont = "";
+const widths = new Map();
+if (typeof document !== "undefined") {
+  document.fonts?.addEventListener?.("loadingdone", () => widths.clear());
+}
 function textWidth(meta, text, px) {
-  ctx ||= document.createElement("canvas").getContext("2d");
-  ctx.font = `${meta.italic ? "italic " : ""}700 ${px}px ${meta.font}`;
-  return ctx.measureText(meta.upper ? text.toUpperCase() : text).width;
+  const font = `${meta.italic ? "italic " : ""}700 ${px}px ${meta.font}`;
+  const shown = meta.upper ? text.toUpperCase() : text;
+  const key = `${font}|${shown}`;
+  let w = widths.get(key);
+  if (w === undefined) {
+    ctx ||= document.createElement("canvas").getContext("2d");
+    // `ctx.font` relu est normalisé par le navigateur : le comparer à notre
+    // chaîne ne marche jamais. On retient nous-mêmes la dernière posée.
+    if (ctxFont !== font) {
+      ctx.font = font;
+      ctxFont = font;
+    }
+    w = ctx.measureText(shown).width;
+    widths.set(key, w);
+  }
+  return w;
 }
 
 /**

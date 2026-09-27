@@ -55,6 +55,7 @@ import { ensureScraped, ytPlaylistTracks } from "../lib/ostScrape.js";
 import { fetchC411Packs, fetchC411Torrent, rewriteAnnounce } from "../lib/c411.js";
 import { fetchFitgirlRepacks } from "../lib/fitgirl.js";
 import { fetchZipertoGames } from "../lib/ziperto.js";
+import { fetchOnlineFixGames } from "../lib/onlinefix.js";
 import { getCachedTranslation, translateGameText } from "../lib/gameText.js";
 import { ensureTrivia, reactToFact, serializeTrivia } from "../lib/gameTrivia.js";
 import { gameCredits, creditsWorks } from "../lib/gameCredits.js";
@@ -2859,6 +2860,9 @@ router.get("/:id/patches", requireAuth, requireDownloadAccess, async (req, res) 
     const isPc = (g.platforms || []).some(
       (p) => p.id === 6 || /\b(pc|windows)\b/i.test(p.name || "")
     );
+    // Jouable en ligne à plusieurs (modes IGDB : 2 multijoueur, 3 coopération,
+    // 5 MMO, 6 battle royale) → fixs réseau Online-Fix (avec isPc).
+    const isMulti = (g.game_modes || []).some((m) => [2, 3, 5, 6].includes(m?.id ?? m));
 
     // On n'interroge VNDB que pour un VN pas déjà en FR ; pour tout jeu Switch
     // on lit le patch poussé par l'app locale (même déjà traduit : la version
@@ -2874,6 +2878,7 @@ router.get("/:id/patches", requireAuth, requireDownloadAccess, async (req, res) 
       hasFr,
       isSwitch,
       isPc,
+      isMulti,
       vnPatches, // null si non pertinent (pas un VN, ou déjà dispo en FR)
       switchPatch: sw?.patch || null, // patch poussé par l'app locale, ou null
       switchPatchRequested: !!sw?.requested, // une demande de scrape est en attente
@@ -2943,6 +2948,25 @@ router.get("/:id/ziperto", requireAuth, requireDownloadAccess, async (req, res) 
     res.json({ name: g.name, results });
   } catch (err) {
     console.error("game ziperto error:", err.message);
+    res.status(err.status || 500).json({ error: err.message || "Erreur." });
+  }
+});
+
+// --- Fixs réseau Online-Fix (jeux PC multijoueurs) pour un jeu, chargés à la
+// demande depuis l'onglet Patchs (recherche + une page par résultat = lent).
+// Le client ne monte ce bloc que pour les jeux PC multijoueurs (isPc && isMulti). ---
+router.get("/:id/onlinefix", requireAuth, requireDownloadAccess, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "id invalide." });
+
+    const g = await gameCore(id);
+    if (!g) return res.status(404).json({ error: "Jeu introuvable." });
+
+    const games = await fetchOnlineFixGames(g.name);
+    res.json({ name: g.name, games });
+  } catch (err) {
+    console.error("game onlinefix error:", err.message);
     res.status(err.status || 500).json({ error: err.message || "Erreur." });
   }
 });

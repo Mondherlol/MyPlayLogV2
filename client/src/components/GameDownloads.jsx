@@ -21,6 +21,8 @@ import {
   ShieldCheck,
   Boxes,
   Disc3,
+  Network,
+  Server,
 } from "lucide-react";
 import { apiFetch, API_BASE } from "../lib/api";
 import { makeCache } from "../lib/cache";
@@ -612,6 +614,134 @@ function FitGirlBlock({ gameId, token, game }) {
   );
 }
 
+// « Coop 4 » / « Coop » (nombre inconnu) ; rien si le mode n'existe pas.
+const modeLabel = (label, n) => (!n ? null : n === "?" ? label : `${label} ${n}`);
+
+// --- Bloc « Téléchargement Online-Fix » : fixs réseau (jeu + fix pour jouer en
+// ligne sans compte officiel), chargés à la demande. Rendu uniquement pour les
+// jeux PC multijoueurs (data.isPc && data.isMulti). Le .torrent et la page
+// Hosters sont publics ; le lien « Serveur » (.rar direct) demande d'être
+// connecté sur online-fix.me dans son navigateur. ---
+function OnlineFixBlock({ gameId, token, game }) {
+  const [state, setState] = useState({ loading: true, data: null, error: false });
+
+  useEffect(() => {
+    let alive = true;
+    setState({ loading: true, data: null, error: false });
+    apiFetch(`/games/${gameId}/onlinefix`, { token })
+      .then((d) => alive && setState({ loading: false, data: d, error: false }))
+      .catch(() => alive && setState({ loading: false, data: null, error: true }));
+    return () => {
+      alive = false;
+    };
+  }, [gameId, token]);
+
+  const games = state.data?.games || [];
+  const log = () => logDownload(gameId, token, game, "Online-Fix");
+
+  return (
+    <section className="gp-block">
+      <BlockHead Icon={Network} title="Téléchargement Online-Fix" hint="Fix réseau · Jeux PC multi" />
+      {state.loading ? (
+        <PatchSkeleton rows={1} />
+      ) : state.error ? (
+        <div className="gp-troph-empty">
+          <Network size={26} />
+          <p className="font-fun">Impossible de charger Online-Fix pour l'instant.</p>
+        </div>
+      ) : !games.length ? (
+        <div className="gp-troph-empty">
+          <Network size={26} />
+          <p className="font-fun">Aucun fix Online-Fix trouvé pour ce jeu.</p>
+        </div>
+      ) : (
+        <div className="gp-hd-list">
+          {games.map((g) => (
+            <div className="gp-hd-row" key={g.page}>
+              <div className="gp-hd-cover">
+                {g.poster ? (
+                  <img src={g.poster} alt="" loading="lazy" referrerPolicy="no-referrer" />
+                ) : (
+                  <Network size={18} />
+                )}
+              </div>
+              <div className="gp-hd-main">
+                <span className="gp-hd-title" title={g.title}>
+                  {g.title}
+                </span>
+                <div className="gp-hd-meta">
+                  {g.version && <span className="gp-hd-badge">v{g.version}</span>}
+                  {modeLabel("Coop", g.coop) && (
+                    <span className="gp-hd-badge">
+                      <Users2 size={11} /> {modeLabel("Coop", g.coop)}
+                    </span>
+                  )}
+                  {modeLabel("Multi", g.multi) && (
+                    <span className="gp-hd-badge">
+                      <Users2 size={11} /> {modeLabel("Multi", g.multi)}
+                    </span>
+                  )}
+                  {g.via && <span className="gp-hd-age">via {g.via}</span>}
+                </div>
+              </div>
+              <div className="gp-hd-actions">
+                {g.torrent && (
+                  <a
+                    href={g.torrent}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="gp-hd-dl clickable"
+                    title="Télécharger le .torrent (jeu + fix)"
+                    onClick={log}
+                  >
+                    <Magnet size={14} />
+                    <span>.torrent</span>
+                  </a>
+                )}
+                {g.hosters && (
+                  <a
+                    href={g.hosters}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="gp-hd-page clickable"
+                    title="Liens directs (hébergeurs de fichiers)"
+                    onClick={log}
+                  >
+                    <Download size={13} />
+                    <span>Hosters</span>
+                  </a>
+                )}
+                {g.server && (
+                  <a
+                    href={g.server}
+                    target="_blank"
+                    className="gp-hd-page clickable"
+                    title="Serveur Online-Fix : il faut être connecté sur online-fix.me"
+                    onClick={log}
+                  >
+                    <Server size={13} />
+                    <span>Serveur</span>
+                  </a>
+                )}
+                <a
+                  href={g.page}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="gp-hd-page clickable"
+                  title="Voir sur Online-Fix (instructions de lancement)"
+                >
+                  <ExternalLink size={13} />
+                  <span>Page</span>
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 // --- Bloc « Téléchargement Ziperto » : résultats Ziperto (ROMs/NSP/XCI Switch &
 // 3DS, jeux PC, VPK PS Vita…), chargés à la demande. Chaque résultat = jaquette +
 // titre + plateforme + lien vers la page du jeu (le lien de téléchargement s'y
@@ -695,7 +825,7 @@ function ZipertoBlock({ gameId, token, game }) {
 }
 
 // --- Onglet Téléchargements : Pack HD (C411) + patch FR Switch (nxbrew) +
-// repacks FitGirl (PC) + Ziperto + fan-traduction FR des visual novels non
+// repacks FitGirl (PC) + Online-Fix (PC multi) + Ziperto + fan-traduction FR des visual novels non
 // traduits (VNDB) + liens de recherche de mods.
 //
 // L'onglet n'est pas ouvert à tout le monde : l'accès se donne compte par compte
@@ -762,6 +892,11 @@ export default function GameDownloads({ gameId, token, game = null }) {
 
       {/* Repacks FitGirl — seulement si jeu PC */}
       {data.isPc && <FitGirlBlock gameId={gameId} token={token} game={game} />}
+
+      {/* Fix réseau Online-Fix — seulement si jeu PC multijoueur */}
+      {data.isPc && data.isMulti && (
+        <OnlineFixBlock gameId={gameId} token={token} game={game} />
+      )}
 
       {/* Ziperto (NSP/XCI) — seulement si jeu Switch, comme nxbrew */}
       {data.isSwitch && (

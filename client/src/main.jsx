@@ -18,6 +18,7 @@ import { ListenPartyProvider } from "./context/ListenPartyContext.jsx";
 import { GameMenuProvider } from "./components/GameContextMenu.jsx";
 import { applyFonts, getFontPrefs } from "./lib/fonts.js";
 import { installDragScrollGuard } from "./lib/dragScrollGuard.js";
+import { installScrollHoverGuard } from "./lib/scrollHoverGuard.js";
 
 // Les polices choisies dans Paramètres → Apparence, AVANT le premier rendu :
 // sinon chaque chargement afficherait d'abord Inter, puis sauterait.
@@ -32,6 +33,8 @@ installGlobalErrorReporting();
 reportEnvPing();
 // Faire glisser une rangée à la souris ne sélectionne plus textes et images.
 installDragScrollGuard();
+// Pas d'effets de survol pendant que la page défile sous la souris.
+installScrollHoverGuard();
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

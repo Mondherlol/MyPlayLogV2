@@ -90,6 +90,48 @@ function FeedFooter({ context }) {
 
 const feedComponents = { Header: FeedHeader, Footer: FeedFooter };
 
+// ⚠️ UNE CARTE NE SE REDESSINE QUE SI ELLE CHANGE. Virtuoso redessine sa liste
+// à chaque fois que la plage visible bouge, c'est-à-dire sans arrêt au
+// défilement ; avec des rappels fabriqués à la volée dans `itemContent`, chaque
+// carte montée se redessinait avec. Ici les rappels passent par `actions`, un
+// objet stable qui lit toujours les gestionnaires du moment.
+const FeedRow = memo(function FeedRow({ item, me, token, actions: a }) {
+  return (
+    <div className="hf-item">
+      <FeedCard
+        item={item}
+        me={me}
+        token={token}
+        onLike={() =>
+          item.type === "video"
+            ? a.current.toggleVideoLike(item)
+            : isPostItem(item)
+              ? a.current.togglePostLike(item)
+              : a.current.toggleLike(item)
+        }
+        onComments={() =>
+          item.type === "video" || item.type === "videoact"
+            ? a.current.setCommentsForVideo(item)
+            : isPostItem(item)
+              ? a.current.setCommentsForPost(item)
+              : a.current.setCommentsFor(item)
+        }
+        onLater={() => a.current.toggleVideoLater(item)}
+        onRepost={() => a.current.toggleRepost(item)}
+        onOpenImage={(i) =>
+          item.type === "gamemediapost"
+            ? a.current.setMediaViewer({ item, index: i })
+            : a.current.setLightbox(item)
+        }
+        onPlay={(v) => a.current.setPlaying(v)}
+        onOpenGems={() => a.current.setGemsFor(item)}
+        onOpenBlindTest={(payload) => a.current.setBlindTestFor(payload || item)}
+        onOpenPixel={(payload) => a.current.setPixelFor(payload || item)}
+      />
+    </div>
+  );
+});
+
 // Fil d'actualité de la page d'accueil : timeline des VRAIES actions des
 // joueurs suivis (statuts, notes, reviews, OST choisies, listes, abonnements,
 // fan arts republiés, documentaires, pépites) — voir routes/feed.js et
@@ -120,6 +162,7 @@ function HomeFeed({ token, me, filterUser = null }) {
     : null;
   // Refs miroirs pour que le chargement (déclenché par Virtuoso) lise l'état courant.
   const stateRef = useRef({ cursor: null, busy: false });
+  const actions = useRef(null);
   stateRef.current = { cursor, busy: loading || loadingMore };
 
   const feedUrl = (extra) =>
@@ -265,6 +308,25 @@ function HomeFeed({ token, me, filterUser = null }) {
     }
   }
 
+  // Les gestionnaires du moment, lus par les cartes via une référence stable
+  // (cf. FeedRow).
+  actions.current = {
+    toggleVideoLike,
+    togglePostLike,
+    toggleLike,
+    toggleVideoLater,
+    toggleRepost,
+    setCommentsFor,
+    setCommentsForVideo,
+    setCommentsForPost,
+    setMediaViewer,
+    setLightbox,
+    setPlaying,
+    setGemsFor,
+    setBlindTestFor,
+    setPixelFor,
+  };
+
   if (loading) return <FeedCardsSkeleton />;
 
   if (!items.length) {
@@ -297,38 +359,7 @@ function HomeFeed({ token, me, filterUser = null }) {
         context={{ community, loadingMore, atEnd: !cursor && items.length > 6 }}
         components={feedComponents}
         itemContent={(_, item) => (
-          <div className="hf-item">
-            <FeedCard
-              item={item}
-              me={me}
-              token={token}
-              onLike={() =>
-                item.type === "video"
-                  ? toggleVideoLike(item)
-                  : isPostItem(item)
-                    ? togglePostLike(item)
-                    : toggleLike(item)
-              }
-              onComments={() =>
-                item.type === "video" || item.type === "videoact"
-                  ? setCommentsForVideo(item)
-                  : isPostItem(item)
-                    ? setCommentsForPost(item)
-                    : setCommentsFor(item)
-              }
-              onLater={() => toggleVideoLater(item)}
-              onRepost={() => toggleRepost(item)}
-              onOpenImage={(i) =>
-                item.type === "gamemediapost"
-                  ? setMediaViewer({ item, index: i })
-                  : setLightbox(item)
-              }
-              onPlay={(v) => setPlaying(v)}
-              onOpenGems={() => setGemsFor(item)}
-              onOpenBlindTest={(payload) => setBlindTestFor(payload || item)}
-              onOpenPixel={(payload) => setPixelFor(payload || item)}
-            />
-          </div>
+          <FeedRow item={item} me={me} token={token} actions={actions} />
         )}
       />
 

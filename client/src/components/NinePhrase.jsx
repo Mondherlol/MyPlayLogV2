@@ -112,7 +112,12 @@ export default function NinePhrase({ themeKey, title, inner, scale = 1, ready, p
         }
         // Un mot d'une ligne peut monter à deux fois et demie le corps du
         // texte ; sur deux lignes, moins — sinon il pousse le pied de carte.
-        const oneLine = nineKeyLayout(meta, seg.text, inner, Math.min(meta.size * scale, base * 2.6));
+        //
+        // Tant que les polices ne sont pas là, le mot est caché : le mesurer
+        // (dans la police de repli, pour rien) coûtait cher à chaque carte.
+        const oneLine = ready
+          ? nineKeyLayout(meta, seg.text, inner, Math.min(meta.size * scale, base * 2.6))
+          : { size: Math.floor(Math.min(meta.size * scale, base * 2.6)), lines: [seg.text] };
         const { size, lines } =
           oneLine.lines.length > 1
             ? nineKeyLayout(meta, seg.text, inner, Math.min(meta.size * scale, base * (big ? 2.2 : 1.8)))

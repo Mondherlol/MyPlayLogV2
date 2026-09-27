@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { frDate, frTime } from "./dateFormat";
 
 // ======================================================================
 //  Les rendez-vous à venir (Directs, showcases)
@@ -87,7 +88,7 @@ export function countdown(event, now = Date.now()) {
   const ts = new Date(startsAt).getTime();
   const small = Number.isNaN(ts)
     ? ""
-    : new Date(ts).toLocaleDateString("fr-FR", {
+    : frDate(ts, {
         weekday: "long",
         day: "numeric",
         month: "long",
@@ -194,7 +195,7 @@ export function needsTicker(events, now = Date.now()) {
 export function shortWhen(startsAt) {
   const d = new Date(startsAt);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("fr-FR", {
+  return frDate(d, {
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -206,7 +207,7 @@ export function localTime(startsAt, precision) {
   if (precision !== "time") return null;
   const d = new Date(startsAt);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  return frTime(d, { hour: "2-digit", minute: "2-digit" });
 }
 
 /** « 30 min » / « 1 h 30 ». */
@@ -221,7 +222,7 @@ export function durationLabel(minutes) {
 /** « 12 juil. » — date courte d'une sortie (timestamp unix en secondes). */
 export function shortDate(ts) {
   if (!ts) return "";
-  return new Date(ts * 1000).toLocaleDateString("fr-FR", {
+  return frDate(ts * 1000, {
     day: "numeric",
     month: "short",
   });
@@ -238,14 +239,14 @@ export function agoLabel(date) {
   if (hours < 24) return `il y a ${hours} h`;
   const days = Math.floor(hours / 24);
   if (days < 7) return `il y a ${days} j`;
-  return new Date(ms).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+  return frDate(ms, { day: "numeric", month: "short" });
 }
 
 /** « lundi 8 septembre, 16:00 » — la ligne complète d'une fiche. */
 export function fullWhen(startsAt, precision) {
   const d = new Date(startsAt);
   if (Number.isNaN(d.getTime())) return "";
-  const date = d.toLocaleDateString("fr-FR", {
+  const date = frDate(d, {
     weekday: "long",
     day: "numeric",
     month: "long",

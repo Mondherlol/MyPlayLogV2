@@ -152,12 +152,26 @@ export default function Topbar() {
   // n'y a rien dessous : un bandeau plein y coupait le décor de l'accueil (et
   // les lueurs du fond) d'une bande opaque. Elle ne reprend son verre dépoli
   // qu'au moment où du contenu passe réellement sous elle.
+  //
+  // ⚠️ PAS D'ÉCOUTEUR `scroll` QUI LIT `window.scrollY`. Lire la position
+  // force le navigateur à recalculer styles et mise en page sur-le-champ, à
+  // chaque frame de défilement : c'était le premier poste de dépense au
+  // scroll de TOUTES les pages. Une sentinelle de 7 px collée en haut du
+  // document, surveillée par un IntersectionObserver, dit la même chose
+  // (« a-t-on défilé de plus de 6 px ? ») sans rien forcer.
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 6);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    const probe = document.createElement("div");
+    probe.setAttribute("aria-hidden", "true");
+    probe.style.cssText =
+      "position:absolute;top:0;left:0;width:1px;height:7px;pointer-events:none;visibility:hidden";
+    document.body.prepend(probe);
+    const io = new IntersectionObserver(([entry]) => setScrolled(!entry.isIntersecting));
+    io.observe(probe);
+    return () => {
+      io.disconnect();
+      probe.remove();
+    };
   }, []);
 
   useClickOutside(searchRef, () => closeSearch(), searchOpen);

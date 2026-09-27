@@ -1,5 +1,5 @@
 import { platformLabel } from "../lib/platforms";
-import { useRef, useState } from "react";
+import { memo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -35,13 +35,22 @@ const STATUS_META = {
   endless: { label: "Sans fin", Icon: InfinityIcon },
 };
 
-export default function GameCard({ game, variant = "grid" }) {
+// ⚠️ MÉMOÏSÉE. L'Explorer en fait défiler des centaines : sans `memo`, chaque
+// ligne ajoutée par le défilement infini redessinait toutes les cartes déjà
+// montées.
+export default memo(GameCard);
+
+function GameCard({ game, variant = "grid" }) {
   const navigate = useNavigate();
   const { token } = useAuth();
   const { map, upsertLocal, removeLocal } = useLibrary();
   const entry = map[game.id];
 
   const [fanOpen, setFanOpen] = useState(false);
+  // Les trois boutons du menu radial ne sont montés qu'à l'approche du « + » :
+  // invisibles tant qu'il est fermé, ils coûtaient trois boutons et trois
+  // icônes par carte à chaque carte qui entre dans l'écran au défilement.
+  const [armed, setArmed] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showListModal, setShowListModal] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -79,7 +88,10 @@ export default function GameCard({ game, variant = "grid" }) {
   }
 
   const platforms = game.platforms || [];
-  const marquee = platforms.length > 0 ? [...platforms, ...platforms] : [];
+  // Le défilé ne boucle qu'au-delà de trois pastilles : on ne double la liste
+  // (pour une boucle sans couture) que dans ce cas.
+  const scrolls = platforms.length > 3;
+  const marquee = scrolls ? [...platforms, ...platforms] : platforms;
 
   // --- Vue liste : mise en page horizontale, plus de détails visibles ---
   if (variant === "list") {
@@ -200,7 +212,7 @@ export default function GameCard({ game, variant = "grid" }) {
           </p>
           {marquee.length > 0 && (
             <div className="game-chips">
-              <div className={`game-chips-track ${platforms.length > 3 ? "scroll" : ""}`}>
+              <div className={`game-chips-track ${scrolls ? "scroll" : ""}`}>
                 {marquee.map((p, i) => (
                   <span className="game-chip" key={`${p}-${i}`}>
                     {platformLabel(p)}
@@ -213,7 +225,14 @@ export default function GameCard({ game, variant = "grid" }) {
       </div>
 
       {/* Menu radial d'ajout (hors de la cover pour pouvoir dépasser) */}
-      <div className={`add-fan ${fanOpen ? "open" : ""}`} ref={fanRef}>
+      <div
+        className={`add-fan ${fanOpen ? "open" : ""}`}
+        ref={fanRef}
+        onPointerEnter={armed ? undefined : () => setArmed(true)}
+        onFocus={armed ? undefined : () => setArmed(true)}
+      >
+        {(armed || fanOpen) && (
+        <>
         <button
           className="fan-btn b1"
           title="Ajouter à une liste"
@@ -243,6 +262,8 @@ export default function GameCard({ game, variant = "grid" }) {
         >
           <Bookmark size={19} fill={isWishlist ? "currentColor" : "none"} />
         </button>
+        </>
+        )}
 
         <button
           className={`game-add ${inLibrary ? "added" : ""} ${fanOpen ? "open" : ""}`}

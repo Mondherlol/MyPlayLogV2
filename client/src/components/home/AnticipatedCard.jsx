@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Bookmark, Gamepad2 } from "lucide-react";
+import { frDate } from "../../lib/dateFormat";
 
 const pad = (n) => String(n).padStart(2, "0");
 
@@ -46,7 +47,7 @@ export default function AnticipatedCard({
   const ts = game.releaseDate ? game.releaseDate * 1000 : null;
   const blocks = ts ? parts(ts, now || Date.now()) : null;
   const date = ts
-    ? new Date(ts).toLocaleDateString("fr-FR", {
+    ? frDate(ts, {
         day: "numeric",
         month: "long",
         year: "numeric",

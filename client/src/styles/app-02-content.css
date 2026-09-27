@@ -347,6 +347,15 @@
   pointer-events: auto;
 }
 
+/* Les boutons peuvent naître déjà ouverts (au doigt, le premier appui monte et
+   ouvre le menu d'un coup) : ils partent quand même du « + ». */
+@starting-style {
+  .add-fan.open .fan-btn {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
 .add-fan.open .fan-btn.b3 {
   transform: translate(-58px, 2px);
 }
@@ -407,10 +416,10 @@
   font-weight: 700;
   padding: 0.2rem 0.45rem;
   border-radius: 8px;
-  background: rgba(15, 15, 20, 0.62);
+  /* Opaque plutôt que flouté : un flou d'arrière-plan PAR CARTE se recalcule
+     à chaque frame de défilement, des dizaines de fois. */
+  background: rgba(15, 15, 20, 0.8);
   color: var(--amber);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
 }
 
 /* Overlay nom au survol */
@@ -488,10 +497,12 @@
   display: inline-flex;
   gap: 0.3rem;
   white-space: nowrap;
-  will-change: transform;
 }
 
-.game-chips-track.scroll {
+/* ⚠️ SEULEMENT AU SURVOL. Les pastilles sont invisibles le reste du temps,
+   mais l'animation infinie tournait quand même sur chaque carte à l'écran :
+   un recalcul de styles par carte et par frame, en permanence. */
+.game-card:hover .game-chips-track.scroll {
   animation: chips-marquee 9s linear infinite;
 }
 
@@ -510,10 +521,8 @@
   font-weight: 600;
   padding: 0.16rem 0.42rem;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.2);
   color: #fff;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
 }
 
 /* ---------- Toolbar Explorer (recherche + tri + filtres) ---------- */

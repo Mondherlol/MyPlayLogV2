@@ -38,12 +38,28 @@ const ALIASES = [
 // deux écritures se retrouvent dans la même colonne de la base.
 export const LETSPLAY = "Vu en let's play";
 
+// ⚠️ APPELÉE DES MILLIERS DE FOIS. Chaque jaquette de l'Explorer passe ses
+// plateformes ici à chaque rendu, et chaque appel essayait une quinzaine
+// d'expressions régulières : c'était la fonction « maison » la plus chère au
+// défilement. Il n'existe que quelques centaines de consoles : on retient la
+// réponse.
+const LABELS = new Map();
+
 /** Le nom court d'une plateforme : `{ name, abbr }`, ou juste son nom. */
 export function platformLabel(p) {
   const name = (typeof p === "string" ? p : p?.name) || "";
   const abbr = (typeof p === "string" ? "" : p?.abbr) || "";
   if (!name) return abbr;
+  const key = abbr ? `${name}|${abbr}` : name;
+  let label = LABELS.get(key);
+  if (label === undefined) {
+    label = computeLabel(name, abbr);
+    LABELS.set(key, label);
+  }
+  return label;
+}
 
+function computeLabel(name, abbr) {
   for (const [re, label] of ALIASES) {
     const m = name.match(re);
     if (m) return typeof label === "function" ? label(m) : label;

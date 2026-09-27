@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Clock, ExternalLink, Gamepad2, Gift, Heart, Play, Tv } from "lucide-react";
 import { STORE_COLORS, freeEndsLabel } from "../FreeGameBanner";
 import GameAddFan from "../GameAddFan";
+import { frDate } from "../../lib/dateFormat";
 
 // ======================================================================
 //  Les petites briques des rails
@@ -161,7 +162,7 @@ export function FreeCard({ game }) {
 export function EventListCard({ list }) {
   const imgs = (list.preview || []).slice(0, 4);
   const date = list.event?.startTime
-    ? new Date(list.event.startTime).toLocaleDateString("fr-FR", {
+    ? frDate(list.event.startTime, {
         day: "numeric",
         month: "short",
         year: "numeric",

@@ -51,6 +51,10 @@ export default function GameAddFan({
   const entry = map[game.id];
 
   const [fanOpen, setFanOpen] = useState(false);
+  // Les trois boutons de l'éventail ne sont montés qu'à l'approche du « + »
+  // (cf. GameCard) : un rayon de l'accueil en portait 48, et autant d'icônes,
+  // cachés, pour seize jaquettes.
+  const [armed, setArmed] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showListModal, setShowListModal] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -140,7 +144,11 @@ export default function GameAddFan({
         className={`add-fan ${hoverOnly ? "hover-only" : ""} ${fanOpen ? "open" : ""}`}
         ref={fanRef}
         onClick={(e) => e.stopPropagation()}
+        onPointerEnter={armed ? undefined : () => setArmed(true)}
+        onFocus={armed ? undefined : () => setArmed(true)}
       >
+        {(armed || fanOpen) && (
+        <>
         <button
           className="fan-btn b1"
           title="Ajouter à une liste"
@@ -170,6 +178,8 @@ export default function GameAddFan({
         >
           <Bookmark size={19} fill={isWishlist ? "currentColor" : "none"} />
         </button>
+        </>
+        )}
 
         <button
           className={`game-add ${inLibrary ? "added" : ""} ${fanOpen ? "open" : ""}`}
