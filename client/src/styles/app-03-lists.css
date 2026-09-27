@@ -1235,10 +1235,9 @@
 
 .ld-cover {
   position: relative;
-  flex: 0 0 100%;
-  width: 100%;
-  margin: -1.4rem -1.4rem 0;
-  height: 168px;
+  grid-column: 1 / -1;
+  margin: -1.1rem -1.3rem 0;
+  height: 140px;
 }
 
 .ld-cover img {

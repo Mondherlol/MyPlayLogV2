@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
+  MessageCircle,
   CopyPlus,
   Heart,
   Globe,
@@ -451,6 +452,19 @@ export default function ListDetail() {
     return `Mon ${t.charAt(0).toLowerCase()}${t.slice(1)}`;
   }
   const [forking, setForking] = useState(false);
+  // L'en-tête est-il sorti de l'écran ? La barre collée du haut affiche alors
+  // le titre de la liste.
+  const headerRef = useRef(null);
+  const [headerGone, setHeaderGone] = useState(false);
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return undefined;
+    const io = new IntersectionObserver(([e]) => setHeaderGone(!e.isIntersecting), {
+      rootMargin: "-120px 0px 0px 0px",
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [list?.id, loading]);
   /**
    * Faire SON top à partir d'un top officiel : une copie à soi, mêmes jeux
    * dans le même ordre, ouverte directement en édition — on réordonne, on
@@ -631,8 +645,10 @@ export default function ListDetail() {
 
   return (
     <div className="ld-page">
-      {/* --- En-tête --- */}
-      <div className="ld-topbar">
+      {/* --- La barre du haut : collée sous la barre de l'app en défilant.
+          Le titre de la liste y apparaît quand l'en-tête est sorti de l'écran
+          (on sait toujours où l'on est, et « Retour » reste à un clic). --- */}
+      <div className={`ld-topbar ${headerGone ? "is-stuck" : ""}`}>
         <Link
           to="/lists"
           className="ld-back clickable"
@@ -648,6 +664,9 @@ export default function ListDetail() {
         >
           <ArrowLeft size={18} /> Retour
         </Link>
+        <span className="ld-topbar-title" aria-hidden={!headerGone}>
+          {list.title}
+        </span>
         {editable && (
           <span className={`ld-save save-${saveStatus}`}>
             {saveStatus === "saving" ? (
@@ -661,7 +680,10 @@ export default function ListDetail() {
         )}
       </div>
 
-      <header className={`ld-header card ${list.cover ? "has-cover" : ""}`}>
+      {/* --- L'en-tête : compact. À gauche ce qu'est la liste (titre, type,
+          description, tags) ; à droite QUI l'a faite et ce qu'on peut en
+          faire (aimer, commenter, exporter…). --- */}
+      <header ref={headerRef} className={`ld-header card ${list.cover ? "has-cover" : ""}`}>
         {list.cover && (
           <div className="ld-cover">
             <img src={list.cover} alt="" draggable="false" />
@@ -771,59 +793,83 @@ export default function ListDetail() {
           )}
 
           <div className="ld-meta">
-            <span className="ld-author">
-              par{" "}
-              {list.author?.username ? (
-                <Link to={`/u/${list.author.username}`} className="ld-author-link">
-                  <strong>@{list.author.username}</strong>
-                  {/* Compte officiel du site : la pastille évite qu'on prenne
-                      une liste système pour celle d'un joueur homonyme. */}
-                  {list.author.isSystem && (
-                    <BadgeCheck size={14} className="ld-author-check" aria-label="Compte officiel" />
-                  )}
-                </Link>
-              ) : (
-                <strong>—</strong>
-              )}
+            <span>
+              {items.length} {isGameList ? "jeu" : "élément"}
+              {items.length > 1 ? (isGameList ? "x" : "s") : ""}
             </span>
-            <span className="dot">·</span>
-            <span>{items.length} élément{items.length > 1 ? "s" : ""}</span>
             <span className="dot">·</span>
             <span>màj {timeAgo(list.updatedAt)}</span>
           </div>
         </div>
 
-        <div className="ld-header-actions">
-          <button
-            className={`ld-like clickable ${list.liked ? "liked" : ""}`}
-            onClick={toggleLike}
-            title="J'aime"
-          >
-            <Heart size={18} fill={list.liked ? "currentColor" : "none"} />
-            {list.likeCount}
-          </button>
-          {/* Un top officiel sert de modèle : on repart de ses jeux pour faire
-              le sien. */}
-          {list.official?.kind === "top" && !isOwner && items.length > 0 && (
+        <aside className="ld-side">
+          {list.author?.username ? (
+            <Link to={`/u/${list.author.username}`} className="ld-by clickable">
+              <span className="ld-by-pp">
+                {list.author.avatar ? (
+                  <img src={list.author.avatar} alt="" draggable="false" />
+                ) : (
+                  list.author.username[0]?.toUpperCase()
+                )}
+              </span>
+              <span className="ld-by-text">
+                <span className="ld-by-label">par</span>
+                <span className="ld-by-name">
+                  {list.author.username}
+                  {/* Compte officiel du site : la pastille évite qu'on prenne
+                      une liste système pour celle d'un joueur homonyme. */}
+                  {list.author.isSystem && (
+                    <BadgeCheck size={14} className="ld-author-check" aria-label="Compte officiel" />
+                  )}
+                </span>
+              </span>
+            </Link>
+          ) : null}
+
+          <div className="ld-header-actions">
             <button
-              className="ld-template clickable"
-              onClick={useAsTemplate}
-              disabled={forking}
-              title="Créer ton propre top à partir de celui-ci"
+              className={`ld-like clickable ${list.liked ? "liked" : ""}`}
+              onClick={toggleLike}
+              title="J'aime"
             >
-              {forking ? <Loader2 size={16} className="spin" /> : <CopyPlus size={16} />}
-              Faire mon top
+              <Heart size={17} fill={list.liked ? "currentColor" : "none"} />
+              {list.likeCount}
             </button>
-          )}
-          {!editing && items.length > 0 && (
-            <button
-              className="ld-export clickable"
-              onClick={() => (token ? setExporting(true) : navigate("/login"))}
-              title="Exporter en image"
-            >
-              <ImageDown size={16} /> Exporter
-            </button>
-          )}
+            {!editing && (
+              <button
+                className="ld-comments-btn clickable"
+                onClick={() =>
+                  document.getElementById("ld-comments")?.scrollIntoView({ behavior: "smooth", block: "start" })
+                }
+                title="Commentaires"
+              >
+                <MessageCircle size={17} />
+                {list.comments?.length || 0}
+              </button>
+            )}
+            {!editing && items.length > 0 && (
+              <button
+                className="ld-icon-btn clickable"
+                onClick={() => (token ? setExporting(true) : navigate("/login"))}
+                title="Exporter en image"
+                aria-label="Exporter en image"
+              >
+                <ImageDown size={17} />
+              </button>
+            )}
+            {/* Un top officiel sert de modèle : on repart de ses jeux pour faire
+                le sien. */}
+            {list.official?.kind === "top" && !isOwner && items.length > 0 && (
+              <button
+                className="ld-template clickable"
+                onClick={useAsTemplate}
+                disabled={forking}
+                title="Créer ton propre top à partir de celui-ci"
+              >
+                {forking ? <Loader2 size={16} className="spin" /> : <CopyPlus size={16} />}
+                Faire mon top
+              </button>
+            )}
           {adminCover && !list.cover && (
             <button
               className="ld-vis clickable"
@@ -897,7 +943,8 @@ export default function ListDetail() {
               </button>
             </>
           )}
-        </div>
+          </div>
+        </aside>
       </header>
 
       {/* Liste officielle d'une conférence : la rediff se regarde ici, sans
@@ -1072,7 +1119,11 @@ export default function ListDetail() {
       </DndContext>
 
       {/* --- Commentaires (masqués en mode édition) --- */}
-      {!editing && <ListComments listId={id} list={list} token={token} />}
+      {!editing && (
+        <div id="ld-comments" className="ld-comments-anchor">
+          <ListComments listId={id} list={list} token={token} />
+        </div>
+      )}
 
       {adding && (
         <AddItemsModal

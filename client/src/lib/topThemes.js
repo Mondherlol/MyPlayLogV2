@@ -88,7 +88,7 @@ const COLORS = {
   "top-castlevania": "#5b21b6",
   "top-dragon-quest": "#2f80ed",
   "top-kingdom-hearts": "#2745a8",
-  "top-sonic": "#1d5fd8",
+  "top-sonic": "#3a9d23",
   "top-yakuza": "#b91c1c",
   "top-fromsoftware": "#57534e",
   "top-fire-emblem": "#1e40af",

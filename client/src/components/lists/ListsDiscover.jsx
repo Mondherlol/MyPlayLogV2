@@ -4,7 +4,6 @@ import Section from "../home/Rail";
 import NineRail from "../home/NineRail";
 import TierIdea from "./TierIdea";
 import { ListTileSkeleton } from "./ListTile";
-import { apiFetch } from "../../lib/api";
 import { apiCached, peekApi } from "../../lib/query";
 
 // ======================================================================
@@ -75,20 +74,30 @@ function ListRail({ path, token, title, moreTo, render, lead = null, skipId = nu
  * Le rayon des tier lists. Il s'ouvre sur celles à faire, tirées des sagas du
  * joueur (« Tier list des jeux Zelda »), puis les plus aimées des autres.
  */
+const IDEAS_PATH = "/lists/suggest/tiers";
+
 function TierRail({ token, render }) {
   const path = "/lists?type=tier&sort=likes&limit=14";
-  const lists = useRail(path, token) || [];
-  const [ideas, setIdeas] = useState(null);
+  const raw = useRail(path, token);
+  // `undefined` : pas encore de réponse ; `null` : indisponible.
+  const [ideas, setIdeas] = useState(() => peekApi(IDEAS_PATH) ?? (token ? undefined : null));
   useEffect(() => {
     if (!token) return undefined;
     let alive = true;
-    apiFetch("/lists/suggest/tiers", { token })
+    apiCached(IDEAS_PATH, { token, maxAge: 10 * 60 * 1000 })
       .then((d) => alive && setIdeas(d))
       .catch(() => alive && setIdeas(null));
     return () => {
       alive = false;
     };
   }, [token]);
+
+  // ⚠️ ON ATTEND LES DEUX. Les tier lists des autres arrivaient d'abord, puis
+  // les idées (plus lentes : elles fouillent la bibliothèque et les sagas) se
+  // glissaient EN TÊTE et poussaient tout le rayon. Tant que l'un des deux
+  // manque, le rayon reste en squelettes : il ne bouge qu'une fois.
+  if (raw === null || ideas === undefined) return <SkeletonRail title="Tier lists" />;
+  const lists = raw;
 
   // ⚠️ TOUJOURS, ET EN TÊTE. Les idées disparaissaient dès qu'on avait fait
   // UNE tier list, et passaient sinon derrière quatorze listes, hors de vue.

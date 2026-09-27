@@ -6,24 +6,69 @@
   margin: 0 auto;
 }
 
+/* ⚠️ LA BARRE DU HAUT RESTE EN PLACE. Collée sous la barre de l'app, elle
+   garde « Retour » à portée quand on est descendu dans une liste de cent jeux,
+   et affiche le titre de la liste une fois l'en-tête sorti de l'écran. */
 .ld-topbar {
+  position: sticky;
+  top: var(--topbar-h, 60px);
+  z-index: 20;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1rem;
+  gap: 0.8rem;
+  margin: 0 calc(-1 * var(--content-pad, 1.6rem)) 0.8rem;
+  padding: 0.55rem var(--content-pad, 1.6rem);
+  background: var(--bg);
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s ease;
+}
+.ld-topbar.is-stuck {
+  border-bottom-color: var(--border);
+}
+.ld-topbar-title {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.98rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+}
+/* L'état de sauvegarde, toujours au bout de la barre (la page d'une
+   playlist n'a pas de titre au milieu pour l'y pousser). */
+.ld-topbar .ld-save {
+  margin-left: auto;
+}
+.ld-topbar.is-stuck .ld-topbar-title {
+  opacity: 1;
+  transform: none;
 }
 
 .ld-back {
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
+  height: 34px;
+  padding: 0 0.85rem 0 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
   color: var(--text-soft);
   font-weight: 600;
+  font-size: 0.88rem;
   font-family: var(--font-display);
+  transition: color 0.15s ease, border-color 0.15s ease;
 }
 
 .ld-back:hover {
   color: var(--text);
+  border-color: #f2b70b;
 }
 
 .ld-save {
@@ -47,27 +92,127 @@
   color: var(--accent-ink);
 }
 
+/* L'en-tête compact : la liste à gauche, l'auteur et les actions à droite. */
 .ld-header {
-  display: flex;
-  gap: 1.2rem;
-  padding: 1.4rem;
-  margin-bottom: 1.4rem;
-  align-items: flex-start;
-  justify-content: space-between;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.9rem 1.6rem;
+  padding: 1.1rem 1.3rem;
+  margin-bottom: 1.3rem;
+  align-items: start;
 }
 
 .ld-header-main {
-  flex: 1;
-  min-width: 260px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
+  gap: 0.45rem;
 }
 
 .ld-title {
-  font-size: 1.9rem;
-  line-height: 1.1;
+  margin: 0;
+  font-size: clamp(1.35rem, 2.6vw, 1.75rem);
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+}
+
+/* La colonne de droite : qui l'a faite, puis ce qu'on peut en faire. */
+.ld-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+.ld-by {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.3rem 0.8rem 0.3rem 0.3rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  transition: border-color 0.15s ease;
+}
+.ld-by:hover {
+  border-color: #f2b70b;
+}
+.ld-by-pp {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #f2b70b;
+  color: #1a1204;
+  font-weight: 800;
+}
+.ld-by-pp img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ld-by-text {
+  display: grid;
+  line-height: 1.15;
+}
+.ld-by-label {
+  font-size: 0.68rem;
+  color: var(--text-soft);
+}
+.ld-by-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.ld-comments-btn,
+.ld-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 38px;
+  min-width: 38px;
+  padding: 0 0.8rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.88rem;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.ld-icon-btn {
+  padding: 0;
+  color: var(--text-soft);
+}
+.ld-comments-btn:hover,
+.ld-icon-btn:hover {
+  border-color: #f2b70b;
+  color: var(--text);
+}
+/* Le bouton « commentaires » fait défiler jusqu'aux commentaires : ils ne
+   doivent pas se cacher sous la barre collée du haut. */
+.ld-comments-anchor {
+  scroll-margin-top: calc(var(--topbar-h, 60px) + 64px);
+}
+
+@media (max-width: 760px) {
+  .ld-header {
+    grid-template-columns: 1fr;
+  }
+  .ld-side {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+  }
 }
 
 .ld-title-input {
@@ -96,7 +241,8 @@
 .ld-desc {
   color: var(--text-soft);
   margin: 0;
-  line-height: 1.5;
+  line-height: 1.45;
+  font-size: 0.92rem;
 }
 
 .ld-desc-input {
@@ -133,7 +279,8 @@
 .ld-header-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: flex-end;
+  gap: 0.4rem;
   flex-wrap: wrap;
 }
 
@@ -142,7 +289,8 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.5rem 0.85rem;
+  height: 38px;
+  padding: 0 0.85rem;
   border-radius: 999px;
   border: 1.5px solid var(--border-strong);
   background: var(--surface);
@@ -237,7 +385,12 @@
   flex-wrap: wrap;
 }
 
-.ld-title-row .ld-title,
+/* Le titre ne prend que sa place : le badge de type se colle à lui au lieu
+   de flotter au milieu de la ligne. Le champ d'édition, lui, s'étire. */
+.ld-title-row .ld-title {
+  flex: 0 1 auto;
+  min-width: 0;
+}
 .ld-title-row .ld-title-input {
   flex: 1;
   min-width: 0;
