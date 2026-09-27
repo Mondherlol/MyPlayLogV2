@@ -110,6 +110,10 @@ function TcgCard({
   tilt = true,
   className = "",
   big = false,
+  // Images chargées tout de suite (carte en grand) plutôt qu'à l'approche de
+  // l'écran : une carte qui arrive ne doit jamais montrer son fond vide.
+  eager = false,
+  lite = false,
   onClick,
   style,
   children,
@@ -129,7 +133,7 @@ function TcgCard({
       ref={ref}
       className={`tcg r-${r} ${full ? "full" : ""} ${holo ? "holo" : ""} ${
         faceDown || back ? "down" : ""
-      } ${onClick ? "clickable" : ""} ${className}`}
+      } ${lite ? "lite" : ""} ${onClick ? "clickable" : ""} ${className}`}
       style={{
         "--t1": t1?.color,
         "--t2": t2?.color,
@@ -147,7 +151,7 @@ function TcgCard({
                   {full ? (
                     // Pleine illustration : la carte est en portrait, comme la
                     // jaquette — elle y tient entière.
-                    <img src={cardCover(card.cover)} alt="" loading="lazy" decoding="async" draggable="false" />
+                    <img src={cardCover(card.cover)} alt="" loading={eager ? "eager" : "lazy"} decoding={eager ? "sync" : "async"} draggable="false" />
                   ) : card.focus ? (
                     // La jaquette cadrée sur sa zone d'intérêt (visage, héros,
                     // véhicule…), calculée une fois côté serveur (lib/cardFocus).
@@ -155,8 +159,8 @@ function TcgCard({
                       className="tcg-art-crop"
                       src={cardCover(card.cover)}
                       alt=""
-                      loading="lazy"
-                      decoding="async"
+                      loading={eager ? "eager" : "lazy"}
+                      decoding={eager ? "sync" : "async"}
                       draggable="false"
                       style={{
                         width: `${100 / card.focus.w}%`,
@@ -168,8 +172,8 @@ function TcgCard({
                     // Rien à viser (jaquette grise, au trait) : la jaquette
                     // ENTIÈRE sur un fond flouté d'elle-même.
                     <>
-                      <img className="tcg-art-blur" src={cardCover(card.cover, "t_cover_small")} alt="" loading="lazy" draggable="false" />
-                      <img className="tcg-art-fit" src={cardCover(card.cover)} alt="" loading="lazy" decoding="async" draggable="false" />
+                      <img className="tcg-art-blur" src={cardCover(card.cover, "t_cover_small")} alt="" loading={eager ? "eager" : "lazy"} draggable="false" />
+                      <img className="tcg-art-fit" src={cardCover(card.cover)} alt="" loading={eager ? "eager" : "lazy"} decoding={eager ? "sync" : "async"} draggable="false" />
                     </>
                   )}
                   {holo && <i className="tcg-art-holo" />}

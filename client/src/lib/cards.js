@@ -44,14 +44,14 @@ export function cardTypes(card) {
   return out.length ? out : ["arcade"];
 }
 
-// --- Raretés : symboles façon TCG Pocket ---------------------------------
+// --- Raretés : d'une étoile (commune) à six (mythique) ----------------------
 export const CARD_RARITIES = {
-  common: { label: "Commune", color: "#9aa3ad", symbol: "◆", n: 1 },
-  uncommon: { label: "Peu commune", color: "#5b7cff", symbol: "◆", n: 2 },
-  rare: { label: "Rare", color: "#9a5cff", symbol: "◆", n: 3 },
-  epic: { label: "Épique", color: "#e040f0", symbol: "★", n: 1 },
-  legendary: { label: "Légendaire", color: "#ff4d4d", symbol: "★", n: 2 },
-  mythic: { label: "Mythique", color: "#f2b70b", symbol: "♛", n: 1 },
+  common: { label: "Commune", color: "#9aa3ad", symbol: "★", n: 1 },
+  uncommon: { label: "Peu commune", color: "#5b7cff", symbol: "★", n: 2 },
+  rare: { label: "Rare", color: "#9a5cff", symbol: "★", n: 3 },
+  epic: { label: "Épique", color: "#e040f0", symbol: "★", n: 4 },
+  legendary: { label: "Légendaire", color: "#ff4d4d", symbol: "★", n: 5 },
+  mythic: { label: "Mythique", color: "#f2b70b", symbol: "★", n: 6 },
 };
 export const CARD_RARITY_ORDER = ["common", "uncommon", "rare", "epic", "legendary", "mythic"];
 export const cardRarityRank = (r) => Math.max(0, CARD_RARITY_ORDER.indexOf(r));

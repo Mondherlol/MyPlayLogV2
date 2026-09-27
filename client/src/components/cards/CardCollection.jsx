@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Search, Gem, Clock, Star, Hash, Package, X, Loader2 } from "lucide-react";
 import {
   TYPES,
@@ -210,15 +210,16 @@ export default function CardCollection({
             <span className="cd-empty-slot" />
           </div>
         ) : (
-          <div className="cd-grid">
-            {shown.map((c, i) => (
+          <VirtualGrid
+            items={shown}
+            renderItem={(c, i) => (
               <div className="cd-cell" key={c.id}>
-                <TcgCard card={c} onClick={() => setInspect(i)} />
+                <TcgCard card={c} lite onClick={() => setInspect(i)} />
                 {c.fresh && <span className="cd-new">NEW</span>}
                 {c.count > 1 && <span className="cd-count">×{c.count}</span>}
               </div>
-            ))}
-          </div>
+            )}
+          />
         )}
       </section>
 
@@ -231,5 +232,81 @@ export default function CardCollection({
         />
       )}
     </>
+  );
+}
+
+// ======================================================================
+//  La grille du classeur, virtualisée
+// ======================================================================
+// Seules les rangées à l'écran (plus deux de marge de chaque côté) existent
+// dans la page ; le conteneur garde la hauteur de TOUTES les rangées, donc la
+// barre de défilement dit la vérité. Toutes les cartes ont le même format
+// (63 × 88), ce qui rend la hauteur d'une rangée exacte sans rien mesurer.
+function VirtualGrid({ items, renderItem }) {
+  const ref = useRef(null);
+  const [width, setWidth] = useState(0);
+  const [win, setWin] = useState({ first: 0, last: 6 });
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    setWidth(el.clientWidth);
+    const ro = new ResizeObserver(([e]) => setWidth(e.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Les mêmes gabarits que la grille en CSS (téléphone / reste).
+  const small = width > 0 && width < 600;
+  const minCol = small ? 104 : 158;
+  const gapX = small ? 10 : 16;
+  const gapY = small ? 14 : 19;
+  const cols = Math.max(1, Math.floor((width + gapX) / (minCol + gapX)));
+  const cellW = width ? (width - gapX * (cols - 1)) / cols : minCol;
+  const rowH = (cellW * 88) / 63 + gapY;
+  const rows = Math.ceil(items.length / cols);
+
+  useEffect(() => {
+    let raf = 0;
+    const measure = () => {
+      raf = 0;
+      const el = ref.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      const first = Math.max(0, Math.floor(-top / rowH) - 2);
+      const last = Math.min(rows, Math.ceil((window.innerHeight - top) / rowH) + 2);
+      setWin((w) => (w.first === first && w.last === last ? w : { first, last }));
+    };
+    const on = () => {
+      if (!raf) raf = requestAnimationFrame(measure);
+    };
+    measure();
+    // En capture : on entend le défilement de la fenêtre comme celui du
+    // conteneur de l'app, quel que soit celui qui défile.
+    document.addEventListener("scroll", on, { capture: true, passive: true });
+    window.addEventListener("resize", on);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener("scroll", on, { capture: true });
+      window.removeEventListener("resize", on);
+    };
+  }, [rowH, rows]);
+
+  const start = win.first * cols;
+  const end = Math.min(items.length, win.last * cols);
+  return (
+    <div ref={ref} className="cd-grid-v" style={{ height: rows ? rows * rowH - gapY : 0 }}>
+      <div
+        className="cd-grid"
+        style={{
+          transform: `translateY(${win.first * rowH}px)`,
+          gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+          columnGap: gapX,
+          rowGap: gapY,
+        }}
+      >
+        {items.slice(start, end).map((it, k) => renderItem(it, start + k))}
+      </div>
+    </div>
   );
 }

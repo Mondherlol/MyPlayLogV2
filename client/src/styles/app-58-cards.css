@@ -292,8 +292,9 @@
 }
 .tcg-rar {
   margin-left: auto;
-  font-size: 3.6cqw;
-  letter-spacing: 0.2cqw;
+  font-size: 3.2cqw;
+  letter-spacing: -0.1cqw;
+  white-space: nowrap;
 }
 .tcg-no {
   opacity: 0.75;
@@ -1425,7 +1426,7 @@
   animation: poIn 0.2s ease both;
 }
 .po-zoom .tcg,
-.cd-insp-card {
+.cd-insp-main {
   animation: cardIn 0.4s cubic-bezier(0.2, 1.25, 0.4, 1) both;
 }
 @keyframes cardIn {
@@ -2488,54 +2489,45 @@ button.cd-rar:hover {
   width: 55%;
 }
 
-/* Passer d'une carte à l'autre dans la visionneuse : un glissé, rien d'autre
-   (transform + opacity seulement — rien qui fasse recalculer la carte). */
+/* Passer d'une carte à l'autre : un carrousel. L'ancienne et la nouvelle
+   glissent ENSEMBLE, à la même vitesse — l'une pousse l'autre. Rien d'autre
+   ne bouge (ni rotation, ni échelle, ni apparition rejouée), et les images de
+   la voisine sont préchargées : pas une image de vide pendant le glissé. */
 .cd-insp-stage {
   position: relative;
 }
-.cd-insp-out {
+.cd-insp-slide {
+  position: relative;
+  z-index: 2;
+}
+.cd-insp-slide.in {
+  animation: inspIn 0.34s cubic-bezier(0.25, 0.8, 0.25, 1) both;
+}
+.cd-insp-slide.out {
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  animation: inspOut 0.24s ease-in forwards;
-}
-.cd-insp-out.to-right {
-  --dx: 1;
-}
-.cd-insp-out.to-left {
-  --dx: -1;
-}
-@keyframes inspOut {
-  to {
-    opacity: 0;
-    transform: translateX(calc(var(--dx) * 45%));
-  }
-}
-.cd-insp-in {
-  position: relative;
-  z-index: 2;
-  animation: inspIn 0.3s cubic-bezier(0.2, 0.8, 0.3, 1) both;
-}
-.cd-insp-in.from-right {
-  --dx: 1;
-}
-.cd-insp-in.from-left {
-  --dx: -1;
+  animation: inspOut 0.34s cubic-bezier(0.25, 0.8, 0.25, 1) both;
 }
 @keyframes inspIn {
   from {
-    opacity: 0;
-    transform: translateX(calc(var(--dx) * 45%));
+    transform: translateX(calc(var(--dir) * 112%));
   }
 }
-.cd-insp-in .cd-insp-card {
-  animation: none;
+@keyframes inspOut {
+  to {
+    transform: translateX(calc(var(--dir) * -112%));
+    opacity: 0.35;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cd-insp-out,
-  .cd-insp-in {
+  .cd-insp-slide.in,
+  .cd-insp-slide.out {
     animation: none;
+  }
+  .cd-insp-slide.out {
+    display: none;
   }
 }
 
@@ -2730,4 +2722,32 @@ button.cd-rar:hover {
   background: #f2b70b;
   color: #17171a;
   font: 800 0.7rem/1 var(--font-display);
+}
+
+/* ---------------------------------------------------------------------
+   Les cartes du classeur, en version légère
+   ---------------------------------------------------------------------
+   Des centaines de cartes à l'écran : chacune en 3D (preserve-3d) était un
+   calque pour la carte graphique, et chaque reflet (mix-blend-mode) un calque
+   de plus. Ici la carte reste plate, le basculement au survol se fait par une
+   simple perspective, et les reflets n'existent que sur la carte survolée. */
+.tcg.lite {
+  perspective: none;
+}
+.tcg.lite .tcg-tilt,
+.tcg.lite .tcg-flip {
+  transform-style: flat;
+}
+.tcg.lite .tcg-tilt {
+  transform: perspective(1000px) rotateX(var(--rx)) rotateY(var(--ry));
+}
+.tcg.lite .tcg-back {
+  display: none;
+}
+.tcg.lite:not(.live) :is(.tcg-holo, .tcg-art-holo, .tcg-sparkle, .tcg-glare) {
+  display: none;
+}
+
+.cd-grid-v {
+  position: relative;
 }

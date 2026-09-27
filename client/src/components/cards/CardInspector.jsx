@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, Info, X } from "lucide-react";
 import { useScrollLock } from "../../hooks/useScrollLock";
 import { useBackClose } from "../../hooks/useBackClose";
-import { CARD_RARITIES, raritySymbol } from "../../lib/cards";
+import { CARD_RARITIES, raritySymbol, cardCover } from "../../lib/cards";
 import { playCardDeal } from "../../lib/sfx";
 import TcgCard from "./TcgCard";
 import GameDrawer, { useGameDrawer, siteModalOpen } from "./GameDrawer";
@@ -24,16 +24,32 @@ export default function CardInspector({ list, index, onIndex, onClose }) {
   // côté, la nouvelle arrive de l'autre. Pas de retournement : sur une carte
   // en grand, holo compris, il saccadait et faisait bizarre.
   const [swap, setSwap] = useState(null); // { dir, prev, k }
+  const swapTimer = useRef(0);
   const go = useCallback(
     (d) => {
       const next = Math.min(list.length - 1, Math.max(0, index + d));
       if (next === index) return;
       setSwap({ dir: d, prev: list[index], k: Date.now() });
+      // Fin du glissé à l'horloge, pas sur « animationend » : ceux des calques
+      // de la carte (reflet, holo) remontent jusqu'ici et le coupaient net.
+      clearTimeout(swapTimer.current);
+      swapTimer.current = setTimeout(() => setSwap(null), 360);
       playCardDeal(0);
       onIndex(next);
     },
     [onIndex, list, index]
   );
+  useEffect(() => () => clearTimeout(swapTimer.current), []);
+
+  // Les voisines sont chargées d'avance : au glissé, leur image est déjà là
+  // (c'était l'éclair noir — la carte arrivait avant sa jaquette).
+  useEffect(() => {
+    for (const c of [list[index - 1], list[index + 1]]) {
+      if (!c?.cover) continue;
+      new Image().src = cardCover(c.cover);
+      if (!c.focus) new Image().src = cardCover(c.cover, "t_cover_small");
+    }
+  }, [list, index]);
   const drawerOpen = drawer.open;
   const setDrawer = drawer.setOpen;
   useEffect(() => {
@@ -111,19 +127,16 @@ export default function CardInspector({ list, index, onIndex, onClose }) {
       <div className="cd-insp-main" onClick={(e) => e.stopPropagation()}>
         <div className="cd-insp-stage">
           {swap && (
-            <div
-              key={`out-${swap.k}`}
-              className={`cd-insp-out ${swap.dir > 0 ? "to-left" : "to-right"}`}
-              onAnimationEnd={() => setSwap((s) => (s?.k === swap.k ? null : s))}
-            >
-              <TcgCard card={swap.prev} big tilt={false} className="cd-insp-card" />
+            <div key={`out-${swap.k}`} className="cd-insp-slide out" style={{ "--dir": swap.dir }}>
+              <TcgCard card={swap.prev} big eager tilt={false} className="cd-insp-card" />
             </div>
           )}
           <div
             key={card.id}
-            className={swap ? `cd-insp-in ${swap.dir > 0 ? "from-right" : "from-left"}` : ""}
+            className={`cd-insp-slide ${swap ? "in" : ""}`}
+            style={swap ? { "--dir": swap.dir } : undefined}
           >
-            <TcgCard card={card} big className="cd-insp-card" />
+            <TcgCard card={card} big eager className="cd-insp-card" />
           </div>
         </div>
         <div className="cd-insp-bar">

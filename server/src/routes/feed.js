@@ -145,6 +145,37 @@ function listMini(l) {
 // regroupement, sinon elle ne sait pas combien de documents aller chercher.
 const GROUP_GAP = 2 * 60 * 60 * 1000; // 2 h
 
+// Les rafales d'UNE MÊME PERSONNE : ses évènements à moins de `gap` les uns des
+// autres forment un paquet (du plus récent au plus ancien).
+// ⚠️ PAR PERSONNE, PAS DANS L'ORDRE DU FIL. Regrouper « tant que le suivant est
+// du même joueur » cassait tout dès que deux amis jouaient en même temps : leurs
+// ouvertures s'intercalaient (A, B, A, B…) et chacune faisait sa propre carte —
+// dix boosters, dix cartes. Chaque paquet porte `user`, `date` (le plus
+// récent), `lastDate` (le plus ancien) et `members`.
+function burstsByUser(items, gap = GROUP_GAP) {
+  const byUser = new Map();
+  for (const it of items) {
+    const k = it.user?.id || "";
+    if (!byUser.has(k)) byUser.set(k, []);
+    byUser.get(k).push(it);
+  }
+  const out = [];
+  for (const list of byUser.values()) {
+    list.sort((a, b) => new Date(b.date) - new Date(a.date));
+    let cur = null;
+    for (const it of list) {
+      if (cur && new Date(cur.lastDate) - new Date(it.date) <= gap) {
+        cur.members.push(it);
+        cur.lastDate = it.date;
+      } else {
+        cur = { user: it.user, date: it.date, lastDate: it.date, members: [it] };
+        out.push(cur);
+      }
+    }
+  }
+  return out;
+}
+
 // Estimation BASSE du nombre de cartes que produiront ces documents : une
 // série de documents de même clé, espacés de moins de GROUP_GAP, compte pour
 // une seule carte. Sous-estimer est sans danger (on lit un peu plus que
@@ -1443,17 +1474,7 @@ async function buildTimeline(
     }
     const cat = visible ? await getCatalog().catch(() => null) : null;
     if (cat) {
-      cardpacks.sort((a, b) => new Date(b.date) - new Date(a.date));
-      const clusters = [];
-      for (const p of cardpacks) {
-        const last = clusters[clusters.length - 1];
-        if (last && last.user.id === p.user.id && new Date(last.lastDate) - new Date(p.date) <= GROUP_GAP) {
-          last.members.push(p);
-          last.lastDate = p.date;
-        } else {
-          clusters.push({ user: p.user, date: p.date, lastDate: p.date, members: [p] });
-        }
-      }
+      const clusters = burstsByUser(cardpacks);
       const rank = (c) => CARD_RARITIES.indexOf(c.rarity) * 1e6 - c.no;
       for (const c of clusters) {
         const news = new Set(c.members.flatMap((m) => m.news));
@@ -1505,21 +1526,7 @@ async function buildTimeline(
       c.rewardType = r?.type || "cursor";
     }
 
-    caseopens.sort((a, b) => new Date(b.date) - new Date(a.date));
-    const clusters = [];
-    for (const co of caseopens) {
-      const last = clusters[clusters.length - 1];
-      if (
-        last &&
-        last.user.id === co.user.id &&
-        new Date(last.lastDate) - new Date(co.date) <= GROUP_GAP
-      ) {
-        last.members.push(co);
-        last.lastDate = co.date;
-      } else {
-        clusters.push({ user: co.user, date: co.date, lastDate: co.date, members: [co] });
-      }
-    }
+    const clusters = burstsByUser(caseopens);
     for (const c of clusters) {
       if (c.members.length >= 2) {
         // Le plus rare de la fournée porte la carte : c'est lui l'évènement.
@@ -1549,21 +1556,7 @@ async function buildTimeline(
   //     en vignettes — pas de « plus belle prise » ici : sans rareté, aucun
   //     boîtier ne vaut plus qu'un autre, et c'est très bien comme ça. ---
   if (drops.length) {
-    drops.sort((a, b) => new Date(b.date) - new Date(a.date));
-    const clusters = [];
-    for (const d of drops) {
-      const last = clusters[clusters.length - 1];
-      if (
-        last &&
-        last.user.id === d.user.id &&
-        new Date(last.lastDate) - new Date(d.date) <= GROUP_GAP
-      ) {
-        last.members.push(d);
-        last.lastDate = d.date;
-      } else {
-        clusters.push({ user: d.user, date: d.date, lastDate: d.date, members: [d] });
-      }
-    }
+    const clusters = burstsByUser(drops);
     for (const c of clusters) {
       if (c.members.length >= 2) {
         events.push({
