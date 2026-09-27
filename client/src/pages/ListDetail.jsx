@@ -27,7 +27,6 @@ import {
   BadgeCheck,
   LayoutGrid,
   Rows3,
-  SlidersHorizontal,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import AwardsBoard from "../components/AwardsBoard";
@@ -54,6 +53,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { apiFetch, apiUpload } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+import { useLibrary } from "../context/LibraryContext";
 import {
   typeMeta,
   timeAgo,
@@ -61,6 +61,7 @@ import {
   localId,
   GAME_LIST_TYPES,
   DRAFT_ID,
+  openListDraft,
   readListDraft,
   clearListDraft,
 } from "../lib/lists";
@@ -208,8 +209,13 @@ function TagEditor({ tags, onChange }) {
 
 // Conteneur virtuel pour les éléments non classés (tier list) / la liste simple.
 const POOL = "__pool__";
-const tierOf = (containerId) => (containerId === POOL ? null : containerId);
-const containerOfItem = (it) => it.tier ?? POOL;
+// Le vivier d'un top fait depuis un modèle (« Faire mon top ») : les jeux pas
+// encore placés dans SON classement. Marqués `pooled`, ils ne sont jamais
+// enregistrés — seuls ceux qu'on a glissés dans le top le sont.
+const STASH = "__stash__";
+const tierOf = (containerId) => (containerId === POOL || containerId === STASH ? null : containerId);
+const containerOfItem = (it) => (it.pooled ? STASH : it.tier ?? POOL);
+const placeIn = (it, to) => ({ ...it, pooled: to === STASH, tier: tierOf(to) });
 
 // ======================================================================
 //  Le brouillon : une liste qui n'existe pas encore
@@ -224,7 +230,7 @@ const containerOfItem = (it) => it.tier ?? POOL;
 // Ce qui fait qu'un brouillon mérite d'exister : un jeu classé dans un palier
 // (tier list), un élément tout court ailleurs.
 const draftWorthSaving = (list, items) =>
-  list.type === "tier" ? items.some((i) => i.tier) : items.length > 0;
+  list.type === "tier" ? items.some((i) => i.tier) : items.some((i) => !i.pooled);
 
 export default function ListDetail() {
   const { id } = useParams();
@@ -232,6 +238,7 @@ export default function ListDetail() {
   const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
+  const { map: library } = useLibrary();
 
   const [list, setList] = useState(null);
   const [items, setItems] = useState([]);
@@ -325,7 +332,7 @@ export default function ListDetail() {
           updatedAt: new Date().toISOString(),
         });
         setItems(
-          (d.items || []).map((it) => ({
+          [...(d.items || []), ...(d.pool || []).map((it) => ({ ...it, pooled: true }))].map((it) => ({
             note: "",
             media: [],
             rating: null,
@@ -384,7 +391,7 @@ export default function ListDetail() {
           tags: l.tags || [],
           tiers: trs,
           type: l.type,
-          items: its.map((i) => ({
+          items: its.filter((i) => !i.pooled).map((i) => ({
             kind: i.kind,
             refId: i.refId,
             gameId: i.gameId,
@@ -427,7 +434,7 @@ export default function ListDetail() {
               setList((prev) => ({ ...prev, id: newId, draft: false }));
               navigate(`/lists/${newId}`, { replace: true, state: { edit: true } });
               toast.show({
-                title: "Tier list enregistrée",
+                title: l.type === "tier" ? "Tier list enregistrée" : l.type === "ranked" ? "Top enregistré" : "Liste enregistrée",
                 text: "Elle est maintenant sur ton profil.",
                 undo: async () => {
                   await apiFetch(`/lists/${newId}`, { method: "DELETE", token });
@@ -474,7 +481,7 @@ export default function ListDetail() {
   // exact même pendant les mutations successives d'un drag.
   const findContainerIn = useCallback(
     (list, key) => {
-      if (key === POOL) return POOL;
+      if (key === POOL || key === STASH) return key;
       if (tiers.some((t) => t.id === key)) return key;
       const it = list.find((i) => i.key === key);
       return it ? containerOfItem(it) : null;
@@ -500,7 +507,7 @@ export default function ListDetail() {
 
       const activeIdx = prev.findIndex((i) => i.key === active.id);
       if (activeIdx < 0) return prev;
-      const moved = { ...prev[activeIdx], tier: tierOf(to) };
+      const moved = placeIn(prev[activeIdx], to);
       const without = prev.filter((_, k) => k !== activeIdx);
 
       let insertAt = without.findIndex((i) => i.key === over.id);
@@ -527,7 +534,7 @@ export default function ListDetail() {
       let next = prev;
       // Assure le bon conteneur (dépôt sur une zone vide).
       if (to && containerOfItem(prev[activeIdx]) !== to) {
-        next = prev.map((i, k) => (k === activeIdx ? { ...i, tier: tierOf(to) } : i));
+        next = prev.map((i, k) => (k === activeIdx ? placeIn(i, to) : i));
       }
       const overIdx = next.findIndex((i) => i.key === over.id);
       const fromIdx = next.findIndex((i) => i.key === active.id);
@@ -611,39 +618,28 @@ export default function ListDetail() {
     return () => io.disconnect();
   }, [list?.id, loading]);
   /**
-   * Faire SON top à partir d'un top officiel : une copie à soi, mêmes jeux
-   * dans le même ordre, ouverte directement en édition — on réordonne, on
-   * retire, on ajoute. Les notes de la liste d'origine ne suivent pas : ce
-   * sont celles du site, pas les siennes.
+   * Faire SON top à partir d'un top officiel.
+   *
+   * ⚠️ UN TOP VIDE, PAS UNE COPIE. La copie rendait les mêmes jeux dans le
+   * même ordre : il fallait tout défaire pour faire le sien. On ouvre un
+   * brouillon vide, en édition, avec les jeux du modèle dans un vivier en
+   * bas — CEUX QU'ON A JOUÉS D'ABORD (on classe ce qu'on connaît) — à glisser
+   * dans l'ordre qu'on veut. Le top naît au premier jeu placé (cf. brouillon).
    */
-  async function useAsTemplate() {
+  function useAsTemplate() {
     if (!token) return navigate("/login");
-    if (forking) return;
-    setForking(true);
-    try {
-      const body = {
-        title: myTopTitle(list.title).slice(0, 120),
-        type: list.type,
-        itemKind: list.itemKind || "game",
-        tags: (list.tags || []).filter((t) => t !== "Saga" && t !== "Thème"),
-        items: items.map(({ key, _id, note, media, ...it }) => ({ ...it, note: "", media: [] })),
-      };
-      const { list: made } = await apiFetch("/lists", { method: "POST", token, body });
-      navigate(`/lists/${made.id}`, { state: { edit: true } });
-      toast.show({
-        title: "Ton top est prêt",
-        text: "Réordonne, retire ou ajoute des jeux : il est à toi.",
-        cover: items[0]?.image || null,
-        undo: async () => {
-          await apiFetch(`/lists/${made.id}`, { method: "DELETE", token });
-          navigate(`/lists/${id}`);
-        },
-      });
-    } catch (e) {
-      alert(e.message || "Impossible de créer ton top.");
-    } finally {
-      setForking(false);
-    }
+    const played = (it) => {
+      const e = library[it.gameId];
+      return !!e && e.status !== "wishlist";
+    };
+    const base = items.map(({ key, _id, note, media, rating, tier, pooled, ...it }) => it);
+    openListDraft(navigate, {
+      type: list.type === "tier" ? "tier" : "ranked",
+      itemKind: list.itemKind || "game",
+      title: myTopTitle(list.title).slice(0, 120),
+      items: [],
+      pool: [...base.filter(played), ...base.filter((it) => !played(it))],
+    });
   }
 
   // --- Couverture ---
@@ -789,6 +785,9 @@ export default function ListDetail() {
   const isTier = list.type === "tier";
   const isGameList = (list.itemKind || "game") === "game";
   const pool = isTier ? items.filter((i) => !i.tier) : items;
+  // Hors tier list : ce qui est dans la liste, et le vivier du modèle.
+  const placed = isTier ? items : items.filter((i) => !i.pooled);
+  const stash = isTier ? [] : items.filter((i) => i.pooled);
   // La vue détaillée n'a de sens que sur une liste de JEUX en lecture : elle
   // s'appuie sur les fiches IGDB, et le réordonnancement se fait en cartes.
   const canRows = isGameList && !isTier && !editable && items.length > 0;
@@ -804,7 +803,7 @@ export default function ListDetail() {
           headerRef={headerRef}
           list={list}
           meta={meta}
-          items={items}
+          items={placed}
           isGameList={isGameList}
           isOwner={isOwner}
           editable={editable}
@@ -922,15 +921,15 @@ export default function ListDetail() {
 
           <div className="ld-meta">
             <span>
-              {items.length} {isGameList ? "jeu" : "élément"}
-              {items.length > 1 ? (isGameList ? "x" : "s") : ""}
+              {placed.length} {isGameList ? "jeu" : "élément"}
+              {placed.length > 1 ? (isGameList ? "x" : "s") : ""}
             </span>
             <span className="dot">·</span>
             <span>màj {timeAgo(list.updatedAt)}</span>
           </div>
         </div>
 
-        <aside className="ld-side">
+        <aside className={`ld-side ${editable ? "is-editing" : ""}`}>
           {list.author?.username ? (
             <Link to={`/u/${list.author.username}`} className="ld-by clickable">
               <span className="ld-by-pp">
@@ -1036,7 +1035,7 @@ export default function ListDetail() {
                 onClick={() => setSettingsOpen(true)}
                 title="Type, description, tags, couverture, visibilité…"
               >
-                <SlidersHorizontal size={16} /> Réglages
+                <Pencil size={16} /> Modifier
               </button>
               {!list.draft && (
                 <button
@@ -1174,7 +1173,7 @@ export default function ListDetail() {
               </div>
             )}
 
-            {items.length === 0 ? (
+            {placed.length === 0 && !(editable && stash.length) ? (
               <div className="ld-empty card">
                 <meta.Icon size={30} />
                 <p className="font-fun">Cette liste est vide pour l'instant.</p>
@@ -1185,12 +1184,12 @@ export default function ListDetail() {
                 )}
               </div>
             ) : rowsView ? (
-              <ListRowsView items={items} ranked={ranked} token={token} />
+              <ListRowsView items={placed} ranked={ranked} token={token} />
             ) : !editable ? (
               // Lecture : cards riches (lien jeu, menu d'actions, bulle
               // d'annotation). Pas de drag en lecture.
               <div className={`ld-grid rich ${ranked ? "ranked" : ""}`}>
-                {items.map((it, i) =>
+                {placed.map((it, i) =>
                   isGameList ? (
                     <ListGameCard
                       key={it.key}
@@ -1207,23 +1206,45 @@ export default function ListDetail() {
                 )}
               </div>
             ) : (
-              <SortableContext
-                items={items.map((i) => i.key)}
-                strategy={rectSortingStrategy}
-              >
-                <div className={`ld-grid ${ranked ? "ranked" : ""}`}>
-                  {items.map((it, i) => (
-                    <SortableItemCard
-                      key={it.key}
-                      item={it}
-                      rank={ranked ? i + 1 : null}
-                      editable={editable}
-                      onEdit={setEditItem}
-                      onRemove={removeItem}
-                    />
-                  ))}
-                </div>
-              </SortableContext>
+              <RankDrop empty={!placed.length}>
+                <SortableContext
+                  items={placed.map((i) => i.key)}
+                  strategy={rectSortingStrategy}
+                >
+                  <div className={`ld-grid ${ranked ? "ranked" : ""}`}>
+                    {placed.map((it, i) => (
+                      <SortableItemCard
+                        key={it.key}
+                        item={it}
+                        rank={ranked ? i + 1 : null}
+                        editable={editable}
+                        onEdit={setEditItem}
+                        onRemove={removeItem}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </RankDrop>
+            )}
+
+            {/* Le vivier du modèle (« Faire mon top ») : les jeux à placer. */}
+            {editable && stash.length > 0 && (
+              <>
+                <div className="ld-stash-space" aria-hidden="true" />
+                <PoolZone
+                  items={stash}
+                  totalCount={items.length}
+                  editable={editable}
+                  docked
+                  dropId={STASH}
+                  title="À placer"
+                  collapsed={poolCollapsed}
+                  onToggleCollapse={() => setPoolCollapsed((v) => !v)}
+                  onAdd={() => setAdding(true)}
+                  onEdit={setEditItem}
+                  onRemove={removeItem}
+                />
+              </>
             )}
           </>
         )}
@@ -1365,10 +1386,10 @@ function PhoneHeader({
               type="button"
               className="ld-mh-icon clickable"
               onClick={onSettings}
-              aria-label="Réglages de la liste"
+              aria-label="Modifier la liste"
               title="Type, description, couverture…"
             >
-              <SlidersHorizontal size={18} />
+              <Pencil size={17} />
             </button>
             {!list.draft && (
               <button type="button" className="ld-mh-icon gold clickable" onClick={onDone} aria-label="Terminer">
@@ -1510,7 +1531,7 @@ function ListSettingsSheet({ list, coverBusy, onClose, onType, onPatch, onPickCo
         <button type="button" className="modal-close clickable" onClick={onClose} aria-label="Fermer">
           <X size={18} />
         </button>
-        <h2 className="ld-sheet-title">Réglages de la liste</h2>
+        <h2 className="ld-sheet-title">Modifier la liste</h2>
 
         <section className="ld-sheet-sec">
           <h3>Type</h3>
@@ -1599,6 +1620,20 @@ function ListSettingsSheet({ list, coverBusy, onClose, onType, onPatch, onPickCo
   );
 }
 
+// --- La liste d'un top en édition, cible de dépôt ---
+// Le vivier du modèle (« Faire mon top ») se vide ICI : la grille doit accepter
+// un dépôt même vide, d'où une zone de dépôt et, tant qu'elle est vide, une
+// invitation à glisser.
+function RankDrop({ empty, children }) {
+  const { setNodeRef, isOver } = useDroppable({ id: POOL });
+  return (
+    <div ref={setNodeRef} className={`ld-rankdrop ${empty ? "is-empty" : ""} ${isOver ? "is-over" : ""}`}>
+      {empty && <p className="ld-rankdrop-hint">Glisse ici les jeux du bas, dans ton ordre : le premier sera ton n°1.</p>}
+      {children}
+    </div>
+  );
+}
+
 // --- Vivier (éléments non classés d'une tier list) ---
 function PoolZone({
   items,
@@ -1610,8 +1645,10 @@ function PoolZone({
   onAdd,
   onEdit,
   onRemove,
+  dropId = POOL,
+  title = "Non classés",
 }) {
-  const { setNodeRef } = useDroppable({ id: POOL });
+  const { setNodeRef } = useDroppable({ id: dropId });
   const scrollRef = useRef(null);
   const [query, setQuery] = useState("");
   // Défilement possible à gauche / à droite (pilote l'affichage des flèches).
@@ -1664,7 +1701,7 @@ function PoolZone({
           aria-expanded={!collapsed}
         >
           {collapsed ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-          <span>Non classés</span>
+          <span>{title}</span>
           <span className="tier-pool-count">{items.length}</span>
         </button>
         {!collapsed && (

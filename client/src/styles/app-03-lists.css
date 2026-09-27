@@ -4477,3 +4477,43 @@
     gap: 0.7rem;
   }
 }
+
+/* En édition, l'auteur et « Modifier / Terminé » sur UNE ligne, à hauteur du
+   titre : la colonne de droite doublait la hauteur de l'en-tête. */
+.ld-side.is-editing {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* « Faire mon top » : la liste (cible de dépôt) et la place du vivier ancré. */
+.ld-rankdrop {
+  border-radius: 14px;
+  transition: background 0.15s ease, outline-color 0.15s ease;
+  outline: 2px dashed transparent;
+  outline-offset: 6px;
+}
+.ld-rankdrop.is-empty {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  outline-color: var(--border-strong, var(--border));
+}
+.ld-rankdrop.is-over {
+  outline-color: #f2b70b;
+  background: color-mix(in srgb, #f2b70b 5%, transparent);
+}
+.ld-rankdrop-hint {
+  margin: 0;
+  padding: 0 1rem;
+  text-align: center;
+  color: var(--text-soft);
+  font-size: 0.92rem;
+}
+.ld-rankdrop.is-empty .ld-grid {
+  display: none;
+}
+.ld-stash-space {
+  height: 170px;
+}
