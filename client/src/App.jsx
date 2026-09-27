@@ -1,58 +1,65 @@
+import { Suspense } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import lazyPage from "./lib/lazyPage";
 import { useAuth } from "./context/AuthContext";
 import Landing from "./pages/Landing";
-import DownloadApp from "./pages/DownloadApp";
-import Privacy from "./pages/Privacy";
-import Services from "./pages/Services";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import OAuthCallback from "./pages/OAuthCallback";
 import Welcome from "./pages/Welcome";
-import Activity from "./pages/Activity";
-import EventPage from "./pages/EventPage";
-import EventsAgenda from "./pages/EventsAgenda";
-import BingoPage from "./pages/BingoPage";
-import GbaWatch from "./pages/GbaWatch";
-import BlindTest from "./pages/BlindTest";
-import PixelRush from "./pages/PixelRush";
-import GeoGamer from "./pages/GeoGamer";
-import GeoVersus from "./pages/GeoVersus";
-import BlindTestVersus from "./pages/BlindTestVersus";
-import PixelVersus from "./pages/PixelVersus";
-import Quizz from "./pages/Quizz";
-import Perroquet from "./pages/Perroquet";
-import PerroquetVersus from "./pages/PerroquetVersus";
-import QuizzVersus from "./pages/QuizzVersus";
-import Imposteur from "./pages/Imposteur";
-import ImposteurRoom from "./pages/ImposteurRoom";
-import MotDuJour from "./pages/MotDuJour";
-import Arcade from "./pages/Arcade";
-import Playtopia from "./pages/Playtopia";
-import Explorer from "./pages/Explorer";
-import Releases from "./pages/Releases";
-import GamePage from "./pages/GamePage";
-import ClipPage from "./pages/ClipPage";
-import ListenInvite from "./pages/ListenInvite";
-import CompanyPage from "./pages/CompanyPage";
-import PlatformPage from "./pages/PlatformPage";
-import Profile from "./pages/Profile";
-import Lists from "./pages/Lists";
-import Collection from "./pages/Collection";
-import CollectionDetail from "./pages/CollectionDetail";
-import WatchParty from "./pages/WatchParty";
-import Messages from "./pages/Messages";
-import ListDetail from "./pages/ListDetail";
-import Admin from "./pages/Admin";
-import Settings from "./pages/Settings";
-import Companion from "./pages/Companion";
-import Onboarding from "./pages/Onboarding";
-import Placeholder from "./pages/Placeholder";
 import AppLayout from "./components/AppLayout";
 import PublicShell from "./components/PublicShell";
 import InstallPrompt from "./components/InstallPrompt";
 import ScrollManager from "./components/ScrollManager";
+
+// Chaque page dans son propre fichier, chargé quand on l'ouvre (cf. lib/lazyPage).
+// L'accueil et la page d'arrivée restent dans le fichier principal : ce sont
+// elles qu'on ouvre en premier, les faire attendre un second fichier serait
+// un aller-retour de plus.
+const DownloadApp = lazyPage(() => import("./pages/DownloadApp"));
+const Privacy = lazyPage(() => import("./pages/Privacy"));
+const Services = lazyPage(() => import("./pages/Services"));
+const Login = lazyPage(() => import("./pages/Login"));
+const Register = lazyPage(() => import("./pages/Register"));
+const ForgotPassword = lazyPage(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazyPage(() => import("./pages/ResetPassword"));
+const OAuthCallback = lazyPage(() => import("./pages/OAuthCallback"));
+const Activity = lazyPage(() => import("./pages/Activity"));
+const EventPage = lazyPage(() => import("./pages/EventPage"));
+const EventsAgenda = lazyPage(() => import("./pages/EventsAgenda"));
+const BingoPage = lazyPage(() => import("./pages/BingoPage"));
+const GbaWatch = lazyPage(() => import("./pages/GbaWatch"));
+const BlindTest = lazyPage(() => import("./pages/BlindTest"));
+const PixelRush = lazyPage(() => import("./pages/PixelRush"));
+const GeoGamer = lazyPage(() => import("./pages/GeoGamer"));
+const GeoVersus = lazyPage(() => import("./pages/GeoVersus"));
+const BlindTestVersus = lazyPage(() => import("./pages/BlindTestVersus"));
+const PixelVersus = lazyPage(() => import("./pages/PixelVersus"));
+const Quizz = lazyPage(() => import("./pages/Quizz"));
+const Perroquet = lazyPage(() => import("./pages/Perroquet"));
+const PerroquetVersus = lazyPage(() => import("./pages/PerroquetVersus"));
+const QuizzVersus = lazyPage(() => import("./pages/QuizzVersus"));
+const Imposteur = lazyPage(() => import("./pages/Imposteur"));
+const ImposteurRoom = lazyPage(() => import("./pages/ImposteurRoom"));
+const MotDuJour = lazyPage(() => import("./pages/MotDuJour"));
+const Arcade = lazyPage(() => import("./pages/Arcade"));
+const Playtopia = lazyPage(() => import("./pages/Playtopia"));
+const Explorer = lazyPage(() => import("./pages/Explorer"));
+const Releases = lazyPage(() => import("./pages/Releases"));
+const GamePage = lazyPage(() => import("./pages/GamePage"));
+const ClipPage = lazyPage(() => import("./pages/ClipPage"));
+const ListenInvite = lazyPage(() => import("./pages/ListenInvite"));
+const CompanyPage = lazyPage(() => import("./pages/CompanyPage"));
+const PlatformPage = lazyPage(() => import("./pages/PlatformPage"));
+const Profile = lazyPage(() => import("./pages/Profile"));
+const Lists = lazyPage(() => import("./pages/Lists"));
+const Collection = lazyPage(() => import("./pages/Collection"));
+const CollectionDetail = lazyPage(() => import("./pages/CollectionDetail"));
+const WatchParty = lazyPage(() => import("./pages/WatchParty"));
+const Messages = lazyPage(() => import("./pages/Messages"));
+const ListDetail = lazyPage(() => import("./pages/ListDetail"));
+const Admin = lazyPage(() => import("./pages/Admin"));
+const Settings = lazyPage(() => import("./pages/Settings"));
+const Companion = lazyPage(() => import("./pages/Companion"));
+const Onboarding = lazyPage(() => import("./pages/Onboarding"));
+const Placeholder = lazyPage(() => import("./pages/Placeholder"));
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -166,6 +173,9 @@ export default function App() {
   return (
     <>
       <ScrollManager />
+      {/* Le temps qu'une page arrive : rien (les pages dans la coquille de
+          l'app ont leur propre attente, cf. AppLayout). */}
+      <Suspense fallback={<div className="page-fallback" />}>
       <Routes>
       <Route path="/" element={<Landing />} />
       {/* Le téléchargement de l'app Android. Publique : on y arrive souvent
@@ -362,6 +372,7 @@ export default function App() {
 
       <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
 
       {/* Pop-up d'installation PWA (Android/iOS), globale à toute l'app. */}
       <InstallPrompt />

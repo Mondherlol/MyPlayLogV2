@@ -3220,6 +3220,11 @@
   background: #0e0e10;
 }
 
+/* Le guetteur du défilement infini (page Listes). */
+.lists-sentinel {
+  height: 1px;
+}
+
 /* La carte en attente (ListTileSkeleton). */
 .lt-skel {
   pointer-events: none;
@@ -3284,7 +3289,7 @@
   left: -20%;
   width: 150%;
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
   transform: rotate(-12deg);
   opacity: 0.2;

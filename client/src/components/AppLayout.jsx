@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
@@ -38,7 +38,11 @@ export default function AppLayout({ children }) {
       <div className="app-main">
         <Topbar />
         <main className="app-content">
-          {children || <Outlet />}
+          {/* ⚠️ L'ATTENTE D'UNE PAGE RESTE DANS LE CADRE. Sans ce Suspense, c'est
+              celui de l'App qui attrapait le chargement d'une page à la
+              demande : la barre latérale et le haut disparaissaient le temps
+              qu'elle arrive. Ici, seul le contenu attend. */}
+          <Suspense fallback={<div className="page-fallback" />}>{children || <Outlet />}</Suspense>
         </main>
       </div>
       <PatchnotePopup />

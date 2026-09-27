@@ -212,8 +212,11 @@ function TopPoster({ list }) {
   const imgs = (list.preview || []).filter(Boolean);
   // Sans visuel, les trois premières jaquettes font l'éventail à droite.
   const fan = art ? [] : imgs.slice(0, 3);
-  // La mosaïque du fond : 18 cases, on reboucle sur ce qu'on a.
-  const mosaic = imgs.length ? Array.from({ length: 18 }, (_, i) => imgs[i % imgs.length]) : [];
+  // La mosaïque du fond : 12 cases, on reboucle sur ce qu'on a. ⚠️ EN
+  // VIGNETTES : elle est grise, à 20 % et minuscule — y charger les jaquettes
+  // pleine taille coûtait ~30 Ko par case pour rien (t_cover_small ≈ 4 Ko).
+  const small = imgs.map((src) => src.replace("/t_cover_big/", "/t_cover_small/"));
+  const mosaic = small.length ? Array.from({ length: 12 }, (_, i) => small[i % small.length]) : [];
   return (
     <span className={`lt-top ${ready ? "fonts-ready" : ""}`} style={{ "--tc": color }}>
       {mosaic.length > 0 && (

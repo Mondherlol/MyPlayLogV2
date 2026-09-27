@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Plus,
@@ -37,11 +37,20 @@ const SCOPES = [
 // officiels (filtrés, eux, par rayon et par tag).
 const FIXED_SCOPES = ["playlists", "events", "tops"];
 
+// Le nombre de listes par page (défilement infini).
+const PAGE = 24;
+
 export default function Lists() {
   const { token } = useAuth();
   const navigate = useNavigate();
   const [lists, setLists] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Le défilement infini : la requête de la page courante (sans offset), s'il
+  // reste des listes après, et si la page suivante est en route.
+  const [pageQuery, setPageQuery] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const sentinel = useRef(null);
   const [error, setError] = useState(null);
   // `false` fermé ; sinon le type imposé à la création (tuiles « Créer » de
   // la vitrine), ou `true` pour laisser choisir.
@@ -160,14 +169,58 @@ export default function Lists() {
     }
     if (tag) params.set("tag", tag);
     if (query) params.set("q", query);
-    apiFetch(`/lists?${params}`, { token })
-      .then((d) => alive && setLists(d.lists || []))
+    // ⚠️ PAR PAGES. On demandait tout (jusqu'à 200 listes) et on dessinait tout :
+    // l'onglet Tops, c'était 185 affiches et des milliers d'images avant le
+    // premier défilement. On en prend PAGE, les suivantes arrivent en
+    // descendant (cf. `loadMore`).
+    params.set("limit", String(PAGE));
+    const q = params.toString();
+    setPageQuery(null);
+    setHasMore(false);
+    apiFetch(`/lists?${q}`, { token })
+      .then((d) => {
+        if (!alive) return;
+        setLists(d.lists || []);
+        setHasMore(!!d.hasMore);
+        setPageQuery(q);
+      })
       .catch((e) => alive && setError(e.message))
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
   }, [scope, token, typeFilter, kindFilter, sort, query, group, tag]);
+
+  // La page suivante, quand le bas de la grille approche.
+  const loadMore = useCallback(() => {
+    if (!pageQuery || !hasMore || loadingMore) return;
+    setLoadingMore(true);
+    const q = pageQuery;
+    apiFetch(`/lists?${q}&offset=${lists.length}`, { token })
+      .then((d) => {
+        // Les filtres ont changé entre-temps : cette page ne sert plus à rien.
+        if (q !== pageQuery) return;
+        setLists((prev) => {
+          const seen = new Set(prev.map((l) => String(l.id)));
+          return [...prev, ...(d.lists || []).filter((l) => !seen.has(String(l.id)))];
+        });
+        setHasMore(!!d.hasMore);
+      })
+      .catch(() => setHasMore(false))
+      .finally(() => setLoadingMore(false));
+  }, [pageQuery, hasMore, loadingMore, lists.length, token]);
+
+  // Le guetteur : une ligne invisible sous la grille. Elle entre dans l'écran
+  // (avec une avance de 600 px) → on charge la suite.
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || !hasMore) return undefined;
+    const io = new IntersectionObserver((entries) => entries[0].isIntersecting && loadMore(), {
+      rootMargin: "600px 0px",
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, loadMore]);
 
   return (
     <div className="lists-page">
@@ -377,8 +430,12 @@ export default function Lists() {
               <ListTile key={l.id} list={l} onDelete={handleDelete} />
             )
           )}
+          {loadingMore &&
+            scope !== "playlists" &&
+            Array.from({ length: 4 }, (_, i) => <ListTileSkeleton key={`more-${i}`} />)}
         </div>
       )}
+      {!loading && hasMore && <div ref={sentinel} className="lists-sentinel" aria-hidden="true" />}
 
       {creating && (
         <CreateListModal

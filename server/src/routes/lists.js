@@ -478,6 +478,9 @@ router.get("/", optionalAuth, async (req, res) => {
     // centaines de Ko à chaque ouverture du site. Sans `limit`, rien ne change
     // pour la page Listes.
     const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 200));
+    // ?offset= : la page suivante (défilement infini de la page Listes). Sans
+    // lui, on rend la première page, comme avant.
+    const offset = Math.min(5000, Math.max(0, Number(req.query.offset) || 0));
     // ⚠️ UN TRI QUI SE FAIT APRÈS COUP DOIT VOIR TOUT LE MONDE. Les « j'aime »
     // et le recoupement « pour toi » se comptent en mémoire : plafonner la
     // requête d'abord, c'était ranger les douze plus récentes, pas trouver
@@ -498,7 +501,9 @@ router.get("/", optionalAuth, async (req, res) => {
                 { "official.order": -1 }
               : { updatedAt: -1 }
       )
-      .limit(late ? 200 : limit)
+      // Un de plus que demandé : c'est ce qui dit s'il reste une page.
+      .skip(late ? 0 : offset)
+      .limit(late ? 200 : limit + 1)
       .lean();
     let cards = lists.map((l) => toCard(l, req.userId));
     if (forYouIds) {
@@ -533,7 +538,11 @@ router.get("/", optionalAuth, async (req, res) => {
     if (req.query.sort === "likes") {
       cards = cards.sort((a, b) => b.likeCount - a.likeCount);
     }
-    res.json({ lists: late ? cards.slice(0, limit) : cards });
+    // ⚠️ PAR PAGES, PAS TOUT D'UN COUP. L'onglet Tops renvoyait ses 185 listes
+    // en une réponse (430 Ko de JSON) et la page en dessinait les 185 cartes
+    // — des milliers d'images — avant qu'on ait fait défiler quoi que ce soit.
+    const start = late ? offset : 0;
+    res.json({ lists: cards.slice(start, start + limit), hasMore: cards.length > start + limit });
   } catch (err) {
     console.error("lists feed error:", err.message);
     res.status(500).json({ error: "Erreur lors du chargement des listes." });
