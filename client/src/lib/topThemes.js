@@ -22,27 +22,35 @@
 // la palette par défaut et l'éventail : il reste présentable.
 
 const ART = new Set([
-  // Consoles
-  "top-switch", "top-ds", "top-3ds", "top-snes", "top-n64", "top-gamecube", "top-wii",
-  "top-wiiu", "top-gba", "top-gameboy", "top-nes", "top-megadrive", "top-saturn",
-  "top-dreamcast", "top-xbox", "top-xbox360", "top-ps1", "top-ps2", "top-ps3", "top-ps4",
-  "top-ps5", "top-psp", "top-vita",
-  // Héros
-  "top-mario", "top-final-fantasy", "top-metroid", "top-resident-evil", "top-castlevania",
-  "top-dragon-quest", "top-kingdom-hearts", "top-sonic", "top-yakuza", "top-fire-emblem",
-  "top-kirby", "top-metal-gear", "top-street-fighter", "top-mega-man", "top-persona",
-  "top-danganronpa", "top-donkey-kong", "top-god-of-war", "top-uncharted", "top-halo",
-  "top-crash", "top-ratchet", "top-devil-may-cry", "top-tomb-raider", "top-assassins-creed",
-  "top-professor-layton", "top-tekken", "top-mortal-kombat", "top-fallout", "top-ys",
-  "top-monster-hunter", "top-touhou", "top-pokemon", "top-suikoden", "top-dragon-ball",
-  "top-star-wars", "top-atelier",
+  "top-3ds", "top-assassins-creed", "top-atelier", "top-castlevania", "top-crash",
+  "top-danganronpa", "top-devil-may-cry", "top-donkey-kong", "top-dragon-ball",
+  "top-dragon-quest", "top-dreamcast", "top-ds", "top-fallout", "top-final-fantasy",
+  "top-fire-emblem", "top-gameboy", "top-gamecube", "top-gba", "top-god-of-war", "top-gta",
+  "top-halo", "top-kingdom-hearts", "top-kirby", "top-mario", "top-mega-man",
+  "top-megadrive", "top-metal-gear", "top-metal-slug", "top-metroid", "top-monster-hunter",
+  "top-mortal-kombat", "top-n64", "top-nes", "top-persona", "top-pokemon",
+  "top-professor-layton", "top-ps1", "top-ps2", "top-ps3", "top-ps4", "top-ps5", "top-psp",
+  "top-ratchet", "top-resident-evil", "top-saturn", "top-silent-hill", "top-smt",
+  "top-snes", "top-sonic", "top-star-wars", "top-street-fighter", "top-suikoden",
+  "top-switch", "top-tekken", "top-tomb-raider", "top-touhou", "top-trails",
+  "top-uncharted", "top-vita", "top-wii", "top-wiiu", "top-xbox", "top-xbox360",
+  "top-xeno", "top-yakuza", "top-ys", "top-zelda",
 ]);
 
-// Les tops thèmes : une icône (SVG) plutôt qu'un personnage.
+// Une icône (SVG) plutôt qu'un personnage : les thèmes, les genres, et les
+// sagas sans héros détourable (FromSoftware, Tales of, Elder Scrolls…).
 const ICONS = new Set([
-  "top-detective", "top-funny", "top-emotional", "top-narrative", "top-scary",
-  "top-couch-coop", "top-short", "top-hard", "top-art", "top-soundtrack", "top-space",
-  "top-postapo", "top-remakes", "top-escape", "top-board", "top-free-to-play", "top-gacha",
+  "top-ace-attorney", "top-ace-attorney-like", "top-action-rpg", "top-art", "top-beatemup",
+  "top-board", "top-character-action", "top-couch-coop", "top-cozy", "top-crpg",
+  "top-detective", "top-elder-scrolls", "top-emotional", "top-escape", "top-fighting",
+  "top-fps", "top-free-to-play", "top-fromsoftware", "top-funny", "top-gacha", "top-hard",
+  "top-immersive-sim", "top-indie", "top-jrpg", "top-mana", "top-manga-anime",
+  "top-mario-rpg", "top-metroidvania", "top-monster-collecting", "top-monster-hunting",
+  "top-mystery-dungeon", "top-narrative", "top-open-world", "top-pc", "top-persona-like",
+  "top-platformer", "top-point-and-click", "top-postapo", "top-puzzle", "top-racing",
+  "top-remakes", "top-rhythm", "top-roguelike", "top-scary", "top-shmup", "top-short",
+  "top-soulslike", "top-soundtrack", "top-space", "top-stealth", "top-survival-horror",
+  "top-tactical-rpg", "top-tales-of", "top-visual-novel", "top-zelda-like",
 ]);
 
 // Un aplat par top : la couleur de la console ou celle qu'on associe à la
@@ -141,6 +149,38 @@ const COLORS = {
   "top-board": "#2b8a3e",
   "top-free-to-play": "#1971c2",
   "top-gacha": "#c2255c",
+
+  "top-platformer": "#e03131",
+  "top-metroidvania": "#5f3dc4",
+  "top-jrpg": "#1c7ed6",
+  "top-roguelike": "#0c8599",
+  "top-soulslike": "#5c4033",
+  "top-survival-horror": "#5c1a1a",
+  "top-visual-novel": "#d6336c",
+  "top-fighting": "#e8590c",
+  "top-shmup": "#364fc7",
+  "top-beatemup": "#c92a2a",
+  "top-mystery-dungeon": "#7048e8",
+  "top-manga-anime": "#f03e3e",
+  "top-persona-like": "#c2255c",
+  "top-ace-attorney-like": "#1864ab",
+  "top-point-and-click": "#2f9e44",
+  "top-tactical-rpg": "#495057",
+  "top-monster-hunting": "#a16207",
+  "top-monster-collecting": "#f59f00",
+  "top-open-world": "#2b8a3e",
+  "top-stealth": "#343a40",
+  "top-rhythm": "#ae3ec9",
+  "top-puzzle": "#1098ad",
+  "top-fps": "#c92a2a",
+  "top-zelda-like": "#2e8b57",
+  "top-cozy": "#66a80f",
+  "top-crpg": "#8a4b2e",
+  "top-racing": "#e03131",
+  "top-indie": "#f08c00",
+  "top-immersive-sim": "#3b5bdb",
+  "top-action-rpg": "#9c36b5",
+  "top-character-action": "#e8590c",
 };
 
 // Les tops sans couleur attitrée (les genres, surtout) : une teinte de cette
