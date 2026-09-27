@@ -71,3 +71,89 @@ myplaylog.cc {
         file_server
     }
 }
+
+# ---------------------------------------------------------------------------
+# Findi — marketplace de services de proximité (findi.cc).
+#
+# Pile séparée, dans ~/projects/findi, reliée à ce Caddy par le réseau Docker
+# `myplaylog_myplaylog`. Findi ne publie aucun port sur l'hôte : ce bloc est le
+# seul chemin par lequel il est joignable depuis Internet.
+# ---------------------------------------------------------------------------
+
+www.findi.cc {
+    redir https://findi.cc{uri} permanent
+}
+
+findi.cc {
+    encode gzip zstd
+
+    # Un seul amont, contrairement à myplaylog : le conteneur `findi-frontend`
+    # sert la PWA et relaie lui-même /api et /ws vers son propre backend, sur un
+    # réseau interne que Caddy ne voit pas. C'est ce qui garde l'API de Findi
+    # hors d'atteinte directe.
+    #
+    # Le nom du conteneur est figé par `container_name` dans
+    # docker-compose.prod.yml, et non déduit du dossier du projet : sans ça,
+    # renommer le dossier casserait ce routage par un 502 qui n'apparaîtrait
+    # dans aucun journal applicatif.
+    #
+    # Les WebSockets de la messagerie (/ws) ne demandent aucune directive :
+    # Caddy assure la bascule de protocole d'office.
+    reverse_proxy findi-frontend:80 {
+        # Même raison que pour myplaylog plus haut. Findi dérive de cette
+        # adresse l'empreinte de visiteur de ses statistiques
+        # (backend/src/routes/metrics.ts) : si l'en-tête du client était
+        # conservé, il suffirait d'en changer à chaque requête pour fausser
+        # les chiffres.
+        header_up X-Forwarded-For {remote_host}
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Facter — facturation et gestion commerciale (facter.cc).
+#
+# Pile séparée, dans ~/projects/facter, reliée à ce Caddy par le réseau Docker
+# `myplaylog_myplaylog` (docker-compose.caddy.yml). Elle ne publie qu'un port
+# de diagnostic sur la boucle locale : ce bloc est le seul chemin public.
+# ---------------------------------------------------------------------------
+
+www.facter.cc {
+    redir https://facter.cc{uri} permanent
+}
+
+facter.cc {
+    encode gzip zstd
+
+    # HSTS posé ICI, et pas par Facter : son Nginx ne voit qu'une connexion HTTP
+    # interne (il n'envoie l'en-tête que sur une requête reçue en HTTPS). Sans
+    # cette ligne, le site serait servi en HTTPS sans jamais l'imposer au
+    # navigateur pour les visites suivantes.
+    header Strict-Transport-Security "max-age=63072000; includeSubDomains"
+
+    # Comme Findi : un seul amont. Le Nginx de Facter sert la SPA et relaie /api
+    # vers son backend NestJS sur un réseau interne, invisible depuis ce Caddy.
+    # Le nom `facter-frontend` est figé par `container_name` dans
+    # docker-compose.caddy.yml, indépendamment du nom du dossier du projet.
+    reverse_proxy facter-frontend:8080 {
+        # Même raison que pour les deux blocs précédents : Facter limite par IP
+        # les inscriptions, les connexions et les envois d'e-mails de
+        # vérification. L'adresse retenue doit être celle de la connexion.
+        header_up X-Forwarded-For {remote_host}
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Bookshelf — accès par l'IP publique (HTTP, sans domaine).
+# Pile dans ~/projects/bookshelf, reliée par le réseau myplaylog_myplaylog.
+# ---------------------------------------------------------------------------
+bookshelf.findi.cc {
+	reverse_proxy bookshelf-frontend:80 {
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Real-IP {remote_host}
+	}
+}
+
+# Ancienne adresse par IP : redirige vers l'adresse HTTPS.
+http://149.202.227.174 {
+	redir https://bookshelf.findi.cc{uri} permanent
+}

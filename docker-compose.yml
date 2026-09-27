@@ -138,6 +138,15 @@ services:
       # Certificats HTTPS persistés pour ne pas les regénérer à chaque rebuild.
       - caddy_data:/data
       - caddy_config:/config
+      # LE CADDYFILE VIENT DE L'HÔTE, pas seulement de l'image (Dockerfile.web le
+      # copie encore, comme valeur par défaut). Ce Caddy sert aussi les autres
+      # applications du VPS (findi.cc, facter.cc) : sans ce montage, ajouter ou
+      # corriger un domaine imposerait de reconstruire l'image — donc de rebâtir
+      # le client React de myplaylog — pour une modification qui ne le concerne
+      # pas. Avec le montage :  éditer ce fichier, puis
+      #   docker compose exec web caddy reload --config /etc/caddy/Caddyfile
+      # recharge la configuration sans interrompre une seule connexion.
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:
       - server
     networks:
