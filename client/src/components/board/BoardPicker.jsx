@@ -5,6 +5,7 @@ import { ArrowLeft, Check, Loader2, Plus, Search, Trash2, UserRound, X } from "l
 import { apiFetch } from "../../lib/api";
 import { apiCached } from "../../lib/query";
 import { boardSlot } from "../../lib/boards";
+import { useScrollLock } from "../../hooks/useScrollLock";
 
 // ======================================================================
 //  Choisir le jeu d'UNE case de la carte de joueur
@@ -55,6 +56,9 @@ export default function BoardPicker({ boardKey, slotKey, current, token, onPick,
   const [query, setQuery] = useState("");
   const [results, setResults] = useState(null);
   const [searching, setSearching] = useState(false);
+  // La page derrière ne bouge plus : sur téléphone, le doigt qui glissait dans
+  // la grille faisait défiler la carte de joueur au lieu des jeux.
+  useScrollLock();
 
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && onClose();

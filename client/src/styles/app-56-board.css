@@ -322,9 +322,23 @@ button.pc-cell.empty:hover .pc-empty {
 .bp-close:hover {
   color: var(--text);
 }
+/* ⚠️ LA GRILLE DÉFILE TOUJOURS DANS LA FENÊTRE, téléphone compris. La règle
+   mobile de la fenêtre des 9 (« .nine-m-grid { overflow: visible } ») la
+   rattrapait aussi : la grille ne défilait plus, et le doigt faisait défiler
+   la page derrière. `overscroll-behavior` garde le geste dans la fenêtre une
+   fois le bas atteint. */
+.bp-modal .bp-grid,
+.bd-char-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
 .bp-grid {
   flex: 1;
   min-height: 0;
+}
+.bp-modal .nine-m-search {
+  margin-right: 0;
 }
 .bp-current {
   display: flex;
@@ -631,5 +645,32 @@ button.pc-cell.empty:hover .pc-empty {
   .bd-stage > .pc-grid .pc-cell {
     flex: none;
     aspect-ratio: 3 / 4;
+  }
+}
+
+/* La fenêtre de choix d'une case, sur téléphone : feuille compacte. */
+@media (max-width: 620px) {
+  .modal.bp-modal {
+    height: 92dvh;
+    gap: 0.65rem;
+  }
+  .bp-head-ic {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+  .bp-head h2 {
+    font-size: 1.08rem;
+  }
+  .bp-current {
+    flex-wrap: wrap;
+  }
+  .bp-current-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .bp-modal .bp-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px 10px;
   }
 }

@@ -2655,12 +2655,36 @@
   border-color: var(--orange);
 }
 
-.lr-loading {
-  position: absolute;
-  top: 0.7rem;
-  right: 0.7rem;
-  color: var(--text-soft);
-  opacity: 0.6;
+/* Squelette d'une ligne pendant que ses détails arrivent : chaque info a son
+   pavé, à sa taille (cf. `Skel` dans ListRowsView). */
+.lr-skel {
+  display: inline-block;
+  flex-shrink: 0;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.lr-summary-skel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.55rem;
+  height: calc(0.86rem * 1.45 * 2);
+}
+
+.lr-summary-skel .lr-skel {
+  display: block;
+  height: 11px;
+}
+
+.lr-shot.gp-skel {
+  display: block;
+  border-color: transparent;
+  border-radius: 9px;
+}
+
+.lr-shot.gp-skel:hover {
+  transform: none;
 }
 
 /* La bulle d'annotation de l'auteur est posée en absolu sur les cartes :
@@ -2853,6 +2877,15 @@
   .lr-summary {
     -webkit-line-clamp: 3;
     line-clamp: 3;
+  }
+
+  .lr-summary-skel {
+    height: calc(0.86rem * 1.45 * 3);
+  }
+
+  .lr-actions .lr-act-skel {
+    width: 100% !important;
+    height: 38px !important;
   }
 
   /* Pas de survol au doigt : le « + » d'ajout reste visible. */
@@ -3740,3 +3773,213 @@
   color: var(--text-soft);
 }
 
+
+/* ======================================================================
+   La page d'une liste sur téléphone — calée sur l'appli
+   ======================================================================
+   Trois jaquettes par rangée, le nom écrit dessous (pas de survol au doigt
+   pour le révéler), un en-tête resserré. Préfixé `.ld-page` : les règles de
+   base vivent dans plusieurs feuilles chargées après celle-ci. */
+.lg-name {
+  display: none;
+}
+
+@media (max-width: 620px) {
+  .ld-page .ld-topbar {
+    padding-block: 0.4rem;
+    margin-bottom: 0.5rem;
+  }
+  .ld-page .ld-back {
+    height: 30px;
+    font-size: 0.8rem;
+  }
+
+  /* --- L'en-tête --- */
+  .ld-page .ld-header {
+    gap: 0.6rem;
+    padding: 0.85rem 0.9rem;
+    margin-bottom: 0.9rem;
+  }
+  .ld-page .ld-cover {
+    margin: -0.85rem -0.9rem 0;
+    height: 96px;
+  }
+  .ld-page .ld-header-main {
+    gap: 0.35rem;
+  }
+  .ld-page .ld-title {
+    font-size: 1.22rem;
+  }
+  .ld-page .ld-title-input {
+    font-size: 1.25rem;
+  }
+  .ld-page .list-type-badge {
+    font-size: 0.66rem;
+    padding: 0.26rem 0.5rem;
+  }
+  .ld-page .ld-desc {
+    font-size: 0.84rem;
+  }
+  .ld-page .ld-tags {
+    gap: 0.3rem;
+    margin: 0.1rem 0 0.2rem;
+  }
+  .ld-page .ld-tag {
+    font-size: 0.72rem;
+    padding: 0.15rem 0.5rem;
+  }
+  .ld-page .ld-meta {
+    font-size: 0.76rem;
+  }
+  .ld-page .ld-side {
+    gap: 0.5rem;
+  }
+  .ld-page .ld-by {
+    gap: 0.45rem;
+    padding: 0.2rem 0.65rem 0.2rem 0.2rem;
+  }
+  .ld-page .ld-by-pp {
+    width: 26px;
+    height: 26px;
+    font-size: 0.75rem;
+  }
+  .ld-page .ld-by-label {
+    display: none;
+  }
+  .ld-page .ld-by-name {
+    font-size: 0.82rem;
+  }
+  /* L'auteur et les boutons sur la même ligne quand ils tiennent (la règle
+     « largeur 100 % » des actions les renvoyait toujours dessous). */
+  .ld-page .ld-header-actions {
+    width: auto;
+    margin-left: auto;
+    gap: 0.3rem;
+  }
+  .ld-page .ld-like,
+  .ld-page .ld-vis,
+  .ld-page .ld-comments-btn,
+  .ld-page .ld-icon-btn {
+    height: 32px;
+    min-width: 32px;
+    font-size: 0.8rem;
+    border-width: 1px;
+  }
+  .ld-page .ld-like,
+  .ld-page .ld-vis,
+  .ld-page .ld-comments-btn {
+    padding: 0 0.65rem;
+  }
+  .ld-page .ld-del {
+    width: 32px;
+    height: 32px;
+    border-width: 1px;
+  }
+  .ld-page .ld-edit,
+  .ld-page .ld-template {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+  }
+  .ld-page .ld-header svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .ld-page .ld-viewswitch {
+    margin-bottom: 0.7rem;
+  }
+  .ld-page .ld-view-opt {
+    padding: 0.32rem 0.6rem;
+    font-size: 0.78rem;
+  }
+
+  /* --- La grille : trois par rangée --- */
+  .ld-page .ld-grid.rich {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.85rem 0.6rem;
+  }
+  .ld-grid.rich .game-card,
+  .ld-grid.rich .game-cover {
+    border-radius: 10px;
+  }
+  .ld-grid.rich .game-card:hover .game-cover {
+    transform: none;
+  }
+  .ld-grid.rich .game-rating {
+    top: 4px;
+    left: 4px;
+    padding: 0.1rem 0.3rem;
+    font-size: 0.62rem;
+    border-radius: 6px;
+  }
+  .ld-grid.rich .game-rating svg {
+    width: 9px;
+    height: 9px;
+  }
+  /* Le « + » d'ajout, à l'échelle d'une vignette de 100 px : réduit en bloc
+     (bouton ET éventail, dont les décalages suivent). */
+  .ld-grid.rich .add-fan {
+    top: 4px;
+    right: 4px;
+    transform: scale(0.7);
+    transform-origin: top right;
+  }
+  .ld-grid.rich .lg-rank {
+    top: -6px;
+    left: -5px;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 0.3rem;
+    border-radius: 7px;
+    font-size: 0.74rem;
+  }
+  /* La bulle se pose sur le bas de la JAQUETTE, pas de la carte : le nom
+     dessous prend une ou deux lignes. La jaquette fait 4/3 de la largeur,
+     que les unités de conteneur donnent exactement. */
+  .ld-grid.rich .lg-wrap {
+    container-type: inline-size;
+  }
+  .ld-grid.rich .lg-note-wrap {
+    left: 4px;
+    bottom: auto;
+    top: calc(133.33cqw - 28px);
+  }
+  /* Le conteneur fait pile de rendu : l'éventail ouvert doit repasser
+     au-dessus de la rangée suivante. */
+  .ld-grid.rich .lg-wrap:has(.add-fan.open) {
+    z-index: 20;
+  }
+  /* Le mot de l'auteur ne sort pas de l'écran : aligné sur la carte à gauche,
+     centré au milieu, calé à droite sur la troisième colonne. */
+  .ld-grid.rich .lg-note-pop {
+    width: min(240px, calc(100vw - 2.5rem));
+  }
+  .ld-grid.rich .lg-wrap:nth-child(3n + 2) .lg-note-pop {
+    left: calc(50cqw - 4px);
+    translate: -50% 0;
+  }
+  .ld-grid.rich .lg-wrap:nth-child(3n) .lg-note-pop {
+    left: auto;
+    right: calc(28px - 100cqw);
+  }
+  .ld-grid.rich .lg-note-btn {
+    width: 24px;
+    height: 24px;
+  }
+  .ld-grid.rich .lg-note-btn svg {
+    width: 12px;
+    height: 12px;
+  }
+  .ld-grid.rich .lg-name {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-top: 0.35rem;
+    font-size: 0.72rem;
+    font-weight: 500;
+    line-height: 1.25;
+    color: var(--text-soft);
+  }
+}

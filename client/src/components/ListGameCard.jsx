@@ -16,6 +16,9 @@ export default function ListGameCard({ item, rank }) {
       {rank != null && <span className="lg-rank">{rank}</span>}
       <GameCard game={game} variant="grid" />
       <AnnotationBubble note={item.note} media={item.media} />
+      {/* Sur téléphone, pas de survol pour révéler le titre : il s'écrit sous
+          la jaquette, comme dans l'appli (masqué sur grand écran, cf. CSS). */}
+      <span className="lg-name">{item.name}</span>
     </div>
   );
 }

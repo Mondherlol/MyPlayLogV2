@@ -6,6 +6,8 @@ import NinePhrase, { useNineFonts } from "./NinePhrase";
 import { apiFetch } from "../lib/api";
 import { apiCached } from "../lib/query";
 import { useAuth } from "../context/AuthContext";
+import { useScrollLock } from "../hooks/useScrollLock";
+import useMediaQuery from "../hooks/useMediaQuery";
 import { NINE_CUSTOM, NINE_MAX, NINE_PREFIX, nineEnding, nineTheme, nineTitle } from "../lib/nines";
 
 // ======================================================================
@@ -82,14 +84,17 @@ export default function NineModal({ themeKey, library: given, list = null, onClo
     return () => ro.disconnect();
   }, []);
 
+  // Verrou partagé (cf. hooks/useScrollLock) : l'ancien `overflow = ""` à la
+  // fermeture débloquait la page même si une autre fenêtre restait ouverte.
+  useScrollLock();
+  // Sur téléphone, la phrase se fait plus petite : elle ne doit pas manger
+  // l'écran avant même les neuf cases.
+  const compact = useMediaQuery("(max-width: 760px)");
+
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
+    return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
   // Ouverte hors de l'accueil (page d'une liste), la fenêtre n'a pas reçu la
@@ -242,7 +247,7 @@ export default function NineModal({ themeKey, library: given, list = null, onClo
                 />
               </div>
             ) : (
-              <NinePhrase themeKey={themeKey} inner={heroW} scale={1.25} ready={fontsReady} />
+              <NinePhrase themeKey={themeKey} inner={heroW} scale={compact ? 0.9 : 1.25} ready={fontsReady} />
             )}
           </div>
 

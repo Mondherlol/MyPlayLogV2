@@ -6,7 +6,6 @@ import {
   Gamepad2,
   Languages,
   Layers,
-  Loader2,
   Play,
   Star,
   X,
@@ -187,6 +186,17 @@ function Langs({ detail: d }) {
   );
 }
 
+// Un pavé de squelette. Chaque info d'une ligne en a un, à sa taille : la
+// ligne arrive d'emblée à sa hauteur finale et ne grandit plus quand les
+// détails tombent (une barre de date seule faisait tout sursauter).
+const Skel = ({ w, h = 12, r, className = "" }) => (
+  <span
+    className={`gp-skel lr-skel ${className}`}
+    style={{ width: w, height: h, borderRadius: r }}
+    aria-hidden="true"
+  />
+);
+
 // L'id IGDB d'un élément. `gameId` est renseigné depuis toujours côté ajout,
 // mais `refId` porte la même valeur pour un jeu : de quoi rester debout sur une
 // vieille liste où il manquerait.
@@ -263,6 +273,7 @@ export function GameRow({ item, rank, detail, onNeedDetail, onShots, onTrailer }
               )}
             </span>
           )}
+          {loading && <Skel w={42} h={20} r={999} />}
           {d?.rating != null && (
             <span className="lr-score" title={`${d.ratingCount} avis`}>
               <Star size={12} fill="currentColor" strokeWidth={0} />
@@ -276,10 +287,11 @@ export function GameRow({ item, rank, detail, onNeedDetail, onShots, onTrailer }
           {d?.releaseDate ? (
             <span className="lr-date">{fmtDate.format(new Date(d.releaseDate * 1000))}</span>
           ) : loading ? (
-            <span className="gp-skel gp-skel-bar" style={{ width: 120, height: 12 }} />
+            <Skel w={120} />
           ) : (
             <span className="lr-date tbd">Date inconnue</span>
           )}
+          {loading && <Skel w={150} />}
           {d?.genres?.length > 0 && (
             <span className="lr-genres">{d.genres.slice(0, 3).join(" · ")}</span>
           )}
@@ -305,12 +317,32 @@ export function GameRow({ item, rank, detail, onNeedDetail, onShots, onTrailer }
           </div>
         )}
 
+        {loading && (
+          <div className="lr-plats">
+            {[38, 46, 34, 42].map((w, i) => (
+              <Skel key={i} w={w} h={22} r={7} />
+            ))}
+          </div>
+        )}
+
+        {loading && (
+          <div className="lr-summary-skel" aria-hidden="true">
+            <Skel w="100%" />
+            <Skel w="72%" />
+          </div>
+        )}
         {d?.summary && <p className="lr-summary">{d.summary}</p>}
 
         {/* Langues : la langue d'origine et le français, rien de plus. La liste
             complète noyait la ligne sous quinze drapeaux dont on n'a rien à
             faire ; ce qu'on veut savoir, c'est « c'est en VO quoi ? » et
             « est-ce jouable en français ? ». */}
+        {loading && (
+          <div className="lr-langs">
+            <Skel w={78} h={20} r={6} />
+            <Skel w={64} h={20} r={6} />
+          </div>
+        )}
         {d?.languages?.length > 0 && <Langs detail={d} />}
 
       </div>
@@ -320,6 +352,7 @@ export function GameRow({ item, rank, detail, onNeedDetail, onShots, onTrailer }
           part (et non dans .lr-main) pour pouvoir passer pleine largeur sous la
           jaquette sur téléphone. */}
       <div className="lr-actions">
+        {loading && <Skel w={128} h={32} r={10} className="lr-act-skel" />}
         {d?.trailer && (
           <button
             type="button"
@@ -355,10 +388,12 @@ export function GameRow({ item, rank, detail, onNeedDetail, onShots, onTrailer }
         </div>
       )}
 
-      {loading && gameId && (
-        <span className="lr-loading" aria-hidden="true">
-          <Loader2 size={14} className="spin" />
-        </span>
+      {loading && (
+        <div className="lr-shots" aria-hidden="true">
+          {[0, 1, 2, 3].map((i) => (
+            <span key={i} className="lr-shot gp-skel" />
+          ))}
+        </div>
       )}
     </article>
   );
