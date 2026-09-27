@@ -118,41 +118,39 @@ Mushoku Tensei: Jobless Reincarnation - Quest of Memories
     key: "top-persona-like",
     group: "genre",
     title: "Top {n} des meilleurs Persona-like",
-    size: 25,
+    size: 30,
     tags: ["Persona-like", "JRPG", "RPG"],
     games: `
-Persona 5 Royal
-Persona 4 Golden
 Metaphor: ReFantazio
-Persona 3 Reload
-Persona 5 Strikers
-Persona 3 FES
-Persona 3 Portable
-Persona 5 Tactica
-Persona 2: Eternal Punishment
-Persona 2: Innocent Sin
-Shin Megami Tensei: Persona
-Persona Q: Shadow of the Labyrinth
-Persona Q2: New Cinema Labyrinth
-Tokyo Mirage Sessions #FE Encore
-Fire Emblem: Three Houses
 Shin Megami Tensei V: Vengeance
-Shin Megami Tensei: Devil Survivor
-Shin Megami Tensei: Digital Devil Saga
+Tokyo Mirage Sessions #FE Encore
 Catherine: Full Body
+Fire Emblem: Three Houses
+Shin Megami Tensei: Digital Devil Saga
+13 Sentinels: Aegis Rim
+Shin Megami Tensei: Devil Survivor
 The Caligula Effect 2
-Tokyo Xanadu eX+
-Monark
-Mary Skelter 2
-Akiba's Trip: Undead & Undressed
-The Legend of Heroes: Trails of Cold Steel
-The Legend of Heroes: Trails through Daybreak
 Digimon Story: Cyber Sleuth
+The Legend of Heroes: Trails of Cold Steel
+Tokyo Xanadu eX+
+The Legend of Heroes: Trails through Daybreak
 Soul Hackers 2
 Shin Megami Tensei: Devil Summoner: Soul Hackers
-13 Sentinels: Aegis Rim
+Monark
 Blue Reflection: Second Light
+The World Ends with You
+Neo: The World Ends with You
+Mary Skelter 2
+Akiba's Trip: Undead & Undressed
 Ever Oasis
+Digimon Story: Cyber Sleuth - Hacker's Memory
+Lost Dimension
+Conception II: Children of the Seven Stars
+Tokyo Twilight Ghost Hunters
+Stranger of Sword City
+Shin Megami Tensei III: Nocturne
+Shin Megami Tensei IV
+The Caligula Effect: Overdose
 `,
   },
   {
@@ -161,29 +159,64 @@ Ever Oasis
     key: "top-deduction",
     group: "genre",
     title: "Top {n} des meilleurs jeux de déduction & de procès",
-    size: 20,
+    size: 55,
     tags: ["Déduction", "Procès", "Visual novel", "Enquête"],
     games: `
 Danganronpa 2: Goodbye Despair
 Ghost Trick: Phantom Detective
+Return of the Obra Dinn
+The Case of the Golden Idol
 AI: The Somnium Files
+Zero Escape: Virtue's Last Reward
+Nine Hours, Nine Persons, Nine Doors
 Danganronpa: Trigger Happy Havoc
+Paradise Killer
+The Rise of the Golden Idol
 Master Detective Archives: Rain Code
+Her Story
 Paranormasight: The Seven Mysteries of Honjo
 Danganronpa V3: Killing Harmony
+The Centennial Case: A Shijima Story
 Famicom Detective Club: The Missing Heir
+Disco Elysium
+Shadows of Doubt
+Zero Time Dilemma
+Raging Loop
+L.A. Noire
 Aviary Attorney
 AI: The Somnium Files - nirvanA Initiative
 Famicom Detective Club: Emio - The Smiling Man
-Famicom Detective Club: The Girl Who Stands Behind
-Chaos;Head Noah
-Tangle Tower
-Murder by Numbers
 Hotel Dusk: Room 215
+Sherlock Holmes: Crimes & Punishments
+Chaos;Head Noah
+Famicom Detective Club: The Girl Who Stands Behind
 Last Window: The Secret of Cape West
-Nine Hours, Nine Persons, Nine Doors
-Zero Escape: Virtue's Last Reward
+Sherlock Holmes Chapter One
+Duck Detective: The Secret Salami
+The Roottrees are Dead
+Tangle Tower
+Unheard
+Overboard!
+Telling Lies
+The Wolf Among Us
+Heavy Rain
+Murder by Numbers
+Strange Horticulture
+Chants of Sennaar
 Contradiction: Spot the Liar!
+Spirit Hunter: NG
+Death Mark
+Chinatown Detective Agency
+Root Letter
+Process of Elimination
+Orwell
+Detective Pikachu Returns
+Detective Pikachu
+Jake Hunter Detective Story: Ghost of the Dusk
+Detective Instinct: Farewell, My Beloved
+Root Film
+The Painscreek Killings
+Sherlock Holmes: The Devil's Daughter
 `,
   },
   {
@@ -661,43 +694,46 @@ Rainbow Six Siege
     key: "top-zelda-like",
     group: "genre",
     title: "Top {n} des meilleurs Zelda-like",
-    size: 30,
+    size: 35,
     tags: ["Zelda-like", "Action", "Aventure"],
     games: `
-The Legend of Zelda: A Link to the Past
-The Legend of Zelda: Ocarina of Time
-The Legend of Zelda: Link's Awakening @1993
-The Legend of Zelda: The Minish Cap
-The Legend of Zelda: A Link Between Worlds
-The Legend of Zelda: Echoes of Wisdom
 Okami
 Tunic
 Death's Door
-Beyond Good & Evil
-Darksiders
-Alundra
-Illusion of Gaia
-Terranigma
-Soul Blazer
-Landstalker
-Secret of Mana
-Crystalis
-StarTropics
-Ittle Dew 2+
 Hyper Light Drifter
-Blossom Tales: The Sleeping King
-Oceanhorn: Monster of Uncharted Seas
-Minishoot' Adventures
-Eastward
+Alundra
+Terranigma
+Illusion of Gaia
 CrossCode
-Hob
-Ys Origin
+Beyond Good & Evil
+Secret of Mana
+Soul Blazer
+Crystalis
+Landstalker
+Ittle Dew 2+
+Golden Sun
+Blossom Tales: The Sleeping King
+Minishoot' Adventures
+Lil Gator Game
+Darksiders
 Anodyne
-Moonlighter
+Eastward
+Chicory: A Colorful Tale
+StarTropics
 Beyond Oasis
+Lufia II: Rise of the Sinistrals
+Neutopia
 3D Dot Game Heroes
 Immortals Fenyx Rising
-Sea of Stars
+Oceanhorn: Monster of Uncharted Seas
+The Swords of Ditto
+Unsighted
+Garden Story
+Hob
+Ys Origin
+Blossom Tales II: The Minotaur Prince
+Moonlighter
+Neutopia II
 `,
   },
   {

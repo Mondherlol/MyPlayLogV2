@@ -25,6 +25,7 @@ import { nineSuggestions } from "../lib/nineSuggest.js";
 import { boardKey, boardSlot, cleanBoardItems } from "../lib/boards.js";
 import { ensureGameMeta } from "../lib/gameMeta.js";
 import { igdbQuery } from "../lib/igdb.js";
+import { similarGames } from "../lib/recoEngine.js";
 
 const router = express.Router();
 
@@ -1010,6 +1011,154 @@ router.get("/suggest/tiers", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("tier suggest error:", err.message);
     res.status(500).json({ error: "Suggestions indisponibles." });
+  }
+});
+
+// ----------------------------------------------------------------------
+//  « T'en veux plus ? » — sous le top d'une saga, les jeux dans son esprit
+// ----------------------------------------------------------------------
+// Kingdom Hearts, Ace Attorney, Touhou… ces sagas ont peu d'épisodes : leur
+// top se lit vite, et on reste sur sa faim. Plutôt qu'écrire un « top des
+// Kingdom Hearts-like » à la main pour chacune des cent sagas, on le calcule :
+// les jeux qui ressemblent le plus aux MEILLEURS épisodes (moteur de
+// recommandation, cf. lib/recoEngine `similarGames`), moins la saga elle-même.
+//
+// Quelques sagas ont déjà leur top « -like » écrit à la main : on le reprend
+// tel quel, il vaut mieux qu'un calcul.
+// Les sagas qui appartiennent nettement à un genre : le top de ce genre, écrit
+// à la main, est un meilleur « dans son esprit » que le calcul (qui, pour un
+// Yakuza, remontait surtout de grands jeux d'action à la mode).
+const CURATED_LIKE = {
+  "top-zelda": "top-zelda-like",
+  "top-persona": "top-persona-like",
+  "top-smt": "top-persona-like",
+  "top-fromsoftware": "top-soulslike",
+  "top-metroid": "top-metroidvania",
+  "top-castlevania": "top-metroidvania",
+  "top-ace-attorney": "top-deduction",
+  "top-danganronpa": "top-deduction",
+  "top-pokemon": "top-monster-collecting",
+  "top-monster-hunter": "top-monster-hunting",
+  "top-metal-gear": "top-stealth",
+  "top-splinter-cell": "top-stealth",
+  "top-hitman": "top-stealth",
+  "top-street-fighter": "top-fighting",
+  "top-tekken": "top-fighting",
+  "top-mortal-kombat": "top-fighting",
+  "top-fighting-sagas": "top-fighting",
+  "top-mario": "top-platformer",
+  "top-donkey-kong": "top-platformer",
+  "top-crash": "top-platformer",
+  "top-spyro": "top-platformer",
+  "top-rayman": "top-platformer",
+  "top-jak-sly": "top-platformer",
+  "top-sonic": "top-platformer",
+  "top-devil-may-cry": "top-character-action",
+  "top-bayonetta": "top-character-action",
+  "top-resident-evil": "top-survival-horror",
+  "top-silent-hill": "top-survival-horror",
+  "top-fire-emblem": "top-tactical-rpg",
+  "top-disgaea": "top-tactical-rpg",
+  "top-civilization": "top-strategy",
+  "top-total-war": "top-strategy",
+  "top-age-of-empires": "top-strategy",
+  "top-xcom": "top-strategy",
+  "top-gran-turismo-forza": "top-racing",
+  "top-nfs-burnout": "top-racing",
+  "top-harvest-moon": "top-cozy",
+  "top-animal-crossing": "top-cozy",
+  "top-touhou": "top-shmup",
+  "top-metal-slug": "top-shmup",
+};
+const MORE_SEEDS = 12;
+const MORE_MAX = 50;
+const MORE_TTL = 24 * 3600 * 1000;
+const moreCache = new Map(); // id de liste -> { at, payload }
+
+// « Les 25 meilleurs Kingdom Hearts » → « Kingdom Hearts » ; « Les 10
+// meilleurs jeux Batman » → « Batman ».
+function sagaSubject(title) {
+  const m = String(title || "").match(/^les\s+\d+\s+meilleur(?:e?s)\s+(.+)$/i);
+  const raw = m ? m[1] : String(title || "");
+  return raw
+    .replace(/\s*\([^)]*\)\s*$/, "")
+    .replace(/^jeux\s+/i, "")
+    .trim();
+}
+
+const plainName = (s) =>
+  String(s || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+router.get("/:id/more", optionalAuth, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.json({ more: null });
+    const hit = moreCache.get(req.params.id);
+    if (hit && Date.now() - hit.at < MORE_TTL) return res.json({ more: hit.payload });
+
+    const top = await List.findById(req.params.id).select("title official items.gameId items.name").lean();
+    if (top?.official?.kind !== "top" || top.official.group !== "series") return res.json({ more: null });
+    const subject = sagaSubject(top.title);
+    const own = new Set((top.items || []).map((i) => String(i.gameId)));
+    // La saga elle-même (autres épisodes, spin-offs) n'est pas « dans son
+    // esprit » : c'est elle. Un nom composé (« Yakuza & Like a Dragon »,
+    // « Pikmin, Star Fox & Splatoon ») donne plusieurs noms à écarter.
+    const keys = subject.split(/&|,/).map(plainName).filter((k) => k.length >= 3);
+    const isSaga = (name) => keys.some((k) => plainName(name).includes(k));
+
+    let payload = null;
+    const curatedKey = CURATED_LIKE[top.official.key];
+    if (curatedKey) {
+      const like = await List.findOne({ "official.key": curatedKey })
+        .select("title items.gameId items.name items.image")
+        .lean();
+      if (like) {
+        const games = like.items
+          .filter((i) => !own.has(String(i.gameId)) && !isSaga(i.name))
+          .map((i) => ({ id: i.gameId, name: i.name, cover: i.image || null }));
+        payload = { subject, listId: String(like._id), listTitle: like.title, games };
+      }
+    }
+
+    if (!payload) {
+      // Les meilleurs épisodes servent de graines ; un jeu recommandé par
+      // plusieurs d'entre eux, et par les mieux classés, remonte.
+      const seeds = (top.items || []).slice(0, MORE_SEEDS).map((i) => Number(i.gameId)).filter(Boolean);
+      const lists = await Promise.all(
+        seeds.map((id) => similarGames(id, { limit: 40 }).catch(() => null))
+      );
+      const score = new Map();
+      const hits = new Map();
+      const cardOf = new Map();
+      lists.forEach((games, rank) => {
+        for (const [pos, g] of (games || []).entries()) {
+          if (!g?.id || own.has(String(g.id)) || isSaga(g.name)) continue;
+          const w = (1 / (1 + rank * 0.15)) * (1 / (1 + pos * 0.05));
+          score.set(g.id, (score.get(g.id) || 0) + w);
+          hits.set(g.id, (hits.get(g.id) || 0) + 1);
+          if (!cardOf.has(g.id)) cardOf.set(g.id, { id: g.id, name: g.name, cover: g.cover });
+        }
+      });
+      // Un jeu que PLUSIEURS épisodes recommandent passe devant un jeu qu'un
+      // seul a fait remonter : c'est le consensus qui fait « l'esprit ».
+      const games = [...score]
+        .map(([id, v]) => [id, v * Math.sqrt(hits.get(id) / Math.max(1, seeds.length))])
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, MORE_MAX)
+        .map(([id]) => cardOf.get(id))
+        .filter((g) => g.cover);
+      payload = games.length >= 5 ? { subject, listId: null, listTitle: null, games } : null;
+    }
+
+    moreCache.set(req.params.id, { at: Date.now(), payload });
+    res.json({ more: payload });
+  } catch (err) {
+    console.error("list more error:", err.message);
+    res.json({ more: null });
   }
 });
 

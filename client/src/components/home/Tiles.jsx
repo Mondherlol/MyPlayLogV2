@@ -70,6 +70,10 @@ export function GameTile({ game, sub, subGold = false, badge = null, bare = fals
  * sur le site, et le magasin est à un clic. Titre non reconnu : on retombe sur
  * l'offre, puisqu'il n'y a pas de fiche où aller.
  */
+// Les boutiques dont on a le logo (client/public/stores/*.svg, Simple Icons,
+// domaine public) — les clés sont les `slug` de server/src/lib/freeGames.js.
+const STORE_LOGOS = new Set(["steam", "epic", "gog", "itchio", "ubisoft", "ea", "battlenet", "prime"]);
+
 export function FreeCard({ game }) {
   const ends = freeEndsLabel(game.endsAt);
   const color = STORE_COLORS[game.store.slug] || STORE_COLORS.pc;
@@ -85,9 +89,21 @@ export function FreeCard({ game }) {
             <Gamepad2 size={22} />
           </span>
         )}
-        <span className="mh-free-store" style={{ background: color }}>
-          {game.store.label}
-        </span>
+        {/* La boutique par son LOGO (le nom en infobulle) : « Epic », « itch.io »
+            écrits en toutes lettres se lisaient moins vite qu'un logo connu. */}
+        {STORE_LOGOS.has(game.store.slug) ? (
+          <span
+            className="mh-free-store has-logo"
+            style={{ background: color }}
+            title={`Gratuit sur ${game.store.label}`}
+          >
+            <img src={`/stores/${game.store.slug}.svg`} alt={game.store.label} draggable="false" />
+          </span>
+        ) : (
+          <span className="mh-free-store" style={{ background: color }}>
+            {game.store.label}
+          </span>
+        )}
         {!!ends && (
           <span className={`mh-free-ends ${ends.urgent ? "urgent" : ""}`}>
             <Clock size={11} /> {ends.text}

@@ -55,12 +55,12 @@ myplaylog.cc {
 
         # Images, modèles 3D, polices, sons : une semaine (leur nom ne change
         # pas d'un build à l'autre, il faut qu'une mise à jour finisse par passer).
-        @media path /tops/* /arcade/* /case/* /geo/* /sfx/* /fonts/* *.glb *.png *.webp *.jpg *.woff2 *.mp3
+        @media path /tops/* /stores/* /arcade/* /case/* /geo/* /sfx/* /fonts/* *.glb *.png *.webp *.jpg *.woff2 *.mp3
         header @media Cache-Control "public, max-age=604800"
 
         # La page elle-même et le service worker : toujours revérifiés, sinon
         # un déploiement mettrait des jours à arriver chez les gens.
-        @fresh not path /assets/* /tops/* /arcade/* /case/* /geo/* /sfx/* /fonts/* *.glb *.png *.webp *.jpg *.woff2 *.mp3
+        @fresh not path /assets/* /tops/* /stores/* /arcade/* /case/* /geo/* /sfx/* /fonts/* *.glb *.png *.webp *.jpg *.woff2 *.mp3
         header @fresh Cache-Control "no-cache"
 
         try_files {path} /index.html

@@ -28,6 +28,7 @@ import {
   Rows3,
 } from "lucide-react";
 import AwardsBoard from "../components/AwardsBoard";
+import MoreLike from "../components/lists/MoreLike";
 import {
   DndContext,
   DragOverlay,
@@ -1044,6 +1045,12 @@ export default function ListDetail() {
               </SortableContext>
             )}
           </>
+        )}
+
+        {/* --- « T'en veux plus ? » : sous le top d'une saga, les jeux dans
+            son esprit (cf. components/lists/MoreLike). --- */}
+        {!editing && list.official?.kind === "top" && list.official.group === "series" && (
+          <MoreLike listId={id} token={token} />
         )}
 
         {/* --- Fantôme de drag --- */}

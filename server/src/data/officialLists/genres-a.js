@@ -354,40 +354,38 @@ Hades II
     size: 30,
     tags: ["Soulslike", "Action", "RPG"],
     games: `
-Elden Ring
-Bloodborne
-Dark Souls
-Sekiro: Shadows Die Twice
-Dark Souls III
-Demon's Souls @2020
-Elden Ring: Shadow of the Erdtree
 Lies of P
-Dark Souls II: Scholar of the First Sin
 Nioh 2
-Nioh
 Hollow Knight
-Star Wars Jedi: Survivor
-Star Wars Jedi: Fallen Order
 Black Myth: Wukong
+Nioh
+Star Wars Jedi: Survivor
 Salt and Sanctuary
 Blasphemous
 Remnant II
-Remnant: From the Ashes
+Star Wars Jedi: Fallen Order
 Mortal Shell
 Code Vein
 Lords of the Fallen @2023
 The Surge 2
-Thymesia
 Wo Long: Fallen Dynasty
-Rise of the Ronin
-Stellar Blade
+Thymesia
 Death's Door
 Tunic
-Hellpoint
-Another Crab's Treasure
-Demon's Souls @2009
-Enotria: The Last Song
+Rise of the Ronin
+Stellar Blade
+Remnant: From the Ashes
 Wuchang: Fallen Feathers
+Another Crab's Treasure
+Enotria: The Last Song
+Hellpoint
+Blasphemous 2
+The Surge
+Ender Lilies: Quietus of the Knights
+Salt and Sacrifice
+Code Vein II
+Lords of the Fallen @2014
+Hollow Knight: Silksong
 `,
   },
   {

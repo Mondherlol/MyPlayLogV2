@@ -1853,6 +1853,12 @@
   "year": 1998,
   "exact": true
  },
+ "Blossom Tales II: The Minotaur Prince": {
+  "id": 172489,
+  "name": "Blossom Tales 2: The Minotaur Prince",
+  "year": 2022,
+  "exact": false
+ },
  "Blossom Tales: The Sleeping King": {
   "id": 27994,
   "name": "Blossom Tales: The Sleeping King",
@@ -3125,6 +3131,12 @@
   "year": 2019,
   "exact": true
  },
+ "Code Vein II": {
+  "id": 347636,
+  "name": "Code Vein II",
+  "year": 2026,
+  "exact": true
+ },
  "Code: Realize - Guardian of Rebirth": {
   "id": 19475,
   "name": "Code: Realize - Guardian of Rebirth",
@@ -3243,6 +3255,12 @@
   "id": 16999,
   "name": "Conan Exiles",
   "year": 2018,
+  "exact": true
+ },
+ "Conception II: Children of the Seven Stars": {
+  "id": 4701,
+  "name": "Conception II: Children of the Seven Stars",
+  "year": 2013,
   "exact": true
  },
  "Condemned: Criminal Origins": {
@@ -4139,6 +4157,12 @@
   "year": 2010,
   "exact": true
  },
+ "Death Mark": {
+  "id": 26624,
+  "name": "Spirit Hunter: Death Mark",
+  "year": 2017,
+  "exact": true
+ },
  "Death Must Die": {
   "id": 244243,
   "name": "Death Must Die",
@@ -4295,10 +4319,22 @@
   "year": 1996,
   "exact": true
  },
+ "Detective Instinct: Farewell, My Beloved": {
+  "id": 278060,
+  "name": "Detective Instinct: Farewell, My Beloved",
+  "year": 2025,
+  "exact": true
+ },
  "Detective Pikachu": {
   "id": 81272,
   "name": "Detective Pikachu",
   "year": 2018,
+  "exact": true
+ },
+ "Detective Pikachu Returns": {
+  "id": 128307,
+  "name": "Detective Pikachu Returns",
+  "year": 2023,
   "exact": true
  },
  "Detroit: Become Human": {
@@ -9719,6 +9755,12 @@
   "year": 2005,
   "exact": true
  },
+ "Jake Hunter Detective Story: Ghost of the Dusk": {
+  "id": 347617,
+  "name": "Jake Hunter Detective Story: Ghost of the Dusk",
+  "year": 2017,
+  "exact": true
+ },
  "Jamestown": {
   "id": 23221,
   "name": "Jamestown+",
@@ -10835,6 +10877,12 @@
   "year": 2025,
   "exact": true
  },
+ "Lil Gator Game": {
+  "id": 145796,
+  "name": "Lil Gator Game",
+  "year": 2022,
+  "exact": true
+ },
  "Limbo": {
   "id": 1331,
   "name": "Limbo",
@@ -10979,6 +11027,12 @@
   "year": 2021,
   "exact": true
  },
+ "Lords of the Fallen @2014": {
+  "id": 4847,
+  "name": "Lords of the Fallen",
+  "year": 2014,
+  "exact": true
+ },
  "Lords of the Fallen @2023": {
   "id": 21593,
   "name": "Lords of the Fallen",
@@ -11001,6 +11055,12 @@
   "id": 26128,
   "name": "Lost Ark",
   "year": 2019,
+  "exact": true
+ },
+ "Lost Dimension": {
+  "id": 19099,
+  "name": "Lost Dimension",
+  "year": 2014,
   "exact": true
  },
  "Lost Judgment": {
@@ -11037,6 +11097,12 @@
   "id": 142035,
   "name": "Luck be a Landlord",
   "year": 2023,
+  "exact": true
+ },
+ "Lufia II: Rise of the Sinistrals": {
+  "id": 1178,
+  "name": "Lufia II: Rise of the Sinistrals",
+  "year": 1995,
   "exact": true
  },
  "Lufia II: Rise of the Sinistrals #19": {
@@ -13511,6 +13577,12 @@
   "year": 2004,
   "exact": true
  },
+ "Neo: The World Ends with You": {
+  "id": 141192,
+  "name": "NEO: The World Ends with You",
+  "year": 2021,
+  "exact": true
+ },
  "Neon Abyss": {
   "id": 116100,
   "name": "Neon Abyss",
@@ -13533,6 +13605,18 @@
   "id": 207850,
   "name": "NetHack",
   "year": 2011,
+  "exact": true
+ },
+ "Neutopia": {
+  "id": 28524,
+  "name": "Neutopia",
+  "year": 1989,
+  "exact": true
+ },
+ "Neutopia II": {
+  "id": 28523,
+  "name": "Neutopia II",
+  "year": 1991,
   "exact": true
  },
  "Neva": {
@@ -14277,6 +14361,12 @@
   "id": 37001,
   "name": "Ori and the Will of the Wisps",
   "year": 2020,
+  "exact": true
+ },
+ "Orwell": {
+  "id": 22704,
+  "name": "Orwell: Keeping an Eye on You",
+  "year": 2016,
   "exact": true
  },
  "Osu! Tatakae! Ouendan 2": {
@@ -15899,6 +15989,12 @@
   "year": 2006,
   "exact": true
  },
+ "Process of Elimination": {
+  "id": 216583,
+  "name": "Process of Elimination",
+  "year": 2021,
+  "exact": true
+ },
  "Professor Layton and the Azran Legacy": {
   "id": 1403,
   "name": "Professor Layton and the Azran Legacy",
@@ -17363,6 +17459,18 @@
   "year": 2020,
   "exact": true
  },
+ "Root Film": {
+  "id": 124953,
+  "name": "Root Film",
+  "year": 2020,
+  "exact": true
+ },
+ "Root Letter": {
+  "id": 19798,
+  "name": "Root Letter",
+  "year": 2016,
+  "exact": true
+ },
  "Rule of Rose": {
   "id": 7415,
   "name": "Rule of Rose",
@@ -17553,6 +17661,12 @@
   "id": 71399,
   "name": "Sakura Taisen",
   "year": 1996,
+  "exact": true
+ },
+ "Salt and Sacrifice": {
+  "id": 152065,
+  "name": "Salt and Sacrifice",
+  "year": 2022,
   "exact": true
  },
  "Salt and Sanctuary": {
@@ -17927,6 +18041,12 @@
   "year": 2014,
   "exact": true
  },
+ "Sherlock Holmes: The Devil's Daughter": {
+  "id": 11563,
+  "name": "Sherlock Holmes: The Devil's Daughter",
+  "year": 2016,
+  "exact": true
+ },
  "Shin Megami Tensei": {
   "id": 21074,
   "name": "Shin Megami Tensei",
@@ -18057,12 +18177,6 @@
   "id": 9669,
   "name": "Shin Megami Tensei: Nocturne",
   "year": 2004,
-  "exact": true
- },
- "Shin Megami Tensei: Persona": {
-  "id": 21842,
-  "name": "Shin Megami Tensei: Persona",
-  "year": 2009,
   "exact": true
  },
  "Shin Megami Tensei: Persona #38": {
@@ -19913,6 +20027,12 @@
   "year": 2022,
   "exact": true
  },
+ "Stranger of Sword City": {
+  "id": 18905,
+  "name": "Stranger of Sword City",
+  "year": 2014,
+  "exact": true
+ },
  "Stray": {
   "id": 110248,
   "name": "Stray",
@@ -21707,9 +21827,21 @@
   "year": 2021,
   "exact": true
  },
+ "The Caligula Effect: Overdose": {
+  "id": 75990,
+  "name": "The Caligula Effect: Overdose",
+  "year": 2018,
+  "exact": true
+ },
  "The Case of the Golden Idol": {
   "id": 166722,
   "name": "The Case of the Golden Idol",
+  "year": 2022,
+  "exact": true
+ },
+ "The Centennial Case: A Shijima Story": {
+  "id": 191420,
+  "name": "The Centennial Case: A Shijima Story",
   "year": 2022,
   "exact": true
  },
@@ -22565,6 +22697,12 @@
   "year": 2018,
   "exact": false
  },
+ "The Roottrees are Dead": {
+  "id": 288983,
+  "name": "The Roottrees Are Dead",
+  "year": 2025,
+  "exact": true
+ },
  "The Secret of Monkey Island": {
   "id": 60,
   "name": "The Secret of Monkey Island",
@@ -22661,10 +22799,22 @@
   "year": 2022,
   "exact": true
  },
+ "The Surge": {
+  "id": 11590,
+  "name": "The Surge",
+  "year": 2017,
+  "exact": true
+ },
  "The Surge 2": {
   "id": 86477,
   "name": "The Surge 2",
   "year": 2019,
+  "exact": true
+ },
+ "The Swords of Ditto": {
+  "id": 36798,
+  "name": "The Swords of Ditto",
+  "year": 2018,
   "exact": true
  },
  "The Talos Principle": {
@@ -23997,6 +24147,12 @@
   "id": 272,
   "name": "Unreal Tournament",
   "year": 1999,
+  "exact": true
+ },
+ "Unsighted": {
+  "id": 111815,
+  "name": "Unsighted",
+  "year": 2021,
   "exact": true
  },
  "Until Dawn": {
@@ -25348,6 +25504,12 @@
   "name": "Zero Escape: Zero Time Dilemma",
   "year": 2016,
   "exact": true
+ },
+ "Zero Time Dilemma": {
+  "id": 11549,
+  "name": "Zero Escape: Zero Time Dilemma",
+  "year": 2016,
+  "exact": false
  },
  "ZeroRanger": {
   "id": 59737,

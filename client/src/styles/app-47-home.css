@@ -1286,6 +1286,20 @@ a.mh-head-main:hover .mh-head-title {
   font-size: 0.65rem;
   font-weight: 700;
 }
+/* Le logo de la boutique : blanc sur la couleur de la boutique. */
+.mh-free-store.has-logo {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.mh-free-store.has-logo img {
+  width: 16px;
+  height: 16px;
+  filter: brightness(0) invert(1);
+}
 .mh-free-ends {
   position: absolute;
   right: 0.4rem;

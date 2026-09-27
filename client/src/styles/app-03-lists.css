@@ -1312,6 +1312,60 @@
   color: #1a1204;
 }
 
+/* ---------- « T'en veux plus ? » (components/lists/MoreLike) ----------
+   Sous le top d'une saga : un vrai second chapitre, séparé du premier par un
+   grand blanc et un filet, avec son propre titre. */
+.ml {
+  margin-top: 3.5rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border);
+}
+.ml-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.35rem 1rem;
+  margin-bottom: 1.3rem;
+}
+.ml-kicker {
+  flex-basis: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #f2b70b;
+}
+.ml-title {
+  flex: 1 1 auto;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 2.4vw, 1.9rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+.ml-title b {
+  color: #f2b70b;
+}
+.ml-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  height: 32px;
+  padding: 0 0.6rem 0 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.ml-more:hover {
+  color: var(--text);
+  border-color: #f2b70b;
+}
+
 /* ---------- Cards riches de jeux (lecture, listes classiques/rankées) ---------- */
 .ld-grid.rich {
   display: grid;
