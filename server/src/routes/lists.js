@@ -26,6 +26,8 @@ import { boardKey, boardSlot, cleanBoardItems } from "../lib/boards.js";
 import { ensureGameMeta } from "../lib/gameMeta.js";
 import { igdbQuery } from "../lib/igdb.js";
 import { similarGames } from "../lib/recoEngine.js";
+import { officialCharacters, rosterProvider } from "../lib/gameCharacters.js";
+import { wikiCharacters, wikiRoster } from "../lib/gameWiki.js";
 
 const router = express.Router();
 
@@ -893,8 +895,9 @@ router.get("/tops/for-me", requireAuth, async (req, res) => {
 // GET /api/lists/suggest/tiers — des tier lists à faire, tirées des sagas que
 // le joueur a jouées (« Tier list des jeux Pokémon »). La page Listes les
 // propose quand le rayon des tier lists est vide, ou tant que le joueur n'en a
-// fait aucune. Chaque suggestion porte ses jeux : un clic crée la tier list
-// déjà remplie, il ne reste qu'à ranger.
+// fait aucune. Chaque suggestion porte ses jeux (ou, pour un jeu-service, les
+// personnages de son roster) : un clic ouvre la tier list en brouillon, déjà
+// remplie — elle n'est créée qu'au premier élément classé.
 // Déclarée AVANT /:id pour ne pas être capturée par la route paramétrée.
 const TIER_SUGGEST_MAX = 8;
 const TIER_POOL_MAX = 60;
@@ -955,7 +958,7 @@ router.get("/suggest/tiers", requireAuth, async (req, res) => {
   try {
     const [entries, mine] = await Promise.all([
       UserGame.find({ user: req.userId, status: { $ne: "wishlist" } })
-        .select("gameId name cover")
+        .select("gameId name cover playtimeHours favorite")
         .lean(),
       List.find({ user: req.userId, type: "tier" }).select("title").lean(),
     ]);
@@ -1007,7 +1010,58 @@ router.get("/suggest/tiers", requireAuth, async (req, res) => {
       };
     });
 
-    res.json({ hasOwnTier: mine.length > 0, suggestions });
+    // --- Les rosters : « Tier list des héros Overwatch » ---------------
+    // Un jeu-service joué (Overwatch, Valorant, LoL, Marvel Rivals, Dota 2) ou
+    // un jeu de combat (Smash, Tekken, Street Fighter) n'a pas de « saga » à
+    // classer : ce qu'on y classe, ce sont ses personnages.
+    // Le roster officiel (cf. lib/gameCharacters) remplit le bac, portraits
+    // compris. Les plus joués d'abord, et en tête du rayon : c'est le débat
+    // que tout joueur de ces jeux a déjà en tête.
+    const rosterBySlug = new Map();
+    for (const e of entries) {
+      // Roster officiel (jeux-services, Smash), sinon celui d'un wiki fiable
+      // (jeux de combat : Tekken, Street Fighter — cf. lib/gameWiki).
+      const official = rosterProvider(e.name);
+      const p = official ? { ...official, source: "official" } : wikiRoster(e.name) && { ...wikiRoster(e.name), source: "wiki" };
+      if (!p) continue;
+      const hours = e.playtimeHours || 0;
+      const cur = rosterBySlug.get(p.slug);
+      if (!cur || hours > cur.hours) rosterBySlug.set(p.slug, { p, e, hours });
+    }
+    const rosterPicked = [...rosterBySlug.values()]
+      .filter(({ p }) => !done.some((t) => t.includes(p.title.toLowerCase())))
+      .sort((a, b) => b.hours - a.hours || (b.e.favorite ? 1 : 0) - (a.e.favorite ? 1 : 0))
+      .slice(0, 4);
+    const rosters = await Promise.all(
+      rosterPicked.map(({ p, e }) =>
+        p.source === "official" ? officialCharacters(e.name) : wikiCharacters(e.gameId, e.name, [])
+      )
+    );
+    const rosterSuggestions = rosterPicked
+      .map(({ p, e }, i) => {
+        const chars = rosters[i].filter((c) => c.image);
+        return {
+          saga: `roster:${p.slug}`,
+          title: p.title,
+          label: p.title,
+          unit: p.unit,
+          itemKind: "character",
+          count: chars.length,
+          played: 1,
+          covers: chars.slice(0, 3).map((c) => c.image),
+          games: chars.map((c) => ({
+            kind: "character",
+            refId: c.id,
+            gameId: e.gameId,
+            gameName: e.name,
+            name: c.name,
+            cover: c.image,
+          })),
+        };
+      })
+      .filter((sg) => sg.count >= 4);
+
+    res.json({ hasOwnTier: mine.length > 0, suggestions: [...rosterSuggestions, ...suggestions] });
   } catch (err) {
     console.error("tier suggest error:", err.message);
     res.status(500).json({ error: "Suggestions indisponibles." });

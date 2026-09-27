@@ -360,6 +360,10 @@ a.mh-head-main:hover .mh-head-title {
      titre, là où elle doit être. */
   scroll-padding-inline: var(--bleed);
   scrollbar-width: none;
+  /* Les cartes empilent leurs propres calques (titre, badges, menus à
+     z-index 6, 20…) : isolées ici, elles ne passent plus jamais au-dessus des
+     flèches du rayon (z-index 3, hors du rail). */
+  isolation: isolate;
 }
 .mh-rail::-webkit-scrollbar {
   display: none;

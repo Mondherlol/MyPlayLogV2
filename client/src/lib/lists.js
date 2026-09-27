@@ -139,3 +139,39 @@ export const playlistItemToTrack = (it) => ({
   gameId: it.gameId,
   gameName: it.gameName,
 });
+
+// ======================================================================
+//  Brouillon de liste (cf. pages/ListDetail)
+// ======================================================================
+// Une liste ouverte depuis une suggestion (« Tier list des jeux Yakuza »)
+// n'est pas créée tout de suite : elle s'ouvre sur /lists/draft, et n'est
+// enregistrée qu'au premier jeu classé. Le brouillon voyage dans l'état de
+// navigation, doublé en sessionStorage pour survivre à un rechargement.
+export const DRAFT_ID = "draft";
+const DRAFT_KEY = "mpl_list_draft";
+
+export function openListDraft(navigate, draft) {
+  try {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    /* stockage indisponible : l'état de navigation suffit */
+  }
+  navigate(`/lists/${DRAFT_ID}`, { state: { edit: true, draft } });
+}
+
+export function readListDraft(state) {
+  if (state?.draft) return state.draft;
+  try {
+    return JSON.parse(sessionStorage.getItem(DRAFT_KEY) || "null");
+  } catch {
+    return null;
+  }
+}
+
+export function clearListDraft() {
+  try {
+    sessionStorage.removeItem(DRAFT_KEY);
+  } catch {
+    /* rien à nettoyer */
+  }
+}

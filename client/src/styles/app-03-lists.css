@@ -3983,3 +3983,320 @@
     color: var(--text-soft);
   }
 }
+
+/* ======================================================================
+   La page d'une liste sur téléphone : l'en-tête compact (PhoneHeader)
+   ====================================================================== */
+.ld-mh {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin: 0 0 0.9rem;
+}
+.ld-mh-cover {
+  position: relative;
+  height: 110px;
+  margin-bottom: 0.2rem;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.ld-mh-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.ld-mh-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.ld-mh-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+.ld-mh-icon.gold {
+  border-color: #f2b70b;
+  background: #f2b70b;
+  color: #1a1204;
+}
+.ld-mh-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 1.2rem;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ld-mh-title-input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px; /* pas de zoom automatique d'iOS au focus */
+  outline: none;
+}
+.ld-mh-title-input:focus {
+  border-color: var(--orange);
+}
+.ld-mh-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+.ld-mh-meta .list-type-badge {
+  font-size: 0.64rem;
+  padding: 0.22rem 0.45rem;
+}
+.ld-mh-private {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+.ld-mh-draft {
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.ld-mh-desc {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: var(--text-soft);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ld-mh-desc.open {
+  display: block;
+}
+.ld-mh-tags {
+  display: flex;
+  gap: 0.3rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ld-mh-tags::-webkit-scrollbar {
+  display: none;
+}
+.ld-mh-tags .ld-tag {
+  flex: none;
+  font-size: 0.72rem;
+  padding: 0.15rem 0.5rem;
+}
+.ld-mh-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.1rem;
+}
+.ld-mh-by {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.84rem;
+}
+.ld-mh-by .ld-by-pp {
+  width: 26px;
+  height: 26px;
+  font-size: 0.72rem;
+}
+.ld-mh-by-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ld-mh-acts {
+  flex: none;
+  display: flex;
+  gap: 0.3rem;
+}
+.ld-mh-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  height: 30px;
+  min-width: 30px;
+  padding: 0 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.ld-mh-pill.icon {
+  padding: 0;
+  color: var(--text-soft);
+}
+.ld-mh-pill.liked {
+  border-color: rgba(255, 84, 112, 0.4);
+  color: #ff5470;
+}
+.ld-mh-template {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 40px;
+  margin-top: 0.2rem;
+  border: none;
+  border-radius: 999px;
+  background: #f2b70b;
+  color: #1a1204;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+/* --- La feuille de réglages (ListSettingsSheet) --- */
+.modal.ld-sheet {
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.ld-sheet-title {
+  margin: 0;
+  padding-right: 2.4rem;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+.ld-sheet-sec h3 {
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+.ld-sheet .ld-typeswitch {
+  width: 100%;
+}
+.ld-sheet .ld-type-opt {
+  flex: 1 1 0;
+  justify-content: center;
+}
+.ld-sheet .ld-desc-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 16px;
+}
+.ld-sheet-cover {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.ld-sheet-cover img {
+  width: 72px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+.ld-sheet-del {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, #e0574d 45%, var(--border));
+  background: none;
+  color: #e0574d;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+/* --- En édition, la barre d'onglets du bas s'efface (cf. ListDetail) : elle
+       recouvrait le vivier ancré en bas, qui prend sa place. --- */
+@media (max-width: 760px) {
+  body.ld-editing .sidebar,
+  body.ld-editing .sidebar.collapsed {
+    display: none;
+  }
+  body.ld-editing .app-shell {
+    --bottom-bar-h: 0px;
+  }
+  body.ld-editing .tier-pool.is-docked {
+    padding-bottom: calc(0.55rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* Le vivier sur téléphone : titre, recherche et « + » sur UNE ligne (ils
+   s'empilaient sur trois et mangeaient la moitié du vivier). */
+@media (max-width: 620px) {
+  .ld-page .tier-pool.is-docked {
+    left: 0;
+    right: 0;
+  }
+  .ld-page .tier-pool-head {
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+  }
+  .ld-page .tier-pool-head-actions {
+    flex: 1;
+    min-width: 0;
+    flex-wrap: nowrap;
+    gap: 0.35rem;
+  }
+  .ld-page .tier-pool-search {
+    flex: 1;
+    min-width: 0;
+  }
+  .ld-page .tier-pool-search input {
+    padding: 0.35rem 0.7rem;
+    font-size: 16px; /* pas de zoom automatique d'iOS au focus */
+  }
+  .ld-page .tier-pool-head-actions {
+    justify-content: flex-end;
+  }
+  .ld-page .tier-pool-head .ld-addbtn.small {
+    flex: none;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+  }
+  .ld-page .tier-pool-head .ld-addbtn-label {
+    display: none;
+  }
+  /* Des paliers moins hauts : on en voit plus d'un coup d'œil. */
+  .ld-page .tier-drop,
+  .ld-page .tier-label {
+    min-height: 68px;
+  }
+}

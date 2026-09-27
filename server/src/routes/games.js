@@ -2128,11 +2128,16 @@ router.get("/:id/details", optionalAuth, markStaff, async (req, res) => {
     // exemple), celui de l'éditeur porte le portrait officiel là où IGDB a
     // souvent une vignette absente — ou celle d'un homonyme.
     const officialAdd = dedupe(officialChars);
+    // ⚠️ UN ROSTER OFFICIEL SE SUFFIT. Il est complet et exact (les 84
+    // combattants de Smash, les héros d'Overwatch) : y ajouter le wiki et
+    // IGDB ne rajoutait que du bruit — la « Palette Swap » et les « Mobs » de
+    // Smash, des PNJ de lore à LoL. Les personnages de la communauté restent.
+    const hasRoster = officialAdd.length > 0;
     // Le wiki passe devant IGDB pour la même raison que le roster officiel :
     // quand les deux connaissent le personnage, c'est le wiki qui a le
     // portrait — et le bon, pas celui d'un homonyme.
-    const wikiAdd = dedupe(wikiChars);
-    const igdbAdd = dedupe(mergeByAlias(igdbChars));
+    const wikiAdd = hasRoster ? [] : dedupe(wikiChars);
+    const igdbAdd = hasRoster ? [] : dedupe(mergeByAlias(igdbChars));
     const vnAdd = dedupe(vnChars);
 
     // Personnages : roster officiel + IGDB + VNDB + communauté, portraits

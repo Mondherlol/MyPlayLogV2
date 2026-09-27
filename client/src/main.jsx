@@ -17,6 +17,7 @@ import { CallProvider } from "./context/CallContext.jsx";
 import { ListenPartyProvider } from "./context/ListenPartyContext.jsx";
 import { GameMenuProvider } from "./components/GameContextMenu.jsx";
 import { applyFonts, getFontPrefs } from "./lib/fonts.js";
+import { installDragScrollGuard } from "./lib/dragScrollGuard.js";
 
 // Les polices choisies dans Paramètres → Apparence, AVANT le premier rendu :
 // sinon chaque chargement afficherait d'abord Inter, puis sauterait.
@@ -29,6 +30,8 @@ installGlobalErrorReporting();
 // Diagnostic ponctuel : identifie si l'app installée (APK) tourne en TWA (Chrome)
 // ou en WebView. Ne fait rien dans un onglet de navigateur classique.
 reportEnvPing();
+// Faire glisser une rangée à la souris ne sélectionne plus textes et images.
+installDragScrollGuard();
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

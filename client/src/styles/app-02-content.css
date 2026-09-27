@@ -5493,3 +5493,11 @@
 /* Hors boutique : un gris d'ardoise, ni honteux ni tapageur. C'est une
    provenance parmi d'autres, pas une alerte. */
 .store-chip.active.unofficial { background: #4a4f58; }
+
+/* Pendant qu'on fait glisser une rangée à la souris (cf. lib/dragScrollGuard) :
+   aucune sélection de texte ni d'image ne peut démarrer. */
+html.drag-scrolling,
+html.drag-scrolling * {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}

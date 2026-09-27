@@ -41,7 +41,7 @@ import { ttlFor } from "./gameIgdb.js";
 
 const KIND = "wikichars";
 // À incrémenter quand la forme stockée ou les règles de nettoyage changent.
-const VERSION = 4; // v4 : pagination large (500/requête), pages d'index écartées
+const VERSION = 5; // v5 : rosters par épisode (Tekken, Street Fighter), filtre « jouable »
 const MAX = 60;
 
 // ----------------------------------------------------------------------
@@ -67,6 +67,42 @@ const KNOWN = [
   { names: ["Grand Theft Auto V"], host: "gta.fandom.com", category: "Characters in GTA V" },
   { names: ["Red Dead Redemption 2"], host: "reddead.fandom.com", category: "Characters in Redemption 2" },
   { names: ["Stardew Valley"], host: "stardewvalley.fandom.com", category: "Villagers" },
+  // ⚠️ LES JEUX DE COMBAT : LE ROSTER DE L'ÉPISODE, PAS CELUI DE LA SÉRIE. La
+  // découverte automatique tombait sur « Characters », qui mélange trente ans
+  // de Tekken (Tekken 8 affichait Kuma, Wang, Mokujin… absents du jeu). Chaque
+  // wiki a sa catégorie par épisode ; celle de Street Fighter 6 compte aussi
+  // les PNJ du mode World Tour, d'où `playable` (la page doit AUSSI être dans
+  // cette catégorie-là). `exclude` écarte l'avatar du joueur et les
+  // figurants. `roster` nomme la tier list que ces jeux proposent
+  // (cf. routes/lists, GET /suggest/tiers).
+  {
+    names: ["Tekken 8"],
+    host: "tekken.fandom.com",
+    category: "Tekken 8 Fighters",
+    exclude: /^(avatar|tekken monks)/i,
+    roster: { slug: "tekken-8", title: "Tier list des personnages de Tekken 8", unit: "combattants" },
+  },
+  {
+    names: ["Tekken 7"],
+    host: "tekken.fandom.com",
+    category: "Tekken 7 Fighters",
+    roster: { slug: "tekken-7", title: "Tier list des personnages de Tekken 7", unit: "combattants" },
+  },
+  {
+    names: ["Street Fighter 6"],
+    host: "streetfighter.fandom.com",
+    category: "Street Fighter 6 Characters",
+    playable: "Playable Characters",
+    exclude: /^avatar/i,
+    roster: { slug: "street-fighter-6", title: "Tier list des personnages de Street Fighter 6", unit: "combattants" },
+  },
+  {
+    names: ["Street Fighter V", "Street Fighter V: Champion Edition"],
+    host: "streetfighter.fandom.com",
+    category: "Street Fighter V Characters",
+    playable: "Playable Characters",
+    roster: { slug: "street-fighter-5", title: "Tier list des personnages de Street Fighter V", unit: "combattants" },
+  },
 ];
 
 const norm = (s) =>
@@ -116,18 +152,29 @@ const MAX_PAGES = 3;
  * `generator=categorymembers` plutôt que deux requêtes : la liste ET les
  * images arrivent ensemble, sinon il faudrait redemander page par page.
  */
-async function categoryPages(host, category, maxPages = MAX_PAGES) {
+async function categoryPages(host, category, maxPages = MAX_PAGES, playable = null) {
   // Pas de `pilimit` : Fandom ne le reconnaît pas (il le signale en warning) et
   // rend de toute façon une vignette par page.
+  // `playable` : on demande en plus si chaque page est AUSSI dans cette
+  // catégorie (`clcategories`) — un seul aller, le filtre se fait ensuite.
   const base =
     `action=query&generator=categorymembers&gcmtitle=Category:${encodeURIComponent(category)}` +
-    `&gcmlimit=${PER_PAGE}&gcmtype=page&prop=pageimages|info&piprop=thumbnail&pithumbsize=400`;
+    `&gcmlimit=${PER_PAGE}&gcmtype=page&piprop=thumbnail&pithumbsize=400` +
+    (playable
+      ? `&prop=pageimages|info|categories&cllimit=max&clcategories=Category:${encodeURIComponent(playable)}`
+      : "&prop=pageimages|info");
 
   const out = [];
   let cont = null;
   for (let i = 0; i < maxPages; i += 1) {
     const body = await mediawiki(host, cont ? `${base}&${cont}` : base);
-    out.push(...Object.values(body?.query?.pages || {}));
+    // Les continuations peuvent rendre une même page en deux fois (une avec sa
+    // vignette, l'autre avec ses catégories) : on fusionne par identifiant.
+    for (const pg of Object.values(body?.query?.pages || {})) {
+      const prev = out.find((x) => x.pageid === pg.pageid);
+      if (prev) Object.assign(prev, Object.fromEntries(Object.entries(pg).filter(([, v]) => v != null)));
+      else out.push(pg);
+    }
     // La continuation se rend telle quelle : elle porte plusieurs curseurs
     // (les membres de la catégorie ET les vignettes), et n'en renvoyer qu'un
     // ferait boucler la requête sur elle-même.
@@ -189,11 +236,13 @@ async function fetchFromWiki(gameName, websites) {
 
   const known = BY_NAME.get(norm(gameName));
   const pages = known
-    ? await categoryPages(host, known.category).catch(() => [])
+    ? await categoryPages(host, known.category, MAX_PAGES, known.playable).catch(() => [])
     : await discover(host, gameName);
 
   return pages
     .filter((p) => p?.title && !NOT_A_CHARACTER.test(p.title))
+    .filter((p) => !known?.playable || p.categories?.length)
+    .filter((p) => !known?.exclude?.test(p.title))
     // Le tri par taille d'article : voir l'en-tête du module.
     .sort((a, b) => (b.length || 0) - (a.length || 0))
     .slice(0, MAX)
@@ -239,4 +288,12 @@ export async function wikiCharacters(gameId, gameName, websites, releaseDate = n
     console.error("wiki characters error:", err.message);
     return [];
   }
+}
+
+/**
+ * La tier list de roster qu'un jeu propose (`{ slug, title, unit }`), quand
+ * son wiki en donne un fiable — les jeux de combat de la table plus haut.
+ */
+export function wikiRoster(gameName) {
+  return BY_NAME.get(norm(gameName))?.roster || null;
 }

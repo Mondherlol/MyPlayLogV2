@@ -1,55 +1,56 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Plus } from "lucide-react";
-import { apiFetch } from "../../lib/api";
-import { DEFAULT_TIERS } from "../../lib/lists";
+import { Plus } from "lucide-react";
+import { DEFAULT_TIERS, openListDraft } from "../../lib/lists";
 
 // ======================================================================
-//  Une tier list à faire : « Tier list des jeux Pokémon »
+//  Une tier list à faire : « Tier list des jeux Pokémon »,
+//  « Tier list des héros Overwatch »
 // ======================================================================
 // Ça ne doit PAS ressembler à une liste qui existe : contour pointillé doré,
 // un grand « + » au centre, et derrière, très pâles, des paliers vides et
-// trois jaquettes de la saga. Un clic crée la tier list avec les jeux de la
-// saga (les siens d'abord, puis le reste — cf. GET /lists/suggest/tiers) et
-// l'ouvre en édition : il ne reste qu'à ranger.
-export default function TierIdea({ idea, token }) {
+// trois jaquettes de la saga.
+//
+// ⚠️ UN CLIC NE CRÉE RIEN. Il ouvre un BROUILLON (cf. lib/lists,
+// `openListDraft`) avec les jeux de la saga dans le vivier — les siens
+// d'abord, puis le reste (cf. GET /lists/suggest/tiers). La tier list n'est
+// enregistrée, et n'apparaît sur le profil, qu'au premier jeu rangé dans un
+// palier : cliquer pour voir ne laisse plus de liste vide derrière soi.
+export default function TierIdea({ idea, token, title, sub }) {
   const navigate = useNavigate();
-  const [busy, setBusy] = useState(false);
 
-  async function create() {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const { list } = await apiFetch("/lists", {
-        method: "POST",
-        token,
-        body: {
-          type: "tier",
-          itemKind: "game",
-          title: idea.title,
-          visibility: "public",
-          items: idea.games.map((g) => ({
-            kind: "game",
-            refId: String(g.gameId),
-            gameId: g.gameId,
-            name: g.name,
-            image: g.cover,
-          })),
-        },
-      });
-      navigate(`/lists/${list.id}`, { state: { edit: true } });
-    } catch (e) {
-      alert(e.message);
-      setBusy(false);
-    }
+  function open() {
+    if (!token) return navigate("/login");
+    openListDraft(navigate, {
+      type: "tier",
+      itemKind: idea.itemKind || "game",
+      title: idea.title,
+      items: idea.games.map((g) =>
+        g.kind === "character"
+          ? {
+              kind: "character",
+              refId: String(g.refId),
+              gameId: g.gameId || null,
+              gameName: g.gameName || "",
+              name: g.name,
+              image: g.cover,
+            }
+          : {
+              kind: "game",
+              refId: String(g.gameId),
+              gameId: g.gameId,
+              name: g.name,
+              image: g.cover,
+            }
+      ),
+    });
   }
 
-  // Trois jaquettes de la saga en éventail, estompées derrière le « + » : on
-  // devine de quoi on parle sans que ça ressemble à une liste déjà faite.
+  // Trois jaquettes en éventail, estompées derrière le « + » : on devine de
+  // quoi on parle sans que ça ressemble à une liste déjà faite.
   const fan = idea.games.filter((g) => g.cover).slice(0, 3);
 
   return (
-    <button type="button" className="ti clickable" onClick={create} disabled={busy}>
+    <button type="button" className="ti clickable" onClick={open}>
       {/* Le fond : des paliers vides (S, A, B…) et l'éventail, très pâles. */}
       <span className="ti-ghost" aria-hidden="true">
         {DEFAULT_TIERS.slice(0, 4).map((t) => (
@@ -64,17 +65,24 @@ export default function TierIdea({ idea, token }) {
       {fan.length > 0 && (
         <span className="ti-fan" aria-hidden="true">
           {fan.map((g, i) => (
-            <img key={g.gameId} src={g.cover} alt="" loading="lazy" draggable="false" style={{ "--i": i }} />
+            <img
+              key={g.refId || g.gameId}
+              src={g.cover}
+              alt=""
+              loading="lazy"
+              draggable="false"
+              style={{ "--i": i }}
+            />
           ))}
         </span>
       )}
 
       <span className="ti-center">
         <span className="ti-plus">
-          {busy ? <Loader2 size={24} className="spin" /> : <Plus size={28} strokeWidth={2.8} />}
+          <Plus size={28} strokeWidth={2.8} />
         </span>
-        <span className="ti-title">Tier list {idea.saga}</span>
-        <span className="ti-sub">{idea.count} jeux à classer</span>
+        <span className="ti-title">{title || idea.label || `Tier list ${idea.saga}`}</span>
+        <span className="ti-sub">{sub || `${idea.count} ${idea.unit || "jeux"} à classer`}</span>
       </span>
     </button>
   );

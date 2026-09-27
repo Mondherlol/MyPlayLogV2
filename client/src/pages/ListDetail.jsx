@@ -27,7 +27,9 @@ import {
   BadgeCheck,
   LayoutGrid,
   Rows3,
+  SlidersHorizontal,
 } from "lucide-react";
+import { createPortal } from "react-dom";
 import AwardsBoard from "../components/AwardsBoard";
 import MoreLike from "../components/lists/MoreLike";
 import {
@@ -52,7 +54,16 @@ import { CSS } from "@dnd-kit/utilities";
 import { apiFetch, apiUpload } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
-import { typeMeta, timeAgo, DEFAULT_TIERS, localId, GAME_LIST_TYPES } from "../lib/lists";
+import {
+  typeMeta,
+  timeAgo,
+  DEFAULT_TIERS,
+  localId,
+  GAME_LIST_TYPES,
+  DRAFT_ID,
+  readListDraft,
+  clearListDraft,
+} from "../lib/lists";
 import PlaylistDetail from "./PlaylistDetail";
 import NineDetail from "./NineDetail";
 import BoardDetail from "./BoardDetail";
@@ -63,6 +74,8 @@ import ListGameCard from "../components/ListGameCard";
 import ListCharacterCard from "../components/ListCharacterCard";
 import ListRowsView from "../components/ListRowsView";
 import ListExportModal from "../components/ListExportModal";
+import useMediaQuery from "../hooks/useMediaQuery";
+import { useScrollLock } from "../hooks/useScrollLock";
 
 const TIER_COLORS = [
   "#ff5470", "#ff8b3d", "#f2b70b", "#3dd68c", "#4aa8ff", "#a879ff", "#8b93a7",
@@ -197,6 +210,21 @@ const POOL = "__pool__";
 const tierOf = (containerId) => (containerId === POOL ? null : containerId);
 const containerOfItem = (it) => it.tier ?? POOL;
 
+// ======================================================================
+//  Le brouillon : une liste qui n'existe pas encore
+// ======================================================================
+// « Tier list des jeux Yakuza » (cf. components/lists/TierIdea) s'ouvre ICI,
+// sur /lists/draft, avec ses jeux dans le vivier — mais sans rien créer.
+// Cliquer par curiosité ne doit pas laisser une tier list vide sur son profil.
+// La liste naît au premier jeu posé dans un palier : c'est là qu'elle devient
+// la sienne. Quitter la page avant, c'est l'abandonner, sans trace
+// (cf. lib/lists, `openListDraft`).
+
+// Ce qui fait qu'un brouillon mérite d'exister : un jeu classé dans un palier
+// (tier list), un élément tout court ailleurs.
+const draftWorthSaving = (list, items) =>
+  list.type === "tier" ? items.some((i) => i.tier) : items.length > 0;
+
 export default function ListDetail() {
   const { id } = useParams();
   const { token, user } = useAuth();
@@ -209,7 +237,7 @@ export default function ListDetail() {
   const [tiers, setTiers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [saveStatus, setSaveStatus] = useState("idle"); // idle|saving|saved
+  const [saveStatus, setSaveStatus] = useState(id === DRAFT_ID ? "draft" : "idle"); // draft|idle|saving|saved
   const [adding, setAdding] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [activeId, setActiveId] = useState(null); // drag en cours (dnd-kit)
@@ -236,8 +264,82 @@ export default function ListDetail() {
   const adminCover =
     !isOwner && !!(user?.isAdmin || user?.isSuperAdmin) && !!(list?.official || list?.event);
 
+  // --- Téléphone ---
+  // L'en-tête de bureau (titre, type, description, tags, auteur, sept boutons)
+  // mangeait les trois quarts de l'écran avant le premier jeu. Sur téléphone :
+  // une ligne de titre avec le retour et les actions en icônes, et tout le
+  // réglage de la liste (type, description, tags, couverture, visibilité,
+  // suppression) dans une feuille, comme dans l'appli.
+  const phone = useMediaQuery("(max-width: 620px)");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // En édition, la barre d'onglets du bas s'efface : elle recouvrait le vivier
+  // des éléments à classer (cf. `body.ld-editing` dans app-03-lists.css).
+  useEffect(() => {
+    if (!editable) return undefined;
+    document.body.classList.add("ld-editing");
+    return () => document.body.classList.remove("ld-editing");
+  }, [editable]);
+
+  // Revenir d'où l'on vient (profil, feed, recherche…) quand on y est arrivé
+  // depuis l'app ; sinon la page des listes (accès direct, lien partagé).
+  const goBack = (e) => {
+    if (location.key !== "default") {
+      e?.preventDefault();
+      navigate(-1);
+    }
+  };
+
+  // Brouillon enregistré pour de bon : son identifiant, et la création en vol
+  // (deux sauvegardes rapprochées ne doivent pas créer deux listes).
+  const createdId = useRef(null);
+  const creating = useRef(null);
+
   // --- Chargement ---
   useEffect(() => {
+    // On vient de créer cette liste depuis son brouillon : elle est déjà à
+    // l'écran, la recharger ferait clignoter la page (et couperait le drag).
+    if (createdId.current && createdId.current === id) return undefined;
+    if (id === DRAFT_ID) {
+      const d = readListDraft(location.state);
+      if (!d || !user) {
+        setError(d ? "Connecte-toi pour faire ta tier list." : "Ce brouillon n'existe plus.");
+      } else {
+        const type = d.type || "tier";
+        setList({
+          id: null,
+          draft: true,
+          mine: true,
+          title: d.title,
+          description: "",
+          type,
+          itemKind: d.itemKind || "game",
+          visibility: "public",
+          tags: [],
+          cover: null,
+          likeCount: 0,
+          liked: false,
+          comments: [],
+          author: { username: user.username, avatar: user.avatar },
+          updatedAt: new Date().toISOString(),
+        });
+        setItems(
+          (d.items || []).map((it) => ({
+            note: "",
+            media: [],
+            rating: null,
+            ...it,
+            tier: null,
+            key: localId("it"),
+          }))
+        );
+        setTiers(type === "tier" ? DEFAULT_TIERS : []);
+        setEditing(true);
+        setError(null);
+      }
+      setLoading(false);
+      return undefined;
+    }
     let alive = true;
     setLoading(true);
     apiFetch(`/lists/${id}`, { token })
@@ -255,7 +357,9 @@ export default function ListDetail() {
     return () => {
       alive = false;
     };
-  }, [id, token]);
+    // `user?.id` : la session peut arriver après la page (brouillon ouvert à froid).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, token, user?.id]);
 
   // --- Sauvegarde (debounce) ---
   const saveTimer = useRef(null);
@@ -265,47 +369,87 @@ export default function ListDetail() {
   const scheduleSave = useCallback(
     (patch) => {
       if (!latest.current.list?.mine) return;
-      setSaveStatus("saving");
+      if (!latest.current.list.draft) setSaveStatus("saving");
       clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(async () => {
         const { list: l, items: its, tiers: trs } = latest.current;
+        const body = {
+          title: l.title,
+          description: l.description,
+          visibility: l.visibility,
+          // Sans elle, « Retirer l'image » ne quittait jamais l'écran :
+          // le serveur gardait l'ancienne couverture.
+          cover: l.cover || null,
+          tags: l.tags || [],
+          tiers: trs,
+          type: l.type,
+          items: its.map((i) => ({
+            kind: i.kind,
+            refId: i.refId,
+            gameId: i.gameId,
+            gameName: i.gameName,
+            name: i.name,
+            image: i.image,
+            note: i.note,
+            media: i.media,
+            rating: i.rating,
+            tier: i.tier,
+          })),
+          ...patch,
+        };
         try {
-          await apiFetch(`/lists/${id}`, {
+          // Brouillon : rien ne part tant qu'aucun jeu n'est classé. Au premier,
+          // la liste est CRÉÉE (et rejoint le profil) ; l'adresse prend son
+          // vrai identifiant sans recharger la page.
+          if (l.draft && !createdId.current) {
+            if (!draftWorthSaving(l, its)) {
+              setSaveStatus("draft");
+              return;
+            }
+            setSaveStatus("saving");
+            if (!creating.current) {
+              creating.current = apiFetch("/lists", {
+                method: "POST",
+                token,
+                body: { ...body, itemKind: l.itemKind },
+              })
+                .then((d) => d.list.id)
+                .catch((e) => {
+                  creating.current = null;
+                  throw e;
+                });
+            }
+            const newId = await creating.current;
+            if (!createdId.current) {
+              createdId.current = newId;
+              clearListDraft();
+              setList((prev) => ({ ...prev, id: newId, draft: false }));
+              navigate(`/lists/${newId}`, { replace: true, state: { edit: true } });
+              toast.show({
+                title: "Tier list enregistrée",
+                text: "Elle est maintenant sur ton profil.",
+                undo: async () => {
+                  await apiFetch(`/lists/${newId}`, { method: "DELETE", token });
+                  navigate("/lists");
+                },
+              });
+            }
+            setSaveStatus("saved");
+            return;
+          }
+          await apiFetch(`/lists/${createdId.current || id}`, {
             method: "PUT",
             token,
-            body: {
-              title: l.title,
-              description: l.description,
-              visibility: l.visibility,
-              // Sans elle, « Retirer l'image » ne quittait jamais l'écran :
-              // le serveur gardait l'ancienne couverture.
-              cover: l.cover || null,
-              tags: l.tags || [],
-              tiers: trs,
-              type: l.type,
-              items: its.map((i) => ({
-                kind: i.kind,
-                refId: i.refId,
-                gameId: i.gameId,
-                gameName: i.gameName,
-                name: i.name,
-                image: i.image,
-                note: i.note,
-                media: i.media,
-                rating: i.rating,
-                tier: i.tier,
-              })),
-              ...patch,
-            },
+            body,
           });
           setSaveStatus("saved");
           setList((prev) => ({ ...prev, updatedAt: new Date().toISOString() }));
         } catch {
-          setSaveStatus("idle");
+          setSaveStatus(l.draft && !createdId.current ? "draft" : "idle");
         }
       }, 700);
     },
-    [id, token]
+    [id, token, navigate, toast]
   );
 
   // --- Drag & drop (dnd-kit) ---
@@ -568,6 +712,12 @@ export default function ListDetail() {
   }
 
   async function deleteList() {
+    // Un brouillon n'existe nulle part : l'abandonner, c'est juste partir.
+    if (list?.draft) {
+      clearTimeout(saveTimer.current);
+      navigate("/lists");
+      return;
+    }
     if (!confirm("Supprimer cette liste ? Cette action est définitive.")) return;
     try {
       await apiFetch(`/lists/${id}`, { method: "DELETE", token });
@@ -648,33 +798,48 @@ export default function ListDetail() {
       {/* --- La barre du haut : collée sous la barre de l'app en défilant.
           Le titre de la liste y apparaît quand l'en-tête est sorti de l'écran
           (on sait toujours où l'on est, et « Retour » reste à un clic). --- */}
+      {phone ? (
+        <PhoneHeader
+          headerRef={headerRef}
+          list={list}
+          meta={meta}
+          items={items}
+          isGameList={isGameList}
+          isOwner={isOwner}
+          editable={editable}
+          editing={editing}
+          token={token}
+          adminCover={adminCover}
+          coverBusy={coverBusy}
+          forking={forking}
+          onBack={goBack}
+          onTitle={(title) => patchList({ title })}
+          onEdit={() => setEditing(true)}
+          onDone={() => setEditing(false)}
+          onSettings={() => setSettingsOpen(true)}
+          onLike={toggleLike}
+          onExport={() => (token ? setExporting(true) : navigate("/login"))}
+          onTemplate={useAsTemplate}
+          onPickCover={() => coverInputRef.current?.click()}
+          onRemoveCover={removeCover}
+        />
+      ) : (
+      <>
       <div className={`ld-topbar ${headerGone ? "is-stuck" : ""}`}>
-        <Link
-          to="/lists"
-          className="ld-back clickable"
-          onClick={(e) => {
-            // Revenir d'où l'on vient (profil, feed, recherche…) quand on y est
-            // arrivé depuis l'app ; sinon le Link fait son travail natif vers
-            // /lists (accès direct, lien partagé, nouvel onglet).
-            if (location.key !== "default") {
-              e.preventDefault();
-              navigate(-1);
-            }
-          }}
-        >
+        <Link to="/lists" className="ld-back clickable" onClick={goBack}>
           <ArrowLeft size={18} /> Retour
         </Link>
         <span className="ld-topbar-title" aria-hidden={!headerGone}>
           {list.title}
         </span>
-        {editable && (
+        {editable && saveStatus !== "idle" && (
           <span className={`ld-save save-${saveStatus}`}>
-            {saveStatus === "saving" ? (
+            {saveStatus === "draft" ? (
+              <><CloudOff size={14} /> Classe un jeu pour l'enregistrer</>
+            ) : saveStatus === "saving" ? (
               <><Loader2 size={14} className="spin" /> Enregistrement…</>
-            ) : saveStatus === "saved" ? (
-              <><Cloud size={14} /> Enregistré</>
             ) : (
-              <><CloudOff size={14} /> Modifs locales</>
+              <><Cloud size={14} /> Enregistré</>
             )}
           </span>
         )}
@@ -713,17 +878,6 @@ export default function ListDetail() {
             )}
           </div>
         )}
-        {/* input fichier partagé (banner + bouton dans les actions) */}
-        <input
-          ref={coverInputRef}
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={(e) => {
-            uploadCover(e.target.files?.[0]);
-            e.target.value = "";
-          }}
-        />
         <div className="ld-header-main">
           <div className="ld-title-row">
             {editable ? (
@@ -827,14 +981,16 @@ export default function ListDetail() {
           ) : null}
 
           <div className="ld-header-actions">
-            <button
-              className={`ld-like clickable ${list.liked ? "liked" : ""}`}
-              onClick={toggleLike}
-              title="J'aime"
-            >
-              <Heart size={17} fill={list.liked ? "currentColor" : "none"} />
-              {list.likeCount}
-            </button>
+            {!list.draft && (
+              <button
+                className={`ld-like clickable ${list.liked ? "liked" : ""}`}
+                onClick={toggleLike}
+                title="J'aime"
+              >
+                <Heart size={17} fill={list.liked ? "currentColor" : "none"} />
+                {list.likeCount}
+              </button>
+            )}
             {!editing && (
               <button
                 className="ld-comments-btn clickable"
@@ -901,7 +1057,7 @@ export default function ListDetail() {
           )}
           {editable && (
             <>
-              {!list.cover && (
+              {!list.cover && !list.draft && (
                 <button
                   className="ld-vis clickable"
                   onClick={() => coverInputRef.current?.click()}
@@ -931,21 +1087,55 @@ export default function ListDetail() {
                   <><Lock size={16} /> Privée</>
                 )}
               </button>
-              <button className="ld-del clickable" onClick={deleteList} title="Supprimer">
+              <button
+                className="ld-del clickable"
+                onClick={deleteList}
+                title={list.draft ? "Abandonner cette tier list" : "Supprimer"}
+              >
                 <Trash2 size={16} />
               </button>
-              <button
-                className="ld-edit done clickable"
-                onClick={() => setEditing(false)}
-                title="Terminer l'édition"
-              >
-                <Check size={16} /> Terminé
-              </button>
+              {!list.draft && (
+                <button
+                  className="ld-edit done clickable"
+                  onClick={() => setEditing(false)}
+                  title="Terminer l'édition"
+                >
+                  <Check size={16} /> Terminé
+                </button>
+              )}
             </>
           )}
           </div>
         </aside>
       </header>
+      </>
+      )}
+
+      {/* Le fichier de couverture : partagé par l'en-tête de bureau, celui du
+          téléphone et la feuille de réglages. */}
+      <input
+        ref={coverInputRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          uploadCover(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+
+      {settingsOpen && editable && (
+        <ListSettingsSheet
+          list={list}
+          coverBusy={coverBusy}
+          onClose={() => setSettingsOpen(false)}
+          onType={changeType}
+          onPatch={patchList}
+          onPickCover={() => coverInputRef.current?.click()}
+          onRemoveCover={removeCover}
+          onDelete={deleteList}
+        />
+      )}
 
       {/* Liste officielle d'une conférence : la rediff se regarde ici, sans
           quitter la liste des jeux annoncés. */}
@@ -1119,7 +1309,7 @@ export default function ListDetail() {
       </DndContext>
 
       {/* --- Commentaires (masqués en mode édition) --- */}
-      {!editing && (
+      {!editing && !list.draft && (
         <div id="ld-comments" className="ld-comments-anchor">
           <ListComments listId={id} list={list} token={token} />
         </div>
@@ -1153,6 +1343,315 @@ export default function ListDetail() {
         />
       )}
     </div>
+  );
+}
+
+// ======================================================================
+//  Téléphone : l'en-tête compact
+// ======================================================================
+// Une ligne : le retour, le titre, et les actions en icônes. Sous elle, le
+// type et le compte, puis — en lecture seulement — la description (repliée à
+// deux lignes, un appui la déplie), les tags et la rangée auteur / réactions.
+// En édition, il ne reste que le titre : le reste est dans la feuille de
+// réglages (cf. ListSettingsSheet), pour que les jeux à classer commencent
+// tout de suite.
+function PhoneHeader({
+  headerRef,
+  list,
+  meta,
+  items,
+  isGameList,
+  isOwner,
+  editable,
+  adminCover,
+  coverBusy,
+  forking,
+  onBack,
+  onTitle,
+  onEdit,
+  onDone,
+  onSettings,
+  onLike,
+  onExport,
+  onTemplate,
+  onPickCover,
+  onRemoveCover,
+}) {
+  const [descOpen, setDescOpen] = useState(false);
+  const n = items.length;
+  const count = `${n} ${isGameList ? "jeu" : "élément"}${n > 1 ? (isGameList ? "x" : "s") : ""}`;
+  const showCover = list.cover && !editable;
+
+  return (
+    <header ref={headerRef} className={`ld-mh ${showCover ? "has-cover" : ""}`}>
+      {showCover && (
+        <div className="ld-mh-cover">
+          <img src={list.cover} alt="" draggable="false" />
+          {adminCover && (
+            <div className="ld-cover-actions">
+              <button type="button" className="ld-cover-btn clickable" onClick={onPickCover} disabled={coverBusy}>
+                {coverBusy ? <Loader2 size={14} className="spin" /> : <ImagePlus size={14} />}
+              </button>
+              <button type="button" className="ld-cover-btn danger clickable" onClick={onRemoveCover}>
+                <X size={14} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="ld-mh-row">
+        <Link to="/lists" className="ld-mh-icon clickable" onClick={onBack} aria-label="Retour">
+          <ArrowLeft size={19} />
+        </Link>
+        {editable ? (
+          <input
+            className="ld-mh-title-input"
+            value={list.title}
+            maxLength={120}
+            onChange={(e) => onTitle(e.target.value)}
+            placeholder="Titre de la liste"
+          />
+        ) : (
+          <h1 className="ld-mh-title">{list.title}</h1>
+        )}
+        {editable ? (
+          <>
+            <button
+              type="button"
+              className="ld-mh-icon clickable"
+              onClick={onSettings}
+              aria-label="Réglages de la liste"
+              title="Type, description, couverture…"
+            >
+              <SlidersHorizontal size={18} />
+            </button>
+            {!list.draft && (
+              <button type="button" className="ld-mh-icon gold clickable" onClick={onDone} aria-label="Terminer">
+                <Check size={19} strokeWidth={2.6} />
+              </button>
+            )}
+          </>
+        ) : (
+          isOwner && (
+            <button type="button" className="ld-mh-icon clickable" onClick={onEdit} aria-label="Modifier la liste">
+              <Pencil size={17} />
+            </button>
+          )
+        )}
+      </div>
+
+      <div className="ld-mh-meta">
+        {!editable && (
+          <span className={`list-type-badge t-${list.type}`}>
+            <meta.Icon size={11} /> {meta.long}
+          </span>
+        )}
+        <span>{count}</span>
+        {list.visibility === "private" && (
+          <span className="ld-mh-private">
+            <Lock size={11} /> Privée
+          </span>
+        )}
+        {list.draft && <span className="ld-mh-draft">Classe un élément pour l'enregistrer</span>}
+      </div>
+
+      {!editable && list.description && (
+        <p
+          className={`ld-mh-desc clickable ${descOpen ? "open" : ""}`}
+          onClick={() => setDescOpen((v) => !v)}
+        >
+          {list.description}
+        </p>
+      )}
+
+      {!editable && list.tags?.length > 0 && (
+        <div className="ld-mh-tags">
+          {list.tags.map((t) => (
+            <Link
+              key={t}
+              className="ld-tag clickable"
+              to={`/lists?${new URLSearchParams({
+                ...(list.official?.kind === "top" ? { sc: "tops" } : {}),
+                tag: t,
+              })}`}
+            >
+              {t}
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {!editable && (
+        <div className="ld-mh-foot">
+          {list.author?.username && (
+            <Link to={`/u/${list.author.username}`} className="ld-mh-by clickable">
+              <span className="ld-by-pp">
+                {list.author.avatar ? (
+                  <img src={list.author.avatar} alt="" draggable="false" />
+                ) : (
+                  list.author.username[0]?.toUpperCase()
+                )}
+              </span>
+              <span className="ld-mh-by-name">{list.author.username}</span>
+              {list.author.isSystem && (
+                <BadgeCheck size={13} className="ld-author-check" aria-label="Compte officiel" />
+              )}
+            </Link>
+          )}
+          <div className="ld-mh-acts">
+            <button
+              type="button"
+              className={`ld-mh-pill clickable ${list.liked ? "liked" : ""}`}
+              onClick={onLike}
+              aria-label="J'aime"
+            >
+              <Heart size={15} fill={list.liked ? "currentColor" : "none"} />
+              {list.likeCount}
+            </button>
+            <button
+              type="button"
+              className="ld-mh-pill clickable"
+              onClick={() =>
+                document.getElementById("ld-comments")?.scrollIntoView({ behavior: "smooth", block: "start" })
+              }
+              aria-label="Commentaires"
+            >
+              <MessageCircle size={15} />
+              {list.comments?.length || 0}
+            </button>
+            {n > 0 && (
+              <button type="button" className="ld-mh-pill icon clickable" onClick={onExport} aria-label="Exporter en image">
+                <ImageDown size={15} />
+              </button>
+            )}
+            {adminCover && !list.cover && (
+              <button type="button" className="ld-mh-pill icon clickable" onClick={onPickCover} aria-label="Image (admin)">
+                {coverBusy ? <Loader2 size={15} className="spin" /> : <ImagePlus size={15} />}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* « Faire mon top » : le geste principal d'un top officiel, en clair. */}
+      {!editable && list.official?.kind === "top" && !isOwner && n > 0 && (
+        <button type="button" className="ld-mh-template clickable" onClick={onTemplate} disabled={forking}>
+          {forking ? <Loader2 size={16} className="spin" /> : <CopyPlus size={16} />}
+          Faire mon top
+        </button>
+      )}
+    </header>
+  );
+}
+
+// ======================================================================
+//  Téléphone : les réglages de la liste, dans une feuille
+// ======================================================================
+// Tout ce qui ne sert qu'une fois — le type, la description, les tags, la
+// couverture, la visibilité, la suppression — sort de l'en-tête et se range
+// ici, derrière l'icône de réglages. Chaque changement s'enregistre aussitôt,
+// comme dans l'en-tête de bureau.
+function ListSettingsSheet({ list, coverBusy, onClose, onType, onPatch, onPickCover, onRemoveCover, onDelete }) {
+  useScrollLock();
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return createPortal(
+    <div className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal ld-sheet">
+        <button type="button" className="modal-close clickable" onClick={onClose} aria-label="Fermer">
+          <X size={18} />
+        </button>
+        <h2 className="ld-sheet-title">Réglages de la liste</h2>
+
+        <section className="ld-sheet-sec">
+          <h3>Type</h3>
+          <div className="ld-typeswitch" role="group" aria-label="Type de liste">
+            {GAME_LIST_TYPES.map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                className={`ld-type-opt clickable ${list.type === t.value ? "active" : ""}`}
+                onClick={() => onType(t.value)}
+              >
+                <t.Icon size={13} /> {t.label}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="ld-sheet-sec">
+          <h3>Description</h3>
+          <textarea
+            className="ld-desc-input"
+            value={list.description}
+            maxLength={2000}
+            rows={3}
+            placeholder="Ajoute une description…"
+            onChange={(e) => onPatch({ description: e.target.value })}
+          />
+        </section>
+
+        <section className="ld-sheet-sec">
+          <h3>Tags</h3>
+          <TagEditor tags={list.tags || []} onChange={(tags) => onPatch({ tags })} />
+        </section>
+
+        {!list.draft && (
+          <section className="ld-sheet-sec">
+            <h3>Couverture</h3>
+            <div className="ld-sheet-cover">
+              {list.cover && <img src={list.cover} alt="" draggable="false" />}
+              <button type="button" className="ld-vis clickable" onClick={onPickCover} disabled={coverBusy}>
+                {coverBusy ? <Loader2 size={15} className="spin" /> : <ImagePlus size={15} />}
+                {list.cover ? "Changer" : "Ajouter une image"}
+              </button>
+              {list.cover && (
+                <button type="button" className="ld-del clickable" onClick={onRemoveCover} aria-label="Retirer la couverture">
+                  <X size={15} />
+                </button>
+              )}
+            </div>
+          </section>
+        )}
+
+        <section className="ld-sheet-sec">
+          <h3>Visibilité</h3>
+          <div className="ld-typeswitch" role="group" aria-label="Visibilité">
+            <button
+              type="button"
+              className={`ld-type-opt clickable ${list.visibility === "public" ? "active" : ""}`}
+              onClick={() => onPatch({ visibility: "public" })}
+            >
+              <Globe size={13} /> Publique
+            </button>
+            <button
+              type="button"
+              className={`ld-type-opt clickable ${list.visibility === "private" ? "active" : ""}`}
+              onClick={() => onPatch({ visibility: "private" })}
+            >
+              <Lock size={13} /> Privée
+            </button>
+          </div>
+        </section>
+
+        <button
+          type="button"
+          className="ld-sheet-del clickable"
+          onClick={() => {
+            onClose();
+            onDelete();
+          }}
+        >
+          <Trash2 size={16} /> {list.draft ? "Abandonner cette liste" : "Supprimer la liste"}
+        </button>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1238,7 +1737,7 @@ function PoolZone({
             )}
             {editable && (
               <button className="ld-addbtn small clickable" onClick={onAdd}>
-                <Plus size={15} /> Ajouter
+                <Plus size={15} /> <span className="ld-addbtn-label">Ajouter</span>
               </button>
             )}
           </div>

@@ -98,19 +98,101 @@ async function lolChampions() {
 }
 
 // ----------------------------------------------------------------------
+//  Dota 2 — les constantes publiques d'OpenDota
+// ----------------------------------------------------------------------
+// Sans clé ; les images sont celles du CDN de Steam (portrait paysage du héros).
+async function dotaHeroes() {
+  const d = await getJson("https://api.opendota.com/api/constants/heroes");
+  return Object.values(d || {}).map((h) => ({
+    key: h.id,
+    name: h.localized_name,
+    image: h.img ? `https://cdn.cloudflare.steamstatic.com${h.img.replace(/\?$/, "")}` : null,
+  }));
+}
+
+// ----------------------------------------------------------------------
+//  Super Smash Bros. Ultimate — les données du site officiel
+// ----------------------------------------------------------------------
+// Le site de Nintendo charge sa page des combattants depuis un JSON public :
+// les 84 combattants numérotés (écho compris), nom localisé, et un fichier
+// d'image par combattant. Le wiki, lui, mêlait la « Palette Swap », les
+// « Mobs » et des doublons, et en ratait la moitié.
+const SMASH = "https://www.smashbros.com/assets_v2";
+
+// Les noms arrivent EN CAPITALES (« MR. GAME & WATCH »). Remis en casse de
+// titre, sans casser les sigles (« R.O.B. ») ni les noms composés
+// (« PAC-MAN » → « Pac-Man »).
+const smashName = (s) =>
+  String(s || "")
+    // Le site coupe les noms longs avec un `<br>` pour sa mise en page.
+    .replace(/\s*<br\s*\/?>\s*/gi, " ")
+    .toLowerCase()
+    .replace(/(^|[\s\-/(&])([\p{L}])/gu, (_, sep, c) => sep + c.toUpperCase())
+    .replace(/\b((?:\p{L}\.){2,})/gu, (m) => m.toUpperCase())
+    // « Dresseur de Pokémon », pas « Dresseur De Pokémon ».
+    .replace(/ (De|Du|Des|La|Le|Les|Et) /g, (m) => m.toLowerCase());
+
+async function smashFighters() {
+  const d = await getJson(`${SMASH}/data/fighter.json`);
+  return (d?.fighters || []).map((f) => ({
+    key: f.file,
+    name: smashName(f.displayName?.fr_FR || f.displayNameEn),
+    // `thumb_a` : le visage, cadré serré — lisible en petite vignette.
+    image: `${SMASH}/img/fighter/thumb_a/${f.file}.png`,
+  }));
+}
+
+// ----------------------------------------------------------------------
 //  Le registre
 // ----------------------------------------------------------------------
 // `names` : les noms IGDB du jeu, comparés à la casse et à la ponctuation près.
 // Plusieurs par jeu quand le catalogue en tient plusieurs fiches (« Overwatch »
 // et « Overwatch 2 » sont deux entrées, le roster est le même).
+// `title` / `unit` : de quoi nommer la tier list du roster (cf. routes/lists,
+// GET /suggest/tiers) — « Tier list des agents Valorant », « 28 agents à
+// classer ».
 export const PROVIDERS = [
-  { slug: "valorant", names: ["Valorant"], fetch: valorantAgents },
-  { slug: "overwatch", names: ["Overwatch", "Overwatch 2"], fetch: overwatchHeroes },
-  { slug: "marvel-rivals", names: ["Marvel Rivals"], fetch: marvelRivalsHeroes },
+  {
+    slug: "valorant",
+    names: ["Valorant"],
+    fetch: valorantAgents,
+    title: "Tier list des agents Valorant",
+    unit: "agents",
+  },
+  {
+    slug: "overwatch",
+    names: ["Overwatch", "Overwatch 2"],
+    fetch: overwatchHeroes,
+    title: "Tier list des héros Overwatch",
+    unit: "héros",
+  },
+  {
+    slug: "marvel-rivals",
+    names: ["Marvel Rivals"],
+    fetch: marvelRivalsHeroes,
+    title: "Tier list des héros Marvel Rivals",
+    unit: "héros",
+  },
   {
     slug: "league-of-legends",
     names: ["League of Legends"],
     fetch: lolChampions,
+    title: "Tier list des champions de League of Legends",
+    unit: "champions",
+  },
+  {
+    slug: "smash-ultimate",
+    names: ["Super Smash Bros. Ultimate"],
+    fetch: smashFighters,
+    title: "Tier list des combattants de Smash Ultimate",
+    unit: "combattants",
+  },
+  {
+    slug: "dota-2",
+    names: ["Dota 2"],
+    fetch: dotaHeroes,
+    title: "Tier list des héros Dota 2",
+    unit: "héros",
   },
 ];
 
@@ -142,4 +224,14 @@ export async function officialCharacters(gameName) {
     // Source en panne : la fiche s'affiche avec ce qu'IGDB sait, comme avant.
     return [];
   }
+}
+
+/**
+ * Le fournisseur de roster d'un jeu (`{ slug, title, unit }`), ou `null`.
+ * Sert aux suggestions de tier lists : un jeu joué qui a un roster officiel
+ * propose de classer ses personnages.
+ */
+export function rosterProvider(gameName) {
+  const p = BY_NAME.get(norm(gameName));
+  return p ? { slug: p.slug, title: p.title, unit: p.unit } : null;
 }
