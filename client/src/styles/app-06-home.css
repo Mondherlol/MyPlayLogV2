@@ -13028,7 +13028,8 @@
   display: flex;
   gap: 1.1rem;
   overflow-x: auto;
-  scroll-snap-type: x proximity;
+  /* Pas d'aimantation au glissé (cf. lib/railScroll) : seules les flèches calent. */
+  scroll-snap-type: none;
   padding: 0.3rem 0.1rem 1rem;
   margin: 0 -0.1rem;
   cursor: var(--cursor-grab);

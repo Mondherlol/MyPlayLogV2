@@ -369,7 +369,8 @@ a.mh-head-main:hover .mh-head-title {
   display: none;
 }
 .mh-rail.snap {
-  scroll-snap-type: x proximity;
+  /* Pas d'aimantation au glissé (cf. lib/railScroll) : seules les flèches calent. */
+  scroll-snap-type: none;
 }
 .mh-rail.snap > * {
   scroll-snap-align: start;

@@ -23,6 +23,7 @@ import {
 import { apiFetch } from "../lib/api";
 import SteamIcon from "./SteamIcon";
 import PsnIcon from "./PsnIcon";
+import { scrollRailBy } from "../lib/railScroll";
 
 // Petit logo de la plateforme d'origine d'un succès (Steam / PlayStation).
 function PlatformIcon({ platform, size = 13 }) {
@@ -409,7 +410,7 @@ function Rail({ children }) {
 
   const nudge = (dir) => {
     const el = ref.current;
-    if (el) el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: "smooth" });
+    scrollRailBy(el, dir, 0.85);
   };
 
   const onPointerDown = (e) => {

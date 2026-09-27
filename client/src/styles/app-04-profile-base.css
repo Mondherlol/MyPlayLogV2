@@ -915,7 +915,8 @@
   overflow-x: auto;
   overflow-y: hidden;
   min-height: 96px;
-  scroll-snap-type: x proximity;
+  /* Pas d'aimantation au glissé (cf. lib/railScroll) : seules les flèches calent. */
+  scroll-snap-type: none;
   /* ⚠️ L'ACCROCHE TIENT COMPTE DU PADDING. Sans ça, la première carte
      s'accrochait au bord de la zone de défilement : au repos, la rangée était
      déjà décalée de 2rem (scrollLeft ≈ 32) et la flèche « vers la gauche »

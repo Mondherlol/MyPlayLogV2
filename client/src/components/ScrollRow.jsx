@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { scrollRailBy } from "../lib/railScroll";
 
 // Rangée à défilement horizontal : scrollbar cachée, flèches ‹ › conditionnelles,
 // et drag-to-scroll à la souris (comme un écran tactile).
@@ -83,7 +84,7 @@ export default function ScrollRow({ children, className = "" }) {
 
   function scrollBy(dir) {
     const el = ref.current;
-    if (el) el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: "smooth" });
+    scrollRailBy(el, dir);
   }
 
   return (

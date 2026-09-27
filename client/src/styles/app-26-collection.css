@@ -3532,7 +3532,8 @@
   gap: 0.5rem;
   overflow-x: auto;
   overscroll-behavior-x: contain;
-  scroll-snap-type: x mandatory;
+  /* Pas d'aimantation au glissé (cf. lib/railScroll) : seules les flèches calent. */
+  scroll-snap-type: none;
   padding-bottom: 0.2rem;
   scrollbar-width: thin;
 }

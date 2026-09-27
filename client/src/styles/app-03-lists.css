@@ -2848,7 +2848,8 @@
     overflow-x: auto;
     overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x proximity;
+    /* Pas d'aimantation au glissé (cf. lib/railScroll) : seules les flèches calent. */
+    scroll-snap-type: none;
     scrollbar-width: none;
     /* Déborde des marges de la carte : le rail va bord à bord. */
     margin-inline: -0.7rem;

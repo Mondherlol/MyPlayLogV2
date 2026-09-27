@@ -75,6 +75,7 @@ import ListCharacterCard from "../components/ListCharacterCard";
 import ListRowsView from "../components/ListRowsView";
 import ListExportModal from "../components/ListExportModal";
 import useMediaQuery from "../hooks/useMediaQuery";
+import { scrollRailBy } from "../lib/railScroll";
 import { useScrollLock } from "../hooks/useScrollLock";
 
 const TIER_COLORS = [
@@ -1703,7 +1704,7 @@ function PoolZone({
   function scrollByCards(direction) {
     const node = scrollRef.current;
     if (!node) return;
-    node.scrollBy({ left: direction * 420, behavior: "smooth" });
+    scrollRailBy(node, direction);
   }
 
   return (

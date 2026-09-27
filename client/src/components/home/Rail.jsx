@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, RotateCw } from "lucide-react";
+import { scrollRailBy } from "../../lib/railScroll";
 
 // ======================================================================
 //  Le rayon : un titre, et une rangée qui défile
@@ -130,11 +131,9 @@ export function Rail({ children, className = "", snap = true }) {
     return () => ro.disconnect();
   }, [children, update]);
 
-  const nudge = (dir) =>
-    ref.current?.scrollBy({
-      left: dir * ref.current.clientWidth * 0.8,
-      behavior: "smooth",
-    });
+  // Les flèches calent sur une carte ; le glissé, lui, reste libre
+  // (cf. lib/railScroll).
+  const nudge = (dir) => scrollRailBy(ref.current, dir);
 
   return (
     <div className="mh-rail-wrap">

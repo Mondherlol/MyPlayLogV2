@@ -434,7 +434,8 @@
   /* overflow-x:auto rogne aussi le haut → padding vertical pour laisser respirer
      le translateY + l'ombre au survol des cartes (sinon le haut est coupé). */
   padding: 12px 2px 16px;
-  scroll-snap-type: x proximity;
+  /* Pas d'aimantation au glissé (cf. lib/railScroll) : seules les flèches calent. */
+  scroll-snap-type: none;
   /* Barre de défilement dorée, discrète, adaptée au thème (Firefox) */
   scrollbar-width: thin;
   scrollbar-color: var(--orange) transparent;

@@ -20,6 +20,7 @@ import { apiFetch } from "../lib/api";
 import { makeCache } from "../lib/cache";
 import { useAuth } from "../context/AuthContext";
 import GameMediaWall from "./GameMediaWall";
+import { scrollRailBy } from "../lib/railScroll";
 
 // Onglet « Feed » d'un jeu : le fil des POSTS DES JOUEURS (GameMediaWall,
 // texte + screens + clips + embeds) d'abord, puis « Découvrez quelques fan
@@ -220,7 +221,7 @@ function Rail({ title, Icon, count, children }) {
   const ref = useDragScroll();
   const scroll = (dir) => {
     const el = ref.current;
-    if (el) el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: "smooth" });
+    scrollRailBy(el, dir, 0.85);
   };
   return (
     <section className="gp-rail-sec">
