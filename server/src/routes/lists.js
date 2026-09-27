@@ -28,6 +28,7 @@ import { igdbQuery } from "../lib/igdb.js";
 import { similarGames } from "../lib/recoEngine.js";
 import { officialCharacters, rosterProvider } from "../lib/gameCharacters.js";
 import { wikiCharacters, wikiRoster } from "../lib/gameWiki.js";
+import { tierSetsFor, tierSetItems } from "../lib/tierSets.js";
 
 const router = express.Router();
 
@@ -452,6 +453,16 @@ router.get("/", optionalAuth, async (req, res) => {
               // de tête, une fois par an et pendant des années.
               { visibility: "public", "official.kind": "awards" }
             : { $or: [{ visibility: "public" }, { user: req.userId }] };
+    // ?scope=lists : l'onglet « Listes » de la page Listes — les listes et tops
+    // des JOUEURS. Les tier lists ont leur onglet, les playlists aussi ; les
+    // listes du site, les listes des 9 et les cartes de joueur ont leur place.
+    if (scope === "lists") {
+      filter.type = { $in: ["classic", "ranked"] };
+      filter.official = null;
+      filter["event.igdbId"] = { $exists: false };
+      filter.nine = null;
+      filter.board = null;
+    }
     // Filtres optionnels : type, itemKind (jeu/perso), rayon, tag, recherche.
     if (TYPES.includes(req.query.type)) filter.type = req.query.type;
     if (ITEM_KINDS.includes(req.query.itemKind))
@@ -901,7 +912,7 @@ router.get("/tops/for-me", requireAuth, async (req, res) => {
 // Déclarée AVANT /:id pour ne pas être capturée par la route paramétrée.
 // Le rayon défile : de quoi le remplir, pas seulement le début d'une ligne.
 const TIER_SUGGEST_MAX = 24;
-const ROSTER_SUGGEST_MAX = 6;
+const ROSTER_SUGGEST_MAX = 10;
 const TIER_POOL_MAX = 60;
 const IGDB_COVER = "https://images.igdb.com/igdb/image/upload/t_cover_big";
 
@@ -1018,16 +1029,26 @@ router.get("/suggest/tiers", requireAuth, async (req, res) => {
     // Le roster officiel (cf. lib/gameCharacters) remplit le bac, portraits
     // compris. Les plus joués d'abord, et en tête du rayon : c'est le débat
     // que tout joueur de ces jeux a déjà en tête.
+    //
+    // Un jeu peut en proposer PLUSIEURS : les agents ET les armes de Valorant,
+    // les personnages ET les armes 5★ de Genshin (cf. lib/tierSets pour tout ce
+    // qui n'est pas un personnage : armes, boss, monstres, cartes, starters).
     const rosterBySlug = new Map();
     for (const e of entries) {
       // Roster officiel (jeux-services, Smash), sinon celui d'un wiki fiable
-      // (jeux de combat : Tekken, Street Fighter — cf. lib/gameWiki).
+      // (jeux de combat, Genshin, Apex… — cf. lib/gameWiki).
       const official = rosterProvider(e.name);
-      const p = official ? { ...official, source: "official" } : wikiRoster(e.name) && { ...wikiRoster(e.name), source: "wiki" };
-      if (!p) continue;
+      const wikiR = official ? null : wikiRoster(e.name);
+      const sets = [
+        official && { ...official, source: "official" },
+        wikiR && { ...wikiR, source: "wiki" },
+        ...tierSetsFor(e.name).map((t) => ({ ...t, source: "set" })),
+      ].filter(Boolean);
       const hours = e.playtimeHours || 0;
-      const cur = rosterBySlug.get(p.slug);
-      if (!cur || hours > cur.hours) rosterBySlug.set(p.slug, { p, e, hours });
+      for (const p of sets) {
+        const cur = rosterBySlug.get(p.slug);
+        if (!cur || hours > cur.hours) rosterBySlug.set(p.slug, { p, e, hours });
+      }
     }
     const rosterPicked = [...rosterBySlug.values()]
       .filter(({ p }) => !done.some((t) => t.includes(p.title.toLowerCase())))
@@ -1035,7 +1056,11 @@ router.get("/suggest/tiers", requireAuth, async (req, res) => {
       .slice(0, ROSTER_SUGGEST_MAX);
     const rosters = await Promise.all(
       rosterPicked.map(({ p, e }) =>
-        p.source === "official" ? officialCharacters(e.name) : wikiCharacters(e.gameId, e.name, [])
+        p.source === "official"
+          ? officialCharacters(e.name)
+          : p.source === "wiki"
+            ? wikiCharacters(e.gameId, e.name, [])
+            : tierSetItems(p.slug)
       )
     );
     const rosterSuggestions = rosterPicked

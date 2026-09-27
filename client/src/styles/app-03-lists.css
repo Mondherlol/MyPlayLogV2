@@ -4442,3 +4442,38 @@
   box-shadow: none;
   cursor: default;
 }
+
+/* --- Onglet « Tier lists » de la page Listes : la communauté, puis « À toi
+       de classer » (les idées tirées de la bibliothèque, cf. TierIdea). --- */
+.lists-ideas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+.lists-more {
+  display: block;
+  margin: 1.2rem auto 0.4rem;
+  padding: 0.6rem 1.3rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+.lists-more:hover:not(:disabled) {
+  border-color: #f2b70b;
+}
+.lists-tier-none {
+  margin: 0 0 1.2rem;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+@media (max-width: 560px) {
+  .lists-ideas-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+  }
+}

@@ -11,6 +11,7 @@ import {
   Tag,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
+import { apiCached, peekApi } from "../lib/query";
 import { useAuth } from "../context/AuthContext";
 import {
   LIST_SORTS,
@@ -22,10 +23,15 @@ import CreateListModal from "../components/CreateListModal";
 import PlaylistCard from "../components/PlaylistCard";
 import ListTile, { ListTileSkeleton } from "../components/lists/ListTile";
 import ListsDiscover from "../components/lists/ListsDiscover";
+import TierIdea from "../components/lists/TierIdea";
 
 const SCOPES = [
   { value: "feed", label: "Découvrir" },
   { value: "tops", label: "Tops" },
+  // Les tier lists des joueurs, puis celles qu'on peut faire (cf. TierIdea) ;
+  // « Listes » : les listes et tops des joueurs, sans le reste.
+  { value: "tiers", label: "Tier lists" },
+  { value: "lists", label: "Listes" },
   { value: "events", label: "Événements" },
   { value: "playlists", label: "PlayLists" },
   { value: "mine", label: "Mes listes" },
@@ -35,7 +41,11 @@ const SCOPES = [
 // type / contenu : « PlayLists » ne montre que des playlists, « Événements »
 // que les listes officielles de conférences, « Tops » que les classements
 // officiels (filtrés, eux, par rayon et par tag).
-const FIXED_SCOPES = ["playlists", "events", "tops"];
+const FIXED_SCOPES = ["playlists", "events", "tops", "tiers"];
+
+// Les tier lists à faire, tirées de la bibliothèque (même adresse que le
+// rayon de la vitrine : le cache est partagé).
+const IDEAS_PATH = "/lists/suggest/tiers";
 
 // Le nombre de listes par page (défilement infini).
 const PAGE = 24;
@@ -120,6 +130,19 @@ export default function Lists() {
       { replace: true }
     );
 
+  // --- Onglet « Tier lists » : celles qu'on peut créer ---
+  const [ideas, setIdeas] = useState(() => peekApi(IDEAS_PATH)?.suggestions || null);
+  useEffect(() => {
+    if (eff !== "tiers" || !token) return undefined;
+    let alive = true;
+    apiCached(IDEAS_PATH, { token, maxAge: 10 * 60 * 1000 })
+      .then((d) => alive && setIdeas(d?.suggestions || []))
+      .catch(() => alive && setIdeas([]));
+    return () => {
+      alive = false;
+    };
+  }, [eff, token]);
+
   // Pastilles de tags de l'onglet Tops (celles du rayon choisi).
   const [tagOptions, setTagOptions] = useState([]);
   useEffect(() => {
@@ -169,6 +192,7 @@ export default function Lists() {
     // Listes officielles de conférences : le serveur les range par date
     // d'événement, la plus récente en tête.
     if (eff === "events") params.set("scope", "events");
+    if (eff === "lists") params.set("scope", "lists");
     // Classements officiels, dans l'ordre éditorial (consoles, genres, sagas).
     if (eff === "tops") {
       params.set("scope", "tops");
@@ -177,6 +201,7 @@ export default function Lists() {
     params.set("sort", sort);
     // L'onglet « PlayLists » ne montre que les playlists (filtres type/contenu ignorés).
     if (eff === "playlists") params.set("type", "playlist");
+    else if (eff === "tiers") params.set("type", "tier");
     else if (!FIXED_SCOPES.includes(eff)) {
       if (typeFilter) params.set("type", typeFilter);
       if (kindFilter) params.set("itemKind", kindFilter);
@@ -318,7 +343,13 @@ export default function Lists() {
             <select
               className="lists-select"
               value={
-                eff === "playlists" ? "playlist" : eff === "events" ? "" : typeFilter
+                eff === "playlists"
+                  ? "playlist"
+                  : eff === "tiers"
+                    ? "tier"
+                    : eff === "events"
+                      ? ""
+                      : typeFilter
               }
               onChange={(e) => setTypeFilter(e.target.value)}
               disabled={FIXED_SCOPES.includes(eff)}
@@ -399,6 +430,8 @@ export default function Lists() {
         </div>
       )}
 
+      {eff === "tiers" && <h2 className="lists-all-title">De la communauté</h2>}
+
       {loading ? (
         // Des cartes en attente plutôt qu'une roue : la page a déjà sa forme.
         <div className="lists-grid">
@@ -411,6 +444,8 @@ export default function Lists() {
           <h3>Oups</h3>
           <p>{error}</p>
         </div>
+      ) : lists.length === 0 && eff === "tiers" ? (
+        <p className="lists-tier-none">Personne n'a encore publié de tier list ici.</p>
       ) : lists.length === 0 ? (
         <div className="lists-empty card">
           {eff === "playlists" ? (
@@ -453,7 +488,40 @@ export default function Lists() {
             Array.from({ length: 4 }, (_, i) => <ListTileSkeleton key={`more-${i}`} />)}
         </div>
       )}
-      {!loading && hasMore && <div ref={sentinel} className="lists-sentinel" aria-hidden="true" />}
+      {/* ⚠️ PAS DE DÉFILEMENT INFINI DANS L'ONGLET TIER LISTS : les tier lists
+          à créer viennent APRÈS celles de la communauté, et un défilement
+          infini les repousserait sans fin. On charge la suite à la demande. */}
+      {!loading && hasMore && eff !== "tiers" && (
+        <div ref={sentinel} className="lists-sentinel" aria-hidden="true" />
+      )}
+      {!loading && hasMore && eff === "tiers" && (
+        <button type="button" className="lists-more clickable" onClick={loadMore} disabled={loadingMore}>
+          {loadingMore ? "Chargement…" : "Voir plus de tier lists"}
+        </button>
+      )}
+
+      {eff === "tiers" && (
+        <>
+          <h2 className="lists-all-title">À toi de classer</h2>
+          {!token ? (
+            <p className="lists-tier-none">Connecte-toi : on te propose des tier lists tirées de tes jeux.</p>
+          ) : ideas === null ? (
+            <div className="lists-ideas-grid">
+              {Array.from({ length: 8 }, (_, i) => (
+                <ListTileSkeleton key={i} />
+              ))}
+            </div>
+          ) : ideas.length === 0 ? (
+            <p className="lists-tier-none">Joue à quelques jeux d'une même saga : on te proposera de les classer.</p>
+          ) : (
+            <div className="lists-ideas-grid">
+              {ideas.map((idea) => (
+                <TierIdea key={idea.saga} idea={idea} token={token} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
 
       {creating && (
         <CreateListModal

@@ -41,7 +41,7 @@ import { ttlFor } from "./gameIgdb.js";
 
 const KIND = "wikichars";
 // À incrémenter quand la forme stockée ou les règles de nettoyage changent.
-const VERSION = 5; // v5 : rosters par épisode (Tekken, Street Fighter), filtre « jouable »
+const VERSION = 6; // v6 : rosters des jeux-services (Genshin, Apex, HSR…), sous-pages écartées
 const MAX = 60;
 
 // ----------------------------------------------------------------------
@@ -102,6 +102,50 @@ const KNOWN = [
     category: "Street Fighter V Characters",
     playable: "Playable Characters",
     roster: { slug: "street-fighter-5", title: "Tier list des personnages de Street Fighter V", unit: "combattants" },
+  },
+  // Les jeux-services dont l'éditeur ne publie pas d'API ouverte : leur wiki
+  // a une catégorie « jouables » propre et illustrée. `max` : leur roster
+  // dépasse les 60 personnages gardés d'habitude, et une tier list amputée
+  // de la moitié du roster ne sert à rien.
+  {
+    names: ["Genshin Impact"],
+    host: "genshin-impact.fandom.com",
+    category: "Playable Characters",
+    max: 160,
+    roster: { slug: "genshin", title: "Tier list des personnages de Genshin Impact", unit: "personnages" },
+  },
+  {
+    names: ["Honkai: Star Rail"],
+    host: "honkai-star-rail.fandom.com",
+    category: "Playable Characters",
+    max: 160,
+    roster: { slug: "honkai-star-rail", title: "Tier list des personnages de Honkai: Star Rail", unit: "personnages" },
+  },
+  {
+    names: ["Zenless Zone Zero"],
+    host: "zenless-zone-zero.fandom.com",
+    category: "Playable Agents",
+    max: 120,
+    roster: { slug: "zzz", title: "Tier list des agents de Zenless Zone Zero", unit: "agents" },
+  },
+  {
+    names: ["Apex Legends"],
+    host: "apexlegends.fandom.com",
+    category: "Legends",
+    exclude: /^legends?$/i,
+    roster: { slug: "apex", title: "Tier list des légendes d'Apex Legends", unit: "légendes" },
+  },
+  {
+    names: ["Mortal Kombat 1"],
+    host: "mortalkombat.fandom.com",
+    category: "Mortal Kombat 1 Characters",
+    roster: { slug: "mk1", title: "Tier list des personnages de Mortal Kombat 1", unit: "combattants" },
+  },
+  {
+    names: ["Hades"],
+    host: "hades.fandom.com",
+    category: "Characters",
+    roster: { slug: "hades", title: "Tier list des personnages de Hades", unit: "personnages" },
   },
 ];
 
@@ -239,13 +283,21 @@ async function fetchFromWiki(gameName, websites) {
     ? await categoryPages(host, known.category, MAX_PAGES, known.playable).catch(() => [])
     : await discover(host, gameName);
 
+  return cleanPages(pages, known);
+}
+
+// Le tri des pages d'une catégorie en personnages : pas d'index, pas de
+// sous-pages (« Pathfinder/ru » : les traductions du wiki), le filtre
+// « jouable » et les exclusions de la table, puis les plus longs articles
+// d'abord (voir l'en-tête du module).
+function cleanPages(pages, known) {
   return pages
     .filter((p) => p?.title && !NOT_A_CHARACTER.test(p.title))
+    .filter((p) => !p.title.includes("/") || known?.slashOk)
     .filter((p) => !known?.playable || p.categories?.length)
     .filter((p) => !known?.exclude?.test(p.title))
-    // Le tri par taille d'article : voir l'en-tête du module.
     .sort((a, b) => (b.length || 0) - (a.length || 0))
-    .slice(0, MAX)
+    .slice(0, known?.max || MAX)
     .map((p) => ({
       id: `wiki-${p.pageid}`,
       name: stripDisambig(p.title).slice(0, 120),
@@ -296,4 +348,18 @@ export async function wikiCharacters(gameId, gameName, websites, releaseDate = n
  */
 export function wikiRoster(gameName) {
   return BY_NAME.get(norm(gameName))?.roster || null;
+}
+
+/**
+ * Les pages illustrées d'une catégorie de wiki, triées comme les personnages
+ * (les plus longs articles d'abord). Sert aux tier lists qui ne sont pas des
+ * personnages — les boss d'Elden Ring, les monstres de Monster Hunter, les
+ * armes 5★ de Genshin (cf. lib/tierSets). Pas de cache ici : c'est l'appelant
+ * qui garde le résultat.
+ */
+export async function wikiCategoryItems(host, category, { max = 80, exclude = null, slashOk = false } = {}) {
+  const pages = await categoryPages(host, category).catch(() => []);
+  return cleanPages(pages, { max, exclude, slashOk })
+    .filter((c) => c.image)
+    .map((c) => ({ key: c.id.replace(/^wiki-/, ""), name: c.name, image: c.image }));
 }

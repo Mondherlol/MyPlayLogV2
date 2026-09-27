@@ -197,6 +197,18 @@ async function smashFighters() {
 }
 
 // ----------------------------------------------------------------------
+//  Brawl Stars — l'API publique de Brawlify
+// ----------------------------------------------------------------------
+// Sans clé. `imageUrl2` : le portrait sans cadre (le premier a la bordure
+// du jeu, qui jure dans une grille).
+async function brawlers() {
+  const d = await getJson("https://api.brawlapi.com/v1/brawlers");
+  return (d?.list || [])
+    .filter((b) => b.released !== false)
+    .map((b) => ({ key: b.id, name: b.name, image: b.imageUrl2 || b.imageUrl || null }));
+}
+
+// ----------------------------------------------------------------------
 //  Le registre
 // ----------------------------------------------------------------------
 // `names` : les noms IGDB du jeu, comparés à la casse et à la ponctuation près.
@@ -240,6 +252,13 @@ export const PROVIDERS = [
     fetch: smashFighters,
     title: "Tier list des combattants de Smash Ultimate",
     unit: "combattants",
+  },
+  {
+    slug: "brawl-stars",
+    names: ["Brawl Stars"],
+    fetch: brawlers,
+    title: "Tier list des brawlers de Brawl Stars",
+    unit: "brawlers",
   },
   {
     slug: "dota-2",

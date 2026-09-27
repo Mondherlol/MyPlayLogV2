@@ -105,7 +105,7 @@ function TierRail({ token, render }) {
   const shown = ideas?.suggestions || [];
   if (!lists.length && !shown.length) return null;
   return (
-    <Section title="Tier lists" moreTo={lists.length ? "/lists?type=tier&sort=likes" : null} className="lx-sec">
+    <Section title="Tier lists" moreTo="/lists?sc=tiers" className="lx-sec">
       {shown.map((idea) => (
         <div key={idea.saga} className="lx-rail-item">
           <TierIdea idea={idea} token={token} />
